@@ -3735,6 +3735,19 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
         name_tok_line = name_tok->line;
         name_tok_col = name_tok->col;
     }
+    /* `main` (ktm syntax v0.2) is the entry point `Main`: inside it is
+     * named Main, so every backend, the JIT and the file-scope
+     * initialiser driver treat it as the entry, and `main` is kept as
+     * a second name for calls. */
+    int is_lower_main = len == 4 && !memcmp(fname, "main", 4);
+    if (is_lower_main) {
+        Ast *other = mapGetLen(cc->global_env, "Main", 4);
+        if (other && other->kind == AST_FUNC) {
+            cctrlRaiseException(cc, "both `main` and `Main` are defined: "
+                                    "a program has one entry point");
+        }
+        fname = "Main";
+    }
     int has_var_args = 0;
     cctrlTokenExpect(cc,'(');
     cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -3760,6 +3773,7 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
             fn->line = name_line;
             fn->col = name_col;
             fn->file_id = name_file;
+            if (is_lower_main) mapAdd(cc->global_env, "main", fn);
         }
         return fn;
     } else if (tokenPunctIs(tok, ';')) {
@@ -3771,6 +3785,7 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
         Ast *fn = astFunction(type,fname,len,params,NULL,NULL,has_var_args);
         fn->kind = AST_FUN_PROTO;
         mapAdd(cc->global_env,fn->fname->data,fn);
+        if (is_lower_main) mapAdd(cc->global_env, "main", fn);
         return fn;
     } else {
         /* Neither `{ ... }` (definition) nor `;` (prototype). Almost

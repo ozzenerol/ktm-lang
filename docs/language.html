@@ -48,9 +48,11 @@
 will look familiar. The differences are where ktm gets interesting.</p>
 
 <h2 id="program-structure">Program structure<a class="anchor" href="#program-structure" aria-label="Link to this section">#</a></h2>
-<p>A program is one or more <code>.ktm</code> files. Code at the top level runs in order,
-then <code>Main</code> runs if you defined one (top-level code can't <code>return</code>: that is a
-compile error). A program can be a single line:</p>
+<p>A program is one or more <code>.ktm</code> files. Its entry point is <code>main</code>, as in C:
+<code>i32 main()</code>, <code>i32 main(i32 argc, u8 **argv)</code> or <code>void main()</code>; the value
+it returns is the exit code (0 for <code>void main</code>). The older name <code>Main</code> still works for
+now; a program can't have both. Code at the top level runs in order before <code>main</code>
+(top-level code can't <code>return</code>: that is a compile error). A program can be a single line:</p>
 <pre data-run><code>"Hello\n";
 </code></pre>
 <pre class="output">Hello
