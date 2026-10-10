@@ -148,6 +148,10 @@
 /* Compile-time type query: `typeof(<type or expr>)` folds to a string
  * literal naming the type, e.g. typeof(1+1) == "I64". */
 #define KW_TYPEOF       90
+/* Literals (ktm syntax v0.2): true and false are bool, null is a void *. */
+#define KW_TRUE         91
+#define KW_FALSE        92
+#define KW_NULL         93
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)

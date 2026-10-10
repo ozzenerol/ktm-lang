@@ -2336,6 +2336,14 @@ Ast *parseUnaryExpr(Cctrl *cc) {
             case KW_SIZEOF: return parseSizeof(cc);
             case KW_ALIGNOF: return parseAlignof(cc);
             case KW_TYPEOF: return parseTypeof(cc);
+            case KW_TRUE:
+            case KW_FALSE: {
+                ast = astI64Type(tok->i64 == KW_TRUE);
+                ast->type = cctrlGetKeyWord(cc, "Bool", 4);
+                return ast;
+            }
+            case KW_NULL:
+                return astCast(astI64Type(0), astMakePointerType(ast_void_type));
             case KW_DEFINED: {
                 cctrlTokenExpect(cc,'(');
                 tok = cctrlTokenGetRequired(cc);

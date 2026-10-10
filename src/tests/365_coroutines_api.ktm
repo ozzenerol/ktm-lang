@@ -335,8 +335,8 @@ I32 RunInChild(I32 (*fn)())
   I32 pid = fork();
   if (pid == 0) {
     alarm(30);
-    I32 null = open("/dev/null", 1);
-    dup2(null, 2);                /* the misuse message goes to stderr */
+    I32 devnull = open("/dev/null", 1);
+    dup2(devnull, 2);                /* the misuse message goes to stderr */
     _exit(fn());
   }
   I32 status = 0;
