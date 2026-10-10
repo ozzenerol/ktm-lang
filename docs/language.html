@@ -1322,7 +1322,9 @@ i32 main() {
   return 0;
 }</code></pre>
 <p>Inside a module every name of every one of its files is visible, in any order:
-a function can call one defined in a later file. Outside it, only the names marked
+a function can call one defined in a later file, and a struct can hold a later file's
+struct (by value too), enum or const (as an array size). Only a cycle of structs that
+hold each other by value is an error: one of them needs a pointer. Outside it, only the names marked
 <code>pub</code> are, and always through the prefix (<code>geo.area</code>, the type
 <code>geo.Point</code>, <code>geo.Kind.square</code>, <code>geo.SIZE</code>, which works
 in constant expressions too). A module can't use the names its program defines: a library

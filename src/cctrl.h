@@ -186,6 +186,17 @@ typedef struct Cctrl {
      * pass (function bodies and global initialisers skipped) */
     u32 cur_module;
     int decls_only;
+    /* M5: a module's type declarations (struct/union bodies, enums,
+     * consts), recorded by its names pass and parsed again from the
+     * recorded tokens until no more succeed, so the files of a module can
+     * use each other's types in any order. `replaying` is set while one
+     * is parsed from its tokens; diagnostics are then dropped and only
+     * counted (`quiet_errors`), the declarations pass reports them. */
+    Vec *mod_type_decls;
+    Set *mod_decls_done;
+    Set *mod_types_done;   /* module ids parseModuleTypes has run for */
+    int replaying;
+    int quiet_errors;
     /* The declaration being parsed is `pub`; it comes from the main
      * program (not a module, not a stdlib header) */
     int decl_pub;

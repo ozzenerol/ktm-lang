@@ -747,7 +747,7 @@ static void lexWarningAt(Lexer *l, s64 line, s64 col, s64 len,
 static void lexFileEnded(Lexer *l, LexFile *file) {
     if (!file || file->ended) return;
     file->ended = 1;
-    if (file->mod_pass == LEX_PASS_DECLS) return;
+    if (LEX_PASS_QUIET(file->mod_pass)) return;
     for (LexImport *imp = file->imports; imp; imp = imp->next) {
         if (!imp->used) {
             lexWarningAt(l, imp->line, imp->col, imp->len,
@@ -3217,8 +3217,9 @@ static int lexCmpStr(const void *a, const void *b) {
     return strcmp(*(char **)a, *(char **)b);
 }
 
-/* Push module `m`'s files: they are read next, declarations-only pass
- * first, then the full pass */
+/* Push module `m`'s files: they are read next, the names pass first,
+ * then the declarations-only pass, then the full pass (a prebuilt module
+ * has no full pass: its code is in its library) */
 static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
     DIR *dir = opendir(m->dir->data);
     char **names = NULL;
@@ -3245,9 +3246,11 @@ static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
 
     int prebuilt = lexModulePrebuilt(l, m);
     int last_pass = prebuilt ? LEX_PASS_DECLS : LEX_PASS_FULL;
+    int passes[] = {LEX_PASS_FULL, LEX_PASS_DECLS, LEX_PASS_NAMES};
     l->mod_stack[l->mod_depth++] = m->id;
     /* The file stack is last in, first out */
-    for (int pass = last_pass; pass >= LEX_PASS_DECLS; --pass) {
+    for (int p = prebuilt ? 1 : 0; p < 3; ++p) {
+        int pass = passes[p];
         for (int i = n - 1; i >= 0; --i) {
             lexPushFile(l, aoStrDupRaw(names[i], strlen(names[i])));
             l->cur_file->module_id = m->id;
@@ -3319,7 +3322,7 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
             aoStrCatPrintf(chain, "%s -> ", l->modules[l->mod_stack[i] - 1]->path->data);
         }
         aoStrCatPrintf(chain, "%s", path->data);
-        if (file->mod_pass != LEX_PASS_DECLS) {
+        if (!LEX_PASS_QUIET(file->mod_pass)) {
             lexReportAt(l, kw->line, kw->col, kw->len,
                         "circular import: %s", chain->data);
         }
@@ -3380,7 +3383,7 @@ static void lexModuleLine(Map *macro_defs, Lexer *l, Lexeme *kw) {
     AoStr *path = l->modules[file->module_id - 1]->path;
     char *dot = strrchr(path->data, '.');
     char *want = dot ? dot + 1 : path->data;
-    if (strcmp(want, name->data) && file->mod_pass != LEX_PASS_DECLS) {
+    if (strcmp(want, name->data) && !LEX_PASS_QUIET(file->mod_pass)) {
         lexReportAt(l, first->line, first->col,
                     (last->start + last->len) - first->start,
                     "this file is in module %s, so it starts with `module %s;`, not `module %s;`",
