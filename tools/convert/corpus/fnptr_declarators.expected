@@ -1,3 +1,4 @@
+// pending: (fn(i64) i64) *pp and fn(...args) need fix/fn-type-returns
 struct Shape { u8 *name; fn(Shape *s) f64 area; };
 i64 Twice(i64 x) { return 2 * x; }
 i64 Sq(i64 x) { return x * x; }
@@ -8,7 +9,7 @@ void main()
 {
   fn(i64) i64 ops[2];
   ops[0] = &Twice;
-  fn(i64) i64 *pp = &ops[0];
+  (fn(i64) i64) *pp = &ops[0];
   void *raw = &Sq;
   i64 r = ((fn(i64) i64)raw)(6);
   printf("%d %d %d\n", Apply(ops[0], 3), (*pp)(4), Pick(true)(5));

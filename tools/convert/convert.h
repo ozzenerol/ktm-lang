@@ -20,6 +20,10 @@ void migrateNotePrint(Cctrl *cc, Lexeme *first, Lexeme *semi, int is_char);
  * `(*name[N])`, `(*Name(params))(P)` and the cast type `R (*)(P)`): the
  * `(` before the `*` and the `)` that closes P */
 void migrateNoteFnPtr(Cctrl *cc, Lexeme *open, Lexeme *close);
+/* The `...` of an old-style variadic function (implicit argc/argv) */
+void migrateNoteOldVarArgs(Cctrl *cc, Lexeme *ellipsis);
+/* A use of that implicit `argc` or `argv` */
+void migrateNoteOldVarArgUse(Cctrl *cc, Lexeme *name);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

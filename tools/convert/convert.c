@@ -683,10 +683,42 @@ void migrateNoteFnPtr(Cctrl *cc, Lexeme *open, Lexeme *close) {
     if (ns >= ne) {
         migAddSegs(f, rs, end + 1, "fn pointer", migLit("fn("), migRange(ps + 1, end),
                    migLit(") "), migRange(rs, re + 1), NULL);
+    } else if (t[ns] == '*') {
+        /* `R (**pp)(P)`: a pointer to one is `(fn(P) R) *pp` */
+        migAddSegs(f, rs, end + 1, "fn pointer", migLit("(fn("), migRange(ps + 1, end),
+                   migLit(") "), migRange(rs, re + 1), migLit(") "),
+                   migRange(ns, ne), NULL);
     } else {
         migAddSegs(f, rs, end + 1, "fn pointer", migLit("fn("), migRange(ps + 1, end),
                    migLit(") "), migRange(rs, re + 1), migLit(r_ptr ? "" : " "),
                    migRange(ns, ne), NULL);
+    }
+}
+
+/* `(...)` -> `(...args)`; argc -> args.len, argv -> args */
+void migrateNoteOldVarArgs(Cctrl *cc, Lexeme *ellipsis) {
+    MigFile *f = migFileOf(cc, ellipsis ? ellipsis->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, ellipsis);
+    if (s < 0 || strncmp(f->text + s, "...", 3)) {
+        migNote(f, s, "can't rewrite an old `...` that spans a macro");
+        return;
+    }
+    migAdd(f, s + 3, s + 3, "args", "varargs");
+}
+
+void migrateNoteOldVarArgUse(Cctrl *cc, Lexeme *name) {
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) {
+        migNote(f, s, "can't rewrite an argc/argv that comes from a macro");
+        return;
+    }
+    if (name->len == 4 && !memcmp(f->text + s, "argc", 4)) {
+        migAdd(f, s, s + 4, "args.len", "varargs");
+    } else if (name->len == 4 && !memcmp(f->text + s, "argv", 4)) {
+        migAdd(f, s, s + 4, "args", "varargs");
     }
 }
 
@@ -765,7 +797,8 @@ static char *migEditText(MigFile *f, MigEdit *e) {
     AoStr *out = aoStrNew();
     for (u64 k = 0; k < e->segs->size; ++k) {
         MigSeg *g = e->segs->entries[k];
-        aoStrCat(out, g->text ? g->text : migApply(f, g->s, g->e, 0));
+        /* an insert at the end of a moved range moves with it */
+        aoStrCat(out, g->text ? g->text : migApply(f, g->s, g->e, 1));
     }
     return out->data ? out->data : "";
 }

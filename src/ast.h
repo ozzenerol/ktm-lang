@@ -255,6 +255,8 @@ typedef struct AstType {
  * count parameter `name#len`. `name.len`, `name[i]` and range-for read
  * them; `name` itself can't be assigned. */
 #define AST_FLAG_VARARGS (1<<8)
+/* The implicit `argc` / `argv` of a function with an old-style `(...)` */
+#define AST_FLAG_OLD_VARARGS (1<<9)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */

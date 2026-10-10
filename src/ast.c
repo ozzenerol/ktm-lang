@@ -952,6 +952,8 @@ Ast *astVarArgs(void) {
     ast->argc = astLVar(astTypeCopy(ast_int_type),"argc",4);
     ast->argv = astLVar(astMakeArrayType(slot_type,0),"argv",4);
     ast->argv->type->has_var_args = 1;
+    ast->argc->flags |= AST_FLAG_OLD_VARARGS;
+    ast->argv->flags |= AST_FLAG_OLD_VARARGS;
     return ast;
 }
 

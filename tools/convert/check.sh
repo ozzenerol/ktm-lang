@@ -53,6 +53,12 @@ else
   }
   for src in "$HERE"/corpus/*.ktm; do
     name="$(basename "$src" .ktm)"
+    # `// pending: why` on the first line: its output needs a compiler
+    # change that isn't on this branch yet; only its text is checked
+    if head -1 "$src" | grep -q '^// pending:'; then
+      echo "PENDING $name: $(head -1 "$src" | sed 's|^// pending: *||')"
+      continue
+    fi
     cp "$src" "$TMP/$name.old.ktm"
     cp "$HERE/corpus/$name.expected" "$TMP/$name.new.ktm"
     for mode in aot jit; do

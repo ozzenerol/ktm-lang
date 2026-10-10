@@ -17,6 +17,7 @@
 /* `T (*Name(params))(fn_params)`: the `(` before the `*`, for the
  * converter's hook once the fn params are parsed */
 static Lexeme *parse_fnptr_open = NULL;
+extern int migrate_c_varargs;
 static Lexeme *parseLastTok(Cctrl *cc) {
     cctrlTokenRewind(cc);
     return cctrlTokenGet(cc);
@@ -4168,7 +4169,13 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cc->tmp_locals = NULL;
 
+#ifdef KTM_CONVERT
+    migrate_c_varargs++;
+#endif
     Vec *params = parseParams(cc,')', &has_var_args,1);
+#ifdef KTM_CONVERT
+    migrate_c_varargs--;
+#endif
     tok = cctrlTokenGet(cc);
     if (!tokenPunctIs(tok, ';')) {
         cctrlRaiseException(cc,"extern %.*s() cannot have a function body "
@@ -4568,7 +4575,13 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cctrlTokenExpect(cc,'(');
 
+#ifdef KTM_CONVERT
+    migrate_c_varargs++;
+#endif
     Vec *params = parseParams(cc,')',&has_var_args,0);
+#ifdef KTM_CONVERT
+    migrate_c_varargs--;
+#endif
 
     asm_func = astAsmFunctionBind(
             astMakeFunctionType(rettype, params),

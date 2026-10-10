@@ -17,6 +17,10 @@
 #ifdef KTM_CONVERT
 #include "../tools/convert/convert.h"
 #endif
+#ifdef KTM_CONVERT
+/* Inside an `extern "c"` prototype or an asm binding: its `...` is C's */
+int migrate_c_varargs = 0;
+#endif
 #include "util.h"
 
 static AstType *parseArrayDimensionsInternal(Cctrl *cc, AstType *base_type);
@@ -210,6 +214,12 @@ static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
                 return params;
             }
             *has_var_args = 1;
+#ifdef KTM_CONVERT
+            if (cc->migrate && !migrate_c_varargs) {
+                cctrlTokenRewind(cc);
+                migrateNoteOldVarArgs(cc, cctrlTokenGet(cc));
+            }
+#endif
             /* The argument-count check (parseFunctionArgumentCheck) finds
              * the vararg point by looking for an AST_VAR_ARGS entry in
              * params, not just the has_var_args flag; unlike parseParams,
@@ -489,6 +499,9 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
                 return params;
             }
             var = astVarArgs();
+#ifdef KTM_CONVERT
+            if (cc->migrate && !migrate_c_varargs) migrateNoteOldVarArgs(cc, &ellipsis);
+#endif
             mapAdd(cc->localenv,var->argc->lname->data,var->argc);
             mapAdd(cc->localenv,var->argv->lname->data,var->argv);
             
@@ -2579,6 +2592,12 @@ static Ast *parsePrimary(Cctrl *cc) {
         }
         ast = parseIdentifierOrFunction(cc, tok->start, tok->len,
                 can_call_function);
+#ifdef KTM_CONVERT
+        if (cc->migrate && ast && ast->kind == AST_LVAR &&
+            (ast->flags & AST_FLAG_OLD_VARARGS)) {
+            migrateNoteOldVarArgUse(cc, tok);
+        }
+#endif
         if (tokenPunctIs(prev, '&')) {
             if (ast->flags & AST_FLAG_INLINE) {
                 Lexeme *peek = cctrlTokenPeek(cc);
