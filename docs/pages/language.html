@@ -19,15 +19,14 @@ of a file is an error (<code>unterminated comment</code>). Statements end with <
 <code>{ }</code>. Header files conventionally end in <code>.ktmh</code>.</p>
 
 <h2>Printing</h2>
-<p>A string literal used as a statement prints itself. Put arguments after a comma and it
-behaves like <code>printf</code>:</p>
+<p><code>printf(fmt, ...)</code> prints, as in C:</p>
 <pre data-run><code>
 U0 Main()
 {
-  "plain text\n";
-  "%s is %d years old\n", "Ada", 36;
-  "%5d|%-5d|%05d\n", 42, 42, 42;
-  "%x %X %c %.3f\n", 255, 255, 'A', 3.14159;
+  printf("plain text\n");
+  printf("%s is %d years old\n", "Ada", 36);
+  printf("%5d|%-5d|%05d\n", 42, 42, 42);
+  printf("%x %X %c %.3f\n", 255, 255, 'A', 3.14159);
 }
 </code></pre>
 <pre class="output">
@@ -44,8 +43,8 @@ a file. The compiler checks the number of arguments against them.</p>
 <pre data-run><code>
 U0 Main()
 {
-  "%Q\n", "say \"hi\"\n";
-  "%C%c\n", 'h', 'i';
+  printf("%Q\n", "say \"hi\"\n");
+  printf("%C%c\n", 'h', 'i');
 }
 </code></pre>
 <pre class="output">
@@ -53,8 +52,9 @@ say \"hi\"\n
 Hi
 </pre>
 <p>The string is always a format, even without arguments, so write
-<code>%%</code> for a literal percent sign: <code>"100%%\n";</code> prints
-<code>100%</code>.</p>
+<code>%%</code> for a literal percent sign: <code>printf("100%%\n");</code> prints
+<code>100%</code>. The older print statement, a string on its own with the arguments after a
+comma (<code>"%d\n", x;</code>), does the same and still works for now.</p>
 <p><code>%d</code>, <code>%i</code>, <code>%u</code>, <code>%x</code>,
 <code>%X</code> and <code>%o</code> print the full 64-bit value, so there is no need for
 C's <code>%ld</code> (which also works):</p>

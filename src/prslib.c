@@ -1325,13 +1325,18 @@ static int parsePrintFormatIsktm(char *s, int len) {
  * a ktm-only conversion (%Q %D %T %C %F) calls the library's Print
  * instead, which formats like StrPrint; plain formats keep the direct
  * printf call. */
-Ast *parsePrintStatement(Cctrl *cc) {
+/* A print: the arguments of `"fmt", args;` (terminator `;`) or of
+ * `printf(fmt, args)` (terminator `)`), with the format still to come.
+ * A literal format using ktm's conversions (%Q %D %T %C %F) calls Print;
+ * any other calls C's printf with its integer conversions widened to 64
+ * bits, and the arguments are checked against the format either way. */
+Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
     Lexeme *tok = cctrlTokenPeek(cc);
     if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR &&
         parsePrintFormatIsktm(tok->start, tok->len)) {
-        return parseFunctionArguments(cc,"Print",5,';');
+        return parseFunctionArguments(cc,"Print",5,terminator);
     }
-    Ast *call = parseFunctionArguments(cc,"printf",6,';');
+    Ast *call = parseFunctionArguments(cc,"printf",6,terminator);
     if (cc->flags & CCTRL_TRANSPILING) return call;
     if (call->kind != AST_FUNCALL || !call->args || call->args->size == 0)
         return call;
@@ -1350,6 +1355,19 @@ Ast *parsePrintStatement(Cctrl *cc) {
     }
     call->flags |= AST_FLAG_PRINT_STMT;
     return call;
+}
+
+Ast *parsePrintStatement(Cctrl *cc) {
+    return parsePrintCall(cc, ';');
+}
+
+/* The arguments of a call to `name`, the `(` just read. `printf(...)` is
+ * ktm's print (see parsePrintCall), not a bare call to C's printf. */
+Ast *parseCallArguments(Cctrl *cc, char *name, int len) {
+    if (len == 6 && !memcmp(name, "printf", 6)) {
+        return parsePrintCall(cc, ')');
+    }
+    return parseFunctionArguments(cc, name, len, ')');
 }
 
 /* parse either a function call or a variable being used */
@@ -1438,7 +1456,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
      * type. peek == NULL (end of input) counts as a call attempt - the
      * argument parser raises the unterminated-`(` diagnostic. */
     if (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len)) {
-        return parseFunctionArguments(cc,name,len,')');
+        return parseCallArguments(cc,name,len);
     }
 
     /* Is a postfix typecast, need to grap the variable and 'ParsePostFixExpr' will do the cast */

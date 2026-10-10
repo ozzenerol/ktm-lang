@@ -7,6 +7,8 @@ Ast *parseUnaryExpr(Cctrl *cc);
 Ast *parseExpr(Cctrl *cc, int prec);
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator);
 Ast *parsePrintStatement(Cctrl *cc);
+Ast *parsePrintCall(Cctrl *cc, s64 terminator);
+Ast *parseCallArguments(Cctrl *cc, char *name, int len);
 Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store);
 void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type);
 void parseAssignAuto(Cctrl *cc, Ast *ast);
