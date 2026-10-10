@@ -1035,6 +1035,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         prev->line = tag_line;
         prev->col = tag_col;
         prev->file_id = tag_file;
+        prev->in_std = !cc->cur_module && !cc->decl_from_main;
         mapAdd(env, tag->data, prev);
     }
 
@@ -1082,6 +1083,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     ref->line = tag_line;
     ref->col = tag_col;
     ref->file_id = tag_file;
+    ref->in_std = !cc->cur_module && !cc->decl_from_main;
     if (tag) {
         mapAdd(env,tag->data,ref);
     }
@@ -3915,7 +3917,8 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
                     mapAdd(cc->global_env, func->fname->data, func);
                     break;
                 }
-                cctrlRaiseException(cc,"Cannot redefine function: %.*s",len,fname);
+                cctrlRaiseException(cc,"Cannot redefine function: %s",
+                        astModuleDemangle(fname, len));
 
             case AST_ASM_FUNC_BIND:
                 cctrlRaiseException(cc,"Cannot redefine asm function: %.*s",
@@ -4006,9 +4009,9 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
         !has_asm && astStmtFallsThrough(func_body))
     {
         cctrlWarningAt(cc, name_line, name_col, len,
-            "control may reach the end of non-void function '%.*s' "
+            "control may reach the end of non-void function '%s' "
             "without returning a value",
-            len, fname);
+            astModuleDemangle(fname, len));
     }
 
     cc->localenv = NULL;
@@ -4334,7 +4337,18 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
     /* Reset the unique id counter otherwise we get ridiculous numbers */
     astResetLVarId();
 
+    /* A method: `self`, a const pointer to the type, is its first
+     * parameter */
+    Ast *self = NULL;
+    if (cc->method_self) {
+        self = astLVar(cc->method_self, "self", 4);
+        self->flags |= AST_FLAG_CONST;
+        cc->method_self = NULL;
+        mapAdd(cc->localenv, self->lname->data, self);
+        listAppend(cc->tmp_locals, self);
+    }
     Vec *params = parseParams(cc,')',&has_var_args,1);
+    if (self) vecInsertAt(params, self, 0);
     if (ret_fnptr) {
         /* `)(fn_params)` after the parameters: what the returned function
          * pointer points to */
@@ -4500,6 +4514,79 @@ static void parseGlobalDeclListNext(Cctrl *cc, Lexeme *tok, AstType *base_type) 
 static void parseGlobalDeclListNextPrev(Cctrl *cc, AstType *base_type) {
     cctrlTokenRewind(cc);
     parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
+}
+
+/* `T User.name(params)`, a method of the class or union `User`: a
+ * definition or a prototype. `type_tok` is `User`, the `.` was taken. It
+ * is the function `User.name` with a `User *self` first parameter, and
+ * only the module (or the standard library) defining `User` can add it. */
+static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
+                           int is_static) {
+    char *tname = type_tok->start;
+    int tlen = type_tok->len;
+    AstType *cls = NULL;
+    if (cc->flags & CCTRL_TRANSPILING) {
+        cc->current_recovery = NULL;
+        cctrlRaiseException(cc, "methods are not supported with -transpile");
+    }
+    char *qual = cctrlQualifyName(cc, tname, tlen);
+    if (qual) cls = mapGet(cc->clsdefs, qual);
+    if (!cls) cls = mapGetLen(cc->clsdefs, tname, tlen);
+    if (!cls) cls = mapGetLen(cc->uniondefs, tname, tlen);
+    if (!cls || cls->is_enum || cls->is_intrinsic ||
+        (cls->kind != AST_TYPE_CLASS && cls->kind != AST_TYPE_UNION))
+    {
+        cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        cctrlRaiseException(cc, "`%.*s` is not a struct: only a struct or "
+                                "union can have methods", tlen, tname);
+    }
+    int here_std = !cc->cur_module && !cc->decl_from_main;
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    char *dot = NULL;
+    for (int i = (int)cls->clsname->len - 1; i >= 0 && !dot; --i) {
+        if (cls->clsname->data[i] == '.') dot = cls->clsname->data + i;
+    }
+    int mine = cls->in_std == here_std;
+    if (dot) {
+        int mod_len = dot - cls->clsname->data;
+        mine = mine && path && (int)path->len == mod_len &&
+               !memcmp(path->data, cls->clsname->data, mod_len);
+    } else {
+        mine = mine && !path;
+    }
+    if (!mine) {
+        cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        cctrlRaiseException(cc, "methods of `%s` can only be defined %s",
+                cls->clsname->data,
+                cls->in_std ? "by the standard library"
+                            : "in the module that defines it");
+    }
+
+    Lexeme *mtok = cctrlTokenGetRequired(cc);
+    if (mtok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc, "Expected a method name after `%.*s.`, got `%s`",
+                            tlen, tname, lexemeAsWritten(mtok));
+    }
+    if (cls->fields && mapGetLen(cls->fields, mtok->start, mtok->len)) {
+        cctrlRaiseException(cc, "`%s` has a field named `%.*s`: a method "
+                            "cannot have the same name",
+                            cls->clsname->data, mtok->len, mtok->start);
+    }
+    if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        cctrlRaiseException(cc, "Expected `(` after the method name `%.*s.%.*s`",
+                            tlen, tname, mtok->len, mtok->start);
+    }
+    char *name = mprintf("%s.%.*s", cls->clsname->data, mtok->len, mtok->start);
+    if (cc->decl_pub && dot) setAdd(cc->pub_names, name);
+
+    cc->method_self = astMakePointerType(cls);
+    Ast *fn = parseFunctionOrDef(cc, rettype, name, strlen(name), 0);
+    if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
+    if (fn) {
+        fn->line = mtok->line;
+        fn->col = mtok->col;
+    }
+    return fn;
 }
 
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
@@ -4831,6 +4918,16 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
         cctrlCheckPrefixHidden(cc, name);
+        /* `T User.name(...)`: a method */
+        if (type && name->tk_type == TK_IDENT &&
+            tokenPunctIs(cctrlTokenPeek(cc), '.'))
+        {
+            if (is_const) {
+                cctrlRaiseException(cc,"const is only allowed on declarations");
+            }
+            cctrlTokenGet(cc);
+            return parseMethodDef(cc, type, name, is_static);
+        }
         /* A module's declaration is named `a.b.name` */
         if (cc->cur_module && name->tk_type == TK_IDENT) {
             char *qual = cctrlQualifyName(cc, name->start, name->len);
