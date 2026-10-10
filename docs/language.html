@@ -824,8 +824,9 @@ explicit size, the rest is zero-filled:</p>
 </pre>
 
 <h2 id="classes">Classes<a class="anchor" href="#classes" aria-label="Link to this section">#</a></h2>
-<p>A <code>class</code> is a C <code>struct</code>, and its name is a type straight away,
-with no <code>typedef</code> needed. Several fields can share a line.</p>
+<p>A <code>struct</code> (or <code>class</code>, the same thing) is a C <code>struct</code>,
+and its name is a type straight away, with no <code>typedef</code> needed. Several fields can
+share a line. <code>pub</code> (or <code>public</code>) marks what a library exports.</p>
 <pre data-run><code>class Point
 {
   I64 x, y;
