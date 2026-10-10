@@ -102,6 +102,9 @@ typedef struct CliArgs {
     char *asm_outfile;
     char *obj_outfile;
     char *lib_name;
+    /* `ktm -lib a.b dir/a/b`: build the module in dir/a/b into a library
+     * there, with a .ktmlib marker importers link it by */
+    char *module_dir;
     char *output_filename;
     char *clibs;
     char *install_dir;

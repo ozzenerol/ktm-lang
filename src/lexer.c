@@ -401,6 +401,7 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->modules_cap = 0;
     l->mod_depth = 0;
     l->program_root = NULL;
+    l->building_module = NULL;
     /* Default: no diagnostic engine wired up; lex errors fall
      * back to loggerPanic. cctrlInitParse plugs the real Cctrl
      * in when this lexer is being driven by a real parse. */
@@ -942,6 +943,12 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->line_start_ptr = src_code->data;
     f->filename = aoStrDupRaw(name, strlen(name));
     f->file_id = 0; /* registered lazily by cctrlTokenGet */
+    /* A document (the LSP's, the REPL's): its modules are found from
+     * its directory */
+    if (!l->program_root && strchr(name, '/')) {
+        char *slash = strrchr(name, '/');
+        l->program_root = mprintf("%.*s", (int)(slash - name), name);
+    }
     f->module_id = 0;
     f->mod_pass = LEX_PASS_NONE;
     f->last_of_module = 0;
@@ -3150,6 +3157,62 @@ static char *lexModuleDir(Lexer *l, AoStr *path, Lexeme *at) {
     return found;
 }
 
+/* `ktm -lib a.b dir/a/b`: modules are found from dir. 0 when the
+ * directory doesn't end in a/b. */
+int lexSetModuleLibRoot(Lexer *l, char *dir, char *path) {
+    char *rel = mprintf("%s", path);
+    for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
+    int dlen = strlen(dir), rlen = strlen(rel);
+    while (dlen > 1 && dir[dlen - 1] == '/') dlen--;
+    if (dlen < rlen || memcmp(dir + dlen - rlen, rel, rlen) ||
+        (dlen > rlen && dir[dlen - rlen - 1] != '/')) {
+        return 0;
+    }
+    l->program_root = dlen == rlen ? mprintf(".")
+                                   : mprintf("%.*s", dlen - rlen - 1, dir);
+    l->building_module = mprintf("%s", path);
+    return 1;
+}
+
+static int lexIsFile(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+/* A module with a .ktmlib marker (written by `ktm -lib`): only its
+ * declarations are read, and its library is linked: the archive by AOT,
+ * the shared object by the JIT. 0 when it has none. */
+static int lexModulePrebuilt(Lexer *l, LexModule *m) {
+    if (l->building_module && !strcmp(l->building_module, m->path->data)) {
+        return 0;
+    }
+    char *marker = mprintf("%s/.ktmlib", m->dir->data);
+    if (!lexIsFile(marker)) return 0;
+    if (!l->cc) return 1;
+    s64 len = 0;
+    char *text = lexTryReadfile(marker, &len);
+    if (!text) return 1;
+    int jit = mapGet(l->cc->macro_defs, "__KTM_JIT__") != NULL;
+    char *save = NULL;
+    for (char *line = strtok_r(text, "\n", &save); line;
+         line = strtok_r(NULL, "\n", &save)) {
+        char *path = NULL;
+        List **libs = NULL;
+        if (!jit && !strncmp(line, "static ", 7)) {
+            path = line + 7;
+            libs = &l->cc->object_files;
+        } else if (jit && !strncmp(line, "shared ", 7)) {
+            path = line + 7;
+            libs = &l->cc->shared_object_files;
+        }
+        if (!libs) continue;
+        AoStr *lib = aoStrDupRaw(path, strlen(path));
+        if (*libs == NULL) *libs = listNew();
+        if (!listContainsAoStr(*libs, lib)) listAppend(*libs, lib);
+    }
+    return 1;
+}
+
 static int lexCmpStr(const void *a, const void *b) {
     return strcmp(*(char **)a, *(char **)b);
 }
@@ -3180,14 +3243,16 @@ static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
     }
     qsort(names, n, sizeof(char *), lexCmpStr);
 
+    int prebuilt = lexModulePrebuilt(l, m);
+    int last_pass = prebuilt ? LEX_PASS_DECLS : LEX_PASS_FULL;
     l->mod_stack[l->mod_depth++] = m->id;
     /* The file stack is last in, first out */
-    for (int pass = LEX_PASS_FULL; pass >= LEX_PASS_DECLS; --pass) {
+    for (int pass = last_pass; pass >= LEX_PASS_DECLS; --pass) {
         for (int i = n - 1; i >= 0; --i) {
             lexPushFile(l, aoStrDupRaw(names[i], strlen(names[i])));
             l->cur_file->module_id = m->id;
             l->cur_file->mod_pass = pass;
-            l->cur_file->last_of_module = pass == LEX_PASS_FULL && i == n - 1;
+            l->cur_file->last_of_module = pass == last_pass && i == n - 1;
         }
     }
     free(names);
@@ -3284,6 +3349,8 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     LexImport *imp = (LexImport *)calloc(1, sizeof(LexImport));
     imp->prefix = prefix;
     imp->module = m;
+    /* the `import` of `ktm -lib`'s generated program */
+    imp->used = l->building_module && !file->module_id;
     imp->line = kw->line;
     imp->col = kw->col;
     imp->len = kw->len;

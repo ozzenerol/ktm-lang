@@ -4945,8 +4945,24 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * pass defines it. Its initialiser is skipped. */
         if (cc->decls_only && !tokenPunctIs(tok, '(')) {
             int depth = 0;
-            Lexeme *t;
-            while ((t = cctrlTokenGet(cc)) != NULL) {
+            Lexeme *t = NULL;
+            /* A const integer's value is known here already, so another
+             * file (or a program using a prebuilt module) can use it in
+             * a constant expression */
+            s64 const_val = 0;
+            int const_ok = 0;
+            if (is_const && astIsIntType(type) && tokenPunctIs(tok, '=')) {
+                cctrlTokenGet(cc);
+                Ast *init = parseExpr(cc, 16);
+                const_ok = init != NULL;
+                if (init) const_val = evalIntConstExprOrErr(init, &const_ok);
+                t = cctrlTokenGet(cc);
+                if (!tokenPunctIs(t, ';') && !tokenPunctIs(t, ',')) {
+                    cctrlRaiseException(cc, "Expected `;` after `%.*s`",
+                                        name->len, name->start);
+                }
+            }
+            while (!t && (t = cctrlTokenGet(cc)) != NULL) {
                 if (tokenPunctIs(t,'(') || tokenPunctIs(t,'[') ||
                     tokenPunctIs(t,'{')) {
                     depth++;
@@ -4957,10 +4973,15 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                                           tokenPunctIs(t,','))) {
                     break;
                 }
+                t = NULL;
             }
             Ast *gvar = astGVar(type, name->start, name->len, 0);
             gvar->flags |= AST_FLAG_EXTERN;
             if (is_const) gvar->flags |= AST_FLAG_CONST;
+            if (const_ok) {
+                gvar->deref_symbol = const_val;
+                gvar->flags |= AST_FLAG_CONST_VALUE;
+            }
             Ast *decl = astDecl(gvar, NULL);
             decl->flags |= AST_FLAG_EXTERN;
             if (!is_static) {
@@ -5207,6 +5228,24 @@ void parseToAst(Cctrl *cc) {
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
+        /* A module built into a library (`ktm -lib`) has no code that
+         * runs before main: a run-time initialiser would never run */
+        if (is_global && cc->cur_module && cc->lexer_ &&
+            cc->lexer_->building_module) {
+            is_global = 0;
+            if (ast->kind == AST_BINOP && ast->left &&
+                ast->left->kind == AST_GVAR) {
+                char *name = strrchr(ast->left->gname->data, '.');
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "`%s` needs a constant initialiser in a module built with -lib "
+                    "(its library has no code that runs before main)",
+                    name ? name + 1 : ast->left->gname->data);
+            } else {
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "a statement at the top of a module built with -lib would never run "
+                    "(its library has no code that runs before main)");
+            }
+        }
         if (is_global) {
             listAppend(cc->initalisers,ast);
             if (!listEmpty(cc->tmp_locals)) {

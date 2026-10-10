@@ -730,6 +730,96 @@ static u32 lspDocId(LspCtx *ctx, const char *uri) {
     return doc_id;
 }
 
+/* ---- modules ----
+ * `prefix.name` where `prefix` is one of the document's imports means the
+ * module's `a.b.name`. The imports are read from the document's text: the
+ * lexer that loaded the modules is gone by the time a request runs. */
+
+/* The module path `import a.b;` (prefix b) or `import x = a.b;` (prefix
+ * x) in `text` gives `recv`; NULL if no import does */
+static char *lspImportPath(AoStr *text, const char *recv, size_t rlen) {
+    const char *s = text->data, *end = s + text->len;
+    while (s < end) {
+        const char *eol = memchr(s, '\n', end - s);
+        if (!eol) eol = end;
+        const char *p = s;
+        while (p < eol && isspace((unsigned char)*p)) p++;
+        if (eol - p > 7 && !memcmp(p, "import", 6) && isspace((unsigned char)p[6])) {
+            const char *w[2];
+            size_t wl[2];
+            int nw = 0, alias = 0;
+            p += 6;
+            while (p < eol && nw < 2) {
+                while (p < eol && isspace((unsigned char)*p)) p++;
+                if (p < eol && *p == '=') { alias = 1; p++; continue; }
+                const char *q = p;
+                while (q < eol && (lspIsIdentChar(*q) || *q == '.')) q++;
+                if (q == p) break;
+                w[nw] = p;
+                wl[nw++] = q - p;
+                p = q;
+            }
+            const char *path = NULL, *prefix = NULL;
+            size_t path_len = 0, prefix_len = 0;
+            if (alias && nw == 2) {
+                prefix = w[0]; prefix_len = wl[0];
+                path = w[1]; path_len = wl[1];
+            } else if (!alias && nw >= 1) {
+                path = w[0]; path_len = wl[0];
+                prefix = path;
+                for (size_t i = 0; i < path_len; ++i) {
+                    if (path[i] == '.') prefix = path + i + 1;
+                }
+                prefix_len = path + path_len - prefix;
+            }
+            if (path && prefix_len == rlen && !memcmp(prefix, recv, rlen)) {
+                return mprintf("%.*s", (int)path_len, path);
+            }
+        }
+        s = eol + 1;
+    }
+    return NULL;
+}
+
+/* `recv.name` at the cursor with `recv` an import prefix: "a.b.name",
+ * `name` running to the cursor with prefix_only (completion) or to its
+ * end; the module path in *_path. NULL otherwise. */
+static char *lspModuleRefAt(AoStr *text, int line, int character,
+                            int prefix_only, char **_path)
+{
+    const char *s = text->data;
+    size_t n = text->len, i = 0;
+    for (int l = 0; l < line && i < n; ++i) {
+        if (s[i] == '\n') l++;
+    }
+    size_t line_start = i, line_end = i;
+    while (line_end < n && s[line_end] != '\n') line_end++;
+    size_t pos = line_start + (size_t)character;
+    if (pos > line_end) pos = line_end;
+    size_t start = pos, end = pos;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    if (!prefix_only) {
+        while (end < line_end && lspIsIdentChar(s[end])) end++;
+    }
+    if (start <= line_start || s[start - 1] != '.') return NULL;
+    size_t r_end = start - 1, r_start = r_end;
+    while (r_start > line_start && lspIsIdentChar(s[r_start - 1])) r_start--;
+    if (r_start == r_end) return NULL;
+    char *path = lspImportPath(text, s + r_start, r_end - r_start);
+    if (!path) return NULL;
+    if (_path) *_path = path;
+    return mprintf("%s.%.*s", path, (int)(end - start), s + start);
+}
+
+/* A module's function is named by its symbol: show `a.b.name` */
+static char *lspModuleFnString(Ast *fn, const char *qual) {
+    char *str = astFunctionToString(fn);
+    char *at = fn->fname ? strstr(str, fn->fname->data) : NULL;
+    if (!at) return str;
+    return mprintf("%.*s%s%s", (int)(at - str), str, qual,
+                   at + fn->fname->len);
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -750,9 +840,24 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
      * then a macro. */
     AoStr *rendered = aoStrNew();
     int is_member = 0;
-    AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
+    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = qual ? NULL
+                  : lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
-    if (is_member) {
+    if (qual) {
+        Ast *entry = mapGet(ctx->cc->global_env, qual);
+        AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
+        if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
+        if (entry && lspIsFn(entry)) {
+            aoStrCatPrintf(rendered, "%s", lspModuleFnString(entry, qual));
+        } else if (entry && entry->type) {
+            aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type), qual);
+        } else if (ty) {
+            AoStr *body = astClassToAoStr(ty);
+            aoStrCatLen(rendered, body->data, body->len);
+            aoStrRelease(body);
+        }
+    } else if (is_member) {
         AstType *f = (mcls && mcls->fields) ? mapGetLen(mcls->fields, ident, ilen) : NULL;
         if (f && mcls->clsname)
             aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(f),
@@ -988,6 +1093,41 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                      .capacity = 0 };
     u32 doc_id = cctrlRegisterFile(ctx->cc, &path_s);
     free(doc_path);
+    /* `prefix.` of an import: the module's pub names */
+    char *mod_path = NULL;
+    if (lspModuleRefAt(text, line, character, 1, &mod_path)) {
+        AoStr *mbody = aoStrNew();
+        aoStrCatPrintf(mbody, "{\"isIncomplete\":false,\"items\":[");
+        int memitted = 0;
+        size_t mlen = strlen(mod_path);
+        SetIter it;
+        setIterInit(ctx->cc->pub_names, &it);
+        char *qn;
+        while ((qn = setNext(&it)) != NULL) {
+            if (strncmp(qn, mod_path, mlen) || qn[mlen] != '.') continue;
+            const char *name = qn + mlen + 1;
+            if (strchr(name, '.') || strncmp(name, prefix, plen)) continue;
+            Ast *entry = mapGet(ctx->cc->global_env, qn);
+            int kind = KTM_LSP_CLASS;
+            const char *detail = NULL;
+            if (entry && lspIsFn(entry)) {
+                kind = KTM_LSP_FUNCTION;
+                detail = lspModuleFnString(entry, qn);
+            } else if (entry) {
+                kind = (entry->flags & AST_FLAG_CONST) ? KTM_LSP_CONSTANT
+                                                      : KTM_LSP_VARIABLE;
+                detail = entry->type ? astTypeToString(entry->type) : NULL;
+            }
+            lspCatCompletion(mbody, &memitted, name, kind, detail);
+        }
+        aoStrCatPrintf(mbody, "]}");
+        lspRespond(id, mbody->data);
+        aoStrRelease(mbody);
+        lspLog(ctx, "lsp: module completion '%s.%s' -> %d item(s)",
+               mod_path, prefix, memitted);
+        return;
+    }
+
     int is_member = 0;
     AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
@@ -1406,8 +1546,27 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
      * The canonical class AstTypes are shared with clsdefs, so fields
      * carry the provenance stamped at parse. */
     int is_member = 0;
-    AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
-                                     &is_member);
+    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = NULL;
+    if (qual) {
+        /* `prefix.name`: the module's declaration, in its own file */
+        Ast *entry = mapGet(ctx->cc->global_env, qual);
+        AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
+        if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
+        is_member = 1;
+        if (entry) {
+            def_line = entry->line;
+            def_col = entry->col;
+            def_file = entry->file_id;
+        } else if (ty) {
+            def_line = ty->line;
+            def_col = ty->col;
+            def_file = ty->file_id;
+        }
+    } else {
+        mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
+                                &is_member);
+    }
     if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);
         if (field && field->line > 0) {
