@@ -653,6 +653,8 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                     base_type = nested;
                     break;
                 }
+                case KW_CONST:
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
                 default:
                     cctrlRaiseException(cc,"Unexpected keyword: `%.*s` while parsing class %s",
                             tok_name->len,
@@ -1412,6 +1414,13 @@ Ast *parseDecl(Cctrl *cc) {
     AstType *type;
     Lexeme *varname;
     Ast *var, *ast;
+    int is_const = 0;
+
+    Lexeme *lead = cctrlTokenPeek(cc);
+    if (lead && lead->tk_type == TK_KEYWORD && lead->i64 == KW_CONST) {
+        cctrlTokenGet(cc);
+        is_const = 1;
+    }
 
     parseDeclInternal(cc,&varname,&type);
     if (varname == NULL) {
@@ -1423,6 +1432,13 @@ Ast *parseDecl(Cctrl *cc) {
      * to the name itself for jump-to-definition. */
     var->line = varname->line;
     var->col = varname->col;
+    if (is_const) {
+        var->flags |= AST_FLAG_CONST;
+        if (!tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+            cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                    varname->len, varname->start);
+        }
+    }
     if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
         cctrlRaiseException(cc,"variable %s already declared",astLValueToString(var,0));
     }
@@ -1432,6 +1448,13 @@ Ast *parseDecl(Cctrl *cc) {
     ast = parseVariableInitialiser(cc,var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
     if (type->kind == AST_TYPE_AUTO) {
         parseAssignAuto(cc,ast);
+    }
+    if (is_const && ast->kind == AST_DECL && ast->declinit &&
+        astIsIntType(var->type))
+    {
+        int const_ok = 1;
+        s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+        if (const_ok) var->deref_symbol = const_val;
     }
     return ast;
 }
@@ -2700,7 +2723,8 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     if (!tok) {
         return NULL;
     }
-    if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+    if (cctrlIsKeyword(cc,tok->start,tok->len) ||
+        (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST)) {
         return parseDecl(cc);
     }
     return parseStatement(cc);
@@ -2711,6 +2735,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
     Ast *var = NULL;
     AstType *base_type, *type, *next_type;
     Lexeme *tok, *varname, *peek;
+    int is_const;
     Map *block_scope = cctrlCreateAstMap(cc->localenv);
     cc->localenv = block_scope;
     tok = NULL;
@@ -2767,6 +2792,13 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             continue;
         }
 
+        is_const = 0;
+        if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+            is_const = 1;
+            cctrlTokenGet(cc);
+            tok = cctrlTokenPeek(cc);
+        }
+
         if (cctrlIsKeyword(cc,tok->start,tok->len)) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
@@ -2791,6 +2823,13 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                     var->col = varname->col;
                     var->pinned_kind = pinned_kind;
                     var->pinned_reg = pinned_reg;
+                    if (is_const) {
+                        var->flags |= AST_FLAG_CONST;
+                        if (!tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+                            cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                                    varname->len, varname->start);
+                        }
+                    }
                     if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
                         cctrlRewindUntilStrMatch(cc,var->lname->data,var->lname->len,NULL);
                         cctrlRaiseException(cc,"variable `%s` already declared",
@@ -2811,6 +2850,14 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 stmt = parseVariableInitialiser(cc,var,PUNCT_TERM_COMMA|PUNCT_TERM_SEMI);
                 if (next_type->kind == AST_TYPE_AUTO) {
                     parseAssignAuto(cc,stmt);
+                }
+
+                if (is_const && stmt && stmt->kind == AST_DECL &&
+                    stmt->declinit && astIsIntType(var->type))
+                {
+                    int const_ok = 1;
+                    s64 const_val = evalIntConstExprOrErr(stmt->declinit, &const_ok);
+                    if (const_ok) var->deref_symbol = const_val;
                 }
 
                 if (stmt) {
@@ -3917,6 +3964,8 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
 /* Whether the file-scope declaration list being continued (`static T a,
  * b;`) is static; set with tmp_gvar_base_type */
 static int parse_gvar_list_static = 0;
+/* Same as parse_gvar_list_static, for `const T a = 1, b = 2;` */
+static int parse_gvar_list_const = 0;
 
 static void parseGlobalDeclListNext(Cctrl *cc, Lexeme *tok, AstType *base_type) {
     assertTokenIsTerminator(cc,tok,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
@@ -3936,6 +3985,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     AstType *type = NULL, *base_type = NULL;
     Lexeme *tok, *name, *peek;
     int is_static = 0;
+    int is_const = 0;
 
     while (1) {
         if ((tok = cctrlTokenGet(cc)) == NULL) {
@@ -3960,6 +4010,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             base_type = cc->tmp_gvar_base_type;
             cc->tmp_gvar_base_type = NULL;
             is_static = parse_gvar_list_static;
+            is_const = parse_gvar_list_const;
             cctrlTokenRewind(cc);
             type = parsePointerType(cc,base_type);
         } else if (tok->tk_type == TK_KEYWORD) {
@@ -4032,6 +4083,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     return decl;
                 }
                 case KW_INLINE: {
+                    if (is_const) {
+                        cctrlRaiseException(cc,"const is only allowed on declarations");
+                    }
                     peek = cctrlTokenPeek(cc);
                     if (!peek) {
                         cctrlRaiseException(cc,"Unexpected end of input after `inline`");
@@ -4060,6 +4114,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 case KW_PUBLIC:
                 case KW_PRIVATE:
                 case KW_ATOMIC:
+                    continue;
+
+                case KW_CONST:
+                    is_const = 1;
                     continue;
 
                 case KW_STATIC:
@@ -4222,6 +4280,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
         parse_gvar_list_static = is_static;
+        parse_gvar_list_const = is_const;
 
         /* A keyword after a type: `I64 class X`. Without a type (a
          * stray punct before `class`) it is reported below. */
@@ -4241,6 +4300,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     parseClassDef(cc,type);
                     cctrlTokenExpect(cc,';');
                     continue;
+                case KW_CONST:
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
                 default: {
                     cctrlRaiseException(cc,"%s can only prefix a class",lexemeToString(name));
                 }
@@ -4268,6 +4329,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 if (fn_name) cctrlTokenRewind(cc);
                 for (int i = 0; i < stars; ++i) cctrlTokenRewind(cc);
             } else {
+                if (is_const) {
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
+                }
                 Ast *fn = parseFunctionOrDefImpl(cc, type, fn_name->start,
                                                  fn_name->len, 0, stars);
                 if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
@@ -4325,6 +4389,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             tokenPunctIs(cctrlTokenPeekBy(cc,1),'{'))
         {
             variable = astGVar(type,name->start,name->len,is_static);
+            if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
             ast = parseVariableInitialiser(cc,variable,
@@ -4354,6 +4419,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlRaiseException(cc,
                             "auto cannot be used without an initialiser");
                 }
+                if (is_const) variable->flags |= AST_FLAG_CONST;
                 variable->type = rhs->type;
                 if (rhs->kind == AST_STRING) {
                     ast_decl->declinit = rhs;
@@ -4386,9 +4452,20 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 }
                 int is_err = 0;
                 ast_expr = astBinaryOp(AST_BIN_OP_ASSIGN,variable,rhs,&is_err);
+                if (is_const) variable->flags |= AST_FLAG_CONST;
             } else {
                 cctrlTokenRewind(cc);
+                /* `variable` must not carry AST_FLAG_CONST yet: this
+                 * re-parses `name = rhs` as a real assignment
+                 * expression, and the LHS is `variable` itself. */
                 ast_expr = parseExpr(cc,16); // parseVariableInitialiser(cc,variable,PUNCT_TERM_COMMA|PUNCT_TERM_SEMI);
+                if (is_const) variable->flags |= AST_FLAG_CONST;
+            }
+
+            if (is_const && astIsIntType(variable->type)) {
+                int const_ok = 1;
+                s64 const_val = evalIntConstExprOrErr(ast_expr->right, &const_ok);
+                if (const_ok) variable->deref_symbol = const_val;
             }
 
             Ast *folded = NULL;
@@ -4409,7 +4486,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             return ast_expr;
         } else if (type->kind == AST_TYPE_ARRAY) {
+            if (is_const && !tokenPunctIs(tok,'=')) {
+                cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                        name->len, name->start);
+            }
             variable = astGVar(type,name->start,name->len,is_static);
+            if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
             ast = parseVariableInitialiser(cc,variable,PUNCT_TERM_COMMA|PUNCT_TERM_SEMI);
@@ -4421,6 +4503,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
 
         if (tokenPunctIs(tok, '(')) {
+            if (is_const) {
+                cctrlRaiseException(cc,"const is only allowed on declarations");
+            }
             Ast *fn = parseFunctionOrDef(cc,type,name->start,name->len,0);
             /* `static` on the prototype or the definition makes it local */
             if (fn && is_static) {
@@ -4437,6 +4522,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
 
         if (tokenPunctIs(tok,';') || tokenPunctIs(tok, ',')) {
+            if (is_const) {
+                cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                        name->len, name->start);
+            }
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             variable = astGVar(type,name->start,name->len,is_static);
             mapAdd(cc->global_env,variable->gname->data,variable);

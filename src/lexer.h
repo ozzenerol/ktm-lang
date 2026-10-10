@@ -152,6 +152,9 @@
 #define KW_TRUE         91
 #define KW_FALSE        92
 #define KW_NULL         93
+/* `const` on a declaration (ktm syntax v0.2): marks it read-only, not a
+ * type qualifier like C's. */
+#define KW_CONST        94
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)
