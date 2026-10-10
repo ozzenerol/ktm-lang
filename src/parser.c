@@ -625,7 +625,7 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             break;
         } else if (cctrlIsKeyword(cc,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
-        } else if (tokenIsFnIdent(tok_name) && parseFnStartsType(cc)) {
+        } else if (tokenIsFnIdent(tok_name) && parseFnLooksLikeType(cc)) {
             base_type = parseBaseDeclSpec(cc);
         } else if (name && !memcmp(name->data,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
@@ -1831,7 +1831,7 @@ static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Ast *clause;
     Lexeme *tok = cctrlTokenPeek(cc);
     if (tok && (cctrlIsKeyword(cc, tok->start, tok->len) ||
-                (tokenIsFnIdent(tok) && parseFnStartsType(cc)))) {
+                (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc)))) {
         AstType *type = parseDeclSpec(cc);
         if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
             /* `if (Color.red == c)`: an enum member reference, not an
@@ -2192,7 +2192,7 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
 
     if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
          !parseTypeNameFollowedByDot(cc)) ||
-        (tokenIsFnIdent(tok) && parseFnStartsType(cc))) {
+        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
@@ -3097,7 +3097,7 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
-        (tokenIsFnIdent(tok) && parseFnStartsType(cc))) {
+        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
         return parseDecl(cc);
     }
     return parseStatement(cc);
@@ -3188,7 +3188,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
 
         if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
              !parseTypeNameFollowedByDot(cc)) ||
-            (tokenIsFnIdent(tok) && parseFnStartsType(cc))) {
+            (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
                 next_type = parsePointerType(cc,base_type);

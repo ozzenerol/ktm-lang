@@ -25,6 +25,7 @@ AstType *parseFunctionPointerType(Cctrl *cc,
         char **fnptr_name, int *fnptr_name_len, AstType *rettype);
 int tokenIsFnIdent(Lexeme *tok);
 int parseFnStartsType(Cctrl *cc);
+int parseFnLooksLikeType(Cctrl *cc);
 AstType *parseFnType(Cctrl *cc);
 Ast *findFunctionDecl(Cctrl *cc, char *fname, int len);
 Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right);

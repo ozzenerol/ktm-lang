@@ -106,11 +106,33 @@ int parseFnStartsType(Cctrl *cc) {
             }
         } else if (first && (cctrlIsKeyword(cc,first->start,first->len) ||
                               tokenIsFnIdent(first))) {
-            result = 1;
+            /* `Name.member` (an enum member, ktm syntax v0.2's Y6) is an
+             * expression, not a type: `fn(Color.blue)` is a call through
+             * a variable named `fn`, not a one-parameter type. */
+            Lexeme *after_first = cctrlTokenPeek(cc);
+            result = !tokenPunctIs(after_first,'.');
         }
     }
     while (n-- > 0) cctrlTokenRewind(cc);
     return result;
+}
+
+/* At a declaration/expression-statement fork, should `fn` here be routed
+ * to the declaration side at all, so a malformed one (`fn i64 x;`, a
+ * missing `(`) gets parseBaseDeclSpec's precise error instead of being
+ * read as the expression `fn` followed by a stray `i64`? True for a
+ * real `fn(...)` type, or for `fn` directly followed by a type name
+ * (whichever it is, that can never continue a valid expression). */
+int parseFnLooksLikeType(Cctrl *cc) {
+    if (parseFnStartsType(cc)) {
+        return 1;
+    }
+    cctrlTokenGet(cc); /* `fn` */
+    Lexeme *after = cctrlTokenPeek(cc);
+    int looks_like_type = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+                                     tokenIsFnIdent(after));
+    cctrlTokenRewind(cc);
+    return looks_like_type;
 }
 
 /* The parameter TYPES of an `fn(...)` type: `[type {, type}] [, ...]`,
@@ -131,6 +153,12 @@ static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
         if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
             cctrlTokenGet(cc);
             *has_var_args = 1;
+            /* The argument-count check (parseFunctionArgumentCheck) finds
+             * the vararg point by looking for an AST_VAR_ARGS entry in
+             * params, not just the has_var_args flag; unlike parseParams,
+             * its argc/argv are not registered anywhere (there is no
+             * real function body here to bind them in). */
+            vecPush(params, astVarArgs());
             cctrlTokenExpect(cc,')');
             return params;
         }

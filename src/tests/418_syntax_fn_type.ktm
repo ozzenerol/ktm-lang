@@ -45,8 +45,32 @@ fn(fn(i64) i64) fn(i64) i64 g_compose = &ComposeImpl;
 fn() void g_tick;
 U0 Tick() { "tick\n"; }
 
-/* varargs */
+/* varargs, with and without fixed parameters first; the call path must
+ * thread the varargs through an fn(...) type the same way it does the
+ * old declarator, not just set a flag and lose it */
 fn(u8 *, ...) i32 g_logger;
+i64 Sum(...) {
+  i64 total = 0;
+  for (i64 i = 0; i < argc; i++) total += argv[i](i64);
+  return total;
+}
+i64 SumFrom(i64 n, ...) {
+  i64 total = 0;
+  for (i64 i = 0; i < n; i++) total += argv[i](i64);
+  return total;
+}
+fn(...) i64 g_sum = &Sum;
+fn(i64, ...) i64 g_sumFrom = &SumFrom;
+
+/* used below: a call through a variable named `fn` with an enum member
+ * argument must not be read as a one-parameter type, since `Name.member`
+ * is an expression (ktm syntax v0.2's Y6), not a type. Declared only
+ * where it is used (not as a global): once `fn` names a variable in
+ * scope, that shadows `fn(...)` as a type in the same scope, same as a
+ * C variable shadowing a type of the same name, so it must not leak
+ * into the earlier cast test, which still wants `fn` as a type name. */
+enum Color { red, green, blue };
+i64 ShowColor(Color c) { return (i64)c; }
 
 #define AT_SRC "./ktm-418-fn.ktm"
 #define AT_OUT "./ktm-418-fn.out"
@@ -117,6 +141,11 @@ I32 Main()
   if (srv.onAccept == &OnAccept) correct++;
   else "\n  struct field of fn(...) type\n";
 
+  /* varargs through fn(...), with and without a fixed parameter first */
+  tests++;
+  if (g_sum(1, 2, 3) == 6 && g_sumFrom(2, 10, 20) == 30) correct++;
+  else "\n  varargs through fn(...)\n";
+
   /* a function returning fn(...), called through the result */
   tests++;
   fn(i64) i64 p1 = Pick(true);
@@ -179,6 +208,21 @@ I32 Main()
   if (fn(5) == 6) correct++;
   else "\n  fn as a plain identifier (old code)\n";
 
+  /* a call through a variable named `fn` with an enum member argument:
+   * a call, not a one-parameter `fn(...)` type, at statement start, in
+   * an expression and in an if condition (its own block: a fresh `fn`,
+   * shadowing the outer one, of a different parameter type) */
+  tests++;
+  {
+    i64 (*fn)(Color) = &ShowColor;
+    fn(Color.blue);
+    i64 r = fn(Color.green) + 1;
+    Bool ok = false;
+    if (fn(Color.red) == 0) ok = true;
+    if (r == 2 && ok) correct++;
+    else "\n  fn as a variable called with an enum member argument\n";
+  }
+
   /* compile errors */
 
   tests++;
@@ -188,6 +232,13 @@ I32 Main()
   tests++;
   if (Fails("fn i64 x;", "`(`")) correct++;
   else "\n  fn without parens\n";
+
+  /* the same, as a statement inside a function body: must not fall
+   * through to reading `fn` as an expression and reporting a confusing
+   * error on an unrelated later token */
+  tests++;
+  if (Fails("i32 g() { fn i64 op; return 0; }", "`(`")) correct++;
+  else "\n  fn without parens, as a statement\n";
 
   tests++;
   if (Fails("fn(i64 x;", "`)`")) correct++;
