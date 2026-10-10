@@ -806,6 +806,7 @@ static const char *lsp_keywords[] = {
     "switch", "union", "while",
     /* Added */
     "auto", "continue", "typeof", "F32", "alignof",
+    "true", "false", "null",
 };
 
 #define KTM_LSP_FUNCTION     3

@@ -171,6 +171,9 @@ static LexerType lexer_types[] = {
     {"sizeof",   KW_SIZEOF},
     {"alignof",  KW_ALIGNOF},
     {"typeof",   KW_TYPEOF},
+    {"true",     KW_TRUE},
+    {"false",    KW_FALSE},
+    {"null",     KW_NULL},
     {"inline",   KW_INLINE},
     {"atomic",   KW_ATOMIC},
     {"volatile", KW_VOLATILE},
@@ -632,6 +635,9 @@ AoStr *lexemeToAoStr(Lexeme *tok) {
                 case KW_SIZEOF:      aoStrCatPrintf(str,"sizeof");  break;
                 case KW_ALIGNOF:     aoStrCatPrintf(str,"alignof"); break;
                 case KW_TYPEOF:      aoStrCatPrintf(str,"typeof");  break;
+                case KW_TRUE:        aoStrCatPrintf(str,"true");    break;
+                case KW_FALSE:       aoStrCatPrintf(str,"false");   break;
+                case KW_NULL:        aoStrCatPrintf(str,"null");    break;
                 case KW_RETURN:      aoStrCatPrintf(str,"return");  break;
                 case KW_TRY:         aoStrCatPrintf(str,"try");     break;
                 case KW_CATCH:       aoStrCatPrintf(str,"catch");   break;

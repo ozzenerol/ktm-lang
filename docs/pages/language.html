@@ -88,7 +88,10 @@ U0 Main()
 are type names, not keywords, so a struct field can still be called <code>i64</code> or
 <code>f64</code>; a variable can't.</p>
 <p>Pointers are written as in C (<code>U8 *s</code>, <code>I64 **pp</code>) and are 8 bytes.
-<code>NULL</code> is 0.</p>
+<code>null</code> is the null pointer: 0 as a <code>U0 *</code>, so it can be assigned to any
+pointer or function pointer. <code>true</code> and <code>false</code> are <code>Bool</code>
+values, 1 and 0. The older <code>NULL</code>, <code>TRUE</code> and <code>FALSE</code> (plain
+0, 1 and 0) still work for now.</p>
 <p>As in C, a value becomes a <code>Bool</code> by comparing it with 0: an integer, float
 or pointer that isn't 0 (or <code>NULL</code>) is <code>TRUE</code>, whether it is assigned,
 passed as an argument, returned, stored in a field or cast with <code>x(Bool)</code>. Only the
