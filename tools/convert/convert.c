@@ -1822,6 +1822,128 @@ static void migExceptions(MigFile *f) {
     migAdd(f, at, at, at > 0 ? mprintf("\n%s", decl->data) : decl->data, "error");
 }
 
+/* ------------------------------------------------------------------ */
+/* `#define MAX 64` -> `const i64 MAX = 64;` for object-like defines whose
+ * value folds to an integer or float: literals, operators, parentheses
+ * and names converted before. Not when the name is used by the
+ * preprocessor (#if, #ifdef, defined()), #undef'd or defined twice, nor
+ * in a header (.ktmh: its macros move into the modules). */
+
+static int migPreprocUses(MigFile *f, const char *name, s64 nlen) {
+    char *t = f->text;
+    int defs = 0;
+    for (s64 i = 0; i < f->len; ) {
+        s64 le = i;
+        while (le < f->len && t[le] != '\n') le++;
+        s64 j = i;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (j < le && t[j] == '#') {
+            j++;
+            while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+            s64 w = j;
+            while (j < le && migIsIdent(t[j])) j++;
+            int is_define = j - w == 6 && !memcmp(t + w, "define", 6);
+            s64 k = j;
+            while (k < le && (t[k] == ' ' || t[k] == '\t')) k++;
+            s64 nw = k;
+            while (k < le && migIsIdent(t[k])) k++;
+            int names_it = k - nw == nlen && !memcmp(t + nw, name, nlen);
+            if (is_define && names_it) defs++;
+            else if (!is_define) {
+                /* any other directive that mentions it */
+                for (s64 q = j; q + nlen <= le; ++q) {
+                    if (!memcmp(t + q, name, nlen) && !migIsIdent(t[q - 1]) &&
+                        (q + nlen == le || !migIsIdent(t[q + nlen]))) return 1;
+                }
+            }
+        }
+        i = le + 1;
+    }
+    return defs != 1;
+}
+
+static void migDefines(MigFile *f) {
+    s64 plen = strlen(f->path);
+    if (plen > 5 && !strcmp(f->path + plen - 5, ".ktmh")) return;
+    char *t = f->text;
+    Vec *done = vecNew(&vec_unsigned_long_type);
+    for (s64 i = 0; i < f->len; ) {
+        s64 le = i;
+        while (le < f->len && t[le] != '\n') le++;
+        s64 j = i;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        s64 line_start = j;
+        int skipped = 0;
+        for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
+            if ((s64)(intptr_t)f->skipped->entries[r] <= i &&
+                i < (s64)(intptr_t)f->skipped->entries[r + 1]) skipped = 1;
+        }
+        if (skipped || le - j < 8 || memcmp(t + j, "#define", 7) || !isspace((unsigned char)t[j + 7])) {
+            i = le + 1;
+            continue;
+        }
+        j += 7;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        s64 nw = j;
+        while (j < le && migIsIdent(t[j])) j++;
+        s64 nlen = j - nw;
+        if (nlen == 0 || t[j] == '(' || t[le - 1] == '\\') { i = le + 1; continue; }
+        /* the value, up to a comment */
+        s64 vs = j, ve = j, ce = le;
+        int ok = 1, is_float = 0, is_u64 = 0, depth = 0;
+        for (s64 k = j; k < le && ok; ) {
+            char c = t[k];
+            if (c == '/' && k + 1 < le && (t[k + 1] == '/' || t[k + 1] == '*')) { ce = k; break; }
+            if (c == ' ' || c == '\t') { k++; continue; }
+            if (isdigit((unsigned char)c) || (c == '.' && k + 1 < le && isdigit((unsigned char)t[k + 1]))) {
+                s64 w = k;
+                int hex = c == '0' && k + 1 < le && (t[k + 1] == 'x' || t[k + 1] == 'X');
+                while (k < le && (isalnum((unsigned char)t[k]) || t[k] == '_' || t[k] == '.' ||
+                                  (!hex && (t[k] == '+' || t[k] == '-') && (t[k - 1] == 'e' || t[k - 1] == 'E')))) k++;
+                for (s64 q = w; q < k; ++q) {
+                    if (t[q] == '.' || (!hex && (t[q] == 'e' || t[q] == 'E'))) is_float = 1;
+                }
+                if (hex) {
+                    s64 digits = 0;
+                    for (s64 q = w + 2; q < k; ++q) if (isxdigit((unsigned char)t[q])) digits++;
+                    if (digits == 16 && strchr("89abcdefABCDEF", t[w + 2])) is_u64 = 1;
+                }
+                if (t[k - 1] == 'U' || t[k - 1] == 'u') is_u64 = 1;
+                ve = k;
+                continue;
+            }
+            if (c == '\'' && k + 2 < le && t[k + 2] == '\'') { k += 3; ve = k; continue; }
+            if (migIsIdent(c)) {
+                s64 w = k;
+                while (k < le && migIsIdent(t[k])) k++;
+                int known = 0;
+                for (u64 d = 0; d < done->size; ++d) {
+                    char *n = done->entries[d];
+                    if ((s64)strlen(n) == k - w && !memcmp(n, t + w, k - w)) known = 1;
+                }
+                if (!known) ok = 0;
+                ve = k;
+                continue;
+            }
+            if (strchr("+-*/%<>|&~^", c)) { k++; continue; }
+            if (c == '(') { depth++; k++; continue; }
+            if (c == ')') { depth--; k++; ve = k; continue; }
+            ok = 0;
+        }
+        while (vs < ve && (t[vs] == ' ' || t[vs] == '\t')) vs++;
+        if (!ok || depth || vs >= ve) { i = le + 1; continue; }
+        char *name = mprintf("%.*s", (int)nlen, t + nw);
+        if (migPreprocUses(f, name, nlen)) { i = le + 1; continue; }
+        vecPush(done, name);
+        const char *type = is_float ? "f64" : is_u64 ? "u64" : "i64";
+        s64 tail = ve;   /* keep the spacing before a trailing comment */
+        migAddSegs(f, line_start, tail, "const", migLit(mprintf("const %s %s = ", type, name)),
+                   migRange(vs, ve), migLit(";"), NULL);
+        (void)ce;
+        i = le + 1;
+    }
+}
+
 /* Every pass but writing: the edits of f, sorted */
 static int migConvert(MigFile *f, char *install_dir, int outer) {
     /* Code at file scope that calls Main: Main stays a function and a new
@@ -1835,6 +1957,7 @@ static int migConvert(MigFile *f, char *install_dir, int outer) {
     }
     migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
     migExceptions(f);
+    migDefines(f);
     migDropLiteralDefines(f);
     migCommentsAndStrings(f, install_dir, outer);
     migDefineCasts(f);
