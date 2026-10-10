@@ -306,6 +306,7 @@ void cctrlInitParse(Cctrl *cc, Lexer *lexer_);
 
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len);
 int cctrlIsKeyword(Cctrl *cc, char *name, int len);
+int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok);
 AoStr *cctrlModulePath(Cctrl *cc, u32 module_id);
 char *cctrlQualifyName(Cctrl *cc, char *name, int len);
 int cctrlModuleHides(Cctrl *cc, char *name, int len);

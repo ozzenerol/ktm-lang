@@ -33,6 +33,7 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast);
 void assertNotConstAssign(Cctrl *cc, Ast *ast);
 int parseIsFloatOrInt(Ast *ast);
 int parseIsClassOrUnion(int kind);
+void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len);
 int parseIsFunction(Ast *ast);
 int astIsArithmetic(Ast *ast, int is_float);
 

@@ -252,6 +252,8 @@ static Ast *parseDeclNestedInit(Cctrl *cc, AstType *type, int is_class,
                     astTypeToString(type));
         }
         sub_type = entry->value;
+        parseCheckPrivateField(cc, sub_type, (char *)entry->key,
+                               strlen((char *)entry->key));
         if (sub_type->kind != AST_TYPE_ARRAY &&
             ((sub_type->kind != AST_TYPE_CLASS &&
               sub_type->kind != AST_TYPE_UNION) ||
@@ -303,6 +305,8 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                     astTypeToString(type));
         }
         AstType *cls_field_type = entry->value;
+        parseCheckPrivateField(cc, cls_field_type, (char *)entry->key,
+                               strlen((char *)entry->key));
         if (init->kind == AST_STRING &&
             cls_field_type->kind == AST_TYPE_ARRAY &&
             cls_field_type->ptr->kind == AST_TYPE_CHAR)
@@ -621,9 +625,32 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             cctrlRaiseException(cc,
                     "Unexpected end of input in class/union body");
         }
+        /* `private T name;`: only the class's module can use the field */
+        int is_private = 0;
+        if (tok_name->tk_type == TK_KEYWORD &&
+            (tok_name->i64 == KW_PRIVATE || tok_name->i64 == KW_PUBLIC))
+        {
+            Lexeme *vis = cctrlTokenGet(cc);
+            if (vis->i64 == KW_PUBLIC) {
+                cctrlRaiseExceptionAt(cc, vis->line, vis->col, vis->len,
+                        "a field is public unless it is marked `private`");
+            }
+            if (!cc->cur_module) {
+                cctrlRaiseExceptionAt(cc, vis->line, vis->col, vis->len,
+                        "`private` fields are for the structs of a module: "
+                        "outside one there is nothing to hide them from");
+            }
+            is_private = 1;
+            tok_name = cctrlTokenPeek(cc);
+            if (tok_name == NULL) {
+                cc->current_recovery = outer_recovery;
+                cctrlRaiseException(cc,
+                        "Unexpected end of input in class/union body");
+            }
+        }
         if (tokenPunctIs(tok_name,'}')) {
             break;
-        } else if (cctrlIsKeyword(cc,tok_name->start,tok_name->len)) {
+        } else if (cctrlTokIsKeyword(cc, tok_name)) {
             base_type = parseBaseDeclSpec(cc);
         } else if (tokenIsFnIdent(tok_name) && parseFnLooksLikeType(cc)) {
             base_type = parseBaseDeclSpec(cc);
@@ -704,6 +731,10 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             field_type->file_id = ast_file_hint;
             if (next_type && next_type->clsname) {
                 field_type->clsname = next_type->clsname;
+            }
+            if (is_private) {
+                field_type->private_module = cc->cur_module;
+                field_type->private_of = name;
             }
             /* The list is here to ease calculating the offset of the class 
              * fields as they have been defined by the programmer... Hashing 
@@ -1875,7 +1906,7 @@ static Ast *parseRequiredExpr(Cctrl *cc, char *what) {
 static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Ast *clause;
     Lexeme *tok = cctrlTokenPeek(cc);
-    if (tok && (cctrlIsKeyword(cc, tok->start, tok->len) ||
+    if (tok && (cctrlTokIsKeyword(cc, tok) ||
                 (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc)))) {
         AstType *type = parseDeclSpec(cc);
         if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
@@ -2115,6 +2146,8 @@ void parseAssertContainerHasFields(Cctrl *cc, AstType *size_field,
     if (entries_field->ptr->kind == AST_TYPE_VOID) {
         cctrlRaiseException(cc,"cannot dereference void pointer");
     }
+    parseCheckPrivateField(cc, size_field, "size", 4);
+    parseCheckPrivateField(cc, entries_field, "entries", 7);
 }
 
 Ast *parseCreateForRange(Cctrl *cc, Ast *iteratee,
@@ -2244,7 +2277,7 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         }
     }
 
-    if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+    if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
         AstType *type = parseDeclSpec(cc);
@@ -3148,7 +3181,7 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     if (!tok) {
         return NULL;
     }
-    if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+    if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
         (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
@@ -3240,7 +3273,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             tok = cctrlTokenPeek(cc);
         }
 
-        if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+        if ((cctrlTokIsKeyword(cc, tok) &&
              !parseTypeNameFollowedByDot(cc)) ||
             (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
             base_type = parseBaseDeclSpec(cc);
@@ -4597,6 +4630,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Lexeme *tok, *name, *peek;
     int is_static = 0;
     int is_const = 0;
+    int saw_private = 0;
     cc->decl_pub = 0;
 
     while (1) {
@@ -4730,9 +4764,18 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     return ast;
                 }
                 case KW_PUBLIC:
+                    if (saw_private) {
+                        cctrlRaiseException(cc, "a declaration is either `pub` or `private`, not both");
+                    }
                     cc->decl_pub = 1;
                     continue;
+                /* `private` says what leaving out `pub` means */
                 case KW_PRIVATE:
+                    if (cc->decl_pub) {
+                        cctrlRaiseException(cc, "a declaration is either `pub` or `private`, not both");
+                    }
+                    saw_private = 1;
+                    continue;
                 case KW_ATOMIC:
                     continue;
 
@@ -4844,7 +4887,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             }
             if (!fn_is_type && tokenPunctIs(peek,'(') &&
                 (mapGetLen(cc->global_env, tok->start, tok->len) ||
-                 !cctrlIsKeyword(cc, tok->start, tok->len))) {
+                 !cctrlTokIsKeyword(cc, tok))) {
                 cctrlTokenGet(cc);
                 ast = parseCallArguments(cc,tok->start,tok->len);
                 cctrlTokenExpect(cc,';');
