@@ -142,6 +142,7 @@ typedef enum AstKind {
     AST_TRY           = 298,  /* try { ... } catch <stmt> */
     AST_THROW         = 299,  /* throw(u64_value); */
     AST_TERNARY       = 300,  /* cond ? then : els (the conditional operator) */
+    AST_DEFER         = 301,  /* defer <stmt>; runs <stmt> when its block is left */
 } AstKind;
 
 /* @Cleanup
@@ -425,6 +426,11 @@ typedef struct Ast {
             Ast *throw_value;
         };
 
+        /* defer <stmt> */
+        struct {
+            Ast *defer_stmt;
+        };
+
         /* @Typeo
          * Compound statement */
         struct {
@@ -559,6 +565,7 @@ Ast *astFunction(AstType *rettype, char *fname, int len, Vec *params,
 Ast *astReturn(Ast *retval, AstType *rettype);
 Ast *astTry(Ast *try_body, Ast *catch_body);
 Ast *astThrow(Ast *value);
+Ast *astDefer(Ast *stmt);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 

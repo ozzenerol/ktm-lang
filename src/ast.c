@@ -720,6 +720,13 @@ Ast *astThrow(Ast *value) {
     return ast;
 }
 
+Ast *astDefer(Ast *stmt) {
+    Ast *ast = astNew();
+    ast->kind = AST_DEFER;
+    ast->defer_stmt = stmt;
+    return ast;
+}
+
 AstType *astMakePointerType(AstType *type) {
     AstType *pointer_type = astTypeNew();
     pointer_type->kind = AST_TYPE_POINTER;
@@ -2269,6 +2276,12 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             astStringEndStmt(str);
             break;
 
+        case AST_DEFER:
+            aoStrCatPrintf(str, "<defer>\n");
+            _astToString(str, ast->defer_stmt, depth+1);
+            astStringEndStmt(str);
+            break;
+
         case AST_VAR_ARGS:
             aoStrCatPrintf(str, "<var_args>...\n");
             break;
@@ -2529,6 +2542,7 @@ char *astKindToString(AstKind kind) {
         case AST_UNOP:          return "AST_UNOP";
         case AST_TRY:           return "AST_TRY";
         case AST_THROW:         return "AST_THROW";
+        case AST_DEFER:         return "AST_DEFER";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -2801,6 +2815,11 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
                     lexemePunctToStringWithFlags(';',lexeme_flags));
             break;
 
+        case AST_DEFER:
+            aoStrCatPrintf(str, "defer ");
+            _astLValueToString(str, ast->defer_stmt, lexeme_flags);
+            break;
+
         case AST_DEFAULT:
             aoStrCatPrintf(str,"default:");
             break;
@@ -2950,6 +2969,7 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_RETURN: return "return statement";
         case AST_TRY: return "try/catch statement";
         case AST_THROW: return "throw statement";
+        case AST_DEFER: return "defer statement";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";

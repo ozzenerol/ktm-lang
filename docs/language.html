@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#classes">Classes</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#classes">Classes</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#defer">defer</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -1329,6 +1329,75 @@ ends the program with exit code 1. A character constant whose bytes are all prin
 shown as text, anything else as a number:</p>
 <pre><code>uncaught throw: 'Funds'
 uncaught throw: 404</code></pre>
+
+<h2 id="defer">defer<a class="anchor" href="#defer" aria-label="Link to this section">#</a></h2>
+<p><code>defer</code> followed by a statement (or a <code>{ }</code> block) runs that
+statement when control leaves the enclosing block, however it leaves: at the end of the
+block, through <code>return</code>, <code>break</code>, <code>continue</code> or a
+<code>goto</code> out of it, or because a <code>throw</code> is passing through it on its
+way to a <code>catch</code> (after the deferred statements have run, the throw carries on
+to that catch). It keeps clean-up next to the code that needs it:</p>
+<pre data-run><code>U0 Copy(I64 n)
+{
+  U8 *buf = MAlloc(64);
+  defer { Free(buf); "freed\n"; }
+  if (n &lt; 0) throw('Neg');
+  "copied %d\n", n;
+}
+
+U0 Main()
+{
+  {
+    defer "1st registered, runs last\n";
+    defer "2nd registered, runs first\n";
+  }
+  for (I64 i = 0; i &lt; 3; i++) {
+    defer "end of iteration %d\n", i;
+    if (i == 1) continue;
+  }
+  Copy(5);
+  try {
+    Copy(-1);
+  } catch {
+    "caught\n";
+  }
+}
+</code></pre>
+<pre class="output">2nd registered, runs first
+1st registered, runs last
+end of iteration 0
+end of iteration 1
+end of iteration 2
+copied 5
+freed
+freed
+caught
+</pre>
+<p>The rules:</p>
+<ul>
+<li>The scope is the block the <code>defer</code> is written in (not the whole function):
+in a loop body it runs at the end of every iteration. It must be a statement of a
+<code>{ }</code> block, so <code>if (x) defer f();</code> or a <code>defer</code> directly
+after a <code>case</code> label needs braces.</li>
+<li>Several defers in a block run in reverse order, the last one first; inner blocks
+finish before outer ones.</li>
+<li>A defer only runs if it was reached: one written after an early <code>return</code> does
+not run on that return.</li>
+<li>The statement runs as written when the block is left, so it sees the values variables
+have then. <code>return</code> evaluates its value first: <code>return buf[0];</code> with
+<code>defer Free(buf);</code> returns the right value.</li>
+<li>A <code>throw</code> from a deferred statement goes on like any other throw.</li>
+<li>A deferred statement can't be left by <code>return</code>, <code>break</code>,
+<code>continue</code> or <code>goto</code> (a loop inside it keeps its own
+<code>break</code> and <code>continue</code>), can't contain a label, and a
+<code>goto</code> can't jump past a <code>defer</code> into the rest of its block. These,
+and <code>defer</code> outside a function, are compile errors.</li>
+<li>Returning from <code>Main</code> runs its defers, but <code>Exit()</code>, <code>exit()</code>
+and a crash end the program without running any. Switching coroutines doesn't leave a
+block either, so it runs no defers.</li>
+</ul>
+<p>Only functions that use <code>defer</code> pay for it (each one reached sets up a frame
+like a <code>try</code> does); code without it compiles exactly as before.</p>
 
 <h2 id="calling-c">Calling C<a class="anchor" href="#calling-c" aria-label="Link to this section">#</a></h2>
 <p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always

@@ -177,6 +177,10 @@ typedef struct Cctrl {
      * current loop's labels */
     AoStr *tmp_loop_begin;
     AoStr *tmp_loop_end;
+    /* Deferred statements (`defer <stmt>`) being parsed around the
+     * current token: a return, or a break/continue with no loop inside
+     * the deferred statement, would leave one. */
+    int defer_depth;
 
     /* Temporary asm function name */
     AoStr *tmp_asm_fname;

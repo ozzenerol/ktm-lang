@@ -977,6 +977,10 @@ public U0 KTM_PushFrame(CatchFrame *f);
  * when a try body ends or is left by return/break/continue/goto, and
  * before its catch handler runs, so a throw there goes further out. */
 public U0 KTM_TryLeave(CatchFrame *f);
+/* A `defer` caught a throw leaving its block: make the try that was
+ * active before f the innermost again and return the thrown value, which
+ * the compiler throws again once the deferred statement has run. */
+public U64 KTM_DeferCaught(CatchFrame *f);
 /* `throw(v)`: store v in Fs->except_ch and jump to the catch of the
  * innermost try of the calling thread. With no try it reports v and
  * exits the process with 1, from any thread. */

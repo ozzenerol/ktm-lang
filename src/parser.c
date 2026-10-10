@@ -1630,6 +1630,7 @@ int parseValidPostControlFlowToken(Lexeme *tok) {
             case KW_TRY:
             case KW_THROW:
             case KW_ASM:
+            case KW_DEFER:  /* reported by parseStatement */
                 return 1;
         }
     }
@@ -2417,6 +2418,10 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
 }
 
 Ast *parseBreakStatement(Cctrl *cc) {
+    if (cc->tmp_loop_end == NULL && cc->defer_depth) {
+        cctrlTokenRewind(cc);
+        cctrlRaiseException(cc,"`break` can't leave a deferred statement");
+    }
     if (cc->tmp_loop_end == NULL) {
         cctrlRaiseException(cc,"Floating break, not inside a breakable statement");
     }
@@ -2426,6 +2431,10 @@ Ast *parseBreakStatement(Cctrl *cc) {
 }
 
 Ast *parseContinueStatement(Cctrl *cc) {
+    if (cc->tmp_loop_begin == NULL && cc->defer_depth) {
+        cctrlTokenRewind(cc);
+        cctrlRaiseException(cc,"`continue` can't leave a deferred statement");
+    }
     if (cc->tmp_loop_begin == NULL) {
         cctrlRaiseException(cc,"Floating continue, not inside a loop");
     }
@@ -2444,6 +2453,10 @@ Ast *parseReturnStatement(Cctrl *cc) {
         cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
                 "`return` outside a function");
         cctrlTerminate(cc);
+    }
+    if (cc->defer_depth) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "`return` can't leave a deferred statement");
     }
     Ast *retval = parseExpr(cc,16);
     AstType *check;
@@ -2751,6 +2764,10 @@ Ast *parseStatement(Cctrl *cc) {
             case KW_RETURN:   return parseReturnStatement(cc);
             case KW_TRY:      return parseTryStatement(cc);
             case KW_THROW:    return parseThrowStatement(cc);
+            case KW_DEFER:
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc,
+                    "`defer` must be a statement of a { } block");
             case KW_SWITCH:   return parseSwitchStatement(cc);
             case KW_CASE:     return parseCaseLabel(cc,tok);
             case KW_DEFAULT:  return parseDefaultStatement(cc);
@@ -2835,6 +2852,10 @@ Ast *parseStatement(Cctrl *cc) {
 
             case KW_GOTO: {
                 int goto_line = tok->line, goto_col = tok->col;
+                if (cc->defer_depth) {
+                    cctrlRaiseExceptionAt(cc, goto_line, goto_col, tok->len,
+                        "`goto` can't leave a deferred statement");
+                }
                 tok = cctrlTokenGet(cc);
                 if (tok == NULL) {
                     cctrlRaiseException(cc,
@@ -2869,6 +2890,10 @@ Ast *parseStatement(Cctrl *cc) {
     /* Hacked in goto label ;) */
     peek = cctrlTokenPeek(cc);
     if (tok->tk_type == TK_IDENT && tokenPunctIs(peek,':')) {
+        if (cc->defer_depth) {
+            cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                "a label can't be inside a deferred statement");
+        }
         label = createFunctionLevelGotoLabel(cc,tok);
         ret = astLabel(label);
         /* consume ':' */
@@ -2915,6 +2940,43 @@ static int parseTypeNameFollowedByDot(Cctrl *cc) {
     cctrlTokenRewind(cc);
     (void)t1;
     return dot;
+}
+
+/* `defer <stmt>`: <stmt> (one statement or a block) runs whenever the
+ * enclosing block is left. Only a statement of a { } block: the block is
+ * its scope. Inside <stmt> nothing can jump out of it, so the loop
+ * markers are cleared while it is parsed (a loop inside sets its own). */
+static Ast *parseDeferStatement(Cctrl *cc) {
+    Lexeme *kw = cctrlTokenGet(cc);
+    int line = kw->line, col = kw->col, len = kw->len;
+    if (!cc->tmp_fname) {
+        cctrlRaiseExceptionAt(cc, line, col, len,
+            "`defer` is only allowed inside a function");
+    }
+    if (cc->flags & CCTRL_TRANSPILING) {
+        /* The transpiler doesn't print recovered errors: fail now */
+        cc->current_recovery = NULL;
+        cctrlRaiseExceptionAt(cc, line, col, len,
+            "`defer` is not supported with -transpile");
+    }
+    Lexeme *peek = cctrlTokenPeek(cc);
+    if (!peek || tokenPunctIs(peek, ';') || tokenPunctIs(peek, '}')) {
+        cctrlRaiseExceptionAt(cc, line, col, len,
+            "expected a statement after `defer`");
+    }
+    AoStr *loop_begin = cc->tmp_loop_begin;
+    AoStr *loop_end = cc->tmp_loop_end;
+    cc->tmp_loop_begin = NULL;
+    cc->tmp_loop_end = NULL;
+    cc->defer_depth++;
+    Ast *stmt = parseStatement(cc);
+    cc->defer_depth--;
+    cc->tmp_loop_begin = loop_begin;
+    cc->tmp_loop_end = loop_end;
+    Ast *ast = astDefer(stmt);
+    ast->line = line;
+    ast->col = col;
+    return ast;
 }
 
 Ast *parseDeclOrStatement(Cctrl *cc) {
@@ -2969,9 +3031,17 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                                                     : NULL;
         /* Where this statement starts in the token stream */
         volatile s64 stmt_start = cc->token_buffer->pos;
+        /* An error inside a `defer <stmt>` unwinds past the code that
+         * restores these (parseDeferStatement) */
+        volatile int stmt_defer_depth = cc->defer_depth;
+        AoStr *volatile stmt_loop_begin = cc->tmp_loop_begin;
+        AoStr *volatile stmt_loop_end = cc->tmp_loop_end;
 
         if (setjmp(stmt_recovery) != 0) {
             cc->localenv = block_scope;
+            cc->defer_depth = stmt_defer_depth;
+            cc->tmp_loop_begin = stmt_loop_begin;
+            cc->tmp_loop_end = stmt_loop_end;
             if (body && body->stms && body_tail) {
                 body_tail->next = body->stms;
                 body->stms->prev = body_tail;
@@ -2988,6 +3058,12 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             while (cc->token_buffer->pos < stmt_start &&
                    cctrlTokenGet(cc) != NULL);
             cctrlSyncStatement(cc);
+            tok = cctrlTokenPeek(cc);
+            continue;
+        }
+
+        if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_DEFER) {
+            listAppend(body->stms, parseDeferStatement(cc));
             tok = cctrlTokenPeek(cc);
             continue;
         }
@@ -3315,7 +3391,8 @@ static void parseLabelTriesWalkList(Map *label_try, List *l, Ast *inner_try) {
 }
 
 /* Record the innermost try body around each label (labels outside any
- * try are left out). */
+ * try are left out). The rest of a block after a `defer` counts as a try
+ * body too: jumping into it would skip registering the defer. */
 static void parseLabelTriesWalk(Map *label_try, Ast *s, Ast *inner_try) {
     if (!s) return;
     switch (s->kind) {
@@ -3326,7 +3403,13 @@ static void parseLabelTriesWalk(Map *label_try, Ast *s, Ast *inner_try) {
             }
             return;
         case AST_COMPOUND_STMT:
-            parseLabelTriesWalkList(label_try, s->stms, inner_try);
+            if (s->stms) {
+                listForEach(s->stms) {
+                    Ast *stmt = (Ast *)it->value;
+                    if (stmt && stmt->kind == AST_DEFER) inner_try = stmt;
+                    parseLabelTriesWalk(label_try, stmt, inner_try);
+                }
+            }
             return;
         case AST_IF:
             parseLabelTriesWalk(label_try, s->then, inner_try);
@@ -3393,14 +3476,42 @@ static void parseGotoIntoTryWalk(Cctrl *cc, Map *label_try, Ast *s,
             if (cc->tmp_fname && s->slabel->len > cc->tmp_fname->len + 2) {
                 name += cc->tmp_fname->len + 2;
             }
+            if (target_try->kind == AST_DEFER) {
+                cctrlRaiseExceptionAt(cc, s->line, s->col, 4,
+                    "`goto %s` jumps past a `defer` into its scope", name);
+                return;
+            }
             cctrlRaiseExceptionAt(cc, s->line, s->col, 4,
                 "`goto %s` jumps into a try body from outside it; "
                 "a try body can only be entered from its start", name);
             return;
         }
-        case AST_COMPOUND_STMT:
-            parseGotoIntoTryWalkList(cc, label_try, s->stms, scope);
+        case AST_COMPOUND_STMT: {
+            if (!s->stms) return;
+            /* Each `defer` opens a scope for the rest of the block, held
+             * on this frame; the walk is depth first so they outlive it */
+            ParseTryScope *defers = NULL;
+            int ndefers = 0;
+            listForEach(s->stms) {
+                Ast *stmt = (Ast *)it->value;
+                if (stmt && stmt->kind == AST_DEFER) ndefers++;
+            }
+            if (ndefers) {
+                defers = (ParseTryScope *)malloc(sizeof(ParseTryScope) * ndefers);
+            }
+            int d = 0;
+            listForEach(s->stms) {
+                Ast *stmt = (Ast *)it->value;
+                if (stmt && stmt->kind == AST_DEFER) {
+                    defers[d].try_ast = stmt;
+                    defers[d].outer = scope;
+                    scope = &defers[d++];
+                }
+                parseGotoIntoTryWalk(cc, label_try, stmt, scope);
+            }
+            free(defers);
             return;
+        }
         case AST_IF:
             parseGotoIntoTryWalk(cc, label_try, s->then, scope);
             parseGotoIntoTryWalk(cc, label_try, s->els, scope);
@@ -4323,6 +4434,11 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 case KW_CONST:
                     is_const = 1;
                     continue;
+
+                case KW_DEFER:
+                    cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                        "`defer` is only allowed inside a function");
+                    cctrlTerminate(cc);
 
                 case KW_STATIC:
                     base_type = parseBaseDeclSpec(cc);
