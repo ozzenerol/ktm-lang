@@ -24,6 +24,8 @@ void migrateNoteFnPtr(Cctrl *cc, Lexeme *open, Lexeme *close);
 void migrateNoteOldVarArgs(Cctrl *cc, Lexeme *ellipsis);
 /* A use of that implicit `argc` or `argv` */
 void migrateNoteOldVarArgUse(Cctrl *cc, Lexeme *name);
+/* A `catch` without `(Error e)`: the keyword and its handler's last token */
+void migrateNoteCatch(Cctrl *cc, Lexeme *kw, Lexeme *last);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

@@ -1,0 +1,25 @@
+enum Err { neg, tooBig };
+i64 Check(i64 x)
+{
+  if (x < 0) throw(Err.neg);
+  if (x > 9) throw(Err.tooBig);
+  return x;
+}
+
+i64 Run(i64 x)
+{
+  try {
+    Check(x);
+  } catch (Error e) {
+    if (e.code == Err.neg) return -1;
+    return e.code == Err.tooBig;
+  }
+  return 0;
+}
+
+void main()
+{
+  i64 e = 5;
+  try { Check(-e); } catch (Error err) { printf("%d\n", err.code == Err.neg && e == 5); }
+  printf("%d %d %d\n", Run(-3), Run(12), Run(4));
+}

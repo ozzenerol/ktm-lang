@@ -16,7 +16,7 @@
 #include "../tools/convert/convert.h"
 /* `T (*Name(params))(fn_params)`: the `(` before the `*`, for the
  * converter's hook once the fn params are parsed */
-static Lexeme *parse_fnptr_open = NULL;
+static Lexeme parse_fnptr_open_copy, *parse_fnptr_open = NULL;
 extern int migrate_c_varargs;
 static Lexeme *parseLastTok(Cctrl *cc) {
     cctrlTokenRewind(cc);
@@ -2723,9 +2723,15 @@ Ast *parseTryStatement(Cctrl *cc) {
             lexemeAsWritten(tok));
     }
     cctrlTokenGet(cc);  /* consume `catch` */
+#ifdef KTM_CONVERT
+    Lexeme catch_kw = *tok;
+#endif
     Ast *catch_body = parseCatchBinding(cc);
     if (!catch_body) {
         catch_body = parseStatement(cc);
+#ifdef KTM_CONVERT
+        if (cc->migrate) migrateNoteCatch(cc, &catch_kw, parseLastTok(cc));
+#endif
         if (!(cc->flags & CCTRL_TRANSPILING)) {
             List *stmts = listNew();
             listAppend(stmts, astFunctionCall(ast_void_type, "KTM_ErrorForget",
@@ -5366,7 +5372,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlRaiseException(cc,"const is only allowed on declarations");
                 }
 #ifdef KTM_CONVERT
-                parse_fnptr_open = name;
+                parse_fnptr_open_copy = *name;
+                parse_fnptr_open = &parse_fnptr_open_copy;
 #endif
                 Ast *fn = parseFunctionOrDefImpl(cc, type, fn_name->start,
                                                  fn_name->len, 0, stars);

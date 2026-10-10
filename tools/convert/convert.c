@@ -97,7 +97,14 @@ typedef struct MigFile {
     int failed;
     AoStr *notes;        /* "path:line: message" lines for the report */
     Vec *skipped;        /* [start, end) pairs of text an #if skipped */
+    Vec *catches;        /* MigCatch *: catches without `(Error e)` */
 } MigFile;
+
+typedef struct MigCatch {
+    s64 kw_end;          /* just past `catch` */
+    s64 end;             /* just past its handler */
+    const char *name;    /* the Error's name, once one is needed */
+} MigCatch;
 
 struct Migrate {
     MigFile **files;
@@ -720,6 +727,17 @@ void migrateNoteOldVarArgUse(Cctrl *cc, Lexeme *name) {
     } else if (name->len == 4 && !memcmp(f->text + s, "argv", 4)) {
         migAdd(f, s, s + 4, "args", "varargs");
     }
+}
+
+void migrateNoteCatch(Cctrl *cc, Lexeme *kw, Lexeme *last) {
+    MigFile *f = migFileOf(cc, kw ? kw->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, kw), e = migOff(f, last);
+    if (s < 0 || e < 0) return;
+    MigCatch *c = (MigCatch *)calloc(1, sizeof(MigCatch));
+    c->kw_end = s + 5;
+    c->end = e + last->len;
+    vecPush(f->catches, c);
 }
 
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
@@ -1548,6 +1566,7 @@ static MigFile *migFileNew(char *path) {
     f->items = vecNew(&vec_unsigned_long_type);
     f->main_calls = vecNew(&vec_unsigned_long_type);
     f->skipped = vecNew(&vec_unsigned_long_type);
+    f->catches = vecNew(&vec_unsigned_long_type);
     f->seen = setNew(64, &set_cstring_type);
     f->notes = aoStrNew();
     f->item_start = -1;
@@ -1661,6 +1680,148 @@ static void migDropLiteralDefines(MigFile *f) {
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Exceptions: `throw('Neg')` -> `throw(Err.neg)` with a file-local
+ * `enum Err` (every character constant with a thrown code's text too),
+ * and `Fs->except_ch` in a catch -> `e.code` with `catch (Error e)` */
+
+typedef struct { Vec *codes; Vec *names; } MigThrowCtx;
+
+/* The member name for the code 'BlkDev': blkDev (`_` added to a keyword) */
+static char *migErrMember(const char *t, s64 len) {
+    static const char *kw[] = {"if", "else", "for", "while", "do", "switch", "case",
+        "default", "break", "continue", "return", "goto", "struct", "union", "enum",
+        "const", "static", "true", "false", "null", "fn", "self", "defer", "try",
+        "catch", "throw", "import", "module", "pub", "private", "auto", "sizeof"};
+    char *m = mprintf("%.*s", (int)len, t);
+    m[0] = tolower((unsigned char)m[0]);
+    for (u64 k = 0; k < sizeof(kw) / sizeof(kw[0]); ++k) {
+        if (!strcmp(m, kw[k])) return mprintf("%s_", m);
+    }
+    return m;
+}
+
+/* A character constant of identifier characters only, as codes are */
+static int migIsCodeConst(const char *t, s64 at, s64 end, s64 *_close) {
+    if (t[at] != '\'') return 0;
+    s64 j = at + 1;
+    while (j < end && migIsIdent(t[j])) j++;
+    if (j == at + 1 || j >= end || t[j] != '\'' || !isalpha((unsigned char)t[at + 1])) return 0;
+    *_close = j;
+    return 1;
+}
+
+static void migThrowWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    MigThrowCtx *x = ctx;
+    char *t = f->text;
+    if (len != 5 || memcmp(t + at, "throw", 5)) return;
+    s64 j = at + 5;
+    while (j < f->len && isspace((unsigned char)t[j])) j++;
+    if (j >= f->len || t[j] != '(') return;
+    j++;
+    while (j < f->len && isspace((unsigned char)t[j])) j++;
+    s64 close;
+    if (!migIsCodeConst(t, j, f->len, &close)) return;
+    char *code = mprintf("%.*s", (int)(close - j - 1), t + j + 1);
+    for (u64 k = 0; k < x->codes->size; ++k) {
+        if (!strcmp(x->codes->entries[k], code)) return;
+    }
+    vecPush(x->codes, code);
+    vecPush(x->names, migErrMember(code, strlen(code)));
+}
+
+/* Where `enum Err` goes: after the #include lines at the top */
+static s64 migEnumAt(MigFile *f) {
+    char *t = f->text;
+    s64 at = 0;
+    for (s64 i = 0; i < f->len; ) {
+        s64 le = i;
+        while (le < f->len && t[le] != '\n') le++;
+        s64 j = i;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (le - j >= 8 && !memcmp(t + j, "#include", 8)) at = le < f->len ? le + 1 : le;
+        i = le + 1;
+    }
+    return at;
+}
+
+/* Is the identifier `name` used in [s, e)? */
+static int migUsesWord(MigFile *f, s64 s, s64 e, const char *name) {
+    s64 n = strlen(name);
+    for (s64 i = s; i + n <= e; ++i) {
+        if (!memcmp(f->text + i, name, n) && (i == 0 || !migIsIdent(f->text[i - 1])) &&
+            !migIsIdent(f->text[i + n])) return 1;
+    }
+    return 0;
+}
+
+static void migExceptChWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    (void)ctx;
+    char *t = f->text;
+    if (len != 2 || memcmp(t + at, "Fs", 2)) return;
+    s64 j = at + 2;
+    if (j + 1 < f->len && t[j] == '(' && t[j + 1] == ')') j += 2;
+    if (j + 11 > f->len || memcmp(t + j, "->except_ch", 11) || migIsIdent(t[j + 11])) return;
+    s64 end = j + 11;
+    MigCatch *in = NULL;
+    for (u64 k = 0; k < f->catches->size; ++k) {
+        MigCatch *c = f->catches->entries[k];
+        if (c->kw_end <= at && at < c->end && (!in || c->kw_end > in->kw_end)) in = c;
+    }
+    if (!in) {
+        migNote(f, at, "can't convert Fs->except_ch outside a catch: use catch (Error e) and e.code");
+        return;
+    }
+    if (!in->name) in->name = migUsesWord(f, in->kw_end, in->end, "e") ? "err" : "e";
+    migAdd(f, at, end, mprintf("%s.code", in->name), "error");
+}
+
+static void migExceptions(MigFile *f) {
+    MigThrowCtx x = { vecNew(&vec_unsigned_long_type), vecNew(&vec_unsigned_long_type) };
+    migScanWords(f, f->text, 0, f->len, migThrowWord, &x);
+    migScanWords(f, f->text, 0, f->len, migExceptChWord, NULL);
+    for (u64 k = 0; k < f->catches->size; ++k) {
+        MigCatch *c = f->catches->entries[k];
+        if (c->name) migAdd(f, c->kw_end, c->kw_end, mprintf(" (Error %s)", c->name), "error");
+    }
+    if (x.codes->size == 0) return;
+    /* every character constant with a code's text: the throws and what
+     * they are compared with */
+    char *t = f->text;
+    for (s64 i = 0; i < f->len; ) {
+        if (t[i] == '"') { i = migQuoteEnd(t, i, f->len) + 1; continue; }
+        if (t[i] == '/' && i + 1 < f->len && t[i + 1] == '/') { while (i < f->len && t[i] != '\n') i++; continue; }
+        if (t[i] == '/' && i + 1 < f->len && t[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < f->len && !(t[i] == '*' && t[i + 1] == '/')) i++;
+            i += 2;
+            continue;
+        }
+        s64 close;
+        if (t[i] == '\'' && migIsCodeConst(t, i, f->len, &close)) {
+            for (u64 k = 0; k < x.codes->size; ++k) {
+                char *code = x.codes->entries[k];
+                if ((s64)strlen(code) == close - i - 1 && !memcmp(t + i + 1, code, close - i - 1)) {
+                    migAdd(f, i, close + 1, mprintf("Err.%s", (char *)x.names->entries[k]), "error");
+                }
+            }
+            i = close + 1;
+            continue;
+        }
+        if (t[i] == '\'') { i = migQuoteEnd(t, i, f->len) + 1; continue; }
+        i++;
+    }
+    AoStr *decl = aoStrNew();
+    aoStrCat(decl, "enum Err { ");
+    for (u64 k = 0; k < x.names->size; ++k) {
+        aoStrCatPrintf(decl, "%s%s", k ? ", " : "", (char *)x.names->entries[k]);
+    }
+    aoStrCat(decl, " };\n");
+    s64 at = migEnumAt(f);
+    if (at > 0) aoStrCat(decl, "\n"), at = at;
+    migAdd(f, at, at, at > 0 ? mprintf("\n%s", decl->data) : decl->data, "error");
+}
+
 /* Every pass but writing: the edits of f, sorted */
 static int migConvert(MigFile *f, char *install_dir, int outer) {
     /* Code at file scope that calls Main: Main stays a function and a new
@@ -1673,6 +1834,7 @@ static int migConvert(MigFile *f, char *install_dir, int outer) {
         }
     }
     migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
+    migExceptions(f);
     migDropLiteralDefines(f);
     migCommentsAndStrings(f, install_dir, outer);
     migDefineCasts(f);
