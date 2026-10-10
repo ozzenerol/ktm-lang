@@ -5,7 +5,9 @@
  * marker dir/geo/.ktmlib. A program importing geo then reads only geo's
  * declarations (no geo code in its own output) and links the library:
  * the archive AOT, the shared object in the JIT. A const of the module
- * still works as an array size. Uses a copy of src/tests/modules/basic. */
+ * still works as an array size. Uses a copy of src/tests/modules/basic.
+ * A library has no code that runs before main, so a global with a
+ * run-time initialiser is an error in a module built with -lib. */
 
 #define PRE_OUT "./ktm-424-prebuilt.out"
 #define PRE_BIN "./ktm-424-prebuilt.bin"
@@ -47,6 +49,13 @@ I32 Main()
     correct++;
   tests++;
   if (Output(KTM "-jit ./pre/main.ktm > " PRE_OUT " 2>&1", g_want)) correct++;
+
+  System("mkdir -p ./pre/cfg && printf 'module cfg;\\ni64 seven() { return 7; }\\n"
+         "i64 g_runtime = seven();\\npub i64 value() { return g_runtime; }\\n' > ./pre/cfg/cfg.ktm");
+  tests++;
+  if (Output(KTM "-lib cfg ./pre/cfg 2>&1 | grep -c '`g_runtime` needs a constant initialiser' > " PRE_OUT,
+             "1\n"))
+    correct++;
 
   System("rm -rf ./pre " PRE_OUT " " PRE_BIN);
   PrintResult(correct, tests);

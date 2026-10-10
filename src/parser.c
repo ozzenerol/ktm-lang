@@ -5228,6 +5228,24 @@ void parseToAst(Cctrl *cc) {
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
+        /* A module built into a library (`ktm -lib`) has no code that
+         * runs before main: a run-time initialiser would never run */
+        if (is_global && cc->cur_module && cc->lexer_ &&
+            cc->lexer_->building_module) {
+            is_global = 0;
+            if (ast->kind == AST_BINOP && ast->left &&
+                ast->left->kind == AST_GVAR) {
+                char *name = strrchr(ast->left->gname->data, '.');
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "`%s` needs a constant initialiser in a module built with -lib "
+                    "(its library has no code that runs before main)",
+                    name ? name + 1 : ast->left->gname->data);
+            } else {
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "a statement at the top of a module built with -lib would never run "
+                    "(its library has no code that runs before main)");
+            }
+        }
         if (is_global) {
             listAppend(cc->initalisers,ast);
             if (!listEmpty(cc->tmp_locals)) {

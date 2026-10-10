@@ -1270,6 +1270,69 @@ green
 integers do; an integer, or a different enum, needs a cast to become one
 (<code>(Color)2</code>). Two different enums never mix without a cast either.</p>
 
+<h2 id="modules">Modules</h2>
+<p>A module is a directory of <code>.ktm</code> files. Each file in it starts with
+<code>module</code> and the directory's name, and a program uses it with
+<code>import</code>; its names are then written with the module's name in front:</p>
+<pre><code>// geo/shapes.ktm
+module geo;
+
+pub struct Point { i64 x; i64 y; };
+pub enum Kind { square, circle };
+pub const i64 SIZE = 4;
+
+pub i64 area(Kind k, i64 side) {
+  if (k == Kind.square) return square(side);   // square() is in another file of geo
+  return 3 * side * side;
+}
+
+// geo/helpers.ktm
+module geo;
+
+i64 square(i64 n) { return n * n; }             // private to geo
+
+// main.ktm
+import geo;
+
+i32 main() {
+  geo.Point p;
+  i64 cells[geo.SIZE];
+  printf("%d\n", geo.area(geo.Kind.square, 5));
+  return 0;
+}</code></pre>
+<p>Inside a module every name of every one of its files is visible, in any order:
+a function can call one defined in a later file. Outside it, only the names marked
+<code>pub</code> are, and always through the prefix (<code>geo.area</code>, the type
+<code>geo.Point</code>, <code>geo.Kind.square</code>, <code>geo.SIZE</code>, which works
+in constant expressions too). A module can't use the names its program defines: a library
+doesn't depend on whoever uses it. The C functions it declares with <code>extern "c"</code>
+are its own names as well, private unless <code>pub</code>.</p>
+<p><code>import net.http;</code> loads the directory <code>net/http</code> (its files
+start with <code>module http;</code>) and its names are <code>http.get</code>;
+<code>import h = net.http;</code> names it <code>h</code> instead. The imports come first in
+a file, before any declaration. A module is looked for under the main file's directory,
+then in the standard library's module directory, then in each directory of
+<code>KTM_PATH</code> (separated by <code>:</code>); found in two places is an error.
+Each module is compiled once, before the code that imports it, so its globals are set
+up before its importers' (the files of a module in name order).</p>
+<p>These are compile errors: using a name that isn't <code>pub</code> from outside its
+module, a module that isn't found or is found twice, an import cycle (the message shows it,
+<code>a -&gt; b -&gt; a</code>), a file whose <code>module</code> line is missing or doesn't
+match its directory, and a variable or parameter named like an import's prefix
+(<code>i64 geo;</code> would hide the module). An import that is never used is a
+warning.</p>
+<p>A module can be built into a library once and used from there:
+<code>ktm -lib geo lib/geo</code> writes <code>libgeo.a</code> and its shared object into
+<code>lib/geo</code>, with a <code>.ktmlib</code> file naming them. A program importing
+<code>geo</code> then reads only its declarations (the sources stay, as headers would) and
+links the library: the archive when compiled, the shared object in the JIT. A library has
+no code that runs before <code>main</code>, so in a module built this way a global needs a
+constant initialiser.</p>
+<p>A module's names are emitted as symbols of their own (<code>geo.area</code> is
+<code>_K3geo4area</code>), so they never clash with C functions or with the program's
+names. <code>#include</code> still pastes a file in, for C-style headers and the
+preprocessor.</p>
+
 <h2 id="preprocessor">The preprocessor</h2>
 <h3>#define</h3>
 <p>Macros name a single value: a number, a float, a string, or an expression that evaluates to
