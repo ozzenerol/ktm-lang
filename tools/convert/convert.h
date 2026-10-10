@@ -26,6 +26,10 @@ void migrateNoteOldVarArgs(Cctrl *cc, Lexeme *ellipsis);
 void migrateNoteOldVarArgUse(Cctrl *cc, Lexeme *name);
 /* A `catch` without `(Error e)`: the keyword and its handler's last token */
 void migrateNoteCatch(Cctrl *cc, Lexeme *kw, Lexeme *last);
+/* A switch's `case`/`default` (or its closing `}`): how the arm before it
+ * ends (0: no statements, 1: falls through, 2: with `break;`, 3: leaves
+ * otherwise), its last statement's last token and its statement count */
+void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, int n);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

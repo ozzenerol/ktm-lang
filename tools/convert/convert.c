@@ -756,6 +756,61 @@ void migrateNoteCatch(Cctrl *cc, Lexeme *kw, Lexeme *last) {
     vecPush(f->catches, c);
 }
 
+static void migWholeLines(MigFile *f, s64 *s, s64 *e);
+
+/* The indentation of the line holding off */
+static char *migLineIndent(MigFile *f, s64 off) {
+    s64 ls = off;
+    while (ls > 0 && f->text[ls - 1] != '\n') ls--;
+    s64 e = ls;
+    while (e < f->len && (f->text[e] == ' ' || f->text[e] == '\t')) e++;
+    return mprintf("%.*s", (int)(e - ls), f->text + ls);
+}
+
+/* Y8: an arm's last `break;` goes (not when it is the arm's only
+ * statement: `case 3: break;` does nothing, an empty arm would join the
+ * next one); an arm that falls into the next label gets `fallthrough;` */
+void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, int n) {
+    MigFile *f = migFileOf(cc, label ? label->src : NULL);
+    if (!f || !prev_end) return;
+    s64 lab = migOff(f, label), pe = migOff(f, prev_end);
+    if (lab < 0 || pe < 0) {
+        if (kind == 1 || kind == 2) migNote(f, lab, "can't rewrite a switch arm that comes from a macro");
+        return;
+    }
+    char *t = f->text;
+    int is_end = t[lab] == '}';
+    if (kind == 2 && n > 1) {
+        s64 semi = pe;
+        if (t[semi] == '}') semi = migSkipSpaceBack(t, semi - 1);
+        s64 b = migSkipSpaceBack(t, semi - 1);
+        if (semi < 0 || t[semi] != ';' || b < 4 || memcmp(t + b - 4, "break", 5) ||
+            (b > 4 && migIsIdent(t[b - 5]))) {
+            migNote(f, pe, "check: an arm's last break was not where expected");
+            return;
+        }
+        s64 s = b - 4, e = semi + 1;
+        s64 ws = s, we = e;
+        migWholeLines(f, &ws, &we);
+        if (ws != s || we != e) {
+            migAdd(f, ws, we, "", "switch");
+        } else {
+            while (s > 0 && (t[s - 1] == ' ' || t[s - 1] == '\t')) s--;
+            migAdd(f, s, e, "", "switch");
+        }
+    } else if (kind == 1 && !is_end) {
+        s64 at = pe + prev_end->len;
+        /* on the label's line: ` fallthrough;`, else on a line of its own */
+        int same_line = 1;
+        for (s64 k = at; k < lab; ++k) if (t[k] == '\n') same_line = 0;
+        if (same_line) {
+            migAdd(f, at, at, " fallthrough;", "switch");
+        } else {
+            migAdd(f, at, at, mprintf("\n%sfallthrough;", migLineIndent(f, pe)), "switch");
+        }
+    }
+}
+
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;

@@ -17,6 +17,44 @@
 /* `T (*Name(params))(fn_params)`: the `(` before the `*`, for the
  * converter's hook once the fn params are parsed */
 static Lexeme parse_fnptr_open_copy, *parse_fnptr_open = NULL;
+static Lexeme *parseLastTok(Cctrl *cc);
+/* Switches being parsed, for the converter (Y8): the last statement at
+ * arm level (directly in the switch's body or a case's list) and how
+ * many there have been since the last label */
+typedef struct { Ast *prev; Lexeme prev_end; int n; } MigSwitch;
+static MigSwitch mig_sw[64];
+static int mig_sw_n = 0, mig_sw_body = 0;
+static int astStmtFallsThrough(Ast *s);
+static void migSwStmt(Cctrl *cc, Ast *stmt) {
+    if (!cc->migrate || mig_sw_n == 0 || mig_sw_n > 64 || !stmt) return;
+    if (stmt->kind == AST_CASE || stmt->kind == AST_DEFAULT) return;
+    MigSwitch *sw = &mig_sw[mig_sw_n - 1];
+    sw->prev = stmt;
+    sw->prev_end = *parseLastTok(cc);
+    sw->n++;
+}
+/* A label (or the switch's `}`): how the arm before it ends */
+static void migSwLabel(Cctrl *cc, Lexeme *label) {
+    if (!cc->migrate || mig_sw_n == 0 || mig_sw_n > 64) return;
+    MigSwitch *sw = &mig_sw[mig_sw_n - 1];
+    int kind = 0;
+    if (sw->n) {
+        Ast *last = sw->prev;
+        while (last && last->kind == AST_COMPOUND_STMT && last->stms && !listEmpty(last->stms)) {
+            last = (Ast *)listTail(last->stms)->value;
+        }
+        if (last && last->kind == AST_BREAK) kind = 2;
+        else kind = astStmtFallsThrough(sw->prev) ? 1 : 3;
+    }
+    int n = sw->n;
+    /* `case 6: { r = 6; break; }`: the block's statements count */
+    for (Ast *b = sw->prev; n && b && b->kind == AST_COMPOUND_STMT && b->stms &&
+         !listEmpty(b->stms); b = (Ast *)listTail(b->stms)->value) {
+        n += listCount(b->stms) - 1;
+    }
+    migrateSwitchLabel(cc, label, kind, sw->n ? &sw->prev_end : NULL, n);
+    sw->n = 0;
+}
 extern int migrate_c_varargs;
 static Lexeme *parseLastTok(Cctrl *cc) {
     cctrlTokenRewind(cc);
@@ -2804,6 +2842,9 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
     cc->fallthrough_pending = 0;
+#ifdef KTM_CONVERT
+    migSwLabel(cc, tok);
+#endif
     Ast *case_, *prev, *case_expr = NULL;
     Lexeme *peek;
     AoStr *label;
@@ -2878,6 +2919,9 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         if (stmt->kind != AST_CASE && stmt->kind != AST_DEFAULT) {
             listAppend(stmts,stmt);
         }
+#ifdef KTM_CONVERT
+        migSwStmt(cc, stmt);
+#endif
         if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE ||
                 stmt->kind == AST_DEFAULT || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
                 || stmt->kind == AST_GOTO) break;
@@ -2894,6 +2938,10 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
 }
 
 Ast *parseDefaultStatement(Cctrl *cc) {
+#ifdef KTM_CONVERT
+    Lexeme mig_default = *parseLastTok(cc);
+    migSwLabel(cc, &mig_default);
+#endif
     cctrlTokenExpect(cc,':');
     cc->fallthrough_pending = 0;
     if (cc->tmp_default_case) {
@@ -2916,6 +2964,9 @@ Ast *parseDefaultStatement(Cctrl *cc) {
         if (stmt->kind != AST_CASE) {
             listAppend(stmts,stmt);
         }
+#ifdef KTM_CONVERT
+        migSwStmt(cc, stmt);
+#endif
         if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
                 || stmt->kind == AST_GOTO) break;
         peek = cctrlTokenPeek(cc);
@@ -2985,7 +3036,24 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     int outer_fallthrough = cc->fallthrough_pending;
     s64 outer_ft_line = cc->fallthrough_line, outer_ft_col = cc->fallthrough_col;
     cc->fallthrough_pending = 0;
+#ifdef KTM_CONVERT
+    if (cc->migrate) {
+        if (mig_sw_n < 64) {
+            mig_sw[mig_sw_n].prev = NULL;
+            mig_sw[mig_sw_n].n = 0;
+        }
+        mig_sw_n++;
+        mig_sw_body = 1;
+    }
+#endif
     parseStatement(cc);
+#ifdef KTM_CONVERT
+    if (cc->migrate) {
+        mig_sw_body = 0;
+        migSwLabel(cc, parseLastTok(cc));
+        mig_sw_n--;
+    }
+#endif
     aoStrRelease(tmp_name);
     int last_fallthrough = cc->fallthrough_pending;
     s64 last_ft_line = cc->fallthrough_line, last_ft_col = cc->fallthrough_col;
@@ -3303,6 +3371,10 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
 }
 
 void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
+#ifdef KTM_CONVERT
+    int mig_is_sw = mig_sw_body;
+    mig_sw_body = 0;
+#endif
     Ast *stmt = NULL;
     Ast *var = NULL;
     AstType *base_type, *type, *next_type;
@@ -3461,6 +3533,9 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 if (tokenPunctIs(tok, ',')) {
                     continue;
                 } else if (tokenPunctIs(tok,';')) {
+#ifdef KTM_CONVERT
+                    if (mig_is_sw) migSwStmt(cc, stmt ? stmt : body);
+#endif
                     break;
                 } else {
                     cctrlRaiseException(cc,"Unexpected %s `%s` while parsing statement, perhaps you meant to terminate the declaration with `;`?",
@@ -3478,6 +3553,9 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                     continue;
                 }
                 listAppend(body->stms,stmt);
+#ifdef KTM_CONVERT
+                if (mig_is_sw) migSwStmt(cc, stmt);
+#endif
             } else {
                 break;
             }
