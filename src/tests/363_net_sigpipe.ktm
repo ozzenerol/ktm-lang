@@ -27,7 +27,7 @@ U0 TcpClosedPeer()
 
   srv = NetCreateServer(0, "127.0.0.1", 4);
   Check(srv != -1, "NetCreateServer");
-  Check(getsockname(srv, &sa, &len) == 0, "getsockname");
+  Check(getsockname(srv, (sockaddr *)&sa, &len) == 0, "getsockname");
   cli = NetConnect("127.0.0.1", Ntohs(sa.sin_port));
   Check(cli != -1, "NetConnect");
   conn = NetAccept(srv);

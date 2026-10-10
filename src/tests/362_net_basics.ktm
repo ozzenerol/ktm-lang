@@ -53,12 +53,12 @@ U0 ErrnoValues()
   sa.sin_family = AF_INET;
   sa.sin_port = Htons(0);
   sa.sin_addr.s_addr = Htonl(0x7F000001);
-  Check(bind(srv, &sa, sizeof(sockaddr_in)) == 0, "bind 127.0.0.1:0");
-  Check(getsockname(srv, &sa, &len) == 0 && Ntohs(sa.sin_port) != 0,
+  Check(bind(srv, (sockaddr *)&sa, sizeof(sockaddr_in)) == 0, "bind 127.0.0.1:0");
+  Check(getsockname(srv, (sockaddr *)&sa, &len) == 0 && Ntohs(sa.sin_port) != 0,
       "getsockname gives a port");
   close(srv);
   fd = socket(AF_INET, SOCK_STREAM, 0);
-  Check(connect(fd, &sa, sizeof(sockaddr_in)) == -1 &&
+  Check(connect(fd, (sockaddr *)&sa, sizeof(sockaddr_in)) == -1 &&
       Errno() == ECONNREFUSED, "connect: ECONNREFUSED");
   close(fd);
 }

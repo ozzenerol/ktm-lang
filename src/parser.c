@@ -1019,6 +1019,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
 
     if (prev && fields_dict) {
         prev->fields = fields_dict;
+        prev->base_cls = base_class;
         prev->size = aligned_size;
         prev->alignment = (u32)aligned;
         if (intrinsic_base) prev->issigned = intrinsic_base->issigned;
@@ -1041,6 +1042,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         ref = astClassType(NULL,tag,aligned_size,is_intrinsic);
     }
     ref->alignment = (u32)aligned;
+    ref->base_cls = base_class;
     if (intrinsic_base) ref->issigned = intrinsic_base->issigned;
     if (!is_class) ref->kind = AST_TYPE_UNION;
     ref->line = tag_line;

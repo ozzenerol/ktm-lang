@@ -182,6 +182,8 @@ typedef struct AstType {
     Map *fields;
     int offset;
     int is_intrinsic;
+    /* `class D : B`: B, whose fields D starts with; NULL otherwise */
+    struct AstType *base_cls;
     /* Bool: a 1-byte char type, but a value converted to it becomes 0 or
      * 1 (value != 0), as in C, instead of keeping its low byte. */
     u8 is_bool;
