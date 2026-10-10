@@ -1812,7 +1812,13 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
 
     case AST_TYPE_POINTER: {
         AoStr *ptr_type = astTypeToAoStrInternal(type->ptr);
-        aoStrCatPrintf(str, "%s*", ptr_type->data);
+        /* `(fn(i64) i64) *`: a pointer to a function pointer, written
+         * as it is declared; `fn(i64) i64 *` returns an i64 * */
+        if (type->ptr && type->ptr->kind == AST_TYPE_FUNC) {
+            aoStrCatPrintf(str, "(%s)*", ptr_type->data);
+        } else {
+            aoStrCatPrintf(str, "%s*", ptr_type->data);
+        }
         return str;
     }
 

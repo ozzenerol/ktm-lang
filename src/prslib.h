@@ -24,6 +24,7 @@ Ast *parseFunctionPointer(Cctrl *cc, AstType *rettype);
 AstType *parseFunctionPointerType(Cctrl *cc,
         char **fnptr_name, int *fnptr_name_len, AstType *rettype);
 int tokenIsFnIdent(Lexeme *tok);
+int tokenMayStartFnType(Lexeme *tok);
 int parseFnStartsType(Cctrl *cc);
 int parseFnLooksLikeType(Cctrl *cc);
 AstType *parseFnType(Cctrl *cc);

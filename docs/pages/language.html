@@ -851,8 +851,7 @@ U0 Main()
 <h3>fn(...) types</h3>
 <p>ktm syntax v0.2 adds <code>fn ( types ) RetType</code> as a way to write a function pointer
 type: <code>fn(i64) i64</code> is exactly <code>i64 (*)(i64)</code>, with the same size, the
-same calls, and the same argument checks. Parameter names are optional and ignored. A <code>*</code>
-after the whole <code>fn(...)  RetType</code> makes a pointer to it, not to RetType, and RetType
+same calls, and the same argument checks. Parameter names are optional and ignored. RetType
 can itself be another <code>fn(...)</code> type:</p>
 <pre data-run><code>
 i64 twice(i64 x) { return x * 2; }
@@ -873,6 +872,31 @@ i32 main()
 <pre class="output">
 10
 10
+</pre>
+<p>A <code>*</code> after the return type is part of it: <code>fn(u8 *) u8 *</code> returns a
+<code>u8 *</code>. A pointer to a function pointer puts the <code>fn</code> type in
+parentheses, <code>(fn(i64) i64) *slot</code>, in declarations, parameters, fields, casts,
+<code>sizeof</code> and <code>typeof</code>, and <code>typeof</code> prints it that way.
+Parameters can have defaults, filled in when a call through the pointer leaves them out,
+and take varargs in every form a function does (<code>...</code>, <code>...args</code>,
+<code>i64 ...nums</code>):</p>
+<pre data-run><code>
+u8 *skip(u8 *s) { return s + 1; }
+i64 add(i64 a, i64 b) { return a + b; }
+i64 count(...args) { return args.len; }
+
+i32 main()
+{
+  fn(u8 *) u8 * f = &skip;
+  fn(i64 a, i64 b = 10) i64 k = &add;
+  fn(...args) i64 c = &count;
+  (fn(u8 *) u8 *) *pf = &f;
+  "%s %d %d %d %s\n", f("xyz"), k(1), k(1, 2), c(4, 5, 6), (*pf)("ab");
+  return 0;
+}
+</code></pre>
+<pre class="output">
+yz 11 3 3 b
 </pre>
 <p><code>fn</code> is a contextual keyword: old code that uses it as a plain identifier
 (<code>fn(x)</code>, <code>fn = &amp;f</code>) keeps working, since a bare <code>fn</code> only
