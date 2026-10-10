@@ -1,7 +1,8 @@
-# ktm
-
 <p align="center">
-  <img src="/assets/ktm-logo.png?raw=true" alt="ktm logo" width="300"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="ktm" width="280">
+  </picture>
 </p>
 
 ktm is a small compiled language for systems programming and networking:

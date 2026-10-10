@@ -166,16 +166,6 @@ a:hover { text-decoration-thickness: 2px; }
   white-space: nowrap;
   flex-shrink: 0;
 }
-.wordmark::before {
-  content: "";
-  display: inline-block;
-  width: 0.55em;
-  height: 0.55em;
-  margin-right: 0.35em;
-  border-radius: 2px;
-  background: var(--accent);
-  vertical-align: 0.05em;
-}
 
 .topbar button {
   display: inline-flex;
@@ -468,23 +458,8 @@ td code { white-space: nowrap; }
 
 .home main { max-width: 64rem; }
 .hero { padding: 2.5rem 0 1.5rem; }
-.hero .name {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: clamp(3.2rem, 11vw, 5.5rem);
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 1;
-}
-.hero .name::before {
-  content: "";
-  display: inline-block;
-  width: 0.5em;
-  height: 0.5em;
-  margin-right: 0.15em;
-  border-radius: 6px;
-  background: var(--accent);
-}
+.hero .name { margin: 0; line-height: 1; }
+.hero .name .logo { height: clamp(3.2rem, 12vw, 5.2rem); }
 .hero .pitch { font-size: clamp(1.15rem, 3vw, 1.45rem); margin: 1rem 0 0.4rem; max-width: 40rem; }
 .hero .sub { color: var(--muted); max-width: 40rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.4rem 0 0; }
@@ -601,3 +576,12 @@ td code { white-space: nowrap; }
   .topbar, .sidebar, .copy, .page-foot { display: none; }
   .layout { display: block; }
 }
+
+.logo { display: block; width: auto; }
+.wordmark { display: inline-flex; align-items: center; }
+.wordmark .logo { height: 1.6rem; }
+.logo-acc, .logo-txt { fill: none; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+.logo-acc { stroke: var(--accent); }
+.logo-txt { stroke: var(--text); }
+.logo-cur { fill: var(--accent); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
