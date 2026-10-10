@@ -1073,15 +1073,19 @@ U0 Main()
 
   Point *p = MAlloc(sizeof(Point));
   p->x = 5;                       // -> through a pointer
-  "%d\n", p->x;
+  p.y = 6;                        // . works through one pointer too
+  "%d %d\n", p->x, p.y;
   Free(p);
 }
 </code></pre>
 <pre class="output">
 11 22 3
 11 0
-5
+5 6
 </pre>
+<p><code>p.x</code> on a pointer to a class is <code>p-&gt;x</code>. It goes through one pointer
+only: on a <code>Point **pp</code>, <code>pp.x</code> is an error and <code>(*pp).x</code> or
+<code>pp[0].x</code> is what you write.</p>
 <p>A field that is itself a class or an array takes a nested list:</p>
 <pre data-run><code>
 class Point { I64 x, y; };
@@ -1169,6 +1173,81 @@ U0 Main()
 circle: 3.14
 rect: 6.00
 </pre>
+
+<h3 id="methods">Methods</h3>
+<p>A method is written outside its struct, as a function named <code>Type.name</code>. Inside,
+<code>self</code> is a pointer to the object it was called on (a <code>User *</code> here), and
+it can't be assigned. A method is called on a value or on a pointer, with <code>.</code> or
+<code>-&gt;</code>:</p>
+<pre data-run><code>
+struct User
+{
+  u8 *name;
+  i64 age;
+};
+
+struct Admin : User
+{
+  i64 level;
+};
+
+void User.describe()
+{
+  "%s is %d\n", self.name, self.age;
+}
+
+i64 User.older(i64 years = 1)    // default arguments and `T ...name` work as usual
+{
+  self.age += years;             // self points at the caller's object
+  return self.age;
+}
+
+void Admin.describe()            // hides User.describe for an Admin
+{
+  "admin %d: ", self.level;
+  User.describe(self);           // the base's, called explicitly
+}
+
+void main()
+{
+  User u = {"ann", 30};
+  User *p = &u;
+  u.describe();
+  p.older(5);                    // the same as p->older(5)
+  p.describe();
+
+  Admin a;
+  a.name = "bob";
+  a.age = 40;
+  a.level = 2;
+  a.older();                     // inherited from User
+  a.describe();
+
+  User *as_user = &a;
+  as_user.describe();            // no virtual dispatch: the pointer's type decides
+
+  fn(User *) void f = &User.describe;   // a method is a function taking self first
+  f(p);
+}
+</code></pre>
+<pre class="output">
+ann is 30
+ann is 35
+admin 2: bob is 41
+bob is 41
+ann is 35
+</pre>
+<p>A derived struct has its base's methods; a method of the same name on it hides the base's,
+which <code>Base.name(self)</code> still calls. Which method runs is decided by the type the
+compiler sees, never at run time. <code>&amp;User.describe</code> is an ordinary function
+pointer whose first parameter is <code>self</code>, so it works as a callback;
+<code>u.describe</code> without <code>()</code> is an error (there are no bound methods).
+A prototype, <code>void User.describe();</code>, declares a method defined later, and
+<code>static</code> keeps one to its file. A union can have methods too.</p>
+<p>These are compile errors: a method with the name of a field (inherited ones included),
+the same method defined twice, a method of something that isn't a struct or union, a method
+added to a type of the standard library or of another module, and a parameter named
+<code>self</code>. Methods are not supported with <code>-transpile</code>.</p>
 
 <h3>Unions</h3>
 <p>All fields of a <code>union</code> share the same memory:</p>
@@ -1307,6 +1386,34 @@ a function can call one defined in a later file. Outside it, only the names mark
 in constant expressions too). A module can't use the names its program defines: a library
 doesn't depend on whoever uses it. The C functions it declares with <code>extern "c"</code>
 are its own names as well, private unless <code>pub</code>.</p>
+<p>Only the module that defines a type can define its methods. Outside it, the
+<code>pub</code> methods are called on the object with no prefix
+(<code>a.deposit(5)</code> on a <code>bank.Account *a</code>), and
+<code>&amp;bank.Account.deposit</code> is one as a function pointer; a method that isn't
+<code>pub</code> is private to the module:</p>
+<pre><code>// bank/account.ktm
+module bank;
+
+pub struct Account { u8 *owner; i64 balance; };
+
+pub Account *open(u8 *owner) {
+  Account *a = MAlloc(sizeof(Account));
+  a.owner = owner;
+  a.balance = 0;
+  return a;
+}
+
+pub void Account.deposit(i64 x) { self.balance += x; self.audit(); }
+void Account.audit() { }                         // private to bank
+
+// main.ktm
+import bank;
+
+i32 main() {
+  bank.Account *a = bank.open("ann");
+  a.deposit(5);
+  return 0;
+}</code></pre>
 <p><code>import net.http;</code> loads the directory <code>net/http</code> (its files
 start with <code>module http;</code>) and its names are <code>http.get</code>;
 <code>import h = net.http;</code> names it <code>h</code> instead. The imports come first in
@@ -1329,7 +1436,8 @@ links the library: the archive when compiled, the shared object in the JIT. A li
 no code that runs before <code>main</code>, so in a module built this way a global needs a
 constant initialiser.</p>
 <p>A module's names are emitted as symbols of their own (<code>geo.area</code> is
-<code>_K3geo4area</code>), so they never clash with C functions or with the program's
+<code>_K3geo4area</code>, the method <code>Account.deposit</code> of bank
+<code>_K4bank7Account7deposit</code>), so they never clash with C functions or with the program's
 names. <code>#include</code> still pastes a file in, for C-style headers and the
 preprocessor.</p>
 

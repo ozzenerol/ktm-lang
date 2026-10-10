@@ -820,6 +820,42 @@ static char *lspModuleFnString(Ast *fn, const char *qual) {
                    at + fn->fname->len);
 }
 
+/* A method: the function `Class.name` whose first parameter is its
+ * const `self` */
+static int lspIsMethod(Ast *fn) {
+    if (!lspIsFn(fn) || !fn->params || fn->params->size == 0) return 0;
+    Ast *self = fn->params->entries[0];
+    return self && self->kind == AST_LVAR && self->lname &&
+           !strcmp(self->lname->data, "self") && (self->flags & AST_FLAG_CONST);
+}
+
+/* The method `name` of `cls` or of the nearest class it inherits from */
+static Ast *lspFindMethod(LspCtx *ctx, AstType *cls, const char *name,
+                          s64 len, AstType **owner) {
+    for (AstType *t = cls; t; t = t->base_cls) {
+        if (!t->clsname) continue;
+        Ast *fn = mapGet(ctx->cc->global_env,
+                         mprintf("%s.%.*s", t->clsname->data, (int)len, name));
+        if (fn && lspIsMethod(fn)) {
+            if (owner) *owner = t;
+            return fn;
+        }
+    }
+    return NULL;
+}
+
+/* `i64 User.older(i64 years)`: the method's signature without `self` */
+static char *lspMethodString(Ast *fn, AstType *owner, const char *name) {
+    char *str = lspModuleFnString(fn, mprintf("%s.%s", owner->clsname->data, name));
+    char *open = strchr(str, '(');
+    char *self = open ? strstr(open, "self") : NULL;
+    if (!self) return str;
+    char *rest = self + 4;
+    if (*rest == ',') rest++;
+    while (*rest == ' ') rest++;
+    return mprintf("%.*s%s", (int)(open + 1 - str), str, rest);
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -859,11 +895,16 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         }
     } else if (is_member) {
         AstType *f = (mcls && mcls->fields) ? mapGetLen(mcls->fields, ident, ilen) : NULL;
+        AstType *owner = NULL;
+        Ast *method = (mcls && !f) ? lspFindMethod(ctx, mcls, ident, ilen, &owner)
+                                   : NULL;
         if (f && mcls->clsname)
             aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(f),
                            mcls->clsname->data, ident);
         else if (f)
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(f), ident);
+        else if (method)
+            aoStrCatPrintf(rendered, "%s", lspMethodString(method, owner, ident));
     } else {
         int in_doc = 0;
         Ast *entry = lspResolveValue(ctx, doc_id, line + 1, ident, ilen,
@@ -989,6 +1030,11 @@ void lspScanMapForSuggestion(Map *suggestions,
         const char *name = (const char *)mi.node->key;
         if (strncmp(name, prefix, plen) != 0) continue;
         Ast *entry = (Ast *)mi.node->value;
+        /* a method is completed after `u.`, not on its own */
+        if (lsp_suggestion_resolver == lspGlobalSuggestionResolver &&
+            lspIsMethod(entry)) {
+            continue;
+        }
         int type = 0;
         char *str_suggestion = lsp_suggestion_resolver(entry, &type);
         lspCatCompletion(body, &emitted, name, type, str_suggestion);
@@ -1146,6 +1192,28 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                          ? KTM_LSP_FUNCTION : KTM_LSP_FIELD;
                 lspCatCompletion(mbody, &memitted, fname, kind,
                                  ft ? astTypeToString(ft) : NULL);
+            }
+        }
+        /* then its methods and the ones it inherits (a hidden base
+         * method is listed once, as the derived one) */
+        for (AstType *t = mcls; t; t = t->base_cls) {
+            if (!t->clsname) continue;
+            size_t clen = t->clsname->len;
+            MapIter gi;
+            mapIterInit(ctx->cc->global_env, &gi);
+            while (mapIterNext(&gi)) {
+                const char *key = (const char *)gi.node->key;
+                if (strncmp(key, t->clsname->data, clen) || key[clen] != '.') continue;
+                const char *mname = key + clen + 1;
+                if (strchr(mname, '.') || strncmp(mname, prefix, plen)) continue;
+                Ast *fn = (Ast *)gi.node->value;
+                AstType *owner = NULL;
+                if (!lspIsMethod(fn) ||
+                    lspFindMethod(ctx, mcls, mname, strlen(mname), &owner) != fn) {
+                    continue;
+                }
+                lspCatCompletion(mbody, &memitted, mname, KTM_LSP_FUNCTION,
+                                 lspMethodString(fn, owner, mname));
             }
         }
         aoStrCatPrintf(mbody, "]}");
@@ -1368,12 +1436,21 @@ static AstType *lspMemberClassAt(LspCtx *ctx, AoStr *text, u32 doc_id,
               ? lspCanonicalClass(ctx, r->type->rettype) : NULL;
         else
             ty = lspCanonicalClass(ctx, r->type);
+    } else if (kinds[0] == KTM_LSP_SEG_PLAIN) {
+        /* `User.describe`: a method named through its type */
+        ty = mapGet(ctx->cc->clsdefs, chain[0]);
+        if (!ty) ty = mapGet(ctx->cc->uniondefs, chain[0]);
     }
     for (int seg = 1; seg < nseg && ty && ty->fields; ++seg) {
         AstType *f = (AstType *)mapGetLen(ty->fields, chain[seg],
                 (s64)strlen(chain[seg]));
         if (f && kinds[seg] == KTM_LSP_SEG_CALL)
             f = f->rettype; /* fn-pointer field call */
+        if (!f && kinds[seg] == KTM_LSP_SEG_CALL) {
+            /* `u.me().x`: a method call, typed by its return type */
+            Ast *m = lspFindMethod(ctx, ty, chain[seg], strlen(chain[seg]), NULL);
+            if (m && m->type) f = m->type->rettype;
+        }
         ty = f ? lspCanonicalClass(ctx, f) : NULL;
     }
     return (ty && ty->fields) ? ty : NULL;
@@ -1569,10 +1646,15 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     }
     if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);
+        Ast *method = field ? NULL : lspFindMethod(ctx, mcls, ident, ilen, NULL);
         if (field && field->line > 0) {
             def_line = field->line;
             def_col = field->col;
             def_file = field->file_id;
+        } else if (method && method->line > 0) {
+            def_line = method->line;
+            def_col = method->col;
+            def_file = method->file_id;
         }
     }
 

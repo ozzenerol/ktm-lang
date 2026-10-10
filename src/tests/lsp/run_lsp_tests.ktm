@@ -94,6 +94,7 @@ U8 *REG_HC;
 U8 *UTF_HC;
 U8 *MOD_GEO_HC;
 U8 *MOD_MAIN_HC;
+U8 *METH_HC;
 
 U0 InitFixtures()
 {
@@ -118,6 +119,22 @@ U0 InitFixtures()
     "i32 main() {\n"
     "  i64 a = geo.area(3);\n"
     "  geo.\n"
+    "  return 0;\n"
+    "}\n";
+  /* Methods: Admin inherits older, hides describe */
+  METH_HC =
+    "struct User { u8 *name; i64 age; };\n"
+    "struct Admin : User { i64 level; };\n"
+    "i64 User.older(i64 years) {\n"
+    "  self.\n"
+    "  return self.age + years;\n"
+    "}\n"
+    "void User.describe() { }\n"
+    "void Admin.describe() { }\n"
+    "i32 main() {\n"
+    "  Admin a;\n"
+    "  a.\n"
+    "  i64 n = a.older(1);\n"
     "  return 0;\n"
     "}\n";
   MAIN_HC =
@@ -1197,7 +1214,7 @@ U0 TestReferences()
 
 /* ---------------- driver ---------------- */
 
-#define LSP_GROUPS 10
+#define LSP_GROUPS 11
 
 /* Modules: completion after `geo.` offers geo's pub names only, hover
  * and definition on `geo.area` resolve into geo/geo.ktm */
@@ -1231,6 +1248,45 @@ U0 TestModules()
   Check("clean shutdown", LspClose(l) == 0);
 }
 
+/* Methods: completion after `a.` offers the fields and the methods
+ * (inherited ones, a hidden one once), `self.` inside a method too;
+ * hover shows the method without `self`; definition jumps to it */
+U0 TestMethods()
+{
+  "methods\n";
+  LspClient *l = LspStart();
+  U8 *uri = UriOf("methods.ktm");
+  LspDidOpen(l, uri, METH_HC);
+
+  I64 line;
+  I64 chr;
+  I64 want_line;
+  I64 want_chr;
+  PosOf(METH_HC, "a.\n", 2, &line, &chr);
+  Json *resp = LspPositionRequest(l, "textDocument/completion", uri, line, chr);
+  Json *items = JsonSelect(resp, ".result.items:a");
+  Check("completion after `a.` offers fields and methods, describe once",
+        JsonArrayCount(items) == 5 && LabelsOk(resp, "", "older", "level") &&
+        LabelsOk(resp, "", "describe", "age"));
+
+  PosOf(METH_HC, "self.\n", 5, &line, &chr);
+  resp = LspPositionRequest(l, "textDocument/completion", uri, line, chr);
+  items = JsonSelect(resp, ".result.items:a");
+  Check("completion after `self.` offers User's fields and methods",
+        JsonArrayCount(items) == 4 && LabelsOk(resp, "", "age", "older"));
+
+  PosOf(METH_HC, "older(1)", 1, &line, &chr);
+  resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);
+  Check("hover on a.older shows the method without self",
+        HoverContains(resp, "i64 User.older(i64 years)"));
+
+  resp = LspPositionRequest(l, "textDocument/definition", uri, line, chr);
+  PosOf(METH_HC, "older(i64", 0, &want_line, &want_chr);
+  Check("definition of a.older is User.older",
+        LocEq(resp, uri, want_line, want_chr, TRUE));
+  Check("clean shutdown", LspClose(l) == 0);
+}
+
 U0 RunGroup(I64 group)
 {
   switch (group) {
@@ -1244,6 +1300,7 @@ U0 RunGroup(I64 group)
     case 7: TestReferences(); break;
     case 8: TestRegressions(); break;
     case 9: TestModules(); break;
+    case 10: TestMethods(); break;
   }
 }
 
