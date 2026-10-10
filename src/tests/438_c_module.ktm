@@ -58,12 +58,13 @@ I32 Main()
   if (Output(KTM "-jit " FIXTURE " > " MOD_OUT " 2>&1", g_want)) correct++;
 
   /* C's names: calls to write and abs (net.sock's private extern), the
-   * address of strlen; no module symbol for any of them */
+   * address of strlen (x86_64 `strlen@GOTPCREL`, arm64 `:got:strlen`,
+   * Mach-O with a `_`); no module symbol for any of them */
   tests++;
   if (Output(KTM "-S " FIXTURE " -o " MOD_BIN " && "
              "grep -qE '(call|bl)[a-z]*[[:space:]]+_?write$' " MOD_BIN " && "
              "grep -qE '(call|bl)[a-z]*[[:space:]]+_?abs$' " MOD_BIN " && "
-             "grep -qE '_?strlen@' " MOD_BIN " && "
+             "grep -qE ':got:strlen|_?strlen@' " MOD_BIN " && "
              "! grep -qE '_K[0-9]+c[0-9]+(write|strlen|clock_gettime)|_K3net4sock3abs' " MOD_BIN " && "
              "echo c-names > " MOD_OUT, "c-names"))
     correct++;
