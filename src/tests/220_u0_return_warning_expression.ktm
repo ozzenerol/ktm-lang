@@ -43,7 +43,7 @@ I32 Main()
 
   tests++;
   if (Has(PRE "U0 A() { return g++; }\n",
-          "unexpected return value 'g++' of type 'I64' expected 'U0'",
+          "unexpected return value 'g++' of type 'i64' expected 'void'",
           "220-ure.ktm:3:10\n", "|             ^^^^^^^^^^\n"))
     correct++;
   else "Failed - g++\n";
@@ -63,7 +63,7 @@ I32 Main()
 
   tests++;
   if (Has(PRE "I64 *E() { F64 f; return f; }\n",
-          "unexpected return value 'f' of type 'F64' expected 'I64 *'",
+          "unexpected return value 'f' of type 'f64' expected 'i64 *'",
           "220-ure.ktm:3:19\n"))
     correct++;
   else "Failed - pointer return\n";

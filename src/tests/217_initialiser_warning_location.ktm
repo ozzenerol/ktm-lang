@@ -32,9 +32,9 @@ Bool Has(U8 *source, U8 *want1, U8 *want2, U8 *want3 = NULL)
   return ok;
 }
 
-#define CLS "class Q { I64 a; I64 *p; };\nclass R { I64 a; Q q; I64 b; };\n" \
-            "F64 f;\n"
-#define MSG "expected 'I64 *' got 'F64"
+#define CLS "class Q { i64 a; i64 *p; };\nclass R { i64 a; Q q; i64 b; };\n" \
+            "f64 f;\n"
+#define MSG "expected 'i64 *' got 'f64"
 
 I32 Main()
 {
@@ -65,7 +65,7 @@ I32 Main()
   else "Failed - expression item\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  Q lq = {1,\n          f};\n}\n", MSG,
+  if (Has(CLS "void Main() {\n  Q lq = {1,\n          f};\n}\n", MSG,
           "217-iwl.ktm:6:11\n"))
     correct++;
   else "Failed - local, item on the next line\n";

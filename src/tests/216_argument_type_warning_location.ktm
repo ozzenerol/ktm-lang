@@ -31,8 +31,8 @@ Bool Has(U8 *source, U8 *want1, U8 *want2, U8 *want3 = NULL)
   return ok;
 }
 
-#define CLS "class P { I64 x, y; };\nclass S { U0 (*f)(P *p); };\n" \
-            "U0 Take(P *p) { }\nU0 TakeV(P p) { }\nU0 Two(I64 a, P *p) { }\n"
+#define CLS "class P { i64 x, y; };\nclass S { void (*f)(P *p); };\n" \
+            "void Take(P *p) { }\nU0 TakeV(P p) { }\nU0 Two(i64 a, P *p) { }\n"
 
 I32 Main()
 {
@@ -41,39 +41,39 @@ I32 Main()
   I64 correct = 0;
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  Take(y);\n}\n",
-          "expected 'P *' got 'I64' in function 'Take'",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Take(y);\n}\n",
+          "expected 'P *' got 'i64' in function 'Take'",
           "216-argloc.ktm:8:8\n", "|           ^\n"))
     correct++;
   else "Failed - pointer parameter\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  TakeV(y);\n}\n",
-          "expected 'P' got 'I64' in function 'TakeV'",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  TakeV(y);\n}\n",
+          "expected 'P' got 'i64' in function 'TakeV'",
           "216-argloc.ktm:8:9\n"))
     correct++;
   else "Failed - class parameter\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  Two(1, y);\n}\n",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Two(1, y);\n}\n",
           "in function 'Two'", "216-argloc.ktm:8:10\n"))
     correct++;
   else "Failed - second argument\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  Take(y + 1);\n}\n",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Take(y + 1);\n}\n",
           "216-argloc.ktm:8:8\n", "|           ^^^^^\n"))
     correct++;
   else "Failed - expression argument\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  S s;\n  s.f(y);\n}\n",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  S s;\n  s.f(y);\n}\n",
           "in function 'f'", "216-argloc.ktm:9:7\n"))
     correct++;
   else "Failed - function pointer field\n";
 
   tests++;
-  if (Has(CLS "U0 Main() {\n  I64 y = 1;\n  Two(1,\n      y);\n}\n",
+  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Two(1,\n      y);\n}\n",
           "in function 'Two'", "216-argloc.ktm:9:7\n"))
     correct++;
   else "Failed - argument on the next line\n";

@@ -53,21 +53,21 @@ Bool PtrToBool(U8 *p) { return p; }
 
 I32 Main()
 {
-  "Test - Bool diagnostics: ";
+  "Test - bool diagnostics: ";
   I64 correct = 0, tests = 0;
 
   /* pointer, array and function to Bool: no warning anywhere */
   tests++;
   if (Prints(
-"class C { Bool f; };
-U0 F() {}
-U0 Take(Bool b) {}
-Bool Ret(U8 *p) { return p; }
-Bool RetFn() { return &F; }
-U0 Main()
+"class C { bool f; };
+void F() {}
+void Take(bool b) {}
+bool Ret(u8 *p) { return p; }
+bool RetFn() { return &F; }
+void Main()
 {
-  U8 *p = \"x\", buf[4];
-  Bool a = p, b = buf, f = &F;
+  u8 *p = \"x\", buf[4];
+  bool a = p, b = buf, f = &F;
   C c;
   a = p;
   c.f = p;
@@ -79,51 +79,51 @@ U0 Main()
   /* other pointer to integer conversions still warn */
   tests++;
   if (Prints(
-"I32 Ret(U8 *p) { return p; }
-U0 Take(U8 b) {}
-U0 Main()
+"i32 Ret(u8 *p) { return p; }
+void Take(u8 b) {}
+void Main()
 {
-  U8 *p = \"x\";
-  I32 i = p;
-  U8 u = p;
-  I8 s = p;
+  u8 *p = \"x\";
+  i32 i = p;
+  u8 u = p;
+  i8 s = p;
   Take(p);
 }
-", 5, "'U8 *' is not assignable to type 'I32'",
-      "expected 'U8' got 'U8 *'")) correct++;
+", 5, "'u8 *' is not assignable to type 'i32'",
+      "expected 'u8' got 'u8 *'")) correct++;
 
   /* messages spell Bool as Bool */
   tests++;
   if (Prints(
-"class C { I64 a; };
-U0 Take(Bool b) {}
-Bool Ret() { C c; return c; }
-U0 Main()
+"class C { i64 a; };
+void Take(bool b) {}
+bool Ret() { C c; return c; }
+void Main()
 {
   C c;
   Take(c);
 }
-", 2, "Bool Ret(U0); unexpected return value 'c' of type 'C' expected 'Bool'",
-      "expected 'Bool' got 'C' in function 'Take'")) correct++;
+", 2, "bool Ret(void); unexpected return value 'c' of type 'C' expected 'bool'",
+      "expected 'bool' got 'C' in function 'Take'")) correct++;
 
   tests++;
   U8 *out = Diagnose(
-"class C { I64 a; };
-U0 Main()
+"class C { i64 a; };
+void Main()
 {
   C c;
-  Bool b = c;
+  bool b = c;
 }
 ");
-  if (out && strstr(out, "`Bool = C` is invalid") &&
-      strstr(out, "applied to a Bool type")) correct++;
+  if (out && strstr(out, "`bool = C` is invalid") &&
+      strstr(out, "applied to a bool type")) correct++;
   else "\n%s\n", out;
   Free(out);
 
   /* typeof names the type the same way */
   Bool bb;
   tests++;
-  if (!StrCmp(typeof(bb), "Bool") && !StrCmp(typeof(&bb), "Bool *")) correct++;
+  if (!StrCmp(typeof(bb), "bool") && !StrCmp(typeof(&bb), "bool *")) correct++;
   else "typeof %s / %s ", typeof(bb), typeof(&bb);
 
   /* and the conversions give 0 or 1 */

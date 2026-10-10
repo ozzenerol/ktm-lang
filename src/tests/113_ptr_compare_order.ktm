@@ -112,10 +112,10 @@ I32 Main()
 
   /* int - pointer is rejected, as in C */
   Bool ok1 = CompileFailsWith(
-"U0 Main() { I64 *w = NULL; I64 *r = 5 - w; \"%d\\n\", r; }
-", "`I64 - I64 *` is invalid");
+"void Main() { i64 *w = NULL; i64 *r = 5 - w; \"%d\\n\", r; }
+", "`i64 - i64 *` is invalid");
   Bool ok2 = CompileFailsWith(
-"U0 Main() { I64 arr[4]; I64 i = 1; I64 *r = i - arr; \"%d\\n\", r; }
+"void Main() { i64 arr[4]; i64 i = 1; i64 *r = i - arr; \"%d\\n\", r; }
 ", "is invalid");
   if (ok1) correct++; else "Failed - 5 - w compiled\n";
   if (ok2) correct++; else "Failed - i - arr compiled\n";

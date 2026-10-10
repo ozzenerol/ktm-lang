@@ -57,42 +57,42 @@ I64 TestErrors(U0)
 {
   I64 ok = 0;
   if (CompileFailsWith("-string",
-      "U0 Main() { I64 u = -\"s\"; }\n",
+      "void Main() { i64 u = -\"s\"; }\n",
       "The `-` operator cannot be applied to a string literal")) ok++;
   if (CompileFailsWith("+string",
-      "U0 Main() { I64 u = +\"s\"; }\n",
+      "void Main() { i64 u = +\"s\"; }\n",
       "The `+` operator cannot be applied to a string literal")) ok++;
   if (CompileFailsWith("~string",
-      "U0 Main() { I64 u = ~\"s\"; }\n",
+      "void Main() { i64 u = ~\"s\"; }\n",
       "The `~` operator cannot be applied to a string literal")) ok++;
   /* Located on the operator: line 3, column of the `-`. */
   if (CompileFailsWith("-pointer",
-      "U0 Main() {\n  I64 *p = 0;\n  I64 u = 1 + -p;\n}\n",
+      "void Main() {\n  i64 *p = 0;\n  i64 u = 1 + -p;\n}\n",
       ":3:15")) ok++;
   if (CompileFailsWith("-pointer message",
-      "U0 Main() { I64 *p = 0; I64 u = -p; }\n",
-      "`-` on `I64 *` is invalid")) ok++;
+      "void Main() { i64 *p = 0; i64 u = -p; }\n",
+      "`-` on `i64 *` is invalid")) ok++;
   if (CompileFailsWith("-array",
-      "U0 Main() { I64 a[3]; I64 u = -a; }\n",
+      "void Main() { i64 a[3]; i64 u = -a; }\n",
       "cannot be applied to a local variable of array type")) ok++;
   if (CompileFailsWith("-class",
-      "class C { I64 x; };\nU0 Main() { C c; I64 u = -c; }\n",
+      "class C { i64 x; };\nU0 Main() { C c; i64 u = -c; }\n",
       "cannot be applied to a local variable of class")) ok++;
   if (CompileFailsWith("-fnptr",
-      "I64 F(I64 a) { return a; }\nU0 Main() { I64 (*fp)(I64 a) = &F; I64 u = -fp; }\n",
+      "i64 F(i64 a) { return a; }\nU0 Main() { i64 (*fp)(i64 a) = &F; i64 u = -fp; }\n",
       "The `-` operator cannot be applied to a function pointer")) ok++;
   if (CompileFailsWith("-&fn",
-      "U0 F() {}\nU0 Main() { I64 u = -&F; }\n",
+      "void F() {}\nU0 Main() { i64 u = -&F; }\n",
       "The `-` operator cannot be applied")) ok++;
   /* A pointer expression, not just a variable. */
   if (CompileFailsWith("-(ptr+1)",
-      "class S { I64 *q; };\nU0 Main() { S s; S *sp = &s; I64 u = -(sp->q + 1); }\n",
+      "class S { i64 *q; };\nU0 Main() { S s; S *sp = &s; i64 u = -(sp->q + 1); }\n",
       "cannot be applied to a binary op of pointer type")) ok++;
-  if (CompileFailsWith("~F64",
-      "U0 Main() { F64 f = 2.5; I64 u = ~f; }\n",
+  if (CompileFailsWith("~f64",
+      "void Main() { f64 f = 2.5; i64 u = ~f; }\n",
       "The `~` operator cannot be applied to a local variable of float type")) ok++;
-  if (CompileFailsWith("-U0 call",
-      "U0 F() {}\nU0 Main() { I64 u = -F(); }\n",
+  if (CompileFailsWith("-void call",
+      "void F() {}\nU0 Main() { i64 u = -F(); }\n",
       "The `-` operator cannot be applied to a function call of void type")) ok++;
   return ok;
 }

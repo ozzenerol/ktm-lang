@@ -1927,7 +1927,7 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
             if (container->type->ptr->kind != AST_TYPE_CLASS) {
-                cctrlRaiseException(cc,"pointer '%s' has no fields; range requires 'I64 size' and '<type> *entries'",
+                cctrlRaiseException(cc,"pointer '%s' has no fields; range requires 'i64 size' and '<type> *entries'",
                         astLValueToString(container, 0));
             }
 

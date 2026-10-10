@@ -72,29 +72,29 @@ I32 Main()
   "Test - pointer conversion warnings: ";
 
   out = CompileOutput(
-"U0 TakeI(I64 *p) { if (p) \"take\\n\"; }
-I64 *RetI(F64 *f) { return f; }
-U0 Main() {
-  F64 f = 1.5;
-  I64 x = 3;
-  I64 *q = &x;
-  I64 *r = &f;
+"void TakeI(i64 *p) { if (p) \"take\\n\"; }
+i64 *RetI(f64 *f) { return f; }
+void Main() {
+  f64 f = 1.5;
+  i64 x = 3;
+  i64 *q = &x;
+  i64 *r = &f;
   r = &f;
   TakeI(&f);
   \"%d\\n\", RetI(&f) == &f;
   q -= q;
-  \"%d %d\\n\", q == NULL, *r == *(&f)(I64 *);
+  \"%d %d\\n\", q == NULL, *r == *(&f)(i64 *);
 }
 ");
   if (out) correct++;
-  if (Has(out, "Incompatible types 'F64 *' is not assignable to type 'I64 *'\n --> "
+  if (Has(out, "Incompatible types 'f64 *' is not assignable to type 'i64 *'\n --> "
                PTRCONV_FILE ":7:10")) correct++;
-  if (Has(out, "Incompatible types 'F64 *' is not assignable to type 'I64 *'\n --> "
+  if (Has(out, "Incompatible types 'f64 *' is not assignable to type 'i64 *'\n --> "
                PTRCONV_FILE ":8:5")) correct++;
-  if (Has(out, "Incompatible function argument, expected 'I64 *' got 'F64 *' in function 'TakeI'\n --> "
+  if (Has(out, "Incompatible function argument, expected 'i64 *' got 'f64 *' in function 'TakeI'\n --> "
                PTRCONV_FILE ":9:")) correct++;
-  if (Has(out, "unexpected return value 'f' of type 'F64 *' expected 'I64 *'")) correct++;
-  if (Has(out, "Incompatible types 'U64' is not assignable to type 'I64 *'\n --> "
+  if (Has(out, "unexpected return value 'f' of type 'f64 *' expected 'i64 *'")) correct++;
+  if (Has(out, "Incompatible types 'u64' is not assignable to type 'i64 *'\n --> "
                PTRCONV_FILE ":11:5")) correct++;
   if (out && !strstr(out, "error")) correct++;
   /* Still a working program */
@@ -103,33 +103,33 @@ U0 Main() {
 
   /* None of these warn */
   out = CompileOutput(
-"class C { I64 a; };
-U0 TakeU(U0 *p) { if (!p) \"null\\n\"; }
-U0 Main() {
-  F64 f = 1.5;
-  I64 x = 3, d;
-  I64 *q = &x;
-  U0 *v = &f;
-  I64 *z = v;
+"class C { i64 a; };
+void TakeU(void *p) { if (!p) \"null\\n\"; }
+void Main() {
+  f64 f = 1.5;
+  i64 x = 3, d;
+  i64 *q = &x;
+  void *v = &f;
+  i64 *z = v;
   v = q;
   q = &x;
   d = q - q;
   q += 1; q -= 1; q++; q--;
-  q = (&f)(I64 *);
+  q = (&f)(i64 *);
   q = &x;
-  U8 *s = \"abc\";
-  I8 *t = s;
+  u8 *s = \"abc\";
+  i8 *t = s;
   s = t;
-  U8 **pp = &s;
-  U64 *w = s + 1;
+  u8 **pp = &s;
+  u64 *w = s + 1;
   s = w;
-  Bool *b = s;
-  F64 *fp = &f;
-  F64 *fq = fp;
+  bool *b = s;
+  f64 *fp = &f;
+  f64 *fq = fp;
   C c; C *cp = &c;
   TakeU(&f);
   TakeU(q);
-  I64 *n = NULL;
+  i64 *n = NULL;
   n = 0;
   \"%d %d %d\\n\", d, *q, n == NULL;
 }
@@ -142,13 +142,13 @@ U0 Main() {
 
   /* `I64 *q = &f` alone, from a global */
   out = CompileOutput(
-"F64 g = 2.0;
-U0 Main() {
-  I64 *q = &g;
+"f64 g = 2.0;
+void Main() {
+  i64 *q = &g;
   \"%d\\n\", q != NULL;
 }
 ");
-  if (Has(out, "Incompatible types 'F64 *' is not assignable to type 'I64 *'\n --> "
+  if (Has(out, "Incompatible types 'f64 *' is not assignable to type 'i64 *'\n --> "
                PTRCONV_FILE ":3:10")) correct++;
   Free(out);
 

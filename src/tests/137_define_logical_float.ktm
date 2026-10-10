@@ -33,17 +33,17 @@ I32 Main()
 
   "Test - #define with float operands of &&, || and !: ";
 
-  if (AND_F == 1 && !StrCmp(typeof(AND_F), "I64")) correct++;
+  if (AND_F == 1 && !StrCmp(typeof(AND_F), "i64")) correct++;
   if (AND_F2 == 1 && AND_FF == 1) correct++;
   if (AND_ZERO == 0 && AND_NEG == 1) correct++;
   if (AND_MACRO == 1) correct++;
-  if (OR_F == 1 && !StrCmp(typeof(OR_F), "I64")) correct++;
+  if (OR_F == 1 && !StrCmp(typeof(OR_F), "i64")) correct++;
   if (OR_ZERO == 0 && OR_ZEROF == 0) correct++;
-  if (NOT_F == 0 && !StrCmp(typeof(NOT_F), "I64")) correct++;
+  if (NOT_F == 0 && !StrCmp(typeof(NOT_F), "i64")) correct++;
   if (NOT_ZERO == 1 && NOT_NOT == 1) correct++;
   if (CMP_AND == 1) correct++;
-  if (F_AND == 1.5 && !StrCmp(typeof(F_AND), "F64")) correct++;
-  if (F_NOT == 1.5 && !StrCmp(typeof(F_NOT), "F64")) correct++;
+  if (F_AND == 1.5 && !StrCmp(typeof(F_AND), "f64")) correct++;
+  if (F_NOT == 1.5 && !StrCmp(typeof(F_NOT), "f64")) correct++;
 
   /* The folded value equals the run-time one. */
   if (AND_F == (h && 1) && AND_NEG == (-h && 1)) correct++;
