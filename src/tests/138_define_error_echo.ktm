@@ -61,10 +61,10 @@ I32 Main()
 
   "Test - error excerpt shows the line as written: ";
 
-  /* the issue's repro: a macro, a `?` and a float */
+  /* the issue's repro: a macro, a `$` and a float */
   if (ExcerptIs(
-      "#define N 3\n#define T (N > 2 ? 1 : 2.5)\nU0 Main() {}\n",
-      "   2 |    #define T (N > 2 ? 1 : 2.5)\n     |              ^^^^^^^^^^^^^^^^^")) correct++;
+      "#define N 3\n#define T (N > 2 $ 1 : 2.5)\nU0 Main() {}\n",
+      "   2 |    #define T (N > 2 $ 1 : 2.5)\n     |              ^^^^^^^^^^^^^^^^^")) correct++;
 
   /* hex, exponent, char const and string macro in a #define */
   if (ExcerptIs(
@@ -76,10 +76,10 @@ I32 Main()
       "#define N 3\n#define X (N + 1.5 /* c */ + \"s\")   // tail\nU0 Main() {}\n",
       "   2 |    #define X (N + 1.5 /* c */ + \"s\")   // tail\n     |              ^^^^^^^^^^^^^^^^^^^^^^^")) correct++;
 
-  /* an #if with a float and a `?` */
+  /* an #if with a float and a `$` */
   if (ExcerptIs(
-      "#define N 3\n#if N > 2.5 ? 1\n#endif\nU0 Main() {}\n",
-      "   2 |    #if N > 2.5 ? 1\n     |                  ^")) correct++;
+      "#define N 3\n#if N > 2.5 $ 1\n#endif\nU0 Main() {}\n",
+      "   2 |    #if N > 2.5 $ 1\n     |                  ^")) correct++;
 
   /* a statement using a macro next to number literals */
   if (ExcerptIs(
