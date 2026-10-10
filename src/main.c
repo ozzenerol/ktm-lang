@@ -340,6 +340,36 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                     (s64)asmbuf->len, written);
         }
         close(fd);
+    } else if (args->emit_dylib && args->module_dir) {
+        /* `ktm -lib a.b dir/a/b`: liba.b.a and the shared object next to
+         * the module's sources, and the .ktmlib marker an importer finds
+         * them by. Nothing is installed. */
+        writeAsmToTmp(asmbuf);
+        char *dir = realpath(args->module_dir, NULL);
+        if (!dir) dir = args->module_dir;
+#if IS_BSD
+        char *shared = mprintf("%s/lib%s.dylib", dir, args->lib_name);
+        char *shared_flags = "-dynamiclib -undefined dynamic_lookup";
+#else
+        char *shared = mprintf("%s/lib%s.so", dir, args->lib_name);
+        char *shared_flags = "-shared -Wl,-Bsymbolic";
+#endif
+        char *archive = mprintf("%s/lib%s.a", dir, args->lib_name);
+        aoStrCatPrintf(cmd, "%s -shared -fPIC -c %s -o %s",
+                cc->CC, asm_tmp_file, args->obj_outfile);
+        safeSystem(cmd->data,1);
+        safeSystem(mprintf("rm -f %s && ar rcs %s %s", archive, archive,
+                           args->obj_outfile), 1);
+        safeSystem(mprintf("%s -fPIC %s %s -o %s", cc->CC, shared_flags,
+                           args->obj_outfile, shared), 1);
+        unlink(args->obj_outfile);
+        char *marker = mprintf("%s/.ktmlib", dir);
+        FILE *mf = fopen(marker, "w");
+        if (!mf) {
+            loggerPanic("Failed to write '%s': %s\n", marker, strerror(errno));
+        }
+        fprintf(mf, "static %s\nshared %s\n", archive, shared);
+        fclose(mf);
     } else if (args->emit_dylib) {
         writeAsmToTmp(asmbuf);
         ktmLibInit(cc, &lib,args,args->lib_name);

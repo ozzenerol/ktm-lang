@@ -4945,8 +4945,24 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * pass defines it. Its initialiser is skipped. */
         if (cc->decls_only && !tokenPunctIs(tok, '(')) {
             int depth = 0;
-            Lexeme *t;
-            while ((t = cctrlTokenGet(cc)) != NULL) {
+            Lexeme *t = NULL;
+            /* A const integer's value is known here already, so another
+             * file (or a program using a prebuilt module) can use it in
+             * a constant expression */
+            s64 const_val = 0;
+            int const_ok = 0;
+            if (is_const && astIsIntType(type) && tokenPunctIs(tok, '=')) {
+                cctrlTokenGet(cc);
+                Ast *init = parseExpr(cc, 16);
+                const_ok = init != NULL;
+                if (init) const_val = evalIntConstExprOrErr(init, &const_ok);
+                t = cctrlTokenGet(cc);
+                if (!tokenPunctIs(t, ';') && !tokenPunctIs(t, ',')) {
+                    cctrlRaiseException(cc, "Expected `;` after `%.*s`",
+                                        name->len, name->start);
+                }
+            }
+            while (!t && (t = cctrlTokenGet(cc)) != NULL) {
                 if (tokenPunctIs(t,'(') || tokenPunctIs(t,'[') ||
                     tokenPunctIs(t,'{')) {
                     depth++;
@@ -4957,10 +4973,15 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                                           tokenPunctIs(t,','))) {
                     break;
                 }
+                t = NULL;
             }
             Ast *gvar = astGVar(type, name->start, name->len, 0);
             gvar->flags |= AST_FLAG_EXTERN;
             if (is_const) gvar->flags |= AST_FLAG_CONST;
+            if (const_ok) {
+                gvar->deref_symbol = const_val;
+                gvar->flags |= AST_FLAG_CONST_VALUE;
+            }
             Ast *decl = astDecl(gvar, NULL);
             decl->flags |= AST_FLAG_EXTERN;
             if (!is_static) {

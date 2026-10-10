@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -418,6 +419,12 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             /* A clean break from the old extensions: as the input file
              * they're an error (after it, they are the program's own
              * arguments, like any other word). */
+            struct stat st;
+            if (file_type == FT_INVALID && !args->infile && !args->module_dir &&
+                stat(arg, &st) == 0 && S_ISDIR(st.st_mode)) {
+                args->module_dir = mprintf("%s", arg);
+                continue;
+            }
             if (file_type == FT_OLD_SOURCE && !args->infile) {
                 fprintf(stderr, "ktm: `%s`: ktm sources use .ktm (headers .ktmh)\n", arg);
                 exit(EXIT_FAILURE);
@@ -535,6 +542,17 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
         cliPanic("Unknown commandline options: %s\n", s->data);
     }
 
+    if (args->module_dir) {
+        if (!args->emit_dylib) {
+            cliPanic("a module directory (%s) is built with -lib <module>, "
+                     "as in `ktm -lib net.http lib/net/http`\n", args->module_dir);
+        }
+        args->infile = args->module_dir;
+        args->infile_no_ext = mprintf("lib%s", args->lib_name);
+        args->asm_outfile = mprintf("%s/lib%s.s", args->module_dir, args->lib_name);
+        args->obj_outfile = mprintf("%s/lib%s.o", args->module_dir, args->lib_name);
+    }
+
     /* The REPL and the LSP read from stdin - the two modes with no
      * input file. */
     if (args->infile == NULL && !args->repl && !args->lsp) {
@@ -548,6 +566,7 @@ void cliArgsInit(CliArgs *args) {
     args->clibs = "";
     args->defines_list = NULL;
     args->object_files = NULL;
+    args->module_dir = NULL;
     args->shared_object_files = NULL;
     args->argv = listNew();
 

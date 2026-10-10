@@ -76,7 +76,19 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     l->lineno = 1;
     lexSetBuiltinRoot(l,root_dir);
 
-    lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
+    if (args->module_dir) {
+        /* `ktm -lib a.b dir/a/b`: compile the module as a program that
+         * imports it, found from dir (dir/a/b less the a/b) */
+        if (!lexSetModuleLibRoot(l, args->module_dir, args->lib_name)) {
+            fprintf(stderr, "ktm: %s is not a directory ending in %s (module %s)\n",
+                    args->module_dir, args->lib_name, args->lib_name);
+            return 0;
+        }
+        char *src = mprintf("import %s;\n", args->lib_name);
+        lexPushString(l, "<module library>", src, strlen(src));
+    } else {
+        lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
+    }
     /* library files */
     /* the structure is a so this will get popped first */
     lexPushFile(l,builtin_path);
