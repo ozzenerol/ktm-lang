@@ -30,6 +30,9 @@ void migrateNoteCatch(Cctrl *cc, Lexeme *kw, Lexeme *last);
  * ends (0: no statements, 1: falls through, 2: with `break;`, 3: leaves
  * otherwise), its last statement's last token and its statement count */
 void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, int n);
+/* A control statement's body that isn't a `{ }` block (Y13): the token
+ * before it (`)`, `else`, `do`, `catch`), its first and its last token */
+void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

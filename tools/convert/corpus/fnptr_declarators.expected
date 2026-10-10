@@ -3,7 +3,7 @@ struct Shape { u8 *name; fn(Shape *s) f64 area; };
 i64 Twice(i64 x) { return 2 * x; }
 i64 Sq(i64 x) { return x * x; }
 i64 Apply(fn(i64) i64 f, i64 x) { return f(x); }
-fn(i64) i64 Pick(bool sq) { if (sq) return &Sq; return &Twice; }
+fn(i64) i64 Pick(bool sq) { if (sq) { return &Sq; } return &Twice; }
 fn(u8 *s, fn(i64) i64 cb) u8 *g_namer = null;
 void main()
 {

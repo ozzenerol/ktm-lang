@@ -1,10 +1,10 @@
 i64 Sum(...args)
 {
   i64 t = 0;
-  for (i64 i = 0; i < args.len; i++) t += (i64)args[i];
+  for (i64 i = 0; i < args.len; i++) { t += (i64)args[i]; }
   return t;
 }
-f64 First(u8 *tag, ...args) { if (args.len) return (f64)args[0]; return 0; }
+f64 First(u8 *tag, ...args) { if (args.len) { return (f64)args[0]; } return 0; }
 i64 Join(i64 n, i64 *v) { return n + v[0]; }
 i64 Fwd(...args) { return Join(args.len, args); }
 void main()

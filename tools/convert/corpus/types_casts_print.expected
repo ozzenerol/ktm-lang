@@ -8,7 +8,7 @@ struct Point
 
 pub u8 *Name(Point *p)
 {
-  if (p == null) return "none";
+  if (p == null) { return "none"; }
   return "pt";
 }
 

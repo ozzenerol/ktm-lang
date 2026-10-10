@@ -13,11 +13,33 @@
 #include "list.h"
 #include "parser.h"
 #ifdef KTM_CONVERT
+#define parseBodyStmt(cc) parseBody(cc)
+#else
+#define parseBodyStmt(cc) parseStatement(cc)
+#endif
+#ifdef KTM_CONVERT
 #include "../tools/convert/convert.h"
 /* `T (*Name(params))(fn_params)`: the `(` before the `*`, for the
  * converter's hook once the fn params are parsed */
 static Lexeme parse_fnptr_open_copy, *parse_fnptr_open = NULL;
 static Lexeme *parseLastTok(Cctrl *cc);
+/* A control statement's body (Y13): parsed as parseStatement does; one
+ * that isn't a `{ }` block is reported (not `else if`) */
+Ast *parseStatement(Cctrl *cc);
+static Ast *parseBody(Cctrl *cc) {
+    if (!cc->migrate) return parseStatement(cc);
+    Lexeme hdr = *parseLastTok(cc);
+    Lexeme *peek = cctrlTokenPeek(cc);
+    Lexeme first = peek ? *peek : hdr;
+    Ast *body = parseStatement(cc);
+    int is_block = tokenPunctIs(&first, '{');
+    int is_else_if = hdr.tk_type == TK_KEYWORD && hdr.i64 == KW_ELSE &&
+                     first.tk_type == TK_KEYWORD && first.i64 == KW_IF;
+    if (peek && !is_block && !is_else_if) {
+        migrateNoteBody(cc, &hdr, &first, parseLastTok(cc));
+    }
+    return body;
+}
 /* Switches being parsed, for the converter (Y8): the last statement at
  * arm level (directly in the switch's body or a case's list) and how
  * many there have been since the last label */
@@ -2108,7 +2130,7 @@ Ast *parseIfStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    Ast *then = parseStatement(cc);
+    Ast *then = parseBodyStmt(cc);
     Lexeme *tok = cctrlTokenGet(cc);
     Ast *els = NULL;
 
@@ -2123,7 +2145,7 @@ Ast *parseIfStatement(Cctrl *cc) {
             cctrlRaiseException(cc,"Unexpected %s `%s` while parsing else body",
                     lexemeTypeToString(epeek->tk_type), lexemeAsWritten(epeek));
         }
-        els = parseStatement(cc);
+        els = parseBodyStmt(cc);
     } else {
         cctrlTokenRewind(cc);
     }
@@ -2163,7 +2185,7 @@ Ast *parseOptExpr(Cctrl *cc) {
  * variable. A body without braces is a single statement, so it is wrapped
  * in a compound statement to have a statement list to prepend to. */
 static Ast *parseRangeLoopBody(Cctrl *cc, Ast *iterator) {
-    Ast *forbody = parseStatement(cc);
+    Ast *forbody = parseBodyStmt(cc);
     if (forbody == NULL || forbody->kind != AST_COMPOUND_STMT) {
         List *stmts = listNew();
         if (forbody) listAppend(stmts,forbody); /* NULL: an empty `;` body */
@@ -2485,7 +2507,7 @@ Ast *parseForStatement(Cctrl *cc) {
         cctrlRaiseException(cc,"Unexpected %s `%s` while parsing for loop body", 
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
-    forbody = parseStatement(cc);
+    forbody = parseBodyStmt(cc);
     /* Go back up */
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
@@ -2532,7 +2554,7 @@ Ast *parseWhileStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBodyStmt(cc);
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
     cc->tmp_loop_end = prev_end;
@@ -2568,7 +2590,7 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
     }
 
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBodyStmt(cc);
     
     tok = cctrlTokenGetRequired(cc);
 
@@ -2731,7 +2753,7 @@ static Ast *parseCatchBinding(Cctrl *cc) {
     if (cc->tmp_locals) {
         listAppend(cc->tmp_locals, var);
     }
-    Ast *handler = parseStatement(cc);
+    Ast *handler = parseBodyStmt(cc);
     cc->localenv = outer;
 
     List *stmts = listNew();
@@ -2766,7 +2788,7 @@ Ast *parseTryStatement(Cctrl *cc) {
 #endif
     Ast *catch_body = parseCatchBinding(cc);
     if (!catch_body) {
-        catch_body = parseStatement(cc);
+        catch_body = parseBodyStmt(cc);
 #ifdef KTM_CONVERT
         if (cc->migrate) migrateNoteCatch(cc, &catch_kw, parseLastTok(cc));
 #endif

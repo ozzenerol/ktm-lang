@@ -17,7 +17,7 @@ i64 Grade(i64 s)
       r = 6;
     }
     case 7:
-      if (s) break;
+      if (s) { break; }
       r = 7;
       fallthrough;
     default:
@@ -25,4 +25,4 @@ i64 Grade(i64 s)
   }
   return r;
 }
-void main() { for (i64 i = 0; i < 9; i++) printf("%d ", Grade(i)); printf("\n"); }
+void main() { for (i64 i = 0; i < 9; i++) { printf("%d ", Grade(i)); } printf("\n"); }

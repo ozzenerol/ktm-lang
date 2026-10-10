@@ -99,6 +99,7 @@ typedef struct MigFile {
     Vec *skipped;        /* [start, end) pairs of text an #if skipped */
     Vec *catches;        /* MigCatch *: catches without `(Error e)` */
     Vec *defines;        /* MigDefine *: #defines that fold to a number */
+    Vec *closers;        /* MigEdit *: `}`s of bodies, innermost first */
 } MigFile;
 
 typedef struct MigDefine {
@@ -811,6 +812,41 @@ void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, in
     }
 }
 
+/* Y13: `if (x) y;` -> `if (x) { y; }`; a body on lines of its own gets
+ * `{` on the header's line and `}` on a line of its own at the header's
+ * indentation; an empty body `;` becomes `{}` */
+void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last) {
+    MigFile *f = migFileOf(cc, first ? first->src : NULL);
+    if (!f) return;
+    s64 h = migOff(f, hdr), b = migOff(f, first), e = migOff(f, last);
+    if (h < 0 || b < 0 || e < 0 || e < b) {
+        migNote(f, b, "can't add braces to a body that comes from a macro");
+        return;
+    }
+    char *t = f->text;
+    s64 he = h + hdr->len, be = e + last->len;
+    char *key = mprintf("body:%lld:%lld", (long long)h, (long long)b);
+    if (setHas(f->seen, key)) return;
+    setAdd(f->seen, key);
+    if (b == e && t[b] == ';') {
+        migAdd(f, b, b + 1, b > 0 && (t[b - 1] == ' ' || t[b - 1] == '\t') ? "{}" : " {}", "braces");
+        return;
+    }
+    int same_line = 1;
+    for (s64 k = he; k < be; ++k) if (t[k] == '\n') same_line = 0;
+    MigEdit *c = (MigEdit *)calloc(1, sizeof(MigEdit));
+    c->start = c->end = be;
+    c->kind = "braces";
+    if (same_line) {
+        migAdd(f, b, b, "{ ", "braces");
+        c->text = strdup(" }");
+    } else {
+        migAdd(f, he, he, " {", "braces");
+        c->text = mprintf("\n%s}", migLineIndent(f, h));
+    }
+    vecPush(f->closers, c);
+}
+
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;
@@ -1002,7 +1038,8 @@ static void migMoveItems(MigFile *f) {
             }
             migNote(f, it->start, "moved the initialiser of a global into main");
         } else {
-            text = migApply(f, it->start, it->end, 0);
+            /* with what is inserted at its end (a body's `}`) */
+            text = migApply(f, it->start, it->end, 1);
             s64 s = it->start, e = it->end;
             migWholeLines(f, &s, &e);
             migAdd(f, s, e, "", "moved");
@@ -1679,6 +1716,7 @@ static MigFile *migFileNew(char *path) {
     f->skipped = vecNew(&vec_unsigned_long_type);
     f->catches = vecNew(&vec_unsigned_long_type);
     f->defines = vecNew(&vec_unsigned_long_type);
+    f->closers = vecNew(&vec_unsigned_long_type);
     f->seen = setNew(64, &set_cstring_type);
     f->notes = aoStrNew();
     f->item_start = -1;
@@ -2018,6 +2056,13 @@ static int migConvert(MigFile *f, char *install_dir, int outer) {
             MigItem *it = f->items->entries[k];
             if (at >= it->start && at < it->end) f->top_calls_main = 1;
         }
+    }
+    /* body `}`s: reported innermost first; at one offset the newest
+     * insert comes first, so the outermost is added first */
+    for (u64 k = f->closers->size; k-- > 0; ) {
+        MigEdit *c = f->closers->entries[k];
+        c->seq = f->seq++;
+        vecPush(f->edits, c);
     }
     migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
     migExceptions(f);
