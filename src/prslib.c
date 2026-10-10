@@ -135,6 +135,29 @@ int parseFnLooksLikeType(Cctrl *cc) {
     return looks_like_type;
 }
 
+static int parseIsVarArgElemType(AstType *t);
+
+/* The two hidden parameters of `T ...name` (elem NULL: `...name`, 64-bit
+ * slots): the count `name#len` and `name`, a pointer to the caller's
+ * array of the extras, flagged AST_FLAG_VARARGS. */
+static void parseVarArgsPair(Vec *params, AstType *elem, char *name, int len,
+                             Ast **_count, Ast **_data)
+{
+    if (!elem) {
+        elem = astTypeCopy(ast_int_type);
+        elem->has_var_args = 1;
+    }
+    AoStr *len_name = aoStrPrintf("%.*s#len", len, name);
+    Ast *count = astLVar(astTypeCopy(ast_int_type), len_name->data,
+                         len_name->len);
+    Ast *data = astLVar(astMakePointerType(elem), name, len);
+    data->flags |= AST_FLAG_VARARGS;
+    vecPush(params, count);
+    vecPush(params, data);
+    if (_count) *_count = count;
+    if (_data) *_data = data;
+}
+
 /* The parameter TYPES of an `fn(...)` type: `[type {, type}] [, ...]`,
  * an optional, ignored name after each type. Not `parseParams`: that
  * registers names, varargs' argc/argv and defaults into the current
@@ -152,6 +175,14 @@ static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
     while (1) {
         if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
             cctrlTokenGet(cc);
+            /* `...name`: the untyped named form (as `fn(u8 *, ...args)`) */
+            Lexeme *name = cctrlTokenPeek(cc);
+            if (name && name->tk_type == TK_IDENT) {
+                cctrlTokenGet(cc);
+                parseVarArgsPair(params, NULL, name->start, name->len, NULL, NULL);
+                cctrlTokenExpect(cc,')');
+                return params;
+            }
             *has_var_args = 1;
             /* The argument-count check (parseFunctionArgumentCheck) finds
              * the vararg point by looking for an AST_VAR_ARGS entry in
@@ -163,6 +194,24 @@ static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
             return params;
         }
         AstType *type = parseDeclSpec(cc);
+        /* `T ...` (a name may follow): the typed named form */
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            Lexeme *ell = cctrlTokenGet(cc);
+            if (!parseIsVarArgElemType(type)) {
+                cctrlRaiseExceptionAt(cc, ell->line, ell->col, 3,
+                    "the elements of `...` must be numbers or pointers, got %s",
+                    astTypeToString(type));
+            }
+            Lexeme *name = cctrlTokenPeek(cc);
+            if (name && name->tk_type == TK_IDENT) {
+                cctrlTokenGet(cc);
+                parseVarArgsPair(params, type, name->start, name->len, NULL, NULL);
+            } else {
+                parseVarArgsPair(params, type, "_", 1, NULL, NULL);
+            }
+            cctrlTokenExpect(cc,')');
+            return params;
+        }
         type = parseArrayDimensions(cc,type);
         if (type->kind == AST_TYPE_ARRAY) {
             type = astMakePointerType(type->ptr);
@@ -345,22 +394,15 @@ static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
         cctrlRaiseExceptionAt(cc, line, col, 3,
             "`...%.*s` is not supported with -transpile", name->len, name->start);
     }
-    int untyped = elem == NULL;
-    if (untyped) {
-        elem = astTypeCopy(ast_int_type);
-        elem->has_var_args = 1;
-    } else if (!parseIsVarArgElemType(elem)) {
+    if (elem && !parseIsVarArgElemType(elem)) {
         cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
             "the elements of `...%.*s` must be numbers or pointers, got %s",
             name->len, name->start, astTypeToString(elem));
     }
-    AoStr *len_name = aoStrPrintf("%.*s#len", name->len, name->start);
-    Ast *count = astLVar(astTypeCopy(ast_int_type), len_name->data,
-                         len_name->len);
-    Ast *data = astLVar(astMakePointerType(elem), name->start, name->len);
+    Ast *count, *data;
+    parseVarArgsPair(params, elem, name->start, name->len, &count, &data);
     count->line = data->line = name->line;
     count->col = data->col = name->col;
-    data->flags |= AST_FLAG_VARARGS;
     if (store) {
         if (!mapAddOrErr(cc->localenv, data->lname->data, data)) {
             cctrlRaiseException(cc, "variable %s already declared",
@@ -372,8 +414,6 @@ static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
         listAppend(cc->tmp_locals, count);
         listAppend(cc->tmp_locals, data);
     }
-    vecPush(params, count);
-    vecPush(params, data);
 
     Lexeme *tok = cctrlTokenGet(cc);
     if (!tokenPunctIs(tok, terminator)) {

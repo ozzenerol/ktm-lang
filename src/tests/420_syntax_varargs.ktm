@@ -115,6 +115,12 @@ Bool Fails(U8 *source, U8 *want)
   return ok;
 }
 
+/* through fn(...) types (ktm syntax v0.2's Y4) */
+i64 Apply(fn(i64 ...) i64 f)
+{
+  return f(1, 2, 3);
+}
+
 /* a call at file scope */
 i64 g_file_scope = Sum(4, 5, 6);
 
@@ -150,6 +156,18 @@ I32 Main()
   /* through a function pointer */
   i64 (*fp)(i64 ...n) = &Sum;
   tests++; if (fp() == 0 && fp(10, 20, 30) == 60) correct++;
+  fn(i64 ...) i64 ft = &Sum;
+  fn(u8 *, ...args) i64 fu = &Untyped;
+  fn(f64 ...) f64 fa = &Avg;
+  tests++;
+  if (ft() == 0 && ft(4, 5) == 9 && fu("f", 1, 2) == 2 && fa(1, 3) == 2 &&
+      Apply(&Sum) == 6 && Apply(&Total) == 6)
+    correct++;
+  tests++;
+  if (!StrCmp(typeof(ft), "fn(i64 ...) i64") && !StrCmp(typeof(fa), "fn(f64 ...) f64") &&
+      !StrCmp(typeof(fp), "fn(i64 ...) i64"))
+    correct++;
+  else "\n  %s | %s | %s\n", typeof(ft), typeof(fa), typeof(fp);
   /* in a loop: the call site's array is reused each time */
   i64 acc = 0;
   for (i64 k = 0; k < 5; k++) acc += Sum(k, k, k);

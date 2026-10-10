@@ -4037,6 +4037,9 @@ static int parseFnTypesMatch(AstType *a, AstType *b) {
                 if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
                     return 0;
                 }
+                if ((pa->flags & AST_FLAG_VARARGS) != (pb->flags & AST_FLAG_VARARGS)) {
+                    return 0;
+                }
                 if (pa->kind == AST_VAR_ARGS) continue;
                 if (!parseFnTypesMatch(pa->type, pb->type)) return 0;
             }

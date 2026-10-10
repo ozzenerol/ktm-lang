@@ -1728,11 +1728,27 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
          * even for a function pointer declared the old way. */
         aoStrCatPrintf(str, "fn(");
         if (type->params) {
+            int printed = 0;
             for (u64 i = 0; i < type->params->size; ++i) {
                 Ast *param = type->params->entries[i];
                 if (!param) continue;
-                if (i > 0) aoStrCatPrintf(str, ", ");
-                if (param->kind == AST_VAR_ARGS) {
+                /* `T ...`: its hidden count isn't shown */
+                Ast *next = i + 1 < type->params->size
+                          ? type->params->entries[i + 1] : NULL;
+                if (next && next->kind == AST_LVAR &&
+                    (next->flags & AST_FLAG_VARARGS)) {
+                    continue;
+                }
+                if (printed++) aoStrCatPrintf(str, ", ");
+                if (param->kind == AST_LVAR && (param->flags & AST_FLAG_VARARGS)) {
+                    AstType *elem = param->type->ptr;
+                    if (elem->has_var_args) {
+                        aoStrCatPrintf(str, "...%s", param->lname->data);
+                    } else {
+                        AoStr *etype = astTypeToAoStrInternal(elem);
+                        aoStrCatPrintf(str, "%s ...", etype->data);
+                    }
+                } else if (param->kind == AST_VAR_ARGS) {
                     aoStrCatPrintf(str, "...");
                 } else {
                     AoStr *ptype = astTypeToAoStrInternal(param->type);
