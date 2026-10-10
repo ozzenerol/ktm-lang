@@ -119,6 +119,9 @@ step "Building libktm into $PREFIX"
 rm -rf "$PREFIX"
 mkdir -p "$PREFIX/include" "$PREFIX/lib"
 cp "$ROOT/src/std/std.ktmh" "$PREFIX/include/std.ktmh"
+# the prelude, which every compile (all.ktm's too) reads before std.ktmh
+mkdir -p "$PREFIX/modules"
+cp -R "$ROOT/src/std/prelude" "$PREFIX/modules/prelude"
 lib_args=(-fPIC -lib ktm --install-dir="$PREFIX")
 [ "$SQLITE" = 1 ] && lib_args=(-DKTM_LINK_SQLITE3 "${lib_args[@]}")
 (cd "$ROOT/src/std" && "$KTM" "${lib_args[@]}" ./all.ktm)
@@ -155,6 +158,9 @@ if [ "$DO_INSTALL" = 1 ]; then
     ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/include" "$INSTALL_PREFIX/lib"
     ${as[@]+"${as[@]}"} cp -f "$KTM" "$INSTALL_PREFIX/bin/ktm"
     ${as[@]+"${as[@]}"} cp -f "$PREFIX/include/std.ktmh" "$INSTALL_PREFIX/include/std.ktmh"
+    ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/modules/prelude"
+    ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/modules"
+    ${as[@]+"${as[@]}"} cp -R "$PREFIX/modules/prelude" "$INSTALL_PREFIX/modules/prelude"
     for f in "$PREFIX"/lib/*; do
         ${as[@]+"${as[@]}"} cp -fPR "$f" "$INSTALL_PREFIX/lib/"
     done

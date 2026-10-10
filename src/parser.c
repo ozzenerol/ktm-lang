@@ -1018,7 +1018,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     u32 tag_file = 0;
     if (tok->tk_type == TK_IDENT) {
         /* A module's type is named `a.b.Name` */
-        char *qual = cctrlQualifyName(cc, tok->start, tok->len);
+        char *qual = cctrlDeclName(cc, tok->start, tok->len);
         tag = qual ? aoStrDupRaw(qual, strlen(qual))
                    : aoStrDupRaw(tok->start,tok->len);
         tag_line = tok->line;
@@ -1186,7 +1186,7 @@ AstType *parseEnumDef(Cctrl *cc) {
                 lexemeAsWritten(tok));
     }
     /* A module's enum is named `a.b.Name` */
-    char *qual = cctrlQualifyName(cc, tok->start, tok->len);
+    char *qual = cctrlDeclName(cc, tok->start, tok->len);
     AoStr *tag = qual ? aoStrDupRaw(qual, strlen(qual))
                       : aoStrDupRaw(tok->start, tok->len);
     if (qual) {
@@ -4164,7 +4164,7 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     func->kind = AST_EXTERN_FUNC;
     /* In a module it is the module's name (`a.b.open`, private unless
      * pub), still calling the C symbol `open` */
-    char *qual = cctrlQualifyName(cc, fname, len);
+    char *qual = cctrlDeclName(cc, fname, len);
     if (qual) {
         mapAdd(cc->global_env, qual, func);
         if (cc->decl_pub) setAdd(cc->pub_names, qual);
@@ -5257,7 +5257,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
         /* A module's declaration is named `a.b.name` */
         if (cc->cur_module && name->tk_type == TK_IDENT) {
-            char *qual = cctrlQualifyName(cc, name->start, name->len);
+            char *qual = cctrlDeclName(cc, name->start, name->len);
             if (qual) {
                 name = lexemeCopy(name);
                 name->start = qual;

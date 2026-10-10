@@ -1555,6 +1555,21 @@ char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
     return mprintf("%s.%.*s", path->data, len, name);
 }
 
+/* Is the current module the prelude, whose pub names every file sees
+ * without a prefix or an import? */
+int cctrlInPrelude(Cctrl *cc) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    return path && path->len == 7 && !memcmp(path->data, "prelude", 7);
+}
+
+/* The name a declaration is made under: as cctrlQualifyName, except
+ * that the prelude's pub names are flat (`Error`, not `prelude.Error`)
+ * so every file finds them as it finds the program's own */
+char *cctrlDeclName(Cctrl *cc, char *name, int len) {
+    if (cc->decl_pub && cctrlInPrelude(cc)) return NULL;
+    return cctrlQualifyName(cc, name, len);
+}
+
 /* The file diagnostics are about: the last taken token's */
 LexFile *cctrlCurFile(Cctrl *cc) {
     if (cc->tok_file) return cc->tok_file;

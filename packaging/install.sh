@@ -5,6 +5,7 @@
 # (ktmLibInit in src/main.c), namely:
 #   <prefix>/bin/ktm
 #   <prefix>/include/std.ktmh
+#   <prefix>/modules/prelude/*.ktm  (read before std.ktmh)
 #   <prefix>/lib/libktm.a
 #   <prefix>/lib/libktm.so.0.0.1   (Linux)
 #   <prefix>/lib/libktm.0.0.1.dylib (macOS)
@@ -74,12 +75,15 @@ if [ "$UNINSTALL" -eq 1 ]; then
             rm -f "$f" && echo "removed $f"
         fi
     done
+    if [ -d "$PREFIX/modules/prelude" ]; then
+        rm -rf "$PREFIX/modules/prelude" && echo "removed $PREFIX/modules/prelude"
+    fi
     exit 0
 fi
 
 # Fail early with a useful message rather than part-way through with a
 # permission error on one of five copies.
-for d in bin include lib; do
+for d in bin include lib modules/prelude; do
     if ! mkdir -p "$PREFIX/$d" 2>/dev/null; then
         echo "install.sh: cannot create $PREFIX/$d - try: sudo ./install.sh --prefix=$PREFIX" >&2
         exit 1
@@ -99,6 +103,9 @@ install_file() {
 
 install_file "$SRC/ktm"             "$PREFIX/bin/ktm"           755
 install_file "$SRC/include/std.ktmh"  "$PREFIX/include/std.ktmh"    644
+for f in "$SRC"/modules/prelude/*.ktm; do
+    install_file "$f" "$PREFIX/modules/prelude/$(basename "$f")" 644
+done
 install_file "$SRC/lib/libktm.a"    "$PREFIX/lib/libktm.a"      644
 install_file "$SRC/lib/$SHLIB"      "$PREFIX/lib/$SHLIB"        755
 

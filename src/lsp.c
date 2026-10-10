@@ -194,6 +194,7 @@ static void lspBootstrap(LspCtx *ctx, Cctrl *cc) {
     l->cc = cc; /* lex-time raises route through diagnostics, not exit */
     lexSetBuiltinRoot(l, ctx->root_dir);
     lexPushFile(l, builtin);
+    lexPushPrelude(l);
 
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
