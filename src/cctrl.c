@@ -1563,6 +1563,12 @@ int cctrlInPrelude(Cctrl *cc) {
     return path && path->len == 7 && !memcmp(path->data, "prelude", 7);
 }
 
+/* Is the current module `c`, the C library's declarations? */
+int cctrlInCModule(Cctrl *cc) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    return path && path->len == 1 && path->data[0] == 'c';
+}
+
 /* The name a declaration is made under: as cctrlQualifyName, except
  * that the prelude's pub names are flat (`Error`, not `prelude.Error`)
  * so every file finds them as it finds the program's own */

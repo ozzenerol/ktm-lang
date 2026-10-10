@@ -1400,6 +1400,11 @@ hold each other by value is an error: one of them needs a pointer. Outside it, o
 in constant expressions too). A module can't use the names its program defines: a library
 doesn't depend on whoever uses it. The C functions it declares with <code>extern "c"</code>
 are its own names as well, private unless <code>pub</code>.</p>
+<p>A C function declared with <code>extern "c"</code> in a module keeps its C symbol, so
+<code>c.write(fd, buf, n)</code>, or <code>&amp;c.write</code>, is C's <code>write</code>. A
+module named <code>c</code> holds the C library's declarations and nothing else: its files
+contain only <code>extern "c"</code> functions, structs, unions, enums and constants, and a
+function with a body, a ktm prototype, a method or a variable there is an error.</p>
 <p>Only the module that defines a type can define its methods. Outside it, the
 <code>pub</code> methods are called on the object with no prefix
 (<code>a.deposit(5)</code> on a <code>bank.Account *a</code>), and
@@ -1473,8 +1478,9 @@ up before its importers' (the files of a module in name order).</p>
 <code>modules/prelude</code>. Its <code>pub</code> names are seen by every file, the
 program's and every module's, with no prefix: <code>Error</code> (what a
 <code>catch</code> binds), <code>EXIT_OK</code> and <code>EXIT_FAIL</code>, and the
-integer limits <code>I64_MIN</code>, <code>I64_MAX</code>, <code>U64_MAX</code>,
-<code>I8_MIN</code>, <code>I8_MAX</code> and <code>U8_MAX</code>. <code>import prelude;</code>
+integer limits, the smallest and largest value of each integer type: <code>I8_MIN</code>,
+<code>I8_MAX</code>, <code>U8_MAX</code>, and the same for 16, 32 and 64 bits
+(<code>I16_MIN</code> ... <code>U64_MAX</code>). <code>import prelude;</code>
 is an error, and a directory of the program called <code>prelude</code> is not it.</p>
 <p>These are compile errors: using a name that isn't <code>pub</code> from outside its
 module, a module that isn't found or is found twice, an import cycle (the message shows it,

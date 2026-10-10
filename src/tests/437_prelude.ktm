@@ -1,7 +1,8 @@
 #include "testhelper.ktm"
 
 /* The prelude (src/std/prelude, installed as modules/prelude): its pub
- * names, Error and the macros EXIT_OK/EXIT_FAIL and I64_MIN ... U64_MAX,
+ * names, Error and the macros EXIT_OK/EXIT_FAIL and the integer limits
+ * (I8_MIN, I8_MAX, U8_MAX ... I64_MIN, I64_MAX, U64_MAX),
  * are seen by every file, the program's and every module's, with no
  * import and no prefix, and it is read before std.ktmh. std.ktmh keeps
  * guarded copies for an install without a prelude. `import prelude;` is
@@ -57,6 +58,20 @@ I32 Main()
   tests++;
   if (e.code == I64_MIN && U64_MAX == -1 && EXIT_OK == 0 && !StrCmp(typeof(e), "Error"))
     correct++;
+
+  /* the limits of every integer type, in code and in #if */
+  i8 small = I8_MIN;
+  tests++;
+  if (small == -128 && I8_MIN == -128 && I8_MAX == 127 && U8_MAX == 255 &&
+      I16_MIN == -32768 && I16_MAX == 32767 && U16_MAX == 65535 &&
+      I32_MIN == -2147483648 && I32_MAX == 2147483647 && U32_MAX == 4294967295 &&
+      I64_MAX == 0x7fffffffffffffff && I64_MIN == -I64_MAX - 1)
+    correct++;
+#if I32_MIN < 0 && U16_MAX == 65535 && I8_MIN == -128
+  tests++; correct++;
+#else
+  tests++;
+#endif
 
   tests++;
   if (Diagnose("import prelude;\ni32 main() { return 0; }\n",

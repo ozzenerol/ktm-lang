@@ -29,12 +29,19 @@
 #define EXIT_FAIL 1
 #define EXIT_OK   0
 
+/* The smallest and largest value of each integer type */
+#define I8_MIN  (-0x7F - 1)
+#define I8_MAX  0x7F
+#define U8_MAX  0xFF
+#define I16_MIN (-0x7FFF - 1)
+#define I16_MAX 0x7FFF
+#define U16_MAX 0xFFFF
+#define I32_MIN (-0x7FFFFFFF - 1)
+#define I32_MAX 0x7FFFFFFF
+#define U32_MAX 0xFFFFFFFF
 #define I64_MIN (-0x7fffffffffffffff - 1)
 #define I64_MAX 0x7fffffffffffffff
 #define U64_MAX 0xffffffffffffffff
-#define U8_MAX  0xFF
-#define I8_MAX  0x7F
-#define I8_MIN  0xFFFFFF80
 #endif
 
 public class List;
