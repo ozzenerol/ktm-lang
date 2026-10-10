@@ -79,12 +79,23 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     if (args->module_dir) {
         /* `ktm -lib a.b dir/a/b`: compile the module as a program that
          * imports it, found from dir (dir/a/b less the a/b) */
-        if (!lexSetModuleLibRoot(l, args->module_dir, args->lib_name)) {
-            fprintf(stderr, "ktm: %s is not a directory ending in %s (module %s)\n",
-                    args->module_dir, args->lib_name, args->lib_name);
-            return 0;
+        char *src;
+        if (lexSetModuleLibRoot(l, args->module_dir, args->lib_name)) {
+            src = mprintf("import %s;\n", args->lib_name);
+        } else {
+            /* `ktm -lib name dir`: every module under dir, one library */
+            args->lib_tree_paths = vecNew(&vec_unsigned_long_type);
+            args->lib_tree_dirs = vecNew(&vec_unsigned_long_type);
+            src = lexModuleTreeImports(l, args->module_dir,
+                                       args->lib_tree_paths,
+                                       args->lib_tree_dirs);
+            if (!src) {
+                fprintf(stderr, "ktm: %s is neither module %s's directory (one "
+                        "ending in %s) nor a tree with modules under it\n",
+                        args->module_dir, args->lib_name, args->lib_name);
+                return 0;
+            }
         }
-        char *src = mprintf("import %s;\n", args->lib_name);
         lexPushString(l, "<module library>", src, strlen(src));
     } else {
         lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));

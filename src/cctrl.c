@@ -665,6 +665,8 @@ static const char *cctrl_libktm_extra_exports[] = {
  * everything else is local and a program can't replace it. */
 int cctrlIsExported(Cctrl *cc, AoStr *name) {
     if (!cc->is_libktm || !name) return 1;
+    /* a module's name (`a.b.name`): libktm built from a tree of them */
+    if (memchr(name->data, '.', name->len)) return 1;
     if (setHasLen(cc->header_names, name->data, name->len)) return 1;
     for (int i = 0; cctrl_libktm_extra_exports[i]; ++i) {
         if (!strcmp(name->data, cctrl_libktm_extra_exports[i])) return 1;

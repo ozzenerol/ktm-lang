@@ -5686,7 +5686,7 @@ void parseToAst(Cctrl *cc) {
         /* A module built into a library (`ktm -lib`) has no code that
          * runs before main: a run-time initialiser would never run */
         if (is_global && cc->cur_module && cc->lexer_ &&
-            cc->lexer_->building_module) {
+            (cc->lexer_->building_module || cc->lexer_->building_tree)) {
             is_global = 0;
             if (ast->kind == AST_BINOP && ast->left &&
                 ast->left->kind == AST_GVAR) {

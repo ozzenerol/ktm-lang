@@ -1495,6 +1495,13 @@ warning.</p>
 links the library: the archive when compiled, the shared object in the JIT. A library has
 no code that runs before <code>main</code>, so in a module built this way a global needs a
 constant initialiser.</p>
+<p><code>ktm -lib name dir</code>, where <code>dir</code> is not the directory of a module
+<code>name</code>, builds every module under <code>dir</code> (<code>dir/net/http</code> is
+<code>net.http</code>) into one library, <code>dir/libname.a</code> and its shared object,
+and gives each module's directory a <code>.ktmlib</code>. The files at the top of
+<code>dir</code> and a <code>prelude</code> directory there are not built. A
+<code>.ktmlib</code> names its library relative to itself, so a built tree can be moved.
+<code>-v</code> prints the commands that build a library.</p>
 <p>A module's names are emitted as symbols of their own (<code>geo.area</code> is
 <code>_K3geo4area</code>, the method <code>Account.deposit</code> of bank
 <code>_K4bank7Account7deposit</code>), so they never clash with C functions or with the program's

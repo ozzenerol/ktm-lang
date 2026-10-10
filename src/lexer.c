@@ -402,6 +402,7 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->mod_depth = 0;
     l->program_root = NULL;
     l->building_module = NULL;
+    l->building_tree = NULL;
     /* Default: no diagnostic engine wired up; lex errors fall
      * back to loggerPanic. cctrlInitParse plugs the real Cctrl
      * in when this lexer is being driven by a real parse. */
@@ -3180,6 +3181,74 @@ int lexSetModuleLibRoot(Lexer *l, char *dir, char *path) {
     return 1;
 }
 
+static int lexCmpStr(const void *a, const void *b);
+
+static int lexHasKtmFiles(const char *path) {
+    DIR *dir = opendir(path);
+    struct dirent *ent;
+    int found = 0;
+    while (dir && !found && (ent = readdir(dir)) != NULL) {
+        int len = strlen(ent->d_name);
+        found = len > 4 && !strcmp(ent->d_name + len - 4, ".ktm");
+    }
+    if (dir) closedir(dir);
+    return found;
+}
+
+/* The module directories under `dir` (`rel` its path from the tree's
+ * root, "" at the root), into paths ("net.http") and dirs */
+static void lexModuleTreeWalk(char *dir, char *rel, Vec *paths, Vec *dirs) {
+    DIR *d = opendir(dir);
+    char **names = NULL;
+    int n = 0, cap = 0;
+    struct dirent *ent;
+    while (d && (ent = readdir(d)) != NULL) {
+        if (ent->d_name[0] == '.') continue;
+        char *sub = mprintf("%s/%s", dir, ent->d_name);
+        if (!lexIsDir(sub)) continue;
+        if (n == cap) {
+            cap = cap ? cap * 2 : 8;
+            names = realloc(names, sizeof(char *) * cap);
+        }
+        names[n++] = mprintf("%s", ent->d_name);
+    }
+    if (d) closedir(d);
+    qsort(names, n, sizeof(char *), lexCmpStr);
+    for (int i = 0; i < n; ++i) {
+        /* the prelude is read by every compile, never a library's */
+        if (!*rel && !strcmp(names[i], "prelude")) continue;
+        char *sub = mprintf("%s/%s", dir, names[i]);
+        char *path = *rel ? mprintf("%s.%s", rel, names[i]) : names[i];
+        if (lexHasKtmFiles(sub)) {
+            vecPush(paths, path);
+            vecPush(dirs, sub);
+        }
+        lexModuleTreeWalk(sub, path, paths, dirs);
+    }
+    free(names);
+}
+
+/* `ktm -lib name dir` where dir is not module `name`'s directory: every
+ * module under dir goes into one library. Collects their paths and
+ * directories, finds modules from dir, and gives the program that
+ * imports them all; NULL when there is no module under dir. */
+char *lexModuleTreeImports(Lexer *l, char *dir, Vec *paths, Vec *dirs) {
+    char *real = realpath(dir, NULL);
+    if (!real) return NULL;
+    lexModuleTreeWalk(real, "", paths, dirs);
+    if (paths->size == 0) {
+        free(real);
+        return NULL;
+    }
+    l->program_root = mprintf("%s", real);
+    l->building_tree = real;
+    AoStr *src = aoStrNew();
+    for (u64 i = 0; i < paths->size; ++i) {
+        aoStrCatPrintf(src, "import %s;\n", (char *)paths->entries[i]);
+    }
+    return src->data;
+}
+
 static int lexIsFile(const char *path) {
     struct stat st;
     return stat(path, &st) == 0 && S_ISREG(st.st_mode);
@@ -3191,6 +3260,14 @@ static int lexIsFile(const char *path) {
 static int lexModulePrebuilt(Lexer *l, LexModule *m) {
     if (l->building_module && !strcmp(l->building_module, m->path->data)) {
         return 0;
+    }
+    if (l->building_tree) {
+        char *dir = realpath(m->dir->data, NULL);
+        size_t len = strlen(l->building_tree);
+        int inside = dir && !strncmp(dir, l->building_tree, len) &&
+                     (dir[len] == '/' || dir[len] == '\0');
+        free(dir);
+        if (inside) return 0;
     }
     char *marker = mprintf("%s/.ktmlib", m->dir->data);
     if (!lexIsFile(marker)) return 0;
@@ -3212,6 +3289,13 @@ static int lexModulePrebuilt(Lexer *l, LexModule *m) {
             libs = &l->cc->shared_object_files;
         }
         if (!libs) continue;
+        /* relative to the module's directory (the marker's) */
+        if (path[0] != '/') {
+            char *joined = mprintf("%s/%s", m->dir->data, path);
+            char *real = realpath(joined, NULL);
+            path = real ? mprintf("%s", real) : joined;
+            free(real);
+        }
         AoStr *lib = aoStrDupRaw(path, strlen(path));
         if (*libs == NULL) *libs = listNew();
         if (!listContainsAoStr(*libs, lib)) listAppend(*libs, lib);
@@ -3373,7 +3457,8 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     imp->prefix = prefix;
     imp->module = m;
     /* the `import` of `ktm -lib`'s generated program */
-    imp->used = (l->building_module && !file->module_id) || auto_prelude;
+    imp->used = ((l->building_module || l->building_tree) && !file->module_id) ||
+                auto_prelude;
     imp->line = kw->line;
     imp->col = kw->col;
     imp->len = kw->len;
