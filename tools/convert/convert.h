@@ -33,6 +33,9 @@ void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, in
 /* A control statement's body that isn't a `{ }` block (Y13): the token
  * before it (`)`, `else`, `do`, `catch`), its first and its last token */
 void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last);
+/* A name declared or used (variable, parameter, function, field):
+ * renamed when it is a keyword or type name of the new syntax */
+void migrateNoteName(Cctrl *cc, Lexeme *name);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

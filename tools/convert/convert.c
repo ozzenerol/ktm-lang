@@ -847,6 +847,34 @@ void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last) {
     vecPush(f->closers, c);
 }
 
+/* A name that is a keyword or a type name of the new syntax: name_ (in
+ * src/std listed instead, those get names picked by hand) */
+void migrateNoteName(Cctrl *cc, Lexeme *name) {
+    static const char *reserved[] = {
+        "fn", "self", "defer", "enum", "const", "module", "import", "private",
+        "pub", "fallthrough", "struct", "null", "true", "false",
+        "void", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64",
+        "f32", "f64", "bool"};
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    int hit = 0;
+    for (u64 k = 0; k < sizeof(reserved) / sizeof(reserved[0]); ++k) {
+        if ((s64)strlen(reserved[k]) == name->len && !memcmp(f->text + s, reserved[k], name->len)) hit = 1;
+    }
+    if (!hit) return;
+    if (f->real && strstr(f->real, "/src/std/")) {
+        char *key = mprintf("stdname:%lld", (long long)s);
+        if (setHas(f->seen, key)) return;
+        setAdd(f->seen, key);
+        migNote(f, s, "check: `%.*s` is a keyword or type name now: pick a name (src/std)",
+                (int)name->len, f->text + s);
+        return;
+    }
+    migAdd(f, s, s + name->len, mprintf("%.*s_", (int)name->len, f->text + s), "keyword name");
+}
+
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;

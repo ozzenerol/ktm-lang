@@ -334,6 +334,9 @@ AstType *parseFunctionPointerType(Cctrl *cc,
         depth++;
     }
     fname = cctrlTokenGetRequired(cc);
+#ifdef KTM_CONVERT
+    if (cc->migrate && fname->tk_type == TK_IDENT) migrateNoteName(cc, fname);
+#endif
     if (fname->tk_type != TK_IDENT) {
         /* `T (*)(params)`: report it at the token in place of the name
          * and go on as if it had none. Unwinding here would resync
@@ -2594,8 +2597,19 @@ static Ast *parsePrimary(Cctrl *cc) {
                 return parseStringLiterals(cc, tok);
             }
         }
+#ifdef KTM_CONVERT
+        Lexeme mig_name = *tok;
+#endif
         ast = parseIdentifierOrFunction(cc, tok->start, tok->len,
                 can_call_function);
+#ifdef KTM_CONVERT
+        /* not a method's own `self` */
+        if (cc->migrate && !(ast && ast->kind == AST_LVAR &&
+                             (ast->flags & AST_FLAG_CONST) && ast->lname &&
+                             !strcmp(ast->lname->data, "self"))) {
+            migrateNoteName(cc, &mig_name);
+        }
+#endif
 #ifdef KTM_CONVERT
         if (cc->migrate && ast && ast->kind == AST_LVAR &&
             (ast->flags & AST_FLAG_OLD_VARARGS)) {
@@ -2830,6 +2844,16 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
                 tok->len, tok->start, astTypeToString(cls->type));
     }
     AstType *field = mapGetLen(type->fields, tok->start, tok->len);
+#ifdef KTM_CONVERT
+    /* a field the program declares (the stdlib's get names by hand) */
+    if (cc->migrate && field) {
+        AoStr *where = cctrlLookUpFile(cc, field->file_id);
+        if (!where || (!strstr(where->data, "/src/std/") &&
+                       !strstr(where->data, "/include/"))) {
+            migrateNoteName(cc, tok);
+        }
+    }
+#endif
     AstType *owner = NULL;
     Ast *method = field ? NULL : parseFindMethod(cc, type, tok->start,
                                                  tok->len, &owner);

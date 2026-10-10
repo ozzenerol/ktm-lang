@@ -784,6 +784,9 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
         while (1) {
             next_type = parsePointerType(cc,base_type);
             tok_name = cctrlTokenGet(cc);
+#ifdef KTM_CONVERT
+            if (cc->migrate && tok_name && tok_name->tk_type == TK_IDENT) migrateNoteName(cc, tok_name);
+#endif
             if (!tok_name) {
                 /* Nothing left to recover into; report it once. */
                 cc->current_recovery = outer_recovery;

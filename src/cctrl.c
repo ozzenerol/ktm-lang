@@ -11,6 +11,9 @@
 #include "aostr.h"
 #include "ast.h"
 #include "cctrl.h"
+#ifdef KTM_CONVERT
+#include "../tools/convert/convert.h"
+#endif
 #include "config.h"
 #include "lexer.h"
 #include "list.h"
@@ -1616,6 +1619,9 @@ void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
 
 /* A declaration named like one of its file's import prefixes */
 void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name) {
+#ifdef KTM_CONVERT
+    if (cc->migrate && name && name->tk_type == TK_IDENT) migrateNoteName(cc, name);
+#endif
     if (name && name->tk_type == TK_IDENT && name->is_prefix) {
         cctrlRaiseException(cc, "`%.*s` hides the module imported as %.*s",
                             name->len, name->start, name->len, name->start);
