@@ -300,6 +300,8 @@ AstType *parseFnType(Cctrl *cc) {
     return fn_type;
 }
 
+static Lexeme *parseLastToken(Cctrl *cc);
+
 AstType *parseFunctionPointerType(Cctrl *cc,
                                   char **fnptr_name,
                                   int *fnptr_name_len,
@@ -307,6 +309,9 @@ AstType *parseFunctionPointerType(Cctrl *cc,
 {
     int has_var_args, depth = 0;
     Lexeme *fname;
+#ifdef KTM_CONVERT
+    Lexeme *fnptr_open = cc->migrate ? parseLastToken(cc) : NULL;
+#endif
     cctrlTokenExpect(cc,'*');
     /* `T (**name)(params)`: a pointer to a function pointer, one more
      * pointer for each further `*` */
@@ -352,6 +357,9 @@ AstType *parseFunctionPointerType(Cctrl *cc,
     cctrlTokenExpect(cc,')');
     cctrlTokenExpect(cc,'(');
     fn_type->params = parseParams(cc,')',&has_var_args,0);
+#ifdef KTM_CONVERT
+    if (fnptr_open) migrateNoteFnPtr(cc, fnptr_open, parseLastToken(cc));
+#endif
     return type;
 }
 
@@ -3620,13 +3628,18 @@ static AstType *parseCastTypeName(Cctrl *cc) {
     AstType *type = parseDeclSpec(cc);
     if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
         int has_var_args = 0;
-        cctrlTokenGet(cc);
+        Lexeme *open = cctrlTokenGet(cc);
         cctrlTokenExpect(cc,'*');
         cctrlTokenExpect(cc,')');
         cctrlTokenExpect(cc,'(');
         AstType *fn_type = astMakeFunctionType(type, NULL);
         fn_type->params = parseParams(cc,')',&has_var_args,0);
         fn_type->has_var_args = has_var_args;
+#ifdef KTM_CONVERT
+        if (cc->migrate) migrateNoteFnPtr(cc, open, parseLastToken(cc));
+#else
+        (void)open;
+#endif
         return fn_type;
     }
     return type;

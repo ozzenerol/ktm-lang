@@ -58,7 +58,16 @@ typedef struct MigEdit {
     char *text;
     s64 seq;        /* order of recording: inserts at one offset go newest first */
     const char *kind;
+    /* A rewrite that moves code: its text is built at apply time from
+     * these pieces (MigSeg *), each literal text or a range of the
+     * original rendered with the edits inside it */
+    Vec *segs;
 } MigEdit;
+
+typedef struct MigSeg {
+    const char *text;   /* NULL: the range [s, e) */
+    s64 s, e;
+} MigSeg;
 
 /* Code at file scope that runs: moved into main */
 typedef struct MigItem {
@@ -145,6 +154,46 @@ static void migAdd(MigFile *f, s64 start, s64 end, const char *text,
     e->text = strdup(text);
     e->seq = f->seq++;
     e->kind = kind;
+    e->segs = NULL;
+    vecPush(f->edits, e);
+}
+
+/* Pieces for migAddSegs */
+static MigSeg *migLit(const char *text) {
+    MigSeg *g = (MigSeg *)calloc(1, sizeof(MigSeg));
+    g->text = strdup(text);
+    return g;
+}
+
+static MigSeg *migRange(s64 s, s64 e) {
+    MigSeg *g = (MigSeg *)calloc(1, sizeof(MigSeg));
+    g->s = s;
+    g->e = e;
+    return g;
+}
+
+/* Replace [start, end) with the pieces (a NULL-terminated list) */
+static void migAddSegs(MigFile *f, s64 start, s64 end, const char *kind, ...) {
+    va_list ap;
+    va_start(ap, kind);
+    Vec *segs = vecNew(&vec_unsigned_long_type);
+    AoStr *key = aoStrPrintf("%lld:%lld:segs", (long long)start, (long long)end);
+    MigSeg *g;
+    while ((g = va_arg(ap, MigSeg *)) != NULL) {
+        vecPush(segs, g);
+        if (g->text) aoStrCatPrintf(key, "|%s", g->text);
+        else aoStrCatPrintf(key, "|%lld-%lld", (long long)g->s, (long long)g->e);
+    }
+    va_end(ap);
+    if (setHas(f->seen, key->data)) return;
+    setAdd(f->seen, key->data);
+    MigEdit *e = (MigEdit *)malloc(sizeof(MigEdit));
+    e->start = start;
+    e->end = end;
+    e->text = strdup("");
+    e->seq = f->seq++;
+    e->kind = kind;
+    e->segs = segs;
     vecPush(f->edits, e);
 }
 
@@ -495,7 +544,9 @@ static void migCastAt(MigFile *f, s64 lp, s64 rp) {
             }
         }
     }
-    migAdd(f, op, op, mprintf(wrap ? "((%s)" : "(%s)", type), "cast");
+    (void)type;
+    migAddSegs(f, op, op, "cast", migLit(wrap ? "((" : "("), migRange(lp + 1, rp),
+               migLit(")"), NULL);
     migAdd(f, lp, rp + 1, "", "cast");
     if (wrap) migAdd(f, rp + 1, rp + 1, ")", "cast");
 }
@@ -540,6 +591,103 @@ void migrateNotePrint(Cctrl *cc, Lexeme *first, Lexeme *semi, int is_char) {
     }
     migAdd(f, s, s, "printf(", "printf");
     migAdd(f, e, e, ")", "printf");
+}
+
+/* The matching `)` of the `(` at i, -1 if none */
+static s64 migMatchFwd(char *t, s64 i, s64 len) {
+    int depth = 0;
+    for (; i < len; ++i) {
+        if (t[i] == '"' || t[i] == '\'') { i = migQuoteEnd(t, i, len); continue; }
+        if (t[i] == '(') depth++;
+        else if (t[i] == ')' && --depth == 0) return i;
+    }
+    return -1;
+}
+
+/* `R (*name)(P)` -> `fn(P) R name`; `R (**pp)(P)` -> `fn(P) R *pp`;
+ * `R (*ops[4])(P)` -> `fn(P) R ops[4]`; `R (*Name(a))(P)` (a function
+ * returning one) -> `fn(P) R Name(a)`; the cast type `R (*)(P)` ->
+ * `fn(P) R`. R is the type word before the `(` with its `*`s. */
+void migrateNoteFnPtr(Cctrl *cc, Lexeme *open, Lexeme *close) {
+    MigFile *f = migFileOf(cc, open ? open->src : NULL);
+    if (!f) return;
+    s64 lp = migOff(f, open), end = migOff(f, close);
+    char *t = f->text;
+    if (lp < 0 || end < 0 || t[lp] != '(' || t[end] != ')') {
+        migNote(f, lp, "can't rewrite a function pointer declarator that spans a macro");
+        return;
+    }
+    s64 mp = migMatchFwd(t, lp, f->len);
+    s64 ps = mp < 0 ? -1 : mp + 1;
+    while (ps >= 0 && ps < end && isspace((unsigned char)t[ps])) ps++;
+    s64 re = migSkipSpaceBack(t, lp - 1);       /* R's last char */
+    s64 comma = -1;
+    if (re >= 0 && t[re] == ',') {
+        /* `T (*a)(P) = x, (*b)(Q)`: b becomes a declaration of its own,
+         * of the list's type, which starts after the last `;`, `{` or
+         * `}` (or `(` for a for-init) before it */
+        comma = re;
+        s64 k = re - 1;
+        int depth = 0;
+        for (; k >= 0; --k) {
+            if (t[k] == ')' || t[k] == ']') depth++;
+            else if ((t[k] == '(' || t[k] == '[') && depth > 0) depth--;
+            else if (depth == 0 && (t[k] == ';' || t[k] == '{' || t[k] == '}' || t[k] == '(')) break;
+        }
+        k++;
+        for (;;) {
+            for (;;) {      /* blanks and comments */
+                while (k < comma && isspace((unsigned char)t[k])) k++;
+                if (k + 1 < comma && t[k] == '/' && t[k + 1] == '/') {
+                    while (k < comma && t[k] != '\n') k++;
+                } else if (k + 1 < comma && t[k] == '/' && t[k + 1] == '*') {
+                    k += 2;
+                    while (k + 1 < comma && !(t[k] == '*' && t[k + 1] == '/')) k++;
+                    k += 2;
+                } else {
+                    break;
+                }
+            }
+            s64 w = k;
+            while (k < comma && migIsIdent(t[k])) k++;
+            if ((k - w == 6 && (!memcmp(t + w, "static", 6) || !memcmp(t + w, "public", 6))) ||
+                (k - w == 3 && !memcmp(t + w, "pub", 3))) continue;
+            re = k - 1;
+            while (k < comma && (t[k] == ' ' || t[k] == '*')) {
+                if (t[k] == '*') re = k;
+                k++;
+            }
+            break;
+        }
+    }
+    s64 rs = re;
+    while (rs >= 0 && (t[rs] == '*' || t[rs] == ' ' || t[rs] == '\t')) rs--;
+    while (rs >= 0 && (migIsIdent(t[rs]) || t[rs] == '.')) rs--;
+    rs++;
+    s64 star = lp + 1;
+    while (star < mp && isspace((unsigned char)t[star])) star++;
+    if (mp < 0 || ps < 0 || t[ps] != '(' || rs > re || t[star] != '*') {
+        migNote(f, lp, "can't rewrite a function pointer declarator");
+        return;
+    }
+    s64 ns = star + 1;                          /* after the first `*` */
+    while (ns < mp && isspace((unsigned char)t[ns])) ns++;
+    s64 ne = migSkipSpaceBack(t, mp - 1) + 1;
+    int r_ptr = t[re] == '*';
+    if (comma >= 0) {
+        migAddSegs(f, comma, end + 1, "fn pointer", migLit("; fn("), migRange(ps + 1, end),
+                   migLit(") "), migRange(rs, re + 1), migLit(r_ptr ? "" : " "),
+                   migRange(ns, ne), NULL);
+        return;
+    }
+    if (ns >= ne) {
+        migAddSegs(f, rs, end + 1, "fn pointer", migLit("fn("), migRange(ps + 1, end),
+                   migLit(") "), migRange(rs, re + 1), NULL);
+    } else {
+        migAddSegs(f, rs, end + 1, "fn pointer", migLit("fn("), migRange(ps + 1, end),
+                   migLit(") "), migRange(rs, re + 1), migLit(r_ptr ? "" : " "),
+                   migRange(ns, ne), NULL);
+    }
 }
 
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
@@ -609,6 +757,19 @@ static void migSort(MigFile *f) {
 
 /* [rs, re) of the text with the edits inside it applied; an edit that
  * starts inside a range another one replaces is dropped */
+static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof);
+
+/* What an edit puts in: its text, or its pieces rendered */
+static char *migEditText(MigFile *f, MigEdit *e) {
+    if (!e->segs) return e->text;
+    AoStr *out = aoStrNew();
+    for (u64 k = 0; k < e->segs->size; ++k) {
+        MigSeg *g = e->segs->entries[k];
+        aoStrCat(out, g->text ? g->text : migApply(f, g->s, g->e, 0));
+    }
+    return out->data ? out->data : "";
+}
+
 static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof) {
     AoStr *out = aoStrNew();
     s64 pos = rs;
@@ -618,7 +779,7 @@ static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof) {
         if (e->start == re && !(to_eof && e->start == e->end)) continue;
         if (e->end > re) continue;
         aoStrCatLen(out, f->text + pos, e->start - pos);
-        aoStrCat(out, e->text);
+        aoStrCat(out, migEditText(f, e));
         pos = e->end;
     }
     aoStrCatLen(out, f->text + pos, re - pos);
@@ -1251,7 +1412,7 @@ static void migSnippetAt(MigFile *outer, s64 *cs, s64 *ce, int np, char *install
         MigEdit *e = eff->entries[i];
         /* an edit across the gap between two literals can't be placed */
         if (e->end > e->start && piece[e->start] != piece[e->end - 1]) continue;
-        char *text = e->text;
+        char *text = migEditText(f, e);
         if (quotes) {
             text = strdup(text);
             for (char *q = text; *q; ++q) {

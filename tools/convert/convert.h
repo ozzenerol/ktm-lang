@@ -16,6 +16,10 @@ void migrateNoteCast(Cctrl *cc, Lexeme *lparen, Lexeme *rparen);
 /* A print statement: its first token (the format string, or a character
  * constant when `is_char`) and its `;` */
 void migrateNotePrint(Cctrl *cc, Lexeme *first, Lexeme *semi, int is_char);
+/* A C function pointer declarator `R (*name)(P)` (also `(**name)`,
+ * `(*name[N])`, `(*Name(params))(P)` and the cast type `R (*)(P)`): the
+ * `(` before the `*` and the `)` that closes P */
+void migrateNoteFnPtr(Cctrl *cc, Lexeme *open, Lexeme *close);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

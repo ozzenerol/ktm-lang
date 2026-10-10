@@ -14,6 +14,13 @@
 #include "parser.h"
 #ifdef KTM_CONVERT
 #include "../tools/convert/convert.h"
+/* `T (*Name(params))(fn_params)`: the `(` before the `*`, for the
+ * converter's hook once the fn params are parsed */
+static Lexeme *parse_fnptr_open = NULL;
+static Lexeme *parseLastTok(Cctrl *cc) {
+    cctrlTokenRewind(cc);
+    return cctrlTokenGet(cc);
+}
 #endif
 #include "prslib.h"
 #include "prsasm.h"
@@ -4436,6 +4443,12 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         cctrlTokenExpect(cc,'(');
         AstType *fn_type = astMakeFunctionType(rettype,
                 parseParams(cc,')',&fn_var_args,0));
+#ifdef KTM_CONVERT
+        if (cc->migrate && parse_fnptr_open) {
+            migrateNoteFnPtr(cc, parse_fnptr_open, parseLastTok(cc));
+        }
+        parse_fnptr_open = NULL;
+#endif
         fn_type->has_var_args = fn_var_args;
         rettype = fn_type;
         for (int i = 1; i < ret_fnptr; ++i) {
@@ -5339,6 +5352,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 if (is_const) {
                     cctrlRaiseException(cc,"const is only allowed on declarations");
                 }
+#ifdef KTM_CONVERT
+                parse_fnptr_open = name;
+#endif
                 Ast *fn = parseFunctionOrDefImpl(cc, type, fn_name->start,
                                                  fn_name->len, 0, stars);
                 if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
