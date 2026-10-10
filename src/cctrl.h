@@ -196,6 +196,9 @@ typedef struct Cctrl {
     Set *mod_decls_done;
     Set *mod_types_done;   /* module ids parseModuleTypes has run for */
     int replaying;
+    /* `((fn(i64) i64)raw + 1)`: the cast already parsed, handed back
+     * by the next parseUnaryExpr as the start of the expression */
+    Ast *pending_unary;
     int quiet_errors;
     /* The declaration being parsed is `pub`; it comes from the main
      * program (not a module, not a stdlib header) */
