@@ -753,7 +753,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
     if (is_member) {
-        AstType *f = mcls ? mapGetLen(mcls->fields, ident, ilen) : NULL;
+        AstType *f = (mcls && mcls->fields) ? mapGetLen(mcls->fields, ident, ilen) : NULL;
         if (f && mcls->clsname)
             aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(f),
                            mcls->clsname->data, ident);
@@ -807,7 +807,7 @@ static const char *lsp_keywords[] = {
     /* Added */
     "auto", "continue", "typeof", "F32", "alignof",
     "true", "false", "null",
-    "struct", "pub", "const",
+    "struct", "pub", "const", "enum",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -1406,7 +1406,7 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     int is_member = 0;
     AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
-    if (mcls) {
+    if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);
         if (field && field->line > 0) {
             def_line = field->line;

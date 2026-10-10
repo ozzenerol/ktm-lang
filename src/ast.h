@@ -188,6 +188,13 @@ typedef struct AstType {
     /* Bool: a 1-byte char type, but a value converted to it becomes 0 or
      * 1 (value != 0), as in C, instead of keeping its low byte. */
     u8 is_bool;
+    /* A scoped enum (`enum Name : IntType { ... };`): an intrinsic class
+     * (`is_intrinsic`) with no instance fields, whose members live in
+     * `enum_members` (member name -> its constant Ast, typed as this
+     * enum) instead. Only another enum of the SAME name converts to/from
+     * it without a cast; every other integer type needs one. */
+    u8 is_enum;
+    Map *enum_members;
     /* On a class field: a union member after the first one (directly or
      * through an anonymous class/union flattened into the class). A
      * union takes one initialiser item, for its first member, so
@@ -634,6 +641,8 @@ int astSysvClassify(AstType *type, SysvClass *classes, int *n_eightbytes);
 int astTypeIsPtr(AstType *type);
 int astTypeIsArray(AstType *type);
 int astIsIntrinsicClass(AstType *ty);
+int astIsEnumType(AstType *ty);
+int astIsDifferentEnum(AstType *a, AstType *b);
 int astIsVarArg(Ast *ast);
 int astIsRangeOperator(AstBinOp op);
 int astIsBinCmp(s64 op);
