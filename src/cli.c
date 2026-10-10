@@ -126,6 +126,7 @@ static CliParser parsers[] = {
     {str_lit("-D"),         0, CLI_DEFINES_LIST, "-D<VAR>", "Set a compiler #define (does not accept a value)", &cliParseDefine},
     {str_lit("--dump-ir"),  0, CLI_DUMP_IR, "--dump-ir", "Dump ir to stdout" , &cliParseNop},
     {str_lit("--mem-stats"),  0, CLI_MEM_STATS, "--mem-stats", "Stats about memory usage when compiling" , &cliParseNop},
+    CliNopParser("-v", CLI_VERBOSE, "-v print the commands that build a library (-lib)"),
     {str_lit("--version"),  0, CLI_VERSION, "--version", "Print the version of the compiler", &cliParseNop},
     {str_lit("--help"),     0, CLI_HELP, "--help", "Print this message", &cliParseNop},
     {str_lit("--use-legacy-x86"), 0, CLI_USE_LEGACY_X86, "--use-legacy-x86", "Removed in v0.4.0: the legacy x86_64 codegen is gone, ktm reports an error.", &cliParseNop},
@@ -477,6 +478,7 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             }
             case CLI_EMIT_OBJECT:        args->emit_object = 1; break;
             case CLI_fPIC:               args->fPIC = 1; break;
+            case CLI_VERBOSE:            args->verbose = 1; break;
             case CLI_RUN:                args->run = 1; break;
             case CLI_JIT:                args->jit = 1; break;
             case CLI_MEMSAFE:            args->memsafe = 1; break;

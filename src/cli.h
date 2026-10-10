@@ -51,6 +51,7 @@ enum CliArgType {
     CLI_TRANSPILE,
     CLI_USE_LEGACY_X86,
     CLI_VERSION,
+    CLI_VERBOSE,
     CLI_WERROR,
 };
 
@@ -109,6 +110,12 @@ typedef struct CliArgs {
     char *clibs;
     char *install_dir;
     int is_cross_compile;
+    /* -v: print the commands that build a library */
+    int verbose;
+    /* `ktm -lib name dir` over a tree of modules: their paths and
+     * directories (the library is dir/lib<name>) */
+    Vec *lib_tree_paths;
+    Vec *lib_tree_dirs;
     enum CliTarget target;
     List *defines_list;
     List *object_files;

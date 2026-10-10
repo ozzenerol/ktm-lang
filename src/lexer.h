@@ -335,6 +335,9 @@ typedef struct Lexer {
     /* `ktm -lib a.b dir/a/b`: the module being built into a library,
      * compiled in full even if it has a .ktmlib marker */
     char *building_module;
+    /* `ktm -lib name dir` over a tree of modules: dir (a real path),
+     * whose modules are all compiled in full */
+    char *building_tree;
     /* Diagnostic engine back-pointer. When non-NULL the lexer
      * routes user-visible errors through cctrlRaiseException so
      * they accumulate in the same Vec the parser writes to and
@@ -366,6 +369,7 @@ void lexPushPrelude(Lexer *l);
 int lex(Lexer *l, Lexeme *le);
 Lexeme *lexToken(Map *macro_defs, Lexer *l);
 int lexSetModuleLibRoot(Lexer *l, char *dir, char *path);
+char *lexModuleTreeImports(Lexer *l, char *dir, Vec *paths, Vec *dirs);
 void lexemePrint(Lexeme *le);
 char *lexemeTypeToString(int tk_type);
 char *lexemePunctToString(s64 op);

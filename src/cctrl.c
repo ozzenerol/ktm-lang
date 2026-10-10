@@ -665,6 +665,8 @@ static const char *cctrl_libktm_extra_exports[] = {
  * everything else is local and a program can't replace it. */
 int cctrlIsExported(Cctrl *cc, AoStr *name) {
     if (!cc->is_libktm || !name) return 1;
+    /* a module's name (`a.b.name`): libktm built from a tree of them */
+    if (memchr(name->data, '.', name->len)) return 1;
     if (setHasLen(cc->header_names, name->data, name->len)) return 1;
     for (int i = 0; cctrl_libktm_extra_exports[i]; ++i) {
         if (!strcmp(name->data, cctrl_libktm_extra_exports[i])) return 1;
@@ -1561,6 +1563,12 @@ char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
 int cctrlInPrelude(Cctrl *cc) {
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
     return path && path->len == 7 && !memcmp(path->data, "prelude", 7);
+}
+
+/* Is the current module `c`, the C library's declarations? */
+int cctrlInCModule(Cctrl *cc) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    return path && path->len == 1 && path->data[0] == 'c';
 }
 
 /* The name a declaration is made under: as cctrlQualifyName, except

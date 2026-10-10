@@ -5582,6 +5582,33 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     }
 }
 
+/* The module `c` only declares the C library: `extern "c"` functions
+ * (called by their C names, as an extern "c" of any module is), structs,
+ * unions, enums and constants. Its code would be the program's, under
+ * the name of C's. Checked in its full pass only. */
+static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
+    if (!cc->cur_module || cc->decls_only || cc->replaying ||
+        !cctrlInCModule(cc)) {
+        return;
+    }
+    if (ast->kind == AST_EXTERN_FUNC) return;
+    if (ast->kind == AST_DECL && ast->declvar &&
+        (ast->declvar->flags & AST_FLAG_CONST)) {
+        return;
+    }
+    const char *what = "a statement";
+    switch (ast->kind) {
+        case AST_FUNC:      what = "a function with a body"; break;
+        case AST_FUN_PROTO: what = "a ktm function's prototype"; break;
+        case AST_DECL:
+        case AST_GVAR:      what = "a variable"; break;
+        default: break;
+    }
+    cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+        "module c only declares C: extern \"c\" functions, structs, unions, "
+        "enums and constants, not %s", what);
+}
+
 void parseToAst(Cctrl *cc) {
     Ast *ast;
     Lexeme *tok;
@@ -5655,10 +5682,11 @@ void parseToAst(Cctrl *cc) {
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
+        parseCheckCModuleItem(cc, ast);
         /* A module built into a library (`ktm -lib`) has no code that
          * runs before main: a run-time initialiser would never run */
         if (is_global && cc->cur_module && cc->lexer_ &&
-            cc->lexer_->building_module) {
+            (cc->lexer_->building_module || cc->lexer_->building_tree)) {
             is_global = 0;
             if (ast->kind == AST_BINOP && ast->left &&
                 ast->left->kind == AST_GVAR) {

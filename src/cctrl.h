@@ -328,6 +328,7 @@ int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok);
 AoStr *cctrlModulePath(Cctrl *cc, u32 module_id);
 char *cctrlQualifyName(Cctrl *cc, char *name, int len);
 int cctrlInPrelude(Cctrl *cc);
+int cctrlInCModule(Cctrl *cc);
 char *cctrlDeclName(Cctrl *cc, char *name, int len);
 int cctrlModuleHides(Cctrl *cc, char *name, int len);
 LexFile *cctrlCurFile(Cctrl *cc);
