@@ -29,6 +29,23 @@ i64 ClassifyUser(i64 n) {
 }
 
 i64 GetTwo() { return 2; }
+i64 GetSeven() { return 7; }
+
+/* a const whose initializer is NOT a compile-time constant: read-only,
+ * but not itself usable as one (same as an ordinary variable there) */
+i64 DivBySeven() {
+  const i64 n = GetSeven();
+  return 14 / n;
+}
+
+i64 ForConstSum() {
+  i64 total = 0;
+  for (const i64 i = 0; i < 3; ) {
+    total += i;
+    break;
+  }
+  return total;
+}
 
 #define DIAG_SRC "./ktm-414-const.ktm"
 #define DIAG_OUT "./ktm-414-const.out"
@@ -92,6 +109,13 @@ I32 Main()
     tests++; if (n == 4) correct++;
   }
 
+  /* a const whose initializer is NOT a compile-time constant still
+   * runs correctly (it must not be folded to 0): */
+  tests++; if (DivBySeven() == 2) correct++;
+
+  /* `const` in a for-loop's init-statement, like a normal local */
+  tests++; if (ForConstSum() == 0) correct++;
+
   /* rule 1: const needs an initializer */
   tests++;
   if (Fails("const i64 X;\nI32 main() { return 0; }\n",
@@ -145,6 +169,30 @@ I32 main() { return 0; }
   tests++;
   if (Fails("i64 const x = 1;\nI32 main() { return 0; }\n",
             1, "const is only allowed on declarations", 1))
+    correct++;
+
+  /* a const with a runtime (non-constant) initializer is not usable as
+   * a compile-time constant: same errors as a plain variable there */
+  tests++;
+  if (Fails(
+"i64 f() { return 7; }
+I32 main() {
+  const i64 n = f();
+  switch (0) { case n: break; default: break; }
+  return 0;
+}
+", 1, "error:", 1))
+    correct++;
+
+  tests++;
+  if (Fails(
+"i64 f() { return 7; }
+I32 main() {
+  const i64 n = f();
+  i64 a[n];
+  return a[0];
+}
+", 2, "Invalid array subscript", 1))
     correct++;
 
   PrintResult(correct, tests);

@@ -461,9 +461,12 @@ s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
         }
         case AST_GVAR:
         case AST_LVAR: {
-            /* A `const` integer whose own initialiser was a constant
-             * expression: see AST_FLAG_CONST's comment in ast.h. */
-            if ((ast->flags & AST_FLAG_CONST) && astIsIntType(ast->type)) {
+            /* A `const` integer whose own initialiser folded to a
+             * constant: see AST_FLAG_CONST_VALUE's comment in ast.h.
+             * A `const` with a runtime initialiser is not constant
+             * (it reaches here and falls through to *_ok = 0, the same
+             * as any other variable). */
+            if (ast->flags & AST_FLAG_CONST_VALUE) {
                 return ast->deref_symbol;
             }
             *_ok = 0;

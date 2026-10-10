@@ -1454,7 +1454,10 @@ Ast *parseDecl(Cctrl *cc) {
     {
         int const_ok = 1;
         s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
-        if (const_ok) var->deref_symbol = const_val;
+        if (const_ok) {
+            var->deref_symbol = const_val;
+            var->flags |= AST_FLAG_CONST_VALUE;
+        }
     }
     return ast;
 }
@@ -2025,26 +2028,39 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         return NULL;
     }
 
+    int is_const = 0;
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        is_const = 1;
+        cctrlTokenGet(cc);
+        tok = cctrlTokenPeek(cc);
+        if (!tok) {
+            cctrlRaiseException(cc,"Unexpected end of input after `const`");
+        }
+    }
+
     if (cctrlIsKeyword(cc,tok->start,tok->len)) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
             cctrlRaiseException(cc,"expected Identifier got: %s",
-                    lexemeToString(tok)); 
+                    lexemeToString(tok));
         }
 
         /* We have a for loop variable */
         Ast *init_var = astLVar(type,tok->start,tok->len);
+        if (is_const) {
+            init_var->flags |= AST_FLAG_CONST;
+        }
 
         /* can be : for an auto loop or ';' for a normal loop */
-        tok = cctrlTokenPeek(cc); 
+        tok = cctrlTokenPeek(cc);
         if (!mapAddOrErr(cc->localenv,init_var->lname->data,init_var)) {
             cctrlRaiseException(cc,"variable `%s` already declared!",
                     astLValueToString(init_var,0));
         }
-        
+
         /* For this to work the type must have:
-         * 1) a pointer called entries 
+         * 1) a pointer called entries
          * 2) a size value that must be an integer */
         if (tokenPunctIs(tok,':')) {
             return parseRangeLoop(cc,init_var);
@@ -2056,8 +2072,23 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
             if (type->kind == AST_TYPE_AUTO) {
                 parseAssignAuto(cc,ast);
             }
+            if (is_const && ast->kind == AST_DECL && ast->declinit &&
+                astIsIntType(init_var->type))
+            {
+                int const_ok = 1;
+                s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+                if (const_ok) {
+                    init_var->deref_symbol = const_val;
+                    init_var->flags |= AST_FLAG_CONST_VALUE;
+                }
+            }
             return ast;
+        } else if (is_const) {
+            cctrlRaiseException(cc,"const '%s' needs an initializer",
+                    init_var->lname->data);
         }
+    } else if (is_const) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
     }
     return parseStatement(cc);
 }
@@ -2857,7 +2888,10 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 {
                     int const_ok = 1;
                     s64 const_val = evalIntConstExprOrErr(stmt->declinit, &const_ok);
-                    if (const_ok) var->deref_symbol = const_val;
+                    if (const_ok) {
+                        var->deref_symbol = const_val;
+                        var->flags |= AST_FLAG_CONST_VALUE;
+                    }
                 }
 
                 if (stmt) {
@@ -4465,7 +4499,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             if (is_const && astIsIntType(variable->type)) {
                 int const_ok = 1;
                 s64 const_val = evalIntConstExprOrErr(ast_expr->right, &const_ok);
-                if (const_ok) variable->deref_symbol = const_val;
+                if (const_ok) {
+                    variable->deref_symbol = const_val;
+                    variable->flags |= AST_FLAG_CONST_VALUE;
+                }
             }
 
             Ast *folded = NULL;
