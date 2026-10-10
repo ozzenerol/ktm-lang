@@ -1119,6 +1119,38 @@ U0 Main()
 <pre class="output">3 10 4 16
 </pre>
 
+<h3 id="enums">Enums<a class="anchor" href="#enums" aria-label="Link to this section">#</a></h3>
+<p>An <code>enum</code> is a scoped set of named integer constants, at file scope only.
+The first member is 0, then each next one is the previous plus 1, unless it has its own
+<code>= constexpr</code>; an earlier member can be used unqualified inside the braces. The
+underlying type defaults to <code>i32</code>; <code>: Type</code> picks any other integer
+type, and <code>sizeof</code>/<code>alignof</code> follow it. Outside the braces a member is
+only reachable as <code>Name.member</code>, which is itself an integer constant expression
+(an array size, a <code>case</code> label, another const's initialiser):</p>
+<pre data-run><code>enum Color { red, green, blue };
+enum Status : u16 { ok = 200, notFound = 404, gone };
+pub enum Mode { read = 1, write = 2, both = read | write };
+
+i32 main()
+{
+  Color c = Color.green;
+  i64 sizes[Color.blue + 1];
+  switch (c) {
+    case Color.red:   "red\n"; break;
+    case Color.green: "green\n"; break;
+    case Color.blue:  "blue\n"; break;
+  }
+  "%d %d %d\n", sizeof(sizes), Status.gone, Mode.both;
+  return 0;
+}
+</code></pre>
+<pre class="output">green
+24 405 3
+</pre>
+<p>An enum value converts to any integer type implicitly, as arithmetic and comparisons with
+integers do; an integer, or a different enum, needs a cast to become one
+(<code>(Color)2</code>). Two different enums never mix without a cast either.</p>
+
 <h2 id="preprocessor">The preprocessor<a class="anchor" href="#preprocessor" aria-label="Link to this section">#</a></h2>
 <h3 id="define">#define<a class="anchor" href="#define" aria-label="Link to this section">#</a></h3>
 <p>Macros name a single value: a number, a float, a string, or an expression that evaluates to

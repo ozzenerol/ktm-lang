@@ -694,6 +694,17 @@ static ParseArgCompat parseArgCompat(AstType *param, Ast *arg) {
     if (p->kind == AST_TYPE_ARRAY) p = astConvertArray(p);
     if (a->kind == AST_TYPE_ARRAY) a = astConvertArray(a);
 
+    /* A scoped enum parameter only takes the SAME enum without a cast:
+     * `2` and a different enum's member are both errors, reusing this
+     * same check (test 413's). */
+    if (p->kind == AST_TYPE_CLASS && p->is_enum) {
+        if (a->kind == AST_TYPE_CLASS && a->is_enum && p->clsname &&
+            a->clsname && aoStrCmp(p->clsname, a->clsname)) {
+            return ARG_OK;
+        }
+        return ARG_ERROR;
+    }
+
     if (parseIsAggregateType(p) || parseIsAggregateType(a)) {
         if (parseIsAggregateType(p) && parseIsAggregateType(a) &&
             parseSameAggregate(p, a)) {
@@ -1549,9 +1560,29 @@ Ast *parseCallArguments(Cctrl *cc, char *name, int len) {
     return parseFunctionArguments(cc, name, len, ')');
 }
 
+/* `Name.member`: `member`'s constant value, typed as the enum `Name`.
+ * Only reached when `name` names an enum (see below); the `.` is
+ * already consumed. */
+static Ast *parseEnumMemberRef(Cctrl *cc, AstType *enum_type, char *name,
+                               int len)
+{
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (!tok || tok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc,"Expected an enum member name after `%.*s.`",
+                len, name);
+    }
+    Ast *member = mapGetLen(enum_type->enum_members, tok->start, tok->len);
+    if (!member) {
+        cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);
+        cctrlRaiseException(cc,"enum `%.*s` has no member `%.*s`",
+                len, name, tok->len, tok->start);
+    }
+    return member;
+}
+
 /* parse either a function call or a variable being used */
-static Ast *parseIdentifierOrFunction(Cctrl *cc, 
-                                      char *name, 
+static Ast *parseIdentifierOrFunction(Cctrl *cc,
+                                      char *name,
                                       int len,
                                       int can_call_function)
 {
@@ -1560,6 +1591,15 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     Lexeme *tok = cctrlTokenGet(cc);
     Lexeme *peek = cctrlTokenPeek(cc);
     int is_lparen = tokenPunctIs(tok,'(');
+
+    if (tokenPunctIs(tok,'.')) {
+        AstType *enum_type = mapGetLen(cc->clsdefs, name, len);
+        if (enum_type && enum_type->kind == AST_TYPE_CLASS &&
+            enum_type->is_enum)
+        {
+            return parseEnumMemberRef(cc, enum_type, name, len);
+        }
+    }
 
     if ((ast = cctrlGetVar(cc, name, len)) == NULL) {
         cctrlRewindUntilStrMatch(cc, name, len, NULL);
@@ -1633,8 +1673,13 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
 
     /* Is a function call if the next char is '(' and the peek is not a
      * type. peek == NULL (end of input) counts as a call attempt - the
-     * argument parser raises the unterminated-`(` diagnostic. */
-    if (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len)) {
+     * argument parser raises the unterminated-`(` diagnostic. A type
+     * name is never followed by `.`, so `f(Color.red)` is a call whose
+     * first argument is an enum member, not a postfix cast. */
+    Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
+    if (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len) ||
+        tokenPunctIs(after_peek,'.'))
+    {
         return parseCallArguments(cc,name,len);
     }
 
@@ -1847,7 +1892,7 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
                 lexemeTypeToString(tok->tk_type),lexemeAsWritten(tok));
     }
     cctrlTokenExpect(cc, ']');
-    if (!astIsIntType(subscript->type)) {
+    if (!astIsIntOrIntrinsic(subscript->type)) {
         cctrlRaiseExceptionFromTo(cc, "Subscript expressions must evaluate to an integer type",
             '[', ']',
             "Cannot subscript `%s` with a %s of type `%s`",

@@ -155,6 +155,8 @@
 /* `const` on a declaration (ktm syntax v0.2): marks it read-only, not a
  * type qualifier like C's. */
 #define KW_CONST        94
+/* ktm syntax v0.2: a scoped enum, `enum Name [: IntType] { ... };` */
+#define KW_ENUM         95
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)

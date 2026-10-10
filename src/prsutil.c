@@ -213,7 +213,7 @@ int astCanEval(Ast *ast, int *_ok, int is_float) {
                astCanEval(ast->right, _ok,is_float);
     } else if (astIsArithmetic(ast, is_float)) {
         return 1;
-    } else if (ast->kind == AST_LITERAL && (astIsIntType(ast->type) || astIsFloatType(ast->type))) {
+    } else if (ast->kind == AST_LITERAL && (astIsIntOrIntrinsic(ast->type) || astIsFloatType(ast->type))) {
         return 1;
     } else {
         *_ok = 0;
@@ -327,7 +327,7 @@ s64 evalIntArithmeticOrErr(Ast *ast, int *_ok) {
 
     switch (ast->kind) {
         case AST_LITERAL: {
-            if (astIsIntType(ast->type)) {
+            if (astIsIntOrIntrinsic(ast->type)) {
                 return ast->i64;
             } else if (astIsFloatType(ast->type)) {
                 return (long)ast->f64;
@@ -450,7 +450,7 @@ s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
             return evalIntCast(value, ast->type);
         }
         case AST_LITERAL: {
-            if (astIsIntType(ast->type)) {
+            if (astIsIntOrIntrinsic(ast->type)) {
                 return ast->i64;
             } else if (astIsFloatType(ast->type)) {
                 return (long)ast->f64;

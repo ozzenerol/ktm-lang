@@ -1055,6 +1055,37 @@ AstType *astGetResultType(AstBinOp op, AstType *a, AstType *b) {
     ptr1 = astConvertArray(a);
     ptr2 = astConvertArray(b);
 
+    /* `Color d = 2;` and `Color d = someOtherEnum;` both need a cast:
+     * checked here (before the kind-sort below loses which side is the
+     * assignment's target) so only the SAME enum assigns without one. */
+    if (op == AST_BIN_OP_ASSIGN && ptr1->kind == AST_TYPE_CLASS &&
+        ptr1->is_enum)
+    {
+        if (ptr2->kind == AST_TYPE_CLASS && ptr2->is_enum && ptr1->clsname &&
+            ptr2->clsname && aoStrCmp(ptr1->clsname, ptr2->clsname))
+        {
+            return astTypeCopy(ptr1);
+        }
+        goto error;
+    }
+
+    /* An intrinsic class (an enum member included) offsets or indexes a
+     * pointer/array like its underlying integer does, e.g.
+     * `sizes[Color.blue]`, `p + Color.blue`. CLASS sorts after POINTER
+     * below, so without this `ptr2` would never land on the pointer. */
+    if (op != AST_BIN_OP_ASSIGN && astIsValidPointerOp(op) &&
+        (op == AST_BIN_OP_ADD || op == AST_BIN_OP_SUB))
+    {
+        if ((ptr1->kind == AST_TYPE_POINTER || ptr1->kind == AST_TYPE_FUNC) &&
+            astIsIntrinsicClass(ptr2)) {
+            return ptr1;
+        }
+        if ((ptr2->kind == AST_TYPE_POINTER || ptr2->kind == AST_TYPE_FUNC) &&
+            astIsIntrinsicClass(ptr1)) {
+            return ptr2;
+        }
+    }
+
 start_routine:
     if (ptr1->kind > ptr2->kind) {
         tmp = ptr2;
@@ -1153,6 +1184,14 @@ start_routine:
             ptr2 = ptr2->ptr;
             goto start_routine;
         case AST_TYPE_CLASS:
+            /* Two different enum types never mix without a cast, even in
+             * arithmetic/comparisons: `Color.red == Status.ok` is an error. */
+            if ((ptr1->is_enum || ptr2->is_enum) &&
+                !(ptr1->is_enum && ptr2->is_enum && ptr1->clsname &&
+                  ptr2->clsname && aoStrCmp(ptr1->clsname, ptr2->clsname)))
+            {
+                goto error;
+            }
             /* Struct/class copy: `dst = src` between two non-intrinsic
              * classes of the same type is a by-value copy (lowered to a
              * memcpy in the IR). */
@@ -1307,6 +1346,15 @@ check_type:
          * does: the lowering inserts a sitofp / fptosi. */
         ret = e;
         goto out;
+    } else if (e->kind == AST_TYPE_CLASS && e->is_enum) {
+        /* A scoped enum only takes another value of the SAME enum
+         * without a cast: `Color d = 2;` and `Color d = someStatus;`
+         * both need `(Color)...`, unlike a plain intrinsic class. */
+        if (a->kind == AST_TYPE_CLASS && a->is_enum && e->clsname &&
+            a->clsname && aoStrCmp(e->clsname, a->clsname)) {
+            ret = e;
+        }
+        goto out;
     } else if (e->kind == a->kind) {
         ret = e;
         goto out;
@@ -1318,7 +1366,7 @@ check_type:
             } else {
                 goto out;
             }
-        } else if (e->kind == AST_TYPE_CLASS && e->is_intrinsic && astIsIntType(a)) {
+        } else if (e->kind == AST_TYPE_CLASS && e->is_intrinsic && !e->is_enum && astIsIntType(a)) {
             ret = e;
             goto out;
         } 

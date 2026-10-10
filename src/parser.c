@@ -31,6 +31,7 @@ Ast *parseTryStatement(Cctrl *cc);
 Ast *parseThrowStatement(Cctrl *cc);
 AstType *parseClassDef(Cctrl *cc, AstType *intrinsic_base);
 AstType *parseUnionDef(Cctrl *cc);
+AstType *parseEnumDef(Cctrl *cc);
 
 /* `reg <REG>` / `noreg` modifier after a decl type.
  * If the next token is `reg`, consume it plus the following register-
@@ -1066,6 +1067,140 @@ AstType *parseUnionDef(Cctrl *cc) {
     return _union;
 }
 
+/* Does `value` fit in `type`'s width and signedness? */
+static int parseEnumValueFits(AstType *type, s64 value) {
+    int size = type->size > 0 ? type->size : 8;
+    if (size >= 8) return 1;
+    if (type->issigned) {
+        s64 min = -(1LL << (size * 8 - 1));
+        s64 max = (1LL << (size * 8 - 1)) - 1;
+        return value >= min && value <= max;
+    }
+    u64 max = (1ULL << (size * 8)) - 1;
+    return value >= 0 && (u64)value <= max;
+}
+
+/* `enum Name [: IntType] { member [= constexpr], ... };` at file scope.
+ * The members are only reachable qualified (`Name.member`, parsed in
+ * parseIdentifierOrFunction); unqualified they are bound in a scratch
+ * scope just for the body, so `both = read | write` can use `read` and
+ * `write` plainly while they are being defined. */
+AstType *parseEnumDef(Cctrl *cc) {
+    Lexeme *tok = cctrlTokenGetRequired(cc);
+    if (tok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc,"Expected a name after `enum`, got `%s`",
+                lexemeAsWritten(tok));
+    }
+    AoStr *tag = aoStrDupRaw(tok->start, tok->len);
+    if (mapGetLen(cc->clsdefs, tag->data, tag->len) ||
+        mapGetLen(cc->uniondefs, tag->data, tag->len))
+    {
+        cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
+    }
+
+    AstType *underlying;
+    if (tokenPunctIs(cctrlTokenPeek(cc), ':')) {
+        cctrlTokenGet(cc);
+        Lexeme *ty_tok = cctrlTokenGetRequired(cc);
+        underlying = parseGetType(cc, ty_tok);
+        if (!underlying || !astIsIntType(underlying) || underlying->is_bool) {
+            cctrlRaiseException(cc,
+                    "enum `%s`'s underlying type must be an integer type, got `%s`",
+                    tag->data, lexemeAsWritten(ty_tok));
+        }
+    } else {
+        underlying = cctrlGetKeyWord(cc, str_lit("i32"));
+    }
+
+    cctrlTokenExpect(cc,'{');
+
+    AstType *enum_type = astClassType(NULL, tag, underlying->size, 1);
+    enum_type->is_enum = 1;
+    enum_type->alignment = (u32)underlying->size;
+    enum_type->issigned = underlying->issigned;
+    enum_type->enum_members = astMapNew();
+
+    Map *scope = cctrlCreateAstMap(cc->localenv);
+    Map *saved_localenv = cc->localenv;
+    cc->localenv = scope;
+
+    s64 next_val = 0;
+    int member_count = 0;
+    for (;;) {
+        Lexeme *mtok = cctrlTokenGet(cc);
+        if (tokenPunctIs(mtok,'}')) {
+            break;
+        }
+        if (!mtok || mtok->tk_type != TK_IDENT) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "Expected an enum member name in `%s`, got `%s`",
+                    tag->data, lexemeAsWritten(mtok));
+        }
+        if (mapGetLen(enum_type->enum_members, mtok->start, mtok->len)) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,"enum `%s` already has a member `%.*s`",
+                    tag->data, mtok->len, mtok->start);
+        }
+        AoStr *member_name = aoStrDupRaw(mtok->start, mtok->len);
+
+        s64 value = next_val;
+        if (tokenPunctIs(cctrlTokenPeek(cc), '=')) {
+            cctrlTokenGet(cc);
+            Ast *expr = parseExpr(cc,16);
+            int ok = 1;
+            value = expr ? evalIntConstExprOrErr(expr, &ok) : 0;
+            if (!expr || !ok) {
+                cc->localenv = saved_localenv;
+                cctrlRaiseException(cc,
+                        "enum member `%s.%s` needs a constant integer expression",
+                        tag->data, member_name->data);
+            }
+        }
+        if (!parseEnumValueFits(enum_type, value)) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "enum member `%s.%s` value %lld does not fit in `%s`",
+                    tag->data, member_name->data, value,
+                    astTypeToString(underlying));
+        }
+        next_val = value + 1;
+        member_count++;
+
+        Ast *unqualified = astI64Type(value);
+        unqualified->type = astTypeCopy(underlying);
+        mapAdd(scope, member_name->data, unqualified);
+
+        Ast *qualified = astI64Type(value);
+        qualified->type = enum_type;
+        mapAdd(enum_type->enum_members, member_name->data, qualified);
+
+        Lexeme *sep = cctrlTokenGetRequired(cc);
+        if (tokenPunctIs(sep,'}')) {
+            break;
+        }
+        if (!tokenPunctIs(sep,',')) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "Expected `,` or `}` after enum member `%s.%s`, got `%s`",
+                    tag->data, member_name->data, lexemeAsWritten(sep));
+        }
+        if (tokenPunctIs(cctrlTokenPeek(cc),'}')) {
+            cctrlTokenGet(cc);
+            break;
+        }
+    }
+
+    cc->localenv = saved_localenv;
+
+    if (member_count == 0) {
+        cctrlRaiseException(cc,"enum `%s` has no members", tag->data);
+    }
+
+    mapAdd(cc->clsdefs, tag->data, enum_type);
+    return enum_type;
+}
+
 /* No `/` or `%` in `ast` has a divisor that folds to 0 (folding it would
  * divide by zero in the compiler) */
 static int parseConstFoldSafe(Ast *ast) {
@@ -1689,32 +1824,40 @@ static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Lexeme *tok = cctrlTokenPeek(cc);
     if (tok && cctrlIsKeyword(cc, tok->start, tok->len)) {
         AstType *type = parseDeclSpec(cc);
-        Lexeme *name = cctrlTokenGet(cc);
-        if (!name || name->tk_type != TK_IDENT) {
-            cctrlRaiseException(cc,
-                "Expected identifier in `if` declaration, got `%.*s`",
-                name ? name->len : 0, name ? name->start : "");
-        }
-        Ast *var = astLVar(type, name->start, name->len);
-        var->line = name->line;
-        var->col = name->col;
-        if (!mapAddOrErr(cc->localenv, var->lname->data, var)) {
-            cctrlRaiseException(cc, "variable %s already declared",
-                                astLValueToString(var, 0));
-        }
-        if (cc->tmp_locals) {
-            listAppend(cc->tmp_locals, var);
-        }
-        Lexeme *eq = cctrlTokenGet(cc);
-        if (tokenPunctIs(eq, '=')) {
-            Ast *init = parseRequiredExpr(cc, "an initial value");
-            clause = astDecl(var, init);
-            if (type->kind == AST_TYPE_AUTO) {
-                parseAssignAuto(cc, clause);
-            }
-        } else {
+        if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
+            /* `if (Color.red == c)`: an enum member reference, not an
+             * `if (Type name)` declaration. `type` is a bare name here
+             * (no `*`), so rewinding once puts it back. */
             cctrlTokenRewind(cc);
-            clause = astDecl(var, NULL);
+            clause = parseExpr(cc, 16);
+        } else {
+            Lexeme *name = cctrlTokenGet(cc);
+            if (!name || name->tk_type != TK_IDENT) {
+                cctrlRaiseException(cc,
+                    "Expected identifier in `if` declaration, got `%.*s`",
+                    name ? name->len : 0, name ? name->start : "");
+            }
+            Ast *var = astLVar(type, name->start, name->len);
+            var->line = name->line;
+            var->col = name->col;
+            if (!mapAddOrErr(cc->localenv, var->lname->data, var)) {
+                cctrlRaiseException(cc, "variable %s already declared",
+                                    astLValueToString(var, 0));
+            }
+            if (cc->tmp_locals) {
+                listAppend(cc->tmp_locals, var);
+            }
+            Lexeme *eq = cctrlTokenGet(cc);
+            if (tokenPunctIs(eq, '=')) {
+                Ast *init = parseRequiredExpr(cc, "an initial value");
+                clause = astDecl(var, init);
+                if (type->kind == AST_TYPE_AUTO) {
+                    parseAssignAuto(cc, clause);
+                }
+            } else {
+                cctrlTokenRewind(cc);
+                clause = astDecl(var, NULL);
+            }
         }
     } else {
         clause = parseExpr(cc, 16);
@@ -2529,7 +2672,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         cond = parseRequiredExpr(cc, "the `switch` value");
-        if (!astIsIntType(cond->type)) {
+        if (!astIsIntOrIntrinsic(cond->type)) {
             cctrlRaiseException(cc,"Switch can only have int's at this time");
         }
         cctrlTokenExpect(cc,terminating_char);
@@ -4175,7 +4318,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlTokenExpect(cc,';');
                     continue;
 
-                case KW_U0: 
+                case KW_ENUM:
+                    parseEnumDef(cc);
+                    cctrlTokenExpect(cc,';');
+                    continue;
+
+                case KW_U0:
                 case KW_BOOL:
                 case KW_I8:
                 case KW_U8:

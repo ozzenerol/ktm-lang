@@ -2057,6 +2057,13 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
                         // irAddConstFloat(ctx->ir_program, value);
                         return value;
                     }
+                case AST_TYPE_CLASS:
+                    /* An enum member (`Color.red`): an intrinsic class
+                     * literal, int-shaped underneath. */
+                    if (astIsIntrinsicClass(ast->type)) {
+                        return irConstInt(irConvertType(ast->type), ast->i64);
+                    }
+                    /* fallthrough */
                 default:
                     loggerPanic("Unknown literal: %s\n",
                             astTypeKindToString(ast->type->kind));

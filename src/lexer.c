@@ -184,6 +184,7 @@ static LexerType lexer_types[] = {
     {"class",   KW_CLASS},
     {"struct",  KW_CLASS},      /* ktm syntax v0.2: the same as class */
     {"union",   KW_UNION},
+    {"enum",    KW_ENUM},        /* ktm syntax v0.2 */
 
     {"static",  KW_STATIC},
     {"const",   KW_CONST},
@@ -620,6 +621,7 @@ AoStr *lexemeToAoStr(Lexeme *tok) {
             switch (tok->i64) {
                 case KW_CLASS:       aoStrCatPrintf(str,"class");   break;
                 case KW_UNION:       aoStrCatPrintf(str,"union");   break;
+                case KW_ENUM:        aoStrCatPrintf(str,"enum");    break;
                 case KW_U0:          aoStrCatPrintf(str,"U0");      break;
                 case KW_BOOL:        aoStrCatPrintf(str,"Bool");    break;
                 case KW_I8:          aoStrCatPrintf(str,"I8");      break;
