@@ -484,18 +484,26 @@ static void irEmitMemset(IrCtx *ctx, IrValue *dst, int n_bytes) {
  * asmNormaliseFunctionName adds the leading underscore at emit time.
  * Returns the call's dst tmp (for the I64-returning variant) or
  * NULL for the void variant. */
-static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
+static IrValue *irEmitRuntimeCallN(IrCtx *ctx, const char *fname,
                                     IrValueType ret_type, int ret_size,
-                                    IrValue *arg) {
+                                    int argc, IrValue **argv) {
     IrValue *args_wrap = irValueNew(IR_TYPE_ARRAY, IR_VAL_UNRESOLVED);
     args_wrap->as.array.label = aoStrPrintf("%s", fname);
     Vec *args = irValueVecNew();
     args_wrap->as.array.values = args;
-    vecPush(args, arg);
+    for (int i = 0; i < argc; ++i) {
+        vecPush(args, argv[i]);
+    }
     IrValue *ret = irTmp(ret_type, ret_size);
     IrInstr *call = irInstrNew(IR_CALL, ret, args_wrap, NULL);
     irBlockAddInstr(ctx, call);
     return ret;
+}
+
+static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
+                                    IrValueType ret_type, int ret_size,
+                                    IrValue *arg) {
+    return irEmitRuntimeCallN(ctx, fname, ret_type, ret_size, 1, &arg);
 }
 
 
@@ -2246,6 +2254,19 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
     irBlockAddInstr(ctx, jmp);
 }
 
+/* The try and defer frames use _setjmp, which unlike setjmp doesn't save
+ * the signal mask (one sigprocmask syscall per try or defer reached).
+ * Runtime call names are written as the assembler sees them, and on
+ * Mach-O a name starting with `_` is taken as already mangled: the C
+ * `_setjmp` is `__setjmp` there. */
+static const char *irSetjmpName(IrCtx *ctx) {
+    if (ctx->cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+        ctx->cc->target == TARGET_X86_64_APPLE_DARWIN) {
+        return "__setjmp";
+    }
+    return "_setjmp";
+}
+
 /* try { try_body } catch <catch_body> compiles to:
  *
  *     frame = alloca(CatchFrame)                 ; ~256 bytes, opaque
@@ -2294,7 +2315,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    out so the IR stays declarative. */
     irEmitRuntimeCall1(ctx, "KTM_PushFrame",
                         IR_TYPE_VOID, 8, frame_addr);
-    IrValue *enter_ret = irEmitRuntimeCall1(ctx, "setjmp",
+    IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                               IR_TYPE_I64, 8, frame_addr);
 
     /* 4. Branch: (enter_ret == 0) -> body, else -> catch. */
@@ -2353,9 +2374,9 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
  *     t = setjmp(&frame)
  *     br (t == 0), cont_block, unwind_block
  *   unwind_block:                     ; a throw is leaving the block
- *     v = KTM_DeferCaught(&frame)     ; pop the frame, get the value
- *     <lower stmt>
- *     KTM_Throw(v)                    ; on to the next frame out
+ *     KTM_DeferCaught(&frame, &saved) ; pop the frame, move the Error
+ *     <lower stmt>                    ; (a throw caught in here can't
+ *     KTM_Rethrow(&saved)             ;  clobber it), then on it goes
  *   cont_block:
  *
  * and stays on the try stack, so the end of the block and every
@@ -2371,8 +2392,16 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
     IrValue *frame_addr = irTmp(IR_TYPE_PTR, 8);
     irBlockAddInstr(ctx, irInstrNew(IR_LEA, frame_addr, frame_tmp, NULL));
 
+    /* The in-flight Error while the deferred statement runs (`struct
+     * Error`: code, message, file, line) */
+    int saved_size = 32;
+    IrValue *saved_tmp = irTmp(IR_TYPE_PTR, saved_size);
+    irBlockAddInstr(ctx, irInstrNew(IR_ALLOCA, saved_tmp,
+                                    irConstInt(IR_TYPE_I64, saved_size), NULL));
+    irAddStackSpace(ctx, saved_size);
+
     irEmitRuntimeCall1(ctx, "KTM_PushFrame", IR_TYPE_VOID, 8, frame_addr);
-    IrValue *enter_ret = irEmitRuntimeCall1(ctx, "setjmp",
+    IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                             IR_TYPE_I64, 8, frame_addr);
 
     IrBlock *unwind_block = irBlockNew();
@@ -2388,15 +2417,19 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
      * slot reused) by then, so take the address again. */
     irFnAddBlock(ctx->cur_func, unwind_block);
     ctx->cur_block = unwind_block;
-    IrValue *caught_addr = irTmp(IR_TYPE_PTR, 8);
-    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught_addr, frame_tmp, NULL));
-    IrValue *thrown = irEmitRuntimeCall1(ctx, "KTM_DeferCaught",
-                                         IR_TYPE_I64, 8, caught_addr);
+    IrValue *caught[2];
+    caught[0] = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[0], frame_tmp, NULL));
+    caught[1] = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[1], saved_tmp, NULL));
+    irEmitRuntimeCallN(ctx, "KTM_DeferCaught", IR_TYPE_VOID, 8, 2, caught);
     ctx->defer_lowering++;
     irLowerAst(ctx, ast->defer_stmt);
     ctx->defer_lowering--;
     if (!ctx->cur_block->sealed) {
-        irEmitRuntimeCall1(ctx, "KTM_Throw", IR_TYPE_VOID, 8, thrown);
+        IrValue *saved_addr = irTmp(IR_TYPE_PTR, 8);
+        irBlockAddInstr(ctx, irInstrNew(IR_LEA, saved_addr, saved_tmp, NULL));
+        irEmitRuntimeCall1(ctx, "KTM_Rethrow", IR_TYPE_VOID, 8, saved_addr);
         ctx->cur_block->sealed = 1;
     }
 
@@ -2411,10 +2444,16 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
     ctx->try_depth++;
 }
 
-/* throw(value) lowers to a single KTM_Throw(value) call. The runtime
- * longjmps so control never returns; mark the current block sealed
- * so the lowering driver doesn't append a fall-through edge. */
+/* throw(code) lowers to KTM_ThrowAt(code, file, line); the other forms
+ * are already a call (parseThrowCall). The runtime longjmps so control
+ * never returns; mark the current block sealed so the lowering driver
+ * doesn't append a fall-through edge. */
 void irLowerThrow(IrCtx *ctx, Ast *ast) {
+    if (ast->throw_call) {
+        irExpr(ctx, ast->throw_call);
+        ctx->cur_block->sealed = 1;
+        return;
+    }
     IrValue *v = irExpr(ctx, ast->throw_value);
     /* KTM_Throw takes a U64: convert the value like an argument to a
      * U64 parameter, so a float is truncated to an integer (not passed
@@ -2425,7 +2464,11 @@ void irLowerThrow(IrCtx *ctx, Ast *ast) {
     } else if (vt && (vt->kind == AST_TYPE_INT || vt->kind == AST_TYPE_CHAR)) {
         v = irWidenToTargetWidth(ctx, v, vt, ast_uint_type);
     }
-    irEmitRuntimeCall1(ctx, "KTM_Throw", IR_TYPE_VOID, 8, v);
+    IrValue *args[3];
+    args[0] = v;
+    args[1] = irExpr(ctx, ast->throw_file);
+    args[2] = irConstInt(IR_TYPE_I64, ast->line);
+    irEmitRuntimeCallN(ctx, "KTM_ThrowAt", IR_TYPE_VOID, 8, 3, args);
     ctx->cur_block->sealed = 1;
 }
 
@@ -3279,6 +3322,7 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
 
         case AST_THROW: {
             irEscapeWalk(ast->throw_value, escape);
+            irEscapeWalk(ast->throw_call, escape);
             return;
         }
 

@@ -1286,6 +1286,8 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 8 && !strncmp(fname, str_lit("CatPrint"))) return 1;
     else if (len == 11 && !strncmp(fname, str_lit("CatLenPrint"))) return 2;
     else if (len == 9 && !strncmp(fname, str_lit("StrNPrint"))) return 2;
+    /* `throw(code, fmt, ...)`, checked as a call to it */
+    else if (len == 12 && !strncmp(fname, str_lit("KTM_ThrowFmt"))) return 1;
     return -1;
 }
 
@@ -1369,6 +1371,78 @@ static void parsePrintfFormatCheck(Cctrl *cc,
     d->end_col = at->col + at->len;
     cctrlDiagPush(cc, d);
     cctrlTerminate(cc);
+}
+
+/* The stdlib's `struct Error`, which a throw carries */
+int parseIsErrorType(AstType *type) {
+    return type && type->kind == AST_TYPE_CLASS && type->clsname &&
+           type->clsname->len == 5 && !memcmp(type->clsname->data, "Error", 5);
+}
+
+/* The arguments of `throw(`...`)`, the `(` just consumed:
+ *   throw(code)            *_code = code, NULL returned (irLowerThrow
+ *                          calls KTM_ThrowAt with the code, file, line)
+ *   throw(code, fmt, ...)  checked as a call to KTM_ThrowFmt (types and
+ *                          the format), returned as KTM_ThrowFmtAt(file,
+ *                          line, code, fmt, ...)
+ *   throw(e)               e an Error: KTM_ThrowError(&e) */
+Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
+    char *fname = "KTM_ThrowFmt";
+    int len = 12;
+    Ast *decl = findFunctionDecl(cc, fname, len);
+    *_code = NULL;
+
+    ParseCallLoc loc = parseCallLocStart(cc, fname, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, decl, ')', fname, len, loc.args);
+    parseCallLocEnd(cc, &loc);
+
+    if (argv->size == 0 || !argv->entries[0]) {
+        parseCallLocFreeArgs(&loc);
+        parseRaiseCallError(cc, &loc, "`throw` needs a code, or an Error to throw again");
+    }
+    if (argv->size == 1) {
+        Ast *arg = argv->entries[0];
+        if (!parseIsErrorType(arg->type)) {
+            if (arg->type && (arg->type->kind == AST_TYPE_CLASS ||
+                              arg->type->kind == AST_TYPE_UNION) &&
+                !arg->type->is_intrinsic)
+            {
+                parseRaiseCallError(cc, &loc,
+                    "`throw` needs an integer code (usually an enum member) "
+                    "or an Error, got %s", astTypeToString(arg->type));
+            }
+            parseCallLocFreeArgs(&loc);
+            *_code = arg;
+            return NULL;
+        }
+        if (!assertLValue(arg)) {
+            parseRaiseCallError(cc, &loc, "`throw` of an Error needs a variable, as in `throw(e)`");
+        }
+        parseCallLocFreeArgs(&loc);
+        Vec *args = astVecNew();
+        vecPush(args, astUnaryOperator(astMakePointerType(arg->type),
+                                       AST_UN_OP_ADDR_OF, arg));
+        return astFunctionCall(ast_void_type, "KTM_ThrowError", 14, args);
+    }
+    if (!decl) {
+        parseCallLocFreeArgs(&loc);
+        parseRaiseCallError(cc, &loc, "`throw` with a message needs the standard library (KTM_ThrowFmt)");
+    }
+    parseFunctionArgumentCheck(cc, decl, argv, "throw", 5, &loc);
+    parseFlattenDefaultArgs(decl, argv);
+    parseAddEmptyVarArgCount(decl, argv);
+    parseCoerceArgs(decl, argv);
+    parsePrintfFormatCheck(cc, decl, argv, fname, len, &loc);
+    parseCallLocFreeArgs(&loc);
+
+    Vec *at = astVecNew();
+    vecPush(at, file);
+    vecPush(at, astI64Type(line));
+    for (u64 i = 0; i < argv->size; ++i) {
+        vecPush(at, argv->entries[i]);
+    }
+    return astFunctionCall(ast_void_type, "KTM_ThrowFmtAt", 14, at);
 }
 
 /* Read function arguments for a function being called */
