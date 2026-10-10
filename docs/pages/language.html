@@ -796,6 +796,32 @@ U0 Main()
 10 42
 8 1
 </pre>
+<p>A function pointer only takes a function, or a function pointer, with the same
+signature: the same return type, the same parameter types and the same <code>...</code>.
+Anything else is an error naming both types, wherever the conversion happens (an
+assignment, an initialiser, an argument, a <code>return</code> or a conditional), so
+<code>i64 (*op)(u8 *) = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
+<code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. A <code>U0 *</code> and
+<code>null</code> still convert without a cast. A function whose parameters are typed
+pointers, passed where one taking <code>U0 *</code> is expected (a comparator, a thread
+function), needs a cast, which makes the mismatch visible:</p>
+<pre data-run><code>
+class Item { I64 key; };
+
+I64 ItemLess(Item *a, Item *b) { return a->key < b->key; }
+
+U0 Main()
+{
+  Item a, b;
+  a.key = 1;
+  b.key = 2;
+  I64 (*cmp)(U0 *, U0 *) = (&ItemLess)(fn(U0 *, U0 *) I64);
+  "%d\n", cmp(&a, &b);
+}
+</code></pre>
+<pre class="output">
+1
+</pre>
 <p>The other C declarator forms work too: a function returning a function pointer is written
 <code>T (*Name(params))(fn_params)</code>, and a pointer to a function pointer is
 <code>T (**pp)(params)</code>, for locals, globals, class fields and parameters alike.</p>

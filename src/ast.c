@@ -1104,6 +1104,77 @@ int astIsIntrinsicClass(AstType *ty) {
     return ty && ty->kind == AST_TYPE_CLASS && ty->is_intrinsic;
 }
 
+/* Do two declarations of a function, or a function pointer and what is
+ * assigned to it, agree on a type? Integers match
+ * by size and signedness (an `I64 class` like CDate is its integer),
+ * classes and unions by name, an array parameter is its pointer and
+ * `auto` matches anything. */
+int astFnTypesMatch(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+    if (a->kind == AST_TYPE_AUTO || b->kind == AST_TYPE_AUTO) return 1;
+    if (a->kind == AST_TYPE_ARRAY) a = astMakePointerType(a->ptr);
+    if (b->kind == AST_TYPE_ARRAY) b = astMakePointerType(b->ptr);
+
+    int a_int = a->kind == AST_TYPE_INT || a->kind == AST_TYPE_CHAR;
+    int b_int = b->kind == AST_TYPE_INT || b->kind == AST_TYPE_CHAR;
+    if ((a_int || astIsIntrinsicClass(a)) && (b_int || astIsIntrinsicClass(b))) {
+        if (a->size != b->size) return 0;
+        return !a_int || !b_int || a->issigned == b->issigned;
+    }
+    if (a->kind != b->kind) return 0;
+
+    switch (a->kind) {
+        case AST_TYPE_FLOAT:
+            return a->size == b->size;
+        case AST_TYPE_POINTER:
+            return astFnTypesMatch(a->ptr, b->ptr);
+        case AST_TYPE_CLASS:
+        case AST_TYPE_UNION:
+            if (!a->clsname || !b->clsname) return 0;
+            return aoStrCmp(a->clsname, b->clsname);
+        case AST_TYPE_FUNC: {
+            if (!astFnTypesMatch(a->rettype, b->rettype)) return 0;
+            u64 na = a->params ? a->params->size : 0;
+            u64 nb = b->params ? b->params->size : 0;
+            if (na != nb) return 0;
+            for (u64 i = 0; i < na; ++i) {
+                Ast *pa = a->params->entries[i];
+                Ast *pb = b->params->entries[i];
+                if (!pa || !pb) return pa == pb;
+                if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
+                    return 0;
+                }
+                if ((pa->flags & AST_FLAG_VARARGS) != (pb->flags & AST_FLAG_VARARGS)) {
+                    return 0;
+                }
+                if (pa->kind == AST_VAR_ARGS) continue;
+                if (!astFnTypesMatch(pa->type, pb->type)) return 0;
+            }
+            return 1;
+        }
+        default:
+            return 1;
+    }
+}
+
+/* `expected` and `actual` are both function pointers (or pointers to
+ * them, as deep as each other) whose signatures differ: a conversion C
+ * would only warn about and that calls through with the wrong arguments.
+ * A void * (or null) on either side is not one: they convert freely. */
+int astFnPtrMismatch(AstType *expected, AstType *actual) {
+    if (!expected || !actual) return 0;
+    if (expected->kind == AST_TYPE_ARRAY) expected = astMakePointerType(expected->ptr);
+    if (actual->kind == AST_TYPE_ARRAY) actual = astMakePointerType(actual->ptr);
+    while (expected->kind == AST_TYPE_POINTER && actual->kind == AST_TYPE_POINTER &&
+           expected->ptr && actual->ptr) {
+        expected = expected->ptr;
+        actual = actual->ptr;
+    }
+    if (expected->kind != AST_TYPE_FUNC || actual->kind != AST_TYPE_FUNC) return 0;
+    return !astFnTypesMatch(expected, actual);
+}
+
 int astIsEnumType(AstType *ty) {
     return ty && ty->kind == AST_TYPE_CLASS && ty->is_enum;
 }
@@ -1141,6 +1212,12 @@ AstType *astGetResultType(AstBinOp op, AstType *a, AstType *b) {
         {
             return astTypeCopy(ptr1);
         }
+        goto error;
+    }
+
+    /* A function pointer only takes one with the same signature (or a
+     * void * or null, which are not function types) */
+    if (op == AST_BIN_OP_ASSIGN && astFnPtrMismatch(ptr1, ptr2)) {
         goto error;
     }
 

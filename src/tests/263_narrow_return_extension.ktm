@@ -66,12 +66,12 @@ I32 Main()
   else "Failed - C: %d %d %d %d %d\n", atol("511"), atoll("511"),
          strtol("1ffff", NULL, 16), labs(0x7700000000010002), llabs(0x100000007);
 
-  g_i8 = &Wide;
-  g_i16 = &Wide;
-  g_i32 = &Wide;
-  g_u8 = &Wide;
-  g_u16 = &Wide;
-  g_u32 = &Wide;
+  g_i8 = (&Wide)(fn(I64) I8);
+  g_i16 = (&Wide)(fn(I64) I16);
+  g_i32 = (&Wide)(fn(I64) I32);
+  g_u8 = (&Wide)(fn(I64) U8);
+  g_u16 = (&Wide)(fn(I64) U16);
+  g_u32 = (&Wide)(fn(I64) U32);
   I64 big = 0x7700000000000000;
 
   /* Signed: the low bits all ones are -1 */

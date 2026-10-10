@@ -4,7 +4,7 @@ extern "c" I64 strcmp(U8 *p,U8*p2);
 
 class Example
 {
-  U0 *(*fn)(U8 *name);
+  U8 *(*fn)(U8 *name);
 };
 
 U8 *Identity(U8 *chars)
@@ -59,7 +59,7 @@ Bool Test3()
 
 Bool Test4()
 { // You need to add a '&'
-  U0 *(*fn)(U8 *arg) = &Identity;
+  U8 *(*fn)(U8 *arg) = &Identity;
   if (!strcmp(fn("hey"),"hey")) {
     return TRUE;
   }
@@ -68,7 +68,7 @@ Bool Test4()
 
 Bool Test5()
 { // You need to add a '&'
-  U0 *(*fn)(U8 *arg) = &Identity;
+  U8 *(*fn)(U8 *arg) = &Identity;
   auto _ptr = fn;
   if (!strcmp(_ptr("hey"),"hey")) {
     return TRUE;

@@ -187,9 +187,9 @@ I64 IntVecLast(IntVec *vec, Bool *_ok=NULL)
   return -1;
 }
 
-I64 _IntCmp(I64 i1, I64 i2)
+I64 _IntCmp(U0 *i1, U0 *i2)
 {
-  return i1 < i2;
+  return i1(I64) < i2(I64);
 }
 
 U0 IntVecSort(IntVec *vec)

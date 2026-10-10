@@ -104,7 +104,7 @@ I32 Main()
   for (i = 0; i < RBT_THREADS; i++) {
     args[i].seed = i * 7919 + 1;
     args[i].ok = FALSE;
-    pthread_create(&args[i].th,, &RbtWorker, &args[i]);
+    pthread_create(&args[i].th,, (&RbtWorker)(U0 *(*)(U0 *)), &args[i]);
   }
   for (i = 0; i < RBT_THREADS; i++) pthread_join(args[i].th);
   Bool ok = TRUE;

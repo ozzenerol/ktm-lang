@@ -44,7 +44,7 @@ I32 Main()
   else "Failed - strcmp/strlen\n";
 
   /* libktm functions, a ktm one and an asm-bound one */
-  I64 (*hlen)(U8 *s) = &StrLen;
+  U64 (*hlen)(U8 *s) = &StrLen;
   U0 *(*alloc)(U64 size) = &MAlloc;
   U8 *p = alloc(16);
   tests++;

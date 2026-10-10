@@ -191,7 +191,7 @@ class ThreadPool
 };
 
 public extern "c" I32 pthread_create(pthread_t **th, U0 *thread_attr=NULL, 
-		U0 (*function_ptr)(U0 *argv), U0 *argv=NULL);
+		U0 *(*function_ptr)(U0 *argv), U0 *argv=NULL);
 public extern "c" I32 pthread_mutex_init(pthread_mutex_t *lk, pthread_mutexattr_t *mutex_attr=NULL);
 public extern "c" I32 pthread_mutex_destroy(pthread_mutex_t *lk);
 public extern "c" I32 pthread_mutex_lock(pthread_mutex_t *lk);
