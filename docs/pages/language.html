@@ -707,6 +707,31 @@ U0 Main()
 10 42
 8 1
 </pre>
+<p>The other C declarator forms work too: a function returning a function pointer is written
+<code>T (*Name(params))(fn_params)</code>, and a pointer to a function pointer is
+<code>T (**pp)(params)</code>, for locals, globals, class fields and parameters alike.</p>
+<pre data-run><code>
+I64 Dbl(I64 x) { return x * 2; }
+I64 Sq(I64 x) { return x * x; }
+
+I64 (*Choose(Bool square))(I64 x)
+{
+  if (square) return &Sq;
+  return &Dbl;
+}
+
+U0 Main()
+{
+  I64 (*f)(I64 x) = Choose(TRUE);
+  I64 (**pf)(I64 x) = &f;
+  printf("%d ", f(5));
+  *pf = Choose(FALSE);        // changes f through the pointer
+  printf("%d\n", f(5));
+}
+</code></pre>
+<pre class="output">
+25 10
+</pre>
 
 <h2>Pointers and arrays</h2>
 <pre data-run><code>

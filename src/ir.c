@@ -1839,6 +1839,11 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
             if (!src) loggerPanic("&lvar on unknown lvar\n");
         } else if (operand->kind == AST_GVAR) {
             src = irGlobalValue(operand);
+        } else if (operand->kind == AST_FUNPTR) {
+            /* `&fp` on a local function pointer: its slot, as for an lvar
+             * (a pointer to a function pointer, `T (**pp)(...)`) */
+            src = irFnGetVar(ctx->cur_func, operand->fn_ptr_id);
+            if (!src) loggerPanic("&fnptr on unknown local\n");
         } else if (operand->kind == AST_FUNC ||
                    operand->kind == AST_FUN_PROTO ||
                    operand->kind == AST_EXTERN_FUNC)
@@ -3033,6 +3038,8 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
                 Ast *target = irUnwrapDefaultParam(ast->operand);
                 if (target && target->kind == AST_LVAR) {
                     setAdd(escape, (void *)(u64)target->lvar_id);
+                } else if (target && target->kind == AST_FUNPTR) {
+                    setAdd(escape, (void *)(u64)target->fn_ptr_id);
                 }
             }
             irEscapeWalk(ast->operand, escape);

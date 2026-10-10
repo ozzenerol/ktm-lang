@@ -3717,7 +3717,32 @@ static void parseInheritDefaultParams(Cctrl *cc, AstType *rettype,
     }
 }
 
+/* The name in a function pointer declarator `(*name)`, `(**name)`, ...
+ * whose `(` was just read (the `*`s are still to come). */
+static Lexeme *parseFnPtrDeclName(Cctrl *cc) {
+    int stars = 0;
+    while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+        cctrlTokenGet(cc);
+        stars++;
+    }
+    Lexeme *name = cctrlTokenGet(cc);
+    if (name) cctrlTokenRewind(cc);
+    while (stars--) cctrlTokenRewind(cc);
+    return name;
+}
+
+/* `ret_fnptr` > 0: the function returns a function pointer, declared C's
+ * way, `T (*Name(params))(fn_params)`, with `ret_fnptr` stars; rettype is
+ * then the T those pointed-to functions return. */
+static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
+                                   int len, int is_inline, int ret_fnptr);
+
 Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int is_inline) {
+    return parseFunctionOrDefImpl(cc, rettype, fname, len, is_inline, 0);
+}
+
+static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
+                                   int len, int is_inline, int ret_fnptr) {
     cctrlNoteHeaderName(cc, fname, len);
     /* Anchor: the name token was just consumed, so the cursor still
      * sits on its line - stamp the function Ast with the NAME's
@@ -3757,6 +3782,20 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
     astResetLVarId();
 
     Vec *params = parseParams(cc,')',&has_var_args,1);
+    if (ret_fnptr) {
+        /* `)(fn_params)` after the parameters: what the returned function
+         * pointer points to */
+        int fn_var_args = 0;
+        cctrlTokenExpect(cc,')');
+        cctrlTokenExpect(cc,'(');
+        AstType *fn_type = astMakeFunctionType(rettype,
+                parseParams(cc,')',&fn_var_args,0));
+        fn_type->has_var_args = fn_var_args;
+        rettype = fn_type;
+        for (int i = 1; i < ret_fnptr; ++i) {
+            rettype = astMakePointerType(rettype);
+        }
+    }
     Lexeme *tok = cctrlTokenGet(cc);
     if (tokenPunctIs(tok, '{') || tokenPunctIs(tok, ';')) {
         parseCheckFunctionRedeclaration(cc, rettype, fname, len, params,
@@ -3962,7 +4001,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                      * global defined elsewhere (a library's), parsed as
                      * the global definition parses it */
                     if (name && tokenPunctIs(name,'(')) {
-                        Lexeme *fnptr_name = cctrlTokenPeekBy(cc,1);
+                        Lexeme *fnptr_name = parseFnPtrDeclName(cc);
                         char *fname;
                         int flen;
                         cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -4101,9 +4140,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                             tok->len,tok->start);
             }
         } else if (tok->tk_type == TK_IDENT) {
-            /* top level function call */
+            /* top level function call, unless the name is a type: then
+             * `i64 (*fp)(i64);` declares a function pointer */
             peek = cctrlTokenPeek(cc);
-            if (tokenPunctIs(peek,'(')) {
+            if (tokenPunctIs(peek,'(') &&
+                (mapGetLen(cc->global_env, tok->start, tok->len) ||
+                 !cctrlIsKeyword(cc, tok->start, tok->len))) {
                 cctrlTokenGet(cc);
                 ast = parseCallArguments(cc,tok->start,tok->len);
                 cctrlTokenExpect(cc,';');
@@ -4208,8 +4250,33 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * function pointer params, as in parseAsmFunctionBinding. */
         int is_fnptr = 0;
         if (tokenPunctIs(name,'(') && type != NULL) {
+            /* `T (*Name(params))(fn_params)`: a function returning a
+             * function pointer, not a variable */
+            int stars = 0;
+            while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+                cctrlTokenGet(cc);
+                stars++;
+            }
+            Lexeme *fn_name = cctrlTokenGet(cc);
+            int is_function = stars > 0 && fn_name &&
+                              fn_name->tk_type == TK_IDENT &&
+                              tokenPunctIs(cctrlTokenPeek(cc), '(');
+            if (!is_function) {
+                /* a function pointer variable: give the tokens back */
+                if (fn_name) cctrlTokenRewind(cc);
+                for (int i = 0; i < stars; ++i) cctrlTokenRewind(cc);
+            } else {
+                Ast *fn = parseFunctionOrDefImpl(cc, type, fn_name->start,
+                                                 fn_name->len, 0, stars);
+                if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
+                if (fn) {
+                    fn->line = fn_name->line;
+                    fn->col = fn_name->col;
+                }
+                return fn;
+            }
             is_fnptr = 1;
-            Lexeme *fnptr_name = cctrlTokenPeekBy(cc,1);
+            Lexeme *fnptr_name = parseFnPtrDeclName(cc);
             char *fname;
             int flen;
             cc->localenv = cctrlCreateAstMap(cc->localenv);
