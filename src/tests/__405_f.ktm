@@ -1,0 +1,2 @@
+void Main() {}
+void main() {}

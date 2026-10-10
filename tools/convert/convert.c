@@ -428,6 +428,9 @@ static s64 migOperandStart(MigFile *f, s64 lp) {
                 for (u64 k = 0; k < sizeof(kws) / sizeof(kws[0]); ++k) {
                     if ((s64)strlen(kws[k]) == before - w + 1 && !memcmp(t + w, kws[k], before - w + 1)) kw_before = 1;
                 }
+                /* `#define NAME (x)(T)`: NAME is the macro, not a call */
+                s64 d = migSkipSpaceBack(t, w - 1);
+                if (d >= 6 && !memcmp(t + d - 5, "define", 6)) kw_before = 1;
             }
             if (c == ']' || (before >= 0 && !kw_before && (migIsIdent(t[before]) ||
                                              t[before] == ')' || t[before] == ']')))
@@ -1285,8 +1288,11 @@ static void migMoveItems(MigFile *f) {
         if (it->is_decl) {
             text = migSplitDecl(f, it);
             if (!text) {
-                migNote(f, it->start, "kept: a global whose initialiser runs code "
-                        "(not a simple `T name = expr;`)");
+                migNote(f, it->start, any
+                        ? "check: a global whose initialiser runs code stays, but code before it "
+                          "moved into main: it now runs first (`I64 b = a * 2; I64 c[1] = {b};`)"
+                        : "kept: a global whose initialiser runs code "
+                          "(not a simple `T name = expr;`)");
                 continue;
             }
             migNote(f, it->start, "moved the initialiser of a global into main");
