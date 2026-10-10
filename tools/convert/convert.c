@@ -102,6 +102,7 @@ typedef struct MigFile {
     Vec *defines;        /* MigDefine *: #defines that fold to a number */
     Vec *closers;        /* MigEdit *: `}`s of bodies, innermost first */
     Set *imports;        /* modules the file uses (--map) */
+    Set *code_words;     /* identifiers in its code (--names clashes) */
 } MigFile;
 
 typedef struct MigDefine {
@@ -861,6 +862,7 @@ static Map *mig_map;
 static char *migReadFile(char *path, s64 *_len);
 static int migIsStdFile(Cctrl *cc, u32 file_id);
 static Map *mig_renames = NULL;      /* old -> new, every kind */
+static Set *mig_std_names = NULL;    /* every name the stdlib declares */
 static Map *mig_field_renames = NULL;
 
 static int migLoadRenames(const char *path) {
@@ -868,6 +870,7 @@ static int migLoadRenames(const char *path) {
     char *text = migReadFile((char *)path, &len);
     if (!text) return 0;
     if (!mig_renames) {
+        mig_std_names = setNew(4096, &set_cstring_type);
         mig_renames = mapNew(4096, &map_cstring_opaque_type);
         mig_field_renames = mapNew(1024, &map_cstring_opaque_type);
     }
@@ -881,6 +884,7 @@ static int migLoadRenames(const char *path) {
             *new++ = 0;
             char *end = strchr(new, '\t');
             if (end) *end = 0;
+            if (strcmp(kind, "kind")) setAdd(mig_std_names, old);
             if (strcmp(kind, "kind") && strcmp(old, new)) {
                 mapAdd(!strcmp(kind, "field") ? mig_field_renames : mig_renames, old, new);
             }
@@ -931,6 +935,10 @@ static char *migCamel(const char *w, s64 len) {
 }
 
 static int mig_names = 0;
+static void migCollectWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    (void)ctx;
+    setAdd(f->code_words, mprintf("%.*s", (int)len, f->text + at));
+}
 static int migUsesWord(MigFile *f, s64 s, s64 e, const char *name);
 
 /* The naming rule for the name at s (see migCamel) */
@@ -944,6 +952,7 @@ static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
     } else {
         /* not a type, not the stdlib's (1i), not a C function */
         if (cctrlGetKeyWord(cc, w, len)) return;
+        if (mig_std_names && setHas(mig_std_names, w)) return;
         if (mig_map && mapGet(mig_map, w)) return;
         Ast *decl = findFunctionDecl(cc, w, len);
         if (!decl) decl = mapGet(cc->global_env, w);
@@ -951,8 +960,23 @@ static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
         to = migCamel(w, len);
     }
     if (!to) return;
-    /* a name the file already has (`_a` next to `a`): left, for a person */
-    if (migUsesWord(f, 0, f->len, to)) {
+    /* a name the file's code already has (`_a` next to `a`): left, for
+     * a person */
+    if (!f->code_words) {
+        f->code_words = setNew(256, &set_cstring_type);
+        migScanWords(f, f->text, 0, f->len, migCollectWord, NULL);
+    }
+    static const char *kw[] = {"if", "else", "for", "while", "do", "switch", "case",
+        "default", "break", "continue", "return", "goto", "struct", "union", "enum",
+        "class", "const", "static", "extern", "inline", "auto", "pub", "public",
+        "private", "try", "catch", "throw", "defer", "fn", "self", "null", "true",
+        "false", "import", "module", "asm", "sizeof", "typeof", "alignof",
+        "fallthrough", "void", "bool", "i8", "u8", "i16", "u16", "i32", "u32",
+        "i64", "u64", "f32", "f64", "main"};
+    int is_kw = 0;
+    for (u64 k = 0; k < sizeof(kw) / sizeof(kw[0]); ++k) if (!strcmp(kw[k], to)) is_kw = 1;
+    if (is_kw || setHas(f->code_words, to) || (mig_std_names && setHas(mig_std_names, to)) ||
+        mapGet(cc->global_env, to)) {
         char *key = mprintf("clash:%s", w);
         if (!setHas(f->seen, key)) {
             setAdd(f->seen, key);
@@ -964,7 +988,8 @@ static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
 }
 
 void migrateNoteStdField(Cctrl *cc, Lexeme *name) {
-    if (!mig_names || !mig_field_renames) return;
+    /* with the stdlib converted in the same run (--map) */
+    if (!mig_names || !mig_field_renames || !mig_map) return;
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;
     s64 s = migOff(f, name);
@@ -1420,7 +1445,7 @@ static char *migSplitDecl(MigFile *f, MigItem *it) {
         if (!memcmp(t + i, "auto", 4) && (i == it->start || !migIsIdent(t[i - 1])) &&
             !migIsIdent(t[i + 4])) return NULL;
     }
-    char *moved = mprintf("%.*s = %s", (int)(ne - name), t + name,
+    char *moved = mprintf("%s = %s", migApply(f, name, ne, 0),
                           migApply(f, r, it->end, 0));
     migAdd(f, ne, it->end - 1, "", "moved");
     return moved;

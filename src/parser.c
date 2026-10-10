@@ -3193,6 +3193,9 @@ Ast *parseStatement(Cctrl *cc) {
 
                 AstType *type = parseFullType(cc);
                 tok = cctrlTokenGetRequired(cc);
+#ifdef KTM_CONVERT
+                if (cc->migrate && tok->tk_type == TK_IDENT) migrateNoteName(cc, tok);
+#endif
 
                 if (tok->tk_type != TK_IDENT) {
                     cctrlTokenRewind(cc);
@@ -4509,6 +4512,10 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
     if (name_tok && name_tok->start == fname) {
         name_tok_line = name_tok->line;
         name_tok_col = name_tok->col;
+#ifdef KTM_CONVERT
+        /* every function's name (inline ones, `T (*F(a))(b)`) */
+        if (cc->migrate && name_tok->tk_type == TK_IDENT) migrateNoteName(cc, name_tok);
+#endif
     }
     /* A module's function `a.b.f`: named by its symbol (see
      * astModuleMangle), `a.b.f` kept as a second name for lookups */
@@ -4680,6 +4687,9 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
         cctrlRaiseException(cc,"line %d: ASM function requires c function name");
     }
     c_fname = aoStrDupRaw(tok->start,tok->len);
+#ifdef KTM_CONVERT
+    if (cc->migrate && tok->tk_type == TK_IDENT) migrateNoteName(cc, tok);
+#endif
     int name_line = tok->line, name_col = tok->col;
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cctrlTokenExpect(cc,'(');
@@ -5320,6 +5330,13 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             if (!fn_is_type && tokenPunctIs(peek,'(') &&
                 (mapGetLen(cc->global_env, tok->start, tok->len) ||
                  !cctrlTokIsKeyword(cc, tok))) {
+#ifdef KTM_CONVERT
+                if (cc->migrate) {
+                    Lexeme mig_call = *tok;
+                    migrateNoteName(cc, &mig_call);
+                    migrateNoteRef(cc, &mig_call);
+                }
+#endif
                 cctrlTokenGet(cc);
                 ast = parseCallArguments(cc,tok->start,tok->len);
                 cctrlTokenExpect(cc,';');
