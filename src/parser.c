@@ -1002,6 +1002,11 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     }
 
     if (tag) {
+        if (memchr(tag->data, '.', tag->len)) {
+            if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+        } else if (cc->decl_from_main && !cc->cur_module) {
+            setAdd(cc->main_names, tag->data);
+        }
         prev = mapGetLen(env, tag->data, tag->len);
         if (prev && prev->is_enum) {
             cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
@@ -1121,6 +1126,11 @@ AstType *parseEnumDef(Cctrl *cc) {
     char *qual = cctrlQualifyName(cc, tok->start, tok->len);
     AoStr *tag = qual ? aoStrDupRaw(qual, strlen(qual))
                       : aoStrDupRaw(tok->start, tok->len);
+    if (qual) {
+        if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+    } else if (cc->decl_from_main && !cc->cur_module) {
+        setAdd(cc->main_names, tag->data);
+    }
     AstType *defined = mapGetLen(cc->clsdefs, tag->data, tag->len);
     if (defined && defined->is_enum && cc->cur_module && !cc->decls_only) {
         /* A module's full pass: the declarations pass defined it */
@@ -1600,6 +1610,7 @@ Ast *parseDecl(Cctrl *cc) {
         cctrlTokenExpect(cc,';');
         return NULL;
     }
+    cctrlCheckPrefixHidden(cc, varname);
     var = astLVar(type,varname->start,varname->len);
     /* astNew stamped the CURRENT token (post-name); anchor the decl
      * to the name itself for jump-to-definition. */
@@ -1705,12 +1716,13 @@ static void parseCondGuardInit(Cctrl *cc, ParseCondGuard *g, Lexeme *open,
     g->armed = 0;
     g->outer = cc->current_recovery;
     g->localenv = cc->localenv;
-    if (!open || !cc->lexer_ || !cc->lexer_->cur_file ||
-        !cc->lexer_->cur_file->src || open->line <= 0 || open->col <= 0) {
+    LexFile *open_file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
+    if (!open || !open_file || !open_file->src || open->line <= 0 ||
+        open->col <= 0) {
         return;
     }
-    char *src = cc->lexer_->cur_file->src->data;
-    s64 size = cc->lexer_->cur_file->src->len;
+    char *src = open_file->src->data;
+    s64 size = open_file->src->len;
     s64 i = 0, line = 1;
     while (i < size && line < open->line) {
         if (src[i] == '\n') line++;
@@ -3240,6 +3252,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 if (!tokenPunctIs(peek,'(')) {
                     /* A normal variable */
                     varname = cctrlTokenGetRequired(cc);
+                    cctrlCheckPrefixHidden(cc, varname);
                     if (varname->tk_type != TK_IDENT) {
                         cctrlTokenRewind(cc);
                         cctrlRaiseException(cc,"Expected type declaration with identifer got '%.*s' - should be"ESC_BLUE" '%s "ESC_RESET ESC_BOLD"<var_name>'",
@@ -4024,6 +4037,19 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     AstType *type = astMakeFunctionType(rettype, params);
     func = astFunction(type,fname,len,params,NULL,NULL,0);
     func->kind = AST_EXTERN_FUNC;
+    /* In a module it is the module's name (`a.b.open`, private unless
+     * pub), still calling the C symbol `open` */
+    char *qual = cctrlQualifyName(cc, fname, len);
+    if (qual) {
+        mapAdd(cc->global_env, qual, func);
+        if (cc->decl_pub) setAdd(cc->pub_names, qual);
+        return func;
+    }
+    /* The program's own C declaration (not one the stdlib headers
+     * already make, which modules may use) */
+    if (cc->decl_from_main && !mapGet(cc->global_env, func->fname->data)) {
+        setAdd(cc->main_names, func->fname->data);
+    }
     mapAdd(cc->global_env,func->fname->data,func);
     return func;
 }
@@ -4482,6 +4508,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Lexeme *tok, *name, *peek;
     int is_static = 0;
     int is_const = 0;
+    cc->decl_pub = 0;
 
     while (1) {
         if ((tok = cctrlTokenGet(cc)) == NULL) {
@@ -4494,6 +4521,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         /* Which module this declaration is in, and its pass */
         cc->cur_module = tok->module_id;
         cc->decls_only = tok->mod_pass == LEX_PASS_DECLS;
+        if (!cc->tmp_gvar_base_type) {
+            cc->decl_from_main = tok->module_id == 0 && !tok->in_std;
+        }
 
         /* An empty declaration: a stray `;` as in `I64 x = 1;;` or
          * `U0 F() {};`. Skip it, it would be taken for the type of the
@@ -4611,6 +4641,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     return ast;
                 }
                 case KW_PUBLIC:
+                    cc->decl_pub = 1;
+                    continue;
                 case KW_PRIVATE:
                 case KW_ATOMIC:
                     continue;
@@ -4798,6 +4830,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
+        cctrlCheckPrefixHidden(cc, name);
         /* A module's declaration is named `a.b.name` */
         if (cc->cur_module && name->tk_type == TK_IDENT) {
             char *qual = cctrlQualifyName(cc, name->start, name->len);
@@ -4805,7 +4838,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 name = lexemeCopy(name);
                 name->start = qual;
                 name->len = strlen(qual);
+                if (cc->decl_pub) setAdd(cc->pub_names, qual);
             }
+        } else if (cc->decl_from_main && name->tk_type == TK_IDENT) {
+            setAdd(cc->main_names, mprintf("%.*s", name->len, name->start));
         }
         parse_gvar_list_static = is_static;
         parse_gvar_list_const = is_const;

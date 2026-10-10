@@ -206,6 +206,14 @@ typedef struct Lexeme {
      * the main program or a header) and which pass of it (LEX_PASS_*) */
     u32 module_id;
     u8 mod_pass;
+    /* From a stdlib header (under the builtin root), not the program */
+    u8 in_std;
+    /* An identifier that is one of its file's import prefixes, not
+     * followed by `.`: declaring it would hide the module */
+    u8 is_prefix;
+    /* The file it was lexed from (the lexer runs ahead of the parser,
+     * so its current file can already be the next one) */
+    struct LexFile *file;
 } Lexeme;
 
 /* A module's files are lexed twice: declarations only, then in full */
@@ -239,6 +247,7 @@ typedef struct LexImport {
  * diagnostic renderer). */
 struct Cctrl;
 
+struct LexFile;
 typedef struct LexFile {
     AoStr *filename; /* name of the file */
     /* cctrlRegisterFile id, assigned lazily on first token consumed
@@ -258,6 +267,11 @@ typedef struct LexFile {
     u8 last_of_module;
     /* Past the `module` and `import` lines at the top */
     u8 header_done;
+    /* A module's file had its `module` line; under the builtin root */
+    u8 saw_module;
+    u8 is_std;
+    /* Its unused imports were reported */
+    u8 ended;
     LexImport *imports;
 } LexFile;
 
@@ -352,6 +366,7 @@ int tokenPunctIs(Lexeme *tok, s64 ch);
 int tokenIdentIs(Lexeme *tok, char *ident, int len);
 void lexemeFree(void *_le);
 char *lexerReportLine(Lexer *l, s64 lineno);
+char *lexerReportLineIn(LexFile *file, s64 lineno);
 int lexemeEq(Lexeme *l1, Lexeme *l2);
 char *lexReadfile(char *path, s64 *_len);
 

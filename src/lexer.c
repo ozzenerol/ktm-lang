@@ -90,7 +90,9 @@ void lexemeMemoryStats(void) {
 }
 
 Lexeme *lexerAllocLexeme(void) {
-    return (Lexeme *)arenaAlloc(&lexeme_arena, sizeof(Lexeme));
+    Lexeme *le = (Lexeme *)arenaAlloc(&lexeme_arena, sizeof(Lexeme));
+    memset(le, 0, sizeof(Lexeme));
+    return le;
 }
 
 char *lexerAllocateBuffer(u32 size) {
@@ -285,6 +287,9 @@ static void lexDiagVa(Lexer *l, int severity, s64 line, s64 col, s64 len,
         }
         if (len < 1) len = 1;
 
+        /* About where the lexer is, not the last token the parser took */
+        LexFile *parser_file = l->cc->tok_file;
+        l->cc->tok_file = l->cur_file;
         AoStr *buf = cctrlCreateErrorLineAt(l->cc, line, col, len,
                                             bold->data, severity, NULL);
         aoStrRelease(bold);
@@ -293,6 +298,7 @@ static void lexDiagVa(Lexer *l, int severity, s64 line, s64 col, s64 len,
          * default; override with the lexer's view since peek will
          * be holding a stale token from before the broken lexeme. */
         CctrlDiagnostic *d = cctrlMakeDiag(l->cc, severity, buf, NULL);
+        l->cc->tok_file = parser_file;
         d->line = (int)line;
         d->col = (int)col;
         d->end_line = (int)line;
@@ -725,6 +731,31 @@ void lexemePrint(Lexeme *le) {
     }
 }
 
+/* A lex warning at an explicit position */
+static void lexWarningAt(Lexer *l, s64 line, s64 col, s64 len,
+                         const char *fmt, ...)
+{
+    if (l->flags & (CCF_COND_SKIP|CCF_PERMISSIVE)) return;
+    va_list ap;
+    va_start(ap, fmt);
+    lexDiagVa(l, CCTRL_WARN, line, col, len, fmt, ap);
+    va_end(ap);
+}
+
+/* `file` has been read to its end: the imports it never used */
+static void lexFileEnded(Lexer *l, LexFile *file) {
+    if (!file || file->ended) return;
+    file->ended = 1;
+    if (file->mod_pass == LEX_PASS_DECLS) return;
+    for (LexImport *imp = file->imports; imp; imp = imp->next) {
+        if (!imp->used) {
+            lexWarningAt(l, imp->line, imp->col, imp->len,
+                         "module %s is imported but not used",
+                         imp->module->path->data);
+        }
+    }
+}
+
 static char lexNextChar(Lexer *l) {
     l->start = l->ptr;
     LexFile *lex_file;
@@ -733,6 +764,7 @@ static char lexNextChar(Lexer *l) {
         ch = *l->ptr;
     }
     if (ch == '\0') {
+        lexFileEnded(l, l->cur_file);
         if (listEmpty(l->files)) return '\0';
         if ((lex_file = listPop(l->files)) == NULL) {
             return '\0';
@@ -858,6 +890,10 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
     f->mod_pass = LEX_PASS_NONE;
     f->last_of_module = 0;
     f->header_done = 0;
+    f->saw_module = 0;
+    f->ended = 0;
+    f->is_std = l->builtin_root &&
+        !strncmp(filename->data, l->builtin_root, strlen(l->builtin_root));
     f->imports = NULL;
     /* The program's modules are found from its main file's directory */
     if (!l->program_root) {
@@ -910,6 +946,9 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->mod_pass = LEX_PASS_NONE;
     f->last_of_module = 0;
     f->header_done = 0;
+    f->saw_module = 0;
+    f->ended = 0;
+    f->is_std = 0;
     f->imports = NULL;
     if (l->cur_file) {
         l->cur_file->ptr = l->ptr;
@@ -1544,6 +1583,7 @@ int lexNumeric(Lexer *l, int _isfloat) {
 
 LexerType *lexPreProcDirective(Lexer *l) {
     Lexeme le;
+    memset(&le, 0, sizeof(le));
     /* Where the `#` is; lex() below moves tok_start to the name */
     s64 hash_line = l->tok_start_line;
     s64 hash_col = l->tok_start_col;
@@ -2874,6 +2914,7 @@ static int lexSkippedToken(Lexer *l, Lexeme *le) {
  * Returns 0 at the end of the input, having reported what's open. */
 static int lexCondSkip(Map *macro_defs, Lexer *l) {
     Lexeme le;
+    memset(&le, 0, sizeof(le));
     LexCond *cond = lexCondTop(l);
     int depth = 0;
 
@@ -2936,6 +2977,7 @@ static Lexeme *lexTokenRaw(Map *macro_defs, Lexer *l) {
     macro_proccessor->macro_defs = macro_defs;
 
     while (1) {
+        memset(&le, 0, sizeof(le));
         if (!lex(l,&le)) {
             lexCondUnterminated(l);
             return NULL;
@@ -3212,8 +3254,10 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
             aoStrCatPrintf(chain, "%s -> ", l->modules[l->mod_stack[i] - 1]->path->data);
         }
         aoStrCatPrintf(chain, "%s", path->data);
-        lexReportAt(l, kw->line, kw->col, kw->len,
-                    "circular import: %s", chain->data);
+        if (file->mod_pass != LEX_PASS_DECLS) {
+            lexReportAt(l, kw->line, kw->col, kw->len,
+                        "circular import: %s", chain->data);
+        }
         return;
     }
     if (!m) {
@@ -3258,6 +3302,7 @@ static void lexModuleLine(Map *macro_defs, Lexer *l, Lexeme *kw) {
     Lexeme *last = first;
     AoStr *name = lexModulePath(macro_defs, l, first, &last);
     if (!name) return;
+    file->saw_module = 1;
     if (!file->module_id) {
         lexReportAt(l, kw->line, kw->col, kw->len,
                     "`module %s;` in a file that isn't part of a module: "
@@ -3268,7 +3313,7 @@ static void lexModuleLine(Map *macro_defs, Lexer *l, Lexeme *kw) {
     AoStr *path = l->modules[file->module_id - 1]->path;
     char *dot = strrchr(path->data, '.');
     char *want = dot ? dot + 1 : path->data;
-    if (strcmp(want, name->data)) {
+    if (strcmp(want, name->data) && file->mod_pass != LEX_PASS_DECLS) {
         lexReportAt(l, first->line, first->col,
                     (last->start + last->len) - first->start,
                     "this file is in module %s, so it starts with `module %s;`, not `module %s;`",
@@ -3314,14 +3359,39 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
                 continue;
             }
         }
+        tok->is_prefix = 0;
         if (file) {
+            if (!file->header_done && file->module_id && !file->saw_module &&
+                file->mod_pass == LEX_PASS_FULL)
+            {
+                AoStr *path = l->modules[file->module_id - 1]->path;
+                char *dot = strrchr(path->data, '.');
+                lexReportAt(l, tok->line, tok->col, tok->len,
+                            "every file of module %s starts with `module %s;`",
+                            path->data, dot ? dot + 1 : path->data);
+            }
             file->header_done = 1;
             tok->module_id = file->module_id;
             tok->mod_pass = file->mod_pass;
-            if (tok->tk_type == TK_IDENT) lexQualify(l, tok);
+            tok->in_std = file->is_std;
+            tok->file = file;
+            if (tok->tk_type == TK_IDENT) {
+                char *before = tok->start;
+                lexQualify(l, tok);
+                if (tok->start == before) {
+                    for (LexImport *imp = file->imports; imp; imp = imp->next) {
+                        if ((int)imp->prefix->len == tok->len &&
+                            !memcmp(imp->prefix->data, tok->start, tok->len)) {
+                            tok->is_prefix = 1;
+                            break;
+                        }
+                    }
+                }
+            }
         } else {
             tok->module_id = 0;
             tok->mod_pass = LEX_PASS_NONE;
+            tok->in_std = 0;
         }
         return tok;
     }
@@ -3344,10 +3414,14 @@ void lexReleaseAllFiles(Lexer *l) {
 }
 
 char *lexerReportLine(Lexer *l, s64 lineno) {
+    return lexerReportLineIn(l->cur_file, lineno);
+}
+
+char *lexerReportLineIn(LexFile *file, s64 lineno) {
     AoStr *buf = aoStrAlloc(256);
 
-    char *ptr = l->cur_file->src->data;
-    s64 size = l->cur_file->src->len;
+    char *ptr = file->src->data;
+    s64 size = file->src->len;
     s64 line = 1;
     s64 i = 0;
 
