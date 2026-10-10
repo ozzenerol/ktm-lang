@@ -2453,6 +2453,9 @@ Lexeme *lexDefine(Map *macro_defs, Lexer *l) {
     if (start == end) {
         expanded = lexemeCopy(start);
         mapAdd(macro_defs,ident->data,expanded);
+#ifdef KTM_CONVERT
+        if (lex_define_hook) lex_define_hook(l->ptr, ident->data, expanded);
+#endif
     } else {
         /* As for #if: hand the parser a ring padded out with sentinels,
          * its error paths rewind into the slots past the expression. */
@@ -2565,6 +2568,9 @@ Lexeme *lexDefine(Map *macro_defs, Lexer *l) {
             expanded->start = strndup(num, num_len);
             expanded->len = num_len;
             expanded->line = start->line;
+#ifdef KTM_CONVERT
+            if (lex_define_hook) lex_define_hook(l->ptr, ident->data, expanded);
+#endif
         }
         mapAdd(macro_defs,ident->data,expanded);
     }
@@ -2954,6 +2960,7 @@ static int lexSkippedToken(Lexer *l, Lexeme *le) {
 /* Called with the text an #if skipped: tools/convert rewrites code the
  * parser never sees from its text */
 void (*lex_skip_hook)(char *from, char *to) = NULL;
+void (*lex_define_hook)(char *at, char *name, Lexeme *value) = NULL;
 
 static int lexCondSkipText(Map *macro_defs, Lexer *l);
 

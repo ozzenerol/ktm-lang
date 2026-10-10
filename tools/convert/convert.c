@@ -98,7 +98,13 @@ typedef struct MigFile {
     AoStr *notes;        /* "path:line: message" lines for the report */
     Vec *skipped;        /* [start, end) pairs of text an #if skipped */
     Vec *catches;        /* MigCatch *: catches without `(Error e)` */
+    Vec *defines;        /* MigDefine *: #defines that fold to a number */
 } MigFile;
+
+typedef struct MigDefine {
+    s64 line;            /* offset of the #define line */
+    const char *type;    /* i64 u64 f64 */
+} MigDefine;
 
 typedef struct MigCatch {
     s64 kw_end;          /* just past `catch` */
@@ -410,7 +416,17 @@ static s64 migOperandStart(MigFile *f, s64 lp) {
             s64 open = migMatchBack(t, i);
             if (open < 0) return -1;
             s64 before = migSkipSpaceBack(t, open - 1);
-            if (c == ']' || (before >= 0 && (migIsIdent(t[before]) ||
+            /* `return (x)(T)`: a keyword before `(` doesn't call it */
+            int kw_before = 0;
+            if (before >= 0 && migIsIdent(t[before])) {
+                s64 w = before;
+                while (w > 0 && migIsIdent(t[w - 1])) w--;
+                static const char *kws[] = {"return", "case", "else", "do", "goto"};
+                for (u64 k = 0; k < sizeof(kws) / sizeof(kws[0]); ++k) {
+                    if ((s64)strlen(kws[k]) == before - w + 1 && !memcmp(t + w, kws[k], before - w + 1)) kw_before = 1;
+                }
+            }
+            if (c == ']' || (before >= 0 && !kw_before && (migIsIdent(t[before]) ||
                                              t[before] == ')' || t[before] == ']')))
             {
                 i = before;     /* a subscript or the arguments of a call */
@@ -918,6 +934,10 @@ static void migMoveItems(MigFile *f) {
     for (u64 i = 0; i < f->items->size; ++i) {
         MigItem *it = f->items->entries[i];
         char *text;
+        /* `I64 a = 4, b = a * 3;`: the item is the declarator `b = a * 3`
+         * after the comma, a declaration too */
+        s64 before = migSkipSpaceBack(f->text, it->start - 1);
+        if (before >= 0 && f->text[before] == ',') it->is_decl = 1;
         if (it->is_decl) {
             text = migSplitDecl(f, it);
             if (!text) {
@@ -1494,6 +1514,40 @@ static void migSkipped(char *from, char *to) {
     }
 }
 
+static void migDefineFolded(char *at, char *name, Lexeme *value) {
+    if (!mig_active || !at) return;
+    const char *type = NULL;
+    if (value->tk_type == TK_I64) type = value->isu64 ? "u64" : "i64";
+    else if (value->tk_type == TK_F64) type = "f64";
+    else if (value->tk_type == TK_CHAR_CONST) type = "i64";
+    if (!type) return;
+    for (int i = 0; i < mig_active->n_files; ++i) {
+        MigFile *f = mig_active->files[i];
+        if (!f->base || at < f->base || at > f->base + f->len) continue;
+        /* back to the line that defines `name` */
+        s64 k = at - f->base;
+        s64 nlen = strlen(name);
+        while (k > 0) {
+            s64 ls = k - 1;
+            while (ls > 0 && f->text[ls - 1] != '\n') ls--;
+            s64 j = ls;
+            while (j < f->len && (f->text[j] == ' ' || f->text[j] == '\t')) j++;
+            if (!strncmp(f->text + j, "#define", 7)) {
+                j += 7;
+                while (j < f->len && (f->text[j] == ' ' || f->text[j] == '\t')) j++;
+                if (!strncmp(f->text + j, name, nlen) && !migIsIdent(f->text[j + nlen])) {
+                    MigDefine *d = (MigDefine *)malloc(sizeof(MigDefine));
+                    d->line = ls;
+                    d->type = type;
+                    vecPush(f->defines, d);
+                    return;
+                }
+            }
+            k = ls;
+        }
+    }
+}
+
 static void migFilePushed(LexFile *lf) {
     if (!mig_active) return;
     char real[PATH_MAX];
@@ -1531,6 +1585,7 @@ static int migParse(Migrate *m, char *root, char *install_dir) {
     mig_active = m;
     lex_file_pushed_hook = migFilePushed;
     lex_skip_hook = migSkipped;
+    lex_define_hook = migDefineFolded;
     lexInit(l, NULL, CCF_PRE_PROC);
     l->lineno = 1;
     lexSetBuiltinRoot(l, root_dir);
@@ -1541,6 +1596,7 @@ static int migParse(Migrate *m, char *root, char *install_dir) {
     int n_errors = cctrlDiagFlush(cc);
     lex_file_pushed_hook = NULL;
     lex_skip_hook = NULL;
+    lex_define_hook = NULL;
     return n_errors;
 }
 
@@ -1567,6 +1623,7 @@ static MigFile *migFileNew(char *path) {
     f->main_calls = vecNew(&vec_unsigned_long_type);
     f->skipped = vecNew(&vec_unsigned_long_type);
     f->catches = vecNew(&vec_unsigned_long_type);
+    f->defines = vecNew(&vec_unsigned_long_type);
     f->seen = setNew(64, &set_cstring_type);
     f->notes = aoStrNew();
     f->item_start = -1;
@@ -1834,7 +1891,8 @@ static int migPreprocUses(MigFile *f, const char *name, s64 nlen) {
     int defs = 0;
     for (s64 i = 0; i < f->len; ) {
         s64 le = i;
-        while (le < f->len && t[le] != '\n') le++;
+        /* a directive continued with `\` goes on to the next line */
+        while (le < f->len && (t[le] != '\n' || (le > i && t[le - 1] == '\\'))) le++;
         s64 j = i;
         while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
         if (j < le && t[j] == '#') {
@@ -1866,81 +1924,32 @@ static void migDefines(MigFile *f) {
     s64 plen = strlen(f->path);
     if (plen > 5 && !strcmp(f->path + plen - 5, ".ktmh")) return;
     char *t = f->text;
-    Vec *done = vecNew(&vec_unsigned_long_type);
-    for (s64 i = 0; i < f->len; ) {
-        s64 le = i;
+    for (u64 di = 0; di < f->defines->size; ++di) {
+        MigDefine *d = f->defines->entries[di];
+        s64 le = d->line;
         while (le < f->len && t[le] != '\n') le++;
-        s64 j = i;
+        if (le > d->line && t[le - 1] == '\\') continue;      /* continued line */
+        s64 j = d->line;
         while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
         s64 line_start = j;
-        int skipped = 0;
-        for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
-            if ((s64)(intptr_t)f->skipped->entries[r] <= i &&
-                i < (s64)(intptr_t)f->skipped->entries[r + 1]) skipped = 1;
-        }
-        if (skipped || le - j < 8 || memcmp(t + j, "#define", 7) || !isspace((unsigned char)t[j + 7])) {
-            i = le + 1;
-            continue;
-        }
         j += 7;
         while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
         s64 nw = j;
         while (j < le && migIsIdent(t[j])) j++;
         s64 nlen = j - nw;
-        if (nlen == 0 || t[j] == '(' || t[le - 1] == '\\') { i = le + 1; continue; }
-        /* the value, up to a comment */
-        s64 vs = j, ve = j, ce = le;
-        int ok = 1, is_float = 0, is_u64 = 0, depth = 0;
-        for (s64 k = j; k < le && ok; ) {
-            char c = t[k];
-            if (c == '/' && k + 1 < le && (t[k + 1] == '/' || t[k + 1] == '*')) { ce = k; break; }
-            if (c == ' ' || c == '\t') { k++; continue; }
-            if (isdigit((unsigned char)c) || (c == '.' && k + 1 < le && isdigit((unsigned char)t[k + 1]))) {
-                s64 w = k;
-                int hex = c == '0' && k + 1 < le && (t[k + 1] == 'x' || t[k + 1] == 'X');
-                while (k < le && (isalnum((unsigned char)t[k]) || t[k] == '_' || t[k] == '.' ||
-                                  (!hex && (t[k] == '+' || t[k] == '-') && (t[k - 1] == 'e' || t[k - 1] == 'E')))) k++;
-                for (s64 q = w; q < k; ++q) {
-                    if (t[q] == '.' || (!hex && (t[q] == 'e' || t[q] == 'E'))) is_float = 1;
-                }
-                if (hex) {
-                    s64 digits = 0;
-                    for (s64 q = w + 2; q < k; ++q) if (isxdigit((unsigned char)t[q])) digits++;
-                    if (digits == 16 && strchr("89abcdefABCDEF", t[w + 2])) is_u64 = 1;
-                }
-                if (t[k - 1] == 'U' || t[k - 1] == 'u') is_u64 = 1;
-                ve = k;
-                continue;
-            }
-            if (c == '\'' && k + 2 < le && t[k + 2] == '\'') { k += 3; ve = k; continue; }
-            if (migIsIdent(c)) {
-                s64 w = k;
-                while (k < le && migIsIdent(t[k])) k++;
-                int known = 0;
-                for (u64 d = 0; d < done->size; ++d) {
-                    char *n = done->entries[d];
-                    if ((s64)strlen(n) == k - w && !memcmp(n, t + w, k - w)) known = 1;
-                }
-                if (!known) ok = 0;
-                ve = k;
-                continue;
-            }
-            if (strchr("+-*/%<>|&~^", c)) { k++; continue; }
-            if (c == '(') { depth++; k++; continue; }
-            if (c == ')') { depth--; k++; ve = k; continue; }
-            ok = 0;
+        /* the value: up to a comment or the line's end */
+        s64 vs = j, ve = le;
+        for (s64 k = j; k < le; ++k) {
+            if (t[k] == '"' || t[k] == '\'') { k = migQuoteEnd(t, k, le); continue; }
+            if (t[k] == '/' && k + 1 < le && (t[k + 1] == '/' || t[k + 1] == '*')) { ve = k; break; }
         }
         while (vs < ve && (t[vs] == ' ' || t[vs] == '\t')) vs++;
-        if (!ok || depth || vs >= ve) { i = le + 1; continue; }
+        while (ve > vs && (t[ve - 1] == ' ' || t[ve - 1] == '\t')) ve--;
+        if (vs >= ve) continue;
         char *name = mprintf("%.*s", (int)nlen, t + nw);
-        if (migPreprocUses(f, name, nlen)) { i = le + 1; continue; }
-        vecPush(done, name);
-        const char *type = is_float ? "f64" : is_u64 ? "u64" : "i64";
-        s64 tail = ve;   /* keep the spacing before a trailing comment */
-        migAddSegs(f, line_start, tail, "const", migLit(mprintf("const %s %s = ", type, name)),
+        if (migPreprocUses(f, name, nlen)) continue;
+        migAddSegs(f, line_start, ve, "const", migLit(mprintf("const %s %s = ", d->type, name)),
                    migRange(vs, ve), migLit(";"), NULL);
-        (void)ce;
-        i = le + 1;
     }
 }
 

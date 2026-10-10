@@ -1,5 +1,5 @@
 /* Comments get the new names: u8 true class x(i64) */
-#define ONE (i64)1
+const i64 ONE = (i64)1;
 #define SHOUT "true and null are words here\n"
 #define SQL "SELECT * FROM t WHERE x IS NULL"
 

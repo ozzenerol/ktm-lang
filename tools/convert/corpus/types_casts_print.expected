@@ -1,5 +1,5 @@
 // A sample in the old syntax
-#define LIMIT 3
+const i64 LIMIT = 3;
 
 struct Point
 {

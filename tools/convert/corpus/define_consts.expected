@@ -1,0 +1,10 @@
+const i64 MAX = 64;
+const i64 HALF = (MAX / 2);   // half
+const f64 PI = 3.14159;
+const u64 BIG = 0xFFFFFFFFFFFFFFFF;
+#define NAME "x"
+#define DBG 1
+#if DBG
+#endif
+i64 buf[MAX];
+void main() { printf("%d %d %.2f %u %s\n", MAX, HALF, PI, BIG, NAME); }

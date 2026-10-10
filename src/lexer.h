@@ -398,6 +398,9 @@ char *lexReadfile(char *path, s64 *_len);
 #ifdef KTM_CONVERT
 extern void (*lex_file_pushed_hook)(LexFile *f);
 extern void (*lex_skip_hook)(char *from, char *to);
+/* A #define whose value folded to one token `value` (a number, or the
+ * single token of a one-token define); `at` is in the line after it */
+extern void (*lex_define_hook)(char *at, char *name, Lexeme *value);
 #endif
 
 
