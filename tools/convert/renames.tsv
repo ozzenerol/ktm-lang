@@ -893,11 +893,11 @@ field	error	error	unchanged (JsonParser); unchanged (JsonState); json.ktm,std.kt
 field	events	events	unchanged (NetPollFd); unchanged (ProcPollFd); C field name, kept (pollfd); net.ktm,process.ktm,std.ktmh
 field	except_ch	exceptCh	owner Coroutine; owner HCFs; coroutines.ktm,except.ktm,std.ktmh
 field	exit_code	exitCode	owner Proc; process.ktm,std.ktmh
-field	f64	f64	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
+field	f64	floatVal	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
 field	failed	failed	unchanged (Coroutine); coroutines.ktm,std.ktmh
 field	fd	fd	unchanged (NetPollFd); unchanged (ProcPollFd); C field name, kept (pollfd); net.ktm,process.ktm,std.ktmh
 field	flags	flags	unchanged (JsonParser); unchanged (SigAct); json.ktm,signals.ktm,std.ktmh
-field	fn	fn	unchanged (Coroutine); unchanged (FzFTerm); coroutines.ktm,fzf.ktm,std.ktmh
+field	fn	body	unchanged (Coroutine); unchanged (FzFTerm); coroutines.ktm,fzf.ktm,std.ktmh
 field	free_key	freeKey	owner RBTree; set.ktm,std.ktmh
 field	free_value	freeValue	owner RBTree; set.ktm,std.ktmh
 field	group	group	unchanged (Proc); process.ktm,std.ktmh
@@ -911,7 +911,7 @@ field	has_work	hasWork	owner ThreadPool; std.ktmh,threads.ktm
 field	hour	hour	unchanged (CDateStruct); date.ktm,std.ktmh
 field	i16	i16	unchanged (FzFSlab); fzf.ktm
 field	i32	i32	unchanged (FzFSlab); fzf.ktm
-field	i64	i64	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
+field	i64	intVal	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
 field	id	id	unchanged (ThreadWorker); std.ktmh,threads.ktm
 field	idx	idx	unchanged (CsvSlice); csv.ktm,std.ktmh
 field	in	in	unchanged (ProcOpts); process.ktm,std.ktmh

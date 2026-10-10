@@ -863,6 +863,7 @@ static char *migReadFile(char *path, s64 *_len);
 static int migIsStdFile(Cctrl *cc, u32 file_id);
 static Map *mig_renames = NULL;      /* old -> new, every kind */
 static Set *mig_std_names = NULL;    /* every name the stdlib declares */
+static Map *mig_scoped_renames = NULL; /* "file:name" -> new, locals */
 static Map *mig_field_renames = NULL;
 
 static int migLoadRenames(const char *path) {
@@ -872,6 +873,7 @@ static int migLoadRenames(const char *path) {
     if (!mig_renames) {
         mig_std_names = setNew(4096, &set_cstring_type);
         mig_renames = mapNew(4096, &map_cstring_opaque_type);
+        mig_scoped_renames = mapNew(1024, &map_cstring_opaque_type);
         mig_field_renames = mapNew(1024, &map_cstring_opaque_type);
     }
     for (char *line = text; line && *line; ) {
@@ -885,6 +887,13 @@ static int migLoadRenames(const char *path) {
             char *end = strchr(new, '\t');
             if (end) *end = 0;
             if (strcmp(kind, "kind")) setAdd(mig_std_names, old);
+            /* a local's row names its files: `local fn cb ...; fzf.ktm` */
+            char *files = end ? strrchr(end + 1, ';') : NULL;
+            if (!strcmp(kind, "local") && files) {
+                for (char *w = strtok(strdup(files + 1), ", "); w; w = strtok(NULL, ", ")) {
+                    mapAdd(mig_scoped_renames, mprintf("%s:%s", w, old), new);
+                }
+            }
             if (strcmp(kind, "kind") && strcmp(old, new)) {
                 mapAdd(!strcmp(kind, "field") ? mig_field_renames : mig_renames, old, new);
             }
@@ -1019,6 +1028,17 @@ void migrateNoteName(Cctrl *cc, Lexeme *name) {
         return;
     }
     if (f->real && strstr(f->real, "/src/std/")) {
+        /* the name picked for it (renames-locals.tsv per file, else the
+         * field table) */
+        char *base = strrchr(f->path, '/');
+        base = base ? base + 1 : f->path;
+        char *word = mprintf("%.*s", (int)name->len, f->text + s);
+        char *to = mig_scoped_renames ? mapGet(mig_scoped_renames, mprintf("%s:%s", base, word)) : NULL;
+        if (!to && mig_field_renames) to = mapGet(mig_field_renames, word);
+        if (to) {
+            migAdd(f, s, s + name->len, to, "keyword name");
+            return;
+        }
         char *key = mprintf("stdname:%lld", (long long)s);
         if (setHas(f->seen, key)) return;
         setAdd(f->seen, key);

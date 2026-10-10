@@ -111,3 +111,7 @@ local	user_cmd	userCmd	local or parameter; system.ktm
 local	user_data	userData	local or parameter; set.ktm,std.ktmh
 local	was_pending	wasPending	local or parameter; process.ktm
 local	wild_str	wildStr	local or parameter; std.ktmh,strings.ktm
+local	fn	cb	local or parameter (keyword now); fzf.ktm
+local	fn	body	local or parameter (keyword now); coroutines.ktm,std.ktmh
+local	i16	v16	local or parameter (type name now); fzf.ktm
+local	i32	v32	local or parameter (type name now); fzf.ktm
