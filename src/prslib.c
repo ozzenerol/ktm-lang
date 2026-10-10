@@ -74,9 +74,15 @@ AstType *parseFunctionPointerType(Cctrl *cc,
                                   int *fnptr_name_len,
                                   AstType *rettype)
 {
-    int has_var_args;
+    int has_var_args, depth = 0;
     Lexeme *fname;
     cctrlTokenExpect(cc,'*');
+    /* `T (**name)(params)`: a pointer to a function pointer, one more
+     * pointer for each further `*` */
+    while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+        cctrlTokenGet(cc);
+        depth++;
+    }
     fname = cctrlTokenGetRequired(cc);
     if (fname->tk_type != TK_IDENT) {
         /* `T (*)(params)`: report it at the token in place of the name
@@ -109,7 +115,9 @@ AstType *parseFunctionPointerType(Cctrl *cc,
     /* An array of function pointers `T (*name[N])(params)`: the element
      * type is filled in with the parameters once they are parsed. */
     AstType *fn_type = astMakeFunctionType(rettype, NULL);
-    AstType *type = parseArrayDimensions(cc,fn_type);
+    AstType *elem = fn_type;
+    for (int i = 0; i < depth; ++i) elem = astMakePointerType(elem);
+    AstType *type = parseArrayDimensions(cc,elem);
     cctrlTokenExpect(cc,')');
     cctrlTokenExpect(cc,'(');
     fn_type->params = parseParams(cc,')',&has_var_args,0);
@@ -127,8 +135,10 @@ Ast *parseFunctionPointer(Cctrl *cc, AstType *rettype) {
             &fnptr_name_len,
             rettype);
 
-    /* An array of function pointers is an ordinary variable */
-    if (fnptr_type->kind == AST_TYPE_ARRAY) {
+    /* An array of function pointers, or a pointer to one, is an
+     * ordinary variable */
+    if (fnptr_type->kind == AST_TYPE_ARRAY ||
+        fnptr_type->kind == AST_TYPE_POINTER) {
         ast = astLVar(fnptr_type,fnptr_name,fnptr_name_len);
         return ast;
     }
