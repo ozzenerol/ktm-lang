@@ -288,7 +288,8 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
 
 /* Instantiate a new compiler control struct */
 Cctrl *cctrlNew(enum CliTarget target) {
-    Cctrl *cc = (Cctrl *)malloc(sizeof(Cctrl));
+    /* zeroed: a field nothing sets here (pending_unary) must start NULL */
+    Cctrl *cc = (Cctrl *)calloc(1, sizeof(Cctrl));
 
     cc->flags = 0;
     cc->defer_depth = 0;
