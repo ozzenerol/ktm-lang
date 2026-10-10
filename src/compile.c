@@ -100,6 +100,8 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     } else {
         lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
     }
+    /* the runtime, after the header and before the program */
+    lexPushRuntime(l);
     /* library files */
     /* the structure is a so this will get popped first */
     lexPushFile(l,builtin_path);

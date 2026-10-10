@@ -1482,6 +1482,10 @@ integer limits, the smallest and largest value of each integer type: <code>I8_MI
 <code>I8_MAX</code>, <code>U8_MAX</code>, and the same for 16, 32 and 64 bits
 (<code>I16_MIN</code> ... <code>U64_MAX</code>). <code>import prelude;</code>
 is an error, and a directory of the program called <code>prelude</code> is not it.</p>
+<p>Another is the runtime, the standard library's <code>modules/rt</code>: it is part of
+every program, imported or not, but no program imports it. <code>import rt;</code> in a
+program or in a program's own module is an error ("rt is internal"), and nothing binds the
+prefix <code>rt</code>; only the standard library's modules may import it.</p>
 <p>These are compile errors: using a name that isn't <code>pub</code> from outside its
 module, a module that isn't found or is found twice, an import cycle (the message shows it,
 <code>a -&gt; b -&gt; a</code>), a file whose <code>module</code> line is missing or doesn't

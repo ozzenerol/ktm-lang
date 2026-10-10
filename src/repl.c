@@ -1390,6 +1390,7 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
     lexSetBuiltinRoot(l, root_dir);
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
+    if (builtin) lexPushRuntime(l);
     if (builtin) lexPushFile(l, builtin);
     if (builtin) lexPushPrelude(l);
 

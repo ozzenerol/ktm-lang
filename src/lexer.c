@@ -3115,6 +3115,21 @@ static Lexeme *lexTokenRaw(Map *macro_defs, Lexer *l) {
  * `module b;`. In a file that imports it, `b.name` (or `alias.name`) is
  * the single token `a.b.name`. */
 
+static int lexIsDir(const char *path);
+
+/* Is `file` part of one of the standard library's modules
+ * (<install>/modules)? */
+static int lexFileInStdModules(Lexer *l, LexFile *file) {
+    if (!file || !file->module_id || !l->builtin_root) return 0;
+    char *root = realpath(mprintf("%s../modules", l->builtin_root), NULL);
+    char *dir = realpath(l->modules[file->module_id - 1]->dir->data, NULL);
+    size_t len = root ? strlen(root) : 0;
+    int inside = root && dir && !strncmp(dir, root, len) && dir[len] == '/';
+    free(root);
+    free(dir);
+    return inside;
+}
+
 static LexModule *lexModuleFind(Lexer *l, AoStr *path) {
     for (int i = 0; i < l->modules_len; ++i) {
         if (aoStrCmp(l->modules[i]->path, path)) return l->modules[i];
@@ -3154,6 +3169,13 @@ static char *lexModuleDir(Lexer *l, AoStr *path, Lexeme *at) {
         char *cand = mprintf("%s/%s", roots[i], rel);
         if (!lexIsDir(cand)) continue;
         if (found) {
+            /* the same directory through two roots (a tree built where
+             * the standard library's modules are) is found once */
+            char *a = realpath(found, NULL), *b = realpath(cand, NULL);
+            int same = a && b && !strcmp(a, b);
+            free(a);
+            free(b);
+            if (same) continue;
             lexReportAt(l, at->line, at->col, at->len,
                         "module %s is found twice: %s and %s",
                         path->data, found, cand);
@@ -3401,6 +3423,22 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     AoStr *prefix = alias ? alias : aoStrDupRaw(last->start, last->len);
     int auto_prelude = file && file->filename &&
                        !strcmp(file->filename->data, LEX_PRELUDE_FILE);
+    int auto_rt = file && file->filename &&
+                  !strcmp(file->filename->data, LEX_RT_FILE);
+    /* rt, the runtime: in every program, imported by no program. The
+     * standard library's own modules may, and a -lib build of a tree
+     * that has it (its generated program imports every module). */
+    if (!strcmp(path->data, "rt") && !auto_rt &&
+        !(l->building_tree && !file->module_id) &&
+        !lexFileInStdModules(l, file)) {
+        if (!LEX_PASS_QUIET(file->mod_pass)) {
+            lexReportAt(l, kw->line, kw->col,
+                        (last->start + last->len) - kw->start,
+                        "rt is internal: the runtime is part of every program "
+                        "and can't be imported");
+        }
+        return;
+    }
     if (!auto_prelude && !strcmp(path->data, "prelude")) {
         if (!LEX_PASS_QUIET(file->mod_pass)) {
             lexReportAt(l, kw->line, kw->col,
@@ -3433,6 +3471,7 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
         /* the prelude is the install's, whatever else is called that */
         char *dir = auto_prelude
                   ? mprintf("%s../modules/prelude", l->builtin_root)
+                  : auto_rt ? mprintf("%s../modules/rt", l->builtin_root)
                   : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
@@ -3458,7 +3497,7 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     imp->module = m;
     /* the `import` of `ktm -lib`'s generated program */
     imp->used = ((l->building_module || l->building_tree) && !file->module_id) ||
-                auto_prelude;
+                auto_prelude || auto_rt;
     imp->line = kw->line;
     imp->col = kw->col;
     imp->len = kw->len;
@@ -3480,6 +3519,18 @@ void lexPushPrelude(Lexer *l) {
     if (!lexIsDir(dir)) return;
     char *src = "import prelude;\n";
     lexPushString(l, LEX_PRELUDE_FILE, src, strlen(src));
+}
+
+/* rt (<install>/modules/rt), the runtime: loaded into every program,
+ * after std.ktmh and before the program, but bound to no prefix, so a
+ * program can't name it. Not for a -lib build (a library doesn't need
+ * it linked in) or an install without one. */
+void lexPushRuntime(Lexer *l) {
+    if (!l->builtin_root || l->building_module || l->building_tree) return;
+    char *dir = mprintf("%s../modules/rt", l->builtin_root);
+    if (!lexIsDir(dir)) return;
+    char *src = "import rt;\n";
+    lexPushString(l, LEX_RT_FILE, src, strlen(src));
 }
 
 /* `module b;` at the top of a module's file, the `module` just lexed */
