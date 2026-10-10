@@ -626,33 +626,65 @@ U0 Main()
 </pre>
 
 <h3 id="variable-arguments">Variable arguments<a class="anchor" href="#variable-arguments" aria-label="Link to this section">#</a></h3>
-<p>Write <code>...</code> as the last parameter. Inside the function, <code>argc</code> is
-the number of extra arguments and <code>argv</code> holds them as 64-bit values:</p>
-<pre data-run><code>I64 Sum(...)
+<p>The last parameter can take any number of extra arguments, zero included:
+<code>T ...name</code> takes them as values of type <code>T</code>, each checked and
+converted like an argument to a <code>T</code> parameter (a wrong type is an error).
+Inside the function <code>name.len</code> is how many there are, <code>name[i]</code> is
+one of them (<code>&amp;name[i]</code> works too) and <code>for (auto v : name)</code> goes
+through them; <code>name</code> itself can't be assigned. Fixed and default parameters can
+come before it.</p>
+<pre data-run><code>I64 Sum(I64 ...nums)
 {
   I64 total = 0;
-  for (I64 i = 0; i &lt; argc; i++) {
-    total += argv[i];
-  }
+  for (auto n : nums) total += n;
   return total;
 }
 
-U0 Log(U8 *fmt, ...)
+F64 Avg(F64 ...xs)
 {
-  U8 *msg = StrPrintJoin(NULL, fmt, argc, argv);   // format the extras
+  if (!xs.len) return 0;
+  F64 total = 0;
+  for (I64 i = 0; i &lt; xs.len; i++) total += xs[i];   // 1 and 2 become 1.0, 2.0
+  return total / xs.len;
+}
+
+I64 Total(I64 ...nums)
+{
+  return Sum(...nums);   // pass them all on
+}
+
+U0 Main()
+{
+  "%d %d %d\n", Sum(), Sum(1, 2, 3, 4), Total(5, 6);
+  "%.2f\n", Avg(1, 2, 4);
+}
+</code></pre>
+<pre class="output">0 10 11
+2.33
+</pre>
+<p><code>...name</code> as the last argument of a call passes the extras of a variadic
+parameter on, to a function that takes the same kind (it must be the only extra
+argument). Without a type, <code>...name</code> takes the extras as 64-bit slots, the way
+format functions want them: a number as is, a float as its bits (read it back with
+<code>name[i](F64)</code>), a pointer as its address:</p>
+<pre data-run><code>U0 Log(U8 *fmt, ...args)
+{
+  U8 *msg = StrPrintJoin(NULL, fmt, args.len, args);   // format the extras
   "[log] %s\n", msg;
   Free(msg);
 }
 
 U0 Main()
 {
-  "%d\n", Sum(1, 2, 3, 4);
-  Log("%d files in %s", 3, "/tmp");
+  Log("%d files in %s, %.1f%% full", 3, "/tmp", 42.5);
 }
 </code></pre>
-<pre class="output">10
-[log] 3 files in /tmp
+<pre class="output">[log] 3 files in /tmp, 42.5% full
 </pre>
+<p>The extras are passed as their count and a pointer to an array the caller builds, so
+spreading them on costs nothing. The older <code>...</code> with no name, which gives the
+function hidden <code>argc</code> and <code>argv</code> variables, still works until the
+conversion.</p>
 
 <h3 id="function-pointers">Function pointers<a class="anchor" href="#function-pointers" aria-label="Link to this section">#</a></h3>
 <pre data-run><code>I64 Add(I64 a, I64 b) { return a + b; }

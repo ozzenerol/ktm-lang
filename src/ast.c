@@ -720,6 +720,16 @@ Ast *astThrow(Ast *value) {
     return ast;
 }
 
+Ast *astVaPack(Ast *array, Vec *items, int untyped) {
+    Ast *ast = astNew();
+    ast->kind = AST_VA_PACK;
+    ast->type = astMakePointerType(array->type->ptr);
+    ast->va_array = array;
+    ast->va_items = items;
+    ast->va_untyped = untyped;
+    return ast;
+}
+
 Ast *astDefer(Ast *stmt) {
     Ast *ast = astNew();
     ast->kind = AST_DEFER;
@@ -1841,7 +1851,20 @@ static char *astParamsToString(Vec *params) {
             Ast *param = params->entries[i];
             int is_last = i+1 == params->size;
             if (!param) break;
-            if (param->kind == AST_VAR_ARGS) {
+            /* `T ...name`: the hidden count before it isn't shown */
+            Ast *next = is_last ? NULL : params->entries[i + 1];
+            if (next && next->kind == AST_LVAR && (next->flags & AST_FLAG_VARARGS)) {
+                continue;
+            }
+            if (param->kind == AST_LVAR && (param->flags & AST_FLAG_VARARGS)) {
+                AstType *elem = param->type->ptr;
+                if (elem->has_var_args) {
+                    aoStrCatFmt(str,"...%s",param->lname->data);
+                } else {
+                    AoStr *t = astTypeToColorAoStr(elem);
+                    aoStrCatFmt(str,"%S ...%s",t,param->lname->data);
+                }
+            } else if (param->kind == AST_VAR_ARGS) {
                 if (!is_last) aoStrCatFmt(str,"..., ");
                 else          aoStrCatFmt(str,"..."); 
             } else {
@@ -2293,6 +2316,11 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             astStringEndStmt(str);
             break;
 
+        case AST_VA_PACK:
+            aoStrCatPrintf(str, "<va_pack %d items>\n",
+                           ast->va_items ? (int)ast->va_items->size : 0);
+            break;
+
         case AST_DEFER:
             aoStrCatPrintf(str, "<defer>\n");
             _astToString(str, ast->defer_stmt, depth+1);
@@ -2560,6 +2588,7 @@ char *astKindToString(AstKind kind) {
         case AST_TRY:           return "AST_TRY";
         case AST_THROW:         return "AST_THROW";
         case AST_DEFER:         return "AST_DEFER";
+        case AST_VA_PACK:       return "AST_VA_PACK";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -2834,6 +2863,14 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
                     lexemePunctToStringWithFlags(';',lexeme_flags));
             break;
 
+        case AST_VA_PACK:
+            for (u64 i = 0; ast->va_items && i < ast->va_items->size; ++i) {
+                if (i) aoStrCatPrintf(str, ", ");
+                _astLValueToString(str, vecGet(Ast *, ast->va_items, i),
+                                   lexeme_flags);
+            }
+            break;
+
         case AST_DEFER:
             aoStrCatPrintf(str, "defer ");
             _astLValueToString(str, ast->defer_stmt, lexeme_flags);
@@ -2989,6 +3026,7 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_TRY: return "try/catch statement";
         case AST_THROW: return "throw statement";
         case AST_DEFER: return "defer statement";
+        case AST_VA_PACK: return "variadic arguments";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";

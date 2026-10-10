@@ -311,6 +311,77 @@ Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var) {
     return astFunctionDefaultParam(var,init);
 }
 
+/* Whether a `T ...name` element type fits the caller's array: a number
+ * or a pointer (also an enum or an intrinsic class), not a struct */
+static int parseIsVarArgElemType(AstType *t) {
+    if (!t) return 0;
+    switch (t->kind) {
+        case AST_TYPE_INT: case AST_TYPE_CHAR: case AST_TYPE_FLOAT:
+        case AST_TYPE_POINTER: case AST_TYPE_FUNC:
+            return 1;
+        case AST_TYPE_CLASS:
+            return t->is_enum || t->is_intrinsic;
+        default:
+            return 0;
+    }
+}
+
+/* `T ...name` or `...name`, with the `...` just consumed (elem NULL for
+ * the untyped form): two hidden ordinary parameters, the count `name#len`
+ * (no source can name it) and `name`, a pointer to the caller's array of
+ * the extras (see parseVarArgsPack). Untyped elements are 64-bit slots
+ * like the old argv. Must be the last parameter. */
+static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
+                              Lexeme *ellipsis, s64 terminator, int store)
+{
+    int line = ellipsis->line, col = ellipsis->col;
+    Lexeme *name = cctrlTokenGet(cc);
+    if (!name || name->tk_type != TK_IDENT) {
+        cctrlRaiseExceptionAt(cc, line, col, 3,
+            "a variadic parameter needs a name, as in `i64 ...nums` or `...args`");
+    }
+    if (cc->flags & CCTRL_TRANSPILING) {
+        cc->current_recovery = NULL;
+        cctrlRaiseExceptionAt(cc, line, col, 3,
+            "`...%.*s` is not supported with -transpile", name->len, name->start);
+    }
+    int untyped = elem == NULL;
+    if (untyped) {
+        elem = astTypeCopy(ast_int_type);
+        elem->has_var_args = 1;
+    } else if (!parseIsVarArgElemType(elem)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+            "the elements of `...%.*s` must be numbers or pointers, got %s",
+            name->len, name->start, astTypeToString(elem));
+    }
+    AoStr *len_name = aoStrPrintf("%.*s#len", name->len, name->start);
+    Ast *count = astLVar(astTypeCopy(ast_int_type), len_name->data,
+                         len_name->len);
+    Ast *data = astLVar(astMakePointerType(elem), name->start, name->len);
+    count->line = data->line = name->line;
+    count->col = data->col = name->col;
+    data->flags |= AST_FLAG_VARARGS;
+    if (store) {
+        if (!mapAddOrErr(cc->localenv, data->lname->data, data)) {
+            cctrlRaiseException(cc, "variable %s already declared",
+                                astLValueToString(data, 0));
+        }
+        mapAdd(cc->localenv, count->lname->data, count);
+    }
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, count);
+        listAppend(cc->tmp_locals, data);
+    }
+    vecPush(params, count);
+    vecPush(params, data);
+
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (!tokenPunctIs(tok, terminator)) {
+        cctrlRaiseExceptionAt(cc, line, col, 3,
+            "`...%.*s` must be the last parameter", name->len, name->start);
+    }
+}
+
 Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
     Vec *params = astVecNew();
 
@@ -330,7 +401,12 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
 
         /* VarArgs */
         if (tokenPunctIs(pname, TK_ELLIPSIS)) {
-            cctrlTokenGet(cc);
+            Lexeme ellipsis = *cctrlTokenGet(cc);
+            Lexeme *after = cctrlTokenPeek(cc);
+            if (after && after->tk_type == TK_IDENT) {
+                parseNamedVarArgs(cc, params, NULL, &ellipsis, terminator, store);
+                return params;
+            }
             var = astVarArgs();
             mapAdd(cc->localenv,var->argc->lname->data,var->argc);
             mapAdd(cc->localenv,var->argv->lname->data,var->argv);
@@ -363,6 +439,11 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         if (pname == NULL) {
             cctrlRaiseException(cc,
                     "Unexpected end of input in parameter list");
+        }
+        if (tokenPunctIs(pname, TK_ELLIPSIS)) {
+            Lexeme ellipsis = *pname;
+            parseNamedVarArgs(cc, params, type, &ellipsis, terminator, store);
+            return params;
         }
 
         if (tokenPunctIs(pname, ')') && arg_count == 0) {
@@ -965,6 +1046,42 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
     int arg_count = argv ? (int)argv->size : 0;
     int default_count = 0, required_count = 0, fixed_param_count = param_count;
 
+    /* A `T ...name` callee: its hidden (count, data) parameters always got
+     * arguments (parseVarArgsPack), so only the fixed ones can be missing;
+     * report the arguments as written */
+    if (param_count >= 2) {
+        Ast *last = params->entries[param_count - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            int fixed = param_count - 2, written = 0;
+            for (int i = 0; i < fixed && i < arg_count; ++i) {
+                Ast *arg = argv->entries[i];
+                if (arg && arg->kind != AST_PLACEHOLDER) written = i + 1;
+            }
+            if (arg_count == param_count) {
+                Ast *data = argv->entries[param_count - 1];
+                if (data && data->kind == AST_VA_PACK) written = fixed + (int)data->va_items->size;
+                else if (data && data->kind == AST_LVAR) written = fixed + 1;
+            }
+            for (int i = 0; i < fixed; ++i) {
+                Ast *param = params->entries[i];
+                Ast *arg = i < arg_count ? argv->entries[i] : NULL;
+                if (param->kind != AST_DEFAULT_PARAM) required_count++;
+                if ((!arg || arg->kind == AST_PLACEHOLDER) &&
+                    param->kind != AST_DEFAULT_PARAM)
+                {
+                    parseRaiseCallError(cc, loc,
+                        "Unexpected number of arguments %d in call to %.*s(), argument %d is required",
+                        written, len, fname, i + 1);
+                }
+                AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
+                if (type && arg && arg->kind != AST_PLACEHOLDER) {
+                    parseCheckArgType(cc,type,arg,i,fname,len,loc);
+                }
+            }
+            return;
+        }
+    }
+
     /* count fixed/default/required params and find the varargs point if it exists */
     for (int i = 0; i < param_count; ++i) {
         Ast *param = params->entries[i];
@@ -1183,6 +1300,103 @@ static void parseCallLocFreeArgs(ParseCallLoc *loc) {
 
 /* `spans`, when not NULL, gets where each entry of the returned vector
  * is (see ParseCallLoc.args). */
+/* The (count, data) arguments for a `T ...name` parameter from the extras
+ * of a call: a spread `...other` passes other's count and pointer on;
+ * otherwise each extra is checked as an argument of type T (any mismatch
+ * is an error) and converted, and the call passes how many there are and
+ * the address of a hidden array in the caller's frame holding them (one
+ * per call site, so it lives as long as the call needs it). No extras: 0
+ * and a null pointer. Untyped extras go into 64-bit slots as the old
+ * argv's: floats as f64 bits, narrower integers widened. */
+static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
+                             AstType *elem, Vec *items, Vec *item_spans,
+                             Ast *spread, int spread_idx,
+                             int first_arg, char *fname, int len)
+{
+    static int va_array_id = 0;
+    int untyped = elem->has_var_args;
+    AstType *data_type = astMakePointerType(elem);
+    Ast *count, *data;
+
+    if (spread) {
+        ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, spread_idx);
+        if (items->size > 1) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "`...%s` must be the only extra argument in a call to `%.*s`",
+                spread->lname->data, len, fname);
+        }
+        AstType *from = spread->type->ptr;
+        int same = untyped ? from->has_var_args
+                           : !from->has_var_args &&
+                             !strcmp(astTypeToString(from), astTypeToString(elem));
+        if (!same) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "cannot spread `...%s` (%s) into `%.*s`, whose extra arguments are %s",
+                spread->lname->data,
+                from->has_var_args ? "untyped" : astTypeToString(from),
+                len, fname, untyped ? "untyped" : astTypeToString(elem));
+        }
+        AoStr *len_name = aoStrPrintf("%s#len", spread->lname->data);
+        count = cctrlGetVar(cc, len_name->data, len_name->len);
+        data = spread;
+    } else if (items->size == 0) {
+        count = astI64Type(0);
+        data = astCast(astI64Type(0), data_type);
+    } else {
+        Vec *converted = astVecNew();
+        for (u64 i = 0; i < items->size; ++i) {
+            Ast *arg = vecGet(Ast *, items, i);
+            ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, i);
+            AstType *at_type = arg->type;
+            if (untyped) {
+                if (at_type && (parseIsAggregateType(at_type))) {
+                    cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                        "argument %d of `%.*s`: a %s can't be passed as an untyped extra argument",
+                        first_arg + (int)i + 1, len, fname, astTypeToString(at_type));
+                }
+                if (at_type && astIsFloatType(at_type) && at_type->size < 8) {
+                    arg = astCast(arg, ast_float_type);
+                } else if (at_type && (astIsIntType(at_type) || at_type->is_bool ||
+                                       astIsEnumType(at_type)) &&
+                           at_type->size < 8) {
+                    arg = astCast(arg, ast_int_type);
+                }
+            } else {
+                if (parseArgCompat(elem, arg) != ARG_OK) {
+                    cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                        "argument %d of `%.*s`: expected %s, got %s",
+                        first_arg + (int)i + 1, len, fname,
+                        astTypeToString(elem), astTypeToString(at_type));
+                }
+                arg = astCast(arg, elem);
+            }
+            vecPush(converted, arg);
+        }
+        AoStr *arr_name = aoStrPrintf("#va%d", va_array_id++);
+        AstType *arr_type = astMakeArrayType(elem, (int)items->size);
+        Ast *array;
+        if (cc->tmp_fname) {
+            array = astLVar(arr_type, arr_name->data, arr_name->len);
+            if (cc->tmp_locals) {
+                listAppend(cc->tmp_locals, array);
+            }
+        } else {
+            /* A call in file-scope code, which runs once at startup:
+             * a static array */
+            array = astGVar(arr_type, arr_name->data, arr_name->len, 1);
+            listAppend(cc->ast_list, astDecl(array, NULL));
+        }
+        count = astI64Type((s64)items->size);
+        data = astVaPack(array, converted, untyped);
+    }
+    vecPush(argv_vec, count);
+    vecPush(argv_vec, data);
+    if (spans) {
+        vecPush(spans, NULL);
+        vecPush(spans, NULL);
+    }
+}
+
 Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                Vec *spans) {
     List *var_args = NULL;
@@ -1193,11 +1407,68 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
 
     if (decl) params = parseGetFunctionParams(decl);
 
+    /* A `T ...name` callee: its last two parameters are the count and the
+     * data pointer, every argument from the count's position on is an
+     * extra (parseVarArgsPack) */
+    int va_at = -1;
+    AstType *va_elem = NULL;
+    Vec *va_items = NULL, *va_spans = NULL;
+    Ast *va_spread = NULL;
+    int va_spread_idx = -1;
+    if (params && params->size >= 2) {
+        Ast *last = params->entries[params->size - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            va_at = (int)params->size - 2;
+            va_elem = last->type->ptr;
+            va_items = astVecNew();
+            va_spans = vecNew(&vec_unsigned_long_type);
+        }
+    }
+
     Vec *argv_vec = astVecNew();
+    int saw_args = 0;
 
     tok = cctrlTokenPeek(cc);
 
     while (tok && !tokenPunctIs(tok, terminator)) {
+        saw_args = 1;
+        if (va_at >= 0 && (int)argv_vec->size >= va_at) {
+            Lexeme start = *tok;
+            Ast *extra;
+            int is_spread = tokenPunctIs(tok, TK_ELLIPSIS);
+            if (is_spread) cctrlTokenGet(cc);
+            extra = parseExpr(cc,16);
+            if (!extra) {
+                cctrlRaiseException(cc, "Expected an argument in the call to `%.*s`",
+                                    len, fname);
+            }
+            ParseCallLoc *span = parseArgSpan(cc, &start);
+            if (is_spread) {
+                if (extra->kind != AST_LVAR || !(extra->flags & AST_FLAG_VARARGS)) {
+                    cctrlRaiseExceptionAt(cc, span->line, span->col, span->len,
+                        "only a variadic parameter can be spread, as in `...nums`");
+                }
+                va_spread = extra;
+                va_spread_idx = (int)va_items->size;
+            }
+            vecPush(va_items, extra);
+            vecPush(va_spans, span);
+            tok = cctrlTokenGet(cc);
+            if (tokenPunctIs(tok, terminator)) break;
+            if (!tokenPunctIs(tok, ',')) {
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc, "Expected `,` or `)` in the call to `%.*s`, got `%s`",
+                                    len, fname, lexemeAsWritten(tok));
+            }
+            tok = cctrlTokenPeek(cc);
+            continue;
+        }
+        if (tokenPunctIs(tok, TK_ELLIPSIS)) {
+            cctrlRaiseException(cc,
+                "`...` spreads into a `T ...name` parameter, which `%.*s` doesn't have here",
+                len, fname);
+        }
+
         /* For a function with varadic arguments this will never be in bounds */
         int is_in_bounds = params && vecInBounds(params, (unsigned long)param_idx);
         if (is_in_bounds) {
@@ -1286,6 +1557,20 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
         cctrlRaiseException(cc,
                 "Unexpected end of input in call to `%.*s` "
                 "(unterminated `( ... )`?)", len, fname);
+    }
+
+    if (va_at >= 0) {
+        while ((int)argv_vec->size < va_at) {
+            vecPush(argv_vec, astMakePlaceHolder());
+            if (spans) vecPush(spans, NULL);
+        }
+        parseVarArgsPack(cc, argv_vec, spans, va_elem, va_items, va_spans,
+                         va_spread, va_spread_idx, va_at, fname, len);
+        /* With no argument at all the `)` is still there */
+        if (!saw_args) {
+            cctrlTokenGet(cc);
+        }
+        return argv_vec;
     }
 
     if (var_args) {
@@ -2170,6 +2455,24 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
 
 Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     AstType *type;
+    /* `nums.len` of a `T ...nums` parameter: its hidden count */
+    if (cls->kind == AST_LVAR && (cls->flags & AST_FLAG_VARARGS)) {
+        Lexeme *field = cctrlTokenGetRequired(cc);
+        if (field->tk_type != TK_IDENT || field->len != 3 ||
+            memcmp(field->start, "len", 3))
+        {
+            cctrlRaiseExceptionAt(cc, field->line, field->col, field->len,
+                "the variadic parameter `%s` only has `.len`",
+                cls->lname->data);
+        }
+        AoStr *len_name = aoStrPrintf("%s#len", cls->lname->data);
+        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
+        if (!count) {
+            cctrlRaiseException(cc, "`%s.len` is not available here",
+                                cls->lname->data);
+        }
+        return count;
+    }
     if (!parseIsClassOrUnion(cls->type->kind)) {
         char *type_str = astTypeToString(cls->type);
         char *var_str = astLValueToString(cls,0);

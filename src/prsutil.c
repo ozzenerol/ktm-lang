@@ -645,6 +645,10 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    if (ast->kind == AST_LVAR && (ast->flags & AST_FLAG_VARARGS)) {
+        cctrlRaiseException(cc,"cannot assign to the variadic parameter '%s'",
+                            ast->lname->data);
+    }
     if ((ast->kind == AST_LVAR || ast->kind == AST_GVAR) &&
         (ast->flags & AST_FLAG_CONST))
     {

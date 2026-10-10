@@ -143,6 +143,7 @@ typedef enum AstKind {
     AST_THROW         = 299,  /* throw(u64_value); */
     AST_TERNARY       = 300,  /* cond ? then : els (the conditional operator) */
     AST_DEFER         = 301,  /* defer <stmt>; runs <stmt> when its block is left */
+    AST_VA_PACK       = 302,  /* the extras of a `T ...name` call, see astVaPack */
 } AstKind;
 
 /* @Cleanup
@@ -241,6 +242,11 @@ typedef struct AstType {
  * (still not assignable) without this one: it behaves like an ordinary
  * runtime variable everywhere evalIntConstExprOrErr is consulted. */
 #define AST_FLAG_CONST_VALUE (1<<7)
+/* Set on the AST_LVAR `name` of a `T ...name` / `...name` parameter: a
+ * pointer to the caller's array of the extra arguments, next to a hidden
+ * count parameter `name#len`. `name.len`, `name[i]` and range-for read
+ * them; `name` itself can't be assigned. */
+#define AST_FLAG_VARARGS (1<<8)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
@@ -433,6 +439,15 @@ typedef struct Ast {
             Ast *defer_stmt;
         };
 
+        /* The extras of a call to a `T ...name` function, stored into the
+         * caller's hidden array va_array (an AST_LVAR) one per item;
+         * evaluates to its address. Untyped (`...name`): 64-bit slots. */
+        struct {
+            Ast *va_array;
+            Vec *va_items;
+            int va_untyped;
+        };
+
         /* @Typeo
          * Compound statement */
         struct {
@@ -568,6 +583,7 @@ Ast *astReturn(Ast *retval, AstType *rettype);
 Ast *astTry(Ast *try_body, Ast *catch_body);
 Ast *astThrow(Ast *value);
 Ast *astDefer(Ast *stmt);
+Ast *astVaPack(Ast *array, Vec *items, int untyped);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 
