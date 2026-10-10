@@ -105,6 +105,13 @@ public U0 KTM_TryLeave(CatchFrame *f)
   Fs()->catch_top = f->prev;
 }
 
+public U64 KTM_DeferCaught(CatchFrame *f)
+{
+  HCFs *fs = Fs();
+  fs->catch_top = f->prev;
+  return fs->except_ch;
+}
+
 /* Report a throw no try catches on stderr and exit with 1: a character
  * constant whose bytes are all printable as text ('Late'), any other
  * value as a signed decimal number. */

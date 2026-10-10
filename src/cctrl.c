@@ -291,6 +291,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     Cctrl *cc = (Cctrl *)malloc(sizeof(Cctrl));
 
     cc->flags = 0;
+    cc->defer_depth = 0;
     cc->file_map = mapNew(16, &map_u32_to_aostr_type);
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);

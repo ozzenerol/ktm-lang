@@ -69,15 +69,55 @@ static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
                                     IrValueType ret_type, int ret_size,
                                     IrValue *arg);
 
+void irLowerAst(IrCtx *ctx, Ast *ast);
+
 /* A jump to code that is inside only the outer `depth` try bodies of
  * the current ones pops the catch frames of the others. They are a
  * stack, so restoring the chain to what it was before the outermost
- * one we leave pops them all. */
+ * one we leave pops them all.
+ *
+ * A `defer` reached in a block is on the same stack (see irLowerDefer).
+ * When one is left, the frames are popped one at a time, innermost
+ * first, and each deferred statement runs right after its own frame is
+ * popped, so a throw from it goes on to the frames further out. */
 static void irLeaveTries(IrCtx *ctx, u16 depth) {
-    if (ctx->try_depth > depth) {
+    if (ctx->try_depth <= depth) return;
+
+    int has_defer = 0;
+    for (u16 i = depth; i < ctx->try_depth; ++i) {
+        if (ctx->try_stack[i]->kind == AST_DEFER) {
+            has_defer = 1;
+            break;
+        }
+    }
+    if (!has_defer) {
         irEmitRuntimeCall1(ctx, "KTM_TryLeave",
                             IR_TYPE_VOID, 8, ctx->try_frames[depth]);
+        return;
     }
+
+    /* A try in a deferred statement reuses the stack slots from its
+     * depth up: keep the entries, code after this jump still needs them */
+    u16 saved_depth = ctx->try_depth;
+    Ast *saved_stack[IR_TRY_STACK_MAX];
+    IrValue *saved_frames[IR_TRY_STACK_MAX];
+    memcpy(saved_stack, ctx->try_stack, sizeof(saved_stack));
+    memcpy(saved_frames, ctx->try_frames, sizeof(saved_frames));
+
+    for (u16 i = saved_depth; i-- > depth; ) {
+        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+                            IR_TYPE_VOID, 8, saved_frames[i]);
+        if (saved_stack[i]->kind == AST_DEFER) {
+            ctx->try_depth = i;
+            ctx->defer_lowering++;
+            irLowerAst(ctx, saved_stack[i]->defer_stmt);
+            ctx->defer_lowering--;
+        }
+    }
+
+    memcpy(ctx->try_stack, saved_stack, sizeof(saved_stack));
+    memcpy(ctx->try_frames, saved_frames, sizeof(saved_frames));
+    ctx->try_depth = saved_depth;
 }
 
 /* Collapse something that looks like `a.b.c` or `p->a.b`*/
@@ -2305,6 +2345,72 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
     ctx->cur_block = end_block;
 }
 
+/* `defer <stmt>` registers <stmt> for every way out of the enclosing
+ * block. It is a catch frame from here to the end of the block:
+ *
+ *     frame = alloca(CatchFrame)
+ *     KTM_PushFrame(&frame)
+ *     t = setjmp(&frame)
+ *     br (t == 0), cont_block, unwind_block
+ *   unwind_block:                     ; a throw is leaving the block
+ *     v = KTM_DeferCaught(&frame)     ; pop the frame, get the value
+ *     <lower stmt>
+ *     KTM_Throw(v)                    ; on to the next frame out
+ *   cont_block:
+ *
+ * and stays on the try stack, so the end of the block and every
+ * return/break/continue/goto that leaves it runs <stmt> (irLeaveTries).
+ * Only functions with a defer get any of this. */
+static void irLowerDefer(IrCtx *ctx, Ast *ast) {
+    int frame_size = 256;
+    IrValue *size_const = irConstInt(IR_TYPE_I64, frame_size);
+    IrValue *frame_tmp = irTmp(IR_TYPE_PTR, frame_size);
+    irBlockAddInstr(ctx, irInstrNew(IR_ALLOCA, frame_tmp, size_const, NULL));
+    irAddStackSpace(ctx, frame_size);
+
+    IrValue *frame_addr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, frame_addr, frame_tmp, NULL));
+
+    irEmitRuntimeCall1(ctx, "KTM_PushFrame", IR_TYPE_VOID, 8, frame_addr);
+    IrValue *enter_ret = irEmitRuntimeCall1(ctx, "setjmp",
+                                            IR_TYPE_I64, 8, frame_addr);
+
+    IrBlock *unwind_block = irBlockNew();
+    IrBlock *cont_block = irBlockNew();
+    IrValue *cmp_zero = irTmp(IR_TYPE_I64, 8);
+    irBlockAddInstr(ctx, irICmp(cmp_zero, IR_CMP_EQ, enter_ret,
+                                irConstInt(IR_TYPE_I64, 0)));
+    irBranch(ctx->cur_func, ctx->cur_block, cmp_zero,
+             cont_block, unwind_block);
+
+    /* Reached by longjmp from anywhere later in the block, an edge the
+     * register allocator doesn't see: frame_addr may be dead (and its
+     * slot reused) by then, so take the address again. */
+    irFnAddBlock(ctx->cur_func, unwind_block);
+    ctx->cur_block = unwind_block;
+    IrValue *caught_addr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught_addr, frame_tmp, NULL));
+    IrValue *thrown = irEmitRuntimeCall1(ctx, "KTM_DeferCaught",
+                                         IR_TYPE_I64, 8, caught_addr);
+    ctx->defer_lowering++;
+    irLowerAst(ctx, ast->defer_stmt);
+    ctx->defer_lowering--;
+    if (!ctx->cur_block->sealed) {
+        irEmitRuntimeCall1(ctx, "KTM_Throw", IR_TYPE_VOID, 8, thrown);
+        ctx->cur_block->sealed = 1;
+    }
+
+    irFnAddBlock(ctx->cur_func, cont_block);
+    ctx->cur_block = cont_block;
+    if (ctx->try_depth >= IR_TRY_STACK_MAX) {
+        loggerPanic("try and defer nesting above %d not supported\n",
+                    IR_TRY_STACK_MAX);
+    }
+    ctx->try_stack[ctx->try_depth] = ast;
+    ctx->try_frames[ctx->try_depth] = frame_addr;
+    ctx->try_depth++;
+}
+
 /* throw(value) lowers to a single KTM_Throw(value) call. The runtime
  * longjmps so control never returns; mark the current block sealed
  * so the lowering driver doesn't append a fall-through edge. */
@@ -2493,6 +2599,10 @@ static IrValue *irMakeLocalSlot(IrCtx *ctx,
                                 int size,
                                 u32 var_id)
 {
+    if (ctx->defer_lowering) {
+        IrValue *again = irFnGetVar(ctx->cur_func, var_id);
+        if (again) return again;
+    }
     IrValue *local = irTmp(ir_type, size);
     local->kind = IR_VAL_LOCAL;
     irFnAddVar(ctx->cur_func, var_id, local);
@@ -2510,11 +2620,15 @@ void irLowerDecl(IrCtx *ctx, Ast *ast) {
      * whole function. The per-arch emitter sees the IrValue's
      * `pinned_reg` and writes the register directly. */
     if (var->kind == AST_LVAR && var->pinned_kind == LVAR_REG) {
-        IrValue *local = irValueNew(irConvertType(var->type), IR_VAL_LOCAL);
-        local->as.var.id = var->lvar_id;
-        local->as.var.size = var->type ? var->type->size : 8;
-        local->pinned_reg = var->pinned_reg;
-        irFnAddVar(ctx->cur_func, var->lvar_id, local);
+        IrValue *local = ctx->defer_lowering
+            ? irFnGetVar(ctx->cur_func, var->lvar_id) : NULL;
+        if (!local) {
+            local = irValueNew(irConvertType(var->type), IR_VAL_LOCAL);
+            local->as.var.id = var->lvar_id;
+            local->as.var.size = var->type ? var->type->size : 8;
+            local->pinned_reg = var->pinned_reg;
+            irFnAddVar(ctx->cur_func, var->lvar_id, local);
+        }
         if (init) {
             IrValue *iv = irExpr(ctx, init);
             IrInstr *st = irInstrNew(IR_STORE, local, iv, NULL);
@@ -2895,10 +3009,24 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
 
     switch (ast->kind) {
         case AST_COMPOUND_STMT: {
+            /* The defers reached in this block are on the try stack
+             * above `depth`: falling off the end runs them */
+            u16 depth = ctx->try_depth;
             listForEach(ast->stms) {
                 Ast *next = (Ast *)it->value;
                 irLowerAst(ctx, next);
             }
+            if (ctx->try_depth > depth) {
+                if (!ctx->cur_block->sealed) {
+                    irLeaveTries(ctx, depth);
+                }
+                ctx->try_depth = depth;
+            }
+            break;
+        }
+
+        case AST_DEFER: {
+            irLowerDefer(ctx, ast);
             break;
         }
 
@@ -3154,6 +3282,11 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
             return;
         }
 
+        case AST_DEFER: {
+            irEscapeWalk(ast->defer_stmt, escape);
+            return;
+        }
+
         case AST_COMPOUND_STMT: {
             irEscapeWalkList(ast->stms, escape);
             irEscapeWalk(ast->inline_ret, escape);
@@ -3245,9 +3378,24 @@ static void irTryLabelWalk(IrCtx *ctx, Ast *ast, IrTryChain *chain) {
             mapAddLen(ctx->label_tries, lname->data, lname->len, copy);
             return;
         }
-        case AST_COMPOUND_STMT:
-            irTryLabelWalkList(ctx, ast->stms, chain);
+        case AST_COMPOUND_STMT: {
+            /* A defer is on the try stack for the rest of its block */
+            u16 depth = chain->depth;
+            if (ast->stms) {
+                listForEach(ast->stms) {
+                    Ast *stmt = (Ast *)it->value;
+                    if (stmt && stmt->kind == AST_DEFER) {
+                        if (chain->depth < IR_TRY_STACK_MAX) {
+                            chain->tries[chain->depth++] = stmt;
+                        }
+                        continue;
+                    }
+                    irTryLabelWalk(ctx, stmt, chain);
+                }
+            }
+            chain->depth = depth;
             return;
+        }
         case AST_IF:
             irTryLabelWalk(ctx, ast->then, chain);
             irTryLabelWalk(ctx, ast->els, chain);

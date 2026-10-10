@@ -157,6 +157,8 @@
 #define KW_CONST        94
 /* ktm syntax v0.2: a scoped enum, `enum Name [: IntType] { ... };` */
 #define KW_ENUM         95
+/* `defer <stmt>` (ktm syntax v0.2): run <stmt> when the block is left. */
+#define KW_DEFER        96
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)
