@@ -464,6 +464,27 @@ U0 Main()
 <pre class="output">
 zero one two other four-five four-five 
 </pre>
+<p><code>fallthrough;</code> (ktm syntax v0.2) marks a case that goes on into the next one.
+Cases fall through anyway for now, so it changes nothing yet; it is an error outside a
+switch and as the last statement of the last case, where there is no next case. A
+variable called <code>fallthrough</code> still works.</p>
+<pre data-run><code>
+U0 Main()
+{
+  for (I64 i = 1; i <= 3; i++) {
+    switch (i) {
+      case 1: "one, "; fallthrough;
+      case 2: "two or after one\n"; break;
+      default: "three\n";
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+one, two or after one
+two or after one
+three
+</pre>
 
 <h3>Loops</h3>
 <pre data-run><code>
