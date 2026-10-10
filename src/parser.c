@@ -60,7 +60,9 @@ static void migSwLabel(Cctrl *cc, Lexeme *label) {
     if (!cc->migrate || mig_sw_n == 0 || mig_sw_n > 64) return;
     MigSwitch *sw = &mig_sw[mig_sw_n - 1];
     int kind = 0;
-    if (sw->n) {
+    if (sw->n && cc->fallthrough_pending) {
+        kind = 0;           /* already says `fallthrough;` */
+    } else if (sw->n) {
         Ast *last = sw->prev;
         while (last && last->kind == AST_COMPOUND_STMT && last->stms && !listEmpty(last->stms)) {
             last = (Ast *)listTail(last->stms)->value;
@@ -2866,10 +2868,10 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
-    cc->fallthrough_pending = 0;
 #ifdef KTM_CONVERT
     migSwLabel(cc, tok);
 #endif
+    cc->fallthrough_pending = 0;
     Ast *case_, *prev, *case_expr = NULL;
     Lexeme *peek;
     AoStr *label;
