@@ -723,12 +723,13 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                 field_name = aoStrDupRaw(tok_name->start,tok_name->len);
             }
 
-            /* In a module, a field can hold a type of a later file by
-             * value only once that type is complete (see
-             * parseModuleTypes); before, its size isn't known. */
+            /* A field can hold a class by value only once that class is
+             * complete: before, its size isn't known (`class B;` alone,
+             * or in a module a type of a later file, see
+             * parseModuleTypes). A pointer to it is fine. */
             AstType *by_value = next_type;
             while (by_value && by_value->kind == AST_TYPE_ARRAY) by_value = by_value->ptr;
-            if (cc->cur_module && by_value && !by_value->is_intrinsic &&
+            if (by_value && !by_value->is_intrinsic &&
                 !by_value->fields &&
                 (by_value->kind == AST_TYPE_CLASS || by_value->kind == AST_TYPE_UNION))
             {
