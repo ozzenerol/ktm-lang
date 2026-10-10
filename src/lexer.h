@@ -366,6 +366,9 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len);
 /* The name of the internal file that imports the prelude */
 #define LEX_PRELUDE_FILE "<prelude>"
 void lexPushPrelude(Lexer *l);
+/* The name of the internal file that loads the runtime, rt */
+#define LEX_RT_FILE "<rt>"
+void lexPushRuntime(Lexer *l);
 int lex(Lexer *l, Lexeme *le);
 Lexeme *lexToken(Map *macro_defs, Lexer *l);
 int lexSetModuleLibRoot(Lexer *l, char *dir, char *path);
