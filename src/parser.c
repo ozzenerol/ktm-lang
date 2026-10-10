@@ -625,6 +625,8 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             break;
         } else if (cctrlIsKeyword(cc,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
+        } else if (tokenIsFnIdent(tok_name) && parseFnLooksLikeType(cc)) {
+            base_type = parseBaseDeclSpec(cc);
         } else if (name && !memcmp(name->data,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
             if (base_type == NULL) {
@@ -1828,7 +1830,8 @@ static Ast *parseRequiredExpr(Cctrl *cc, char *what) {
 static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Ast *clause;
     Lexeme *tok = cctrlTokenPeek(cc);
-    if (tok && cctrlIsKeyword(cc, tok->start, tok->len)) {
+    if (tok && (cctrlIsKeyword(cc, tok->start, tok->len) ||
+                (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc)))) {
         AstType *type = parseDeclSpec(cc);
         if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
             /* `if (Color.red == c)`: an enum member reference, not an
@@ -2187,8 +2190,9 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         }
     }
 
-    if (cctrlIsKeyword(cc,tok->start,tok->len) &&
-        !parseTypeNameFollowedByDot(cc)) {
+    if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+         !parseTypeNameFollowedByDot(cc)) ||
+        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
@@ -3092,7 +3096,8 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     }
     if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
          !parseTypeNameFollowedByDot(cc)) ||
-        (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST)) {
+        (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
+        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
         return parseDecl(cc);
     }
     return parseStatement(cc);
@@ -3181,8 +3186,9 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             tok = cctrlTokenPeek(cc);
         }
 
-        if (cctrlIsKeyword(cc,tok->start,tok->len) &&
-            !parseTypeNameFollowedByDot(cc)) {
+        if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+             !parseTypeNameFollowedByDot(cc)) ||
+            (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
                 next_type = parsePointerType(cc,base_type);
@@ -4632,9 +4638,18 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             }
         } else if (tok->tk_type == TK_IDENT) {
             /* top level function call, unless the name is a type: then
-             * `i64 (*fp)(i64);` declares a function pointer */
+             * `i64 (*fp)(i64);` declares a function pointer. `fn` is a
+             * contextual keyword (ktm syntax v0.2): old code uses it as
+             * a plain identifier, so check whether THIS `fn` starts a
+             * type before treating it as a call or a variable. */
             peek = cctrlTokenPeek(cc);
-            if (tokenPunctIs(peek,'(') &&
+            int fn_is_type = 0;
+            if (tokenIsFnIdent(tok)) {
+                cctrlTokenRewind(cc);
+                fn_is_type = parseFnStartsType(cc);
+                cctrlTokenGet(cc);
+            }
+            if (!fn_is_type && tokenPunctIs(peek,'(') &&
                 (mapGetLen(cc->global_env, tok->start, tok->len) ||
                  !cctrlIsKeyword(cc, tok->start, tok->len))) {
                 cctrlTokenGet(cc);
@@ -4642,7 +4657,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 cctrlTokenExpect(cc,';');
                 *is_global = 1;
                 return ast;
-            } else if ((variable = mapGetLen(cc->global_env,tok->start, tok->len))) {
+            } else if (!fn_is_type &&
+                       (variable = mapGetLen(cc->global_env,tok->start, tok->len))) {
                 cctrlTokenRewind(cc);
                 ast = parseExpr(cc,16);
                 cctrlTokenExpect(cc,';');

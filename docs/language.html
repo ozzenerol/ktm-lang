@@ -766,6 +766,37 @@ U0 Main()
 <pre class="output">25 10
 </pre>
 
+<h3 id="fn-types">fn(...) types<a class="anchor" href="#fn-types" aria-label="Link to this section">#</a></h3>
+<p>ktm syntax v0.2 adds <code>fn ( types ) RetType</code> as a way to write a function pointer
+type: <code>fn(i64) i64</code> is exactly <code>i64 (*)(i64)</code>, with the same size, the
+same calls, and the same argument checks. Parameter names are optional and ignored. A <code>*</code>
+after the whole <code>fn(...)  RetType</code> makes a pointer to it, not to RetType, and RetType
+can itself be another <code>fn(...)</code> type:</p>
+<pre data-run><code>i64 twice(i64 x) { return x * 2; }
+i64 addOne(i64 x) { return x + 1; }
+
+fn(i64) i64 op = &amp;twice;
+fn(i64) i64 pick(bool sq) { if (sq) return &amp;twice; return &amp;addOne; }
+void apply(fn(i64) i64 f, i64 x) { "%d\n", f(x); }
+
+i32 main()
+{
+  apply(op, 5);
+  fn(i64) i64 g = pick(true);
+  "%d\n", g(5);
+  return 0;
+}
+</code></pre>
+<pre class="output">10
+10
+</pre>
+<p><code>fn</code> is a contextual keyword: old code that uses it as a plain identifier
+(<code>fn(x)</code>, <code>fn = &amp;f</code>) keeps working, since a bare <code>fn</code> only
+starts a type where a type can start and only when a real parameter list and a return type
+follow it. The old C declarator form (<code>i64 (*)(i64)</code>, an array of them, a function
+returning one, a pointer to one) is documented above and keeps working; it is converted to
+<code>fn(...)</code> everywhere in a later pass.</p>
+
 <h2 id="pointers-and-arrays">Pointers and arrays<a class="anchor" href="#pointers-and-arrays" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>U0 Main()
 {

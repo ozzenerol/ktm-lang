@@ -1714,8 +1714,24 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
     }
 
     case AST_TYPE_FUNC: {
+        /* ktm syntax v0.2: `fn(T1, T2) RetType`, the new form, printed
+         * even for a function pointer declared the old way. */
+        aoStrCatPrintf(str, "fn(");
+        if (type->params) {
+            for (u64 i = 0; i < type->params->size; ++i) {
+                Ast *param = type->params->entries[i];
+                if (!param) continue;
+                if (i > 0) aoStrCatPrintf(str, ", ");
+                if (param->kind == AST_VAR_ARGS) {
+                    aoStrCatPrintf(str, "...");
+                } else {
+                    AoStr *ptype = astTypeToAoStrInternal(param->type);
+                    aoStrCatPrintf(str, "%s", ptype->data);
+                }
+            }
+        }
         AoStr *return_type = astTypeToAoStrInternal(type->rettype);
-        aoStrCatPrintf(str, "<fn> %s", return_type->data);
+        aoStrCatPrintf(str, ") %s", return_type->data);
         return str;
     }
 

@@ -69,6 +69,155 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
     return type;
 }
 
+/* `fn` is a contextual keyword (ktm syntax v0.2): used as a plain
+ * identifier in old code (`U0 (*fn)(...)`, `fn(x)`, `fn = &f`), so it
+ * is never registered as a type name. Is `tok` the identifier `fn`? */
+int tokenIsFnIdent(Lexeme *tok) {
+    return tok && tok->tk_type == TK_IDENT && tok->len == 2 &&
+           tok->start[0] == 'f' && tok->start[1] == 'n';
+}
+
+/* Does the current, unconsumed `fn` (just peeked, not gotten) start a
+ * type here? Only when followed by `(` and a parameter list that is
+ * empty, `...`-only, or starts with a type name, and (when the list is
+ * empty or `...`-only, where the closing `)` is right there to check)
+ * a type follows the `)`. A non-empty list starting with a real type
+ * is never ambiguous with a call (`fn(x)` with a plain argument `x` is
+ * not a type name), so that case does not need to look past its `)`.
+ * Gets a handful of tokens and rewinds them all; never consumes. */
+int parseFnStartsType(Cctrl *cc) {
+    int n = 0, result = 0;
+    Lexeme *tok;
+
+    tok = cctrlTokenGet(cc); n++; /* `fn` */
+    tok = cctrlTokenGet(cc); n++; /* expect `(` */
+    if (tokenPunctIs(tok,'(')) {
+        Lexeme *first = cctrlTokenGet(cc); n++;
+        if (tokenPunctIs(first,')')) {
+            Lexeme *after = cctrlTokenPeek(cc);
+            result = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+                                tokenIsFnIdent(after));
+        } else if (tokenPunctIs(first,TK_ELLIPSIS)) {
+            Lexeme *close = cctrlTokenGet(cc); n++;
+            if (tokenPunctIs(close,')')) {
+                Lexeme *after = cctrlTokenPeek(cc);
+                result = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+                                    tokenIsFnIdent(after));
+            }
+        } else if (first && (cctrlIsKeyword(cc,first->start,first->len) ||
+                              tokenIsFnIdent(first))) {
+            /* `Name.member` (an enum member, ktm syntax v0.2's Y6) is an
+             * expression, not a type: `fn(Color.blue)` is a call through
+             * a variable named `fn`, not a one-parameter type. */
+            Lexeme *after_first = cctrlTokenPeek(cc);
+            result = !tokenPunctIs(after_first,'.');
+        }
+    }
+    while (n-- > 0) cctrlTokenRewind(cc);
+    return result;
+}
+
+/* At a declaration/expression-statement fork, should `fn` here be routed
+ * to the declaration side at all, so a malformed one (`fn i64 x;`, a
+ * missing `(`) gets parseBaseDeclSpec's precise error instead of being
+ * read as the expression `fn` followed by a stray `i64`? True for a
+ * real `fn(...)` type, or for `fn` directly followed by a type name
+ * (whichever it is, that can never continue a valid expression). */
+int parseFnLooksLikeType(Cctrl *cc) {
+    if (parseFnStartsType(cc)) {
+        return 1;
+    }
+    cctrlTokenGet(cc); /* `fn` */
+    Lexeme *after = cctrlTokenPeek(cc);
+    int looks_like_type = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+                                     tokenIsFnIdent(after));
+    cctrlTokenRewind(cc);
+    return looks_like_type;
+}
+
+/* The parameter TYPES of an `fn(...)` type: `[type {, type}] [, ...]`,
+ * an optional, ignored name after each type. Not `parseParams`: that
+ * registers names, varargs' argc/argv and defaults into the current
+ * scope, which a type (not a real parameter list) must not do. */
+static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
+    Vec *params = astVecNew();
+    *has_var_args = 0;
+
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (tokenPunctIs(tok,')')) {
+        return params;
+    }
+    cctrlTokenRewind(cc);
+
+    while (1) {
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            cctrlTokenGet(cc);
+            *has_var_args = 1;
+            /* The argument-count check (parseFunctionArgumentCheck) finds
+             * the vararg point by looking for an AST_VAR_ARGS entry in
+             * params, not just the has_var_args flag; unlike parseParams,
+             * its argc/argv are not registered anywhere (there is no
+             * real function body here to bind them in). */
+            vecPush(params, astVarArgs());
+            cctrlTokenExpect(cc,')');
+            return params;
+        }
+        AstType *type = parseDeclSpec(cc);
+        type = parseArrayDimensions(cc,type);
+        if (type->kind == AST_TYPE_ARRAY) {
+            type = astMakePointerType(type->ptr);
+        }
+        /* An optional parameter name, ignored */
+        Lexeme *maybe_name = cctrlTokenPeek(cc);
+        if (maybe_name && maybe_name->tk_type == TK_IDENT) {
+            cctrlTokenGet(cc);
+        }
+        vecPush(params, astLVar(type,"_unknown",7));
+
+        tok = cctrlTokenGet(cc);
+        if (tokenPunctIs(tok,')')) {
+            return params;
+        }
+        if (!tokenPunctIs(tok,',')) {
+            cctrlRaiseException(cc,
+                    "Expected `,` or `)` in `fn(...)`'s parameter list, got `%s`",
+                    lexemeAsWritten(tok));
+        }
+    }
+}
+
+/* `fn ( [type {, type}] [, ...] ) RetType`. Entry: the current,
+ * unconsumed token is the identifier `fn`. RetType is any type,
+ * including another `fn` type, parsed as a base type only: a `*`
+ * right after the whole construct makes a pointer to IT, not to
+ * RetType (`fn(i64) i64 *slot` is a pointer to a function pointer,
+ * handled by the caller's parsePointerType as for any other type). */
+AstType *parseFnType(Cctrl *cc) {
+    cctrlTokenGet(cc); /* `fn` */
+    Lexeme *open = cctrlTokenGet(cc);
+    if (!tokenPunctIs(open,'(')) {
+        cctrlRaiseException(cc,"Expected `(` after `fn`, got `%s`",
+                lexemeAsWritten(open));
+    }
+
+    int has_var_args = 0;
+    Vec *params = parseFnTypeParams(cc,&has_var_args);
+
+    Lexeme *ret_peek = cctrlTokenPeek(cc);
+    if (!ret_peek || (!cctrlIsKeyword(cc,ret_peek->start,ret_peek->len) &&
+                       !tokenIsFnIdent(ret_peek)))
+    {
+        cctrlRaiseException(cc,
+                "Expected a return type after `fn(...)`, got `%s`",
+                ret_peek ? lexemeAsWritten(ret_peek) : "end of input");
+    }
+    AstType *rettype = parseBaseDeclSpec(cc);
+
+    AstType *fn_type = astMakeFunctionType(rettype,params);
+    fn_type->has_var_args = has_var_args;
+    return fn_type;
+}
+
 AstType *parseFunctionPointerType(Cctrl *cc,
                                   char **fnptr_name,
                                   int *fnptr_name_len,
@@ -352,6 +501,16 @@ AstType *parseBaseDeclSpec(Cctrl *cc) {
 
     if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
         cctrlRaiseException(cc,"const is only allowed on declarations");
+    }
+
+    if (tokenIsFnIdent(tok)) {
+        Lexeme *after_fn = cctrlTokenPeek(cc);
+        if (tokenPunctIs(after_fn,'(')) {
+            cctrlTokenRewind(cc);
+            return parseFnType(cc);
+        }
+        cctrlRaiseException(cc,"Expected `(` after `fn`, got `%s`",
+                after_fn ? lexemeAsWritten(after_fn) : "end of input");
     }
 
     if (tok->tk_type == TK_KEYWORD || tok->tk_type == TK_IDENT) {
@@ -1764,7 +1923,9 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
      * name is never followed by `.`, so `f(Color.red)` is a call whose
      * first argument is an enum member, not a postfix cast. */
     Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
-    if (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len) ||
+    int peek_is_fn_type = peek && tokenIsFnIdent(peek) && parseFnStartsType(cc);
+    if (peek == NULL ||
+        (!cctrlIsKeyword(cc,peek->start,peek->len) && !peek_is_fn_type) ||
         tokenPunctIs(after_peek,'.'))
     {
         return parseCallArguments(cc,name,len);
@@ -2330,13 +2491,17 @@ Ast *parseExpr(Cctrl *cc, int prec) {
              * parsePostFixExpr, so a function pointer field followed by
              * something that is not a type is a call, not a cast */
             Lexeme *peek = cctrlTokenPeek(cc);
+            int peek_is_fn_type = peek && tokenIsFnIdent(peek) &&
+                                  parseFnStartsType(cc);
             if (parseIsCallableFnPtr(LHS) &&
-                (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len))) {
+                (peek == NULL || (!cctrlIsKeyword(cc,peek->start,peek->len) &&
+                                   !peek_is_fn_type))) {
                 LHS = parseClassFnPtrCall(cc,LHS);
                 continue;
             }
             /* `(x)(3)`: not a cast (no type follows) and nothing to call */
-            if (peek && !cctrlIsKeyword(cc,peek->start,peek->len)) {
+            if (peek && !cctrlIsKeyword(cc,peek->start,peek->len) &&
+                !peek_is_fn_type) {
                 cctrlTokenRewind(cc);
                 cctrlRaiseException(cc,"Cannot call %s `%s`: only functions and function pointers can be called",
                         astTypeKindToHumanReadable(LHS->type),
@@ -2494,7 +2659,8 @@ Ast *parseSizeof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "sizeof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+         (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2540,7 +2706,8 @@ Ast *parseAlignof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "alignof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+         (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2568,7 +2735,8 @@ Ast *parseTypeof(Cctrl *cc) {
         cctrlRaiseException(cc, "Unexpected end of input after `typeof`");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+         (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2623,7 +2791,8 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 cctrlRaiseException(cc,
                         "Unexpected end of input after '('");
             }
-            if (cctrlIsKeyword(cc,peek->start,peek->len)) {
+            if (cctrlIsKeyword(cc,peek->start,peek->len) ||
+                (tokenIsFnIdent(peek) && parseFnStartsType(cc))) {
                 type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
                 ast = astCast(ast,type);
@@ -2765,6 +2934,9 @@ static int parseIsCastTypeName(Cctrl *cc, Lexeme *tok) {
         ((cc->localenv && mapGetLen(cc->localenv, tok->start, tok->len)) ||
          mapGetLen(cc->global_env, tok->start, tok->len))) {
         return 0;
+    }
+    if (tokenIsFnIdent(tok)) {
+        return parseFnStartsType(cc);
     }
     AstType *type = cctrlGetKeyWord(cc, tok->start, tok->len);
     return type != NULL && type->kind != AST_TYPE_VIS_MODIFIER &&
