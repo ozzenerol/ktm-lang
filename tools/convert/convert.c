@@ -1498,6 +1498,7 @@ static void migUsage(void) {
         "  code at file scope) to the new syntax, in place.\n"
         "  --check     list what would change; exit 1 if anything would\n"
         "  --stdout    print the result instead of writing the files\n"
+        "  --report    the dry run's per-file counts and notes (see dry-run.sh)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
 }
@@ -1521,10 +1522,49 @@ static void migListChanges(MigFile *f) {
     }
 }
 
+static int strnstr_safe(const char *s, int len, const char *needle) {
+    int n = strlen(needle);
+    for (int i = 0; i + n <= len; ++i) {
+        if (!memcmp(s + i, needle, n)) return 1;
+    }
+    return 0;
+}
+
+/* --report, for the dry run (dry-run.sh adds these up): one
+ *   EDITS <path> <n> <kind>=<count>...
+ * line per file, then a CANNOT line for each thing it couldn't convert or
+ * that needs a look, and a NOTE line for each other note */
+static void migReport(MigFile *f) {
+    const char *kinds[64];
+    int counts[64], nk = 0;
+    for (u64 i = 0; i < f->edits->size; ++i) {
+        MigEdit *e = f->edits->entries[i];
+        int k = 0;
+        while (k < nk && strcmp(kinds[k], e->kind)) k++;
+        if (k == nk && nk < 64) { kinds[nk] = e->kind; counts[nk++] = 0; }
+        if (k < nk) counts[k]++;
+    }
+    printf("EDITS %s %llu", f->path, (unsigned long long)f->edits->size);
+    for (int k = 0; k < nk; ++k) {
+        printf(" ");
+        for (const char *c = kinds[k]; *c; ++c) putchar(*c == ' ' ? '_' : *c);
+        printf("=%d", counts[k]);
+    }
+    printf("\n");
+    char *line = f->notes->data;
+    while (line && *line) {
+        char *nl = strchr(line, '\n');
+        int len = nl ? (int)(nl - line) : (int)strlen(line);
+        int cannot = strnstr_safe(line, len, ": can't") || strnstr_safe(line, len, ": check:");
+        printf("%s %.*s\n", cannot ? "CANNOT" : "NOTE", len, line);
+        line = nl ? nl + 1 : NULL;
+    }
+}
+
 int main(int argc, char **argv) {
     char *install_dir = INSTALL_PREFIX;
     convertMemoryInit();
-    int check = 0, to_stdout = 0, rc = 0;
+    int check = 0, to_stdout = 0, report = 0, rc = 0;
     char *root = NULL;
     Migrate m = {0};
     m.files = (MigFile **)calloc(argc, sizeof(MigFile *));
@@ -1532,6 +1572,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--check")) check = 1;
         else if (!strcmp(argv[i], "--stdout")) to_stdout = 1;
+        else if (!strcmp(argv[i], "--report")) report = 1;
         else if (!strcmp(argv[i], "--root") && i + 1 < argc) root = argv[++i];
         else if (!strncmp(argv[i], "--install-dir=", 14)) install_dir = argv[i] + 14;
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) { migUsage(); return 0; }
@@ -1593,7 +1634,10 @@ int main(int argc, char **argv) {
         migCheckLeftovers(f, out);
         int differs = strlen(out) != (size_t)f->len || memcmp(out, f->text, f->len);
         if (differs) changed++;
-        if (check) {
+        if (report) {
+            migReport(f);
+            continue;
+        } else if (check) {
             if (differs) migListChanges(f);
         } else if (to_stdout) {
             fputs(out, stdout);
@@ -1611,7 +1655,9 @@ int main(int argc, char **argv) {
         }
         if (f->notes->len) fputs(f->notes->data, stderr);
     }
-    if (check && changed) {
+    if (report) {
+        return rc;
+    } else if (check && changed) {
         fprintf(stderr, "ktm-convert: %d of %d file(s) would change\n", changed, m.n_files);
         if (rc == 0) rc = 1;
     } else if (!to_stdout && !check) {
