@@ -1,0 +1,13 @@
+/* Comments get the new names: u8 true class x(i64) */
+#define ONE (i64)1
+#define SHOUT "true and null are words here\n"
+#define SQL "SELECT * FROM t WHERE x IS NULL"
+
+// i64 in a line comment
+void main()
+{
+  u8 *s = "plain text(words)";
+  i64 n = ONE + 1;
+  printf("%s|%s\n", s, SQL);
+  printf("%d\n", n);
+}

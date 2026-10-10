@@ -1,0 +1,9 @@
+#ifdef MIGRATE_TEST_NEVER_DEFINED
+i64 Never(u8 *p) { printf("%d\n", (i64)p); return (i64)p + 1; }
+#else
+i64 Never(u8 *p) { return 0; }
+#endif
+void main()
+{
+  printf("%d\n", Never(null));
+}

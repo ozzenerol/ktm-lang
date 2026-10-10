@@ -194,6 +194,12 @@ typedef struct Lexeme {
      * rescan the line later which could lead to the wrong characters. */
     int col;
     char *start;
+#ifdef KTM_CONVERT
+    /* The token's first byte in its source buffer (for a string, the
+     * opening quote; `start` points at the unescaped copy). NULL for
+     * tokens the lexer makes up. tools/convert maps it to an offset. */
+    char *src;
+#endif
     int ishex;
     /* An integer literal too big for an I64 (or a #define folded to a
      * U64): typed U64, like C does for such hex literals. */
@@ -302,6 +308,9 @@ typedef struct Lexer {
      * being lexed. */
     int tok_start_line;
     int tok_start_col;
+#ifdef KTM_CONVERT
+    char *tok_start_ptr;
+#endif
 
     char cur_ch;
     char *cur_str;
@@ -386,6 +395,10 @@ char *lexerReportLine(Lexer *l, s64 lineno);
 char *lexerReportLineIn(LexFile *file, s64 lineno);
 int lexemeEq(Lexeme *l1, Lexeme *l2);
 char *lexReadfile(char *path, s64 *_len);
+#ifdef KTM_CONVERT
+extern void (*lex_file_pushed_hook)(LexFile *f);
+extern void (*lex_skip_hook)(char *from, char *to);
+#endif
 
 
 #endif // !LEXER_H

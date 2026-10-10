@@ -209,6 +209,9 @@ Lexeme *lexemeNew(char *start, int len) {
     le->col = 0;
     le->tk_type = -1;
     le->isu64 = 0;
+#ifdef KTM_CONVERT
+    le->src = NULL;
+#endif
     return le;
 }
 
@@ -220,6 +223,9 @@ Lexeme *lexemeSentinal(void) {
     le->col = 0;
     le->tk_type = -1;
     le->isu64 = 0;
+#ifdef KTM_CONVERT
+    le->src = NULL;
+#endif
     return le;
 }
 
@@ -244,6 +250,9 @@ Lexeme *lexemeTokNew(char *start, int len, int line, s64 ch) {
     copy->line = line;
     copy->col = 0;
     copy->i64 = ch;
+#ifdef KTM_CONVERT
+    copy->src = NULL;
+#endif
     return copy;
 }
 
@@ -870,6 +879,12 @@ char *lexReadfile(char *path, s64 *_len) {
     return buf;
 }
 
+#ifdef KTM_CONVERT
+/* Called with every file pushed (the input and its #includes): how
+ * tools/convert finds the files it rewrites */
+void (*lex_file_pushed_hook)(LexFile *f) = NULL;
+#endif
+
 /* Make `src`, the contents of `filename`, the file being lexed */
 static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
                               s64 file_len)
@@ -918,6 +933,9 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
     l->lineno = f->lineno;
     l->line_start_ptr = f->line_start_ptr;
     l->start = f->ptr;
+#ifdef KTM_CONVERT
+    if (lex_file_pushed_hook) lex_file_pushed_hook(f);
+#endif
 }
 
 void lexPushFile(Lexer *l, AoStr *filename) {
@@ -1662,6 +1680,9 @@ static int lexCore(Lexer *l, Lexeme *le) {
          * still report the opening line/column even after `lexString` bumps
          * `lineno` and line_start_ptr past the embedded newlines. */
         l->tok_start_line = l->lineno;
+#ifdef KTM_CONVERT
+        l->tok_start_ptr = start;
+#endif
         if (start >= l->line_start_ptr) {
             l->tok_start_col = (int)(start - l->line_start_ptr) + 1;
         } else {
@@ -2055,6 +2076,9 @@ int lex(Lexer *l, Lexeme *le) {
     if (rc != 1) return rc;
     le->line = l->tok_start_line;
     le->col = l->tok_start_col;
+#ifdef KTM_CONVERT
+    le->src = l->tok_start_ptr;
+#endif
     return rc;
 }
 
@@ -2926,7 +2950,24 @@ static int lexSkippedToken(Lexer *l, Lexeme *le) {
  * taken) or its #endif, which closes it. Conditionals nested in the
  * dead text are skipped whole and their conditions not evaluated.
  * Returns 0 at the end of the input, having reported what's open. */
+#ifdef KTM_CONVERT
+/* Called with the text an #if skipped: tools/convert rewrites code the
+ * parser never sees from its text */
+void (*lex_skip_hook)(char *from, char *to) = NULL;
+
+static int lexCondSkipText(Map *macro_defs, Lexer *l);
+
 static int lexCondSkip(Map *macro_defs, Lexer *l) {
+    char *from = l->ptr;
+    int rc = lexCondSkipText(macro_defs, l);
+    if (lex_skip_hook) lex_skip_hook(from, l->ptr);
+    return rc;
+}
+
+static int lexCondSkipText(Map *macro_defs, Lexer *l) {
+#else
+static int lexCondSkip(Map *macro_defs, Lexer *l) {
+#endif
     Lexeme le;
     memset(&le, 0, sizeof(le));
     LexCond *cond = lexCondTop(l);

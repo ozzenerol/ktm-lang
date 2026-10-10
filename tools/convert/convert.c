@@ -1,0 +1,1621 @@
+/* ktm-convert: a one-time tool that rewrites ktm's own code from the old
+ * (HolyC-style) syntax to the new one. Dev-only: built from the compiler
+ * sources with -DKTM_CONVERT (cmake -DKTM_BUILD_CONVERT=on), never part
+ * of ktm. Deleted with the old syntax.
+ *
+ * Each file is parsed by the real parser in legacy mode. The parser calls
+ * the migrateNote* hooks for what only it can see (postfix casts, print
+ * statements, calls without parentheses, Main, code at file scope); a
+ * scan of the text finds the words to rename (type names, TRUE/FALSE/NULL,
+ * class, public). Every change is an edit on a range of the original
+ * text, so everything else (comments, layout) is kept byte for byte. */
+#if defined(__linux__)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE /* realpath, strdup, PATH_MAX */
+#endif
+#endif
+#include <ctype.h>
+#include <stdarg.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include "aostr.h"
+#include "ast.h"
+#include "ir-types.h"
+#include "memory.h"
+#include "util.h"
+#include "cctrl.h"
+#include "cli.h"
+#include "containers.h"
+#include "lexer.h"
+#include "convert.h"
+#include "parser.h"
+
+#ifndef INSTALL_PREFIX
+#define INSTALL_PREFIX "/usr/local"
+#endif
+
+/* main.c's globals and memory set-up, which this tool replaces */
+int is_terminal = 0;
+
+static void convertMemoryInit(void) {
+    astMemoryInit();
+    lexemeMemoryInit();
+    globalArenaInit(4096 * 10);
+    irMemoryInit();
+    aoStrTmpBufInit();
+}
+
+typedef struct MigEdit {
+    s64 start;      /* replace [start, end) with text; start == end inserts */
+    s64 end;
+    char *text;
+    s64 seq;        /* order of recording: inserts at one offset go newest first */
+    const char *kind;
+} MigEdit;
+
+/* Code at file scope that runs: moved into main */
+typedef struct MigItem {
+    s64 start;
+    s64 end;
+    int is_decl;
+} MigItem;
+
+typedef struct MigFile {
+    char *path;
+    char *real;          /* realpath, to recognise it when it's #included */
+    char *base;          /* the lexer's buffer for this file, while parsing */
+    char *text;          /* our own copy of the original text */
+    s64 len;
+    Vec *edits;          /* MigEdit * */
+    Vec *items;          /* MigItem * */
+    Set *seen;           /* edits already recorded (macro bodies expand often) */
+    s64 seq;
+    s64 item_start;
+    int has_main;
+    s64 main_name;
+    s64 main_lbrace;
+    s64 main_item;
+    int main_void;
+    int top_calls_main;
+    Vec *main_calls;     /* offsets of `Main` called without parentheses */
+    int failed;
+    AoStr *notes;        /* "path:line: message" lines for the report */
+    Vec *skipped;        /* [start, end) pairs of text an #if skipped */
+} MigFile;
+
+struct Migrate {
+    MigFile **files;
+    int n_files;
+    Lexeme *item_first;
+};
+
+static Migrate *mig_active = NULL;
+
+/* ------------------------------------------------------------------ */
+
+static MigFile *migFileOf(Cctrl *cc, char *p) {
+    Migrate *m = cc ? cc->migrate : mig_active;
+    if (!m || !p) return NULL;
+    for (int i = 0; i < m->n_files; ++i) {
+        MigFile *f = m->files[i];
+        if (f->base && p >= f->base && p < f->base + f->len) return f;
+    }
+    return NULL;
+}
+
+static s64 migOff(MigFile *f, Lexeme *t) {
+    if (!t || !t->src || !f->base) return -1;
+    if (t->src < f->base || t->src >= f->base + f->len) return -1;
+    return t->src - f->base;
+}
+
+static int migLine(MigFile *f, s64 off) {
+    int line = 1;
+    for (s64 i = 0; i < off && i < f->len; ++i) {
+        if (f->text[i] == '\n') line++;
+    }
+    return line;
+}
+
+static void migNote(MigFile *f, s64 off, const char *fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    aoStrCatPrintf(f->notes, "%s:%d: %s\n", f->path, off >= 0 ? migLine(f, off) : 0, buf);
+}
+
+static void migAdd(MigFile *f, s64 start, s64 end, const char *text,
+                   const char *kind)
+{
+    char *key = mprintf("%lld:%lld:%s", (long long)start, (long long)end, text);
+    if (setHas(f->seen, key)) return;
+    setAdd(f->seen, key);
+    MigEdit *e = (MigEdit *)malloc(sizeof(MigEdit));
+    e->start = start;
+    e->end = end;
+    e->text = strdup(text);
+    e->seq = f->seq++;
+    e->kind = kind;
+    vecPush(f->edits, e);
+}
+
+static int migIsIdent(char c) {
+    return isalnum((unsigned char)c) || c == '_';
+}
+
+/* The closing quote of the string or character constant opening at i, or
+ * i itself for a `'` that isn't one: a character constant ends on its
+ * line (skipped #if text holds prose: `don't`) */
+static s64 migQuoteEnd(const char *t, s64 i, s64 end) {
+    char q = t[i];
+    s64 j = i + 1;
+    while (j < end && t[j] != q) {
+        if (q == '\'' && t[j] == '\n') return i;
+        if (t[j] == '\\') j++;
+        j++;
+    }
+    return j < end ? j : (q == '\'' ? i : end);
+}
+
+/* The word map. `Main` only when the file's Main becomes main. */
+static const char *migMapWord(MigFile *f, const char *w, s64 len, const char **kind) {
+    static const char *map[][3] = {
+        {"U0", "void", "type"}, {"I8", "i8", "type"}, {"U8", "u8", "type"},
+        {"I16", "i16", "type"}, {"U16", "u16", "type"}, {"I32", "i32", "type"},
+        {"U32", "u32", "type"}, {"I64", "i64", "type"}, {"U64", "u64", "type"},
+        {"F32", "f32", "type"}, {"F64", "f64", "type"}, {"Bool", "bool", "type"},
+        {"TRUE", "true", "literal"}, {"FALSE", "false", "literal"},
+        {"NULL", "null", "literal"},
+        {"class", "struct", "struct"}, {"public", "pub", "pub"},
+    };
+    for (u64 i = 0; i < sizeof(map) / sizeof(map[0]); ++i) {
+        if ((s64)strlen(map[i][0]) == len && !memcmp(w, map[i][0], len)) {
+            *kind = map[i][2];
+            return map[i][1];
+        }
+    }
+    if (f && f->has_main && len == 4 && !memcmp(w, "Main", 4)) {
+        /* Code at file scope that calls Main: it goes into a new main,
+         * and Main, now an ordinary function, gets a name of its own */
+        *kind = "main";
+        return f->top_calls_main ? "runMain" : "main";
+    }
+    return NULL;
+}
+
+/* Calls fn(f, word_start, word_len, ctx) for every word of [start, end)
+ * that is code: not in a comment, a string, a character constant, an
+ * `asm {}` block, or the macro name of #define/#undef/#ifdef/#ifndef or
+ * `defined`. */
+typedef void (*MigWordFn)(MigFile *f, s64 at, s64 len, void *ctx);
+
+static void migScanWords(MigFile *f, char *text, s64 start, s64 end,
+                         MigWordFn fn, void *ctx)
+{
+    s64 i = start;
+    int line_start = 1, skip_next_word = 0;
+    while (i < end) {
+        char c = text[i];
+        if (c == '\n') {
+            line_start = 1;
+            skip_next_word = 0;
+            i++;
+            continue;
+        }
+        if (c == ' ' || c == '\t' || c == '\r') { i++; continue; }
+        if (c == '/' && i + 1 < end && text[i + 1] == '/') {
+            while (i < end && text[i] != '\n') i++;
+            continue;
+        }
+        if (c == '/' && i + 1 < end && text[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < end && !(text[i] == '*' && text[i + 1] == '/')) i++;
+            i += 2;
+            continue;
+        }
+        if (c == '"' || c == '\'') {
+            i = migQuoteEnd(text, i, end) + 1;
+            line_start = 0;
+            continue;
+        }
+        if (c == '#' && line_start) {
+            s64 j = i + 1;
+            while (j < end && (text[j] == ' ' || text[j] == '\t')) j++;
+            s64 w = j;
+            while (j < end && migIsIdent(text[j])) j++;
+            if ((j - w == 6 && !memcmp(text + w, "define", 6)) ||
+                (j - w == 5 && !memcmp(text + w, "undef", 5)) ||
+                (j - w == 5 && !memcmp(text + w, "ifdef", 5)) ||
+                (j - w == 6 && !memcmp(text + w, "ifndef", 6)))
+            {
+                skip_next_word = 1;
+            }
+            i = j;
+            line_start = 0;
+            continue;
+        }
+        if (migIsIdent(c)) {
+            s64 w = i;
+            while (i < end && migIsIdent(text[i])) i++;
+            s64 len = i - w;
+            if (isdigit((unsigned char)text[w])) { line_start = 0; continue; }
+            if (len == 7 && !memcmp(text + w, "defined", 7)) {
+                skip_next_word = 1;
+                line_start = 0;
+                continue;
+            }
+            if (len == 3 && !memcmp(text + w, "asm", 3)) {
+                s64 j = i;
+                while (j < end && isspace((unsigned char)text[j])) j++;
+                if (j < end && text[j] == '{') {
+                    while (j < end && text[j] != '}') j++;
+                    i = j + 1;
+                    line_start = 0;
+                    continue;
+                }
+            }
+            if (skip_next_word) {
+                skip_next_word = 0;
+            } else {
+                fn(f, w, len, ctx);
+            }
+            line_start = 0;
+            continue;
+        }
+        line_start = 0;
+        i++;
+    }
+}
+
+static s64 migSkipSpaceBack(char *t, s64 i);
+
+static void migWordEdit(MigFile *f, s64 at, s64 len, void *ctx) {
+    (void)ctx;
+    const char *kind;
+    const char *to = migMapWord(f, f->text + at, len, &kind);
+    if (!to && len == 4 && !memcmp(f->text + at, "Main", 4)) {
+        /* a demo `void Main()` in a skipped #if branch */
+        for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
+            if ((s64)(intptr_t)f->skipped->entries[r] <= at &&
+                at < (s64)(intptr_t)f->skipped->entries[r + 1]) {
+                to = "main";
+                kind = "main";
+                break;
+            }
+        }
+    }
+    if (to) migAdd(f, at, at + len, to, kind);
+}
+
+/* The text of [start, end) with the word map applied (a cast's type) */
+typedef struct { AoStr *out; char *text; s64 pos; } MigMapCtx;
+
+static void migMapEmit(MigFile *f, s64 at, s64 len, void *ctx) {
+    MigMapCtx *m = ctx;
+    const char *kind;
+    const char *to = migMapWord(f, m->text + at, len, &kind);
+    if (!to) return;
+    aoStrCatLen(m->out, m->text + m->pos, at - m->pos);
+    aoStrCat(m->out, to);
+    m->pos = at + len;
+}
+
+static char *migMapText(MigFile *f, s64 start, s64 end) {
+    MigMapCtx m = { aoStrNew(), f->text, start };
+    migScanWords(f, f->text, start, end, migMapEmit, &m);
+    aoStrCatLen(m.out, f->text + m.pos, end - m.pos);
+    return m.out->data;
+}
+
+/* ------------------------------------------------------------------ */
+/* The operand of a postfix cast: walking back from its `(` over one
+ * postfix expression (a name, literal or parenthesised expression with
+ * any `.x`, `->x`, `[i]` and `(args)` after it). -1 if it can't tell. */
+
+static s64 migSkipSpaceBack(char *t, s64 i) {
+    while (i >= 0 && isspace((unsigned char)t[i])) i--;
+    return i;
+}
+
+static s64 migMatchBack(char *t, s64 i) {
+    char close = t[i], open = close == ')' ? '(' : '[';
+    int depth = 0;
+    for (; i >= 0; --i) {
+        if (t[i] == '"' || t[i] == '\'') {
+            char q = t[i--];
+            while (i >= 0 && !(t[i] == q && (i == 0 || t[i - 1] != '\\'))) i--;
+            continue;
+        }
+        if (t[i] == close) depth++;
+        else if (t[i] == open && --depth == 0) return i;
+    }
+    return -1;
+}
+
+static s64 migOperandStart(MigFile *f, s64 lp) {
+    char *t = f->text;
+    s64 i = migSkipSpaceBack(t, lp - 1);
+    /* `x++(T)`: the cast applies to `x++` */
+    if (i >= 1 && ((t[i] == '+' && t[i - 1] == '+') || (t[i] == '-' && t[i - 1] == '-'))) {
+        i = migSkipSpaceBack(t, i - 2);
+    }
+    while (i >= 0) {
+        char c = t[i];
+        if (c == ')' || c == ']') {
+            s64 open = migMatchBack(t, i);
+            if (open < 0) return -1;
+            s64 before = migSkipSpaceBack(t, open - 1);
+            if (c == ']' || (before >= 0 && (migIsIdent(t[before]) ||
+                                             t[before] == ')' || t[before] == ']')))
+            {
+                i = before;     /* a subscript or the arguments of a call */
+                continue;
+            }
+            return open;        /* a parenthesised expression */
+        }
+        if (c == '"' || c == '\'') {
+            s64 j = i - 1;
+            while (j >= 0 && !(t[j] == c && (j == 0 || t[j - 1] != '\\'))) j--;
+            return j;
+        }
+        if (migIsIdent(c)) {
+            s64 j = i;
+            while (j >= 0 && migIsIdent(t[j])) j--;
+            s64 word = j + 1;
+            s64 before = migSkipSpaceBack(t, j);
+            if (before >= 0 && t[before] == '.' &&
+                !(before > 0 && isdigit((unsigned char)t[before - 1]) &&
+                  isdigit((unsigned char)t[word])))
+            {
+                i = migSkipSpaceBack(t, before - 1);
+                continue;
+            }
+            if (before >= 0 && t[before] == '.') {   /* 3.14 */
+                i = before - 1;
+                continue;
+            }
+            if (before >= 1 && t[before] == '>' && t[before - 1] == '-') {
+                i = migSkipSpaceBack(t, before - 2);
+                continue;
+            }
+            return word;
+        }
+        return -1;
+    }
+    return -1;
+}
+
+static void migCastAt(MigFile *f, s64 lp, s64 rp);
+
+/* An old type name (and `*`s) between lp's `(` and a `)`: its `)`, or -1 */
+static s64 migOldCastEnd(MigFile *f, s64 lp, s64 end) {
+    static const char *old[] = {"U0", "I8", "U8", "I16", "U16", "I32", "U32",
+                                "I64", "U64", "F32", "F64", "Bool"};
+    char *t = f->text;
+    s64 i = lp + 1;
+    while (i < end && (t[i] == ' ' || t[i] == '\t')) i++;
+    s64 w = i;
+    while (i < end && migIsIdent(t[i])) i++;
+    int is_type = 0;
+    for (u64 k = 0; k < sizeof(old) / sizeof(old[0]); ++k) {
+        if ((s64)strlen(old[k]) == i - w && !memcmp(t + w, old[k], i - w)) is_type = 1;
+    }
+    if (!is_type) return -1;
+    while (i < end && (t[i] == ' ' || t[i] == '\t' || t[i] == '*')) i++;
+    return i < end && t[i] == ')' ? i : -1;
+}
+
+/* The lexer folds a #define's body, so the parser never sees a postfix
+ * cast written there: find them in the text of #define lines */
+static void migDefineCasts(MigFile *f) {
+    char *t = f->text;
+    s64 i = 0;
+    while (i < f->len) {
+        s64 ls = i, le = i;
+        while (le < f->len && t[le] != '\n') le++;
+        s64 j = ls;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (j < le && t[j] == '#') {
+            j++;
+            while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+            s64 body = -1;
+            if (le - j >= 6 && !memcmp(t + j, "define", 6)) body = j + 6;
+            else if (le - j >= 4 && !memcmp(t + j, "elif", 4)) body = j + 4;
+            else if (le - j >= 2 && !memcmp(t + j, "if", 2) && !migIsIdent(t[j + 2])) body = j + 2;
+            if (body >= 0) {
+                j = body - 6;
+                for (s64 k = body; k < le; ++k) {
+                    if (t[k] == '"' || t[k] == '\'') {
+                        k = migQuoteEnd(t, k, le);
+                        continue;
+                    }
+                    if (t[k] == '/' && k + 1 < le && (t[k + 1] == '/' || t[k + 1] == '*')) break;
+                    if (t[k] != '(') continue;
+                    s64 rp = migOldCastEnd(f, k, le);
+                    if (rp < 0) continue;
+                    s64 b = migSkipSpaceBack(t, k - 1);
+                    if (b < j + 6 || !(migIsIdent(t[b]) || t[b] == ')' || t[b] == ']' ||
+                                       t[b] == '"' || t[b] == '\'')) continue;
+                    migCastAt(f, k, rp);
+                    k = rp;
+                }
+            }
+        }
+        i = le + 1;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Parser hooks */
+
+void migrateNoteCast(Cctrl *cc, Lexeme *lparen, Lexeme *rparen) {
+    MigFile *f = migFileOf(cc, lparen ? lparen->src : NULL);
+    if (!f) return;
+    s64 lp = migOff(f, lparen), rp = migOff(f, rparen);
+    if (lp < 0 || rp < 0) {
+        migNote(f, lp, "can't rewrite a postfix cast that spans a macro");
+        return;
+    }
+    migCastAt(f, lp, rp);
+}
+
+/* `x(T)` with its `(` at lp and `)` at rp: `(t)x`, wrapped in parentheses
+ * when a postfix operator follows */
+static void migCastAt(MigFile *f, s64 lp, s64 rp) {
+    s64 op = migOperandStart(f, lp);
+    if (op < 0) {
+        migNote(f, lp, "can't find the operand of a postfix cast");
+        return;
+    }
+    char *type = migMapText(f, lp + 1, rp);
+    s64 after = rp + 1;
+    while (after < f->len && (f->text[after] == ' ' || f->text[after] == '\t')) after++;
+    char *t = f->text;
+    int wrap = after < f->len &&
+        (t[after] == '[' || t[after] == '.' || t[after] == '(' ||
+         (t[after] == '-' && after + 1 < f->len && (t[after + 1] == '>' || t[after + 1] == '-')) ||
+         (t[after] == '+' && after + 1 < f->len && t[after + 1] == '+'));
+    /* The parser hoists a cast out of a unary `&`: `&x(T)` is `(&x)(T)` */
+    if (!wrap) {
+        s64 amp = migSkipSpaceBack(t, op - 1);
+        if (amp >= 0 && t[amp] == '&' && !(amp > 0 && t[amp - 1] == '&')) {
+            s64 before = migSkipSpaceBack(t, amp - 1);
+            if (before < 0 || !(migIsIdent(t[before]) || t[before] == ')' ||
+                                t[before] == ']' || t[before] == '"' || t[before] == '\'')) {
+                op = amp;
+            }
+        }
+    }
+    migAdd(f, op, op, mprintf(wrap ? "((%s)" : "(%s)", type), "cast");
+    migAdd(f, lp, rp + 1, "", "cast");
+    if (wrap) migAdd(f, rp + 1, rp + 1, ")", "cast");
+}
+
+/* `'ab';` prints its characters: printf("ab") (as the old statement did;
+ * printf's %c would print one). The constant starts at s; returns the
+ * offset just past it, or -1. */
+static s64 migCharPrint(MigFile *f, s64 s) {
+    char *t = f->text;
+    s64 e = s + 1;
+    AoStr *str = aoStrNew();
+    aoStrCat(str, "printf(\"");
+    while (e < f->len && t[e] != '\'') {
+        if (t[e] == '\\' && e + 1 < f->len) {
+            if (t[e + 1] == '\'') aoStrPutChar(str, '\'');
+            else aoStrCatLen(str, t + e, 2);
+            e += 2;
+            continue;
+        }
+        if (t[e] == '"') aoStrCat(str, "\\\"");
+        else if (t[e] == '%') aoStrCat(str, "%%");
+        else aoStrPutChar(str, t[e]);
+        e++;
+    }
+    if (e >= f->len) return -1;
+    aoStrCat(str, "\")");
+    migAdd(f, s, e + 1, str->data, "printf");
+    return e + 1;
+}
+
+void migrateNotePrint(Cctrl *cc, Lexeme *first, Lexeme *semi, int is_char) {
+    MigFile *f = migFileOf(cc, first ? first->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, first), e = migOff(f, semi);
+    if (s < 0 || e < 0 || f->text[e] != ';') {
+        migNote(f, s, "can't rewrite a print statement that spans a macro");
+        return;
+    }
+    if (is_char) {
+        if (migCharPrint(f, s) < 0) migNote(f, s, "can't rewrite a character constant statement");
+        return;
+    }
+    migAdd(f, s, s, "printf(", "printf");
+    migAdd(f, e, e, ")", "printf");
+}
+
+void migrateNoteCall(Cctrl *cc, Lexeme *name) {
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    migAdd(f, s + name->len, s + name->len, "()", "call");
+    if (name->len == 4 && !memcmp(f->text + s, "Main", 4)) {
+        vecPush(f->main_calls, (void *)(intptr_t)s);
+    }
+}
+
+void migrateNoteMain(Cctrl *cc, Lexeme *name, Lexeme *lbrace, int is_void) {
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    f->has_main = 1;
+    f->main_name = migOff(f, name);
+    f->main_lbrace = migOff(f, lbrace);
+    f->main_void = is_void;
+    f->main_item = f->item_start;
+}
+
+Lexeme *migrateItemFirst(Cctrl *cc) {
+    return cc->migrate ? cc->migrate->item_first : NULL;
+}
+
+void migrateItemStart(Cctrl *cc, Lexeme *first) {
+    Migrate *m = cc->migrate;
+    m->item_first = first;
+    for (int i = 0; i < m->n_files; ++i) m->files[i]->item_start = -1;
+    MigFile *f = migFileOf(cc, first ? first->src : NULL);
+    if (f) f->item_start = migOff(f, first);
+}
+
+void migrateNoteRunningItem(Cctrl *cc, Lexeme *last, int is_decl) {
+    MigFile *f = migFileOf(cc, last ? last->src : NULL);
+    if (!f || f->item_start < 0) return;
+    s64 e = migOff(f, last);
+    if (e < 0) return;
+    MigItem *it = (MigItem *)malloc(sizeof(MigItem));
+    it->start = f->item_start;
+    it->end = e + last->len;
+    it->is_decl = is_decl;
+    vecPush(f->items, it);
+}
+
+/* ------------------------------------------------------------------ */
+/* Applying the edits */
+
+static int migCmp(const void *a, const void *b) {
+    const MigEdit *x = *(MigEdit *const *)a, *y = *(MigEdit *const *)b;
+    if (x->start != y->start) return x->start < y->start ? -1 : 1;
+    /* Code moved into main takes the edits at its start along with it */
+    int xm = x->start != x->end && !strcmp(x->kind, "moved");
+    int ym = y->start != y->end && !strcmp(y->kind, "moved");
+    if (xm != ym) return xm ? -1 : 1;
+    int xi = x->start == x->end, yi = y->start == y->end;
+    if (xi != yi) return xi ? -1 : 1;            /* inserts first */
+    if (xi) return x->seq > y->seq ? -1 : 1;     /* the newest insert first */
+    return x->end > y->end ? -1 : 1;
+}
+
+static void migSort(MigFile *f) {
+    qsort(f->edits->entries, f->edits->size, sizeof(void *), migCmp);
+}
+
+/* [rs, re) of the text with the edits inside it applied; an edit that
+ * starts inside a range another one replaces is dropped */
+static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof) {
+    AoStr *out = aoStrNew();
+    s64 pos = rs;
+    for (u64 i = 0; i < f->edits->size; ++i) {
+        MigEdit *e = f->edits->entries[i];
+        if (e->start < pos || e->start > re) continue;
+        if (e->start == re && !(to_eof && e->start == e->end)) continue;
+        if (e->end > re) continue;
+        aoStrCatLen(out, f->text + pos, e->start - pos);
+        aoStrCat(out, e->text);
+        pos = e->end;
+    }
+    aoStrCatLen(out, f->text + pos, re - pos);
+    return out->data;
+}
+
+/* Widen [s, e) to whole lines when nothing else is on them */
+static void migWholeLines(MigFile *f, s64 *s, s64 *e) {
+    s64 a = *s, b = *e;
+    while (a > 0 && (f->text[a - 1] == ' ' || f->text[a - 1] == '\t')) a--;
+    while (b < f->len && (f->text[b] == ' ' || f->text[b] == '\t')) b++;
+    if ((a == 0 || f->text[a - 1] == '\n') && (b == f->len || f->text[b] == '\n')) {
+        *s = a;
+        *e = b < f->len ? b + 1 : b;
+    }
+}
+
+static char *migIndent(const char *text, const char *indent) {
+    AoStr *out = aoStrNew();
+    aoStrCat(out, indent);
+    for (const char *p = text; *p; ++p) {
+        aoStrPutChar(out, *p);
+        if (*p == '\n' && p[1] && p[1] != '\n') aoStrCat(out, indent);
+    }
+    return out->data;
+}
+
+/* The indentation of the first line of main's body */
+static char *migBodyIndent(MigFile *f) {
+    s64 i = f->main_lbrace + 1;
+    while (i < f->len && f->text[i] != '\n') i++;
+    while (i < f->len) {
+        s64 j = i + 1, k = j;
+        while (k < f->len && (f->text[k] == ' ' || f->text[k] == '\t')) k++;
+        if (k < f->len && f->text[k] != '\n' && f->text[k] != '}') {
+            return mprintf("%.*s", (int)(k - j), f->text + j);
+        }
+        if (k >= f->len || f->text[k] == '}') break;
+        i = k;
+    }
+    return strdup("  ");
+}
+
+/* `T name = expr;` at file scope: the text to move (`name = expr;`) and
+ * the edit that leaves `T name;`. NULL if it isn't that simple. */
+static char *migSplitDecl(MigFile *f, MigItem *it) {
+    char *t = f->text;
+    s64 eq = -1, depth = 0;
+    for (s64 i = it->start; i < it->end; ++i) {
+        char c = t[i];
+        if (c == '"' || c == '\'') {
+            i = migQuoteEnd(t, i, it->end);
+            continue;
+        }
+        if (c == '(' || c == '[' || c == '{') depth++;
+        else if (c == ')' || c == ']' || c == '}') depth--;
+        else if (depth == 0 && c == ',') return NULL;
+        else if (depth == 0 && c == '=' && eq < 0 &&
+                 !(i + 1 < it->end && t[i + 1] == '=')) eq = i;
+    }
+    if (eq < 0 || t[it->end - 1] != ';') return NULL;
+    s64 n = migSkipSpaceBack(t, eq - 1), ne = n + 1;
+    while (n >= it->start && migIsIdent(t[n])) n--;
+    s64 name = n + 1;
+    if (name >= ne) return NULL;
+    s64 r = eq + 1;
+    while (r < it->end && isspace((unsigned char)t[r])) r++;
+    if (t[r] == '{') return NULL;
+    for (s64 i = it->start; i + 4 <= name; ++i) {
+        if (!memcmp(t + i, "auto", 4) && (i == it->start || !migIsIdent(t[i - 1])) &&
+            !migIsIdent(t[i + 4])) return NULL;
+    }
+    char *moved = mprintf("%.*s = %s", (int)(ne - name), t + name,
+                          migApply(f, r, it->end, 0));
+    migAdd(f, ne, it->end - 1, "", "moved");
+    return moved;
+}
+
+/* Move the code at file scope into main (made if there is none or the
+ * code calls Main itself) */
+static void migMoveItems(MigFile *f) {
+    if (f->items->size == 0) return;
+    AoStr *moved = aoStrNew();
+    int any = 0;
+    for (u64 i = 0; i < f->items->size; ++i) {
+        MigItem *it = f->items->entries[i];
+        char *text;
+        if (it->is_decl) {
+            text = migSplitDecl(f, it);
+            if (!text) {
+                migNote(f, it->start, "kept: a global whose initialiser runs code "
+                        "(not a simple `T name = expr;`)");
+                continue;
+            }
+            migNote(f, it->start, "moved the initialiser of a global into main");
+        } else {
+            text = migApply(f, it->start, it->end, 0);
+            s64 s = it->start, e = it->end;
+            migWholeLines(f, &s, &e);
+            migAdd(f, s, e, "", "moved");
+            migNote(f, it->start, "moved a statement at file scope into main");
+        }
+        aoStrCat(moved, any ? "\n" : "");
+        aoStrCat(moved, text);
+        any = 1;
+    }
+    if (!any) return;
+    if (f->has_main && !f->top_calls_main && f->main_lbrace >= 0) {
+        char *indent = migBodyIndent(f);
+        migAdd(f, f->main_lbrace + 1, f->main_lbrace + 1,
+               mprintf("\n%s", migIndent(moved->data, indent)), "moved");
+    } else {
+        int nl = f->len > 0 && f->text[f->len - 1] != '\n';
+        migAdd(f, f->len, f->len,
+               mprintf("%s\nvoid main()\n{\n%s\n}\n", nl ? "\n" : "",
+                       migIndent(moved->data, "  ")), "main");
+        migNote(f, f->len, f->has_main
+                ? "made `void main()` for the code at file scope (it calls Main, now `runMain`)"
+                : "made `void main()` for the code at file scope");
+    }
+}
+
+/* Main's return type: void stays (the word map makes U0 void), anything
+ * but I32 becomes i32 */
+static void migMainType(MigFile *f) {
+    if (!f->has_main || f->top_calls_main || f->main_void) return;
+    if (f->main_item < 0 || f->main_name < 0) return;
+    s64 s = f->main_item, e = f->main_name;
+    while (s < e && isspace((unsigned char)f->text[s])) s++;
+    s64 te = e;
+    while (te > s && isspace((unsigned char)f->text[te - 1])) te--;
+    for (s64 i = s; i < te; ++i) {
+        if (!migIsIdent(f->text[i])) {
+            migNote(f, s, "can't rewrite the return type of Main");
+            return;
+        }
+    }
+    if (te - s == 3 && !memcmp(f->text + s, "I32", 3)) return;
+    migAdd(f, s, te, "i32", "main");
+}
+
+/* Postfix casts the parser didn't see (skipped #if branches, macros):
+ * `x(i64)` or `p(u8 *)` left in the output */
+/* A copy of `src` with comments and the insides of strings and character
+ * constants blanked (newlines kept), for pattern checks on code only */
+static char *migBlank(const char *src) {
+    char *b = strdup(src);
+    s64 len = (s64)strlen(b);
+    for (char *p = b; *p; ++p) {
+        if (p[0] == '/' && p[1] == '/') {
+            while (*p && *p != '\n') *p++ = ' ';
+            if (!*p) break;
+        } else if (p[0] == '/' && p[1] == '*') {
+            while (*p && !(p[0] == '*' && p[1] == '/')) { if (*p != '\n') *p = ' '; p++; }
+            if (!*p) break;
+            p[0] = ' ';
+            p[1] = ' ';
+            p++;
+        } else if (*p == '"' || *p == '\'') {
+            char q = *p;
+            s64 i = p - b, end = migQuoteEnd(b, i, len);
+            if (end == i) continue;     /* a lone apostrophe */
+            p++;
+            while (*p && *p != q) {
+                if (*p == '\\' && p[1]) *p++ = ' ';
+                if (*p != '\n') *p = ' ';
+                p++;
+            }
+            if (!*p) break;
+        }
+    }
+    return b;
+}
+
+static void migCheckLeftovers(MigFile *f, const char *raw) {
+    const char *out = migBlank(raw);
+    static const char *types[] = {"void", "i8", "u8", "i16", "u16", "i32", "u32",
+                                  "i64", "u64", "f32", "f64", "bool",
+                                  "U0", "I8", "U8", "I16", "U16", "I32", "U32",
+                                  "I64", "U64", "F32", "F64", "Bool"};
+    int line = 1;
+    for (const char *p = out; *p; ++p) {
+        if (*p == '\n') { line++; continue; }
+        if (*p != '(' || p == out) continue;
+        const char *b = p - 1;
+        while (b > out && (*b == ' ' || *b == '\t')) b--;
+        if (!(migIsIdent(*b) || *b == ')' || *b == ']')) continue;
+        if (*b == ')') {
+            /* `T (*name)(params)`: a function pointer's parameters */
+            int depth = 0;
+            const char *o = b;
+            for (; o > out; --o) {
+                if (*o == ')') depth++;
+                else if (*o == '(' && --depth == 0) break;
+            }
+            const char *in = o + 1;
+            while (*in == ' ') in++;
+            if (*in == '*') continue;
+        }
+        if (migIsIdent(*b)) {
+            const char *w = b;
+            while (w > out && migIsIdent(w[-1])) w--;
+            static const char *kw[] = {"sizeof", "alignof", "typeof", "return",
+                                       "case", "if", "while", "for", "switch"};
+            int is_kw = 0;
+            for (u64 k = 0; k < sizeof(kw) / sizeof(kw[0]); ++k) {
+                if ((s64)strlen(kw[k]) == b - w + 1 && !memcmp(w, kw[k], b - w + 1)) is_kw = 1;
+            }
+            if (is_kw) continue;
+        }
+        const char *q = p + 1;
+        while (*q == ' ') q++;
+        for (u64 k = 0; k < sizeof(types) / sizeof(types[0]); ++k) {
+            u64 n = strlen(types[k]);
+            if (strncmp(q, types[k], n) || migIsIdent(q[n])) continue;
+            const char *r = q + n;
+            while (*r == ' ' || *r == '*') r++;
+            const char *after = r + 1;
+            while (*after == ' ' || *after == '\t') after++;
+            /* `(t)x` is a prefix cast: an operand follows it */
+            if (*r == ')' && (migIsIdent(*after) || *after == '(' ||
+                              *after == '"' || *after == '\'')) break;
+            /* `F(void)`: an empty parameter list */
+            if (*r == ')' && r == q + n && (n == 4 && !strncmp(q, "void", 4))) break;
+            if (*r == ')') {
+                aoStrCatPrintf(f->notes, "%s:%d: check: what looks like a postfix cast "
+                               "is left (in a skipped #if branch or a macro?)\n",
+                               f->path, line);
+            }
+            break;
+        }
+    }
+}
+
+/* Postfix casts in text an #if skipped (the parser never saw it): an old
+ * type name in parentheses right after an operand. A declaration like
+ * `I32 Foo(I32);` (the name after a type) is left alone. */
+/* A print statement in skipped text: a string or character constant
+ * where a statement starts (a line's start, after `{`, `}`, `;`, `)` or
+ * `else`), up to its `;` */
+static int migStatementStart(char *t, s64 s, s64 j) {
+    s64 b = j - 1;
+    while (b >= s && (t[b] == ' ' || t[b] == '\t')) b--;
+    if (b < s || t[b] == '\n') return 1;
+    if (t[b] == '{' || t[b] == '}' || t[b] == ';' || t[b] == ')') return 1;
+    return b >= s + 3 && !memcmp(t + b - 3, "else", 4) &&
+           (b - 4 < s || !migIsIdent(t[b - 4]));
+}
+
+static void migSkippedPrints(MigFile *f, s64 s, s64 e) {
+    char *t = f->text;
+    for (s64 j = s; j < e; ++j) {
+        if (t[j] == '/' && j + 1 < e && t[j + 1] == '/') {
+            while (j < e && t[j] != '\n') j++;
+            continue;
+        }
+        if (t[j] == '/' && j + 1 < e && t[j + 1] == '*') {
+            j += 2;
+            while (j + 1 < e && !(t[j] == '*' && t[j + 1] == '/')) j++;
+            j++;
+            continue;
+        }
+        if (t[j] != '"' && t[j] != '\'') continue;
+        if (migQuoteEnd(t, j, e) == j) continue;   /* a lone apostrophe */
+        if (!migStatementStart(t, s, j)) {
+            j = migQuoteEnd(t, j, e);
+            continue;
+        }
+        {
+            s64 k = j, depth = 0;
+            for (; k < e; ++k) {
+                if (t[k] == '"' || t[k] == '\'') {
+                    k = migQuoteEnd(t, k, e);
+                    continue;
+                }
+                if (t[k] == '(') depth++;
+                else if (t[k] == ')') depth--;
+                else if (t[k] == ';' && depth == 0) break;
+            }
+            if (k < e && t[j] == '\'') {
+                migCharPrint(f, j);
+            } else if (k < e) {
+                migAdd(f, j, j, "printf(", "printf");
+                migAdd(f, k, k, ")", "printf");
+            }
+            j = k;
+        }
+    }
+}
+
+static void migSkippedCasts(MigFile *f) {
+    char *t = f->text;
+    int branches = 0;
+    s64 first = -1;
+    for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
+        s64 s = (s64)(intptr_t)f->skipped->entries[r];
+        s64 e = (s64)(intptr_t)f->skipped->entries[r + 1];
+        int code = 0;
+        for (s64 k = s; k < e; ++k) {
+            if (!isspace((unsigned char)t[k])) { code = 1; break; }
+        }
+        if (code) {
+            if (first < 0) first = s;
+            branches++;
+        }
+        migSkippedPrints(f, s, e);
+        for (s64 k = s; k < e; ++k) {
+            if (t[k] == '/' && k + 1 < e && t[k + 1] == '/') {
+                while (k < e && t[k] != '\n') k++;
+                continue;
+            }
+            if (t[k] == '/' && k + 1 < e && t[k + 1] == '*') {
+                k += 2;
+                while (k + 1 < e && !(t[k] == '*' && t[k + 1] == '/')) k++;
+                k++;
+                continue;
+            }
+            if (t[k] == '"' || t[k] == '\'') {
+                k = migQuoteEnd(t, k, e);
+                continue;
+            }
+            if (t[k] != '(') continue;
+            s64 rp = migOldCastEnd(f, k, e);
+            if (rp < 0) continue;
+            s64 op = migOperandStart(f, k);
+            if (op < 0) continue;
+            s64 b = migSkipSpaceBack(t, op - 1);
+            int decl = 0;
+            if (b >= 0 && migIsIdent(t[b])) {
+                s64 w = b;
+                while (w > 0 && migIsIdent(t[w - 1])) w--;
+                decl = !((b - w + 1 == 6 && !memcmp(t + w, "return", 6)) ||
+                         (b - w + 1 == 4 && !memcmp(t + w, "case", 4)));
+            } else if (b >= 0 && t[b] == '*') {
+                s64 c = migSkipSpaceBack(t, b - 1);
+                decl = c >= 0 && migIsIdent(t[c]);
+            }
+            if (decl) {
+                k = rp;
+                continue;
+            }
+            migCastAt(f, k, rp);
+            migNote(f, k, "rewrote a postfix cast in a skipped #if branch (check it)");
+            k = rp;
+        }
+    }
+    if (branches) {
+        migNote(f, first, "%d #if branch(es) not compiled here were rewritten from "
+                "their text only (types, casts, print statements; not calls "
+                "without parentheses): check them", branches);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Comments and strings */
+
+static int migIsOldType(const char *w, s64 len) {
+    static const char *old[] = {"U0", "I8", "U8", "I16", "U16", "I32", "U32",
+                                "I64", "U64", "F32", "F64", "Bool"};
+    for (u64 k = 0; k < sizeof(old) / sizeof(old[0]); ++k) {
+        if ((s64)strlen(old[k]) == len && !memcmp(w, old[k], len)) return 1;
+    }
+    return 0;
+}
+
+/* Old type names (and, with `literals`, TRUE/FALSE/NULL) in [s, e) of
+ * prose: a comment or a string that isn't code */
+static void migProseWords(MigFile *f, s64 s, s64 e, int literals, const char *kind) {
+    char *t = f->text;
+    for (s64 i = s; i < e; ) {
+        if (!migIsIdent(t[i])) { i++; continue; }
+        s64 w = i;
+        while (i < e && migIsIdent(t[i])) i++;
+        if (w > 0 && migIsIdent(t[w - 1])) continue;
+        const char *k;
+        const char *to = migMapWord(NULL, t + w, i - w, &k);
+        if (!to) continue;
+        if (migIsOldType(t + w, i - w) || (literals && !strcmp(k, "literal"))) {
+            migAdd(f, w, i, to, kind);
+        }
+    }
+}
+
+/* `// @TempleOS - Count occurrences of a char.` keeps what the function
+ * does (`// Count occurrences of a char.`); a comment that only credits
+ * the origin goes, with the spaces before it */
+static void migAttribution(MigFile *f, s64 cs, s64 ce) {
+    char *t = f->text;
+    char *at = NULL;
+    for (s64 i = cs; i + 9 <= ce; ++i) {
+        if (!memcmp(t + i, "@TempleOS", 9)) { at = t + i; break; }
+    }
+    if (!at) return;
+    s64 rest = (at - t) + 9;
+    while (rest < ce && (t[rest] == ' ' || t[rest] == '-' || t[rest] == ':' ||
+                         t[rest] == ',')) rest++;
+    s64 end = ce;
+    while (end > rest && isspace((unsigned char)t[end - 1])) end--;
+    static const char *credit_only[] = {"only slight tweaks", "Not a 1:1 yet"};
+    int drop = rest >= end;
+    for (u64 k = 0; k < sizeof(credit_only) / sizeof(credit_only[0]); ++k) {
+        if ((s64)strlen(credit_only[k]) == end - rest &&
+            !strncasecmp(t + rest, credit_only[k], end - rest)) drop = 1;
+    }
+    if (drop) {
+        s64 s0 = cs;
+        while (s0 > 0 && (t[s0 - 1] == ' ' || t[s0 - 1] == '\t')) s0--;
+        if (s0 > 0 && t[s0 - 1] == '\n' && (ce >= f->len || t[ce] == '\n')) {
+            migAdd(f, s0, ce < f->len ? ce + 1 : ce, "", "attribution");  /* the whole line */
+        } else {
+            migAdd(f, s0, ce, "", "attribution");
+        }
+    } else {
+        migAdd(f, cs, rest, "// ", "attribution");
+    }
+}
+
+static void migSnippetAt(MigFile *outer, s64 *cs, s64 *ce, int np, char *install_dir,
+                         int *n, int *n_text, int escaped);
+static int migParse(Migrate *m, char *root, char *install_dir);
+static MigFile *migFileNew(char *path);
+
+/* Comments get the new type names and literals; a string that holds code
+ * (a program a test compiles) is converted as code, any other string gets
+ * the new type names (messages that name a type) */
+static void migCommentsAndStrings(MigFile *f, char *install_dir, int outer) {
+    char *t = f->text;
+    int n = 0, n_text = 0;
+    for (s64 i = 0; i < f->len; ) {
+        if (t[i] == '/' && i + 1 < f->len && t[i + 1] == '/') {
+            s64 e = i;
+            while (e < f->len && t[e] != '\n') e++;
+            migProseWords(f, i, e, 1, "comment");
+            migAttribution(f, i, e);
+            i = e;
+            continue;
+        }
+        if (t[i] == '/' && i + 1 < f->len && t[i + 1] == '*') {
+            s64 e = i + 2;
+            while (e + 1 < f->len && !(t[e] == '*' && t[e + 1] == '/')) e++;
+            migProseWords(f, i, e, 1, "comment");
+            i = e + 2;
+            continue;
+        }
+        if (t[i] == '\'') {
+            i = migQuoteEnd(t, i, f->len) + 1;
+            continue;
+        }
+        if (t[i] == '"') {
+            /* One string: literals next to each other ("a" "b"), also with
+             * a macro between them ("#include \"" HDR "\"\nU0 Main()...") */
+            s64 cs[64], ce[64];
+            int np = 0;
+            s64 e = i;
+            for (;;) {
+                e++;
+                cs[np] = e;
+                while (e < f->len && t[e] != '"') { if (t[e] == '\\') e++; e++; }
+                ce[np++] = e;
+                s64 k = e + 1;
+                while (k < f->len && isspace((unsigned char)t[k])) k++;
+                if (k < f->len && (isupper((unsigned char)t[k]) || t[k] == '_')) {
+                    s64 w = k;
+                    while (k < f->len && migIsIdent(t[k])) k++;
+                    int macro = 1;
+                    for (s64 q = w; q < k; ++q) {
+                        if (islower((unsigned char)t[q])) macro = 0;
+                    }
+                    if (!macro) break;
+                    while (k < f->len && isspace((unsigned char)t[k])) k++;
+                }
+                if (k >= f->len || t[k] != '"' || np == 64) break;
+                e = k;
+            }
+            if (outer) {
+                migSnippetAt(f, cs, ce, np, install_dir, &n, &n_text, 1);
+            }
+            i = e + 1;
+            continue;
+        }
+        i++;
+    }
+    if (n) {
+        migNote(f, -1, "converted %d string(s) that hold code%s", n,
+                n_text ? mprintf(" (%d from their text only: they don't compile "
+                                 "on their own; check them)", n_text) : "");
+    }
+}
+
+/* The edits migApply would apply, in order */
+static Vec *migEffective(MigFile *f) {
+    Vec *v = vecNew(&vec_unsigned_long_type);
+    s64 pos = 0;
+    for (u64 i = 0; i < f->edits->size; ++i) {
+        MigEdit *e = f->edits->entries[i];
+        if (e->start < pos || e->end > f->len) continue;
+        vecPush(v, e);
+        pos = e->end;
+    }
+    return v;
+}
+
+static char *migEscape(const char *text, int raw_newlines) {
+    AoStr *out = aoStrNew();
+    aoStrCat(out, "");
+    for (const char *p = text; *p; ++p) {
+        if (*p == '\\') aoStrCat(out, "\\\\");
+        else if (*p == '"') aoStrCat(out, "\\\"");
+        else if (*p == '\n' && !raw_newlines) aoStrCat(out, "\\n");
+        else if (*p == '\t') aoStrCat(out, "\\t");
+        else aoStrPutChar(out, *p);
+    }
+    return out->data;
+}
+
+static int migLooksLikeCode(const char *u) {
+    if (!strchr(u, ';') || !(strchr(u, '(') || strchr(u, '{'))) return 0;
+    for (const char *p = u; *p; ) {
+        if (!migIsIdent(*p)) { p++; continue; }
+        const char *w = p;
+        while (migIsIdent(*p)) p++;
+        if (w > u && migIsIdent(w[-1])) continue;
+        const char *k;
+        if (migMapWord(NULL, w, p - w, &k) ||
+            (p - w == 4 && !memcmp(w, "Main", 4))) return 1;
+    }
+    return 0;
+}
+
+static int migConvert(MigFile *f, char *install_dir, int outer);
+
+/* Code in [cs, ce) of `outer`: a string literal's content (`escaped`), or
+ * the raw code of an HTML <pre> block */
+/* A message, not code: the new type names; TRUE/FALSE/NULL too, except
+ * in SQL (`IS NULL`) and in what a test looks for in the compiler's own
+ * messages (`strstr(out, "NULL param")`) */
+static void migProseString(MigFile *f, s64 *cs, s64 *ce, int np, const char *u) {
+    int literals = !strstr(u, "SELECT ") && !strstr(u, "INSERT ") &&
+                   !strstr(u, "UPDATE ") && !strstr(u, "CREATE ") &&
+                   !strstr(u, "IS NULL");
+    for (s64 b = cs[0] - 1; b >= 7 && cs[0] - b < 80; --b) {
+        char c = f->text[b - 1];
+        if (c == ';' || c == ')' || c == '{' || c == '}') break;
+        if (!memcmp(f->text + b - 7, "strstr(", 7)) { literals = 0; break; }
+    }
+    for (int p = 0; p < np; ++p) migProseWords(f, cs[p], ce[p], literals, "string");
+}
+
+static void migSnippetAt(MigFile *outer, s64 *cs, s64 *ce, int np, char *install_dir,
+                         int *n, int *n_text, int escaped) {
+    char *t = outer->text;
+    s64 len = 0;
+    for (int p = 0; p < np; ++p) len += ce[p] - cs[p];
+    char *u = (char *)malloc(len + 1);
+    s64 *map = (s64 *)malloc((len + 2) * sizeof(s64));
+    int *piece = (int *)malloc((len + 2) * sizeof(int));
+    s64 k = 0;
+    int raw_newlines = 0;
+    for (int p = 0; p < np; ++p)
+    for (s64 i = cs[p]; i < ce[p]; ) {
+        piece[k] = p;
+        map[k] = i;
+        if (t[i] == '\n') raw_newlines = 1;
+        if (escaped && t[i] == '\\' && i + 1 < ce[p]) {
+            char c = t[i + 1];
+            if (c == 'x' && i + 3 < ce[p] && isxdigit((unsigned char)t[i + 2]) &&
+                isxdigit((unsigned char)t[i + 3])) {
+                char hex[3] = { t[i + 2], t[i + 3], 0 };
+                u[k++] = (char)strtol(hex, NULL, 16);
+                i += 4;
+                continue;
+            }
+            u[k++] = c == 'n' ? '\n' : c == 't' ? '\t' : c == 'r' ? '\r' :
+                     c == '0' ? '\0' : c;
+            i += 2;
+            continue;
+        }
+        u[k++] = t[i++];
+    }
+    map[k] = ce[np - 1];
+    piece[k] = np - 1;
+    u[k] = '\0';
+    if (!migLooksLikeCode(u)) {
+        migProseString(outer, cs, ce, np, u);
+        return;
+    }
+    char tmpl[] = "/tmp/ktm-convert-XXXXXX.ktm";
+    int fd = mkstemps(tmpl, 4);
+    if (fd < 0) return;
+    FILE *w = fdopen(fd, "w");
+    fwrite(u, 1, k, w);
+    fclose(w);
+    MigFile *f = migFileNew(strdup(tmpl));
+    Migrate one = { &f, 1, NULL };
+    fflush(stderr);
+    int saved = dup(2), null = open("/dev/null", O_WRONLY);
+    dup2(null, 2);
+    int errs = migParse(&one, f->path, install_dir);
+    fflush(stderr);
+    dup2(saved, 2);
+    close(saved);
+    close(null);
+    int quotes = 0;
+    if (errs > 0 || !f->base) {
+        f = migFileNew(strdup(tmpl));      /* text only */
+        /* An apostrophe here is a shell quote (`printf 'U0 Main()...'`)
+         * as often as a character constant: read it as neither */
+        for (s64 q = 0; q < f->len; ++q) {
+            if (f->text[q] == '\'') { f->text[q] = '\x01'; quotes = 1; }
+            /* and a `\n` still escaped for the shell ends a line, or
+             * `;\nI64 F();` would read as the word nI64 */
+            if (f->text[q] == '\\' && q + 1 < f->len && f->text[q + 1] == 'n') {
+                f->text[q] = '\x02';
+                f->text[q + 1] = '\n';
+                quotes = 1;
+            }
+        }
+        f->base = f->text;
+        vecPush(f->skipped, (void *)(intptr_t)0);
+        vecPush(f->skipped, (void *)(intptr_t)f->len);
+        if (strstr(f->text, "Main(")) f->has_main = 1;
+        (*n_text)++;
+    }
+    unlink(tmpl);
+    (*n)++;
+    migConvert(f, install_dir, 0);
+    Vec *eff = migEffective(f);
+    /* Backwards: inserts at one offset are applied newest first */
+    for (u64 i = eff->size; i-- > 0; ) {
+        MigEdit *e = eff->entries[i];
+        /* an edit across the gap between two literals can't be placed */
+        if (e->end > e->start && piece[e->start] != piece[e->end - 1]) continue;
+        char *text = e->text;
+        if (quotes) {
+            text = strdup(text);
+            for (char *q = text; *q; ++q) {
+                if (*q == '\x01') *q = '\'';
+                if (*q == '\x02') { *q = '\\'; if (q[1] == '\n') *++q = 'n'; }
+            }
+        }
+        s64 to = map[e->end];
+        if (e->end > e->start && piece[e->end] != piece[e->end - 1]) {
+            to = ce[piece[e->end - 1]];    /* up to the closing quote */
+        }
+        migAdd(outer, map[e->start], to,
+               escaped ? migEscape(text, raw_newlines) : text, "string code");
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Driver */
+
+static void migSkipped(char *from, char *to) {
+    if (!mig_active || !from || !to) return;
+    for (int i = 0; i < mig_active->n_files; ++i) {
+        MigFile *f = mig_active->files[i];
+        if (f->base && from >= f->base && to <= f->base + f->len && to > from) {
+            vecPush(f->skipped, (void *)(intptr_t)(from - f->base));
+            vecPush(f->skipped, (void *)(intptr_t)(to - f->base));
+        }
+    }
+}
+
+static void migFilePushed(LexFile *lf) {
+    if (!mig_active) return;
+    char real[PATH_MAX];
+    if (!realpath(lf->filename->data, real)) return;
+    for (int i = 0; i < mig_active->n_files; ++i) {
+        MigFile *f = mig_active->files[i];
+        if (!f->base && f->real && !strcmp(f->real, real)) {
+            f->base = lf->src->data;
+            if ((s64)lf->src->len != f->len || memcmp(f->base, f->text, f->len)) {
+                f->base = NULL;  /* not what we read: leave it alone */
+            }
+        }
+    }
+}
+
+static int migParse(Migrate *m, char *root, char *install_dir) {
+    CliArgs args;
+    cliArgsInit(&args);
+    Cctrl *cc = cctrlNew(args.target);
+    cc->install_dir = install_dir;
+    cc->migrate = m;
+    cctrlAddDefine(cc, "__KTM_AOT__");
+
+    Lexer *l = (Lexer *)calloc(1, sizeof(Lexer));
+    AoStr *builtin_path = aoStrPrintf("%s/include/std.ktmh", install_dir);
+    /* Converting the library's header itself: parse with that copy */
+    for (int i = 0; i < m->n_files; ++i) {
+        char *base = strrchr(m->files[i]->path, '/');
+        base = base ? base + 1 : m->files[i]->path;
+        if (!strcmp(base, "std.ktmh")) {
+            builtin_path = aoStrDupRaw(m->files[i]->path, strlen(m->files[i]->path));
+        }
+    }
+    char *root_dir = mprintf("%s/include/", install_dir);
+    mig_active = m;
+    lex_file_pushed_hook = migFilePushed;
+    lex_skip_hook = migSkipped;
+    lexInit(l, NULL, CCF_PRE_PROC);
+    l->lineno = 1;
+    lexSetBuiltinRoot(l, root_dir);
+    lexPushFile(l, aoStrDupRaw(root, strlen(root)));
+    lexPushFile(l, builtin_path);
+    cctrlInitParse(cc, l);
+    parseToAst(cc);
+    int n_errors = cctrlDiagFlush(cc);
+    lex_file_pushed_hook = NULL;
+    lex_skip_hook = NULL;
+    return n_errors;
+}
+
+static char *migReadFile(char *path, s64 *_len) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return NULL;
+    AoStr *buf = aoStrNew();
+    char chunk[8192];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) aoStrCatLen(buf, chunk, n);
+    fclose(fp);
+    *_len = (s64)buf->len;
+    return buf->data ? buf->data : strdup("");
+}
+
+static MigFile *migFileNew(char *path) {
+    MigFile *f = (MigFile *)calloc(1, sizeof(MigFile));
+    f->path = path;
+    char real[PATH_MAX];
+    if (realpath(path, real)) f->real = strdup(real);
+    f->text = migReadFile(path, &f->len);
+    f->edits = vecNew(&vec_unsigned_long_type);
+    f->items = vecNew(&vec_unsigned_long_type);
+    f->main_calls = vecNew(&vec_unsigned_long_type);
+    f->skipped = vecNew(&vec_unsigned_long_type);
+    f->seen = setNew(64, &set_cstring_type);
+    f->notes = aoStrNew();
+    f->item_start = -1;
+    f->main_name = f->main_lbrace = f->main_item = -1;
+    return f;
+}
+
+/* In inline <code>, the old keywords and Main are code: `class` is struct */
+static void migInlineKeywords(MigFile *f, s64 s, s64 e) {
+    char *t = f->text;
+    for (s64 i = s; i < e; ) {
+        if (!migIsIdent(t[i])) { i++; continue; }
+        s64 w = i;
+        while (i < e && migIsIdent(t[i])) i++;
+        if (w > 0 && migIsIdent(t[w - 1])) continue;
+        const char *to = NULL;
+        if (i - w == 5 && !memcmp(t + w, "class", 5)) to = "struct";
+        else if (i - w == 6 && !memcmp(t + w, "public", 6)) to = "pub";
+        else if (i - w == 4 && !memcmp(t + w, "Main", 4)) to = "main";
+        if (to) migAdd(f, w, i, to, "inline code");
+    }
+}
+
+/* A docs page: the code of each <pre> block is converted (as a program
+ * when it compiles, else from its text); inline <code> gets the new type
+ * names and literals. The prose around it is left to a person. */
+static void migConvertHtml(MigFile *f, char *install_dir) {
+    char *t = f->text;
+    int n = 0, n_text = 0;
+    for (s64 i = 0; i < f->len; ++i) {
+        if (!strncmp(t + i, "<pre", 4) && !migIsIdent(t[i + 4])) {
+            s64 open_end = i;
+            while (open_end < f->len && t[open_end] != '>') open_end++;
+            s64 cs = open_end + 1;
+            if (!strncmp(t + cs, "<code", 5)) {
+                while (cs < f->len && t[cs] != '>') cs++;
+                cs++;
+            }
+            char *close = strstr(t + cs, "</pre>");
+            if (!close) break;
+            s64 ce = close - t;
+            if (ce >= cs + 7 && !strncmp(t + ce - 7, "</code>", 7)) ce -= 7;
+            int is_output = 0;
+            for (s64 k = i; k < open_end; ++k) {
+                if (!strncmp(t + k, "class=\"output\"", 14)) is_output = 1;
+            }
+            if (!is_output) migSnippetAt(f, &cs, &ce, 1, install_dir, &n, &n_text, 0);
+            i = close - t + 5;
+            continue;
+        }
+        if (!strncmp(t + i, "<code>", 6)) {
+            char *close = strstr(t + i + 6, "</code>");
+            if (!close) break;
+            migProseWords(f, i + 6, close - t, 1, "inline code");
+            migInlineKeywords(f, i + 6, close - t);
+            i = close - t + 6;
+        }
+    }
+    if (n) {
+        migNote(f, -1, "converted %d code block(s)%s", n,
+                n_text ? mprintf(" (%d from their text only: fragments, check them)", n_text) : "");
+    }
+    migSort(f);
+}
+
+/* `#define TRUE 1` and friends: true, false and null are keywords now */
+/* The text of the line [i, le) without its leading and trailing blanks
+ * equals `want` */
+static int migLineIs(const char *t, s64 i, s64 le, const char *want) {
+    while (i < le && (t[i] == ' ' || t[i] == '\t')) i++;
+    while (le > i && isspace((unsigned char)t[le - 1])) le--;
+    return (s64)strlen(want) == le - i && !memcmp(t + i, want, le - i);
+}
+
+static void migDropLiteralDefines(MigFile *f) {
+    char *t = f->text;
+    s64 prev = -1, prev2 = -1;  /* starts of the two lines before */
+    for (s64 i = 0; i < f->len; ) {
+        s64 le = i;
+        while (le < f->len && t[le] != '\n') le++;
+        s64 j = i;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (le - j > 7 && !memcmp(t + j, "#define", 7)) {
+            s64 w = j + 7;
+            while (w < le && (t[w] == ' ' || t[w] == '\t')) w++;
+            s64 we = w;
+            while (we < le && migIsIdent(t[we])) we++;
+            if ((we - w == 4 && (!memcmp(t + w, "TRUE", 4) || !memcmp(t + w, "NULL", 4))) ||
+                (we - w == 5 && !memcmp(t + w, "FALSE", 5))) {
+                s64 from = i, to = le < f->len ? le + 1 : le;
+                /* `#ifndef TRUE` / `#define TRUE 1` / `#endif`: all of it,
+                 * and the blank line after it when one comes before it */
+                char *guard = mprintf("#ifndef %.*s", (int)(we - w), t + w);
+                s64 ne = to;
+                while (ne < f->len && t[ne] != '\n') ne++;
+                if (prev >= 0 && migLineIs(t, prev, i - 1, guard) &&
+                    to < f->len && migLineIs(t, to, ne, "#endif")) {
+                    from = prev;
+                    to = ne < f->len ? ne + 1 : ne;
+                    s64 be = to;
+                    while (be < f->len && t[be] != '\n') be++;
+                    if (prev2 >= 0 && migLineIs(t, prev2, prev - 1, "") &&
+                        be < f->len && migLineIs(t, to, be, "")) to = be + 1;
+                }
+                migAdd(f, from, to, "", "literal");
+            }
+        }
+        prev2 = prev;
+        prev = i;
+        i = le + 1;
+    }
+}
+
+/* Every pass but writing: the edits of f, sorted */
+static int migConvert(MigFile *f, char *install_dir, int outer) {
+    /* Code at file scope that calls Main: Main stays a function and a new
+     * main runs that code */
+    for (u64 c = 0; c < f->main_calls->size; ++c) {
+        s64 at = (s64)(intptr_t)f->main_calls->entries[c];
+        for (u64 k = 0; k < f->items->size; ++k) {
+            MigItem *it = f->items->entries[k];
+            if (at >= it->start && at < it->end) f->top_calls_main = 1;
+        }
+    }
+    migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
+    migDropLiteralDefines(f);
+    migCommentsAndStrings(f, install_dir, outer);
+    migDefineCasts(f);
+    migSkippedCasts(f);
+    migSort(f);
+    migMoveItems(f);
+    migMainType(f);
+    migSort(f);
+    return 0;
+}
+
+static void migUsage(void) {
+    fprintf(stderr,
+        "usage: ktm-convert [--install-dir=DIR] [--check] [--stdout] [--root FILE] FILE...\n"
+        "  Rewrites old syntax (U0/I64/Bool, TRUE/FALSE/NULL, class, public,\n"
+        "  postfix casts, print statements, calls without parentheses, Main,\n"
+        "  code at file scope) to the new syntax, in place.\n"
+        "  --check     list what would change; exit 1 if anything would\n"
+        "  --stdout    print the result instead of writing the files\n"
+        "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
+        "              listed files it includes\n");
+}
+
+/* The kinds of edit on each line, for --check */
+static void migListChanges(MigFile *f) {
+    int last_line = -1;
+    AoStr *kinds = aoStrNew();
+    for (u64 i = 0; i <= f->edits->size; ++i) {
+        MigEdit *e = i < f->edits->size ? f->edits->entries[i] : NULL;
+        int line = e ? migLine(f, e->start) : -2;
+        if (line != last_line) {
+            if (last_line >= 0) printf("%s:%d: %s\n", f->path, last_line, kinds->data);
+            kinds = aoStrNew();
+            last_line = line;
+        }
+        if (e && !strstr(kinds->data ? kinds->data : "", e->kind)) {
+            if (kinds->len) aoStrCat(kinds, ", ");
+            aoStrCat(kinds, e->kind);
+        }
+    }
+}
+
+int main(int argc, char **argv) {
+    char *install_dir = INSTALL_PREFIX;
+    convertMemoryInit();
+    int check = 0, to_stdout = 0, rc = 0;
+    char *root = NULL;
+    Migrate m = {0};
+    m.files = (MigFile **)calloc(argc, sizeof(MigFile *));
+
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "--check")) check = 1;
+        else if (!strcmp(argv[i], "--stdout")) to_stdout = 1;
+        else if (!strcmp(argv[i], "--root") && i + 1 < argc) root = argv[++i];
+        else if (!strncmp(argv[i], "--install-dir=", 14)) install_dir = argv[i] + 14;
+        else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) { migUsage(); return 0; }
+        else if (argv[i][0] == '-') { migUsage(); return 2; }
+        else {
+            MigFile *f = migFileNew(argv[i]);
+            if (!f->text) {
+                fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);
+                rc = 2;
+                continue;
+            }
+            m.files[m.n_files++] = f;
+        }
+    }
+    if (m.n_files == 0) { migUsage(); return 2; }
+
+    if (root) {
+        if (migParse(&m, root, install_dir) > 0) {
+            fprintf(stderr, "ktm-convert: %s doesn't compile; nothing was changed\n", root);
+            return 2;
+        }
+    } else {
+        Migrate one = {0};
+        for (int i = 0; i < m.n_files; ++i) {
+            s64 plen = strlen(m.files[i]->path);
+            if (plen > 5 && !strcmp(m.files[i]->path + plen - 5, ".html")) {
+                m.files[i]->base = m.files[i]->text;   /* not parsed */
+                continue;
+            }
+            one.files = &m.files[i];
+            one.n_files = 1;
+            if (migParse(&one, m.files[i]->path, install_dir) > 0) {
+                m.files[i]->failed = 1;
+            }
+        }
+    }
+
+    int changed = 0;
+    for (int i = 0; i < m.n_files; ++i) {
+        MigFile *f = m.files[i];
+        if (f->failed) {
+            fprintf(stderr, "ktm-convert: %s doesn't compile; it wasn't changed\n", f->path);
+            rc = 2;
+            continue;
+        }
+        if (!f->base) {
+            fprintf(stderr, "ktm-convert: %s isn't included by %s; it wasn't changed\n",
+                    f->path, root);
+            rc = 2;
+            continue;
+        }
+        s64 plen = strlen(f->path);
+        if (plen > 5 && !strcmp(f->path + plen - 5, ".html")) {
+            migConvertHtml(f, install_dir);
+        } else {
+            migConvert(f, install_dir, 1);
+        }
+        char *out = migApply(f, 0, f->len, 1);
+        migCheckLeftovers(f, out);
+        int differs = strlen(out) != (size_t)f->len || memcmp(out, f->text, f->len);
+        if (differs) changed++;
+        if (check) {
+            if (differs) migListChanges(f);
+        } else if (to_stdout) {
+            fputs(out, stdout);
+        } else if (differs) {
+            char *tmp = mprintf("%s.migrate-tmp", f->path);
+            FILE *w = fopen(tmp, "w");
+            if (!w || fwrite(out, 1, strlen(out), w) != strlen(out) || fclose(w) != 0 ||
+                rename(tmp, f->path) != 0)
+            {
+                fprintf(stderr, "ktm-convert: can't write %s\n", f->path);
+                unlink(tmp);
+                rc = 2;
+                continue;
+            }
+        }
+        if (f->notes->len) fputs(f->notes->data, stderr);
+    }
+    if (check && changed) {
+        fprintf(stderr, "ktm-convert: %d of %d file(s) would change\n", changed, m.n_files);
+        if (rc == 0) rc = 1;
+    } else if (!to_stdout && !check) {
+        fprintf(stderr, "ktm-convert: %d of %d file(s) changed\n", changed, m.n_files);
+    }
+    return rc;
+}

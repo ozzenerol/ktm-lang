@@ -1,0 +1,11 @@
+void runMain()
+{
+  printf("main\n");
+}
+
+void main()
+{
+  printf("before\n");
+  runMain();
+  printf("after\n");
+}

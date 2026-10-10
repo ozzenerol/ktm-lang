@@ -12,6 +12,9 @@
 #include "lexer.h"
 #include "list.h"
 #include "parser.h"
+#ifdef KTM_CONVERT
+#include "../tools/convert/convert.h"
+#endif
 #include "prslib.h"
 #include "prsasm.h"
 #include "prsutil.h"
@@ -109,6 +112,12 @@ Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
     Ast *ast = cctrlGetOrSetString(cc,str,len,real_len + 1);
     vecPush(argv, ast);
     cctrlTokenExpect(cc,';');
+#ifdef KTM_CONVERT
+    if (cc->migrate) {
+        cctrlTokenRewind(cc);
+        migrateNotePrint(cc, tok, cctrlTokenGet(cc), 1);
+    }
+#endif
     return astFunctionCall(ast_void_type,"printf",6,argv);
 }
 
@@ -4458,6 +4467,12 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
                                   has_var_args);
     }
     if (tokenPunctIs(tok, '{') && !skipped_body) {
+#ifdef KTM_CONVERT
+        if (cc->migrate && len == 4 && !memcmp(fname, "Main", 4) &&
+            name_tok && name_tok->start == fname) {
+            migrateNoteMain(cc, name_tok, tok, rettype->kind == AST_TYPE_VOID);
+        }
+#endif
         Ast *fn = parseFunctionDef(cc,rettype,fname,len,params,
                                    has_var_args,is_inline,
                                    name_tok_line,name_tok_col);
@@ -4891,6 +4906,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     cc->decl_pub = 0;
 
     while (1) {
+        /* A class definition or a stray `;` loops on to the next item */
+#ifdef KTM_CONVERT
+        if (cc->migrate) migrateItemStart(cc, cctrlTokenPeek(cc));
+#endif
         if ((tok = cctrlTokenGet(cc)) == NULL) {
             if (cc->tmp_gvar_base_type) {
                 cc->tmp_gvar_base_type = NULL;
@@ -5680,6 +5699,22 @@ void parseToAst(Cctrl *cc) {
         }
 
         ast = parseToplevelDef(cc, &is_global);
+#ifdef KTM_CONVERT
+        Lexeme *item_first = cc->migrate ? migrateItemFirst(cc) : NULL;
+        if (cc->migrate && is_global && ast && item_first) {
+            /* a global whose initialiser runs code, or a statement */
+            int is_decl = item_first->tk_type == TK_KEYWORD ||
+                cctrlIsKeyword(cc, item_first->start, item_first->len);
+            if (item_first->tk_type == TK_KEYWORD &&
+                (item_first->i64 == KW_IF || item_first->i64 == KW_FOR ||
+                 item_first->i64 == KW_WHILE || item_first->i64 == KW_DO ||
+                 item_first->i64 == KW_SWITCH)) {
+                is_decl = 0;
+            }
+            cctrlTokenRewind(cc);
+            migrateNoteRunningItem(cc, cctrlTokenGet(cc), is_decl);
+        }
+#endif
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
         parseCheckCModuleItem(cc, ast);

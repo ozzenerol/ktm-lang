@@ -1,0 +1,17 @@
+/* Programs in strings split around a macro, a shell-quoted program, an
+ * #if branch with prose in it, and a guard around true */
+#define HDR "x.ktmh"
+
+#if 0
+Don't compile this: it's prose, and the code after it still converts.
+void Hidden() { printf("hidden\n"); }
+void main() { Hidden; }
+#endif
+
+void main()
+{
+  u8 *prog = "#include \"" HDR "\"\nvoid main() { printf(\"%d\\n\", (i64)1); }\n";
+  u8 *sh = "printf 'void main() { u8 s[3]; }\\n' > /dev/null";
+  i64 ok = StrLen(prog) > 0 && StrLen(sh) > 0;
+  printf("%d %d\n", ok, true);
+}

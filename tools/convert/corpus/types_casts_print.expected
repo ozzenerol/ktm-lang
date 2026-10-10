@@ -1,0 +1,33 @@
+// A sample in the old syntax
+#define LIMIT 3
+
+struct Point
+{
+  i64 x, y;   /* coordinates */
+};
+
+pub u8 *Name(Point *p)
+{
+  if (p == null) return "none";
+  return "pt";
+}
+
+f64 Half(i64 v) { return (f64)v / 2; }
+
+i64 Counter() { static i64 n = 0; return ++n; }
+
+void main()
+{
+  Point p;
+  bool ok = true;
+  i64 raw = 0x4142;
+  u8 *bytes = &raw;
+  p.x = 3; p.y = 4;
+  printf("%s %d %d\n", Name(&p), p.x, p.y);
+  printf("%.1f %d\n", Half(5), (i64)((f64)(p.x + p.y)));
+  printf("%c%c\n", ((u8 *)bytes)[0], bytes[1]);
+  printf("ok");
+  printf("\n");
+  Counter();
+  printf("%d %d\n", Counter(), ok == false);
+}

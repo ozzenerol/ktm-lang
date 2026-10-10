@@ -14,6 +14,9 @@
 #include "list.h"
 #include "prsutil.h"
 #include "prslib.h"
+#ifdef KTM_CONVERT
+#include "../tools/convert/convert.h"
+#endif
 #include "util.h"
 
 static AstType *parseArrayDimensionsInternal(Cctrl *cc, AstType *base_type);
@@ -2251,7 +2254,20 @@ static int parsePrintFormatIsktm(char *s, int len) {
  * A literal format using ktm's conversions (%Q %D %T %C %F) calls Print;
  * any other calls C's printf with its integer conversions widened to 64
  * bits, and the arguments are checked against the format either way. */
+#ifdef KTM_CONVERT
+static Ast *parsePrintCallInner(Cctrl *cc, s64 terminator);
+
 Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
+    Lexeme *first = cc->migrate && terminator == ';' ? cctrlTokenPeek(cc) : NULL;
+    Ast *call = parsePrintCallInner(cc, terminator);
+    if (first) migrateNotePrint(cc, first, parseLastToken(cc), 0);
+    return call;
+}
+
+static Ast *parsePrintCallInner(Cctrl *cc, s64 terminator) {
+#else
+Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
+#endif
     Lexeme *tok = cctrlTokenPeek(cc);
     if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR &&
         parsePrintFormatIsktm(tok->start, tok->len)) {
@@ -2409,6 +2425,9 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                 Vec *argv = astVecNew();
                 /* Underline the name, the token before the one in hand */
                 Lexeme *name_tok = parseLastToken(cc);
+#ifdef KTM_CONVERT
+                if (cc->migrate && name_tok) migrateNoteCall(cc, name_tok);
+#endif
                 ParseCallLoc loc = {0, 0, 0, NULL};
                 if (name_tok) {
                     loc.line = name_tok->line;
@@ -3130,6 +3149,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             AstType *type = parseCastTypeName(cc);
             LHS = astCast(LHS,type);
             cctrlTokenExpect(cc,')');
+#ifdef KTM_CONVERT
+            if (cc->migrate) migrateNoteCast(cc, tok, parseLastToken(cc));
+#endif
             continue;
         }
 
@@ -3433,6 +3455,9 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
                 ast = astCast(ast,type);
+#ifdef KTM_CONVERT
+                if (cc->migrate) migrateNoteCast(cc, tok, parseLastToken(cc));
+#endif
                 continue;
             } else if (ast->kind == AST_CLASS_REF ||
                        parseIsCallableFnPtr(ast)) {

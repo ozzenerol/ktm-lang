@@ -1,0 +1,12 @@
+// true when the u8 checks pass
+u8 *src = "void main()
+{
+  i64 x = 3;
+  printf(\"%d\\n\", (i64)((f64)x));
+}
+";
+u8 *msg = "expected 'i64 *' got 'u8'";
+void main()
+{
+  printf("%d %d\n", src != null, StrLen(msg) > 0);
+}

@@ -1,0 +1,10 @@
+i64 Twice(i64 v) { return v * 2; }
+i64 g;   // runs at startup
+
+i32 main(i32 argc, u8 **argv)
+{
+  g = Twice(21);
+  printf("before main %d\n", g);
+  printf("in main %d\n", argc);
+  return 0;
+}

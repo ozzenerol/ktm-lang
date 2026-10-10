@@ -298,6 +298,10 @@ typedef struct Cctrl {
      * each as `-l<name>` to the linker; the JIT probes
      * lib<name>.{dylib,so} with dlopen. */
     List *link_libs;
+#ifdef KTM_CONVERT
+    /* tools/convert: the parser reports old-syntax constructs to it */
+    struct Migrate *migrate;
+#endif
 } Cctrl;
 
 /* Instantiate a new compiler control struct */

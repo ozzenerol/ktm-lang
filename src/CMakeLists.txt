@@ -107,6 +107,10 @@ set(HEADERS
 
 add_subdirectory(asm)
 
+# The compiler without its main(), for the dev-only tools/convert
+set(CONVERT_SOURCES ${SOURCES})
+list(REMOVE_ITEM CONVERT_SOURCES main.c)
+
 option(KTM_ENABLE_JIT "Build the optional in-process JIT (aarch64 & x86_64)" OFF)
 if (KTM_ENABLE_JIT)
     list(APPEND SOURCES jit-common.c aarch64-jit.c x86_64-jit.c repl.c
@@ -142,6 +146,16 @@ add_custom_target(unit-test
 )
 
 target_link_libraries(ktm m)
+
+# Dev-only, never installed: tools/convert/ktm-convert, the one-time
+# converter of ktm's own code to the new syntax (see tools/convert)
+option(KTM_BUILD_CONVERT "Build the dev-only tools/convert/ktm-convert" OFF)
+if (KTM_BUILD_CONVERT)
+    add_executable(ktm-convert ${CONVERT_SOURCES} ../tools/convert/convert.c)
+    target_include_directories(ktm-convert PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(ktm-convert PRIVATE KTM_CONVERT)
+    target_link_libraries(ktm-convert tasm m)
+endif()
 
 # Install the executable
 install(TARGETS ktm DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

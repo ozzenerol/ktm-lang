@@ -1,0 +1,10 @@
+// a script: no Main
+i64 total = 0;
+
+void main()
+{
+  for (i64 i = 1; i <= 4; i++) {
+    total += i;
+  }
+  printf("total %d\n", total);
+}

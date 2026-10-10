@@ -1,0 +1,5 @@
+i32 main()
+{
+  printf("exit 3\n");
+  return 3;
+}

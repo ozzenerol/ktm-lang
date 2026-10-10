@@ -1,0 +1,7 @@
+i64 Foo() { return 1; }
+void main()
+{
+  u64 a = (u64)&Foo;
+  u64 b = (u64)(&Foo);
+  printf("%d\n", a == b);
+}
