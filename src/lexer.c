@@ -943,6 +943,12 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->line_start_ptr = src_code->data;
     f->filename = aoStrDupRaw(name, strlen(name));
     f->file_id = 0; /* registered lazily by cctrlTokenGet */
+    /* A document (the LSP's, the REPL's): its modules are found from
+     * its directory */
+    if (!l->program_root && strchr(name, '/')) {
+        char *slash = strrchr(name, '/');
+        l->program_root = mprintf("%.*s", (int)(slash - name), name);
+    }
     f->module_id = 0;
     f->mod_pass = LEX_PASS_NONE;
     f->last_of_module = 0;

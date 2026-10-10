@@ -92,6 +92,8 @@ U8 *RENAME_HC;
 U8 *STD_HC;
 U8 *REG_HC;
 U8 *UTF_HC;
+U8 *MOD_GEO_HC;
+U8 *MOD_MAIN_HC;
 
 U0 InitFixtures()
 {
@@ -104,6 +106,20 @@ U0 InitFixtures()
     "  I64 y;\n"
     "};\n";
   DEEP_HC = "I64 DeepFn() { return 1; }\n";
+  /* A module: geo/geo.ktm, three pub names and a private one */
+  MOD_GEO_HC =
+    "module geo;\n"
+    "pub struct Point { i64 x; i64 y; };\n"
+    "pub const i64 ORIGIN = 0;\n"
+    "i64 square(i64 n) { return n * n; }\n"
+    "pub i64 area(i64 side) { return square(side); }\n";
+  MOD_MAIN_HC =
+    "import geo;\n"
+    "i32 main() {\n"
+    "  i64 a = geo.area(3);\n"
+    "  geo.\n"
+    "  return 0;\n"
+    "}\n";
   MAIN_HC =
     "#include \"lib.ktm\"\n"
     "#include \"./lib.ktm\"\n"
@@ -1181,7 +1197,39 @@ U0 TestReferences()
 
 /* ---------------- driver ---------------- */
 
-#define LSP_GROUPS 9
+#define LSP_GROUPS 10
+
+/* Modules: completion after `geo.` offers geo's pub names only, hover
+ * and definition on `geo.area` resolve into geo/geo.ktm */
+U0 TestModules()
+{
+  "modules\n";
+  LspClient *l = LspStart();
+  U8 *uri = UriOf("modmain.ktm");
+  U8 *geo_uri = UriOf("geo/geo.ktm");
+  LspDidOpen(l, uri, MOD_MAIN_HC);
+
+  I64 line;
+  I64 chr;
+  I64 want_line;
+  I64 want_chr;
+  PosOf(MOD_MAIN_HC, "geo.\n", 4, &line, &chr);
+  Json *resp = LspPositionRequest(l, "textDocument/completion", uri, line, chr);
+  Json *items = JsonSelect(resp, ".result.items:a");
+  Check("completion after `geo.` offers exactly geo's pub names",
+        JsonArrayCount(items) == 3 && LabelsOk(resp, "", "area", "Point"));
+
+  PosOf(MOD_MAIN_HC, "area(3)", 1, &line, &chr);
+  resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);
+  Check("hover on geo.area shows the module's function",
+        HoverContains(resp, "geo.area(i64 side)"));
+
+  resp = LspPositionRequest(l, "textDocument/definition", uri, line, chr);
+  PosOf(MOD_GEO_HC, "area(i64", 0, &want_line, &want_chr);
+  Check("definition of geo.area is in geo/geo.ktm",
+        LocEq(resp, geo_uri, want_line, want_chr, FALSE));
+  Check("clean shutdown", LspClose(l) == 0);
+}
 
 U0 RunGroup(I64 group)
 {
@@ -1195,6 +1243,7 @@ U0 RunGroup(I64 group)
     case 6: TestRename(); break;
     case 7: TestReferences(); break;
     case 8: TestRegressions(); break;
+    case 9: TestModules(); break;
   }
 }
 
@@ -1269,7 +1318,7 @@ I32 Main()
   U8 tmp[128];
   snprintf(tmp, 128, "/tmp/ktm_lsp_test_%d", getpid());
   U8 cmd[256];
-  snprintf(cmd, 256, "mkdir -p %s/sub", tmp);
+  snprintf(cmd, 256, "mkdir -p %s/sub %s/geo", tmp, tmp);
   System(cmd);
   g_dir = MAlloc(1024);
   realpath(tmp, g_dir);
@@ -1291,6 +1340,10 @@ I32 Main()
   FileWrite(path, RENAME_HC, StrLen(RENAME_HC));
   snprintf(path, 512, "%s/std.ktm", g_dir);
   FileWrite(path, STD_HC, StrLen(STD_HC));
+  snprintf(path, 512, "%s/geo/geo.ktm", g_dir);
+  FileWrite(path, MOD_GEO_HC, StrLen(MOD_GEO_HC));
+  snprintf(path, 512, "%s/modmain.ktm", g_dir);
+  FileWrite(path, MOD_MAIN_HC, StrLen(MOD_MAIN_HC));
 
   "ktm -lsp tests (%s)\n", g_ktm;
   RunGroups();
