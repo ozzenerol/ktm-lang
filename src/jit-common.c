@@ -197,7 +197,7 @@ static AoStr *jitGlobalLabel(Ast *ast) {
     if (!dv || !dv->type) return NULL;
     if (ast->flags & AST_FLAG_EXTERN) return NULL;
     if (dv->flags & AST_FLAG_EXTERN) return NULL;
-    return dv->is_static ? dv->glabel : dv->gname;
+    return (dv->glabel ? dv->glabel : dv->gname);
 }
 
 /* Estimate the size needed for the not-yet-allocated globals in

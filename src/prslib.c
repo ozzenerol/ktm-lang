@@ -493,6 +493,7 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         }
 
         arg_count++;
+        cctrlCheckPrefixHidden(cc, pname);
         if (pname->tk_type != TK_IDENT) {
             /* Function pointer */
             if (tokenPunctIs(pname, '(')) {
@@ -780,7 +781,17 @@ void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type) {
 
 Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
     Ast *decl;
-    if ((decl = mapGetLen(cc->global_env,fname,len)) != NULL) {
+    /* In a module, its own functions first */
+    char *qual = cctrlQualifyName(cc, fname, len);
+    if (qual && (decl = mapGet(cc->global_env, qual)) != NULL &&
+        (decl->kind == AST_FUNC || decl->kind == AST_EXTERN_FUNC ||
+         decl->kind == AST_FUN_PROTO))
+    {
+        return decl;
+    }
+    if (!cctrlModuleHides(cc, fname, len) &&
+        (decl = mapGetLen(cc->global_env,fname,len)) != NULL) {
+        cctrlCheckModuleAccess(cc, fname, len);
         if (decl->kind == AST_FUNC ||
             decl->kind == AST_EXTERN_FUNC ||
             decl->kind == AST_FUN_PROTO || decl->kind == AST_ASM_FUNC_BIND) {
@@ -843,7 +854,7 @@ static ParseCallLoc parseCallLocStart(Cctrl *cc, char *fname, int len) {
     loc.col = tok->col;
     loc.len = tok->len;
     if (cc->lexer_ && tokenPunctIs(tok,'(')) {
-        char *line_buffer = lexerReportLine(cc->lexer_, tok->line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), tok->line);
         int end = tok->col - 1; /* index of the `(` */
         if (end <= (int)strlen(line_buffer)) {
             while (end > 0 && isspace((unsigned char)line_buffer[end - 1])) end--;
@@ -2004,6 +2015,12 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
         case AST_EXTERN_FUNC:
         case AST_FUNC:
         case AST_FUN_PROTO:
+            /* A module's function is called by its symbol (`a.b.f` or
+             * `f` in its module names `_K1a1b1f`) */
+            if (cc->cur_module || memchr(fname, '.', len)) {
+                return astFunctionCall(rettype, maybe_fn->fname->data,
+                                       maybe_fn->fname->len, argv);
+            }
             return astFunctionCall(rettype,fname,len,argv);
         default: {
             cctrlRaiseException(cc,"Unknown function: %.*s", len, fname);
@@ -2164,7 +2181,13 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     int is_lparen = tokenPunctIs(tok,'(');
 
     if (tokenPunctIs(tok,'.')) {
-        AstType *enum_type = mapGetLen(cc->clsdefs, name, len);
+        AstType *enum_type = NULL;
+        char *qual = cctrlQualifyName(cc, name, len);
+        if (qual) enum_type = mapGet(cc->clsdefs, qual);
+        if (!enum_type && !cctrlModuleHides(cc, name, len)) {
+            enum_type = mapGetLen(cc->clsdefs, name, len);
+            if (enum_type) cctrlCheckModuleAccess(cc, name, len);
+        }
         if (enum_type && enum_type->kind == AST_TYPE_CLASS &&
             enum_type->is_enum)
         {

@@ -181,6 +181,22 @@ typedef struct Cctrl {
      * current token: a return, or a break/continue with no loop inside
      * the deferred statement, would leave one. */
     int defer_depth;
+    /* The module of the declaration being parsed (Lexer.modules, 1-based;
+     * 0: the main program), and whether this is its declarations-only
+     * pass (function bodies and global initialisers skipped) */
+    u32 cur_module;
+    int decls_only;
+    /* The declaration being parsed is `pub`; it comes from the main
+     * program (not a module, not a stdlib header) */
+    int decl_pub;
+    int decl_from_main;
+    /* `a.b.name`s declared pub; names the main program declares, which
+     * a module must not see */
+    Set *pub_names;
+    Set *main_names;
+    /* The file of the last token the parser took: where diagnostics
+     * and new Ast nodes are (the lexer may already be in the next) */
+    LexFile *tok_file;
 
     /* Temporary asm function name */
     AoStr *tmp_asm_fname;
@@ -287,6 +303,12 @@ void cctrlInitParse(Cctrl *cc, Lexer *lexer_);
 
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len);
 int cctrlIsKeyword(Cctrl *cc, char *name, int len);
+AoStr *cctrlModulePath(Cctrl *cc, u32 module_id);
+char *cctrlQualifyName(Cctrl *cc, char *name, int len);
+int cctrlModuleHides(Cctrl *cc, char *name, int len);
+LexFile *cctrlCurFile(Cctrl *cc);
+void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len);
+void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name);
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len);
 void cctrlInfo(Cctrl *cc, char *fmt, ...);
 void cctrlWarning(Cctrl *cc, char *fmt, ...);

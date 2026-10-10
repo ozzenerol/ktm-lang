@@ -206,6 +206,9 @@ U0 RunnerInit()
 
   g_start_dir = AbsPath(".");
   g_ktm = AbsPath("../../ktm");
+  /* Tests run elsewhere: where their fixture directories are
+   * (src/tests/modules/...) */
+  setenv("KTM_TEST_SRC", g_start_dir, 1);
 
   if (g_target[0] != '\0') {
     g_ktm_flags = MStrPrint("--target=%s --install-dir=%s", g_target,

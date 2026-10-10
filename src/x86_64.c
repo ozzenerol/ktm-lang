@@ -2525,7 +2525,7 @@ void x86_64InitialiseEmptyGlobal(Cctrl *cc,
                                  Ast *global,
                                  int zerofill)
 {
-    AoStr *label = global->is_static ? global->glabel : global->gname;
+    AoStr *label = (global->glabel ? global->glabel : global->gname);
     label = asmNormaliseGlobalLabel(cc, label);
     int size = global->type->size;
 
@@ -2574,7 +2574,7 @@ void x86_64GlobalVar(Cctrl *cc,
     Ast *declvar = ast->declvar;
     Ast *declinit = ast->declinit;
     AoStr *varname = declvar->gname;
-    AoStr *label = declvar->is_static ? declvar->glabel : declvar->gname;
+    AoStr *label = (declvar->glabel ? declvar->glabel : declvar->gname);
     label = asmNormaliseGlobalLabel(cc, label);
     /* A local symbol: `static`, or a library global the header
      * doesn't declare */

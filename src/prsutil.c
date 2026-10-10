@@ -688,7 +688,7 @@ void typeCheckWarn(Cctrl *cc, int op_line, int op_col, Ast *expected,
 
     s64 len = 1;
     if (cc->lexer_ && op_col > 0) {
-        char *line_buffer = lexerReportLine(cc->lexer_, op_line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), op_line);
         s64 start = op_col - 1, end = start;
         if (start < (s64)strlen(line_buffer)) {
             while (line_buffer[end] && line_buffer[end] != ';') end++;
@@ -802,7 +802,7 @@ void typeCheckReturnTypeWarn(Cctrl *cc, Ast *maybe_func,
     if (cc->lexer_ && semi_tok && semi_tok->line == ret_tok->line &&
         semi_tok->col > ret_tok->col + ret_tok->len)
     {
-        char *line_buffer = lexerReportLine(cc->lexer_, ret_tok->line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), ret_tok->line);
         s64 start = ret_tok->col - 1 + ret_tok->len;
         s64 end = semi_tok->col - 1;
         if (end <= (s64)strlen(line_buffer)) {

@@ -963,7 +963,10 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     int tag_line = 0, tag_col = 0;
     u32 tag_file = 0;
     if (tok->tk_type == TK_IDENT) {
-        tag = aoStrDupRaw(tok->start,tok->len);
+        /* A module's type is named `a.b.Name` */
+        char *qual = cctrlQualifyName(cc, tok->start, tok->len);
+        tag = qual ? aoStrDupRaw(qual, strlen(qual))
+                   : aoStrDupRaw(tok->start,tok->len);
         tag_line = tok->line;
         tag_col = tok->col;
         tag_file = ast_file_hint;
@@ -978,6 +981,10 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
                 cctrlRaiseException(cc, "Expected Identifier for class inheritance");
             }
             base_class = mapGetLen(cc->clsdefs,tok->start,tok->len);
+            if (base_class == NULL) {
+                char *qual_base = cctrlQualifyName(cc, tok->start, tok->len);
+                if (qual_base) base_class = mapGet(cc->clsdefs, qual_base);
+            }
             if (base_class == NULL) {
                 cctrlRaiseException(cc,"class %.*s has not been defined\n",
                         tok->len,tok->start);
@@ -995,9 +1002,26 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     }
 
     if (tag) {
+        if (memchr(tag->data, '.', tag->len)) {
+            if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+        } else if (cc->decl_from_main && !cc->cur_module) {
+            setAdd(cc->main_names, tag->data);
+        }
         prev = mapGetLen(env, tag->data, tag->len);
         if (prev && prev->is_enum) {
             cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
+        }
+        /* A module's full pass: the declarations pass defined it */
+        if (prev && prev->fields && cc->cur_module && !cc->decls_only &&
+            tokenPunctIs(cctrlTokenPeek(cc), '{'))
+        {
+            int depth = 0;
+            Lexeme *t;
+            while ((t = cctrlTokenGet(cc)) != NULL) {
+                if (tokenPunctIs(t, '{')) depth++;
+                else if (tokenPunctIs(t, '}') && --depth == 0) break;
+            }
+            return prev;
         }
     }
 
@@ -1098,10 +1122,27 @@ AstType *parseEnumDef(Cctrl *cc) {
         cctrlRaiseException(cc,"Expected a name after `enum`, got `%s`",
                 lexemeAsWritten(tok));
     }
-    AoStr *tag = aoStrDupRaw(tok->start, tok->len);
-    if (mapGetLen(cc->clsdefs, tag->data, tag->len) ||
-        mapGetLen(cc->uniondefs, tag->data, tag->len))
-    {
+    /* A module's enum is named `a.b.Name` */
+    char *qual = cctrlQualifyName(cc, tok->start, tok->len);
+    AoStr *tag = qual ? aoStrDupRaw(qual, strlen(qual))
+                      : aoStrDupRaw(tok->start, tok->len);
+    if (qual) {
+        if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+    } else if (cc->decl_from_main && !cc->cur_module) {
+        setAdd(cc->main_names, tag->data);
+    }
+    AstType *defined = mapGetLen(cc->clsdefs, tag->data, tag->len);
+    if (defined && defined->is_enum && cc->cur_module && !cc->decls_only) {
+        /* A module's full pass: the declarations pass defined it */
+        int depth = 0;
+        Lexeme *t;
+        while ((t = cctrlTokenGet(cc)) != NULL) {
+            if (tokenPunctIs(t, '{')) depth++;
+            else if (tokenPunctIs(t, '}') && --depth == 0) break;
+        }
+        return defined;
+    }
+    if (defined || mapGetLen(cc->uniondefs, tag->data, tag->len)) {
         cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
     }
 
@@ -1569,6 +1610,7 @@ Ast *parseDecl(Cctrl *cc) {
         cctrlTokenExpect(cc,';');
         return NULL;
     }
+    cctrlCheckPrefixHidden(cc, varname);
     var = astLVar(type,varname->start,varname->len);
     /* astNew stamped the CURRENT token (post-name); anchor the decl
      * to the name itself for jump-to-definition. */
@@ -1674,12 +1716,13 @@ static void parseCondGuardInit(Cctrl *cc, ParseCondGuard *g, Lexeme *open,
     g->armed = 0;
     g->outer = cc->current_recovery;
     g->localenv = cc->localenv;
-    if (!open || !cc->lexer_ || !cc->lexer_->cur_file ||
-        !cc->lexer_->cur_file->src || open->line <= 0 || open->col <= 0) {
+    LexFile *open_file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
+    if (!open || !open_file || !open_file->src || open->line <= 0 ||
+        open->col <= 0) {
         return;
     }
-    char *src = cc->lexer_->cur_file->src->data;
-    s64 size = cc->lexer_->cur_file->src->len;
+    char *src = open_file->src->data;
+    s64 size = open_file->src->len;
     s64 i = 0, line = 1;
     while (i < size && line < open->line) {
         if (src[i] == '\n') line++;
@@ -3209,6 +3252,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 if (!tokenPunctIs(peek,'(')) {
                     /* A normal variable */
                     varname = cctrlTokenGetRequired(cc);
+                    cctrlCheckPrefixHidden(cc, varname);
                     if (varname->tk_type != TK_IDENT) {
                         cctrlTokenRewind(cc);
                         cctrlRaiseException(cc,"Expected type declaration with identifer got '%.*s' - should be"ESC_BLUE" '%s "ESC_RESET ESC_BOLD"<var_name>'",
@@ -3993,6 +4037,19 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     AstType *type = astMakeFunctionType(rettype, params);
     func = astFunction(type,fname,len,params,NULL,NULL,0);
     func->kind = AST_EXTERN_FUNC;
+    /* In a module it is the module's name (`a.b.open`, private unless
+     * pub), still calling the C symbol `open` */
+    char *qual = cctrlQualifyName(cc, fname, len);
+    if (qual) {
+        mapAdd(cc->global_env, qual, func);
+        if (cc->decl_pub) setAdd(cc->pub_names, qual);
+        return func;
+    }
+    /* The program's own C declaration (not one the stdlib headers
+     * already make, which modules may use) */
+    if (cc->decl_from_main && !mapGet(cc->global_env, func->fname->data)) {
+        setAdd(cc->main_names, func->fname->data);
+    }
     mapAdd(cc->global_env,func->fname->data,func);
     return func;
 }
@@ -4248,6 +4305,14 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         name_tok_line = name_tok->line;
         name_tok_col = name_tok->col;
     }
+    /* A module's function `a.b.f`: named by its symbol (see
+     * astModuleMangle), `a.b.f` kept as a second name for lookups */
+    char *module_name = NULL;
+    if (memchr(fname, '.', len)) {
+        module_name = mprintf("%.*s", len, fname);
+        fname = astModuleMangle(fname, len);
+        len = strlen(fname);
+    }
     /* `main` (ktm syntax v0.2) is the entry point `Main`: inside it is
      * named Main, so every backend, the JIT and the file-scope
      * initialiser driver treat it as the entry, and `main` is kept as
@@ -4285,6 +4350,22 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         }
     }
     Lexeme *tok = cctrlTokenGet(cc);
+    /* A module's declarations-only pass: the body comes in the full
+     * pass, this declares the function so every file can call it */
+    int skipped_body = 0;
+    if (cc->decls_only && tokenPunctIs(tok, '{')) {
+        int depth = 1;
+        while (depth) {
+            Lexeme *t = cctrlTokenGet(cc);
+            if (!t) {
+                cctrlRaiseException(cc, "Unexpected end of input in the body of `%.*s()`",
+                                    len, fname);
+            }
+            if (tokenPunctIs(t, '{')) depth++;
+            else if (tokenPunctIs(t, '}')) depth--;
+        }
+        skipped_body = 1;
+    }
     if (tokenPunctIs(tok, '{') || tokenPunctIs(tok, ';')) {
         parseCheckFunctionRedeclaration(cc, rettype, fname, len, params,
                                         has_var_args, name_tok_line,
@@ -4292,7 +4373,7 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         parseInheritDefaultParams(cc, rettype, fname, len, params,
                                   has_var_args);
     }
-    if (tokenPunctIs(tok, '{')) {
+    if (tokenPunctIs(tok, '{') && !skipped_body) {
         Ast *fn = parseFunctionDef(cc,rettype,fname,len,params,
                                    has_var_args,is_inline,
                                    name_tok_line,name_tok_col);
@@ -4301,9 +4382,10 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
             fn->col = name_col;
             fn->file_id = name_file;
             if (is_lower_main) mapAdd(cc->global_env, "main", fn);
+            if (module_name) mapAdd(cc->global_env, module_name, fn);
         }
         return fn;
-    } else if (tokenPunctIs(tok, ';')) {
+    } else if (tokenPunctIs(tok, ';') || skipped_body) {
         if (rettype->kind == AST_TYPE_AUTO) {
             cctrlRaiseException(cc,"auto cannot be used with a function prototype %.*s() at this time",
                     len,fname);
@@ -4313,6 +4395,7 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         fn->kind = AST_FUN_PROTO;
         mapAdd(cc->global_env,fn->fname->data,fn);
         if (is_lower_main) mapAdd(cc->global_env, "main", fn);
+        if (module_name) mapAdd(cc->global_env, module_name, fn);
         return fn;
     } else {
         /* Neither `{ ... }` (definition) nor `;` (prototype). Almost
@@ -4425,6 +4508,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Lexeme *tok, *name, *peek;
     int is_static = 0;
     int is_const = 0;
+    cc->decl_pub = 0;
 
     while (1) {
         if ((tok = cctrlTokenGet(cc)) == NULL) {
@@ -4433,6 +4517,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 cctrlRaiseException(cc,"Unexpected end of input, expected a declaration after `,`");
             }
             return NULL;
+        }
+        /* Which module this declaration is in, and its pass */
+        cc->cur_module = tok->module_id;
+        cc->decls_only = tok->mod_pass == LEX_PASS_DECLS;
+        if (!cc->tmp_gvar_base_type) {
+            cc->decl_from_main = tok->module_id == 0 && !tok->in_std;
         }
 
         /* An empty declaration: a stray `;` as in `I64 x = 1;;` or
@@ -4551,6 +4641,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     return ast;
                 }
                 case KW_PUBLIC:
+                    cc->decl_pub = 1;
+                    continue;
                 case KW_PRIVATE:
                 case KW_ATOMIC:
                     continue;
@@ -4738,6 +4830,19 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
+        cctrlCheckPrefixHidden(cc, name);
+        /* A module's declaration is named `a.b.name` */
+        if (cc->cur_module && name->tk_type == TK_IDENT) {
+            char *qual = cctrlQualifyName(cc, name->start, name->len);
+            if (qual) {
+                name = lexemeCopy(name);
+                name->start = qual;
+                name->len = strlen(qual);
+                if (cc->decl_pub) setAdd(cc->pub_names, qual);
+            }
+        } else if (cc->decl_from_main && name->tk_type == TK_IDENT) {
+            setAdd(cc->main_names, mprintf("%.*s", name->len, name->start));
+        }
         parse_gvar_list_static = is_static;
         parse_gvar_list_const = is_const;
 
@@ -4834,6 +4939,38 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         type = parseArrayDimensions(cc,type);
         tok = cctrlTokenPeek(cc);
+
+        /* A module's declarations-only pass: a global is declared (as
+         * an extern) so every file of the module can use it; the full
+         * pass defines it. Its initialiser is skipped. */
+        if (cc->decls_only && !tokenPunctIs(tok, '(')) {
+            int depth = 0;
+            Lexeme *t;
+            while ((t = cctrlTokenGet(cc)) != NULL) {
+                if (tokenPunctIs(t,'(') || tokenPunctIs(t,'[') ||
+                    tokenPunctIs(t,'{')) {
+                    depth++;
+                } else if (tokenPunctIs(t,')') || tokenPunctIs(t,']') ||
+                           tokenPunctIs(t,'}')) {
+                    depth--;
+                } else if (depth == 0 && (tokenPunctIs(t,';') ||
+                                          tokenPunctIs(t,','))) {
+                    break;
+                }
+            }
+            Ast *gvar = astGVar(type, name->start, name->len, 0);
+            gvar->flags |= AST_FLAG_EXTERN;
+            if (is_const) gvar->flags |= AST_FLAG_CONST;
+            Ast *decl = astDecl(gvar, NULL);
+            decl->flags |= AST_FLAG_EXTERN;
+            if (!is_static) {
+                mapAdd(cc->global_env, gvar->gname->data, gvar);
+            }
+            if (t && tokenPunctIs(t, ',')) {
+                cc->tmp_gvar_base_type = base_type;
+            }
+            return decl;
+        }
 
         /* Global class/struct/union with an aggregate initialiser:
          *   Color Black = {0,0,0};

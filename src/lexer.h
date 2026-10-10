@@ -202,7 +202,42 @@ typedef struct Lexeme {
         s64 i64;
         double f64;
     };
+    /* The module the token's file belongs to (Lexer.modules, 1-based; 0:
+     * the main program or a header) and which pass of it (LEX_PASS_*) */
+    u32 module_id;
+    u8 mod_pass;
+    /* From a stdlib header (under the builtin root), not the program */
+    u8 in_std;
+    /* An identifier that is one of its file's import prefixes, not
+     * followed by `.`: declaring it would hide the module */
+    u8 is_prefix;
+    /* The file it was lexed from (the lexer runs ahead of the parser,
+     * so its current file can already be the next one) */
+    struct LexFile *file;
 } Lexeme;
+
+/* A module's files are lexed twice: declarations only, then in full */
+#define LEX_PASS_NONE  0
+#define LEX_PASS_DECLS 1
+#define LEX_PASS_FULL  2
+
+/* A module (a directory of .ktm files) as `import a.b;` finds it */
+typedef struct LexModule {
+    AoStr *path;   /* "a.b" */
+    AoStr *dir;    /* the directory it was found in */
+    u32 id;        /* index in Lexer.modules + 1 */
+    int loaded;    /* all of its files have been lexed */
+} LexModule;
+
+/* `import [alias =] a.b;` in one file: `prefix.name` becomes the token
+ * `a.b.name` */
+typedef struct LexImport {
+    AoStr *prefix;
+    LexModule *module;
+    int used;
+    s64 line, col, len;
+    struct LexImport *next;
+} LexImport;
 
 /* Forward declaration. The lexer holds a back-pointer to its
  * owning Cctrl (when there is one) so user-visible lex errors
@@ -212,6 +247,7 @@ typedef struct Lexeme {
  * diagnostic renderer). */
 struct Cctrl;
 
+struct LexFile;
 typedef struct LexFile {
     AoStr *filename; /* name of the file */
     /* cctrlRegisterFile id, assigned lazily on first token consumed
@@ -224,6 +260,19 @@ typedef struct LexFile {
      * columns stays consistent across includes. */
     char *line_start_ptr;
     AoStr *src; /* source */
+    /* Module files: which module and pass (see Lexeme.module_id), and
+     * whether it is the module's last file in its last pass */
+    u32 module_id;
+    u8 mod_pass;
+    u8 last_of_module;
+    /* Past the `module` and `import` lines at the top */
+    u8 header_done;
+    /* A module's file had its `module` line; under the builtin root */
+    u8 saw_module;
+    u8 is_std;
+    /* Its unused imports were reported */
+    u8 ended;
+    LexImport *imports;
 } LexFile;
 
 /* An open #if/#ifdef/#ifndef/#ifjit/#ifaot: where it is (for
@@ -269,6 +318,14 @@ typedef struct Lexer {
     Set *seen_files;
     Map *symbol_table;
     LexFile *cur_file;
+    /* Modules: those found so far, the chain being loaded (for cycles),
+     * the directory of the program's main file and the stdlib's
+     * module directory */
+    LexModule **modules;
+    int modules_len, modules_cap;
+    u32 mod_stack[64];
+    int mod_depth;
+    char *program_root;
     /* Diagnostic engine back-pointer. When non-NULL the lexer
      * routes user-visible errors through cctrlRaiseException so
      * they accumulate in the same Vec the parser writes to and
@@ -309,6 +366,7 @@ int tokenPunctIs(Lexeme *tok, s64 ch);
 int tokenIdentIs(Lexeme *tok, char *ident, int len);
 void lexemeFree(void *_le);
 char *lexerReportLine(Lexer *l, s64 lineno);
+char *lexerReportLineIn(LexFile *file, s64 lineno);
 int lexemeEq(Lexeme *l1, Lexeme *l2);
 char *lexReadfile(char *path, s64 *_len);
 

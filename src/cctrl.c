@@ -292,6 +292,13 @@ Cctrl *cctrlNew(enum CliTarget target) {
 
     cc->flags = 0;
     cc->defer_depth = 0;
+    cc->cur_module = 0;
+    cc->decls_only = 0;
+    cc->decl_pub = 0;
+    cc->decl_from_main = 0;
+    cc->pub_names = setNew(16, &set_cstring_type);
+    cc->tok_file = NULL;
+    cc->main_names = setNew(16, &set_cstring_type);
     cc->file_map = mapNew(16, &map_u32_to_aostr_type);
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);
@@ -540,6 +547,11 @@ static Lexeme *cctrlMaybeExpandToken(Cctrl *cc, Lexeme *token) {
         mu->expansion = lexemeCopy(maybe_define);
         mu->expansion->line = token->line;
         mu->expansion->col = token->col;
+        mu->expansion->file = token->file;
+        mu->expansion->module_id = token->module_id;
+        mu->expansion->mod_pass = token->mod_pass;
+        mu->expansion->in_std = token->in_std;
+        mu->expansion->is_prefix = 0;
         return mu->expansion;
     }
     return token; 
@@ -676,13 +688,14 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
         cc->lineno = token->line;
         ast_line_hint = token->line;
         ast_col_hint = token->col;
-        /* Register the lexer's current file lazily; the id rides on
-         * every astNew until the lexer crosses a file boundary. */
-        if (cc->lexer_ && cc->lexer_->cur_file) {
-            LexFile *f = cc->lexer_->cur_file;
+        /* Register the token's file lazily; the id rides on every
+         * astNew until a token from another file is taken. */
+        if (cc->lexer_ && (token->file || cc->lexer_->cur_file)) {
+            LexFile *f = token->file ? token->file : cc->lexer_->cur_file;
             if (f->file_id == 0)
                 f->file_id = cctrlRegisterFile(cc, f->filename);
             ast_file_hint = f->file_id;
+            cc->tok_file = f;
         }
         return token;
     }
@@ -737,7 +750,7 @@ void cctrlFileAndLine(Cctrl *cc, AoStr *buf, s64 lineno, s64 char_pos, char *msg
     }
 
     if (cc->lexer_) {
-        LexFile *file = cc->lexer_->cur_file;
+        LexFile *file = cctrlCurFile(cc);
         char *file_name = file->filename->data;
         aoStrPutChar(buf, ' ');
         aoStrCatColoured(buf, ESC_CYAN, "-->");
@@ -976,7 +989,7 @@ AoStr *cctrlCreateErrorLineAt(Cctrl *cc, s64 lineno, s64 col, s64 len,
     s64 tok_len  = len > 0 ? len : 1;
     cctrlFileAndLine(cc, buf, lineno, char_pos, msg, severity);
 
-    const char *line_buffer = lexerReportLine(cc->lexer_, lineno);
+    const char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), lineno);
     s64 line_len = strlen(line_buffer);
     AoStr *expanded = aoStrNew();
     for (s64 i = 0; i < line_len; ++i) {
@@ -1090,7 +1103,7 @@ static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
     d->severity = severity;
     d->message = rendered;
     d->suggestion = NULL;
-    d->file = cc->lexer_ ? cc->lexer_->cur_file : NULL;
+    d->file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
     d->line = (int)lineno;
     d->col = (int)col;
     d->end_line = (int)lineno;
@@ -1132,7 +1145,7 @@ CctrlDiagnostic *cctrlMakeDiag(Cctrl *cc,
     d->severity = severity;
     d->message = rendered;
     d->suggestion = suggestion;
-    d->file = cc->lexer_ ? cc->lexer_->cur_file : NULL;
+    d->file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
 
     Lexeme *cur = cctrlTokenPeek(cc);
     if (cur) {
@@ -1463,7 +1476,7 @@ AoStr *cctrlRaiseFromTo(Cctrl *cc, int severity, char *suggestion, char from,
 
     s64 col = 0, len = 0;
     if (cur_tok && cc->lexer_) {
-        const char *line_buffer = lexerReportLine(cc->lexer_, line);
+        const char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), line);
         s64 from_idx = cctrlGetErrorIdx(cc, line, from, line_buffer);
         s64 to_idx   = cctrlGetErrorIdx(cc, line, to,   line_buffer);
         if (from_idx != -1 && to_idx != -1) {
@@ -1511,6 +1524,62 @@ void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *f
 }
 
 /* Get variable either from the local or global scope */
+/* The path ("a.b") of module `module_id`, NULL for the main program */
+AoStr *cctrlModulePath(Cctrl *cc, u32 module_id) {
+    if (!module_id || !cc->lexer_ || (int)module_id > cc->lexer_->modules_len) {
+        return NULL;
+    }
+    return cc->lexer_->modules[module_id - 1]->path;
+}
+
+/* `name` as declared in the current module ("a.b.name"), NULL in the
+ * main program or for a name that is already qualified */
+char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    if (!path || memchr(name, '.', len)) return NULL;
+    return mprintf("%s.%.*s", path->data, len, name);
+}
+
+/* The file diagnostics are about: the last taken token's */
+LexFile *cctrlCurFile(Cctrl *cc) {
+    if (cc->tok_file) return cc->tok_file;
+    return cc->lexer_ ? cc->lexer_->cur_file : NULL;
+}
+
+/* Inside a module, a flat name the main program declared: the module
+ * can't depend on the program that uses it */
+int cctrlModuleHides(Cctrl *cc, char *name, int len) {
+    if (!cc->cur_module || memchr(name, '.', len)) return 0;
+    char *flat = mprintf("%.*s", len, name);
+    return setHas(cc->main_names, flat);
+}
+
+/* `a.b.name` found: an error unless it is pub or used inside a.b */
+void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
+    char *dot = NULL;
+    for (int i = len - 1; i >= 0; --i) {
+        if (name[i] == '.') { dot = name + i; break; }
+    }
+    if (!dot) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    int mod_len = dot - name;
+    if (here && (int)here->len == mod_len && !memcmp(here->data, name, mod_len)) {
+        return;
+    }
+    char *full = mprintf("%.*s", len, name);
+    if (setHas(cc->pub_names, full)) return;
+    cctrlRaiseException(cc, "`%.*s` is private to module %.*s",
+                        len - mod_len - 1, dot + 1, mod_len, name);
+}
+
+/* A declaration named like one of its file's import prefixes */
+void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name) {
+    if (name && name->tk_type == TK_IDENT && name->is_prefix) {
+        cctrlRaiseException(cc, "`%.*s` hides the module imported as %.*s",
+                            name->len, name->start, name->len, name->start);
+    }
+}
+
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     Ast *ast_var;
     Lexeme *tok;
@@ -1519,7 +1588,15 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
         return ast_var;
     }
 
-    if ((ast_var = (Ast *)mapGetLen(cc->global_env, varname, len)) != NULL) {
+    /* In a module, its own names first */
+    char *qual = cctrlQualifyName(cc, varname, len);
+    if (qual && (ast_var = (Ast *)mapGet(cc->global_env, qual)) != NULL) {
+        return ast_var;
+    }
+
+    if (!cctrlModuleHides(cc, varname, len) &&
+        (ast_var = (Ast *)mapGetLen(cc->global_env, varname, len)) != NULL) {
+        cctrlCheckModuleAccess(cc, varname, len);
         return ast_var;
     }
 
@@ -1560,6 +1637,18 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     assert(name != NULL);
     if ((type = mapGetLen(cc->symbol_table, name, len)) != NULL) {
         return type;
+    }
+    /* In a module, its own types first */
+    char *qual = cctrlQualifyName(cc, name, len);
+    if (qual) {
+        if ((type = mapGet(cc->clsdefs, qual)) != NULL) return type;
+        if ((type = mapGet(cc->uniondefs, qual)) != NULL) return type;
+    }
+    if (cctrlModuleHides(cc, name, len)) return NULL;
+    if (memchr(name, '.', len) &&
+        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len)))
+    {
+        cctrlCheckModuleAccess(cc, name, len);
     }
     /* Classes are types */
     if ((type = mapGetLen(cc->clsdefs,name,len)) != NULL) {

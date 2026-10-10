@@ -552,6 +552,7 @@ Ast *astUnaryOperator(AstType *type, AstUnOp operation, Ast *operand);
 
 /* Variable definitions */
 Ast *astLVar(AstType *type, char *name, int len);
+char *astModuleMangle(char *qual, int len);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);
 
 /* More beefy data structures */
