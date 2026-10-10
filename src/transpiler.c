@@ -1168,6 +1168,13 @@ void transpileAstInternal(Ast *ast, TranspileCtx *ctx, s64 *indent) {
         break;
     }
 
+    case AST_TERNARY:
+        /* The transpiler is frozen; the conditional operator is not
+         * translated. Give a clean message rather than crash. */
+        loggerPanic("the conditional operator `?:` is not supported "
+                    "with -transpile\n");
+        break;
+
     default: {
         loggerPanic("Unhandled ast: %s\n", astToString(ast));
         break;

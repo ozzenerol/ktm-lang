@@ -1876,6 +1876,7 @@ static int lexCore(Lexer *l, Lexeme *le) {
                 return 1;
             }
             case '~':
+            case '?':
             case '(':
             case ')':
             case ',':

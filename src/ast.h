@@ -141,6 +141,7 @@ typedef enum AstKind {
     AST_UNOP          = 297,
     AST_TRY           = 298,  /* try { ... } catch <stmt> */
     AST_THROW         = 299,  /* throw(u64_value); */
+    AST_TERNARY       = 300,  /* cond ? then : els (the conditional operator) */
 } AstKind;
 
 /* @Cleanup
@@ -519,6 +520,7 @@ Ast *astCompountStatement(List *stmts);
 Ast *astFor(Ast *init, Ast *cond, Ast *step, Ast *body, AoStr *for_begin,
         AoStr *for_middle, AoStr *for_end);
 Ast *astIf(Ast *cond, Ast *then, Ast *els);
+Ast *astTernary(AstType *type, Ast *cond, Ast *then, Ast *els);
 Ast *astWhile(Ast *whilecond, Ast *whilebody, AoStr *while_begin,
         AoStr *while_end);
 Ast *astDoWhile(Ast *whilecond, Ast *whilebody, AoStr *while_begin, 

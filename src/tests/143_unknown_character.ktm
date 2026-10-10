@@ -66,13 +66,13 @@ Bool Compile(U8 *source, I64 count, U8 *want)
   return ok;
 }
 
-/* The report: located at the `?`, then the parser's own complaint
+/* The report: located at the `$`, then the parser's own complaint
  * about the `3` it now sees after `2.5` */
-Bool TestQuestionMark(U0)
+Bool TestDollarSign(U0)
 {
   return Compile(
-"U0 Main() { I64 x = 2.5 ? 3; }
-", 2, "error: unexpected character '?'\n --> " UNKNOWN_FILE ":1:25\n");
+"U0 Main() { I64 x = 2.5 $ 3; }
+", 2, "error: unexpected character '$'\n --> " UNKNOWN_FILE ":1:25\n");
 }
 
 /* Stray characters between statements: one error each, nothing else */
@@ -173,7 +173,7 @@ I32 Main()
   "Test - unknown character: ";
   I64 correct = 0, tests = 0;
 
-  tests++; if (TestQuestionMark) correct++;
+  tests++; if (TestDollarSign) correct++;
   tests++; if (TestBacktick)     correct++;
   tests++; if (TestDollarAt)     correct++;
   tests++; if (TestControlChar)  correct++;

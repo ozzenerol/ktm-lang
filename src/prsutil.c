@@ -235,9 +235,15 @@ static s64 evalIntCast(s64 value, AstType *to) {
     return value;
 }
 
+static int evalIsTrue(Ast *ast, int *_ok);
+
 double evalFloatExprOrErr(Ast *ast, int *_ok) {
 #define eval evalFloatExprOrErr
     switch (ast->kind) {
+        case AST_TERNARY:
+            /* Only the chosen branch is evaluated, as at runtime. */
+            return evalIsTrue(ast->cond, _ok) ? eval(ast->then, _ok)
+                                              : eval(ast->els, _ok);
         case AST_CAST: {
             double value;
             if (!astIsFloatType(ast->type)) {
@@ -425,6 +431,11 @@ static s64 evalIntDivMod(Ast *ast, int *_ok) {
 
 s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
     switch (ast->kind) {
+        case AST_TERNARY:
+            /* Only the chosen branch is evaluated, as at runtime. */
+            return evalIsTrue(ast->cond, _ok)
+                 ? evalIntConstExprOrErr(ast->then, _ok)
+                 : evalIntConstExprOrErr(ast->els, _ok);
         case AST_CAST: {
             /* To Bool: 0 or 1, as in C (0.5(Bool) and 0x100(Bool) are 1) */
             if (ast->type && ast->type->is_bool) {
