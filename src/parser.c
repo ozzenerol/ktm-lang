@@ -1456,6 +1456,12 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
         Ast *target = NULL;
         if (cc->flags & CCTRL_TRANSPILING) return NULL;
         s64 off = 0;
+        /* `null` is `(void *)0`: the integer inside a pointer cast */
+        while (rhs->kind == AST_CAST && rhs->operand && rhs->operand->type &&
+               (astIsIntType(rhs->operand->type) ||
+                rhs->operand->kind == AST_CAST)) {
+            rhs = rhs->operand;
+        }
         if (astIsIntType(rhs->type)) {
             /* `U8 *p = NULL`, `0x1000` */
             s64 v = evalIntConstExprOrErr(rhs, &ok);
