@@ -83,11 +83,11 @@ U0 Main()
                    "Variable or function `b` has not been defined")) correct++;
   tests++;
   if (FailsLikeJit("class P { I64 x, y; };\nU0 Main()\n{\n  P p;\n  I64 z = p;\n}\n",
-                   "`I64 = P` is invalid")) correct++;
+                   "`i64 = P` is invalid")) correct++;
   tests++;
   if (FailsLikeJit("class Pt { I64 x; };\nU0 Main()\n{\n  Pt pt;\n  Pt *q = &pt;\n"
                    "  Pt **pp = &q;\n  I64 v = **pp(I64 *);\n}\n",
-                   "`*` on `I64` is invalid")) correct++;
+                   "`*` on `i64` is invalid")) correct++;
   tests++;
   if (FailsLikeJit("U0 Main()\n{\n  I64 x = (1 + 2;\n}\n", "error:")) correct++;
 

@@ -1381,7 +1381,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                     break;
                 }
                 case '[': {
-                    char *msg = mprintf("Try defining array `I64 %.*s[] = {1, 2, 3}`?",len,name);
+                    char *msg = mprintf("Try defining array `i64 %.*s[] = {1, 2, 3}`?",len,name);
                     cctrlRaiseSuggestion(cc,msg,"Variable or function `%.*s` has not been defined", len, name);
                     break;
                 }
@@ -2134,8 +2134,8 @@ Ast *parseAlignof(Cctrl *cc) {
 }
 
 /* `typeof(<type or expr>)` - same operand handling as sizeof/alignof
- * but folds to a string literal naming the type: typeof(1+1) == "I64",
- * typeof("s") == "U8[2]", typeof(&f) == "F64 *". The expression is
+ * but folds to a string literal naming the type: typeof(1+1) == "i64",
+ * typeof("s") == "u8[2]", typeof(&f) == "f64 *". The expression is
  * only type-checked, never evaluated. */
 Ast *parseTypeof(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);

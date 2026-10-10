@@ -159,44 +159,44 @@ Bool TestGlobals(U0)
 Bool TestTooManyInNested(U0)
 {
   return CompileFailsWith(
-"class Foo { I64 a; I64 b; };
-class Bar { I64 x; Foo f; };
-U0 Main() { Bar b = {1, {2, 3, 4}}; }
+"class Foo { i64 a; i64 b; };
+class Bar { i64 x; Foo f; };
+void Main() { Bar b = {1, {2, 3, 4}}; }
 ", "More initialisers than class fields for class: Foo");
 }
 
 Bool TestTooManyFields(U0)
 {
   return CompileFailsWith(
-"class Foo { I64 a; I64 b; };
+"class Foo { i64 a; i64 b; };
 Foo g = {1, 2, {3}};
-U0 Main() {}
+void Main() {}
 ", "More initialisers than class fields for class: Foo");
 }
 
 Bool TestScalarField(U0)
 {
   return CompileFailsWith(
-"class Foo { I64 a; };
-class Bar { I64 x; Foo f; };
-U0 Main() { Bar b = {{1}, {2}}; }
-", "Cannot use an initialiser list for field x of type I64");
+"class Foo { i64 a; };
+class Bar { i64 x; Foo f; };
+void Main() { Bar b = {{1}, {2}}; }
+", "Cannot use an initialiser list for field x of type i64");
 }
 
 Bool TestTooManyInArrayField(U0)
 {
   return CompileFailsWith(
-"class Arr { I64 v[2]; I64 w; };
+"class Arr { i64 v[2]; i64 w; };
 Arr g = {{1, 2, 3}, 4};
-U0 Main() {}
+void Main() {}
 ", "Invalid array initializer: expected 2 items but got 3");
 }
 
 Bool TestScalarElement(U0)
 {
   return CompileFailsWith(
-"U0 Main() { I64 a[2] = {{{1}}, {2}}; }
-", "Cannot use an initialiser list for an element of type I64");
+"void Main() { i64 a[2] = {{{1}}, {2}}; }
+", "Cannot use an initialiser list for an element of type i64");
 }
 
 I32 Main()

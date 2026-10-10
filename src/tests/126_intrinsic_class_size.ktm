@@ -81,28 +81,28 @@ Bool CompileFailsExactly(U8 *source, I64 n_expected, U8 *m1, U8 *m2)
 Bool TestTooBig(U0)
 {
   return CompileFailsExactly(
-"I8 class X { I64 a; };
-U0 Main() { X x; x.a = 1; }
+"i8 class X { i64 a; };
+void Main() { X x; x.a = 1; }
 Main;
-", 1, "Fields of intrinsic class X take 8 bytes, more than the 1 bytes of its base type I8", NULL);
+", 1, "Fields of intrinsic class X take 8 bytes, more than the 1 bytes of its base type i8", NULL);
 }
 
 Bool TestOneByteOver(U0)
 {
   return CompileFailsExactly(
-"U16 class Z { U8 a; U8 b; U8 c; };
-U0 Main() { Z z; z.a = 1; z.c = 3; \"%d\\n\", z.b; }
+"u16 class Z { u8 a; u8 b; u8 c; };
+void Main() { Z z; z.a = 1; z.c = 3; \"%d\\n\", z.b; }
 Main;
-", 1, "Fields of intrinsic class Z take 3 bytes, more than the 2 bytes of its base type U16", NULL);
+", 1, "Fields of intrinsic class Z take 3 bytes, more than the 2 bytes of its base type u16", NULL);
 }
 
 /* Each bad class is reported, and nothing else */
 Bool TestTwoClasses(U0)
 {
   return CompileFailsExactly(
-"U16 class Z { U8 a; U8 b; U8 c; };
-I32 class W { I64 a; };
-U0 Main() { Z z; W w; z.a = 1; w.a = 2; }
+"u16 class Z { u8 a; u8 b; u8 c; };
+i32 class W { i64 a; };
+void Main() { Z z; W w; z.a = 1; w.a = 2; }
 Main;
 ", 2, "intrinsic class Z take 3 bytes", "intrinsic class W take 8 bytes");
 }
@@ -110,42 +110,42 @@ Main;
 Bool TestNonIntegerBase(U0)
 {
   return CompileFailsExactly(
-"F64 class Y { I64 a; };
-U0 Main() { Y y; y.a = 1; }
+"f64 class Y { i64 a; };
+void Main() { Y y; y.a = 1; }
 Main;
-", 1, "Can only make intrinsic types from integer types, got F64", NULL);
+", 1, "Can only make intrinsic types from integer types, got f64", NULL);
 }
 
 /* A class body cut off by the end of input, after a field name, an
  * array dimension, a pointer field, a `,` and a field type. */
 Bool TestEofAfterName(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64 b", 1, MSG_EOF, NULL);
+  return CompileFailsExactly("class Foo { i64 a; i64 b", 1, MSG_EOF, NULL);
 }
 
 Bool TestEofAfterDimension(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64 b[2]", 1, MSG_EOF, NULL);
+  return CompileFailsExactly("class Foo { i64 a; i64 b[2]", 1, MSG_EOF, NULL);
 }
 
 Bool TestEofAfterPointer(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64 *b", 1, MSG_EOF, NULL);
+  return CompileFailsExactly("class Foo { i64 a; i64 *b", 1, MSG_EOF, NULL);
 }
 
 Bool TestEofAfterComma(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64 b,", 1, MSG_EOF, NULL);
+  return CompileFailsExactly("class Foo { i64 a; i64 b,", 1, MSG_EOF, NULL);
 }
 
 Bool TestEofAfterType(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64", 1, MSG_EOF, NULL);
+  return CompileFailsExactly("class Foo { i64 a; i64", 1, MSG_EOF, NULL);
 }
 
 Bool TestEofAfterField(U0)
 {
-  return CompileFailsExactly("class Foo { I64 a; I64 b;", 1,
+  return CompileFailsExactly("class Foo { i64 a; i64 b;", 1,
       "Unexpected end of input in class/union body", NULL);
 }
 

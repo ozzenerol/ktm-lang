@@ -1557,30 +1557,30 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
 
     switch (type->kind) {
     case AST_TYPE_VOID:
-        aoStrCatPrintf(str, "U0");
+        aoStrCatPrintf(str, "void");
         return str;
     
     case AST_TYPE_INT:
         switch (type->size) {
             case 0:
-                if (type->issigned) aoStrCatPrintf(str, "I0");
-                else                aoStrCatPrintf(str, "U0");
+                if (type->issigned) aoStrCatPrintf(str, "i0");
+                else                aoStrCatPrintf(str, "void");
                 break;
             case 1:
-                if (type->issigned) aoStrCatPrintf(str, "I8");
-                else                aoStrCatPrintf(str, "U8");
+                if (type->issigned) aoStrCatPrintf(str, "i8");
+                else                aoStrCatPrintf(str, "u8");
                 break;
             case 2:
-                if (type->issigned) aoStrCatPrintf(str, "I16");
-                else                aoStrCatPrintf(str, "U16");
+                if (type->issigned) aoStrCatPrintf(str, "i16");
+                else                aoStrCatPrintf(str, "u16");
                 break;
             case 4:
-                if (type->issigned) aoStrCatPrintf(str, "I32");
-                else                aoStrCatPrintf(str, "U32");
+                if (type->issigned) aoStrCatPrintf(str, "i32");
+                else                aoStrCatPrintf(str, "u32");
                 break;
             case 8:
-                if (type->issigned) aoStrCatPrintf(str, "I64");
-                else                aoStrCatPrintf(str, "U64");
+                if (type->issigned) aoStrCatPrintf(str, "i64");
+                else                aoStrCatPrintf(str, "u64");
                 break;
             default: loggerPanic("Unknown integer size: %d\n", type->size);
 
@@ -1588,16 +1588,16 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
         return str;
     
     case AST_TYPE_CHAR:
-        if (type->is_bool)       aoStrCatPrintf(str, "Bool");
-        else if (type->issigned) aoStrCatPrintf(str, "I8");
-        else                     aoStrCatPrintf(str, "U8");
+        if (type->is_bool)       aoStrCatPrintf(str, "bool");
+        else if (type->issigned) aoStrCatPrintf(str, "i8");
+        else                     aoStrCatPrintf(str, "u8");
         return str;
 
     case AST_TYPE_FLOAT:
         if (type->size == 8)
-            aoStrCatLen(str,str_lit("F64"));
+            aoStrCatLen(str,str_lit("f64"));
         else
-            aoStrCatLen(str,str_lit("F32"));
+            aoStrCatLen(str,str_lit("f32"));
         return str;
 
     case AST_TYPE_POINTER: {
@@ -1825,7 +1825,7 @@ static char *astFunctionToStringInternal(Ast *func, AstType *type) {
     if (strparams) {
         aoStrCatPrintf(str,"(%s);",strparams);
     } else {
-        aoStrCatPrintf(str,"(U0);");
+        aoStrCatPrintf(str,"(void);");
     }
     return aoStrMove(str);
 }
@@ -1849,7 +1849,7 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
         case AST_LITERAL: {
             aoStrCatPrintf(str,"<ast_literal> ");
             switch (ast->type->kind) {
-            case AST_TYPE_VOID:  aoStrCatPrintf(str, "<U0>"); break;
+            case AST_TYPE_VOID:  aoStrCatPrintf(str, "<void>"); break;
             case AST_TYPE_INT: {
                 if (!isatty(STDOUT_FILENO)) {
                     aoStrCatPrintf(str, "<integer> %ld", ast->i64);
@@ -2812,7 +2812,7 @@ const char *astTypeKindToHumanReadable(AstType *type) {
         case AST_TYPE_VOID:    return "void type";
         case AST_TYPE_INT:     return "integer type";
         case AST_TYPE_FLOAT:   return "float type";
-        case AST_TYPE_CHAR:    return type->is_bool ? "Bool type" : "character type";
+        case AST_TYPE_CHAR:    return type->is_bool ? "bool type" : "character type";
         case AST_TYPE_ARRAY:   return "array type";
         case AST_TYPE_POINTER: return "pointer type";
         case AST_TYPE_FUNC:    return "function";

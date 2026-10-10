@@ -107,8 +107,8 @@ I32 Main()
   if (U64_MAX > 1 && U64_MAX / 2 == I64_MAX) correct++;
   if (I64_MIN < 0 && I64_MIN / 2 == -4611686018427387904 && I64_MIN >> 62 == -2) correct++;
   if (-1 >> 1 == -1 && 0x7FFFFFFFFFFFFFFF > -1 && 9223372036854775807 > -1) correct++;
-  if (!StrCmp(typeof(0xFFFFFFFFFFFFFFFF), "U64") &&
-      !StrCmp(typeof(0x7FFFFFFFFFFFFFFF), "I64")) correct++;
+  if (!StrCmp(typeof(0xFFFFFFFFFFFFFFFF), "u64") &&
+      !StrCmp(typeof(0x7FFFFFFFFFFFFFFF), "i64")) correct++;
 
   PrintResult(correct, tests);
   "====\n";

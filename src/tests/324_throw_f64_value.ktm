@@ -31,11 +31,11 @@ I32 Main()
   F64 f = 42.75;
   F32 g = 7.5;
   F64 big = 3e18;
-  I32 i32 = -5;
-  I8 i8 = -2;
-  U8 u8 = 200;
-  U16 u16 = 65535;
-  U32 u32 = 0xFFFFFFFF;
+  I32 v_i32 = -5;
+  I8 v_i8 = -2;
+  U8 v_u8 = 200;
+  U16 v_u16 = 65535;
+  U32 v_u32 = 0xFFFFFFFF;
   U8 *p = "abc";
   I64 r = 7;
 
@@ -48,11 +48,11 @@ I32 Main()
   try { ThrowF32(g); } catch if (Fs->except_ch == 7) correct++;
   if (Caught(-2.5) == AsArg(-2.5)) correct++;
 
-  try { throw(i32); } catch if (Fs->except_ch == AsArg(i32) && Fs->except_ch(I64) == -5) correct++;
-  try { throw(i8); } catch if (Fs->except_ch(I64) == -2) correct++;
-  try { throw(u8); } catch if (Fs->except_ch == 200) correct++;
-  try { throw(u16); } catch if (Fs->except_ch == 65535) correct++;
-  try { throw(u32); } catch if (Fs->except_ch == 0xFFFFFFFF) correct++;
+  try { throw(v_i32); } catch if (Fs->except_ch == AsArg(v_i32) && Fs->except_ch(I64) == -5) correct++;
+  try { throw(v_i8); } catch if (Fs->except_ch(I64) == -2) correct++;
+  try { throw(v_u8); } catch if (Fs->except_ch == 200) correct++;
+  try { throw(v_u16); } catch if (Fs->except_ch == 65535) correct++;
+  try { throw(v_u32); } catch if (Fs->except_ch == 0xFFFFFFFF) correct++;
   try { throw(p); } catch if (Fs->except_ch(U8 *) == p) correct++;
 
   PrintResult(correct, tests);

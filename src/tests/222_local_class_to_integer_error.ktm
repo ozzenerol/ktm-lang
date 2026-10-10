@@ -56,7 +56,7 @@ Bool Clean(U8 *source)
   return ok;
 }
 
-#define CLS "class P { I64 x, y; };\nclass Q { I64 a; };\n"
+#define CLS "class P { i64 x, y; };\nclass Q { i64 a; };\n"
 
 I32 Main()
 {
@@ -64,38 +64,38 @@ I32 Main()
   I64 tests = 0, correct = 0;
 
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  I64 z = p;\n}\n",
-               "`I64 = P` is invalid", "222-ci.ktm:5:9\n")) correct++;
+  if (OneError(CLS "void Main() {\n  P p;\n  i64 z = p;\n}\n",
+               "`i64 = P` is invalid", "222-ci.ktm:5:9\n")) correct++;
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  U8 c = p;\n}\n",
-               "`U8 = P` is invalid", "222-ci.ktm:5:8\n")) correct++;
+  if (OneError(CLS "void Main() {\n  P p;\n  u8 c = p;\n}\n",
+               "`u8 = P` is invalid", "222-ci.ktm:5:8\n")) correct++;
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  F64 f = p;\n}\n",
-               "`F64 = P` is invalid", "222-ci.ktm:5:9\n")) correct++;
+  if (OneError(CLS "void Main() {\n  P p;\n  f64 f = p;\n}\n",
+               "`f64 = P` is invalid", "222-ci.ktm:5:9\n")) correct++;
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  I64 *ip = p;\n}\n",
-               "`I64 * = P` is invalid", "222-ci.ktm:5:11\n")) correct++;
+  if (OneError(CLS "void Main() {\n  P p;\n  i64 *ip = p;\n}\n",
+               "`i64 * = P` is invalid", "222-ci.ktm:5:11\n")) correct++;
   /* A class value into a class of another type was accepted silently */
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  Q q = p;\n}\n",
+  if (OneError(CLS "void Main() {\n  P p;\n  Q q = p;\n}\n",
                "`Q = P` is invalid", "222-ci.ktm:5:7\n")) correct++;
   /* Same message as the assignment and the global */
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  I64 z;\n  z = p;\n}\n",
-               "`I64 = P` is invalid", "222-ci.ktm:6:5\n") &&
+  if (OneError(CLS "void Main() {\n  P p;\n  i64 z;\n  z = p;\n}\n",
+               "`i64 = P` is invalid", "222-ci.ktm:6:5\n") &&
       OneError(CLS "P gp;\nI64 gz = gp;\n",
-               "`I64 = P` is invalid", "222-ci.ktm:4:8\n")) correct++;
+               "`i64 = P` is invalid", "222-ci.ktm:4:8\n")) correct++;
   /* Still in a declaration list */
   tests++;
-  if (OneError(CLS "U0 Main() {\n  P p;\n  I64 a = 1, b = p;\n}\n",
-               "`I64 = P` is invalid", "222-ci.ktm:5:16\n")) correct++;
+  if (OneError(CLS "void Main() {\n  P p;\n  i64 a = 1, b = p;\n}\n",
+               "`i64 = P` is invalid", "222-ci.ktm:5:16\n")) correct++;
 
   /* Legal declarations are unchanged */
   tests++;
-  if (Clean(CLS "U0 Main() {\n  P p;\n  p.x = 1;\n  P same = p;\n"
-            "  P *pp = &p;\n  U0 *u = &p;\n  U0 *v = pp;\n  auto a = p;\n"
-            "  I64 x = 1, y = p.x;\n  F64 f = 2;\n  U8 *s = \"hi\";\n"
-            "  I64 *ip = &p.y;\n  \"%d %d %d %d\\n\", same.x, a.x, x, y;\n}\n"))
+  if (Clean(CLS "void Main() {\n  P p;\n  p.x = 1;\n  P same = p;\n"
+            "  P *pp = &p;\n  void *u = &p;\n  void *v = pp;\n  auto a = p;\n"
+            "  i64 x = 1, y = p.x;\n  f64 f = 2;\n  u8 *s = \"hi\";\n"
+            "  i64 *ip = &p.y;\n  \"%d %d %d %d\\n\", same.x, a.x, x, y;\n}\n"))
     correct++;
 
   PrintResult(correct, tests);

@@ -20,33 +20,33 @@ U0 CleanupTranspileCastTest(U0)
 }
 
 U8 *tc_bad =
-"class Pt { I64 x; I64 y; };
-U0 Main()
+"class Pt { i64 x; i64 y; };
+void Main()
 {
   Pt pt;
   pt.x = 7;
   Pt *q = &pt;
   Pt **pp = &q;
-  I64 v = **pp(I64 *);
+  i64 v = **pp(i64 *);
   \"%d\\n\", v;
 }
 ";
 
 U8 *tc_good =
-"class Pt { I64 x; I64 y; };
-U0 Main()
+"class Pt { i64 x; i64 y; };
+void Main()
 {
   Pt pt;
   pt.x = 7; pt.y = 9;
   Pt *q = &pt;
   Pt **pp = &q;
-  I64 v = *(*pp)(I64 *);
-  I64 w = (*pp)(I64 *)[1];
-  I64 a = 3, b = 4;
-  F64 f = (a + b)(F64) / 2;
-  I64 n = -a(F64) * 2;
-  U8 *bytes = q(U8 *);
-  I64 z = *(bytes + 8)(I64 *);
+  i64 v = *(*pp)(i64 *);
+  i64 w = (*pp)(i64 *)[1];
+  i64 a = 3, b = 4;
+  f64 f = (a + b)(f64) / 2;
+  i64 n = -a(f64) * 2;
+  u8 *bytes = q(u8 *);
+  i64 z = *(bytes + 8)(i64 *);
   \"%d %d %.1f %d %d\\n\", v, w, f, n, z;
 }
 ";
@@ -82,7 +82,7 @@ U0 Main()
   tests++;
   res = System(TC_KTM "-jit " TC_FILE " > " TC_OUT " 2>&1");
   out = FileRead(TC_OUT);
-  if (res == 1 && out && strstr(out, "`*` on `I64` is invalid")) correct++;
+  if (res == 1 && out && strstr(out, "`*` on `i64` is invalid")) correct++;
   else "jit: %d %s\n", res, out;
   Free(out);
 
@@ -93,7 +93,7 @@ U0 Main()
   out = FileRead(TC_OUT);
   U8 *code = FileRead(TC_C);
   if (res == 1 && out && !strstr(out, "NULL") &&
-      strstr(out, "`*` on `I64` is invalid")) correct++;
+      strstr(out, "`*` on `i64` is invalid")) correct++;
   else "transpile: %d %s\n", res, out;
   Free(out);
   Free(code);

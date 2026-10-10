@@ -35,27 +35,27 @@ I32 Main()
 
   "Test - #define with mixed int and float operands: ";
 
-  if (F_FIRST == 4.5 && !StrCmp(typeof(F_FIRST), "F64")) correct++;
-  if (F_LAST == 4.5 && !StrCmp(typeof(F_LAST), "F64")) correct++;
-  if (F_MID == 7.5 && !StrCmp(typeof(F_MID), "F64")) correct++;
-  if (F_MACROS == 1.5 && !StrCmp(typeof(F_MACROS), "F64")) correct++;
-  if (F_MIX == 3.5 && !StrCmp(typeof(F_MIX), "F64")) correct++;
-  if (F_ONLY == 3.0 && !StrCmp(typeof(F_ONLY), "F64")) correct++;
-  if (F_DIV == 1.5 && !StrCmp(typeof(F_DIV), "F64")) correct++;
-  if (F_NEG == -1.5 && !StrCmp(typeof(F_NEG), "F64")) correct++;
-  if (F_NESTED == 7.5 && !StrCmp(typeof(F_NESTED), "F64")) correct++;
+  if (F_FIRST == 4.5 && !StrCmp(typeof(F_FIRST), "f64")) correct++;
+  if (F_LAST == 4.5 && !StrCmp(typeof(F_LAST), "f64")) correct++;
+  if (F_MID == 7.5 && !StrCmp(typeof(F_MID), "f64")) correct++;
+  if (F_MACROS == 1.5 && !StrCmp(typeof(F_MACROS), "f64")) correct++;
+  if (F_MIX == 3.5 && !StrCmp(typeof(F_MIX), "f64")) correct++;
+  if (F_ONLY == 3.0 && !StrCmp(typeof(F_ONLY), "f64")) correct++;
+  if (F_DIV == 1.5 && !StrCmp(typeof(F_DIV), "f64")) correct++;
+  if (F_NEG == -1.5 && !StrCmp(typeof(F_NEG), "f64")) correct++;
+  if (F_NESTED == 7.5 && !StrCmp(typeof(F_NESTED), "f64")) correct++;
 
-  if (I_ONLY == 13 && !StrCmp(typeof(I_ONLY), "I64")) correct++;
-  if (I_DIV == 3 && !StrCmp(typeof(I_DIV), "I64")) correct++;
-  if (I_NESTED == 10 && !StrCmp(typeof(I_NESTED), "I64")) correct++;
-  if (I_CAST == 6 && !StrCmp(typeof(I_CAST), "I64")) correct++;
+  if (I_ONLY == 13 && !StrCmp(typeof(I_ONLY), "i64")) correct++;
+  if (I_DIV == 3 && !StrCmp(typeof(I_DIV), "i64")) correct++;
+  if (I_NESTED == 10 && !StrCmp(typeof(I_NESTED), "i64")) correct++;
+  if (I_CAST == 6 && !StrCmp(typeof(I_CAST), "i64")) correct++;
 
   /* A comparison is an integer, but compares its operands as floats. */
-  if (I_CMP_F == 1 && !StrCmp(typeof(I_CMP_F), "I64")) correct++;
+  if (I_CMP_F == 1 && !StrCmp(typeof(I_CMP_F), "i64")) correct++;
   if (I_CMP_M == 1 && I_CMP_EQ == 1) correct++;
 
   if (C_PLUS == 'b') correct++;
-  if (C_HALF == 50.0 && !StrCmp(typeof(C_HALF), "F64")) correct++;
+  if (C_HALF == 50.0 && !StrCmp(typeof(C_HALF), "f64")) correct++;
   if (!StrCmp(S_VAL, "str") && !StrCmp(S_COPY, "str")) correct++;
 
   /* The same values outside a macro. */

@@ -60,22 +60,22 @@ U8 *rd_same_sig =
   return 42;
 }
 
-U0 Main()
+void Main()
 {
   \"now=%d len=%d\\n\", Now, StrLen(\"abc\");
-  U8 *date = MPrintDate(Now);
+  u8 *date = MPrintDate(Now);
   \"date=%s\\n\", date;
   Free(date);
 }
 ";
 
 U8 *rd_lib_conflict =
-"U8 *Now()
+"u8 *Now()
 {
   return \"x\";
 }
 
-U0 Main()
+void Main()
 {
   \"%s %d\\n\", Now, StrLen(\"abc\");
 }
@@ -96,15 +96,15 @@ U0 Main()
    * class is (`I64 class CDate`) is the same signature */
   tests++;
   if (RunRedefine(FALSE,
-"I64 Now() { return 7; }
-U0 Main() { \"now=%d %d\\n\", Now, StrLen(\"ab\"); }
+"i64 Now() { return 7; }
+void Main() { \"now=%d %d\\n\", Now, StrLen(\"ab\"); }
 ", 0, "now=7 2", NULL)) correct++;
 
   /* A different signature from the library's prototype is an error at
    * the definition's name, not a link failure */
   tests++;
   if (RunRedefine(FALSE, rd_lib_conflict, 1,
-      "error: conflicting types for `Now`: `U8 *Now(U0);` does not match the earlier declaration `CDate Now(U0);` at ",
+      "error: conflicting types for `Now`: `u8 *Now(void);` does not match the earlier declaration `CDate Now(void);` at ",
       "std.ktmh:")) correct++;
   tests++;
   if (RunRedefine(TRUE, rd_lib_conflict, 1, "conflicting types for `Now`",
@@ -113,62 +113,62 @@ U0 Main() { \"now=%d %d\\n\", Now, StrLen(\"ab\"); }
   /* I64 vs U64 return differ (std.ktmh: `public U64 NowMilliseconds();`) */
   tests++;
   if (RunRedefine(TRUE,
-"I64 NowMilliseconds() { return 0; }
-U0 Main() { }
+"i64 NowMilliseconds() { return 0; }
+void Main() { }
 ", 1, "conflicting types for `NowMilliseconds`", NULL)) correct++;
 
   /* Two prototypes in the program that disagree */
   tests++;
   if (RunRedefine(TRUE,
-"I64 Twice(I64 a);
-I64 Twice(U8 *a);
-U0 Main() { }
-", 1, "conflicting types for `Twice`: `I64 Twice(U8 *a);`", RD_FILE ":2:5")) correct++;
+"i64 Twice(i64 a);
+i64 Twice(u8 *a);
+void Main() { }
+", 1, "conflicting types for `Twice`: `i64 Twice(u8 *a);`", RD_FILE ":2:5")) correct++;
 
   /* A definition that disagrees with the program's prototype on a
    * parameter, on varargs, or the number of parameters */
   tests++;
   if (RunRedefine(FALSE,
-"I64 Add(I64 a, I64 b);
-I64 Add(I64 a, F64 b) { return a; }
-U0 Main() { }
+"i64 Add(i64 a, i64 b);
+i64 Add(i64 a, f64 b) { return a; }
+void Main() { }
 ", 1, "conflicting types for `Add`", RD_FILE ":2:5")) correct++;
   tests++;
   if (RunRedefine(TRUE,
-"U0 Log(U8 *fmt, ...);
-U0 Log(U8 *fmt) { }
-U0 Main() { }
+"void Log(u8 *fmt, ...);
+void Log(u8 *fmt) { }
+void Main() { }
 ", 1, "conflicting types for `Log`", NULL)) correct++;
   tests++;
   if (RunRedefine(TRUE,
-"I64 One(I64 a);
-I64 One(I64 a, I64 b) { return a + b; }
-U0 Main() { }
+"i64 One(i64 a);
+i64 One(i64 a, i64 b) { return a + b; }
+void Main() { }
 ", 1, "conflicting types for `One`", NULL)) correct++;
 
   /* A prototype after the definition that disagrees */
   tests++;
   if (RunRedefine(TRUE,
-"I64 Late() { return 1; }
-F64 Late();
-U0 Main() { }
+"i64 Late() { return 1; }
+f64 Late();
+void Main() { }
 ", 1, "conflicting types for `Late`", RD_FILE ":2:5")) correct++;
 
   /* Matching prototypes, repeated, with a default argument, an array
    * parameter for a pointer one and varargs, are all fine */
   tests++;
   if (RunRedefine(FALSE,
-"class Pt { I64 x; };
-I64 Sum(I64 *v, I64 n=2);
-I64 Sum(I64 *v, I64 n=2);
-I64 Sum(I64 v[], I64 n) { I64 s = 0, i; for (i = 0; i < n; i++) s += v[i]; return s; }
-I64 Sum(I64 *v, I64 n);
-I64 GetX(Pt *p);
-I64 GetX(Pt *p) { return p->x; }
-U0 Say(U8 *fmt, ...);
-U0 Say(U8 *fmt, ...) { \"said %d\\n\", argc; }
-U0 Main() {
-  I64 v[2] = {3, 4};
+"class Pt { i64 x; };
+i64 Sum(i64 *v, i64 n=2);
+i64 Sum(i64 *v, i64 n=2);
+i64 Sum(i64 v[], i64 n) { i64 s = 0, i; for (i = 0; i < n; i++) s += v[i]; return s; }
+i64 Sum(i64 *v, i64 n);
+i64 GetX(Pt *p);
+i64 GetX(Pt *p) { return p->x; }
+void Say(u8 *fmt, ...);
+void Say(u8 *fmt, ...) { \"said %d\\n\", argc; }
+void Main() {
+  i64 v[2] = {3, 4};
   Pt p;
   p.x = 9;
   Say(\"x\", 1, 2);

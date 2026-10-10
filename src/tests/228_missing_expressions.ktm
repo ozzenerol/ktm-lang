@@ -91,7 +91,7 @@ I32 Main()
   tests++;
   out = Diagnose("I64 F() { return; }\nU0 Main() { F; }\n", &status);
   if (status == 0 && out &&
-      strstr(out, "`return` with no value, expected a value of type 'I64'") &&
+      strstr(out, "`return` with no value, expected a value of type 'i64'") &&
       !strstr(out, "(null)")) correct++;
   else "got: '%s'\n", out;
   Free(out);

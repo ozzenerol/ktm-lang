@@ -35,17 +35,17 @@ I32 Main()
   "Test - postfix cast inside a #define: ";
 
   if (CAST_MOD == 2) correct++;
-  if (CAST_ONLY == 5 && !StrCmp(typeof(CAST_ONLY), "U64")) correct++;
-  if (!StrCmp(typeof(CAST_MOD), "U64")) correct++;
+  if (CAST_ONLY == 5 && !StrCmp(typeof(CAST_ONLY), "u64")) correct++;
+  if (!StrCmp(typeof(CAST_MOD), "u64")) correct++;
   if (CAST_END == 3) correct++;
   if (CAST_U8 == 44 && CAST_U8 == 300(U8)) correct++;
   if (CAST_I8 == -56) correct++;
   if (CAST_U32 == 4294967295) correct++;
   if (CAST_PTR == 4096) correct++;
   if (CAST_PTR_OP == 3) correct++;
-  if (CAST_F64 == 5.0 && !StrCmp(typeof(CAST_F64), "F64")) correct++;
+  if (CAST_F64 == 5.0 && !StrCmp(typeof(CAST_F64), "f64")) correct++;
   if (CAST_F64_OP == 2.5) correct++;
-  if (CAST_TO_INT == 2 && !StrCmp(typeof(CAST_TO_INT), "I64")) correct++;
+  if (CAST_TO_INT == 2 && !StrCmp(typeof(CAST_TO_INT), "i64")) correct++;
   if (CAST_INT_OP == 4) correct++;
   if (CAST_NESTED == 2) correct++;
   if (CAST_TWICE == 3) correct++;
@@ -57,8 +57,8 @@ I32 Main()
 
   /* Without a cast a define has the type of its value: any float
    * operand makes it an F64 (test 127). */
-  if (PLAIN_INT == 3 && !StrCmp(typeof(PLAIN_INT), "I64")) correct++;
-  if (PLAIN_MIX == 3.5 && !StrCmp(typeof(PLAIN_MIX), "F64")) correct++;
+  if (PLAIN_INT == 3 && !StrCmp(typeof(PLAIN_INT), "i64")) correct++;
+  if (PLAIN_MIX == 3.5 && !StrCmp(typeof(PLAIN_MIX), "f64")) correct++;
 
   PrintResult(correct, tests);
   "====\n";

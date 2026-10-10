@@ -40,8 +40,8 @@ Bool DiagAt(U8 *src, U8 *what, U8 *where, U8 *not_where = NULL)
   return ok;
 }
 
-#define DECLS "U0 Main()\n{\n  I64 y = 1, *q = NULL;\n  F64 f = 1;\n  I64 arr[2];\n"
-#define WARN "Incompatible types 'I64 *' is not assignable to type 'F64'"
+#define DECLS "void Main()\n{\n  i64 y = 1, *q = NULL;\n  f64 f = 1;\n  i64 arr[2];\n"
+#define WARN "Incompatible types 'i64 *' is not assignable to type 'f64'"
 
 I32 Main()
 {
@@ -53,7 +53,7 @@ I32 Main()
   if (DiagAt(DECLS "  y = y + 1; f = q;\n}\n", WARN, ":6:16", ":6:5")) correct++;
   /* Declaration after an assignment */
   tests++;
-  if (DiagAt(DECLS "  y = 2; F64 g = q;\n}\n", WARN, ":6:16", ":6:5")) correct++;
+  if (DiagAt(DECLS "  y = 2; f64 g = q;\n}\n", WARN, ":6:16", ":6:5")) correct++;
   /* Right hand side over several lines */
   tests++;
   if (DiagAt(DECLS "  y = 3;\n  f =\n      q;\n}\n", WARN, ":7:5")) correct++;
@@ -62,10 +62,10 @@ I32 Main()
   if (DiagAt(DECLS "  f = 2; f += q;\n}\n", "The `+=` operator", ":6:12", ":6:5")) correct++;
   /* An array right hand side */
   tests++;
-  if (DiagAt(DECLS "  y = 4; f = arr;\n}\n", "Incompatible types 'I64[", ":6:12")) correct++;
+  if (DiagAt(DECLS "  y = 4; f = arr;\n}\n", "Incompatible types 'i64[", ":6:12")) correct++;
   /* Top level statements */
   tests++;
-  if (DiagAt("I64 *gq = NULL;\nF64 gf;\nI64 gy;\ngy = 1; gf = gq;\nU0 Main() { }\n",
+  if (DiagAt("i64 *gq = NULL;\nF64 gf;\nI64 gy;\ngy = 1; gf = gq;\nU0 Main() { }\n",
              WARN, ":4:12", ":4:4")) correct++;
 
   PrintResult(correct, tests);

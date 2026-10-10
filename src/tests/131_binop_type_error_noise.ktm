@@ -76,7 +76,7 @@ Bool TestDefineFloatString(U0)
   return CompileCheck(
 "#define X (2.5 + \"s\")
 #define Y (\"s\" * 2)
-U0 Main() {}
+void Main() {}
 ", 1, 2, want, 4);
 }
 
@@ -89,9 +89,9 @@ Bool TestLocalInit(U0)
   want[2] = "error: The `*` operator cannot be applied to a array type with a literal of integer type";
   want[3] = " --> " BINOP_NOISE_FILE ":3:15";
   return CompileCheck(
-"U0 Main() {
-  I64 x = 2.5 + \"s\";
-  I64 y = \"s\" * 2;
+"void Main() {
+  i64 x = 2.5 + \"s\";
+  i64 y = \"s\" * 2;
 }
 ", 1, 2, want, 4);
 }
@@ -101,19 +101,19 @@ Bool TestExprForms(U0)
 {
   U8 *want[6];
   want[0] = " --> " BINOP_NOISE_FILE ":5:9";
-  want[1] = "`F64 + U8[2]` is invalid";
+  want[1] = "`f64 + u8[2]` is invalid";
   want[2] = " --> " BINOP_NOISE_FILE ":6:9";
-  want[3] = "`F64 < U8[2]` is invalid";
+  want[3] = "`f64 < u8[2]` is invalid";
   want[4] = " --> " BINOP_NOISE_FILE ":7:13";
-  want[5] = "`Pt * I64` is invalid";
+  want[5] = "`Pt * i64` is invalid";
   return CompileCheck(
-"class Pt { I64 x; };
-U0 Main() {
+"class Pt { i64 x; };
+void Main() {
   Pt p;
-  F64 z = 1.5;
+  f64 z = 1.5;
   z = z + \"q\";
   if (z < \"s\") \"no\\n\";
-  I64 k = p * 2;
+  i64 k = p * 2;
 }
 ", 1, 3, want, 6);
 }
@@ -125,8 +125,8 @@ Bool TestGlobalInit(U0)
   want[0] = "error: The `+` operator cannot be applied to a float type with a string literal of array type";
   want[1] = " --> " BINOP_NOISE_FILE ":1:13";
   return CompileCheck(
-"F64 g = 2.5 + \"s\";
-U0 Main() {}
+"f64 g = 2.5 + \"s\";
+void Main() {}
 ", 1, 1, want, 2);
 }
 
@@ -136,10 +136,10 @@ Bool TestValidStillCompiles(U0)
   return CompileCheck(
 "#define OK_F (2.5 + 1)
 #define OK_S \"a\" \"b\"
-U0 Main() {
-  F64 f = 2 + 1.5;
-  U8 *s = \"abc\" + 1;
-  I64 c = f < 3.0;
+void Main() {
+  f64 f = 2 + 1.5;
+  u8 *s = \"abc\" + 1;
+  i64 c = f < 3.0;
   \"%d %d\\n\", c, *s;
 }
 ", 0, 0, NULL, 0);

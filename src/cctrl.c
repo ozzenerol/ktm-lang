@@ -114,6 +114,14 @@ static BuiltInType built_in_types[] = {
     {"private",AST_TYPE_VIS_MODIFIER,0,0},
 };
 
+/* New name -> the built-in type it names. */
+static struct { const char *name, *old_name; } type_aliases[] = {
+    {"void", "U0"}, {"bool", "Bool"},
+    {"i8", "I8"},   {"u8", "U8"},   {"i16", "I16"}, {"u16", "U16"},
+    {"i32", "I32"}, {"u32", "U32"}, {"i64", "I64"}, {"u64", "U64"},
+    {"f32", "F32"}, {"f64", "F64"},
+};
+
 static void cctrlAddX86_64Defines(Cctrl *cc, Lexeme *le) {
     mapAdd(cc->macro_defs,"IS_X86_64",le);
     mapAdd(cc->macro_defs,"__x86_64__",le);
@@ -240,6 +248,12 @@ static void cctrlAddBuiltinTypes(Map *symbol_table) {
         type->is_bool = !strcmp(built_in->name, "Bool");
         type->ptr = NULL;
         mapAdd(symbol_table, built_in->name, type);
+    }
+    /* The C-like names (ktm syntax v0.2) for the same types. They are type
+     * names, not keywords, so a struct field can still be called `i64`. */
+    for (int i = 0; i < (int)static_size(type_aliases); ++i) {
+        AstType *type = mapGet(symbol_table, type_aliases[i].old_name);
+        mapAdd(symbol_table, type_aliases[i].name, type);
     }
 }
 

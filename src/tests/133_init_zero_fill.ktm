@@ -79,10 +79,10 @@ I64 Locals()
   if (n.t == 1 && PIs(&n.p, 2, 0, 0) && n.u == 0) correct++;
 
   F64 f[3] = {1.5};
-  I32 i32[5] = {7};
+  I32 v_i32[5] = {7};
   U8 b[6] = {1, 2};
   if (f[0] == 1.5 && f[1] == 0.0 && f[2] == 0.0) correct++;
-  if (i32[0] == 7 && i32[1] == 0 && i32[4] == 0) correct++;
+  if (v_i32[0] == 7 && v_i32[1] == 0 && v_i32[4] == 0) correct++;
   if (b[0] == 1 && b[1] == 2 && b[2] == 0 && b[5] == 0) correct++;
 
   /* Bigger than the inline-store limit: cleared with memset. */

@@ -1046,16 +1046,16 @@ U0 TestRegressions()
   PosOf(REG_HC, "Square(counter)", 1, &line, &chr);
   Json *resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);
   Check("hover names every param, defaults included",
-        HoverContains(resp, "Square(I64 n, I64 scale=2)"));
+        HoverContains(resp, "Square(i64 n, i64 scale=2)"));
 
   PosOf(REG_HC, "counter);", 1, &line, &chr);
   resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);
-  Check("hover on a local shows its type", HoverContains(resp, "I64 counter"));
+  Check("hover on a local shows its type", HoverContains(resp, "i64 counter"));
 
   PosOf(REG_HC, "x = Square", 0, &line, &chr);
   resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);
   Check("hover on a field shows class and type",
-        HoverContains(resp, "I64 LibPoint.x"));
+        HoverContains(resp, "i64 LibPoint.x"));
 
   PosOf(REG_HC, "REG_LIMIT;", 1, &line, &chr);
   resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);

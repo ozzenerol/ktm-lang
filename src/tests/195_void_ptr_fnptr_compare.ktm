@@ -35,9 +35,9 @@ Bool CompileFailsWith(U8 *expr, U8 *expected)
 
   CleanupFnCmpTest;
   src = MStrPrint(
-"U0 F() {}
-U0 Main() {
-  U0 *w = &F; U0 (*fp)() = &F; I64 *q = NULL; F64 d = 1.0;
+"void F() {}
+void Main() {
+  void *w = &F; void (*fp)() = &F; i64 *q = NULL; f64 d = 1.0;
   \"%%d\\n\", %s;
 }
 ", expr);
@@ -77,7 +77,7 @@ I32 Main()
   Holder h;
   h.any = &G;
 
-  "Test - compare a U0 pointer with a function pointer: ";
+  "Test - compare a void pointer with a function pointer: ";
 
   if (w == &F) correct++;
   if (!(w != &F)) correct++;
@@ -97,9 +97,9 @@ I32 Main()
   /* Still errors */
   if (CompileFailsWith("fp == 1.5", "cannot be applied to a function")) correct++;
   if (CompileFailsWith("fp == d", "cannot be applied to a function")) correct++;
-  if (CompileFailsWith("q == &F", "`I64 * == <fn> U0` is invalid")) correct++;
-  if (CompileFailsWith("w < &F", "`U0 * < <fn> U0` is invalid")) correct++;
-  if (CompileFailsWith("w - &F", "`U0 * - <fn> U0` is invalid")) correct++;
+  if (CompileFailsWith("q == &F", "`i64 * == <fn> void` is invalid")) correct++;
+  if (CompileFailsWith("w < &F", "`void * < <fn> void` is invalid")) correct++;
+  if (CompileFailsWith("w - &F", "`void * - <fn> void` is invalid")) correct++;
   if (CompileFailsWith("w * fp", "is invalid")) correct++;
 
   PrintResult(correct, tests);

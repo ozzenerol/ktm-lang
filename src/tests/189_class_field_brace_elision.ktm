@@ -57,7 +57,7 @@ Bool FailsWith(U8 *source, U8 *expected)
   return ok;
 }
 
-#define CLS "class P { I64 x, y; }; class L { I64 t; P a; I64 z; };\n"
+#define CLS "class P { i64 x, y; }; class L { i64 t; P a; i64 z; };\n"
 
 I32 Main()
 {
@@ -125,7 +125,7 @@ I32 Main()
   if (m[0][0] == 1 && m[0][2] == 3 && m[1][0] == 4 && m[1][1] == 5 &&
       m[1][2] == 0 && gm[0][0] == 1 && gm[0][2] == 3 && gm[1][0] == 4 &&
       gm[1][1] == 5 && gm[1][2] == 0) correct++;
-  else "Failed - I64 m[2][3]\n";
+  else "Failed - i64 m[2][3]\n";
   tests++;
   if (!StrCmp(s[0].name, "ab") && s[0].n == 1 && s[1].name[0] == 'c' &&
       s[1].name[3] == 'f' && s[1].n == 2 &&
@@ -161,16 +161,16 @@ I32 Main()
                 "More initialisers than class fields for class: L")) correct++;
   else "Failed - L too many\n";
   tests++;
-  if (FailsWith(CLS "U0 Main() { P ps[2] = {1, 2, 3, 4, 5}; } Main;",
+  if (FailsWith(CLS "void Main() { P ps[2] = {1, 2, 3, 4, 5}; } Main;",
                 "expected 2 items but got 3")) correct++;
   else "Failed - P[2] too many\n";
   tests++;
-  if (FailsWith("I64 m[2][2] = {1, 2, 3, 4, 5};",
+  if (FailsWith("i64 m[2][2] = {1, 2, 3, 4, 5};",
                 "expected 2 items but got 3")) correct++;
-  else "Failed - I64[2][2] too many\n";
+  else "Failed - i64[2][2] too many\n";
   tests++;
   if (FailsWith(CLS "L l = {1, 2, {3}, 4};",
-                "Cannot use an initialiser list for field y of type I64"))
+                "Cannot use an initialiser list for field y of type i64"))
     correct++;
   else "Failed - braces for a scalar field\n";
 

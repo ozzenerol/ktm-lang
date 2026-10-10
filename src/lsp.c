@@ -798,6 +798,8 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
 }
 
 static const char *lsp_keywords[] = {
+    "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64",
+    "void", "bool",
     "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64", "F64", "U0",
     "Bool",  "break", "case", "class", "default", "do", "else", "extern",
     "_extern", "for", "goto", "if", "public", "return", "sizeof", "static",

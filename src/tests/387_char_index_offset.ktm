@@ -59,36 +59,36 @@ I32 Main()
   for (k = 0; k < 2048; k++) arr[k] = k - 1024;
   base = arr + 1024;
 
-  U8 u8 = 255;  I8 i8 = -1;  Bool b = TRUE;
-  U16 u16 = 65535 % 1000; I16 i16 = -2;
-  U32 u32 = 1000;  I32 i32 = -3;
-  U64 u64 = 7;  I64 i64 = -1000;
+  U8 v_u8 = 255;  I8 v_i8 = -1;  Bool b = TRUE;
+  U16 v_u16 = 65535 % 1000; I16 v_i16 = -2;
+  U32 v_u32 = 1000;  I32 v_i32 = -3;
+  U64 v_u64 = 7;  I64 v_i64 = -1000;
 
   /* every integer type as an index */
-  tests++; correct += Check(base[u8], 255, "base[U8 255]");
-  tests++; correct += Check(base[i8], -1, "base[I8 -1]");
+  tests++; correct += Check(base[v_u8], 255, "base[U8 255]");
+  tests++; correct += Check(base[v_i8], -1, "base[I8 -1]");
   tests++; correct += Check(base[b], 1, "base[Bool TRUE]");
-  tests++; correct += Check(base[u16], 535, "base[U16]");
-  tests++; correct += Check(base[i16], -2, "base[I16]");
-  tests++; correct += Check(base[u32], 1000, "base[U32]");
-  tests++; correct += Check(base[i32], -3, "base[I32]");
-  tests++; correct += Check(base[u64], 7, "base[U64]");
-  tests++; correct += Check(base[i64], -1000, "base[I64]");
+  tests++; correct += Check(base[v_u16], 535, "base[U16]");
+  tests++; correct += Check(base[v_i16], -2, "base[I16]");
+  tests++; correct += Check(base[v_u32], 1000, "base[U32]");
+  tests++; correct += Check(base[v_i32], -3, "base[I32]");
+  tests++; correct += Check(base[v_u64], 7, "base[U64]");
+  tests++; correct += Check(base[v_i64], -1000, "base[I64]");
 
   /* and as a pointer offset, either side of `+`, and with `-` */
-  tests++; correct += Check(*(base + u8), 255, "base + U8");
-  tests++; correct += Check(*(u8 + base), 255, "U8 + base");
-  tests++; correct += Check(*(base + i8), -1, "base + I8");
-  tests++; correct += Check(*(base - i8), 1, "base - I8");
-  tests++; correct += Check(*(base - u8), -255, "base - U8");
+  tests++; correct += Check(*(base + v_u8), 255, "base + U8");
+  tests++; correct += Check(*(v_u8 + base), 255, "U8 + base");
+  tests++; correct += Check(*(base + v_i8), -1, "base + I8");
+  tests++; correct += Check(*(base - v_i8), 1, "base - I8");
+  tests++; correct += Check(*(base - v_u8), -255, "base - U8");
   tests++; correct += Check(*(base + b), 1, "base + Bool");
 
   /* the extremes, and values whose top bit is set */
-  i8 = -128; u8 = 128;
-  tests++; correct += Check(base[i8], -128, "base[I8 -128]");
-  tests++; correct += Check(base[u8], 128, "base[U8 128]");
-  i8 = 200; /* wraps to -56 */
-  tests++; correct += Check(base[i8], -56, "base[I8 200]");
+  v_i8 = -128; v_u8 = 128;
+  tests++; correct += Check(base[v_i8], -128, "base[I8 -128]");
+  tests++; correct += Check(base[v_u8], 128, "base[U8 128]");
+  v_i8 = 200; /* wraps to -56 */
+  tests++; correct += Check(base[v_i8], -56, "base[I8 200]");
   tests++; correct += Check(base[255(U8)], 255, "base[255(U8)]");
   tests++; correct += Check(base[-1(I8)], -1, "base[-1(I8)]");
 
@@ -109,16 +109,16 @@ I32 Main()
   /* a U8 buffer indexed by a U8, read and written; += and -= */
   U8 buf[256], *p = buf;
   for (k = 0; k < 256; k++) buf[k] = k;
-  u8 = 255; i8 = -1;
-  buf[u8] = 'z';
+  v_u8 = 255; v_i8 = -1;
+  buf[v_u8] = 'z';
   tests++; correct += Check(buf[255], 'z', "buf[U8] = 'z'");
-  p += u8;
+  p += v_u8;
   tests++; correct += Check(p - buf, 255, "p += U8");
-  p += i8;
+  p += v_i8;
   tests++; correct += Check(p - buf, 254, "p += I8");
   p -= b;
   tests++; correct += Check(p - buf, 253, "p -= Bool");
-  tests++; correct += Check(p[i8], 252, "p[I8 -1]");
+  tests++; correct += Check(p[v_i8], 252, "p[I8 -1]");
 
   /* a non-integer subscript is reported at the subscript, not the line
    * before (where the previous `+` is) */

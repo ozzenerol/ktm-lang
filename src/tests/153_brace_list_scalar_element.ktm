@@ -14,7 +14,7 @@
 #define SB_TEST_FILE "__153_brace_list_scalar_element.ktm"
 #define SB_TEST_OUT  "__153_brace_list_scalar_element.out"
 
-#define MSG_ELEM_I64 "Cannot use an initialiser list for an element of type I64"
+#define MSG_ELEM_I64 "Cannot use an initialiser list for an element of type i64"
 #define MSG_EXPECTED "Expected initializer list starting with '{', got "
 
 U0 CleanupScalarBraceTest(U0)
@@ -72,9 +72,9 @@ Bool CompileFailsWith(U8 *source, U8 *expected, U8 *where, I64 errors=1)
 Bool TestScalarElement(U0)
 {
   return CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 a[2] = {1, {2}};
+  i64 a[2] = {1, {2}};
 }
 ", MSG_ELEM_I64, SB_TEST_FILE ":3:18");
 }
@@ -82,9 +82,9 @@ Bool TestScalarElement(U0)
 Bool TestEveryElementBraced(U0)
 {
   return CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 a[2] = {{1}, {2}};
+  i64 a[2] = {{1}, {2}};
 }
 ", MSG_ELEM_I64, SB_TEST_FILE ":3:15");
 }
@@ -92,9 +92,9 @@ Bool TestEveryElementBraced(U0)
 Bool TestInnerDimension(U0)
 {
   return CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 a[2][2] = {{1, 2}, {3, {4}}};
+  i64 a[2][2] = {{1, 2}, {3, {4}}};
 }
 ", MSG_ELEM_I64, SB_TEST_FILE ":3:30");
 }
@@ -102,8 +102,8 @@ Bool TestInnerDimension(U0)
 Bool TestGlobal(U0)
 {
   return CompileFailsWith(
-"I64 g[2] = {1, {2}};
-U0 Main() {}
+"i64 g[2] = {1, {2}};
+void Main() {}
 ", MSG_ELEM_I64, SB_TEST_FILE ":1:16");
 }
 
@@ -111,22 +111,22 @@ Bool TestOtherScalars(U0)
 {
   Bool ok = TRUE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  F64 f[2] = {1.0, {2.0}};
+  f64 f[2] = {1.0, {2.0}};
 }
-", "Cannot use an initialiser list for an element of type F64",
+", "Cannot use an initialiser list for an element of type f64",
       SB_TEST_FILE ":3:20")) ok = FALSE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 *p[2] = {{1}, {2}};
+  i64 *p[2] = {{1}, {2}};
 }
-", "Cannot use an initialiser list for an element of type I64 *",
+", "Cannot use an initialiser list for an element of type i64 *",
       SB_TEST_FILE ":3:16")) ok = FALSE;
   /* An intrinsic class is a scalar */
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
   CDate d[2] = {1, {2}};
 }
@@ -138,12 +138,12 @@ Bool TestOtherScalars(U0)
 Bool TestClassScalarField(U0)
 {
   return CompileFailsWith(
-"class C { I64 a, b; };
-U0 Main()
+"class C { i64 a, b; };
+void Main()
 {
   C c = {1, {2}};
 }
-", "Cannot use an initialiser list for field b of type I64",
+", "Cannot use an initialiser list for field b of type i64",
     SB_TEST_FILE ":4:13");
 }
 
@@ -151,24 +151,24 @@ Bool TestBracedScalar(U0)
 {
   Bool ok = TRUE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 x = {1};
+  i64 x = {1};
 }
-", "Cannot use an initialiser list for a variable of type I64",
+", "Cannot use an initialiser list for a variable of type i64",
       SB_TEST_FILE ":3:11")) ok = FALSE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
   CDate d = {1, {2}};
-  I64 *p = {};
+  i64 *p = {};
 }
 ", "Cannot use an initialiser list for a variable of type CDate",
       SB_TEST_FILE ":3:13", 2)) ok = FALSE;
   /* At file scope it's read as an expression */
   if (!CompileFailsWith(
-"I64 g = {1};
-U0 Main() {}
+"i64 g = {1};
+void Main() {}
 ", "Second operand missing to `g =` got invalid character `{`",
       SB_TEST_FILE ":1:7")) ok = FALSE;
   return ok;
@@ -178,24 +178,24 @@ Bool TestExpectedList(U0)
 {
   Bool ok = TRUE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 a[2] = 5;
+  i64 a[2] = 5;
 }
 ", MSG_EXPECTED "`5`", SB_TEST_FILE ":3:14")) ok = FALSE;
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 n = 1;
-  I64 a[2] = n;
+  i64 n = 1;
+  i64 a[2] = n;
 }
 ", MSG_EXPECTED "`n`", SB_TEST_FILE ":4:14")) ok = FALSE;
   /* Points at the `;`, not at the next line */
   if (!CompileFailsWith(
-"U0 Main()
+"void Main()
 {
-  I64 a[2] = ;
-  I64 b = 1;
+  i64 a[2] = ;
+  i64 b = 1;
 }
 ", MSG_EXPECTED "`;`", SB_TEST_FILE ":3:14")) ok = FALSE;
   return ok;
@@ -205,13 +205,13 @@ Bool TestExpectedList(U0)
 Bool TestRecoveryContinues(U0)
 {
   return CompileFailsWith(
-"I64 g[2] = 5;
-U0 Main()
+"i64 g[2] = 5;
+void Main()
 {
-  I64 a[2] = {1, {2}};
-  I64 b[2][2] = {{1, 2}, {3, {4}}};
-  I64 c[2] = ;
-  I64 x = undefined_thing;
+  i64 a[2] = {1, {2}};
+  i64 b[2][2] = {{1, 2}, {3, {4}}};
+  i64 c[2] = ;
+  i64 x = undefined_thing;
 }
 ", MSG_EXPECTED "`5`", SB_TEST_FILE ":1:12", 5);
 }

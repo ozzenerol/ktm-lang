@@ -18,15 +18,15 @@ U0 Main()
   U8 *s = "hi";
   TypeofVec2 v;
 
-  if (!StrCmp(typeof(1+1), "I64")) correct++;
-  if (!StrCmp(typeof(1.5), "F64")) correct++;
-  if (!StrCmp(typeof(i), "I64")) correct++;
-  if (!StrCmp(typeof(&i), "I64 *")) correct++;
-  if (!StrCmp(typeof(s), "U8 *")) correct++;
+  if (!StrCmp(typeof(1+1), "i64")) correct++;
+  if (!StrCmp(typeof(1.5), "f64")) correct++;
+  if (!StrCmp(typeof(i), "i64")) correct++;
+  if (!StrCmp(typeof(&i), "i64 *")) correct++;
+  if (!StrCmp(typeof(s), "u8 *")) correct++;
   if (!StrCmp(typeof(v), "TypeofVec2")) correct++;
-  if (!StrCmp(typeof(U8*), "U8 *")) correct++;
+  if (!StrCmp(typeof(U8*), "u8 *")) correct++;
   /* The operand is type-checked, not evaluated. */
-  if (!StrCmp(typeof(Half(4.0)), "F64")) correct++;
+  if (!StrCmp(typeof(Half(4.0)), "f64")) correct++;
 }
 Main;
 

@@ -109,16 +109,20 @@ C's <code>%ld</code> (which also works):</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Type</th><th>Size</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td><code>U0</code></td><td>0</td><td>Nothing, like C's <code>void</code></td></tr>
-    <tr><td><code>Bool</code></td><td>1</td><td><code>TRUE</code> (1) or <code>FALSE</code> (0): any other value converted to it is 1 if it isn't 0</td></tr>
-    <tr><td><code>I8</code> / <code>U8</code></td><td>1</td><td>Signed / unsigned byte; <code>U8</code> is the character type</td></tr>
-    <tr><td><code>I16</code> / <code>U16</code></td><td>2</td><td>16-bit integers</td></tr>
-    <tr><td><code>I32</code> / <code>U32</code></td><td>4</td><td>32-bit integers</td></tr>
-    <tr><td><code>I64</code> / <code>U64</code></td><td>8</td><td>64-bit integers, the default integer type</td></tr>
-    <tr><td><code>F64</code></td><td>8</td><td>Double-precision float</td></tr>
-    <tr><td><code>F32</code></td><td>4</td><td>Single-precision float (an ktm addition, for C libraries)</td></tr>
+    <tr><td><code>void</code></td><td>0</td><td>Nothing</td></tr>
+    <tr><td><code>bool</code></td><td>1</td><td><code>TRUE</code> (1) or <code>FALSE</code> (0): any other value converted to it is 1 if it isn't 0</td></tr>
+    <tr><td><code>i8</code> / <code>u8</code></td><td>1</td><td>Signed / unsigned byte; <code>u8</code> is the character type</td></tr>
+    <tr><td><code>i16</code> / <code>u16</code></td><td>2</td><td>16-bit integers</td></tr>
+    <tr><td><code>i32</code> / <code>u32</code></td><td>4</td><td>32-bit integers</td></tr>
+    <tr><td><code>i64</code> / <code>u64</code></td><td>8</td><td>64-bit integers, the default integer type</td></tr>
+    <tr><td><code>f64</code></td><td>8</td><td>Double-precision float</td></tr>
+    <tr><td><code>f32</code></td><td>4</td><td>Single-precision float</td></tr>
   </tbody>
 </table></div>
+<p>The older names <code>U0</code>, <code>Bool</code>, <code>I8</code> ... <code>U64</code>,
+<code>F32</code> and <code>F64</code> still work for now and mean the same types. The new names
+are type names, not keywords, so a struct field can still be called <code>i64</code> or
+<code>f64</code>; a variable can't.</p>
 <p>Pointers are written as in C (<code>U8 *s</code>, <code>I64 **pp</code>) and are 8 bytes.
 <code>NULL</code> is 0.</p>
 <p>As in C, a value becomes a <code>Bool</code> by comparing it with 0: an integer, float
@@ -126,7 +130,7 @@ or pointer that isn't 0 (or <code>NULL</code>) is <code>TRUE</code>, whether it 
 passed as an argument, returned, stored in a field or cast with <code>x(Bool)</code>. Only the
 low byte is never kept, so <code>0x100</code> and <code>0.5</code> are <code>TRUE</code>.
 A pointer needs no cast to become a <code>Bool</code> (other integer types warn without one),
-and messages and <code>typeof</code> call the type <code>Bool</code>.</p>
+and messages and <code>typeof</code> call the type <code>bool</code>.</p>
 <pre data-run><code>Bool IsSet(I64 flags, I64 bit) { return flags &amp; bit; }
 
 U0 Main()
@@ -213,7 +217,7 @@ U0 Main()
   "%s %s %s\n", typeof(count), typeof(price), typeof(label);
 }
 </code></pre>
-<pre class="output">I64 F64 U8[6]
+<pre class="output">i64 f64 u8[6]
 </pre>
 
 <h3 id="static">static<a class="anchor" href="#static" aria-label="Link to this section">#</a></h3>
@@ -307,7 +311,7 @@ U0 Main()
 </code></pre>
 <pre class="output">80 10
 16 8
-I64 I64 *
+i64 i64 *
 </pre>
 <p><code>typeof</code> is an ktm addition. It becomes a string naming the type at compile
 time, and its operand is never evaluated.</p>
@@ -1030,7 +1034,7 @@ U0 Main()
 }
 </code></pre>
 <pre class="output">demo 64 0.5 1024
-32.0 F64
+32.0 f64
 </pre>
 
 <h3 id="conditional-compilation">Conditional compilation<a class="anchor" href="#conditional-compilation" aria-label="Link to this section">#</a></h3>

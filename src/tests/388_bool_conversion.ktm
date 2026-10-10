@@ -43,13 +43,13 @@ U0 Args(U8 *p)
   U64 h = 0x100, big = 0x800;
   I64 m = -1;
   F64 f = 0.5;
-  F32 f32 = 0.25;
+  F32 v_f32 = 0.25;
   I64 (*fp)(Bool) = &Arg;
   Check(Arg(h) == 1, "arg 0x100");
   Check(Arg(big) == 1, "arg 0x800");
   Check(Arg(m) == 1, "arg -1");
   Check(Arg(f) == 1, "arg 0.5");
-  Check(Arg(f32) == 1, "arg F32 0.25");
+  Check(Arg(v_f32) == 1, "arg F32 0.25");
   Check(Arg(p) == 1, "arg pointer");
   Check(Arg(0) == 0 && Arg(0.0) == 0 && Arg(NULL) == 0, "arg 0");
   Check(Arg(0x100) == 1 && Arg(0.5) == 1, "arg constants");

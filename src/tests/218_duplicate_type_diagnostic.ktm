@@ -41,7 +41,7 @@ Bool Prints(U8 *source, I64 errors, I64 warnings, U8 *want)
   return ok;
 }
 
-#define CLS "class P { I64 x, y; };\n"
+#define CLS "class P { i64 x, y; };\n"
 
 I32 Main()
 {
@@ -50,32 +50,32 @@ I32 Main()
   I64 correct = 0;
 
   tests++;
-  if (Prints(CLS "U0 Main() {\n  I64 y = 1; P p; y = p;\n}\n", 1, 0,
+  if (Prints(CLS "void Main() {\n  i64 y = 1; P p; y = p;\n}\n", 1, 0,
              "218-dup.ktm:3:21\n"))
     correct++;
   else "Failed - y = p\n";
 
   tests++;
-  if (Prints(CLS "U0 Main() {\n  I64 y = 1; P p; p = y;\n}\n", 1, 0,
-             "`P = I64` is invalid"))
+  if (Prints(CLS "void Main() {\n  i64 y = 1; P p; p = y;\n}\n", 1, 0,
+             "`P = i64` is invalid"))
     correct++;
   else "Failed - p = y\n";
 
   tests++;
-  if (Prints(CLS "U0 Main() {\n  I64 y = 1; P p; y += p;\n}\n", 1, 0,
-             "`I64 += P` is invalid"))
+  if (Prints(CLS "void Main() {\n  i64 y = 1; P p; y += p;\n}\n", 1, 0,
+             "`i64 += P` is invalid"))
     correct++;
   else "Failed - y += p\n";
 
   tests++;
-  if (Prints(CLS "P gp;\nI64 gz = gp;\n", 1, 0, "`I64 = P` is invalid"))
+  if (Prints(CLS "P gp;\nI64 gz = gp;\n", 1, 0, "`i64 = P` is invalid"))
     correct++;
   else "Failed - global initialiser\n";
 
   /* A valid operation with a doubtful type is still warned about */
   tests++;
-  if (Prints("U0 Main() {\n  I64 *q; F64 f;\n  q = f;\n}\n", 0, 1,
-             "Incompatible types 'F64' is not assignable to type 'I64 *'"))
+  if (Prints("void Main() {\n  i64 *q; f64 f;\n  q = f;\n}\n", 0, 1,
+             "Incompatible types 'f64' is not assignable to type 'i64 *'"))
     correct++;
   else "Failed - warning kept\n";
 
