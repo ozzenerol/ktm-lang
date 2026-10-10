@@ -1030,6 +1030,29 @@ static int migMethodCall(MigFile *f, s64 s, s64 nlen, const char *meth) {
     return 1;
 }
 
+/* Swap arguments a and b (0-based) of the call whose `(` follows p */
+static void migSwapArgs(MigFile *f, s64 p, int a, int b) {
+    char *t = f->text;
+    while (p < f->len && isspace((unsigned char)t[p])) p++;
+    if (p >= f->len || t[p] != '(') return;
+    s64 starts[16], ends[16];
+    int n = 0, depth = 0;
+    starts[0] = p + 1;
+    for (s64 k = p + 1; k < f->len && n < 15; ++k) {
+        if (t[k] == '"' || t[k] == '\'') { k = migQuoteEnd(t, k, f->len); continue; }
+        if (t[k] == '(' || t[k] == '[' || t[k] == '{') depth++;
+        else if ((t[k] == ')' || t[k] == ']' || t[k] == '}') && depth-- == 0) { ends[n++] = k; break; }
+        else if (t[k] == ',' && depth == 0) { ends[n++] = k; starts[n] = k + 1; }
+    }
+    if (a >= n || b >= n) return;
+    for (int i = 0; i < n; ++i) {
+        while (starts[i] < ends[i] && isspace((unsigned char)t[starts[i]])) starts[i]++;
+        while (ends[i] > starts[i] && isspace((unsigned char)t[ends[i] - 1])) ends[i]--;
+    }
+    migAddSegs(f, starts[a], ends[a], "swap", migRange(starts[b], ends[b]), NULL);
+    migAddSegs(f, starts[b], ends[b], "swap", migRange(starts[a], ends[a]), NULL);
+}
+
 void migrateNoteRef(Cctrl *cc, Lexeme *name) {
     if (!mig_map) return;
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
@@ -1053,6 +1076,8 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name) {
     char *meth = migMethodName(decl, m);
     if (meth && migMethodCall(f, s, name->len, meth)) return;
     migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
+    /* decision 11: QSortGeneric(arr, high, low, lt) is vec.qsort(arr, low, high, lt) */
+    if (!strcmp(key, "QSortGeneric")) migSwapArgs(f, s + name->len, 1, 2);
 }
 
 void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type) {
@@ -1184,6 +1209,9 @@ static char *migEditText(MigFile *f, MigEdit *e) {
     return out->data ? out->data : "";
 }
 
+/* migApply's to_eof is 2 for the whole file */
+static int to_eof_outer(int to_eof) { return to_eof == 2; }
+
 static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof) {
     AoStr *out = aoStrNew();
     s64 pos = rs;
@@ -1192,6 +1220,9 @@ static char *migApply(MigFile *f, s64 rs, s64 re, int to_eof) {
         if (e->start < pos || e->start > re) continue;
         if (e->start == re && !(to_eof && e->start == e->end)) continue;
         if (e->end > re) continue;
+        /* a swap's own range renders as written (its partner's edit
+         * renders this one) */
+        if (!strcmp(e->kind, "swap") && e->start == rs && e->end == re && !to_eof_outer(to_eof)) continue;
         aoStrCatLen(out, f->text + pos, e->start - pos);
         aoStrCat(out, migEditText(f, e));
         pos = e->end;
