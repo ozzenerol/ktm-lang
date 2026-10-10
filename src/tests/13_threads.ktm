@@ -35,7 +35,7 @@ Bool pthread_test()
     args->lk = &lk;
     args->ptr = &x;
     args->id = i;
-    threads[i] = pthread_create(&args->th,,&Func, &thread_args[i]);
+    threads[i] = pthread_create(&args->th,,(&Func)(U0 *(*)(U0 *)), &thread_args[i]);
   }
 
   for (I64 i = 0; i < THREAD_COUNT; ++i) {
@@ -71,7 +71,7 @@ Bool ThreadPoolTest()
   arg->lk = &lk;
   arg->th = NULL;
   for (I64 i = 0; i < 10; ++i) {
-    ThreadPoolEnqueue(pool,arg,&PoolFunc);
+    ThreadPoolEnqueue(pool,arg,(&PoolFunc)(fn(U0 *, U0 *) U0));
   }
   ThreadPoolWait(pool);
   pthread_mutex_destroy(&lk);

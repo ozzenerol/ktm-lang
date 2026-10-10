@@ -354,8 +354,9 @@ DirHuman *DirHumanNew(U8 *pathname, Fstat *fst, U8 type)
   return dh;
 }
 
-U0 DirHumanRelease(DirHuman *dh)
+U0 DirHumanRelease(U0 *_dh)
 {
+  DirHuman *dh = _dh;
   if (dh) {
     Free(dh->pathname);
     Free(dh);
@@ -388,8 +389,9 @@ I64 CmpLeadingNumber(U8 *s1, U8 *s2)
 
 /* TRUE if dh1 is listed before dh2: names that both start with a number
  * by that number, then everything by the plain name */
-I64 CmpDirHuman(DirHuman *dh1, DirHuman *dh2)
+I64 CmpDirHuman(U0 *_dh1, U0 *_dh2)
 {
+  DirHuman *dh1 = _dh1, *dh2 = _dh2;
   U8 *str1 = dh1->pathname;
   U8 *str2 = dh2->pathname;
   I64 cmp;

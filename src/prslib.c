@@ -914,6 +914,7 @@ typedef enum {
     ARG_WARN_PTR_TO_INT,  /* a pointer where an integer is expected */
     ARG_WARN_INT_TO_PTR,  /* an integer where a pointer is expected */
     ARG_ERROR,
+    ARG_FN_MISMATCH,      /* function pointers with different signatures */
 } ParseArgCompat;
 
 static int parseIsAggregateType(AstType *t) {
@@ -1014,6 +1015,7 @@ static ParseArgCompat parseArgCompat(AstType *param, Ast *arg) {
             int a_void = a->kind == AST_TYPE_POINTER && a->ptr &&
                          a->ptr->kind == AST_TYPE_VOID;
             if (p_void || a_void) return ARG_OK;
+            if (astFnPtrMismatch(p, a)) return ARG_FN_MISMATCH;
             if (p->kind == AST_TYPE_FUNC || a->kind == AST_TYPE_FUNC) {
                 return p->kind == a->kind ? ARG_OK : ARG_WARN_POINTER;
             }
@@ -1055,6 +1057,17 @@ static void parseCheckArgType(Cctrl *cc, AstType *type, Ast *arg, int i,
     }
     ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
                        ? loc->args->entries[i] : NULL;
+    if (compat == ARG_FN_MISMATCH) {
+        char *msg_expected = astTypeToString(type);
+        char *msg_actual = astTypeToString(arg->type);
+        if (at) {
+            cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                    "cannot convert %s to %s", msg_actual, msg_expected);
+        } else {
+            parseRaiseFnConvert(cc, type, arg->type);
+        }
+        return;
+    }
     if (compat == ARG_ERROR) {
         if (astIsEnumType(type)) {
             char *actual = astTypeToString(arg->type);
@@ -2873,6 +2886,14 @@ static s64 astBinOpToTokenPunct(AstBinOp op) {
  * that is `+=`, not `+`: rewinding for a `+` that is not there would
  * land before the statement and the per-statement recovery would then
  * re-parse it forever. */
+/* A function pointer given one with a different signature: an error
+ * naming both, wherever the conversion happens (assignment,
+ * initialiser, argument, return, conditional) */
+void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
+    cctrlRaiseException(cc, "cannot convert %s to %s",
+            astTypeToString(actual), astTypeToString(expected));
+}
+
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
@@ -2909,6 +2930,10 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
             cctrlRaiseException(cc,"Cannot compare enum `%s` with enum `%s`",
                     left->type->clsname->data, right->type->clsname->data);
         }
+        if (operation == AST_BIN_OP_ASSIGN &&
+            astFnPtrMismatch(left->type, right->type)) {
+            parseRaiseFnConvert(cc, left->type, right->type);
+        }
         if (operation == AST_BIN_OP_ASSIGN && astIsEnumType(left->type)) {
             cctrlRaiseException(cc,
                     "Cannot convert `%s` to enum `%s` without a cast",
@@ -2938,7 +2963,7 @@ Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right) {
 /* Usual arithmetic conversions between the two branches of a conditional:
  * a pointer branch wins (the other is an integer or null), otherwise the
  * arithmetic result type as for a binary operator. */
-static AstType *parseTernaryResultType(Ast *then, Ast *els) {
+static AstType *parseTernaryResultType(Cctrl *cc, Ast *then, Ast *els) {
     /* Arrays and string literals decay to pointers; a function name is
      * a function pointer. Any such branch gives the pointer type (the
      * other branch is a pointer, an array or a null/integer). */
@@ -2946,6 +2971,7 @@ static AstType *parseTernaryResultType(Ast *then, Ast *els) {
     AstType *b = astConvertArray(els->type);
     int a_ptr = a->kind == AST_TYPE_POINTER || a->kind == AST_TYPE_FUNC;
     int b_ptr = b->kind == AST_TYPE_POINTER || b->kind == AST_TYPE_FUNC;
+    if (astFnPtrMismatch(a, b)) parseRaiseFnConvert(cc, a, b);
     if (a_ptr) return a;
     if (b_ptr) return b;
     /* Both branches the same enum: keep it (as an assignment would),
@@ -2974,7 +3000,7 @@ static Ast *parseTernary(Cctrl *cc, Ast *cond) {
     if (!els) {
         cctrlRaiseException(cc, "Expected an expression after `:`");
     }
-    AstType *rt = parseTernaryResultType(then, els);
+    AstType *rt = parseTernaryResultType(cc, then, els);
     then = astCast(then, rt);
     els = astCast(els, rt);
     return astTernary(rt, cond, then, els);

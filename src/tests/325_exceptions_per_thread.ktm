@@ -129,7 +129,7 @@ I32 Main()
   try {
     for (i = 0; i < WORKERS; i++) {
       work[i].id = i + 1;
-      pthread_create(&work[i].th, NULL, &Worker, &work[i]);
+      pthread_create(&work[i].th, NULL, (&Worker)(U0 *(*)(U0 *)), &work[i]);
     }
     for (i = 0; i < WORKERS; i++) {
       pthread_join(work[i].th);

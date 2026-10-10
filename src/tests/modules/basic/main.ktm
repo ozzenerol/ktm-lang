@@ -14,7 +14,7 @@ i32 main() {
   s.kind = geo.Kind.circle;
   s.corner.x = 7;
   printf("%d %d %d %d %d\n", geo.calls(), sizeof(cells) / 8, square(2), s.kind, s.corner.x);
-  i64 (*f)(i64, i64) = &geo.makePoint;
+  geo.Point *(*f)(i64, i64) = &geo.makePoint;
   printf("%d\n", f != NULL);
   return 0;
 }

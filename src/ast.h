@@ -677,6 +677,8 @@ int astTypeIsPtr(AstType *type);
 int astTypeIsArray(AstType *type);
 int astIsIntrinsicClass(AstType *ty);
 int astIsEnumType(AstType *ty);
+int astFnTypesMatch(AstType *a, AstType *b);
+int astFnPtrMismatch(AstType *expected, AstType *actual);
 int astIsDifferentEnum(AstType *a, AstType *b);
 int astIsVarArg(Ast *ast);
 int astIsRangeOperator(AstBinOp op);

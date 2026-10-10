@@ -113,14 +113,14 @@ I32 Main()
   for (I64 k = 0; k < 6; ++k) if (!SortInts(k, 1000000)) ok = FALSE;
   tests++; if (ok) correct++;
 
-  tests++; if (SortItems(200000, &ItemLess, TRUE)) correct++;
+  tests++; if (SortItems(200000, (&ItemLess)(fn(U0 *, U0 *) I64), TRUE)) correct++;
   else "PtrVecSort with duplicates wrong\n";
 
   /* Other comparator styles must still terminate and keep every item;
    * `<=` still sorts, a C-style -1/0/1 comparator does not (documented). */
-  tests++; if (SortItems(50000, &ItemLessEq, TRUE)) correct++;
+  tests++; if (SortItems(50000, (&ItemLessEq)(fn(U0 *, U0 *) I64), TRUE)) correct++;
   else "`<=` comparator wrong\n";
-  tests++; if (SortItems(50000, &ItemCStyle, FALSE)) correct++;
+  tests++; if (SortItems(50000, (&ItemCStyle)(fn(U0 *, U0 *) I64), FALSE)) correct++;
   else "C-style comparator lost items\n";
 
   alarm(0);

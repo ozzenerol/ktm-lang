@@ -118,6 +118,9 @@ Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
 void parseTypeCheckClassFieldInitaliser(Cctrl *cc, AstType *cls_field_type, Ast *init,
                                         Lexeme *start)
 {
+    if (astFnPtrMismatch(cls_field_type, init->type)) {
+        parseRaiseFnConvert(cc, cls_field_type, init->type);
+    }
     if (!astTypeCheck(cls_field_type, init, AST_BIN_OP_ASSIGN)) {
         char *cls_field_str = astTypeToColorString(cls_field_type);
         char *init_field = astTypeToColorString(init->type);
@@ -290,6 +293,9 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                                 Lexeme *start)
 {
     if (type->ptr) {
+        if (astFnPtrMismatch(type->ptr, init->type)) {
+            parseRaiseFnConvert(cc, type->ptr, init->type);
+        }
         if ((astGetResultType(AST_BIN_OP_ASSIGN, init->type, type->ptr)) == NULL) {
             cctrlRaiseException(cc,"Incompatiable types: %s %s",
                     astTypeToString(init->type),
@@ -2596,6 +2602,11 @@ Ast *parseReturnStatement(Cctrl *cc) {
         return astReturn(retval,cc->tmp_rettype);
     }
 
+    if (retval && astFnPtrMismatch(cc->tmp_rettype, check)) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "cannot convert %s to %s",
+                astTypeToString(check), astTypeToString(cc->tmp_rettype));
+    }
     AstType *ok = astTypeCheck(cc->tmp_rettype,retval,'\0');
     if (!ok && astIsEnumType(cc->tmp_rettype)) {
         cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
@@ -4114,58 +4125,6 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     return func;
 }
 
-/* Do two declarations of a function agree on a type? Integers match
- * by size and signedness (an `I64 class` like CDate is its integer),
- * classes and unions by name, an array parameter is its pointer and
- * `auto` matches anything. */
-static int parseFnTypesMatch(AstType *a, AstType *b) {
-    if (a == b) return 1;
-    if (!a || !b) return 0;
-    if (a->kind == AST_TYPE_AUTO || b->kind == AST_TYPE_AUTO) return 1;
-    if (a->kind == AST_TYPE_ARRAY) a = astMakePointerType(a->ptr);
-    if (b->kind == AST_TYPE_ARRAY) b = astMakePointerType(b->ptr);
-
-    int a_int = a->kind == AST_TYPE_INT || a->kind == AST_TYPE_CHAR;
-    int b_int = b->kind == AST_TYPE_INT || b->kind == AST_TYPE_CHAR;
-    if ((a_int || astIsIntrinsicClass(a)) && (b_int || astIsIntrinsicClass(b))) {
-        if (a->size != b->size) return 0;
-        return !a_int || !b_int || a->issigned == b->issigned;
-    }
-    if (a->kind != b->kind) return 0;
-
-    switch (a->kind) {
-        case AST_TYPE_FLOAT:
-            return a->size == b->size;
-        case AST_TYPE_POINTER:
-            return parseFnTypesMatch(a->ptr, b->ptr);
-        case AST_TYPE_CLASS:
-        case AST_TYPE_UNION:
-            if (!a->clsname || !b->clsname) return 0;
-            return aoStrCmp(a->clsname, b->clsname);
-        case AST_TYPE_FUNC: {
-            if (!parseFnTypesMatch(a->rettype, b->rettype)) return 0;
-            u64 na = a->params ? a->params->size : 0;
-            u64 nb = b->params ? b->params->size : 0;
-            if (na != nb) return 0;
-            for (u64 i = 0; i < na; ++i) {
-                Ast *pa = a->params->entries[i];
-                Ast *pb = b->params->entries[i];
-                if (!pa || !pb) return pa == pb;
-                if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
-                    return 0;
-                }
-                if ((pa->flags & AST_FLAG_VARARGS) != (pb->flags & AST_FLAG_VARARGS)) {
-                    return 0;
-                }
-                if (pa->kind == AST_VAR_ARGS) continue;
-                if (!parseFnTypesMatch(pa->type, pb->type)) return 0;
-            }
-            return 1;
-        }
-        default:
-            return 1;
-    }
-}
 
 /* `fname` is being declared or defined again with `rettype`/`params`:
  * a different signature from the earlier prototype or definition (the
@@ -4189,7 +4148,7 @@ static void parseCheckFunctionRedeclaration(Cctrl *cc, AstType *rettype,
         return;
     }
     AstType *type = astMakeFunctionType(rettype, params);
-    if (parseFnTypesMatch(type, prev->type) &&
+    if (astFnTypesMatch(type, prev->type) &&
         !has_var_args == !prev->has_var_args) {
         return;
     }
@@ -4267,7 +4226,7 @@ static void parseInheritDefaultParams(Cctrl *cc, AstType *rettype,
     /* A conflicting signature is reported by
      * parseCheckFunctionRedeclaration; inherit nothing from it */
     AstType *type = astMakeFunctionType(rettype, params);
-    if (!parseFnTypesMatch(type, prev->type) ||
+    if (!astFnTypesMatch(type, prev->type) ||
         !has_var_args != !prev->has_var_args) {
         return;
     }
@@ -5457,6 +5416,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 Lexeme *eq = cctrlTokenGet(cc);     /* consume '=' */
                 int eq_line = eq->line, eq_col = eq->col;
                 Ast *rhs = parseExpr(cc,16);
+                if (astFnPtrMismatch(type, rhs->type)) {
+                    parseRaiseFnConvert(cc, type, rhs->type);
+                }
                 if (!astTypeCheck(type,rhs,AST_BIN_OP_ASSIGN)) {
                     typeCheckWarn(cc,eq_line,eq_col,variable,rhs);
                 }
