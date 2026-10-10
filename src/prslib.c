@@ -95,16 +95,16 @@ int parseFnStartsType(Cctrl *cc) {
         Lexeme *first = cctrlTokenGet(cc); n++;
         if (tokenPunctIs(first,')')) {
             Lexeme *after = cctrlTokenPeek(cc);
-            result = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+            result = after && (cctrlTokIsKeyword(cc, after) ||
                                 tokenIsFnIdent(after));
         } else if (tokenPunctIs(first,TK_ELLIPSIS)) {
             Lexeme *close = cctrlTokenGet(cc); n++;
             if (tokenPunctIs(close,')')) {
                 Lexeme *after = cctrlTokenPeek(cc);
-                result = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+                result = after && (cctrlTokIsKeyword(cc, after) ||
                                     tokenIsFnIdent(after));
             }
-        } else if (first && (cctrlIsKeyword(cc,first->start,first->len) ||
+        } else if (first && (cctrlTokIsKeyword(cc, first) ||
                               tokenIsFnIdent(first))) {
             /* `Name.member` (an enum member, ktm syntax v0.2's Y6) is an
              * expression, not a type: `fn(Color.blue)` is a call through
@@ -129,7 +129,7 @@ int parseFnLooksLikeType(Cctrl *cc) {
     }
     cctrlTokenGet(cc); /* `fn` */
     Lexeme *after = cctrlTokenPeek(cc);
-    int looks_like_type = after && (cctrlIsKeyword(cc,after->start,after->len) ||
+    int looks_like_type = after && (cctrlTokIsKeyword(cc, after) ||
                                      tokenIsFnIdent(after));
     cctrlTokenRewind(cc);
     return looks_like_type;
@@ -253,7 +253,7 @@ AstType *parseFnType(Cctrl *cc) {
     Vec *params = parseFnTypeParams(cc,&has_var_args);
 
     Lexeme *ret_peek = cctrlTokenPeek(cc);
-    if (!ret_peek || (!cctrlIsKeyword(cc,ret_peek->start,ret_peek->len) &&
+    if (!ret_peek || (!cctrlTokIsKeyword(cc, ret_peek) &&
                        !tokenIsFnIdent(ret_peek)))
     {
         cctrlRaiseException(cc,
@@ -2392,7 +2392,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
     int peek_is_fn_type = peek && tokenIsFnIdent(peek) && parseFnStartsType(cc);
     if (peek == NULL ||
-        (!cctrlIsKeyword(cc,peek->start,peek->len) && !peek_is_fn_type) ||
+        (!cctrlTokIsKeyword(cc, peek) && !peek_is_fn_type) ||
         tokenPunctIs(after_peek,'.'))
     {
         return parseCallArguments(cc,name,len);
@@ -2635,6 +2635,17 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     return astUnaryOperator(binop->type->ptr, AST_UN_OP_DEREF, binop);
 }
 
+/* `field` (named `name`) is private to another module than this code's */
+void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len) {
+    if (!field || !field->private_module ||
+        field->private_module == cc->cur_module) {
+        return;
+    }
+    cctrlRaiseException(cc, "`%.*s` is a private field of %s", len, name,
+                        field->private_of ? field->private_of->data
+                                          : "its struct");
+}
+
 Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     AstType *type;
     /* `nums.len` of a `T ...nums` parameter: its hidden count */
@@ -2732,6 +2743,7 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
         cctrlRaiseException(cc,"Property: %.*s does not exist on class", 
                 tok->len, tok->start);
     }
+    parseCheckPrivateField(cc, field, tok->start, tok->len);
 
     AoStr *field_name = aoStrDupRaw(tok->start, tok->len);
     Ast *class_ref = astClassRef(field, cls, aoStrMove(field_name));
@@ -3012,13 +3024,13 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             int peek_is_fn_type = peek && tokenIsFnIdent(peek) &&
                                   parseFnStartsType(cc);
             if (parseIsCallableFnPtr(LHS) &&
-                (peek == NULL || (!cctrlIsKeyword(cc,peek->start,peek->len) &&
+                (peek == NULL || (!cctrlTokIsKeyword(cc, peek) &&
                                    !peek_is_fn_type))) {
                 LHS = parseClassFnPtrCall(cc,LHS);
                 continue;
             }
             /* `(x)(3)`: not a cast (no type follows) and nothing to call */
-            if (peek && !cctrlIsKeyword(cc,peek->start,peek->len) &&
+            if (peek && !cctrlTokIsKeyword(cc, peek) &&
                 !peek_is_fn_type) {
                 cctrlTokenRewind(cc);
                 cctrlRaiseException(cc,"Cannot call %s `%s`: only functions and function pointers can be called",
@@ -3177,7 +3189,7 @@ Ast *parseSizeof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "sizeof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+        (cctrlTokIsKeyword(cc, peek) ||
          (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
@@ -3224,7 +3236,7 @@ Ast *parseAlignof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "alignof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+        (cctrlTokIsKeyword(cc, peek) ||
          (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
@@ -3253,7 +3265,7 @@ Ast *parseTypeof(Cctrl *cc) {
         cctrlRaiseException(cc, "Unexpected end of input after `typeof`");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        (cctrlIsKeyword(cc,peek->start,peek->len) ||
+        (cctrlTokIsKeyword(cc, peek) ||
          (tokenIsFnIdent(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
@@ -3309,7 +3321,7 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 cctrlRaiseException(cc,
                         "Unexpected end of input after '('");
             }
-            if (cctrlIsKeyword(cc,peek->start,peek->len) ||
+            if (cctrlTokIsKeyword(cc, peek) ||
                 (tokenIsFnIdent(peek) && parseFnStartsType(cc))) {
                 type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');

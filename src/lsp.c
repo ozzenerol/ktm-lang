@@ -953,7 +953,7 @@ static const char *lsp_keywords[] = {
     /* Added */
     "auto", "continue", "typeof", "F32", "alignof",
     "true", "false", "null",
-    "struct", "pub", "const", "enum", "defer",
+    "struct", "pub", "private", "const", "enum", "defer",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -1113,6 +1113,23 @@ static void lspCompleteLocals(LspCtx *ctx, u32 doc_id, int cursor_line,
     vecRelease(seen);
 }
 
+/* A `private` field is seen only from its module: the directory of the
+ * file it is declared in */
+static int lspFieldVisible(LspCtx *ctx, AstType *f, u32 doc_id) {
+    if (!f || !f->private_module) return 1;
+    AoStr *fpath = cctrlLookUpFile(ctx->cc, f->file_id);
+    AoStr *dpath = cctrlLookUpFile(ctx->cc, doc_id);
+    if (!fpath || !dpath) return 0;
+    char fabs[PATH_MAX], dabs[PATH_MAX];
+    const char *fp = realpath(fpath->data, fabs) ? fabs : fpath->data;
+    const char *dp = realpath(dpath->data, dabs) ? dabs : dpath->data;
+    const char *fslash = strrchr(fp, '/');
+    const char *dslash = strrchr(dp, '/');
+    int flen = fslash ? (int)(fslash - fp) : 0;
+    int dlen = dslash ? (int)(dslash - dp) : 0;
+    return flen == dlen && !strncmp(fp, dp, flen);
+}
+
 static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1188,6 +1205,7 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                 const char *fname = (const char *)mi.node->key;
                 if (strncmp(fname, prefix, plen) != 0) continue;
                 AstType *ft = (AstType *)mi.node->value;
+                if (!lspFieldVisible(ctx, ft, doc_id)) continue;
                 int kind = (ft && ft->kind == AST_TYPE_FUNC)
                          ? KTM_LSP_FUNCTION : KTM_LSP_FIELD;
                 lspCatCompletion(mbody, &memitted, fname, kind,

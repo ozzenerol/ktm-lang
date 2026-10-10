@@ -190,6 +190,11 @@ typedef struct AstType {
     /* A class or union the standard library defines: only it can add
      * methods to it */
     u8 in_std;
+    /* On a class field marked `private`: the module that defines its
+     * class (Lexer.modules, 1-based; 0 for a public field), the only one
+     * that can use it, and the class's name for the messages */
+    u32 private_module;
+    AoStr *private_of;
     /* Bool: a 1-byte char type, but a value converted to it becomes 0 or
      * 1 (value != 0), as in C, instead of keeping its low byte. */
     u8 is_bool;

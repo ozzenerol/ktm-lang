@@ -176,7 +176,7 @@ AstType *parseGetType(Cctrl *cc, Lexeme *tok) {
 }
 
 int parseIsKeyword(Lexeme *tok, Cctrl *cc) {
-    return cctrlIsKeyword(cc,tok->start,tok->len) || NULL;
+    return cctrlTokIsKeyword(cc, tok) || NULL;
 }
 
 int evalClassRef(Ast *ast, int offset) {

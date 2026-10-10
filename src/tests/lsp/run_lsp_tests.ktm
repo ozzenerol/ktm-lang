@@ -110,7 +110,7 @@ U0 InitFixtures()
   /* A module: geo/geo.ktm, three pub names and a private one */
   MOD_GEO_HC =
     "module geo;\n"
-    "pub struct Point { i64 x; i64 y; };\n"
+    "pub struct Point { i64 x; i64 y; private i64 tag; };\n"
     "pub const i64 ORIGIN = 0;\n"
     "i64 square(i64 n) { return n * n; }\n"
     "pub i64 area(i64 side) { return square(side); }\n";
@@ -118,6 +118,8 @@ U0 InitFixtures()
     "import geo;\n"
     "i32 main() {\n"
     "  i64 a = geo.area(3);\n"
+    "  geo.Point p;\n"
+    "  i64 b = p.x;\n"
     "  geo.\n"
     "  return 0;\n"
     "}\n";
@@ -1216,7 +1218,8 @@ U0 TestReferences()
 
 #define LSP_GROUPS 11
 
-/* Modules: completion after `geo.` offers geo's pub names only, hover
+/* Modules: completion after `geo.` offers geo's pub names only, after
+ * `p.` the public fields of geo.Point only, hover
  * and definition on `geo.area` resolve into geo/geo.ktm */
 U0 TestModules()
 {
@@ -1235,6 +1238,12 @@ U0 TestModules()
   Json *items = JsonSelect(resp, ".result.items:a");
   Check("completion after `geo.` offers exactly geo's pub names",
         JsonArrayCount(items) == 3 && LabelsOk(resp, "", "area", "Point"));
+
+  PosOf(MOD_MAIN_HC, "p.x;", 2, &line, &chr);
+  resp = LspPositionRequest(l, "textDocument/completion", uri, line, chr);
+  items = JsonSelect(resp, ".result.items:a");
+  Check("completion after `p.` outside geo leaves out the private field",
+        JsonArrayCount(items) == 2 && LabelsOk(resp, "", "x", "y"));
 
   PosOf(MOD_MAIN_HC, "area(3)", 1, &line, &chr);
   resp = LspPositionRequest(l, "textDocument/hover", uri, line, chr);

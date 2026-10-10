@@ -1414,6 +1414,39 @@ i32 main() {
   a.deposit(5);
   return 0;
 }</code></pre>
+<p>A field marked <code>private</code> can be used only inside the module that defines its
+struct: in any of the module's files, its functions and its methods. Outside, reading or
+writing it, taking its address, an initialiser list that reaches it, a range-based
+<code>for</code> over it and a struct that inherits it all say
+<code>`buf` is a private field of net.Conn</code>. The rest of the struct stays usable:
+its public fields, <code>sizeof</code>, copying it and passing it by value, since only the
+names are hidden, not the layout:</p>
+<pre><code>// net/conn.ktm
+module net;
+
+pub struct Conn {
+  i32 fd;              // public, as in C
+  private u8 *buf;     // only net uses it
+};
+
+pub u8 *peek(Conn *c) { return c.buf; }
+
+// main.ktm
+import net;
+
+i32 main() {
+  net.Conn c;
+  c.fd = 3;            // fine
+  net.Conn copy = c;   // fine
+  c.buf = NULL;        // error: `buf` is a private field of net.Conn
+  return 0;
+}</code></pre>
+<p><code>private</code> fields are only for a module's structs: in the main program, where
+there is nothing outside to hide them from, they are an error, and so is
+<code>public</code> on a field (fields are public unless marked). On a function, a method
+or a type, <code>private</code> just says what leaving out <code>pub</code> already means;
+<code>pub private</code> together is an error. The editor's completion leaves out the
+private fields outside their module.</p>
 <p><code>import net.http;</code> loads the directory <code>net/http</code> (its files
 start with <code>module http;</code>) and its names are <code>http.get</code>;
 <code>import h = net.http;</code> names it <code>h</code> instead. The imports come first in

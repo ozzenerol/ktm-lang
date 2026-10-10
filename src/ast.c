@@ -842,6 +842,9 @@ AstType *astMakeClassField(AstType *type, int offset) {
     AstType *field_type = astTypeNew();
     memcpy(field_type,type,sizeof(AstType));
     field_type->clsname = NULL;
+    /* a field is public unless marked `private` itself */
+    field_type->private_module = 0;
+    field_type->private_of = NULL;
     field_type->offset = offset;
     field_type->size = type->size;
     return field_type;

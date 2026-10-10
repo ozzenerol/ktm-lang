@@ -792,7 +792,7 @@ char *lexemeToColor(Cctrl *cc, Lexeme *tok, char *text, int len, int is_err) {
                 color = clr(ESC_PURPLE);
                 break;
             case TK_IDENT:
-                if (cctrlIsKeyword(cc, tok->start, tok->len)) {
+                if (cctrlTokIsKeyword(cc, tok)) {
                     color = clr(ESC_BLUE);
                 }
                 break;
@@ -1663,6 +1663,16 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
 
 int cctrlIsKeyword(Cctrl *cc, char *name, int len) {
     return cctrlGetKeyWord(cc,name,len) != NULL;
+}
+
+/* Is the token a keyword or a type name: a string, character or number
+ * literal never is, whatever its text (`F("private")`) */
+int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok) {
+    if (tok->tk_type == TK_STR || tok->tk_type == TK_CHAR_CONST ||
+        tok->tk_type == TK_I64 || tok->tk_type == TK_F64) {
+        return 0;
+    }
+    return cctrlIsKeyword(cc, tok->start, tok->len);
 }
 
 void cctrlSetCommandLineDefines(Cctrl *cc, List *defines_list) {
