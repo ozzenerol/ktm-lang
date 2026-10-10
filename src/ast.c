@@ -1041,6 +1041,18 @@ int astIsIntrinsicClass(AstType *ty) {
     return ty && ty->kind == AST_TYPE_CLASS && ty->is_intrinsic;
 }
 
+int astIsEnumType(AstType *ty) {
+    return ty && ty->kind == AST_TYPE_CLASS && ty->is_enum;
+}
+
+/* `a` and `b` are different enums (both enums, not the same one). Two
+ * NULLs or two non-enums are not "different enums". */
+int astIsDifferentEnum(AstType *a, AstType *b) {
+    if (!astIsEnumType(a) || !astIsEnumType(b)) return 0;
+    if (a == b) return 0;
+    return !(a->clsname && b->clsname && aoStrCmp(a->clsname, b->clsname));
+}
+
 int astIsFnLike(Ast *maybe_fn) {
     return maybe_fn && (maybe_fn->kind == AST_FUNC ||
                         maybe_fn->kind == AST_ASM_FUNCDEF ||
@@ -1943,6 +1955,17 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
                 }
                 break;
             }
+            case AST_TYPE_CLASS: {
+                /* An enum member: its value, typed as the enum. */
+                const char *name = ast->type->clsname ? ast->type->clsname->data
+                                                       : "<anonymous>";
+                if (!isatty(STDOUT_FILENO)) {
+                    aoStrCatPrintf(str, "<enum %s> %ld", name, ast->i64);
+                } else {
+                    aoStrCatPrintf(str, "<enum %s> \033[0;35m%ld\033[0m", name, ast->i64);
+                }
+                break;
+            }
             default:
                 loggerPanic("Unhandled type: %d\n", ast->type->kind);
             }
@@ -2639,6 +2662,14 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
                 break;
             }
             case AST_TYPE_FLOAT: aoStrCatPrintf(str, "%g", ast->f64); break;
+            case AST_TYPE_CLASS: {
+                /* An enum member: its value, typed as the enum. The
+                 * member's own name isn't kept on the literal. */
+                const char *name = ast->type->clsname ? ast->type->clsname->data
+                                                       : "<anonymous>";
+                aoStrCatPrintf(str, "(%s)%ld", name, ast->i64);
+                break;
+            }
             default:
                 loggerPanic("Unhandled type: %d\n", ast->type->kind);
             }

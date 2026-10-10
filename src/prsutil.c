@@ -617,6 +617,31 @@ int assertLValue(Ast *ast) {
     }
 }
 
+/* `ast` is not an lvalue: a plain diagnostic, unless it is an enum
+ * member (`Name.member = x`), which gets a message naming it. Member
+ * literals are interned per name, so pointer identity finds which one.
+ * Reported at `cc`'s current position without unwinding. */
+void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
+    if (ast->kind == AST_LITERAL && ast->type &&
+        ast->type->kind == AST_TYPE_CLASS && ast->type->is_enum &&
+        ast->type->enum_members)
+    {
+        MapIter it;
+        mapIterInit(ast->type->enum_members, &it);
+        while (mapIterNext(&it)) {
+            if (it.node->value == ast) {
+                cctrlRaiseException(cc,"Cannot assign to enum member `%s.%s`",
+                        ast->type->clsname ? ast->type->clsname->data
+                                           : "<anonymous>",
+                        (char *)it.node->key);
+            }
+        }
+    }
+    char *ast_str = astLValueToString(ast,0);
+    cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
+            astKindToHumanReadable(ast), ast_str);
+}
+
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
@@ -704,6 +729,37 @@ int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
     char *name = astLValueToString(lhs,0);
     char *msg = mprintf("Cannot assign to array `%s`, assign to its elements or use a pointer",
                         name);
+    AoStr *bold = aoStrNew();
+    aoStrCatColoured(bold, ESC_BOLD, msg);
+    AoStr *buf = cctrlCreateErrorLineAt(cc, op_line, op_col, op_len, bold->data,
+                                        CCTRL_ERROR, NULL);
+    aoStrRelease(bold);
+    CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+    d->line = d->end_line = op_line;
+    d->col = op_col;
+    d->end_col = op_col + op_len;
+    cctrlDiagPush(cc, d);
+    return 1;
+}
+
+/* A scoped enum is like C++'s `enum class`: `++`, `--` and a compound
+ * assignment (`+=`, `|=`, ...) are all errors, not just an integer
+ * assigned to it without a cast. Plain `c = Color.green` and
+ * `c = (Color)(c + 1)` stay fine. Reported at the operator without
+ * unwinding. Returns 1 if `lhs` is an enum. */
+int assertNotEnumArithAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                             int op_len)
+{
+    if (!lhs || !lhs->type || lhs->type->kind != AST_TYPE_CLASS ||
+        !lhs->type->is_enum)
+    {
+        return 0;
+    }
+    char *name = astLValueToString(lhs,0);
+    char *msg = mprintf(
+            "Cannot do arithmetic assignment on enum `%s`, cast it: `%s`",
+            lhs->type->clsname ? lhs->type->clsname->data : "<anonymous>",
+            name);
     AoStr *bold = aoStrNew();
     aoStrCatColoured(bold, ESC_BOLD, msg);
     AoStr *buf = cctrlCreateErrorLineAt(cc, op_line, op_col, op_len, bold->data,

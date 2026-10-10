@@ -765,6 +765,19 @@ static void parseCheckArgType(Cctrl *cc, AstType *type, Ast *arg, int i,
     ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
                        ? loc->args->entries[i] : NULL;
     if (compat == ARG_ERROR) {
+        if (astIsEnumType(type)) {
+            char *actual = astTypeToString(arg->type);
+            if (at) {
+                cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                        "Cannot convert `%s` to enum `%s` without a cast",
+                        actual, type->clsname->data);
+            } else {
+                cctrlRaiseException(cc,
+                        "Cannot convert `%s` to enum `%s` without a cast",
+                        actual, type->clsname->data);
+            }
+            return;
+        }
         if (at) {
             cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
                     "Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
@@ -2119,14 +2132,28 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
         }
         return binop;
     } else if (is_err && !(cc->flags & CCTRL_TRANSPILING)) {
+        if (op_tok) {
+            cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
+        }
+        /* Enum mismatches get a message naming the enum, not the
+         * generic "operator cannot be applied" one. */
+        int is_cmp = operation == AST_BIN_OP_EQ || operation == AST_BIN_OP_NE ||
+                     operation == AST_BIN_OP_LT || operation == AST_BIN_OP_LE ||
+                     operation == AST_BIN_OP_GT || operation == AST_BIN_OP_GE;
+        if (is_cmp && astIsDifferentEnum(left->type, right->type)) {
+            cctrlRaiseException(cc,"Cannot compare enum `%s` with enum `%s`",
+                    left->type->clsname->data, right->type->clsname->data);
+        }
+        if (operation == AST_BIN_OP_ASSIGN && astIsEnumType(left->type)) {
+            cctrlRaiseException(cc,
+                    "Cannot convert `%s` to enum `%s` without a cast",
+                    astTypeToString(right->type), left->type->clsname->data);
+        }
         const char *opstr = op_tok ? lexemePunctToStringWithFlags(op_tok,0)
                                    : astBinOpKindToString(operation);
         const char *left_kind = astTypeKindToHumanReadable(left->type);
         const char *right_kind = astKindToHumanReadable(right);
         const char *right_type_kind = astTypeKindToHumanReadable(right->type);
-        if (op_tok) {
-            cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
-        }
         char *msg = mprintf("`%s %s %s` is invalid",
                             astTypeToString(left->type),
                             opstr,
@@ -2156,6 +2183,14 @@ static AstType *parseTernaryResultType(Ast *then, Ast *els) {
     int b_ptr = b->kind == AST_TYPE_POINTER || b->kind == AST_TYPE_FUNC;
     if (a_ptr) return a;
     if (b_ptr) return b;
+    /* Both branches the same enum: keep it (as an assignment would),
+     * rather than degrading to the arithmetic result (an integer), as
+     * mixed enum/integer branches still do below. */
+    if (a->kind == AST_TYPE_CLASS && a->is_enum && b->kind == AST_TYPE_CLASS &&
+        b->is_enum && a->clsname && b->clsname &&
+        aoStrCmp(a->clsname, b->clsname)) {
+        return a;
+    }
     AstType *r = astGetResultType(AST_BIN_OP_ADD, a, b);
     return r ? r : a;
 }
@@ -2244,11 +2279,10 @@ Ast *parseExpr(Cctrl *cc, int prec) {
 
         if (tokenPunctIs(tok, TK_PLUS_PLUS) || tokenPunctIs(tok, TK_MINUS_MINUS)) {
             if (!assertLValue(LHS)) {
-                char *ast_str = astLValueToString(LHS,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(LHS), ast_str);
+                parseRaiseNotLValue(cc,LHS);
             }
             assertNotArrayAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotEnumArithAssign(cc,LHS,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,LHS);
             AstUnOp op;
             if (!astUnaryOpFromToken(tok->i64, &op)) {
@@ -2284,9 +2318,7 @@ Ast *parseExpr(Cctrl *cc, int prec) {
         compound_assign = parseCompoundAssign(tok, &deconstructed_compound_op);
         if (tokenPunctIs(tok, '=') || compound_assign) {
             if (!assertLValue(LHS)) {
-                char *ast_str = astLValueToString(LHS,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(LHS), ast_str);
+                parseRaiseNotLValue(cc,LHS);
             }
             assertNotConstAssign(cc,LHS);
         }
@@ -2300,6 +2332,8 @@ Ast *parseExpr(Cctrl *cc, int prec) {
         int op_line = tok->line, op_col = tok->col;
         int is_array_assign = (tokenPunctIs(tok, '=') || compound_assign) &&
                 assertNotArrayAssign(cc,LHS,op_line,op_col,tok->len);
+        int is_enum_arith_assign = compound_assign &&
+                assertNotEnumArithAssign(cc,LHS,op_line,op_col,tok->len);
 
         RHS = parseExpr(cc,next_prec);
         if (!RHS) {
@@ -2324,9 +2358,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             Ast *value = parseCreateBinaryOpAt(cc, deconstructed_compound_op,
                                                LHS, RHS, tok->i64);
             AstType *ok = astTypeCheck(LHS->type,RHS,compound_assign);
-            if (!ok && !is_array_assign) {
+            if (!ok && !is_array_assign && !is_enum_arith_assign) {
                 typeCheckWarn(cc,op_line,op_col,LHS,RHS);
-            } else if (!is_array_assign && LHS->type &&
+            } else if (!is_array_assign && !is_enum_arith_assign && LHS->type &&
                        LHS->type->kind == AST_TYPE_POINTER &&
                        value->type && !astTypeCheck(LHS->type,value,
                                                     AST_BIN_OP_ASSIGN)) {
@@ -2334,7 +2368,11 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                  * back into the pointer, as `q = q - q` would */
                 typeCheckWarn(cc,op_line,op_col,LHS,value);
             }
-            LHS = parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN, LHS, value);
+            /* Already reported above: building `c = (c + 1 as int)` here
+             * would error again (int -> enum needs a cast), at a stale
+             * position. */
+            LHS = is_enum_arith_assign ? value
+                                       : parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN, LHS, value);
         } else {
             AstBinOp binop;
             if (!astBinOpFromToken(tok->i64,&binop)) {
@@ -2541,11 +2579,10 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
         if (tokenPunctIs(tok,TK_PLUS_PLUS) || 
             tokenPunctIs(tok,TK_MINUS_MINUS)) {
             if (!assertLValue(ast)) {
-                char *ast_str = astLValueToString(ast,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(ast), ast_str);
+                parseRaiseNotLValue(cc,ast);
             }
             assertNotArrayAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotEnumArithAssign(cc,ast,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,ast);
             if (tok->i64 == TK_PLUS_PLUS) {
                 return astUnaryOperator(ast->type,AST_UN_OP_POST_INC,ast);
@@ -2781,6 +2818,7 @@ Ast *parseUnaryExpr(Cctrl *cc) {
 
         if (unary_op == AST_UN_OP_PRE_INC || unary_op == AST_UN_OP_PRE_DEC) {
             assertNotArrayAssign(cc,operand,op_line,op_col,op_len);
+            assertNotEnumArithAssign(cc,operand,op_line,op_col,op_len);
             assertNotConstAssign(cc,operand);
         }
 

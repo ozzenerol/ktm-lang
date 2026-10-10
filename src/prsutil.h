@@ -29,6 +29,7 @@ s64 evalOneIntExprOrErr(Ast *LHS, Ast *RHS, AstBinOp op, int *_ok);
 s64 evalIntArithmeticOrErr(Ast *ast, int *_ok);
 int evalClassRef(Ast *ast, int offset);
 int assertLValue(Ast *ast);
+void parseRaiseNotLValue(Cctrl *cc, Ast *ast);
 void assertNotConstAssign(Cctrl *cc, Ast *ast);
 int parseIsFloatOrInt(Ast *ast);
 int parseIsClassOrUnion(int kind);
@@ -48,6 +49,8 @@ void typeCheckWarn(Cctrl *cc, int op_line, int op_col, Ast *expected,
                    Ast *actual);
 int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
                          int op_len);
+int assertNotEnumArithAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                             int op_len);
 void typeCheckReturnTypeWarn(Cctrl *cc, Ast *maybe_func, 
                              AstType *check, Ast *retval,
                              Lexeme *ret_tok, Lexeme *semi_tok);

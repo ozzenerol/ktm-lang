@@ -32,6 +32,7 @@ Ast *parseThrowStatement(Cctrl *cc);
 AstType *parseClassDef(Cctrl *cc, AstType *intrinsic_base);
 AstType *parseUnionDef(Cctrl *cc);
 AstType *parseEnumDef(Cctrl *cc);
+static int parseTypeNameFollowedByDot(Cctrl *cc);
 
 /* `reg <REG>` / `noreg` modifier after a decl type.
  * If the next token is `reg`, consume it plus the following register-
@@ -462,7 +463,8 @@ static Ast *parseDeclArrayInitList(Cctrl *cc, AstType *type, volatile int *depth
         elem_type = elem_type->ptr;
     }
     if ((elem_type->kind == AST_TYPE_CLASS ||
-         elem_type->kind == AST_TYPE_UNION) && elem_type->fields == NULL) {
+         elem_type->kind == AST_TYPE_UNION) && elem_type->fields == NULL &&
+        !elem_type->is_intrinsic) {
         cctrlTokenRewind(cc);
         cctrlRaiseException(cc,"Cannot use an initialiser list, %s is incomplete",
                 astTypeToString(elem_type));
@@ -992,6 +994,9 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
 
     if (tag) {
         prev = mapGetLen(env, tag->data, tag->len);
+        if (prev && prev->is_enum) {
+            cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
+        }
     }
 
     /* Pre-register the tag with an incomplete placeholder so a self-reference
@@ -2181,7 +2186,8 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         }
     }
 
-    if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+    if (cctrlIsKeyword(cc,tok->start,tok->len) &&
+        !parseTypeNameFollowedByDot(cc)) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
@@ -2463,7 +2469,11 @@ Ast *parseReturnStatement(Cctrl *cc) {
     }
 
     AstType *ok = astTypeCheck(cc->tmp_rettype,retval,'\0');
-    if (!ok) {
+    if (!ok && astIsEnumType(cc->tmp_rettype)) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "Cannot convert `%s` to enum `%s` without a cast",
+                astTypeToString(check), cc->tmp_rettype->clsname->data);
+    } else if (!ok) {
         Ast *func = mapGet(cc->global_env, cc->tmp_fname->data);
         typeCheckReturnTypeWarn(cc,func,check,retval,&ret_tok,&semi_tok);
     }
@@ -2892,12 +2902,28 @@ Ast *parseStatement(Cctrl *cc) {
     return ast;
 }
 
+/* Is `tok` (a type/class/enum name, not yet consumed) followed by `.`?
+ * A type name is never followed by `.` in real code; `Name.member` is an
+ * enum member reference, not the start of a declaration (`Name var`).
+ * Gets and rewinds rather than peeking further ahead, which the token
+ * ring buffer does not support reliably beyond one token. */
+static int parseTypeNameFollowedByDot(Cctrl *cc) {
+    Lexeme *t1 = cctrlTokenGet(cc);
+    Lexeme *t2 = cctrlTokenGet(cc);
+    int dot = tokenPunctIs(t2, '.');
+    cctrlTokenRewind(cc);
+    cctrlTokenRewind(cc);
+    (void)t1;
+    return dot;
+}
+
 Ast *parseDeclOrStatement(Cctrl *cc) {
     Lexeme *tok = cctrlTokenPeek(cc);
     if (!tok) {
         return NULL;
     }
-    if (cctrlIsKeyword(cc,tok->start,tok->len) ||
+    if ((cctrlIsKeyword(cc,tok->start,tok->len) &&
+         !parseTypeNameFollowedByDot(cc)) ||
         (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST)) {
         return parseDecl(cc);
     }
@@ -2973,7 +2999,8 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             tok = cctrlTokenPeek(cc);
         }
 
-        if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+        if (cctrlIsKeyword(cc,tok->start,tok->len) &&
+            !parseTypeNameFollowedByDot(cc)) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
                 next_type = parsePointerType(cc,base_type);
