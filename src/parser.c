@@ -658,7 +658,7 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             break;
         } else if (cctrlTokIsKeyword(cc, tok_name)) {
             base_type = parseBaseDeclSpec(cc);
-        } else if (tokenIsFnIdent(tok_name) && parseFnLooksLikeType(cc)) {
+        } else if (tokenMayStartFnType(tok_name) && parseFnLooksLikeType(cc)) {
             base_type = parseBaseDeclSpec(cc);
         } else if (name && !memcmp(name->data,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
@@ -1943,7 +1943,7 @@ static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Ast *clause;
     Lexeme *tok = cctrlTokenPeek(cc);
     if (tok && (cctrlTokIsKeyword(cc, tok) ||
-                (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc)))) {
+                (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc)))) {
         AstType *type = parseDeclSpec(cc);
         if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
             /* `if (Color.red == c)`: an enum member reference, not an
@@ -2315,7 +2315,7 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
 
     if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
-        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
+        (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
@@ -3225,7 +3225,7 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
-        (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
+        (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
         return parseDecl(cc);
     }
     return parseStatement(cc);
@@ -3316,7 +3316,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
 
         if ((cctrlTokIsKeyword(cc, tok) &&
              !parseTypeNameFollowedByDot(cc)) ||
-            (tokenIsFnIdent(tok) && parseFnLooksLikeType(cc))) {
+            (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
                 next_type = parsePointerType(cc,base_type);
@@ -4822,6 +4822,17 @@ static void parseModuleTypes(Cctrl *cc, u32 module_id) {
     }
 }
 
+/* The `(` just gotten starts `(fn(...) R)`: put it back for
+ * parseBaseDeclSpec. Otherwise it stays gotten. */
+static int parseGotParenFnType(Cctrl *cc) {
+    cctrlTokenRewind(cc);
+    if (parseFnStartsType(cc)) {
+        return 1;
+    }
+    cctrlTokenGet(cc);
+    return 0;
+}
+
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
@@ -5152,6 +5163,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 return ast;
             }
             cctrlRaiseException(cc,"Floating float constant '%f' cannot be used in this context", tok->f64);
+        } else if (tokenPunctIs(tok,'(') && parseGotParenFnType(cc)) {
+            /* `(fn(i64) i64) *slot;`: a pointer to a function pointer */
+            base_type = parseBaseDeclSpec(cc);
+            type = parsePointerType(cc,base_type);
         } else if (tokenPunctIs(tok,TK_PLUS_PLUS) ||
                    tokenPunctIs(tok,TK_MINUS_MINUS))
         {

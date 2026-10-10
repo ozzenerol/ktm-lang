@@ -176,9 +176,10 @@ I32 Main()
   if (sizeof(g_logger) == 8) correct++;
   else "\n  fn(..., ...) varargs\n";
 
-  /* pointer to a function pointer */
+  /* pointer to a function pointer: the fn type in parentheses (a `*`
+   * after the return type is part of it, test 433) */
   tests++;
-  fn(i64) i64 *slot = &g_newOp;
+  (fn(i64) i64) *slot = &g_newOp;
   if ((*slot)(8) == 16) correct++;
   else "\n  pointer to a function pointer\n";
 

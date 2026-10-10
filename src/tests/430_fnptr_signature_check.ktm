@@ -95,8 +95,8 @@ void f()
   void *p = &t; a = p; p = a;
   fn(i64, ...) i64 va = &v;
   fn(i64, i64 ...xs) i64 vn = &nv;
-  fn(i64) i64 *pa = &a;
-  fn(i64) i64 *pb = pa;
+  (fn(i64) i64) *pa = &a;
+  (fn(i64) i64) *pb = pa;
 }", 0)) correct++;
 
   /* initialisers: global and local, old and fn form */
@@ -154,8 +154,8 @@ void f()
 
   /* a pointer to a function pointer: the signatures still must agree */
   tests++;
-  if (Prints("void f() { fn(i64) i64 a = &t; fn(u8 *) i64 *pb = &a; }", 1,
-             "cannot convert fn(i64) i64 * to fn(u8*) i64 *"))
+  if (Prints("void f() { fn(i64) i64 a = &t; (fn(u8 *) i64) *pb = &a; }", 1,
+             "cannot convert (fn(i64) i64) * to (fn(u8*) i64) *"))
     correct++;
 
   /* the allowed conversions call through correctly */
