@@ -1060,6 +1060,11 @@ U0 Main()
 <pre class="output">3 4 8
 2 5 9
 </pre>
+<p>A class declared ahead with <code>class Node;</code> can be pointed to straight away, but
+a field can hold it by value only once its definition has been seen, since until then its
+size isn't known: <code>class B; class A { B b; };</code> is the error
+<code>field `b` of A holds a B, which is not complete here: use a pointer</code>, as is a class
+holding itself. Define <code>B</code> first, or use a <code>B *</code> field.</p>
 <p>A string for a <code>U8</code> array field or row is copied in the same way, and
 must fit with its NUL. A <code>U8 *</code> field points at the string instead:</p>
 <pre data-run><code>class Item { I64 id; U8 name[8]; U8 *note; };
