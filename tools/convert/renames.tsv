@@ -1,0 +1,1576 @@
+kind	old	new	note
+type	__atomic_wide_counter	__atomic_wide_counter	C struct, kept; std.ktmh,threads.ktm
+type	__pthread_cond_s	__pthread_cond_s	C struct, kept; std.ktmh,threads.ktm
+type	__pthread_list_t	__pthread_list_t	C struct, kept; std.ktmh,threads.ktm
+type	__pthread_mutex_s	__pthread_mutex_s	C struct, kept; std.ktmh,threads.ktm
+type	addrinfo	addrinfo	C struct, kept; net.ktm,std.ktmh
+type	BitVec	BitVec	unchanged; bitvec.ktm,std.ktmh
+type	CatchFrame	CatchFrame	unchanged; except.ktm,std.ktmh
+type	CDate	Date	curated: TempleOS C-prefix; date.ktm,std.ktmh
+type	CDateStruct	DateStruct	curated: TempleOS C-prefix; date.ktm,std.ktmh
+type	cDIR	DIR	curated: C's DIR (opaque); c-prefix dropped; dir.ktm,std.ktmh
+type	CoroCached	CoroCached	unchanged; coroutines.ktm
+type	Coroutine	Coroutine	unchanged; coroutines.ktm,std.ktmh
+type	cStat	CStat	curated: raw platform struct stat; `stat` is taken by the C function; std.ktmh
+type	CsvParser	CsvParser	unchanged; csv.ktm,std.ktmh
+type	CsvSlice	CsvSlice	unchanged; csv.ktm,std.ktmh
+type	cTimespec	timespec	curated: C's struct timespec; std.ktmh
+type	Dirent	Dirent	unchanged; dir.ktm,std.ktmh
+type	DirHuman	DirHuman	unchanged; io.ktm
+type	FloatVec	FloatVec	unchanged; std.ktmh,vector.ktm
+type	Fstat	FileStat	curated: ktm's portable stat; fields keep C's st_* names; std.ktmh
+type	FzFI16	FzfI16	fzf.ktm
+type	FzFI32	FzfI32	fzf.ktm
+type	FzFPattern	FzfPattern	fzf.ktm
+type	FzFPosition	FzfPosition	fzf.ktm,std.ktmh
+type	FzFResult	FzfResult	fzf.ktm
+type	FzFSlab	FzfSlab	fzf.ktm
+type	FzFSlabConfig	FzfSlabConfig	fzf.ktm
+type	FzFString	FzfString	fzf.ktm
+type	FzFStrSlice	FzfStrSlice	fzf.ktm
+type	FzFTerm	FzfTerm	fzf.ktm
+type	FzFTermSet	FzfTermSet	fzf.ktm
+type	HCFs	ThreadState	curated: HolyC-ism (HC + TempleOS Fs); except.ktm,std.ktmh
+type	hostent	hostent	C struct, kept; net.ktm,std.ktmh
+type	in6_addr	in6_addr	C struct, kept; net.ktm,std.ktmh
+type	in_addr	in_addr	C struct, kept; net.ktm,std.ktmh
+type	IntMap	IntMap	unchanged; hashtable.ktm,std.ktmh
+type	IntMapNode	IntMapNode	unchanged; hashtable.ktm,std.ktmh
+type	IntSet	IntSet	unchanged; set.ktm,std.ktmh
+type	IntSetEntry	IntSetEntry	unchanged; set.ktm,std.ktmh
+type	IntSetIter	IntSetIter	unchanged; set.ktm,std.ktmh
+type	IntVec	IntVec	unchanged; std.ktmh,vector.ktm
+type	iovec	iovec	C struct, kept; io.ktm,std.ktmh
+type	Json	Json	unchanged; json.ktm,std.ktmh
+type	JsonParser	JsonParser	unchanged; json.ktm
+type	JsonState	JsonState	unchanged; json.ktm,std.ktmh
+type	JsonStringBuilder	JsonStringBuilder	unchanged; json.ktm
+type	List	List	unchanged; list.ktm,std.ktmh
+type	msghdr	msghdr	C struct, kept; net.ktm,std.ktmh
+type	netent	netent	C struct, kept; net.ktm,std.ktmh
+type	NetPollFd	NetPollFd	unchanged; net.ktm
+type	pollfd	pollfd	C struct, kept; std.ktmh
+type	Proc	Proc	unchanged; process.ktm,std.ktmh
+type	ProcBuf	ProcBuf	unchanged; process.ktm
+type	ProcOpts	ProcOpts	unchanged; process.ktm,std.ktmh
+type	ProcPollFd	ProcPollFd	unchanged; process.ktm
+type	protoent	protoent	C struct, kept; net.ktm,std.ktmh
+type	pthread_attr_t	pthread_attr_t	C struct, kept; std.ktmh,threads.ktm
+type	pthread_cond_t	pthread_cond_t	C struct, kept; std.ktmh,threads.ktm
+type	pthread_condattr_t	pthread_condattr_t	C struct, kept; std.ktmh,threads.ktm
+type	pthread_handler_rec	pthread_handler_rec	C struct, kept; std.ktmh,threads.ktm
+type	pthread_mutex_t	pthread_mutex_t	C struct, kept; std.ktmh,threads.ktm
+type	pthread_mutexattr_t	pthread_mutexattr_t	C struct, kept; std.ktmh,threads.ktm
+type	pthread_t	pthread_t	C struct, kept; std.ktmh,threads.ktm
+type	PtrVec	PtrVec	unchanged; std.ktmh,vector.ktm
+type	RBIter	RBIter	unchanged; set.ktm,std.ktmh
+type	RBNode	RBNode	unchanged; set.ktm,std.ktmh
+type	RBTree	RBTree	unchanged; set.ktm,std.ktmh
+type	servent	servent	C struct, kept; net.ktm,std.ktmh
+type	SigAct	SigAct	unchanged; signals.ktm,std.ktmh
+type	sockaddr	sockaddr	C struct, kept; net.ktm,std.ktmh
+type	sockaddr_in	sockaddr_in	C struct, kept; net.ktm,std.ktmh
+type	sockaddr_in6	sockaddr_in6	C struct, kept; net.ktm,std.ktmh
+type	sockaddr_storage	sockaddr_storage	C struct, kept; net.ktm,std.ktmh
+type	sockaddr_un	sockaddr_un	C struct, kept; net.ktm,std.ktmh
+type	SqlColumn	SqlColumn	unchanged; sqllite.ktm,std.ktmh
+type	SqlCtx	SqlCtx	unchanged; sqllite.ktm,std.ktmh
+type	sqlite3	sqlite3	C struct, kept; sqllite.ktm,std.ktmh
+type	sqlite3_stmt	sqlite3_stmt	C struct, kept; sqllite.ktm,std.ktmh
+type	sqlite3_value	sqlite3_value	C struct, kept; sqllite.ktm,std.ktmh
+type	SqlParam	SqlParam	unchanged; sqllite.ktm,std.ktmh
+type	SqlPreparedStmt	SqlPreparedStmt	unchanged; sqllite.ktm,std.ktmh
+type	SqlRow	SqlRow	unchanged; sqllite.ktm,std.ktmh
+type	Statx	Statx	C struct, kept; std.ktmh
+type	statx_timestamp	statx_timestamp	C struct, kept; std.ktmh
+type	StrMap	StrMap	unchanged; hashtable.ktm,std.ktmh
+type	StrMapNode	StrMapNode	unchanged; hashtable.ktm,std.ktmh
+type	ThreadPool	ThreadPool	unchanged; std.ktmh,threads.ktm
+type	ThreadWorker	ThreadWorker	unchanged; std.ktmh,threads.ktm
+type	ThreadWorkerJob	ThreadWorkerJob	unchanged; std.ktmh,threads.ktm
+type	timeval	timeval	C struct, kept; date.ktm,std.ktmh
+type	tm	tm	C struct, kept; date.ktm,std.ktmh
+function	__errno_location	__errno_location	C (extern "c"), kept; system.ktm
+function	_FloatCmp	floatCmp	internal; vector.ktm
+function	_IntCmp	intCmp	internal; vector.ktm
+function	_StrDateName	strDateName	static; strings.ktm
+function	_StrDateNum	strDateNum	static; strings.ktm
+function	_VecIndexError	vecIndexError	static; vector.ktm
+function	Abs	abs	public; math.ktm,std.ktmh
+function	accept	accept	C (extern "c"), kept; net.ktm,std.ktmh
+function	accept4	accept4	C (extern "c"), kept; net.ktm
+function	acos	acos	C (extern "c"), kept; math.ktm,std.ktmh
+function	acosh	acosh	C (extern "c"), kept; math.ktm,std.ktmh
+function	append_pos	appendPos	internal; fzf.ktm
+function	ascii_fuzzy_index	asciiFuzzyIndex	internal; fzf.ktm
+function	asin	asin	C (extern "c"), kept; math.ktm,std.ktmh
+function	asinh	asinh	C (extern "c"), kept; math.ktm,std.ktmh
+function	atan	atan	C (extern "c"), kept; math.ktm,std.ktmh
+function	atan2	atan2	C (extern "c"), kept; math.ktm,std.ktmh
+function	atanh	atanh	C (extern "c"), kept; math.ktm,std.ktmh
+function	Atoi	atoi	public; std.ktmh,strings.ktm
+function	atol	atol	C (extern "c"), kept; std.ktmh,strings.ktm
+function	bind	bind	C (extern "c"), kept; net.ktm,std.ktmh
+function	BitVecClear	bitVecClear	public; bitvec.ktm,std.ktmh
+function	BitVecNew	bitVecNew	public; bitvec.ktm,std.ktmh
+function	BitVecRelease	bitVecRelease	public; bitvec.ktm,std.ktmh
+function	BitVecSet	bitVecSet	public; bitvec.ktm,std.ktmh
+function	BitVecTest	bitVecTest	public; bitvec.ktm,std.ktmh
+function	BitVecUnSet	bitVecUnSet	public; bitvec.ktm,std.ktmh
+function	bonus_at	bonusAt	internal; fzf.ktm
+function	bonus_for	bonusFor	internal; fzf.ktm
+function	CAlloc	memAllocZero	curated: HolyC abbreviation; one argument, zeroed (not C's calloc); public; compiler refers to it by name in memsafe.c; memory.ktm,std.ktmh
+function	calloc	calloc	C (extern "c"), kept; memory.ktm
+function	CatLenPrint	strAppendFormatLen	curated: HolyC Cat-prefix; public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	CatPrint	strAppendFormat	curated: HolyC Cat-prefix; public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	cbrt	cbrt	C (extern "c"), kept; math.ktm,std.ktmh
+function	Cd	changeDir	curated: TempleOS command name; public; io.ktm,std.ktmh
+function	ceil	ceil	C (extern "c"), kept; math.ktm,std.ktmh
+function	char_cls_of	charClsOf	internal; fzf.ktm
+function	char_cls_of_ascii	charClsOfAscii	internal; fzf.ktm
+function	chdir	chdir	C (extern "c"), kept; io.ktm,std.ktmh
+function	CivilFromDays	civilFromDays	internal; date.ktm
+function	close	close	C (extern "c"), kept; io.ktm,std.ktmh,system.ktm
+function	closedir	closedir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	CmpDirHuman	cmpDirHuman	internal; io.ktm
+function	CmpLeadingNumber	cmpLeadingNumber	internal; io.ktm
+function	connect	connect	C (extern "c"), kept; net.ktm,std.ktmh
+function	copysign	copysign	C (extern "c"), kept; math.ktm,std.ktmh
+function	CoroDie	coroDie	static; coroutines.ktm
+function	CoroEntry	coroEntry	internal; coroutines.ktm
+function	CoroMain	coroMain	internal; coroutines.ktm
+function	CoroRoot	coroRoot	static; coroutines.ktm
+function	CoroStackGet	coroStackGet	static; coroutines.ktm
+function	CoroStackPut	coroStackPut	static; coroutines.ktm
+function	CoroStacksFree	coroStacksFree	internal; coroutines.ktm,except.ktm
+function	CoroSwap	coroSwap	internal; coroutines.ktm
+function	CoroSwitch	coroSwitch	static; coroutines.ktm
+function	CoroutineDone	coroutineDone	public; coroutines.ktm,std.ktmh
+function	CoroutineNew	coroutineNew	public; coroutines.ktm,std.ktmh
+function	CoroutineNext	coroutineNext	public; coroutines.ktm,std.ktmh
+function	CoroutineRelease	coroutineRelease	public; coroutines.ktm,std.ktmh
+function	CoroutineSelf	coroutineSelf	public; coroutines.ktm,std.ktmh
+function	CoroutineYield	coroutineYield	public; coroutines.ktm,std.ktmh
+function	cos	cos	C (extern "c"), kept; math.ktm,std.ktmh
+function	cosh	cosh	C (extern "c"), kept; math.ktm,std.ktmh
+function	creat	creat	C (extern "c"), kept; io.ktm,std.ktmh
+function	CsvParse	csvParse	public; csv.ktm,std.ktmh
+function	CsvParserInit	csvParserInit	public; csv.ktm,std.ktmh
+function	Date2Struct	dateToStruct	curated: 2 -> To; public; date.ktm,std.ktmh
+function	DayOfWeek	dayOfWeek	public; date.ktm,std.ktmh
+function	Dir	listDir	curated: TempleOS command name; public; io.ktm,std.ktmh
+function	DirHumanColor	dirHumanColor	internal; io.ktm
+function	DirHumanNew	dirHumanNew	internal; io.ktm
+function	DirHumanRelease	dirHumanRelease	internal; io.ktm
+function	dlsym	dlsym	C (extern "c"), kept; process.ktm
+function	endhostent	endhostent	C (extern "c"), kept; net.ktm,std.ktmh
+function	endnetent	endnetent	C (extern "c"), kept; net.ktm,std.ktmh
+function	endprotoent	endprotoent	C (extern "c"), kept; net.ktm,std.ktmh
+function	endservent	endservent	C (extern "c"), kept; net.ktm,std.ktmh
+function	erf	erf	C (extern "c"), kept; math.ktm,std.ktmh
+function	erfc	erfc	C (extern "c"), kept; math.ktm,std.ktmh
+function	Errno	errno	public; std.ktmh,system.ktm
+function	ErrnoPtr	errnoPtr	internal; system.ktm
+function	Exit	exitProgram	curated: `exit` is libc (extern "c" exit); public; compiler refers to it by name in transpiler.c; std.ktmh,system.ktm
+function	exit	exit	C (extern "c"), kept; system.ktm
+function	exp	exp	C (extern "c"), kept; math.ktm,std.ktmh
+function	exp2	exp2	C (extern "c"), kept; math.ktm,std.ktmh
+function	expm1	expm1	C (extern "c"), kept; math.ktm,std.ktmh
+function	F64DigRound	f64DigRound	static; strings.ktm
+function	F64ToFmtStr	f64ToFmtStr	static; strings.ktm
+function	fabs	fabs	C (extern "c"), kept; math.ktm,std.ktmh
+function	fcntl	fcntl	C (extern "c"), kept; io.ktm,std.ktmh
+function	fdim	fdim	C (extern "c"), kept; math.ktm,std.ktmh
+function	FileExtDot	fileExt	curated: pointer to the extension's dot; public; std.ktmh,strings.ktm
+function	FileExtRem	fileExtCut	curated: abbreviation: cut the extension off; public; std.ktmh,strings.ktm
+function	FileRead	fileRead	public; io.ktm,std.ktmh
+function	FileReadToEof	fileReadToEof	static; io.ktm
+function	FileWrite	fileWrite	public; io.ktm,std.ktmh
+function	FirstDayOfMon	firstDayOfMon	public; date.ktm,std.ktmh
+function	FirstDayOfYear	firstDayOfYear	public; date.ktm,std.ktmh
+function	FloatVecCapacity	floatVecCapacity	public; std.ktmh,vector.ktm
+function	FloatVecClear	floatVecClear	public; std.ktmh,vector.ktm
+function	FloatVecGet	floatVecGet	public; std.ktmh,vector.ktm
+function	FloatVecLast	floatVecLast	public; std.ktmh,vector.ktm
+function	FloatVecNew	floatVecNew	public; std.ktmh,vector.ktm
+function	FloatVecPop	floatVecPop	public; std.ktmh,vector.ktm
+function	FloatVecPush	floatVecPush	public; std.ktmh,vector.ktm
+function	FloatVecRelease	floatVecRelease	public; std.ktmh,vector.ktm
+function	FloatVecSet	floatVecSet	public; std.ktmh,vector.ktm
+function	FloatVecSort	floatVecSort	public; std.ktmh,vector.ktm
+function	floor	floor	C (extern "c"), kept; math.ktm,std.ktmh
+function	fma	fma	C (extern "c"), kept; math.ktm,std.ktmh
+function	fmax	fmax	C (extern "c"), kept; math.ktm,std.ktmh
+function	fmin	fmin	C (extern "c"), kept; math.ktm,std.ktmh
+function	fmod	fmod	C (extern "c"), kept; math.ktm,std.ktmh
+function	fork	fork	C (extern "c"), kept; std.ktmh
+function	Free	memFree	curated: `free` is libc (extern "c" free in memory.ktm); public; compiler refers to it by name in memsafe.c; memory.ktm,std.ktmh
+function	free	free	C (extern "c"), kept; memory.ktm,std.ktmh
+function	freeaddrinfo	freeaddrinfo	C (extern "c"), kept; net.ktm,std.ktmh
+function	frexp	frexp	C (extern "c"), kept; math.ktm,std.ktmh
+function	Fs	threadState	curated: TempleOS task pointer name; returns ThreadState (was HCFs); public; except.ktm,std.ktmh
+function	FsFree	fsFree	static; except.ktm
+function	FsKeyCreate	fsKeyCreate	static; except.ktm
+function	fstat	fstat	C (extern "c"), kept; std.ktmh
+function	FzF	fzf	curated: FzF spelling -> fzf; public; fzf.ktm,std.ktmh
+function	FzFCalculateScore	fzfCalculateScore	internal; fzf.ktm
+function	FzFDefaultSlab	fzfDefaultSlab	internal; fzf.ktm
+function	FzFEqMatch	fzfEqMatch	internal; fzf.ktm
+function	FzFEqNaiveMatch	fzfEqNaiveMatch	internal; fzf.ktm
+function	FzFFuzzyMatchV1	fzfFuzzyMatchV1	internal; fzf.ktm
+function	FzFGetPositions	fzfGetPositions	internal; fzf.ktm
+function	FzFGetScore	fzfGetScore	internal; fzf.ktm
+function	FzFParsePattern	fzfParsePattern	internal; fzf.ktm
+function	FzFPatternRelease	fzfPatternRelease	internal; fzf.ktm
+function	FzFPosArray	fzfPosArray	internal; fzf.ktm
+function	FzFPositionRelease	fzfPositionRelease	public; fzf.ktm,std.ktmh
+function	FzFPrefixMatch	fzfPrefixMatch	internal; fzf.ktm
+function	FzFSlabNew	fzfSlabNew	internal; fzf.ktm
+function	FzFSlabRelease	fzfSlabRelease	internal; fzf.ktm
+function	FzFSuffixMatch	fzfSuffixMatch	internal; fzf.ktm
+function	FzFTermRelease	fzfTermRelease	static; fzf.ktm
+function	FzFTermSetRelease	fzfTermSetRelease	static; fzf.ktm
+function	gai_strerror	gai_strerror	C (extern "c"), kept; net.ktm,std.ktmh
+function	Gcd	gcd	public; math.ktm,std.ktmh
+function	getaddrinfo	getaddrinfo	C (extern "c"), kept; net.ktm,std.ktmh
+function	getcwd	getcwd	C (extern "c"), kept; io.ktm
+function	getenv	getenv	C (extern "c"), kept; io.ktm,system.ktm
+function	gethostbyaddr	gethostbyaddr	C (extern "c"), kept; net.ktm,std.ktmh
+function	gethostbyname	gethostbyname	C (extern "c"), kept; net.ktm,std.ktmh
+function	gethostent	gethostent	C (extern "c"), kept; net.ktm,std.ktmh
+function	getnameinfo	getnameinfo	C (extern "c"), kept; net.ktm,std.ktmh
+function	getnetbyaddr	getnetbyaddr	C (extern "c"), kept; net.ktm,std.ktmh
+function	getnetbyname	getnetbyname	C (extern "c"), kept; net.ktm,std.ktmh
+function	getnetent	getnetent	C (extern "c"), kept; net.ktm,std.ktmh
+function	getpagesize	getpagesize	C (extern "c"), kept; coroutines.ktm
+function	getpeername	getpeername	C (extern "c"), kept; net.ktm,std.ktmh
+function	getprotobyname	getprotobyname	C (extern "c"), kept; net.ktm,std.ktmh
+function	getprotobynumber	getprotobynumber	C (extern "c"), kept; net.ktm,std.ktmh
+function	getprotoent	getprotoent	C (extern "c"), kept; net.ktm,std.ktmh
+function	getservbyname	getservbyname	C (extern "c"), kept; net.ktm,std.ktmh
+function	getservbyport	getservbyport	C (extern "c"), kept; net.ktm,std.ktmh
+function	getservent	getservent	C (extern "c"), kept; net.ktm,std.ktmh
+function	getsockname	getsockname	C (extern "c"), kept; net.ktm,std.ktmh
+function	getsockopt	getsockopt	C (extern "c"), kept; net.ktm,std.ktmh
+function	gettimeofday	gettimeofday	C (extern "c"), kept; date.ktm,std.ktmh
+function	has_suffix	hasSuffix	internal; fzf.ktm
+function	hstrerror	hstrerror	C (extern "c"), kept; net.ktm,std.ktmh
+function	HtCapacity	htCapacity	static; hashtable.ktm
+function	HtFmix64	htFmix64	static; hashtable.ktm
+function	Htonl	htonl	public; net.ktm,std.ktmh
+function	Htons	htons	public; net.ktm,std.ktmh
+function	hypot	hypot	C (extern "c"), kept; math.ktm,std.ktmh
+function	I64ToStr	i64ToStr	public; std.ktmh,strings.ktm
+function	ilogb	ilogb	C (extern "c"), kept; math.ktm,std.ktmh
+function	index_byte	indexByte	internal; fzf.ktm
+function	inet_addr	inet_addr	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_aton	inet_aton	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_lnaof	inet_lnaof	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_makeaddr	inet_makeaddr	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_netof	inet_netof	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_network	inet_network	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_ntoa	inet_ntoa	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_ntop	inet_ntop	C (extern "c"), kept; net.ktm,std.ktmh
+function	inet_pton	inet_pton	C (extern "c"), kept; net.ktm,std.ktmh
+function	insert_range	insertRange	internal; fzf.ktm
+function	IntMapClear	intMapClear	public; hashtable.ktm,std.ktmh
+function	IntMapDelete	intMapDelete	public; hashtable.ktm,std.ktmh
+function	IntMapGet	intMapGet	public; hashtable.ktm,std.ktmh
+function	IntMapGetIdx	intMapGetIdx	static; hashtable.ktm
+function	IntMapGetNextIdx	intMapGetNextIdx	static; hashtable.ktm
+function	IntMapHas	intMapHas	public; hashtable.ktm,std.ktmh
+function	IntMapHashFunction	intMapHashFunction	internal; hashtable.ktm
+function	IntMapIter	intMapIter	public; hashtable.ktm,std.ktmh
+function	IntMapKeyIter	intMapKeyIter	public; hashtable.ktm,std.ktmh
+function	IntMapKeysToString	intMapKeysToString	public; hashtable.ktm,std.ktmh
+function	IntMapNew	intMapNew	public; hashtable.ktm,std.ktmh
+function	IntMapNodeNew	intMapNodeNew	internal; hashtable.ktm
+function	IntMapRehash	intMapRehash	static; hashtable.ktm
+function	IntMapRelease	intMapRelease	public; hashtable.ktm,std.ktmh
+function	IntMapResize	intMapResize	public; hashtable.ktm,std.ktmh
+function	IntMapSet	intMapSet	public; hashtable.ktm,std.ktmh
+function	IntMapSetFreeValue	intMapSetFreeValue	public; hashtable.ktm,std.ktmh
+function	IntMapTests	intMapTests	internal; hashtable.ktm
+function	IntMapToString	intMapToString	public; hashtable.ktm,std.ktmh
+function	IntMapValueIter	intMapValueIter	public; hashtable.ktm,std.ktmh
+function	IntSetAdd	intSetAdd	public; set.ktm,std.ktmh
+function	IntSetCmp	intSetCmp	internal; set.ktm
+function	IntSetDelete	intSetDelete	public; set.ktm,std.ktmh
+function	IntSetDiff	intSetDiff	public; set.ktm,std.ktmh
+function	IntSetEq	intSetEq	public; set.ktm,std.ktmh
+function	IntSetHas	intSetHas	public; set.ktm,std.ktmh
+function	IntSetIntersection	intSetIntersection	public; set.ktm,std.ktmh
+function	IntSetIterNew	intSetIterNew	public; set.ktm,std.ktmh
+function	IntSetIterNext	intSetIterNext	public; set.ktm,std.ktmh
+function	IntSetIterRelease	intSetIterRelease	public; set.ktm,std.ktmh
+function	IntSetNew	intSetNew	public; set.ktm,std.ktmh
+function	IntSetRelease	intSetRelease	public; set.ktm,std.ktmh
+function	IntSetSize	intSetSize	public; set.ktm,std.ktmh
+function	IntSetSymDiff	intSetSymDiff	public; set.ktm,std.ktmh
+function	IntSetToString	intSetToString	public; set.ktm,std.ktmh
+function	IntSetToVec	intSetToVec	public; set.ktm,std.ktmh
+function	IntSetUnion	intSetUnion	public; set.ktm,std.ktmh
+function	IntVecCapacity	intVecCapacity	public; std.ktmh,vector.ktm
+function	IntVecClear	intVecClear	public; std.ktmh,vector.ktm
+function	IntVecGet	intVecGet	public; std.ktmh,vector.ktm
+function	IntVecLast	intVecLast	public; std.ktmh,vector.ktm
+function	IntVecNew	intVecNew	public; std.ktmh,vector.ktm
+function	IntVecPop	intVecPop	public; std.ktmh,vector.ktm
+function	IntVecPush	intVecPush	public; std.ktmh,vector.ktm
+function	IntVecRelease	intVecRelease	public; std.ktmh,vector.ktm
+function	IntVecSet	intVecSet	public; std.ktmh,vector.ktm
+function	IntVecSort	intVecSort	public; std.ktmh,vector.ktm
+function	isatty	isatty	C (extern "c"), kept; io.ktm
+function	IsDotC	isDotC	public; std.ktmh,strings.ktm
+function	IsDotZ	isDotZ	public; std.ktmh,strings.ktm
+function	IsoFromTimespec	isoFromTimespec	public; date.ktm,std.ktmh
+function	IsSpace	isSpace	public; std.ktmh,strings.ktm
+function	JsonAdvance	jsonAdvance	static; json.ktm
+function	JsonAdvanceToError	jsonAdvanceToError	static; json.ktm
+function	JsonAdvanceWhitespace	jsonAdvanceWhitespace	static; json.ktm
+function	JsonArrayAt	jsonArrayAt	internal; json.ktm
+function	JsonArrayGet	jsonArrayGet	public; json.ktm,std.ktmh
+function	JsonCanAdvanceBy	jsonCanAdvanceBy	static; json.ktm
+function	JsonCatQuoted	jsonCatQuoted	static; json.ktm
+function	JsonErrorChar	jsonErrorChar	static; json.ktm
+function	JsonFloatToStr	jsonFloatToStr	static; json.ktm
+function	JsonGetStrerror	jsonGetStrerror	public; json.ktm,std.ktmh
+function	JsonGetStrerrorInternal	jsonGetStrerrorInternal	static; json.ktm
+function	JsonHasChars	jsonHasChars	static; json.ktm
+function	JsonIntFits	jsonIntFits	static; json.ktm
+function	JsonIsArray	jsonIsArray	public; json.ktm,std.ktmh
+function	JsonIsBool	jsonIsBool	public; json.ktm,std.ktmh
+function	JsonIsFloat	jsonIsFloat	public; json.ktm,std.ktmh
+function	JsonIsInt	jsonIsInt	public; json.ktm,std.ktmh
+function	JsonIsNull	jsonIsNull	public; json.ktm,std.ktmh
+function	JsonIsObject	jsonIsObject	public; json.ktm,std.ktmh
+function	JsonIsString	jsonIsString	public; json.ktm,std.ktmh
+function	JsonLen	jsonLen	public; json.ktm,std.ktmh
+function	JsonNew	jsonNew	static; json.ktm
+function	JsonNumberLen	jsonNumberLen	static; json.ktm
+function	JsonObjectAt	jsonObjectAt	static; json.ktm
+function	JsonObjectGet	jsonObjectGet	public; json.ktm,std.ktmh
+function	JsonOk	jsonOk	public; json.ktm,std.ktmh
+function	JsonParse	jsonParse	public; json.ktm,std.ktmh
+function	JsonParseArray	jsonParseArray	static; json.ktm
+function	JsonParseBool	jsonParseBool	static; json.ktm
+function	JsonParseHex4	jsonParseHex4	static; json.ktm
+function	JsonParseNull	jsonParseNull	static; json.ktm
+function	JsonParseNumber	jsonParseNumber	static; json.ktm
+function	JsonParseObject	jsonParseObject	internal; json.ktm
+function	JsonParseString	jsonParseString	static; json.ktm
+function	JsonParseStrNum	jsonParseStrNum	static; json.ktm
+function	JsonParseValue	jsonParseValue	internal; json.ktm
+function	JsonParseWithLenAndFlags	jsonParseWithLenAndFlags	internal; json.ktm
+function	JsonPeek	jsonPeek	static; json.ktm
+function	JsonPrintError	jsonPrintError	public; json.ktm,std.ktmh
+function	JsonRelease	jsonRelease	public; json.ktm,std.ktmh
+function	JsonReleaseList	jsonReleaseList	static; json.ktm
+function	JsonSelect	jsonSelect	public; json.ktm,std.ktmh
+function	JsonSetExpectedType	jsonSetExpectedType	static; json.ktm
+function	JsonStateNew	jsonStateNew	static; json.ktm
+function	JsonToString	jsonToString	public; json.ktm,std.ktmh
+function	JsonToStringInternal	jsonToStringInternal	static; json.ktm
+function	JsonTypeCheck	jsonTypeCheck	static; json.ktm
+function	JsonUnsafeAdvanceBy	jsonUnsafeAdvanceBy	static; json.ktm
+function	JsonUnsafePeekAt	jsonUnsafePeekAt	static; json.ktm
+function	JsonUtf8Encode	jsonUtf8Encode	static; json.ktm
+function	kill	kill	C (extern "c"), kept; process.ktm,std.ktmh
+function	KTM_PushFrame	__ktmPushFrame	curated: called by generated code (ir.c); reserved __ prefix; public; compiler refers to it by name in ir.c; except.ktm,std.ktmh
+function	KTM_Throw	__ktmThrow	curated: called by generated code (ir.c); reserved __ prefix; public; compiler refers to it by name in ir.c; except.ktm,std.ktmh
+function	KTM_TryLeave	__ktmTryLeave	curated: called by generated code (ir.c); reserved __ prefix; public; compiler refers to it by name in ir.c; except.ktm,std.ktmh
+function	KTM_Uncaught	__ktmUncaught	curated: exception runtime; reserved __ prefix; static; except.ktm
+function	LastDayOfMon	lastDayOfMon	public; date.ktm,std.ktmh
+function	LastDayOfYear	lastDayOfYear	public; date.ktm,std.ktmh
+function	ldexp	ldexp	C (extern "c"), kept; math.ktm,std.ktmh
+function	leading_whitespaces	leadingWhitespaces	internal; fzf.ktm
+function	lgamma	lgamma	C (extern "c"), kept; math.ktm,std.ktmh
+function	ListAppend	listAppend	public; list.ktm,std.ktmh
+function	ListClear	listClear	public; list.ktm,std.ktmh
+function	ListCount	listCount	public; list.ktm,std.ktmh
+function	ListDeque	listDeque	public; list.ktm,std.ktmh
+function	ListEmpty	listEmpty	public; list.ktm,std.ktmh
+function	listen	listen	C (extern "c"), kept; net.ktm,std.ktmh
+function	ListFirst	listFirst	public; list.ktm,std.ktmh
+function	ListInit	listInit	public; list.ktm,std.ktmh
+function	ListInsertBefore	listInsertBefore	public; list.ktm,std.ktmh
+function	ListInsertValueBefore	listInsertValueBefore	public; list.ktm,std.ktmh
+function	ListLast	listLast	public; list.ktm,std.ktmh
+function	ListMergeAppend	listMergeAppend	public; list.ktm,std.ktmh
+function	ListMergePrepend	listMergePrepend	public; list.ktm,std.ktmh
+function	ListNew	listNew	public; list.ktm,std.ktmh
+function	ListPop	listPop	public; list.ktm,std.ktmh
+function	ListPrepend	listPrepend	public; list.ktm,std.ktmh
+function	ListRelease	listRelease	public; list.ktm,std.ktmh
+function	ListRemove	listRemove	public; list.ktm,std.ktmh
+function	localtime	localtime	C (extern "c"), kept; date.ktm,std.ktmh
+function	log	log	C (extern "c"), kept; math.ktm,std.ktmh
+function	log10	log10	C (extern "c"), kept; math.ktm,std.ktmh
+function	log1p	log1p	C (extern "c"), kept; math.ktm,std.ktmh
+function	log2	log2	C (extern "c"), kept; math.ktm,std.ktmh
+function	logb	logb	C (extern "c"), kept; math.ktm,std.ktmh
+function	longjmp	longjmp	C (extern "c"), kept; except.ktm,std.ktmh
+function	lrint	lrint	C (extern "c"), kept; math.ktm,std.ktmh
+function	lround	lround	C (extern "c"), kept; math.ktm,std.ktmh
+function	lseek	lseek	C (extern "c"), kept; io.ktm,std.ktmh
+function	lstat	lstat	C (extern "c"), kept; std.ktmh
+function	Main	main	curated: test-only entry points behind #ifdef (hashtable.ktm, vector.ktm); internal; compiler refers to it by name in asm.c, ir.c, parser.c, transpiler.c; hashtable.ktm,vector.ktm
+function	MAlloc	memAlloc	curated: HolyC abbreviation; family mem*; public; memory.ktm,std.ktmh
+function	malloc	malloc	C (extern "c"), kept; memory.ktm,std.ktmh
+function	max16	max16	internal, unchanged; fzf.ktm
+function	memchr	memchr	C (extern "c"), kept; memory.ktm,std.ktmh
+function	memcmp	memcmp	C (extern "c"), kept; memory.ktm,std.ktmh
+function	MemCpy	memCpy	curated: mechanical; differs from libc memcpy only by case; public; memory.ktm,std.ktmh
+function	memcpy	memcpy	C (extern "c"), kept; memory.ktm
+function	memmove	memmove	C (extern "c"), kept; memory.ktm,std.ktmh
+function	MemSet	memSet	curated: mechanical; differs from libc memset only by case; public; memory.ktm,std.ktmh
+function	memset	memset	C (extern "c"), kept; memory.ktm
+function	MkDir	makeDir	curated: TempleOS command name; mkDir would differ from libc mkdir only by case; public; stat.ktm,std.ktmh
+function	mkdir	mkdir	C (extern "c"), kept; std.ktmh
+function	MkDirIfNotExist	makeDirIfMissing	curated: family makeDir; static; stat.ktm
+function	mmap	mmap	C (extern "c"), kept; coroutines.ktm
+function	modf	modf	C (extern "c"), kept; math.ktm,std.ktmh
+function	ModU64	modU64	public; date.ktm,math.ktm,std.ktmh
+function	MPrintDate	dateToStr	curated: HolyC M-prefix; "MM/DD/YYYY"; public; std.ktmh,strings.ktm
+function	MPrintQ	strQuote	curated: HolyC M-prefix; what %Q prints; public; std.ktmh,strings.ktm
+function	MPrintTime	timeToStr	curated: HolyC M-prefix; "HH:MM:SS"; public; std.ktmh,strings.ktm
+function	MPrintTimestampNow	timestampNow	curated: HolyC M-prefix; public; std.ktmh,strings.ktm
+function	mprotect	mprotect	C (extern "c"), kept; coroutines.ktm
+function	MSize	memSize	curated: HolyC abbreviation; public; memory.ktm,std.ktmh
+function	MStrPrint	strFormat	curated: HolyC M-prefix (new string); public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	munmap	munmap	C (extern "c"), kept; coroutines.ktm
+function	nan	nan	C (extern "c"), kept; math.ktm,std.ktmh
+function	nearbyint	nearbyint	C (extern "c"), kept; math.ktm,std.ktmh
+function	NetAccept	netAccept	public; net.ktm,std.ktmh
+function	NetAcceptCloexec	netAcceptCloexec	static; net.ktm
+function	NetConnect	netConnect	public; net.ktm,std.ktmh
+function	NetConnectBefore	netConnectBefore	static; net.ktm
+function	NetCreateServer	netCreateServer	public; net.ktm,std.ktmh
+function	NetCreateUdpSocket	netCreateUdpSocket	public; net.ktm,std.ktmh
+function	NetCreateUnixClientSocket	netCreateUnixClientSocket	public; net.ktm,std.ktmh
+function	NetCreateUnixServerSocket	netCreateUnixServerSocket	public; net.ktm,std.ktmh
+function	NetGetInAddress	netGetInAddress	static; net.ktm
+function	NetGetIpv4Address	netGetIpv4Address	public; net.ktm,std.ktmh
+function	NetGetIpv4AddressFromAcceptedSocket	netGetIpv4AddressFromAcceptedSocket	public; net.ktm,std.ktmh
+function	NetGetSocketPort	netGetSocketPort	public; net.ktm,std.ktmh
+function	NetListen	netListen	public; net.ktm,std.ktmh
+function	NetRecvFrom	netRecvFrom	public; net.ktm,std.ktmh
+function	NetSend	netSend	public; net.ktm,std.ktmh
+function	NetSendTo	netSendTo	public; net.ktm,std.ktmh
+function	NetSetRecvTimeout	netSetRecvTimeout	public; net.ktm,std.ktmh
+function	NetSetSendTimeout	netSetSendTimeout	public; net.ktm,std.ktmh
+function	NetSetSocketBlocking	netSetSocketBlocking	static; net.ktm
+function	NetSetSocketNoDelay	netSetSocketNoDelay	public; net.ktm,std.ktmh
+function	NetSetSocketNonBlocking	netSetSocketNonBlocking	public; net.ktm,std.ktmh
+function	NetSetSockReuseAddr	netSetSockReuseAddr	public; net.ktm,std.ktmh
+function	NetSetTimeout	netSetTimeout	static; net.ktm
+function	NetSocket	netSocket	static; net.ktm
+function	NetUnixAddress	netUnixAddress	static; net.ktm
+function	NetUnixSocketIsStale	netUnixSocketIsStale	static; net.ktm
+function	nextafter	nextafter	C (extern "c"), kept; math.ktm,std.ktmh
+function	Now	now	public; date.ktm,std.ktmh
+function	NowDateTimeStruct	nowDateTimeStruct	public; date.ktm,std.ktmh
+function	NowMilliseconds	nowMilliseconds	public; date.ktm,std.ktmh
+function	Ntohl	ntohl	public; net.ktm,std.ktmh
+function	Ntohs	ntohs	public; net.ktm,std.ktmh
+function	open	open	C (extern "c"), kept; io.ktm,std.ktmh
+function	opendir	opendir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	OutStr	outStr	public; std.ktmh,strings.ktm
+function	pipe	pipe	C (extern "c"), kept; process.ktm,signals.ktm
+function	pipe2	pipe2	C (extern "c"), kept; process.ktm
+function	poll	poll	C (extern "c"), kept; net.ktm,process.ktm,std.ktmh
+function	posix_spawn	posix_spawn	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_addchdir_np	posix_spawn_file_actions_addchdir_np	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_addclosefrom_np	posix_spawn_file_actions_addclosefrom_np	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_adddup2	posix_spawn_file_actions_adddup2	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_addinherit_np	posix_spawn_file_actions_addinherit_np	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_addopen	posix_spawn_file_actions_addopen	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_destroy	posix_spawn_file_actions_destroy	C (extern "c"), kept; process.ktm
+function	posix_spawn_file_actions_init	posix_spawn_file_actions_init	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_destroy	posix_spawnattr_destroy	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_init	posix_spawnattr_init	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_setflags	posix_spawnattr_setflags	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_setpgroup	posix_spawnattr_setpgroup	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_setsigdefault	posix_spawnattr_setsigdefault	C (extern "c"), kept; process.ktm
+function	posix_spawnattr_setsigmask	posix_spawnattr_setsigmask	C (extern "c"), kept; process.ktm
+function	posix_spawnp	posix_spawnp	C (extern "c"), kept; process.ktm
+function	Pow	power	curated: `pow` is libc (extern "c" pow); public; math.ktm,std.ktmh
+function	pow	pow	C (extern "c"), kept; math.ktm,std.ktmh
+function	Print	__ktmPrintf	curated: the printf target for ktm's %Q %D %T %C %F; users write printf; public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	printf	printf	C (extern "c"), kept; std.ktmh,strings.ktm
+function	ProcClose	procClose	static; process.ktm
+function	ProcCommunicate	procCommunicate	public; process.ktm,std.ktmh
+function	ProcDone	procDone	public; process.ktm,std.ktmh
+function	ProcDrain	procDrain	static; process.ktm
+function	ProcEnviron	procEnviron	static; process.ktm
+function	ProcKill	procKill	public; process.ktm,std.ktmh
+function	ProcNonBlocking	procNonBlocking	static; process.ktm
+function	ProcNSGetEnviron	procNSGetEnviron	internal; process.ktm
+function	ProcPipe	procPipe	static; process.ktm
+function	ProcReap	procReap	static; process.ktm
+function	ProcRelease	procRelease	public; process.ktm,std.ktmh
+function	ProcRun	procRun	public; process.ktm,std.ktmh
+function	ProcSetStatus	procSetStatus	static; process.ktm
+function	ProcShellOutput	procShellOutput	internal; process.ktm,system.ktm
+function	ProcSpawn	procSpawn	public; process.ktm,std.ktmh
+function	ProcSpawnEx	procSpawnEx	static; process.ktm
+function	ProcWait	procWait	public; process.ktm,std.ktmh
+function	ProcWriteNoSigpipe	procWriteNoSigpipe	static; process.ktm
+function	pthread_attr_init	pthread_attr_init	C (extern "c"), kept; std.ktmh
+function	pthread_attr_setstacksize	pthread_attr_setstacksize	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_cond_broadcast	pthread_cond_broadcast	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_cond_destroy	pthread_cond_destroy	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_cond_init	pthread_cond_init	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_cond_signal	pthread_cond_signal	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_cond_wait	pthread_cond_wait	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_create	pthread_create	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_detach	pthread_detach	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_exit	pthread_exit	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_getspecific	pthread_getspecific	C (extern "c"), kept; except.ktm
+function	pthread_join	pthread_join	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_key_create	pthread_key_create	C (extern "c"), kept; except.ktm
+function	pthread_mutex_destroy	pthread_mutex_destroy	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_mutex_init	pthread_mutex_init	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_mutex_lock	pthread_mutex_lock	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_mutex_unlock	pthread_mutex_unlock	C (extern "c"), kept; std.ktmh,threads.ktm
+function	pthread_once	pthread_once	C (extern "c"), kept; except.ktm
+function	pthread_setspecific	pthread_setspecific	C (extern "c"), kept; except.ktm
+function	pthread_sigmask	pthread_sigmask	C (extern "c"), kept; process.ktm
+function	PtrVecCapacity	ptrVecCapacity	public; std.ktmh,vector.ktm
+function	PtrVecClear	ptrVecClear	public; std.ktmh,vector.ktm
+function	PtrVecGet	ptrVecGet	public; std.ktmh,vector.ktm
+function	PtrVecLast	ptrVecLast	public; std.ktmh,vector.ktm
+function	PtrVecNew	ptrVecNew	public; std.ktmh,vector.ktm
+function	PtrVecPop	ptrVecPop	public; std.ktmh,vector.ktm
+function	PtrVecPush	ptrVecPush	public; std.ktmh,vector.ktm
+function	PtrVecRelease	ptrVecRelease	public; std.ktmh,vector.ktm
+function	PtrVecSet	ptrVecSet	public; std.ktmh,vector.ktm
+function	PtrVecSort	ptrVecSort	public; std.ktmh,vector.ktm
+function	Pwd	currentDir	curated: TempleOS command name; public; io.ktm,std.ktmh
+function	QSortGeneric	qsortGeneric	curated: qSortGeneric reads badly; public; std.ktmh,vector.ktm
+function	raise	raise	C (extern "c"), kept; std.ktmh
+function	RBGrandParent	rbGrandParent	static; set.ktm
+function	RBInsertFixUp	rbInsertFixUp	static; set.ktm
+function	RBIsNil	rbIsNil	static; set.ktm
+function	RBIterNew	rbIterNew	public; set.ktm,std.ktmh
+function	RBIterNext	rbIterNext	public; set.ktm,std.ktmh
+function	RBIterRelease	rbIterRelease	public; set.ktm,std.ktmh
+function	RBLeftRot	rbLeftRot	static; set.ktm
+function	RBNodeFind	rbNodeFind	static; set.ktm
+function	RBNodeMin	rbNodeMin	static; set.ktm
+function	RBNodeNew	rbNodeNew	static; set.ktm
+function	RBNodeRelease	rbNodeRelease	static; set.ktm
+function	RBRightRot	rbRightRot	static; set.ktm
+function	RBTransplant	rbTransplant	static; set.ktm
+function	RBTreeDelete	rbTreeDelete	public; set.ktm,std.ktmh
+function	RBTreeFixDelete	rbTreeFixDelete	static; set.ktm
+function	RBTreeForEach	rbTreeForEach	public; set.ktm,std.ktmh
+function	RBTreeGet	rbTreeGet	public; set.ktm,std.ktmh
+function	RBTreeHas	rbTreeHas	public; set.ktm,std.ktmh
+function	RBTreeInsert	rbTreeInsert	public; set.ktm,std.ktmh
+function	RBTreeNew	rbTreeNew	public; set.ktm,std.ktmh
+function	RBTreeRelease	rbTreeRelease	public; set.ktm,std.ktmh
+function	read	read	C (extern "c"), kept; io.ktm,std.ktmh
+function	readdir	readdir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	ReAlloc	memRealloc	curated: HolyC abbreviation; `realloc` is libc; public; compiler refers to it by name in memsafe.c; memory.ktm,std.ktmh
+function	realloc	realloc	C (extern "c"), kept; memory.ktm
+function	recv	recv	C (extern "c"), kept; net.ktm,std.ktmh
+function	recvfrom	recvfrom	C (extern "c"), kept; net.ktm,std.ktmh
+function	recvmsg	recvmsg	C (extern "c"), kept; net.ktm,std.ktmh
+function	remainder	remainder	C (extern "c"), kept; math.ktm,std.ktmh
+function	remquo	remquo	C (extern "c"), kept; math.ktm,std.ktmh
+function	resize_pos	resizePos	internal; fzf.ktm
+function	rewinddir	rewinddir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	rint	rint	C (extern "c"), kept; math.ktm,std.ktmh
+function	Rm	removePath	curated: TempleOS command name; public; stat.ktm,std.ktmh
+function	RmDir	removeDir	curated: TempleOS command name; `rmdir` is libc; public; stat.ktm,std.ktmh
+function	rmdir	rmdir	C (extern "c"), kept; std.ktmh
+function	round	round	C (extern "c"), kept; math.ktm,std.ktmh
+function	RoundUpToNextPowerOf2	roundUpToNextPowerOf2	internal; hashtable.ktm
+function	scalbln	scalbln	C (extern "c"), kept; math.ktm,std.ktmh
+function	scalbn	scalbn	C (extern "c"), kept; math.ktm,std.ktmh
+function	seekdir	seekdir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	send	send	C (extern "c"), kept; net.ktm,std.ktmh
+function	sendmsg	sendmsg	C (extern "c"), kept; net.ktm,std.ktmh
+function	sendto	sendto	C (extern "c"), kept; net.ktm,std.ktmh
+function	SetErrno	setErrno	public; std.ktmh,system.ktm
+function	sethostent	sethostent	C (extern "c"), kept; net.ktm,std.ktmh
+function	setjmp	setjmp	C (extern "c"), kept; except.ktm,std.ktmh
+function	setnetent	setnetent	C (extern "c"), kept; net.ktm,std.ktmh
+function	setprotoent	setprotoent	C (extern "c"), kept; net.ktm,std.ktmh
+function	setservent	setservent	C (extern "c"), kept; net.ktm,std.ktmh
+function	setsockopt	setsockopt	C (extern "c"), kept; net.ktm,std.ktmh
+function	Sh	shellf	curated: HolyC abbreviation; printf-style System; public; std.ktmh,system.ktm
+function	Shlurp	shellOutput	curated: HolyC-ism (slurp the shell's output); public; std.ktmh,system.ktm
+function	ShQuote	shellQuote	curated: family shell*; public; std.ktmh,system.ktm
+function	shutdown	shutdown	C (extern "c"), kept; net.ktm,std.ktmh
+function	SigAction	sigAction	public; signals.ktm,std.ktmh
+function	sigaction	sigaction	C (extern "c"), kept; signals.ktm
+function	sigaddset	sigaddset	C (extern "c"), kept; process.ktm,signals.ktm
+function	SigBit	sigBit	public; signals.ktm,std.ktmh
+function	sigemptyset	sigemptyset	C (extern "c"), kept; process.ktm,signals.ktm
+function	sigfillset	sigfillset	C (extern "c"), kept; process.ktm
+function	SigHandle	sigHandle	public; signals.ktm,std.ktmh
+function	sigismember	sigismember	C (extern "c"), kept; process.ktm,signals.ktm
+function	signal	signal	C (extern "c"), kept; std.ktmh
+function	sigpending	sigpending	C (extern "c"), kept; process.ktm
+function	SigStopHandler	sigStopHandler	static; signals.ktm
+function	SigStopInit	sigStopInit	public; signals.ktm,std.ktmh
+function	SigStopRequested	sigStopRequested	public; signals.ktm,std.ktmh
+function	SigStopSignal	sigStopSignal	public; signals.ktm,std.ktmh
+function	sigtimedwait	sigtimedwait	C (extern "c"), kept; process.ktm
+function	sin	sin	C (extern "c"), kept; math.ktm,std.ktmh
+function	sinh	sinh	C (extern "c"), kept; math.ktm,std.ktmh
+function	slice_str	sliceStr	internal; fzf.ktm
+function	slice_str_right	sliceStrRight	internal; fzf.ktm
+function	snprintf	snprintf	C (extern "c"), kept; std.ktmh,strings.ktm
+function	socket	socket	C (extern "c"), kept; net.ktm,std.ktmh
+function	SPutChar	strPutChar	curated: internal StrPrint helper; sPutChar reads badly; public; std.ktmh,strings.ktm
+function	SqlCtxNew	sqlCtxNew	public; sqllite.ktm,std.ktmh
+function	SqlCtxRelease	sqlCtxRelease	public; sqllite.ktm,std.ktmh
+function	SqlExecPrepared	sqlExecPrepared	public; sqllite.ktm,std.ktmh
+function	SqlExecQuery	sqlExecQuery	static; sqllite.ktm
+function	SqlExecRaw	sqlExecRaw	public; sqllite.ktm,std.ktmh
+function	SqlFinalizePrepared	sqlFinalizePrepared	public; sqllite.ktm,std.ktmh
+function	sqlite3_bind_blob	sqlite3_bind_blob	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_blob64	sqlite3_bind_blob64	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_double	sqlite3_bind_double	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_int	sqlite3_bind_int	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_int64	sqlite3_bind_int64	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_null	sqlite3_bind_null	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_parameter_count	sqlite3_bind_parameter_count	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_text	sqlite3_bind_text	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_text16	sqlite3_bind_text16	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_text64	sqlite3_bind_text64	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_bind_value	sqlite3_bind_value	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_clear_bindings	sqlite3_clear_bindings	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_close	sqlite3_close	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_close_v2	sqlite3_close_v2	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_blob	sqlite3_column_blob	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_bytes	sqlite3_column_bytes	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_bytes16	sqlite3_column_bytes16	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_double	sqlite3_column_double	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_int	sqlite3_column_int	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_int64	sqlite3_column_int64	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_text	sqlite3_column_text	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_text16	sqlite3_column_text16	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_type	sqlite3_column_type	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_column_value	sqlite3_column_value	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_data_count	sqlite3_data_count	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_errmsg	sqlite3_errmsg	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_exec	sqlite3_exec	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_finalize	sqlite3_finalize	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_free	sqlite3_free	C (extern "c"), kept; sqllite.ktm
+function	sqlite3_open	sqlite3_open	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_prepare_v2	sqlite3_prepare_v2	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_reset	sqlite3_reset	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	sqlite3_step	sqlite3_step	C (extern "c"), kept; sqllite.ktm,std.ktmh
+function	SqlIter	sqlIter	public; sqllite.ktm,std.ktmh
+function	SqlIterGeneric	sqlIterGeneric	static; sqllite.ktm
+function	SqlIterPrepared	sqlIterPrepared	public; sqllite.ktm,std.ktmh
+function	SqlPrepare	sqlPrepare	public; sqllite.ktm,std.ktmh
+function	SqlQuery	sqlQuery	public; sqllite.ktm,std.ktmh
+function	SqlReset	sqlReset	static; sqllite.ktm
+function	SqlRowRelease	sqlRowRelease	public; sqllite.ktm,std.ktmh
+function	SqlSelect	sqlSelect	public; sqllite.ktm,std.ktmh
+function	SqlTailIsEmpty	sqlTailIsEmpty	static; sqllite.ktm
+function	sqrt	sqrt	C (extern "c"), kept; math.ktm,std.ktmh
+function	Stat	fileStat	curated: `stat` is libc (extern "c" stat); public; io.ktm,std.ktmh
+function	stat	stat	C (extern "c"), kept; std.ktmh
+function	statx	statx	C (extern "c"), kept; std.ktmh
+function	Str2CDateStruct	strToDateStruct	curated: CDate is now Date; public; std.ktmh,strings.ktm
+function	str_replace	strReplace	internal; fzf.ktm
+function	str_replace_char	strReplaceChar	internal; fzf.ktm
+function	str_tolower	strTolower	internal; fzf.ktm
+function	strcasecmp	strcasecmp	C (extern "c"), kept; std.ktmh
+function	strcat	strcat	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strchr	strchr	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrCleanEnd	strCleanEnd	public; std.ktmh,strings.ktm
+function	StrCmp	strCmp	public; std.ktmh,strings.ktm
+function	strcmp	strcmp	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strcoll	strcoll	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrCpy	strCpy	public; std.ktmh,strings.ktm
+function	strcpy	strcpy	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strcspn	strcspn	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strdup	strdup	C (extern "c"), kept; std.ktmh
+function	strerror	strerror	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrFirstOcc	strFirstOf	curated: abbreviation: first char that is in marker; public; std.ktmh,strings.ktm
+function	StrFirstRem	strSplitFirst	curated: abbreviation: split off the part before the first marker; public; std.ktmh,strings.ktm
+function	StrHash	strHash	public; std.ktmh,strings.ktm
+function	StrIntToHex	strIntToHex	public; std.ktmh,strings.ktm
+function	StrLastOcc	strLastOf	curated: abbreviation: last char that is in marker; public; std.ktmh,strings.ktm
+function	StrLastRem	strSplitLast	curated: abbreviation: split off the part after the last marker; public; std.ktmh,strings.ktm
+function	StrLen	strLen	public; compiler refers to it by name in transpiler.c; std.ktmh,strings.ktm
+function	strlen	strlen	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrMapClear	strMapClear	public; hashtable.ktm,std.ktmh
+function	StrMapDelete	strMapDelete	public; hashtable.ktm,std.ktmh
+function	StrMapFreeEntry	strMapFreeEntry	static; hashtable.ktm
+function	StrMapGet	strMapGet	public; hashtable.ktm,std.ktmh
+function	StrMapGetIdx	strMapGetIdx	static; hashtable.ktm
+function	StrMapGetLen	strMapGetLen	public; hashtable.ktm,std.ktmh
+function	StrMapGetNextIdx	strMapGetNextIdx	static; hashtable.ktm
+function	StrMapHas	strMapHas	public; hashtable.ktm,std.ktmh
+function	StrMapHash	strMapHash	static; hashtable.ktm
+function	StrMapHasLen	strMapHasLen	public; hashtable.ktm,std.ktmh
+function	StrMapIter	strMapIter	public; hashtable.ktm,std.ktmh
+function	StrMapKeyIter	strMapKeyIter	public; hashtable.ktm,std.ktmh
+function	StrMapKeysToString	strMapKeysToString	public; hashtable.ktm,std.ktmh
+function	StrMapNew	strMapNew	public; hashtable.ktm,std.ktmh
+function	StrMapNodeNew	strMapNodeNew	internal; hashtable.ktm
+function	StrMapRehash	strMapRehash	static; hashtable.ktm
+function	StrMapRelease	strMapRelease	public; hashtable.ktm,std.ktmh
+function	StrMapResize	strMapResize	public; hashtable.ktm,std.ktmh
+function	StrMapSet	strMapSet	public; hashtable.ktm,std.ktmh
+function	StrMapSetFreeKey	strMapSetFreeKey	public; hashtable.ktm,std.ktmh
+function	StrMapSetFreeValue	strMapSetFreeValue	public; hashtable.ktm,std.ktmh
+function	StrMapTests	strMapTests	internal; hashtable.ktm
+function	StrMapToString	strMapToString	public; hashtable.ktm,std.ktmh
+function	StrMapValueIter	strMapValueIter	public; hashtable.ktm,std.ktmh
+function	StrMerge	strConcat	curated: clearer: joins its string arguments; public; std.ktmh,strings.ktm
+function	StrMergeJoin	strConcatArgs	curated: StrMerge for an argument array; public; std.ktmh,strings.ktm
+function	strncasecmp	strncasecmp	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strncat	strncat	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrNCmp	strNCmp	public; std.ktmh,strings.ktm
+function	strncmp	strncmp	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrNCpy	strNewLen	curated: it returns a new copy of len bytes (strndup), not C's strncpy; public; std.ktmh,strings.ktm
+function	strncpy	strncpy	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrNew	strNew	public; std.ktmh,strings.ktm
+function	StrNICmp	strNICmp	public; std.ktmh,strings.ktm
+function	strnlen	strnlen	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrNPrint	strNPrint	public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	StrOcc	strCount	curated: abbreviation: count of ch in src; public; std.ktmh,strings.ktm
+function	strpbrk	strpbrk	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrPrint	strPrint	public; compiler refers to it by name in prslib.c; std.ktmh,strings.ktm
+function	StrPrintInt	strPrintInt	static; strings.ktm
+function	StrPrintJoin	strPrintJoin	public; std.ktmh,strings.ktm
+function	strrchr	strrchr	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrReverse	strReverse	public; std.ktmh,strings.ktm
+function	strspn	strspn	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strstr	strstr	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrToCDate	strToDate	curated: CDate is now Date; public; std.ktmh,strings.ktm
+function	strtod	strtod	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strtok	strtok	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strtok_r	strtok_r	C (extern "c"), kept; fzf.ktm
+function	strtoll	strtoll	C (extern "c"), kept; std.ktmh,strings.ktm
+function	strtoul	strtoul	C (extern "c"), kept; std.ktmh,strings.ktm
+function	StrTrimEnd	strTrimEnd	public; std.ktmh,strings.ktm
+function	StrTrimStart	strTrimStart	public; std.ktmh,strings.ktm
+function	Struct2Date	structToDate	curated: 2 -> To; public; date.ktm,std.ktmh
+function	strxfrm	strxfrm	C (extern "c"), kept; std.ktmh,strings.ktm
+function	System	shell	curated: `system` is libc (extern "c" system); public; std.ktmh,system.ktm
+function	system	system	C (extern "c"), kept; system.ktm
+function	tan	tan	C (extern "c"), kept; math.ktm,std.ktmh
+function	tanh	tanh	C (extern "c"), kept; math.ktm,std.ktmh
+function	telldir	telldir	C (extern "c"), kept; dir.ktm,std.ktmh
+function	tgamma	tgamma	C (extern "c"), kept; math.ktm,std.ktmh
+function	ThreadPoolEnqueue	threadPoolEnqueue	public; std.ktmh,threads.ktm
+function	ThreadPoolMain	threadPoolMain	static; threads.ktm
+function	ThreadPoolNew	threadPoolNew	public; std.ktmh,threads.ktm
+function	ThreadPoolRelease	threadPoolRelease	public; std.ktmh,threads.ktm
+function	ThreadPoolStop	threadPoolStop	public; std.ktmh,threads.ktm
+function	ThreadPoolWait	threadPoolWait	public; std.ktmh,threads.ktm
+function	ToLower	toLower	public; std.ktmh,strings.ktm
+function	ToUpper	toUpper	public; std.ktmh,strings.ktm
+function	trailing_whitespaces	trailingWhitespaces	internal; fzf.ktm
+function	trunc	trunc	C (extern "c"), kept; math.ktm,std.ktmh
+function	try_skip	trySkip	internal; fzf.ktm
+function	U64ToStr	u64ToStr	public; std.ktmh,strings.ktm
+function	unlink	unlink	C (extern "c"), kept; std.ktmh,system.ktm
+function	wait	wait	C (extern "c"), kept; std.ktmh
+function	waitpid	waitpid	C (extern "c"), kept; std.ktmh
+function	WildMatch	wildMatch	public; std.ktmh,strings.ktm
+function	Write	fdWrite	curated: `write` is libc (extern "c" write); public; std.ktmh,system.ktm
+function	write	write	C (extern "c"), kept; io.ktm,std.ktmh,system.ktm
+function	YearStartDate	yearStartDate	public; date.ktm,std.ktmh
+global	_fs_key	fsKey	static; except.ktm
+global	_fs_once	fsOnce	static; except.ktm
+global	_str_date_days	strDateDays	static; strings.ktm
+global	_str_date_months	strDateMonths	static; strings.ktm
+global	mon_start_days1	monStartDays1	internal; date.ktm
+global	mon_start_days2	monStartDays2	internal; date.ktm
+global	sig_stop_rfd	sigStopRfd	static; signals.ktm
+global	sig_stop_sig	sigStopSig	static; signals.ktm
+global	sig_stop_wfd	sigStopWfd	static; signals.ktm
+field	__align	__align	C field name, kept (pthread_attr_t); C field name, kept (pthread_cond_t); C field name, kept (pthread_condattr_t); C field name, kept (pthread_mutex_t); C field name, kept (pthread_mutexattr_t); std.ktmh,threads.ktm
+field	__arg	__arg	C field name, kept (pthread_handler_rec); std.ktmh,threads.ktm
+field	__cleanup_stack	__cleanup_stack	C field name, kept (pthread_t); std.ktmh,threads.ktm
+field	__count	__count	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__data	__data	C field name, kept (pthread_cond_t); C field name, kept (pthread_mutex_t); std.ktmh,threads.ktm
+field	__elision	__elision	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__g1_orig_size	__g1_orig_size	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__g1_start	__g1_start	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__g_regs	__g_regs	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__g_signals	__g_signals	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__g_size	__g_size	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__glibc_reserved	__glibc_reserved	C field name, kept (cStat); std.ktmh
+field	__high	__high	C field name, kept (__atomic_wide_counter); std.ktmh,threads.ktm
+field	__kind	__kind	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__list	__list	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__lock	__lock	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__low	__low	C field name, kept (__atomic_wide_counter); std.ktmh,threads.ktm
+field	__next	__next	C field name, kept (__pthread_list_t); C field name, kept (pthread_handler_rec); std.ktmh,threads.ktm
+field	__nusers	__nusers	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__opaque	__opaque	C field name, kept (pthread_attr_t); C field name, kept (pthread_cond_t); C field name, kept (pthread_condattr_t); C field name, kept (pthread_mutex_t); C field name, kept (pthread_mutexattr_t); C field name, kept (pthread_t); std.ktmh,threads.ktm
+field	__owner	__owner	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__pad	__pad	C field name, kept (timeval); date.ktm,std.ktmh
+field	__pad0	__pad0	C field name, kept (cStat); std.ktmh
+field	__pad1	__pad1	C field name, kept (cStat); std.ktmh
+field	__pad2	__pad2	C field name, kept (cStat); std.ktmh
+field	__padding	__padding	C field name, kept (pthread_t); std.ktmh,threads.ktm
+field	__prev	__prev	C field name, kept (__pthread_list_t); std.ktmh,threads.ktm
+field	__reserved	__reserved	C field name, kept (statx_timestamp); std.ktmh
+field	__routine	__routine	C field name, kept (pthread_handler_rec); std.ktmh,threads.ktm
+field	__sig	__sig	C field name, kept (pthread_attr_t); C field name, kept (pthread_cond_t); C field name, kept (pthread_condattr_t); C field name, kept (pthread_mutex_t); C field name, kept (pthread_mutexattr_t); C field name, kept (pthread_t); std.ktmh,threads.ktm
+field	__size	__size	C field name, kept (pthread_attr_t); C field name, kept (pthread_cond_t); C field name, kept (pthread_condattr_t); C field name, kept (pthread_mutex_t); C field name, kept (pthread_mutexattr_t); std.ktmh,threads.ktm
+field	__spare0	__spare0	C field name, kept (Statx); std.ktmh
+field	__spare2	__spare2	C field name, kept (Statx); std.ktmh
+field	__spare3	__spare3	C field name, kept (Statx); std.ktmh
+field	__spins	__spins	C field name, kept (__pthread_mutex_s); std.ktmh,threads.ktm
+field	__ss_align	__ss_align	C field name, kept (sockaddr_storage); net.ktm,std.ktmh
+field	__ss_pad1	__ss_pad1	C field name, kept (sockaddr_storage); net.ktm,std.ktmh
+field	__ss_pad2	__ss_pad2	C field name, kept (sockaddr_storage); net.ktm,std.ktmh
+field	__u6_addr16	__u6_addr16	C field name, kept (in6_addr); net.ktm,std.ktmh
+field	__u6_addr32	__u6_addr32	C field name, kept (in6_addr); net.ktm,std.ktmh
+field	__u6_addr8	__u6_addr8	C field name, kept (in6_addr); net.ktm,std.ktmh
+field	__unused	__unused	C field name, kept (cStat); std.ktmh
+field	__value64	__value64	C field name, kept (__atomic_wide_counter); std.ktmh,threads.ktm
+field	__wrefs	__wrefs	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	__wseg	__wseg	C field name, kept (__pthread_cond_s); std.ktmh,threads.ktm
+field	_free_key	freeKey	owner StrMap; hashtable.ktm,std.ktmh
+field	_free_value	freeValue	owner IntMap; owner StrMap; hashtable.ktm,std.ktmh
+field	active_threads	activeThreads	owner ThreadPool; std.ktmh,threads.ktm
+field	ai_addr	ai_addr	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_addrlen	ai_addrlen	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_canonname	ai_canonname	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_family	ai_family	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_flags	ai_flags	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_next	ai_next	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_protocol	ai_protocol	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	ai_socktype	ai_socktype	C field name, kept (addrinfo); net.ktm,std.ktmh
+field	alive_threads	aliveThreads	owner ThreadPool; std.ktmh,threads.ktm
+field	allocated	allocated	unchanged (FzFI16); unchanged (FzFI32); fzf.ktm
+field	arg	arg	unchanged (Coroutine); coroutines.ktm,std.ktmh
+field	argv	argv	unchanged (ThreadWorkerJob); std.ktmh,threads.ktm
+field	array	array	unchanged (Json); json.ktm,std.ktmh
+field	blob	blob	unchanged (SqlColumn); unchanged (SqlParam); sqllite.ktm,std.ktmh
+field	blob_len	blobLen	owner SqlParam; sqllite.ktm,std.ktmh
+field	blocks	blocks	unchanged (BitVec); bitvec.ktm,std.ktmh
+field	boolean	boolean	unchanged (Json); json.ktm,std.ktmh
+field	buf	buf	unchanged (JsonStringBuilder); json.ktm
+field	buffer	buffer	unchanged (JsonParser); json.ktm
+field	buflen	buflen	unchanged (JsonParser); json.ktm
+field	callback	callback	unchanged (ThreadWorkerJob); std.ktmh,threads.ktm
+field	cap	cap	unchanged (FzFI16); unchanged (FzFI32); unchanged (FzFPattern); unchanged (FzFPosition); unchanged (FzFTermSet); unchanged (ProcBuf); fzf.ktm,process.ktm,std.ktmh
+field	capacity	capacity	unchanged (IntMap); unchanged (StrMap); hashtable.ktm,std.ktmh
+field	case_sensitive	caseSensitive	owner FzFTerm; fzf.ktm
+field	catch_top	catchTop	owner Coroutine; owner HCFs; coroutines.ktm,except.ktm,std.ktmh
+field	ch	ch	unchanged (JsonState); json.ktm,std.ktmh
+field	col	col	unchanged (JsonState); unchanged (SqlRow); json.ktm,sqllite.ktm,std.ktmh
+field	color	color	unchanged (RBNode); set.ktm,std.ktmh
+field	cols	cols	unchanged (SqlRow); sqllite.ktm,std.ktmh
+field	conn	conn	unchanged (SqlCtx); sqllite.ktm,std.ktmh
+field	coro_cache	coroCache	owner HCFs; except.ktm,std.ktmh
+field	coro_cached	coroCached	owner HCFs; except.ktm,std.ktmh
+field	coro_cur	coroCur	owner HCFs; except.ktm,std.ktmh
+field	coro_root	coroRoot	owner HCFs; except.ktm,std.ktmh
+field	csv	csv	unchanged (CsvParser); csv.ktm,std.ktmh
+field	cur	cur	unchanged (RBIter); set.ktm,std.ktmh
+field	cwd	cwd	unchanged (ProcOpts); process.ktm,std.ktmh
+field	data	data	unchanged (FzFI16); unchanged (FzFI32); unchanged (FzFPosition); unchanged (FzFStrSlice); unchanged (FzFString); unchanged (ProcBuf); fzf.ktm,process.ktm,std.ktmh
+field	date	date	unchanged (CDate); date.ktm,std.ktmh
+field	day_of_mon	dayOfMon	owner CDateStruct; date.ktm,std.ktmh
+field	day_of_week	dayOfWeek	owner CDateStruct; date.ktm,std.ktmh
+field	dbname	dbname	unchanged (SqlCtx); sqllite.ktm,std.ktmh
+field	depth	depth	unchanged (JsonParser); json.ktm
+field	done	done	unchanged (Proc); process.ktm,std.ktmh
+field	end	end	unchanged (FzFResult); fzf.ktm
+field	entries	entries	unchanged (BitVec); unchanged (FloatVec); unchanged (FzFPattern); unchanged (FzFTermSet); unchanged (IntMap); unchanged (IntVec); unchanged (PtrVec); unchanged (StrMap); bitvec.ktm,fzf.ktm,hashtable.ktm,std.ktmh,vector.ktm
+field	entry	entry	unchanged (IntSetIter); set.ktm,std.ktmh
+field	env	env	unchanged (ProcOpts); process.ktm,std.ktmh
+field	err	err	unchanged (ProcOpts); process.ktm,std.ktmh
+field	err_fd	errFd	owner Proc; process.ktm,std.ktmh
+field	error	error	unchanged (JsonParser); unchanged (JsonState); json.ktm,std.ktmh
+field	events	events	unchanged (NetPollFd); unchanged (ProcPollFd); C field name, kept (pollfd); net.ktm,process.ktm,std.ktmh
+field	except_ch	exceptCh	owner Coroutine; owner HCFs; coroutines.ktm,except.ktm,std.ktmh
+field	exit_code	exitCode	owner Proc; process.ktm,std.ktmh
+field	f64	f64	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
+field	failed	failed	unchanged (Coroutine); coroutines.ktm,std.ktmh
+field	fd	fd	unchanged (NetPollFd); unchanged (ProcPollFd); C field name, kept (pollfd); net.ktm,process.ktm,std.ktmh
+field	flags	flags	unchanged (JsonParser); unchanged (SigAct); json.ktm,signals.ktm,std.ktmh
+field	fn	fn	unchanged (Coroutine); unchanged (FzFTerm); coroutines.ktm,fzf.ktm,std.ktmh
+field	free_key	freeKey	owner RBTree; set.ktm,std.ktmh
+field	free_value	freeValue	owner RBTree; set.ktm,std.ktmh
+field	group	group	unchanged (Proc); process.ktm,std.ktmh
+field	h_addr_list	h_addr_list	C field name, kept (hostent); net.ktm,std.ktmh
+field	h_addrtype	h_addrtype	C field name, kept (hostent); net.ktm,std.ktmh
+field	h_aliases	h_aliases	C field name, kept (hostent); net.ktm,std.ktmh
+field	h_length	h_length	C field name, kept (hostent); net.ktm,std.ktmh
+field	h_name	h_name	C field name, kept (hostent); net.ktm,std.ktmh
+field	handler	handler	unchanged (SigAct); signals.ktm,std.ktmh
+field	has_work	hasWork	owner ThreadPool; std.ktmh,threads.ktm
+field	hour	hour	unchanged (CDateStruct); date.ktm,std.ktmh
+field	i16	i16	unchanged (FzFSlab); fzf.ktm
+field	i32	i32	unchanged (FzFSlab); fzf.ktm
+field	i64	i64	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
+field	id	id	unchanged (ThreadWorker); std.ktmh,threads.ktm
+field	idx	idx	unchanged (CsvSlice); csv.ktm,std.ktmh
+field	in	in	unchanged (ProcOpts); process.ktm,std.ktmh
+field	in_fd	inFd	owner Proc; process.ktm,std.ktmh
+field	indexes	indexes	unchanged (IntMap); unchanged (StrMap); hashtable.ktm,std.ktmh
+field	ino	ino	unchanged (Dirent); dir.ktm,std.ktmh
+field	inv	inv	unchanged (FzFTerm); fzf.ktm
+field	iov_base	iov_base	C field name, kept (iovec); io.ktm,std.ktmh
+field	iov_len	iov_len	C field name, kept (iovec); io.ktm,std.ktmh
+field	is_root	isRoot	owner Coroutine; coroutines.ktm,std.ktmh
+field	J	j	curated: JsonParser.J, unused; json.ktm
+field	jb	jb	unchanged (CatchFrame); except.ktm,std.ktmh
+field	jobs	jobs	unchanged (ThreadPool); std.ktmh,threads.ktm
+field	key	key	unchanged (IntMapNode); unchanged (IntSetEntry); unchanged (Json); unchanged (RBNode); unchanged (StrMapNode); hashtable.ktm,json.ktm,set.ktm,std.ktmh
+field	key_cmp	keyCmp	owner RBTree; set.ktm,std.ktmh
+field	key_len	keyLen	owner Json; owner StrMapNode; hashtable.ktm,json.ktm,std.ktmh
+field	left	left	unchanged (RBNode); set.ktm,std.ktmh
+field	len	len	unchanged (CoroCached); unchanged (CsvParser); unchanged (CsvSlice); unchanged (JsonStringBuilder); unchanged (ProcBuf); unchanged (SqlColumn); coroutines.ktm,csv.ktm,json.ktm,process.ktm,sqllite.ktm,std.ktmh
+field	line	line	unchanged (JsonState); json.ktm,std.ktmh
+field	lock	lock	unchanged (ThreadPool); std.ktmh,threads.ktm
+field	mask	mask	unchanged (IntMap); unchanged (SigAct); unchanged (StrMap); hashtable.ktm,signals.ktm,std.ktmh
+field	min	min	unchanged (CDateStruct); date.ktm,std.ktmh
+field	mode	mode	unchanged (DirHuman); io.ktm
+field	mon	mon	unchanged (CDateStruct); date.ktm,std.ktmh
+field	msg_control	msg_control	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_controllen	msg_controllen	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_flags	msg_flags	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_iov	msg_iov	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_iovlen	msg_iovlen	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_name	msg_name	C field name, kept (msghdr); net.ktm,std.ktmh
+field	msg_namelen	msg_namelen	C field name, kept (msghdr); net.ktm,std.ktmh
+field	n_addrtype	n_addrtype	C field name, kept (netent); net.ktm,std.ktmh
+field	n_aliases	n_aliases	C field name, kept (netent); net.ktm,std.ktmh
+field	n_name	n_name	C field name, kept (netent); net.ktm,std.ktmh
+field	n_net	n_net	C field name, kept (netent); net.ktm,std.ktmh
+field	name	name	unchanged (Dirent); dir.ktm,std.ktmh
+field	namlen	namlen	unchanged (Dirent); dir.ktm,std.ktmh
+field	new_group	newGroup	owner ProcOpts; process.ktm,std.ktmh
+field	next	next	unchanged (CoroCached); unchanged (Json); unchanged (List); unchanged (ThreadWorkerJob); coroutines.ktm,json.ktm,list.ktm,std.ktmh,threads.ktm
+field	nfields	nfields	unchanged (CsvParser); csv.ktm,std.ktmh
+field	nil	nil	unchanged (RBTree); set.ktm,std.ktmh
+field	no_path	noPath	owner ProcOpts; process.ktm,std.ktmh
+field	no_work	noWork	owner ThreadPool; std.ktmh,threads.ktm
+field	nrows	nrows	unchanged (CsvParser); csv.ktm,std.ktmh
+field	object	object	unchanged (Json); json.ktm,std.ktmh
+field	off	off	unchanged (CsvParser); unchanged (CsvSlice); csv.ktm,std.ktmh
+field	offset	offset	unchanged (JsonParser); unchanged (JsonState); json.ktm,std.ktmh
+field	only_inv	onlyInv	owner FzFPattern; fzf.ktm
+field	order	order	unchanged (IntMapNode); unchanged (StrMapNode); hashtable.ktm,std.ktmh
+field	out	out	unchanged (ProcOpts); process.ktm,std.ktmh
+field	out_fd	outFd	owner Proc; process.ktm,std.ktmh
+field	owns_stmt	ownsStmt	owner SqlRow; sqllite.ktm,std.ktmh
+field	p_aliases	p_aliases	C field name, kept (protoent); net.ktm,std.ktmh
+field	p_name	p_name	C field name, kept (protoent); net.ktm,std.ktmh
+field	p_proto	p_proto	C field name, kept (protoent); net.ktm,std.ktmh
+field	params_count	paramsCount	owner SqlPreparedStmt; sqllite.ktm,std.ktmh
+field	parent	parent	unchanged (RBNode); set.ktm,std.ktmh
+field	pathname	pathname	unchanged (DirHuman); io.ktm
+field	pid	pid	unchanged (Proc); process.ktm,std.ktmh
+field	prev	prev	unchanged (CatchFrame); unchanged (List); except.ktm,list.ktm,std.ktmh
+field	priv_data	privData	owner ThreadPool; std.ktmh,threads.ktm
+field	ptr	ptr	unchanged (FzFTerm); unchanged (JsonParser); fzf.ktm,json.ktm
+field	reclen	reclen	unchanged (Dirent); dir.ktm,std.ktmh
+field	resumer	resumer	unchanged (Coroutine); coroutines.ktm,std.ktmh
+field	revents	revents	unchanged (NetPollFd); unchanged (ProcPollFd); C field name, kept (pollfd); net.ktm,process.ktm,std.ktmh
+field	right	right	unchanged (RBNode); set.ktm,std.ktmh
+field	root	root	unchanged (RBTree); set.ktm,std.ktmh
+field	row_off	rowOff	owner CsvParser; csv.ktm,std.ktmh
+field	run	run	unchanged (ThreadPool); std.ktmh,threads.ktm
+field	s_addr	s_addr	C field name, kept (in_addr); net.ktm,std.ktmh
+field	s_aliases	s_aliases	C field name, kept (servent); net.ktm,std.ktmh
+field	s_name	s_name	C field name, kept (servent); net.ktm,std.ktmh
+field	s_port	s_port	C field name, kept (servent); net.ktm,std.ktmh
+field	s_proto	s_proto	C field name, kept (servent); net.ktm,std.ktmh
+field	sa_data	sa_data	C field name, kept (sockaddr); net.ktm,std.ktmh
+field	sa_family	sa_family	C field name, kept (sockaddr); net.ktm,std.ktmh
+field	sa_len	sa_len	C field name, kept (sockaddr); net.ktm,std.ktmh
+field	score	score	unchanged (FzFPosition); unchanged (FzFResult); fzf.ktm,std.ktmh
+field	sec	sec	unchanged (CDateStruct); date.ktm,std.ktmh
+field	sec100	sec100	unchanged (CDateStruct); date.ktm,std.ktmh
+field	sec10000	sec10000	unchanged (CDateStruct); date.ktm,std.ktmh
+field	seekoff	seekoff	unchanged (Dirent); dir.ktm,std.ktmh
+field	sin6_addr	sin6_addr	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin6_family	sin6_family	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin6_flowinfo	sin6_flowinfo	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin6_len	sin6_len	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin6_port	sin6_port	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin6_scope_id	sin6_scope_id	C field name, kept (sockaddr_in6); net.ktm,std.ktmh
+field	sin_addr	sin_addr	C field name, kept (sockaddr_in); net.ktm,std.ktmh
+field	sin_family	sin_family	C field name, kept (sockaddr_in); net.ktm,std.ktmh
+field	sin_len	sin_len	C field name, kept (sockaddr_in); net.ktm,std.ktmh
+field	sin_port	sin_port	C field name, kept (sockaddr_in); net.ktm,std.ktmh
+field	sin_zero	sin_zero	C field name, kept (sockaddr_in); net.ktm,std.ktmh
+field	size	size	unchanged (FloatVec); unchanged (FzFI16); unchanged (FzFI32); unchanged (FzFPattern); unchanged (FzFPosition); unchanged (FzFStrSlice); unchanged (FzFString); unchanged (FzFTermSet); unchanged (IntMap); unchanged (IntVec); unchanged (PtrVec); unchanged (RBTree); unchanged (StrMap); fzf.ktm,hashtable.ktm,set.ktm,std.ktmh,vector.ktm
+field	size_16	size16	owner FzFSlabConfig; fzf.ktm
+field	size_32	size32	owner FzFSlabConfig; fzf.ktm
+field	sp	sp	unchanged (Coroutine); unchanged (IntSetIter); unchanged (RBIter); coroutines.ktm,set.ktm,std.ktmh
+field	ss_family	ss_family	C field name, kept (sockaddr_storage); net.ktm,std.ktmh
+field	ss_len	ss_len	C field name, kept (sockaddr_storage); net.ktm,std.ktmh
+field	st_atim	st_atim	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_atimespec	st_atimespec	C field name, kept (cStat); std.ktmh
+field	st_birthtimespec	st_birthtimespec	C field name, kept (cStat); std.ktmh
+field	st_blksize	st_blksize	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_blocks	st_blocks	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_btim	st_btim	C field name, kept (Fstat); std.ktmh
+field	st_ctim	st_ctim	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_ctimespec	st_ctimespec	C field name, kept (cStat); std.ktmh
+field	st_dev	st_dev	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_flags	st_flags	C field name, kept (cStat); std.ktmh
+field	st_gen	st_gen	C field name, kept (cStat); std.ktmh
+field	st_gid	st_gid	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_ino	st_ino	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_lspare	st_lspare	C field name, kept (cStat); std.ktmh
+field	st_mode	st_mode	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_mtim	st_mtim	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_mtimespec	st_mtimespec	C field name, kept (cStat); std.ktmh
+field	st_nlink	st_nlink	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_qspare	st_qspare	C field name, kept (cStat); std.ktmh
+field	st_rdev	st_rdev	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_size	st_size	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	st_uid	st_uid	C field name, kept (Fstat); C field name, kept (cStat); std.ktmh
+field	stack	stack	unchanged (IntSetIter); unchanged (RBIter); set.ktm,std.ktmh
+field	stack_base	stackBase	owner Coroutine; coroutines.ktm,std.ktmh
+field	stack_len	stackLen	owner Coroutine; coroutines.ktm,std.ktmh
+field	start	start	unchanged (FzFResult); fzf.ktm
+field	state	state	unchanged (CsvParser); unchanged (Json); unchanged (JsonParser); csv.ktm,json.ktm,std.ktmh
+field	status	status	unchanged (Coroutine); coroutines.ktm,std.ktmh
+field	stmt	stmt	unchanged (SqlPreparedStmt); unchanged (SqlRow); sqllite.ktm,std.ktmh
+field	str	str	unchanged (Json); unchanged (SqlColumn); unchanged (SqlParam); json.ktm,sqllite.ktm,std.ktmh
+field	str_len	strLen	owner Json; json.ktm,std.ktmh
+field	strnum	strnum	unchanged (Json); json.ktm,std.ktmh
+field	stx_atime	stx_atime	C field name, kept (Statx); std.ktmh
+field	stx_atomic_write_segments_max	stx_atomic_write_segments_max	C field name, kept (Statx); std.ktmh
+field	stx_atomic_write_unit_max	stx_atomic_write_unit_max	C field name, kept (Statx); std.ktmh
+field	stx_atomic_write_unit_max_opt	stx_atomic_write_unit_max_opt	C field name, kept (Statx); std.ktmh
+field	stx_atomic_write_unit_min	stx_atomic_write_unit_min	C field name, kept (Statx); std.ktmh
+field	stx_attributes	stx_attributes	C field name, kept (Statx); std.ktmh
+field	stx_attributes_mask	stx_attributes_mask	C field name, kept (Statx); std.ktmh
+field	stx_blksize	stx_blksize	C field name, kept (Statx); std.ktmh
+field	stx_blocks	stx_blocks	C field name, kept (Statx); std.ktmh
+field	stx_btime	stx_btime	C field name, kept (Statx); std.ktmh
+field	stx_ctime	stx_ctime	C field name, kept (Statx); std.ktmh
+field	stx_dev_major	stx_dev_major	C field name, kept (Statx); std.ktmh
+field	stx_dev_minor	stx_dev_minor	C field name, kept (Statx); std.ktmh
+field	stx_dio_mem_align	stx_dio_mem_align	C field name, kept (Statx); std.ktmh
+field	stx_dio_offset_align	stx_dio_offset_align	C field name, kept (Statx); std.ktmh
+field	stx_dio_read_offset_align	stx_dio_read_offset_align	C field name, kept (Statx); std.ktmh
+field	stx_gid	stx_gid	C field name, kept (Statx); std.ktmh
+field	stx_ino	stx_ino	C field name, kept (Statx); std.ktmh
+field	stx_mask	stx_mask	C field name, kept (Statx); std.ktmh
+field	stx_mnt_id	stx_mnt_id	C field name, kept (Statx); std.ktmh
+field	stx_mode	stx_mode	C field name, kept (Statx); std.ktmh
+field	stx_mtime	stx_mtime	C field name, kept (Statx); std.ktmh
+field	stx_nlink	stx_nlink	C field name, kept (Statx); std.ktmh
+field	stx_rdev_major	stx_rdev_major	C field name, kept (Statx); std.ktmh
+field	stx_rdev_minor	stx_rdev_minor	C field name, kept (Statx); std.ktmh
+field	stx_size	stx_size	C field name, kept (Statx); std.ktmh
+field	stx_subvol	stx_subvol	C field name, kept (Statx); std.ktmh
+field	stx_uid	stx_uid	C field name, kept (Statx); std.ktmh
+field	sun_family	sun_family	C field name, kept (sockaddr_un); net.ktm,std.ktmh
+field	sun_len	sun_len	C field name, kept (sockaddr_un); net.ktm,std.ktmh
+field	sun_path	sun_path	C field name, kept (sockaddr_un); net.ktm,std.ktmh
+field	term_signal	termSignal	owner Proc; process.ktm,std.ktmh
+field	text	text	unchanged (FzFTerm); fzf.ktm
+field	th	th	unchanged (ThreadWorker); std.ktmh,threads.ktm
+field	threashold	threshold	curated: typo fixed (IntMap, StrMap); hashtable.ktm,std.ktmh
+field	thrown	thrown	unchanged (Coroutine); coroutines.ktm,std.ktmh
+field	time	time	unchanged (CDate); date.ktm,std.ktmh
+field	tm_gmtoff	tm_gmtoff	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_hour	tm_hour	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_isdst	tm_isdst	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_mday	tm_mday	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_min	tm_min	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_mon	tm_mon	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_sec	tm_sec	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_wday	tm_wday	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_yday	tm_yday	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_year	tm_year	C field name, kept (tm); date.ktm,std.ktmh
+field	tm_zone	tm_zone	C field name, kept (tm); date.ktm,std.ktmh
+field	tree	tree	unchanged (IntSet); unchanged (IntSetIter); unchanged (RBIter); set.ktm,std.ktmh
+field	tv_nsec	tv_nsec	C field name, kept (cTimespec); C field name, kept (statx_timestamp); std.ktmh
+field	tv_sec	tv_sec	C field name, kept (cTimespec); C field name, kept (statx_timestamp); C field name, kept (timeval); date.ktm,std.ktmh
+field	tv_usec	tv_usec	C field name, kept (timeval); date.ktm,std.ktmh
+field	type	type	unchanged (DirHuman); unchanged (Dirent); unchanged (Json); unchanged (JsonParser); unchanged (SqlColumn); unchanged (SqlParam); dir.ktm,io.ktm,json.ktm,sqllite.ktm,std.ktmh
+field	value	value	unchanged (IntMapNode); unchanged (List); unchanged (RBNode); unchanged (StrMapNode); hashtable.ktm,list.ktm,set.ktm,std.ktmh
+field	version	version	unchanged (IntSetIter); unchanged (RBIter); unchanged (RBTree); set.ktm,std.ktmh
+field	worker_count	workerCount	owner ThreadPool; std.ktmh,threads.ktm
+field	workers	workers	unchanged (ThreadPool); std.ktmh,threads.ktm
+field	year	year	unchanged (CDateStruct); date.ktm,std.ktmh
+field	zone_diff	zoneDiff	owner CDateStruct; date.ktm,std.ktmh
+macro	__BUFSIZ__	__BUFSIZ__	unchanged; defs.ktmh,std.ktmh
+macro	__JMP_BUF_BYTES__	__JMP_BUF_BYTES__	unchanged; except.ktm
+macro	__MUTEX_LOCK_ATTR_SIZE__	__MUTEX_LOCK_ATTR_SIZE__	unchanged; std.ktmh,threads.ktm
+macro	__MUTEX_LOCK_PADDING__	__MUTEX_LOCK_PADDING__	unchanged; std.ktmh,threads.ktm
+macro	__NET_ECONNREFUSED	__NET_ECONNREFUSED	unchanged; net.ktm
+macro	__NET_EINPROGRESS	__NET_EINPROGRESS	unchanged; net.ktm
+macro	__NET_EINTR	__NET_EINTR	unchanged; net.ktm
+macro	__NET_EINVAL	__NET_EINVAL	unchanged; net.ktm
+macro	__NET_ETIMEDOUT	__NET_ETIMEDOUT	unchanged; net.ktm
+macro	__NET_MSG_NOSIGNAL	__NET_MSG_NOSIGNAL	unchanged; net.ktm
+macro	__NET_POLLOUT	__NET_POLLOUT	unchanged; net.ktm
+macro	__NET_SOCK_CLOEXEC	__NET_SOCK_CLOEXEC	unchanged; net.ktm
+macro	__RB_BLACK__	__RB_BLACK__	unchanged; set.ktm
+macro	__RB_RED__	__RB_RED__	unchanged; set.ktm
+macro	__SIZEOF_PTHREAD_ATTR_T	__SIZEOF_PTHREAD_ATTR_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_BARRIER_T	__SIZEOF_PTHREAD_BARRIER_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_BARRIERATTR_T	__SIZEOF_PTHREAD_BARRIERATTR_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_COND_T	__SIZEOF_PTHREAD_COND_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_CONDATTR_T	__SIZEOF_PTHREAD_CONDATTR_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_MUTEX_T	__SIZEOF_PTHREAD_MUTEX_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_MUTEXATTR_T	__SIZEOF_PTHREAD_MUTEXATTR_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_RWLOCK_T	__SIZEOF_PTHREAD_RWLOCK_T	unchanged; std.ktmh,threads.ktm
+macro	__SIZEOF_PTHREAD_RWLOCKATTR_T	__SIZEOF_PTHREAD_RWLOCKATTR_T	unchanged; std.ktmh,threads.ktm
+macro	__THREAD_ATTR_SIZE__	__THREAD_ATTR_SIZE__	unchanged; std.ktmh,threads.ktm
+macro	__THREAD_COND_SIZE__	__THREAD_COND_SIZE__	unchanged; std.ktmh,threads.ktm
+macro	__THREAD_CONDATTR_SIZE__	__THREAD_CONDATTR_SIZE__	unchanged; std.ktmh,threads.ktm
+macro	__THREAD_SIZE__	__THREAD_SIZE__	unchanged; std.ktmh,threads.ktm
+macro	_SS_PAD1SIZE	_SS_PAD1SIZE	unchanged; net.ktm,std.ktmh
+macro	_SS_PAD2SIZE	_SS_PAD2SIZE	unchanged; net.ktm,std.ktmh
+macro	AF_INET	AF_INET	unchanged; net.ktm,std.ktmh
+macro	AF_INET6	AF_INET6	unchanged; net.ktm,std.ktmh
+macro	AF_UNIX	AF_UNIX	unchanged; net.ktm,std.ktmh
+macro	AF_UNSPEC	AF_UNSPEC	unchanged; net.ktm,std.ktmh
+macro	AI_CANONNAME	AI_CANONNAME	unchanged; net.ktm,std.ktmh
+macro	AI_NUMERICHOST	AI_NUMERICHOST	unchanged; net.ktm,std.ktmh
+macro	AI_NUMERICSERV	AI_NUMERICSERV	unchanged; net.ktm,std.ktmh
+macro	AI_PASSIVE	AI_PASSIVE	unchanged; net.ktm,std.ktmh
+macro	AI_UNUSABLE	AI_UNUSABLE	unchanged; net.ktm,std.ktmh
+macro	ALIGN_16	ALIGN_16	unchanged; memory.ktm
+macro	AT_FDCWD	AT_FDCWD	unchanged; io.ktm
+macro	AT_STATX_SYNC_AS_STAT	AT_STATX_SYNC_AS_STAT	unchanged; io.ktm,std.ktmh
+macro	BIT_VEC_BITS	BIT_VEC_BITS	unchanged; bitvec.ktm
+macro	CDATE_BASE_DAY_OF_WEEK	DATE_BASE_DAY_OF_WEEK	curated: CDate is now Date; date.ktm,std.ktmh
+macro	CDATE_NO_ZONE	DATE_NO_ZONE	curated: CDate is now Date; date.ktm,std.ktmh
+macro	CDATE_YEAR_DAYS	DATE_YEAR_DAYS	curated: CDate is now Date; date.ktm,std.ktmh
+macro	CDATE_YEAR_DAYS_INT	DATE_YEAR_DAYS_INT	curated: CDate is now Date; date.ktm,std.ktmh
+macro	CH_SHIFT_SPACE	CH_SHIFT_SPACE	unchanged; std.ktmh,strings.ktm
+macro	CH_SPACE	CH_SPACE	unchanged; std.ktmh,strings.ktm
+macro	CORO_ACTIVE	CORO_ACTIVE	unchanged; coroutines.ktm
+macro	CORO_CACHE_MAX	CORO_CACHE_MAX	unchanged; coroutines.ktm
+macro	CORO_DONE	CORO_DONE	unchanged; coroutines.ktm
+macro	CORO_MAP_ANONYMOUS	CORO_MAP_ANONYMOUS	unchanged; coroutines.ktm
+macro	CORO_MAP_PRIVATE	CORO_MAP_PRIVATE	unchanged; coroutines.ktm
+macro	CORO_PROT_NONE	CORO_PROT_NONE	unchanged; coroutines.ktm
+macro	CORO_PROT_READ	CORO_PROT_READ	unchanged; coroutines.ktm
+macro	CORO_PROT_WRITE	CORO_PROT_WRITE	unchanged; coroutines.ktm
+macro	CORO_READY	CORO_READY	unchanged; coroutines.ktm
+macro	CORO_STACK_DEFAULT	CORO_STACK_DEFAULT	unchanged; coroutines.ktm
+macro	CORO_SUSPENDED	CORO_SUSPENDED	unchanged; coroutines.ktm
+macro	CSV_EOF	CSV_EOF	unchanged; csv.ktm,std.ktmh
+macro	CSV_FIELD	CSV_FIELD	unchanged; csv.ktm,std.ktmh
+macro	CSV_ROW	CSV_ROW	unchanged; csv.ktm,std.ktmh
+macro	DIR_COL_DIR	DIR_COL_DIR	unchanged; io.ktm
+macro	DIR_COL_END	DIR_COL_END	unchanged; io.ktm
+macro	DIR_COL_EXE	DIR_COL_EXE	unchanged; io.ktm
+macro	DIR_COL_LNK	DIR_COL_LNK	unchanged; io.ktm
+macro	DIR_MAXPATHLEN	DIR_MAXPATHLEN	unchanged; dir.ktm,std.ktmh
+macro	DT_BLK	DT_BLK	unchanged; dir.ktm,std.ktmh
+macro	DT_CHR	DT_CHR	unchanged; dir.ktm,std.ktmh
+macro	DT_DIR	DT_DIR	unchanged; dir.ktm,std.ktmh
+macro	DT_FIFO	DT_FIFO	unchanged; dir.ktm,std.ktmh
+macro	DT_LNK	DT_LNK	unchanged; dir.ktm,std.ktmh
+macro	DT_REG	DT_REG	unchanged; dir.ktm,std.ktmh
+macro	DT_SOCK	DT_SOCK	unchanged; dir.ktm,std.ktmh
+macro	DT_UNKNOWN	DT_UNKNOWN	unchanged; dir.ktm,std.ktmh
+macro	DT_WHT	DT_WHT	unchanged; dir.ktm,std.ktmh
+macro	EACCES	EACCES	unchanged; std.ktmh
+macro	EADDRINUSE	EADDRINUSE	unchanged; std.ktmh
+macro	EADDRNOTAVAIL	EADDRNOTAVAIL	unchanged; std.ktmh
+macro	EAGAIN	EAGAIN	unchanged; std.ktmh
+macro	EBADF	EBADF	unchanged; std.ktmh
+macro	ECHILD	ECHILD	unchanged; std.ktmh
+macro	ECONNREFUSED	ECONNREFUSED	unchanged; std.ktmh
+macro	ECONNRESET	ECONNRESET	unchanged; std.ktmh
+macro	EHOSTUNREACH	EHOSTUNREACH	unchanged; std.ktmh
+macro	EINPROGRESS	EINPROGRESS	unchanged; std.ktmh
+macro	EINTR	EINTR	unchanged; std.ktmh
+macro	EINVAL	EINVAL	unchanged; std.ktmh
+macro	EMFILE	EMFILE	unchanged; std.ktmh
+macro	ENETUNREACH	ENETUNREACH	unchanged; std.ktmh
+macro	ENFILE	ENFILE	unchanged; std.ktmh
+macro	ENOENT	ENOENT	unchanged; std.ktmh
+macro	EPIPE	EPIPE	unchanged; std.ktmh
+macro	ETIMEDOUT	ETIMEDOUT	unchanged; std.ktmh
+macro	EWOULDBLOCK	EWOULDBLOCK	unchanged; std.ktmh
+macro	EXIT_FAIL	EXIT_FAIL	unchanged; defs.ktmh,std.ktmh
+macro	EXIT_OK	EXIT_OK	unchanged; defs.ktmh,std.ktmh
+macro	F64_DIG_LEN	F64_DIG_LEN	unchanged; strings.ktm
+macro	F64_DIG_POINT	F64_DIG_POINT	unchanged; strings.ktm
+macro	F_CHKCLEAN	F_CHKCLEAN	unchanged; io.ktm,std.ktmh
+macro	F_DUPFD	F_DUPFD	unchanged; io.ktm,std.ktmh
+macro	F_FLUSH_DATA	F_FLUSH_DATA	unchanged; io.ktm,std.ktmh
+macro	F_GETFD	F_GETFD	unchanged; io.ktm,std.ktmh
+macro	F_GETFL	F_GETFL	unchanged; io.ktm,std.ktmh
+macro	F_GETLK	F_GETLK	unchanged; io.ktm,std.ktmh
+macro	F_GETOWN	F_GETOWN	unchanged; io.ktm,std.ktmh
+macro	F_PREALLOCATE	F_PREALLOCATE	unchanged; io.ktm,std.ktmh
+macro	F_RDADVISE	F_RDADVISE	unchanged; io.ktm,std.ktmh
+macro	F_RDAHEAD	F_RDAHEAD	unchanged; io.ktm,std.ktmh
+macro	F_RDLCK	F_RDLCK	unchanged; io.ktm,std.ktmh
+macro	F_SETFD	F_SETFD	unchanged; io.ktm,std.ktmh
+macro	F_SETFL	F_SETFL	unchanged; io.ktm,std.ktmh
+macro	F_SETLK	F_SETLK	unchanged; io.ktm,std.ktmh
+macro	F_SETLKW	F_SETLKW	unchanged; io.ktm,std.ktmh
+macro	F_SETOWN	F_SETOWN	unchanged; io.ktm,std.ktmh
+macro	F_SETSIZE	F_SETSIZE	unchanged; io.ktm,std.ktmh
+macro	F_UNLCK	F_UNLCK	unchanged; io.ktm,std.ktmh
+macro	F_WRLCK	F_WRLCK	unchanged; io.ktm,std.ktmh
+macro	FALSE	false	curated: removed: the false keyword replaces it (defs.ktmh); defs.ktmh,std.ktmh
+macro	FD_CLOEXEC	FD_CLOEXEC	unchanged; io.ktm,std.ktmh
+macro	FZF_BONUS_BOUNDARY	FZF_BONUS_BOUNDARY	unchanged; fzf.ktm
+macro	FZF_BONUS_CAMEL_123	FZF_BONUS_CAMEL_123	unchanged; fzf.ktm
+macro	FZF_BONUS_CONSECUTIVE	FZF_BONUS_CONSECUTIVE	unchanged; fzf.ktm
+macro	FZF_BONUS_FIRST_CHAR_MULTIPLIER	FZF_BONUS_FIRST_CHAR_MULTIPLIER	unchanged; fzf.ktm
+macro	FZF_BONUS_NON_WORD	FZF_BONUS_NON_WORD	unchanged; fzf.ktm
+macro	FZF_CASE_IGNORE	FZF_CASE_IGNORE	unchanged; fzf.ktm,std.ktmh
+macro	FZF_CASE_RESPECT	FZF_CASE_RESPECT	unchanged; fzf.ktm,std.ktmh
+macro	FZF_CASE_SMART	FZF_CASE_SMART	unchanged; fzf.ktm,std.ktmh
+macro	FZF_CHAR_LETTER	FZF_CHAR_LETTER	unchanged; fzf.ktm
+macro	FZF_CHAR_LOWER	FZF_CHAR_LOWER	unchanged; fzf.ktm
+macro	FZF_CHAR_NON_WORD	FZF_CHAR_NON_WORD	unchanged; fzf.ktm
+macro	FZF_CHAR_NUMBER	FZF_CHAR_NUMBER	unchanged; fzf.ktm
+macro	FZF_CHAR_UPPER	FZF_CHAR_UPPER	unchanged; fzf.ktm
+macro	FZF_SCORE_GAP_EXTENTION	FZF_SCORE_GAP_EXTENSION	curated: typo fixed; fzf.ktm
+macro	FZF_SCORE_GAP_START	FZF_SCORE_GAP_START	unchanged; fzf.ktm
+macro	FZF_SCORE_MATCH	FZF_SCORE_MATCH	unchanged; fzf.ktm
+macro	HT_DELETED	HT_DELETED	unchanged; hashtable.ktm,std.ktmh
+macro	HT_LOAD	HT_LOAD	unchanged; hashtable.ktm
+macro	HT_MAX_CAPACITY	HT_MAX_CAPACITY	unchanged; hashtable.ktm
+macro	HT_MIN_CAPACITY	HT_MIN_CAPACITY	unchanged; hashtable.ktm
+macro	I64_MAX	I64_MAX	unchanged; defs.ktmh,std.ktmh
+macro	I64_MIN	I64_MIN	unchanged; defs.ktmh,std.ktmh
+macro	I8_MAX	I8_MAX	unchanged; defs.ktmh,std.ktmh
+macro	I8_MIN	I8_MIN	unchanged; defs.ktmh,std.ktmh
+macro	INET6_ADDRSTRLEN	INET6_ADDRSTRLEN	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_ICMP	IPPROTO_ICMP	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_ICMPV6	IPPROTO_ICMPV6	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_IP	IPPROTO_IP	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_IPV4	IPPROTO_IPV4	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_IPV6	IPPROTO_IPV6	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_RAW	IPPROTO_RAW	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_TCP	IPPROTO_TCP	unchanged; net.ktm,std.ktmh
+macro	IPPROTO_UDP	IPPROTO_UDP	unchanged; net.ktm,std.ktmh
+macro	IPV6_V6ONLY	IPV6_V6ONLY	unchanged; std.ktmh
+macro	JSON_ARRAY	JSON_ARRAY	unchanged; json.ktm,std.ktmh
+macro	JSON_BOOL	JSON_BOOL	unchanged; json.ktm,std.ktmh
+macro	JSON_CANNOT_ADVANCE	JSON_CANNOT_ADVANCE	unchanged; json.ktm,std.ktmh
+macro	JSON_CANNOT_START_PARSE	JSON_CANNOT_START_PARSE	unchanged; json.ktm,std.ktmh
+macro	JSON_EOF	JSON_EOF	unchanged; json.ktm,std.ktmh
+macro	JSON_FLOAT	JSON_FLOAT	unchanged; json.ktm,std.ktmh
+macro	JSON_INT	JSON_INT	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_ARRAY_CHARACTER	JSON_INVALID_ARRAY_CHARACTER	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_BOOL	JSON_INVALID_BOOL	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_CONTROL_CHARACTER	JSON_INVALID_CONTROL_CHARACTER	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_DECIMAL	JSON_INVALID_DECIMAL	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_ESCAPE_CHARACTER	JSON_INVALID_ESCAPE_CHARACTER	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_HEX	JSON_INVALID_HEX	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_JSON_TYPE_CHAR	JSON_INVALID_JSON_TYPE_CHAR	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_KEY_TERMINATOR_CHARACTER	JSON_INVALID_KEY_TERMINATOR_CHARACTER	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_KEY_VALUE_SEPARATOR	JSON_INVALID_KEY_VALUE_SEPARATOR	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_LITERAL	JSON_INVALID_LITERAL	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_NUMBER	JSON_INVALID_NUMBER	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_SIGN	JSON_INVALID_SIGN	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_STRING_NOT_TERMINATED	JSON_INVALID_STRING_NOT_TERMINATED	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_TYPE	JSON_INVALID_TYPE	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_UTF16	JSON_INVALID_UTF16	unchanged; json.ktm,std.ktmh
+macro	JSON_INVALID_UTF16_SURROGATE	JSON_INVALID_UTF16_SURROGATE	unchanged; json.ktm,std.ktmh
+macro	JSON_MAX_DEPTH	JSON_MAX_DEPTH	unchanged; json.ktm,std.ktmh
+macro	JSON_NESTING_TOO_DEEP	JSON_NESTING_TOO_DEEP	unchanged; json.ktm,std.ktmh
+macro	JSON_NO_FLAGS	JSON_NO_FLAGS	unchanged; json.ktm,std.ktmh
+macro	JSON_NULL	JSON_NULL	unchanged; json.ktm,std.ktmh
+macro	JSON_OBJECT	JSON_OBJECT	unchanged; json.ktm,std.ktmh
+macro	JSON_OK	JSON_OK	unchanged; json.ktm,std.ktmh
+macro	JSON_PARSER_ARRAY	JSON_PARSER_ARRAY	unchanged; json.ktm
+macro	JSON_PARSER_BOOL	JSON_PARSER_BOOL	unchanged; json.ktm
+macro	JSON_PARSER_NULL	JSON_PARSER_NULL	unchanged; json.ktm
+macro	JSON_PARSER_NUMERIC	JSON_PARSER_NUMERIC	unchanged; json.ktm
+macro	JSON_PARSER_OBJECT	JSON_PARSER_OBJECT	unchanged; json.ktm
+macro	JSON_PARSER_STRING	JSON_PARSER_STRING	unchanged; json.ktm
+macro	JSON_SEL_ARRAY	JSON_SEL_ARRAY	unchanged; json.ktm
+macro	JSON_SEL_INVALD	JSON_SEL_INVALID	curated: typo fixed; json.ktm
+macro	JSON_SEL_MAX_BUF	JSON_SEL_MAX_BUF	unchanged; json.ktm
+macro	JSON_SEL_OBJ	JSON_SEL_OBJ	unchanged; json.ktm
+macro	JSON_SEL_TYPECHECK	JSON_SEL_TYPECHECK	unchanged; json.ktm
+macro	JSON_STRING	JSON_STRING	unchanged; json.ktm,std.ktmh
+macro	JSON_STRNUM	JSON_STRNUM	unchanged; json.ktm,std.ktmh
+macro	JSON_STRNUM_FLAG	JSON_STRNUM_FLAG	unchanged; json.ktm,std.ktmh
+macro	M_1_PI	M_1_PI	unchanged; math.ktm,std.ktmh
+macro	M_2_PI	M_2_PI	unchanged; math.ktm,std.ktmh
+macro	M_2_SQRTPI	M_2_SQRTPI	unchanged; math.ktm,std.ktmh
+macro	M_E	M_E	unchanged; math.ktm,std.ktmh
+macro	M_LN10	M_LN10	unchanged; math.ktm,std.ktmh
+macro	M_LN2	M_LN2	unchanged; math.ktm,std.ktmh
+macro	M_LOG10E	M_LOG10E	unchanged; math.ktm,std.ktmh
+macro	M_LOG2E	M_LOG2E	unchanged; math.ktm,std.ktmh
+macro	M_PI	M_PI	unchanged; math.ktm,std.ktmh
+macro	M_PI_2	M_PI_2	unchanged; math.ktm,std.ktmh
+macro	M_PI_4	M_PI_4	unchanged; math.ktm,std.ktmh
+macro	M_SQRT1_2	M_SQRT1_2	unchanged; math.ktm,std.ktmh
+macro	M_SQRT2	M_SQRT2	unchanged; math.ktm,std.ktmh
+macro	MKDIR_DEFAULT	MKDIR_DEFAULT	unchanged; std.ktmh
+macro	MSG_CTRUNC	MSG_CTRUNC	unchanged; std.ktmh
+macro	MSG_DONTROUTE	MSG_DONTROUTE	unchanged; std.ktmh
+macro	MSG_DONTWAIT	MSG_DONTWAIT	unchanged; std.ktmh
+macro	MSG_EOR	MSG_EOR	unchanged; std.ktmh
+macro	MSG_NOSIGNAL	MSG_NOSIGNAL	unchanged; std.ktmh
+macro	MSG_OOB	MSG_OOB	unchanged; std.ktmh
+macro	MSG_PEEK	MSG_PEEK	unchanged; std.ktmh
+macro	MSG_TRUNC	MSG_TRUNC	unchanged; std.ktmh
+macro	MSG_WAITALL	MSG_WAITALL	unchanged; std.ktmh
+macro	NULL	null	curated: removed: the null keyword replaces it (defs.ktmh); compiler refers to it by name in transpiler.c; defs.ktmh,std.ktmh
+macro	O_ACCMODE	O_ACCMODE	unchanged; io.ktm,std.ktmh
+macro	O_APPEND	O_APPEND	unchanged; io.ktm,std.ktmh
+macro	O_CLOEXEC	O_CLOEXEC	unchanged; io.ktm,std.ktmh
+macro	O_CREAT	O_CREAT	unchanged; io.ktm,std.ktmh
+macro	O_EXCL	O_EXCL	unchanged; io.ktm,std.ktmh
+macro	O_NONBLOCK	O_NONBLOCK	unchanged; io.ktm,std.ktmh
+macro	O_RDONLY	O_RDONLY	unchanged; io.ktm,std.ktmh
+macro	O_RDWR	O_RDWR	unchanged; io.ktm,std.ktmh
+macro	O_TRUNC	O_TRUNC	unchanged; io.ktm,std.ktmh
+macro	O_WRONLY	O_WRONLY	unchanged; io.ktm,std.ktmh
+macro	PERSIST_TIMEOUT	PERSIST_TIMEOUT	unchanged; net.ktm,std.ktmh
+macro	POLLERR	POLLERR	unchanged; std.ktmh
+macro	POLLHUP	POLLHUP	unchanged; std.ktmh
+macro	POLLIN	POLLIN	unchanged; std.ktmh
+macro	POLLNVAL	POLLNVAL	unchanged; std.ktmh
+macro	POLLOUT	POLLOUT	unchanged; std.ktmh
+macro	POLLPRI	POLLPRI	unchanged; std.ktmh
+macro	PROC_EAGAIN	PROC_EAGAIN	unchanged; process.ktm
+macro	PROC_EINTR	PROC_EINTR	unchanged; process.ktm
+macro	PROC_EPIPE	PROC_EPIPE	unchanged; process.ktm
+macro	PROC_F_DUPFD_CLOEXEC	PROC_F_DUPFD_CLOEXEC	unchanged; process.ktm
+macro	PROC_F_GETFD	PROC_F_GETFD	unchanged; process.ktm
+macro	PROC_F_GETFL	PROC_F_GETFL	unchanged; process.ktm
+macro	PROC_F_SETFD	PROC_F_SETFD	unchanged; process.ktm
+macro	PROC_F_SETFL	PROC_F_SETFL	unchanged; process.ktm
+macro	PROC_F_SETNOSIGPIPE	PROC_F_SETNOSIGPIPE	unchanged; process.ktm
+macro	PROC_FD_CLOEXEC	PROC_FD_CLOEXEC	unchanged; process.ktm
+macro	PROC_INHERIT	PROC_INHERIT	unchanged; process.ktm,std.ktmh
+macro	PROC_NULL	PROC_NULL	unchanged; process.ktm,std.ktmh
+macro	PROC_O_CLOEXEC	PROC_O_CLOEXEC	unchanged; process.ktm
+macro	PROC_O_NONBLOCK	PROC_O_NONBLOCK	unchanged; process.ktm
+macro	PROC_O_RDWR	PROC_O_RDWR	unchanged; process.ktm
+macro	PROC_PIPE	PROC_PIPE	unchanged; process.ktm,std.ktmh
+macro	PROC_POLLIN	PROC_POLLIN	unchanged; process.ktm
+macro	PROC_POLLOUT	PROC_POLLOUT	unchanged; process.ktm
+macro	PROC_SIG_BLOCK	PROC_SIG_BLOCK	unchanged; process.ktm
+macro	PROC_SIG_SETMASK	PROC_SIG_SETMASK	unchanged; process.ktm
+macro	PROC_SIGPIPE	PROC_SIGPIPE	unchanged; process.ktm
+macro	PROC_SIGSET_BUF	PROC_SIGSET_BUF	unchanged; process.ktm
+macro	PROC_SIGTERM	PROC_SIGTERM	unchanged; process.ktm
+macro	PROC_SPAWN_BUF	PROC_SPAWN_BUF	unchanged; process.ktm
+macro	PROC_SPAWN_CLOEXEC_DEFAULT	PROC_SPAWN_CLOEXEC_DEFAULT	unchanged; process.ktm
+macro	PROC_SPAWN_SETPGROUP	PROC_SPAWN_SETPGROUP	unchanged; process.ktm
+macro	PROC_SPAWN_SETSIGDEF	PROC_SPAWN_SETSIGDEF	unchanged; process.ktm
+macro	PROC_SPAWN_SETSIGMASK	PROC_SPAWN_SETSIGMASK	unchanged; process.ktm
+macro	PROC_STDOUT	PROC_STDOUT	unchanged; process.ktm,std.ktmh
+macro	PROC_WNOHANG	PROC_WNOHANG	unchanged; process.ktm
+macro	PRTF_ALT	PRTF_ALT	unchanged; strings.ktm
+macro	PRTF_DECIMAL	PRTF_DECIMAL	unchanged; std.ktmh,strings.ktm
+macro	PRTF_LEFT_JUSTIFY	PRTF_LEFT_JUSTIFY	unchanged; std.ktmh,strings.ktm
+macro	PRTF_PAD_ZERO	PRTF_PAD_ZERO	unchanged; std.ktmh,strings.ktm
+macro	PRTF_PLUS	PRTF_PLUS	unchanged; strings.ktm
+macro	PRTF_SLASH	PRTF_SLASH	unchanged; std.ktmh,strings.ktm
+macro	PRTF_SPACE	PRTF_SPACE	unchanged; strings.ktm
+macro	PRTF_TRUNCATE	PRTF_TRUNCATE	unchanged; std.ktmh,strings.ktm
+macro	RM_FORCE	RM_FORCE	unchanged; stat.ktm,std.ktmh
+macro	RM_RECURSE	RM_RECURSE	unchanged; stat.ktm,std.ktmh
+macro	RM_VERBOSE	RM_VERBOSE	unchanged; stat.ktm,std.ktmh
+macro	S_IFBLK	S_IFBLK	unchanged; std.ktmh
+macro	S_IFCHR	S_IFCHR	unchanged; std.ktmh
+macro	S_IFDIR	S_IFDIR	unchanged; std.ktmh
+macro	S_IFIFO	S_IFIFO	unchanged; std.ktmh
+macro	S_IFLNK	S_IFLNK	unchanged; std.ktmh
+macro	S_IFMT	S_IFMT	unchanged; std.ktmh
+macro	S_IFREG	S_IFREG	unchanged; std.ktmh
+macro	S_IFSOCK	S_IFSOCK	unchanged; std.ktmh
+macro	S_IRGRP	S_IRGRP	unchanged; std.ktmh
+macro	S_IROTH	S_IROTH	unchanged; std.ktmh
+macro	S_IRUSR	S_IRUSR	unchanged; std.ktmh
+macro	S_IRWXG	S_IRWXG	unchanged; std.ktmh
+macro	S_IRWXO	S_IRWXO	unchanged; std.ktmh
+macro	S_IRWXU	S_IRWXU	unchanged; std.ktmh
+macro	S_ISGID	S_ISGID	unchanged; std.ktmh
+macro	S_ISUID	S_ISUID	unchanged; std.ktmh
+macro	S_ISVTX	S_ISVTX	unchanged; std.ktmh
+macro	S_IWGRP	S_IWGRP	unchanged; std.ktmh
+macro	S_IWOTH	S_IWOTH	unchanged; std.ktmh
+macro	S_IWUSR	S_IWUSR	unchanged; std.ktmh
+macro	S_IXGRP	S_IXGRP	unchanged; std.ktmh
+macro	S_IXOTH	S_IXOTH	unchanged; std.ktmh
+macro	S_IXUSR	S_IXUSR	unchanged; std.ktmh
+macro	SA_NODEFER	SA_NODEFER	unchanged; std.ktmh
+macro	SA_RESETHAND	SA_RESETHAND	unchanged; std.ktmh
+macro	SA_RESTART	SA_RESTART	unchanged; std.ktmh
+macro	SEEK_CUR	SEEK_CUR	unchanged; io.ktm,std.ktmh
+macro	SEEK_END	SEEK_END	unchanged; io.ktm,std.ktmh
+macro	SEEK_SET	SEEK_SET	unchanged; io.ktm,std.ktmh
+macro	SF_ARG1	SF_ARG1	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG2	SF_ARG2	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG3	SF_ARG3	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG4	SF_ARG4	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG5	SF_ARG5	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG6	SF_ARG6	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG7	SF_ARG7	unchanged; defs.ktmh,std.ktmh
+macro	SF_ARG8	SF_ARG8	unchanged; defs.ktmh,std.ktmh
+macro	SHUT_RD	SHUT_RD	unchanged; std.ktmh
+macro	SHUT_RDWR	SHUT_RDWR	unchanged; std.ktmh
+macro	SHUT_WR	SHUT_WR	unchanged; std.ktmh
+macro	SIG_DFL	SIG_DFL	unchanged; std.ktmh
+macro	SIG_ERR	SIG_ERR	unchanged; std.ktmh
+macro	SIG_F_GETFL	SIG_F_GETFL	unchanged; signals.ktm
+macro	SIG_F_SETFD	SIG_F_SETFD	unchanged; signals.ktm
+macro	SIG_F_SETFL	SIG_F_SETFL	unchanged; signals.ktm
+macro	SIG_IGN	SIG_IGN	unchanged; std.ktmh
+macro	SIG_MAX	SIG_MAX	unchanged; signals.ktm
+macro	SIG_O_NONBLOCK	SIG_O_NONBLOCK	unchanged; signals.ktm
+macro	SIG_SA_BYTES	SIG_SA_BYTES	unchanged; signals.ktm
+macro	SIG_SA_FLAGS_AT	SIG_SA_FLAGS_AT	unchanged; signals.ktm
+macro	SIG_SA_RESETHAND	SIG_SA_RESETHAND	unchanged; signals.ktm
+macro	SIG_SA_RESTART	SIG_SA_RESTART	unchanged; signals.ktm
+macro	SIG_SIGINT	SIG_SIGINT	unchanged; signals.ktm
+macro	SIG_SIGTERM	SIG_SIGTERM	unchanged; signals.ktm
+macro	SIGALRM	SIGALRM	unchanged; std.ktmh
+macro	SIGCHLD	SIGCHLD	unchanged; std.ktmh
+macro	SIGCONT	SIGCONT	unchanged; std.ktmh
+macro	SIGHUP	SIGHUP	unchanged; std.ktmh
+macro	SIGINT	SIGINT	unchanged; std.ktmh
+macro	SIGKILL	SIGKILL	unchanged; std.ktmh
+macro	SIGPIPE	SIGPIPE	unchanged; std.ktmh
+macro	SIGQUIT	SIGQUIT	unchanged; std.ktmh
+macro	SIGSTOP	SIGSTOP	unchanged; std.ktmh
+macro	SIGTERM	SIGTERM	unchanged; std.ktmh
+macro	SIGTSTP	SIGTSTP	unchanged; std.ktmh
+macro	SIGTTIN	SIGTTIN	unchanged; std.ktmh
+macro	SIGTTOU	SIGTTOU	unchanged; std.ktmh
+macro	SIGUSR1	SIGUSR1	unchanged; std.ktmh
+macro	SIGUSR2	SIGUSR2	unchanged; std.ktmh
+macro	SO_ACCEPTCONN	SO_ACCEPTCONN	unchanged; net.ktm,std.ktmh
+macro	SO_BROADCAST	SO_BROADCAST	unchanged; net.ktm,std.ktmh
+macro	SO_DEBUG	SO_DEBUG	unchanged; net.ktm,std.ktmh
+macro	SO_DONTROUTE	SO_DONTROUTE	unchanged; net.ktm,std.ktmh
+macro	SO_ERROR	SO_ERROR	unchanged; net.ktm,std.ktmh
+macro	SO_KEEPALIVE	SO_KEEPALIVE	unchanged; net.ktm,std.ktmh
+macro	SO_LINGER	SO_LINGER	unchanged; net.ktm,std.ktmh
+macro	SO_OOBINLINE	SO_OOBINLINE	unchanged; net.ktm,std.ktmh
+macro	SO_RCVBUF	SO_RCVBUF	unchanged; net.ktm,std.ktmh
+macro	SO_RCVTIMEO	SO_RCVTIMEO	unchanged; net.ktm,std.ktmh
+macro	SO_REUSEADDR	SO_REUSEADDR	unchanged; net.ktm,std.ktmh
+macro	SO_REUSEPORT	SO_REUSEPORT	unchanged; net.ktm,std.ktmh
+macro	SO_SNDBUF	SO_SNDBUF	unchanged; net.ktm,std.ktmh
+macro	SO_SNDTIMEO	SO_SNDTIMEO	unchanged; net.ktm,std.ktmh
+macro	SO_TIMESTAMP	SO_TIMESTAMP	unchanged; net.ktm,std.ktmh
+macro	SO_TIMESTAMP_MONOTONIC	SO_TIMESTAMP_MONOTONIC	unchanged; net.ktm,std.ktmh
+macro	SOCK_CLOEXEC	SOCK_CLOEXEC	unchanged; std.ktmh
+macro	SOCK_DGRAM	SOCK_DGRAM	unchanged; net.ktm,std.ktmh
+macro	SOCK_RAW	SOCK_RAW	unchanged; net.ktm,std.ktmh
+macro	SOCK_SEQPACKET	SOCK_SEQPACKET	unchanged; net.ktm,std.ktmh
+macro	SOCK_STREAM	SOCK_STREAM	unchanged; net.ktm,std.ktmh
+macro	SOL_SOCKET	SOL_SOCKET	unchanged; net.ktm,std.ktmh
+macro	SQL_BLOB	SQL_BLOB	unchanged; sqllite.ktm,std.ktmh
+macro	SQL_FLOAT	SQL_FLOAT	unchanged; sqllite.ktm,std.ktmh
+macro	SQL_INT	SQL_INT	unchanged; sqllite.ktm,std.ktmh
+macro	SQL_NULL	SQL_NULL	unchanged; sqllite.ktm,std.ktmh
+macro	SQL_TEXT	SQL_TEXT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE3_TEXT	SQLITE3_TEXT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_ABORT	SQLITE_ABORT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_AUTH	SQLITE_AUTH	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_BLOB	SQLITE_BLOB	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_BUSY	SQLITE_BUSY	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_CANTOPEN	SQLITE_CANTOPEN	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_CONSTRAINT	SQLITE_CONSTRAINT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_CORRUPT	SQLITE_CORRUPT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_DONE	SQLITE_DONE	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_EMPTY	SQLITE_EMPTY	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_ERROR	SQLITE_ERROR	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_FLOAT	SQLITE_FLOAT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_FORMAT	SQLITE_FORMAT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_FULL	SQLITE_FULL	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_INTEGER	SQLITE_INTEGER	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_INTERNAL	SQLITE_INTERNAL	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_INTERRUPT	SQLITE_INTERRUPT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_IOERR	SQLITE_IOERR	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_LOCKED	SQLITE_LOCKED	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_MISMATCH	SQLITE_MISMATCH	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_MISUSE	SQLITE_MISUSE	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NOLFS	SQLITE_NOLFS	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NOMEM	SQLITE_NOMEM	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NOTADB	SQLITE_NOTADB	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NOTFOUND	SQLITE_NOTFOUND	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NOTICE	SQLITE_NOTICE	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_NULL	SQLITE_NULL	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_OK	SQLITE_OK	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_PERM	SQLITE_PERM	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_PROTOCOL	SQLITE_PROTOCOL	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_RANGE	SQLITE_RANGE	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_READONLY	SQLITE_READONLY	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_ROW	SQLITE_ROW	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_SCHEMA	SQLITE_SCHEMA	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_TEXT	SQLITE_TEXT	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_TOOBIG	SQLITE_TOOBIG	unchanged; sqllite.ktm,std.ktmh
+macro	SQLITE_TRANSIENT	SQLITE_TRANSIENT	unchanged; sqllite.ktm
+macro	SQLITE_WARNING	SQLITE_WARNING	unchanged; sqllite.ktm,std.ktmh
+macro	STAT_X_AT_FDCWD	STAT_X_AT_FDCWD	unchanged; std.ktmh
+macro	STATX__RESERVED	STATX__RESERVED	unchanged; std.ktmh
+macro	STATX_ALL	STATX_ALL	unchanged; std.ktmh
+macro	STATX_ATIME	STATX_ATIME	unchanged; io.ktm,std.ktmh
+macro	STATX_ATTR_APPEND	STATX_ATTR_APPEND	unchanged; std.ktmh
+macro	STATX_ATTR_AUTOMOUNT	STATX_ATTR_AUTOMOUNT	unchanged; std.ktmh
+macro	STATX_ATTR_COMPRESSED	STATX_ATTR_COMPRESSED	unchanged; std.ktmh
+macro	STATX_ATTR_DAX	STATX_ATTR_DAX	unchanged; std.ktmh
+macro	STATX_ATTR_ENCRYPTED	STATX_ATTR_ENCRYPTED	unchanged; std.ktmh
+macro	STATX_ATTR_IMMUTABLE	STATX_ATTR_IMMUTABLE	unchanged; std.ktmh
+macro	STATX_ATTR_MOUNT_ROOT	STATX_ATTR_MOUNT_ROOT	unchanged; std.ktmh
+macro	STATX_ATTR_NODUMP	STATX_ATTR_NODUMP	unchanged; std.ktmh
+macro	STATX_ATTR_VERITY	STATX_ATTR_VERITY	unchanged; std.ktmh
+macro	STATX_ATTR_WRITE_ATOMIC	STATX_ATTR_WRITE_ATOMIC	unchanged; std.ktmh
+macro	STATX_BASIC_STATS	STATX_BASIC_STATS	unchanged; std.ktmh
+macro	STATX_BLOCKS	STATX_BLOCKS	unchanged; std.ktmh
+macro	STATX_BTIME	STATX_BTIME	unchanged; io.ktm,std.ktmh
+macro	STATX_CTIME	STATX_CTIME	unchanged; io.ktm,std.ktmh
+macro	STATX_DIO_READ_ALIGN	STATX_DIO_READ_ALIGN	unchanged; std.ktmh
+macro	STATX_DIOALIGN	STATX_DIOALIGN	unchanged; std.ktmh
+macro	STATX_GID	STATX_GID	unchanged; std.ktmh
+macro	STATX_INO	STATX_INO	unchanged; std.ktmh
+macro	STATX_MNT_ID	STATX_MNT_ID	unchanged; std.ktmh
+macro	STATX_MNT_ID_UNIQUE	STATX_MNT_ID_UNIQUE	unchanged; std.ktmh
+macro	STATX_MODE	STATX_MODE	unchanged; std.ktmh
+macro	STATX_MTIME	STATX_MTIME	unchanged; io.ktm,std.ktmh
+macro	STATX_NLINK	STATX_NLINK	unchanged; std.ktmh
+macro	STATX_SIZE	STATX_SIZE	unchanged; std.ktmh
+macro	STATX_SUBVOL	STATX_SUBVOL	unchanged; std.ktmh
+macro	STATX_TYPE	STATX_TYPE	unchanged; std.ktmh
+macro	STATX_UID	STATX_UID	unchanged; std.ktmh
+macro	STATX_WRITE_ATOMIC	STATX_WRITE_ATOMIC	unchanged; std.ktmh
+macro	STDERR	STDERR	unchanged; defs.ktmh,std.ktmh
+macro	STDIN	STDIN	unchanged; defs.ktmh,std.ktmh
+macro	STDOUT	STDOUT	unchanged; defs.ktmh,std.ktmh
+macro	STR_LEN	STR_LEN	unchanged; std.ktmh,strings.ktm
+macro	TCP_CONNECTION_INFO	TCP_CONNECTION_INFO	unchanged; net.ktm,std.ktmh
+macro	TCP_CONNECTIONTIMEOUT	TCP_CONNECTIONTIMEOUT	unchanged; net.ktm,std.ktmh
+macro	TCP_CORK	TCP_CORK	unchanged; net.ktm,std.ktmh
+macro	TCP_ENABLE_ECN	TCP_ENABLE_ECN	unchanged; net.ktm,std.ktmh
+macro	TCP_FASTOPEN	TCP_FASTOPEN	unchanged; net.ktm,std.ktmh
+macro	TCP_INFO	TCP_INFO	unchanged; net.ktm,std.ktmh
+macro	TCP_KEEPALIVE	TCP_KEEPALIVE	unchanged; net.ktm,std.ktmh
+macro	TCP_KEEPCNT	TCP_KEEPCNT	unchanged; net.ktm,std.ktmh
+macro	TCP_KEEPIDLE	TCP_KEEPIDLE	unchanged; net.ktm,std.ktmh
+macro	TCP_KEEPINTVL	TCP_KEEPINTVL	unchanged; net.ktm,std.ktmh
+macro	TCP_MAXSEG	TCP_MAXSEG	unchanged; net.ktm,std.ktmh
+macro	TCP_NODELAY	TCP_NODELAY	unchanged; net.ktm,std.ktmh
+macro	TCP_NOOPT	TCP_NOOPT	unchanged; net.ktm,std.ktmh
+macro	TCP_NOPUSH	TCP_NOPUSH	unchanged; net.ktm,std.ktmh
+macro	TCP_QUICKACK	TCP_QUICKACK	unchanged; net.ktm,std.ktmh
+macro	TCP_RXT_CONNDROPTIME	TCP_RXT_CONNDROPTIME	unchanged; net.ktm,std.ktmh
+macro	TCP_RXT_FINDROP	TCP_RXT_FINDROP	unchanged; net.ktm,std.ktmh
+macro	TCP_SENDMOREACKS	TCP_SENDMOREACKS	unchanged; net.ktm,std.ktmh
+macro	TCP_USER_TIMEOUT	TCP_USER_TIMEOUT	unchanged; net.ktm,std.ktmh
+macro	TIMESTAMP_FMT	TIMESTAMP_FMT	unchanged; strings.ktm
+macro	TRUE	true	curated: removed: the true keyword replaces it (defs.ktmh); defs.ktmh,std.ktmh
+macro	U64_MAX	U64_MAX	unchanged; defs.ktmh,std.ktmh
+macro	U8_MAX	U8_MAX	unchanged; defs.ktmh,std.ktmh

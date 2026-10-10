@@ -42,6 +42,8 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name);
 void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type);
 /* A macro used (with --map: a stdlib macro) */
 void migrateNoteMacro(Cctrl *cc, Lexeme *use);
+/* A use of a stdlib struct's field (with --names: renames.tsv) */
+void migrateNoteStdField(Cctrl *cc, Lexeme *name);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

@@ -2852,6 +2852,8 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
         if (!where || (!strstr(where->data, "/src/std/") &&
                        !strstr(where->data, "/include/"))) {
             migrateNoteName(cc, tok);
+        } else {
+            migrateNoteStdField(cc, tok);
         }
     }
 #endif

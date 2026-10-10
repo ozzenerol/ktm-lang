@@ -852,6 +852,127 @@ void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last) {
     vecPush(f->closers, c);
 }
 
+/* ------------------------------------------------------------------ */
+/* The naming rule (--names): camelCase functions, variables and fields,
+ * PascalCase types, UPPER_CASE constants. src/std follows renames.tsv
+ * (and renames-locals.tsv); our own code the rule. */
+
+static Map *mig_map;
+static char *migReadFile(char *path, s64 *_len);
+static int migIsStdFile(Cctrl *cc, u32 file_id);
+static Map *mig_renames = NULL;      /* old -> new, every kind */
+static Map *mig_field_renames = NULL;
+
+static int migLoadRenames(const char *path) {
+    s64 len;
+    char *text = migReadFile((char *)path, &len);
+    if (!text) return 0;
+    if (!mig_renames) {
+        mig_renames = mapNew(4096, &map_cstring_opaque_type);
+        mig_field_renames = mapNew(1024, &map_cstring_opaque_type);
+    }
+    for (char *line = text; line && *line; ) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = 0;
+        char *kind = line, *old = strchr(kind, '\t');
+        char *new = old ? strchr(old + 1, '\t') : NULL;
+        if (old && new) {
+            *old++ = 0;
+            *new++ = 0;
+            char *end = strchr(new, '\t');
+            if (end) *end = 0;
+            if (strcmp(kind, "kind") && strcmp(old, new)) {
+                mapAdd(!strcmp(kind, "field") ? mig_field_renames : mig_renames, old, new);
+            }
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+    return 1;
+}
+
+/* `CountWord` -> countWord, `RBTreeNew` -> rbTreeNew, `g_correct` ->
+ * gCorrect, `_tmp` -> tmp; NULL when it stays (camelCase already, all
+ * capitals, a single word) */
+static char *migCamel(const char *w, s64 len) {
+    int lower = 0, upper = 0, under = 0;
+    for (s64 i = 0; i < len; ++i) {
+        if (islower((unsigned char)w[i])) lower = 1;
+        else if (isupper((unsigned char)w[i])) upper = 1;
+        else if (w[i] == '_') under = 1;
+    }
+    if (!lower) return NULL;                         /* MAX_LEN, X, I64 */
+    AoStr *out = aoStrNew();
+    s64 i = 0;
+    while (i < len && w[i] == '_') i++;
+    int first = 1, cap_next = 0;
+    while (i < len) {
+        char c = w[i];
+        if (c == '_') { cap_next = !first; i++; continue; }
+        if (first) {
+            /* the first word in lower case: a run of capitals is an
+             * acronym (`RBTree` -> rbTree, `I64ToStr` -> i64ToStr) */
+            s64 j = i;
+            while (j < len && (isupper((unsigned char)w[j]) || isdigit((unsigned char)w[j]))) j++;
+            if (j - i > 1 && j < len && islower((unsigned char)w[j])) j--;   /* RBTree: R B | Tree */
+            if (j == i) j = i + 1;
+            for (s64 k = i; k < j; ++k) aoStrPutChar(out, tolower((unsigned char)w[k]));
+            i = j;
+            first = 0;
+            continue;
+        }
+        aoStrPutChar(out, cap_next ? toupper((unsigned char)c) : c);
+        cap_next = 0;
+        i++;
+    }
+    (void)upper; (void)under;
+    if ((s64)out->len == len && !memcmp(out->data, w, len)) return NULL;
+    if (out->len == 0) return NULL;
+    return out->data;
+}
+
+static int mig_names = 0;
+static int migUsesWord(MigFile *f, s64 s, s64 e, const char *name);
+
+/* The naming rule for the name at s (see migCamel) */
+static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
+    if (!mig_names) return;
+    char *w = mprintf("%.*s", (int)len, f->text + s);
+    if (!strcmp(w, "Main") || !strcmp(w, "argc") || !strcmp(w, "argv")) return;
+    char *to = NULL;
+    if (f->real && strstr(f->real, "/src/std/")) {
+        to = mig_renames ? mapGet(mig_renames, w) : NULL;
+    } else {
+        /* not a type, not the stdlib's (1i), not a C function */
+        if (cctrlGetKeyWord(cc, w, len)) return;
+        if (mig_map && mapGet(mig_map, w)) return;
+        Ast *decl = findFunctionDecl(cc, w, len);
+        if (!decl) decl = mapGet(cc->global_env, w);
+        if (decl && (decl->kind == AST_EXTERN_FUNC || migIsStdFile(cc, decl->file_id))) return;
+        to = migCamel(w, len);
+    }
+    if (!to) return;
+    /* a name the file already has (`_a` next to `a`): left, for a person */
+    if (migUsesWord(f, 0, f->len, to)) {
+        char *key = mprintf("clash:%s", w);
+        if (!setHas(f->seen, key)) {
+            setAdd(f->seen, key);
+            migNote(f, s, "check: `%s` would be `%s`, which the file already uses: renamed by hand", w, to);
+        }
+        return;
+    }
+    migAdd(f, s, s + len, to, "name");
+}
+
+void migrateNoteStdField(Cctrl *cc, Lexeme *name) {
+    if (!mig_names || !mig_field_renames) return;
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    char *to = mapGet(mig_field_renames, mprintf("%.*s", (int)name->len, f->text + s));
+    if (to) migAdd(f, s, s + name->len, to, "name");
+}
+
 /* A name that is a keyword or a type name of the new syntax: name_ (in
  * src/std listed instead, those get names picked by hand) */
 void migrateNoteName(Cctrl *cc, Lexeme *name) {
@@ -868,7 +989,10 @@ void migrateNoteName(Cctrl *cc, Lexeme *name) {
     for (u64 k = 0; k < sizeof(reserved) / sizeof(reserved[0]); ++k) {
         if ((s64)strlen(reserved[k]) == name->len && !memcmp(f->text + s, reserved[k], name->len)) hit = 1;
     }
-    if (!hit) return;
+    if (!hit) {
+        migRename(cc, f, s, name->len);
+        return;
+    }
     if (f->real && strstr(f->real, "/src/std/")) {
         char *key = mprintf("stdname:%lld", (long long)s);
         if (setHas(f->seen, key)) return;
@@ -891,13 +1015,12 @@ typedef struct MigName {
 } MigName;
 
 static Map *mig_map = NULL;
-static char *migReadFile(char *path, s64 *_len);
 
 static int migLoadMap(const char *path) {
     s64 len;
     char *text = migReadFile((char *)path, &len);
     if (!text) return 0;
-    mig_map = mapNew(2048, &map_cstring_opaque_type);
+    mig_map = mapNew(512, &map_cstring_opaque_type);
     char *line = text;
     while (line && *line) {
         char *nl = strchr(line, '\n');
@@ -1985,13 +2108,19 @@ static int migParse(Migrate *m, char *root, char *install_dir) {
 static char *migReadFile(char *path, s64 *_len) {
     FILE *fp = fopen(path, "rb");
     if (!fp) return NULL;
-    AoStr *buf = aoStrNew();
-    char chunk[8192];
-    size_t n;
-    while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) aoStrCatLen(buf, chunk, n);
+    size_t cap = 8192, len = 0, n;
+    char *buf = malloc(cap + 1);
+    while ((n = fread(buf + len, 1, cap - len, fp)) > 0) {
+        len += n;
+        if (len == cap) {
+            cap *= 2;
+            buf = realloc(buf, cap + 1);
+        }
+    }
     fclose(fp);
-    *_len = (s64)buf->len;
-    return buf->data ? buf->data : strdup("");
+    buf[len] = 0;
+    *_len = (s64)len;
+    return buf;
 }
 
 static MigFile *migFileNew(char *path) {
@@ -2427,6 +2556,8 @@ static void migUsage(void) {
         "  --stdout    print the result instead of writing the files\n"
         "  --report    the dry run's per-file counts and notes (see dry-run.sh)\n"
         "  --map TSV   also move stdlib names into modules (stdlib-modules.tsv)\n"
+        "  --names     rename to the naming rule (camelCase functions/variables)\n"
+        "  --renames TSV  the stdlib's own renames (renames.tsv, renames-locals.tsv)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
 }
@@ -2501,6 +2632,13 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "--check")) check = 1;
         else if (!strcmp(argv[i], "--stdout")) to_stdout = 1;
         else if (!strcmp(argv[i], "--report")) report = 1;
+        else if (!strcmp(argv[i], "--names")) mig_names = 1;
+        else if (!strcmp(argv[i], "--renames") && i + 1 < argc) {
+            if (!migLoadRenames(argv[++i])) {
+                fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);
+                return 2;
+            }
+        }
         else if (!strcmp(argv[i], "--map") && i + 1 < argc) {
             if (!migLoadMap(argv[++i])) {
                 fprintf(stderr, "ktm-convert: can't read the stdlib map %s\n", argv[i]);
