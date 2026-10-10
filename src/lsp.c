@@ -807,6 +807,7 @@ static const char *lsp_keywords[] = {
     /* Added */
     "auto", "continue", "typeof", "F32", "alignof",
     "true", "false", "null",
+    "struct", "pub",
 };
 
 #define KTM_LSP_FUNCTION     3

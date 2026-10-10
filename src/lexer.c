@@ -179,8 +179,10 @@ static LexerType lexer_types[] = {
     {"volatile", KW_VOLATILE},
 
     {"public",  KW_PUBLIC},
+    {"pub",     KW_PUBLIC},     /* ktm syntax v0.2 */
     {"private", KW_PRIVATE},
     {"class",   KW_CLASS},
+    {"struct",  KW_CLASS},      /* ktm syntax v0.2: the same as class */
     {"union",   KW_UNION},
 
     {"static",  KW_STATIC},

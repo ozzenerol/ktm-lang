@@ -110,6 +110,7 @@ static BuiltInType built_in_types[] = {
     {"F32",AST_TYPE_FLOAT,4,0},
     {"inline",AST_TYPE_INLINE,0,0},
     {"public",AST_TYPE_VIS_MODIFIER,0,0},
+    {"pub",AST_TYPE_VIS_MODIFIER,0,0},
     {"auto",AST_TYPE_AUTO,0,0},
     {"private",AST_TYPE_VIS_MODIFIER,0,0},
 };
