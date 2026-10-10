@@ -480,7 +480,7 @@ int asmAddrConst(Cctrl *cc, Ast *init, AoStr **_sym, s64 *_off,
     Ast *t = init->operand;
     switch (t->kind) {
         case AST_GVAR: {
-            AoStr *label = t->is_static ? t->glabel : t->gname;
+            AoStr *label = (t->glabel ? t->glabel : t->gname);
             *_sym = for_jit ? label : asmNormaliseGlobalLabel(cc, label);
             break;
         }

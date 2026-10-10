@@ -366,13 +366,37 @@ Ast *astLVar(AstType *type, char *name, int len) {
     return ast;
 }
 
+/* The symbol of a module's name `a.b.name` (only [A-Za-z0-9_], which
+ * every assembler and the JIT take): `_K1a1b4name`, each part prefixed
+ * with its length. `_K` and a capital is reserved in C, so it can't be a
+ * C name or a main-program one. */
+char *astModuleMangle(char *qual, int len) {
+    AoStr *out = aoStrNew();
+    aoStrCatLen(out, "_K", 2);
+    int start = 0;
+    for (int i = 0; i <= len; ++i) {
+        if (i == len || qual[i] == '.') {
+            aoStrCatPrintf(out, "%d%.*s", i - start, i - start, qual + start);
+            start = i + 1;
+        }
+    }
+    return aoStrMove(out);
+}
+
 Ast *astGVar(AstType *type, char *name, int len, int is_static) {
     Ast *ast = astNew();
     ast->kind = AST_GVAR;
     ast->type = type;
     ast->gname = aoStrDupRaw(name, len);
     ast->is_static = is_static;
-    ast->glabel = is_static ? astMakeLabel() : ast->gname;
+    if (is_static) {
+        ast->glabel = astMakeLabel();
+    } else if (memchr(name, '.', len)) {
+        char *sym = astModuleMangle(name, len);
+        ast->glabel = aoStrDupRaw(sym, strlen(sym));
+    } else {
+        ast->glabel = ast->gname;
+    }
     return ast;
 }
 

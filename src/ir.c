@@ -1016,9 +1016,8 @@ IrValue *irLowerBinOpExpr(IrCtx *ctx, Ast *ast) {
 static IrValue *irGlobalValue(Ast *gvar_ast) {
     IrValue *v = irValueNew(IR_TYPE_PTR, IR_VAL_GLOBAL);
     /* @TODO, this should really be fixed; one label field on the struct */
-    v->as.global.name = (gvar_ast->is_static && gvar_ast->glabel)
-                        ? gvar_ast->glabel
-                        : gvar_ast->gname;
+    v->as.global.name = gvar_ast->glabel ? gvar_ast->glabel
+                                         : gvar_ast->gname;
     v->as.global.value = NULL;
     return v;
 }

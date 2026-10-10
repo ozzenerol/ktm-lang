@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <assert.h>
 
 #include "aostr.h"
@@ -389,6 +390,11 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->conds = NULL;
     l->cond_depth = 0;
     l->cond_cap = 0;
+    l->modules = NULL;
+    l->modules_len = 0;
+    l->modules_cap = 0;
+    l->mod_depth = 0;
+    l->program_root = NULL;
     /* Default: no diagnostic engine wired up; lex errors fall
      * back to loggerPanic. cctrlInitParse plugs the real Cctrl
      * in when this lexer is being driven by a real parse. */
@@ -731,6 +737,11 @@ static char lexNextChar(Lexer *l) {
         if ((lex_file = listPop(l->files)) == NULL) {
             return '\0';
         }
+        /* The file that ended was its module's last: it is loaded */
+        if (l->cur_file && l->cur_file->last_of_module) {
+            l->modules[l->cur_file->module_id - 1]->loaded = 1;
+            if (l->mod_depth > 0) l->mod_depth--;
+        }
         l->cur_file = lex_file;
         l->ptr = lex_file->ptr;
         l->lineno = lex_file->lineno;
@@ -843,6 +854,18 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
     f->line_start_ptr = src_code->data;
     f->filename = filename;
     f->file_id = 0; /* registered lazily by cctrlTokenGet */
+    f->module_id = 0;
+    f->mod_pass = LEX_PASS_NONE;
+    f->last_of_module = 0;
+    f->header_done = 0;
+    f->imports = NULL;
+    /* The program's modules are found from its main file's directory */
+    if (!l->program_root) {
+        char *slash = strrchr(filename->data, '/');
+        l->program_root = slash
+            ? mprintf("%.*s", (int)(slash - filename->data), filename->data)
+            : mprintf(".");
+    }
     setAdd(l->seen_files,filename->data);
     if (l->cur_file) {
         /* Snapshot the outgoing file's cursor state so column maths
@@ -883,6 +906,11 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->line_start_ptr = src_code->data;
     f->filename = aoStrDupRaw(name, strlen(name));
     f->file_id = 0; /* registered lazily by cctrlTokenGet */
+    f->module_id = 0;
+    f->mod_pass = LEX_PASS_NONE;
+    f->last_of_module = 0;
+    f->header_done = 0;
+    f->imports = NULL;
     if (l->cur_file) {
         l->cur_file->ptr = l->ptr;
         l->cur_file->lineno = l->lineno;
@@ -2902,7 +2930,7 @@ void lexUnSetAsmFlags(Lexer *l) {
     l->flags &= ~(CCF_MULTI_COLON|CCF_ACCEPT_WHITESPACE|CCF_ACCEPT_NEWLINES|CCF_ASM_BLOCK);
 }
 
-Lexeme *lexToken(Map *macro_defs, Lexer *l) {
+static Lexeme *lexTokenRaw(Map *macro_defs, Lexer *l) {
     Lexeme le,*copy;
 
     macro_proccessor->macro_defs = macro_defs;
@@ -3018,6 +3046,285 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
         return copy;
     }
     return NULL;
+}
+
+/* ---- modules (ktm M1) ----
+ *
+ * `import a.b;` at the top of a file finds the directory a/b (under the
+ * main file's directory, then <install>/modules, then each KTM_PATH
+ * entry; found twice is an error) and pushes its *.ktm files, in name
+ * order, twice: a declarations-only pass, then the full one (the parser
+ * reads Lexeme.mod_pass). Its own imports load first, so a module's code
+ * comes before its importer's. Each file of the directory starts with
+ * `module b;`. In a file that imports it, `b.name` (or `alias.name`) is
+ * the single token `a.b.name`. */
+
+static LexModule *lexModuleFind(Lexer *l, AoStr *path) {
+    for (int i = 0; i < l->modules_len; ++i) {
+        if (aoStrCmp(l->modules[i]->path, path)) return l->modules[i];
+    }
+    return NULL;
+}
+
+static int lexIsDir(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* The directory of module `path` (dots as slashes) or NULL; an error
+ * when two of the places have it */
+static char *lexModuleDir(Lexer *l, AoStr *path, Lexeme *at) {
+    char *rel = mprintf("%s", path->data);
+    for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
+
+    char *roots[64];
+    int nroots = 0;
+    roots[nroots++] = l->program_root ? l->program_root : ".";
+    if (l->builtin_root) {
+        /* <install>/include/ -> <install>/modules */
+        roots[nroots++] = mprintf("%s../modules", l->builtin_root);
+    }
+    char *ktm_path = getenv("KTM_PATH");
+    if (ktm_path && *ktm_path) {
+        char *copy = mprintf("%s", ktm_path), *save = NULL;
+        for (char *dir = strtok_r(copy, ":", &save); dir && nroots < 64;
+             dir = strtok_r(NULL, ":", &save)) {
+            roots[nroots++] = dir;
+        }
+    }
+
+    char *found = NULL;
+    for (int i = 0; i < nroots; ++i) {
+        char *cand = mprintf("%s/%s", roots[i], rel);
+        if (!lexIsDir(cand)) continue;
+        if (found) {
+            lexReportAt(l, at->line, at->col, at->len,
+                        "module %s is found twice: %s and %s",
+                        path->data, found, cand);
+            return found;
+        }
+        found = cand;
+    }
+    return found;
+}
+
+static int lexCmpStr(const void *a, const void *b) {
+    return strcmp(*(char **)a, *(char **)b);
+}
+
+/* Push module `m`'s files: they are read next, declarations-only pass
+ * first, then the full pass */
+static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
+    DIR *dir = opendir(m->dir->data);
+    char **names = NULL;
+    int n = 0, cap = 0;
+    struct dirent *ent;
+    while (dir && (ent = readdir(dir)) != NULL) {
+        int len = strlen(ent->d_name);
+        if (len < 5 || strcmp(ent->d_name + len - 4, ".ktm")) continue;
+        if (n == cap) {
+            cap = cap ? cap * 2 : 8;
+            names = realloc(names, sizeof(char *) * cap);
+        }
+        names[n++] = mprintf("%s/%s", m->dir->data, ent->d_name);
+    }
+    if (dir) closedir(dir);
+    if (n == 0) {
+        lexReportAt(l, at->line, at->col, at->len,
+                    "module %s has no .ktm files in %s",
+                    m->path->data, m->dir->data);
+        m->loaded = 1;
+        return;
+    }
+    qsort(names, n, sizeof(char *), lexCmpStr);
+
+    l->mod_stack[l->mod_depth++] = m->id;
+    /* The file stack is last in, first out */
+    for (int pass = LEX_PASS_FULL; pass >= LEX_PASS_DECLS; --pass) {
+        for (int i = n - 1; i >= 0; --i) {
+            lexPushFile(l, aoStrDupRaw(names[i], strlen(names[i])));
+            l->cur_file->module_id = m->id;
+            l->cur_file->mod_pass = pass;
+            l->cur_file->last_of_module = pass == LEX_PASS_FULL && i == n - 1;
+        }
+    }
+    free(names);
+}
+
+/* The module path after `import` or `module`: ident {. ident}, then `;`.
+ * NULL (reported) when malformed. */
+static AoStr *lexModulePath(Map *macro_defs, Lexer *l, Lexeme *first,
+                            Lexeme **_last)
+{
+    AoStr *path = aoStrNew();
+    Lexeme *tok = first;
+    while (1) {
+        if (!tok || tok->tk_type != TK_IDENT) {
+            Lexeme *at = tok ? tok : first;
+            lexReportAt(l, at->line, at->col, at->len,
+                        "expected a module name, as in `import net;`");
+            return NULL;
+        }
+        aoStrCatLen(path, tok->start, tok->len);
+        *_last = tok;
+        tok = lexTokenRaw(macro_defs, l);
+        if (tokenPunctIs(tok, ';')) return path;
+        if (!tokenPunctIs(tok, '.')) {
+            Lexeme *at = tok ? tok : *_last;
+            lexReportAt(l, at->line, at->col, at->len,
+                        "expected `;` after the module name");
+            return NULL;
+        }
+        aoStrPutChar(path, '.');
+        tok = lexTokenRaw(macro_defs, l);
+    }
+}
+
+/* `import [alias =] a.b;`, the `import` just lexed */
+static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
+    LexFile *file = l->cur_file;
+    Lexeme *first = lexTokenRaw(macro_defs, l);
+    AoStr *alias = NULL;
+    if (first && first->tk_type == TK_IDENT) {
+        Lexeme *eq = lexTokenRaw(macro_defs, l);
+        if (tokenPunctIs(eq, '=')) {
+            alias = aoStrDupRaw(first->start, first->len);
+            first = lexTokenRaw(macro_defs, l);
+        } else {
+            /* not an alias: give the token back by re-lexing from it */
+            l->ptr = eq ? eq->start : l->ptr;
+        }
+    }
+    Lexeme *last = first;
+    AoStr *path = lexModulePath(macro_defs, l, first, &last);
+    if (!path) return;
+    AoStr *prefix = alias ? alias : aoStrDupRaw(last->start, last->len);
+
+    LexModule *m = lexModuleFind(l, path);
+    if (m && !m->loaded) {
+        /* still being loaded: it imports itself through the chain */
+        AoStr *chain = aoStrNew();
+        int start = 0;
+        for (int i = 0; i < l->mod_depth; ++i) {
+            if (l->mod_stack[i] == m->id) { start = i; break; }
+        }
+        for (int i = start; i < l->mod_depth; ++i) {
+            aoStrCatPrintf(chain, "%s -> ", l->modules[l->mod_stack[i] - 1]->path->data);
+        }
+        aoStrCatPrintf(chain, "%s", path->data);
+        lexReportAt(l, kw->line, kw->col, kw->len,
+                    "circular import: %s", chain->data);
+        return;
+    }
+    if (!m) {
+        char *dir = lexModuleDir(l, path, first);
+        if (!dir) {
+            lexReportAt(l, first->line, first->col,
+                        (last->start + last->len) - first->start,
+                        "module %s not found (no directory %s under %s, "
+                        "the stdlib modules or KTM_PATH)",
+                        path->data, path->data, l->program_root);
+            return;
+        }
+        m = (LexModule *)calloc(1, sizeof(LexModule));
+        m->path = path;
+        m->dir = aoStrDupRaw(dir, strlen(dir));
+        if (l->modules_len == l->modules_cap) {
+            l->modules_cap = l->modules_cap ? l->modules_cap * 2 : 8;
+            l->modules = realloc(l->modules, sizeof(LexModule *) * l->modules_cap);
+        }
+        l->modules[l->modules_len++] = m;
+        m->id = l->modules_len;
+    }
+
+    LexImport *imp = (LexImport *)calloc(1, sizeof(LexImport));
+    imp->prefix = prefix;
+    imp->module = m;
+    imp->line = kw->line;
+    imp->col = kw->col;
+    imp->len = kw->len;
+    imp->next = file->imports;
+    file->imports = imp;
+
+    if (!m->loaded && l->mod_depth < 64) {
+        lexModuleLoad(l, m, first);
+    }
+}
+
+/* `module b;` at the top of a module's file, the `module` just lexed */
+static void lexModuleLine(Map *macro_defs, Lexer *l, Lexeme *kw) {
+    LexFile *file = l->cur_file;
+    Lexeme *first = lexTokenRaw(macro_defs, l);
+    Lexeme *last = first;
+    AoStr *name = lexModulePath(macro_defs, l, first, &last);
+    if (!name) return;
+    if (!file->module_id) {
+        lexReportAt(l, kw->line, kw->col, kw->len,
+                    "`module %s;` in a file that isn't part of a module: "
+                    "put it in a directory %s and import it", name->data,
+                    name->data);
+        return;
+    }
+    AoStr *path = l->modules[file->module_id - 1]->path;
+    char *dot = strrchr(path->data, '.');
+    char *want = dot ? dot + 1 : path->data;
+    if (strcmp(want, name->data)) {
+        lexReportAt(l, first->line, first->col,
+                    (last->start + last->len) - first->start,
+                    "this file is in module %s, so it starts with `module %s;`, not `module %s;`",
+                    path->data, want, name->data);
+    }
+}
+
+/* `prefix.name` right after an imported prefix: the token `a.b.name` */
+static void lexQualify(Lexer *l, Lexeme *tok) {
+    LexFile *file = l->cur_file;
+    if (!file || !file->imports || *l->ptr != '.') return;
+    char c = l->ptr[1];
+    if (!(isalpha((unsigned char)c) || c == '_')) return;
+    for (LexImport *imp = file->imports; imp; imp = imp->next) {
+        if ((int)imp->prefix->len != tok->len ||
+            memcmp(imp->prefix->data, tok->start, tok->len)) continue;
+        char *name = l->ptr + 1, *end = name;
+        while (isalnum((unsigned char)*end) || *end == '_') end++;
+        char *text = mprintf("%s.%.*s", imp->module->path->data,
+                             (int)(end - name), name);
+        l->ptr = end;
+        tok->start = text;
+        tok->len = strlen(text);
+        imp->used = 1;
+        return;
+    }
+}
+
+Lexeme *lexToken(Map *macro_defs, Lexer *l) {
+    while (1) {
+        Lexeme *tok = lexTokenRaw(macro_defs, l);
+        if (!tok) return NULL;
+        LexFile *file = l->cur_file;
+        if (file && !file->header_done && tok->tk_type == TK_IDENT &&
+            !(l->flags & CCF_PERMISSIVE))
+        {
+            if (tok->len == 6 && !memcmp(tok->start, "import", 6)) {
+                lexImport(macro_defs, l, tok);
+                continue;
+            }
+            if (tok->len == 6 && !memcmp(tok->start, "module", 6)) {
+                lexModuleLine(macro_defs, l, tok);
+                continue;
+            }
+        }
+        if (file) {
+            file->header_done = 1;
+            tok->module_id = file->module_id;
+            tok->mod_pass = file->mod_pass;
+            if (tok->tk_type == TK_IDENT) lexQualify(l, tok);
+        } else {
+            tok->module_id = 0;
+            tok->mod_pass = LEX_PASS_NONE;
+        }
+        return tok;
+    }
 }
 
 void lexemeFree(void *_le) {

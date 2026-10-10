@@ -292,6 +292,8 @@ Cctrl *cctrlNew(enum CliTarget target) {
 
     cc->flags = 0;
     cc->defer_depth = 0;
+    cc->cur_module = 0;
+    cc->decls_only = 0;
     cc->file_map = mapNew(16, &map_u32_to_aostr_type);
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);
@@ -1511,11 +1513,33 @@ void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *f
 }
 
 /* Get variable either from the local or global scope */
+/* The path ("a.b") of module `module_id`, NULL for the main program */
+AoStr *cctrlModulePath(Cctrl *cc, u32 module_id) {
+    if (!module_id || !cc->lexer_ || (int)module_id > cc->lexer_->modules_len) {
+        return NULL;
+    }
+    return cc->lexer_->modules[module_id - 1]->path;
+}
+
+/* `name` as declared in the current module ("a.b.name"), NULL in the
+ * main program or for a name that is already qualified */
+char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    if (!path || memchr(name, '.', len)) return NULL;
+    return mprintf("%s.%.*s", path->data, len, name);
+}
+
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     Ast *ast_var;
     Lexeme *tok;
 
     if (cc->localenv && (ast_var = mapGetLen(cc->localenv, varname, len)) != NULL) {
+        return ast_var;
+    }
+
+    /* In a module, its own names first */
+    char *qual = cctrlQualifyName(cc, varname, len);
+    if (qual && (ast_var = (Ast *)mapGet(cc->global_env, qual)) != NULL) {
         return ast_var;
     }
 
@@ -1560,6 +1584,12 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     assert(name != NULL);
     if ((type = mapGetLen(cc->symbol_table, name, len)) != NULL) {
         return type;
+    }
+    /* In a module, its own types first */
+    char *qual = cctrlQualifyName(cc, name, len);
+    if (qual) {
+        if ((type = mapGet(cc->clsdefs, qual)) != NULL) return type;
+        if ((type = mapGet(cc->uniondefs, qual)) != NULL) return type;
     }
     /* Classes are types */
     if ((type = mapGetLen(cc->clsdefs,name,len)) != NULL) {
