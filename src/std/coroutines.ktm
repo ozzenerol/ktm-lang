@@ -48,7 +48,8 @@ public class Coroutine
   U0 *arg;
   CatchFrame *catch_top;/* this coroutine's catch chain while it is switched out */
   U64 except_ch;
-  U64 thrown;           /* value of an uncaught throw, rethrown by Next */
+  Error error;          /* its error in flight while it is switched out */
+  Error thrown;         /* an uncaught error, rethrown by Next */
   I64 status;
   Bool failed;          /* fn threw; Next rethrows `thrown` */
   Bool is_root;         /* the save slot of a thread's own stack */
@@ -215,8 +216,10 @@ static U0 *CoroSwitch(HCFs *fs, Coroutine *from, Coroutine *to, U0 *value)
 {
   from->catch_top = fs->catch_top;
   from->except_ch = fs->except_ch;
+  from->error = fs->error;
   fs->catch_top = to->catch_top;
   fs->except_ch = to->except_ch;
+  fs->error = to->error;
   if (to->is_root) fs->coro_cur = NULL;
   else             fs->coro_cur = to;
   return CoroSwap(&from->sp, to->sp, value);
@@ -229,9 +232,9 @@ U0 CoroMain(Coroutine *c)
   U0 *result = NULL;
   try {
     result = c->fn(c->arg);
-  } catch {
+  } catch (Error e) {
     c->failed = TRUE;
-    c->thrown = Fs->except_ch;
+    KTM_ErrorCopy(&c->thrown, &e);
   }
   Coroutine *to = c->resumer;
   c->resumer = NULL;
@@ -316,7 +319,7 @@ public U0 *CoroutineNext(Coroutine *c, U0 *send=NULL)
   U0 *v = CoroSwitch(fs, from, c, send);
   if (c->failed) {
     c->failed = FALSE;
-    throw(c->thrown);
+    KTM_Rethrow(&c->thrown);
   }
   return v;
 }
@@ -357,6 +360,7 @@ public U0 CoroutineRelease(Coroutine *c)
   if (!c) return;
   if (c->status == CORO_ACTIVE)
     CoroDie("CoroutineRelease: the coroutine is running\n");
+  KTM_ErrorDrop(&c->error);
   if (!CoroStackPut(Fs(), c->stack_base, c->stack_len))
     munmap(c->stack_base, c->stack_len);
   free(c);

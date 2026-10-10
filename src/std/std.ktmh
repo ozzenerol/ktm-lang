@@ -943,6 +943,18 @@ public U8 *ProcRun(U8 **argv, I64 *code=NULL);
 /* try/catch/throw. The compiler emits the calls to the
  * KTM_ helpers below; user code only reads Fs. */
 
+/* What a throw carries and `catch (Error e)` binds: the code (usually an
+ * enum member), a message (never NULL, "" without one), and the file and
+ * line of the throw. The message is freed when the catch block is left:
+ * copy it (StrNew) to keep it. */
+public struct Error
+{
+  i64 code;
+  u8 *message;
+  u8 *file;
+  i32 line;
+};
+
 /* One per `try`, on the stack of the function the try is in (the
  * compiler reserves 256 bytes): the setjmp buffer, then the next outer
  * frame of the same thread. */
@@ -953,8 +965,8 @@ public class CatchFrame
   CatchFrame *prev;
 };
 /* A thread's exception state: catch_top is its innermost active try
- * (NULL outside any), except_ch the value of its last throw, which a
- * catch handler reads. */
+ * (NULL outside any), except_ch the code of its last throw, error the
+ * error being thrown (a catch takes it). */
 public class HCFs
 {
   CatchFrame *catch_top;
@@ -963,6 +975,7 @@ public class HCFs
   U0 *coro_root;  /* coroutines.ktm: save slot for the thread's own stack */
   U0 *coro_cache; /* coroutines.ktm: released stacks kept for reuse */
   I64 coro_cached;/* coroutines.ktm: how many (at most 16) */
+  Error error;
 };
 /* The calling thread's exception state (Fs: the classic name of the
  * current task pointer). A function, so `Fs->except_ch` calls it: each thread has
@@ -978,13 +991,30 @@ public U0 KTM_PushFrame(CatchFrame *f);
  * before its catch handler runs, so a throw there goes further out. */
 public U0 KTM_TryLeave(CatchFrame *f);
 /* A `defer` caught a throw leaving its block: make the try that was
- * active before f the innermost again and return the thrown value, which
- * the compiler throws again once the deferred statement has run. */
-public U64 KTM_DeferCaught(CatchFrame *f);
-/* `throw(v)`: store v in Fs->except_ch and jump to the catch of the
- * innermost try of the calling thread. With no try it reports v and
- * exits the process with 1, from any thread. */
+ * active before f the innermost again and move the error into *saved;
+ * KTM_Rethrow(saved) throws it on once the deferred statement has run. */
+public U0 KTM_DeferCaught(CatchFrame *f, Error *saved);
+public U0 KTM_Rethrow(Error *saved);
+/* `throw(code)` and `throw(code, fmt, ...)`: set the calling thread's
+ * error (and Fs->except_ch to the code) and jump to the catch of its
+ * innermost try. With no try it prints
+ *   uncaught error <code>: <message> (<file>:<line>)
+ * on stderr and exits the process with 1, from any thread. The compiler
+ * checks `throw(code, fmt, ...)` as a call to KTM_ThrowFmt and calls
+ * KTM_ThrowFmtAt with where the throw is. */
+public U0 KTM_ThrowAt(U64 code, U8 *file, I64 line);
+public U0 KTM_ThrowFmtAt(U8 *file, I64 line, U64 code, U8 *fmt, ...);
+public U0 KTM_ThrowFmt(U64 code, U8 *fmt, ...);
+/* `throw(e)`: the same error again (code, message, file, line). */
+public U0 KTM_ThrowError(Error *e);
 public U0 KTM_Throw(U64 v);
+/* `catch (Error e)` takes the error into e and drops it when its block
+ * is left; a catch without a binding forgets the message on entry.
+ * KTM_ErrorCopy: dst = src with its own copy of the message. */
+public U0 KTM_ErrorTake(Error *e);
+public U0 KTM_ErrorDrop(Error *e);
+public U0 KTM_ErrorCopy(Error *dst, Error *src);
+public U0 KTM_ErrorForget();
 
 /* Coroutines (coroutines.ktm): each runs a function on its own stack and
  * pauses with CoroutineYield. Fields are private: use the functions. */
@@ -999,7 +1029,8 @@ public class Coroutine
   U0 *arg;
   CatchFrame *catch_top;
   U64 except_ch;
-  U64 thrown;
+  Error error;
+  Error thrown;
   I64 status;
   Bool failed;
   Bool is_root;

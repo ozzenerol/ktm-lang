@@ -421,9 +421,11 @@ typedef struct Ast {
             Ast *catch_body;
         };
 
-        /* throw(value) */
+        /* throw(code), or throw(code, fmt, ...) / throw(e) as a call */
         struct {
-            Ast *throw_value;
+            Ast *throw_value;  /* the code; NULL with throw_call */
+            Ast *throw_call;   /* KTM_ThrowFmtAt(...) or KTM_ThrowError(&e) */
+            Ast *throw_file;   /* AST_STRING: the file the throw is in */
         };
 
         /* defer <stmt> */

@@ -1319,13 +1319,21 @@ A file that can't be opened or read (a directory, say) is reported as an error a
 <a href="#calling-c">calling C</a>).</p>
 
 <h2 id="exceptions">Exceptions</h2>
-<p><code>throw</code> takes a 64-bit value, usually a character constant. A <code>try</code>
-block catches it in the nearest enclosing <code>catch</code>, which finds the value in
-<code>Fs->except_ch</code>. Throws unwind through any number of function calls.</p>
+<p>A <code>throw</code> carries an <code>Error</code>, a struct every program has:</p>
+<pre><code>struct Error { i64 code; u8 *message; u8 *file; i32 line; };</code></pre>
+<p>The code is usually an enum member. <code>throw(code)</code> throws one with an empty
+message, <code>throw(code, fmt, ...)</code> formats the message like <code>printf</code>
+(the format and its arguments are checked at compile time the same way), and the compiler
+fills in the file and line of the <code>throw</code>. A <code>try</code> block catches it in
+the nearest enclosing <code>catch</code>; <code>catch (Error e)</code> gets the error in
+<code>e</code>. Throws unwind through any number of function calls, running the
+<a href="#defer">defers</a> on the way.</p>
 <pre data-run><code>
+enum BankError { funds, locked };
+
 U0 Withdraw(I64 balance, I64 amount)
 {
-  if (amount > balance) throw('Funds');
+  if (amount > balance) throw(BankError.funds, "need %d, have %d", amount, balance);
   "withdrew %d\n", amount;
 }
 
@@ -1335,9 +1343,9 @@ U0 Main()
     Withdraw(100, 30);
     Withdraw(100, 500);
     "never printed\n";
-  } catch {
-    if (Fs->except_ch == 'Funds') {
-      "insufficient funds\n";
+  } catch (Error e) {
+    if (e.code == BankError.funds) {
+      "insufficient funds: %s\n", e.message;
     }
   }
   "carrying on\n";
@@ -1345,13 +1353,19 @@ U0 Main()
 </code></pre>
 <pre class="output">
 withdrew 30
-insufficient funds
+insufficient funds: need 500, have 100
 carrying on
 </pre>
-<p>The value is converted to <code>U64</code> like an argument to a <code>U64</code>
-parameter: <code>throw(42.75)</code> throws 42. The catch handler runs after its
-<code>try</code> has ended, so a <code>throw</code> inside it goes to the next enclosing
-<code>try</code>.</p>
+<p><code>e.message</code> is never <code>NULL</code> (it is <code>""</code> without a message)
+and is freed when the catch block is left: copy it (<code>StrNew(e.message)</code>) to keep
+it. <code>throw(e)</code> throws the same error again, with its original message, file and
+line, so a handler can look at an error and pass it on. A <code>catch</code> without a
+binding still works and finds the code in <code>Fs->except_ch</code>; until the old code
+is converted, <code>throw('Funds')</code> with a character constant also still works (the
+constant is the code).</p>
+<p>The code is converted like an argument to an integer parameter:
+<code>throw(42.75)</code> throws 42. The catch handler runs after its <code>try</code> has
+ended, so a <code>throw</code> inside it goes to the next enclosing <code>try</code>.</p>
 <p>A <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> may
 leave a <code>try</code> body (or a catch handler) at any depth of nesting; the tries it
 leaves stop catching:</p>
@@ -1388,11 +1402,15 @@ caught here, not in Find
 <code>try</code> of the thread that threw, so threads can use try/catch at the same time.
 <code>Fs</code> is a function returning the calling thread's state, so
 <code>Fs->except_ch</code> reads that thread's last thrown value.</p>
-<p>A throw that no <code>try</code> catches, in any thread, prints the value on stderr and
-ends the program with exit code 1. A character constant whose bytes are all printable is
-shown as text, anything else as a number:</p>
-<pre><code>uncaught throw: 'Funds'
-uncaught throw: 404</code></pre>
+<p>An error that no <code>try</code> catches, in any thread, is printed on stderr (after
+what the program printed so far) and ends the program with exit code 1. A code that is a
+character constant with all bytes printable is shown as text, anything else as a
+number:</p>
+<pre><code>uncaught error 0: need 500, have 100 (bank.ktm:5)
+uncaught error 'Funds' (old.ktm:12)</code></pre>
+<p>Each <code>try</code> and each <code>defer</code> reached saves the registers but not the
+signal mask, so they cost no system call; the flip side is that a <code>throw</code> out of a
+signal handler leaves that signal blocked.</p>
 
 <h2 id="defer">defer</h2>
 <p><code>defer</code> followed by a statement (or a <code>{ }</code> block) runs that

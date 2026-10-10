@@ -2496,10 +2496,70 @@ Ast *parseReturnStatement(Cctrl *cc) {
     return astReturn(retval,cc->tmp_rettype);
 }
 
-/* strict `try { ... } catch <stmt>`. The catch handler is a
- * single statement (often `{...}` so braces still work via the
- * normal block-statement path) and does NOT bind the thrown value -
- * read it via the global `Fs->except_ch`. */
+/* A call to a runtime helper taking &var, for the lowerings below */
+static Ast *parseCallWithAddrOf(char *fname, Ast *var) {
+    Vec *args = astVecNew();
+    vecPush(args, astUnaryOperator(astMakePointerType(var->type),
+                                   AST_UN_OP_ADDR_OF, var));
+    return astFunctionCall(ast_void_type, fname, strlen(fname), args);
+}
+
+/* `catch (Error e) <stmt>` after the `catch`: the handler becomes
+ *     { Error e; KTM_ErrorTake(&e); defer KTM_ErrorDrop(&e); <stmt> }
+ * so e owns the message until the handler is left, however it is left.
+ * NULL (nothing consumed) when no `(Type name)` follows. */
+static Ast *parseCatchBinding(Cctrl *cc) {
+    Lexeme *open = cctrlTokenPeek(cc);
+    if (!tokenPunctIs(open, '(')) return NULL;
+    cctrlTokenGet(cc);
+    Lexeme *tname = cctrlTokenPeek(cc);
+    if (!tname || !cctrlGetKeyWord(cc, tname->start, tname->len)) {
+        cctrlTokenRewind(cc);
+        return NULL;
+    }
+    int tline = tname->line, tcol = tname->col, tlen = tname->len;
+    AstType *type = parseDeclSpec(cc);
+    if (!parseIsErrorType(type)) {
+        cctrlRaiseExceptionAt(cc, tline, tcol, tlen,
+            "`catch` can only bind an Error, as in `catch (Error e)`, got %s",
+            astTypeToString(type));
+    }
+    Lexeme *name = cctrlTokenGetRequired(cc);
+    if (name->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc, "Expected a name for the Error in `catch (Error <name>)`");
+    }
+    cctrlTokenExpect(cc, ')');
+    if (cc->flags & CCTRL_TRANSPILING) {
+        cc->current_recovery = NULL;
+        cctrlRaiseExceptionAt(cc, tline, tcol, tlen,
+            "`catch (Error e)` is not supported with -transpile");
+    }
+
+    Map *outer = cc->localenv;
+    cc->localenv = cctrlCreateAstMap(cc->localenv);
+    Ast *var = astLVar(type, name->start, name->len);
+    var->line = name->line;
+    var->col = name->col;
+    mapAdd(cc->localenv, var->lname->data, var);
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, var);
+    }
+    Ast *handler = parseStatement(cc);
+    cc->localenv = outer;
+
+    List *stmts = listNew();
+    listAppend(stmts, astDecl(var, NULL));
+    listAppend(stmts, parseCallWithAddrOf("KTM_ErrorTake", var));
+    listAppend(stmts, astDefer(parseCallWithAddrOf("KTM_ErrorDrop", var)));
+    if (handler) listAppend(stmts, handler);
+    return astCompountStatement(stmts);
+}
+
+/* `try { ... } catch <stmt>` or `try { ... } catch (Error e) <stmt>`.
+ * The handler is a single statement (often `{...}`). The binding form
+ * gets the error (see parseCatchBinding); without one the code is in
+ * `Fs->except_ch`, and the message, which nothing can read, is freed
+ * when the handler starts. */
 Ast *parseTryStatement(Cctrl *cc) {
     cctrlTokenExpect(cc,'{');
     Ast *try_body = parseCompoundStatement(cc);
@@ -2514,20 +2574,66 @@ Ast *parseTryStatement(Cctrl *cc) {
             lexemeAsWritten(tok));
     }
     cctrlTokenGet(cc);  /* consume `catch` */
-    Ast *catch_body = parseStatement(cc);
+    Ast *catch_body = parseCatchBinding(cc);
+    if (!catch_body) {
+        catch_body = parseStatement(cc);
+        if (!(cc->flags & CCTRL_TRANSPILING)) {
+            List *stmts = listNew();
+            listAppend(stmts, astFunctionCall(ast_void_type, "KTM_ErrorForget",
+                                              15, astVecNew()));
+            if (catch_body) listAppend(stmts, catch_body);
+            catch_body = astCompountStatement(stmts);
+        }
+    }
     return astTry(try_body, catch_body);
 }
 
-/* `throw(expr);` - the expression yields a u64 (commonly a multi-
- * char constant like `'BlkDev'` which the lexer packs into 8 bytes
- * via TK_CHAR_CONST). The runtime stashes it into `Fs->except_ch`
- * and longjmps to the nearest enclosing catch. */
+/* The file a throw is in, as a string literal: the path it was compiled
+ * from, as diagnostics show it. */
+static Ast *parseThrowFile(Cctrl *cc) {
+    char *path = "";
+    if (cc->lexer_ && cc->lexer_->cur_file && cc->lexer_->cur_file->filename) {
+        path = cc->lexer_->cur_file->filename->data;
+    }
+    AoStr *esc = aoStrNew();
+    s64 real_len = 1;
+    for (char *p = path; *p; ++p, ++real_len) {
+        if (*p == '\\' || *p == '"') aoStrPutChar(esc, '\\');
+        aoStrPutChar(esc, *p);
+    }
+    return cctrlGetOrSetString(cc, esc->data, esc->len, real_len);
+}
+
+/* `throw(code);`, `throw(code, fmt, ...);` or `throw(e);` with an Error
+ * (see parseThrowCall). The code is usually an enum member (or, from
+ * before Error, a character constant like 'BlkDev'); the runtime sets the
+ * thread's Error, file and line included, and longjmps to the nearest
+ * enclosing catch. */
 Ast *parseThrowStatement(Cctrl *cc) {
+    int line = cc->lineno;   /* of the `throw` just consumed */
     cctrlTokenExpect(cc,'(');
-    Ast *value = parseRequiredExpr(cc, "the value to `throw`");
-    cctrlTokenExpect(cc,')');
+    int open_line = cc->lineno, open_col = 0;
+    cctrlTokenRewind(cc);
+    Lexeme *open = cctrlTokenGet(cc);
+    if (open) open_col = open->col;
+    if (tokenPunctIs(cctrlTokenPeek(cc), ')')) {
+        /* `throw();`: reported as a missing expression */
+        parseRequiredExpr(cc, "the value to `throw`");
+    }
+    Ast *file = parseThrowFile(cc);
+    Ast *code = NULL;
+    Ast *call = parseThrowCall(cc, file, line, &code);
+    if (call && (cc->flags & CCTRL_TRANSPILING)) {
+        cc->current_recovery = NULL;
+        cctrlRaiseExceptionAt(cc, open_line, open_col, 1,
+            "`throw` with a message or an Error is not supported with -transpile");
+    }
     cctrlTokenExpect(cc,';');
-    return astThrow(value);
+    Ast *ast = astThrow(code);
+    ast->throw_call = call;
+    ast->throw_file = file;
+    ast->line = line;
+    return ast;
 }
 
 void parseRaiseCaseException(Cctrl *cc, Ast *case_expr) {

@@ -2272,7 +2272,8 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
 
         case AST_THROW:
             aoStrCatPrintf(str, "<throw>\n");
-            _astToString(str, ast->throw_value, depth+1);
+            _astToString(str, ast->throw_call ? ast->throw_call
+                                              : ast->throw_value, depth+1);
             astStringEndStmt(str);
             break;
 
@@ -2808,7 +2809,9 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
 
         case AST_THROW:
             aoStrCatPrintf(str, "throw(");
-            _astLValueToString(str, ast->throw_value, lexeme_flags);
+            _astLValueToString(str, ast->throw_call ? ast->throw_call
+                                                    : ast->throw_value,
+                               lexeme_flags);
             aoStrCatPrintf(str, "%s",
                     lexemePunctToStringWithFlags(')',lexeme_flags));
             aoStrCatPrintf(str,"%s",

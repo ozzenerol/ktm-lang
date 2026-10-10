@@ -6,6 +6,8 @@
 Ast *parseUnaryExpr(Cctrl *cc);
 Ast *parseExpr(Cctrl *cc, int prec);
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator);
+Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code);
+int parseIsErrorType(AstType *type);
 Ast *parsePrintStatement(Cctrl *cc);
 Ast *parsePrintCall(Cctrl *cc, s64 terminator);
 Ast *parseCallArguments(Cctrl *cc, char *name, int len);

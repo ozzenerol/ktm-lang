@@ -102,7 +102,7 @@ U0 Main()
     I64 res = System(UNCAUGHT_BIN " > " UNCAUGHT_LOG " 2>&1");
     U8 *out = FileRead(UNCAUGHT_LOG);
     if (out) {
-      ok = res == 1 && strstr(out, "uncaught throw") != NULL &&
+      ok = res == 1 && strstr(out, "uncaught error") != NULL &&
            strstr(out, "main caught") == NULL &&
            strstr(out, "joined") == NULL;
       if (!ok) "exit %d: %s\n", res, out;
