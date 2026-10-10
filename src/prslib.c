@@ -582,6 +582,169 @@ static void parseRaiseCallError(Cctrl *cc, ParseCallLoc *loc, char *fmt, ...) {
 }
 
 /* We use this to check function calls against their definitions reusably */
+/* How a call argument converts to its parameter's type, as in C:
+ * numbers convert to each other silently, 0 and null to any pointer,
+ * void * to and from any pointer; other pointer pairs and pointer/integer
+ * mixes warn (C's -Wincompatible-pointer-types / -Wint-conversion); a
+ * struct where another struct or a scalar is expected, or a scalar where
+ * a struct is, is an error. */
+typedef enum {
+    ARG_OK,
+    ARG_WARN_POINTER,     /* pointers to incompatible types */
+    ARG_WARN_PTR_TO_INT,  /* a pointer where an integer is expected */
+    ARG_WARN_INT_TO_PTR,  /* an integer where a pointer is expected */
+    ARG_ERROR,
+} ParseArgCompat;
+
+static int parseIsAggregateType(AstType *t) {
+    return t && (t->kind == AST_TYPE_CLASS || t->kind == AST_TYPE_UNION) &&
+           !t->is_intrinsic;
+}
+
+static int parseIsNumberType(AstType *t) {
+    return astIsIntType(t) || astIsFloatType(t) || astIsIntrinsicClass(t);
+}
+
+static int parseSameAggregate(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (a->kind != b->kind) return 0;
+    if (a->clsname && b->clsname) return aoStrCmp(a->clsname, b->clsname);
+    return 0;
+}
+
+/* Do pointers to e and to a point at compatible types? Integers of the
+ * same size match whatever their sign (C would only warn with
+ * -Wpointer-sign), function types match each other, and a byte pointer
+ * (U8 *, I8 *, Bool *) matches any number pointer, as in assignments
+ * (code walks raw buffers through them). */
+static int parsePointeeCompatible(AstType *e, AstType *a) {
+    if (!e || !a || e == a) return 1;
+    if (e->kind == AST_TYPE_VOID || a->kind == AST_TYPE_VOID) return 1;
+    if (e->kind == AST_TYPE_ARRAY) e = e->ptr;
+    if (a->kind == AST_TYPE_ARRAY) a = a->ptr;
+    if (parseIsNumberType(e) && parseIsNumberType(a) &&
+        (e->size == 1 || a->size == 1)) {
+        return 1;
+    }
+    if (astIsIntrinsicClass(e) && astIsIntType(a)) return e->size == a->size;
+    if (astIsIntrinsicClass(a) && astIsIntType(e)) return e->size == a->size;
+    if (astIsIntType(e) && astIsIntType(a)) return e->size == a->size;
+    if (astIsFloatType(e) && astIsFloatType(a)) return e->size == a->size;
+    if (e->kind == AST_TYPE_POINTER && a->kind == AST_TYPE_POINTER) {
+        /* void ** and T ** are not compatible in C, but code passes
+         * U0 ** for "any pointer's address" */
+        if (e->ptr && a->ptr &&
+            (e->ptr->kind == AST_TYPE_VOID || a->ptr->kind == AST_TYPE_VOID)) {
+            return 1;
+        }
+        return parsePointeeCompatible(e->ptr, a->ptr);
+    }
+    if (e->kind == AST_TYPE_FUNC && a->kind == AST_TYPE_FUNC) return 1;
+    if (parseIsAggregateType(e) && parseIsAggregateType(a)) {
+        /* a derived class starts with its base: `Derived *` is a
+         * `Base *`, for any base up the chain */
+        for (AstType *cls = a; cls; cls = cls->base_cls) {
+            if (parseSameAggregate(e, cls)) return 1;
+        }
+        return 0;
+    }
+    if (astIsIntrinsicClass(e) && astIsIntrinsicClass(a)) {
+        return e->size == a->size;
+    }
+    return 0;
+}
+
+static int parseIsNullConstant(Ast *arg) {
+    return arg && arg->kind == AST_LITERAL && astIsIntType(arg->type) &&
+           arg->i64 == 0;
+}
+
+static ParseArgCompat parseArgCompat(AstType *param, Ast *arg) {
+    AstType *p = param, *a = arg ? arg->type : NULL;
+    if (!p || !a) return ARG_OK;
+    if (p->kind == AST_TYPE_ARRAY) p = astConvertArray(p);
+    if (a->kind == AST_TYPE_ARRAY) a = astConvertArray(a);
+
+    if (parseIsAggregateType(p) || parseIsAggregateType(a)) {
+        if (parseIsAggregateType(p) && parseIsAggregateType(a) &&
+            parseSameAggregate(p, a)) {
+            return ARG_OK;
+        }
+        return ARG_ERROR;
+    }
+
+    int p_ptr = p->kind == AST_TYPE_POINTER || p->kind == AST_TYPE_FUNC;
+    int a_ptr = a->kind == AST_TYPE_POINTER || a->kind == AST_TYPE_FUNC;
+
+    if (p_ptr) {
+        if (a_ptr) {
+            int p_void = p->kind == AST_TYPE_POINTER && p->ptr &&
+                         p->ptr->kind == AST_TYPE_VOID;
+            int a_void = a->kind == AST_TYPE_POINTER && a->ptr &&
+                         a->ptr->kind == AST_TYPE_VOID;
+            if (p_void || a_void) return ARG_OK;
+            if (p->kind == AST_TYPE_FUNC || a->kind == AST_TYPE_FUNC) {
+                return p->kind == a->kind ? ARG_OK : ARG_WARN_POINTER;
+            }
+            return parsePointeeCompatible(p->ptr, a->ptr) ? ARG_OK
+                                                          : ARG_WARN_POINTER;
+        }
+        if (parseIsNullConstant(arg)) return ARG_OK;
+        if (astIsIntType(a) || astIsIntrinsicClass(a)) return ARG_WARN_INT_TO_PTR;
+        if (astIsFloatType(a)) return ARG_ERROR;
+        return ARG_OK;
+    }
+
+    if (parseIsNumberType(p)) {
+        if (parseIsNumberType(a)) return ARG_OK;
+        if (a_ptr) {
+            /* Bool takes a pointer as C's _Bool does: 0 or 1, no cast */
+            if (p->kind == AST_TYPE_CHAR && p->is_bool) return ARG_OK;
+            if (astIsFloatType(p)) return ARG_ERROR;
+            return ARG_WARN_PTR_TO_INT;
+        }
+    }
+    return ARG_OK;
+}
+
+/* Warn about (or reject) argument i of a call, per parseArgCompat */
+static void parseCheckArgType(Cctrl *cc, AstType *type, Ast *arg, int i,
+                              char *fname, int len, ParseCallLoc *loc)
+{
+    ParseArgCompat compat = parseArgCompat(type, arg);
+    if (compat == ARG_OK) return;
+
+    char *expected = astTypeToColorString(type);
+    char *got = astTypeToColorString(arg->type);
+    char *why = "";
+    switch (compat) {
+        case ARG_WARN_PTR_TO_INT: why = ": makes an integer from a pointer without a cast"; break;
+        case ARG_WARN_INT_TO_PTR: why = ": makes a pointer from an integer without a cast"; break;
+        default: break;
+    }
+    ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
+                       ? loc->args->entries[i] : NULL;
+    if (compat == ARG_ERROR) {
+        if (at) {
+            cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                    "Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
+                    expected,got,len,fname);
+        } else {
+            cctrlRaiseException(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
+                    expected,got,len,fname);
+        }
+        return;
+    }
+    if (at) {
+        cctrlWarningAt(cc,at->line,at->col,at->len,
+                "Incompatible function argument, expected '%s' got '%s' in function '%.*s'%s",
+                expected,got,len,fname,why);
+    } else {
+        cctrlWarning(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'%s",
+                expected,got,len,fname,why);
+    }
+}
+
 static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fname, int len,
                                        ParseCallLoc *loc)
 {
@@ -622,20 +785,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
         }
 
         AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
-        if (type && astTypeCheck(type,arg,AST_BIN_OP_ASSIGN) == NULL) {
-            char *expected = astTypeToColorString(type);
-            char *got = astTypeToColorString(arg->type);
-            ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
-                               ? loc->args->entries[i] : NULL;
-            if (at) {
-                cctrlWarningAt(cc,at->line,at->col,at->len,
-                        "Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
-                        expected,got,len,fname);
-            } else {
-                cctrlWarning(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
-                        expected,got,len,fname);
-            }
-        }
+        if (type) parseCheckArgType(cc,type,arg,i,fname,len,loc);
     }
 
     /* vararg calls allow extras, but still require fixed args */

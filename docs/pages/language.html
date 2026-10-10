@@ -744,6 +744,15 @@ with <code>F64 f</code> (also when assigning, passing or returning it), and
 <code>U0 *</code> and byte pointers (<code>U8 *</code>, <code>I8 *</code>, <code>Bool *</code>)
 convert to and from any pointer without one; otherwise cast:
 <code>(&amp;f)(I64 *)</code>.</p>
+<p>Call arguments are checked against the parameter types as in C, for functions, function
+pointers and <code>extern</code> functions alike. Numbers convert silently (an
+<code>I64</code> passed for an <code>F64</code> becomes a float), <code>0</code> and
+<code>null</code> pass as any pointer, <code>U0 *</code> converts both ways, and a pointer to a
+derived class is a pointer to its base class. A pointer passed for an integer, an integer for a
+pointer (other than <code>0</code>) and a pointer to an incompatible type are warnings
+(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a class passed
+where another class or a number is expected, or a number or pointer where a class or a float
+is, is an error. Extra arguments of a <code>...</code> function are not checked.</p>
 <p>An initialiser list may be shorter than the array or class it initialises; as in C,
 everything it leaves out is zero, for locals and globals alike:</p>
 <pre data-run><code>

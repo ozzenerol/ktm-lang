@@ -55,6 +55,7 @@ I32 Main()
 {
   "Test - bool diagnostics: ";
   I64 correct = 0, tests = 0;
+  U8 *out;
 
   /* pointer, array and function to Bool: no warning anywhere */
   tests++;
@@ -92,9 +93,10 @@ void Main()
 ", 5, "'u8 *' is not assignable to type 'i32'",
       "expected 'u8' got 'u8 *'")) correct++;
 
-  /* messages spell Bool as Bool */
+  /* messages spell Bool as Bool (a class passed for a bool is an
+   * error since argument types are checked like C) */
   tests++;
-  if (Prints(
+  out = Diagnose(
 "class C { i64 a; };
 void Take(bool b) {}
 bool Ret() { C c; return c; }
@@ -103,11 +105,18 @@ void Main()
   C c;
   Take(c);
 }
-", 2, "bool Ret(void); unexpected return value 'c' of type 'C' expected 'bool'",
-      "expected 'bool' got 'C' in function 'Take'")) correct++;
+");
+  if (out && Count(out, "warning:") == 1 && Count(out, "error:") == 1 &&
+      strstr(out, "bool Ret(void); unexpected return value 'c' of type 'C' expected 'bool'") &&
+      strstr(out, "error: Incompatible function argument, expected 'bool' got 'C' in function 'Take'")) {
+    correct++;
+  } else {
+    "\n%s\n", out;
+  }
+  Free(out);
 
   tests++;
-  U8 *out = Diagnose(
+  out = Diagnose(
 "class C { i64 a; };
 void Main()
 {
