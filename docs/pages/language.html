@@ -304,20 +304,24 @@ i64 i64 *
 time, and its operand is never evaluated.</p>
 
 <h2>Type casts</h2>
-<p>ktm casts are written <em>after</em> the value: <code>x(F64)</code> rather than C's
-<code>(double)x</code>.</p>
+<p>Casts are written as in C, <code>(T)x</code>: the type in parentheses before the value.
+A cast is a unary operator, so it binds tighter than any binary operator
+(<code>(F64)a / b</code> divides as floats) and applies to the whole postfix expression after it
+(<code>(I64)p-&gt;n</code> casts <code>p-&gt;n</code>). Any type works, including pointers, classes and
+function pointers (<code>(I64 (*)(I64))p</code>). A variable hides a type of the same name, so
+<code>(x)</code> stays a value in parentheses.</p>
 <pre data-run><code>
 U0 Main()
 {
   F64 f = 3.9;
-  I64 i = f(I64);            // truncates
+  I64 i = (I64)f;            // truncates
   "%d\n", i;
-  "%.1f %.1f\n", (7 / 2)(F64), 7(F64) / 2;
-  "%.1f\n", -i(F64) / 2;     // -(i(F64)) / 2
+  "%.1f %.1f\n", (F64)(7 / 2), (F64)7 / 2;
+  "%.1f\n", (F64)-i / 2;     // ((F64)-i) / 2
 
   U8 *s = "hey";
-  I64 address = s(I64);
-  "%c\n", *(address(U8 *));
+  I64 address = (I64)s;
+  "%c\n", *(U8 *)address;
 }
 </code></pre>
 <pre class="output">
@@ -326,9 +330,7 @@ U0 Main()
 -1.5
 h
 </pre>
-<p>A cast is a postfix operator, like <code>[]</code>, <code>.</code>, <code>-&gt;</code> and
-calls, so a prefix operator applies to the whole postfix expression: <code>-x(F64)</code> is
-<code>-(x(F64))</code> and <code>!p-&gt;done</code> is <code>!(p-&gt;done)</code>.</p>
+<p>The older postfix form, <code>x(F64)</code>, still works for now.</p>
 
 <h2>Control flow</h2>
 

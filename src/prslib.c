@@ -2323,6 +2323,43 @@ static void parseCheckDerefOperand(Cctrl *cc, Ast *operand,
     cctrlTerminate(cc);
 }
 
+/* Does `tok` start a type name (a built-in type, a class, a union or a
+ * typedef-like name), so that `(` before it opens a prefix cast? */
+static int parseIsCastTypeName(Cctrl *cc, Lexeme *tok) {
+    if (tok == NULL ||
+        (tok->tk_type != TK_IDENT && tok->tk_type != TK_KEYWORD)) {
+        return 0;
+    }
+    /* As in C, a variable in scope hides a type of the same name:
+     * `(tm.tv_sec)` reads the variable `tm`, not the class. */
+    if (tok->tk_type == TK_IDENT &&
+        ((cc->localenv && mapGetLen(cc->localenv, tok->start, tok->len)) ||
+         mapGetLen(cc->global_env, tok->start, tok->len))) {
+        return 0;
+    }
+    AstType *type = cctrlGetKeyWord(cc, tok->start, tok->len);
+    return type != NULL && type->kind != AST_TYPE_VIS_MODIFIER &&
+           type->kind != AST_TYPE_INLINE && type->kind != AST_TYPE_AUTO;
+}
+
+/* The type in a prefix cast: `T`, `T *`, ... or a function pointer
+ * `T (*)(params)`, whose parameters may be unnamed. */
+static AstType *parseCastTypeName(Cctrl *cc) {
+    AstType *type = parseDeclSpec(cc);
+    if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        int has_var_args = 0;
+        cctrlTokenGet(cc);
+        cctrlTokenExpect(cc,'*');
+        cctrlTokenExpect(cc,')');
+        cctrlTokenExpect(cc,'(');
+        AstType *fn_type = astMakeFunctionType(type, NULL);
+        fn_type->params = parseParams(cc,')',&has_var_args,0);
+        fn_type->has_var_args = has_var_args;
+        return fn_type;
+    }
+    return type;
+}
+
 Ast *parseUnaryExpr(Cctrl *cc) {
     Lexeme *tok;
     Ast *ast;
@@ -2367,6 +2404,14 @@ Ast *parseUnaryExpr(Cctrl *cc) {
     }
 
     if (tokenPunctIs(tok,'(')) {
+        /* `(T)x`: a C prefix cast when what follows the `(` names a type.
+         * Its operand is a unary expression, so the cast binds tighter
+         * than any binary operator and `(T)p->f` casts `p->f`, as in C. */
+        if (parseIsCastTypeName(cc, cctrlTokenPeek(cc))) {
+            AstType *type = parseCastTypeName(cc);
+            cctrlTokenExpect(cc,')');
+            return astCast(parseUnaryExpr(cc), type);
+        }
         ast = parseExpr(cc,16);
         cctrlTokenExpect(cc,')');
         return parsePostFixOps(cc,ast);
