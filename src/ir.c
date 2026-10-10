@@ -2045,6 +2045,8 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
     return is_post ? cur : new_val;
 }
 
+static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast);
+
 IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     /* Variable references are SHARED Ast nodes stamped with their
      * declaration line - letting them touch the hint would attribute
@@ -2052,6 +2054,9 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     if (ast && ast->line && ast->kind != AST_LVAR && ast->kind != AST_GVAR)
         ir_line_hint = ast->line;
     switch (ast->kind) {
+        case AST_VA_PACK:
+            return irLowerVaPack(ctx, ast);
+
         case AST_TERNARY: {
             /* cond ? then : els. Only the chosen branch runs: evaluate
              * the condition, branch, compute each branch in its own
@@ -2651,6 +2656,46 @@ static IrValue *irMakeLocalSlot(IrCtx *ctx,
     irFnAddVar(ctx->cur_func, var_id, local);
     irAddStackSpace(ctx, size);
     return local;
+}
+
+/* The extras of a call to a `T ...name` function: each item (already
+ * converted by the parser) is stored in turn into the call site's hidden
+ * array, whose address is the value. The array is an ordinary local of
+ * the calling function, so it outlives the call; lowered again (a defer)
+ * it keeps its slot. */
+static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast) {
+    Ast *array = ast->va_array;
+    AstType *elem = array->type->ptr;
+    int is_global = array->kind == AST_GVAR;
+    IrValue *base = NULL, *addr = NULL;
+    if (is_global) {
+        addr = irLowerGlobal(ctx, array);
+    } else {
+        base = irFnGetVar(ctx->cur_func, array->lvar_id);
+        if (!base) {
+            base = irMakeLocalSlot(ctx, irConvertType(array->type),
+                                   array->type->size, array->lvar_id);
+        }
+    }
+    int esize = ast->va_untyped ? 8 : elem->size;
+    for (u64 i = 0; i < ast->va_items->size; ++i) {
+        Ast *item = vecGet(Ast *, ast->va_items, i);
+        IrValue *val = irExpr(ctx, item);
+        if (!ast->va_untyped) {
+            val = irConvertFloatToTargetWidth(ctx, val, elem);
+            val = irNarrowToTargetWidth(ctx, val, elem);
+        }
+        IrValue *off = irConstInt(IR_TYPE_I64, (s64)i * esize);
+        IrValue *slot = irTmp(IR_TYPE_PTR, 8);
+        if (is_global) {
+            irBlockAddInstr(ctx, irInstrNew(IR_IADD, slot, addr, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, slot, val, NULL));
+        } else {
+            irBlockAddInstr(ctx, irInstrNew(IR_GEP, slot, base, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE, slot, val, NULL));
+        }
+    }
+    return is_global ? addr : irLowerLVar(ctx, array);
 }
 
 void irLowerDecl(IrCtx *ctx, Ast *ast) {
@@ -3328,6 +3373,13 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
 
         case AST_DEFER: {
             irEscapeWalk(ast->defer_stmt, escape);
+            return;
+        }
+
+        case AST_VA_PACK: {
+            for (u64 i = 0; i < ast->va_items->size; ++i) {
+                irEscapeWalk(vecGet(Ast *, ast->va_items, i), escape);
+            }
             return;
         }
 

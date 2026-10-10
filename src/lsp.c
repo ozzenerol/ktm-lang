@@ -921,6 +921,8 @@ static void lspCatLocal(AoStr *body, int *emitted, Vec *seen, Ast *v,
 {
     if (v && v->kind == AST_DECL && v->declvar) v = v->declvar;
     if (v == NULL || v->kind != AST_LVAR || v->lname == NULL) return;
+    /* hidden locals (`nums#len`, a call's `#va0`) can't be named */
+    if (memchr(v->lname->data, '#', v->lname->len)) return;
     if (v->lname->len < plen || strncmp(v->lname->data, prefix, plen) != 0)
         return;
     if (lspNameSeen(seen, v->lname->data, v->lname->len)) return;

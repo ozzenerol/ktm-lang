@@ -2104,6 +2104,15 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
+    if (container->kind == AST_LVAR && (container->flags & AST_FLAG_VARARGS)) {
+        /* `for (auto v : nums)` over a `T ...nums` parameter */
+        AoStr *len_name = aoStrPrintf("%s#len", container->lname->data);
+        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
+        if (iteratee->type->kind == AST_TYPE_AUTO) {
+            iteratee->type = container->type->ptr;
+        }
+        return parseCreateForRange(cc, iteratee, count, container);
+    }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
             if (container->type->ptr->kind != AST_TYPE_CLASS) {
@@ -4026,6 +4035,9 @@ static int parseFnTypesMatch(AstType *a, AstType *b) {
                 Ast *pb = b->params->entries[i];
                 if (!pa || !pb) return pa == pb;
                 if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
+                    return 0;
+                }
+                if ((pa->flags & AST_FLAG_VARARGS) != (pb->flags & AST_FLAG_VARARGS)) {
                     return 0;
                 }
                 if (pa->kind == AST_VAR_ARGS) continue;
