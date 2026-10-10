@@ -194,7 +194,7 @@ static LexerType lexer_types[] = {
 #define isHex(ch) \
     (isNum(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'))
 #define isNumTerminator(ch) (!isNum(ch) && !isHex(ch) && ch != '.' && ch != 'x' \
-        && ch != 'X' && ch != '\\')
+        && ch != 'X' && ch != '\\' && ch != '_')
 
 Lexeme *lexemeNew(char *start, int len) {
     Lexeme *le = lexerAllocLexeme();
@@ -963,6 +963,19 @@ static int countNumberLen(Lexer *l, char *ptr, int *isfloat, int *ishex,
                 *err = 1;
                 return -1;
             }
+            if (*ptr == '_') {
+                char prev = ptr[-1], next = ptr[1];
+                int prev_ok = prev == '0' || prev == '1';
+                int next_ok = next == '0' || next == '1';
+                if (!prev_ok || !next_ok) {
+                    lexNumWarning(l, "line %d: misplaced '_' in number\n",
+                                  l->lineno);
+                    *err = 1;
+                    return -1;
+                }
+                ptr++;
+                continue;
+            }
             if (*ptr != '0' && *ptr != '1') {
                 lexNumWarning(l, "line %d: invalid binary digit: '%c'\n",
                               l->lineno, *ptr);
@@ -1004,6 +1017,12 @@ static int countNumberLen(Lexer *l, char *ptr, int *isfloat, int *ishex,
                 *isfloat = 1;
                 if (*(ptr + 1) == '+' || *(ptr + 1) == '-') {
                     ptr++;
+                }
+                if (*(ptr + 1) == '_') {
+                    lexNumWarning(l, "line %d: misplaced '_' in number\n",
+                                  l->lineno);
+                    *err = 1;
+                    return -1;
                 }
                 if (!isNum(*(ptr + 1))) {
                     lexNumWarning(l, "line %d: exponent has no digits\n",
@@ -1052,6 +1071,23 @@ static int countNumberLen(Lexer *l, char *ptr, int *isfloat, int *ishex,
             }
             *isfloat = 1;
             break;
+        /* `1_000_000`, `0xFF_FF`, `1_000.25`: a digit separator, valid
+         * only between two digits of the literal's own base (decimal
+         * everywhere but a hex literal, where it's hex). Misplaced at
+         * the start, the end, next to `.`/the exponent, or doubled, it
+         * has no digit on one side and is rejected. */
+        case '_': {
+            char prev = ptr[-1], next = ptr[1];
+            int prev_ok = *ishex ? isHex((unsigned char)prev) : isNum((unsigned char)prev);
+            int next_ok = *ishex ? isHex((unsigned char)next) : isNum((unsigned char)next);
+            if (!prev_ok || !next_ok) {
+                lexNumWarning(l, "line %d: misplaced '_' in number\n", l->lineno);
+                *err = 1;
+                return -1;
+            }
+            break;
+        }
+
         /* Anything else is invalid */
         default:
             /* `1f32` / `2f64`: a float suffix ends the literal, so
@@ -1395,6 +1431,19 @@ static void lexLeadingZeroWarning(Lexer *l, char *start, int numlen) {
                oct, ndigits, start);
 }
 
+/* `_` is kept through the scan so countNumberLen can check its
+ * placement, but strtoull/strtold don't know it: copies [start,
+ * start+len) into `out` (which must hold at least len+1 bytes),
+ * dropping every `_`, and returns the copy's length. */
+static int stripDigitSeparators(const char *start, int len, char *out) {
+    int j = 0;
+    for (int i = 0; i < len; i++) {
+        if (start[i] != '_') out[j++] = start[i];
+    }
+    out[j] = '\0';
+    return j;
+}
+
 int lexNumeric(Lexer *l, int _isfloat) {
     int ishex, isbin, isfloat, err, numlen;
     char *endptr;
@@ -1440,17 +1489,21 @@ int lexNumeric(Lexer *l, int _isfloat) {
 
     l->cur_strlen = numlen;
     l->ptr += numlen - 1;
+
+    char cleaned[numlen + 1];
+    int cleanlen = stripDigitSeparators(start, numlen, cleaned);
+
     if (isfloat) {
-        l->cur_f64 = strtold(start, &endptr);
+        l->cur_f64 = strtold(cleaned, &endptr);
         return TK_F64;
     } else if (ishex) {
-        l->cur_i64 = strtoull(start, &endptr, 16);
+        l->cur_i64 = strtoull(cleaned, &endptr, 16);
         l->ishex = ishex;
     } else if (isbin) {
-        l->cur_i64 = strtoull(start + 2, &endptr, 2);
+        l->cur_i64 = strtoull(cleaned + 2, &endptr, 2);
     } else {
-        l->cur_i64 = strtoull(start, &endptr, 10);
-        lexLeadingZeroWarning(l, start, numlen);
+        l->cur_i64 = strtoull(cleaned, &endptr, 10);
+        lexLeadingZeroWarning(l, cleaned, cleanlen);
     }
     /* A literal above I64_MAX only fits in a U64, so it is typed U64. */
     l->isu64 = l->cur_i64 < 0;

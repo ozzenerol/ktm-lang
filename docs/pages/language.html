@@ -163,6 +163,24 @@ the decimal number 644 (C reads it as octal 420). Because code copied from C wou
 change value, ktm warns at such a literal and suggests the hex spelling (<code>0x1A4</code>
 for octal 0644). Literals that mean the same in both, like <code>00</code> or <code>07</code>,
 and floats like <code>00.5</code> are not warned about.</p>
+<p><code>_</code> may appear between two digits of a number literal and is ignored, to
+group long ones for reading: <code>1_000_000</code>, <code>0xFF_FF</code>,
+<code>0b1010_0101</code>, <code>1_000.25</code>. It is only valid between two digits of
+the literal's own base, so misplaced at the start or end, next to <code>.</code> or the
+exponent, or doubled, it is a compile error. A leading <code>_</code> is still an
+identifier (<code>_100</code> is a name, not a number).</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 million = 1_000_000;
+  I64 word = 0xFF_FF;
+  F64 price = 1_000.25;
+  "%d %d %.2f\n", million, word, price;
+}
+</code></pre>
+<pre class="output">
+1000000 65535 1000.25
+</pre>
 
 <h2>Variables</h2>
 <p>Declare variables anywhere in a block, or at file scope for globals. Several can
