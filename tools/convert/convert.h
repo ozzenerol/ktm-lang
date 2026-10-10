@@ -36,6 +36,12 @@ void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last);
 /* A name declared or used (variable, parameter, function, field):
  * renamed when it is a keyword or type name of the new syntax */
 void migrateNoteName(Cctrl *cc, Lexeme *name);
+/* An identifier used in an expression (with --map: a stdlib name) */
+void migrateNoteRef(Cctrl *cc, Lexeme *name);
+/* A type name (with --map: a stdlib type) */
+void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type);
+/* A macro used (with --map: a stdlib macro) */
+void migrateNoteMacro(Cctrl *cc, Lexeme *use);
 /* A function called without parentheses: its name */
 void migrateNoteCall(Cctrl *cc, Lexeme *name);
 /* The definition of `Main`: its name, the `{` of its body and whether it

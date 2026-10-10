@@ -21,7 +21,10 @@ bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 
 for src in "$HERE"/corpus/*.ktm; do
   name="$(basename "$src" .ktm)"
-  if $TO "$CONV" --install-dir="$DIR" --stdout "$src" > "$TMP/$name.got" 2> "$TMP/$name.err" &&
+  # `// map` on the first line: converted with the stdlib map too
+  MAP=""
+  head -1 "$src" | grep -q '^// map' && MAP="--map $HERE/stdlib-modules.tsv"
+  if $TO "$CONV" --install-dir="$DIR" $MAP --stdout "$src" > "$TMP/$name.got" 2> "$TMP/$name.err" &&
      cmp -s "$TMP/$name.got" "$HERE/corpus/$name.expected"; then
     ok
   else
@@ -55,7 +58,7 @@ else
     name="$(basename "$src" .ktm)"
     # `// pending: why` on the first line: its output needs a compiler
     # change that isn't on this branch yet; only its text is checked
-    if head -1 "$src" | grep -q '^// pending:'; then
+    if head -1 "$src" | grep -q '^// pending:\|^// map'; then
       echo "PENDING $name: $(head -1 "$src" | sed 's|^// pending: *||')"
       continue
     fi

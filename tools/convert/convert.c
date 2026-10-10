@@ -36,6 +36,7 @@
 #include "lexer.h"
 #include "convert.h"
 #include "parser.h"
+#include "prslib.h"
 
 #ifndef INSTALL_PREFIX
 #define INSTALL_PREFIX "/usr/local"
@@ -100,6 +101,7 @@ typedef struct MigFile {
     Vec *catches;        /* MigCatch *: catches without `(Error e)` */
     Vec *defines;        /* MigDefine *: #defines that fold to a number */
     Vec *closers;        /* MigEdit *: `}`s of bodies, innermost first */
+    Set *imports;        /* modules the file uses (--map) */
 } MigFile;
 
 typedef struct MigDefine {
@@ -873,6 +875,229 @@ void migrateNoteName(Cctrl *cc, Lexeme *name) {
         return;
     }
     migAdd(f, s, s + name->len, mprintf("%.*s_", (int)name->len, f->text + s), "keyword name");
+}
+
+/* ------------------------------------------------------------------ */
+/* The stdlib map (--map stdlib-modules.tsv): old name -> module.new */
+
+typedef struct MigName {
+    const char *kind;      /* function type macro c */
+    const char *module;    /* "-": dropped, "prelude": no prefix */
+    const char *name;
+    const char *note;
+} MigName;
+
+static Map *mig_map = NULL;
+static char *migReadFile(char *path, s64 *_len);
+
+static int migLoadMap(const char *path) {
+    s64 len;
+    char *text = migReadFile((char *)path, &len);
+    if (!text) return 0;
+    mig_map = mapNew(2048, &map_cstring_opaque_type);
+    char *line = text;
+    while (line && *line) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = 0;
+        char *col[5] = {0};
+        int n = 0;
+        for (char *c = line; c && n < 5; ++n) {
+            col[n] = c;
+            c = strchr(c, '\t');
+            if (c) *c++ = 0;
+        }
+        if (n >= 4 && strcmp(col[0], "kind")) {
+            if (!strcmp(col[0], "cfunctions") || !strcmp(col[0], "ctypes") ||
+                !strcmp(col[0], "cconstants")) {
+                /* one row lists every C name of a group: each is c.<name> */
+                char *names = strdup(col[3]);
+                for (char *w = strtok(names, " "); w; w = strtok(NULL, " ")) {
+                    MigName *m = calloc(1, sizeof(MigName));
+                    m->kind = "c";
+                    m->module = col[2];
+                    m->name = w;
+                    m->note = col[4];
+                    mapAdd(mig_map, w, m);
+                }
+            } else {
+                MigName *m = calloc(1, sizeof(MigName));
+                m->kind = col[0];
+                m->module = col[2];
+                m->name = col[3];
+                m->note = col[4] ? col[4] : "";
+                mapAdd(mig_map, col[1], m);
+            }
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+    return 1;
+}
+
+/* Is a declaration (by its file id) the stdlib's? */
+static int migIsStdFile(Cctrl *cc, u32 file_id) {
+    AoStr *where = cctrlLookUpFile(cc, file_id);
+    return where && (strstr(where->data, "/src/std/") || strstr(where->data, "/include/"));
+}
+
+/* `module.name` as code: `c.write`, `map.strNew`, `EXIT_OK` (prelude) */
+static char *migQualified(MigFile *f, MigName *m) {
+    if (!strcmp(m->module, "prelude")) return (char *)m->name;
+    setAdd(f->imports, (char *)m->module);
+    return mprintf("%s.%s", m->module, m->name);
+}
+
+/* Container types whose functions become methods, and the kind prefix
+ * their module names carry (`intSet`, `strGet`, `ptrPush`) */
+static const char *migContainerPrefix(const char *type) {
+    static const char *t[][2] = {
+        {"IntMap", "int"}, {"StrMap", "str"}, {"RBTree", "rb"}, {"IntSet", "int"},
+        {"IntVec", "int"}, {"FloatVec", "float"}, {"PtrVec", "ptr"}, {"BitVec", "bit"},
+        {"List", ""}};
+    for (u64 k = 0; k < sizeof(t) / sizeof(t[0]); ++k) {
+        if (!strcmp(type, t[k][0])) return t[k][1];
+    }
+    return NULL;
+}
+
+/* The method a container function becomes (`intSet` -> `set`), NULL for
+ * a function that stays a module function (constructors, ...) */
+static char *migMethodName(Ast *decl, MigName *m) {
+    if (!decl->params || decl->params->size == 0) return NULL;
+    Ast *p0 = decl->params->entries[0];
+    if (!p0 || !p0->type || p0->type->kind != AST_TYPE_POINTER || !p0->type->ptr ||
+        !p0->type->ptr->clsname) return NULL;
+    const char *prefix = migContainerPrefix(p0->type->ptr->clsname->data);
+    if (!prefix) return NULL;
+    size_t pl = strlen(prefix);
+    if (strncmp(m->name, prefix, pl)) return NULL;
+    char *meth = strdup(m->name + pl);
+    if (!*meth) return NULL;
+    meth[0] = tolower((unsigned char)meth[0]);
+    if (!strcmp(meth, "new")) return NULL;
+    return meth;
+}
+
+/* `Old(recv, args)` -> `recv.method(args)`, the name at s */
+static int migMethodCall(MigFile *f, s64 s, s64 nlen, const char *meth) {
+    char *t = f->text;
+    s64 p = s + nlen;
+    while (p < f->len && isspace((unsigned char)t[p])) p++;
+    if (p >= f->len || t[p] != '(') return 0;
+    s64 a = p + 1, k = a;
+    int depth = 0;
+    for (; k < f->len; ++k) {
+        if (t[k] == '"' || t[k] == '\'') { k = migQuoteEnd(t, k, f->len); continue; }
+        if (t[k] == '(' || t[k] == '[' || t[k] == '{') depth++;
+        else if (t[k] == ')' || t[k] == ']' || t[k] == '}') { if (depth-- == 0) break; }
+        else if (t[k] == ',' && depth == 0) break;
+    }
+    if (k >= f->len) return 0;
+    s64 rs = a, re = k;
+    while (rs < re && isspace((unsigned char)t[rs])) rs++;
+    while (re > rs && isspace((unsigned char)t[re - 1])) re--;
+    if (rs >= re) return 0;
+    int simple = 1;
+    s64 q = rs;
+    if (t[q] == '&') q++;
+    for (s64 i = q; i < re; ++i) {
+        char c = t[i];
+        if (migIsIdent(c) || c == '.' || c == ' ') continue;
+        if (c == '-' && i + 1 < re && t[i + 1] == '>') { i++; continue; }
+        if (c == '[' || c == '(') {
+            int d = 0;
+            for (; i < re; ++i) {
+                if (t[i] == '[' || t[i] == '(') d++;
+                else if ((t[i] == ']' || t[i] == ')') && --d == 0) break;
+            }
+            continue;
+        }
+        simple = 0;
+    }
+    s64 after = k;
+    if (t[k] == ',') {
+        after = k + 1;
+        while (after < f->len && (t[after] == ' ' || t[after] == '\t')) after++;
+    }
+    if (simple) {
+        migAddSegs(f, s, after, "method", migRange(q, re), migLit(mprintf(".%s(", meth)), NULL);
+    } else {
+        migAddSegs(f, s, after, "method", migLit("("), migRange(rs, re),
+                   migLit(mprintf(").%s(", meth)), NULL);
+    }
+    return 1;
+}
+
+void migrateNoteRef(Cctrl *cc, Lexeme *name) {
+    if (!mig_map) return;
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    char *key = mprintf("%.*s", (int)name->len, f->text + s);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || !strcmp(m->kind, "macro") || !strcmp(m->kind, "type")) return;
+    /* only the stdlib's own name, not a local or a function of the
+     * program that happens to share it */
+    Ast *decl = findFunctionDecl(cc, key, strlen(key));
+    if (!decl) decl = mapGet(cc->global_env, key);
+    if (!decl || (cc->localenv && mapGet(cc->localenv, key))) return;
+    if (!migIsStdFile(cc, decl->file_id) && !(decl->kind == AST_EXTERN_FUNC)) return;
+    if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
+        migNote(f, s, "can't convert `%s`: %s in the stdlib map (%s)", key,
+                !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
+        return;
+    }
+    char *meth = migMethodName(decl, m);
+    if (meth && migMethodCall(f, s, name->len, meth)) return;
+    migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
+}
+
+void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type) {
+    if (!mig_map || !type || !type->in_std) return;
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    char *key = mprintf("%.*s", (int)name->len, f->text + s);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || strcmp(m->kind, "type")) return;
+    if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
+        migNote(f, s, "can't convert the type `%s`: %s in the stdlib map (%s)", key,
+                !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
+        return;
+    }
+    migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
+}
+
+/* Does the file #define `name` itself? */
+static int migDefinesMacro(MigFile *f, const char *name) {
+    s64 n = strlen(name);
+    for (char *p = f->text; (p = strstr(p, "#define")) != NULL; p += 7) {
+        char *q = p + 7;
+        while (*q == ' ' || *q == '\t') q++;
+        if (!strncmp(q, name, n) && !migIsIdent(q[n])) return 1;
+    }
+    return 0;
+}
+
+void migrateNoteMacro(Cctrl *cc, Lexeme *use) {
+    if (!mig_map) return;
+    MigFile *f = migFileOf(cc, use ? use->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, use);
+    if (s < 0) return;
+    char *key = mprintf("%.*s", (int)use->len, f->text + s);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || (strcmp(m->kind, "macro") && strcmp(m->kind, "c"))) return;
+    if (migDefinesMacro(f, key)) return;
+    if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
+        if (!strcmp(m->name, "removed")) return;      /* TRUE FALSE NULL: stage 1 */
+        migNote(f, s, "can't convert the macro `%s`: %s in the stdlib map (%s)", key,
+                !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
+        return;
+    }
+    migAdd(f, s, s + use->len, !strcmp(m->kind, "c") ? (setAdd(f->imports, "c"), mprintf("c.%s", key))
+                                                     : migQualified(f, m), "stdlib");
 }
 
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
@@ -1745,6 +1970,7 @@ static MigFile *migFileNew(char *path) {
     f->catches = vecNew(&vec_unsigned_long_type);
     f->defines = vecNew(&vec_unsigned_long_type);
     f->closers = vecNew(&vec_unsigned_long_type);
+    f->imports = setNew(16, &set_cstring_type);
     f->seen = setNew(64, &set_cstring_type);
     f->notes = aoStrNew();
     f->item_start = -1;
@@ -1920,7 +2146,36 @@ static s64 migEnumAt(MigFile *f) {
         if (le - j >= 8 && !memcmp(t + j, "#include", 8)) at = le < f->len ? le + 1 : le;
         i = le + 1;
     }
-    return at;
+    if (at > 0) return at;
+    /* no #include: after the comment at the top of the file */
+    s64 i = 0;
+    for (;;) {
+        while (i < f->len && (t[i] == ' ' || t[i] == '\t' || t[i] == '\n')) i++;
+        if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '/') {
+            while (i < f->len && t[i] != '\n') i++;
+        } else if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < f->len && !(t[i] == '*' && t[i + 1] == '/')) i++;
+            i += 2;
+        } else {
+            break;
+        }
+    }
+    /* the start of the first line of code */
+    while (i > 0 && t[i - 1] != '\n') i--;
+    return -i - 1;
+}
+
+/* A line (`import ...;`, `enum Err ...;`) at the top: after the #include
+ * lines, or before the first code after the file's opening comment */
+static void migTopInsert(MigFile *f, const char *line, const char *kind) {
+    s64 at = migEnumAt(f);
+    if (at > 0) {
+        migAdd(f, at, at, mprintf("\n%s", line), kind);
+    } else {
+        at = -at - 1;
+        migAdd(f, at, at, mprintf("%s\n", line), kind);
+    }
 }
 
 /* Is the identifier `name` used in [s, e)? */
@@ -1995,9 +2250,7 @@ static void migExceptions(MigFile *f) {
         aoStrCatPrintf(decl, "%s%s", k ? ", " : "", (char *)x.names->entries[k]);
     }
     aoStrCat(decl, " };\n");
-    s64 at = migEnumAt(f);
-    if (at > 0) aoStrCat(decl, "\n"), at = at;
-    migAdd(f, at, at, at > 0 ? mprintf("\n%s", decl->data) : decl->data, "error");
+    migTopInsert(f, decl->data, "error");
 }
 
 /* ------------------------------------------------------------------ */
@@ -2074,6 +2327,26 @@ static void migDefines(MigFile *f) {
     }
 }
 
+/* `import a, b;` for the modules the file uses (--map) */
+static void migImports(MigFile *f) {
+    if (!f->imports->size) return;
+    Vec *names = vecNew(&vec_unsigned_long_type);
+    SetIter it;
+    setIterInit(f->imports, &it);
+    char *m;
+    while ((m = setNext(&it)) != NULL) vecPush(names, m);
+    for (u64 i = 0; i < names->size; ++i)
+        for (u64 j = i + 1; j < names->size; ++j)
+            if (strcmp(names->entries[j], names->entries[i]) < 0) {
+                void *x = names->entries[i]; names->entries[i] = names->entries[j]; names->entries[j] = x;
+            }
+    AoStr *line = aoStrNew();
+    aoStrCat(line, "import ");
+    for (u64 i = 0; i < names->size; ++i) aoStrCatPrintf(line, "%s%s", i ? ", " : "", (char *)names->entries[i]);
+    aoStrCat(line, ";\n");
+    migTopInsert(f, line->data, "import");
+}
+
 /* Every pass but writing: the edits of f, sorted */
 static int migConvert(MigFile *f, char *install_dir, int outer) {
     /* Code at file scope that calls Main: Main stays a function and a new
@@ -2093,6 +2366,7 @@ static int migConvert(MigFile *f, char *install_dir, int outer) {
         vecPush(f->edits, c);
     }
     migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
+    migImports(f);
     migExceptions(f);
     migDefines(f);
     migDropLiteralDefines(f);
@@ -2115,6 +2389,7 @@ static void migUsage(void) {
         "  --check     list what would change; exit 1 if anything would\n"
         "  --stdout    print the result instead of writing the files\n"
         "  --report    the dry run's per-file counts and notes (see dry-run.sh)\n"
+        "  --map TSV   also move stdlib names into modules (stdlib-modules.tsv)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
 }
@@ -2189,6 +2464,12 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "--check")) check = 1;
         else if (!strcmp(argv[i], "--stdout")) to_stdout = 1;
         else if (!strcmp(argv[i], "--report")) report = 1;
+        else if (!strcmp(argv[i], "--map") && i + 1 < argc) {
+            if (!migLoadMap(argv[++i])) {
+                fprintf(stderr, "ktm-convert: can't read the stdlib map %s\n", argv[i]);
+                return 2;
+            }
+        }
         else if (!strcmp(argv[i], "--root") && i + 1 < argc) root = argv[++i];
         else if (!strncmp(argv[i], "--install-dir=", 14)) install_dir = argv[i] + 14;
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) { migUsage(); return 0; }

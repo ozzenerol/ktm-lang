@@ -1,4 +1,3 @@
-// pending: ((fn(i64) i64)raw)(6) needs gap 5 (prefix cast to a fn type)
 class Shape { U8 *name; F64 (*area)(Shape *s); };
 I64 Twice(I64 x) { return 2 * x; }
 I64 Sq(I64 x) { return x * x; }

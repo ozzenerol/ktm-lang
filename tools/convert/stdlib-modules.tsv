@@ -1,0 +1,464 @@
+kind	old	module	new	note
+type	Coroutine	coro	Coroutine	coroutines.ktm
+function	CoroutineSelf	coro	current	not `self`: Y10 methods will likely want `self`; renames.tsv: coroutineSelf; coroutines.ktm
+function	CoroutineDone	coro	done	coroutines.ktm
+function	CoroutineNext	coro	next	coroutines.ktm
+function	CoroutineRelease	coro	release	coroutines.ktm
+function	CoroutineNew	coro	spawn	decision 10: not `new`; renames.tsv: coroutineNew; coroutines.ktm
+function	CoroutineYield	coro	yield	decision 10: stays; coroutines.ktm
+type	CsvParser	csv	Parser	module name dropped from the type; csv.ktm
+type	CsvSlice	csv	Slice	module name dropped from the type; csv.ktm
+function	CsvParserInit	csv	init	csv.ktm
+function	CsvParse	csv	next	returns the next field/row/EOF; `csv.parse` would suggest a whole-buffer parse; renames.tsv: csvParse; csv.ktm
+macro	CSV_EOF	csv	EOF	std.ktmh
+macro	CSV_FIELD	csv	FIELD	std.ktmh
+macro	CSV_ROW	csv	ROW	std.ktmh
+type	CDate	date	Date	stays date.Date (decision 7); date.ktm
+type	CDateStruct	date	Parts	was DateStruct in renames.tsv; date.DateStruct would repeat the module; date.ktm
+function	DayOfWeek	date	dayOfWeek	date.ktm
+function	FirstDayOfMon	date	firstDayOfMonth	renames.tsv: firstDayOfMon; date.ktm
+function	FirstDayOfYear	date	firstDayOfYear	date.ktm
+function	MPrintDate	date	formatDate	was in strings.ktm; a date function; renames.tsv: dateToStr
+function	MPrintTime	date	formatTime	was in strings.ktm; a date function; renames.tsv: timeToStr
+function	Struct2Date	date	fromParts	renames.tsv: structToDate; date.ktm
+function	IsoFromTimespec	date	isoFromTimespec	date.ktm
+function	LastDayOfMon	date	lastDayOfMonth	renames.tsv: lastDayOfMon; date.ktm
+function	LastDayOfYear	date	lastDayOfYear	date.ktm
+function	Now	date	now	date.ktm
+function	NowMilliseconds	date	nowMs	renames.tsv: nowMilliseconds; date.ktm
+function	NowDateTimeStruct	date	nowParts	DateStruct is date.Parts; renames.tsv: nowDateTimeStruct; date.ktm
+function	StrToCDate	date	parse	was in strings.ktm; a date function; renames.tsv: strToDate
+function	Str2CDateStruct	date	parseParts	was in strings.ktm; a date function; renames.tsv: strToDateStruct
+function	MPrintTimestampNow	date	timestampNow	was in strings.ktm; a date function
+function	Date2Struct	date	toParts	renames.tsv: dateToStruct; date.ktm
+function	YearStartDate	date	yearStart	renames.tsv: yearStartDate; date.ktm
+macro	CDATE_BASE_DAY_OF_WEEK	date	BASE_DAY_OF_WEEK	renames.tsv: DATE_*; std.ktmh
+macro	CDATE_NO_ZONE	date	NO_ZONE	renames.tsv: DATE_*; std.ktmh
+macro	CDATE_YEAR_DAYS	date	YEAR_DAYS	renames.tsv: DATE_*; std.ktmh
+macro	CDATE_YEAR_DAYS_INT	date	YEAR_DAYS_INT	renames.tsv: DATE_*; std.ktmh
+type	Dirent	fs	Dirent	dir.ktm
+type	Fstat	fs	FileStat	ktm's portable stat; std.ktmh
+function	Cd	fs	changeDir	io.ktm
+function	Pwd	fs	currentDir	io.ktm
+function	FileExtRem	fs	cutExt	a path helper, was in strings.ktm; cuts in place; renames.tsv: fileExtCut
+function	FileExtDot	fs	ext	a path helper, was in strings.ktm
+function	MkDir	fs	makeDir	stat.ktm
+function	FileRead	fs	readAll	renames.tsv: fileRead; io.ktm
+function	Rm	fs	remove	renames.tsv: removePath; stat.ktm
+function	RmDir	fs	removeDir	stat.ktm
+function	Stat	fs	stat	ktm's portable stat; C stat is c.stat; io.ktm
+function	FileWrite	fs	writeAll	renames.tsv: fileWrite; io.ktm
+macro	MKDIR_DEFAULT	fs	MAKE_DIR_DEFAULT	follows MkDir -> makeDir; std.ktmh
+macro	DIR_MAXPATHLEN	fs	MAX_NAME	the size of Dirent.name (256 Linux, 1024 macOS); std.ktmh
+macro	RM_FORCE	fs	REMOVE_FORCE	follows Rm -> remove; std.ktmh
+macro	RM_RECURSE	fs	REMOVE_RECURSE	follows Rm -> remove; std.ktmh
+type	FzFPosition	fzf	Position	fzf.ktm
+function	FzF	fzf	match	fuzzy-match text against a pattern; returns positions or NULL; renames.tsv: fzf; fzf.ktm
+function	FzFPositionRelease	fzf	release	fzf.ktm
+macro	FZF_CASE_IGNORE	fzf	CASE_IGNORE	std.ktmh
+macro	FZF_CASE_RESPECT	fzf	CASE_RESPECT	std.ktmh
+macro	FZF_CASE_SMART	fzf	CASE_SMART	std.ktmh
+type	JsonState	json	State	module name dropped from the type; json.ktm
+type	Json	json	Value	decision 7: json.Value, not json.Json; json.ktm
+function	JsonArrayGet	json	arrayGet	json.ktm
+function	JsonGetStrerror	json	errorStr	renames.tsv: jsonGetStrerror; json.ktm
+function	JsonIsArray	json	isArray	json.ktm
+function	JsonIsBool	json	isBool	json.ktm
+function	JsonIsFloat	json	isFloat	json.ktm
+function	JsonIsInt	json	isInt	json.ktm
+function	JsonIsNull	json	isNull	json.ktm
+function	JsonIsObject	json	isObject	json.ktm
+function	JsonIsString	json	isString	json.ktm
+function	JsonLen	json	len	json.ktm
+function	JsonObjectGet	json	objectGet	json.ktm
+function	JsonOk	json	ok	json.ktm
+function	JsonParse	json	parse	json.ktm
+function	JsonPrintError	json	printError	json.ktm
+function	JsonRelease	json	release	json.ktm
+function	JsonSelect	json	select	json.ktm
+function	JsonToString	json	toStr	renames.tsv: jsonToString; json.ktm
+macro	JSON_ARRAY	json	ARRAY	std.ktmh
+macro	JSON_BOOL	json	BOOL	std.ktmh
+macro	JSON_CANNOT_ADVANCE	json	CANNOT_ADVANCE	std.ktmh
+macro	JSON_CANNOT_START_PARSE	json	CANNOT_START_PARSE	std.ktmh
+macro	JSON_EOF	json	EOF	std.ktmh
+macro	JSON_FLOAT	json	FLOAT	std.ktmh
+macro	JSON_INT	json	INT	std.ktmh
+macro	JSON_INVALID_ARRAY_CHARACTER	json	INVALID_ARRAY_CHARACTER	std.ktmh
+macro	JSON_INVALID_BOOL	json	INVALID_BOOL	std.ktmh
+macro	JSON_INVALID_CONTROL_CHARACTER	json	INVALID_CONTROL_CHARACTER	std.ktmh
+macro	JSON_INVALID_DECIMAL	json	INVALID_DECIMAL	std.ktmh
+macro	JSON_INVALID_ESCAPE_CHARACTER	json	INVALID_ESCAPE_CHARACTER	std.ktmh
+macro	JSON_INVALID_HEX	json	INVALID_HEX	std.ktmh
+macro	JSON_INVALID_JSON_TYPE_CHAR	json	INVALID_JSON_TYPE_CHAR	std.ktmh
+macro	JSON_INVALID_KEY_TERMINATOR_CHARACTER	json	INVALID_KEY_TERMINATOR_CHARACTER	std.ktmh
+macro	JSON_INVALID_KEY_VALUE_SEPARATOR	json	INVALID_KEY_VALUE_SEPARATOR	std.ktmh
+macro	JSON_INVALID_LITERAL	json	INVALID_LITERAL	std.ktmh
+macro	JSON_INVALID_NUMBER	json	INVALID_NUMBER	std.ktmh
+macro	JSON_INVALID_SIGN	json	INVALID_SIGN	std.ktmh
+macro	JSON_INVALID_STRING_NOT_TERMINATED	json	INVALID_STRING_NOT_TERMINATED	std.ktmh
+macro	JSON_INVALID_TYPE	json	INVALID_TYPE	std.ktmh
+macro	JSON_INVALID_UTF16	json	INVALID_UTF16	std.ktmh
+macro	JSON_INVALID_UTF16_SURROGATE	json	INVALID_UTF16_SURROGATE	std.ktmh
+macro	JSON_MAX_DEPTH	json	MAX_DEPTH	std.ktmh
+macro	JSON_NESTING_TOO_DEEP	json	NESTING_TOO_DEEP	std.ktmh
+macro	JSON_NO_FLAGS	json	NO_FLAGS	std.ktmh
+macro	JSON_NULL	json	NULL	std.ktmh
+macro	JSON_OBJECT	json	OBJECT	std.ktmh
+macro	JSON_OK	json	OK	std.ktmh
+macro	JSON_STRING	json	STRING	std.ktmh
+macro	JSON_STRNUM	json	STRNUM	std.ktmh
+macro	JSON_STRNUM_FLAG	json	STRNUM_FLAG	std.ktmh
+type	List	list	List	stays list.List (decision 7); list.ktm
+function	ListAppend	list	append	list.ktm
+function	ListClear	list	clear	list.ktm
+function	ListCount	list	count	list.ktm
+function	ListFirst	list	first	list.ktm
+function	ListInit	list	init	list.ktm
+function	ListInsertValueBefore	list	insertBefore	renames.tsv: listInsertValueBefore; list.ktm
+function	ListInsertBefore	list	insertNodeBefore	links a node; insertBefore takes a value; renames.tsv: listInsertBefore; list.ktm
+function	ListEmpty	list	isEmpty	renames.tsv: listEmpty; list.ktm
+function	ListLast	list	last	list.ktm
+function	ListMergeAppend	list	mergeAppend	list.ktm
+function	ListMergePrepend	list	mergePrepend	list.ktm
+function	ListNew	list	new	list.ktm
+function	ListPop	list	pop	list.ktm
+function	ListPrepend	list	prepend	list.ktm
+function	ListRelease	list	release	list.ktm
+function	ListRemove	list	remove	list.ktm
+function	ListDeque	list	shift	removes and returns the FIRST value (its comment: a queue's shift); renames.tsv: listDeque; list.ktm
+type	IntMap	map	IntMap	hashtable.ktm
+type	IntMapNode	map	IntMapNode	hashtable.ktm
+type	RBIter	map	RBIter	set.ktm
+type	RBNode	map	RBNode	set.ktm
+type	RBTree	map	RBTree	a sorted map; set.ktm
+type	StrMap	map	StrMap	hashtable.ktm
+type	StrMapNode	map	StrMapNode	hashtable.ktm
+function	IntMapClear	map	intClear	hashtable.ktm
+function	IntMapDelete	map	intDelete	hashtable.ktm
+function	IntMapGet	map	intGet	hashtable.ktm
+function	IntMapHas	map	intHas	hashtable.ktm
+function	IntMapIter	map	intIter	hashtable.ktm
+function	IntMapKeyIter	map	intKeyIter	hashtable.ktm
+function	IntMapKeysToString	map	intKeysToStr	hashtable.ktm
+function	IntMapNew	map	intNew	hashtable.ktm
+function	IntMapRelease	map	intRelease	hashtable.ktm
+function	IntMapResize	map	intResize	hashtable.ktm
+function	IntMapSet	map	intSet	hashtable.ktm
+function	IntMapSetFreeValue	map	intSetFreeValue	hashtable.ktm
+function	IntMapToString	map	intToStr	hashtable.ktm
+function	IntMapValueIter	map	intValueIter	hashtable.ktm
+function	RBTreeDelete	map	rbDelete	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBTreeForEach	map	rbForEach	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBTreeGet	map	rbGet	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBTreeHas	map	rbHas	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBIterNew	map	rbIterNew	was set.ktm
+function	RBIterNext	map	rbIterNext	was set.ktm
+function	RBIterRelease	map	rbIterRelease	was set.ktm
+function	RBTreeNew	map	rbNew	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBTreeRelease	map	rbRelease	RBTree is a sorted map (U0 * keys); was set.ktm
+function	RBTreeInsert	map	rbSet	fix: map.rbSet(tree, key, value) returning bool, like intSet/strSet (today RBTreeInsert, U0; decision 11); set.ktm
+function	StrMapClear	map	strClear	hashtable.ktm
+function	StrMapDelete	map	strDelete	hashtable.ktm
+function	StrMapGet	map	strGet	hashtable.ktm
+function	StrMapGetLen	map	strGetLen	hashtable.ktm
+function	StrMapHas	map	strHas	hashtable.ktm
+function	StrMapHasLen	map	strHasLen	hashtable.ktm
+function	StrMapIter	map	strIter	hashtable.ktm
+function	StrMapKeyIter	map	strKeyIter	hashtable.ktm
+function	StrMapKeysToString	map	strKeysToStr	hashtable.ktm
+function	StrMapNew	map	strNew	hashtable.ktm
+function	StrMapRelease	map	strRelease	hashtable.ktm
+function	StrMapResize	map	strResize	hashtable.ktm
+function	StrMapSet	map	strSet	hashtable.ktm
+function	StrMapSetFreeKey	map	strSetFreeKey	hashtable.ktm
+function	StrMapSetFreeValue	map	strSetFreeValue	hashtable.ktm
+function	StrMapToString	map	strToStr	hashtable.ktm
+function	StrMapValueIter	map	strValueIter	hashtable.ktm
+function	Abs	math	abs	math.ktm
+function	ModU64	math	divModU64	returns *k % m and divides *k by m; name says both; renames.tsv: modU64; date.ktm,math.ktm
+function	Gcd	math	gcd	math.ktm
+function	Pow	math	power	not `pow`: math re-exports C pow (renames.tsv's reason too); math.ktm
+macro	M_1_PI	math	1_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_2_PI	math	2_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_2_SQRTPI	math	2_SQRTPI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_E	math	E	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_LN10	math	LN10	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_LN2	math	LN2	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_LOG10E	math	LOG10E	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_LOG2E	math	LOG2E	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_PI	math	PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_PI_2	math	PI_2	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_PI_4	math	PI_4	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_SQRT1_2	math	SQRT1_2	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_SQRT2	math	SQRT2	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+function	MAlloc	mem	alloc	memory.ktm
+function	CAlloc	mem	allocZero	memory.ktm
+function	MemCpy	mem	copy	renames.tsv: memCpy; memory.ktm
+function	Free	mem	free	C free is c.free (decision 2); memory.ktm
+function	ReAlloc	mem	realloc	C realloc is private today, no clash; memory.ktm
+function	MemSet	mem	set	memory.ktm
+function	MSize	mem	size	memory.ktm
+function	NetAccept	net	accept	C accept is c.accept; net.ktm
+function	NetGetIpv4Address	net	addrToStr	the old name is wrong: it does IPv6 too; renames.tsv: netGetIpv4Address; net.ktm
+function	NetListen	net	bindListen	bind()+listen() on an existing socket and addrinfo; renames.tsv: netListen; net.ktm
+function	NetConnect	net	dial	connect by host name and port; `dial` as in the design doc; renames.tsv: netConnect; net.ktm
+function	Htonl	net	htonl	net.ktm
+function	Htons	net	htons	net.ktm
+function	NetCreateServer	net	listen	a listening TCP socket from port + address; C listen is c.listen; renames.tsv: netCreateServer; net.ktm
+function	NetGetSocketPort	net	localPort	the local port the socket is bound to; renames.tsv: netGetSocketPort; net.ktm
+function	Ntohl	net	ntohl	net.ktm
+function	Ntohs	net	ntohs	net.ktm
+function	NetGetIpv4AddressFromAcceptedSocket	net	peerAddr	the peer's address as text; renames.tsv: netGetIpv4AddressFromAcceptedSocket; net.ktm
+function	NetRecvFrom	net	recvFrom	C recvfrom is c.recvfrom; net.ktm
+function	NetSend	net	send	C send is c.send; net.ktm
+function	NetSendTo	net	sendTo	C sendto is c.sendto; net.ktm
+function	NetSetSocketNoDelay	net	setNoDelay	renames.tsv: netSetSocketNoDelay; net.ktm
+function	NetSetSocketNonBlocking	net	setNonBlocking	renames.tsv: netSetSocketNonBlocking; net.ktm
+function	NetSetRecvTimeout	net	setRecvTimeout	net.ktm
+function	NetSetSockReuseAddr	net	setReuseAddr	renames.tsv: netSetSockReuseAddr; net.ktm
+function	NetSetSendTimeout	net	setSendTimeout	net.ktm
+function	NetCreateUdpSocket	net	udpSocket	net.ktm
+function	NetCreateUnixClientSocket	net	unixDial	renames.tsv: netCreateUnixClientSocket; net.ktm
+function	NetCreateUnixServerSocket	net	unixListen	renames.tsv: netCreateUnixServerSocket; net.ktm
+function	Errno	os	errno	system.ktm
+function	Exit	os	exit	C exit is private today, no clash; renames.tsv: exitProgram; system.ktm
+function	SetErrno	os	setErrno	system.ktm
+macro	STDERR	os	STDERR	std.ktmh
+macro	STDIN	os	STDIN	std.ktmh
+macro	STDOUT	os	STDOUT	std.ktmh
+type	Error	prelude	Error	bound by `catch (Error e)`, visible without an import (decision 6); except.ktm
+macro	EXIT_FAIL	prelude	EXIT_FAIL	visible without an import (decision 6); std.ktmh
+macro	EXIT_OK	prelude	EXIT_OK	visible without an import (decision 6); std.ktmh
+macro	I64_MAX	prelude	I64_MAX	integer limit, visible without an import (decision 6); std.ktmh
+macro	I64_MIN	prelude	I64_MIN	integer limit, visible without an import (decision 6); std.ktmh
+macro	I8_MAX	prelude	I8_MAX	integer limit, visible without an import (decision 6); std.ktmh
+macro	I8_MIN	prelude	I8_MIN	integer limit, visible without an import (decision 6); std.ktmh
+macro	U64_MAX	prelude	U64_MAX	integer limit, visible without an import (decision 6); std.ktmh
+macro	U8_MAX	prelude	U8_MAX	integer limit, visible without an import (decision 6); std.ktmh
+type	ProcOpts	proc	Opts	module name dropped from the type; process.ktm
+type	Proc	proc	Proc	stays proc.Proc (decision 7); process.ktm
+function	ProcCommunicate	proc	communicate	process.ktm
+function	ProcDone	proc	done	process.ktm
+function	ProcKill	proc	kill	C kill is c.kill; process.ktm
+function	ProcRelease	proc	release	process.ktm
+function	ProcRun	proc	run	process.ktm
+function	System	proc	shell	was in system.ktm; running a shell command is a process
+function	Sh	proc	shellf	was in system.ktm; running a shell command is a process
+function	Shlurp	proc	shellOutput	was in system.ktm; running a shell command is a process
+function	ShQuote	proc	shellQuote	was in system.ktm; running a shell command is a process
+function	ProcSpawn	proc	spawn	process.ktm
+function	ProcWait	proc	wait	C wait is c.wait; process.ktm
+macro	PROC_NULL	proc	DEVNULL	/dev/null; proc.NULL next to the null keyword reads badly; std.ktmh
+macro	PROC_INHERIT	proc	INHERIT	child stdin/stdout/stderr modes; std.ktmh
+macro	PROC_PIPE	proc	PIPE	child stdin/stdout/stderr modes; std.ktmh
+macro	PROC_STDOUT	proc	STDOUT	child stdin/stdout/stderr modes; std.ktmh
+type	CatchFrame	rt	CatchFrame	runtime only; except.ktm
+function	KTM_DeferCaught	rt	__ktmDeferCaught	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ErrorCopy	rt	__ktmErrorCopy	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ErrorDrop	rt	__ktmErrorDrop	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ErrorForget	rt	__ktmErrorForget	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ErrorTake	rt	__ktmErrorTake	called by generated code (throw/try/defer); not for users; except.ktm
+function	Print	rt	__ktmPrintf	printf's target for %Q %D %T %C %F; users write printf; strings.ktm
+function	KTM_PushFrame	rt	__ktmPushFrame	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_Rethrow	rt	__ktmRethrow	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_Throw	rt	__ktmThrow	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ThrowAt	rt	__ktmThrowAt	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ThrowError	rt	__ktmThrowError	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ThrowFmt	rt	__ktmThrowFmt	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_ThrowFmtAt	rt	__ktmThrowFmtAt	called by generated code (throw/try/defer); not for users; except.ktm
+function	KTM_TryLeave	rt	__ktmTryLeave	called by generated code (throw/try/defer); not for users; except.ktm
+macro	SF_ARG1	rt	SF_ARG1	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG2	rt	SF_ARG2	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG3	rt	SF_ARG3	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG4	rt	SF_ARG4	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG5	rt	SF_ARG5	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG6	rt	SF_ARG6	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG7	rt	SF_ARG7	stack-frame offsets for asm; runtime only; std.ktmh
+macro	SF_ARG8	rt	SF_ARG8	stack-frame offsets for asm; runtime only; std.ktmh
+type	IntSet	set	IntSet	set.ktm
+type	IntSetEntry	set	IntSetEntry	set.ktm
+type	IntSetIter	set	IntSetIter	set.ktm
+function	IntSetAdd	set	intAdd	set.ktm
+function	IntSetDelete	set	intDelete	set.ktm
+function	IntSetDiff	set	intDiff	set.ktm
+function	IntSetEq	set	intEq	set.ktm
+function	IntSetHas	set	intHas	set.ktm
+function	IntSetIntersection	set	intIntersection	set.ktm
+function	IntSetIterNew	set	intIterNew	set.ktm
+function	IntSetIterNext	set	intIterNext	set.ktm
+function	IntSetIterRelease	set	intIterRelease	set.ktm
+function	IntSetNew	set	intNew	set.ktm
+function	IntSetRelease	set	intRelease	set.ktm
+function	IntSetSize	set	intSize	set.ktm
+function	IntSetSymDiff	set	intSymDiff	set.ktm
+function	IntSetToString	set	intToStr	set.ktm
+function	IntSetToVec	set	intToVec	set.ktm
+function	IntSetUnion	set	intUnion	set.ktm
+type	SigAct	signal	Action	module name dropped from the type; signals.ktm
+function	SigAction	signal	action	signals.ktm
+function	SigBit	signal	bit	signals.ktm
+function	SigHandle	signal	handle	signals.ktm
+function	SigStopInit	signal	stopInit	signals.ktm
+function	SigStopRequested	signal	stopRequested	signals.ktm
+function	SigStopSignal	signal	stopSignal	signals.ktm
+type	SqlColumn	sql	Column	sqllite.ktm
+type	SqlCtx	sql	Db	an open database; `Ctx` says little; sqllite.ktm
+type	SqlParam	sql	Param	sqllite.ktm
+type	SqlRow	sql	Row	sqllite.ktm
+type	SqlPreparedStmt	sql	Stmt	sqllite.ktm
+function	SqlCtxRelease	sql	close	closes the database and frees the context; renames.tsv: sqlCtxRelease; sqllite.ktm
+function	SqlQuery	sql	exec	a statement whose rows you don't need; `query` reads like select; renames.tsv: sqlQuery; sqllite.ktm
+function	SqlExecPrepared	sql	execPrepared	sqllite.ktm
+function	SqlExecRaw	sql	execRaw	sqllite.ktm
+function	SqlFinalizePrepared	sql	finalize	renames.tsv: sqlFinalizePrepared; sqllite.ktm
+function	SqlIter	sql	next	moves a row to its next row; renames.tsv: sqlIter; sqllite.ktm
+function	SqlIterPrepared	sql	nextPrepared	renames.tsv: sqlIterPrepared; sqllite.ktm
+function	SqlCtxNew	sql	open	opens (or creates) the database file; renames.tsv: sqlCtxNew; sqllite.ktm
+function	SqlPrepare	sql	prepare	sqllite.ktm
+function	SqlRowRelease	sql	rowRelease	sqllite.ktm
+function	SqlSelect	sql	select	sqllite.ktm
+macro	SQL_BLOB	sql	BLOB	column/param types; std.ktmh
+macro	SQL_FLOAT	sql	FLOAT	column/param types; std.ktmh
+macro	SQL_INT	sql	INT	column/param types; std.ktmh
+macro	SQL_NULL	sql	NULL_TYPE	sql.NULL next to the null keyword reads badly; std.ktmh
+macro	SQL_TEXT	sql	TEXT	column/param types; std.ktmh
+function	CatPrint	str	appendFormat	strings.ktm
+function	CatLenPrint	str	appendFormatLen	strings.ktm
+function	StrCmp	str	cmp	strings.ktm
+function	StrNCmp	str	cmpLen	renames.tsv: strNCmp; strings.ktm
+function	StrNICmp	str	cmpLenNoCase	renames.tsv: strNICmp; strings.ktm
+function	StrMerge	str	concat	strings.ktm
+function	StrMergeJoin	str	concatArgs	strings.ktm
+function	StrCpy	str	copy	renames.tsv: strCpy; strings.ktm
+function	StrOcc	str	count	strings.ktm
+function	StrNew	str	dup	renames.tsv had strNew; `new` may become a keyword, dup pairs with dupLen; except.ktm,strings.ktm
+function	StrNCpy	str	dupLen	strndup; renames.tsv had strNewLen, dup/dupLen pairs with StrNew; strings.ktm
+function	StrFirstOcc	str	firstOf	strings.ktm
+function	MStrPrint	str	format	strings.ktm
+function	StrPrintJoin	str	formatArgs	StrPrint for an argument array, like concatArgs; renames.tsv: strPrintJoin; except.ktm,strings.ktm
+function	StrPrint	str	formatTo	into dst (NULL: new string); `str.print` would read as printing; renames.tsv: strPrint; strings.ktm
+function	StrNPrint	str	formatToSize	snprintf; renames.tsv: strNPrint; strings.ktm
+function	WildMatch	str	globMatch	renames.tsv: wildMatch; strings.ktm
+function	StrHash	str	hash	was the planned `hash` module's only public function; strings.ktm
+function	StrIntToHex	str	hex	strings.ktm
+function	IsSpace	str	isSpace	one ASCII char (decision 8); strings.ktm
+function	StrLastOcc	str	lastOf	strings.ktm
+function	StrLen	str	len	strings.ktm
+function	MPrintQ	str	quote	strings.ktm
+function	StrReverse	str	reverse	strings.ktm
+function	StrFirstRem	str	splitFirst	strings.ktm
+function	StrLastRem	str	splitLast	strings.ktm
+function	Atoi	str	toInt	like atol; returns i64; renames.tsv: atoi; strings.ktm
+function	ToLower	str	toLower	one ASCII char (decision 8: stays in str); strings.ktm
+function	ToUpper	str	toUpper	one ASCII char (decision 8); strings.ktm
+function	StrTrimEnd	str	trimEnd	strings.ktm
+function	StrCleanEnd	str	trimEndChars	drops any of `chars` from the end; renames.tsv: strCleanEnd; strings.ktm
+function	StrTrimStart	str	trimStart	strings.ktm
+function	HeapInUse	test	heapInUse	src/tests/testhelper.ktm, not in libktm today
+function	PrintResult	test	printResult	src/tests/testhelper.ktm, not in libktm today
+type	ThreadWorkerJob	thread	Job	module name dropped from the type; threads.ktm
+type	ThreadPool	thread	Pool	module name dropped from the type; threads.ktm
+type	ThreadWorker	thread	Worker	module name dropped from the type; threads.ktm
+function	ThreadPoolEnqueue	thread	poolEnqueue	threads.ktm
+function	ThreadPoolNew	thread	poolNew	threads.ktm
+function	ThreadPoolRelease	thread	poolRelease	threads.ktm
+function	ThreadPoolStop	thread	poolStop	threads.ktm
+function	ThreadPoolWait	thread	poolWait	threads.ktm
+type	BitVec	vec	BitVec	was bitvec.ktm
+type	FloatVec	vec	FloatVec	vector.ktm
+type	IntVec	vec	IntVec	vector.ktm
+type	PtrVec	vec	PtrVec	vector.ktm
+function	BitVecClear	vec	bitClear	was bitvec.ktm
+function	BitVecNew	vec	bitNew	was bitvec.ktm
+function	BitVecRelease	vec	bitRelease	was bitvec.ktm
+function	BitVecSet	vec	bitSet	was bitvec.ktm
+function	BitVecTest	vec	bitTest	was bitvec.ktm
+function	BitVecUnSet	vec	bitUnset	was bitvec.ktm
+function	FloatVecCapacity	vec	floatCapacity	vector.ktm
+function	FloatVecClear	vec	floatClear	vector.ktm
+function	FloatVecGet	vec	floatGet	vector.ktm
+function	FloatVecLast	vec	floatLast	vector.ktm
+function	FloatVecNew	vec	floatNew	vector.ktm
+function	FloatVecPop	vec	floatPop	vector.ktm
+function	FloatVecPush	vec	floatPush	vector.ktm
+function	FloatVecRelease	vec	floatRelease	vector.ktm
+function	FloatVecSet	vec	floatSet	vector.ktm
+function	FloatVecSort	vec	floatSort	vector.ktm
+function	IntVecCapacity	vec	intCapacity	vector.ktm
+function	IntVecClear	vec	intClear	vector.ktm
+function	IntVecGet	vec	intGet	vector.ktm
+function	IntVecLast	vec	intLast	vector.ktm
+function	IntVecNew	vec	intNew	vector.ktm
+function	IntVecPop	vec	intPop	vector.ktm
+function	IntVecPush	vec	intPush	vector.ktm
+function	IntVecRelease	vec	intRelease	vector.ktm
+function	IntVecSet	vec	intSet	vector.ktm
+function	IntVecSort	vec	intSort	vector.ktm
+function	PtrVecCapacity	vec	ptrCapacity	vector.ktm
+function	PtrVecClear	vec	ptrClear	vector.ktm
+function	PtrVecGet	vec	ptrGet	vector.ktm
+function	PtrVecLast	vec	ptrLast	vector.ktm
+function	PtrVecNew	vec	ptrNew	vector.ktm
+function	PtrVecPop	vec	ptrPop	vector.ktm
+function	PtrVecPush	vec	ptrPush	vector.ktm
+function	PtrVecRelease	vec	ptrRelease	vector.ktm
+function	PtrVecSet	vec	ptrSet	vector.ktm
+function	PtrVecSort	vec	ptrSort	vector.ktm
+function	QSortGeneric	vec	qsort	fix: vec.qsort(arr, low, high, lessThan), low before high (today high, low; decision 11); vector.ktm
+type	HCFs	-	drop	leaves the public API with Fs (decision 6); stays a runtime internal; except.ktm
+type	cStat	-	private in fs	the raw platform struct stat behind fs.stat; std.ktmh
+function	Dir	-	drop	TempleOS `Dir` command, prints an ls-style listing (decision 9); io.ktm
+function	Fs	-	drop	HolyC `Fs->except_ch`, leaves the public API: `catch (Error e)` replaces it (decision 6); stays a runtime internal; except.ktm
+function	IsDotC	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
+function	IsDotZ	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
+function	Write	-	drop	duplicate of C write(2), which os re-exports (would collide as os.write); its users (coroutines, except, vector, test 84) call write; system.ktm
+function	I64ToStr	-	private in str	documented as an internal helper of StrPrint; strings.ktm
+function	OutStr	-	private in str	documented as an internal helper of StrPrint; strings.ktm
+function	SPutChar	-	private in str	documented as an internal helper of StrPrint; strings.ktm
+function	U64ToStr	-	private in str	documented as an internal helper of StrPrint; strings.ktm
+macro	CH_SHIFT_SPACE	-	drop	TempleOS keyboard scan code; unused; std.ktmh
+macro	CH_SPACE	-	drop	TempleOS keyboard scan code; unused; std.ktmh
+macro	RM_VERBOSE	-	drop	verbose remove prints what it removes (decision 9); std.ktmh
+macro	HT_DELETED	-	private	an implementation detail in the header; std.ktmh
+macro	PRTF_DECIMAL	-	private	an implementation detail in the header; std.ktmh
+macro	PRTF_LEFT_JUSTIFY	-	private	an implementation detail in the header; std.ktmh
+macro	PRTF_PAD_ZERO	-	private	an implementation detail in the header; std.ktmh
+macro	PRTF_SLASH	-	private	an implementation detail in the header; std.ktmh
+macro	PRTF_TRUNCATE	-	private	an implementation detail in the header; std.ktmh
+macro	STR_LEN	-	private	an implementation detail in the header; std.ktmh
+macro	_SS_PAD1SIZE	-	private	an implementation detail in the header; std.ktmh
+macro	_SS_PAD2SIZE	-	private	an implementation detail in the header; std.ktmh
+macro	__BUFSIZ__	-	private	an implementation detail in the header; std.ktmh
+macro	FALSE	-	removed	the true/false/null keywords replace it (renames.tsv); std.ktmh
+macro	NULL	-	removed	the true/false/null keywords replace it (renames.tsv); std.ktmh
+macro	TRUE	-	removed	the true/false/null keywords replace it (renames.tsv); std.ktmh
+cfunctions	(fd I/O; topic os)	c	open close read write lseek fcntl creat poll	C names, unchanged, as c.<name>
+cfunctions	(files and directories; topic fs)	c	stat fstat lstat statx mkdir rmdir unlink chdir closedir rewinddir seekdir telldir	C names, unchanged, as c.<name>
+cfunctions	(processes; topic proc)	c	fork wait waitpid kill	C names, unchanged, as c.<name>
+cfunctions	(signals; topic signal)	c	signal raise	C names, unchanged, as c.<name>
+cfunctions	(memory (mem does not wrap malloc/free: decision 2); topic mem)	c	malloc free memchr memcmp memmove	C names, unchanged, as c.<name>
+cfunctions	(C strings; topic str)	c	strlen strcmp strncmp strcasecmp strncasecmp strcpy strncpy strcat strncat strchr strrchr strstr strspn strcspn strpbrk strtok strnlen strdup strcoll strxfrm strtod strtoll strtoul atol snprintf strerror	C names, unchanged, as c.<name>
+cfunctions	(libm; topic math)	c	acos acosh asin asinh atan atan2 atanh cbrt ceil copysign cos cosh erf erfc exp exp2 expm1 fabs fdim floor fma fmax fmin fmod frexp hypot ilogb ldexp lgamma log log10 log1p log2 logb lrint lround modf nan nearbyint nextafter pow remainder remquo rint round scalbln scalbn sin sinh sqrt tan tanh tgamma trunc	C names, unchanged, as c.<name>
+cfunctions	(sockets; topic net)	c	socket bind listen accept connect send recv sendto recvfrom sendmsg recvmsg shutdown getsockopt setsockopt getsockname getpeername	C names, unchanged, as c.<name>
+cfunctions	(name lookup; topic net)	c	getaddrinfo freeaddrinfo gai_strerror getnameinfo gethostbyname gethostbyaddr gethostent sethostent endhostent hstrerror getnetbyname getnetbyaddr getnetent setnetent endnetent getprotobyname getprotobynumber getprotoent setprotoent endprotoent getservbyname getservbyport getservent setservent endservent	C names, unchanged, as c.<name>
+cfunctions	(addresses; topic net)	c	inet_addr inet_aton inet_ntoa inet_ntop inet_pton inet_network inet_makeaddr inet_lnaof inet_netof	C names, unchanged, as c.<name>
+cfunctions	(pthreads; topic thread)	c	pthread_create pthread_join pthread_detach pthread_exit pthread_attr_init pthread_attr_setstacksize pthread_mutex_init pthread_mutex_lock pthread_mutex_unlock pthread_mutex_destroy pthread_cond_init pthread_cond_wait pthread_cond_signal pthread_cond_broadcast pthread_cond_destroy	C names, unchanged, as c.<name>
+cfunctions	(time; topic date)	c	gettimeofday localtime	C names, unchanged, as c.<name>
+cfunctions	(SQLite; topic sql)	c	sqlite3_open sqlite3_close sqlite3_close_v2 sqlite3_exec sqlite3_errmsg sqlite3_prepare_v2 sqlite3_step sqlite3_reset sqlite3_finalize sqlite3_clear_bindings sqlite3_bind_* (11) sqlite3_column_* (10) sqlite3_data_count	C names, unchanged, as c.<name>
+cfunctions	(non-local jumps; topic rt)	c	setjmp longjmp	C names, unchanged, as c.<name>
+cfunctions	(builtin, no module: the compiler checks and routes it)	-	printf	C name, no module
+ctypes	(socket structs; topic net)	c	addrinfo hostent in6_addr in_addr msghdr netent protoent servent sockaddr sockaddr_in sockaddr_in6 sockaddr_storage sockaddr_un	C names, unchanged, as c.<name>
+ctypes	(poll, readv/writev and time structs (timespec was cTimespec); topic os)	c	pollfd iovec timespec	C names, unchanged, as c.<name>
+ctypes	(directory handle (was cDIR) and Linux statx; topic fs)	c	DIR Statx statx_timestamp	C names, unchanged, as c.<name>
+ctypes	(gettimeofday/localtime structs; topic date)	c	timeval tm	C names, unchanged, as c.<name>
+ctypes	(pthread types; the __pthread_* / __atomic_wide_counter layout helpers become private; topic thread)	c	pthread_t pthread_attr_t pthread_mutex_t pthread_mutexattr_t pthread_cond_t pthread_condattr_t pthread_handler_rec	C names, unchanged, as c.<name>
+ctypes	(SQLite handles; topic sql)	c	sqlite3 sqlite3_stmt sqlite3_value	C names, unchanged, as c.<name>
+cconstants	(errno values; topic os)	c	EACCES EADDRINUSE EADDRNOTAVAIL EAGAIN EBADF ECHILD ECONNREFUSED ECONNRESET EHOSTUNREACH EINPROGRESS EINTR EINVAL EMFILE ENETUNREACH ENFILE ENOENT EPIPE ETIMEDOUT EWOULDBLOCK	19 C constants, unchanged, as c.<NAME>
+cconstants	(open/fcntl/lseek flags; topic os)	c	FD_CLOEXEC F_CHKCLEAN F_DUPFD F_FLUSH_DATA F_GETFD F_GETFL F_GETLK F_GETOWN F_PREALLOCATE F_RDADVISE F_RDAHEAD F_RDLCK F_SETFD F_SETFL F_SETLK F_SETLKW F_SETOWN F_SETSIZE F_UNLCK F_WRLCK O_ACCMODE O_APPEND O_CLOEXEC O_CREAT O_EXCL O_NONBLOCK O_RDONLY O_RDWR O_TRUNC O_WRONLY SEEK_CUR SEEK_END SEEK_SET	33 C constants, unchanged, as c.<NAME>
+cconstants	(poll events; topic os)	c	POLLERR POLLHUP POLLIN POLLNVAL POLLOUT POLLPRI	6 C constants, unchanged, as c.<NAME>
+cconstants	(stat modes, statx, d_type, *at(); topic fs)	c	AT_STATX_SYNC_AS_STAT DT_BLK DT_CHR DT_DIR DT_FIFO DT_LNK DT_REG DT_SOCK DT_UNKNOWN DT_WHT STATX_ALL STATX_ATIME STATX_ATTR_APPEND STATX_ATTR_AUTOMOUNT STATX_ATTR_COMPRESSED STATX_ATTR_DAX STATX_ATTR_ENCRYPTED STATX_ATTR_IMMUTABLE STATX_ATTR_MOUNT_ROOT STATX_ATTR_NODUMP STATX_ATTR_VERITY STATX_ATTR_WRITE_ATOMIC STATX_BASIC_STATS STATX_BLOCKS STATX_BTIME STATX_CTIME STATX_DIOALIGN STATX_DIO_READ_ALIGN STATX_GID STATX_INO STATX_MNT_ID STATX_MNT_ID_UNIQUE STATX_MODE STATX_MTIME STATX_NLINK STATX_SIZE STATX_SUBVOL STATX_TYPE STATX_UID STATX_WRITE_ATOMIC STATX__RESERVED STAT_X_AT_FDCWD S_IFBLK S_IFCHR S_IFDIR S_IFIFO S_IFLNK S_IFMT S_IFREG S_IFSOCK S_IRGRP S_IROTH S_IRUSR S_IRWXG S_IRWXO S_IRWXU S_ISGID S_ISUID S_ISVTX S_IWGRP S_IWOTH S_IWUSR S_IXGRP S_IXOTH S_IXUSR	65 C constants, unchanged, as c.<NAME>
+cconstants	(signal numbers and sigaction flags; topic signal)	c	SA_NODEFER SA_RESETHAND SA_RESTART SIGALRM SIGCHLD SIGCONT SIGHUP SIGINT SIGKILL SIGPIPE SIGQUIT SIGSTOP SIGTERM SIGTSTP SIGTTIN SIGTTOU SIGUSR1 SIGUSR2 SIG_DFL SIG_ERR SIG_IGN	21 C constants, unchanged, as c.<NAME>
+cconstants	(sockets and TCP options; topic net)	c	AF_INET AF_INET6 AF_UNIX AF_UNSPEC AI_CANONNAME AI_NUMERICHOST AI_NUMERICSERV AI_PASSIVE AI_UNUSABLE INET6_ADDRSTRLEN IPPROTO_ICMP IPPROTO_ICMPV6 IPPROTO_IP IPPROTO_IPV4 IPPROTO_IPV6 IPPROTO_RAW IPPROTO_TCP IPPROTO_UDP IPV6_V6ONLY MSG_CTRUNC MSG_DONTROUTE MSG_DONTWAIT MSG_EOR MSG_NOSIGNAL MSG_OOB MSG_PEEK MSG_TRUNC MSG_WAITALL PERSIST_TIMEOUT SHUT_RD SHUT_RDWR SHUT_WR SOCK_CLOEXEC SOCK_DGRAM SOCK_RAW SOCK_SEQPACKET SOCK_STREAM SOL_SOCKET SO_ACCEPTCONN SO_BROADCAST SO_DEBUG SO_DONTROUTE SO_ERROR SO_KEEPALIVE SO_LINGER SO_OOBINLINE SO_RCVBUF SO_RCVTIMEO SO_REUSEADDR SO_REUSEPORT SO_SNDBUF SO_SNDTIMEO SO_TIMESTAMP SO_TIMESTAMP_MONOTONIC TCP_CONNECTIONTIMEOUT TCP_CONNECTION_INFO TCP_CORK TCP_ENABLE_ECN TCP_FASTOPEN TCP_INFO TCP_KEEPALIVE TCP_KEEPCNT TCP_KEEPIDLE TCP_KEEPINTVL TCP_MAXSEG TCP_NODELAY TCP_NOOPT TCP_NOPUSH TCP_QUICKACK TCP_RXT_CONNDROPTIME TCP_RXT_FINDROP TCP_SENDMOREACKS TCP_USER_TIMEOUT	73 C constants, unchanged, as c.<NAME>
+cconstants	(SQLite result codes and types; topic sql)	c	SQLITE3_TEXT SQLITE_ABORT SQLITE_AUTH SQLITE_BLOB SQLITE_BUSY SQLITE_CANTOPEN SQLITE_CONSTRAINT SQLITE_CORRUPT SQLITE_DONE SQLITE_EMPTY SQLITE_ERROR SQLITE_FLOAT SQLITE_FORMAT SQLITE_FULL SQLITE_INTEGER SQLITE_INTERNAL SQLITE_INTERRUPT SQLITE_IOERR SQLITE_LOCKED SQLITE_MISMATCH SQLITE_MISUSE SQLITE_NOLFS SQLITE_NOMEM SQLITE_NOTADB SQLITE_NOTFOUND SQLITE_NOTICE SQLITE_NULL SQLITE_OK SQLITE_PERM SQLITE_PROTOCOL SQLITE_RANGE SQLITE_READONLY SQLITE_ROW SQLITE_SCHEMA SQLITE_TEXT SQLITE_TOOBIG SQLITE_WARNING	37 C constants, unchanged, as c.<NAME>
+cconstants	(struct-size helpers (private))	-	__MUTEX_LOCK_ATTR_SIZE__ __MUTEX_LOCK_PADDING__ __SIZEOF_PTHREAD_ATTR_T __SIZEOF_PTHREAD_BARRIERATTR_T __SIZEOF_PTHREAD_BARRIER_T __SIZEOF_PTHREAD_CONDATTR_T __SIZEOF_PTHREAD_COND_T __SIZEOF_PTHREAD_MUTEXATTR_T __SIZEOF_PTHREAD_MUTEX_T __SIZEOF_PTHREAD_RWLOCKATTR_T __SIZEOF_PTHREAD_RWLOCK_T __THREAD_ATTR_SIZE__ __THREAD_CONDATTR_SIZE__ __THREAD_COND_SIZE__ __THREAD_SIZE__	15 constants, private

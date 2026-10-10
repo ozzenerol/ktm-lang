@@ -1,4 +1,5 @@
 enum Err { neg, tooBig };
+
 i64 Check(i64 x)
 {
   if (x < 0) { throw(Err.neg); }

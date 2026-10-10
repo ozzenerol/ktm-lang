@@ -5,6 +5,9 @@
 #include "cctrl.h"
 #include "lexer.h"
 #include "prsutil.h"
+#ifdef KTM_CONVERT
+#include "../tools/convert/convert.h"
+#endif
 #include "util.h"
 
 int align(int n, int m) {
@@ -172,7 +175,13 @@ AstType *parseGetType(Cctrl *cc, Lexeme *tok) {
     if (tok->tk_type != TK_IDENT && tok->tk_type != TK_KEYWORD) {
         return NULL;
     }
+#ifdef KTM_CONVERT
+    AstType *found = cctrlGetKeyWord(cc,tok->start,tok->len);
+    if (cc->migrate && found) migrateNoteType(cc, tok, found);
+    return found;
+#else
     return cctrlGetKeyWord(cc,tok->start,tok->len);
+#endif
 }
 
 int parseIsKeyword(Lexeme *tok, Cctrl *cc) {

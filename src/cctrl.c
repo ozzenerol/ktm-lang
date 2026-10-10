@@ -553,6 +553,9 @@ static Lexeme *cctrlMaybeExpandToken(Cctrl *cc, Lexeme *token) {
         /* The macro's value, at the line and column the macro is used:
          * the stored lexeme carries the #define's position, which put
          * an error on the use on the #define line. */
+#ifdef KTM_CONVERT
+        if (cc->migrate) migrateNoteMacro(cc, token);
+#endif
         CctrlMacroUse *mu = &cc->macro_uses[cc->macro_use_next];
         cc->macro_use_next = (cc->macro_use_next + 1) % CCTRL_MACRO_USE_CACHE_SIZE;
         mu->use = token;
