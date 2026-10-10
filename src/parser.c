@@ -4554,7 +4554,8 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     } else {
         mine = mine && !path;
     }
-    if (!mine) {
+    /* (reported once, by a module's full pass) */
+    if (!mine && !cc->decls_only) {
         cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
         cctrlRaiseException(cc, "methods of `%s` can only be defined %s",
                 cls->clsname->data,
@@ -4567,7 +4568,8 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
         cctrlRaiseException(cc, "Expected a method name after `%.*s.`, got `%s`",
                             tlen, tname, lexemeAsWritten(mtok));
     }
-    if (cls->fields && mapGetLen(cls->fields, mtok->start, mtok->len)) {
+    if (cls->fields && mapGetLen(cls->fields, mtok->start, mtok->len) &&
+        !cc->decls_only) {
         cctrlRaiseException(cc, "`%s` has a field named `%.*s`: a method "
                             "cannot have the same name",
                             cls->clsname->data, mtok->len, mtok->start);
