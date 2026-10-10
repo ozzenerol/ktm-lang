@@ -540,6 +540,16 @@ Ast *astIf(Ast *cond, Ast *then, Ast *els) {
     return ast;
 }
 
+Ast *astTernary(AstType *type, Ast *cond, Ast *then, Ast *els) {
+    Ast *ast = astNew();
+    ast->type = type;
+    ast->kind = AST_TERNARY;
+    ast->cond = cond;
+    ast->then = then;
+    ast->els = els;
+    return ast;
+}
+
 /* Sort the cases from low to high */
 static void astJumpTableSort(Ast **cases, int high, int low) {
     if (low < high) {
@@ -2099,6 +2109,14 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             }
             break;
 
+        case AST_TERNARY:
+            aoStrCatPrintf(str, "<ternary_cond>\n");
+            _astToString(str,ast->cond,depth+1);
+            astStringEndStmt(str);
+            _astToString(str,ast->then,depth+1);
+            _astToString(str,ast->els,depth+1);
+            break;
+
         case AST_IF:
             aoStrCatPrintf(str, "<if_cond>\n");
             _astToString(str,ast->cond,depth+1);
@@ -2409,6 +2427,7 @@ char *astKindToString(AstKind kind) {
         case AST_LITERAL:       return "AST_LITERAL";
         case AST_ARRAY_INIT:    return "AST_ARRAY_INIT";
         case AST_IF:            return "AST_IF";
+        case AST_TERNARY:       return "AST_TERNARY";
         case AST_FOR:           return "AST_FOR";
         case AST_RETURN:        return "AST_RETURN";
         case AST_WHILE:         return "AST_WHILE";
@@ -2548,6 +2567,13 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
         return;
     }
     switch(ast->kind) {
+        case AST_TERNARY:
+            _astLValueToString(str, ast->cond, lexeme_flags);
+            aoStrCatPrintf(str, " ? ");
+            _astLValueToString(str, ast->then, lexeme_flags);
+            aoStrCatPrintf(str, " : ");
+            _astLValueToString(str, ast->els, lexeme_flags);
+            break;
         case AST_LITERAL:
             switch (ast->type->kind) {
             case AST_TYPE_VOID:  aoStrCatPrintf(str, "void"); break;
@@ -2840,6 +2866,7 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_FUNCALL: return "function call";
         case AST_ARRAY_INIT: return "array initialization";
         case AST_IF: return "if statement";
+        case AST_TERNARY: return "conditional operator";
         case AST_FOR: return "for loop";
         case AST_RETURN: return "return statement";
         case AST_TRY: return "try/catch statement";

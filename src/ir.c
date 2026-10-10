@@ -2004,6 +2004,42 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     if (ast && ast->line && ast->kind != AST_LVAR && ast->kind != AST_GVAR)
         ir_line_hint = ast->line;
     switch (ast->kind) {
+        case AST_TERNARY: {
+            /* cond ? then : els. Only the chosen branch runs: evaluate
+             * the condition, branch, compute each branch in its own
+             * block, and phi the two values. Both branches were cast to
+             * ast->type by the parser, so the phi is well typed. Mirrors
+             * the && / || short-circuit lowering. */
+            IrBlock *then_block = irBlockNew();
+            IrBlock *else_block = irBlockNew();
+            IrBlock *end_block = irBlockNew();
+
+            IrValue *cond = irExpr(ctx, ast->cond);
+            IrBlock *cond_block = ctx->cur_block;
+            IrValue *result = irTmp(irConvertType(ast->type), ast->type->size);
+            irBranch(ctx->cur_func, cond_block, cond, then_block, else_block);
+
+            irFnAddBlock(ctx->cur_func, then_block);
+            ctx->cur_block = then_block;
+            IrValue *then_val = irExpr(ctx, ast->then);
+            IrBlock *then_end = ctx->cur_block;
+            irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+            irFnAddBlock(ctx->cur_func, else_block);
+            ctx->cur_block = else_block;
+            IrValue *else_val = irExpr(ctx, ast->els);
+            IrBlock *else_end = ctx->cur_block;
+            irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+            irFnAddBlock(ctx->cur_func, end_block);
+            ctx->cur_block = end_block;
+            IrInstr *phi = irPhi(result);
+            irBlockAddInstr(ctx, phi);
+            irAddPhiIncoming(phi, then_val, then_end);
+            irAddPhiIncoming(phi, else_val, else_end);
+            return result;
+        }
+
         case AST_BINOP: {
             if (astIsBinOpKind(ast, AST_BIN_OP_ASSIGN) ||
                     irBinOpIsCompoundAssign(ast->binop)) {
@@ -2863,6 +2899,7 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
         case AST_LVAR:
             break;
 
+        case AST_TERNARY:
         case AST_BINOP: {
             irExpr(ctx, ast);
             break;
@@ -3054,6 +3091,13 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_BINOP: {
             irEscapeWalk(ast->left, escape);
             irEscapeWalk(ast->right, escape);
+            return;
+        }
+
+        case AST_TERNARY: {
+            irEscapeWalk(ast->cond, escape);
+            irEscapeWalk(ast->then, escape);
+            irEscapeWalk(ast->els, escape);
             return;
         }
 

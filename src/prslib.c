@@ -1795,6 +1795,9 @@ static int parseGetPriority(Lexeme *tok) {
     case TK_OR_OR:
         return 13;
 
+    case '?':   /* the conditional operator: looser than ||, like assignment */
+        return 14;
+
     case '=':
     case TK_ADD_EQU: 
     case TK_SUB_EQU: 
@@ -1806,7 +1809,7 @@ static int parseGetPriority(Lexeme *tok) {
     case TK_XOR_EQU: 
     case TK_SHL_EQU: 
     case TK_SHR_EQU:
-        return 14;
+        return 15;
 
     default:
         return -1;
@@ -1925,6 +1928,7 @@ static int parseIsCallableFnPtr(Ast *ast) {
         case AST_FUNPTR_CALL:
         case AST_ASM_FUNCALL:
         case AST_BINOP:
+        case AST_TERNARY:
             return 1;
         default:
             return 0;
@@ -2075,6 +2079,43 @@ Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right) {
                                  astBinOpToTokenPunct(operation));
 }
 
+/* Usual arithmetic conversions between the two branches of a conditional:
+ * a pointer branch wins (the other is an integer or null), otherwise the
+ * arithmetic result type as for a binary operator. */
+static AstType *parseTernaryResultType(Ast *then, Ast *els) {
+    /* Arrays and string literals decay to pointers; a function name is
+     * a function pointer. Any such branch gives the pointer type (the
+     * other branch is a pointer, an array or a null/integer). */
+    AstType *a = astConvertArray(then->type);
+    AstType *b = astConvertArray(els->type);
+    int a_ptr = a->kind == AST_TYPE_POINTER || a->kind == AST_TYPE_FUNC;
+    int b_ptr = b->kind == AST_TYPE_POINTER || b->kind == AST_TYPE_FUNC;
+    if (a_ptr) return a;
+    if (b_ptr) return b;
+    AstType *r = astGetResultType(AST_BIN_OP_ADD, a, b);
+    return r ? r : a;
+}
+
+/* `cond ? then : els`. Only the chosen branch runs (the IR lowers it with
+ * a branch and a phi); the result has the common type of the branches,
+ * which both are cast to so the phi is well typed. Right-associative and
+ * not an lvalue (assertLValue has no AST_TERNARY case), as in C. */
+static Ast *parseTernary(Cctrl *cc, Ast *cond) {
+    Ast *then = parseExpr(cc, 16);
+    if (!then) {
+        cctrlRaiseException(cc, "Expected an expression after `?`");
+    }
+    cctrlTokenExpect(cc, ':');
+    Ast *els = parseExpr(cc, 16);
+    if (!els) {
+        cctrlRaiseException(cc, "Expected an expression after `:`");
+    }
+    AstType *rt = parseTernaryResultType(then, els);
+    then = astCast(then, rt);
+    els = astCast(els, rt);
+    return astTernary(rt, cond, then, els);
+}
+
 Ast *parseExpr(Cctrl *cc, int prec) {
     Ast *LHS, *RHS;
     Lexeme *tok;
@@ -2103,6 +2144,11 @@ Ast *parseExpr(Cctrl *cc, int prec) {
 
         if (tokenPunctIs(tok,'.')) {
             LHS = parseGetClassField(cc,LHS);
+            continue;
+        }
+
+        if (tokenPunctIs(tok,'?')) {
+            LHS = parseTernary(cc,LHS);
             continue;
         }
 
