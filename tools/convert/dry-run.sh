@@ -10,7 +10,9 @@ I="--install-dir=$(cd "$HERE/../.." && pwd)/build/prefix"
 TREE="$(cd "$1" && pwd)"; shift
 RAW="$(mktemp)"
 trap 'rm -f "$RAW"' EXIT
-run() { "$CONV" "$I" --report "$@" 2>&1 | sed "s|^EDITS |EDITS $PWD/|;s|^CANNOT |CANNOT $PWD/|;s|^NOTE |NOTE $PWD/|" >> "$RAW"; }
+# every rewrite (CONV_FLAGS overrides, e.g. CONV_FLAGS= for syntax only)
+FLAGS=${CONV_FLAGS-"--map $HERE/stdlib-modules.tsv --names --renames $HERE/renames.tsv --renames $HERE/renames-locals.tsv --layout"}
+run() { "$CONV" "$I" $FLAGS --report "$@" 2>&1 | sed "s|^EDITS |EDITS $PWD/|;s|^CANNOT |CANNOT $PWD/|;s|^NOTE |NOTE $PWD/|" >> "$RAW"; }
 (cd "$TREE/src/std" && run --root all.ktm *.ktm *.ktmh)
 (cd "$TREE/src/tests" && run *.ktm)
 (cd "$TREE/src/tests/lsp" && run *.ktm)

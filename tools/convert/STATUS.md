@@ -17,4 +17,5 @@ Checks used: convert a copy of src/tests with all flags but --map and compile ev
 result line): the differences are tests that compile programs from strings and check
 error text/columns, the switch tests (behave after S3), 156/385 (old file-scope order).
 
-Open: the final dry-run report to the coordinator; --map/--names on src/std itself is S2.
+Dry run: ~/opensource/ktm-scratch/dry-run-s1.txt (tools/convert/dry-run.sh . ~/opensource/hcc-builds).
+Open: --map/--names on src/std itself is S2.
