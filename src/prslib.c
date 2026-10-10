@@ -843,6 +843,12 @@ Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
         if (decl->kind == AST_FUNPTR || decl->kind == AST_LVAR) {
             return decl;
         }
+        /* `fn(i64) i64 f = &D`: a function pointer parameter with a
+         * default is in scope as its AST_DEFAULT_PARAM */
+        if (decl->kind == AST_DEFAULT_PARAM && decl->declvar &&
+            decl->declvar->type->kind == AST_TYPE_FUNC) {
+            return decl->declvar;
+        }
     } else if ((decl = mapGetLen(cc->asm_funcs,fname,len)) != NULL) {
         /* Assembly function */
         return decl;
@@ -2442,6 +2448,17 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
      * first argument is an enum member, not a postfix cast. */
     Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
     int peek_is_fn_type = peek && tokenMayStartFnType(peek) && parseFnStartsType(cc);
+    /* `Call((fn(i64) i64)raw)` passes a cast; only something that can't
+     * be called takes `((fn(i64) i64) *)` as a postfix cast */
+    if (peek_is_fn_type && tokenPunctIs(peek,'(')) {
+        Ast *callee = findFunctionDecl(cc,name,len);
+        if (callee && callee->type && (callee->type->kind == AST_TYPE_FUNC ||
+                                       callee->kind == AST_FUNC ||
+                                       callee->kind == AST_FUN_PROTO ||
+                                       callee->kind == AST_EXTERN_FUNC)) {
+            peek_is_fn_type = 0;
+        }
+    }
     if (peek == NULL ||
         (!cctrlTokIsKeyword(cc, peek) && !peek_is_fn_type) ||
         tokenPunctIs(after_peek,'.'))
@@ -2822,6 +2839,7 @@ static int parseIsCallableFnPtr(Ast *ast) {
         case AST_ASM_FUNCALL:
         case AST_BINOP:
         case AST_TERNARY:
+        case AST_DEFAULT_PARAM: /* `(*f)(x)`, f a parameter with a default */
             return 1;
         default:
             return 0;
@@ -3087,6 +3105,11 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             Lexeme *peek = cctrlTokenPeek(cc);
             int peek_is_fn_type = peek && tokenMayStartFnType(peek) &&
                                   parseFnStartsType(cc);
+            /* `s.cb((fn(i64) i64)raw)`: a call with a cast argument */
+            if (peek_is_fn_type && tokenPunctIs(peek,'(') &&
+                parseIsCallableFnPtr(LHS)) {
+                peek_is_fn_type = 0;
+            }
             if (parseIsCallableFnPtr(LHS) &&
                 (peek == NULL || (!cctrlTokIsKeyword(cc, peek) &&
                                    !peek_is_fn_type))) {
@@ -3400,8 +3423,13 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 cctrlRaiseException(cc,
                         "Unexpected end of input after '('");
             }
+            /* `cb((fn(i64) i64)raw)` calls cb with a cast argument */
+            int paren_arg = tokenPunctIs(peek,'(') &&
+                            (ast->kind == AST_CLASS_REF ||
+                             parseIsCallableFnPtr(ast));
             if (cctrlTokIsKeyword(cc, peek) ||
-                (tokenMayStartFnType(peek) && parseFnStartsType(cc))) {
+                (!paren_arg && tokenMayStartFnType(peek) &&
+                 parseFnStartsType(cc))) {
                 type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
                 ast = astCast(ast,type);
@@ -3552,6 +3580,11 @@ static int parseIsCastTypeName(Cctrl *cc, Lexeme *tok) {
         return parseFnStartsType(cc);
     }
     AstType *type = cctrlGetKeyWord(cc, tok->start, tok->len);
+    /* `(Color.red ^ 1)`: an enum member, not a cast to the enum */
+    if (type && type->kind == AST_TYPE_CLASS && type->is_enum &&
+        tokenPunctIs(cctrlTokenPeekBy(cc,1),'.')) {
+        return 0;
+    }
     return type != NULL && type->kind != AST_TYPE_VIS_MODIFIER &&
            type->kind != AST_TYPE_INLINE && type->kind != AST_TYPE_AUTO;
 }
@@ -3577,6 +3610,12 @@ static AstType *parseCastTypeName(Cctrl *cc) {
 Ast *parseUnaryExpr(Cctrl *cc) {
     Lexeme *tok;
     Ast *ast;
+
+    if (cc->pending_unary) {
+        ast = cc->pending_unary;
+        cc->pending_unary = NULL;
+        return ast;
+    }
 
     if ((tok = cctrlTokenGet(cc)) == NULL) {
         cctrlRaiseException(cc,"Unexpected end of input");
@@ -3622,6 +3661,25 @@ Ast *parseUnaryExpr(Cctrl *cc) {
          * Its operand is a unary expression, so the cast binds tighter
          * than any binary operator and `(T)p->f` casts `p->f`, as in C. */
         if (parseIsCastTypeName(cc, cctrlTokenPeek(cc))) {
+            if (tokenPunctIs(cctrlTokenPeek(cc),'(')) {
+                /* `((fn(i64) i64) *)pp` is a cast to a pointer to a
+                 * function pointer, `((fn(i64) i64)raw)(6)` a cast in
+                 * parentheses: what follows the inner `)` tells which
+                 * (the tokens can't be looked ahead that far) */
+                cctrlTokenGet(cc);
+                AstType *fn_type = parseFnType(cc);
+                cctrlTokenExpect(cc,')');
+                Lexeme *after = cctrlTokenPeek(cc);
+                if (!tokenPunctIs(after,'*') && !tokenPunctIs(after,')')) {
+                    cc->pending_unary = astCast(parseUnaryExpr(cc), fn_type);
+                    ast = parseExpr(cc,16);
+                    cctrlTokenExpect(cc,')');
+                    return parsePostFixOps(cc,ast);
+                }
+                AstType *type = parsePointerType(cc,fn_type);
+                cctrlTokenExpect(cc,')');
+                return astCast(parseUnaryExpr(cc), type);
+            }
             AstType *type = parseCastTypeName(cc);
             cctrlTokenExpect(cc,')');
             return astCast(parseUnaryExpr(cc), type);

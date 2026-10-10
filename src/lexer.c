@@ -2682,6 +2682,12 @@ int lexPreProcIf(Map *macro_defs, Lexer *l, const char *directive) {
             } else if (macro != NULL && macro->tk_type != -1) {
                 vecPush(macro_tokens,lexemeCopy(macro));
                 tk_type = macro->tk_type;
+            } else if (macro == NULL &&
+                       cctrlGetKeyWord(macro_proccessor,next.start,next.len)) {
+                /* A type name (`u64`, an identifier unlike `U64`): kept
+                 * for a cast, `(u64)7 % 4`, not taken for an undefined
+                 * macro */
+                vecPush(macro_tokens,lexemeCopy(&next));
             } else {
                 /* Valueless flag macros (`#define FOO`, the builtin
                  * platform defines - stored as sentinels) count as 1;
