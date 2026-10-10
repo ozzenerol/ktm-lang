@@ -1083,10 +1083,20 @@ static IrValue *irLowerCast(IrCtx *ctx,
         int from_size = from_type->size ? from_type->size : 8;
         int to_size = to_type->size ? to_type->size : 8;
         if (to_size < from_size && to_size < 8) {
+            /* Narrow to the destination's bytes, then re-extend to full
+             * width by the destination's signedness, so the value is
+             * canonical (`200(I8)` is the i64 -56, not the raw byte 0xC8)
+             * wherever it is used next: a compare, arithmetic, an
+             * argument or a return. A store into a narrow slot re-narrows
+             * on its own. Without the extend a signed narrowing cast kept
+             * its low bits and `200(I8) == -56` was false. */
             IrValueType t = irConvertType(to_type);
-            IrValue *dst = irTmp(t, to_size);
-            irBlockAddInstr(ctx, irInstrNew(IR_TRUNC, dst, src, NULL));
-            return dst;
+            IrValue *narrow = irTmp(t, to_size);
+            irBlockAddInstr(ctx, irInstrNew(IR_TRUNC, narrow, src, NULL));
+            IrValue *wide = irTmp(IR_TYPE_I64, 8);
+            IrOp ext = to_type->issigned ? IR_SEXT : IR_ZEXT;
+            irBlockAddInstr(ctx, irInstrNew(ext, wide, narrow, NULL));
+            return wide;
         }
     }
     return src;
