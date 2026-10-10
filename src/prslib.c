@@ -3244,6 +3244,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                 cctrlRaiseException(cc,"Pointer type expected got `%s` `%s`",
                         astTypeToString(LHS->type), astLValueToString(LHS,0));
             }
+#ifdef KTM_CONVERT
+            if (cc->migrate) migrateNoteArrow(cc, tok);
+#endif
             LHS = astUnaryOperator(LHS->type->ptr, AST_UN_OP_DEREF, LHS);
             LHS->deref_symbol = TK_ARROW;
             LHS = parseGetClassField(cc, LHS);
@@ -3533,6 +3536,9 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                                         type_str, 
                                         var_str);
             }
+#ifdef KTM_CONVERT
+            if (cc->migrate) migrateNoteArrow(cc, tok);
+#endif
             ast = astUnaryOperator(ast->type->ptr,AST_UN_OP_DEREF,ast);
             ast->deref_symbol = TK_ARROW;
             ast = parseGetClassField(cc,ast);

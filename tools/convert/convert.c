@@ -1276,6 +1276,192 @@ void migrateNoteMacro(Cctrl *cc, Lexeme *use) {
                                                      : migQualified(f, m), "stdlib");
 }
 
+/* ------------------------------------------------------------------ */
+/* 1k, layout (--layout): `->` becomes `.`; on the converted text, `{` on
+ * the line of its function, struct or control statement, `} else`,
+ * `} while`, `} catch` on one line, and 4-space indentation */
+
+static int mig_layout = 0;
+
+void migrateNoteArrow(Cctrl *cc, Lexeme *arrow) {
+    if (!mig_layout) return;
+    MigFile *f = migFileOf(cc, arrow ? arrow->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, arrow);
+    if (s < 0 || f->text[s] != '-' || f->text[s + 1] != '>') return;
+    migAdd(f, s, s + 2, ".", "layout");
+}
+
+/* The lines of text, with for each whether it starts inside a string or
+ * a block comment (left as they are), and its brace depth at its start */
+typedef struct { char *s; s64 len; int in_str, in_comment, depth, opens_first; } MigLine;
+
+static MigLine *migLines(const char *text, int *_n) {
+    int cap = 256, n = 0;
+    MigLine *ls = malloc(cap * sizeof(MigLine));
+    int in_str = 0, in_comment = 0, depth = 0;
+    const char *p = text;
+    while (*p) {
+        const char *e = strchr(p, '\n');
+        s64 len = e ? e - p : (s64)strlen(p);
+        if (n == cap) { cap *= 2; ls = realloc(ls, cap * sizeof(MigLine)); }
+        MigLine *l = &ls[n++];
+        l->s = strndup(p, len);
+        l->len = len;
+        l->in_str = in_str;
+        l->in_comment = in_comment;
+        l->depth = depth;
+        l->opens_first = 0;
+        /* first code char a `}`: the line is one level out */
+        int first_code = 1;
+        for (s64 i = 0; i < len; ++i) {
+            char c = p[i];
+            if (in_comment) {
+                if (c == '*' && i + 1 < len && p[i + 1] == '/') { in_comment = 0; i++; }
+                continue;
+            }
+            if (in_str) {
+                if (c == '\\') { i++; continue; }
+                if (c == '"') in_str = 0;
+                continue;
+            }
+            if (c == '/' && i + 1 < len && p[i + 1] == '/') break;
+            if (c == '/' && i + 1 < len && p[i + 1] == '*') { in_comment = 1; i++; continue; }
+            if (c == '"') { in_str = 1; first_code = 0; continue; }
+            if (c == '\'') {
+                s64 j = i + 1;
+                while (j < len && p[j] != '\'') { if (p[j] == '\\') j++; j++; }
+                i = j;
+                first_code = 0;
+                continue;
+            }
+            if (c == ' ' || c == '\t') continue;
+            if (c == '}' && first_code) l->opens_first = 1;
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            first_code = 0;
+        }
+        p = e ? e + 1 : p + len;
+        if (!e) break;
+    }
+    *_n = n;
+    return ls;
+}
+
+/* Leading blanks as columns (a tab is `unit` columns) */
+static int migIndentCols(const char *s, int unit, int *_chars) {
+    int cols = 0, i = 0;
+    for (; s[i] == ' ' || s[i] == '\t'; ++i) cols += s[i] == '\t' ? unit : 1;
+    *_chars = i;
+    return cols;
+}
+
+static int migEndsWithWord(const char *s, s64 len, const char *w) {
+    s64 n = strlen(w);
+    return len >= n && !memcmp(s + len - n, w, n) && (len == n || !migIsIdent(s[len - n - 1]));
+}
+
+static char *migLayout(const char *text) {
+    int n;
+    MigLine *ls = migLines(text, &n);
+    /* the file's indentation unit: the smallest indent at depth 1 */
+    int unit = 0;
+    for (int i = 0; i < n; ++i) {
+        if (ls[i].in_str || ls[i].in_comment || ls[i].depth != 1 || ls[i].opens_first) continue;
+        int ch, cols = migIndentCols(ls[i].s, 2, &ch);
+        if (ch == (int)ls[i].len) continue;
+        if (ls[i].s[0] == '\t') { unit = -1; break; }
+        if (cols > 0 && (unit == 0 || cols < unit)) unit = cols;
+    }
+    int tabs = unit == -1;
+    if (unit <= 0) unit = tabs ? 4 : 2;
+    AoStr *out = aoStrNew();
+    for (int i = 0; i < n; ++i) {
+        MigLine *l = &ls[i];
+        char *s = l->s;
+        s64 len = l->len;
+        if (l->in_str) {          /* inside a string: as it is */
+            aoStrCatLen(out, s, len);
+            if (i + 1 < n) aoStrPutChar(out, '\n');
+            continue;
+        }
+        int ch, cols = migIndentCols(s, unit, &ch);
+        const char *body = s + ch;
+        s64 blen = len - ch;
+        /* a lone `{`: onto the line before when that is a header */
+        if (!l->in_comment && blen == 1 && body[0] == '{' && out->len > 0) {
+            s64 pe = out->len - 1;           /* the previous line's end */
+            while (pe > 0 && out->data[pe - 1] != '\n' && out->data[pe] == '\n') break;
+            s64 ls_ = out->len - 1;
+            while (ls_ > 0 && out->data[ls_ - 1] != '\n') ls_--;
+            char *prev = out->data + ls_;
+            s64 plen = out->len - 1 - ls_;
+            while (plen > 0 && (prev[plen - 1] == ' ' || prev[plen - 1] == '\t')) plen--;
+            int has_comment = 0;
+            for (s64 k = 0; k + 1 < plen; ++k) if (prev[k] == '/' && (prev[k + 1] == '/' || prev[k + 1] == '*')) has_comment = 1;
+            char last = plen > 0 ? prev[plen - 1] : 0;
+            int header = !has_comment && plen > 0 && prev[0] != '#' &&
+                (last == ')' || migEndsWithWord(prev, plen, "else") || migEndsWithWord(prev, plen, "do") ||
+                 migEndsWithWord(prev, plen, "try") ||
+                 (migIsIdent(last) && (strncmp(prev + (plen - plen), "", 0) == 0) &&
+                  (strstr(prev, "struct ") || strstr(prev, "union ") || strstr(prev, "enum ") ||
+                   strstr(prev, "class "))));
+            if (header) {
+                out->len = ls_ + plen;
+                out->data[out->len] = 0;
+                aoStrCat(out, " {");
+                if (i + 1 < n) aoStrPutChar(out, '\n');
+                continue;
+            }
+        }
+        /* `}` then `else`/`while`/`catch` on the next line: one line */
+        if (!l->in_comment && blen > 0 && out->len > 1 &&
+            (!strncmp(body, "else", 4) || !strncmp(body, "catch", 5) ||
+             (!strncmp(body, "while", 5) && blen > 5 && (body[5] == ' ' || body[5] == '(') &&
+              body[blen - 1] == ';'))) {
+            s64 ls_ = out->len - 1;
+            while (ls_ > 0 && out->data[ls_ - 1] != '\n') ls_--;
+            char *prev = out->data + ls_;
+            s64 plen = out->len - 1 - ls_;
+            s64 k = 0;
+            while (k < plen && (prev[k] == ' ' || prev[k] == '\t')) k++;
+            if (plen - k == 1 && prev[k] == '}') {
+                out->len = ls_ + plen;
+                out->data[out->len] = 0;
+                aoStrPutChar(out, ' ');
+                aoStrCatLen(out, body, blen);
+                if (i + 1 < n) aoStrPutChar(out, '\n');
+                continue;
+            }
+        }
+        if (blen == 0) {              /* a blank line: no trailing blanks */
+            if (i + 1 < n) aoStrPutChar(out, '\n');
+            continue;
+        }
+        if (body[0] == '#') {          /* the preprocessor: as it is */
+            aoStrCatLen(out, s, len);
+            if (i + 1 < n) aoStrPutChar(out, '\n');
+            continue;
+        }
+        int depth = l->depth - (l->opens_first ? 1 : 0);
+        if (depth < 0) depth = 0;
+        int extra = cols - depth * unit;
+        int newcols;
+        if (extra < 0) {
+            newcols = cols * 4 / unit;           /* indented less than its depth */
+        } else {
+            newcols = depth * 4 + (extra / unit) * 4 + extra % unit;
+        }
+        for (int k = 0; k < newcols; ++k) aoStrPutChar(out, ' ');
+        aoStrCatLen(out, body, blen);
+        if (i + 1 < n) aoStrPutChar(out, '\n');
+    }
+    if (text[0] && text[strlen(text) - 1] == '\n' && (out->len == 0 || out->data[out->len - 1] != '\n')) {
+        aoStrPutChar(out, '\n');
+    }
+    return out->data ? out->data : strdup("");
+}
+
 void migrateNoteCall(Cctrl *cc, Lexeme *name) {
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;
@@ -2582,6 +2768,7 @@ static void migUsage(void) {
         "  --report    the dry run's per-file counts and notes (see dry-run.sh)\n"
         "  --map TSV   also move stdlib names into modules (stdlib-modules.tsv)\n"
         "  --names     rename to the naming rule (camelCase functions/variables)\n"
+        "  --layout    `->` to `.`, braces on the header's line, 4-space indents (last)\n"
         "  --renames TSV  the stdlib's own renames (renames.tsv, renames-locals.tsv)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
@@ -2658,6 +2845,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--stdout")) to_stdout = 1;
         else if (!strcmp(argv[i], "--report")) report = 1;
         else if (!strcmp(argv[i], "--names")) mig_names = 1;
+        else if (!strcmp(argv[i], "--layout")) mig_layout = 1;
         else if (!strcmp(argv[i], "--renames") && i + 1 < argc) {
             if (!migLoadRenames(argv[++i])) {
                 fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);
@@ -2728,6 +2916,11 @@ int main(int argc, char **argv) {
             migConvert(f, install_dir, 1);
         }
         char *out = migApply(f, 0, f->len, 1);
+        /* layout last, on the whole result (not on docs pages: their
+         * code blocks would need it per block) */
+        if (mig_layout && !(strlen(f->path) > 5 && !strcmp(f->path + strlen(f->path) - 5, ".html"))) {
+            out = migLayout(out);
+        }
         migCheckLeftovers(f, out);
         int differs = strlen(out) != (size_t)f->len || memcmp(out, f->text, f->len);
         if (differs) changed++;
