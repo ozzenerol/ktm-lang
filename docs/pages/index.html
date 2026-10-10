@@ -1,0 +1,197 @@
+<!-- title: ktm -->
+<section class="hero">
+  <h1 class="name">ktm</h1>
+  <p class="pitch">A compiled language for systems programming and networking: REST microservices,
+  network daemons and system tools, on Linux and macOS.</p>
+  <p class="sub">C-like, with classes, default arguments and exceptions; an ahead-of-time compiler,
+  a JIT, a REPL and a language server in one binary.</p>
+  <div class="actions">
+    <a class="button primary" href="getting-started.html">Get started</a>
+    <a class="button" href="language.html">Language tour</a>
+    <a class="button" href="stdlib.html">Library reference</a>
+  </div>
+</section>
+
+<p>ktm is a C-like language with classes, default arguments, a print-a-string statement and a JIT
+at its heart, made for REST microservices, network daemons and systems tools. <code>ktm</code> runs on
+Linux (x86_64 and arm64) and macOS (Apple Silicon) as an ahead-of-time compiler, a JIT, a REPL and a
+language server.</p>
+
+<pre data-run><code>
+U0 Main()
+{
+  "Hello world\n";
+}
+</code></pre>
+<pre class="output">
+Hello world
+</pre>
+
+<p>A string on its own is a print statement, <code>U0</code> is <code>void</code>, and
+<code>Main</code> is called for you. Save it as <code>hello.ktm</code> and run it either way:</p>
+
+<pre><code>ktm hello.ktm -o hello && ./hello   # compile to a native binary
+ktm -jit hello.ktm                    # or compile in memory and run straight away</code></pre>
+
+<h2>What it looks like</h2>
+<div class="samples">
+<div class="sample">
+<h3>A request and a reply</h3>
+<p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
+Unix sockets, IPv4 and IPv6.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I32 srv = NetCreateServer(0, "127.0.0.1", 4);
+  I32 cli = NetConnect("127.0.0.1", NetGetSocketPort(srv));
+  I32 conn = NetAccept(srv);
+  U8 req[256], resp[256];
+  I64 n;
+
+  NetSend(cli, "GET /hello HTTP/1.0\r\n\r\n", 23);
+
+  n = recv(conn, req, sizeof(req) - 1, 0);   // the server side
+  req[n] = '\0';
+  U8 *path = req + 4;                          // after "GET "
+  *StrFirstOcc(path, " ") = '\0';
+  U8 *reply = MStrPrint("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  NetSend(conn, reply, StrLen(reply));
+  close(conn);
+
+  n = recv(cli, resp, sizeof(resp) - 1, MSG_WAITALL);  // the client side
+  resp[n] = '\0';
+  "%s", strstr(resp, "\r\n\r\n") + 4;
+  Free(reply);
+  close(cli);
+  close(srv);
+}
+</code></pre>
+<pre class="output">
+you asked for /hello
+</pre>
+</div>
+<div class="sample">
+<h3>Running a program</h3>
+<p><code>ProcRun</code> runs a command and returns what it printed; <code>ProcSpawn</code> gives
+you its pipes.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *argv[] = {"echo", "hello from a child process", NULL};
+  I64 code;
+  U8 *out = ProcRun(argv, &code);
+  "%s\n", out;
+  "exit code %d\n", code;
+  Free(out);
+}
+</code></pre>
+<pre class="output">
+hello from a child process
+exit code 0
+</pre>
+</div>
+<div class="sample">
+<h3>Threads</h3>
+<p>POSIX threads directly, or a thread pool from the library.</p>
+<pre data-run><code>
+I64 sums[4];
+
+U0 *Sum(U0 *arg)
+{
+  I64 part = arg(I64), total = 0;
+  for (I64 i = part * 250 + 1; i <= (part + 1) * 250; i++) total += i;
+  sums[part] = total;
+  return NULL;
+}
+
+U0 Main()
+{
+  pthread_t *th[4];
+  I64 i, total = 0;
+  for (i = 0; i < 4; i++) pthread_create(&th[i], NULL, &Sum, i(U0 *));
+  for (i = 0; i < 4; i++) {
+    pthread_join(th[i]);
+    total += sums[i];
+  }
+  "1 + 2 + ... + 1000 = %d\n", total;
+}
+</code></pre>
+<pre class="output">
+1 + 2 + ... + 1000 = 500500
+</pre>
+</div>
+<div class="sample">
+<h3>A taste of the language</h3>
+<p>Classes with inheritance, default arguments and ranges in <code>case</code>.</p>
+<pre data-run><code>
+class Animal
+{
+  U8 *name;
+  I64 legs;
+};
+
+class Bird : Animal
+{
+  Bool can_fly;
+};
+
+U0 Describe(Animal *a, U8 *sound = "...")
+{
+  "%s has %d legs and says %s\n", a->name, a->legs, sound;
+}
+
+U0 Main()
+{
+  Bird b;
+  b.name = "Tweety";
+  b.legs = 2;
+  b.can_fly = TRUE;
+
+  Describe(&b, "tweet");   // a Bird is an Animal
+  Describe(&b);            // default argument
+
+  for (I64 i = 1; i <= 3; i++) {
+    switch (i) {
+      case 1: "one"; break;
+      case 2 ... 3: ", more"; break;
+    }
+  }
+  "\n";
+}
+</code></pre>
+<pre class="output">
+Tweety has 2 legs and says tweet
+Tweety has 2 legs and says ...
+one, more, more
+</pre>
+</div>
+</div>
+
+<h2>Where to go next</h2>
+<div class="cards">
+  <a class="card" href="getting-started.html"><strong>Getting started</strong><span>Build ktm, compile and run your first program.</span></a>
+  <a class="card" href="language.html"><strong>Language</strong><span>Every feature, with examples you can run.</span></a>
+  <a class="card" href="library.html"><strong>Library guide</strong><span>Strings, files, hash tables, vectors, JSON.</span></a>
+  <a class="card" href="stdlib.html"><strong>Library reference</strong><span>All 700+ declarations in std.ktmh.</span></a>
+  <a class="card" href="tools.html"><strong>Tools</strong><span>Compiler flags, JIT, REPL, LSP, transpiler.</span></a>
+  <a class="card" href="examples.html"><strong>Examples</strong><span>Complete projects with expected output.</span></a>
+</div>
+
+<h2>What ktm is</h2>
+<ul>
+  <li><strong>A native compiler.</strong> ktm is parsed to an AST, lowered to an SSA IR and emitted as x86_64 or AArch64 assembly, which the system C compiler assembles and links.</li>
+  <li><strong>A JIT.</strong> <code>ktm -jit</code> assembles machine code in memory with a built-in assembler and runs it, with no files written.</li>
+  <li><strong>A REPL.</strong> <code>ktm -repl</code> runs ktm interactively.</li>
+  <li><strong>A language server.</strong> <code>ktm -lsp</code> gives editors diagnostics, hover, completion, go-to-definition, references and rename.</li>
+  <li><strong>A standard library.</strong> Strings, files, hash tables, vectors, JSON, dates, threads, sockets and more, available in every program without an include.</li>
+</ul>
+<p>It runs on Linux on x86_64 and arm64 and on macOS on Apple Silicon. On Windows, use WSL2.</p>
+
+<h2 id="history">History and credits</h2>
+<p>ktm started as a fork of <a href="https://github.com/Jamesbarford/holyc-lang">Jamesbarford/holyc-lang</a>
+(BSD-2-Clause), a compiler for HolyC, the language Terry A. Davis created for TempleOS. Thanks to both:
+to <a href="https://en.wikipedia.org/wiki/Terry_A._Davis">Terry A. Davis</a> for HolyC and
+<a href="https://templeos.org/">TempleOS</a>, and to
+<a href="https://github.com/Jamesbarford">James Barford-Evans</a>, who wrote the compiler ktm grew from.
+The fork was called hcc until v0.19.3 and was renamed ktm at v0.1.0; its earlier history is on the
+<a href="releases.html#hcc">Releases</a> page.</p>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html">ktm</a>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<ul class="pages"><li><a href="index.html">Home</a></li><li class="current"><a href="getting-started.html" aria-current="page">Getting started</a><ul class="toc"><li><a href="#requirements">Requirements</a></li><li><a href="#build">Build</a></li><li><a href="#your-first-program">Your first program</a></li><li><a href="#run-without-compiling-a-binary">Run without compiling a binary</a></li><li><a href="#how-a-program-runs">How a program runs</a></li><li><a href="#the-standard-library">The standard library</a></li><li><a href="#several-files">Several files</a></li><li><a href="#next-steps">Next steps</a></li></ul></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<h1>Getting started</h1>
+<p class="lede">Build ktm from source, then compile and run your first programs.</p>
+
+<h2 id="requirements">Requirements<a class="anchor" href="#requirements" aria-label="Link to this section">#</a></h2>
+<ul>
+  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon (arm64); macOS on Intel is not supported. On Windows, use WSL2.</li>
+  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>. ktm uses the C compiler to assemble and link the code it generates.</li>
+  <li>Optional: the SQLite development package, for the SQLite bindings.</li>
+</ul>
+
+<h2 id="build">Build<a class="anchor" href="#build" aria-label="Link to this section">#</a></h2>
+<p>From the repository root, run as your normal user (not with <code>sudo</code>):</p>
+<pre><code>./build.sh</code></pre>
+<p>This builds the compiler as <code>./ktm</code> and the standard library into
+<code>build/prefix</code>. Useful options:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>./build.sh --test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
+    <tr><td><code>./build.sh --install</code></td><td>Also install <code>ktm</code> and the library to <code>/usr/local</code> (asks for sudo only for the copy)</td></tr>
+    <tr><td><code>./build.sh --sqlite</code></td><td>Include the SQLite bindings</td></tr>
+    <tr><td><code>./build.sh --debug</code></td><td>Debug build with AddressSanitizer</td></tr>
+    <tr><td><code>./build.sh --clean</code></td><td>Start from scratch</td></tr>
+  </tbody>
+</table></div>
+<p>Set <code>INSTALL_PREFIX=$HOME/.local</code> to install somewhere else, and
+<code>CC=clang</code> to choose the C compiler, and <code>JOBS=4</code> to build and
+run the tests 4 at a time instead of one per CPU. A test that runs longer than
+<code>KTM_TEST_TIMEOUT</code> seconds (default 60, <code>0</code> for no limit) is
+stopped and reported as failed. The classic route also works:
+<code>make &amp;&amp; sudo make install</code>.</p>
+
+<div class="note"><p><strong>Without installing.</strong> A program needs the standard library to
+compile. If you haven't installed ktm, point it at the local build with
+<code>--install-dir</code>:</p>
+<pre><code>./ktm --install-dir=build/prefix hello.ktm -o hello</code></pre>
+<p>The rest of these docs assume ktm is installed and on your <code>PATH</code>.</p></div>
+
+<h2 id="your-first-program">Your first program<a class="anchor" href="#your-first-program" aria-label="Link to this section">#</a></h2>
+<p>Create <code>hello.ktm</code>:</p>
+<pre data-run><code>U0 Main()
+{
+  "Hello, %s!\n", "world";
+}
+</code></pre>
+<pre class="output">Hello, world!
+</pre>
+<p>A string literal on its own line is a print statement: it works like <code>printf</code>,
+with any arguments after a comma. Compile and run it:</p>
+<pre><code>ktm hello.ktm -o hello
+./hello</code></pre>
+<p>Without <code>-o</code> the binary is called <code>a.out</code>.</p>
+
+<h2 id="run-without-compiling-a-binary">Run without compiling a binary<a class="anchor" href="#run-without-compiling-a-binary" aria-label="Link to this section">#</a></h2>
+<p>The JIT compiles into memory and runs immediately, which is handy while developing:</p>
+<pre><code>ktm -jit hello.ktm</code></pre>
+<p>Make a file executable as a script with a shebang line. ktm skips a first line that
+starts with <code>#!</code>:</p>
+<pre><code>#!/usr/bin/env -S ktm -jit
+"Hello from a script\n";</code></pre>
+<pre><code>chmod +x hello.ktm
+./hello.ktm</code></pre>
+
+<h2 id="how-a-program-runs">How a program runs<a class="anchor" href="#how-a-program-runs" aria-label="Link to this section">#</a></h2>
+<p>Statements at the top level of a file run in order, as in a script. If you define
+<code>Main</code>, it runs after them:</p>
+<pre data-run><code>"first\n";
+
+U0 Main()
+{
+  "last\n";
+}
+
+"second\n";
+</code></pre>
+<pre class="output">first
+second
+last
+</pre>
+<p>Small programs can skip <code>Main</code> entirely and just write statements. Larger
+ones usually keep their code in functions.</p>
+<p>Return a value from <code>Main</code> to set the exit code:</p>
+<pre><code>I32 Main()
+{
+  return 3;   // ./a.out; echo $? prints 3
+}</code></pre>
+
+<h2 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h2>
+<p>Every program can use the whole standard library (<code>MAlloc</code>, <code>StrPrint</code>,
+hash tables, JSON and the rest) without an <code>#include</code>. The compiler reads its
+header, <code>std.ktmh</code>, automatically and links <code>libktm</code>. See the
+<a href="library.html">library guide</a>.</p>
+
+<h2 id="several-files">Several files<a class="anchor" href="#several-files" aria-label="Link to this section">#</a></h2>
+<p>Pull other files in with <code>#include</code>. Paths in quotes are relative to the
+including file:</p>
+<pre><code>// main.ktm
+#include "geometry.ktm"
+
+U0 Main()
+{
+  "%d\n", Area(3, 4);
+}</code></pre>
+<pre><code>// geometry.ktm
+I64 Area(I64 w, I64 h)
+{
+  return w * h;
+}</code></pre>
+<pre><code>ktm main.ktm -o shapes</code></pre>
+
+<h2 id="next-steps">Next steps<a class="anchor" href="#next-steps" aria-label="Link to this section">#</a></h2>
+<ul>
+  <li><a href="language.html">The language</a>: types, classes, control flow, functions and more.</li>
+  <li><a href="tools.html">Tools</a>: every compiler flag, the REPL and editor setup.</li>
+  <li><a href="examples.html">Examples</a>: complete projects to read and run.</li>
+</ul>
+
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/getting-started.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body class="home">
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html">ktm</a>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<ul class="pages"><li class="current"><a href="index.html" aria-current="page">Home</a><ul class="toc"><li><a href="#what-it-looks-like">What it looks like</a></li><li><a href="#where-to-go-next">Where to go next</a></li><li><a href="#what-ktm-is">What ktm is</a></li><li><a href="#history">History and credits</a></li></ul></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<section class="hero">
+  <h1 class="name">ktm</h1>
+  <p class="pitch">A compiled language for systems programming and networking: REST microservices,
+  network daemons and system tools, on Linux and macOS.</p>
+  <p class="sub">C-like, with classes, default arguments and exceptions; an ahead-of-time compiler,
+  a JIT, a REPL and a language server in one binary.</p>
+  <div class="actions">
+    <a class="button primary" href="getting-started.html">Get started</a>
+    <a class="button" href="language.html">Language tour</a>
+    <a class="button" href="stdlib.html">Library reference</a>
+  </div>
+</section>
+
+<p>ktm is a C-like language with classes, default arguments, a print-a-string statement and a JIT
+at its heart, made for REST microservices, network daemons and systems tools. <code>ktm</code> runs on
+Linux (x86_64 and arm64) and macOS (Apple Silicon) as an ahead-of-time compiler, a JIT, a REPL and a
+language server.</p>
+
+<pre data-run><code>U0 Main()
+{
+  "Hello world\n";
+}
+</code></pre>
+<pre class="output">Hello world
+</pre>
+
+<p>A string on its own is a print statement, <code>U0</code> is <code>void</code>, and
+<code>Main</code> is called for you. Save it as <code>hello.ktm</code> and run it either way:</p>
+
+<pre><code>ktm hello.ktm -o hello &amp;&amp; ./hello   # compile to a native binary
+ktm -jit hello.ktm                    # or compile in memory and run straight away</code></pre>
+
+<h2 id="what-it-looks-like">What it looks like<a class="anchor" href="#what-it-looks-like" aria-label="Link to this section">#</a></h2>
+<div class="samples">
+<div class="sample">
+<h3 id="a-request-and-a-reply">A request and a reply<a class="anchor" href="#a-request-and-a-reply" aria-label="Link to this section">#</a></h3>
+<p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
+Unix sockets, IPv4 and IPv6.</p>
+<pre data-run><code>U0 Main()
+{
+  I32 srv = NetCreateServer(0, "127.0.0.1", 4);
+  I32 cli = NetConnect("127.0.0.1", NetGetSocketPort(srv));
+  I32 conn = NetAccept(srv);
+  U8 req[256], resp[256];
+  I64 n;
+
+  NetSend(cli, "GET /hello HTTP/1.0\r\n\r\n", 23);
+
+  n = recv(conn, req, sizeof(req) - 1, 0);   // the server side
+  req[n] = '\0';
+  U8 *path = req + 4;                          // after "GET "
+  *StrFirstOcc(path, " ") = '\0';
+  U8 *reply = MStrPrint("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  NetSend(conn, reply, StrLen(reply));
+  close(conn);
+
+  n = recv(cli, resp, sizeof(resp) - 1, MSG_WAITALL);  // the client side
+  resp[n] = '\0';
+  "%s", strstr(resp, "\r\n\r\n") + 4;
+  Free(reply);
+  close(cli);
+  close(srv);
+}
+</code></pre>
+<pre class="output">you asked for /hello
+</pre>
+</div>
+<div class="sample">
+<h3 id="running-a-program">Running a program<a class="anchor" href="#running-a-program" aria-label="Link to this section">#</a></h3>
+<p><code>ProcRun</code> runs a command and returns what it printed; <code>ProcSpawn</code> gives
+you its pipes.</p>
+<pre data-run><code>U0 Main()
+{
+  U8 *argv[] = {"echo", "hello from a child process", NULL};
+  I64 code;
+  U8 *out = ProcRun(argv, &amp;code);
+  "%s\n", out;
+  "exit code %d\n", code;
+  Free(out);
+}
+</code></pre>
+<pre class="output">hello from a child process
+exit code 0
+</pre>
+</div>
+<div class="sample">
+<h3 id="threads">Threads<a class="anchor" href="#threads" aria-label="Link to this section">#</a></h3>
+<p>POSIX threads directly, or a thread pool from the library.</p>
+<pre data-run><code>I64 sums[4];
+
+U0 *Sum(U0 *arg)
+{
+  I64 part = arg(I64), total = 0;
+  for (I64 i = part * 250 + 1; i &lt;= (part + 1) * 250; i++) total += i;
+  sums[part] = total;
+  return NULL;
+}
+
+U0 Main()
+{
+  pthread_t *th[4];
+  I64 i, total = 0;
+  for (i = 0; i &lt; 4; i++) pthread_create(&amp;th[i], NULL, &amp;Sum, i(U0 *));
+  for (i = 0; i &lt; 4; i++) {
+    pthread_join(th[i]);
+    total += sums[i];
+  }
+  "1 + 2 + ... + 1000 = %d\n", total;
+}
+</code></pre>
+<pre class="output">1 + 2 + ... + 1000 = 500500
+</pre>
+</div>
+<div class="sample">
+<h3 id="a-taste-of-the-language">A taste of the language<a class="anchor" href="#a-taste-of-the-language" aria-label="Link to this section">#</a></h3>
+<p>Classes with inheritance, default arguments and ranges in <code>case</code>.</p>
+<pre data-run><code>class Animal
+{
+  U8 *name;
+  I64 legs;
+};
+
+class Bird : Animal
+{
+  Bool can_fly;
+};
+
+U0 Describe(Animal *a, U8 *sound = "...")
+{
+  "%s has %d legs and says %s\n", a-&gt;name, a-&gt;legs, sound;
+}
+
+U0 Main()
+{
+  Bird b;
+  b.name = "Tweety";
+  b.legs = 2;
+  b.can_fly = TRUE;
+
+  Describe(&amp;b, "tweet");   // a Bird is an Animal
+  Describe(&amp;b);            // default argument
+
+  for (I64 i = 1; i &lt;= 3; i++) {
+    switch (i) {
+      case 1: "one"; break;
+      case 2 ... 3: ", more"; break;
+    }
+  }
+  "\n";
+}
+</code></pre>
+<pre class="output">Tweety has 2 legs and says tweet
+Tweety has 2 legs and says ...
+one, more, more
+</pre>
+</div>
+</div>
+
+<h2 id="where-to-go-next">Where to go next<a class="anchor" href="#where-to-go-next" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="getting-started.html"><strong>Getting started</strong><span>Build ktm, compile and run your first program.</span></a>
+  <a class="card" href="language.html"><strong>Language</strong><span>Every feature, with examples you can run.</span></a>
+  <a class="card" href="library.html"><strong>Library guide</strong><span>Strings, files, hash tables, vectors, JSON.</span></a>
+  <a class="card" href="stdlib.html"><strong>Library reference</strong><span>All 700+ declarations in std.ktmh.</span></a>
+  <a class="card" href="tools.html"><strong>Tools</strong><span>Compiler flags, JIT, REPL, LSP, transpiler.</span></a>
+  <a class="card" href="examples.html"><strong>Examples</strong><span>Complete projects with expected output.</span></a>
+</div>
+
+<h2 id="what-ktm-is">What ktm is<a class="anchor" href="#what-ktm-is" aria-label="Link to this section">#</a></h2>
+<ul>
+  <li><strong>A native compiler.</strong> ktm is parsed to an AST, lowered to an SSA IR and emitted as x86_64 or AArch64 assembly, which the system C compiler assembles and links.</li>
+  <li><strong>A JIT.</strong> <code>ktm -jit</code> assembles machine code in memory with a built-in assembler and runs it, with no files written.</li>
+  <li><strong>A REPL.</strong> <code>ktm -repl</code> runs ktm interactively.</li>
+  <li><strong>A language server.</strong> <code>ktm -lsp</code> gives editors diagnostics, hover, completion, go-to-definition, references and rename.</li>
+  <li><strong>A standard library.</strong> Strings, files, hash tables, vectors, JSON, dates, threads, sockets and more, available in every program without an include.</li>
+</ul>
+<p>It runs on Linux on x86_64 and arm64 and on macOS on Apple Silicon. On Windows, use WSL2.</p>
+
+<h2 id="history">History and credits<a class="anchor" href="#history" aria-label="Link to this section">#</a></h2>
+<p>ktm started as a fork of <a href="https://github.com/Jamesbarford/holyc-lang">Jamesbarford/holyc-lang</a>
+(BSD-2-Clause), a compiler for HolyC, the language Terry A. Davis created for TempleOS. Thanks to both:
+to <a href="https://en.wikipedia.org/wiki/Terry_A._Davis">Terry A. Davis</a> for HolyC and
+<a href="https://templeos.org/">TempleOS</a>, and to
+<a href="https://github.com/Jamesbarford">James Barford-Evans</a>, who wrote the compiler ktm grew from.
+The fork was called hcc until v0.19.3 and was renamed ktm at v0.1.0; its earlier history is on the
+<a href="releases.html#hcc">Releases</a> page.</p>
+
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/index.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

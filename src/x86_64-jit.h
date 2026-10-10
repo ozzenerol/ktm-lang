@@ -1,0 +1,25 @@
+#ifndef X86_64_JIT_H__
+#define X86_64_JIT_H__
+
+/* Optional in-process JIT for x86_64 hosts. Lowers IR straight to
+ * native instruction bytes via the libtasm x86_64 direct-emit encoders;
+ * all the arch-independent machinery (state, globals, symbol
+ * resolution, the runner) lives in jit-common.h.
+ *
+ * Build-gated: this header is only meaningful when KTM is built on an
+ * x86_64 host with KTM_ENABLE_JIT defined. */
+
+#include "cctrl.h"
+#include "jit-common.h"
+
+/* Run the front-end -> IR -> x86_64 bytes -> RX mapping pipeline for
+ * every function in `cc`. Returns NULL on error (errors are reported
+ * via the same channels as the AOT path). Use ktmJitRunMain /
+ * ktmJitLookup / ktmJitFree on the result. */
+KtmJit *x86_64JitCompile(Cctrl *cc);
+
+/* The backend vtable, for incremental compilation via ktmJitNew /
+ * ktmJitCompileChunk (the REPL). NULL on non-x86_64 hosts. */
+const KtmJitBackend *x86_64JitBackend(void);
+
+#endif

@@ -1,0 +1,41 @@
+<!-- title: Examples -->
+<h1>Example projects</h1>
+<p class="lede">Three complete programs in <code>docs/examples/</code>, each with the exact
+output it should produce. They double as tests: <code>docs/examples/run.sh</code> builds
+every project, runs it both compiled and in the JIT, and compares the output with its
+<code>expected.txt</code>.</p>
+<pre><code>docs/examples/run.sh          # all projects
+docs/examples/run.sh life     # just one</code></pre>
+
+<h2>Word frequency</h2>
+<p>Reads a text file and prints its most common words. It shows reading a file, scanning
+characters, counting with a <code>StrMap</code>, ranking with <code>PtrVecSort</code>, and
+reading command-line arguments.</p>
+<pre><code>cd docs/examples/wordfreq
+ktm main.ktm -o wordfreq && ./wordfreq sample.txt</code></pre>
+<pre><code class="language-ktm"><!-- include: examples/wordfreq/main.ktm --></code></pre>
+<pre class="output"><!-- include: examples/wordfreq/expected.txt --></pre>
+
+<h2>Bank</h2>
+<p>Accounts with monthly interest and a transaction log. A savings account
+<em>inherits</em> from <code>Account</code> and swaps in its own interest function through
+a function pointer. Errors are exceptions, and a failed transfer rolls itself back. Money is
+kept in integer cents, so no rounding errors creep in.</p>
+<pre><code>cd docs/examples/bank
+ktm main.ktm -o bank && ./bank</code></pre>
+<pre><code class="language-ktm"><!-- include: examples/bank/main.ktm --></code></pre>
+<pre class="output"><!-- include: examples/bank/expected.txt --></pre>
+
+<h2>Game of Life</h2>
+<p>Conway's Game of Life on a small board that wraps at the edges, with a glider and a
+blinker. It shows 2D arrays, nested loops, <code>%</code> for wrap-around and
+<code>MemCpy</code> on whole arrays.</p>
+<pre><code>cd docs/examples/life
+ktm main.ktm -o life && ./life</code></pre>
+<pre><code class="language-ktm"><!-- include: examples/life/main.ktm --></code></pre>
+<pre class="output"><!-- include: examples/life/expected.txt --></pre>
+
+<h2>More examples in the repository</h2>
+<p>The compiler's own test suite, <code>src/tests/</code>, has more than 300 small programs,
+one per feature or fixed bug: threads, sockets, JSON, SQLite, fuzzy matching and more. The
+standard library in <code>src/std/</code> is all ktm too, and worth reading.</p>

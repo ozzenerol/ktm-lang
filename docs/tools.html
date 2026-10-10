@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html">ktm</a>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a></li><li><a href="#libraries">Libraries</a></li><li><a href="#the-transpiler">The transpiler</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<h1>Tools</h1>
+<p class="lede">One binary, <code>ktm</code>, does everything: compiling, JIT, REPL, language
+server, transpiler and debugging output.</p>
+
+<h2 id="compiling">Compiling<a class="anchor" href="#compiling" aria-label="Link to this section">#</a></h2>
+<pre><code>ktm main.ktm -o app          # build ./app
+ktm main.ktm                 # build ./a.out
+ktm -S main.ktm -o main.s    # assembly only
+ktm -S -o- main.ktm          # assembly to stdout
+ktm -c main.ktm -o main.o    # object file, to link later
+ktm main.ktm util.o -o app   # link object files in
+ktm -DDEBUG main.ktm         # define a macro (no value)
+ktm -Werror main.ktm         # treat warnings as errors</code></pre>
+<p>Link C libraries with <code>-clibs</code>, or record them in the source with
+<a href="language.html#calling-c"><code>#link</code></a>:</p>
+<pre><code>ktm game.ktm -clibs="-lSDL2 -lm" -o game</code></pre>
+<p>ktm hands the generated assembly to the system C compiler through a temporary
+file in <code>$TMPDIR</code> (<code>/tmp</code> if unset), one per compile and
+removed afterwards, so several compiles can run at once.</p>
+
+<h3 id="all-flags">All flags<a class="anchor" href="#all-flags" aria-label="Link to this section">#</a></h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Flag</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>-o &lt;file&gt;</code></td><td>Output file name</td></tr>
+    <tr><td><code>-run</code></td><td>Compile to a temporary binary, run it and delete it; arguments after the file are passed to the program and its exit code becomes ktm's</td></tr>
+    <tr><td><code>-jit</code></td><td>Compile in memory and run (x86_64 and arm64)</td></tr>
+    <tr><td><code>-Memsafe</code></td><td>With <code>-jit</code>: report double frees, wild frees and leaks at exit</td></tr>
+    <tr><td><code>-repl</code></td><td>Interactive session</td></tr>
+    <tr><td><code>-lsp</code></td><td>Language server over stdio, for editors</td></tr>
+    <tr><td><code>-S</code></td><td>Emit assembly only</td></tr>
+    <tr><td><code>-o-</code></td><td>With <code>-S</code>: write the assembly to stdout</td></tr>
+    <tr><td><code>-c</code></td><td>Emit an object file</td></tr>
+    <tr><td><code>-fPIC</code></td><td>Position-independent code, for object files that go into shared libraries</td></tr>
+    <tr><td><code>-lib &lt;name&gt;</code></td><td>Build <code>lib&lt;name&gt;.a</code> and a shared library and install them under the install prefix</td></tr>
+    <tr><td><code>-clibs="..."</code></td><td>Extra linker flags, such as <code>-lcurl</code></td></tr>
+    <tr><td><code>-D&lt;NAME&gt;</code></td><td>Define a macro (no value)</td></tr>
+    <tr><td><code>-Werror</code></td><td>Treat warnings as errors</td></tr>
+    <tr><td><code>--install-dir &lt;dir&gt;</code></td><td>Use <code>&lt;dir&gt;/include</code> and <code>&lt;dir&gt;/lib</code> instead of the install prefix</td></tr>
+    <tr><td><code>--target &lt;triple&gt;</code></td><td>Cross-compile: <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-apple-darwin</code>, <code>aarch64-apple-darwin</code>, …</td></tr>
+    <tr><td><code>-transpile</code></td><td>Print the program as C (best effort)</td></tr>
+    <tr><td><code>-ast</code>, <code>-tokens</code></td><td>Print the syntax tree or the token stream and exit</td></tr>
+    <tr><td><code>--dump-ir</code></td><td>Print the intermediate representation</td></tr>
+    <tr><td><code>-cfg</code>, <code>-cfg-png</code>, <code>-cfg-svg</code></td><td>Write a Graphviz control flow graph (PNG and SVG need Graphviz)</td></tr>
+    <tr><td><code>--mem-stats</code></td><td>Report the compiler's own memory use</td></tr>
+    <tr><td><code>--version</code>, <code>--help</code></td><td>Version and build details; all flags</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="the-jit">The JIT<a class="anchor" href="#the-jit" aria-label="Link to this section">#</a></h2>
+<p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's built-in
+assembler and runs it. No C compiler, linker or files are involved, so it starts fast.
+Arguments after the file are passed to the program. A file with no <code>Main</code> and
+no code at file scope has nothing to run: <code>-jit</code> says so and exits with 1. Use
+<code>#ifjit</code> / <code>#ifaot</code> for code that should differ between the two modes.</p>
+<pre><code>ktm -jit server.ktm 8080</code></pre>
+
+<h2 id="the-repl">The REPL<a class="anchor" href="#the-repl" aria-label="Link to this section">#</a></h2>
+<pre><code>ktm -repl</code></pre>
+<p>ktm runs as you type it. Functions, classes, globals and
+<code>#define</code>s accumulate across the session, and the value of a trailing expression
+is echoed:</p>
+<pre><code>&amp;gt; I64 Sq(I64 x) { return x * x; }
+&amp;gt; Sq(7);
+49
+&amp;gt; "hello %d\n", Sq(3);
+hello 9</code></pre>
+<ul>
+  <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
+  <li><code>~/.ktm_rc.ktm</code> is included at start-up. Put <code>#define KTM_NO_REPL_HELLO</code> in it to hide the welcome message.</li>
+  <li><code>Uf("Name");</code> disassembles a function. <code>ReplDel("name");</code> forgets a definition so you can redefine it.</li>
+  <li><code>@ ls -la</code> runs a shell command. It goes through <code>system()</code>, so <code>@ cd</code> doesn't change the REPL's directory.</li>
+  <li>Allocations are tracked, so leaks and bad frees are reported.</li>
+</ul>
+
+<h2 id="editor-support">Editor support<a class="anchor" href="#editor-support" aria-label="Link to this section">#</a></h2>
+<p><code>ktm -lsp</code> is a language server: errors and warnings as you type, hover,
+completion (including after <code>.</code> and <code>-&gt;</code>), go to definition,
+find references, highlighting and rename. It works with any editor that speaks LSP.</p>
+
+<h3 id="neovim">Neovim<a class="anchor" href="#neovim" aria-label="Link to this section">#</a></h3>
+<pre><code>vim.filetype.add({ extension = { ktm = "ktm", ktmh = "ktm" } })
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "ktm",
+  callback = function(ev)
+    vim.lsp.start({
+      name = "ktm",
+      cmd = { "ktm", "-lsp" },
+      root_dir = vim.fs.root(ev.buf, { ".git" })
+                 or vim.fs.dirname(vim.api.nvim_buf_get_name(ev.buf)),
+    })
+  end,
+})</code></pre>
+
+<h3 id="other-editors">Other editors<a class="anchor" href="#other-editors" aria-label="Link to this section">#</a></h3>
+<p>Point your editor's generic LSP client at the command <code>ktm -lsp</code> for
+<code>.ktm</code> and <code>.ktmh</code> files. If ktm isn't installed, add
+<code>--install-dir=/path/to/build/prefix</code> so it can find the library header. Set
+<code>KTM_LSP_LOG=1</code> in the server's environment to log its traffic to stderr.
+Syntax highlighting for Vim is in <code>src/syntax-highlighting/ktm.vim</code>.</p>
+
+<h2 id="libraries">Libraries<a class="anchor" href="#libraries" aria-label="Link to this section">#</a></h2>
+<p>Build your own ktm library and install it next to the standard one:</p>
+<pre><code>ktm -lib mylib --install-dir=$HOME/.local mylib.ktm</code></pre>
+<p>This produces <code>libmylib.a</code> and a shared library in
+<code>$HOME/.local/lib</code>. Mark the functions and globals it exports
+<code>public</code>. To use the library, declare its functions, and its globals with
+<code>extern</code> (<code>extern I64 count;</code>, <code>extern I64 (*hook)(I64);</code>),
+usually in a <code>.ktmh</code> header you <code>#include</code>, and add
+<code>#link &lt;mylib&gt;</code>.</p>
+
+<h2 id="the-transpiler">The transpiler<a class="anchor" href="#the-transpiler" aria-label="Link to this section">#</a></h2>
+<pre><code>ktm -transpile main.ktm &amp;gt; main.c</code></pre>
+<p>This prints a C version of the program. It's experimental and <strong>frozen</strong>: it
+supports the language as of v0.18 and gets no new features, so language and library features
+added later may not translate. Comments are dropped, and some programs need fixing by hand. Globals are written with their initialisers;
+code at file scope (initialisers that aren't constant, statements) goes into
+<code>__ktm_init()</code>, which <code>main</code> calls first.
+The program is checked by the compiler first: its warnings and errors are printed as for a
+compile, and an error stops the transpile with exit status 1, so a wrong program gives no C.
+The program is parsed twice, once for the check and once for the C.</p>
+
+<h2 id="looking-under-the-hood">Looking under the hood<a class="anchor" href="#looking-under-the-hood" aria-label="Link to this section">#</a></h2>
+<pre><code>ktm -tokens main.ktm                 # what the lexer sees
+ktm -ast main.ktm                    # the parsed program
+ktm --dump-ir main.ktm               # the SSA intermediate representation
+ktm -S -o- main.ktm                  # the generated assembly
+ktm -cfg main.ktm &amp;&amp; dot -Tpng main.dot -o main.png</code></pre>
+
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/tools.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

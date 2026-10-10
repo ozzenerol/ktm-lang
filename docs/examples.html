@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Examples - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html">ktm</a>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li class="current"><a href="examples.html" aria-current="page">Examples</a><ul class="toc"><li><a href="#word-frequency">Word frequency</a></li><li><a href="#bank">Bank</a></li><li><a href="#game-of-life">Game of Life</a></li><li><a href="#more-examples-in-the-repository">More examples in the repository</a></li></ul></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<h1>Example projects</h1>
+<p class="lede">Three complete programs in <code>docs/examples/</code>, each with the exact
+output it should produce. They double as tests: <code>docs/examples/run.sh</code> builds
+every project, runs it both compiled and in the JIT, and compares the output with its
+<code>expected.txt</code>.</p>
+<pre><code>docs/examples/run.sh          # all projects
+docs/examples/run.sh life     # just one</code></pre>
+
+<h2 id="word-frequency">Word frequency<a class="anchor" href="#word-frequency" aria-label="Link to this section">#</a></h2>
+<p>Reads a text file and prints its most common words. It shows reading a file, scanning
+characters, counting with a <code>StrMap</code>, ranking with <code>PtrVecSort</code>, and
+reading command-line arguments.</p>
+<pre><code>cd docs/examples/wordfreq
+ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>
+<pre><code class="language-ktm">// Word frequency: reads a text file and prints its most common words.
+//
+//   ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt
+//   ktm -jit main.ktm sample.txt
+//
+// Shows: reading files, scanning strings, StrMap, PtrVec sorting,
+// classes and command-line arguments.
+
+#define TOP_N    8
+#define MAX_WORD 64
+
+class WordCount
+{
+  U8 *word;
+  I64 count;
+};
+
+// Sort predicate: TRUE when a ranks above b. Most frequent first, then
+// alphabetical so ties have a stable order.
+I64 RanksHigher(U0 *_a, U0 *_b)
+{
+  WordCount *a = _a;
+  WordCount *b = _b;
+  if (a-&gt;count != b-&gt;count) {
+    return a-&gt;count &gt; b-&gt;count;
+  }
+  return StrCmp(a-&gt;word, b-&gt;word) &lt; 0;
+}
+
+Bool IsLetter(U8 c)
+{
+  return ('a' &lt;= c &lt;= 'z') || ('A' &lt;= c &lt;= 'Z');
+}
+
+U0 CountWord(StrMap *counts, U8 *word)
+{
+  WordCount *wc = StrMapGet(counts, word);
+  if (wc == NULL) {
+    wc = MAlloc(sizeof(WordCount));
+    wc-&gt;word = StrNew(word);       // the map keeps this pointer as its key
+    wc-&gt;count = 0;
+    StrMapSet(counts, wc-&gt;word, wc);
+  }
+  wc-&gt;count++;
+}
+
+I32 Main(I32 argc, U8 **argv)
+{
+  U8 *path = "sample.txt";
+  if (argc &gt; 1) {
+    path = argv[1];
+  }
+
+  I64 size;
+  U8 *text = FileRead(path, &amp;size);
+  if (text == NULL) {
+    "cannot read %s\n", path;
+    return 1;
+  }
+
+  StrMap *counts = StrMapNew();
+  U8 word[MAX_WORD];
+  I64 len = 0, total = 0;
+
+  // One pass over the text; i == size flushes the final word.
+  for (I64 i = 0; i &lt;= size; i++) {
+    U8 c = 0;
+    if (i &lt; size) c = text[i];
+    if (IsLetter(c)) {
+      if (len &lt; MAX_WORD - 1) {
+        word[len++] = ToLower(c);
+      }
+    } else if (len &gt; 0) {
+      word[len] = 0;
+      CountWord(counts, word);
+      total++;
+      len = 0;
+    }
+  }
+
+  PtrVec *ranked = PtrVecNew();
+  I64 idx = 0;
+  WordCount *wc;
+  while (StrMapValueIter(counts, &amp;idx, &amp;wc)) {
+    PtrVecPush(ranked, wc);
+  }
+  PtrVecSort(ranked, &amp;RanksHigher);
+
+  "%d words, %d distinct\n", total, ranked-&gt;size;
+  for (I64 i = 0; i &lt; TOP_N &amp;&amp; i &lt; ranked-&gt;size; i++) {
+    WordCount *top = ranked-&gt;entries[i];
+    "%2d. %-10s %d\n", i + 1, top-&gt;word, top-&gt;count;
+  }
+
+  Free(text);
+  return 0;
+}
+</code></pre>
+<pre class="output">66 words, 28 distinct
+ 1. the        10
+ 2. was        8
+ 3. and        6
+ 4. in         4
+ 5. god        3
+ 6. him        3
+ 7. made       3
+ 8. word       3
+</pre>
+
+<h2 id="bank">Bank<a class="anchor" href="#bank" aria-label="Link to this section">#</a></h2>
+<p>Accounts with monthly interest and a transaction log. A savings account
+<em>inherits</em> from <code>Account</code> and swaps in its own interest function through
+a function pointer. Errors are exceptions, and a failed transfer rolls itself back. Money is
+kept in integer cents, so no rounding errors creep in.</p>
+<pre><code>cd docs/examples/bank
+ktm main.ktm -o bank &amp;&amp; ./bank</code></pre>
+<pre><code class="language-ktm">// Bank: accounts, monthly interest and a transaction log.
+//
+//   ktm main.ktm -o bank &amp;&amp; ./bank
+//   ktm -jit main.ktm
+//
+// Shows: classes and inheritance, function pointers as "methods",
+// exceptions for errors, linked lists, and integer money (cents).
+
+#define ERR_FUNDS  'Funds'
+#define ERR_FROZEN 'Frozen'
+
+class Account
+{
+  U8 *owner;
+  I64 balance;          // in cents
+  Bool frozen;
+  // Per-kind behaviour: interest earned in a month.
+  I64 (*interest)(Account *a);
+};
+
+class Savings : Account
+{
+  I64 rate_bp;          // annual rate in basis points (1/100 of a percent)
+};
+
+class Txn
+{
+  U8 *owner;
+  U8 *what;
+  I64 amount;
+};
+
+List *ledger;
+
+I64 NoInterest(Account *a)
+{
+  return 0;
+}
+
+I64 SavingsInterest(Account *a)
+{
+  Savings *s = a;
+  return s-&gt;balance * s-&gt;rate_bp / 10000 / 12;
+}
+
+U0 InitAccount(Account *a, U8 *owner, I64 cents)
+{
+  a-&gt;owner = owner;
+  a-&gt;balance = cents;
+  a-&gt;frozen = FALSE;
+  a-&gt;interest = &amp;NoInterest;
+}
+
+U0 Record(Account *a, U8 *what, I64 amount)
+{
+  Txn *t = MAlloc(sizeof(Txn));
+  t-&gt;owner = a-&gt;owner;
+  t-&gt;what = what;
+  t-&gt;amount = amount;
+  ListAppend(ledger, t);
+}
+
+U0 Withdraw(Account *a, I64 cents)
+{
+  if (a-&gt;frozen) throw(ERR_FROZEN);
+  if (cents &gt; a-&gt;balance) throw(ERR_FUNDS);
+  a-&gt;balance -= cents;
+  Record(a, "withdraw", -cents);
+}
+
+U0 Deposit(Account *a, I64 cents)
+{
+  if (a-&gt;frozen) throw(ERR_FROZEN);
+  a-&gt;balance += cents;
+  Record(a, "deposit", cents);
+}
+
+// Moves money between accounts, or neither changes.
+Bool Transfer(Account *from, Account *to, I64 cents)
+{
+  Bool withdrawn = FALSE;
+  try {
+    Withdraw(from, cents);
+    withdrawn = TRUE;
+    Deposit(to, cents);
+  } catch {
+    if (withdrawn) {                 // the deposit failed: put it back
+      from-&gt;balance += cents;
+      Record(from, "refund", cents);
+    }
+    U8 *why = "account frozen";
+    if (Fs-&gt;except_ch == ERR_FUNDS) why = "insufficient funds";
+    "  transfer %s -&gt; %s refused: %s\n", from-&gt;owner, to-&gt;owner, why;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+U0 PrintMoney(I64 cents)
+{
+  if (cents &lt; 0) {
+    "-";
+    cents = -cents;
+  }
+  "%d.%02d", cents / 100, cents % 100;
+}
+
+U0 Statement(Account *a)
+{
+  "  %-6s ", a-&gt;owner;
+  PrintMoney(a-&gt;balance);
+  if (a-&gt;frozen) " (frozen)";
+  "\n";
+}
+
+U0 Main()
+{
+  ledger = ListNew();
+
+  Account alice;
+  InitAccount(&amp;alice, "alice", 120000);
+
+  Savings bob;
+  InitAccount(&amp;bob, "bob", 50000);
+  bob.rate_bp = 450;                 // 4.5% a year
+  bob.interest = &amp;SavingsInterest;
+
+  Account carol;
+  InitAccount(&amp;carol, "carol", 2500);
+
+  Account *all[3];
+  all[0] = &amp;alice;
+  all[1] = &amp;bob;
+  all[2] = &amp;carol;
+
+  "Opening balances\n";
+  for (I64 i = 0; i &lt; 3; i++) Statement(all[i]);
+
+  "Transfers\n";
+  Transfer(&amp;alice, &amp;bob, 30000);
+  Transfer(&amp;carol, &amp;alice, 9999);    // carol only has 25.00
+  carol.frozen = TRUE;
+  Transfer(&amp;bob, &amp;carol, 100);
+
+  "Month end\n";
+  for (I64 i = 0; i &lt; 3; i++) {
+    Account *a = all[i];
+    I64 earned = a-&gt;interest(a);
+    if (earned &gt; 0) {
+      a-&gt;balance += earned;
+      Record(a, "interest", earned);
+    }
+    Statement(a);
+  }
+
+  "Ledger (%d entries)\n", ListCount(ledger);
+  for (List *it = ledger-&gt;next; it != ledger; it = it-&gt;next) {
+    Txn *t = it-&gt;value;
+    "  %-6s %-9s ", t-&gt;owner, t-&gt;what;
+    PrintMoney(t-&gt;amount);
+    "\n";
+  }
+}
+</code></pre>
+<pre class="output">Opening balances
+  alice  1200.00
+  bob    500.00
+  carol  25.00
+Transfers
+  transfer carol -&gt; alice refused: insufficient funds
+  transfer bob -&gt; carol refused: account frozen
+Month end
+  alice  900.00
+  bob    803.00
+  carol  25.00 (frozen)
+Ledger (5 entries)
+  alice  withdraw  -300.00
+  bob    deposit   300.00
+  bob    withdraw  -1.00
+  bob    refund    1.00
+  bob    interest  3.00
+</pre>
+
+<h2 id="game-of-life">Game of Life<a class="anchor" href="#game-of-life" aria-label="Link to this section">#</a></h2>
+<p>Conway's Game of Life on a small board that wraps at the edges, with a glider and a
+blinker. It shows 2D arrays, nested loops, <code>%</code> for wrap-around and
+<code>MemCpy</code> on whole arrays.</p>
+<pre><code>cd docs/examples/life
+ktm main.ktm -o life &amp;&amp; ./life</code></pre>
+<pre><code class="language-ktm">// Conway's Game of Life on a small wrapping board.
+//
+//   ktm main.ktm -o life &amp;&amp; ./life
+//   ktm -jit main.ktm
+//
+// Shows: 2D arrays, nested loops, the % operator for wrap-around,
+// #define constants and building output a line at a time.
+
+#define W     12
+#define H     8
+#define STEPS 4
+
+U8 board[H][W];
+U8 next[H][W];
+
+U0 Place(U8 *pattern, I64 top, I64 left)
+{
+  // `pattern` rows are separated by '/'; '#' is a live cell.
+  I64 r = top, c = left;
+  for (U8 *p = pattern; *p; p++) {
+    if (*p == '/') {
+      r++;
+      c = left;
+    } else {
+      board[r][c] = *p == '#';
+      c++;
+    }
+  }
+}
+
+I64 Neighbours(I64 r, I64 c)
+{
+  I64 n = 0;
+  for (I64 dr = -1; dr &lt;= 1; dr++) {
+    for (I64 dc = -1; dc &lt;= 1; dc++) {
+      if (dr == 0 &amp;&amp; dc == 0) continue;
+      n += board[(r + dr + H) % H][(c + dc + W) % W];
+    }
+  }
+  return n;
+}
+
+U0 Step()
+{
+  for (I64 r = 0; r &lt; H; r++) {
+    for (I64 c = 0; c &lt; W; c++) {
+      I64 n = Neighbours(r, c);
+      // Born with 3 neighbours, survives with 2 or 3.
+      next[r][c] = n == 3 || (board[r][c] &amp;&amp; n == 2);
+    }
+  }
+  MemCpy(board, next, sizeof(board));
+}
+
+I64 Population()
+{
+  I64 alive = 0;
+  for (I64 r = 0; r &lt; H; r++) {
+    for (I64 c = 0; c &lt; W; c++) {
+      alive += board[r][c];
+    }
+  }
+  return alive;
+}
+
+U0 Show(I64 gen)
+{
+  "generation %d, %d alive\n", gen, Population;
+  U8 line[W + 1];
+  line[W] = 0;
+  for (I64 r = 0; r &lt; H; r++) {
+    for (I64 c = 0; c &lt; W; c++) {
+      line[c] = '.';
+      if (board[r][c]) line[c] = '#';
+    }
+    "%s\n", line;
+  }
+}
+
+U0 Main()
+{
+  Place(".#./..#/###", 0, 0);   // a glider, top left
+  Place("###", 5, 7);           // a blinker, bottom right
+  for (I64 gen = 0; gen &lt;= STEPS; gen++) {
+    Show(gen);
+    Step;
+  }
+}
+</code></pre>
+<pre class="output">generation 0, 8 alive
+.#..........
+..#.........
+###.........
+............
+............
+.......###..
+............
+............
+generation 1, 8 alive
+............
+#.#.........
+.##.........
+.#..........
+........#...
+........#...
+........#...
+............
+generation 2, 8 alive
+............
+..#.........
+#.#.........
+.##.........
+............
+.......###..
+............
+............
+generation 3, 8 alive
+............
+.#..........
+..##........
+.##.........
+........#...
+........#...
+........#...
+............
+generation 4, 8 alive
+............
+..#.........
+...#........
+.###........
+............
+.......###..
+............
+............
+</pre>
+
+<h2 id="more-examples-in-the-repository">More examples in the repository<a class="anchor" href="#more-examples-in-the-repository" aria-label="Link to this section">#</a></h2>
+<p>The compiler's own test suite, <code>src/tests/</code>, has more than 300 small programs,
+one per feature or fixed bug: threads, sockets, JSON, SQLite, fuzzy matching and more. The
+standard library in <code>src/std/</code> is all ktm too, and worth reading.</p>
+
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/examples.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!-- title: Getting started -->
+<h1>Getting started</h1>
+<p class="lede">Build ktm from source, then compile and run your first programs.</p>
+
+<h2>Requirements</h2>
+<ul>
+  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon (arm64); macOS on Intel is not supported. On Windows, use WSL2.</li>
+  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>. ktm uses the C compiler to assemble and link the code it generates.</li>
+  <li>Optional: the SQLite development package, for the SQLite bindings.</li>
+</ul>
+
+<h2>Build</h2>
+<p>From the repository root, run as your normal user (not with <code>sudo</code>):</p>
+<pre><code>./build.sh</code></pre>
+<p>This builds the compiler as <code>./ktm</code> and the standard library into
+<code>build/prefix</code>. Useful options:</p>
+<table>
+  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>./build.sh --test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
+    <tr><td><code>./build.sh --install</code></td><td>Also install <code>ktm</code> and the library to <code>/usr/local</code> (asks for sudo only for the copy)</td></tr>
+    <tr><td><code>./build.sh --sqlite</code></td><td>Include the SQLite bindings</td></tr>
+    <tr><td><code>./build.sh --debug</code></td><td>Debug build with AddressSanitizer</td></tr>
+    <tr><td><code>./build.sh --clean</code></td><td>Start from scratch</td></tr>
+  </tbody>
+</table>
+<p>Set <code>INSTALL_PREFIX=$HOME/.local</code> to install somewhere else, and
+<code>CC=clang</code> to choose the C compiler, and <code>JOBS=4</code> to build and
+run the tests 4 at a time instead of one per CPU. A test that runs longer than
+<code>KTM_TEST_TIMEOUT</code> seconds (default 60, <code>0</code> for no limit) is
+stopped and reported as failed. The classic route also works:
+<code>make &amp;&amp; sudo make install</code>.</p>
+
+<div class="note"><p><strong>Without installing.</strong> A program needs the standard library to
+compile. If you haven't installed ktm, point it at the local build with
+<code>--install-dir</code>:</p>
+<pre><code>./ktm --install-dir=build/prefix hello.ktm -o hello</code></pre>
+<p>The rest of these docs assume ktm is installed and on your <code>PATH</code>.</p></div>
+
+<h2>Your first program</h2>
+<p>Create <code>hello.ktm</code>:</p>
+<pre data-run><code>
+U0 Main()
+{
+  "Hello, %s!\n", "world";
+}
+</code></pre>
+<pre class="output">
+Hello, world!
+</pre>
+<p>A string literal on its own line is a print statement: it works like <code>printf</code>,
+with any arguments after a comma. Compile and run it:</p>
+<pre><code>ktm hello.ktm -o hello
+./hello</code></pre>
+<p>Without <code>-o</code> the binary is called <code>a.out</code>.</p>
+
+<h2>Run without compiling a binary</h2>
+<p>The JIT compiles into memory and runs immediately, which is handy while developing:</p>
+<pre><code>ktm -jit hello.ktm</code></pre>
+<p>Make a file executable as a script with a shebang line. ktm skips a first line that
+starts with <code>#!</code>:</p>
+<pre><code>#!/usr/bin/env -S ktm -jit
+"Hello from a script\n";</code></pre>
+<pre><code>chmod +x hello.ktm
+./hello.ktm</code></pre>
+
+<h2>How a program runs</h2>
+<p>Statements at the top level of a file run in order, as in a script. If you define
+<code>Main</code>, it runs after them:</p>
+<pre data-run><code>
+"first\n";
+
+U0 Main()
+{
+  "last\n";
+}
+
+"second\n";
+</code></pre>
+<pre class="output">
+first
+second
+last
+</pre>
+<p>Small programs can skip <code>Main</code> entirely and just write statements. Larger
+ones usually keep their code in functions.</p>
+<p>Return a value from <code>Main</code> to set the exit code:</p>
+<pre><code>I32 Main()
+{
+  return 3;   // ./a.out; echo $? prints 3
+}</code></pre>
+
+<h2>The standard library</h2>
+<p>Every program can use the whole standard library (<code>MAlloc</code>, <code>StrPrint</code>,
+hash tables, JSON and the rest) without an <code>#include</code>. The compiler reads its
+header, <code>std.ktmh</code>, automatically and links <code>libktm</code>. See the
+<a href="library.html">library guide</a>.</p>
+
+<h2>Several files</h2>
+<p>Pull other files in with <code>#include</code>. Paths in quotes are relative to the
+including file:</p>
+<pre><code>// main.ktm
+#include "geometry.ktm"
+
+U0 Main()
+{
+  "%d\n", Area(3, 4);
+}</code></pre>
+<pre><code>// geometry.ktm
+I64 Area(I64 w, I64 h)
+{
+  return w * h;
+}</code></pre>
+<pre><code>ktm main.ktm -o shapes</code></pre>
+
+<h2>Next steps</h2>
+<ul>
+  <li><a href="language.html">The language</a>: types, classes, control flow, functions and more.</li>
+  <li><a href="tools.html">Tools</a>: every compiler flag, the REPL and editor setup.</li>
+  <li><a href="examples.html">Examples</a>: complete projects to read and run.</li>
+</ul>

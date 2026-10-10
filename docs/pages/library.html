@@ -1,0 +1,1691 @@
+<!-- title: Library guide -->
+<h1>Library guide</h1>
+<p class="lede">How to use the standard library for everyday tasks. Every program can use it
+without an <code>#include</code>. For every function and class, see the
+<a href="stdlib.html">library reference</a>.</p>
+
+<h2 id="memory">Memory</h2>
+<table>
+  <thead><tr><th>Function</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>MAlloc(size)</code></td><td>Allocate <code>size</code> bytes</td></tr>
+    <tr><td><code>CAlloc(size)</code></td><td>Allocate <code>size</code> zeroed bytes</td></tr>
+    <tr><td><code>ReAlloc(ptr, size)</code></td><td>Resize an allocation</td></tr>
+    <tr><td><code>Free(ptr)</code></td><td>Release it (<code>NULL</code> is fine)</td></tr>
+    <tr><td><code>MSize(ptr)</code></td><td>The size an allocation was asked for (0 for <code>NULL</code>)</td></tr>
+    <tr><td><code>MemCpy(dst, src, n)</code>, <code>MemSet(dst, byte, n)</code></td><td>Copy and fill; both return <code>dst</code></td></tr>
+  </tbody>
+</table>
+<p><code>CAlloc</code> takes one argument, the total size, unlike C's
+<code>calloc(count, size)</code>. <code>MAlloc</code>, <code>CAlloc</code> and
+<code>ReAlloc</code> return <code>NULL</code> when out of memory or when the size is too
+large (a negative size passed as a <code>U64</code>, say). <code>ReAlloc</code> always
+moves the block and copies as much of it as fits; <code>ReAlloc(NULL, size)</code> is
+<code>MAlloc(size)</code>, and when it fails the old block is left as it was, so keep
+the old pointer until you know it worked. Each block carries its size in a hidden header,
+so only pointers from these functions can go to <code>Free</code>, <code>MSize</code> and
+<code>ReAlloc</code>. <code>MemCpy</code> copies front to back: for overlapping buffers
+use <code>memmove</code>.</p>
+<pre data-run><code>
+class Player
+{
+  U8 *name;
+  I64 score;
+};
+
+U0 Main()
+{
+  Player *team = CAlloc(3 * sizeof(Player));
+  team[0].name = "ada";
+  team[0].score = 10;
+  team = ReAlloc(team, 4 * sizeof(Player));
+  team[3].name = "linus";
+  "%s %d, %s\n", team[0].name, team[0].score, team[3].name;
+  Free(team);
+}
+</code></pre>
+<pre class="output">
+ada 10, linus
+</pre>
+<p>Run a program with <code>ktm -jit -Memsafe file.ktm</code> to have double frees and wild
+frees reported (and skipped) as they happen, and leaks reported at exit, each with the line
+that allocated or freed the block, in any thread. Only blocks your code gets from <code>MAlloc</code>,
+<code>CAlloc</code> and <code>ReAlloc</code> are tracked: a string or container the standard
+library allocates for you (<code>StrNew</code>, <code>StrPrint</code>, <code>PtrVecNew</code>, ...)
+is not, so leaking one goes unreported, and a block of yours that the library resizes
+(<code>CatPrint</code>, <code>CatLenPrint</code>) is reported as never freed.</p>
+
+<h2 id="strings">Strings</h2>
+<p>A string is a NUL-terminated <code>U8</code> array. Functions that make a string
+(<code>StrNew</code>, <code>StrPrint(NULL, ...)</code>, <code>MStrPrint</code>,
+<code>StrMerge</code>, <code>StrNCpy</code>, <code>MPrintQ</code>, <code>MPrintDate</code>,
+<code>MPrintTime</code>, <code>MPrintTimestampNow</code>) return a new block that you
+<code>Free</code>. The trimming and <code>...Rem</code> functions change the string you
+pass, in place, so give them a copy rather than a literal. Case conversion and the
+case-insensitive compares only know ASCII letters.</p>
+
+<h3>Building strings</h3>
+<p><code>StrPrint(NULL, fmt, ...)</code> returns a newly allocated formatted string, and
+<code>CatPrint(s, fmt, ...)</code> appends the formatted text to the heap string <code>s</code>
+and returns it, so write <code>s = CatPrint(s, fmt, ...)</code>: when <code>s</code> is full it
+is grown, which may move it and frees the old block. <code>s</code> must come from
+<code>MAlloc</code>, <code>StrNew</code>, <code>StrPrint(NULL, ...)</code> or an earlier
+<code>CatPrint</code>, or be <code>NULL</code> to start a new string; never pass a string
+literal or a stack buffer. <code>CatPrint</code> measures <code>s</code> on every call, so
+appending in a long loop is quadratic; <code>CatLenPrint(s, &amp;len, fmt, ...)</code> keeps
+the length in <code>len</code> and doesn't. <code>StrMerge("a", "b", ...)</code> joins strings and <code>MStrPrint(fmt, ...)</code> is
+<code>StrPrint</code> into an exactly sized block.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *s = StrPrint(NULL, "%d|%05d|%s|%.2f", 5000000000, 42, "x", 3.14159);
+  "%s\n", s;
+
+  U8 *csv = StrNew("id");
+  for (I64 i = 1; i <= 3; i++) {
+    csv = CatPrint(csv, ",%d", i);
+  }
+  "%s\n", csv;
+
+  I64 len = 0;
+  U8 *log = NULL;
+  for (I64 i = 0; i < 3; i++) {
+    log = CatLenPrint(log, &len, "[%d]", i * i);
+  }
+  "%s (%d)\n", log, len;
+
+  U8 *joined = StrMerge("con", "cat", "enate");
+  "%s\n", joined;
+  Free(s);
+  Free(csv);
+  Free(log);
+  Free(joined);
+}
+</code></pre>
+<pre class="output">
+5000000000|00042|x|3.14
+id,1,2,3
+[0][1][4] (9)
+concatenate
+</pre>
+
+<h3>Format conversions</h3>
+<p><code>StrPrint</code>, <code>CatPrint</code> and the other formatting functions share one
+format language with print statements. Integers are always 64-bit, and the C length
+modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <code>z</code> and
+<code>j</code> are accepted and ignored, so C formats can be pasted in.</p>
+<table>
+  <thead><tr><th>Conversion</th><th>Prints</th></tr></thead>
+  <tbody>
+    <tr><td><code>%d</code> <code>%i</code></td><td>a signed integer</td></tr>
+    <tr><td><code>%u</code></td><td>an unsigned integer</td></tr>
+    <tr><td><code>%x</code> <code>%X</code> <code>%o</code></td><td>hexadecimal (lower / upper case), octal</td></tr>
+    <tr><td><code>%f</code> <code>%e</code> <code>%g</code></td><td>an <code>F64</code>, as C's <code>printf</code> prints it</td></tr>
+    <tr><td><code>%s</code></td><td>a string</td></tr>
+    <tr><td><code>%c</code> <code>%C</code></td><td>a character; a multi-character constant like <code>'abc'</code> prints all its characters (up to 8), <code>%C</code> in upper case; the value 0 prints nothing</td></tr>
+    <tr><td><code>%p</code></td><td>a pointer as <code>0x</code> and 16 hex digits</td></tr>
+    <tr><td><code>%D</code> <code>%T</code></td><td>a <code>CDate</code> as <code>MM/DD/YYYY</code> / <code>HH:MM:SS</code></td></tr>
+    <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>MPrintQ</code>)</td></tr>
+    <tr><td><code>%F</code></td><td>the contents of the file whose name is the argument (nothing if it can't be read)</td></tr>
+    <tr><td><code>%%</code></td><td>a <code>%</code> (a width on it is ignored)</td></tr>
+  </tbody>
+</table>
+<p>Between the <code>%</code> and the letter come, in order: the flags <code>-</code> (left
+justify), <code>0</code> (pad with zeros), <code>+</code> (always a sign), a space (a space
+where a plus sign would go) and <code>#</code> (<code>0x</code> / <code>0</code> prefix for
+hex and octal); a width; and a precision after a <code>.</code>, which is the number of
+decimals for floats, the maximum length for <code>%s</code> and the minimum number of digits
+for integers (<code>%.3d</code> of 7 is <code>007</code>). Width and precision can be
+<code>*</code>, taken from the arguments. An unknown conversion is printed as it was written,
+with a warning on stderr, and still uses up its argument, so the ones after it stay in
+place.</p>
+<p><code>StrPrint(buf, fmt, ...)</code> writes into <code>buf</code> with no bound. For a
+fixed-size buffer use <code>StrNPrint(buf, size, fmt, ...)</code>, which works like C's
+<code>snprintf</code>: it writes at most <code>size - 1</code> characters and always ends them
+with a <code>'\0'</code>, cutting longer output short. It returns <code>buf</code>.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *s = StrPrint(NULL, "%+d|% d|%#x|%#o|%.3d|%ld|%-4s|%5.1f", 7, 7, 255, 8, 7,
+                   5000000000, "ab", 2.25);
+  "%s\n", s;
+  Free(s);
+
+  U8 small[8];
+  StrNPrint(small, sizeof(small), "%s-%d", "overflow", 12345);
+  "[%s] %d\n", small, StrLen(small);
+}
+</code></pre>
+<pre class="output">
++7| 7|0xff|010|007|5000000000|ab  |  2.2
+[overflo] 7
+</pre>
+
+<h3>Inspecting strings</h3>
+<p><code>StrCmp</code>, <code>StrNCmp</code> and <code>StrNICmp</code> return a negative,
+zero or positive number like C's <code>strcmp</code>, comparing bytes as unsigned, and sort a
+<code>NULL</code> before every string. <code>StrFirstOcc</code> and <code>StrLastOcc</code>
+find the first or last character of the first string that is any of the characters in the
+second. <code>WildMatch</code> matches a whole string against a pattern where
+<code>*</code> is any run of characters and <code>?</code> any one character.
+<code>StrHash</code> gives a well mixed 64-bit hash of a string.</p>
+<pre data-run><code>
+U0 Main()
+{
+  "%d %d\n", StrLen("hello"), StrCmp("abc", "abc") == 0;
+  "%d\n", StrNCmp("prefix-rest", "prefix", 6) == 0;
+  "%d %d\n", StrCmp("abc", "abd") < 0, StrNICmp("ABC", "abc", 3) == 0;
+  "%d\n", StrOcc("banana", 'a');               // count a character
+  "%s\n", StrFirstOcc("key=value", "=");       // from the first match
+  "%s\n", StrLastOcc("a/b/c.ktm", "/");         // from the last match
+  "%s\n", FileExtDot("archive.tar.gz");
+  "%d %d %d\n", WildMatch("main.ktm", "*.ktm"), WildMatch("main.c", "*.ktm"),
+    WildMatch("banana", "b?n*a");
+  "%d\n", Atoi("1234") + 1;
+  "%c %c %d\n", ToUpper('q'), ToLower('Q'), IsSpace(' ');
+}
+</code></pre>
+<pre class="output">
+5 1
+1
+1 1
+3
+=value
+/c.ktm
+.tar.gz
+1 0 1
+1235
+Q q 1
+</pre>
+<p><code>NULL</code> is safe in the inspecting functions: the compares sort it first,
+<code>StrFirstOcc</code>, <code>StrLastOcc</code> and <code>FileExtDot</code> return
+<code>NULL</code>, <code>WildMatch</code> and <code>IsDotC</code>/<code>IsDotZ</code>
+<code>FALSE</code>, <code>StrOcc</code> and <code>Atoi</code> 0.</p>
+
+<h3>Copying and trimming</h3>
+<p><code>StrNew</code> copies a whole string and <code>StrNCpy(s, n)</code> at most the first
+<code>n</code> bytes of it, like C's <code>strndup</code> (a negative <code>n</code> is 0).
+<code>StrCpy</code> copies into a buffer you provide. <code>StrTrimStart</code> and
+<code>StrTrimEnd</code> remove whitespace in place and return the same pointer; pass a length
+as the second argument to look only at that many bytes, or -1 for the whole string.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *copy = StrNew("  padded  ");
+  I64 len;
+  StrTrimStart(copy, -1, &len);
+  "[%s] %d\n", copy, len;
+  StrTrimEnd(copy, -1, &len);
+  "[%s] %d\n", copy, len;
+
+  U8 *part = StrNCpy("truncate me", 8);
+  "[%s]\n", part;
+
+  U8 buf[16];
+  StrCpy(buf, "fixed");
+  "%s\n", buf;
+  Free(copy);
+  Free(part);
+}
+</code></pre>
+<pre class="output">
+[padded  ] 8
+[padded] 6
+[truncate]
+fixed
+</pre>
+<p><code>StrCleanEnd(s, chars)</code> removes any of the characters in <code>chars</code> from the end
+of <code>s</code>, in place, and returns the new length. Use it to drop the line ending from text
+you read, before comparing it.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 buf[32];
+  StrCpy(buf, "exit\r\n");
+  I64 len = StrCleanEnd(buf, "\r\n");
+  "[%s] %d %d\n", buf, len, StrCmp(buf, "exit") == 0;
+
+  StrCpy(buf, "Hello!!!...");
+  len = StrCleanEnd(buf, ".!");
+  "[%s] %d\n", buf, len;
+}
+</code></pre>
+<pre class="output">
+[exit] 4 1
+[Hello] 5
+</pre>
+
+<h3>Splitting paths and names</h3>
+<p>These come from the original library. <code>StrFirstRem(s, markers, dst)</code> moves the part before
+the first marker character into <code>dst</code> and leaves the rest in <code>s</code>;
+<code>StrLastRem</code> does the same with the part after the last marker. Both change
+<code>s</code> in place, and <code>dst</code> may be <code>NULL</code>.
+<code>FileExtRem(name, dst)</code> cuts the extension off <code>name</code> and puts it,
+without the dot, in <code>dst</code>. <code>FileExtDot</code> finds the first <code>.</code>
+that isn't followed by <code>/</code> or <code>.</code>, and <code>IsDotZ</code> /
+<code>IsDotC</code> are TRUE for names like <code>Doc.ktm.Z</code>: the name must end
+in <code>.Z</code> / <code>.C</code> and have another dot before it.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 path[32], first[16], last[16], ext[8];
+  StrCpy(path, "usr/lib/libktm.a");
+  StrFirstRem(path, "/", first);
+  "%s + %s\n", first, path;
+  StrLastRem(path, "/", last);
+  "%s + %s\n", path, last;
+  FileExtRem(last, ext);
+  "%s . %s\n", last, ext;
+  "%d %d\n", IsDotZ("Doc.ktm.Z"), IsDotZ("Doc.Z");
+}
+</code></pre>
+<pre class="output">
+usr + lib/libktm.a
+lib + libktm.a
+libktm . a
+1 0
+</pre>
+<p><code>I64ToStr</code> and <code>U64ToStr</code> are internal helpers of the formatter: they
+write the digits least significant first and without a sign. Use <code>StrPrint</code> to
+turn a number into text.</p>
+
+<h2 id="files">Files</h2>
+<p><code>FileWrite</code> writes a buffer to a file and returns whether it worked.
+<code>FileRead</code> reads a whole file into a new NUL-terminated buffer, or returns
+<code>NULL</code> if it can't.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *path = "/tmp/ktm_docs_example.txt";
+  U8 *text = "first line\nsecond line\n";
+  if (!FileWrite(path, text, StrLen(text))) {
+    "could not write %s\n", path;
+    return;
+  }
+
+  I64 size;
+  U8 *contents = FileRead(path, &size);
+  "%d bytes\n%s", size, contents;
+  Free(contents);
+
+  if (FileRead("/no/such/file", &size) == NULL) {
+    "missing files give NULL\n";
+  }
+}
+</code></pre>
+<pre class="output">
+23 bytes
+first line
+second line
+missing files give NULL
+</pre>
+<p><code>FileWrite</code> replaces the file's contents: by default it opens with
+<code>O_CREAT | O_WRONLY | O_TRUNC</code> (a new file gets mode 0644 minus the umask).
+Pass the flags yourself to do something else, <code>O_CREAT | O_WRONLY | O_APPEND</code>
+to add to the end. A <code>NULL</code> name or buffer or a negative size gives
+<code>FALSE</code> and creates nothing. <code>FileRead</code> reads a regular file up to
+its size, and a FIFO, a pipe (<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a
+<code>/proc</code> file (which reports size 0) until end of file, so it waits for a
+FIFO's writer and never finishes on an endless device like <code>/dev/zero</code>. For a
+directory it returns <code>NULL</code>, and on any failure it sets <code>*_size</code> to 0.</p>
+
+<p>Directories: <code>MkDir(path)</code> makes one directory and
+<code>MkDir(path,, TRUE)</code> the missing parents too; both return 0 if the path is a
+directory afterwards (made now or already there) and -1 if not, the convention
+<code>Rm</code> and <code>RmDir</code> use too. <code>Rm(path)</code> removes a file, a
+symlink (never what it points to) or an empty directory; with <code>RM_RECURSE</code>
+a directory and everything in it, with <code>RM_FORCE</code> a path that doesn't exist
+is not an error, and only <code>RM_VERBOSE</code> makes it print. <code>RmDir</code> is the
+directory half of it. <code>Dir(path)</code> prints the entries one per line (in colour on
+a terminal) and returns how many there are, or -1 if it can't open the directory: names
+that start with a number are ordered by that number, the rest by name.
+<code>Stat(&amp;fst, path)</code> fills an <code>Fstat</code> (size, mode, times),
+<code>Cd</code> changes directory (<code>~</code> is <code>$HOME</code>) and
+<code>Pwd()</code> returns the working directory as a new string to <code>Free</code>.</p>
+<pre data-run><code>
+extern "c" U8 *mkdtemp(U8 *template);
+
+U0 Main()
+{
+  U8 root[32], path[64];
+  MemCpy(root, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(root)) return;    // a fresh directory to work in
+
+  StrPrint(path, "%s/a/b", root);
+  "MkDir: %d\n", MkDir(path,, TRUE);
+
+  StrPrint(path, "%s/a/notes.txt", root);
+  FileWrite(path, "a long first version\n", 21);
+  FileWrite(path, "short\n", 6);                  // replaces it
+  FileWrite(path, "more\n", 5, O_CREAT | O_WRONLY | O_APPEND);
+  I64 size;
+  U8 *text = FileRead(path, &size);
+  "%d bytes:\n%s", size, text;
+  Free(text);
+
+  StrPrint(path, "%s/a/10_ten", root);
+  FileWrite(path, "", 0);
+  StrPrint(path, "%s/a/9_nine", root);
+  FileWrite(path, "", 0);
+  StrPrint(path, "%s/a", root);
+  "FileRead of a directory: %d\n", FileRead(path) == NULL;
+  "%d entries\n", Dir(path);
+
+  Fstat fst;
+  StrPrint(path, "%s/a/notes.txt", root);
+  if (Stat(&fst, path) == 0) "notes.txt: %d bytes\n", fst.st_size;
+
+  "Rm: %d\n", Rm(root, RM_RECURSE);
+  "Rm again with RM_FORCE: %d\n", Rm(root, RM_FORCE);
+}
+</code></pre>
+<pre class="output">
+MkDir: 0
+11 bytes:
+short
+more
+FileRead of a directory: 1
+9_nine
+10_ten
+b
+notes.txt
+4 entries
+notes.txt: 11 bytes
+Rm: 0
+Rm again with RM_FORCE: 0
+</pre>
+<p>For lower-level work the POSIX calls (<code>open</code>, <code>read</code>,
+<code>write</code>, <code>close</code>, <code>lseek</code>, <code>stat</code>,
+<code>mkdir</code>, <code>unlink</code>, <code>opendir</code>, <code>readdir</code>) are
+declared too.</p>
+
+<h2 id="csv">CSV</h2>
+<p><code>CsvParse</code> walks a CSV buffer without copying it: each call gives the next
+field (<code>CSV_FIELD</code>), then the whole row (<code>CSV_ROW</code>), and
+<code>CSV_EOF</code> at the end. A <code>CsvSlice</code> is where that piece is in the
+buffer (<code>off</code>, <code>len</code>) and its number (<code>idx</code>, the field in
+its row or the row). The slices are the raw text: a quoted field keeps its quotes and
+its doubled <code>""</code>, commas and newlines inside quotes don't split, and a row's
+length includes its <code>\n</code> or <code>\r\n</code>. Unquoting is up to you.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *csv = "name,quote\r\nann,\"say \"\"hi\"\", ok\"\nbob,\n";
+  CsvParser p;
+  CsvSlice s;
+  I64 kind;
+  CsvParserInit(&p, csv, StrLen(csv));
+  while ((kind = CsvParse(&p, &s)) != CSV_EOF) {
+    if (kind == CSV_FIELD) "field %d: [%.*s]\n", s.idx, s.len, csv + s.off;
+    else                   "row %d: %d bytes\n", s.idx, s.len;
+  }
+}
+</code></pre>
+<pre class="output">
+field 0: [name]
+field 1: [quote]
+row 0: 12 bytes
+field 0: [ann]
+field 1: ["say ""hi"", ok"]
+row 1: 21 bytes
+field 0: [bob]
+field 1: []
+row 2: 5 bytes
+</pre>
+
+<h2 id="system">Running commands</h2>
+<pre data-run><code>
+U0 Main()
+{
+  I64 status = System("echo from the shell");
+  Sh("echo %s has %d files", "/tmp", 3);    // printf-style
+  U8 *out = Shlurp("echo %s", "captured");  // capture stdout
+
+  "exit code %d\n", status;
+  "[%s]\n", out;
+  Free(out);
+}
+</code></pre>
+<pre class="output">
+from the shell
+/tmp has 3 files
+exit code 0
+[captured]
+</pre>
+<p>Print statements are buffered, while commands write straight to the terminal. When
+output goes to a pipe or file, a command's output can appear before text you printed
+earlier.</p>
+<p><code>System</code> and <code>Sh</code> run the command with <code>sh -c</code> and
+return its exit code, 0 to 255: <code>System("exit 3")</code> gives 3, and a command the
+shell can't find gives 127. They return -1 if the command was killed by a signal or the
+shell couldn't be run.</p>
+<p><code>Shlurp</code> returns what the command printed to stdout, minus one trailing
+newline, as a string to <code>Free</code>; format arguments are optional. It doesn't
+capture stderr or return the exit status: a failing command gives whatever it printed,
+often <code>""</code>. It returns once the shell exits, without waiting for a background
+job (<code>cmd &amp;</code>) the command started. <code>Exit(code)</code> ends the program.</p>
+<p>The commands get the program's stdin, stdout and stderr, but none of the files or
+sockets the library opened: those (the <code>Net*</code> sockets and accepted connections,
+<code>FileRead</code>/<code>FileWrite</code>'s file, <code>Shlurp</code>'s pipe)
+are close-on-exec. An fd you open yourself with <code>open</code> or <code>socket</code> is
+inherited unless you pass <code>O_CLOEXEC</code> (Linux also has <code>SOCK_CLOEXEC</code>)
+or set <code>FD_CLOEXEC</code> with <code>fcntl(fd, F_SETFD, FD_CLOEXEC)</code>.</p>
+<p>The command is shell text, so a string from elsewhere (a file name, user input) must
+not be pasted in as it is: a space splits it and <code>$</code>, <code>`</code>,
+<code>;</code> or <code>*</code> run or expand things. <code>ShQuote(s)</code> returns
+<code>s</code> in single quotes as a new string to <code>Free</code>, with each
+<code>'</code> written as <code>'\''</code> (and <code>''</code> for <code>NULL</code>),
+so the shell gets it as one word, unchanged.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *q = ShQuote("it's $HOME; *");
+  U8 *out = Shlurp("printf '%%s' %s", q);
+  "[%s]\n", out;
+  Free(out);
+  Free(q);
+}
+</code></pre>
+<pre class="output">
+[it's $HOME; *]
+</pre>
+
+<h3 id="processes">Running programs without a shell</h3>
+<p><code>ProcRun(argv, &amp;code)</code> runs a program with the arguments in <code>argv</code>, a
+NULL-terminated array, and returns what it printed to stdout (minus one trailing newline, to
+<code>Free</code>) with its exit code in <code>code</code>. No shell is involved: every argument reaches
+the program exactly as written, so nothing needs quoting. The program is looked up in
+<code>$PATH</code>; NULL means it couldn't be started, and <code>Errno()</code> says why
+(2, ENOENT, for a program that doesn't exist).</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *argv[] = {"printf", "%s|", "it's $HOME", "a b", NULL};
+  I64 code;
+  U8 *out = ProcRun(argv, &code);
+  "[%s] exit %d
+", out, code;
+  Free(out);
+}
+</code></pre>
+<pre class="output">
+[it's $HOME|a b|] exit 0
+</pre>
+<p>For more control, <code>ProcSpawn(argv, &amp;opts)</code> starts the program and returns a
+<code>Proc</code>. In <code>ProcOpts</code> each of <code>in</code>, <code>out</code> and <code>err</code>
+is <code>PROC_INHERIT</code> (ours, the default), <code>PROC_PIPE</code> (our end is
+<code>p-&gt;in_fd</code>, <code>out_fd</code> or <code>err_fd</code>), <code>PROC_NULL</code>
+(<code>/dev/null</code>) or, for <code>err</code>, <code>PROC_STDOUT</code> (2&gt;&amp;1);
+<code>cwd</code> and <code>env</code> (a NULL-terminated <code>"NAME=value"</code> list that replaces the
+environment) are optional. <code>ProcCommunicate(p, input, len, &amp;out, &amp;out_len, &amp;err,
+&amp;err_len)</code> writes the input, reads both outputs to the end and waits, all in one
+<code>poll()</code> loop, so a program that writes a lot to both, or echoes its input, can't block.
+<code>ProcWait(p)</code> returns the exit code, or -1 when a signal killed the program
+(<code>p-&gt;term_signal</code> says which); <code>ProcDone(p)</code> checks without waiting,
+<code>ProcKill(p, sig)</code> signals it (the whole group with <code>new_group</code>), and
+<code>ProcRelease(p)</code> closes the pipes and frees it, waiting for a program that is still
+running.</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *argv[] = {"sh", "-c", "tr a-z A-Z; echo done >&2; exit 3", NULL};
+  ProcOpts opts;
+  MemSet(&opts, 0, sizeof(ProcOpts));
+  opts.in = PROC_PIPE;
+  opts.out = PROC_PIPE;
+  opts.err = PROC_PIPE;
+  Proc *p = ProcSpawn(argv, &opts);
+  U8 *out, *err;
+  I64 code = ProcCommunicate(p, "hello\n", 6, &out, NULL, &err);
+  "out=%s err=%s exit=%d\n", out, err, code;
+  Free(out);
+  Free(err);
+  ProcRelease(p);
+}
+</code></pre>
+<pre class="output">
+out=HELLO
+ err=done
+ exit=3
+</pre>
+<p>The program starts with default signal handlers and only stdin, stdout and stderr open: it
+inherits none of your sockets or files. <code>System</code>, <code>Sh</code> and <code>Shlurp</code>
+are still the tools for shell pipelines, globs and redirections; use the <code>Proc</code>
+functions whenever an argument comes from a file name or user input.</p>
+
+<h2 id="signals">Signals</h2>
+<p><code>SigHandle(sig, handler, flags, mask, &amp;old)</code> sets what happens when a signal arrives:
+<code>SIG_DFL</code>, <code>SIG_IGN</code>, or a function <code>U0 F(I32 sig)</code> passed as
+<code>(&amp;F)(I64)</code>. <code>flags</code> defaults to <code>SA_RESTART</code>, which makes a
+blocking <code>read</code>, <code>write</code> or <code>accept</code> carry on after the handler; pass 0 to
+have it return -1 with <code>Errno() == EINTR</code> instead (<code>poll</code> always does).
+<code>mask</code> (<code>SigBit(SIGUSR2) | ...</code>) holds other signals back while the handler runs,
+and <code>old</code>, if given, receives the previous action, so it can be put back with
+<code>SigAction(sig, &amp;old)</code>. <code>signal(sig, handler)</code> is the same as
+<code>SigHandle</code> with <code>SA_RESTART</code>, and the two can be mixed.</p>
+<pre data-run><code>
+I64 hits = 0;
+U0 OnUsr1(I32 sig)
+{
+  hits++;
+}
+
+U0 Main()
+{
+  SigAct old;
+  SigHandle(SIGUSR1, (&OnUsr1)(I64), SA_RESTART, 0, &old);
+  raise(SIGUSR1);
+  raise(SIGUSR1);
+  SigAction(SIGUSR1, &old);      // back to what it was
+  "%d signals, previous handler SIG_DFL: %d\n", hits, old.handler == SIG_DFL;
+}
+</code></pre>
+<pre class="output">
+2 signals, previous handler SIG_DFL: 1
+</pre>
+<p>A handler interrupts the program wherever it is, on whichever thread the signal reached, so it
+may only set a global variable, call <code>write</code>, <code>_exit</code>, <code>kill</code> or
+<code>raise</code>, and keep <code>Errno()</code> as it found it. Allocating, printing,
+<code>throw</code> or taking a mutex there can deadlock or corrupt memory: the interrupted code may be
+in the middle of the same thing. Actions are shared by all threads, and a signal sent to the
+process is handled by one of them, whichever doesn't block it.</p>
+<p>For a server built around <code>poll()</code>, <code>SigStopInit()</code> does this for SIGINT and
+SIGTERM: it returns an fd to add to the poll set, which becomes readable when either signal
+arrives, and from then on <code>SigStopRequested()</code> is TRUE (<code>SigStopSignal()</code> says
+which one came). The loop finishes what it is doing and returns. A second Ctrl-C ends the program
+as usual, in case the loop never gets there.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I32 fd = SigStopInit();
+  pollfd p;
+  p.fd = fd;
+  p.events = POLLIN;
+  raise(SIGTERM);                // as if `kill` had been run on us
+  if (poll(&p, 1, 1000) == 1 && SigStopRequested())
+    "stopping cleanly after signal %d\n", SigStopSignal();
+}
+</code></pre>
+<pre class="output">
+stopping cleanly after signal 15
+</pre>
+
+<h2 id="lists">Lists</h2>
+<p><code>List</code> is a circular doubly linked list of <code>U0 *</code> values. The list
+is its head node, which links to itself when the list is empty, so iterate from
+<code>l->next</code> until you get back to <code>l</code>. The list never frees the values
+it holds unless you hand it a free function.</p>
+<pre data-run><code>
+U0 Main()
+{
+  List *l = ListNew();
+  ListAppend(l, "two");
+  ListAppend(l, "three");
+  ListPrepend(l, "one");
+
+  for (List *it = l->next; it != l; it = it->next) {
+    "%s\n", it->value;
+  }
+  "first %s, last %s\n", ListFirst(l), ListLast(l);
+  "popped %s, %d left\n", ListPop(l), ListCount(l);
+  ListRelease(l, NULL);
+}
+</code></pre>
+<pre class="output">
+one
+two
+three
+first one, last three
+popped three, 2 left
+</pre>
+<ul>
+  <li><strong>Making one.</strong> <code>ListNew()</code> allocates a head; free it with
+  <code>ListRelease</code>. <code>ListInit(&amp;head)</code> turns a head you own (on the stack,
+  or inside a class) into an empty list; empty that one with <code>ListClear</code>, because
+  <code>ListRelease</code> also frees the head.</li>
+  <li><strong>Adding.</strong> <code>ListAppend</code> and <code>ListPrepend</code> add at the
+  end and the front; <code>ListInsertValueBefore(node, value)</code> inserts before any node
+  (before the head is the end), and <code>ListInsertBefore(node, new_node)</code> links in a
+  node you made yourself.</li>
+  <li><strong>Removing.</strong> <code>ListDeque</code> removes and returns the first value and
+  <code>ListPop</code> the last, so <code>ListAppend</code> with <code>ListDeque</code> is a
+  first-in first-out queue and <code>ListAppend</code> with <code>ListPop</code> a stack.
+  <code>ListRemove(node)</code> unlinks one node while you walk the list (take
+  <code>it->next</code> first) and returns its value; never pass it the head.</li>
+  <li><strong>Looking.</strong> <code>ListFirst</code> and <code>ListLast</code> return a value
+  without removing it, <code>ListEmpty</code> tells whether there are any, and
+  <code>ListCount</code> counts them by walking the list, so it is O(n).</li>
+  <li><strong>Emptying.</strong> <code>ListClear(l, free_value)</code> frees every node and
+  keeps the head; <code>ListRelease(l, free_value)</code> frees the nodes and the head. Both
+  call <code>free_value</code> on each value when it isn't <code>NULL</code>.</li>
+  <li><strong>Joining.</strong> <code>ListMergeAppend(l1, l2)</code> and
+  <code>ListMergePrepend(l1, l2)</code> move all of <code>l2</code>'s values to the end or
+  the front of <code>l1</code> and free <code>l2</code>'s head, so <code>l2</code> (which
+  must come from <code>ListNew</code>) can't be used afterwards.</li>
+</ul>
+<p><code>ListDeque</code>, <code>ListPop</code>, <code>ListFirst</code> and
+<code>ListLast</code> return <code>NULL</code> for an empty list, which looks the same as a
+stored <code>NULL</code>: check <code>ListEmpty</code> first if you store them. The
+functions that remove, look or free accept a <code>NULL</code> list and do nothing
+(returning <code>NULL</code>, <code>0</code> from <code>ListCount</code>, <code>TRUE</code>
+from <code>ListEmpty</code>); the ones that add need a real list.</p>
+<pre data-run><code>
+U0 Main()
+{
+  List todo;              // a head on the stack
+  ListInit(&todo);
+  ListAppend(&todo, StrNew("write"));
+  ListAppend(&todo, StrNew("test"));
+  ListAppend(&todo, StrNew("ship"));
+
+  List *it = todo.next;
+  while (it != &todo) {   // drop "test" while walking
+    List *next = it->next;
+    if (!StrCmp(it->value, "test")) Free(ListRemove(it));
+    it = next;
+  }
+
+  List *later = ListNew();
+  ListAppend(later, StrNew("rest"));
+  ListMergeAppend(&todo, later);   // `later` is freed
+
+  for (it = todo.next; it != &todo; it = it->next) "%s ", it->value;
+  "(%d)\n", ListCount(&todo);
+  ListClear(&todo, &Free);         // keeps the stack head
+  "empty: %d\n", ListEmpty(&todo);
+}
+</code></pre>
+<pre class="output">
+write ship rest (3)
+empty: 1
+</pre>
+
+<h2 id="vectors">Vectors</h2>
+<p>Growable arrays: <code>IntVec</code> of <code>I64</code>, <code>FloatVec</code> of
+<code>F64</code> and <code>PtrVec</code> of pointers. Each has <code>size</code> and
+<code>entries</code> fields, so a range-based <code>for</code> works on them. The functions
+are the same for the three, with the type as prefix:</p>
+<ul>
+  <li><code>IntVecNew(size = 32)</code> makes an empty vector with room for
+  <code>size</code> values (its initial capacity); a size below 1 is taken as 1.
+  <code>IntVecCapacity</code> says how many values fit before the storage has to grow, and
+  <code>IntVecPush</code> appends, doubling the storage when it is full.</li>
+  <li><code>IntVecGet(v, i)</code> and <code>IntVecSet(v, i, value)</code> read and replace an
+  entry. The index is always checked: outside <code>0</code> to <code>size - 1</code> they
+  print <code>IntVecGet: index 5 out of range (size 3)</code> on stderr and exit with
+  status 1. Reading <code>v->entries[i]</code> directly is not checked.</li>
+  <li><code>IntVecPop(v, &amp;ok)</code> removes and returns the last entry and
+  <code>IntVecLast(v, &amp;ok)</code> returns it without removing it. On an empty vector they
+  return <code>-1</code> (<code>-1.0</code> for <code>FloatVec</code>, <code>NULL</code> for
+  <code>PtrVec</code>) and set <code>ok</code> to <code>FALSE</code>; the
+  <code>ok</code> argument is optional.</li>
+  <li><code>IntVecClear</code> sets the size to 0 and keeps the storage for reuse;
+  <code>IntVecRelease</code> frees it. <code>PtrVecRelease(v, free_value)</code> first calls
+  <code>free_value</code> (for example <code>&amp;Free</code>) on every value.</li>
+  <li><code>IntVecSort</code> and <code>FloatVecSort</code> sort ascending.
+  <code>PtrVecSort</code> takes a comparison that returns <code>TRUE</code> when its first
+  argument should come first. That's a "less than" test, not a C-style negative, zero or
+  positive result, which leaves the vector unsorted. The sorts are O(n log n), also for
+  sorted or all-equal input, and not stable: equal values may change order.</li>
+</ul>
+<pre data-run><code>
+I64 ShorterFirst(U0 *a, U0 *b)
+{
+  return StrLen(a) < StrLen(b);
+}
+
+U0 Main()
+{
+  IntVec *nums = IntVecNew();
+  IntVecPush(nums, 30);
+  IntVecPush(nums, 10);
+  IntVecPush(nums, 20);
+  IntVecSort(nums);
+  for (I64 n : nums) {
+    "%d\n", n;
+  }
+  IntVecSet(nums, 0, 15);
+  "popped %d, size %d, first %d\n", IntVecPop(nums), nums->size, IntVecGet(nums, 0);
+  IntVecRelease(nums);
+
+  PtrVec *words = PtrVecNew();
+  PtrVecPush(words, StrNew("banana"));
+  PtrVecPush(words, StrNew("fig"));
+  PtrVecPush(words, StrNew("kiwi"));
+  PtrVecSort(words, &ShorterFirst);
+  for (U8 *w : words) {
+    "%s\n", w;
+  }
+  PtrVecRelease(words, &Free);   // frees the strings too
+}
+</code></pre>
+<pre class="output">
+10
+20
+30
+popped 30, size 2, first 15
+fig
+kiwi
+banana
+</pre>
+<pre data-run><code>
+U0 Main()
+{
+  FloatVec *temps = FloatVecNew(4);
+  FloatVecPush(temps, 21.5);
+  FloatVecPush(temps, -3.25);
+  FloatVecPush(temps, 8.0);
+  FloatVecSort(temps);
+  "lowest %.2f, highest %.2f, capacity %d\n",
+    FloatVecGet(temps, 0), FloatVecLast(temps), FloatVecCapacity(temps);
+
+  FloatVecClear(temps);
+  Bool ok;
+  F64 last = FloatVecLast(temps, &ok);
+  "after clear: size %d, last %.1f, ok %d\n", temps->size, last, ok;
+  FloatVecRelease(temps);
+}
+</code></pre>
+<pre class="output">
+lowest -3.25, highest 21.50, capacity 4
+after clear: size 0, last -1.0, ok 0
+</pre>
+
+<h2 id="sets">Sets and trees</h2>
+<p><code>IntSet</code> is a sorted set of <code>I64</code> values. <code>IntSetAdd</code>,
+<code>IntSetDelete</code> and <code>IntSetHas</code> are O(log n); adding a value that is
+there, or deleting one that isn't, changes nothing. <code>IntSetUnion</code>,
+<code>IntSetIntersection</code>, <code>IntSetDiff</code> (in the first set, not the
+second) and <code>IntSetSymDiff</code> (in exactly one) return a new set and leave their
+arguments alone; <code>IntSetEq</code> compares two sets. An iterator, <code>IntSetToVec</code>
+and <code>IntSetToString</code> give the values in ascending order. Don't add or delete
+values while iterating: once one is added or deleted, <code>IntSetIterNext</code> returns
+<code>NULL</code> and the loop ends early, so collect the changes and apply them after it. The functions that only read a set, and
+<code>IntSetRelease</code>, treat <code>NULL</code> as the empty set.</p>
+<pre data-run><code>
+U0 Main()
+{
+  IntSet *evens = IntSetNew();
+  IntSet *threes = IntSetNew();
+  I64 i;
+  for (i = 1; i <= 6; i++) IntSetAdd(evens, i * 2);
+  for (i = 1; i <= 4; i++) IntSetAdd(threes, i * 3);
+  IntSetAdd(evens, 4);
+  IntSetDelete(evens, 10);
+  "has 4: %d, has 5: %d, size %d\n",
+    IntSetHas(evens, 4), IntSetHas(evens, 5), IntSetSize(evens);
+
+  IntSet *both = IntSetIntersection(evens, threes);
+  U8 *str = IntSetToString(both);
+  "both: %s\n", str;
+  Free(str);
+
+  IntSet *either = IntSetUnion(evens, threes);
+  IntSetIter *it = IntSetIterNew(either);
+  IntSetEntry *e;
+  while ((e = IntSetIterNext(it))) "%d ", e->key;
+  "\n";
+  IntSetIterRelease(it);
+
+  IntSetRelease(either);
+  IntSetRelease(both);
+  IntSetRelease(threes);
+  IntSetRelease(evens);
+}
+</code></pre>
+<pre class="output">
+has 4: 1, has 5: 0, size 5
+both: {6, 12}
+2 3 4 6 8 9 12 
+</pre>
+<p><code>RBTree</code>, which <code>IntSet</code> is built on, maps <code>U0 *</code> keys to
+<code>U0 *</code> values in the order of a comparison function you pass to
+<code>RBTreeNew(free_key, free_value, key_cmp)</code>: <code>key_cmp(a, b)</code> returns
+less than 0 when <code>a</code> comes first, 0 when they are equal and more than 0
+otherwise. The two free functions may be <code>NULL</code>; when set, the tree frees keys
+and values with them on delete, release and when an insert replaces a value (an insert of
+an existing key keeps the stored key). <code>RBTreeGet</code> returns <code>NULL</code> for
+a missing key, the same as a stored <code>NULL</code>, so ask <code>RBTreeHas</code> to tell
+them apart. <code>RBIterNew</code> and <code>RBTreeForEach</code> visit the entries in key
+order; don't insert or delete while they run. Once a new key is added or one is deleted,
+<code>RBIterNext</code> returns <code>NULL</code> and <code>RBTreeForEach</code> returns after
+that callback; replacing the value of a key that is there is fine.</p>
+<pre data-run><code>
+I64 StrKeyCmp(U0 *a, U0 *b)
+{
+  return StrCmp(a, b);
+}
+
+U0 Main()
+{
+  RBTree *ages = RBTreeNew(NULL, NULL, &StrKeyCmp);
+  RBTreeInsert(ages, "linus", 55(U0 *));
+  RBTreeInsert(ages, "ada", 36(U0 *));
+  RBTreeInsert(ages, "grace", 85(U0 *));
+  RBTreeInsert(ages, "ada", 37(U0 *));
+  RBTreeDelete(ages, "grace");
+  "ada %d, has grace: %d, %d entries\n",
+    RBTreeGet(ages, "ada"), RBTreeHas(ages, "grace"), ages->size;
+
+  RBIter *it = RBIterNew(ages);
+  RBNode *node;
+  while ((node = RBIterNext(it))) "%s = %d\n", node->key, node->value;
+  RBIterRelease(it);
+  RBTreeRelease(ages);
+}
+</code></pre>
+<pre class="output">
+ada 37, has grace: 0, 2 entries
+ada = 37
+linus = 55
+</pre>
+
+<h2 id="hash-tables">Hash tables</h2>
+<p><code>StrMap</code> maps strings to <code>U0 *</code> values and <code>IntMap</code> maps
+<code>I64</code> keys. Values are pointers, so cast integers when storing them:
+<code>count(U0 *)</code>. Setting an existing key replaces its value.</p>
+<pre data-run><code>
+U0 Main()
+{
+  StrMap *stock = StrMapNew();
+  StrMapSet(stock, "apples", 3(U0 *));
+  StrMapSet(stock, "pears", 5(U0 *));
+  StrMapSet(stock, "apples", 4(U0 *));
+  StrMapSet(stock, "plums", 7(U0 *));
+  StrMapDelete(stock, "plums");
+
+  "%d apples, has kiwis: %d, %d keys\n",
+    StrMapGet(stock, "apples"), StrMapHas(stock, "kiwis"), stock->size;
+
+  I64 idx = 0;
+  StrMapNode *node;
+  while (StrMapIter(stock, &idx, &node)) {
+    "%s = %d\n", node->key, node->value;
+  }
+  StrMapRelease(stock);
+
+  IntMap *names = IntMapNew();
+  IntMapSet(names, 404, "not found");
+  IntMapSet(names, 200, "ok");
+  "%s\n", IntMapGet(names, 404);
+  "deleted 200: %d, deleted 500: %d\n", IntMapDelete(names, 200), IntMapDelete(names, 500);
+  IntMapRelease(names);
+}
+</code></pre>
+<pre class="output">
+4 apples, has kiwis: 0, 2 keys
+apples = 4
+pears = 5
+not found
+deleted 200: 1, deleted 500: 0
+</pre>
+<p><code>StrMapGet</code> and <code>IntMapGet</code> return <code>NULL</code> for a missing
+key, which is also what a stored <code>NULL</code> or <code>0</code> gives. Pass a
+<code>Bool</code> as the optional last argument to tell them apart: it is set to
+<code>TRUE</code> when the key is there (<code>StrMapHas</code> and <code>IntMapHas</code> answer
+the same question). <code>StrMapGetLen</code> and <code>StrMapHasLen</code> look up the first
+<code>key_len</code> bytes at a pointer, so a word inside a larger buffer can be looked up
+without copying it out. <code>StrMapClear</code> and <code>IntMapClear</code> remove every
+entry and keep the capacity.</p>
+<pre data-run><code>
+U0 Main()
+{
+  IntMap *seen = IntMapNew();
+  IntMapSet(seen, 7, 0(U0 *));
+  Bool ok;
+  I64 v = IntMapGet(seen, 7, &ok);
+  "7: %d (there: %d)\n", v, ok;
+  v = IntMapGet(seen, 8, &ok);
+  "8: %d (there: %d)\n", v, ok;
+
+  StrMap *words = StrMapNew();
+  StrMapSet(words, "let", 1(U0 *));
+  StrMapSet(words, "for", 2(U0 *));
+  U8 *line = "for x in xs";
+  "first word: %d\n", StrMapGetLen(words, line, 3);
+
+  StrMapClear(words);
+  "after clear: %d keys, %d slots\n", words->size, words->capacity;
+  StrMapRelease(words);
+  IntMapRelease(seen);
+}
+</code></pre>
+<pre class="output">
+7: 0 (there: 1)
+8: 0 (there: 0)
+first word: 2
+after clear: 0 keys, 32 slots
+</pre>
+<p>Iteration (<code>StrMapIter</code>, <code>StrMapKeyIter</code>, <code>StrMapValueIter</code>
+and the <code>IntMap</code> ones) follows insertion order. Start the cursor at 0 and call
+until it returns <code>FALSE</code>; the cursor is opaque, so don't compute with it.
+Deleting entries while iterating is safe (the loop above could delete
+<code>node->key</code>); adding entries is not, as an added entry can be skipped or the
+table rebuilt under the loop. A deleted key can be set again and then comes last.
+<code>StrMapToString</code>, <code>IntMapToString</code> and the <code>KeysToString</code>
+versions print a map, in insertion order, into a new string you free.</p>
+<p><code>StrMapNew</code> and <code>IntMapNew</code> take an optional starting capacity
+(default 32): the number of slots, rounded up to a power of two, at least 8 (a negative
+request gets 8 and one above 2<sup>28</sup> gets 2<sup>28</sup>). The table is rebuilt,
+doubling, when its entries and deleted holes fill 60% of the slots, so a capacity of 1024
+holds about 600 entries before it grows. It never shrinks, not on delete and not on clear;
+release it and make a new one to give the memory back. <code>StrMapResize</code> and
+<code>IntMapResize</code> double it ahead of time. They and the <code>New</code> functions
+return <code>FALSE</code> or <code>NULL</code> when out of memory, as does a
+<code>Set</code> that needed to grow the table.</p>
+<p><code>StrMapSetFreeKey</code>, <code>StrMapSetFreeValue</code> and
+<code>IntMapSetFreeValue</code> register destructors. With them the map owns what you give
+it: they run on <code>Delete</code>, <code>Clear</code> and <code>Release</code>, and when
+<code>Set</code> replaces a value. Setting a key that is already there keeps the key the map
+stores and frees the old value and the key you passed (nothing is freed when you pass the
+stored pointers again). A pointer used as both the key and the value
+(<code>StrMapSet(m, s, s)</code>) is freed once. <code>Set</code> returns <code>TRUE</code>
+for a new key and an update alike; check <code>Has</code> first to know which. A
+<code>NULL</code> map or key is safe everywhere: <code>Get</code> and <code>Has</code> give
+<code>NULL</code> and <code>FALSE</code>, <code>Set</code> and <code>Delete</code>
+<code>FALSE</code>, and <code>Release</code> and <code>Clear</code> do nothing.</p>
+<div class="warn"><p>The map keeps the key pointer you pass the first time a key is set,
+instead of copying it. Use keys that live as long as the map, such as
+<code>StrNew</code> copies; updating an existing key from a reused buffer is fine. With a
+key destructor registered, an update frees the key you passed: don't use it after
+<code>StrMapSet</code> returns.</p></div>
+
+<h2 id="bit-vectors">Bit vectors</h2>
+<p>A <code>BitVec</code> is a set of numbered bits, all 0 to begin with. <code>BitVecSet</code>
+grows it to fit any index (a <code>U64</code>), <code>BitVecTest</code> and
+<code>BitVecUnSet</code> treat bits past the end as 0, and <code>BitVecClear</code> zeroes
+every bit. <code>BitVecSet</code> returns <code>FALSE</code> when it runs out of memory
+growing. <code>BitVecRelease(NULL)</code> does nothing.</p>
+<pre data-run><code>
+U0 Main()
+{
+  BitVec *seen = BitVecNew();
+  I64 primes[5] = {2, 3, 5, 7, 1000003};
+  for (I64 i = 0; i < 5; i++) BitVecSet(seen, primes[i]);
+  BitVecUnSet(seen, 5);
+
+  for (I64 n = 0; n < 10; n++) {
+    if (BitVecTest(seen, n)) "%d ", n;
+  }
+  "\n1000003: %d, 1000004: %d, 99999999: %d\n",
+    BitVecTest(seen, 1000003), BitVecTest(seen, 1000004), BitVecTest(seen, 99999999);
+  BitVecRelease(seen);
+}
+</code></pre>
+<pre class="output">
+2 3 7 
+1000003: 1, 1000004: 0, 99999999: 0
+</pre>
+
+<h2 id="json">JSON</h2>
+<h3>Parsing and selecting</h3>
+<p><code>JsonParse(text)</code> parses text into a tree of <code>Json</code> nodes and
+returns its root; the text can be any one JSON value (an object, array, string, number,
+boolean or <code>null</code>). It always returns a root: check <code>JsonOk</code> before
+using it, and free it with <code>JsonRelease</code> either way. <code>JsonSelect(node,
+path)</code> walks a path from any node: <code>.key</code> for an object member,
+<code>[n]</code> for an array item, and a type check that must match: <code>:s</code>
+string, <code>:i</code> integer, <code>:f</code> float, <code>:b</code> boolean,
+<code>:a</code> array, <code>:o</code> object, <code>:!</code> null. It returns
+<code>NULL</code> if the path doesn't match or is malformed (<code>[1x]</code>,
+<code>..a</code>, a trailing <code>.</code>).</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *text = "{\"name\": \"ktm\", \"version\": 15, \"ratio\": 0.75, \"tags\": [\"jit\", \"repl\"], \"stable\": false, \"owner\": null}";
+  Json *doc = JsonParse(text);
+  if (!JsonOk(doc)) {
+    JsonPrintError(doc);
+    JsonRelease(doc);
+    return;
+  }
+
+  "%s v%d\n", JsonSelect(doc, ".name:s")->str, JsonSelect(doc, ".version:i")->i64;
+  "second tag: %s\n", JsonSelect(doc, ".tags[1]:s")->str;
+  "stable: %d, owner is null: %d\n", JsonSelect(doc, ".stable:b")->boolean,
+    JsonSelect(doc, ".owner:!") != NULL;
+  "missing: %d, wrong type: %d\n", JsonSelect(doc, ".author") == NULL,
+    JsonSelect(doc, ".version:s") == NULL;
+
+  Json *tags = JsonSelect(doc, ".tags:a");
+  for (Json *t = tags->array; t; t = t->next) {
+    "tag %s\n", t->str;
+  }
+
+  U8 *out = JsonToString(doc);
+  "%s\n", out;
+  Free(out);
+  JsonRelease(doc);
+}
+</code></pre>
+<pre class="output">
+ktm v15
+second tag: repl
+stable: 0, owner is null: 1
+missing: 1, wrong type: 1
+tag jit
+tag repl
+{"name": "ktm","version": 15,"ratio": 0.75,"tags": ["jit","repl"],"stable": false,"owner": null}
+</pre>
+<p>Each node has a <code>type</code> and its value in the matching field:
+<code>JSON_STRING</code> in <code>str</code>, <code>JSON_INT</code> in <code>i64</code>,
+<code>JSON_FLOAT</code> in <code>f64</code>, <code>JSON_BOOL</code> in
+<code>boolean</code>, <code>JSON_NULL</code>, <code>JSON_STRNUM</code> in
+<code>strnum</code> (see below), and <code>JSON_ARRAY</code> / <code>JSON_OBJECT</code>,
+whose <code>array</code> / <code>object</code> points at the first item or member - or is
+<code>NULL</code> when the array or object is empty. A member has its name in
+<code>key</code>, and <code>next</code> leads to the following item or member, so that is how
+you iterate.</p>
+
+<h3>Wildcards and getters</h3>
+<p>A <code>*</code> in a path takes the next argument: an <code>I64</code> inside
+<code>[]</code>, a string after <code>.</code>, and it can be part of a name
+(<code>.price_*</code>). Each part of a path is at most 256 bytes, and a key that contains
+<code>.</code> <code>[</code> <code>]</code> <code>:</code> or <code>*</code> can't be written
+in a path. <code>JsonObjectGet(obj, key)</code> and <code>JsonArrayGet(arr, i)</code> take
+any key or index directly (<code>NULL</code> if it isn't there or the node has the wrong
+type), and <code>JsonLen</code> counts the items of an array or object (0 for anything
+else). If a key appears twice, both members are kept; selecting it finds the first.</p>
+<pre data-run><code>
+U0 Main()
+{
+  Json *doc = JsonParse("{\"prices\": {\"eur\": 9.5, \"usd\": 10.25}, \"rows\": [[1, 2], [3]],"
+                        " \"a.b\": \"dotted\", \"dup\": 1, \"dup\": 2}");
+  U8 *currency = "usd";
+  for (I64 i = 0; i < 2; i++) {
+    "row %d has %d items\n", i, JsonLen(JsonSelect(doc, ".rows[*]", i));
+  }
+  "%s: %.2f\n", currency, JsonSelect(doc, ".prices.*:f", currency)->f64;
+
+  Json *prices = JsonObjectGet(doc, "prices");
+  for (Json *p = prices->object; p; p = p->next) {
+    "%s = %.2f\n", p->key, p->f64;
+  }
+  "%s, dup = %d, members %d\n", JsonObjectGet(doc, "a.b")->str,
+    JsonObjectGet(doc, "dup")->i64, JsonLen(doc);
+  "rows[1][0] = %d, rows[5]: %d\n", JsonArrayGet(JsonArrayGet(JsonObjectGet(doc, "rows"), 1), 0)->i64,
+    JsonArrayGet(JsonObjectGet(doc, "rows"), 5) == NULL;
+  JsonRelease(doc);
+}
+</code></pre>
+<pre class="output">
+row 0 has 2 items
+row 1 has 1 items
+usd: 10.25
+eur = 9.50
+usd = 10.25
+dotted, dup = 1, members 5
+rows[1][0] = 3, rows[5]: 1
+</pre>
+
+<h3>Writing JSON and freeing</h3>
+<p><code>JsonToString(node)</code> returns the JSON text of that node's value as a new
+string to <code>Free</code>: for an inner node just its value, without its key or the nodes
+after it. Members are written as <code>"key": value</code> and items are separated by
+<code>,</code> without a space. Floats get 15, 16 or 17 significant digits, the fewest that
+read back as the same value, always with a decimal point (<code>0.75</code>,
+<code>2.0</code>, <code>1.0e+21</code>); infinity and NaN, which JSON lacks, are written as
+<code>null</code>. Strings are escaped (<code>\"</code>, <code>\\</code>, <code>\n</code>,
+<code>\t</code>, ..., <code>\u00XX</code> for other control characters), so the output
+parses back to the same values.</p>
+<p>The nodes inside a document - whatever <code>JsonSelect</code>, the getters and
+<code>next</code> give you - are views into it: don't free or keep them after the root is
+released. <code>JsonRelease</code> frees a whole document, and only does something when given
+a root; on <code>NULL</code> or an inner node it does nothing.</p>
+<pre data-run><code>
+U0 Main()
+{
+  Json *doc = JsonParse("{\"user\": {\"id\": 7, \"roles\": [\"admin\"]}, \"n\": 1e400}");
+  Json *user = JsonSelect(doc, ".user");
+  U8 *s = JsonToString(user);      // just this node's value
+  "%s\n", s;
+  Free(s);
+  JsonRelease(user);               // a view: ignored
+  s = JsonToString(doc);           // 1e400 is too big for an F64: null
+  "%s\n", s;
+  Free(s);
+  JsonRelease(doc);                // frees everything
+}
+</code></pre>
+<pre class="output">
+{"id": 7,"roles": ["admin"]}
+{"user": {"id": 7,"roles": ["admin"]},"n": null}
+</pre>
+
+<h3>Errors and strictness</h3>
+<p>The parser follows RFC 8259 strictly. It rejects trailing commas, anything after the
+top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
+<code>1.</code>, <code>1e</code> or hex, raw control characters (tab, newline, ...) inside
+strings, whitespace other than space, tab, newline and carriage return, anything but whitespace
+between a key and its <code>:</code>, and arrays and objects nested more than
+<code>JSON_MAX_DEPTH</code> (512) deep. On an error <code>JsonGetStrerror(root)</code>
+returns a message to <code>Free</code> (<code>NULL</code> if there was no error) and
+<code>JsonPrintError</code> prints it; both say where, as a line and a byte column, also
+found in <code>root-&gt;state</code> with the error code (<code>error</code>, <code>line</code>,
+<code>col</code>, <code>offset</code>).</p>
+<pre data-run><code>
+U0 Main()
+{
+  Json *doc = JsonParse("{\n  \"a\": [1, 2],\n  \"b\" 3\n}");
+  if (!JsonOk(doc)) {
+    U8 *msg = JsonGetStrerror(doc);
+    "%s\n", msg;
+    "code %d, line %d, column %d\n", doc->state->error, doc->state->line, doc->state->col;
+    Free(msg);
+  }
+  JsonRelease(doc);
+
+  U8 *bad[6] = {"[1, 2,]", "[1] x", "[01]", "{\"a\": tru}", "[\"tab\there\"]", ""};
+  for (I64 i = 0; i < 6; i++) {
+    doc = JsonParse(bad[i]);
+    "%d ", doc->state->error;
+    JsonRelease(doc);
+  }
+  "\n";
+}
+</code></pre>
+<pre class="output">
+Expected ':' after an object key, got '3' at line 3, column 7
+code 14, line 3, column 7
+8 8 5 18 19 12 
+</pre>
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>JSON_INVALID_UTF16_SURROGATE</code> (2)</td><td>a <code>\u</code> escape with an unpaired or invalid surrogate</td></tr>
+    <tr><td><code>JSON_INVALID_HEX</code> (3)</td><td><code>\u</code> not followed by 4 hex digits</td></tr>
+    <tr><td><code>JSON_INVALID_STRING_NOT_TERMINATED</code> (4)</td><td>a string without its closing quote</td></tr>
+    <tr><td><code>JSON_INVALID_NUMBER</code> (5)</td><td>a malformed number</td></tr>
+    <tr><td><code>JSON_INVALID_JSON_TYPE_CHAR</code> (8)</td><td>no value where one was expected (<code>[1,]</code>), an unexpected character after a value (also after the top-level one), or the end of the input</td></tr>
+    <tr><td><code>JSON_CANNOT_START_PARSE</code> (12)</td><td>empty input, or it doesn't start with a value</td></tr>
+    <tr><td><code>JSON_INVALID_KEY_TERMINATOR_CHARACTER</code> (13)</td><td>an object member that doesn't start with a quoted key</td></tr>
+    <tr><td><code>JSON_INVALID_KEY_VALUE_SEPARATOR</code> (14)</td><td>no <code>:</code> after a key</td></tr>
+    <tr><td><code>JSON_INVALID_ARRAY_CHARACTER</code> (15)</td><td>no <code>,</code> or <code>]</code> after an array item</td></tr>
+    <tr><td><code>JSON_INVALID_ESCAPE_CHARACTER</code> (16)</td><td>an unknown escape such as <code>\q</code></td></tr>
+    <tr><td><code>JSON_INVALID_LITERAL</code> (18)</td><td>not <code>true</code>, <code>false</code> or <code>null</code></td></tr>
+    <tr><td><code>JSON_INVALID_CONTROL_CHARACTER</code> (19)</td><td>a raw byte below 0x20 inside a string</td></tr>
+    <tr><td><code>JSON_NESTING_TOO_DEEP</code> (20)</td><td>nested deeper than <code>JSON_MAX_DEPTH</code></td></tr>
+  </tbody>
+</table>
+<p><code>JSON_OK</code> is 0. The codes 1, 6, 7, 9, 10, 11 and 17 are still defined but no
+longer produced.</p>
+
+<h3>Numbers and strings</h3>
+<p>An integer that fits in an <code>I64</code> becomes a <code>JSON_INT</code>; a larger one
+becomes a <code>JSON_FLOAT</code>, as in JavaScript, and a number with a fraction or exponent
+is a float (one too big for an <code>F64</code> is infinity). String escapes are decoded,
+<code>\uXXXX</code> and surrogate pairs to UTF-8. A string can contain <code>\u0000</code>,
+so <code>str_len</code> and <code>key_len</code> give the full byte length of
+<code>str</code> and <code>key</code>; C-style functions and paths see them only up to the
+first <code>'\0'</code>.</p>
+<p><code>JsonParse</code>'s optional arguments are the length to parse (-1, the default,
+reads up to the terminating NUL) and flags: <code>JSON_NO_FLAGS</code> or
+<code>JSON_STRNUM_FLAG</code>. With <code>JSON_STRNUM_FLAG</code> numbers are not converted:
+each one is still checked against the JSON grammar and becomes a <code>JSON_STRNUM</code>
+node whose <code>strnum</code> is the number exactly as written, so large integers and
+decimals keep every digit, and <code>JsonToString</code> writes it back unchanged. The
+<code>:i</code> and <code>:f</code> checks don't match these nodes; select them without
+one.</p>
+<pre data-run><code>
+U0 Main()
+{
+  Json *doc = JsonParse("[9007199254740993, 99999999999999999999, 2.50, \"a\\u0000b\"]");
+  Json *big = JsonArrayGet(doc, 1);
+  "%d %d %d\n", JsonIsInt(JsonArrayGet(doc, 0)), JsonIsFloat(big), JsonArrayGet(doc, 3)->str_len;
+  U8 *s = JsonToString(doc);
+  "%s\n", s;
+  Free(s);
+  JsonRelease(doc);
+
+  doc = JsonParse("{\"id\": 123456789012345678901234567890, \"price\": 9.90}",
+                  -1, JSON_STRNUM_FLAG);
+  "id %s\n", JsonSelect(doc, ".id")->strnum;
+  "price %s\n", JsonSelect(doc, ".price")->strnum;
+  s = JsonToString(doc);
+  "%s\n", s;
+  Free(s);
+  JsonRelease(doc);
+}
+</code></pre>
+<pre class="output">
+1 1 3
+[9007199254740993,1.0e+20,2.5,"a\u0000b"]
+id 123456789012345678901234567890
+price 9.90
+{"id": 123456789012345678901234567890,"price": 9.90}
+</pre>
+
+<h2 id="dates">Dates and time</h2>
+<pre data-run><code>
+U0 Main()
+{
+  U64 start = NowMilliseconds();
+
+  CDateStruct ds;
+  NowDateTimeStruct(&ds);
+  "year looks right: %d\n", ds.year >= 2024;
+
+  U8 *stamp = MPrintTimestampNow();     // like 2026-10-08 19:01:37
+  "timestamp is %d characters\n", StrLen(stamp);
+  Free(stamp);
+
+  "elapsed ms is never negative: %d\n", NowMilliseconds() >= start;
+
+  MemSet(&ds, 0, sizeof(CDateStruct));  // Struct2Date reads every field
+  ds.year = 2024;
+  ds.mon = 2;
+  ds.day_of_mon = 29;
+  ds.hour = 12;
+  ds.min = 34;
+  CDate leap = Struct2Date(&ds);
+  U8 *date = MPrintDate(leap), *time = MPrintTime(leap);
+  "%s %s\n", date, time;
+  Free(date);
+  Free(time);
+
+  CDateStruct back;
+  Date2Struct(&back, leap);
+  "%d-%02d-%02d, day of week %d\n", back.year, back.mon, back.day_of_mon,
+    back.day_of_week;
+}
+</code></pre>
+<pre class="output">
+year looks right: 1
+timestamp is 19 characters
+elapsed ms is never negative: 1
+02/29/2024 12:34:00
+2024-02-29, day of week 4
+</pre>
+<p><code>Now()</code> returns a <code>CDate</code>, and
+<code>Date2Struct</code> / <code>Struct2Date</code> convert between it and a
+<code>CDateStruct</code>, which has <code>year</code>, <code>mon</code>,
+<code>day_of_mon</code>, <code>hour</code>, <code>min</code>, <code>sec</code> and
+<code>day_of_week</code> (0 is Sunday). <code>MPrintDate</code> and
+<code>MPrintTime</code> return new strings as <code>MM/DD/YYYY</code> and
+<code>HH:MM:SS</code>. A <code>CDate</code> is an <code>I64 class</code>, an integer
+underneath, so <code>CDate d = 5;</code> and <code>I64 x = d;</code> need no cast,
+and <code>F64 f = d;</code> converts it to a float like any integer (a float assigned to a
+<code>CDate</code> is truncated, as it would be for an <code>I64</code>).</p>
+
+<p><code>Now()</code> and <code>NowDateTimeStruct</code> give local time (the
+<code>TZ</code> time zone), not UTC; <code>NowDateTimeStruct</code> also sets
+<code>zone_diff</code>, the offset from UTC as &plusmn;hhmm (100 for +01:00), and
+<code>NowMilliseconds</code> counts from the Unix epoch. Below the seconds a
+<code>CDateStruct</code> has <code>sec100</code> (hundredths, 0-99) and
+<code>sec10000</code> (the ten-thousandths below those, 0-99). <code>Struct2Date</code>
+carries fields that are out of range: day 32 of January is February 1, month 13 is
+January of the next year and month 0 December of the year before; the time carries the same
+way, so hour 24 is midnight of the next day.</p>
+<pre data-run><code>
+U0 Main()
+{
+  CDateStruct ds;
+  MemSet(&ds, 0, sizeof(CDateStruct));
+  ds.year = 2024;
+  ds.mon = 13;
+  ds.day_of_mon = 32;
+  U8 *date = MPrintDate(Struct2Date(&ds));
+  "%s\n", date;    // month 13 of 2024, day 32
+  Free(date);
+}
+</code></pre>
+<pre class="output">
+02/01/2025
+</pre>
+<p>The calendar is the proleptic Gregorian one, with the same leap years before 1582 and
+for year 0 (a leap year, as in ISO 8601) and the years before it. Day 0 is January 2 of
+year 0, so a <code>CDate</code> of 0 prints as <code>01/02/0000</code>. Years 1 to 3999
+have the same day numbers whose calendar has no February 29 in years
+divisible by 4000 and is a day ahead from 4000-03-01. <code>IsoFromTimespec(&amp;ts, buf)</code>,
+which formats a <code>Stat</code> time as UTC ISO 8601
+(<code>2026-07-05T14:30:00.123456789Z</code>, 31 bytes with the NUL), uses the same
+calendar.</p>
+
+<p><code>StrToCDate(text, format)</code> parses a date with a <code>strptime</code>-like
+format and <code>Str2CDateStruct(text, format, &amp;ds)</code> fills a
+<code>CDateStruct</code>. The conversions are <code>%Y</code>, <code>%m</code>,
+<code>%d</code>, <code>%H</code>, <code>%M</code>, <code>%s</code> (or <code>%S</code>) for
+seconds, <code>%a</code> and <code>%b</code> for day and month names (full or three letters,
+any case), <code>%p</code> for AM/PM, <code>%z</code> for a zone offset and <code>%%</code>; a
+space in the format matches any run of spaces, other characters must match exactly.
+Missing time fields are 0, and without <code>%z</code> <code>zone_diff</code> is
+<code>CDATE_NO_ZONE</code> (a value no &plusmn;hhmm offset can have). <code>Str2CDateStruct</code> returns <code>FALSE</code> and
+<code>StrToCDate</code> 0 for empty or short input, text that doesn't match, an unknown
+conversion or an impossible value (month 13, February 30, hour 24, ...);
+<code>StrToCDate</code> also needs the year, month and day.</p>
+<pre data-run><code>
+U0 Main()
+{
+  CDate d = StrToCDate("Mar 5 2024 1:30 PM", "%b %d %Y %H:%M %p");
+  U8 *date = MPrintDate(d), *time = MPrintTime(d);
+  "%s %s\n", date, time;
+  Free(date);
+  Free(time);
+
+  CDateStruct ds;
+  "%d %d\n", Str2CDateStruct("2023-02-29", "%Y-%m-%d", &ds),
+    StrToCDate("2024-03", "%Y-%m-%d") == 0;
+}
+</code></pre>
+<pre class="output">
+03/05/2024 13:30:00
+0 1
+</pre>
+
+<h2 id="maths">Maths</h2>
+<p>The C maths library is declared under its usual names (<code>sqrt</code>,
+<code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
+<code>F64</code>), plus <code>Abs</code>, <code>Gcd</code> and <code>Pow</code>, and the
+constants <code>M_PI</code>, <code>M_E</code>, <code>M_SQRT2</code> and the rest of C's
+<code>M_*</code> set.
+<code>Gcd</code> ignores signs: <code>Gcd(0, n)</code> is <code>|n|</code> and
+<code>Gcd(0, 0)</code> is 0. <code>Pow</code> takes an <code>F64</code> exponent: integral
+ones use exact repeated squaring (<code>Pow(2, 10)</code> is 1024.0) and the rest go to
+<code>pow</code>, so <code>Pow(4.0, 0.5)</code> is 2.0. <code>Abs</code> returns an
+<code>I64</code>; like C's <code>labs</code>, <code>Abs(I64_MIN)</code> is
+<code>I64_MIN</code>. Use <code>fabs</code> for floats.</p>
+<pre data-run><code>
+U0 Main()
+{
+  "%.4f %.0f %.1f %.1f\n", sqrt(2.0), pow(2.0, 10.0), floor(2.7), fabs(-1.5);
+  "%d %d %d %.2f\n", Abs(-5), Gcd(12, 18), Gcd(-4, 0), Pow(1.5, 2);
+}
+</code></pre>
+<pre class="output">
+1.4142 1024 2.0 1.5
+5 6 4 2.25
+</pre>
+
+<h2 id="net">Sockets</h2>
+<p><code>NetCreateServer(port, bindaddr, backlog)</code> returns a listening TCP socket,
+<code>NetAccept(server)</code> the next connection on it and <code>NetConnect(addr, port)</code>
+a connected socket. All three return the socket as an <code>I32</code>, or -1 on failure
+(0 is a valid socket number). Read and write them with <code>read</code>/<code>write</code>
+or <code>recv</code>/<code>send</code>, and <code>close</code> them when done.
+<code>NetConnect</code> takes a host name or an IPv4 or IPv6 address and tries every address
+the name resolves to. The server's bind address must be numeric (<code>"127.0.0.1"</code>,
+<code>"::1"</code>), <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6
+address; port 0 lets the kernel pick one. Ports outside 0..65535 give -1.
+<code>NetConnect(addr, port, non_blocking, timeout_ms)</code> gives up after
+<code>timeout_ms</code> milliseconds (shared by all the addresses the name resolves to; the
+name lookup itself isn't timed) with -1 and <code>Errno()</code> <code>ETIMEDOUT</code>;
+0, the default, waits as long as the system does. <code>NetSetRecvTimeout(sock, ms)</code>
+and <code>NetSetSendTimeout(sock, ms)</code> make a read or a write on a connected socket
+give up after <code>ms</code> milliseconds with -1 and <code>Errno()</code>
+<code>EAGAIN</code> (a write returns the bytes it got out first, if any).
+Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which ends the
+program, as in C. <code>NetSend(sock, buf, len)</code> (a <code>send</code> that adds
+<code>MSG_NOSIGNAL</code> to its optional flags) returns -1 with <code>Errno()</code>
+<code>EPIPE</code> (or <code>ECONNRESET</code>) instead; <code>signal(SIGPIPE, SIG_IGN)</code>
+does the same for every <code>write</code> and <code>send</code> in the program.
+<code>signal</code> takes <code>SIG_DFL</code>, <code>SIG_IGN</code> or a handler
+<code>U0 F(I32 sig)</code> passed as <code>(&amp;F)(I64)</code>, and returns the previous
+one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
+<code>SIGKILL</code>, <code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGPIPE</code>,
+<code>SIGALRM</code>, <code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control signals
+<code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
+<code>SIGTTOU</code> are defined, with each platform's numbers.</p>
+<pre><code>
+I32 srv = NetCreateServer(8080, "127.0.0.1", 16);
+if (srv == -1) {
+  "can't listen on 8080\n";
+  return;
+}
+I32 conn = NetAccept(srv);   // waits for a client
+if (conn != -1) {
+  NetSend(conn, "hello\n", 6);   // -1 if the client already left
+  close(conn);
+}
+close(srv);
+</code></pre>
+<p>The raw calls are there too, for UDP and anything the helpers don't cover:
+<code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
+<code>sendmsg</code>, <code>recvmsg</code>, <code>getsockname</code>, <code>setsockopt</code>, ...
+Address and option lengths are C's <code>socklen_t</code>, a <code>U32</code>: declare the
+ones you pass by address (to <code>accept</code>, <code>recvfrom</code>, <code>getsockname</code>,
+<code>getpeername</code>, <code>getsockopt</code>) as <code>U32</code> and set them to the buffer
+size first. The <code>MSG_*</code> flags (<code>MSG_PEEK</code>, <code>MSG_TRUNC</code>,
+<code>MSG_WAITALL</code>, ...) have the platform's values.</p>
+<pre><code>
+I32 fd = socket(AF_INET, SOCK_DGRAM, 0);
+sockaddr_storage from;
+U32 fromlen = sizeof(sockaddr_storage);
+U8 buf[512];
+I64 n = recvfrom(fd, buf, sizeof(buf), 0, (&from)(sockaddr *), &fromlen);
+</code></pre>
+<p>For UDP, <code>NetCreateUdpSocket(port, bindaddr)</code> returns a bound datagram
+socket (the same bind addresses as <code>NetCreateServer</code>, port 0 picks one:
+<code>NetGetSocketPort</code> tells which), <code>NetSendTo(sock, buf, len, addr, port)</code>
+sends one datagram and <code>NetRecvFrom(sock, buf, len, from, from_size, &amp;port)</code>
+receives one and says who sent it, so a server answers with
+<code>NetSendTo(sock, reply, n, from, port)</code>. Both work with IPv4 and IPv6 and return
+-1 on failure. A datagram longer than the buffer is cut. <code>NetSetRecvTimeout(sock, ms)</code>
+makes reads give up with -1 after <code>ms</code> milliseconds.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I32 srv = NetCreateUdpSocket(0, "127.0.0.1");
+  I32 cli = NetCreateUdpSocket(0, "127.0.0.1");
+  U8 buf[64], from[INET6_ADDRSTRLEN];
+  I32 port;
+  I64 n;
+
+  NetSendTo(cli, "ping", 4, "127.0.0.1", NetGetSocketPort(srv));
+  n = NetRecvFrom(srv, buf, sizeof(buf) - 1, from, sizeof(from), &port);
+  buf[n] = '\0';
+  "server got %s from %s\n", buf, from;
+  NetSendTo(srv, "pong", 4, from, port);   // answer the sender
+
+  NetSetRecvTimeout(cli, 1000);
+  n = NetRecvFrom(cli, buf, sizeof(buf) - 1);
+  buf[n] = '\0';
+  "client got %s\n", buf;
+  close(srv);
+  close(cli);
+}
+</code></pre>
+<pre class="output">
+server got ping from 127.0.0.1
+client got pong
+</pre>
+
+<p>For code on the raw socket calls: <code>Htons</code>/<code>Ntohs</code> and
+<code>Htonl</code>/<code>Ntohl</code> convert ports and IPv4 addresses to network byte
+order and back; <code>Errno()</code> is the C <code>errno</code> of the calling thread
+(<code>SetErrno(0)</code> clears it), to compare with <code>EAGAIN</code>
+(= <code>EWOULDBLOCK</code>), <code>EINTR</code>, <code>EINPROGRESS</code>,
+<code>ECONNREFUSED</code>, <code>ECONNRESET</code>, <code>EPIPE</code>,
+<code>EADDRINUSE</code>, <code>EADDRNOTAVAIL</code>, <code>ENETUNREACH</code>,
+<code>EHOSTUNREACH</code>, <code>ETIMEDOUT</code>, <code>EMFILE</code>,
+<code>ENFILE</code>, <code>ENOENT</code>, <code>EACCES</code>, <code>ECHILD</code>,
+<code>EBADF</code> and <code>EINVAL</code>, each with the platform's number (several
+differ between Linux and macOS). The flags
+<code>MSG_NOSIGNAL</code>, <code>MSG_DONTWAIT</code>, <code>MSG_PEEK</code>,
+<code>MSG_WAITALL</code>, <code>MSG_TRUNC</code> and <code>MSG_OOB</code>, and
+<code>SHUT_RD</code>/<code>SHUT_WR</code>/<code>SHUT_RDWR</code> for <code>shutdown</code>,
+have each platform's values. <code>poll(fds, n, timeout_ms)</code> waits on an array of
+<code>pollfd</code> (<code>fd</code>, <code>events</code>, <code>revents</code>) with the
+<code>POLLIN</code>, <code>POLLOUT</code>, <code>POLLERR</code>, <code>POLLHUP</code>,
+<code>POLLNVAL</code> and <code>POLLPRI</code> bits.</p>
+<pre data-run><code>
+U0 Main()
+{
+  "%X %X\n", Htons(0x1F90), Htonl(0x7F000001);
+  "%d\n", inet_addr("127.0.0.1") == Htonl(0x7F000001);
+  if (close(-1) == -1 && Errno() == EBADF)
+    "close(-1): EBADF\n";
+}
+</code></pre>
+<pre class="output">
+901F 100007F
+1
+close(-1): EBADF
+</pre>
+
+<h2 id="coroutines">Coroutines</h2>
+<p>A coroutine runs a function on its own stack and can pause in the middle.
+<code>CoroutineNew(&amp;Fn, arg)</code> makes one (nothing runs yet; NULL if its stack can't be
+mapped), <code>CoroutineNext(c)</code> runs it until it calls <code>CoroutineYield(value)</code>
+and returns that value, and the next <code>CoroutineNext</code> carries on after the yield.
+When the function returns, <code>CoroutineDone(c)</code> becomes TRUE and that last
+<code>CoroutineNext</code> returns the function's return value; after that it returns NULL. A yielded
+NULL is a value like any other, so loops test <code>CoroutineDone</code>. Values also go the other
+way: <code>CoroutineNext(c, send)</code> makes the paused <code>CoroutineYield</code> return
+<code>send</code> (the first <code>CoroutineNext</code> just starts the function with its arg).
+<code>CoroutineRelease(c)</code> frees it, also while it is paused.</p>
+<p>The function is <code>U0 *Fn(U0 *arg)</code>. Coroutines can resume other coroutines
+(<code>CoroutineSelf()</code> is the running one, NULL outside), every thread can have its own,
+and a <code>try</code> may span a yield. A throw that leaves the coroutine's function goes on from the
+<code>CoroutineNext</code> that resumed it. Each stack is 256 KiB unless <code>CoroutineNew</code>'s
+third argument says otherwise, with a guard page below it: running past it crashes the program
+instead of overwriting memory. <code>CoroutineRelease</code> keeps up to 16 stacks per thread
+for the next <code>CoroutineNew</code> of the same size, so short-lived coroutines (one per request)
+don't map and unmap a stack each time; they are unmapped when the thread ends. <code>CoroutineYield</code> outside a coroutine, or resuming one that is
+running, prints a message and exits with 1.</p>
+<pre data-run><code>
+U0 *Fib(U0 *max)
+{
+  I64 a = 0, b = 1, t;
+  while (a < max(I64)) {
+    CoroutineYield(a(U0 *));
+    t = a + b;
+    a = b;
+    b = t;
+  }
+  return NULL;
+}
+
+U0 *Sum(U0 *unused)
+{// a running total of whatever CoroutineNext sends
+  I64 total = 0;
+  while (TRUE) total += CoroutineYield(total(U0 *))(I64);
+  return NULL;
+}
+
+U0 Main()
+{
+  Coroutine *f = CoroutineNew(&Fib, 50(U0 *));
+  for (U0 *v = CoroutineNext(f); !CoroutineDone(f); v = CoroutineNext(f))
+    "%d ", v;
+  "\n";
+  CoroutineRelease(f);
+
+  Coroutine *s = CoroutineNew(&Sum);
+  CoroutineNext(s);                 // runs to the first yield
+  "%d\n", CoroutineNext(s, 5(U0 *));
+  "%d\n", CoroutineNext(s, 7(U0 *));
+  CoroutineRelease(s);
+}
+</code></pre>
+<pre class="output">
+0 1 1 2 3 5 8 13 21 34 
+5
+12
+</pre>
+
+<h2 id="fzf">Fuzzy matching</h2>
+<p><code>FzF(text, pattern)</code> matches text the way the fzf tool does and returns the
+score and the matched byte offsets, or NULL when it doesn't match. Terms separated by
+spaces must all match, <code>a | b</code> takes either. A plain term is fuzzy: its
+characters in order, with gaps. <code>'term</code> is an exact substring,
+<code>^term</code> a prefix, <code>term$</code> a suffix, <code>^term$</code> the whole
+text and <code>!term</code> must not occur; <code>\ </code> is a space inside a term.
+With the default <code>FZF_CASE_SMART</code> a term is case-sensitive only when it has an
+upper-case letter; <code>FZF_CASE_IGNORE</code> and <code>FZF_CASE_RESPECT</code> force it.
+Passing <code>FALSE</code> as the last argument makes plain terms exact (and
+<code>'term</code> fuzzy). The offsets come term after term, so they are only sorted for
+a single term, and the matcher is fzf's greedy one: it finds a match, not always the
+best-scoring placement. The pattern is not modified, so a string literal is fine.
+FzF keeps no shared state, so threads can call it at the same time.</p>
+<pre data-run><code>
+U0 Show(U8 *text, U8 *pattern)
+{
+  FzFPosition *m = FzF(text, pattern);
+  "%-12s %-11s ", text, pattern;
+  if (!m) {
+    "no match\n";
+    return;
+  }
+  "score %d at", m->score;
+  for (I64 i = 0; i < m->size; i++) " %d", m->data[i];
+  "\n";
+  FzFPositionRelease(m);
+}
+
+U0 Main()
+{
+  Show("src/main.ktm", "smkm");
+  Show("src/main.ktm", "smKM");
+  Show("src/main.ktm", "ktm$ main");
+  Show("src/main.ktm", "^src 'main");
+  Show("src/main.ktm", "!test main");
+  Show("my file.txt", "my\\ file");
+}
+</code></pre>
+<pre class="output">
+src/main.ktm smkm        score 82 at 0 4 9 11
+src/main.ktm smKM        no match
+src/main.ktm ktm$ main   score 184 at 9 10 11 4 5 6 7
+src/main.ktm ^src 'main  score 184 at 0 1 2 4 5 6 7
+src/main.ktm !test main  score 104 at 4 5 6 7
+my file.txt  my\ file    score 176 at 0 1 2 3 4 5 6
+</pre>
+
+<h2 id="sqlite">SQLite</h2>
+<p>The SQLite functions exist when ktm and the library are built with
+<code>./build.sh --sqlite</code> (they are under <code>#ifdef __KTM_LINK_SQLITE3__</code>).
+<code>SqlCtxNew(path)</code> opens a database (<code>":memory:"</code> for a private one)
+and <code>SqlCtxRelease</code> closes it. <code>SqlExecRaw</code> runs a script of
+statements and returns NULL or an error message to <code>Free</code>.
+<code>SqlQuery</code> and <code>SqlSelect</code> run one statement with <code>?</code>
+parameters from an array of <code>SqlParam</code> (<code>SQL_INT</code>,
+<code>SQL_FLOAT</code>, <code>SQL_TEXT</code>, <code>SQL_BLOB</code>,
+<code>SQL_NULL</code>); text and blobs are copied, so they can be freed right away. A
+string with a second statement is an error rather than half-run. <code>SqlIter</code>
+steps through the rows of <code>SqlSelect</code> and frees the row after the last one;
+call <code>SqlRowRelease</code> if you stop early. A column's <code>str</code> and
+<code>blob</code> are only valid until the next row.</p>
+<pre><code>
+SqlCtx *db = SqlCtxNew(":memory:");
+U8 *err = SqlExecRaw(db, "CREATE TABLE users(id INTEGER, name TEXT);");
+if (err) {
+  "%s\n", err;
+  Free(err);
+}
+
+SqlParam p[2];
+p[0].type = SQL_INT;
+p[0].i64 = 1;
+p[1].type = SQL_TEXT;
+p[1].str = "ann";
+SqlQuery(db, "INSERT INTO users VALUES(?, ?);", p, 2);
+
+SqlRow row;
+if (SqlSelect(db, &row, "SELECT id, name FROM users;")) {
+  while (SqlIter(&row)) "%d %s\n", row.col[0].i64, row.col[1].str;
+}
+SqlCtxRelease(db);
+</code></pre>
+<p><code>SqlPrepare</code> compiles a statement once (NULL on an error) and
+<code>SqlExecPrepared(stmt, &amp;row, params)</code> runs it with new parameters, returning
+<code>SQLITE_ROW</code>, <code>SQLITE_DONE</code> or an error code; read its rows with
+<code>SqlIterPrepared</code>. A parameter it can't bind (an unknown <code>type</code> gives
+<code>SQLITE_MISMATCH</code>, a string over sqlite's length limit <code>SQLITE_TOOBIG</code>) returns that
+error without running the statement. Such a row belongs to the statement, which
+<code>SqlFinalizePrepared</code> frees.</p>
+
+<h2>More modules</h2>
+<p>These are covered in the <a href="stdlib.html">library reference</a>:</p>
+<ul>
+  <li><a href="stdlib.html#threads">Threads</a>: pthreads (<code>pthread_create</code>, mutexes, condition variables) and a thread pool:
+  <code>ThreadPoolNew(n)</code> (NULL if <code>n</code> &lt;= 0 or a thread can't start), <code>ThreadPoolEnqueue(pool, argv, &amp;Fn)</code>
+  runs <code>Fn(pool-&gt;priv_data, argv)</code> on a worker, <code>ThreadPoolWait</code> waits until the queue is empty (never call it
+  from inside a job), <code>ThreadPoolRelease</code> runs what is left and frees the pool.</li>
+  <li><a href="stdlib.html#net">Networking</a>: sockets, <code>getaddrinfo</code> and friends.
+  <code>NetCreateUnixServerSocket(path, backlog)</code> and <code>NetCreateUnixClientSocket(path)</code>
+  make Unix domain sockets; they return -1 on failure, also when the path is longer than
+  107 bytes on Linux or 103 on macOS. The address classes (<code>sockaddr_in</code>,
+  <code>sockaddr_un</code>, <code>addrinfo</code>, ...) have the platform's C layout, and
+  <code>SOL_SOCKET</code>, <code>SO_*</code>, <code>AF_INET6</code>, <code>IPPROTO_*</code>,
+  <code>TCP_*</code> and <code>AI_*</code> the platform's values.</li>
+</ul>

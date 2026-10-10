@@ -1,0 +1,17 @@
+Opening balances
+  alice  1200.00
+  bob    500.00
+  carol  25.00
+Transfers
+  transfer carol -> alice refused: insufficient funds
+  transfer bob -> carol refused: account frozen
+Month end
+  alice  900.00
+  bob    803.00
+  carol  25.00 (frozen)
+Ledger (5 entries)
+  alice  withdraw  -300.00
+  bob    deposit   300.00
+  bob    withdraw  -1.00
+  bob    refund    1.00
+  bob    interest  3.00

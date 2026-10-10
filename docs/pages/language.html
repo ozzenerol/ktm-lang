@@ -1,0 +1,1306 @@
+<!-- title: Language -->
+<h1>The ktm language</h1>
+<p class="lede">A complete tour of the ktm language. If you know C, most of it
+will look familiar. The differences are where ktm gets interesting.</p>
+
+<h2>Program structure</h2>
+<p>A program is one or more <code>.ktm</code> files. Code at the top level runs in order,
+then <code>Main</code> runs if you defined one (top-level code can't <code>return</code>: that is a
+compile error). A program can be a single line:</p>
+<pre data-run><code>
+"Hello\n";
+</code></pre>
+<pre class="output">
+Hello
+</pre>
+<p>Comments are the same as in C: <code>// to the end of the line</code> and
+<code>/* across lines */</code>. Block comments don't nest, and one still open at the end
+of a file is an error (<code>unterminated comment</code>). Statements end with <code>;</code> and blocks use
+<code>{ }</code>. Header files conventionally end in <code>.ktmh</code>.</p>
+
+<h2>Printing</h2>
+<p>A string literal used as a statement prints itself. Put arguments after a comma and it
+behaves like <code>printf</code>:</p>
+<pre data-run><code>
+U0 Main()
+{
+  "plain text\n";
+  "%s is %d years old\n", "Ada", 36;
+  "%5d|%-5d|%05d\n", 42, 42, 42;
+  "%x %X %c %.3f\n", 255, 255, 'A', 3.14159;
+}
+</code></pre>
+<pre class="output">
+plain text
+Ada is 36 years old
+   42|42   |00042
+ff FF A 3.142
+</pre>
+<p>The conversions are the ones <code>StrPrint</code> knows (see the
+<a href="library.html">library guide</a>), ktm's own included: <code>%Q</code> prints a
+string escaped as a C literal, <code>%C</code> a character in upper case, <code>%D</code> and
+<code>%T</code> the date and time of a <code>CDate</code>, and <code>%F</code> the contents of
+a file. The compiler checks the number of arguments against them.</p>
+<pre data-run><code>
+U0 Main()
+{
+  "%Q\n", "say \"hi\"\n";
+  "%C%c\n", 'h', 'i';
+}
+</code></pre>
+<pre class="output">
+say \"hi\"\n
+Hi
+</pre>
+<p>The string is always a format, even without arguments, so write
+<code>%%</code> for a literal percent sign: <code>"100%%\n";</code> prints
+<code>100%</code>.</p>
+<p><code>%d</code>, <code>%i</code>, <code>%u</code>, <code>%x</code>,
+<code>%X</code> and <code>%o</code> print the full 64-bit value, so there is no need for
+C's <code>%ld</code> (which also works):</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 big = 5000000000;
+  "%d vs %ld\n", big, big;
+}
+</code></pre>
+<pre class="output">
+5000000000 vs 5000000000
+</pre>
+
+<h2>Types</h2>
+<table>
+  <thead><tr><th>Type</th><th>Size</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>U0</code></td><td>0</td><td>Nothing, like C's <code>void</code></td></tr>
+    <tr><td><code>Bool</code></td><td>1</td><td><code>TRUE</code> (1) or <code>FALSE</code> (0): any other value converted to it is 1 if it isn't 0</td></tr>
+    <tr><td><code>I8</code> / <code>U8</code></td><td>1</td><td>Signed / unsigned byte; <code>U8</code> is the character type</td></tr>
+    <tr><td><code>I16</code> / <code>U16</code></td><td>2</td><td>16-bit integers</td></tr>
+    <tr><td><code>I32</code> / <code>U32</code></td><td>4</td><td>32-bit integers</td></tr>
+    <tr><td><code>I64</code> / <code>U64</code></td><td>8</td><td>64-bit integers, the default integer type</td></tr>
+    <tr><td><code>F64</code></td><td>8</td><td>Double-precision float</td></tr>
+    <tr><td><code>F32</code></td><td>4</td><td>Single-precision float (an ktm addition, for C libraries)</td></tr>
+  </tbody>
+</table>
+<p>Pointers are written as in C (<code>U8 *s</code>, <code>I64 **pp</code>) and are 8 bytes.
+<code>NULL</code> is 0.</p>
+<p>As in C, a value becomes a <code>Bool</code> by comparing it with 0: an integer, float
+or pointer that isn't 0 (or <code>NULL</code>) is <code>TRUE</code>, whether it is assigned,
+passed as an argument, returned, stored in a field or cast with <code>x(Bool)</code>. Only the
+low byte is never kept, so <code>0x100</code> and <code>0.5</code> are <code>TRUE</code>.
+A pointer needs no cast to become a <code>Bool</code> (other integer types warn without one),
+and messages and <code>typeof</code> call the type <code>Bool</code>.</p>
+<pre data-run><code>
+Bool IsSet(I64 flags, I64 bit) { return flags & bit; }
+
+U0 Main()
+{
+  Bool b = 0x100;
+  "%d %d %d %d\n", b, IsSet(0x800, 0x800), 0.5(Bool), (-1)(Bool);
+}
+</code></pre>
+<pre class="output">
+1 1 1 1
+</pre>
+<pre data-run><code>
+U0 Main()
+{
+  "%d %d %d %d %d\n", sizeof(U8), sizeof(I16), sizeof(I32), sizeof(I64), sizeof(F32);
+  "%d %d\n", sizeof(U8 *), sizeof(Bool);
+}
+</code></pre>
+<pre class="output">
+1 2 4 8 4
+8 1
+</pre>
+
+<h2>Literals</h2>
+<pre data-run><code>
+U0 Main()
+{
+  I64 dec = 42, hex = 0xFF, bin = 0b1010;
+  F64 f = 1.5e3, g = 2e-3;
+  "%d %d %d %.1f %.3f\n", dec, hex, bin, f, g;
+
+  // Character constants hold up to 8 characters, packed into an integer
+  // (the first in the low byte), and take the same escapes as strings.
+  I64 one = 'A', many = 'Hi';
+  "%d %d %c\n", one, many, one;
+
+  "tab:[\t] quote:[\"] backslash:[\\]\n";
+}
+</code></pre>
+<pre class="output">
+42 255 10 1500.0 0.002
+65 26952 A
+tab:[	] quote:["] backslash:[\]
+</pre>
+<p>Integers can be written in decimal, hex (<code>0x</code>) or binary
+(<code>0b</code>). A number with a <code>.</code> or an exponent (<code>1e3</code>,
+<code>2e-3</code>) is an <code>F64</code>. Multi-character constants are a ktm idiom for short tags, such as the values thrown by
+<a href="#exceptions">exceptions</a>. String literals are <code>U8 *</code>.</p>
+<p>Strings take the C escapes <code>\n \t \r \b \f \v \a
+\\ \' \"</code>, and <code>\d</code> for <code>$</code>. <code>\x</code> takes at most two hex digits, so <code>"\x01b"</code> is the
+bytes 1 and <code>'b'</code>, and <code>\0</code> to <code>\7</code> start an octal escape of
+up to three digits (<code>"\033"</code> is ESC). Every string literal ends in a NUL that
+<code>sizeof</code> counts: <code>sizeof("\x42")</code> is 2.</p>
+<p>An integer literal too big for <code>I64</code> is a <code>U64</code>. A malformed number
+is a compile error that says what is wrong with it: <code>0x</code> or <code>0b</code> with
+no digits, a digit that doesn't fit the base (<code>0b102</code>), a letter after a decimal
+number (<code>12ab</code>) or an exponent with no digits (<code>1e</code>).</p>
+<p>ktm has no octal literals: leading zeros don't change the base, so <code>0644</code> is
+the decimal number 644 (C reads it as octal 420). Because code copied from C would silently
+change value, ktm warns at such a literal and suggests the hex spelling (<code>0x1A4</code>
+for octal 0644). Literals that mean the same in both, like <code>00</code> or <code>07</code>,
+and floats like <code>00.5</code> are not warned about.</p>
+
+<h2>Variables</h2>
+<p>Declare variables anywhere in a block, or at file scope for globals. Several can
+share one declaration, inside a function or at global scope; each <code>*</code> belongs
+to the name after it:</p>
+<pre data-run><code>
+I64 g_total = 100, g_count; // globals, visible to everything below them
+
+U0 Main()
+{
+  I64 a = 1, b = 2, c;
+  c = a + b;
+  F64 ratio = 0.25;
+  U8 *name = "ktm", letter = 'h';
+  "%d %d %d %.2f %s %c\n", c, g_total, g_count, ratio, name, letter;
+}
+</code></pre>
+<pre class="output">
+3 100 0 0.25 ktm h
+</pre>
+
+<h3>auto</h3>
+<p><code>auto</code> takes its type from the initialiser:</p>
+<pre data-run><code>
+U0 Main()
+{
+  auto count = 3;
+  auto price = 9.99;
+  auto label = "total";
+  "%s %s %s\n", typeof(count), typeof(price), typeof(label);
+}
+</code></pre>
+<pre class="output">
+I64 F64 U8[6]
+</pre>
+
+<h3>static</h3>
+<p>A <code>static</code> local keeps its value between calls:</p>
+<pre data-run><code>
+I64 NextId()
+{
+  static I64 id = 0;
+  id++;
+  return id;
+}
+
+U0 Main()
+{
+  NextId;
+  NextId;
+  "%d\n", NextId;
+}
+</code></pre>
+<pre class="output">
+3
+</pre>
+
+<h2>Operators</h2>
+<p>The C operators work as expected: <code>+ - * / %</code>, <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code>,
+<code>&amp;&amp; || !</code>, <code>== != &lt; &lt;= &gt; &gt;=</code>, compound assignment
+(<code>+=</code>, <code>&lt;&lt;=</code>, …) and <code>++</code> / <code>--</code>.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 a = 7, b = 2;
+  "%d %d %d %d %d\n", a + b, a - b, a * b, a / b, a % b;
+  "%d %d %d %d %d\n", a & b, a | b, a ^ b, a << 2, a >> 1;
+  a += 3;
+  a++;
+  "%d\n", a;
+}
+</code></pre>
+<pre class="output">
+9 5 14 3 1
+2 7 5 28 3
+11
+</pre>
+<p><code>&amp;&amp;</code>, <code>||</code>, <code>!</code> and the comparisons always give 0
+or 1. A float operand of <code>&amp;&amp;</code>, <code>||</code> or <code>!</code> is true
+when it isn't 0.0, and a pointer when it isn't <code>NULL</code>. Comparing an integer with
+a float compares them as floats. On <code>U64</code> values, <code>&gt;&gt;</code>,
+<code>/</code>, <code>%</code> and the comparisons are unsigned. An assignment used as a value
+has the type of its left side, so the value is truncated to fit:</p>
+<pre data-run><code>
+U0 Main()
+{
+  F64 half = 0.5;
+  U8 *none = NULL;
+  "%d %d %d %d\n", half && 1, !half, none || 0, !none;
+  "%d\n", 2 < 2.5;
+
+  U64 big = 0xFFFFFFFFFFFFFFFF;
+  "%d %d\n", big > 1, big >> 60;
+
+  U8 c;
+  I64 v = (c = 300);
+  "%d\n", v;
+}
+</code></pre>
+<pre class="output">
+1 0 0 1
+1
+1 15
+44
+</pre>
+<p>Unary <code>-</code> and <code>+</code> need a number and <code>~</code> needs an
+integer: <code>-p</code> on a pointer or <code>~f</code> on an <code>F64</code> is a compile
+error. A narrower integer operand is widened to <code>I64</code> first.</p>
+<p>Comparisons can be chained, as in maths: <code>lo &lt; x &lt; hi</code> means
+<code>lo &lt; x &amp;&amp; x &lt; hi</code>.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 x = 5;
+  "%d %d\n", 1 < x < 10, 1 < x < 3;
+}
+</code></pre>
+<pre class="output">
+1 0
+</pre>
+<div class="note"><p>There is no <code>?:</code> operator. Use <code>if</code>/<code>else</code>.</p></div>
+
+<h3>sizeof, alignof, typeof</h3>
+<pre data-run><code>
+class Pair { I32 a; I64 b; };
+
+U0 Main()
+{
+  I64 arr[10];
+  "%d %d\n", sizeof(arr), sizeof(arr) / sizeof(arr[0]);
+  "%d %d\n", sizeof(Pair), alignof(Pair);
+  "%s %s\n", typeof(1 + 1), typeof(&arr[0]);
+}
+</code></pre>
+<pre class="output">
+80 10
+16 8
+I64 I64 *
+</pre>
+<p><code>typeof</code> is an ktm addition. It becomes a string naming the type at compile
+time, and its operand is never evaluated.</p>
+
+<h2>Type casts</h2>
+<p>ktm casts are written <em>after</em> the value: <code>x(F64)</code> rather than C's
+<code>(double)x</code>.</p>
+<pre data-run><code>
+U0 Main()
+{
+  F64 f = 3.9;
+  I64 i = f(I64);            // truncates
+  "%d\n", i;
+  "%.1f %.1f\n", (7 / 2)(F64), 7(F64) / 2;
+  "%.1f\n", -i(F64) / 2;     // -(i(F64)) / 2
+
+  U8 *s = "hey";
+  I64 address = s(I64);
+  "%c\n", *(address(U8 *));
+}
+</code></pre>
+<pre class="output">
+3
+3.0 3.5
+-1.5
+h
+</pre>
+<p>A cast is a postfix operator, like <code>[]</code>, <code>.</code>, <code>-&gt;</code> and
+calls, so a prefix operator applies to the whole postfix expression: <code>-x(F64)</code> is
+<code>-(x(F64))</code> and <code>!p-&gt;done</code> is <code>!(p-&gt;done)</code>.</p>
+
+<h2>Control flow</h2>
+
+<h3>if and else</h3>
+<pre data-run><code>
+U0 Main()
+{
+  I64 n = 15;
+  if (n % 15 == 0) {
+    "FizzBuzz\n";
+  } else if (n % 3 == 0) {
+    "Fizz\n";
+  } else {
+    "%d\n", n;
+  }
+
+  // An initialiser can come before the condition, scoped to the if.
+  if (I64 half = n / 2; half > 5) {
+    "half is %d\n", half;
+  }
+}
+</code></pre>
+<pre class="output">
+FizzBuzz
+half is 7
+</pre>
+
+<h3>switch</h3>
+<p><code>case</code> takes a value or a range <code>lo ... hi</code>. Cases fall through
+without <code>break</code>, as in C.</p>
+<pre data-run><code>
+U0 Grade(I64 score)
+{
+  switch (score) {
+    case 90 ... 100: "A\n"; break;
+    case 80 ... 89:  "B\n"; break;
+    case 0:          "no score\n"; break;
+    default:         "C or below\n";
+  }
+}
+
+U0 Main()
+{
+  Grade(95);
+  Grade(83);
+  Grade(0);
+  Grade(42);
+}
+</code></pre>
+<pre class="output">
+A
+B
+no score
+C or below
+</pre>
+<p>Two extras over C: a bare <code>case:</code> takes the previous case's value plus
+one (starting from 0), and <code>switch [x]</code> skips the range check on
+<code>x</code>, for speed when you know it's in range.</p>
+<pre data-run><code>
+U0 Main()
+{
+  for (I64 i = 0; i < 6; i++) {
+    switch [i] {
+      case 0: "zero "; break;
+      case:   "one "; break;      // 1
+      case:   "two "; break;      // 2
+      case 4...5: "four-five "; break;
+      default: "other "; break;
+    }
+  }
+  "\n";
+}
+</code></pre>
+<pre class="output">
+zero one two other four-five four-five 
+</pre>
+
+<h3>Loops</h3>
+<pre data-run><code>
+U0 Main()
+{
+  I64 i = 0;
+  while (i < 3) {
+    "w%d ", i;
+    i++;
+  }
+  do {
+    "d%d ", i;
+    i--;
+  } while (i > 0);
+  for (I64 j = 0; j < 10; j++) {
+    if (j == 2) continue;
+    if (j == 5) break;
+    "f%d ", j;
+  }
+  "end\n";
+}
+</code></pre>
+<pre class="output">
+w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
+</pre>
+
+<h3>Range-based for</h3>
+<p>An ktm addition. Loop over a fixed-size array, or over any class with an
+<code>entries</code> field and a <code>size</code> field, such as the library's
+<code>IntVec</code> and <code>PtrVec</code>:</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 primes[] = {2, 3, 5, 7, 11};
+  I64 sum = 0;
+  for (auto p : primes) {
+    sum += p;
+  }
+  "sum = %d\n", sum;
+
+  IntVec *v = IntVecNew();
+  IntVecPush(v, 10);
+  IntVecPush(v, 20);
+  for (I64 x : v) "%d\n", x;
+  IntVecRelease(v);
+}
+</code></pre>
+<pre class="output">
+sum = 28
+10
+20
+</pre>
+
+<h3>goto</h3>
+<pre data-run><code>
+U0 Main()
+{
+  I64 tries = 0;
+retry:
+  tries++;
+  if (tries < 3) goto retry;
+  "gave up after %d tries\n", tries;
+}
+</code></pre>
+<pre class="output">
+gave up after 3 tries
+</pre>
+
+<h2>Functions</h2>
+<pre data-run><code>
+I64 Square(I64 n)
+{
+  return n * n;
+}
+
+U0 Main()
+{
+  "%d\n", Square(12);
+}
+</code></pre>
+<pre class="output">
+144
+</pre>
+<p>Declare a prototype to call a function before its definition:
+<code>I64 Later(I64 x);</code> Every prototype and the definition must agree on the return
+and parameter types; a mismatch is an error ("conflicting types") at the later one.
+That includes the standard library's functions, whether <code>std.ktmh</code> declares them as
+prototypes or as <code>_extern</code> bindings: a function of your own named
+<code>Exit</code> or <code>MAlloc</code> must have the library's signature.
+Default arguments carry over: after <code>I64 Later(I64 x=1);</code> the definition can be
+written <code>I64 Later(I64 x) { ... }</code> and <code>Later()</code> still passes 1 (this
+includes the prototypes in <code>std.ktmh</code>). Repeating a default is allowed if it is the
+same value; a different value is an error.</p>
+<p>A program may define its own version of a standard-library function, with the same
+signature as in <code>std.ktmh</code> (<code>CDate Now()</code>, say): the program's calls go to
+its own version, in the JIT and in a compiled binary. The library's own internal calls are
+not redirected under the JIT; in a compiled binary, which links the static
+<code>libktm.a</code>, they may go to your version too, so keep its behaviour compatible.</p>
+<p>A returned value is converted to the function's return type, as in C: an integer returned
+from an <code>F64</code> function becomes a float. In a
+<code>U0</code> function, <code>return expr;</code> is a warning ("unexpected return
+value"), but the expression is still evaluated for its side effects.</p>
+<p><code>inline</code> is accepted as a hint only: an <code>inline</code> function is compiled
+as an ordinary function, so it can recurse, take default arguments and have its address taken.</p>
+<pre data-run><code>
+inline I64 Twice(I64 x)
+{
+  return x * 2;
+}
+
+U0 Main()
+{
+  I64 (*fp)(I64 x) = &Twice;
+  "%d %d\n", Twice(21), fp(4);
+}
+</code></pre>
+<pre class="output">
+42 8
+</pre>
+
+<h3>Default arguments</h3>
+<p>Any parameter can have a default, not just trailing ones. Leave an argument empty to use
+its default:</p>
+<pre data-run><code>
+U0 Box(I64 w = 2, I64 h = 3, U8 *fill = "#")
+{
+  "%dx%d of %s\n", w, h, fill;
+}
+
+U0 Main()
+{
+  Box(5, 1, "*");
+  Box(5);
+  Box(, 9);
+  Box(, , "@");
+}
+</code></pre>
+<pre class="output">
+5x1 of *
+5x3 of #
+2x9 of #
+2x3 of @
+</pre>
+
+<h3>Calling without parentheses</h3>
+<p>A function that needs no arguments can be called by name alone, anywhere
+in an expression. Use <code>&amp;Name</code> for the function's address:</p>
+<pre data-run><code>
+U0 Greet()
+{
+  "hi\n";
+}
+
+I64 Answer()
+{
+  return 42;
+}
+
+U0 Main()
+{
+  Greet;
+  "%d\n", Answer;
+  "%d\n", Answer + 1;
+}
+</code></pre>
+<pre class="output">
+hi
+42
+43
+</pre>
+
+<h3>Variable arguments</h3>
+<p>Write <code>...</code> as the last parameter. Inside the function, <code>argc</code> is
+the number of extra arguments and <code>argv</code> holds them as 64-bit values:</p>
+<pre data-run><code>
+I64 Sum(...)
+{
+  I64 total = 0;
+  for (I64 i = 0; i < argc; i++) {
+    total += argv[i];
+  }
+  return total;
+}
+
+U0 Log(U8 *fmt, ...)
+{
+  U8 *msg = StrPrintJoin(NULL, fmt, argc, argv);   // format the extras
+  "[log] %s\n", msg;
+  Free(msg);
+}
+
+U0 Main()
+{
+  "%d\n", Sum(1, 2, 3, 4);
+  Log("%d files in %s", 3, "/tmp");
+}
+</code></pre>
+<pre class="output">
+10
+[log] 3 files in /tmp
+</pre>
+
+<h3>Function pointers</h3>
+<pre data-run><code>
+I64 Add(I64 a, I64 b) { return a + b; }
+I64 Mul(I64 a, I64 b) { return a * b; }
+
+I64 Fold(I64 (*op)(I64 a, I64 b), I64 *nums, I64 n)
+{
+  I64 acc = nums[0];
+  for (I64 i = 1; i < n; i++) {
+    acc = op(acc, nums[i]);
+  }
+  return acc;
+}
+
+U0 Main()
+{
+  I64 nums[] = {1, 2, 3, 4};
+  I64 (*f)(I64 a, I64 b) = &Mul;
+  "%d %d\n", Fold(&Add, nums, 4), Fold(f, nums, 4);
+}
+</code></pre>
+<pre class="output">
+10 24
+</pre>
+<p>As in C, <code>*</code> on a function pointer gives the function pointer back, so
+<code>(*f)(acc, x)</code>, <code>(*c.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
+like <code>f(acc, x)</code>.</p>
+<p>An array of function pointers puts the size after the name, as in C. It works for
+locals, globals, class fields and parameters:</p>
+<pre data-run><code>
+I64 Dbl(I64 x) { return x * 2; }
+I64 Sq(I64 x) { return x * x; }
+
+I64 (*ops[])(I64 x) = {&Dbl, &Sq};
+
+U0 Main()
+{
+  for (I64 i = 0; i < 2; i++) {
+    "%d\n", ops[i](5);
+  }
+}
+</code></pre>
+<pre class="output">
+10
+25
+</pre>
+<p>A default in a function pointer's parameter list fills a left-out argument when you call
+through it, for variables and class fields alike. A <code>U0 *</code> converts to and from a
+function pointer without a cast, and compares (<code>==</code>, <code>!=</code>) with one:</p>
+<pre data-run><code>
+I64 Dbl(I64 x) { return x * 2; }
+
+class Calc { I64 (*op)(I64 x = 21); };
+
+U0 Main()
+{
+  Calc c;
+  c.op = &Dbl;
+  "%d %d\n", c.op(5), c.op();
+
+  U0 *raw = &Dbl;
+  I64 (*back)(I64 x) = raw;
+  "%d %d\n", back(4), raw == &Dbl;
+}
+</code></pre>
+<pre class="output">
+10 42
+8 1
+</pre>
+
+<h2>Pointers and arrays</h2>
+<pre data-run><code>
+U0 Main()
+{
+  I64 x = 5;
+  I64 *p = &x;
+  *p = 10;
+  "%d\n", x;
+
+  I64 squares[5];
+  for (I64 i = 0; i < 5; i++) {
+    squares[i] = i * i;
+  }
+  I64 *q = squares;              // arrays decay to pointers
+  "%d %d %d\n", q[3], *(q + 4), &squares[4] - &squares[1];
+
+  I64 grid[3][4];
+  grid[2][3] = 7;
+  "%d %d\n", grid[2][3], sizeof(grid);
+}
+</code></pre>
+<pre class="output">
+10
+9 16 3
+7 96
+</pre>
+<p>As in C, <code>n + p</code> is the same as <code>p + n</code>, a pointer can be
+compared with an integer on either side, and <code>n - p</code> is a compile error. An
+array can't be assigned as a whole (<code>a = b;</code> is an error): assign its elements or
+copy it with <code>MemCpy</code>.</p>
+<p>Storing one pointer type in another is a warning, as in C: <code>I64 *q = &amp;f;</code>
+with <code>F64 f</code> (also when assigning, passing or returning it), and
+<code>q -= q</code>, which stores a pointer difference (an integer) back into the pointer.
+<code>U0 *</code> and byte pointers (<code>U8 *</code>, <code>I8 *</code>, <code>Bool *</code>)
+convert to and from any pointer without one; otherwise cast:
+<code>(&amp;f)(I64 *)</code>.</p>
+<p>An initialiser list may be shorter than the array or class it initialises; as in C,
+everything it leaves out is zero, for locals and globals alike:</p>
+<pre data-run><code>
+class Point { I64 x, y, z; };
+
+I64 counts[4] = {1, 2};
+
+U0 Main()
+{
+  I64 grid[2][3] = {{1}, {4, 5}};
+  Point p = {7};
+  "%d %d %d %d\n", counts[0], counts[1], counts[2], counts[3];
+  "%d %d %d | %d %d %d\n", grid[0][0], grid[0][1], grid[0][2],
+                           grid[1][0], grid[1][1], grid[1][2];
+  "%d %d %d\n", p.x, p.y, p.z;
+}
+</code></pre>
+<pre class="output">
+1 2 0 0
+1 0 0 | 4 5 0
+7 0 0
+</pre>
+<p>Unlike C, braces only go around an array, class or union: a scalar can't be
+initialised from a list (<code>I64 x = {1};</code>), and neither can a scalar
+element or field (<code>I64 a[2] = {1, {2}};</code>). Both are compile errors.</p>
+<p>As in C, the braces of an inner array or class can be left out: its items are then
+taken from the list in order, as many as it has, and a list that ends early zero-fills
+the rest. A string still initialises a whole <code>U8</code> array, and a value of the
+class itself a whole class field.</p>
+<pre data-run><code>
+class Point { I64 x, y; };
+class Line { I64 id; Point a, b; };
+
+Line ln = {1, 2, 3, 4, 5};
+Point pts[] = {1, 2, 3};
+
+U0 Main()
+{
+  I64 m[2][2] = {1, 2, 3};
+  "%d (%d %d) (%d %d)\n", ln.id, ln.a.x, ln.a.y, ln.b.x, ln.b.y;
+  "%d: (%d %d) (%d %d)\n", sizeof(pts) / sizeof(Point), pts[0].x, pts[0].y,
+                           pts[1].x, pts[1].y;
+  "%d %d %d %d\n", m[0][0], m[0][1], m[1][0], m[1][1];
+}
+</code></pre>
+<pre class="output">
+1 (2 3) (4 5)
+2: (1 2) (3 0)
+1 2 3 0
+</pre>
+
+<p>The items of a global array or class initialiser need not be constants: an item
+such as another global's value or the address of a function or a global is stored
+when the program starts, in order with the other file-scope statements, the way
+<code>I64 g = other;</code> is.</p>
+<pre data-run><code>
+I64 Dbl(I64 v) { return v * 2; }
+I64 Sq(I64 v) { return v * v; }
+
+class Op { U8 *name; I64 (*fn)(I64 v); };
+
+I64 base = 10;
+I64 limits[3] = {base, base * 2, 99};
+Op ops[2] = {{"double", &Dbl}, {"square", &Sq}};
+
+U0 Main()
+{
+  I64 i;
+  "%d %d %d\n", limits[0], limits[1], limits[2];
+  for (i = 0; i < 2; i++)
+    "%s %d\n", ops[i].name, ops[i].fn(7);
+}
+</code></pre>
+<pre class="output">
+10 20 99
+double 14
+square 49
+</pre>
+
+<h3>Heap memory</h3>
+<p><code>MAlloc</code> allocates, <code>CAlloc</code> allocates zeroed memory,
+<code>ReAlloc</code> resizes and <code>Free</code> releases. Nothing is garbage collected.</p>
+<pre data-run><code>
+U0 Main()
+{
+  I64 n = 4;
+  I64 *nums = CAlloc(n * sizeof(I64));
+  nums[2] = 7;
+  nums = ReAlloc(nums, 8 * sizeof(I64));
+  "%d %d\n", nums[0], nums[2];
+  Free(nums);
+}
+</code></pre>
+<pre class="output">
+0 7
+</pre>
+
+<h3>Strings</h3>
+<p>Strings are NUL-terminated <code>U8</code> arrays, as in C. The library has the
+usual helpers (<a href="library.html#strings">more in the library guide</a>):</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 *copy = StrNew("hello");
+  "%s %d %d\n", copy, StrLen(copy), StrCmp(copy, "hello");
+
+  U8 *msg = StrPrint(NULL, "%s has %d letters", copy, StrLen(copy));
+  "%s\n", msg;
+
+  I64 vowels = 0;
+  for (U8 *c = copy; *c; c++) {
+    if (*c == 'e' || *c == 'o') vowels++;
+  }
+  "%d vowels\n", vowels;
+  Free(copy);
+  Free(msg);
+}
+</code></pre>
+<pre class="output">
+hello 5 0
+hello has 5 letters
+2 vowels
+</pre>
+<p>A <code>U8</code> array initialised from a string gets its own writable copy. With an
+explicit size, the rest is zero-filled:</p>
+<pre data-run><code>
+U0 Main()
+{
+  U8 buf[] = "abc";               // 4 bytes: a, b, c, NUL
+  U8 name[8] = "hi";              // the 6 bytes after "hi" are zero
+  buf[0] = 'X';
+  "%s %d %s %d\n", buf, sizeof(buf), name, sizeof(name);
+}
+</code></pre>
+<pre class="output">
+Xbc 4 hi 8
+</pre>
+
+<h2>Classes</h2>
+<p>A <code>class</code> is a C <code>struct</code>, and its name is a type straight away,
+with no <code>typedef</code> needed. Several fields can share a line.</p>
+<pre data-run><code>
+class Point
+{
+  I64 x, y;
+};
+
+Point Make(I64 x, I64 y)          // classes can be returned by value
+{
+  Point r;
+  r.x = x;
+  r.y = y;
+  return r;
+}
+
+I64 Sum(Point p)                  // and passed by value
+{
+  return p.x + p.y;
+}
+
+U0 Main()
+{
+  Point a = {1, 2};               // initialise fields in order
+  Point c = Make(11, 22);
+  "%d %d %d\n", c.x, c.y, Sum(a);
+
+  Point copy = c;                 // assignment copies
+  copy.x = 0;
+  "%d %d\n", c.x, copy.x;
+
+  Point *p = MAlloc(sizeof(Point));
+  p->x = 5;                       // -> through a pointer
+  "%d\n", p->x;
+  Free(p);
+}
+</code></pre>
+<pre class="output">
+11 22 3
+11 0
+5
+</pre>
+<p>A field that is itself a class or an array takes a nested list:</p>
+<pre data-run><code>
+class Point { I64 x, y; };
+class Line  { Point from, to; I64 tags[2]; };
+
+Line l = {{0, 0}, {3, 4}, {7, 8}};
+
+U0 Main()
+{
+  Line m = {{1, 2}, {5, 6}, {9, 10}};
+  "%d %d %d\n", l.to.x, l.to.y, l.tags[1];
+  "%d %d %d\n", m.from.y, m.to.x, m.tags[0];
+}
+</code></pre>
+<pre class="output">
+3 4 8
+2 5 9
+</pre>
+<p>A string for a <code>U8</code> array field or row is copied in the same way, and
+must fit with its NUL. A <code>U8 *</code> field points at the string instead:</p>
+<pre data-run><code>
+class Item { I64 id; U8 name[8]; U8 *note; };
+
+U8 days[3][4] = {"Mon", "Tue", "Wed"};
+Item first = {1, "pen", "blue"};
+
+U0 Main()
+{
+  Item second = {2, "ink\n", "black"};
+  "%s %s %s\n", days[0], days[2], first.name;
+  "%s%s %s %d\n", second.name, first.note, second.note, sizeof(Item);
+}
+</code></pre>
+<pre class="output">
+Mon Wed pen
+ink
+blue black 24
+</pre>
+
+<h3>Inheritance</h3>
+<p>A class can extend one other class. It starts with all of the base class's fields, so a
+pointer to it can be used wherever the base class is expected:</p>
+<pre data-run><code>
+class Shape
+{
+  U8 *name;
+  F64 (*area)(Shape *s);
+};
+
+class Circle : Shape
+{
+  F64 r;
+};
+
+class Rect : Shape
+{
+  F64 w, h;
+};
+
+F64 CircleArea(Shape *s) { Circle *c = s; return 3.14159 * c->r * c->r; }
+F64 RectArea(Shape *s)   { Rect *r = s; return r->w * r->h; }
+
+U0 Main()
+{
+  Circle c;
+  c.name = "circle";
+  c.area = &CircleArea;
+  c.r = 1.0;
+
+  Rect r;
+  r.name = "rect";
+  r.area = &RectArea;
+  r.w = 2.0;
+  r.h = 3.0;
+
+  Shape *shapes[2];
+  shapes[0] = &c;
+  shapes[1] = &r;
+  for (I64 i = 0; i < 2; i++) {
+    "%s: %.2f\n", shapes[i]->name, shapes[i]->area(shapes[i]);
+  }
+}
+</code></pre>
+<pre class="output">
+circle: 3.14
+rect: 6.00
+</pre>
+
+<h3>Unions</h3>
+<p>All fields of a <code>union</code> share the same memory:</p>
+<pre data-run><code>
+union Bits
+{
+  I64 i;
+  F64 f;
+  U8 bytes[8];
+};
+
+U0 Main()
+{
+  Bits b;
+  b.i = 0x41;
+  "%c %d\n", b.bytes[0], sizeof(Bits);
+}
+</code></pre>
+<pre class="output">
+A 8
+</pre>
+<p>An initialiser list gives a union one item, for its first field. A union can also be
+anonymous inside a class: its fields are used as the class's own, and it still takes one
+item:</p>
+<pre data-run><code>
+union Num { I32 i; F32 f; };
+class Token { U8 kind; union { I32 ival; F32 fval; }; I64 line; };
+
+Num n = {7};
+Token t = {1, 42, 3};
+
+U0 Main()
+{
+  Token u = {2, 5, 9};
+  "%d %d %d %d\n", n.i, t.kind, t.ival, t.line;
+  "%d %d %d\n", u.kind, u.ival, u.line;
+}
+</code></pre>
+<pre class="output">
+7 1 42 3
+2 5 9
+</pre>
+<p>A class or union defined inside a class can also have a tag. Without a field name its
+fields are still the class's own, and the tag can be used as a type elsewhere; with a field
+name it is the type of that field:</p>
+<pre data-run><code>
+class Shape
+{
+  U8 kind;
+  union Size { I32 side; F32 radius; };
+  class Pos { I32 x, y; } at;
+};
+
+U0 Main()
+{
+  Shape s;
+  s.side = 3;
+  s.at.x = 10;
+  Size z;
+  z.radius = 1.5;
+  "%d %d %d %d\n", s.side, s.at.x, sizeof(Size), sizeof(Shape);
+}
+</code></pre>
+<pre class="output">
+3 10 4 16
+</pre>
+
+<h2 id="preprocessor">The preprocessor</h2>
+<h3>#define</h3>
+<p>Macros name a single value: a number, a float, a string, or an expression that evaluates to
+one. Function-like macros (<code>#define F(x) ...</code>, no space before the
+<code>(</code>) are not supported: they are a compile error ("function-like macros are not
+supported"), so write a function instead. With a space, <code>#define CALC (2 * 21)</code>
+is an ordinary macro whose value is the expression in brackets. Names in a macro's value
+must be other macros. A numeric macro has the type of its value, as in C: if any operand
+is a float the macro is an <code>F64</code> (<code>#define AREA (1.5 * SIDE)</code> and
+<code>(SIDE * 1.5)</code> both are), otherwise an <code>I64</code>. A comparison or a
+logical operator (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>) is an
+<code>I64</code> 0 or 1 even with float operands, and a float counts as true when it isn't
+0.0, as at run time: <code>#define ON (0.5 &amp;&amp; 1)</code> is 1.
+A postfix cast to a built-in type works and gives the macro that type:
+<code>#define BIG (5(U64) % 3)</code> is a <code>U64</code>, <code>#define HALF (5(F64) / 2)</code>
+an <code>F64</code> (2.5). Classes are not known to the preprocessor, so
+<code>0(MyClass*)</code> is an error in a macro. A long value can go on over several lines:
+end each line but the last with a <code>\</code>, as in C.</p>
+<pre data-run><code>
+#define MAX_USERS 64
+#define APP_NAME  "demo"
+#define RATE      0.5
+#define BUFFER    (MAX_USERS * 16)
+#define BUDGET    (MAX_USERS * RATE)
+
+U0 Main()
+{
+  "%s %d %.1f %d\n", APP_NAME, MAX_USERS, RATE, BUFFER;
+  "%.1f %s\n", BUDGET, typeof(BUDGET);
+}
+</code></pre>
+<pre class="output">
+demo 64 0.5 1024
+32.0 F64
+</pre>
+
+<h3>Conditional compilation</h3>
+<p><code>#if</code>, <code>#ifdef</code>, <code>#ifndef</code>, <code>#elif</code>, <code>#else</code>,
+<code>#endif</code>, <code>#undef</code> and <code>#error</code> work as in C. Define a
+macro from the command line with <code>-D</code>:</p>
+<pre data-run data-args="-DVERBOSE"><code>
+U0 Main()
+{
+#ifdef VERBOSE
+  "verbose mode\n";
+#else
+  "quiet mode\n";
+#endif
+}
+</code></pre>
+<pre class="output">
+verbose mode
+</pre>
+<p>That example was built with <code>ktm -DVERBOSE</code>. <code>#if</code> and
+<code>#elif</code> take a constant expression of macros, which can use
+<code>defined(NAME)</code>, and they nest:</p>
+<pre data-run><code>
+#define LEVEL 2
+
+U0 Main()
+{
+#if LEVEL > 2
+  "high\n";
+#elif LEVEL == 2 && !defined(QUIET)
+  "level two\n";
+#else
+  "low\n";
+#endif
+}
+</code></pre>
+<pre class="output">
+level two
+</pre>
+<p>A conditional directive without its partner (<code>#else</code> or <code>#endif</code>
+without <code>#if</code>, a second <code>#else</code>, an <code>#if</code> never closed) and
+extra tokens after an <code>#if</code> condition are compile errors. <code>#error</code>
+stops the build and prints the rest of its line. <code>#undef</code> takes effect where it
+appears: code above it keeps the old value. These macros are always predefined:</p>
+<table>
+  <thead><tr><th>Macro</th><th>Defined when</th></tr></thead>
+  <tbody>
+    <tr><td><code>IS_LINUX</code>, <code>__linux__</code></td><td>Compiling on Linux</td></tr>
+    <tr><td><code>IS_MACOS</code>, <code>__macos__</code></td><td>Compiling on macOS</td></tr>
+    <tr><td><code>IS_X86_64</code>, <code>__x86_64__</code></td><td>Targeting x86_64</td></tr>
+    <tr><td><code>IS_ARM_64</code>, <code>__aarch64__</code></td><td>Targeting arm64</td></tr>
+    <tr><td><code>__ARCH__</code></td><td>Always: the architecture name as a string</td></tr>
+    <tr><td><code>__KTM_JIT__</code> / <code>__KTM_AOT__</code></td><td>Running in the JIT or REPL / compiling a binary</td></tr>
+    <tr><td><code>__KTM_VERSION__</code>, <code>__DATE__</code>, <code>__TIME__</code>, <code>__TIMESTAMP__</code></td><td>Always</td></tr>
+    <tr><td><code>__KTM_LINK_SQLITE3__</code></td><td>ktm was built with SQLite support</td></tr>
+  </tbody>
+</table>
+<p><code>#ifjit</code> and <code>#ifaot</code> are shorthands for
+<code>#ifdef __KTM_JIT__</code> and <code>#ifdef __KTM_AOT__</code>:</p>
+<pre data-run data-mode="aot"><code>
+U0 Main()
+{
+#ifjit
+  "running in the JIT\n";
+#else
+  "running as a compiled binary\n";
+#endif
+}
+</code></pre>
+<pre class="output">
+running as a compiled binary
+</pre>
+
+<h3>#include and #link</h3>
+<p><code>#include "file.ktm"</code> is relative to the including file;
+<code>#include &lt;file.ktmh&gt;</code> searches the installed include directory.
+A file that can't be opened or read (a directory, say) is reported as an error at the
+<code>#include</code>, and the rest of the file is still checked.
+<code>#link</code> records a library dependency in the source itself (see
+<a href="#calling-c">calling C</a>).</p>
+
+<h2 id="exceptions">Exceptions</h2>
+<p><code>throw</code> takes a 64-bit value, usually a character constant. A <code>try</code>
+block catches it in the nearest enclosing <code>catch</code>, which finds the value in
+<code>Fs->except_ch</code>. Throws unwind through any number of function calls.</p>
+<pre data-run><code>
+U0 Withdraw(I64 balance, I64 amount)
+{
+  if (amount > balance) throw('Funds');
+  "withdrew %d\n", amount;
+}
+
+U0 Main()
+{
+  try {
+    Withdraw(100, 30);
+    Withdraw(100, 500);
+    "never printed\n";
+  } catch {
+    if (Fs->except_ch == 'Funds') {
+      "insufficient funds\n";
+    }
+  }
+  "carrying on\n";
+}
+</code></pre>
+<pre class="output">
+withdrew 30
+insufficient funds
+carrying on
+</pre>
+<p>The value is converted to <code>U64</code> like an argument to a <code>U64</code>
+parameter: <code>throw(42.75)</code> throws 42. The catch handler runs after its
+<code>try</code> has ended, so a <code>throw</code> inside it goes to the next enclosing
+<code>try</code>.</p>
+<p>A <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> may
+leave a <code>try</code> body (or a catch handler) at any depth of nesting; the tries it
+leaves stop catching:</p>
+<pre data-run><code>
+I64 Find(I64 *items, I64 n, I64 want)
+{
+  I64 i;
+  for (i = 0; i < n; i++) {
+    try {
+      if (items[i] == want) return i;
+      if (items[i] < 0) break;
+    } catch {
+    }
+  }
+  return -1;
+}
+
+U0 Main()
+{
+  I64 items[4] = {3, 7, -1, 9};
+  try {
+    "%d %d\n", Find(items, 4, 7), Find(items, 4, 9);
+    throw('Late');
+  } catch {
+    "caught here, not in Find\n";
+  }
+}
+</code></pre>
+<pre class="output">
+1 -1
+caught here, not in Find
+</pre>
+<p>Each thread has its own <code>Fs</code>: a <code>throw</code> is caught only by a
+<code>try</code> of the thread that threw, so threads can use try/catch at the same time.
+<code>Fs</code> is a function returning the calling thread's state, so
+<code>Fs->except_ch</code> reads that thread's last thrown value.</p>
+<p>A throw that no <code>try</code> catches, in any thread, prints the value on stderr and
+ends the program with exit code 1. A character constant whose bytes are all printable is
+shown as text, anything else as a number:</p>
+<pre><code>uncaught throw: 'Funds'
+uncaught throw: 404</code></pre>
+
+<h2 id="calling-c">Calling C</h2>
+<p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always
+linked:</p>
+<pre data-run><code>
+extern "c" I32 abs(I32 x);
+extern "c" U8 *getenv(U8 *name);
+
+U0 Main()
+{
+  "%d %d\n", abs(-5), getenv("PATH") != NULL;
+}
+</code></pre>
+<pre class="output">
+5 1
+</pre>
+<p>Use <code>F32</code> for C <code>float</code>, <code>I32</code> for <code>int</code> and
+<code>U8 *</code> for <code>char *</code>. To use another library, link it from the source
+and it works in compiled programs, the JIT and the REPL alike:</p>
+<pre><code>#link &lt;sqlite3&gt;          // like -lsqlite3
+#link "./libmine.so"     // a path, relative to the working directory
+
+extern "c" I32 sqlite3_libversion_number();</code></pre>
+
+<h2>Inline assembly</h2>
+<p>An <code>asm</code> block defines labelled routines. <code>_extern</code> binds one to a
+ktm prototype. Arguments arrive in the platform's C calling convention:</p>
+<pre data-run><code>
+#ifdef IS_X86_64
+asm {
+_ADD_ONE::
+  MOV RAX, RDI
+  INC RAX
+  RET
+}
+#endif
+
+#ifdef IS_ARM_64
+asm {
+_ADD_ONE::
+  ADD X0, X0, 1
+  RET
+}
+#endif
+
+_extern _ADD_ONE I64 AddOne(I64 x);
+
+U0 Main()
+{
+  "%d\n", AddOne(41);
+}
+</code></pre>
+<pre class="output">
+42
+</pre>
+
+<h2>Differences from its origins</h2>
+<p>ktm grew from a language made for its own operating system (see
+<a href="index.html#history">History and credits</a>); ktm runs on a normal operating system
+instead. The differences:</p>
+<table>
+  <thead><tr><th>Feature</th><th>ktm</th></tr></thead>
+  <tbody>
+    <tr><td><code>F32</code></td><td>Added, for C libraries that use <code>float</code></td></tr>
+    <tr><td><code>auto</code>, <code>typeof</code>, range-based <code>for</code>, <code>if (init; cond)</code></td><td>Added</td></tr>
+    <tr><td><code>extern "c"</code>, <code>#link</code>, <code>#ifjit</code> / <code>#ifaot</code></td><td>Added, for working with the host system</td></tr>
+    <tr><td><code>?:</code></td><td>Not supported</td></tr>
+    <tr><td>Sub-integer access (<code>x.u8[1]</code>)</td><td>Not supported</td></tr>
+    <tr><td>Exponent operator <code>`</code></td><td>Not supported; use <code>Pow</code> or <code>pow</code></td></tr>
+    <tr><td><code>Fs</code></td><td>Exists for exceptions (<code>Fs->except_ch</code>), one per thread; there are no tasks</td></tr>
+    <tr><td>DolDoc, graphics, the system shell</td><td>Not available; use the C library through <code>extern "c"</code></td></tr>
+  </tbody>
+</table>

@@ -1,0 +1,158 @@
+#include "testhelper.ktm"
+
+Bool TestBreakInLoopCrazy()
+{
+  I64 i,j,k;
+  switch (1) {
+    case 1:
+      for (i = 0; i < 10; ++i) {
+        for (j = 0; j < 10; ++j) {
+          for (k = 0; k < 10; ++k) {
+            if (k == 5) break;
+          }
+          if (j == 6) break;
+        }
+        if (i == 7) break;
+      }
+      break;
+    case 2:  return FALSE;
+    default: return FALSE;
+  }
+
+  return i == 7 && 
+         j == 6 && 
+         k == 5;
+}
+
+Bool TestBreakInLoop()
+{
+  I64 i = 0;
+  switch (1) {
+    case 1:
+      for (; i < 10; ++i) {
+        if (i == 5) {
+          break; // This break should be part of the loop
+        }
+      }
+      break;
+    case 2:  return FALSE;
+    default: return FALSE;
+  }
+  return i == 5;
+}
+
+Bool UnNamedCase()
+{
+  I32 num = 0;
+  for (I32 i = 0; i <= 5; ++i) {
+    switch (i) {
+      case: num++; break; //0
+      case: num++; break; //1
+      case 3: num++; break; //3
+      case: num++; break; //4
+      case: num++; break; //5
+    }
+  }
+  return num == 5;
+}
+
+Bool TestOutOfRange()
+{
+  I64 num = 2000;
+  I64 is_set = 0;
+
+  switch (num) {
+    case 10: is_set = -1; break;
+    case 20: is_set = -1; break;
+    case 30: is_set = -1; break;
+    default: is_set = 1; break;
+  }
+
+  return is_set == 1;
+}
+
+Bool TestNoBoundsSwitch()
+{
+  I64 num = 0;
+  for (I64 i = 0; i < 5; ++i) {
+    switch [i] {
+      case:   num++; break;
+      case 1: num++; break;
+      case 2: num++; break;
+      case 4: num++; break;
+      default: break;
+    }
+  }
+
+  return num == 4;
+}
+
+/* `1...3` with no spaces used to lex `1.` as a float and fail. */
+Bool TestRangeWithoutSpaces()
+{
+  I64 small = 0, big = 0, hex = 0, letters = 0;
+  for (I64 i = 0; i < 40; ++i) {
+    switch (i) {
+      case 1...3:       small++; break;
+      case 7...9:       big++; break;
+      case 0x10...0x1F: hex++; break;
+    }
+  }
+  for (U8 *p = "a1b2c"; *p; ++p) {
+    switch (*p) {
+      case 'a'...'z': letters++; break;
+    }
+  }
+  return small == 3 && big == 3 && hex == 16 && letters == 3;
+}
+
+I32 Main(I32 argc, U8 **argv)
+{
+  "Test - Switch statement: ";
+  I64 correct = 0, tests = 8, count = 0;
+  I64 i = 0;
+
+  for (; i < 10; ++i) {
+    switch (i) {
+      case 1:  count++; break;
+      case 2:  count++; break;
+      case 3:  count++; break;
+      case 7:  count++; break;
+      case 8:  count++; break;
+      case 10: count++; break;
+      case 9:  count++; break;
+      default: count--; break;
+    }
+  }
+  if (count == 2) {
+    correct++;
+  }
+
+  count ^= count;
+  U8 *name = "hello", *ptr = name;
+  while (*ptr) {
+    switch (*ptr) {
+      case 'h': count++; break;
+      case 'e': count++; break;
+      case 'l': count++; break;
+      case 'o': count++; break;
+      case 'z': count++; break;
+      default:  count--; break;
+    }
+    ++ptr;
+  }
+
+  if (count == 5) {
+    correct++;
+  }
+
+  if (TestBreakInLoop())      correct++;
+  if (TestBreakInLoopCrazy()) correct++;
+  if (UnNamedCase())          correct++;
+  if (TestNoBoundsSwitch())   correct++;
+  if (TestOutOfRange())       correct++;
+  if (TestRangeWithoutSpaces()) correct++;
+
+  PrintResult(correct,tests);
+  return 0;
+}

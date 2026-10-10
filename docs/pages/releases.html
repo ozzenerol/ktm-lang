@@ -1,0 +1,989 @@
+<!-- title: Releases -->
+<h1>Releases</h1>
+<p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
+macOS are attached to each release on
+<a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.1.0 <small>(2026-10-10)</small></h2>
+<p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
+only names are new.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
+  <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
+  and in <code>#include</code>.</li>
+  <li>The library header is <code>std.ktmh</code> (was <code>tos.HH</code>), the library
+  <code>libktm</code> (was <code>libtos</code>, built with <code>-lib ktm</code>), its sources
+  <code>src/std/</code>.</li>
+  <li>Environment variables, macros and defines are <code>KTM_*</code> (was <code>HCC_*</code>), e.g.
+  <code>KTM_INSTALL_DIR</code>, <code>KTM_TEST_TIMEOUT</code>, <code>__KTM_JIT__</code>; temporary files
+  and the REPL's files are named <code>ktm</code> too (<code>~/.ktm_rc.ktm</code>,
+  <code>~/.ktm_repl_history</code>).</li>
+  <li>The <code>--terry</code> option is gone; the history and credits are in the README.</li>
+</ul>
+
+<h2 id="hcc">hcc (before the rename)</h2>
+<p>ktm was called hcc up to v0.19.3. Its release notes follow as they were written.</p>
+
+<h2>v0.19.3 <small>(2026-10-10)</small></h2>
+<p>Fixes from building a shell and a duplicate-file finder with hcc, and stack overflow safety. Tested
+compiled and in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>On macOS a program started by <code>ProcSpawn</code> had no stdin, stdout or stderr when they were
+  inherited, the default, so most programs failed there.</li>
+  <li><code>-jit -Memsafe</code> crashed as soon as a thread allocated memory; it now tracks every
+  thread, and leaks and double frees in threads are reported.</li>
+  <li>A function whose frame is bigger than a page touches each page as it reserves the frame, so a stack
+  overflow in a thread or coroutine (whose guard page is small) crashes instead of silently writing over
+  other memory. Frames up to a page cost nothing extra.</li>
+  <li><code>ENOENT</code>, <code>EACCES</code> and <code>ECHILD</code>, which the process docs name, were
+  missing. Added with them: <code>ENFILE</code>, <code>EMFILE</code>, <code>EADDRNOTAVAIL</code>,
+  <code>ENETUNREACH</code>, <code>EHOSTUNREACH</code>, and the job-control signals <code>SIGCONT</code>,
+  <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and <code>SIGTTOU</code>, all with each
+  platform's values.</li>
+</ul>
+
+<h2>v0.19.2 <small>(2026-10-10)</small></h2>
+<p>An important code generation fix found by building a job runner with hcc, and extern function
+pointers. Tested compiled and in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A function with more than about 64 KiB of local variables (<code>U8 buf[65536];</code>) got a stack
+  frame of only the size modulo 65536, so its locals lay below the stack pointer and the next call
+  overwrote them: silent corruption or a crash, on every platform. Frame and local sizes are now 32-bit.</li>
+  <li><code>extern I64 (*fp)(I64);</code> declares a function-pointer global defined elsewhere, such as a
+  library's <code>public</code> one; it was a syntax error.</li>
+</ul>
+
+<h2>v0.19.1 <small>(2026-10-10)</small></h2>
+<p>One code generation fix, tested compiled and in the JIT on Linux x86_64, Linux arm64 and macOS
+arm64.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A global pointer initialised with a constant address (<code>U8 *p = &amp;g;</code>,
+  <code>&amp;arr[2]</code>, <code>arr + 4</code>, <code>&amp;Fn</code>) is written as data the linker
+  relocates instead of being set when <code>Main</code> starts, so a <code>-lib</code> library's pointer
+  globals are no longer <code>NULL</code>.</li>
+</ul>
+
+<h2>v0.19.0 <small>(2026-10-10)</small></h2>
+<p>The last bugs found while building real programs, and the C transpiler is frozen. Tested compiled and
+in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>-transpile</code> is frozen: it stays experimental, supports the language as of this release
+  and gets no new features, so features added later may not translate.</li>
+  <li>Messages, <code>typeof</code>, LSP hover and the REPL call a <code>Bool</code> <code>Bool</code>
+  (they said <code>I8</code>), and converting a pointer to <code>Bool</code> no longer warns, as in C.
+  Converting a pointer to any other integer type still does.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>-transpile</code> dropped every global variable and all code at file scope, so the C didn't
+  compile. Globals are written with their initialisers, file-scope code runs from <code>main</code> first,
+  <code>&amp;Fn</code> is no longer written as a GCC label address, and <code>main</code>'s
+  <code>argv</code> is a <code>char **</code>, which clang requires.</li>
+  <li>Taking the address of a parameter that has a default value (<code>&amp;b</code> in
+  <code>F(Bool b = TRUE)</code>) was a compile error.</li>
+</ul>
+
+<h2>v0.18.0 <small>(2026-10-10)</small></h2>
+<p>Fixes for the bugs found by building two real programs with hcc, an HTTP server and a SOCKS5 proxy.
+Every fix has a regression test that runs compiled and in the JIT on Linux x86_64, Linux arm64 and macOS
+arm64, and the known-issues page is empty again.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Converting a value to <code>Bool</code> gives 0 or 1 (non-zero is <code>TRUE</code>), as in C, for
+  arguments, assignments, initialisers, returns, class fields and casts. Before, only the low byte was
+  kept, so <code>0x800</code> became <code>FALSE</code>. <code>Bool</code> is still one byte.</li>
+  <li><code>Rm</code> and <code>RmDir</code> take their <code>RM_*</code> flags as an <code>I64</code>.
+  As a <code>Bool</code>, <code>RM_VERBOSE</code> was turned into <code>RM_RECURSE</code> by the conversion
+  fix above, so <code>RmDir(dir, RM_VERBOSE)</code> would have deleted recursively.</li>
+  <li><code>NetAccept</code> returns a blocking socket unless <code>non_blocking</code> is set, on every
+  OS. On macOS it used to inherit <code>O_NONBLOCK</code> from a non-blocking listening socket.</li>
+  <li>A file whose only file-scope code is constant global initialisers (<code>I64 x = 3;</code>) has
+  nothing to run under <code>-jit</code> without a <code>Main</code>, like one with <code>I64 x;</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>On arm64 an initialised global (<code>I32 g = 7;</code>) corrupted <code>Main</code>'s
+  <code>argc</code> and <code>argv</code>; on x86_64 the same happened when an initialiser called a
+  function. Constant initialisers are now static data, and the generated <code>main</code> passes
+  <code>argc</code>/<code>argv</code> on.</li>
+  <li>Initialised scalar globals in a library (<code>-lib</code>) were always 0.</li>
+  <li>An <code>I64</code> global initialiser beyond 32 bits was written wrong in compiled x86_64 code.</li>
+  <li>An <code>I8</code>, <code>U8</code> or <code>Bool</code> can be an array index or a pointer offset
+  (it was a compile error), with correct sign extension, and the subscript error points at the right
+  line.</li>
+  <li><code>JsonParse</code> reports an invalid literal such as <code>trux</code> as
+  <code>JSON_INVALID_LITERAL</code>.</li>
+</ul>
+
+<h2>v0.17.0 <small>(2026-10-10)</small></h2>
+<p>What long-running servers need next: real signal handling with a clean shutdown, and timeouts on
+TCP. Tested compiled and in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>New</h3>
+<ul>
+  <li><code>SigAction</code> and <code>SigHandle</code>: install a handler, <code>SIG_IGN</code> or
+  <code>SIG_DFL</code> with flags (<code>SA_RESTART</code>, <code>SA_RESETHAND</code>,
+  <code>SA_NODEFER</code>) and a mask of signals blocked while it runs (<code>SigBit(sig)</code>), and get
+  the previous action back to restore it. <code>signal</code> keeps working and the two can be mixed.</li>
+  <li>Clean shutdown: <code>SigStopInit()</code> returns a file descriptor that becomes readable on
+  SIGINT or SIGTERM, to put in a <code>poll</code> loop; <code>SigStopRequested()</code> and
+  <code>SigStopSignal()</code> tell whether and why. A second Ctrl-C ends the program.</li>
+  <li><code>NetConnect</code> takes an optional <code>timeout_ms</code>: one budget for every address the
+  name resolves to, -1 with <code>Errno()</code> <code>ETIMEDOUT</code> when it runs out. Existing calls
+  are unchanged.</li>
+  <li><code>NetSetSendTimeout</code>, the counterpart of <code>NetSetRecvTimeout</code> (which works on TCP
+  too): a write stuck on a peer that doesn't read gives up with <code>EAGAIN</code>.</li>
+  <li><code>raise</code>, <code>kill</code> and the signal names <code>SIGQUIT</code>, <code>SIGALRM</code>,
+  <code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGCHLD</code>.</li>
+</ul>
+
+<h2>v0.16.0 <small>(2026-10-10)</small></h2>
+<p><code>Shlurp</code> runs on the new process functions instead of a temporary file. Tested compiled and
+in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>Shlurp</code> reads the command's output through a pipe: it no longer needs a writable
+  <code>$TMPDIR</code> (it used to return <code>NULL</code> without one) and never leaves an
+  <code>hcc-shlurp-*</code> file behind.</li>
+  <li><code>Shlurp</code> returns once the shell exits, without waiting for a background job
+  (<code>cmd &amp;</code>) that still holds its output.</li>
+  <li>Ctrl-C during <code>Shlurp</code> stops the program, as it does anywhere else; before, only the
+  shell was stopped and the program carried on.</li>
+</ul>
+
+<h2>v0.15.0 <small>(2026-10-10)</small></h2>
+<p>Running programs without a shell, and file descriptors that don't leak into them. Tested compiled
+and in the JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Every file descriptor the library opens is close-on-exec: <code>FileRead</code>,
+  <code>FileWrite</code>, every <code>Net*</code> socket and accepted connection, and
+  <code>Shlurp</code>'s temporary file. Programs started with <code>System</code>, <code>Sh</code>,
+  <code>Shlurp</code> or <code>ProcSpawn</code> no longer inherit them. <code>O_CLOEXEC</code> (and
+  <code>SOCK_CLOEXEC</code> on Linux) are available for your own <code>open</code> and
+  <code>socket</code> calls, which keep C's behaviour.</li>
+  <li>The process functions need glibc 2.34 or newer on Linux.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li>Processes: <code>ProcSpawn(argv, opts)</code> starts a program by its argument list, never through a
+  shell, with stdin, stdout and stderr each inherited, piped, sent to <code>/dev/null</code> or (stderr)
+  merged into stdout, plus a working directory, a replacement environment and its own process group.
+  <code>ProcWait</code>, <code>ProcDone</code>, <code>ProcKill</code> and <code>ProcRelease</code> manage it;
+  <code>ProcCommunicate</code> feeds stdin and collects stdout and stderr with <code>poll</code>, so large
+  outputs can't deadlock; <code>ProcRun(argv, &amp;code)</code> returns a program's output, like
+  <code>Shlurp</code> without the shell.</li>
+</ul>
+
+<h3>Testing</h3>
+<ul>
+  <li>A test still running after <code>HCC_TEST_TIMEOUT</code> seconds (default 60, 0 for no limit) is
+  killed together with everything it started and reported as <code>FAILED ... timed out</code>, so one
+  hanging test no longer stalls the whole suite. Ctrl-C stops a run cleanly.</li>
+</ul>
+
+<h2>v0.14.0 <small>(2026-10-10)</small></h2>
+<p>The last three known issues are fixed, so the known-issues page is empty. Every fix has a regression
+test that runs compiled and in the JIT on Linux x86_64, Linux arm64 and macOS arm64. The echo server
+example added in v0.12.0 has been removed.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Print statements (<code>"fmt", args;</code>) support the HolyC conversions <code>%Q %D %T %C %F</code>,
+  like <code>StrPrint</code>, and the argument check counts them. In a print statement <code>%F</code> and
+  <code>%C</code> now mean what they mean in <code>StrPrint</code> (a file's contents, an upper-case
+  character), not C's upper-case float and wide character.</li>
+  <li><code>FileRead</code> reads pipes, FIFOs and <code>/proc</code> files to the end instead of returning
+  <code>NULL</code>; on a FIFO it waits for the writer, and on an endless device such as
+  <code>/dev/zero</code> it never returns.</li>
+  <li>Adding to or deleting from an <code>RBTree</code> or <code>IntSet</code> while iterating stops the
+  iteration (<code>RBIterNext</code>/<code>IntSetIterNext</code> return <code>NULL</code>,
+  <code>RBTreeForEach</code> returns after that callback) instead of overflowing the iterator.
+  Replacing a value doesn't stop it. <code>RBTree</code>, <code>RBIter</code> and <code>IntSetIter</code>
+  have new fields at the end.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li><code>Print(fmt, ...)</code>: <code>StrPrint</code>-style formatting straight to stdout, for formats
+  that aren't literals.</li>
+</ul>
+
+<h2>v0.13.0 <small>(2026-10-09)</small></h2>
+<p>A stricter redeclaration check and two internal fixes, tested compiled and in the JIT on Linux
+x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Defining a function whose name the standard library binds with <code>_extern</code> (on x86_64:
+  <code>Exit</code>, <code>MAlloc</code>, <code>ToUpper</code>, ...) with a different signature is a
+  "conflicting types" error, as it already was for ordinary prototypes. Before, on x86_64 the program's
+  function silently replaced the library's, while arm64 failed later with a confusing type error.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>An internal list merge corrupted memory when the appended list was empty (nothing triggers it
+  since v0.12.0, but it no longer can).</li>
+</ul>
+
+<h3>Testing</h3>
+<ul>
+  <li>The SQLite leak test no longer fails at random on macOS: the macOS allocator keeps the last freed
+  block counted as in use per CPU, so the check now allows for that while still catching the real
+  leak by a wide margin.</li>
+</ul>
+
+<h2>v0.12.0 <small>(2026-10-09)</small></h2>
+<p>Compiler crash and warning fixes, a coroutine stack cache, an event-loop example, and SQLite and
+fuzzy-matcher fixes. Every change has a regression test that runs compiled and in the JIT on Linux
+x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>return</code> in top-level code (outside any function) is a compile error,
+  "<code>return</code> outside a function"; it used to crash hcc.</li>
+  <li><code>SqlExecPrepared</code> returns the SQLite error (<code>SQLITE_MISMATCH</code> for an unknown
+  parameter type) instead of silently running the statement with that parameter missing.
+  <code>SqlPreparedStmt</code> no longer has the unused <code>params_type</code> field.</li>
+  <li><code>Shlurp</code> writes its temporary file in <code>$TMPDIR</code> (<code>/tmp</code> if
+  unset), like hcc itself.</li>
+  <li>The "control may reach the end of non-void function" warning points at the function name.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li><code>CoroutineRelease</code> keeps up to 16 stacks per thread for the next
+  <code>CoroutineNew</code> of the same size, so short-lived coroutines don't map and unmap a stack
+  each time; the cache is freed when the thread ends.</li>
+  <li>An echo server example (<code>docs/examples/echo</code>): one coroutine per connection driven by
+  a <code>poll</code> loop, with a built-in loopback self-test.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A <code>goto</code> into a braced block that follows a <code>return</code> crashed the compiler;
+  such blocks are now compiled.</li>
+  <li>A false "control may reach the end of non-void function" warning after a trailing
+  <code>goto</code>, and a missed one after a label that follows a <code>return</code>.</li>
+  <li><code>FzF</code> gave wrong results when called from several threads at once (the pattern was
+  split with <code>strtok</code>), and allocated and freed a 200 KB buffer it never used on every
+  call.</li>
+</ul>
+
+<h3>Testing</h3>
+<ul>
+  <li>Tests use their own working directory for temporary files instead of fixed <code>/tmp</code>
+  names, so two full suites can run on one machine at once.</li>
+</ul>
+
+<h2>v0.11.0 <small>(2026-10-09)</small></h2>
+<p>Coroutines are a library module on Linux x86_64, Linux arm64 and macOS arm64, tested compiled and
+in the JIT on all three.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>coroutines.HC</code> was a stand-alone x86_64 demo; it is now part of the library with a
+  new API, so code written against the demo (<code>CoroutineInit</code>, the fixed coroutine table,
+  <code>U0</code> coroutine functions) needs updating.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li><code>CoroutineNew(fn, arg, stack_size)</code>, <code>CoroutineNext(c, send)</code>,
+  <code>CoroutineYield(value)</code>, <code>CoroutineDone</code>, <code>CoroutineSelf</code> and
+  <code>CoroutineRelease</code>. A coroutine function is <code>U0 *fn(U0 *arg)</code>; values go both
+  ways (<code>Yield(v)</code> hands <code>v</code> to <code>Next</code>, <code>Next(c, x)</code> makes the
+  paused <code>Yield</code> return <code>x</code>) and the function's return value comes back from the
+  last <code>Next</code>.</li>
+  <li>Each thread has its own coroutines, each coroutine its own catch chain: a <code>try</code> can span
+  a yield, and an uncaught <code>throw</code> in a coroutine is rethrown by the <code>CoroutineNext</code>
+  that resumed it.</li>
+  <li>Stacks are 256 KiB by default, with a guard page the size of a real memory page (16 KiB on macOS
+  arm64), so an overflow crashes instead of overwriting memory.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A coroutine finishing entered its exit code with a misaligned stack on x86_64.</li>
+</ul>
+
+<h2>v0.10.0 <small>(2026-10-09)</small></h2>
+<p>UDP and the networking basics. Every change has a regression test that runs compiled and in the
+JIT on Linux x86_64, Linux arm64 and macOS arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Socket address and option lengths are <code>U32</code>, like C's <code>socklen_t</code>:
+  <code>accept</code>, <code>getsockname</code>, <code>getpeername</code>, <code>recvfrom</code> and
+  <code>getsockopt</code> take a <code>U32 *</code>, and <code>connect</code>, <code>bind</code>,
+  <code>sendto</code> and <code>setsockopt</code> a <code>U32</code>. Passing an <code>I64</code>
+  length variable still works but gives an "Incompatible function argument" warning; declare it
+  <code>U32</code>.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li>UDP helpers: <code>NetCreateUdpSocket</code>, <code>NetSendTo</code>, <code>NetRecvFrom</code>
+  (IPv4 and IPv6, the sender's address and port as text), <code>NetSetRecvTimeout</code> and
+  <code>NetGetSocketPort</code>.</li>
+  <li><code>Htons</code>, <code>Ntohs</code>, <code>Htonl</code>, <code>Ntohl</code>.</li>
+  <li><code>Errno()</code> and <code>SetErrno()</code>, with the common error names
+  (<code>EAGAIN</code>, <code>EINTR</code>, <code>EPIPE</code>, <code>ECONNREFUSED</code>, ...) at the
+  right values on Linux and macOS.</li>
+  <li><code>MSG_*</code> flags (including <code>MSG_DONTWAIT</code> and <code>MSG_NOSIGNAL</code>),
+  <code>SHUT_*</code>, <code>SO_RCVTIMEO</code> and friends, <code>IPV6_V6ONLY</code>,
+  <code>poll</code> with <code>pollfd</code>, and <code>signal</code> with <code>SIGPIPE</code>,
+  <code>SIG_IGN</code> and the other common signals.</li>
+  <li><code>NetSend</code>: a <code>send</code> that returns -1 with <code>Errno()</code>
+  <code>EPIPE</code> when the peer has closed, instead of a SIGPIPE that ends the program.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Writing to a socket whose peer had closed killed the program, with no way around it (known
+  issue removed): use <code>NetSend</code>, <code>MSG_NOSIGNAL</code> or
+  <code>signal(SIGPIPE, SIG_IGN)</code>.</li>
+  <li><code>timeval.tv_usec</code> was 4 bytes on Linux, where C uses 8: a <code>timeval</code> passed to
+  <code>setsockopt(SO_RCVTIMEO)</code> could carry garbage in the upper half and be rejected.</li>
+</ul>
+
+<h2>v0.9.2 <small>(2026-10-09)</small></h2>
+<p>Parallel compiles and a much faster test suite.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>hcc wrote every compile's intermediate assembly to the same file,
+  <code>/tmp/holyc-asm.s</code>, so two compiles at the same time could produce each other's
+  program or fail. Each compile now uses its own temporary file in <code>$TMPDIR</code>
+  (<code>/tmp</code> if unset), removed when hcc exits, also on an error or a signal. The
+  <code>-run</code> binary is created there too.</li>
+</ul>
+
+<h3>Testing</h3>
+<ul>
+  <li><code>./build.sh --test</code> runs the unit, JIT and LSP tests in parallel, <code>JOBS</code> at a
+  time (default: one per CPU), each test in its own directory. The full suite takes about 12
+  seconds on Linux, down from about 30-40.</li>
+</ul>
+
+<h2>v0.9.1 <small>(2026-10-09)</small></h2>
+<p>Three compiler fixes, and the SQLite bindings and fuzzy matcher fixed and documented. Every fix
+has a regression test that runs compiled and in the JIT on Linux x86_64, Linux arm64 and macOS
+arm64.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>A <code>goto</code> into a <code>try</code> body from outside it is a compile error (it used to
+  corrupt the exception chain). Jumping within a body, out of it, or into a catch handler is fine.</li>
+  <li><code>SqlQuery</code>, <code>SqlSelect</code> and <code>SqlPrepare</code> reject a string with more
+  than one statement; <code>SqlExecRaw</code> still runs them all. <code>SqlPrepare</code> returns
+  <code>NULL</code> on an error, and <code>SqlExecRaw</code> returns the error message (a string to
+  <code>Free</code>) or <code>NULL</code>.</li>
+  <li><code>SqlRow</code> has a new field, <code>owns_stmt</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>continue</code> inside a <code>switch</code> inside a loop crashed the compiler.</li>
+  <li>A false "control may reach the end of non-void function" warning when both a
+  <code>try</code> body and its <code>catch</code> end in <code>return</code>.</li>
+  <li>SQLite: text and blob parameters were bound without a copy, so freeing them before reading
+  the rows was a use-after-free; <code>NULL</code> parameters were rejected; releasing a row from a
+  prepared statement finalized the statement; column arrays, failed opens and busy closes
+  leaked; column lengths were uninitialised. <code>SQL_INT</code>, <code>SQL_TEXT</code> and the
+  other type constants are available to programs.</li>
+  <li>Fuzzy matching: exact (<code>'foo</code>) and inverse (<code>!foo</code>) terms only worked for
+  one character, <code>^prefix</code> and <code>^exact$</code> terms were wrong, <code>FzF</code> wrote
+  into the caller's pattern (a crash for string literals), and parsed terms leaked.</li>
+  <li>The unused <code>builtins.HC</code> is removed.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.9.0 <small>(2026-10-09)</small></h2>
+<p>A systems and networking release. Exceptions, sockets and threads were audited and every bug
+found is fixed, with a regression test that runs compiled and in the JIT on Linux x86_64, Linux
+arm64 and macOS arm64. macOS on Intel is no longer a supported target.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>Fs</code> is per thread: it is now a function, <code>HCFs *Fs()</code>. Code that reads
+  <code>Fs-&gt;except_ch</code> or <code>Fs-&gt;catch_top</code> compiles unchanged.</li>
+  <li>An uncaught <code>throw</code> prints to stderr, as text when every byte is printable
+  (<code>uncaught throw: 'Late'</code>) and as a number otherwise. The exit code is still 1.</li>
+  <li><code>throw</code> converts its value to <code>U64</code> like a normal argument, so
+  <code>throw(42.75)</code> throws 42.</li>
+  <li><code>NetCreateServer</code> honours <code>addrfam</code> (<code>AF_INET</code>,
+  <code>AF_INET6</code>, <code>AF_UNSPEC</code>; <code>"::*"</code> is any IPv6 address) and its bind
+  address must be numeric: <code>"localhost"</code> gives -1. <code>NetConnect</code> connects over
+  IPv4 or IPv6 and tries every address a name resolves to.</li>
+  <li>Ports outside 0-65535 give -1 instead of being truncated.</li>
+  <li><code>NetCreateUnixServerSocket</code> only replaces a stale socket: a file, a directory or a
+  socket another server is listening on makes it fail.</li>
+  <li><code>ThreadPoolNew</code> returns <code>NULL</code> for a count of 0 or less, or when a thread
+  can't be created.</li>
+  <li><code>pthread_create</code> returns an <code>I32</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Leaving a <code>try</code> with <code>return</code>, <code>break</code>, <code>continue</code> or
+  <code>goto</code> left its frame on the exception chain: the next <code>throw</code> crashed or
+  looped forever.</li>
+  <li><code>try</code>/<code>catch</code> in two threads at once crashed ("stack smashing detected").</li>
+  <li><code>throw</code> of an <code>F64</code> passed garbage.</li>
+  <li>On Linux arm64 the pthread attribute types were too small, so
+  <code>pthread_attr_init</code> wrote past them.</li>
+  <li><code>ThreadPoolNew</code> ignored <code>pthread_create</code> failures and
+  <code>ThreadPoolRelease</code> then crashed; <code>ThreadPoolEnqueue</code>, <code>Wait</code> and
+  <code>Stop</code> accept a <code>NULL</code> pool.</li>
+  <li><code>NetCreateServer</code> and <code>NetConnect</code> ignored <code>addrfam</code> and only did
+  IPv4.</li>
+  <li><code>NetGetIpv4AddressFromAcceptedSocket</code> returned garbage for IPv6 peers.</li>
+  <li><code>msghdr</code> had the wrong layout, so <code>sendmsg</code> could fail.</li>
+  <li><code>NetCreateUnixServerSocket</code> deleted whatever was at its path, including regular
+  files and a live server's socket.</li>
+  <li><code>NetConnect</code> gave up after the first address that refused.</li>
+  <li><code>coroutines.HC</code> (a stand-alone x86_64 demo) crashed on first use; its stacks are
+  aligned now and have a guard page.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>. Writing to a socket whose peer has
+closed still raises SIGPIPE, which ends the program; that is next.</p>
+
+<h2>v0.8.0 <small>(2026-10-09)</small></h2>
+<p>A standard-library release. Memory, maths, sets, bit vectors, files, directories, the shell
+helpers, CSV and dates were audited like strings and JSON before them: the code was read
+against its documentation, random tests were checked against Python, plus valgrind and
+worst-case inputs. Every bug found is fixed and every function in these modules is
+documented. Every fix has a regression test that runs both compiled and in the JIT, on
+Linux x86_64, Linux arm64 and macOS.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>MkDir</code> returns 0 when the path is a directory afterwards and -1 otherwise, in
+  both modes, like <code>Rm</code> and <code>RmDir</code>. The recursive mode used to return
+  <code>TRUE</code> on success.</li>
+  <li><code>FileWrite</code> truncates the file by default, so a shorter write no longer leaves the
+  old tail behind. A <code>NULL</code> buffer or a negative size returns <code>FALSE</code> without
+  creating the file.</li>
+  <li><code>FileRead</code> reads only regular files: a directory, device or FIFO gives
+  <code>NULL</code> (<code>/dev/null</code> used to give ""), and <code>*_size</code> is 0 on every
+  failure.</li>
+  <li><code>Dir</code> returns -1 when the path can't be opened as a directory, so an error differs
+  from an empty directory, and lists entries it can't <code>Stat</code> (dangling symlinks).</li>
+  <li><code>Sh</code> and <code>Shlurp</code> always format their command, also without extra
+  arguments: <code>%%</code> is now <code>%</code> in both cases.</li>
+  <li><code>Abs</code> returns an <code>I64</code> (it was a <code>U64</code>, so <code>Abs(x) &gt; -1</code>
+  was false). <code>Abs(I64_MIN)</code> is <code>I64_MIN</code>, like C's <code>labs</code>.</li>
+  <li><code>Pow</code> takes an <code>F64</code> exponent: <code>Pow(4.0, 0.5)</code> is 2.0 (the
+  exponent used to be truncated to an integer). Integral exponents still use exact repeated
+  squaring; one beyond 2<sup>53</sup> is rounded when it becomes an <code>F64</code>, so
+  <code>Pow(-1, I64_MAX)</code> is now 1.0.</li>
+  <li>CDate uses the proleptic Gregorian calendar. Dates from 4000-03-01 on, and in year 0 and
+  before, move by a day (4000-02-29 exists now); years 1 to 3999 keep their day numbers. A
+  CDate of 0 prints as 01/02/0000.</li>
+  <li><code>Struct2Date</code> carries out-of-range fields all the way: month 13 is January of the
+  next year and hour 24 midnight of the next day.</li>
+  <li><code>Str2CDateStruct</code> sets <code>zone_diff</code> to <code>CDATE_NO_ZONE</code>, not -1, when
+  there is no <code>%z</code>, and rejects offsets with hours past 23 or minutes past 59.</li>
+  <li><code>BitVecSet</code> returns a <code>Bool</code>.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li>Bit vectors: <code>BitVec</code> works and is part of the library (it was broken in every
+  operation and couldn't be included).</li>
+  <li><code>ShQuote(s)</code> quotes text for <code>Sh</code> and <code>Shlurp</code>.</li>
+  <li><code>M_PI</code>, <code>M_E</code> and the other maths constants are available to programs.</li>
+  <li><code>CDATE_NO_ZONE</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Shrinking a block with <code>ReAlloc</code> wrote past the new block (x86_64).</li>
+  <li><code>MAlloc</code>, <code>CAlloc</code> and <code>ReAlloc</code> crashed when memory ran out and
+  returned a tiny block for sizes near <code>U64_MAX</code>; they return <code>NULL</code>, and
+  <code>ReAlloc</code> keeps the old block.</li>
+  <li><code>MemSet</code> and <code>MemCpy</code> return <code>dst</code>.</li>
+  <li><code>Pow(x, I64_MIN)</code> returned 1.0.</li>
+  <li><code>RBIter</code> in <code>tos.HH</code> was bigger than what the library allocates.</li>
+  <li><code>IntSetToString</code> was quadratic (500,000 elements: 24 s to under 0.1 s).</li>
+  <li>The <code>IntSet</code> and <code>RBTree</code> functions accept a <code>NULL</code> set or tree.</li>
+  <li><code>Rm</code> and <code>RmDir</code> with <code>RM_RECURSE</code> followed a symlink to a directory
+  and deleted what was inside it; they remove the link.</li>
+  <li><code>Rm</code> with any flag didn't delete files, <code>RM_FORCE</code> did nothing, and
+  <code>Rm</code>/<code>RmDir</code> printed without <code>RM_VERBOSE</code> and reported quiet successes
+  as errors.</li>
+  <li>Recursive <code>RmDir</code> stopped at sockets, FIFOs and devices, and recursed forever on
+  filesystems that don't report entry types.</li>
+  <li>Recursive <code>MkDir</code> overflowed a stack buffer on long paths.</li>
+  <li><code>FileRead</code> on a directory crashed.</li>
+  <li><code>Free(Pwd())</code> aborted the program.</li>
+  <li><code>Dir</code> sorted names starting with the same number in no order, overflowed on huge
+  numbers and was quadratic (20,000 files: 1.6 s to 37 ms). <code>Dir(NULL)</code> and
+  <code>RmDir(NULL, RM_RECURSE)</code> crashed.</li>
+  <li><code>Shlurp("")</code> or a command ending in a backslash gave a shell syntax error.</li>
+  <li><code>Date2Struct</code> gave "December 32" for some January 1sts (1904, 1908, ...).</li>
+  <li><code>Now()</code> counted the sub-second part twice, ran up to 2 s fast and went back to the
+  start of the day just before midnight; <code>zone_diff</code> is set now.</li>
+  <li><code>Struct2Date</code> read past its month tables for months outside 1-12.</li>
+  <li><code>StrPrint</code> and <code>MStrPrint</code> with an empty result returned a string without
+  its terminating NUL, so junk could follow it (and <code>Shlurp("")</code> ran it on arm64).</li>
+  <li>On Linux arm64, <code>cStat</code> had the x86_64 layout, so <code>stat</code> results were read
+  from the wrong offsets.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.7.2 <small>(2026-10-09)</small></h2>
+<p>A follow-up to v0.7.1.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>StrCleanEnd(str, chars)</code> returns the new length of the string instead of the string,
+  and no longer takes a third <code>_new_len</code> argument: <code>len = StrCleanEnd(line, "\r\n");</code>.
+  <code>NULL</code> returns 0.</li>
+</ul>
+
+<h2>v0.7.1 <small>(2026-10-09)</small></h2>
+<p>A small library addition.</p>
+
+<h3>New</h3>
+<ul>
+  <li><code>StrCleanEnd(str, chars)</code> removes any of the given characters from the end of a
+  string, in place: <code>StrCleanEnd(line, "\r\n")</code> drops a line ending.</li>
+</ul>
+
+<h2>v0.7.0 <small>(2026-10-09)</small></h2>
+<p>A JSON release. The JSON module was audited like strings, hash tables and lists: conformance
+cases from the JSON specification, random documents checked against Python's <code>json</code>,
+valgrind and worst-case inputs. Every bug found is fixed and the module is fully documented. The
+library also stops exporting its internal helpers. Every fix has a regression test that runs both
+compiled and in the JIT, on Linux x86_64, Linux arm64 and macOS.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>JsonParse</code> follows RFC 8259 strictly. These are now errors: invalid numbers
+  (<code>-</code>, <code>01</code>, <code>+1</code>, <code>.5</code>, <code>0x1F</code>, <code>1e</code>),
+  anything after the top-level value (<code>[1]x</code>, <code>1 2</code>), anything but whitespace
+  between a key and its <code>:</code>, raw control characters in strings, <code>\v</code> and
+  <code>\f</code> as whitespace, and nesting deeper than 512 (<code>JSON_MAX_DEPTH</code>). They used to
+  be accepted and turned into wrong values.</li>
+  <li>Integers outside the <code>I64</code> range become <code>F64</code> (<code>JSON_FLOAT</code>) instead of
+  silently capping; infinity and NaN are written as <code>null</code>; floats are written with 15 to 17
+  significant digits.</li>
+  <li><code>JsonToString</code> of a selected node writes only that node (it also wrote the node's key
+  and every following sibling). <code>JsonRelease</code> only acts on a document root: on NULL or a
+  selected node it does nothing, where it used to free the siblings and corrupt the tree.</li>
+  <li>Error messages give a line and column; <code>JsonGetStrerror</code> and <code>JsonPrintError</code>
+  are NULL-safe. New error codes <code>JSON_INVALID_LITERAL</code>,
+  <code>JSON_INVALID_CONTROL_CHARACTER</code> and <code>JSON_NESTING_TOO_DEEP</code>.</li>
+  <li>The <code>Json</code> class has two new fields at the end, <code>str_len</code> and <code>key_len</code>,
+  so strings containing <code>\u0000</code> keep all their bytes.</li>
+  <li>libtos exports exactly what <code>tos.HH</code> declares. A program can no longer replace a library
+  helper by accident, but a program that called an undeclared library function must declare its own.
+  <code>static</code> functions and file-scope <code>static</code> variables are local to their file.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li><code>JsonObjectGet(obj, key)</code>, <code>JsonArrayGet(arr, i)</code> and <code>JsonLen(node)</code>,
+  which also reach keys a selector path can't spell.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Strings ending in a backslash (<code>{"path":"C:\\"}</code>) parse.</li>
+  <li><code>JsonParse</code> stays within <code>len</code> (it read past the buffer and accepted truncated
+  strings), and <code>JsonParse(NULL)</code> returns NULL.</li>
+  <li><code>JsonSelect</code>: the <code>*</code> wildcard after <code>.</code> works (<code>.*</code>,
+  <code>.price_*</code>); paths ending in <code>.</code> or <code>[</code> no longer read past their end;
+  junk like <code>[1abc]</code> or <code>:ixyz</code> is rejected; NULL arguments return NULL.</li>
+  <li>Writing floats is about 100 times faster (500,000 floats: 70 s to 0.7 s).</li>
+  <li>The JSON documentation is complete, with examples that free what they allocate.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.6.0 <small>(2026-10-09)</small></h2>
+<p>A standard-library release. Strings, hash tables, lists and vectors were audited with random
+tests against reference models, valgrind and worst-case inputs; every bug found is fixed, the
+missing basics are added and every function is documented. Plus four compiler fixes. Every fix
+has a regression test that runs both compiled and in the JIT, on Linux x86_64, Linux arm64 and
+macOS.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Vector <code>Get</code> and the new <code>Set</code> check the index: out of range prints the
+  function, index and size and exits with status 1 (it returned whatever was in memory).</li>
+  <li><code>StrPrint</code> and friends accept C's flags (<code>-0+ #</code>), length modifiers
+  (<code>l ll h hh z j</code>, all 64-bit), <code>%i</code>, <code>%o</code> and integer precision
+  (<code>%.3d</code> is <code>007</code>); <code>%.*d</code> is a precision, as in C. An unsupported
+  conversion is printed as written, warns on stderr and still uses its argument; the compiler's
+  format check knows the HolyC conversions (<code>%Q %D %T %C %F</code>) and warns about unknown ones.</li>
+  <li><code>Str2CDateStruct</code> and <code>StrToCDate</code> reject empty, partial and out-of-range
+  input (they returned success with garbage fields); <code>%a</code>, <code>%b</code> and <code>%p</code>
+  work, and missing seconds are 0.</li>
+  <li><code>StrNCpy</code> copies at most <code>len</code> bytes and stops at the end of the string
+  (like <code>strndup</code>); <code>MPrintQ</code>/<code>%Q</code> escape control bytes as
+  <code>\xNN</code>; <code>StrHash</code> values changed (an empty string hashes to 0).</li>
+  <li>String functions, maps and lists accept NULL instead of crashing (NULL compares before every
+  string).</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li><code>StrNPrint(dst, size, fmt, ...)</code>: bounded formatting with <code>snprintf</code>
+  semantics.</li>
+  <li>Maps: an optional <code>Bool *_ok</code> on <code>IntMapGet</code>/<code>StrMapGet</code> to tell
+  a missing key from a stored 0, <code>IntMapClear</code> and <code>StrMapClear</code>.</li>
+  <li>Lists: <code>ListClear</code>, <code>ListRemove</code>, <code>ListFirst</code>,
+  <code>ListLast</code>. Vectors: <code>IntVecSet</code>/<code>FloatVecSet</code>/<code>PtrVecSet</code>
+  and <code>...VecLast</code>; the <code>ok</code> flag of <code>Pop</code> is optional.</li>
+  <li><code>strncasecmp</code> and <code>atol</code> are declared for programs.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Strings: a trailing <code>%</code> read past the format; an unsupported conversion shifted the
+  later arguments (and could crash); <code>StrTrimEnd</code> wrote before an empty or blank string;
+  <code>CatLenPrint</code> leaked and overflowed by one byte; <code>WildMatch</code> got simple globs
+  wrong; <code>SPutChar</code> and <code>StrNCpy</code> memory errors. <code>StrLen</code> is about 5x
+  faster and <code>StrPrint</code> output grows 2x instead of 10x.</li>
+  <li>Hash tables: <code>""</code> as a key, <code>StrMapGetLen</code>/<code>HasLen</code> on part of a
+  string, integer keys sharing their low bits (quadratic), similar string keys clustering,
+  <code>IntMapNew(-1)</code> corrupting the heap, a key that is also its value freed twice.</li>
+  <li>Lists and vectors: <code>IntVecNew(0)</code> and <code>FloatVecNew(0)</code> overflowed on the
+  first pushes, <code>PtrVecNew</code> ignored its size, <code>FloatVecSort</code> did nothing,
+  sorting sorted or repeated data was quadratic and crashed at 100,000 elements, merging an empty list
+  linked freed memory into the other.</li>
+  <li>JSON: <code>JsonRelease</code> and parse errors leaked.</li>
+  <li>Compiler: a narrow (<code>I32</code>, <code>U16</code>, ...) call result used directly in an
+  expression wasn't extended (<code>strcmp("a", "b") &lt; 0</code> was false); <code>&amp;labs</code>
+  and other external function addresses failed to link; a lone <code>;</code> ended a function body;
+  an error in an <code>if</code> condition gave a second, bogus error on its <code>else</code>;
+  <code>sizeof()</code> crashed; <code>if ()</code>, <code>switch ()</code> and <code>while ()</code>
+  are errors; the transpiler keeps strings pasted with macros.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.5.0 <small>(2026-10-09)</small></h2>
+<p>The C transpiler checks programs before translating them, and the last v0.4.0 known issues
+are fixed. Every fix has a regression test that runs both compiled and in the JIT, on Linux
+x86_64, Linux arm64 and macOS.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>A class value in a local declaration of another type is an error, as it already was for
+  assignments and globals: <code>I64 z = p;</code> stored the class's address, and <code>Q q = p;</code>
+  between different classes copied bytes silently (reading past the source when <code>Q</code> is
+  larger). To reinterpret a class on purpose, go through a pointer: <code>Q q = *(&amp;p)(Q *);</code>.</li>
+  <li><code>-transpile</code> checks the program first, like <code>-jit</code>: on an error it prints the
+  diagnostics and exits 1 without writing C (it used to write C with the bad statements left out,
+  or crash). It also prints the program's warnings, and needs the same <code>-D</code> defines as a
+  compile.</li>
+  <li>Error messages show string and character constants as written, with their quotes
+  (<code>'\n'</code>, <code>"abcd"</code>).</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>I64 v = ;</code> is an error instead of a crash.</li>
+  <li>A function pointer without a name (<code>I64 (*)(I64 x);</code>) gives one error, and parsing
+  continues correctly after it.</li>
+  <li>The transpiler brackets casts in its C, so <code>p(I64 *)[1]</code> and <code>(a + b)(F64)</code>
+  keep their meaning.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.4.0 <small>(2026-10-09)</small></h2>
+<p>Every known issue from v0.3.0 is fixed: two wrong-code bugs, standard-library fixes for
+threads, trees, processes, sockets and JSON, and diagnostics that point at the right place.
+The old x86 backend is gone. Every fix has a regression test that runs both compiled and in
+the JIT, on Linux x86_64, Linux arm64 and macOS.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>--use-legacy-x86</code> is removed: the old AST-based x86_64 code generator had several
+  wrong-code bugs, and the flag is now an error.</li>
+  <li><code>System</code> and <code>Sh</code> return the command's exit code (0 to 255), or -1 if it was
+  killed by a signal or couldn't run; they used to return the raw wait status
+  (<code>System("exit 3")</code> was 768). <code>System(NULL)</code> returns -1.</li>
+  <li><code>NetSetSocketNoDelay</code> returns <code>TRUE</code> on success; it returned the opposite.</li>
+  <li>A definition keeps its prototype's default arguments; giving the same parameter a different
+  default in both is an error.</li>
+  <li><code>JsonParse</code> honours <code>JSON_STRNUM_FLAG</code>: numbers are kept as their source text.</li>
+  <li>A function pointer can be called through <code>*</code>: <code>(*fp)()</code>, as in C.</li>
+  <li><code>RBTree</code> is 8 bytes larger (each tree has its own sentinel node).</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Classes of any size from 1 to 16 bytes are passed and returned by value correctly. Odd
+  sizes (3, 5 to 7, 9 to 15 bytes) overwrote neighbouring memory on x86_64 and didn't compile
+  on arm64.</li>
+  <li>A class item in a local initialiser list (<code>L l = {1, p0, 4};</code>) is copied; it was
+  garbage.</li>
+  <li><code>ThreadPoolRelease</code> no longer hangs; queued jobs still run before it returns.</li>
+  <li><code>RBTreeRelease</code> frees the tree and calls the key and value free functions; replacing
+  a value frees the old one. Trees used on different threads no longer corrupt each other.</li>
+  <li>An <code>asm {}</code> block no longer breaks the parsing of the code after it, depending on
+  where it sat in the file.</li>
+  <li>The C transpiler writes array members with their element count and indexing as
+  <code>a[i]</code>.</li>
+  <li>Cross-compiling for macOS from Linux (<code>--target=*-apple-darwin</code>) assembles.</li>
+  <li>Diagnostics at the right place: a wrong argument type at the argument, a class initialiser
+  warning at its item, a missing name after a comma at the bad token. A class assigned to an
+  integer is reported once, the underline under strings includes the quotes, and the
+  <code>U0</code> return warning prints the expression as written.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.3.0 <small>(2026-10-09)</small></h2>
+<p>A wrong-code fix in the optimiser, library functions you can redefine, new warnings for
+mistakes hcc used to accept silently, and three fewer ways to crash the compiler. Every fix
+has a regression test that runs both compiled and in the JIT.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Conflicting declarations of a function are an error ("conflicting types"), also against
+  the standard library's prototypes. Programs that declared a library function with a different
+  signature used to compile and now don't.</li>
+  <li>New warnings: a number with a leading zero (<code>0644</code> is decimal 644, not octal), a pointer
+  converted to one of a different scalar type (<code>I64 *q = &amp;f</code> with <code>F64 f</code>), and a pointer
+  difference stored back into a pointer (<code>q -= q</code>). <code>-Werror</code> makes them errors.</li>
+  <li>Redefining a library function (your own <code>Now()</code>) works in compiled programs too; it used
+  to fail to link. Library functions are now weak symbols in libtos.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Copying a pointer and then reassigning the original no longer changes the copy
+  (<code>I64 *z = v; v = &amp;x;</code> made <code>*z</code> read <code>x</code>, or crash once <code>v</code> was NULL).</li>
+  <li>A <code>U0 *</code> compares with a function pointer using <code>==</code> and <code>!=</code>.</li>
+  <li>No more crashes on <code>I64 a[;</code> or on <code>*</code> applied to something that isn't a pointer
+  (<code>1 +* 2</code>); both are normal errors.</li>
+  <li>A stray <code>;</code> at the top level (<code>I64 x = 1;;</code>) is accepted instead of swallowing the
+  next declaration; in the REPL it also no longer breaks later results.</li>
+  <li>The C transpiler writes classes and unions after the types they contain and turns
+  <code>F32</code> into <code>float</code>.</li>
+  <li>The standard library's own prototypes now match their definitions (<code>ListDeque</code>,
+  <code>ListPop</code>, <code>StrMapSet</code>, <code>FzFGetScore</code>).</li>
+  <li>The LSP tests take seconds instead of over a minute.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.2.0 <small>(2026-10-09)</small></h2>
+<p>Networking and parser fixes: sockets now work the same on Linux and macOS, and five
+more compiler bugs are gone, each with a regression test.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>NetAccept</code> returns an <code>I32</code>: the new socket, or -1 on failure (it used to
+  return a value you couldn't check).</li>
+  <li><code>\x</code> in strings and character constants takes at most two hex digits, as in C, so
+  <code>"\x01b"</code> is the bytes 1 and <code>'b'</code>, the same in AOT and the JIT.</li>
+  <li><code>sizeof</code> of a string literal always counts its terminating NUL
+  (<code>sizeof("\xa3\xFF")</code> is 3).</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Socket address layouts and constants follow the platform: <code>sockaddr</code> layouts, the
+  Linux <code>TCP_*</code> options, <code>AI_NUMERICSERV</code>; <code>IPPROTO_*</code> are exported.</li>
+  <li>The arm64 JIT sign-extends <code>I32</code> locals at large frame offsets (negative values
+  read back as large positive ones).</li>
+  <li>A modulo or division by a variable inside an array subscript no longer crashes hcc;
+  division or modulo by a constant 0 is reported as an error.</li>
+  <li>Two bad statements in a row no longer crash hcc; error recovery skips a stray
+  <code>}</code> at the top level.</li>
+  <li>Brace elision works for class-typed and array fields of initialiser lists
+  (<code>Q q = {1, 2, 3};</code> where the last field is a class).</li>
+  <li>String escapes are emitted so the assembler can't misread them, so AOT and JIT strings
+  are byte-for-byte the same.</li>
+  <li>Character constants accept every escape strings do: <code>'\b'</code> is 8, not 92.</li>
+  <li><code>make build</code> works, and <code>make</code> no longer copies <code>build.sh</code> over the
+  <code>build</code> directory.</li>
+  <li>The test suite runs on macOS, which has no <code>timeout</code> command.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<h2>v0.1.0 <small>(2026-10-09)</small></h2>
+<p>The first release of this fork, which is developed independently of
+<a href="https://github.com/Jamesbarford/holyc-lang">Jamesbarford/holyc-lang</a>
+(it continues from upstream v0.0.15-beta). It is mostly about correctness: 120 fixes,
+each with a regression test that runs both compiled and in the JIT.</p>
+
+<h3>Highlights</h3>
+<ul>
+  <li><strong>Wrong code fixed</strong>: loads through pointer arrays, global initialisers laid
+  out at their field offsets and zero-filled, int/float conversions on return, assignment and
+  intrinsic classes, <code>return f();</code> in <code>U0</code> functions no longer dropped,
+  <code>&amp;&amp;</code>/<code>||</code>/<code>!</code> on floats and pointers, comparisons with the pointer on the
+  right, register clobbering in indexed loads on arm64 and x86_64, stack-passed parameters.</li>
+  <li><strong>No more compiler crashes or hangs</strong> on bad or truncated input: end of file
+  anywhere, errors inside class bodies, initialisers and directives, runaway compound
+  assignments.</li>
+  <li><strong>Language</strong>: nested <code>#if</code> handled properly, <code>#undef</code> applied in order,
+  <code>#define</code> line continuation and float typing, function-pointer arrays and file-scope
+  function pointers, nested/union/string initialisers, calling a function without
+  parentheses anywhere in an expression, C precedence for prefix operators.</li>
+  <li><strong>Diagnostics</strong> at the right place: macro uses, directives, tabs and non-ASCII text,
+  argument counts; clear messages for malformed numbers and unknown characters.</li>
+  <li><strong>Standard library</strong>: JSON <code>\u</code> escapes, top-level values and round-tripping;
+  <code>IntSet</code>, <code>CatPrint</code>, <code>FileRead</code>, <code>RBTreeDelete</code> and <code>%d</code> of the smallest
+  <code>I64</code> fixed.</li>
+  <li><strong>Building and testing</strong>: <code>./build.sh</code> builds into a local prefix and runs the
+  suites; <code>docker/test.sh</code> tests x86_64 and arm64 Linux; documentation with checked
+  examples, published at <a href="https://ozzenerol.github.io/holyc-lang/">ozzenerol.github.io/holyc-lang</a>.</li>
+</ul>
+<p>Still open: see <a href="known-issues.html">Known issues</a>.</p>
+
+<details>
+<summary>All 120 fixes</summary>
+<ul>
+  <li>check for array index bounds (#277)</li>
+  <li>use libc write/atol for Write() and Atoi() on x86_64</li>
+  <li>lsp memory leak, stale symbols, hover/completion gaps and utf-16 positions</li>
+  <li>lex `case 1...3` as a range instead of a malformed float</li>
+  <li>lex 0b binary literals instead of silently compiling them to 0</li>
+  <li>copy string literals into local U8 arrays and allow shorter initialisers</li>
+  <li>call function pointer fields through array elements and call results</li>
+  <li>correct the usage labels of -cfg-png, -cfg-svg and -c</li>
+  <li>allow range-based for loops without braces</li>
+  <li>compile inline functions as ordinary functions</li>
+  <li>allow several declarations in one global statement</li>
+  <li>report function-like macros and bad #define values as errors instead of crashing</li>
+  <li>make hcc -run build, run and clean up the program</li>
+  <li>pass classes by value correctly in the x86_64 JIT and spill class results safely on arm64</li>
+  <li>give small class returns their own stack slot so struct copies never overlap</li>
+  <li>make F64 comparisons used as values give 0 or 1 and handle NaN on x86_64</li>
+  <li>make %d and friends 64-bit in print statements</li>
+  <li>stop miscompiling stores across calls, fix the date helpers and wide arm64 JIT stores</li>
+  <li>support %f, %e and %g in StrPrint and never grow a caller&#x27;s buffer</li>
+  <li>make StrCmp, StrNCmp and StrNICmp follow C on x86_64</li>
+  <li>compute Gcd correctly for every input</li>
+  <li>capture Shlurp output without format arguments and always pass argc to variadic calls</li>
+  <li>use the POSIX values for STDIN, STDOUT and STDERR</li>
+  <li>let StrMapNew and IntMapNew take any capacity</li>
+  <li>keep the stored key when StrMapSet updates an existing key</li>
+  <li>let the JIT load libraries built with -lib</li>
+  <li>make the docs easier to read</li>
+  <li>lex float literals with an exponent instead of misreading 1e3 and 1.0e-7</li>
+  <li>report bad #if and #elif conditions at the directive&#x27;s file and line</li>
+  <li>make &gt;&gt;, /, % and comparisons unsigned for U64 and type big literals as U64</li>
+  <li>size intrinsic classes by their base type so sizeof(CDate) is 8</li>
+  <li>read a field off a returned or cast I64 class instead of crashing</li>
+  <li>give auto the element type in a range-for over a container field</li>
+  <li>compare floats with integers as floats and convert big U64 to float unsigned</li>
+  <li>pass variadic arguments correctly when calling through a function pointer</li>
+  <li>stop -Memsafe reporting false leaks and double frees</li>
+  <li>honour width, precision and - for %s and %d in StrPrint</li>
+  <li>make StrMapDelete and IntMapDelete remove keys without breaking the map</li>
+  <li>show one module at a time on the stdlib reference page</li>
+  <li>parse function pointers declared at file scope</li>
+  <li>allow a pointer next to a Bool in &amp;&amp; and ||, keeping their order and 0/1 result</li>
+  <li>reject extra tokens after an #if condition</li>
+  <li>reject letters after a decimal number instead of dropping them</li>
+  <li>give an assignment used as a value the type of its left side</li>
+  <li>load an intrinsic class read through a pointer instead of returning the pointer</li>
+  <li>convert between int and float when returning a value</li>
+  <li>fill default arguments when calling through a class field function pointer</li>
+  <li>make CatPrint grow and return the string it is given instead of leaking it</li>
+  <li>report #define errors without abandoning the declaration being parsed</li>
+  <li>truncate a constant assigned to a narrow integer when the assignment is used as a value</li>
+  <li>keep pointer and index parameter registers intact in indexed loads and stores</li>
+  <li>read only the bytes left in FileRead instead of past the buffer</li>
+  <li>test float operands of &amp;&amp;, || and ! against 0.0</li>
+  <li>reject 0x with no digits and digits after an f32/f64 suffix</li>
+  <li>keep the stack slot of a stack-passed parameter used as an index or return value</li>
+  <li>stop arm64 indexed accesses adding the offset into the base register</li>
+  <li>report directive and token errors without abandoning the declaration being parsed</li>
+  <li>fold postfix casts in #define values instead of crashing</li>
+  <li>keep comparison operands in order when the pointer is on the right</li>
+  <li>recover from a field error inside a class body instead of crashing on use</li>
+  <li>point directive errors at the offending token on the directive&#x27;s line</li>
+  <li>report a non-constant #define value at its location instead of exiting</li>
+  <li>track #if nesting and report unmatched conditional directives</li>
+  <li>explain why a malformed number literal is rejected</li>
+  <li>reject an initialiser list for an incomplete class instead of crashing</li>
+  <li>report an intrinsic class size error once and keep its fields</li>
+  <li>type a #define as F64 when any operand is a float</li>
+  <li>reject 0x with no digits before a case range</li>
+  <li>support brace initialisers for class-typed fields</li>
+  <li>drop the unlocated warnings printed before a binary operator type error</li>
+  <li>report unexpected end of input instead of hanging or crashing</li>
+  <li>test float operands of &amp;&amp;, || and ! against 0.0 when folding a #define</li>
+  <li>echo the source line as written in error excerpts</li>
+  <li>reject unary -, + and ~ on non-arithmetic operands and promote narrow ints</li>
+  <li>report an unterminated block comment</li>
+  <li>report an unreadable #include instead of hanging on a directory</li>
+  <li>require while after a do block and stop the undefined-call walk-back from hanging</li>
+  <li>reject nested array initialiser rows and strings that are too long</li>
+  <li>skip the whole initialiser after an error inside it</li>
+  <li>lay out global initialisers at their field offsets</li>
+  <li>zero-fill the rest of a partial initialiser and accept short top-level array lists</li>
+  <li>bind prefix operators to the whole postfix expression</li>
+  <li>assign intrinsic classes to integers silently and place assignment warnings correctly</li>
+  <li>report errors on a macro use where it is used</li>
+  <li>line up error carets on lines with tabs</li>
+  <li>report unexpected characters instead of dropping them</li>
+  <li>print the whole line of an #error directive</li>
+  <li>don&#x27;t let /*/ close the block comment it opens</li>
+  <li>report a bad compound assignment at its operator instead of looping</li>
+  <li>reject brace lists for scalar elements and name the token in the initialiser-list error</li>
+  <li>load pointer elements and take the address of pointer variables instead of returning the pointer</li>
+  <li>convert intrinsic classes to and from floats instead of copying bits</li>
+  <li>copy strings into char-array slots of initialisers as bytes</li>
+  <li>give an anonymous union one initialiser and allow brace lists for unions</li>
+  <li>store non-constant items of global initialisers at startup</li>
+  <li>align initialised and static global data to their type</li>
+  <li>call a function named without parentheses anywhere in an expression</li>
+  <li>expand macros as tokens enter the lookahead ring so #undef applies in order</li>
+  <li>give argc its own integer type so it converts to a float</li>
+  <li>parse tagged classes and unions defined inside a class body</li>
+  <li>report a missing Main when running with -jit</li>
+  <li>decode \\u escapes in JsonParse, including surrogate pairs</li>
+  <li>parse arrays of function pointers</li>
+  <li>accept any JSON value at the top level, including empty objects and arrays</li>
+  <li>escape control characters and print empty objects in JsonToString</li>
+  <li>evaluate the expression of a return in a U0 function instead of dropping it</li>
+  <li>make assigning to an array an error</li>
+  <li>show the value of a folded macro in parse errors</li>
+  <li>only suggest a missing semicolon on a line that can take one</li>
+  <li>print the smallest I64 correctly with signed formats</li>
+  <li>don&#x27;t report lexical errors inside skipped #if blocks</li>
+  <li>support backslash line continuation in #define</li>
+  <li>place error carets correctly after non-ASCII text</li>
+  <li>emit file-scope char arrays initialised from a string into writable data</li>
+  <li>make IntSet printing and iteration work and declare IntSetIntersection</li>
+  <li>lay out global class initialisers at their field offsets in the legacy x86 backend</li>
+  <li>stop RBTreeDelete dereferencing NULL and looping after a match</li>
+  <li>convert between U0 pointers and function pointers without a warning</li>
+  <li>underline the call with the wrong argument count</li>
+  <li>name array types by element count and size string literals by their decoded bytes</li>
+</ul>
+</details>
+<details>
+<summary>New features and tooling</summary>
+<ul>
+  <li>Adds build.sh to build hcc + libtos, run all tests against the in-tree lib, and install safely (sudo only for the copy). Tested on Linux x86_64 and macOS arm64</li>
+  <li>feat: add docker/test.sh to run the test matrix on x86_64 and arm64</li>
+  <li>feat: add HTML docs for the language, library and tools, with example projects</li>
+  <li>feat: added docs</li>
+</ul>
+</details>

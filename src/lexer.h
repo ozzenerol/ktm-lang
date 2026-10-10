@@ -1,0 +1,305 @@
+#ifndef LEXER_H
+#define LEXER_H
+
+#include <sys/types.h>
+
+#include "aostr.h"
+#include "containers.h"
+#include "list.h"
+
+#define LEX_MAX_IDENT_LEN  128
+#define LEX_CHAR_CONST_LEN 8
+
+/* TOKENS */
+#define TK_EOF          0
+#define TK_SUPERSCRIPT  0x301
+#define TK_SUBSCRIPT    0x302
+#define TK_NORMALSCRIPT 0x303
+#define TK_IDENT        0x300
+#define TK_STR          0x301
+#define TK_I64          0x302
+#define TK_CHAR_CONST   0x303
+#define TK_F64          0x304
+#define TK_PLUS_PLUS    0x305
+#define TK_MINUS_MINUS  0x306
+#define TK_DEREFERENCE  0x307
+#define TK_DBL_COLON    0x308
+#define TK_SHL          0x309
+#define TK_SHR          0x30A
+#define TK_EQU_EQU      0x30B
+#define TK_NOT_EQU      0x30C
+#define TK_LESS_EQU     0x30D
+#define TK_GREATER_EQU  0x30E
+#define TK_AND_AND      0x30F
+#define TK_OR_OR        0x310
+#define TK_XOR_XOR      0x311
+#define TK_SHL_EQU      0x312
+#define TK_SHR_EQU      0x313
+#define TK_MUL_EQU      0x314
+#define TK_DIV_EQU      0x315
+#define TK_AND_EQU      0x316
+#define TK_OR_EQU       0x317
+#define TK_XOR_EQU      0x318
+#define TK_ADD_EQU      0x319
+#define TK_SUB_EQU      0x31A
+#define TK_IF           0x31B
+#define TK_IFDEF        0x31C
+#define TK_IFNDEF       0x31D
+#define TK_IFAOT        0x31E
+#define TK_IFJIT        0x31F
+#define TK_ENDIF        0x320
+#define TK_ELSE         0x321
+#define TK_MOD_EQU      0x322
+#define TK_DOT_DOT      0x323
+#define TK_ELLIPSIS     0x324
+#define TK_INS_BIN      0x325
+#define TK_INS_BIN_SIZE 0x326
+#define TK_TKS_NUM      0x327
+#define TK_ARROW        0x328
+#define TK_PUNCT        0x329
+#define TK_PRE_PLUS_PLUS 0x330
+#define TK_PRE_MINUS_MINUS 0x331
+#define TK_KEYWORD      0x332
+#define TK_COMMENT      0x333
+
+#define KW_CLASS       (1<<0) /* Easy to see if struct or union */
+#define KW_UNION       (1<<1)
+#define KW_U0           0
+/* Integers are odd numbers */
+#define KW_BOOL         3
+#define KW_I8           5
+#define KW_U8           7
+#define KW_I16          9
+#define KW_U16          11
+#define KW_I32          13
+#define KW_U32          15
+#define KW_I64          17
+#define KW_U64          19
+/* back to even */
+#define KW_F64          4
+#define KW_PUBLIC       6
+#define KW_ATOMIC       8
+#define KW_DEFINE       10
+#define KW_PP_INCLUDE   12
+#define KW_SIZEOF       16
+#define KW_RETURN       18
+#define KW_SWITCH       20
+#define KW_CASE         22
+#define KW_BREAK        24
+#define KW_CONTINUE     26
+#define KW_ASM          28
+#define KW_ASM_EXTERN   30
+#define KW_EXTERN       32
+#define KW_PRIVATE      34
+#define KW_INLINE       36
+#define KW_FOR          38
+#define KW_WHILE        40
+#define KW_VOLATILE     42
+#define KW_GOTO         44
+#define KW_IF           46
+#define KW_ELSE         48
+#define KW_ELIF         50
+#define KW_IF_NDEF      52
+#define KW_IF_DEF       54
+#define KW_ENDIF        56
+#define KW_DEFINED      58
+#define KW_UNDEF        60
+#define KW_AUTO         62
+#define KW_DEFAULT      64
+#define KW_DO           66
+#define KW_STATIC       67
+#define KW_ELIF_DEF     68
+#define KW_PP_IF        69
+#define KW_PP_ELSE      70
+#define KW_PP_DEFINE    71
+#define KW_PP_IF_NDEF   72
+#define KW_PP_IF_DEF    73
+#define KW_PP_ELIF_DEF  74
+#define KW_PP_ENDIF     75
+#define KW_PP_ELIF      76
+#define KW_PP_DEFINED   77
+#define KW_PP_UNDEF     78
+#define KW_PP_ERROR     79
+/* structured exceptions. */
+#define KW_TRY          80
+#define KW_CATCH        81
+#define KW_THROW        82
+/* register pinning for locals/params:
+ *   I64 reg R15 i = 5;    // bound to R15 for the function
+ *   I64 noreg j = 4;      // explicit stack local
+ * `noreg` is also required for any local in a function that contains
+ * an asm { } block (no implicit "compiler picks"). */
+#define KW_REG          83
+#define KW_NOREG        84
+/* Extended to have F32 support, a lot of C libraries use floats, so without
+ * an F32 they become very hard to use */
+#define KW_F32          85
+/* Compile-time alignment query: `alignof(<type or expr>)`. */
+#define KW_ALIGNOF      86
+/* `#link "<path>"` / `#link <libname>` - record a shared library
+ * dependency in the source itself. AOT passes it to the linker,
+ * the JIT dlopen's it. */
+#define KW_PP_LINK      87
+/* `#ifjit` / `#ifaot` - sugar for `#ifdef __KTM_JIT__` /
+ * `#ifdef __KTM_AOT__` (main() defines exactly one of the two).
+ * Compose with #else / #endif like any other #if. */
+#define KW_PP_IF_JIT    88
+#define KW_PP_IF_AOT    89
+/* Compile-time type query: `typeof(<type or expr>)` folds to a string
+ * literal naming the type, e.g. typeof(1+1) == "I64". */
+#define KW_TYPEOF       90
+
+/* Compiler Flags*/
+#define CCF_MULTI_CHAR_OP     (1<<0)
+#define CCF_PRE_PROC          (1<<1)
+#define CCF_ACCEPT_NEWLINES   (1<<2)
+#define CCF_MULTI_COLON       (1<<3)
+#define CCF_ASM_BLOCK         (1<<4)
+#define CCF_BLOCK             (1<<5)
+#define CCF_ACCEPT_WHITESPACE (1<<6)
+#define CCF_ACCEPT_COMMENTS   (1<<7)
+/* Permissive mode: don't raise on malformed input. Lexing
+ * continues by absorbing the offending byte literally (e.g.
+ * unknown escape `\q` becomes the two chars `\q` in the string
+ * body). Used by the diagnostic renderer's per-line re-lexer,
+ * which only needs to colourise, not validate. */
+#define CCF_PERMISSIVE        (1<<8)
+/* Lexing a skipped #if group: like C, a character with no use outside
+ * an asm block (`@@1` in an `#ifdef IS_X86_64` asm block skipped on
+ * arm64) is not an error there. */
+#define CCF_COND_SKIP         (1<<9)
+
+#define LEXEME_RAW_PUNCT              (1<<0)
+#define LEXEME_ENCODE_PUNCT           (1<<1)
+#define LEXEME_GRAPH_VIZ_ENCODE_PUNCT (1<<2)
+
+typedef struct Lexeme {
+    int tk_type;
+    int len;
+    int line;
+    /* 1-based column of the first byte of `start` within its source
+     * line. Derived at lex time from `start - line_start_ptr + 1`;
+     * preserved when the lexer cursor moves so we don't have to
+     * rescan the line later which could lead to the wrong characters. */
+    int col;
+    char *start;
+    int ishex;
+    /* An integer literal too big for an I64 (or a #define folded to a
+     * U64): typed U64, like C does for such hex literals. */
+    int isu64;
+    union {
+        s64 i64;
+        double f64;
+    };
+} Lexeme;
+
+/* Forward declaration. The lexer holds a back-pointer to its
+ * owning Cctrl (when there is one) so user-visible lex errors
+ * can route through the diagnostic accumulator instead of the
+ * fail-fast `loggerPanic`. NULL for standalone lexer instances
+ * (the macro-processor stub, the per-line re-lexer used by the
+ * diagnostic renderer). */
+struct Cctrl;
+
+typedef struct LexFile {
+    AoStr *filename; /* name of the file */
+    /* cctrlRegisterFile id, assigned lazily on first token consumed
+     * from this file; 0 = not yet registered. */
+    u32 file_id;
+    char *ptr; /* Where we are in the file */
+    int lineno; /* line number in the file */
+    /* First byte of the current line in `src->data`. Saved/restored
+     * alongside `ptr` and `lineno` when crossing file boundaries so
+     * columns stays consistent across includes. */
+    char *line_start_ptr;
+    AoStr *src; /* source */
+} LexFile;
+
+/* An open #if/#ifdef/#ifndef/#ifjit/#ifaot: where it is (for
+ * "Unterminated #if"), whether one of its branches has been taken and
+ * whether its #else has been seen. */
+typedef struct LexCond {
+    s64 line;
+    s64 col;
+    s64 len;
+    int taken;
+    int seen_else;
+} LexCond;
+
+typedef struct Lexer {
+    int tk_type;
+    char *ptr;
+    char *start;
+    /* Pointer to the start of the current source line. */
+    char *line_start_ptr;
+    /* Line and column of the first byte of the token currently
+     * being lexed. */
+    int tok_start_line;
+    int tok_start_col;
+
+    char cur_ch;
+    char *cur_str;
+    s64 cur_strlen;
+    s64 cur_i64;
+    double cur_f64;
+    int lineno;
+    int flags;
+    int ishex;
+    int isu64;
+    /* The last string lexed ran into the end of the input */
+    int str_unterminated;
+    /* The open conditionals, innermost last */
+    LexCond *conds;
+    int cond_depth;
+    int cond_cap;
+    char *builtin_root;
+    List *files;
+    List *all_source;/* This saves all of the files we see so we can free them later */
+    Set *seen_files;
+    Map *symbol_table;
+    LexFile *cur_file;
+    /* Diagnostic engine back-pointer. When non-NULL the lexer
+     * routes user-visible errors through cctrlRaiseException so
+     * they accumulate in the same Vec the parser writes to and
+     * honour the recovery longjmp. NULL means fall back to
+     * `loggerPanic` (standalone lexer / macro processor). */
+    struct Cctrl *cc;
+} Lexer;
+
+void lexemeMemoryInit(void);
+void lexemeMemoryRelease(void);
+void lexemeMemoryStats(void);
+void lexerRelease(Lexer *l);
+
+Lexeme *lexemeTokNew(char *start, int len, int line, s64 ch);
+Lexeme *lexemeNew(char *start, int len);
+Lexeme *lexemeCopy(Lexeme *le);
+Lexeme *lexemeSentinal(void);
+void lexSetAsmFlags(Lexer *l);
+void lexUnSetAsmFlags(Lexer *l);
+void lexSetBuiltinRoot(Lexer *l, char *root);
+void lexInit(Lexer *l, char *source, int flag);
+void lexPushFile(Lexer *l, AoStr *filename);
+/* Push an in-memory buffer as if it were a file (REPL input). `src`
+ * is borrowed and must outlive the parse of this buffer. */
+void lexPushString(Lexer *l, char *name, char *src, s64 len);
+int lex(Lexer *l, Lexeme *le);
+Lexeme *lexToken(Map *macro_defs, Lexer *l);
+void lexemePrint(Lexeme *le);
+char *lexemeTypeToString(int tk_type);
+char *lexemePunctToString(s64 op);
+char *lexemePunctToStringWithFlags(s64 op, u64 flags);
+char *lexemePunctToEncodedString(s64 op);
+char *lexemeToString(Lexeme *tok);
+char *lexemeAsWritten(Lexeme *tok);
+AoStr *lexemeToAoStr(Lexeme *tok);
+void lexReleaseAllFiles(Lexer *l);
+int tokenPunctIs(Lexeme *tok, s64 ch);
+int tokenIdentIs(Lexeme *tok, char *ident, int len);
+void lexemeFree(void *_le);
+char *lexerReportLine(Lexer *l, s64 lineno);
+int lexemeEq(Lexeme *l1, Lexeme *l2);
+char *lexReadfile(char *path, s64 *_len);
+
+
+#endif // !LEXER_H

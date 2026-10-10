@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Known issues - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html">ktm</a>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li class="current"><a href="known-issues.html" aria-current="page">Known issues</a><ul class="toc"><li><a href="#compiler">Compiler</a></li><li><a href="#jit-and-code-generation">JIT and code generation</a></li><li><a href="#standard-library">Standard library</a></li><li><a href="#reporting">Reporting</a></li></ul></li><li><a href="releases.html">Releases</a></li></ul>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<h1>Known issues</h1>
+<p class="lede">Bugs found while writing and testing these docs and while testing the compiler,
+each with a way to reproduce it and a workaround. The other pages avoid them, so every example
+there works as shown.</p>
+
+<h2 id="compiler">Compiler<a class="anchor" href="#compiler" aria-label="Link to this section">#</a></h2>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
+
+<h3 id="diagnostics">Diagnostics<a class="anchor" href="#diagnostics" aria-label="Link to this section">#</a></h3>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
+
+<h2 id="jit-and-code-generation">JIT and code generation<a class="anchor" href="#jit-and-code-generation" aria-label="Link to this section">#</a></h2>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
+
+<h2 id="standard-library">Standard library<a class="anchor" href="#standard-library" aria-label="Link to this section">#</a></h2>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
+
+<h2 id="reporting">Reporting<a class="anchor" href="#reporting" aria-label="Link to this section">#</a></h2>
+<p>Please report bugs on <a href="https://github.com/ozzenerol/ktm-lang/issues">GitHub</a>.
+A minimal <code>.ktm</code> file that reproduces the problem helps the most.</p>
+
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/known-issues.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
