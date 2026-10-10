@@ -299,6 +299,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->pub_names = setNew(16, &set_cstring_type);
     cc->tok_file = NULL;
     cc->main_names = setNew(16, &set_cstring_type);
+    cc->method_self = NULL;
     cc->file_map = mapNew(16, &map_u32_to_aostr_type);
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);

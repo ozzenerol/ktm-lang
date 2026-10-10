@@ -383,6 +383,25 @@ char *astModuleMangle(char *qual, int len) {
     return aoStrMove(out);
 }
 
+/* `_K3net4dial` back to `net.dial`, for messages; any other name as is */
+char *astModuleDemangle(char *sym, int len) {
+    if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||
+        !isdigit((unsigned char)sym[2])) {
+        return mprintf("%.*s", len, sym);
+    }
+    AoStr *out = aoStrNew();
+    int i = 2;
+    while (i < len) {
+        int n = 0;
+        while (i < len && isdigit((unsigned char)sym[i])) n = n * 10 + (sym[i++] - '0');
+        if (n == 0 || i + n > len) return mprintf("%.*s", len, sym);
+        if (out->len) aoStrPutChar(out, '.');
+        aoStrCatLen(out, sym + i, n);
+        i += n;
+    }
+    return aoStrMove(out);
+}
+
 Ast *astGVar(AstType *type, char *name, int len, int is_static) {
     Ast *ast = astNew();
     ast->kind = AST_GVAR;

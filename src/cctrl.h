@@ -194,6 +194,9 @@ typedef struct Cctrl {
      * a module must not see */
     Set *pub_names;
     Set *main_names;
+    /* A method definition (`void User.describe()`) being parsed: the
+     * type of its implicit `self` parameter (`User *`), NULL otherwise */
+    AstType *method_self;
     /* The file of the last token the parser took: where diagnostics
      * and new Ast nodes are (the lexer may already be in the next) */
     LexFile *tok_file;

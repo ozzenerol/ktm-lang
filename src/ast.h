@@ -187,6 +187,9 @@ typedef struct AstType {
     int is_intrinsic;
     /* `class D : B`: B, whose fields D starts with; NULL otherwise */
     struct AstType *base_cls;
+    /* A class or union the standard library defines: only it can add
+     * methods to it */
+    u8 in_std;
     /* Bool: a 1-byte char type, but a value converted to it becomes 0 or
      * 1 (value != 0), as in C, instead of keeping its low byte. */
     u8 is_bool;
@@ -553,6 +556,7 @@ Ast *astUnaryOperator(AstType *type, AstUnOp operation, Ast *operand);
 /* Variable definitions */
 Ast *astLVar(AstType *type, char *name, int len);
 char *astModuleMangle(char *qual, int len);
+char *astModuleDemangle(char *sym, int len);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);
 
 /* More beefy data structures */

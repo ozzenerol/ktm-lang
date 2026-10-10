@@ -2028,6 +2028,92 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     }
 }
 
+/* The method `name` of `cls` or of a class it inherits from, the
+ * nearest one (a method of a derived class hides its base's), with
+ * `*owner` the class that has it; NULL if there is none. A method is
+ * the function `Class.name`. */
+static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
+                            AstType **owner) {
+    for (AstType *t = cls; t; t = t->base_cls) {
+        if (!t->clsname) continue;
+        char *key = mprintf("%s.%.*s", t->clsname->data, len, name);
+        Ast *fn = mapGet(cc->global_env, key);
+        /* inside its own body (a recursive call) only its symbol is
+         * registered yet */
+        if (!fn) fn = mapGet(cc->global_env, astModuleMangle(key, strlen(key)));
+        if (fn && (fn->kind == AST_FUNC || fn->kind == AST_FUN_PROTO)) {
+            *owner = t;
+            return fn;
+        }
+    }
+    return NULL;
+}
+
+/* A method of a module's type, used outside that module: it must be pub */
+static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
+                                   int len) {
+    AoStr *cls = owner->clsname;
+    int mod_len = -1;
+    for (int i = (int)cls->len - 1; i >= 0; --i) {
+        if (cls->data[i] == '.') { mod_len = i; break; }
+    }
+    if (mod_len < 0) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    if (here && (int)here->len == mod_len && !memcmp(here->data, cls->data, mod_len)) {
+        return;
+    }
+    char *key = mprintf("%s.%.*s", cls->data, len, name);
+    if (setHas(cc->pub_names, key)) return;
+    cctrlRewindUntilStrMatch(cc, name, len, NULL);
+    cctrlRaiseException(cc, "the method `%.*s` of `%s` is private to module %.*s",
+                        len, name, cls->data, mod_len, cls->data);
+}
+
+/* The arguments of a call to the method `fn`, the `(` just taken. With
+ * `recv` (`u.name(...)`, a pointer to the object) the arguments are the
+ * method's own and `recv` becomes `self`; without (`User.name(p, ...)`)
+ * the first argument is `self`. */
+static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
+                            char *name, int len) {
+    Ast *decl = fn;
+    if (recv) {
+        /* The method as seen by the caller: without `self` */
+        Vec *params = astVecNew();
+        for (u64 i = 1; i < fn->params->size; ++i) {
+            vecPush(params, fn->params->entries[i]);
+        }
+        decl = (Ast *)malloc(sizeof(Ast));
+        *decl = *fn;
+        decl->params = params;
+        decl->type = astTypeCopy(fn->type);
+        decl->type->params = params;
+    }
+    char *fname = mprintf("%s.%.*s", owner->clsname->data, len, name);
+    int flen = strlen(fname);
+
+    ParseCallLoc loc = parseCallLocStart(cc, name, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, decl, ')', fname, flen, loc.args);
+    parseCallLocEnd(cc, &loc);
+    parseFunctionArgumentCheck(cc, decl, argv, fname, flen, &loc);
+    parseFlattenDefaultArgs(decl, argv);
+    parseAddEmptyVarArgCount(decl, argv);
+    parseCoerceArgs(decl, argv);
+    parsePrintfFormatCheck(cc, decl, argv, fname, flen, &loc);
+    parseCallLocFreeArgs(&loc);
+
+    if (recv) {
+        AstType *self_type = ((Ast *)fn->params->entries[0])->type;
+        if (recv->type->ptr != self_type->ptr) {
+            /* a derived class's object, for its base's method */
+            recv = astCast(recv, self_type);
+        }
+        vecInsertAt(argv, recv, 0);
+    }
+    return astFunctionCall(fn->type->rettype, fn->fname->data,
+                           fn->fname->len, argv);
+}
+
 /* Rewrite a print statement's format literal so integer conversions with
  * no length modifier read 64 bits: `%d` -> `%lld`, `%-5x` -> `%-5llx`.
  * In ktm `%d` is an I64 but the statement lowers to C's printf, where
@@ -2192,6 +2278,39 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
             enum_type->is_enum)
         {
             return parseEnumMemberRef(cc, enum_type, name, len);
+        }
+        if (!enum_type && !cctrlModuleHides(cc, name, len)) {
+            enum_type = mapGetLen(cc->uniondefs, name, len);
+        }
+        /* `User.name`: a method, called with its `self` as the first
+         * argument (`User.describe(self)` from a derived class's method)
+         * or its address taken (`&User.describe`) */
+        if (enum_type && !enum_type->is_intrinsic &&
+            parseIsClassOrUnion(enum_type->kind) &&
+            !(cc->localenv && mapGetLen(cc->localenv, name, len)) &&
+            !mapGetLen(cc->global_env, name, len))
+        {
+            Lexeme *mtok = cctrlTokenGetRequired(cc);
+            AstType *owner = NULL;
+            Ast *method = mtok->tk_type != TK_IDENT ? NULL :
+                parseFindMethod(cc, enum_type, mtok->start, mtok->len, &owner);
+            if (!method) {
+                cctrlRaiseException(cc, "`%.*s` has no method `%s`",
+                        len, name, lexemeAsWritten(mtok));
+            }
+            parseCheckMethodAccess(cc, owner, mtok->start, mtok->len);
+            if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+                cctrlTokenGet(cc);
+                return parseMethodCall(cc, method, owner, NULL,
+                                       mtok->start, mtok->len);
+            }
+            if (can_call_function) {
+                cctrlRaiseException(cc, "`%s.%.*s` needs its `self`, as in "
+                        "`%s.%.*s(p)`", owner->clsname->data, mtok->len,
+                        mtok->start, owner->clsname->data, mtok->len,
+                        mtok->start);
+            }
+            return method;
         }
     }
 
@@ -2536,6 +2655,13 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
         }
         return count;
     }
+    /* `p.x` on a pointer to a class is `p->x` (one level: not `pp.x`) */
+    if (cls->type->kind == AST_TYPE_POINTER && cls->type->ptr &&
+        parseIsClassOrUnion(cls->type->ptr->kind))
+    {
+        cls = astUnaryOperator(cls->type->ptr, AST_UN_OP_DEREF, cls);
+        cls->deref_symbol = TK_ARROW;
+    }
     if (!parseIsClassOrUnion(cls->type->kind)) {
         char *type_str = astTypeToString(cls->type);
         char *var_str = astLValueToString(cls,0);
@@ -2575,6 +2701,32 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
                 tok->len, tok->start, astTypeToString(cls->type));
     }
     AstType *field = mapGetLen(type->fields, tok->start, tok->len);
+    AstType *owner = NULL;
+    Ast *method = field ? NULL : parseFindMethod(cc, type, tok->start,
+                                                 tok->len, &owner);
+    if (method) {
+        parseCheckMethodAccess(cc, owner, tok->start, tok->len);
+        if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+            cctrlRaiseException(cc, "`%s.%.*s` is a method: call it with "
+                    "`(...)`, or take its address with `&%s.%.*s`",
+                    owner->clsname->data, tok->len, tok->start,
+                    owner->clsname->data, tok->len, tok->start);
+        }
+        cctrlTokenGet(cc);
+        Ast *recv;
+        if (astIsDeref(cls)) {
+            recv = cls->operand;
+        } else {
+            if (!assertLValue(cls)) {
+                cctrlRaiseException(cc, "a method is called on a variable "
+                                        "or a pointer, not on a %s",
+                                    astKindToHumanReadable(cls));
+            }
+            recv = astUnaryOperator(astMakePointerType(cls->type),
+                                    AST_UN_OP_ADDR_OF, cls);
+        }
+        return parseMethodCall(cc, method, owner, recv, tok->start, tok->len);
+    }
     if (!field) {
         cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);
         cctrlRaiseException(cc,"Property: %.*s does not exist on class", 
