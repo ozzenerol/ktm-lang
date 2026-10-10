@@ -97,9 +97,9 @@ I32 Main()
   /* Still errors */
   if (CompileFailsWith("fp == 1.5", "cannot be applied to a function")) correct++;
   if (CompileFailsWith("fp == d", "cannot be applied to a function")) correct++;
-  if (CompileFailsWith("q == &F", "`i64 * == <fn> void` is invalid")) correct++;
-  if (CompileFailsWith("w < &F", "`void * < <fn> void` is invalid")) correct++;
-  if (CompileFailsWith("w - &F", "`void * - <fn> void` is invalid")) correct++;
+  if (CompileFailsWith("q == &F", "`i64 * == fn() void` is invalid")) correct++;
+  if (CompileFailsWith("w < &F", "`void * < fn() void` is invalid")) correct++;
+  if (CompileFailsWith("w - &F", "`void * - fn() void` is invalid")) correct++;
   if (CompileFailsWith("w * fp", "is invalid")) correct++;
 
   PrintResult(correct, tests);
