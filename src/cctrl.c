@@ -294,6 +294,11 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->defer_depth = 0;
     cc->cur_module = 0;
     cc->decls_only = 0;
+    cc->mod_type_decls = vecNew(&vec_unsigned_long_type);
+    cc->mod_decls_done = setNew(16, &set_cstring_type);
+    cc->mod_types_done = setNew(16, &set_cstring_type);
+    cc->replaying = 0;
+    cc->quiet_errors = 0;
     cc->decl_pub = 0;
     cc->decl_from_main = 0;
     cc->pub_names = setNew(16, &set_cstring_type);
@@ -682,7 +687,7 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
             token = tokenRingBufferPeek(cc->token_buffer);
             continue;
         }
-        if (cc->token_buffer->size < 3 && cc->lexer_) {
+        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying) {
             cctrLoadNextTokens(cc,5);
         }
         cc->token_buffer->pos++;
@@ -1174,6 +1179,15 @@ void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
             if (d->suggestion) aoStrRelease(d->suggestion);
             free(d);
         }
+        return;
+    }
+    /* A module type declaration parsed from its recorded tokens: the
+     * declarations pass reports what still fails (see Cctrl.replaying) */
+    if (cc->replaying) {
+        if (d->severity == CCTRL_ERROR) cc->quiet_errors++;
+        if (d->message) aoStrRelease(d->message);
+        if (d->suggestion) aoStrRelease(d->suggestion);
+        free(d);
         return;
     }
     vecPush(cc->diagnostics, d);

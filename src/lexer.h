@@ -216,10 +216,16 @@ typedef struct Lexeme {
     struct LexFile *file;
 } Lexeme;
 
-/* A module's files are lexed twice: declarations only, then in full */
+/* A module's files are lexed three times: its type names (the parser
+ * records its type declarations and parses them in an order that works,
+ * see parseModuleTypes), then declarations only, then in full */
 #define LEX_PASS_NONE  0
 #define LEX_PASS_DECLS 1
 #define LEX_PASS_FULL  2
+#define LEX_PASS_NAMES 3
+/* A pass that only reads declarations: nothing in it is reported twice */
+#define LEX_PASS_QUIET(pass) \
+    ((pass) == LEX_PASS_DECLS || (pass) == LEX_PASS_NAMES)
 
 /* A module (a directory of .ktm files) as `import a.b;` finds it */
 typedef struct LexModule {

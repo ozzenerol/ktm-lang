@@ -3173,6 +3173,19 @@ static void parseRaiseMissingSizeofOperand(Cctrl *cc, char *keyword) {
     cctrlRaiseException(cc, "`%s` needs a type or an expression", keyword);
 }
 
+/* sizeof/alignof of a module type that isn't complete yet, while a
+ * module's type declarations are parsed from their tokens: fail, so it
+ * is tried again once the type is complete (parseModuleTypes) instead of
+ * folding to a size of 0 */
+static void parseCheckSizeKnown(Cctrl *cc, AstType *type) {
+    while (type && type->kind == AST_TYPE_ARRAY) type = type->ptr;
+    if (cc->replaying && type && !type->is_intrinsic && !type->fields &&
+        (type->kind == AST_TYPE_CLASS || type->kind == AST_TYPE_UNION)) {
+        cctrlRaiseException(cc, "the size of %s is not known yet",
+                            astTypeToString(type));
+    }
+}
+
 Ast *parseSizeof(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
     Lexeme *peek = cctrlTokenPeek(cc);
@@ -3202,6 +3215,7 @@ Ast *parseSizeof(Cctrl *cc) {
         type = ast->type;
     }
 
+    parseCheckSizeKnown(cc, type);
     if (cc->flags & CCTRL_PRESERVE_SIZEOF) {
         return astSizeOf(type);
     }
@@ -3249,6 +3263,7 @@ Ast *parseAlignof(Cctrl *cc) {
         type = ast->type;
     }
 
+    parseCheckSizeKnown(cc, type);
     return astI64Type(astTypeAlign(type));
 }
 

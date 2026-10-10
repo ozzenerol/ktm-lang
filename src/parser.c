@@ -723,6 +723,22 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                 field_name = aoStrDupRaw(tok_name->start,tok_name->len);
             }
 
+            /* In a module, a field can hold a type of a later file by
+             * value only once that type is complete (see
+             * parseModuleTypes); before, its size isn't known. */
+            AstType *by_value = next_type;
+            while (by_value && by_value->kind == AST_TYPE_ARRAY) by_value = by_value->ptr;
+            if (cc->cur_module && by_value && !by_value->is_intrinsic &&
+                !by_value->fields &&
+                (by_value->kind == AST_TYPE_CLASS || by_value->kind == AST_TYPE_UNION))
+            {
+                cctrlRewindUntilStrMatch(cc, tok_name->start, tok_name->len, NULL);
+                cctrlRaiseException(cc, "field `%.*s` of %s holds a %s, which is not "
+                        "complete here: use a pointer, or a type that doesn't "
+                        "contain %s", (int)field_name->len, field_name->data,
+                        cls_str, astTypeToString(by_value), cls_str);
+            }
+
             field_type = astMakeClassField(next_type, 0);
             /* Field provenance for jump-to-definition: the name token
              * is in hand ('(' for fn-pointer fields - same line). */
@@ -1070,7 +1086,14 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         mapAdd(env, tag->data, prev);
     }
 
+    int errors_before = cc->quiet_errors;
     fields = parseClassOrUnionFields(cc,tag,computeSize,&class_size);
+    /* A field's error is recovered inside the body; parsed from its
+     * recorded tokens (parseModuleTypes), the type must then stay
+     * incomplete, not be completed without that field */
+    if (cc->replaying && cc->quiet_errors != errors_before) {
+        cctrlRaiseException(cc, "a field of %s failed", tag ? tag->data : "a class");
+    }
 
     if (prev && !fields) {
         return prev;
@@ -4624,6 +4647,215 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     return fn;
 }
 
+/* M5: the files of a module can use each other's types in any order.
+ * Its names pass (LEX_PASS_NAMES) records every top-level declaration's
+ * tokens and declares every struct/union/class name, so pointers and
+ * signatures can name a type of any file. Its type declarations (struct
+ * and union bodies, enums, consts) are then parsed from their tokens,
+ * over and over while more of them succeed, so a body can use a later
+ * file's type by value, its enum or its const as an array size. What
+ * never succeeds is left to the declarations pass, which reports it as
+ * before; what did succeed it skips. */
+Ast *parseToplevelDef(Cctrl *cc, int *is_global);
+
+typedef struct ParseModDecl {
+    u32 module_id;
+    Vec *toks;      /* Lexeme *, the whole declaration */
+    int is_type;    /* a struct/union body, an enum or a const */
+    int replayed;   /* parseModuleTypes is done with it */
+} ParseModDecl;
+
+/* "file:line:col" of tok: the same declaration in another pass */
+static char *parseModDeclKey(Lexeme *tok) {
+    LexFile *f = tok->file;
+    return mprintf("%s:%d:%d", f && f->filename ? f->filename->data : "",
+                   tok->line, tok->col);
+}
+
+/* The rest of the top-level declaration that starts with `first`
+ * (already taken), appended to `toks` when not NULL: up to a `;`, or the
+ * `}` closing a body (and a `;` right after it), never past its file */
+static void parseModDeclRest(Cctrl *cc, Lexeme *first, Vec *toks) {
+    int depth = 0;
+    Lexeme *t = first;
+    while (1) {
+        if (toks) vecPush(toks, t);
+        if (tokenPunctIs(t, '(') || tokenPunctIs(t, '[') ||
+            tokenPunctIs(t, '{')) {
+            depth++;
+        } else if (tokenPunctIs(t, ')') || tokenPunctIs(t, ']') ||
+                   tokenPunctIs(t, '}')) {
+            depth--;
+            if (depth == 0 && tokenPunctIs(t, '}')) {
+                Lexeme *peek = cctrlTokenPeek(cc);
+                if (peek && tokenPunctIs(peek, ';') && peek->file == first->file) {
+                    t = cctrlTokenGet(cc);
+                    if (toks) vecPush(toks, t);
+                }
+                return;
+            }
+        } else if (depth <= 0 && tokenPunctIs(t, ';')) {
+            return;
+        }
+        Lexeme *peek = cctrlTokenPeek(cc);
+        if (!peek || peek->file != first->file ||
+            peek->mod_pass != first->mod_pass) {
+            return;
+        }
+        t = cctrlTokenGet(cc);
+    }
+}
+
+/* Parse the declarations in `toks` as the declarations pass would, from
+ * the tokens instead of the lexer, diagnostics dropped (Cctrl.replaying).
+ * 1 if it went through without an error. */
+static int parseModReplay(Cctrl *cc, Vec *toks) {
+    u64 cap = roundUpToNextPowerOf2(toks->size + 1);
+    Lexeme **ring = (Lexeme **)malloc(cap * sizeof(Lexeme *));
+    /* padded with sentinels, as for a #define's value: error paths
+     * rewind past the ends */
+    for (u64 i = 0; i < cap; ++i) {
+        ring[i] = i < toks->size ? (Lexeme *)toks->entries[i] : lexemeSentinal();
+    }
+    TokenRingBuffer replay = {0};
+    replay.entries = ring;
+    replay.size = toks->size;
+    replay.capacity = cap;
+
+    TokenRingBuffer *saved_ring = cc->token_buffer;
+    jmp_buf *saved_recovery = cc->current_recovery;
+    Map *saved_localenv = cc->localenv;
+    List *saved_tmp_locals = cc->tmp_locals;
+    AstType *saved_gvar_base = cc->tmp_gvar_base_type;
+    Ast *saved_gvar_decl = cc->tmp_gvar_decl;
+    u32 saved_module = cc->cur_module;
+    int saved_decls_only = cc->decls_only;
+    int saved_pub = cc->decl_pub;
+    int saved_from_main = cc->decl_from_main;
+    s64 saved_lineno = cc->lineno;
+    LexFile *saved_tok_file = cc->tok_file;
+    List *volatile ast_tail = cc->ast_list ? cc->ast_list->prev : NULL;
+    int errors = cc->quiet_errors;
+    volatile int ok = 1;
+
+    jmp_buf recovery;
+    cc->token_buffer = &replay;
+    cc->current_recovery = &recovery;
+    cc->replaying = 1;
+    cc->localenv = NULL;
+    cc->tmp_locals = NULL;
+    cc->tmp_gvar_base_type = NULL;
+    cc->tmp_gvar_decl = NULL;
+    if (setjmp(recovery) != 0) {
+        ok = 0;
+    } else {
+        int is_global = 0;
+        Ast *ast;
+        while ((ast = parseToplevelDef(cc, &is_global)) != NULL) {
+            if (!is_global && ast->kind != AST_FUN_PROTO) {
+                listAppend(cc->ast_list, ast);
+            }
+            is_global = 0;
+            cc->localenv = NULL;
+        }
+    }
+    if (cc->quiet_errors != errors) ok = 0;
+    if (!ok && cc->ast_list && ast_tail) {
+        ast_tail->next = cc->ast_list;
+        cc->ast_list->prev = ast_tail;
+    }
+    cc->replaying = 0;
+    cc->token_buffer = saved_ring;
+    cc->current_recovery = saved_recovery;
+    cc->localenv = saved_localenv;
+    cc->tmp_locals = saved_tmp_locals;
+    cc->tmp_gvar_base_type = saved_gvar_base;
+    cc->tmp_gvar_decl = saved_gvar_decl;
+    cc->cur_module = saved_module;
+    cc->decls_only = saved_decls_only;
+    cc->decl_pub = saved_pub;
+    cc->decl_from_main = saved_from_main;
+    cc->lineno = saved_lineno;
+    cc->tok_file = saved_tok_file;
+    free(ring);
+    return ok;
+}
+
+/* The names pass: record the declaration starting with `first`, and
+ * declare the struct/union/class it defines (`pub struct Box;`) */
+static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
+    ParseModDecl *d = malloc(sizeof(ParseModDecl));
+    d->module_id = first->module_id;
+    d->toks = vecNew(&vec_unsigned_long_type);
+    d->is_type = 0;
+    d->replayed = 0;
+    parseModDeclRest(cc, first, d->toks);
+    /* replayed as the declarations pass */
+    for (u64 i = 0; i < d->toks->size; ++i) {
+        ((Lexeme *)d->toks->entries[i])->mod_pass = LEX_PASS_DECLS;
+    }
+
+    u64 i = 0;
+    while (i < d->toks->size) {
+        Lexeme *t = d->toks->entries[i];
+        if (t->tk_type != TK_KEYWORD ||
+            (t->i64 != KW_PUBLIC && t->i64 != KW_PRIVATE &&
+             t->i64 != KW_STATIC && t->i64 != KW_ATOMIC)) break;
+        i++;
+    }
+    Lexeme *kw = i < d->toks->size ? d->toks->entries[i] : NULL;
+    if (kw && kw->tk_type == TK_KEYWORD &&
+        (kw->i64 == KW_CLASS || kw->i64 == KW_UNION) &&
+        i + 1 < d->toks->size &&
+        ((Lexeme *)d->toks->entries[i + 1])->tk_type == TK_IDENT)
+    {
+        /* `[pub] struct Name;`: the name now, the body later */
+        Vec *fwd = vecNew(&vec_unsigned_long_type);
+        for (u64 j = 0; j <= i + 1; ++j) vecPush(fwd, d->toks->entries[j]);
+        Lexeme *semi = lexemeCopy(d->toks->entries[i + 1]);
+        semi->tk_type = TK_PUNCT;
+        semi->i64 = ';';
+        semi->start = ";";
+        semi->len = 1;
+        vecPush(fwd, semi);
+        parseModReplay(cc, fwd);
+        vecRelease(fwd);
+        for (u64 j = i + 2; j < d->toks->size; ++j) {
+            if (tokenPunctIs(d->toks->entries[j], '{')) {
+                d->is_type = 1;
+                break;
+            }
+        }
+    } else if (kw && kw->tk_type == TK_KEYWORD &&
+               (kw->i64 == KW_ENUM || kw->i64 == KW_CONST)) {
+        d->is_type = 1;
+    }
+    vecPush(cc->mod_type_decls, d);
+}
+
+/* Module `module_id`'s names pass is over: parse its type declarations
+ * from their tokens while more of them succeed. The declarations pass
+ * skips the ones that did. */
+static void parseModuleTypes(Cctrl *cc, u32 module_id) {
+    int progress = 1;
+    while (progress) {
+        progress = 0;
+        for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+            ParseModDecl *d = cc->mod_type_decls->entries[i];
+            if (d->module_id != module_id || d->replayed || !d->is_type) continue;
+            if (parseModReplay(cc, d->toks)) {
+                setAdd(cc->mod_decls_done, parseModDeclKey(d->toks->entries[0]));
+                d->replayed = 1;
+                progress = 1;
+            }
+        }
+    }
+    for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+        ParseModDecl *d = cc->mod_type_decls->entries[i];
+        if (d->module_id == module_id) d->replayed = 1;
+    }
+}
+
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
@@ -4640,6 +4872,24 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 cctrlRaiseException(cc,"Unexpected end of input, expected a declaration after `,`");
             }
             return NULL;
+        }
+        /* A module's names pass (see parseModuleNamesDecl) */
+        if (tok->mod_pass == LEX_PASS_NAMES) {
+            parseModuleNamesDecl(cc, tok);
+            continue;
+        }
+        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying &&
+            !cc->tmp_gvar_base_type) {
+            char *mod_key = mprintf("%u", tok->module_id);
+            if (!setHas(cc->mod_types_done, mod_key)) {
+                setAdd(cc->mod_types_done, mod_key);
+                parseModuleTypes(cc, tok->module_id);
+            }
+            char *key = parseModDeclKey(tok);
+            if (setHas(cc->mod_decls_done, key)) {
+                parseModDeclRest(cc, tok, NULL);
+                continue;
+            }
         }
         /* Which module this declaration is in, and its pass */
         cc->cur_module = tok->module_id;
