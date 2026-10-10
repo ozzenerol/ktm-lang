@@ -186,6 +186,7 @@ static LexerType lexer_types[] = {
     {"union",   KW_UNION},
 
     {"static",  KW_STATIC},
+    {"const",   KW_CONST},
 };
 
 
@@ -671,6 +672,7 @@ AoStr *lexemeToAoStr(Lexeme *tok) {
                 case KW_DEFAULT:     aoStrCatPrintf(str,"default"); break;
                 case KW_DO:          aoStrCatPrintf(str,"do");      break;
                 case KW_STATIC:      aoStrCatPrintf(str,"static");  break;
+                case KW_CONST:       aoStrCatPrintf(str,"const");   break;
                 case KW_DEFINED:     aoStrCatPrintf(str,"defined"); break;
 
                 case KW_PP_INCLUDE:  aoStrCatPrintf(str,"#include"); break;

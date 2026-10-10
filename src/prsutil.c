@@ -459,6 +459,19 @@ s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
                 return 0;
             }
         }
+        case AST_GVAR:
+        case AST_LVAR: {
+            /* A `const` integer whose own initialiser folded to a
+             * constant: see AST_FLAG_CONST_VALUE's comment in ast.h.
+             * A `const` with a runtime initialiser is not constant
+             * (it reaches here and falls through to *_ok = 0, the same
+             * as any other variable). */
+            if (ast->flags & AST_FLAG_CONST_VALUE) {
+                return ast->deref_symbol;
+            }
+            *_ok = 0;
+            return 0;
+        }
         case AST_UNOP: {
             switch (ast->unop) {
                 case AST_UN_OP_PLUS: return +(evalIntConstExprOrErr(ast->operand, _ok));
@@ -601,6 +614,17 @@ int assertLValue(Ast *ast) {
 
         default:
             return 0;
+    }
+}
+
+/* `ast` is about to be written to (`=`, a compound assignment, `++`,
+ * `--`): error out if it is a `const` variable or parameter. */
+void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    if ((ast->kind == AST_LVAR || ast->kind == AST_GVAR) &&
+        (ast->flags & AST_FLAG_CONST))
+    {
+        char *name = ast->kind == AST_LVAR ? ast->lname->data : ast->gname->data;
+        cctrlRaiseException(cc,"cannot assign to const '%s'", name);
     }
 }
 

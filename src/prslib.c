@@ -198,6 +198,14 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             return params;
         }
 
+        int param_is_const = 0;
+        Lexeme *const_tok = cctrlTokenPeek(cc);
+        if (const_tok && const_tok->tk_type == TK_KEYWORD &&
+            const_tok->i64 == KW_CONST)
+        {
+            cctrlTokenGet(cc);
+            param_is_const = 1;
+        }
         type = parseDeclSpec(cc);
         int pinned_kind;
         AoStr *pinned_reg;
@@ -293,6 +301,9 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         var->col = pname->col;
         var->pinned_kind = pinned_kind;
         var->pinned_reg = pinned_reg;
+        if (param_is_const) {
+            var->flags |= AST_FLAG_CONST;
+        }
 
         tok = cctrlTokenGet(cc);
         if (tokenPunctIs(tok, '=')) {
@@ -337,6 +348,10 @@ AstType *parseBaseDeclSpec(Cctrl *cc) {
 
     if (!tok) {
         return NULL;
+    }
+
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
     }
 
     if (tok->tk_type == TK_KEYWORD || tok->tk_type == TK_IDENT) {
@@ -467,6 +482,10 @@ void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type) {
         cctrlTokenRewind(cc);
         *tok = NULL;
         return;
+    }
+
+    if (_tok->tk_type == TK_KEYWORD && _tok->i64 == KW_CONST) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
     }
 
     if (_tok->tk_type != TK_IDENT) {
@@ -2185,6 +2204,7 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                         astKindToHumanReadable(LHS), ast_str);
             }
             assertNotArrayAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotConstAssign(cc,LHS);
             AstUnOp op;
             if (!astUnaryOpFromToken(tok->i64, &op)) {
                 /* This should be impossible to hit as we've already pre-validated */
@@ -2223,6 +2243,7 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                 cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
                         astKindToHumanReadable(LHS), ast_str);
             }
+            assertNotConstAssign(cc,LHS);
         }
         
         next_prec = prec2;
@@ -2480,6 +2501,7 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                         astKindToHumanReadable(ast), ast_str);
             }
             assertNotArrayAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotConstAssign(cc,ast);
             if (tok->i64 == TK_PLUS_PLUS) {
                 return astUnaryOperator(ast->type,AST_UN_OP_POST_INC,ast);
             } else {
@@ -2573,6 +2595,13 @@ static int parseIsCastTypeName(Cctrl *cc, Lexeme *tok) {
     if (tok == NULL ||
         (tok->tk_type != TK_IDENT && tok->tk_type != TK_KEYWORD)) {
         return 0;
+    }
+    /* `(const ...)`: not a real cast (`const` isn't a type), but routing
+     * it through parseCastTypeName reports the specific "const is only
+     * allowed on declarations" rather than a parenthesised-expression
+     * error. */
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        return 1;
     }
     /* As in C, a variable in scope hides a type of the same name:
      * `(tm.tv_sec)` reads the variable `tm`, not the class. */
@@ -2707,6 +2736,7 @@ Ast *parseUnaryExpr(Cctrl *cc) {
 
         if (unary_op == AST_UN_OP_PRE_INC || unary_op == AST_UN_OP_PRE_DEC) {
             assertNotArrayAssign(cc,operand,op_line,op_col,op_len);
+            assertNotConstAssign(cc,operand);
         }
 
         switch (unary_op) {

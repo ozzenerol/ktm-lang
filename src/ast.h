@@ -221,6 +221,18 @@ typedef struct AstType {
  * to the object, so it neither overrides nor is overridden by a function
  * of the same name elsewhere (a library internal, a user function). */
 #define AST_FLAG_STATIC (1<<5)
+/* Set on an AST_GVAR / AST_LVAR declared `const`: assigning to it (`=`,
+ * a compound assignment, `++`/`--`) is a compile error. */
+#define AST_FLAG_CONST (1<<6)
+/* Set alongside AST_FLAG_CONST only when the const's own initialiser
+ * was itself a compile-time-constant integer expression: `deref_symbol`
+ * (otherwise unused on these kinds) then holds that value, so the
+ * variable itself folds in evalIntConstExprOrErr - usable in array
+ * sizes, case labels and other constant expressions. A `const` whose
+ * initialiser is not foldable (`const i64 n = f();`) keeps AST_FLAG_CONST
+ * (still not assignable) without this one: it behaves like an ordinary
+ * runtime variable everywhere evalIntConstExprOrErr is consulted. */
+#define AST_FLAG_CONST_VALUE (1<<7)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */

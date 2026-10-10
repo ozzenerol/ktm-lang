@@ -29,6 +29,7 @@ s64 evalOneIntExprOrErr(Ast *LHS, Ast *RHS, AstBinOp op, int *_ok);
 s64 evalIntArithmeticOrErr(Ast *ast, int *_ok);
 int evalClassRef(Ast *ast, int offset);
 int assertLValue(Ast *ast);
+void assertNotConstAssign(Cctrl *cc, Ast *ast);
 int parseIsFloatOrInt(Ast *ast);
 int parseIsClassOrUnion(int kind);
 int parseIsFunction(Ast *ast);

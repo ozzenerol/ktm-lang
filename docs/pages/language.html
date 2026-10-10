@@ -220,6 +220,43 @@ U0 Main()
 3
 </pre>
 
+<h3>const</h3>
+<p><code>const</code> marks a declaration read-only; it is not a type qualifier like
+C's. An initializer is required (except on a function parameter). A
+<code>const</code> of integer type whose initializer is itself a constant
+expression is a compile-time constant: usable in an array size, a
+<code>case</code> label, or another <code>const</code>'s initializer.
+Assigning to a <code>const</code> (<code>=</code>, a compound assignment,
+<code>++</code>/<code>--</code>), including a <code>const</code> parameter, is a
+compile error, and so is writing <code>const</code> anywhere but a declaration
+(a cast, a struct field, a return type, or after the type).</p>
+<pre data-run><code>
+const I64 MAX_USERS = 4;
+const I64 DOUBLE_MAX = MAX_USERS * 2;   // built from another const
+I64 g_users[MAX_USERS];                 // a const works as an array size
+
+I64 Classify(I64 n)
+{
+  switch (n) {
+    case MAX_USERS: return 1;           // and as a case label
+    default:        return 0;
+  }
+}
+
+I64 Twice(const I64 n)                  // n cannot be assigned inside Twice
+{
+  return n * 2;
+}
+
+U0 Main()
+{
+  "%d %d %d %d\n", MAX_USERS, DOUBLE_MAX, Classify(4), Twice(21);
+}
+</code></pre>
+<pre class="output">
+4 8 1 42
+</pre>
+
 <h2>Operators</h2>
 <p>The C operators work as expected: <code>+ - * / %</code>, <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code>,
 <code>&amp;&amp; || !</code>, <code>== != &lt; &lt;= &gt; &gt;=</code>, compound assignment
