@@ -1727,9 +1727,13 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     return class_ref;
 }
 
+static AstType *parseCastTypeName(Cctrl *cc);
+
 /* A function pointer value that `(` after it calls: a class field, an
- * array element or, after a parenthesised `(*fp)`/`(fp)`, the variable
- * itself. A function name is not one: `F` alone is already a call. */
+ * array element, the variable itself after a parenthesised `(*fp)`/`(fp)`,
+ * a cast to a function pointer type (`(fv(I64 (*)(I64)))(x)`), the result
+ * of a call that returns one (`GetHandler()(x)`) or of an assignment. A
+ * function name is not one: `F` alone is already a call. */
 static int parseIsCallableFnPtr(Ast *ast) {
     if (!ast || !ast->type || ast->type->kind != AST_TYPE_FUNC) return 0;
     switch (ast->kind) {
@@ -1738,6 +1742,11 @@ static int parseIsCallableFnPtr(Ast *ast) {
         case AST_FUNPTR:
         case AST_LVAR:
         case AST_GVAR:
+        case AST_CAST:
+        case AST_FUNCALL:
+        case AST_FUNPTR_CALL:
+        case AST_ASM_FUNCALL:
+        case AST_BINOP:
             return 1;
         default:
             return 0;
@@ -1763,6 +1772,10 @@ static Ast *parseClassFnPtrCall(Cctrl *cc, Ast *class_ref) {
         name = class_ref->lname->data;
     } else if (class_ref->kind == AST_GVAR) {
         name = class_ref->gname->data;
+    } else if ((class_ref->kind == AST_FUNCALL ||
+                class_ref->kind == AST_FUNPTR_CALL ||
+                class_ref->kind == AST_ASM_FUNCALL) && class_ref->fname) {
+        name = class_ref->fname->data;
     }
     int len = strlen(name);
     ParseCallLoc loc = parseCallLocStart(cc, name, len);
@@ -1925,10 +1938,17 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                 LHS = parseClassFnPtrCall(cc,LHS);
                 continue;
             }
+            /* `(x)(3)`: not a cast (no type follows) and nothing to call */
+            if (peek && !cctrlIsKeyword(cc,peek->start,peek->len)) {
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc,"Cannot call %s `%s`: only functions and function pointers can be called",
+                        astTypeKindToHumanReadable(LHS->type),
+                        astLValueToString(LHS,0));
+            }
             /* XXX: Should this check still be here ? Not sure as 
              * casting _anything_ makes sense */
             // assertLValue(LHS,cc->lineno);
-            AstType *type = parseDeclSpec(cc);
+            AstType *type = parseCastTypeName(cc);
             LHS = astCast(LHS,type);
             cctrlTokenExpect(cc,')');
             continue;
@@ -2202,7 +2222,7 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                         "Unexpected end of input after '('");
             }
             if (cctrlIsKeyword(cc,peek->start,peek->len)) {
-                type = parseDeclSpec(cc);
+                type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
                 ast = astCast(ast,type);
                 continue;

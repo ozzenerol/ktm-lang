@@ -626,6 +626,31 @@ U0 Main()
 <p>As in C, <code>*</code> on a function pointer gives the function pointer back, so
 <code>(*f)(acc, x)</code>, <code>(*c.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
 like <code>f(acc, x)</code>.</p>
+<p>Any expression whose type is a function pointer can be called: a cast to a function pointer
+type (<code>((I64 (*)(I64))p)(5)</code>, or <code>p(I64 (*)(I64))(5)</code> as a postfix cast),
+the result of a call that returns one, or of an assignment (<code>(f = &amp;Mul)(2, 3)</code>).
+The arguments are checked against the pointer's parameters, as for a named function:</p>
+<pre data-run><code>I64 Add(I64 a, I64 b) { return a + b; }
+I64 Mul(I64 a, I64 b) { return a * b; }
+
+U0 *Lookup(U8 *name)
+{
+  if (!StrCmp(name, "add")) return &amp;Add;
+  return &amp;Mul;
+}
+
+U0 Main()
+{
+  I64 (*f)(I64 a, I64 b);
+  "%d\n", ((I64 (*)(I64, I64))Lookup("add"))(2, 3);
+  "%d\n", Lookup("mul")(I64 (*)(I64, I64))(2, 3);
+  "%d\n", (f = &amp;Mul)(4, 5);
+}
+</code></pre>
+<pre class="output">5
+6
+20
+</pre>
 <p>An array of function pointers puts the size after the name, as in C. It works for
 locals, globals, class fields and parameters:</p>
 <pre data-run><code>I64 Dbl(I64 x) { return x * 2; }
