@@ -360,6 +360,9 @@ void lexPushFile(Lexer *l, AoStr *filename);
 /* Push an in-memory buffer as if it were a file (REPL input). `src`
  * is borrowed and must outlive the parse of this buffer. */
 void lexPushString(Lexer *l, char *name, char *src, s64 len);
+/* The name of the internal file that imports the prelude */
+#define LEX_PRELUDE_FILE "<prelude>"
+void lexPushPrelude(Lexer *l);
 int lex(Lexer *l, Lexeme *le);
 Lexeme *lexToken(Map *macro_defs, Lexer *l);
 int lexSetModuleLibRoot(Lexer *l, char *dir, char *path);

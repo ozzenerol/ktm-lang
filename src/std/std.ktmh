@@ -22,6 +22,10 @@
 
 #define __BUFSIZ__ 2048
 
+/* EXIT_OK, EXIT_FAIL, the integer limits and Error are the prelude's
+ * (modules/prelude, read before this file). These copies are for an
+ * install without one. */
+#ifndef __KTM_PRELUDE__
 #define EXIT_FAIL 1
 #define EXIT_OK   0
 
@@ -31,6 +35,7 @@
 #define U8_MAX  0xFF
 #define I8_MAX  0x7F
 #define I8_MIN  0xFFFFFF80
+#endif
 
 public class List;
 /* A circular doubly linked list of U0 * values. The list itself is a head
@@ -943,10 +948,9 @@ public U8 *ProcRun(U8 **argv, I64 *code=NULL);
 /* try/catch/throw. The compiler emits the calls to the
  * KTM_ helpers below; user code only reads Fs. */
 
-/* What a throw carries and `catch (Error e)` binds: the code (usually an
- * enum member), a message (never NULL, "" without one), and the file and
- * line of the throw. The message is freed when the catch block is left:
- * copy it (StrNew) to keep it. */
+/* Error, what a throw carries and `catch (Error e)` binds, is the
+ * prelude's; this copy is for an install without one */
+#ifndef __KTM_PRELUDE__
 public struct Error
 {
   i64 code;
@@ -954,6 +958,7 @@ public struct Error
   u8 *file;
   i32 line;
 };
+#endif
 
 /* One per `try`, on the stack of the function the try is in (the
  * compiler reserves 256 bytes): the setjmp buffer, then the next outer

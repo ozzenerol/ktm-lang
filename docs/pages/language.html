@@ -1533,6 +1533,13 @@ then in the standard library's module directory, then in each directory of
 <code>KTM_PATH</code> (separated by <code>:</code>); found in two places is an error.
 Each module is compiled once, before the code that imports it, so its globals are set
 up before its importers' (the files of a module in name order).</p>
+<p>One module needs no import: the <em>prelude</em>, the standard library's
+<code>modules/prelude</code>. Its <code>pub</code> names are seen by every file, the
+program's and every module's, with no prefix: <code>Error</code> (what a
+<code>catch</code> binds), <code>EXIT_OK</code> and <code>EXIT_FAIL</code>, and the
+integer limits <code>I64_MIN</code>, <code>I64_MAX</code>, <code>U64_MAX</code>,
+<code>I8_MIN</code>, <code>I8_MAX</code> and <code>U8_MAX</code>. <code>import prelude;</code>
+is an error, and a directory of the program called <code>prelude</code> is not it.</p>
 <p>These are compile errors: using a name that isn't <code>pub</code> from outside its
 module, a module that isn't found or is found twice, an import cycle (the message shows it,
 <code>a -&gt; b -&gt; a</code>), a file whose <code>module</code> line is missing or doesn't

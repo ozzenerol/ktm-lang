@@ -3315,6 +3315,17 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     AoStr *path = lexModulePath(macro_defs, l, first, &last);
     if (!path) return;
     AoStr *prefix = alias ? alias : aoStrDupRaw(last->start, last->len);
+    int auto_prelude = file && file->filename &&
+                       !strcmp(file->filename->data, LEX_PRELUDE_FILE);
+    if (!auto_prelude && !strcmp(path->data, "prelude")) {
+        if (!LEX_PASS_QUIET(file->mod_pass)) {
+            lexReportAt(l, kw->line, kw->col,
+                        (last->start + last->len) - kw->start,
+                        "the prelude is always imported: its names need no "
+                        "import and no prefix");
+        }
+        return;
+    }
 
     LexModule *m = lexModuleFind(l, path);
     if (m && !m->loaded) {
@@ -3335,7 +3346,10 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
         return;
     }
     if (!m) {
-        char *dir = lexModuleDir(l, path, first);
+        /* the prelude is the install's, whatever else is called that */
+        char *dir = auto_prelude
+                  ? mprintf("%s../modules/prelude", l->builtin_root)
+                  : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
                         (last->start + last->len) - first->start,
@@ -3359,7 +3373,7 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     imp->prefix = prefix;
     imp->module = m;
     /* the `import` of `ktm -lib`'s generated program */
-    imp->used = l->building_module && !file->module_id;
+    imp->used = (l->building_module && !file->module_id) || auto_prelude;
     imp->line = kw->line;
     imp->col = kw->col;
     imp->len = kw->len;
@@ -3369,6 +3383,18 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     if (!m->loaded && l->mod_depth < 64) {
         lexModuleLoad(l, m, first);
     }
+}
+
+/* The prelude (<install>/modules/prelude), whose pub names every file
+ * sees with no import and no prefix: imported by an internal file read
+ * before everything else. Pushed last, so it is popped first. Nothing
+ * when the install has none. */
+void lexPushPrelude(Lexer *l) {
+    if (!l->builtin_root) return;
+    char *dir = mprintf("%s../modules/prelude", l->builtin_root);
+    if (!lexIsDir(dir)) return;
+    char *src = "import prelude;\n";
+    lexPushString(l, LEX_PRELUDE_FILE, src, strlen(src));
 }
 
 /* `module b;` at the top of a module's file, the `module` just lexed */

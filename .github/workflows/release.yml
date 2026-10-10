@@ -86,6 +86,9 @@ jobs:
           # std.ktmh must be in the prefix before all.ktm is compiled -
           # the lexer resolves builtins from <install-dir>/include.
           cp ./src/std/std.ktmh "$stage/include/std.ktmh"
+          # and the prelude, read before it by every compile
+          mkdir -p "$stage/modules"
+          cp -R ./src/std/prelude "$stage/modules/prelude"
 
           (cd ./src/std && \
             "$GITHUB_WORKSPACE/ktm-native" \

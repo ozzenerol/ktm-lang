@@ -1391,6 +1391,7 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
     if (builtin) lexPushFile(l, builtin);
+    if (builtin) lexPushPrelude(l);
 
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
