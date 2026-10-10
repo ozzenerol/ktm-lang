@@ -2780,6 +2780,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
+    cc->fallthrough_pending = 0;
     Ast *case_, *prev, *case_expr = NULL;
     Lexeme *peek;
     AoStr *label;
@@ -2871,6 +2872,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
 
 Ast *parseDefaultStatement(Cctrl *cc) {
     cctrlTokenExpect(cc,':');
+    cc->fallthrough_pending = 0;
     if (cc->tmp_default_case) {
         cctrlRaiseException(cc,"Duplicate default case");
     }
@@ -2957,8 +2959,16 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     tmp = astLVar(cond->type, tmp_name->data, tmp_name->len);
     listAppend(cc->tmp_locals,tmp);
 
+    int outer_fallthrough = cc->fallthrough_pending;
+    s64 outer_ft_line = cc->fallthrough_line, outer_ft_col = cc->fallthrough_col;
+    cc->fallthrough_pending = 0;
     parseStatement(cc);
     aoStrRelease(tmp_name);
+    int last_fallthrough = cc->fallthrough_pending;
+    s64 last_ft_line = cc->fallthrough_line, last_ft_col = cc->fallthrough_col;
+    cc->fallthrough_pending = outer_fallthrough;
+    cc->fallthrough_line = outer_ft_line;
+    cc->fallthrough_col = outer_ft_col;
 
     Ast *switch_ast = astSwitch(
         cond,
@@ -2971,7 +2981,42 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     cc->tmp_loop_end = original_break;
     cc->tmp_case_list = original_cases;
     cc->tmp_default_case = original_default_label;
+    if (last_fallthrough) {
+        cctrlRaiseExceptionAt(cc, last_ft_line, last_ft_col, 11,
+                "`fallthrough` in the last case of a switch: there is no next case");
+    }
     return switch_ast;
+}
+
+/* `fallthrough;` (ktm syntax v0.2), a contextual keyword: a variable
+ * of that name in scope, or no `;` after it, keeps it an identifier */
+static int parseIsFallthrough(Cctrl *cc, Lexeme *tok, Lexeme *peek) {
+    if (tok->tk_type != TK_IDENT || tok->len != 11 ||
+        memcmp(tok->start, "fallthrough", 11) != 0 ||
+        !tokenPunctIs(peek, ';')) {
+        return 0;
+    }
+    if ((cc->localenv && mapGetLen(cc->localenv, tok->start, tok->len)) ||
+        mapGetLen(cc->global_env, tok->start, tok->len)) {
+        return 0;
+    }
+    return 1;
+}
+
+/* A case of a switch says it goes on into the next one. A no-op while
+ * cases fall through anyway; only inside a switch, and not after its
+ * last case (parseSwitchStatement checks that once the body ends). */
+static Ast *parseFallthrough(Cctrl *cc, Lexeme *tok) {
+    s64 line = tok->line, col = tok->col;
+    cctrlTokenExpect(cc, ';');
+    if (cc->tmp_case_list == NULL) {
+        cctrlRaiseExceptionAt(cc, line, col, 11,
+                "`fallthrough` can only be used in a case of a switch");
+    }
+    cc->fallthrough_pending = 1;
+    cc->fallthrough_line = line;
+    cc->fallthrough_col = col;
+    return NULL;
 }
 
 /* Concatinate the label of the goto with the name of the function 
@@ -3127,6 +3172,9 @@ Ast *parseStatement(Cctrl *cc) {
 
     /* Hacked in goto label ;) */
     peek = cctrlTokenPeek(cc);
+    if (parseIsFallthrough(cc, tok, peek)) {
+        return parseFallthrough(cc, tok);
+    }
     if (tok->tk_type == TK_IDENT && tokenPunctIs(peek,':')) {
         if (cc->defer_depth) {
             cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
@@ -5099,6 +5147,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlRaiseException(cc,"Unexpected floating keyword: %.*s",
                             tok->len,tok->start);
             }
+        } else if (tok->tk_type == TK_IDENT &&
+                   parseIsFallthrough(cc, tok, cctrlTokenPeek(cc))) {
+            parseFallthrough(cc, tok);
         } else if (tok->tk_type == TK_IDENT) {
             /* top level function call, unless the name is a type: then
              * `i64 (*fp)(i64);` declares a function pointer. `fn` is a

@@ -177,6 +177,10 @@ typedef struct Cctrl {
      * current loop's labels */
     AoStr *tmp_loop_begin;
     AoStr *tmp_loop_end;
+    /* A `fallthrough;` not yet followed by a case or default label of
+     * its switch: where it is, for the error if the switch ends first */
+    int fallthrough_pending;
+    s64 fallthrough_line, fallthrough_col;
     /* Deferred statements (`defer <stmt>`) being parsed around the
      * current token: a return, or a break/continue with no loop inside
      * the deferred statement, would leave one. */
