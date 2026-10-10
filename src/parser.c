@@ -4090,7 +4090,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             peek = cctrlTokenPeek(cc);
             if (tokenPunctIs(peek,'(')) {
                 cctrlTokenGet(cc);
-                ast = parseFunctionArguments(cc,tok->start,tok->len,')');
+                ast = parseCallArguments(cc,tok->start,tok->len);
                 cctrlTokenExpect(cc,';');
                 *is_global = 1;
                 return ast;
