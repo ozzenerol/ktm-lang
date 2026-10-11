@@ -3439,7 +3439,8 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
         }
 
         case AST_STRING:
-        case AST_SLICE_MAKE: {
+        case AST_SLICE_MAKE:
+        case AST_SUBSLICE: {
             irExpr(ctx, ast);
             break;
         }

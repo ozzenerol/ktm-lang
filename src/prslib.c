@@ -77,11 +77,27 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
 }
 
 Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
+static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
+                            int ptr_first);
 
-/* `expr` where a `want` is expected: an array of want's element type
+/* `expr` where a `want` is expected: a String (or a String *) is a view
+ * of its bytes where a u8[] is; an array of want's element type
  * becomes a slice of it (its address and length, in a hidden variable),
  * anything else is returned as is for the type checks */
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
+    if (astTypeIsSlice(want) && expr && expr->type && want->elem->size == 1 &&
+        (want->elem->kind == AST_TYPE_CHAR || want->elem->kind == AST_TYPE_INT)) {
+        AstType *t = expr->type;
+        if (t->kind == AST_TYPE_POINTER && astTypeIsString(t->ptr)) {
+            expr = astUnaryOperator(t->ptr, AST_UN_OP_DEREF, expr);
+            t = expr->type;
+        }
+        if (astTypeIsString(t)) {
+            Ast *len, *ptr;
+            parseSliceParts(cc, expr, &len, &ptr, 1);
+            return astSliceMake(parseHiddenSliceVar(cc, want), ptr, len);
+        }
+    }
     if (!astTypeIsSlice(want) || !expr || !expr->type ||
         expr->type->kind != AST_TYPE_ARRAY || expr->type->len < 0) {
         return expr;
@@ -1433,6 +1449,8 @@ static void parseCallLocFreeArgs(ParseCallLoc *loc) {
  * per call site, so it lives as long as the call needs it). No extras: 0
  * and a null pointer. Untyped extras go into 64-bit slots as the old
  * argv's: floats as f64 bits, narrower integers widened. */
+static void parseSliceLenPtr(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr);
+
 static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
                              AstType *elem, Vec *items, Vec *item_spans,
                              Ast *spread, int spread_idx,
@@ -1447,23 +1465,20 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
         ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, spread_idx);
         if (items->size > 1) {
             cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
-                "`...%s` must be the only extra argument in a call to `%.*s`",
-                spread->lname->data, len, fname);
+                "a spread `...` must be the only extra argument in a call to `%.*s`",
+                len, fname);
         }
+        /* the same element type (untyped extras are u64 slots) */
         AstType *from = spread->type->elem;
-        int same = untyped ? from->has_var_args
-                           : !from->has_var_args &&
-                             !strcmp(astTypeToString(from), astTypeToString(elem));
+        int same = !strcmp(astTypeToString(from), astTypeToString(elem));
         if (!same) {
             cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
-                "cannot spread `...%s` (%s) into `%.*s`, whose extra arguments are %s",
-                spread->lname->data,
-                from->has_var_args ? "untyped" : astTypeToString(from),
-                len, fname, untyped ? "untyped" : astTypeToString(elem));
+                "cannot spread a %s into `%.*s`, whose extra arguments are %s",
+                astTypeToString(spread->type), len, fname,
+                untyped ? "untyped (u64[])" : astTypeToString(elem));
         }
-        /* the slice's count and pointer */
-        count = astClassRef(mapGetLen(spread->type->fields, str_lit("len")), spread, "len");
-        data = astClassRef(mapGetLen(spread->type->fields, str_lit("ptr")), spread, "ptr");
+        /* the slice's count and pointer, evaluated once */
+        parseSliceLenPtr(cc, spread, &count, &data);
     } else if (items->size == 0) {
         count = astI64Type(0);
         data = astCast(astI64Type(0), data_type);
@@ -1526,20 +1541,33 @@ static int parseFormatArgIdx(char *fname, int len);
 
 /* A byte slice (`u8[]`), which `%s` prints */
 static int parseIsByteSlice(AstType *t) {
-    return astTypeIsSlice(t) && t->elem && t->elem->size == 1 &&
-           (t->elem->kind == AST_TYPE_CHAR || t->elem->kind == AST_TYPE_INT);
+    return (astTypeIsSlice(t) && t->elem && t->elem->size == 1 &&
+            (t->elem->kind == AST_TYPE_CHAR || t->elem->kind == AST_TYPE_INT)) ||
+           astTypeIsString(t);
 }
 
 /* `expr`, a slice, read twice (its len, then its ptr) without being
  * evaluated twice: a variable or a field of one as is, anything else
  * (a call, a sub-slice) assigned to a hidden variable first. *_len reads
  * it (and does the assignment), *_ptr reads the variable after. */
+static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
+                            int ptr_first);
 static void parseSliceLenPtr(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr) {
+    parseSliceParts(cc, expr, _len, _ptr, 0);
+}
+
+/* As parseSliceLenPtr, the hidden assignment (if any) in *_ptr when
+ * ptr_first: the one read first */
+static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
+                            int ptr_first) {
     Map *fields = expr->type->fields;
     AstType *len_t = mapGetLen(fields, str_lit("len"));
     AstType *ptr_t = mapGetLen(fields, str_lit("ptr"));
     Ast *root = expr;
     while (root->kind == AST_CLASS_REF) root = root->cls;
+    if (astIsUnOpKind(root, AST_UN_OP_DEREF) && root->operand->kind == AST_LVAR) {
+        root = root->operand;
+    }
     if (root->kind == AST_LVAR || root->kind == AST_GVAR) {
         *_len = astClassRef(len_t, expr, "len");
         *_ptr = astClassRef(ptr_t, expr, "ptr");
@@ -1548,8 +1576,8 @@ static void parseSliceLenPtr(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr) {
     Ast *var = parseHiddenSliceVar(cc, expr->type);
     int is_err = 0;
     Ast *assign = astBinaryOp(AST_BIN_OP_ASSIGN, var, expr, &is_err);
-    *_len = astClassRef(len_t, assign, "len");
-    *_ptr = astClassRef(ptr_t, var, "ptr");
+    *_len = astClassRef(len_t, ptr_first ? var : assign, "len");
+    *_ptr = astClassRef(ptr_t, ptr_first ? assign : var, "ptr");
 }
 
 /* A call to a format function (printf, str.format, throw, ...): each
@@ -1564,13 +1592,15 @@ static void parseLowerSliceFormat(Cctrl *cc, Ast **fmt_slot, Vec *args,
     int has_slice = 0;
     for (u64 i = first; i < args->size; ++i) {
         Ast *arg = args->entries[i];
-        if (arg && arg->type && astTypeIsSlice(arg->type)) has_slice = 1;
+        if (arg && arg->type && (astTypeIsSlice(arg->type) || astTypeIsString(arg->type))) {
+            has_slice = 1;
+        }
     }
     if (!has_slice) return;
     Ast *fmt = *fmt_slot;
     if (!fmt || fmt->kind != AST_STRING || !fmt->sval) {
-        cctrlRaiseException(cc, "a slice passed to `%.*s` needs a literal format, "
-                            "where its `%%s` takes its length too", len, fname);
+        cctrlRaiseException(cc, "a slice or a String passed to `%.*s` needs a literal "
+                            "format, where its `%%s` takes its length too", len, fname);
     }
     char *text = fmt->sval->data;
     int n = (int)fmt->sval->len, argi = first, added = 0;
@@ -1615,9 +1645,9 @@ static void parseLowerSliceFormat(Cctrl *cc, Ast **fmt_slot, Vec *args,
     }
     for (u64 i = first; i < args->size; ++i) {
         Ast *arg = args->entries[i];
-        if (arg && arg->type && astTypeIsSlice(arg->type)) {
+        if (arg && arg->type && (astTypeIsSlice(arg->type) || astTypeIsString(arg->type))) {
             cctrlRaiseException(cc, "a %s passed to `%.*s` is printed by a `%%s` "
-                                "(a u8[] only)", astTypeToString(arg->type), len, fname);
+                                "(a u8[] or a String only)", astTypeToString(arg->type), len, fname);
         }
     }
     *fmt_slot = cctrlGetOrSetString(cc, out->data, out->len, fmt->real_len + added);
@@ -1671,9 +1701,11 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
             }
             ParseCallLoc *span = parseArgSpan(cc, &start);
             if (is_spread) {
-                if (extra->kind != AST_LVAR || !(extra->flags & AST_FLAG_VARARGS)) {
+                /* any slice (an array: its slice) of the extras' type */
+                extra = parseSliceFrom(cc, astMakeSliceType(va_elem), extra);
+                if (!extra->type || !astTypeIsSlice(extra->type)) {
                     cctrlRaiseExceptionAt(cc, span->line, span->col, span->len,
-                        "only a variadic parameter can be spread, as in `...nums`");
+                        "only a slice can be spread, as in `...nums` or `...s[1:]`");
                 }
                 va_spread = extra;
                 va_spread_idx = (int)va_items->size;
@@ -2005,6 +2037,8 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 16 && !strncmp(fname, str_lit("str.appendFormat"))) return 1;
     else if (len == 19 && !strncmp(fname, str_lit("str.appendFormatLen"))) return 2;
     else if (len == 16 && !strncmp(fname, str_lit("str.formatToSize"))) return 2;
+    /* s.appendFormat(fmt, ...) of a String (its arguments without self) */
+    else if (len == 19 && !strncmp(fname, str_lit("String.appendFormat"))) return 0;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
@@ -2937,6 +2971,10 @@ static Ast *parseSubSlice(Cctrl *cc, Ast *base, Ast *lo, int line) {
 
 Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     int line = cc->lineno;
+    /* `s[i]`, `s[a:b]` of a String: of its bytes, a u8[] view */
+    if (astTypeIsString(ast->type)) {
+        ast = parseSliceFrom(cc, astMakeSliceType(ast_u8_type), ast);
+    }
     /* `s[:b]` */
     if (tokenPunctIs(cctrlTokenPeek(cc), ':')) {
         cctrlTokenGet(cc);
@@ -3428,7 +3466,8 @@ Ast *parseExpr(Cctrl *cc, int prec) {
 
         if (tokenPunctIs(tok,'[')) {
             if (LHS->type->kind != AST_TYPE_POINTER && LHS->type->kind != AST_TYPE_ARRAY &&
-                !astTypeIsSlice(LHS->type)) {
+                !astTypeIsSlice(LHS->type) &&
+                !astTypeIsString(LHS->type)) {
                 cctrlRewindUntilPunctMatch(cc,'[',NULL);
                 cctrlRaiseException(cc,"Cannot subscript a %s, only pointers, arrays or slices can be subscripted with '['",
                                    astTypeKindToHumanReadable(LHS->type));
@@ -3685,7 +3724,8 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
 
         if (tokenPunctIs(tok,'[')) {
             if (ast->type->kind != AST_TYPE_POINTER &&
-                ast->type->kind != AST_TYPE_ARRAY && !astTypeIsSlice(ast->type)) {
+                ast->type->kind != AST_TYPE_ARRAY && !astTypeIsSlice(ast->type) &&
+                !astTypeIsString(ast->type)) {
                 cctrlRewindUntilPunctMatch(cc,'[',NULL);
                 cctrlRaiseException(cc,"Cannot subscript a %s, only pointers, arrays or slices can be subscripted with '['",
                                    astTypeKindToHumanReadable(ast->type));
