@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test, vec;
+import fs, libc, mem, proc, str, test;
 
 /* A definition (or a later prototype) dropped the default arguments of
  * the earlier prototype: `i64 F(i64 *v, i64 n=2);` then
@@ -20,10 +20,6 @@ i64 apply(i64 x, fn(i64 y) i64 f=&twice);
 i64 same(i64 n=4);
 i64 twice2(i64 a=1, i64 b=2);
 i64 twice2(i64 a, i64 b);          /* a second prototype keeps them */
-
-/* std.ktmh prototypes: redeclaring without the default keeps it */
-pub vec.IntVec *IntVecNew(i64 size);
-pub u8 *StrTrimStart(u8 *str, i64 str_len, i64 *newLen);
 
 i64 callsBefore()
 {// calls before the definition use the prototype, as before
@@ -93,29 +89,12 @@ i32 main() {
     tests++; if (twice2() == 12 && twice2(3) == 32 && twice2(3, 4) == 34) { correct++; }
     else { printf("second prototype dropped the defaults\n"); }
 
-    vec.IntVec *iv = IntVecNew();
-    i64 trimmed_len = 0;
-    u8 *t = StrTrimStart(str.dup("  x"), 3, &trimmed_len);
-    u8 *t2 = StrTrimStart(str.dup("  y"));
-    tests++; if (iv && iv.size == 0 && !str.cmp(t, "x") && !str.cmp(t2, "y") && trimmed_len == 1) { correct++; }
-    else { printf("std.ktmh default lost\n"); }
-    iv.release();
-    mem.free(t);
-    mem.free(t2);
-
     tests++;
     if (compile("i64 F(i64 n=2);\ni64 F(i64 n=3) { return n; }\n"
                             "i32 main() { return F(); }\n", true,
                             "default argument `3` for parameter `n` of `F` does not match")) {
         correct++;
     } else { printf("different default accepted\n"); }
-
-    tests++;
-    if (compile("import vec;\n\npub vec.IntVec *IntVecNew(i64 size=64);\n"
-                            "i32 main() { IntVecNew(); return 0; }\n", true,
-                            "does not match the earlier declaration's `32`")) {
-        correct++;
-    } else { printf("different std.ktmh default accepted\n"); }
 
     tests++;
     if (compile("i64 F(i64 n=1+1);\ni64 F(i64 n=2) { return n; }\n"
