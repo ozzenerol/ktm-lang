@@ -282,6 +282,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
      * dereference a garbage map. */
     cc->global_env = mapNew(32, &map_ast_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     /* A postfix cast in a #define's value, `#define X (5(U64) % 3)`,
      * looks the type name up: give it the built-in types (classes and
      * unions are not known while lexing, so those stay empty). */
@@ -327,6 +328,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->uniondefs = mapNew(32, &map_asttype_type);
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     cc->macro_defs = cctrlCreateLexemeMap();
     cc->x86_registers = setNew(32, &set_cstring_type);
     cc->libc_functions = setNew(32, &set_cstring_type);
@@ -679,6 +681,15 @@ static const char *cctrl_libktm_extra_exports[] = {
  * one does in a program or a user library. libktm is one translation
  * unit, so in it only what std.ktmh declares is exported (and argc/argv);
  * everything else is local and a program can't replace it. */
+/* The declaration a direct call to the symbol `name` calls, for the
+ * backends' calling convention (variadic or not): a function by its name,
+ * or a module's extern "c" by its C name */
+Ast *cctrlCalleeDecl(Cctrl *cc, char *name, int len) {
+    Ast *decl = mapGetLen(cc->global_env, name, len);
+    if (!decl && cc->c_externs) decl = mapGetLen(cc->c_externs, name, len);
+    return decl;
+}
+
 int cctrlIsExported(Cctrl *cc, AoStr *name) {
     if (!cc->is_libktm || !name) return 1;
     /* libktm built from the stdlib's modules, without a header: module

@@ -94,6 +94,9 @@ typedef struct Cctrl {
     /* The global environment for user defined types, functions and global
      * variables */
     Map *global_env;
+    /* A module's extern "c" functions by their C name (they are in
+     * global_env as `a.b.name`): what a call to the C symbol calls */
+    Map *c_externs;
 
     /* key words defined in the language */
     Map *symbol_table;
@@ -313,6 +316,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs);
 u32 cctrlRegisterFile(Cctrl *cc, AoStr *filename);
 void cctrlNoteHeaderName(Cctrl *cc, char *start, int len);
 int cctrlIsExported(Cctrl *cc, AoStr *name);
+Ast *cctrlCalleeDecl(Cctrl *cc, char *name, int len);
 AoStr *cctrlLookUpFile(Cctrl *cc, u32 file_id);
 
 Lexeme *cctrlTokenGet(Cctrl *cc);

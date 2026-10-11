@@ -1665,7 +1665,7 @@ static void jitEmitInstr(JitFnCtx *ctx, IrInstr *instr) {
             }
             Ast *callee = NULL;
             if (!indirect) {
-                callee = (Ast *)mapGetLen(jit->cc->global_env,
+                callee = (Ast *)cctrlCalleeDecl(jit->cc,
                                           fname->data, fname->len);
             }
             int callee_va = 0, named_count = 0;
