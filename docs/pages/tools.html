@@ -51,14 +51,14 @@ removed afterwards, so several compiles can run at once.</p>
 <h2>The JIT</h2>
 <p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's built-in
 assembler and runs it. No C compiler, linker or files are involved, so it starts fast.
-Arguments after the file are passed to the program. A file with no <code>main</code> and
-no code at file scope has nothing to run: <code>-jit</code> says so and exits with 1. Use
+Arguments after the file are passed to the program. A file with no <code>main</code> has nothing to
+run: <code>-jit</code> says so and exits with 1. Use
 <code>#ifjit</code> / <code>#ifaot</code> for code that should differ between the two modes.</p>
 <pre><code>ktm -jit server.ktm 8080</code></pre>
 
 <h2>The REPL</h2>
 <pre><code>ktm -repl</code></pre>
-<p>ktm runs as you type it. Functions, classes, globals and
+<p>ktm runs as you type it. Functions, structs, globals and
 <code>#define</code>s accumulate across the session, and the value of a trailing expression
 is echoed:</p>
 <pre><code>&gt; i64 Sq(i64 x) { return x * x; }

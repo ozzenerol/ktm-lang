@@ -1,7 +1,7 @@
 <!-- title: Library guide -->
 <h1>Library guide</h1>
 <p class="lede">How to use the standard library for everyday tasks. Every program can use it
-without an <code>#include</code>. For every function and class, see the
+without an <code>#include</code>. For every function and struct, see the
 <a href="stdlib.html">library reference</a>.</p>
 
 <h2 id="memory">Memory</h2>
@@ -128,12 +128,13 @@ modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <cod
     <tr><td><code>%s</code></td><td>a string</td></tr>
     <tr><td><code>%c</code> <code>%C</code></td><td>a character; a multi-character constant like <code>'abc'</code> prints all its characters (up to 8), <code>%C</code> in upper case; the value 0 prints nothing</td></tr>
     <tr><td><code>%p</code></td><td>a pointer as <code>0x</code> and 16 hex digits</td></tr>
-    <tr><td><code>%D</code> <code>%T</code></td><td>a <code>CDate</code> as <code>MM/DD/YYYY</code> / <code>HH:MM:SS</code></td></tr>
-    <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>MPrintQ</code>)</td></tr>
-    <tr><td><code>%F</code></td><td>the contents of the file whose name is the argument (nothing if it can't be read)</td></tr>
+    <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>str.quote</code>)</td></tr>
     <tr><td><code>%%</code></td><td>a <code>%</code> (a width on it is ignored)</td></tr>
   </tbody>
 </table>
+<p>A date is formatted with <code>date.format(d, fmt)</code> (<code>%Y %m %d %H %M %S</code>,
+<code>%a %b %p</code>) and a file read with <code>fs.readAll</code>; <code>%D</code>,
+<code>%T</code> and <code>%F</code> are an error, with the way to do it in the message.</p>
 <p>Between the <code>%</code> and the letter come, in order: the flags <code>-</code> (left
 justify), <code>0</code> (pad with zeros), <code>+</code> (always a sign), a space (a space
 where a plus sign would go) and <code>#</code> (<code>0x</code> / <code>0</code> prefix for
@@ -185,7 +186,7 @@ void main()
   printf("%d %d\n", str.cmp("abc", "abd") < 0, str.cmpLenNoCase("ABC", "abc", 3) == 0);
   printf("%d\n", str.count("banana", 'a'));               // count a character
   printf("%s\n", str.firstOf("key=value", "="));       // from the first match
-  printf("%s\n", str.lastOf("a/b/c.ktm", "/"));         // from the last match
+  printf("%s\n", str.lastOf("a/b/libc.ktm", "/"));         // from the last match
   printf("%s\n", fs.ext("archive.tar.gz"));
   printf("%d %d %d\n", str.globMatch("main.ktm", "*.ktm"), str.globMatch("main.c", "*.ktm"),
     str.globMatch("banana", "b?n*a"));
@@ -199,7 +200,7 @@ void main()
 1 1
 3
 =value
-/c.ktm
+/libc.ktm
 .tar.gz
 1 0 1
 1235
@@ -676,7 +677,7 @@ popped three, 2 left
 <ul>
   <li><strong>Making one.</strong> <code>ListNew()</code> allocates a head; free it with
   <code>ListRelease</code>. <code>ListInit(&amp;head)</code> turns a head you own (on the stack,
-  or inside a class) into an empty list; empty that one with <code>ListClear</code>, because
+  or inside a struct) into an empty list; empty that one with <code>ListClear</code>, because
   <code>ListRelease</code> also frees the head.</li>
   <li><strong>Adding.</strong> <code>ListAppend</code> and <code>ListPrepend</code> add at the
   end and the front; <code>ListInsertValueBefore(node, value)</code> inserts before any node
@@ -863,7 +864,7 @@ void main()
   printf("both: %s\n", str);
   mem.free(str);
 
-  set.IntSet *either = evens.unionWith(threes);
+  set.IntSet *either = evens.union(threes);
   set.IntSetIter *it = either.iterNew();
   set.IntSetEntry *e;
   while ((e = set.intIterNext(it))) { printf("%d ", e.key); }
@@ -1495,19 +1496,17 @@ one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIG
 <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
 <code>SIGTTOU</code> are defined, with each platform's numbers.</p>
 <pre><code>
-import libc, net;
-
-i32 srv = net.listen(8080, "127.0.0.1", 16);
+i32 srv = NetCreateServer(8080, "127.0.0.1", 16);
 if (srv == -1) {
   printf("can't listen on 8080\n");
   return;
 }
-i32 conn = net.accept(srv);   // waits for a client
+i32 conn = NetAccept(srv);   // waits for a client
 if (conn != -1) {
-  net.send(conn, "hello\n", 6);   // -1 if the client already left
-  libc.close(conn);
+  NetSend(conn, "hello\n", 6);   // -1 if the client already left
+  close(conn);
 }
-libc.close(srv);
+close(srv);
 </code></pre>
 <p>The raw calls are there too, for UDP and anything the helpers don't cover:
 <code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
@@ -1781,7 +1780,7 @@ error without running the statement. Such a row belongs to the statement, which
   <li><a href="stdlib.html#net">Networking</a>: sockets, <code>getaddrinfo</code> and friends.
   <code>NetCreateUnixServerSocket(path, backlog)</code> and <code>NetCreateUnixClientSocket(path)</code>
   make Unix domain sockets; they return -1 on failure, also when the path is longer than
-  107 bytes on Linux or 103 on macOS. The address classes (<code>sockaddr_in</code>,
+  107 bytes on Linux or 103 on macOS. The address structs (<code>sockaddr_in</code>,
   <code>sockaddr_un</code>, <code>addrinfo</code>, ...) have the platform's C layout, and
   <code>SOL_SOCKET</code>, <code>SO_*</code>, <code>AF_INET6</code>, <code>IPPROTO_*</code>,
   <code>TCP_*</code> and <code>AI_*</code> the platform's values.</li>

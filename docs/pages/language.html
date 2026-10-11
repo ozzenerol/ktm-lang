@@ -6,11 +6,15 @@ will look familiar. The differences are where ktm gets interesting.</p>
 <h2>Program structure</h2>
 <p>A program is one or more <code>.ktm</code> files. Its entry point is <code>main</code>, as in C:
 <code>i32 main()</code>, <code>i32 main(i32 argc, u8 **argv)</code> or <code>void main()</code>; the value
-it returns is the exit code (0 for <code>void main</code>). The older name <code>main</code> still works for
-now; a program can't have both. Code at the top level runs in order before <code>main</code>
-(top-level code can't <code>return</code>: that is a compile error). A program can be a single line:</p>
+it returns is the exit code (0 for <code>void main</code>). The file scope holds declarations:
+types, functions, globals (whose initialisers may call functions and run before
+<code>main</code>, in order), constants and imports; statements go in functions. The smallest
+program:</p>
 <pre data-run><code>
-"Hello\n";
+void main()
+{
+  printf("Hello\n");
+}
 </code></pre>
 <pre class="output">
 Hello
@@ -37,11 +41,11 @@ Ada is 36 years old
    42|42   |00042
 ff FF A 3.142
 </pre>
-<p>The conversions are the ones <code>StrPrint</code> knows (see the
+<p>The conversions are the ones <code>str.format</code> knows (see the
 <a href="library.html">library guide</a>), ktm's own included: <code>%Q</code> prints a
-string escaped as a C literal, <code>%C</code> a character in upper case, <code>%D</code> and
-<code>%T</code> the date and time of a <code>CDate</code>, and <code>%F</code> the contents of
-a file. The compiler checks the number of arguments against them.</p>
+string escaped as a C literal and <code>%C</code> a character in upper case. A date is
+formatted with <code>date.format(d, "%m/%d/%Y %H:%M:%S")</code> and printed with
+<code>%s</code>. The compiler checks the number of arguments against the format.</p>
 <pre data-run><code>
 void main()
 {
@@ -55,8 +59,7 @@ Hi
 </pre>
 <p>The string is always a format, even without arguments, so write
 <code>%%</code> for a literal percent sign: <code>printf("100%%\n");</code> prints
-<code>100%</code>. The older print statement, a string on its own with the arguments after a
-comma (<code>"%d\n", x;</code>), does the same and still works for now.</p>
+<code>100%</code>.</p>
 <p><code>%d</code>, <code>%i</code>, <code>%u</code>, <code>%x</code>,
 <code>%X</code> and <code>%o</code> print the full 64-bit value, so there is no need for
 C's <code>%ld</code> (which also works):</p>
@@ -85,18 +88,15 @@ void main()
     <tr><td><code>f32</code></td><td>4</td><td>Single-precision float</td></tr>
   </tbody>
 </table>
-<p>The older names <code>void</code>, <code>bool</code>, <code>i8</code> ... <code>u64</code>,
-<code>f32</code> and <code>f64</code> still work for now and mean the same types. The new names
-are type names, not keywords, so a struct field can still be called <code>i64</code> or
+<p>The type names are not keywords, so a struct field can still be called <code>i64</code> or
 <code>f64</code>; a variable can't.</p>
 <p>Pointers are written as in C (<code>u8 *s</code>, <code>i64 **pp</code>) and are 8 bytes.
 <code>null</code> is the null pointer: 0 as a <code>void *</code>, so it can be assigned to any
 pointer or function pointer. <code>true</code> and <code>false</code> are <code>bool</code>
-values, 1 and 0. The older <code>null</code>, <code>true</code> and <code>false</code> (plain
-0, 1 and 0) still work for now.</p>
+values, 1 and 0.</p>
 <p>As in C, a value becomes a <code>bool</code> by comparing it with 0: an integer, float
 or pointer that isn't 0 (or <code>null</code>) is <code>true</code>, whether it is assigned,
-passed as an argument, returned, stored in a field or cast with <code>x(bool)</code>. Only the
+passed as an argument, returned, stored in a field or cast with <code>(bool)x</code>. Only the
 low byte is never kept, so <code>0x100</code> and <code>0.5</code> are <code>true</code>.
 A pointer needs no cast to become a <code>bool</code> (other integer types warn without one),
 and messages and <code>typeof</code> call the type <code>bool</code>.</p>
@@ -364,8 +364,8 @@ time, and its operand is never evaluated.</p>
 <p>Casts are written as in C, <code>(T)x</code>: the type in parentheses before the value.
 A cast is a unary operator, so it binds tighter than any binary operator
 (<code>(f64)a / b</code> divides as floats) and applies to the whole postfix expression after it
-(<code>(i64)p-&gt;n</code> casts <code>p-&gt;n</code>). Any type works, including pointers, classes and
-function pointers (<code>(i64 (*)(i64))p</code>). A variable hides a type of the same name, so
+(<code>(i64)p-&gt;n</code> casts <code>p-&gt;n</code>). Any type works, including pointers, structs and
+function pointers (<code>(fn(i64) i64)p</code>). A variable hides a type of the same name, so
 <code>(x)</code> stays a value in parentheses.</p>
 <pre data-run><code>
 void main()
@@ -387,7 +387,6 @@ void main()
 -1.5
 h
 </pre>
-<p>The older postfix form, <code>x(f64)</code>, still works for now.</p>
 
 <h2>Control flow</h2>
 
@@ -512,7 +511,7 @@ w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
 </pre>
 
 <h3>Range-based for</h3>
-<p>An ktm addition. Loop over a fixed-size array, or over any class with an
+<p>An ktm addition. Loop over a fixed-size array, or over any struct with an
 <code>entries</code> field and a <code>size</code> field, such as the library's
 <code>IntVec</code> and <code>PtrVec</code>:</p>
 <pre data-run><code>
@@ -631,33 +630,6 @@ void main()
 2x3 of @
 </pre>
 
-<h3>Calling without parentheses</h3>
-<p>A function that needs no arguments can be called by name alone, anywhere
-in an expression. Use <code>&amp;Name</code> for the function's address:</p>
-<pre data-run><code>
-void greet()
-{
-  printf("hi\n");
-}
-
-i64 answer()
-{
-  return 42;
-}
-
-void main()
-{
-  greet();
-  printf("%d\n", answer)();
-  printf("%d\n", answer() + 1);
-}
-</code></pre>
-<pre class="output">
-hi
-42
-43
-</pre>
-
 <h3>Variable arguments</h3>
 <p>The last parameter can take any number of extra arguments, zero included:
 <code>T ...name</code> takes them as values of type <code>T</code>, each checked and
@@ -721,9 +693,7 @@ void main()
 [log] 3 files in /tmp, 42.5% full
 </pre>
 <p>The extras are passed as their count and a pointer to an array the caller builds, so
-spreading them on costs nothing. The older <code>...</code> with no name, which gives the
-function hidden <code>argc</code> and <code>argv</code> variables, still works until the
-conversion.</p>
+spreading them on costs nothing.</p>
 
 <h3>Function pointers</h3>
 <pre data-run><code>
@@ -750,10 +720,10 @@ void main()
 10 24
 </pre>
 <p>As in C, <code>*</code> on a function pointer gives the function pointer back, so
-<code>(*f)(acc, x)</code>, <code>(*c.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
+<code>(*f)(acc, x)</code>, <code>(*libc.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
 like <code>f(acc, x)</code>.</p>
 <p>Any expression whose type is a function pointer can be called: a cast to a function pointer
-type (<code>((i64 (*)(i64))p)(5)</code>, or <code>p(i64 (*)(i64))(5)</code> as a postfix cast),
+type (<code>((fn(i64) i64)p)(5)</code>),
 the result of a call that returns one, or of an assignment (<code>(f = &amp;Mul)(2, 3)</code>).
 The arguments are checked against the pointer's parameters, as for a named function:</p>
 <pre data-run><code>
@@ -782,7 +752,7 @@ void main()
 20
 </pre>
 <p>An array of function pointers puts the size after the name, as in C. It works for
-locals, globals, class fields and parameters:</p>
+locals, globals, struct fields and parameters:</p>
 <pre data-run><code>
 i64 dbl(i64 x) { return x * 2; }
 i64 sq(i64 x) { return x * x; }
@@ -801,7 +771,7 @@ void main()
 25
 </pre>
 <p>A default in a function pointer's parameter list fills a left-out argument when you call
-through it, for variables and class fields alike. A <code>void *</code> converts to and from a
+through it, for variables and struct fields alike. A <code>void *</code> converts to and from a
 function pointer without a cast, and compares (<code>==</code>, <code>!=</code>) with one:</p>
 <pre data-run><code>
 i64 dbl(i64 x) { return x * 2; }
@@ -811,8 +781,8 @@ struct Calc { fn(i64 x = 21) i64 op; };
 void main()
 {
   Calc c;
-  c.op = &dbl;
-  printf("%d %d\n", c.op(5), c.op());
+  libc.op = &dbl;
+  printf("%d %d\n", libc.op(5), libc.op());
 
   void *raw = &dbl;
   fn(i64 x) i64 back = raw;
@@ -851,7 +821,7 @@ void main()
 </pre>
 <p>The other C declarator forms work too: a function returning a function pointer is written
 <code>T (*Name(params))(fn_params)</code>, and a pointer to a function pointer is
-<code>T (**pp)(params)</code>, for locals, globals, class fields and parameters alike.</p>
+<code>T (**pp)(params)</code>, for locals, globals, struct fields and parameters alike.</p>
 <pre data-run><code>
 i64 dbl(i64 x) { return x * 2; }
 i64 sq(i64 x) { return x * x; }
@@ -876,17 +846,17 @@ void main()
 </pre>
 
 <h3>fn(...) types</h3>
-<p>ktm syntax v0.2 adds <code>fn ( types ) RetType</code> as a way to write a function pointer
-type: <code>fn(i64) i64</code> is exactly <code>i64 (*)(i64)</code>, with the same size, the
-same calls, and the same argument checks. Parameter names are optional and ignored. RetType
+<p>A function pointer type is written <code>fn ( types ) RetType</code>: <code>fn(i64) i64</code>
+takes an <code>i64</code> and returns one, and has the same size, calls and argument checks
+as C's <code>i64 (*)(i64)</code>. Parameter names are optional and ignored. RetType
 can itself be another <code>fn(...)</code> type:</p>
 <pre data-run><code>
 i64 twice(i64 x) { return x * 2; }
 i64 addOne(i64 x) { return x + 1; }
 
 fn(i64) i64 op = &twice;
-fn(i64) i64 pick(bool sq) { if (sq) return &twice; return &addOne; }
-void apply(fn(i64) i64 f, i64 x) { "%d\n", f(x); }
+fn(i64) i64 pick(bool sq) { if (sq) { return &twice; } return &addOne; }
+void apply(fn(i64) i64 f, i64 x) { printf("%d\n", f(x)); }
 
 i32 main()
 {
@@ -972,12 +942,12 @@ convert to and from any pointer without one; otherwise cast:
 pointers and <code>extern</code> functions alike. Numbers convert silently (an
 <code>i64</code> passed for an <code>f64</code> becomes a float), <code>0</code> and
 <code>null</code> pass as any pointer, <code>void *</code> converts both ways, and a pointer to a
-derived class is a pointer to its base class. A pointer passed for an integer, an integer for a
+derived struct is a pointer to its base struct. A pointer passed for an integer, an integer for a
 pointer (other than <code>0</code>) and a pointer to an incompatible type are warnings
-(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a class passed
-where another class or a number is expected, or a number or pointer where a class or a float
+(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a struct passed
+where another struct or a number is expected, or a number or pointer where a struct or a float
 is, is an error. Extra arguments of a <code>...</code> function are not checked.</p>
-<p>An initialiser list may be shorter than the array or class it initialises; as in C,
+<p>An initialiser list may be shorter than the array or struct it initialises; as in C,
 everything it leaves out is zero, for locals and globals alike:</p>
 <pre data-run><code>
 struct Point { i64 x, y, z; };
@@ -999,13 +969,13 @@ void main()
 1 0 0 | 4 5 0
 7 0 0
 </pre>
-<p>Unlike C, braces only go around an array, class or union: a scalar can't be
+<p>Unlike C, braces only go around an array, struct or union: a scalar can't be
 initialised from a list (<code>i64 x = {1};</code>), and neither can a scalar
 element or field (<code>i64 a[2] = {1, {2}};</code>). Both are compile errors.</p>
-<p>As in C, the braces of an inner array or class can be left out: its items are then
+<p>As in C, the braces of an inner array or struct can be left out: its items are then
 taken from the list in order, as many as it has, and a list that ends early zero-fills
 the rest. A string still initialises a whole <code>u8</code> array, and a value of the
-class itself a whole class field.</p>
+struct itself a whole struct field.</p>
 <pre data-run><code>
 struct Point { i64 x, y; };
 struct Line { i64 id; Point a, b; };
@@ -1028,7 +998,7 @@ void main()
 1 2 3 0
 </pre>
 
-<p>The items of a global array or class initialiser need not be constants: an item
+<p>The items of a global array or struct initialiser need not be constants: an item
 such as another global's value or the address of a function or a global is stored
 when the program starts, in order with the other file-scope statements, the way
 <code>i64 g = other;</code> is.</p>
@@ -1120,7 +1090,7 @@ void main()
 Xbc 4 hi 8
 </pre>
 
-<h2>Classes</h2>
+<h2>Structs</h2>
 <p>A <code>struct</code> (or <code>struct</code>, the same thing) is a C <code>struct</code>,
 and its name is a type straight away, with no <code>typedef</code> needed. Several fields can
 share a line. <code>pub</code> (or <code>pub</code>) marks what a library exports.</p>
@@ -1132,7 +1102,7 @@ struct Point
   i64 x, y;
 };
 
-Point make(i64 x, i64 y)          // classes can be returned by value
+Point make(i64 x, i64 y)          // structs can be returned by value
 {
   Point r;
   r.x = x;
@@ -1149,11 +1119,11 @@ void main()
 {
   Point a = {1, 2};               // initialise fields in order
   Point c = make(11, 22);
-  printf("%d %d %d\n", c.x, c.y, sum(a));
+  printf("%d %d %d\n", libc.x, libc.y, sum(a));
 
   Point copy = c;                 // assignment copies
   copy.x = 0;
-  printf("%d %d\n", c.x, copy.x);
+  printf("%d %d\n", libc.x, copy.x);
 
   Point *p = mem.alloc(sizeof(Point));
   p.x = 5;                       // -> through a pointer
@@ -1167,10 +1137,10 @@ void main()
 11 0
 5 6
 </pre>
-<p><code>p.x</code> on a pointer to a class is <code>p-&gt;x</code>. It goes through one pointer
+<p><code>p.x</code> on a pointer to a struct is <code>p-&gt;x</code>. It goes through one pointer
 only: on a <code>Point **pp</code>, <code>pp.x</code> is an error and <code>(*pp).x</code> or
 <code>pp[0].x</code> is what you write.</p>
-<p>A field that is itself a class or an array takes a nested list:</p>
+<p>A field that is itself a struct or an array takes a nested list:</p>
 <pre data-run><code>
 struct Point { i64 x, y; };
 struct Line  { Point from, to; i64 tags[2]; };
@@ -1188,10 +1158,10 @@ void main()
 3 4 8
 2 5 9
 </pre>
-<p>A class declared ahead with <code>struct Node;</code> can be pointed to straight away, but
+<p>A struct declared ahead with <code>struct Node;</code> can be pointed to straight away, but
 a field can hold it by value only once its definition has been seen, since until then its
 size isn't known: <code>struct B; struct A { B b; };</code> is the error
-<code>field `b` of A holds a B, which is not complete here: use a pointer</code>, as is a class
+<code>field `b` of A holds a B, which is not complete here: use a pointer</code>, as is a struct
 holding itself. Define <code>B</code> first, or use a <code>B *</code> field.</p>
 <p>A string for a <code>u8</code> array field or row is copied in the same way, and
 must fit with its NUL. A <code>u8 *</code> field points at the string instead:</p>
@@ -1215,8 +1185,8 @@ blue black 24
 </pre>
 
 <h3>Inheritance</h3>
-<p>A class can extend one other class. It starts with all of the base class's fields, so a
-pointer to it can be used wherever the base class is expected:</p>
+<p>A struct can extend one other struct. It starts with all of the base struct's fields, so a
+pointer to it can be used wherever the base struct is expected:</p>
 <pre data-run><code>
 struct Shape
 {
@@ -1234,15 +1204,15 @@ struct Rect : Shape
   f64 w, h;
 };
 
-f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * c.r * c.r; }
+f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * libc.r * libc.r; }
 f64 rectArea(Shape *s)   { Rect *r = s; return r.w * r.h; }
 
 void main()
 {
   Circle c;
-  c.name = "circle";
-  c.area = &circleArea;
-  c.r = 1.0;
+  libc.name = "circle";
+  libc.area = &circleArea;
+  libc.r = 1.0;
 
   Rect r;
   r.name = "rect";
@@ -1359,7 +1329,7 @@ void main()
 A 8
 </pre>
 <p>An initialiser list gives a union one item, for its first field. A union can also be
-anonymous inside a class: its fields are used as the class's own, and it still takes one
+anonymous inside a struct: its fields are used as the struct's own, and it still takes one
 item:</p>
 <pre data-run><code>
 union Num { i32 i; f32 f; };
@@ -1379,8 +1349,8 @@ void main()
 7 1 42 3
 2 5 9
 </pre>
-<p>A class or union defined inside a class can also have a tag. Without a field name its
-fields are still the class's own, and the tag can be used as a type elsewhere; with a field
+<p>A struct or union defined inside a struct can also have a tag. Without a field name its
+fields are still the struct's own, and the tag can be used as a type elsewhere; with a field
 name it is the type of that field:</p>
 <pre data-run><code>
 struct Shape
@@ -1525,16 +1495,16 @@ pub struct Conn {
   private u8 *buf;     // only net uses it
 };
 
-pub u8 *peek(Conn *c) { return c.buf; }
+pub u8 *peek(Conn *c) { return libc.buf; }
 
 // main.ktm
 import net;
 
 i32 main() {
   net.Conn c;
-  c.fd = 3;            // fine
+  libc.fd = 3;            // fine
   net.Conn copy = c;   // fine
-  c.buf = null;        // error: `buf` is a private field of net.Conn
+  libc.buf = null;        // error: `buf` is a private field of net.Conn
   return 0;
 }</code></pre>
 <p><code>private</code> fields are only for a module's structs: in the main program, where
@@ -1609,10 +1579,11 @@ is a float the macro is an <code>f64</code> (<code>#define AREA (1.5 * SIDE)</co
 logical operator (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>) is an
 <code>i64</code> 0 or 1 even with float operands, and a float counts as true when it isn't
 0.0, as at run time: <code>#define ON (0.5 &amp;&amp; 1)</code> is 1.
-A postfix cast to a built-in type works and gives the macro that type:
-<code>#define BIG (5(u64) % 3)</code> is a <code>u64</code>, <code>#define HALF (5(f64) / 2)</code>
-an <code>f64</code> (2.5). Classes are not known to the preprocessor, so
-<code>0(MyClass*)</code> is an error in a macro. A long value can go on over several lines:
+A cast to a built-in type works and gives the macro that type:
+<code>#define BIG ((u64)5 % 3)</code> is a <code>u64</code>, <code>#define HALF ((f64)5 / 2)</code>
+an <code>f64</code> (2.5). Structs are not known to the preprocessor, so
+<code>(MyStruct *)0</code> is an error in a macro. A numeric constant is usually better
+written as <code>const</code>. A long value can go on over several lines:
 end each line but the last with a <code>\</code>, as in C.</p>
 <pre data-run><code>
 const i64 MAX_USERS = 64;
@@ -1750,12 +1721,10 @@ insufficient funds: need 500, have 100
 carrying on
 </pre>
 <p><code>e.message</code> is never <code>null</code> (it is <code>""</code> without a message)
-and is freed when the catch block is left: copy it (<code>StrNew(e.message)</code>) to keep
+and is freed when the catch block is left: copy it (<code>str.dup(e.message)</code>) to keep
 it. <code>throw(e)</code> throws the same error again, with its original message, file and
-line, so a handler can look at an error and pass it on. A <code>catch</code> without a
-binding still works and finds the code in <code>Fs->except_ch</code>; until the old code
-is converted, <code>throw('Funds')</code> with a character constant also still works (the
-constant is the code).</p>
+line, so a handler can look at an error and pass it on. A <code>catch</code> that doesn't
+need the error can leave out the binding.</p>
 <p>The code is converted like an argument to an integer parameter:
 <code>throw(42.75)</code> throws 42. The catch handler runs after its <code>try</code> has
 ended, so a <code>throw</code> inside it goes to the next enclosing <code>try</code>.</p>
@@ -1793,16 +1762,11 @@ void main()
 1 -1
 caught here, not in Find
 </pre>
-<p>Each thread has its own <code>Fs</code>: a <code>throw</code> is caught only by a
-<code>try</code> of the thread that threw, so threads can use try/catch at the same time.
-<code>Fs</code> is a function returning the calling thread's state, so
-<code>Fs->except_ch</code> reads that thread's last thrown value.</p>
+<p>Each thread has its own catch chain: a <code>throw</code> is caught only by a
+<code>try</code> of the thread that threw, so threads can use try/catch at the same time.</p>
 <p>An error that no <code>try</code> catches, in any thread, is printed on stderr (after
-what the program printed so far) and ends the program with exit code 1. A code that is a
-character constant with all bytes printable is shown as text, anything else as a
-number:</p>
-<pre><code>uncaught error 0: need 500, have 100 (bank.ktm:5)
-uncaught error 'Funds' (old.ktm:12)</code></pre>
+what the program printed so far) and ends the program with exit code 1:</p>
+<pre><code>uncaught error 0: need 500, have 100 (bank.ktm:5)</code></pre>
 <p>Each <code>try</code> and each <code>defer</code> reached saves the registers but not the
 signal mask, so they cost no system call; the flip side is that a <code>throw</code> out of a
 signal handler leaves that signal blocked.</p>
@@ -1815,9 +1779,9 @@ block, through <code>return</code>, <code>break</code>, <code>continue</code> or
 way to a <code>catch</code> (after the deferred statements have run, the throw carries on
 to that catch). It keeps clean-up next to the code that needs it:</p>
 <pre data-run><code>
-import mem;
-
 enum Err { neg };
+
+import mem;
 
 void copy(i64 n)
 {
@@ -1902,9 +1866,7 @@ void main()
 <p>Use <code>f32</code> for C <code>float</code>, <code>i32</code> for <code>int</code> and
 <code>u8 *</code> for <code>char *</code>. To use another library, link it from the source
 and it works in compiled programs, the JIT and the REPL alike:</p>
-<pre><code>import sql;
-
-#link &lt;sql.sqlite3&gt;          // like -lsqlite3
+<pre><code>#link &lt;sqlite3&gt;          // like -lsqlite3
 #link "./libmine.so"     // a path, relative to the working directory
 
 extern "c" i32 sqlite3_libversion_number();</code></pre>
@@ -1953,8 +1915,8 @@ instead. The differences:</p>
     <tr><td><code>extern "c"</code>, <code>#link</code>, <code>#ifjit</code> / <code>#ifaot</code></td><td>Added, for working with the host system</td></tr>
     <tr><td><code>?:</code></td><td>Not supported</td></tr>
     <tr><td>Sub-integer access (<code>x.u8[1]</code>)</td><td>Not supported</td></tr>
-    <tr><td>Exponent operator <code>`</code></td><td>Not supported; use <code>Pow</code> or <code>pow</code></td></tr>
-    <tr><td><code>Fs</code></td><td>Exists for exceptions (<code>Fs->except_ch</code>), one per thread; there are no tasks</td></tr>
+    <tr><td>Exponent operator <code>`</code></td><td>Not supported; use <code>math.power</code> or <code>libc.pow</code></td></tr>
+    <tr><td><code>Fs</code></td><td>Gone: <code>catch (Error e)</code> gives the error; there are no tasks</td></tr>
     <tr><td>DolDoc, graphics, the system shell</td><td>Not available; use the C library through <code>extern "c"</code></td></tr>
   </tbody>
 </table>

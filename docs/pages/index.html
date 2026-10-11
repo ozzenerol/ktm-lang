@@ -3,7 +3,7 @@
   <h1 class="name"><span class="visually-hidden">ktm</span><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></h1>
   <p class="pitch">A compiled language for systems programming and networking: REST microservices,
   network daemons and system tools, on Linux and macOS.</p>
-  <p class="sub">C-like, with classes, default arguments and exceptions; an ahead-of-time compiler,
+  <p class="sub">C-like, with modules, methods, default arguments and exceptions; an ahead-of-time compiler,
   a JIT, a REPL and a language server in one binary.</p>
   <div class="actions">
     <a class="button primary" href="getting-started.html">Get started</a>
@@ -12,7 +12,7 @@
   </div>
 </section>
 
-<p>ktm is a C-like language with classes, default arguments, a print-a-string statement and a JIT
+<p>ktm is a C-like language with modules, methods, default arguments, exceptions and a JIT
 at its heart, made for REST microservices, network daemons and systems tools. <code>ktm</code> runs on
 Linux (x86_64 and arm64) and macOS (Apple Silicon) as an ahead-of-time compiler, a JIT, a REPL and a
 language server.</p>
@@ -27,8 +27,8 @@ void main()
 Hello world
 </pre>
 
-<p>A string on its own is a print statement, <code>void</code> is <code>void</code>, and
-<code>main</code> is called for you. Save it as <code>hello.ktm</code> and run it either way:</p>
+<p><code>main</code> is where a program starts and <code>printf</code> prints, as in C. Save it
+as <code>hello.ktm</code> and run it either way:</p>
 
 <pre><code>ktm hello.ktm -o hello && ./hello   # compile to a native binary
 ktm -jit hello.ktm                    # or compile in memory and run straight away</code></pre>
@@ -128,7 +128,7 @@ void main()
 </div>
 <div class="sample">
 <h3>A taste of the language</h3>
-<p>Classes with inheritance, default arguments and ranges in <code>case</code>.</p>
+<p>Structs with inheritance, default arguments and ranges in <code>case</code>.</p>
 <pre data-run><code>
 struct Animal
 {
