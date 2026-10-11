@@ -22,7 +22,7 @@ void runTest(u8 *filename, i64 idx) {
         if ((res = proc.shell(bin)) != 0) {
             printf("\033[0;31mFAILED\033[0;0m to run: %s\n",filename);
         }
-        fs.remove(bin);
+        fs.remove(cstr.view(bin));
     }
     mem.free(cmd);
     mem.free(bin);
