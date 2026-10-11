@@ -77,7 +77,7 @@ bool testStrayElse(void) {
 "#if 1
 #endif
 #else
-void Main() {}
+void main() {}
 ",
         1, "#else without #if", "3:1", null, null, null, null);
 }
@@ -87,7 +87,7 @@ bool testStrayElif(void) {
     return compileReports(
 "#elif (zz+
 #elifdef FOO
-void Main() {}
+void main() {}
 ",
         2, "#elif without #if", "1:1", "#elifdef without #if", "2:1",
         null, null);

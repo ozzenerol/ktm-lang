@@ -840,7 +840,7 @@ i32 main()
 {
   apply(op, 5);
   fn(i64) i64 g = pick(true);
-  "%d\n", g(5);
+  printf("%d\n", g(5));
   return 0;
 }
 </code></pre>
@@ -864,7 +864,7 @@ i32 main()
   fn(i64 a, i64 b = 10) i64 k = &amp;add;
   fn(...args) i64 c = &amp;count;
   (fn(u8 *) u8 *) *pf = &amp;f;
-  "%s %d %d %d %s\n", f("xyz"), k(1), k(1, 2), c(4, 5, 6), (*pf)("ab");
+  printf("%s %d %d %d %s\n", f("xyz"), k(1), k(1, 2), c(4, 5, 6), (*pf)("ab"));
   return 0;
 }
 </code></pre>
@@ -1203,7 +1203,7 @@ struct Admin : User
 
 void User.describe()
 {
-  "%s is %d\n", self.name, self.age;
+  printf("%s is %d\n", self.name, self.age);
 }
 
 i64 User.older(i64 years = 1)    // default arguments and `T ...name` work as usual
@@ -1214,7 +1214,7 @@ i64 User.older(i64 years = 1)    // default arguments and `T ...name` work as us
 
 void Admin.describe()            // hides User.describe for an Admin
 {
-  "admin %d: ", self.level;
+  printf("admin %d: ", self.level);
   User.describe(self);           // the base's, called explicitly
 }
 
@@ -1335,11 +1335,11 @@ i32 main()
   Color c = Color.green;
   i64 sizes[Color.blue + 1];
   switch (c) {
-    case Color.red:   "red\n"; break;
-    case Color.green: "green\n"; break;
-    case Color.blue:  "blue\n"; break;
+    case Color.red:   printf("red\n");
+    case Color.green: printf("green\n");
+    case Color.blue:  printf("blue\n");
   }
-  "%d %d %d\n", sizeof(sizes), Status.gone, Mode.both;
+  printf("%d %d %d\n", sizeof(sizes), Status.gone, Mode.both);
   return 0;
 }
 </code></pre>

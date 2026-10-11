@@ -51,19 +51,19 @@ i32 main() {
     u8 *out;
 
     tests++;
-    if (rejected("void Main() { while () {} }\n",
+    if (rejected("void main() { while () {} }\n",
                              "Expected the `while` condition, got `)`", "228-ee.ktm:1:24\n")) { correct++; }
     tests++;
     if (rejected("void main() { do {} while (); }\n",
                              "Expected the `while` condition, got `)`", "228-ee.ktm:1:29\n")) { correct++; }
     tests++;
-    if (rejected("void Main() { if () {} }\n",
+    if (rejected("void main() { if () {} }\n",
                              "Expected the `if` condition, got `)`", "228-ee.ktm:1:21\n")) { correct++; }
     tests++;
     if (rejected("void main() { if (i64 a = 1; ) {} }\n",
                              "Expected the `if` condition, got `)`", "228-ee.ktm:1:32\n")) { correct++; }
     tests++;
-    if (rejected("void Main() { if (i64 a = ) {} }\n",
+    if (rejected("void main() { if (i64 a = ) {} }\n",
                              "Expected an initial value, got `)`", "228-ee.ktm:1:29\n")) { correct++; }
     tests++;
     if (rejected("void main() { switch () { case 1: break; } }\n",

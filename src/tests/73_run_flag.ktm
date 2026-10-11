@@ -54,7 +54,7 @@ void main(i32 argc, u8 **argv)
 ");
     writeSource(RUN_TEST_TOP,
 "i64 x = 40;
-\"top level %d\\n\", x + 2;
+void main() { printf(\"top level %d\\n\", x + 2); }
 ");
 
     /* Program output reaches stdout and the exit code is the program's */
@@ -78,7 +78,7 @@ void main(i32 argc, u8 **argv)
     if (outputIs("run works argc=3\n[foo]\n[b c]\n")) { correct++; }
     else { printf("Failed - -run arguments\n"); }
 
-    /* A program with only top-level statements and no Main */
+    /* A program with a global and main */
     if (proc.shell("(" RUN_KTM "../" RUN_TEST_TOP ") > " RUN_TEST_OUT " 2>&1") == 0 &&
             outputIs("top level 42\n")) { correct++; }
     else { printf("Failed - -run top-level program\n"); }

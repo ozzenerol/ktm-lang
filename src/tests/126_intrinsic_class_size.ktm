@@ -77,7 +77,6 @@ bool testTooBig(void) {
     return compileFailsExactly(
 "i8 struct X { i64 a; };
 void main() { X x; x.a = 1; }
-main;
 ", 1, "Fields of intrinsic class X take 8 bytes, more than the 1 bytes of its base type i8", null);
 }
 
@@ -85,7 +84,6 @@ bool testOneByteOver(void) {
     return compileFailsExactly(
 "u16 struct Z { u8 a; u8 b; u8 c; };
 void main() { Z z; z.a = 1; z.c = 3; printf(\"%d\\n\", z.b); }
-main;
 ", 1, "Fields of intrinsic class Z take 3 bytes, more than the 2 bytes of its base type u16", null);
 }
 
@@ -95,7 +93,6 @@ bool testTwoClasses(void) {
 "u16 struct Z { u8 a; u8 b; u8 c; };
 i32 struct W { i64 a; };
 void main() { Z z; W w; z.a = 1; w.a = 2; }
-main;
 ", 2, "intrinsic class Z take 3 bytes", "intrinsic class W take 8 bytes");
 }
 
@@ -103,7 +100,6 @@ bool testNonIntegerBase(void) {
     return compileFailsExactly(
 "f64 struct Y { i64 a; };
 void main() { Y y; y.a = 1; }
-main;
 ", 1, "Can only make intrinsic types from integer types, got f64", null);
 }
 

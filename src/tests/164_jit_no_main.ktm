@@ -42,26 +42,26 @@ bool jitRuns(u8 *source, bool wantOk, u8 *expected) {
     return ok;
 }
 
-#define NO_MAIN_MSG "ktm: __164_jit_no_main.ktm: nothing to run: no Main function and no code at file scope"
+#define NO_MAIN_MSG "ktm: __164_jit_no_main.ktm: nothing to run: no main function"
 
 i32 main() {
     i64 correct = 0, tests = 0;
 
-    printf("Test - ktm -jit with no Main: ");
+    printf("Test - ktm -jit with no main: ");
 
     /* nothing to run: reported */
     tests++; if (jitRuns("i64 foo() { return 1; }\n", false, NO_MAIN_MSG)) { correct++; }
     tests++; if (jitRuns("", false, NO_MAIN_MSG)) { correct++; }
     tests++; if (jitRuns("// only a comment\n", false, NO_MAIN_MSG)) { correct++; }
     tests++; if (jitRuns("struct C { i64 a; };\ni64 g;\n", false, NO_MAIN_MSG)) { correct++; }
-    /* code at file scope: runs as before */
-    tests++; if (jitRuns("\"top\\n\";\n", true, "top\n")) { correct++; }
+    /* code at file scope: an error (ktm syntax v0.2 has none) */
+    tests++; if (jitRuns("printf(\"top\\n\");\n", false, "code at file scope: put it in `main`")) { correct++; }
     tests++; if (jitRuns("i64 two() { return 2; }\n\nvoid main()\n{\n  printf(\"%d\\n\", two());\n}\n", true, "2\n")) { correct++; }
     /* a constant initialiser is static data, like `i64 g;` (no code); one
      * that calls a function is code at file scope */
     tests++; if (jitRuns("i64 x = 3;\ni64 foo() { return x; }\n", false, NO_MAIN_MSG)) { correct++; }
     tests++; if (jitRuns("import str;\n\ni64 x;\ni64 foo() { return x; }\n\nvoid main()\n{\n  x = str.len(\"ab\");\n}\n", true, "")) { correct++; }
-    /* a Main: runs as before */
+    /* a main: runs */
     tests++; if (jitRuns("void main() { printf(\"main\\n\"); }\n", true, "main\n")) { correct++; }
     tests++; if (jitRuns("i32 main() { return 3; }\n", false, "")) { correct++; }
 

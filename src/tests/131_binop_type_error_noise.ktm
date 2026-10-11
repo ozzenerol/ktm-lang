@@ -72,7 +72,7 @@ bool testDefineFloatString(void) {
     return compileCheck(
 "#define X (2.5 + \"s\")
 #define Y (\"s\" * 2)
-void Main() {}
+void main() {}
 ", 1, 2, want, 4);
 }
 

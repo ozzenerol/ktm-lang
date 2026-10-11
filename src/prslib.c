@@ -2327,7 +2327,14 @@ Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
     return call;
 }
 
+/* The old print statement, `"fmt", args;`: an error naming printf (the
+ * REPL's input aside), parsed on as before */
 Ast *parsePrintStatement(Cctrl *cc) {
+    Lexeme *tok = cctrlTokenPeek(cc);
+    if (tok && !(cc->flags & CCTRL_REPL)) {
+        cctrlErrorAt(cc, tok->line, tok->col, tok->len,
+                     "a print statement: write `printf(\"...\", ...)`");
+    }
     return parsePrintCall(cc, ';');
 }
 
@@ -2458,6 +2465,12 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                 Vec *argv = astVecNew();
                 /* Underline the name, the token before the one in hand */
                 Lexeme *name_tok = parseLastToken(cc);
+                /* the old call without `(`: an error, parsed on as one */
+                if (name_tok && !(cc->flags & CCTRL_REPL)) {
+                    cctrlErrorAt(cc, name_tok->line, name_tok->col, name_tok->len,
+                                 "a call needs its `()`: write `%.*s()`",
+                                 name_tok->len, name_tok->start);
+                }
                 ParseCallLoc loc = {0, 0, 0, NULL};
                 if (name_tok) {
                     loc.line = name_tok->line;
