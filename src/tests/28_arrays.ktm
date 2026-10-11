@@ -65,7 +65,7 @@ bool vector3D() {
                  v3d[3][3][0] == 46 && v3d[3][3][1] == 47 && v3d[3][3][2] == 48;
 }
 
-bool Matrix() {
+bool matrixFn() {
     i32 matrix[4][4] = {
             {1,   2,  3, 4},
             {5,   6,  7, 8},
@@ -106,7 +106,7 @@ i32 main() {
     i32 correct = 0, tests = 5;
 
     if (singleDimensionArray()) { correct++; }
-    if (Matrix()) { correct++; }
+    if (matrixFn()) { correct++; }
     if (vector3D()) { correct++; }
     if (stringArray()) { correct++; }
     if (stringArray2()) { correct++; }

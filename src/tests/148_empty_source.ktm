@@ -31,14 +31,14 @@ bool writeFile(u8 *file, u8 *printfFmt) {
 
 /* Run ktm with `flags` on EMPTY_FILE; returns the exit code and
  * leaves the output in `*_out` (null if it could not be read) */
-i64 runKtm(u8 *flags, u8 **_out) {
+i64 runKtm(u8 *flags, u8 **outArg) {
     u8 *cmd = str.format(
             "T=; command -v timeout >/dev/null 2>&1 && T='timeout 10'; "
             "$T ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
             "%s " EMPTY_FILE " > " EMPTY_OUT " 2>&1", flags);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
-    *_out = fs.readAll(EMPTY_OUT);
+    *outArg = fs.readAll(EMPTY_OUT);
     return res;
 }
 

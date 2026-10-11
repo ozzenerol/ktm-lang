@@ -19,7 +19,7 @@ set.IntSet *setOf(i64 *keys, i64 n) {
 }
 
 /* The set's keys, in iteration order, as "a,b,c" */
-u8 *Keys(set.IntSet *s) {
+u8 *keysFn(set.IntSet *s) {
     u8 *buf = str.dup("");
     set.IntSetIter *it = s.iterNew();
     set.IntSetEntry *e;
@@ -34,7 +34,7 @@ u8 *Keys(set.IntSet *s) {
 }
 
 bool keysAre(set.IntSet *s, u8 *want) {
-    u8 *got = Keys(s);
+    u8 *got = keysFn(s);
     bool ok = !str.cmp(got, want);
     if (!ok) { printf("\n  keys '%s', want '%s'\n", got, want); }
     mem.free(got);

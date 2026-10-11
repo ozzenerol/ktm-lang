@@ -17,7 +17,7 @@ void check(bool ok, u8 *what) {
     else { printf("\n  failed: %s\n", what); }
 }
 
-i64 Port(i32 sockfd) {
+i64 portFn(i32 sockfd) {
     libc.sockaddr_storage ss;
     u32 len = sizeof(libc.sockaddr_storage);
     if (sockfd == -1 || libc.getsockname(sockfd, (libc.sockaddr *)(&ss), &len) == -1) { return -1; }
@@ -55,7 +55,7 @@ bool resolves(u8 *name, i32 family) {
 
 bool reach(u8 *name, i32 srv)
 {// NetConnect(name) gets to srv
-    i32 c = net.dial(name, Port(srv));
+    i32 c = net.dial(name, portFn(srv));
     if (c == -1) { return false; }
     i32 a = net.accept(srv);
     bool ok = a != -1;
@@ -87,7 +87,7 @@ i32 main() {
     }
 
     /* nobody listening on any of localhost's addresses: -1, nothing leaked */
-    i64 port = Port(s4);
+    i64 port = portFn(s4);
     libc.close(s4);
     if (s6 != -1) { libc.close(s6); }
     i32 fdBefore = lowestFreeFd();

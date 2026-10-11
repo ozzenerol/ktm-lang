@@ -122,7 +122,7 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
     return (status >> 8) & 0xff;
 }
 
-void Case(u8 *what, fn() i32 fn_, u8 *input, u8 *wantOut, u8 *wantErr) {
+void caseFn(u8 *what, fn() i32 fn_, u8 *input, u8 *wantOut, u8 *wantErr) {
     u8 out[256], err[256];
     i32 rc = inChild(fn_, input, out, err);
     bool ok = rc == 0 && !str.cmp(out, wantOut) && !str.cmp(err, wantErr);
@@ -132,15 +132,15 @@ void Case(u8 *what, fn() i32 fn_, u8 *input, u8 *wantOut, u8 *wantErr) {
 
 i32 main() {
     printf("Test - ProcSpawn PROC_INHERIT: ");
-    Case("all inherited: reads stdin, writes stdout and stderr", &allInherit,
+    caseFn("all inherited: reads stdin, writes stdout and stderr", &allInherit,
              "hello\n", "out:hello\n", "err:hello\n");
-    Case("stdout piped, stdin and stderr inherited", &outPiped, "hi\n", "", "e:hi\n");
-    Case("stdin /dev/null, stdout inherited, stderr piped", &errPiped, "unread\n", "out\n", "");
-    Case("stderr into an inherited stdout (2>&1)", &errToStdout, "", "a\nb\n", "");
-    Case("only stdin inherited", &inOnly, "data\n", "", "");
-    Case("only stderr inherited", &errOnly, "", "", "y\n");
-    Case("ProcRun: stderr inherited", &runErr, "", "", "e\n");
-    Case("our stdin closed: the child starts anyway", &closedStdin, "", "ok\n", "");
+    caseFn("stdout piped, stdin and stderr inherited", &outPiped, "hi\n", "", "e:hi\n");
+    caseFn("stdin /dev/null, stdout inherited, stderr piped", &errPiped, "unread\n", "out\n", "");
+    caseFn("stderr into an inherited stdout (2>&1)", &errToStdout, "", "a\nb\n", "");
+    caseFn("only stdin inherited", &inOnly, "data\n", "", "");
+    caseFn("only stderr inherited", &errOnly, "", "", "y\n");
+    caseFn("ProcRun: stderr inherited", &runErr, "", "", "e\n");
+    caseFn("our stdin closed: the child starts anyway", &closedStdin, "", "ok\n", "");
     test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;

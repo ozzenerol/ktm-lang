@@ -26,7 +26,7 @@ i64 deep(i64 n)
 }
 
 /* Bytes of buf that aren't `v` */
-i64 Bad(u8 *buf, i64 len, u8 v) {
+i64 badFn(u8 *buf, i64 len, u8 v) {
     i64 i, bad = 0;
     for (i = 0; i < len; i++) { bad += buf[i] != v; }
     return bad;
@@ -36,7 +36,7 @@ i64 Bad(u8 *buf, i64 len, u8 v) {
 i64 fill(u8 *buf, i64 size, i64 depth) {
     mem.set(buf, 0x40 + depth, size);
     deep(200);
-    return Bad(buf, size, 0x40 + depth);
+    return badFn(buf, size, 0x40 + depth);
 }
 
 i64 below(i64 depth) {
@@ -44,7 +44,7 @@ i64 below(i64 depth) {
     i64 bad = fill(buf, 65480, depth);
     if (depth > 0) { bad += below(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 65480, 0x40 + depth);
+    return bad + badFn(buf, 65480, 0x40 + depth);
 }
 
 i64 above(i64 depth) {
@@ -52,7 +52,7 @@ i64 above(i64 depth) {
     i64 bad = fill(buf, 65481, depth);
     if (depth > 0) { bad += above(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 65481, 0x40 + depth);
+    return bad + badFn(buf, 65481, 0x40 + depth);
 }
 
 i64 frame64K(i64 depth) {
@@ -60,7 +60,7 @@ i64 frame64K(i64 depth) {
     i64 bad = fill(buf, 65536, depth);
     if (depth > 0) { bad += frame64K(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 65536, 0x40 + depth);
+    return bad + badFn(buf, 65536, 0x40 + depth);
 }
 
 i64 frame65K(i64 depth) {
@@ -68,7 +68,7 @@ i64 frame65K(i64 depth) {
     i64 bad = fill(buf, 66560, depth);
     if (depth > 0) { bad += frame65K(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 66560, 0x40 + depth);
+    return bad + badFn(buf, 66560, 0x40 + depth);
 }
 
 i64 frame1M(i64 depth) {
@@ -76,7 +76,7 @@ i64 frame1M(i64 depth) {
     i64 bad = fill(buf, 1048576, depth);
     if (depth > 0) { bad += frame1M(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 1048576, 0x40 + depth);
+    return bad + badFn(buf, 1048576, 0x40 + depth);
 }
 
 i64 frame4M(i64 depth) {
@@ -84,7 +84,7 @@ i64 frame4M(i64 depth) {
     i64 bad = fill(buf, 4194304, depth);
     if (depth > 0) { bad += frame4M(depth - 1); }
     deep(200);
-    return bad + Bad(buf, 4194304, 0x40 + depth);
+    return bad + badFn(buf, 4194304, 0x40 + depth);
 }
 
 /* Several big locals plus scalars around them in one frame */
@@ -97,7 +97,7 @@ i64 mixed() {
     mem.set(a, 'a', sizeof(a));
     mem.set(b, 'b', sizeof(b));
     deep(200);
-    return Bad(a, sizeof(a), 'a') + Bad(b, sizeof(b), 'b') +
+    return badFn(a, sizeof(a), 'a') + badFn(b, sizeof(b), 'b') +
                  (before != 0x1111) + (after != 0x2222) + (f != 2.5);
 }
 

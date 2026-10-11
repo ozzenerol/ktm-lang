@@ -19,7 +19,7 @@ i64 strKeyCmp(void *a, void *b) {
     return str.cmp(a, b);
 }
 
-map.RBTree *Tree(i64 n) {
+map.RBTree *treeFn(i64 n) {
     map.RBTree *t = map.rbNew(null, null, &cmp);
     for (i64 i = 1; i <= n; i++) { t.set((void *)(i * 10), (void *)i); }
     return t;
@@ -68,7 +68,7 @@ i32 main() {
     set.IntSetEntry *e;
 
     /* RBIter: inserting far more keys than the tree had stops the walk */
-    t = Tree(3);
+    t = treeFn(3);
     it = t.iterNew();
     n = 0;
     while ((node = map.rbIterNext(it))) {
@@ -82,7 +82,7 @@ i32 main() {
     t.release();
 
     /* RBIter: deleting every other node (stacked ones included) stops it */
-    t = Tree(8);
+    t = treeFn(8);
     it = t.iterNew();
     n = 0;
     while ((node = map.rbIterNext(it))) {
@@ -112,7 +112,7 @@ i32 main() {
     t.release();
 
     /* RBIter: replacing values doesn't stop it */
-    t = Tree(20);
+    t = treeFn(20);
     it = t.iterNew();
     n = 0;
     while ((node = map.rbIterNext(it))) {
@@ -124,19 +124,19 @@ i32 main() {
     t.release();
 
     /* RBTreeForEach stops after the callback that changed the tree */
-    t = Tree(3);
+    t = treeFn(3);
     gCalls = 0;
     t.forEach(t, &insertMany);
     tests++; if (gCalls == 1 && sorted(t, 503)) { correct++; }
     t.release();
 
-    t = Tree(8);
+    t = treeFn(8);
     gCalls = 0;
     t.forEach(t, &deleteAll);
     tests++; if (gCalls == 1 && t.size == 0) { correct++; }
     t.release();
 
-    t = Tree(8);
+    t = treeFn(8);
     gCalls = 0;
     t.forEach(t, &replaceValue);
     tests++; if (gCalls == 8 && (i64)t.get((void *)30) == 103) { correct++; }

@@ -8,13 +8,13 @@ import mem, str;
  * x86_64 and arm64 (or crashed). The backends only recognised a
  * variadic callee by looking up the name of a direct call. */
 
-i64 Sum(u8 *t, ...args) {
+i64 sumFn(u8 *t, ...args) {
     i64 i, s = 0;
     for (i = 0; i < args.len; i++) { s += args[i]; }
     return s;
 }
 
-i64 Count(u8 *t, ...args) {
+i64 countFn(u8 *t, ...args) {
     return args.len;
 }
 
@@ -59,8 +59,8 @@ i32 main() {
     i64 tests = 17, correct = 0;
     u8 *s;
 
-    fn(u8 *t, ...args) i64 sp = &Sum;
-    fn(u8 *t, ...args) i64 cp = &Count;
+    fn(u8 *t, ...args) i64 sp = &sumFn;
+    fn(u8 *t, ...args) i64 cp = &countFn;
     fn(i64 a, i64 b, ...args) i64 mp = &mix;
     fn(f64 k, ...args) f64 kp = &scale;
     fn(u8 *fmt, ...args) u8 *fp = &format;
@@ -83,18 +83,18 @@ i32 main() {
     else { printf("Failed - results used in an expression\n"); }
     if (kp(0.5, 4, 6) == 5.0) { correct++; }
     else { printf("Failed - f64 named argument with extras\n"); }
-    if (via(&Sum) == 360) { correct++; }
+    if (via(&sumFn) == 360) { correct++; }
     else { printf("Failed - function pointer parameter\n"); }
 
     H h;
-    h.count = &Count;
-    h.sum = &Sum;
+    h.count = &countFn;
+    h.sum = &sumFn;
     H *p = &h;
     H *arr[2];
     arr[0] = &h;
     arr[1] = &h;
-    gH.count = &Count;
-    gH.sum = &Sum;
+    gH.count = &countFn;
+    gH.sum = &sumFn;
 
     if (h.count("a", 1, 2) == 2 && h.sum("a", 1, 2) == 3) { correct++; }
     else { printf("Failed - class field\n"); }

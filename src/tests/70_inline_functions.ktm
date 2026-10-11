@@ -15,7 +15,7 @@ inline i64 twice(i64 x) { return x * 2; }
 inline i64 fact(i64 n) { if (n <= 1) { return 1; } return n * fact(n - 1); }
 inline i64 quad(i64 x) { return twice(twice(x)); }
 inline i64 addDef(i64 a, i64 b = 10) { return a + b; }
-pub inline i64 Pub(i64 x) { return x + 1; }
+pub inline i64 pubFn(i64 x) { return x + 1; }
 inline void bump(i64 n) { gHits += n; }
 inline void tick() { gHits++; }
 inline Pt makePt(i64 v) { Pt p; p.x = v; p.y = v * 2; p.z = v * 3; return p; }
@@ -38,7 +38,7 @@ i32 main() {
     if (fp(8) == 16) { correct++; }
 
     if (addDef(1) == 11 && addDef(1, 2) == 3) { correct++; }
-    if (Pub(41) == 42) { correct++; }
+    if (pubFn(41) == 42) { correct++; }
 
     bump(5);
     tick();

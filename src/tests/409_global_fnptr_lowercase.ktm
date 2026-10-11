@@ -15,7 +15,7 @@ struct Pt {
 
 i64 twice(i64 x) { return x * 2; }
 f64 half(f64 x) { return x / 2; }
-u8 *Name() { return "ktm"; }
+u8 *nameFn() { return "ktm"; }
 Pt origin() { Pt p; p.x = 1; p.y = 2; return p; }
 
 fn(i64) i64 gInt;
@@ -37,7 +37,7 @@ i32 main() {
     tests++;
     gInt = &twice;
     gFlt = &half;
-    gStr = &Name;
+    gStr = &nameFn;
     if (gInt(21) == 42 && gFlt(5.0) == 2.5 && !str.cmp(gStr(), "ktm") && !gNone) { correct++; }
     else { printf("\n  scalars\n"); }
 

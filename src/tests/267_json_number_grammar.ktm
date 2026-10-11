@@ -10,7 +10,7 @@ import json, mem, str;
  * STRNUM the text is kept). 1e400 is inf, and JsonToString writes inf and
  * nan as null. */
 
-bool Bad(u8 *text, i64 flags=0) {
+bool badFn(u8 *text, i64 flags=0) {
     json.Value *j = json.parse(text, -1, flags);
     bool ok = !json.ok(j) && j.state.error == json.INVALID_NUMBER;
     if (!ok) { printf("[%s] flags %d: error %d\n", text, flags, j.state.error); }
@@ -47,7 +47,7 @@ i32 main() {
     tests++;
     bool ok = true;
     for (i = 0; i < 22; i++) {
-        if (!Bad(bad[i]) || !Bad(bad[i], json.STRNUM_FLAG)) { ok = false; }
+        if (!badFn(bad[i]) || !badFn(bad[i], json.STRNUM_FLAG)) { ok = false; }
     }
     if (ok) { correct++; }
 

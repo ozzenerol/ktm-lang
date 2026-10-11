@@ -30,7 +30,7 @@ i64 add(i64 a, i64 b = 10) { return a + b; }
 f64 half(f64 v) { return v / 2; }
 bool isNeg(i32 v) { return v < 0; }
 void bump(i64 *p) { *p += 1; }
-u8 *Name() { return gName; }
+u8 *nameFn() { return gName; }
 
 i32 main() {
     i64 correct = 0, tests = 0;
@@ -63,7 +63,7 @@ i32 main() {
     i64 n = 1;
     bump(&n);
     if (add(1) == 11 && add(1, 2) == 3 && half(5) == 2.5 && n == 2 &&
-            gCount == 3 && !str.cmp(Name(), "ktm")) { correct++; }
+            gCount == 3 && !str.cmp(nameFn(), "ktm")) { correct++; }
     else { printf("\n  functions\n"); }
 
     tests++;   /* struct fields, including fields named like types */

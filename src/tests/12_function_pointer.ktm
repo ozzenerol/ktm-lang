@@ -67,8 +67,8 @@ bool test4()
 bool test5()
 { // You need to add a '&'
     fn(u8 *arg) u8 *fn_ = &identity;
-    auto _ptr = fn_;
-    if (!libc.strcmp(_ptr("hey"),"hey")) {
+    auto ptrArg = fn_;
+    if (!libc.strcmp(ptrArg("hey"),"hey")) {
         return true;
     }
     return false;

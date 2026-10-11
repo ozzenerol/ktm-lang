@@ -46,7 +46,7 @@ bool prints(u8 *source, i64 warnings, u8 *want1, u8 *want2=null) {
 }
 
 i64 gCalled;
-void Fn() { gCalled++; }
+void fnFn() { gCalled++; }
 bool asBool(bool b) { return b; }
 bool ptrToBool(u8 *p) { return p; }
 
@@ -135,7 +135,7 @@ void main()
 
     /* and the conversions give 0 or 1 */
     u8 *p = "x", *np = null;
-    bool t = p, n = np, f = &Fn;
+    bool t = p, n = np, f = &fnFn;
     tests++;
     if (t == 1 && n == 0 && f == 1 && asBool(p) == 1 && asBool(np) == 0 &&
             ptrToBool(p) == 1 && ptrToBool(null) == 0) { correct++; }

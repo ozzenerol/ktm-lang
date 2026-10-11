@@ -8,7 +8,7 @@ import json, mem, str;
  * Only JSON's whitespace (space, tab, LF, CR) may follow the value or sit
  * between a key and ':'. */
 
-bool Err(u8 *text, i64 len, i64 error) {
+bool errFn(u8 *text, i64 len, i64 error) {
     json.Value *j = json.parse(text, len);
     bool ok = !json.ok(j) && j.state.error == error;
     if (!ok) { printf("[%s]: error %d want %d\n", text, j.state.error, error); }
@@ -16,7 +16,7 @@ bool Err(u8 *text, i64 len, i64 error) {
     return ok;
 }
 
-bool Ok(u8 *text, u8 *want, i64 len=-1) {
+bool okFn(u8 *text, u8 *want, i64 len=-1) {
     json.Value *j = json.parse(text, len);
     bool ok = json.ok(j);
     if (ok) {
@@ -36,47 +36,47 @@ i32 main() {
     i64 correct = 0, tests = 0;
 
     tests++;
-    if (Err("[1]x", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("1 2", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("truex", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("nullx", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("\"a\"x", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("{\"a\":1}}", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("[][]", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("[1]//x", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("[1]\x00[2]", 7, json.INVALID_JSON_TYPE_CHAR)) {
+    if (errFn("[1]x", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("1 2", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("truex", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("nullx", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("\"a\"x", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("{\"a\":1}}", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("[][]", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("[1]//x", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("[1]\x00[2]", 7, json.INVALID_JSON_TYPE_CHAR)) {
         correct++;
             }
 
     /* Exactly ':' after a key */
     tests++;
-    if (Err("{\"a\" , \"b\": 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
-            Err("{\"a\" x : 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
-            Err("{\"a\" 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
-            Err("{\"a\",1}", -1, json.INVALID_KEY_VALUE_SEPARATOR)) {
+    if (errFn("{\"a\" , \"b\": 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
+            errFn("{\"a\" x : 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
+            errFn("{\"a\" 1}", -1, json.INVALID_KEY_VALUE_SEPARATOR) &&
+            errFn("{\"a\",1}", -1, json.INVALID_KEY_VALUE_SEPARATOR)) {
         correct++;
             }
 
     /* \v and \f are not whitespace */
     tests++;
-    if (Err("[\x0b" "1]", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("[\x0c" "1]", -1, json.INVALID_JSON_TYPE_CHAR) &&
-            Err("[1]\x0b", -1, json.INVALID_JSON_TYPE_CHAR)) {
+    if (errFn("[\x0b" "1]", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("[\x0c" "1]", -1, json.INVALID_JSON_TYPE_CHAR) &&
+            errFn("[1]\x0b", -1, json.INVALID_JSON_TYPE_CHAR)) {
         correct++;
             }
 
     /* Whitespace everywhere it may be */
     tests++;
-    if (Ok(" \t\r\n[ 1 , 2 ]\n ", "[1,2]") &&
-            Ok("{ \"a\" \t:\r\n 1 , \"b\" : [ ] }", "{\"a\": 1,\"b\": []}") &&
-            Ok("{\"a\":1}\n", "{\"a\": 1}") && Ok("1 ", "1") && Ok("true", "true") &&
-            Ok("[1]", "[1]") && Ok("{}", "{}") && Ok("[[[]]]", "[[[]]]")) {
+    if (okFn(" \t\r\n[ 1 , 2 ]\n ", "[1,2]") &&
+            okFn("{ \"a\" \t:\r\n 1 , \"b\" : [ ] }", "{\"a\": 1,\"b\": []}") &&
+            okFn("{\"a\":1}\n", "{\"a\": 1}") && okFn("1 ", "1") && okFn("true", "true") &&
+            okFn("[1]", "[1]") && okFn("{}", "{}") && okFn("[[[]]]", "[[[]]]")) {
         correct++;
             }
 
     /* `len` ends the input: what is after it doesn't count */
     tests++;
-    if (Ok("[1]xyz", "[1]", 3) && Ok("{\"a\":1}}", "{\"a\": 1}", 7)) { correct++; }
+    if (okFn("[1]xyz", "[1]", 3) && okFn("{\"a\":1}}", "{\"a\": 1}", 7)) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

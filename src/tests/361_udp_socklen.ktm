@@ -40,7 +40,7 @@ bool compilesCleanly(u8 *source) {
     return ok;
 }
 
-i64 Off(void *base, void *field) {
+i64 offFn(void *base, void *field) {
     return (u8 *)field - (u8 *)base;
 }
 
@@ -176,8 +176,8 @@ void main()
     check(sizeof(libc.sockaddr_in) == 16, "sizeof(sockaddr_in)");
     check(sizeof(libc.sockaddr_in6) == 28, "sizeof(sockaddr_in6)");
     check(sizeof(libc.sockaddr_storage) == 128, "sizeof(sockaddr_storage)");
-    check(Off(&s6, &s6.sin6_port) == 2 && Off(&s6, &s6.sin6_flowinfo) == 4 &&
-                Off(&s6, &s6.sin6_addr) == 8 && Off(&s6, &s6.sin6_scope_id) == 24,
+    check(offFn(&s6, &s6.sin6_port) == 2 && offFn(&s6, &s6.sin6_flowinfo) == 4 &&
+                offFn(&s6, &s6.sin6_addr) == 8 && offFn(&s6, &s6.sin6_scope_id) == 24,
                 "sockaddr_in6 offsets");
 
     /* MSG_* flags differ between Linux and the BSDs */

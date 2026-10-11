@@ -14,7 +14,7 @@ i64 add(i64 a, i64 b) { return a + b; }
 i64 sub(i64 a, i64 b) { return a - b; }
 i64 dbl(i64 x) { return x * 2; }
 i64 apply(fn(i64 x) i64 f, i64 v) { return f(v); }
-u8 *Name(i64 i) { if (i) { return "one"; } return "zero"; }
+u8 *nameFn(i64 i) { if (i) { return "one"; } return "zero"; }
 i64 gHits = 0;
 void hit() { gHits++; }
 i64 count(...args) { return args.len; }
@@ -25,7 +25,7 @@ fn(i64 a, i64 b) i64 later;
 fn(i64 a, i64 b = 10) i64 k = &add;
 fn(i64 x) i64 p1 = &dbl; fn(i64 x) i64 p2;
 fn(fn(i64 x) i64 f, i64 v) i64 ap = &apply;
-fn(i64 i) u8 *nm = &Name;
+fn(i64 i) u8 *nm = &nameFn;
 fn() void cb = &hit;
 fn(...args) i64 va = &count;
 static fn(i64 x) i64 st = &dbl;

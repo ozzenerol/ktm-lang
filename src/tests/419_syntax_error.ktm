@@ -19,7 +19,7 @@ enum BankError { funds, locked };
 u8 gLog[256];
 i64 gLen = 0;
 
-void Log(u8 *s) {
+void logFn(u8 *s) {
     while (*s) { gLog[gLen++] = *s++; }
     gLog[gLen] = 0;
 }
@@ -86,21 +86,21 @@ bool rethrow() {
 
 /* through defers in two call frames */
 void inner() {
-    defer Log("i");
+    defer logFn("i");
     throw(BankError.locked, "locked %s", "account");
 }
 
 void outer() {
-    defer Log("o");
+    defer logFn("o");
     inner();
 }
 
 bool throughDefers() {
     try {
-        defer Log("t");
+        defer logFn("t");
         outer();
     } catch (Error e) {
-        Log("c");
+        logFn("c");
         return got("iotc") && e.code == BankError.locked &&
                      !str.cmp(e.message, "locked account") && inThisFile(&e);
     }
@@ -111,7 +111,7 @@ bool throughDefers() {
  * that is passing through */
 void deferWithTry() {
     defer {
-        try { throw(BankError.funds, "inside the defer"); } catch (Error x) { Log("x"); }
+        try { throw(BankError.funds, "inside the defer"); } catch (Error x) { logFn("x"); }
     }
     throw(BankError.locked, "outer");
 }
@@ -136,7 +136,7 @@ bool oldForms() {
 
 /* an error from a coroutine, rethrown by CoroutineNext */
 void *gen(void *arg) {
-    defer Log("g");
+    defer logFn("g");
     coro.yield((void *)1);
     throw(BankError.locked, "from %s", "coroutine");
     return null;

@@ -31,7 +31,7 @@ proc.Opts *opts(i64 in, i64 out, i64 err) {
 }
 
 /* Run argv with stdout piped; its output (Free it) and exit code. */
-u8 *Out(u8 **argv, proc.Opts *o, i64 *code) {
+u8 *outFn(u8 **argv, proc.Opts *o, i64 *code) {
     u8 *out = null;
     proc.Proc *p = proc.spawn(argv, o);
     if (!p) { return null; }
@@ -78,7 +78,7 @@ bool noShell()
 {// every argument arrives as it was, nothing is expanded or split
     u8 *a[] = {"printf", "%s|", "a b", "it's", "$HOME", ";", "*", "", "\"q\"", null};
     i64 code = -2;
-    u8 *s = Out(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    u8 *s = outFn(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
     bool ok = s && !str.cmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
     mem.free(s);
     u8 *e[] = {"echo", "hello", null};
@@ -91,15 +91,15 @@ bool noShell()
 bool redirects() {
     i64 code;
     u8 *cat[] = {"cat", null};
-    u8 *s = Out(cat, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    u8 *s = outFn(cat, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
     bool ok = s && !str.cmp(s, "") && code == 0;     /* stdin /dev/null: EOF */
     mem.free(s);
 
     u8 *both[] = {"sh", "-c", "echo out; echo err >&2", null};
-    s = Out(both, opts(proc.DEVNULL, proc.PIPE, proc.STDOUT), &code);
+    s = outFn(both, opts(proc.DEVNULL, proc.PIPE, proc.STDOUT), &code);
     ok = ok && s && !str.cmp(s, "out\nerr\n");
     mem.free(s);
-    s = Out(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL), &code);
+    s = outFn(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL), &code);
     ok = ok && s && !str.cmp(s, "out\n");
     mem.free(s);
 
@@ -127,7 +127,7 @@ bool cwdEnv() {
     u8 *pwd[] = {"pwd", null};
     proc.Opts *o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
     o.cwd = "/";
-    u8 *s = Out(pwd, o, &code);
+    u8 *s = outFn(pwd, o, &code);
     bool ok = s && !str.cmp(s, "/\n");
     mem.free(s);
 
@@ -135,12 +135,12 @@ bool cwdEnv() {
     u8 *env[] = {"KTM_379=replaced", null};
     o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
     o.env = env;
-    s = Out(show, o, &code);
+    s = outFn(show, o, &code);
     ok = ok && s && !str.cmp(s, "replaced|\n");      /* HOME is gone */
     mem.free(s);
 
     setenv("KTM_379", "inherited", 1);              /* set at run time */
-    s = Out(show, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    s = outFn(show, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
     ok = ok && s && str.len(s) > 10 && !str.cmpLen(s, "inherited|", 10);
     mem.free(s);
     return ok;
@@ -217,7 +217,7 @@ bool noLeak() {
                                                  srv, keep.inFd, keep.outFd);
     u8 *a[] = {"sh", "-c", script, null};
     i64 code;
-    u8 *s = Out(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    u8 *s = outFn(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
     ok = ok && s && !str.cmp(s, "closed\nclosed\nclosed\n");
     mem.free(s);
     mem.free(script);

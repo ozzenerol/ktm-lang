@@ -17,7 +17,7 @@ i64 F() { gCalls++; return 3; }
 i64 G(i64 a = 4, i64 b = 5) { return a + b; }
 f64 half() { return 0.5; }
 Pt *getPt() { return &gPt; }
-u8 *Name() { return "abc"; }
+u8 *nameFn() { return "abc"; }
 i64 twice(i64 x) { return x * 2; }
 
 i32 main() {
@@ -34,7 +34,7 @@ i32 main() {
     tests++;
     gPt.x = 7; gPt.y = 8;
     if (getPt().x == 7 && getPt().y == 8) { correct++; }
-    tests++; if (Name()[1] == 'b') { correct++; }
+    tests++; if (nameFn()[1] == 'b') { correct++; }
     tests++; if (twice(F()) == 6) { correct++; }
     tests++;
     i64 i = 0, n = 0;

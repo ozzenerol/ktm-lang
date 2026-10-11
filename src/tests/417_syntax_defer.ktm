@@ -18,7 +18,7 @@ enum Err { oops, in, def, co };
 u8 gLog[512];
 i64 gLen = 0;
 
-void Log(u8 *s) {
+void logFn(u8 *s) {
     while (*s) { gLog[gLen++] = *s++; }
     gLog[gLen] = 0;
 }
@@ -26,7 +26,7 @@ void Log(u8 *s) {
 void logNum(i64 n) {
     u8 buf[24];
     str.formatTo(buf, "%d", n);
-    Log(buf);
+    logFn(buf);
 }
 
 void reset() {
@@ -43,15 +43,15 @@ bool got(u8 *want) {
 }
 
 /* LIFO, and the inner block unwinds when it ends */
-void Order() {
-    defer Log("1");
+void orderFn() {
+    defer logFn("1");
     {
-        defer Log("2");
-        defer { Log("3"); }
-        Log("a");
+        defer logFn("2");
+        defer { logFn("3"); }
+        logFn("a");
     }
-    defer Log("4");
-    Log("b");
+    defer logFn("4");
+    logFn("b");
 }
 
 /* every iteration, also when left by continue and break */
@@ -60,20 +60,20 @@ void loop() {
         defer logNum(i);
         if (i == 1) { continue; }
         if (i == 3) { break; }
-        Log(".");
+        logFn(".");
     }
     i64 j = 0;
     while (true) {
-        defer Log("w");
+        defer logFn("w");
         if (++j == 2) { break; }
     }
 }
 
 /* a defer after an early return was not reached and does not run */
 i64 early(i64 x) {
-    defer Log("a");
+    defer logFn("a");
     if (x) { return 1; }
-    defer Log("b");
+    defer logFn("b");
     return 2;
 }
 
@@ -81,7 +81,7 @@ i64 early(i64 x) {
 i64 returnValue() {
     i64 *p = mem.alloc(sizeof(i64));
     *p = 42;
-    defer { *p = 0; mem.free(p); Log("f"); }
+    defer { *p = 0; mem.free(p); logFn("f"); }
     return *p;
 }
 
@@ -103,31 +103,31 @@ again:
         goto done;
     }
 done:
-    Log("d");
+    logFn("d");
 }
 
 /* a throw goes through the defers of two frames and is then caught */
 void thrower(i64 *seen) {
     i64 local = 5;
-    defer { Log("t"); *seen = local; }
+    defer { logFn("t"); *seen = local; }
     local = 9;
     throw(Err.oops);
 }
 
 void middle(i64 *seen) {
-    defer Log("m");
+    defer logFn("m");
     thrower(seen);
-    Log("X");
+    logFn("X");
 }
 
 bool unwinds() {
     i64 seen = 0;
     try {
-        defer Log("o");
+        defer logFn("o");
         middle(&seen);
-        Log("Y");
+        logFn("Y");
     } catch {
-        Log("c");
+        logFn("c");
     }
     return got("tmoc") && seen == 9 && Fs().exceptCh == Err.oops;
 }
@@ -136,30 +136,30 @@ bool unwinds() {
  * runs at its end as usual */
 bool tryInBlock() {
     {
-        defer Log("e");
+        defer logFn("e");
         try {
-            defer Log("i");
+            defer logFn("i");
             throw(Err.in);
         } catch {
-            Log("c");
+            logFn("c");
         }
-        Log("n");
+        logFn("n");
     }
     return got("icne");
 }
 
 /* a throw from a deferred statement goes on like any throw */
 void throwInDefer() {
-    defer Log("2");
+    defer logFn("2");
     {
         defer throw(Err.def);
-        Log("1");
+        logFn("1");
     }
-    Log("X");
+    logFn("X");
 }
 
 bool throwFromDefer() {
-    try { throwInDefer(); } catch { Log("c"); }
+    try { throwInDefer(); } catch { logFn("c"); }
     return got("12c") && Fs().exceptCh == Err.def;
 }
 
@@ -187,11 +187,11 @@ i64 inSwitch(i64 x) {
 
 /* a coroutine switch is not a way out of the block */
 void *gen(void *arg) {
-    defer Log("G");
+    defer logFn("G");
     for (i64 i = 0; i < 2; i++) {
-        defer Log("i");
+        defer logFn("i");
         coro.yield((void *)i);
-        Log("r");
+        logFn("r");
     }
     return null;
 }
@@ -199,9 +199,9 @@ void *gen(void *arg) {
 bool inCoroutine() {
     coro.Coroutine *c = coro.spawn(&gen, null);
     coro.next(c);
-    Log("|");
+    logFn("|");
     coro.next(c);
-    Log("|");
+    logFn("|");
     coro.next(c);
     bool ok = coro.done(c);
     coro.release(c);
@@ -211,11 +211,11 @@ bool inCoroutine() {
 /* a throw going through a defer in a coroutine, caught in it */
 void *genThrow(void *arg) {
     try {
-        defer Log("d");
+        defer logFn("d");
         coro.yield(null);
         throw(Err.co);
     } catch {
-        Log("c");
+        logFn("c");
     }
     return null;
 }
@@ -223,7 +223,7 @@ void *genThrow(void *arg) {
 bool throwInCoroutine() {
     coro.Coroutine *c = coro.spawn(&genThrow, null);
     coro.next(c);
-    Log("|");
+    logFn("|");
     coro.next(c);
     bool ok = coro.done(c);
     coro.release(c);
@@ -296,7 +296,7 @@ i32 main() {
     i64 correct = 0, tests = 0;
 
     reset();
-    tests++; Order();          if (got("a32b41")) { correct++; }
+    tests++; orderFn();          if (got("a32b41")) { correct++; }
     tests++; loop();           if (got(".01.23ww")) { correct++; }
     tests++;
     if (early(1) == 1 && got("a") && early(0) == 2 && got("ba")) { correct++; }

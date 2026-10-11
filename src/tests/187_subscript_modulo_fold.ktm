@@ -40,7 +40,7 @@ struct Holder {
     i64 vals[5];
 };
 
-i64 Idx(i64 i) { return i; }
+i64 idxFn(i64 i) { return i; }
 
 i32 main() {
     printf("Test - subscript modulo/division folding: ");
@@ -68,7 +68,7 @@ i32 main() {
     tests++; if (a[1] == 11) { correct++; } else { printf("Failed - a[ui %% un]\n"); }
     a[(i + 1) % n + 1] = 12;
     tests++; if (a[1] == 12) { correct++; } else { printf("Failed - a[(i + 1) %% n + 1]\n"); }
-    a[Idx(10) % n] = 13;
+    a[idxFn(10) % n] = 13;
     tests++; if (a[1] == 13) { correct++; } else { printf("Failed - a[Idx(10) %% n]\n"); }
     a[3 % n] = 14;
     tests++; if (a[0] == 14) { correct++; } else { printf("Failed - a[3 %% n]\n"); }

@@ -10,7 +10,7 @@ import json, mem, str;
 
 i64 gBad = 0;
 
-bool Err(u8 *json, i64 code, u8 *want) {
+bool errFn(u8 *json, i64 code, u8 *want) {
     json.Value *j = json.parse(json);
     u8 *e = json.errorStr(j);
     bool ok = !json.ok(j) && j.state.error == code && e && !str.cmp(e, want);
@@ -26,37 +26,37 @@ i32 main() {
 
     json.Value *spaced = json.parse("{\"a\" : 1}");
     tests++;
-    if (Err("{\"a\",1}", json.INVALID_KEY_VALUE_SEPARATOR,
+    if (errFn("{\"a\",1}", json.INVALID_KEY_VALUE_SEPARATOR,
                     "Expected ':' after an object key, got ',' at line 1, column 5") &&
-            Err("{\"a\" 1}", json.INVALID_KEY_VALUE_SEPARATOR,
+            errFn("{\"a\" 1}", json.INVALID_KEY_VALUE_SEPARATOR,
                     "Expected ':' after an object key, got '1' at line 1, column 6") &&
             json.ok(spaced)) { correct++; }
     json.release(spaced);
 
     tests++;
-    if (Err("[trux]", json.INVALID_LITERAL,
+    if (errFn("[trux]", json.INVALID_LITERAL,
                     "Invalid literal, expected true, false or null at line 1, column 2") &&
-            Err("[nul]", json.INVALID_LITERAL,
+            errFn("[nul]", json.INVALID_LITERAL,
                     "Invalid literal, expected true, false or null at line 1, column 2") &&
-            Err("{\"a\":\n [1,\n  fals]}", json.INVALID_LITERAL,
+            errFn("{\"a\":\n [1,\n  fals]}", json.INVALID_LITERAL,
                     "Invalid literal, expected true, false or null at line 3, column 3")) { correct++; }
 
     tests++;
-    if (Err("[1,2", json.INVALID_ARRAY_CHARACTER,
+    if (errFn("[1,2", json.INVALID_ARRAY_CHARACTER,
                     "Expected ',' or ']' in an array, got '\\0' at line 1, column 5") &&
-            Err("[1 2]", json.INVALID_ARRAY_CHARACTER,
+            errFn("[1 2]", json.INVALID_ARRAY_CHARACTER,
                     "Expected ',' or ']' in an array, got '2' at line 1, column 4") &&
-            Err("{\n\"a\":1,\n}", json.INVALID_KEY_TERMINATOR_CHARACTER,
+            errFn("{\n\"a\":1,\n}", json.INVALID_KEY_TERMINATOR_CHARACTER,
                     "Expected '\"' to start an object key, got '}' at line 3, column 1") &&
-            Err("", json.CANNOT_START_PARSE,
+            errFn("", json.CANNOT_START_PARSE,
                     "Expected a JSON value (object, array, string, number, true, false or null)"
                     " at line 1, column 1") &&
-            Err("[\"a\\q\"]", json.INVALID_ESCAPE_CHARACTER,
+            errFn("[\"a\\q\"]", json.INVALID_ESCAPE_CHARACTER,
                     "Invalid escape character 'q' after '\\' at line 1, column 5")) { correct++; }
 
     /* a control character is shown as \xNN; no message ends in a newline */
     tests++;
-    if (Err("[true\x01]", json.INVALID_ARRAY_CHARACTER,
+    if (errFn("[true\x01]", json.INVALID_ARRAY_CHARACTER,
                     "Expected ',' or ']' in an array, got '\\x01' at line 1, column 6")) { correct++; }
 
     /* success, null and inner nodes */

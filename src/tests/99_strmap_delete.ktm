@@ -32,7 +32,7 @@ u8 *dup(u8 *s) {
     return d;
 }
 
-u8 *Fmt(u8 *fmt, i64 i) {
+u8 *fmtFn(u8 *fmt, i64 i) {
     u8 tmp[64];
     str.formatTo(tmp, fmt, i);
     return dup(tmp);
@@ -98,7 +98,7 @@ i32 main() {
     big.setFreeKey(&countingFreeKey);
     big.setFreeValue(&countingFreeValue);
     for (i = 0; i < 10000; i++) {
-        big.set(Fmt("key-%d", i), box(i));
+        big.set(fmtFn("key-%d", i), box(i));
     }
     bad = 0;
     for (i = 0; i < 10000; i += 2) {
@@ -146,7 +146,7 @@ i32 main() {
 
     /* Updating surviving keys must not create duplicates. */
     for (i = 1; i < 10000; i += 2) {
-        big.set(Fmt("key-%d", i), box(i + 100000));
+        big.set(fmtFn("key-%d", i), box(i + 100000));
     }
     idx = 0;
     n = 0;
@@ -159,7 +159,7 @@ i32 main() {
 
     /* Re-insert the deleted half: they come after the survivors. */
     for (i = 0; i < 10000; i += 2) {
-        big.set(Fmt("key-%d", i), box(i));
+        big.set(fmtFn("key-%d", i), box(i));
     }
     idx = 0;
     n = 0;
@@ -201,7 +201,7 @@ i32 main() {
     cyc.set(dup("keep"), box(-1));
     bad = 0;
     for (i = 0; i < 20000; i++) {
-        cyc.set(Fmt("key-%d", i), box(i));
+        cyc.set(fmtFn("key-%d", i), box(i));
         str.formatTo(buf, "key-%d", i);
         if (!cyc.has(buf)) { bad++; }
         if (!cyc.delete(buf)) { bad++; }

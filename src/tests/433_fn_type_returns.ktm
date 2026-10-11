@@ -60,7 +60,7 @@ i64 sumT(i64 ...nums) {
     return t;
 }
 i32 count(u8 *f, ...args) { return args.len; }
-i64 Va(...args) { return args.len; }
+i64 vaFn(...args) { return args.len; }
 
 /* return types, pointers to function pointers */
 fn(u8 *) u8 * gDup = &dup;
@@ -126,7 +126,7 @@ i32 main() {
     else { printf("\n  %s\n", typeof(k)); }
 
     /* varargs, named or not, typed or not, first or not */
-    fn(...args) i64 va = &Va;
+    fn(...args) i64 va = &vaFn;
     fn(...args) i64 sn = &sumN;
     fn(i64 ...) i64 st = &sumT;
     fn(i64 ...nums) i64 st2 = &sumT;

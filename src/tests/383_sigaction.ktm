@@ -67,7 +67,7 @@ void install() {
     check(signal.bit(1) == 1 && signal.bit(libc.SIGTERM) == 0x4000 && signal.bit(0) == 0, "SigBit");
 }
 
-void Mask() {
+void maskFn() {
     signal.Action got;
     signal.handle(libc.SIGUSR2, (i64)(&onUsr2));
     signal.handle(libc.SIGUSR1, (i64)(&onUsr1), libc.SA_RESTART, signal.bit(libc.SIGUSR2));
@@ -168,7 +168,7 @@ i32 main() {
     printf("Test - sigaction: ");
     alarm(60);
     install();
-    Mask();
+    maskFn();
     restart();
     withSignal();
     i32 rc = runInChild(&childStop);

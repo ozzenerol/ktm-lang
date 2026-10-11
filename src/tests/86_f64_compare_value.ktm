@@ -17,7 +17,7 @@ void expect(i64 got, i64 want) {
 
 bool isTwo(f64 x) { return x == 2.0; }
 i64 less(f64 a, f64 c) { return a < c; }
-i64 Id(i64 v) { return v; }
+i64 idFn(i64 v) { return v; }
 
 i32 main() {
     i64 tests = 77;
@@ -83,7 +83,7 @@ i32 main() {
 
     /* Function arguments and return values. */
     expect(b < c, 1);
-    expect(Id(b > 1.0), 1);
+    expect(idFn(b > 1.0), 1);
     expect(isTwo(2.0), 1);
     expect(isTwo(3.0), 0);
     expect(less(b, c), 1);

@@ -64,8 +64,8 @@ bool callingAFunctionPointer(void *ptr)
     return (i32)((Ptr *)ptr).fn_(5) == 7;
 }
 
-bool callingAFunctionPointerPart2(void *_ptr) {
-    Ptr *ptr = (Ptr *)_ptr;
+bool callingAFunctionPointerPart2(void *ptrArg) {
+    Ptr *ptr = (Ptr *)ptrArg;
     ptr.fn_ = &add2;
     return (i32)ptr.fn_(5) == 7;
 }

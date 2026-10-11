@@ -28,7 +28,7 @@ f64 squareArea(Shape *s) { return s.w * s.w; }
 f64 halfArea(Shape *s) { return s.w / 2.0; }
 i64 dbl(i64 x) { gCalls++; return x * 2; }
 i64 seven() { return 7; }
-i64 Add3(i64 a, i64 b, i64 c) { return a + b + c; }
+i64 add3Fn(i64 a, i64 b, i64 c) { return a + b + c; }
 
 S gS;
 S *getS() { return &gS; }
@@ -58,7 +58,7 @@ i32 main() {
     S s;
     s.f = &dbl;
     s.none = &seven;
-    s.add3 = &Add3;
+    s.add3 = &add3Fn;
     s.v = 9;
     gS = s;
 

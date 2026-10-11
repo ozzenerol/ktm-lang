@@ -11,7 +11,7 @@ import os;
 i64 correct = 0;
 i64 tests = 3;
 
-i64 Mode() {
+i64 modeFn() {
 #ifjit
     return 1;
 #else
@@ -36,7 +36,7 @@ i64 aot_only = 0;
 
 #ifdef __KTM_AOT__
 #else
-if (Mode() == 1) correct++;
+if (modeFn() == 1) correct++;
 if (Mode2() == 1) correct++;
 if (aot_only == 0) correct++;
 #endif
@@ -44,7 +44,7 @@ if (aot_only == 0) correct++;
 
 void main() {
     printf("Test - #ifjit / #ifaot: ");
-    if (Mode() == 2) { correct++; }
+    if (modeFn() == 2) { correct++; }
     if (mode2() == 2) { correct++; }
     if (aotOnly == 42) { correct++; }
     test.printResult(correct, tests);

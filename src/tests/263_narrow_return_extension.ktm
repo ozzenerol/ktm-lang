@@ -34,7 +34,7 @@ i32 truncI32(i64 x) { return x; }
 u16 truncU16(i64 x) { return x; }
 i8 truncI8(i64 x) { return x; }
 
-i64 Id(i64 x) { return x; }
+i64 idFn(i64 x) { return x; }
 
 #ifdef IS_X86_64
 asm {
@@ -53,7 +53,7 @@ i32 main() {
 
     tests++;
     if (libc.strcmp("a", "b") < 0 && libc.strcmp("b", "a") > 0 && libc.strcmp("a", "a") == 0 &&
-            Id(libc.strcmp("a", "b")) < 0 && libc.strcmp("a", "b") + 0 < 0 && -libc.strcmp("a", "b") > 0) {
+            idFn(libc.strcmp("a", "b")) < 0 && libc.strcmp("a", "b") + 0 < 0 && -libc.strcmp("a", "b") > 0) {
         correct++;
             } else { printf("Failed - strcmp: %d\n", libc.strcmp("a", "b") < 0); }
 
@@ -62,7 +62,7 @@ i32 main() {
     if (libc.atol("511") == -1 && libc.atol("511") < 0 && atoll("511") == 255 &&
             strtol("1ffff", null, 16) == -1 && labs(0x7700000000010002) == 2 &&
             llabs(0x100000007) == 7 && llabs(0x1ffffffff) == 0xffffffff &&
-            Id(libc.atol("383")) == 127) {
+            idFn(libc.atol("383")) == 127) {
         correct++;
             } else { printf("Failed - C: %d %d %d %d %d\n", libc.atol("511"), atoll("511"),
                  strtol("1ffff", null, 16), labs(0x7700000000010002), llabs(0x100000007));
@@ -101,7 +101,7 @@ i32 main() {
     if (gI32(big | 0xffffffff)) { n++; }
     if (!gU8(big | 0x100)) { n++; }
     tests++;
-    if (n == 2 && Id(gI16(big | 0xfffe)) == -2 &&
+    if (n == 2 && idFn(gI16(big | 0xfffe)) == -2 &&
             gI8(big | 0xfe) * 3 == -6 && (gU16(big | 0x10002) << 1) == 4) {
         correct++;
             } else { printf("Failed - in expressions\n"); }

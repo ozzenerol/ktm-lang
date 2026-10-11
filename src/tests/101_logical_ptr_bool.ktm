@@ -18,7 +18,7 @@ bool F() { gCalls++; return false; }
 u8 C0() { gCalls++; return 0; }
 i8 cNeg() { gCalls++; return -1; }
 
-i64 Id(i64 x) { return x; }
+i64 idFn(i64 x) { return x; }
 bool retOr(u8 *p) { return p || T(); }
 bool retAnd(u8 *p) { return p && T(); }
 
@@ -112,7 +112,7 @@ i32 main() {
     if (r == 1) { correct++; }
     r = (T() && q) + (q || T()) + (p || T());
     if (r == 3) { correct++; }
-    if (Id(p || T()) == 1 && Id(q && F()) == 0) { correct++; }
+    if (idFn(p || T()) == 1 && idFn(q && F()) == 0) { correct++; }
 
     /* The right operand is tested as a whole, not truncated to a byte:
      * a pointer / i64 whose low byte is 0 is still true. */

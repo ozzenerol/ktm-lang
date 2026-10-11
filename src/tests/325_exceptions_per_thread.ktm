@@ -43,7 +43,7 @@ void waitForAllWorkers() {
     } while (n < WORKERS);
 }
 
-void Raise(i64 v) {
+void raiseFn(i64 v) {
     throw(v);
 }
 
@@ -55,7 +55,7 @@ void *worker(Work *w) {
         v = w.id * 1000000 + i;
         try {
             try {
-                Raise(v);
+                raiseFn(v);
             } catch (Error e) {
                 if (e.code == v) { w.inner++; }
                 else { w.wrong++; }
@@ -135,7 +135,7 @@ i32 main() {
             libc.pthread_join(work[i].th);
         }
         /* Still inside this thread's try: the workers never touched it. */
-        Raise('Main');
+        raiseFn('Main');
     } catch (Error e) {
         after = e.code;
     }
@@ -158,7 +158,7 @@ i32 main() {
     if (Fs() == Fs() && Fs().catchTop == null) { correct++; }
 
     try {
-        Raise('Again');
+        raiseFn('Again');
     } catch (Error e) {
         if (e.code == 'Again') { correct++; }
     }

@@ -84,7 +84,7 @@ void main()
 
 /* runtime: implicitly converted arguments arrive converted */
 f64 halve(f64 x) { return x / 2.0; }
-i64 Trunc(i64 x) { return x; }
+i64 truncFn(i64 x) { return x; }
 i64 wide(i64 x) { return x; }
 struct Base { i64 v; };
 struct Derived : Base { i64 w; };
@@ -157,7 +157,7 @@ i32 main() {
 
     /* the conversions themselves */
     tests++; if (halve(5) == 2.5) { correct++; }
-    tests++; if (Trunc(7.9) == 7) { correct++; }
+    tests++; if (truncFn(7.9) == 7) { correct++; }
     tests++; if (wide(small) == 200) { correct++; }
     dv.v = 41;
     dv.w = 1;

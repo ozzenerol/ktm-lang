@@ -30,7 +30,7 @@ u8 *dup(u8 *s) {
 }
 
 /* Allocate test strings in this file so -Memsafe tracks every one. */
-u8 *Fmt(u8 *fmt, i64 i) {
+u8 *fmtFn(u8 *fmt, i64 i) {
     u8 tmp[64];
     str.formatTo(tmp, fmt, i);
     return dup(tmp);
@@ -117,7 +117,7 @@ i32 main() {
     str.copy(buf, "gone");
     bad = 0;
     for (i = 0; i < 2000; i++) {
-        u8 *k = Fmt("word-%d", i);
+        u8 *k = fmtFn("word-%d", i);
         if ((i64)big.get(k) != 3) { bad++; }
         mem.free(k);
     }
@@ -140,7 +140,7 @@ i32 main() {
     own.setFreeKey(&countingFreeKey);
     own.setFreeValue(&countingFreeValue);
     for (i = 0; i < 100; i++) {
-        u8 *k = Fmt("k%d", i);
+        u8 *k = fmtFn("k%d", i);
         own.set(dup(k), box(i));
         mem.free(k);
     }
@@ -148,7 +148,7 @@ i32 main() {
     if (gKeyFrees == 0 && gValueFrees == 0 && own.size == 100) { correct++; }
 
     for (i = 0; i < 100; i++) {
-        u8 *k = Fmt("k%d", i);
+        u8 *k = fmtFn("k%d", i);
         own.set(dup(k), box(i + 1000));
         mem.free(k);
     }
@@ -167,7 +167,7 @@ i32 main() {
 
     bad = 0;
     for (i = 0; i < 100; i++) {
-        u8 *k = Fmt("k%d", i);
+        u8 *k = fmtFn("k%d", i);
         i64 *v = own.get(k);
         if (!v || *v != i + 1000) { bad++; }
         mem.free(k);

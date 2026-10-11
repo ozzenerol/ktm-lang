@@ -13,7 +13,7 @@ struct Narrow {
 u8 gU8;
 i32 gI32;
 
-i64 Id(i64 x) { return x; }
+i64 idFn(i64 x) { return x; }
 
 i32 main() {
     i64 correct = 0, tests = 24;
@@ -69,7 +69,7 @@ i32 main() {
     if ((u += 300) == 54 && u == 54) { correct++; }
 
     /* As a function argument and through memory targets. */
-    if (Id((u = 300)) == 44) { correct++; }
+    if (idFn((u = 300)) == 44) { correct++; }
     Narrow n;
     Narrow *np = &n;
     if ((n.b = 300) == 44 && n.b == 44) { correct++; }

@@ -44,14 +44,14 @@ bool generator() {
     return true;
 }
 
-void *Sum(void *start) {
+void *sumFn(void *start) {
     i64 total = (i64)start;
     while (true) { total += (i64)coro.yield((void *)total); }
     return null;
 }
 
 bool sendValues() {
-    coro.Coroutine *c = coro.spawn(&Sum, (void *)100);
+    coro.Coroutine *c = coro.spawn(&sumFn, (void *)100);
     if ((i64)coro.next(c, (void *)555) != 100) { return false; } /* send ignored */
     if ((i64)coro.next(c, (void *)5) != 105) { return false; }
     if ((i64)coro.next(c, (void *)7) != 112) { return false; }
@@ -247,7 +247,7 @@ bool many() {
 void *threadMain(void *arg) {
     i64 *res = arg, rounds, sum = 0;
     for (rounds = 0; rounds < 200; rounds++) {
-        coro.Coroutine *c = coro.spawn(&Sum, (void *)0, 16 * 1024);
+        coro.Coroutine *c = coro.spawn(&sumFn, (void *)0, 16 * 1024);
         coro.next(c);
         for (i64 i = 1; i <= 10; i++) { sum = (i64)coro.next(c, (void *)i) + sum; }
         coro.release(c);

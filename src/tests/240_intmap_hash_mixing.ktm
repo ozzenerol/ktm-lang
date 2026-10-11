@@ -33,7 +33,7 @@ i64 maxProbe(map.IntMap *m) {
 }
 
 /* Insert, find and delete `n` keys `i * mul` (or `i << shift`) */
-i64 Run(i64 n, i64 shift, i64 mul) {
+i64 runFn(i64 n, i64 shift, i64 mul) {
     map.IntMap *m = map.intNew();
     for (i64 i = 0; i < n; i++) { m.set((i * mul) << shift, (void *)i); }
     for (i64 i = 0; i < n; i++) {
@@ -54,12 +54,12 @@ i32 main() {
     i64 tests = 0;
     i64 correct = 0;
     i64 t0 = nowUs();
-    i64 w12 = Run(40000, 12, 1);
-    i64 w20 = Run(40000, 20, 1);
-    i64 w32 = Run(40000, 32, 1);
-    i64 w1k = Run(40000, 0, 1024);
-    i64 wneg = Run(40000, 16, -1);
-    i64 wseq = Run(40000, 0, 1);
+    i64 w12 = runFn(40000, 12, 1);
+    i64 w20 = runFn(40000, 20, 1);
+    i64 w32 = runFn(40000, 32, 1);
+    i64 w1k = runFn(40000, 0, 1024);
+    i64 wneg = runFn(40000, 16, -1);
+    i64 wseq = runFn(40000, 0, 1);
     i64 ms = (nowUs() - t0) / 1000;
 
     tests++;

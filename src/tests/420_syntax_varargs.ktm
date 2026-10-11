@@ -71,9 +71,9 @@ i64 doubled(i64 ...nums) {
 }
 
 /* recursion: each call has its own extras */
-i64 Depth(i64 n, i64 ...extra) {
+i64 depthFn(i64 n, i64 ...extra) {
     if (n == 0) { return sum(...extra); }
-    return Depth(n - 1, n, n * 10) + extra.len;
+    return depthFn(n - 1, n, n * 10) + extra.len;
 }
 
 /* no implicit argc / argv: a parameter of that name is not shadowed */
@@ -147,7 +147,7 @@ i32 main() {
     tests++; if (total() == 0 && total(4, 5, 6) == 15) { correct++; }
     tests++; if (sum(sum(1, 2), sum(), sum(3)) == 6) { correct++; }
     tests++; if (doubled(1, 2, 3) == 12) { correct++; }
-    tests++; if (Depth(3) == 15) { correct++; }
+    tests++; if (depthFn(3) == 15) { correct++; }
     tests++; if (argcParam(3, 9, 9) == 302) { correct++; }
     /* through a function pointer */
     fn(i64 ...n) i64 fp = &sum;

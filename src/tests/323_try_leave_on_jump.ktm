@@ -6,7 +6,7 @@ enum Err { neg, in };
  * its catch frame, so the next throw longjmp'd into the stack of a
  * function that had already returned (segfault or endless loop). */
 
-i64 Depth() {
+i64 depthFn() {
     if (!Fs()) { return 0; }
     i64 n = 0;
     CatchFrame *f = Fs().catchTop;
@@ -164,14 +164,14 @@ i64 gotos() {
     } catch {
     }
 out:
-    r += Depth();
+    r += depthFn();
     try {
         try {
             goto mid;
         } catch {
         }
 mid:
-        r += Depth() * 10;
+        r += depthFn() * 10;
         boom('Mid');
     } catch (Error e) {
         if (e.code == 'Mid') { r += 100; }
@@ -189,20 +189,20 @@ again:
 
 i32 main() {
     printf("Test - jumping out of a try body pops its catch frame: ");
-    i64 correct = 0, tests = 16, base = Depth();
+    i64 correct = 0, tests = 16, base = depthFn();
 
-    if (retInTry(5) == 10 && Depth() == base) { correct++; }
-    if (retInTry(0) == -2 && Depth() == base) { correct++; }
-    if (retComputed(4) == 15 && Depth() == base) { correct++; }
-    if (retComputed(-1) == -Err.neg && Depth() == base) { correct++; }
+    if (retInTry(5) == 10 && depthFn() == base) { correct++; }
+    if (retInTry(0) == -2 && depthFn() == base) { correct++; }
+    if (retComputed(4) == 15 && depthFn() == base) { correct++; }
+    if (retComputed(-1) == -Err.neg && depthFn() == base) { correct++; }
     if (retNested(1) == 100 && retNested(2) == 200 && retNested(3) == 300 &&
-            Depth() == base) { correct++; }
-    if (retFromCatch() == 7 && Depth() == base) { correct++; }
-    if (retInLoopInTry(4) == 4 && Depth() == base) { correct++; }
-    if (breakLoops() == 500 + 5 + 3 && Depth() == base) { correct++; }
-    if (switchBreak(1) == 1 && switchBreak(0) == 2 && Depth() == base) { correct++; }
-    if (breakInsideTry() == 11 && Depth() == base) { correct++; }
-    if (gotos() == 0 + 10 + 100 + 3000 && Depth() == base) { correct++; }
+            depthFn() == base) { correct++; }
+    if (retFromCatch() == 7 && depthFn() == base) { correct++; }
+    if (retInLoopInTry(4) == 4 && depthFn() == base) { correct++; }
+    if (breakLoops() == 500 + 5 + 3 && depthFn() == base) { correct++; }
+    if (switchBreak(1) == 1 && switchBreak(0) == 2 && depthFn() == base) { correct++; }
+    if (breakInsideTry() == 11 && depthFn() == base) { correct++; }
+    if (gotos() == 0 + 10 + 100 + 3000 && depthFn() == base) { correct++; }
 
     /* After all of that a throw reaches the live try, not a dead frame. */
     i64 caught = 0, i;
@@ -237,7 +237,7 @@ i32 main() {
     }
     if (got == 'Ok') { correct++; }
 
-    if (Depth() == base) { correct++; }
+    if (depthFn() == base) { correct++; }
     if (retComputed(9) == 30) { correct++; }
 
     test.printResult(correct, tests);

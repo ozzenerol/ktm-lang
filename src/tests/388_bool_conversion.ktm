@@ -30,7 +30,7 @@ bool is(bool b, i64 want) {
     return ((u8 *)(&b))[0] == want;
 }
 
-i64 Arg(bool b) { return ((u8 *)(&b))[0]; }
+i64 argFn(bool b) { return ((u8 *)(&b))[0]; }
 i64 defArg(bool b = 0x800) { return ((u8 *)(&b))[0]; }
 bool retInt(i64 x) { return x; }
 bool retU64(u64 x) { return x; }
@@ -42,15 +42,15 @@ void args(u8 *p) {
     i64 m = -1;
     f64 f = 0.5;
     f32 vF32 = 0.25;
-    fn(bool) i64 fp = &Arg;
-    check(Arg(h) == 1, "arg 0x100");
-    check(Arg(big) == 1, "arg 0x800");
-    check(Arg(m) == 1, "arg -1");
-    check(Arg(f) == 1, "arg 0.5");
-    check(Arg(vF32) == 1, "arg f32 0.25");
-    check(Arg(p) == 1, "arg pointer");
-    check(Arg(0) == 0 && Arg(0.0) == 0 && Arg(null) == 0, "arg 0");
-    check(Arg(0x100) == 1 && Arg(0.5) == 1, "arg constants");
+    fn(bool) i64 fp = &argFn;
+    check(argFn(h) == 1, "arg 0x100");
+    check(argFn(big) == 1, "arg 0x800");
+    check(argFn(m) == 1, "arg -1");
+    check(argFn(f) == 1, "arg 0.5");
+    check(argFn(vF32) == 1, "arg f32 0.25");
+    check(argFn(p) == 1, "arg pointer");
+    check(argFn(0) == 0 && argFn(0.0) == 0 && argFn(null) == 0, "arg 0");
+    check(argFn(0x100) == 1 && argFn(0.5) == 1, "arg constants");
     check(fp(big) == 1, "arg through a function pointer");
     check(defArg() == 1, "default 0x800, called with ()");
     check(defArg() == 1, "default 0x800, called without ()");

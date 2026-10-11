@@ -14,7 +14,7 @@ u16 struct W { u8 lo, hi; };
 i32 struct N { i16 a, b; };
 u64 struct UC { u32 a, b; };
 
-f64 Id(f64 x) { return x; }
+f64 idFn(f64 x) { return x; }
 f32 id32(f32 x) { return x; }
 f64 fromDate(date.Date d) { return d; }
 date.Date toDate(f64 f) { return f; }
@@ -81,7 +81,7 @@ i32 main() {
     if (f == 14.0) { correct++; }
 
     /* Arguments, returns, and an argument among other parameters. */
-    if (Id(d) == 7.0 && id32(d) == 7.0) { correct++; }
+    if (idFn(d) == 7.0 && id32(d) == 7.0) { correct++; }
     if (fromDate(d) == 7.0 && fromDate(-3) == -3.0) { correct++; }
     if (sum3(d, d, 0.5) == 14.5) { correct++; }
 

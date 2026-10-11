@@ -11,10 +11,10 @@ import fs, libc, mem, proc, str;
 #define CI_OUT "./ktm-222-ci.out"
 
 /* Compile `source`; `*_status` gets ktm's exit code; returns its output */
-u8 *diagnose(u8 *source, i64 *_status) {
+u8 *diagnose(u8 *source, i64 *statusArg) {
     proc.shell("rm -f " CI_SRC " " CI_OUT);
     fs.writeAll(CI_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    *_status = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    *statusArg = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " CI_SRC " -o /dev/null > " CI_OUT " 2>&1");
     u8 *out = fs.readAll(CI_OUT);

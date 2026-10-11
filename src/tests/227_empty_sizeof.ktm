@@ -10,13 +10,13 @@ import fs, libc, mem, proc, str;
 #define SZ_OUT "./ktm-227-sz.out"
 
 /* Run ktm with `flags` on `source`; `*_status` gets its exit status */
-u8 *diagnose(u8 *source, u8 *flags, i64 *_status) {
+u8 *diagnose(u8 *source, u8 *flags, i64 *statusArg) {
     proc.shell("rm -f " SZ_SRC " " SZ_OUT);
     fs.writeAll(SZ_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     u8 *cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "%s " SZ_SRC " > " SZ_OUT " 2>&1", flags);
-    *_status = proc.shell(cmd);
+    *statusArg = proc.shell(cmd);
     mem.free(cmd);
     u8 *out = fs.readAll(SZ_OUT);
     proc.shell("rm -f " SZ_SRC " " SZ_OUT);

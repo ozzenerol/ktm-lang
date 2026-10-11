@@ -15,7 +15,7 @@ void freeKey(void *p) {
     mem.free(p);
 }
 
-u8 *Str(void *v) {
+u8 *strFn(void *v) {
     return str.formatTo(null, "%d", v);
 }
 
@@ -62,7 +62,7 @@ i32 main() {
     m.delete("b");
     m.set("b", (void *)9);
     u8 *keys = m.keysToStr();
-    u8 *all = m.toStr(&Str);
+    u8 *all = m.toStr(&strFn);
     tests++;
     if (!str.cmp(keys, "{a, c, d, e, b}") &&
             !str.cmp(all, "{[a] => 0, [c] => 2, [d] => 3, [e] => 4, [b] => 9}")) {

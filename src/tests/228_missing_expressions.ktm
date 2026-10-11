@@ -13,10 +13,10 @@ import fs, libc, mem, proc, str;
 #define EE_SRC "./ktm-228-ee.ktm"
 #define EE_OUT "./ktm-228-ee.out"
 
-u8 *diagnose(u8 *source, i64 *_status) {
+u8 *diagnose(u8 *source, i64 *statusArg) {
     proc.shell("rm -f " EE_SRC " " EE_OUT);
     fs.writeAll(EE_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    *_status = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    *statusArg = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-jit " EE_SRC " > " EE_OUT " 2>&1");
     u8 *out = fs.readAll(EE_OUT);

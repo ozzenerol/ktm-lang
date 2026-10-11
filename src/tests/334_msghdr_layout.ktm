@@ -17,7 +17,7 @@ void check(bool ok, u8 *what) {
     else { printf("\n  failed: %s\n", what); }
 }
 
-i64 Off(libc.msghdr *m, void *field) {
+i64 offFn(libc.msghdr *m, void *field) {
     return (u8 *)field - (u8 *)m;
 }
 
@@ -36,16 +36,16 @@ i32 main() {
 
 #ifdef IS_LINUX
     check(sizeof(libc.msghdr) == 56, "sizeof(msghdr)");
-    check(Off(&m, &m.msg_controllen) == 40, "msg_controllen offset");
-    check(Off(&m, &m.msg_flags) == 48, "msg_flags offset");
+    check(offFn(&m, &m.msg_controllen) == 40, "msg_controllen offset");
+    check(offFn(&m, &m.msg_flags) == 48, "msg_flags offset");
 #else
     Check(sizeof(libc.msghdr) == 48, "sizeof(msghdr)");
-    Check(Off(&m, &m.msg_controllen) == 40, "msg_controllen offset");
-    Check(Off(&m, &m.msg_flags) == 44, "msg_flags offset");
+    Check(offFn(&m, &m.msg_controllen) == 40, "msg_controllen offset");
+    Check(offFn(&m, &m.msg_flags) == 44, "msg_flags offset");
 #endif
-    check(Off(&m, &m.msg_iov) == 16, "msg_iov offset");
-    check(Off(&m, &m.msg_iovlen) == 24, "msg_iovlen offset");
-    check(Off(&m, &m.msg_control) == 32, "msg_control offset");
+    check(offFn(&m, &m.msg_iov) == 16, "msg_iov offset");
+    check(offFn(&m, &m.msg_iovlen) == 24, "msg_iovlen offset");
+    check(offFn(&m, &m.msg_control) == 32, "msg_control offset");
 
     /* sendmsg/recvmsg with two buffers, over a stale struct */
     check(socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, sv) == 0, "socketpair");

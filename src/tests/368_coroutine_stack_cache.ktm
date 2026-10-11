@@ -17,7 +17,7 @@ extern "c" i32 msync(void *addr, u64 len, i32 flags);
 const i64 MS_ASYNC = 1;  /* same value on Linux and macOS */
 
 /* Is the page at addr still mapped? msync fails (ENOMEM) on unmapped memory. */
-bool Mapped(void *addr) {
+bool mappedFn(void *addr) {
     return msync(addr, libc.getpagesize(), MS_ASYNC) == 0;
 }
 
@@ -103,9 +103,9 @@ bool bounded() {
     if (fs.coroCached != 16) { return false; }
     /* the first ones released filled the cache, the rest were unmapped */
     i64 mapped = 0;
-    for (i = 0; i < MANY; i++) { if (Mapped(tops[i])) { mapped++; } }
+    for (i = 0; i < MANY; i++) { if (mappedFn(tops[i])) { mapped++; } }
     if (mapped != 16 - start) { return false; }
-    return !Mapped(tops[MANY - 1]);
+    return !mappedFn(tops[MANY - 1]);
 }
 
 bool cycles() {
@@ -138,7 +138,7 @@ bool threadExit() {
     i64 cached = 0, i, still = 0;
     libc.pthread_create(&t, null, &threadMain, &cached);
     libc.pthread_join(t);
-    for (i = 0; i < 8; i++) { if (Mapped(gTops[i])) { still++; } }
+    for (i = 0; i < 8; i++) { if (mappedFn(gTops[i])) { still++; } }
     return cached == 8 && still == 0;
 }
 

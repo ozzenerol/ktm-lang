@@ -42,7 +42,7 @@ u8 *both =
 "}\n";
 
 /* Split s at each newline, in place: up to max lines into out. */
-i64 Lines(u8 *s, u8 **out, i64 max) {
+i64 linesFn(u8 *s, u8 **out, i64 max) {
     i64 n = 0;
     if (!s) { return 0; }
     while (*s && n < max) {
@@ -64,7 +64,7 @@ i32 main() {
     tests++;   /* each printf line equals the print statement after it */
     i64 pairsOk = 1;
     u8 *copy = str.dup(out), *lines[32];
-    i64 count = Lines(copy, lines, 32);
+    i64 count = linesFn(copy, lines, 32);
     if (count == 19) {
         /* 8 pairs, then the 42 whose length printf returns, then 2 counts */
         for (i = 0; i < 16; i += 2) { if (str.cmp(lines[i], lines[i + 1])) { pairsOk = 0; } }

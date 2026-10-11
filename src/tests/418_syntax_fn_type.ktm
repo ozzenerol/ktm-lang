@@ -28,7 +28,7 @@ void handler0(i64 n, u8 *s) { printf("h0 %d %s\n", n, s); }
 
 /* a struct field */
 struct Server { fn(i32) void onAccept; };
-void OnAccept(i32 fd) { printf("accepted %d\n", fd); }
+void onAcceptFn(i32 fd) { printf("accepted %d\n", fd); }
 
 /* a function returning a function pointer */
 fn(i64) i64 pick(bool sq) {
@@ -135,9 +135,9 @@ i32 main() {
     /* a struct field of fn(...) type */
     tests++;
     Server srv;
-    srv.onAccept = &OnAccept;
+    srv.onAccept = &onAcceptFn;
     srv.onAccept(9);
-    if (srv.onAccept == &OnAccept) { correct++; }
+    if (srv.onAccept == &onAcceptFn) { correct++; }
     else { printf("\n  struct field of fn(...) type\n"); }
 
     /* varargs through fn(...), with and without a fixed parameter first */

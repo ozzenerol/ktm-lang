@@ -23,7 +23,7 @@ void cleanupPrintFmt(void) {
 /* ktm's output (and the program's, piped) for `src`, built with `how`
  * ("-jit", or "-o" to compile a binary and run it); null if it can't be
  * written or read. *_res gets the exit status. */
-u8 *runPrint(u8 *src, u8 *how, i64 *_res) {
+u8 *runPrint(u8 *src, u8 *how, i64 *resArg) {
     u8 *cmd;
     cleanupPrintFmt();
     if (!fs.writeAll(PF_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
@@ -34,7 +34,7 @@ u8 *runPrint(u8 *src, u8 *how, i64 *_res) {
     } else {
         cmd = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PF_FILE " -o " PF_BIN " > " PF_OUT " 2>&1 && ./" PF_BIN " > " PF_OUT " 2>&1";
     }
-    *_res = proc.shell(cmd);
+    *resArg = proc.shell(cmd);
     return fs.readAll(PF_OUT);
 }
 

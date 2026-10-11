@@ -35,7 +35,7 @@ bool exists(u8 *path) {
     return libc.lstat(path, &st) == 0;
 }
 
-i64 Run(u8 *fmt, u8 *root) {
+i64 runFn(u8 *fmt, u8 *root) {
     u8 *cmd = str.formatTo(null, fmt, root, root, root, root, root, root);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
@@ -55,16 +55,16 @@ i32 main() {
     }
 
     fs.writeAll(str.formatTo(tree, "%s/dtunk.c", root), SHIM_SRC, str.len(SHIM_SRC));
-    if (Run("[ \"$(uname)\" = Linux ] && command -v cc >/dev/null 2>&1 && "
+    if (runFn("[ \"$(uname)\" = Linux ] && command -v cc >/dev/null 2>&1 && "
                     "cd '%s' && cc -shared -fPIC -o dtunk.so dtunk.c -ldl", root) != 0) {
         /* No shim possible here: nothing to test */
         correct = tests;
     } else {
         fs.writeAll(str.formatTo(tree, "%s/p.ktm", root), PROG_SRC, str.len(PROG_SRC));
-        Run("mkdir -p '%s/t/a/b/c' '%s/t/d' && echo x > '%s/t/a/f' && "
+        runFn("mkdir -p '%s/t/a/b/c' '%s/t/d' && echo x > '%s/t/a/f' && "
                 "echo y > '%s/t/a/b/c/g' && echo z > '%s/t/top'", root);
         str.formatTo(tree, "%s/t", root);
-        if (Run("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+        if (runFn("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                         "'%s/p.ktm' -o '%s/p' && cd '%s' && "
                         "LD_PRELOAD='%s/dtunk.so' ./p '%s/t' > '%s/out' 2>&1",
                         root) == 0) {
@@ -77,7 +77,7 @@ i32 main() {
         if (!exists(str.formatTo(tree, "%s/t", root))) { correct++; }
     }
 
-    Run("rm -rf '%s'", root);
+    runFn("rm -rf '%s'", root);
 
     test.printResult(correct, tests);
     printf("====\n");

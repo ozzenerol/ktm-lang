@@ -15,7 +15,7 @@ f64 fromI32(i32 b) { return b; }
 f64 fromU32(u32 b) { return b; }
 f32 f32Conv(i64 u) { return u; }
 f64 same(f64 f) { return f * 2.0; }
-i64 Trunc(f64 f) { return f; }
+i64 truncFn(f64 f) { return f; }
 i64 truncExpr(f64 f) { return f * 2.0; }
 i64 truncF32(f32 f) { return f; }
 u8 toU8(f64 f) { return f; }
@@ -41,8 +41,8 @@ i32 main() {
 
     /* Same truncation an assignment `i64 x = f;` does. */
     assign = neg;
-    if (Trunc(3.7) == 3) { correct++; }
-    if (Trunc(neg) == assign && assign == -3) { correct++; }
+    if (truncFn(3.7) == 3) { correct++; }
+    if (truncFn(neg) == assign && assign == -3) { correct++; }
     if (truncExpr(1.75) == 3) { correct++; }
     if (truncF32(9.5) == 9) { correct++; }
     if (toU8(200.5) == 200) { correct++; }
@@ -52,11 +52,11 @@ i32 main() {
 
     /* Through function pointers and nested calls. */
     fn(i64) f64 fp = &conv;
-    fn(f64) i64 tp = &Trunc;
+    fn(f64) i64 tp = &truncFn;
     if (fp(9) == 9.0) { correct++; }
     if (tp(8.9) == 8) { correct++; }
-    if (conv(Trunc(conv2(2))) == 4.0) { correct++; }
-    if (conv(conv2(1)) == 2.0 && Trunc(conv(Trunc(lit()))) == 3) { correct++; }
+    if (conv(truncFn(conv2(2))) == 4.0) { correct++; }
+    if (conv(conv2(1)) == 2.0 && truncFn(conv(truncFn(lit()))) == 3) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

@@ -34,7 +34,7 @@ i64 C(fn(i64) i64 f = &D, i64 x = 5) { fn(i64) i64 g = f; return f(x) + g(1) + (
 /* enum members after `(` */
 enum Color { red, blue };
 enum Kind { x, y };
-i64 Id(i64 v) { return v; }
+i64 idFn(i64 v) { return v; }
 
 /* casts to fn types */
 i64 call(fn(i64) i64 f, i64 v) { return f(v); }
@@ -51,7 +51,7 @@ i32 main() {
 
     i64 e1 = (Color.blue ^ 1);
     i64 e2 = (Kind.y + 1) * 2;
-    i64 e3 = Id((Kind.y));
+    i64 e3 = idFn((Kind.y));
     i64 seen = 0;
     if ((Color.blue == 1)) { seen++; }
     tests++; if (e1 == 0 && e2 == 4 && e3 == 1 && seen == 1) { correct++; }

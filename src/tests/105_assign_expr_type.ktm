@@ -33,7 +33,7 @@ Big mkBig() {
     return b;
 }
 
-i64 Next() {
+i64 nextFn() {
     gIdx++;
     if (gIdx > 3) { return 0; }
     return gIdx;
@@ -89,7 +89,7 @@ i32 main() {
 
     /* Conditions */
     i64 v, sum = 0;
-    while ((v = Next())) { sum += v; }
+    while ((v = nextFn())) { sum += v; }
     if (sum == 6) { correct++; }
     u8 *s = "abc", *t;
     i64 len = 0;
