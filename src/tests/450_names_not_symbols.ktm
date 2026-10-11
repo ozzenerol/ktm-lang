@@ -47,7 +47,7 @@ i32 main() {
     mem.free(out);
 
     /* the REPL */
-    u8 *in = "import geo;\nReplFindFn(\"area\");\n";
+    u8 *in = "import geo;\nreplFindFn(\"area\");\n";
     fs.writeAll(D "/in", in, str.len(in), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = run(KTM "-repl < in");
     tests++;

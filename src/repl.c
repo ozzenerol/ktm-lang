@@ -528,7 +528,7 @@ static void replBuiltinReloadRc(void) {
     replLexerRelease(l);
 }
 
-/* --------- ReplListFn: List all defined functions ---------- */
+/* --------- replListFn: List all defined functions ---------- */
 static void replBuiltinListFn(void) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
@@ -551,7 +551,7 @@ static void replBuiltinListFn(void) {
 }
 
 
-/* --------- ReplFindFn: Find a function -------------------------------- */
+/* --------- replFindFn: Find a function -------------------------------- */
 static void replBuiltinFindFn(char *name) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
@@ -669,8 +669,8 @@ static void replBuiltinReplDel(char *name) {
 static const char repl_builtin_protos[] =
     "extern \"c\" void replDisasm(u8 *fname);\n"
     "extern \"c\" void ReplReloadRc();\n"
-    "extern \"c\" void ReplListFn();\n"
-    "extern \"c\" void ReplFindFn(u8 *name);\n"
+    "extern \"c\" void replListFn();\n"
+    "extern \"c\" void replFindFn(u8 *name);\n"
     "extern \"c\" void ReplListGVars();\n"
     "extern \"c\" void ReplClassRep(u8 *name);\n"
     "extern \"c\" void ReplEval(u8 *code);\n"
@@ -1519,12 +1519,12 @@ int replRun(Cctrl *cc, CliArgs *args) {
     ktmJitDefineSymbol(jit, "replDisasm", (void *)(uintptr_t)replBuiltinUf);
     ktmJitDefineSymbol(jit, "replDel", (void *)(uintptr_t)replBuiltinReplDel);
     ktmJitDefineSymbol(jit, "ReplReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
-    ktmJitDefineSymbol(jit, "ReplListFn", (void *)(uintptr_t)replBuiltinListFn);
+    ktmJitDefineSymbol(jit, "replListFn", (void *)(uintptr_t)replBuiltinListFn);
     ktmJitDefineSymbol(jit, "ReplListGVars", (void *)(uintptr_t)replBuiltinListGVars);
     ktmJitDefineSymbol(jit, "ReplClassRep", (void *)(uintptr_t)replBuiltinPrintClass);
     ktmJitDefineSymbol(jit, "ReplEval", (void *)(uintptr_t)replEvalString);
     ktmJitDefineSymbol(jit, "ReplHeap", (void *)(uintptr_t)replBuiltinReplHeap);
-    ktmJitDefineSymbol(jit, "ReplFindFn", (void *)(uintptr_t)replBuiltinFindFn);
+    ktmJitDefineSymbol(jit, "replFindFn", (void *)(uintptr_t)replBuiltinFindFn);
 
     /* Tracking allocator (memsafe.c) - always on in the REPL, and
      * registered before the bootstrap so the very first chunk already

@@ -113,6 +113,7 @@ hello 9</code></pre>
   <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
   <li><code>~/.ktm_rc.ktm</code> is included at start-up. Put <code>#define KTM_NO_REPL_HELLO</code> in it to hide the welcome message.</li>
   <li><code>replDisasm("name");</code> disassembles a function. <code>replDel("name");</code> forgets a definition so you can redefine it.</li>
+  <li><code>replListFn();</code> lists the functions defined so far. <code>replFindFn("name");</code> shows the functions whose names contain <code>name</code>.</li>
   <li><code>@ ls -la</code> runs a shell command. It goes through <code>system()</code>, so <code>@ cd</code> doesn't change the REPL's directory.</li>
   <li>Allocations are tracked, so leaks and bad frees are reported.</li>
 </ul>
