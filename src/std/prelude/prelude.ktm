@@ -34,3 +34,7 @@ pub struct Error
   u8 *file;
   i32 line;
 };
+
+/* The code of the Error a failed bounds check throws: an index, or a
+ * sub-slice, outside a slice or an array */
+#define ERR_BOUNDS 0x6B746D01

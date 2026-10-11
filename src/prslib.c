@@ -14,6 +14,7 @@
 #include "list.h"
 #include "prsutil.h"
 #include "prslib.h"
+#include "parser.h"
 #include "util.h"
 
 static AstType *parseArrayDimensionsInternal(Cctrl *cc, AstType *base_type);
@@ -75,6 +76,8 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
     return type;
 }
 
+Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
+
 /* `expr` where a `want` is expected: an array of want's element type
  * becomes a slice of it (its address and length, in a hidden variable),
  * anything else is returned as is for the type checks */
@@ -83,6 +86,12 @@ Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
         expr->type->kind != AST_TYPE_ARRAY || expr->type->len < 0) {
         return expr;
     }
+    /* a string literal: its bytes, not its NUL, where they are (no copy) */
+    if (expr->kind == AST_STRING && want->elem->kind == AST_TYPE_CHAR &&
+        want->elem->size == 1) {
+        return astSliceMake(parseHiddenSliceVar(cc, want), expr,
+                            astI64Type(expr->real_len - 1));
+    }
     AoStr *want_elem = astTypeToAoStr(want->elem);
     AoStr *got_elem = astTypeToAoStr(expr->type->ptr);
     int same = aoStrCmp(want_elem, got_elem);
@@ -90,17 +99,24 @@ Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
     aoStrRelease(got_elem);
     if (!same) return expr;
 
+    return astSliceMake(parseHiddenSliceVar(cc, want), expr,
+                        astI64Type(expr->type->len));
+}
+
+/* The hidden variable a made slice is written into: a local, or a static
+ * in file-scope code */
+Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type) {
     static int slice_id = 0;
     AoStr *name = aoStrPrintf("#slice%d", slice_id++);
     Ast *var;
     if (cc->tmp_fname) {
-        var = astLVar(want, name->data, name->len);
+        var = astLVar(type, name->data, name->len);
         if (cc->tmp_locals) listAppend(cc->tmp_locals, var);
     } else {
-        var = astGVar(want, name->data, name->len, 1);
+        var = astGVar(type, name->data, name->len, 1);
         listAppend(cc->ast_list, astDecl(var, NULL));
     }
-    return astSliceMake(var, expr, astI64Type(expr->type->len));
+    return var;
 }
 
 /* Words that are keywords though the lexer gives them as identifiers
@@ -2765,8 +2781,56 @@ static int parseGetPriority(Lexeme *tok) {
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok);
 
+/* `base[lo:hi]` (either may be left out) after the `[` and the `lo` */
+static Ast *parseSubSlice(Cctrl *cc, Ast *base, Ast *lo, int line) {
+    Ast *hi = NULL;
+    if (!tokenPunctIs(cctrlTokenPeek(cc), ']')) {
+        hi = parseRequiredExpr(cc, "the end of the slice");
+    }
+    cctrlTokenExpect(cc, ']');
+    Ast *bounds[2] = { lo, hi };
+    for (int i = 0; i < 2; ++i) {
+        if (bounds[i] && !astIsIntOrIntrinsic(bounds[i]->type)) {
+            cctrlRaiseExceptionFromTo(cc, "A slice's bounds must be integers",
+                '[', ']', "Cannot slice `%s` with a %s of type `%s`",
+                astTypeToString(base->type), astKindToHumanReadable(bounds[i]),
+                astTypeToString(bounds[i]->type));
+        }
+    }
+    AstType *elem;
+    if (astTypeIsSlice(base->type)) {
+        elem = base->type->elem;
+    } else if (base->type->kind == AST_TYPE_ARRAY || base->type->kind == AST_TYPE_POINTER) {
+        elem = base->type->ptr;
+        /* a pointer has no length to default the end to */
+        if (base->type->kind == AST_TYPE_POINTER && !hi) {
+            cctrlRewindUntilPunctMatch(cc, ']', NULL);
+            cctrlRaiseException(cc, "`p[a:]` of a pointer needs its end: `p[a:b]` "
+                                "(a pointer has no length)");
+        }
+    } else {
+        cctrlRewindUntilPunctMatch(cc, '[', NULL);
+        cctrlRaiseException(cc, "Cannot slice a %s, only slices, arrays or pointers",
+                            astTypeKindToHumanReadable(base->type));
+    }
+    AstType *type = astMakeSliceType(elem);
+    return astSubSlice(parseHiddenSliceVar(cc, type), base, lo, hi,
+                       parseThrowFile(cc), line);
+}
+
 Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
+    int line = cc->lineno;
+    /* `s[:b]` */
+    if (tokenPunctIs(cctrlTokenPeek(cc), ':')) {
+        cctrlTokenGet(cc);
+        return parseSubSlice(cc, ast, NULL, line);
+    }
     Ast *subscript = parseExpr(cc,16);
+    /* `s[a:b]`, `s[a:]` */
+    if (subscript && tokenPunctIs(cctrlTokenPeek(cc), ':')) {
+        cctrlTokenGet(cc);
+        return parseSubSlice(cc, ast, subscript, line);
+    }
     if (subscript == NULL) {
         cctrlRewindUntilPunctMatch(cc,'[',NULL);
         Lexeme *tok = cctrlTokenPeek(cc);
@@ -2783,9 +2847,10 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
             astTypeToString(subscript->type));
     }
 
-    /* `s[i]` of a slice indexes its `ptr` */
+    /* `s[i]` of a slice: its element, once i is checked against its len */
     if (astTypeIsSlice(ast->type)) {
-        ast = astClassRef(mapGetLen(ast->type->fields, str_lit("ptr")), ast, "ptr");
+        Ast *elem = astSliceElem(ast, subscript, parseThrowFile(cc), line);
+        return astUnaryOperator(ast->type->elem, AST_UN_OP_DEREF, elem);
     }
 
     /* An error points at the `[`: there is no `+` in the source to

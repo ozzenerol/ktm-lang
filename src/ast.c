@@ -849,6 +849,30 @@ Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len) {
     return ast;
 }
 
+Ast *astSliceElem(Ast *base, Ast *index, Ast *file, int line) {
+    Ast *ast = astNew();
+    ast->kind = AST_SLICE_ELEM;
+    ast->type = astMakePointerType(base->type->elem);
+    ast->sub_base = base;
+    ast->sub_lo = index;
+    ast->sub_file = file;
+    ast->line = line;
+    return ast;
+}
+
+Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line) {
+    Ast *ast = astNew();
+    ast->kind = AST_SUBSLICE;
+    ast->type = var->type;
+    ast->sub_var = var;
+    ast->sub_base = base;
+    ast->sub_lo = lo;
+    ast->sub_hi = hi;
+    ast->sub_file = file;
+    ast->line = line;
+    return ast;
+}
+
 Ast *astDefer(Ast *stmt) {
     Ast *ast = astNew();
     ast->kind = AST_DEFER;
@@ -2529,6 +2553,14 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
                            ast->va_items ? (int)ast->va_items->size : 0);
             break;
 
+        case AST_SLICE_ELEM:
+        case AST_SUBSLICE:
+            aoStrCatPrintf(str, "<%s>\n", ast->kind == AST_SLICE_ELEM ? "slice_elem" : "subslice");
+            _astToString(str, ast->sub_base, depth+1);
+            if (ast->sub_lo) _astToString(str, ast->sub_lo, depth+1);
+            if (ast->sub_hi) _astToString(str, ast->sub_hi, depth+1);
+            break;
+
         case AST_SLICE_MAKE:
             aoStrCatPrintf(str, "<slice>\n");
             _astToString(str, ast->slice_ptr, depth+1);
@@ -2794,6 +2826,8 @@ char *astKindToString(AstKind kind) {
         case AST_DEFER:         return "AST_DEFER";
         case AST_VA_PACK:       return "AST_VA_PACK";
         case AST_SLICE_MAKE:    return "AST_SLICE_MAKE";
+        case AST_SLICE_ELEM:    return "AST_SLICE_ELEM";
+        case AST_SUBSLICE:      return "AST_SUBSLICE";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -3072,6 +3106,16 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
             _astLValueToString(str, ast->slice_ptr, lexeme_flags);
             break;
 
+        case AST_SLICE_ELEM:
+        case AST_SUBSLICE:
+            _astLValueToString(str, ast->sub_base, lexeme_flags);
+            aoStrCatPrintf(str, "[");
+            if (ast->sub_lo) _astLValueToString(str, ast->sub_lo, lexeme_flags);
+            if (ast->kind == AST_SUBSLICE) aoStrCatPrintf(str, ":");
+            if (ast->sub_hi) _astLValueToString(str, ast->sub_hi, lexeme_flags);
+            aoStrCatPrintf(str, "]");
+            break;
+
         case AST_VA_PACK:
             for (u64 i = 0; ast->va_items && i < ast->va_items->size; ++i) {
                 if (i) aoStrCatPrintf(str, ", ");
@@ -3226,6 +3270,8 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_DEFER: return "defer statement";
         case AST_VA_PACK: return "variadic arguments";
         case AST_SLICE_MAKE: return "slice";
+        case AST_SLICE_ELEM: return "slice element";
+        case AST_SUBSLICE: return "slice";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";
