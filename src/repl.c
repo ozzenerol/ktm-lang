@@ -333,7 +333,7 @@ static void replReportFault(void) {
                  * instruction before it, so attribute to addr-1. */
                 int line = ktmJitFindLineForAddr(jit,
                                                  (void *)(frame - 1));
-                fprintf(stderr, "`%s`+%zu", sym, off);
+                fprintf(stderr, "`%s`+%zu", astSymbolDisplayName(sym), off);
                 if (line) fprintf(stderr, ", line %d", line);
                 fprintf(stderr, "\n");
             } else {
@@ -535,9 +535,12 @@ static void replBuiltinListFn(void) {
     Cctrl *cc = jit->cc;
     MapIter it;
     mapIterInit(cc->global_env, &it);
+    /* a module's function is in global_env by its name and its symbol */
+    Set *seen = setNew(32, &set_uint_type);
     while (mapIterNext(&it)) {
         Ast *entry = it.node->value;
-        if (astIsFnLike(entry)) {
+        if (astIsFnLike(entry) && !setHas(seen, (void *)entry)) {
+            setAdd(seen, (void *)entry);
             /* Can't free the string as it belongs to the AoStr pool... We
              * need a way to be able to detach buffers from AoStr and free
              * the underlying buffer as we leak everywhere. */
@@ -558,7 +561,9 @@ static void replBuiltinFindFn(char *name) {
     Vec *vec = vecNew(&vec_cstring_type);
     while (mapIterNext(&it)) {
         Ast *entry = it.node->value;
-        if (astIsFnLike(entry) && entry->fname && strstr(entry->fname->data, name)) {
+        if (astIsFnLike(entry) && entry->fname &&
+            strstr(astSymbolDisplayName(entry->fname->data), name) &&
+            !vecHas(vec, astFunctionToString(entry))) {
             char *fn_str = astFunctionToString(entry);
             vecPush(vec, fn_str);
         }

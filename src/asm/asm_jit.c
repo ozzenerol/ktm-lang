@@ -7,6 +7,9 @@
 #include <sys/mman.h>
 
 #include "asm_jit.h"
+
+/* ast.c: a ktm symbol by its name (`_K3geo4area` is `geo.area`) */
+const char *astSymbolDisplayName(const char *sym);
 #include "enc_arm64.h"
 
 /* Apple Silicon JIT requires MAP_JIT + the per-thread write-protect
@@ -363,7 +366,8 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
                  * declared without a body, meant as a C function */
                 const char *k0 = f->sym[0] == '_' && f->sym[1] == '_' ? f->sym + 1 : f->sym;
                 asm_err_at(enc, NULL,
-                           asm_tmp_printf("JIT: unresolved symbol '%s'%s", f->sym,
+                           asm_tmp_printf("JIT: unresolved symbol '%s'%s",
+                               astSymbolDisplayName(f->sym),
                                !strncmp(k0, "_K0", 3)
                                ? ": a function declared but not defined; a C function "
                                  "is declared with extern \"c\""
@@ -461,7 +465,8 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
             asm_err_at(enc, NULL,
                        asm_tmp_printf("JIT: '%s' out of range or unsupported "
                                       "reloc=%d",
-                                      desc ? desc : "<local>", (int)f->reloc));
+                                      desc ? astSymbolDisplayName(desc) : "<local>",
+                                      (int)f->reloc));
             rc = -1;
             break;
         }
