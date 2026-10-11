@@ -71,7 +71,7 @@
 
 /* linenoise callbacks carry no user-data pointer, so the completion
  * callback reaches the compiler state through these. repl_jit is for
- * the `Uf` builtin, which JIT'd code calls back into. */
+ * the `replDisasm` builtin, which JIT'd code calls back into. */
 static Cctrl *repl_cc = NULL;
 static KtmJit *repl_jit = NULL;
 static char repl_history_path[512];
@@ -377,9 +377,9 @@ static void replBuiltinReplHeap(void) {
     memsafeDumpLive(stdout);
 }
 
-/* ---------------- Uf: the unassembler builtin ----------------
+/* ---------------- replDisasm: the unassembler builtin ----------------
  *
- * `Uf("Fib");` prints the disassembly of a JIT-compiled function,
+ * `replDisasm("fib");` prints the disassembly of a JIT-compiled function,
  * the classic "unassemble function", pointed at libtasm's disassembler. It's a
  * host C function registered in the jit's symbol table, so compiled ktm
  * calls straight back into the compiler. */
@@ -390,7 +390,13 @@ static void replBuiltinUf(char *name) {
 
     uint8_t *addr = (uint8_t *)ktmJitLookup(jit, name);
     if (addr == NULL) {
-        printf("Uf: `%s` is not a JIT-compiled function in this session\n",
+        /* a program's own function: its symbol is `_K0<len><name>` */
+        char sym[512];
+        snprintf(sym, sizeof(sym), "_K0%zu%s", strlen(name), name);
+        addr = (uint8_t *)ktmJitLookup(jit, sym);
+    }
+    if (addr == NULL) {
+        printf("replDisasm: `%s` is not a JIT-compiled function in this session\n",
                name);
         return;
     }
@@ -409,7 +415,7 @@ static void replBuiltinUf(char *name) {
         }
     }
     if (end == NULL) {
-        printf("Uf: cannot locate the code chunk for `%s`\n", name);
+        printf("replDisasm: cannot locate the code chunk for `%s`\n", name);
         return;
     }
 
@@ -602,9 +608,9 @@ static void replBuiltinPrintClass(char *name) {
     }
 }
 
-/* ---------------- ReplDel: drop a definition ----------------
+/* ---------------- replDel: drop a definition ----------------
  *
- * `ReplDel("name");` removes a global variable, function, class,
+ * `replDel("name");` removes a global variable, function, class,
  * union or #define from the session so the name can be redefined
  * from scratch. Already-compiled code that captured the old
  * definition keeps working - this only frees the NAME (and, for
@@ -628,12 +634,12 @@ static void replBuiltinReplDel(char *name) {
     for (size_t i = 0; i < sizeof(tables)/sizeof(tables[0]); ++i) {
         if (tables[i].m && mapGetLen(tables[i].m, name, len)) {
             mapRemove(tables[i].m, name);
-            printf("ReplDel: removed %s `%s`\n", tables[i].what, name);
+            printf("replDel: removed %s `%s`\n", tables[i].what, name);
             removed = 1;
         }
     }
     if (!removed) {
-        printf("ReplDel: nothing named `%s`\n", name);
+        printf("replDel: nothing named `%s`\n", name);
         return;
     }
 
@@ -656,14 +662,14 @@ static void replBuiltinReplDel(char *name) {
  * type-check like any other function (and show up in completion and
  * hints). The implementations are registered via ktmJitDefineSymbol. */
 static const char repl_builtin_protos[] =
-    "extern \"c\" void Uf(u8 *fname);\n"
+    "extern \"c\" void replDisasm(u8 *fname);\n"
     "extern \"c\" void ReplReloadRc();\n"
     "extern \"c\" void ReplListFn();\n"
     "extern \"c\" void ReplFindFn(u8 *name);\n"
     "extern \"c\" void ReplListGVars();\n"
     "extern \"c\" void ReplClassRep(u8 *name);\n"
     "extern \"c\" void ReplEval(u8 *code);\n"
-    "extern \"c\" void ReplDel(u8 *name);\n"
+    "extern \"c\" void replDel(u8 *name);\n"
     "extern \"c\" void ReplHeap();\n";
 
 /* ---------------- tab completion ---------------- */
@@ -1505,8 +1511,8 @@ int replRun(Cctrl *cc, CliArgs *args) {
     repl_jit = jit;
 
     /* Builtin helper functions */
-    ktmJitDefineSymbol(jit, "Uf", (void *)(uintptr_t)replBuiltinUf);
-    ktmJitDefineSymbol(jit, "ReplDel", (void *)(uintptr_t)replBuiltinReplDel);
+    ktmJitDefineSymbol(jit, "replDisasm", (void *)(uintptr_t)replBuiltinUf);
+    ktmJitDefineSymbol(jit, "replDel", (void *)(uintptr_t)replBuiltinReplDel);
     ktmJitDefineSymbol(jit, "ReplReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
     ktmJitDefineSymbol(jit, "ReplListFn", (void *)(uintptr_t)replBuiltinListFn);
     ktmJitDefineSymbol(jit, "ReplListGVars", (void *)(uintptr_t)replBuiltinListGVars);

@@ -213,7 +213,7 @@ one, more, more
   <a class="card" href="language.html"><strong>Language</strong><span>Every feature, with examples you can run.</span></a>
   <a class="card" href="library.html"><strong>Library guide</strong><span>Strings, files, hash tables, vectors, JSON.</span></a>
   <a class="card" href="stdlib.html"><strong>Library reference</strong><span>Every module of the standard library.</span></a>
-  <a class="card" href="tools.html"><strong>Tools</strong><span>Compiler flags, JIT, REPL, LSP, transpiler.</span></a>
+  <a class="card" href="tools.html"><strong>Tools</strong><span>Compiler flags, JIT, REPL, LSP.</span></a>
   <a class="card" href="examples.html"><strong>Examples</strong><span>Complete projects with expected output.</span></a>
 </div>
 
@@ -223,7 +223,7 @@ one, more, more
   <li><strong>A JIT.</strong> <code>ktm -jit</code> assembles machine code in memory with a built-in assembler and runs it, with no files written.</li>
   <li><strong>A REPL.</strong> <code>ktm -repl</code> runs ktm interactively.</li>
   <li><strong>A language server.</strong> <code>ktm -lsp</code> gives editors diagnostics, hover, completion, go-to-definition, references and rename.</li>
-  <li><strong>A standard library.</strong> Strings, files, hash tables, vectors, JSON, dates, threads, sockets and more, available in every program without an include.</li>
+  <li><strong>A standard library.</strong> Strings, files, hash tables, vectors, JSON, dates, threads, sockets and more, in modules you import (<code>import net, str;</code>).</li>
 </ul>
 <p>It runs on Linux on x86_64 and arm64 and on macOS on Apple Silicon. On Windows, use WSL2.</p>
 
@@ -233,7 +233,7 @@ one, more, more
 to <a href="https://en.wikipedia.org/wiki/Terry_A._Davis">Terry A. Davis</a> for HolyC and
 <a href="https://templeos.org/">TempleOS</a>, and to
 <a href="https://github.com/Jamesbarford">James Barford-Evans</a>, who wrote the compiler ktm grew from.
-The fork was called hcc until v0.19.3 and was renamed ktm at v0.1.0; the hcc releases are in the
+The fork was called hcc until v0.19.3, was renamed ktm at v0.1.0 and replaced the HolyC syntax with its own at v0.2.0; the hcc releases are in the
 <a href="https://github.com/ozzenerol/holyc-lang/releases">holyc-lang repository</a>.</p>
 
     <footer class="page-foot">

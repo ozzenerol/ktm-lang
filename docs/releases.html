@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,114 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-2-0-2026-10-11">v0.2.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-0-2026-10-11" aria-label="Link to this section">#</a></h2>
+<p>A new language. ktm now has its own C-like syntax, modules, methods and a standard library organised
+into modules. The old HolyC syntax is gone: every program, test, doc page and example in the repository
+was converted once with an internal tool, which was then deleted. Code written for v0.1.0 does not
+compile with v0.2.0.</p>
+
+<pre><code>
+enum Kind { circle, rect };
+
+struct Shape { Kind kind; f64 w, h; };
+
+f64 Shape.area() {
+    switch (self.kind) {
+        case Kind.circle: return 3.14159 * self.w * self.w;
+        case Kind.rect:   return self.w * self.h;
+    }
+    throw(1, "unknown kind %d", self.kind);
+    return 0;
+}
+
+i32 main(i32 argc, u8 **argv) {
+    defer printf("bye\n");
+    Shape s = {Kind.rect, 2, 3};
+    printf("%.1f\n", s.area());
+    return 0;
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
+  <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
+  separators (<code>1_000_000</code>); a character literal holds one character.</li>
+  <li><code>struct</code>, C prefix casts <code>(T)x</code>, <code>printf</code>, <code>i32 main(...)</code>,
+  calls always with parentheses, file scope holds declarations only.</li>
+  <li>Typed constants: <code>const i64 MAX = 4;</code> (compile-time constants when the value is).</li>
+  <li>Scoped enums: <code>enum Color { red, green };</code> used as <code>Color.red</code>, with an
+  optional integer type (<code>enum Status : u16 { ... }</code>); converting an integer to an enum needs a
+  cast.</li>
+  <li>Function types: <code>fn(i64) i64</code>, <code>fn(u8 *) u8 *</code>, <code>(fn(i64) i64) *</code>
+  for a pointer to one. A function pointer only takes a function with the same signature.</li>
+  <li>Named varargs: <code>i64 sum(i64 ...nums)</code> with <code>nums.len</code>, indexing,
+  range-for and spreading (<code>sum(...nums)</code>).</li>
+  <li><code>defer</code>: block-scoped, runs on every exit (return, break, continue, goto, exceptions).</li>
+  <li>Errors: <code>throw(code)</code> or <code>throw(code, "format", ...)</code>, caught as
+  <code>catch (Error e)</code> with <code>e.code</code>, <code>e.message</code>, <code>e.file</code> and
+  <code>e.line</code>; <code>throw(e)</code> rethrows. <code>try</code> and <code>defer</code> no longer
+  make a system call each (7 to 12 times faster).</li>
+  <li>switch cases end at the next label; <code>fallthrough;</code> continues into the next one.</li>
+  <li>Braces are required on <code>if</code>/<code>else</code>/<code>for</code>/<code>while</code>/<code>do</code>
+  bodies.</li>
+  <li>Methods: <code>f64 Shape.area() { ... self ... }</code>, called <code>s.area()</code>; derived
+  structs inherit methods, a same-named method hides the base one, no virtual dispatch.
+  <code>.</code> works on a value or a pointer (<code>p.x</code> is <code>p-&gt;x</code>).</li>
+  <li>Modules: a directory is a module (<code>module net;</code> in every file),
+  <code>import net, h = net.http;</code>, <code>pub</code> exports, names private by default,
+  <code>private</code> struct fields hidden outside their module, files of a module see each other in
+  any order. <code>ktm -lib</code> builds a module or a tree of modules into a library that importers
+  link automatically. A local may shadow a module name.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
+  <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
+  <code>sql</code>, <code>date</code>, <code>coro</code>, <code>thread</code>, <code>map</code>,
+  <code>set</code>, <code>vec</code>, <code>list</code>, <code>math</code>, <code>fzf</code>, plus
+  <code>libc</code> for the C and POSIX functions under their C names. Names are camelCase:
+  <code>StrLen(s)</code> is now <code>str.len(s)</code>, <code>StrMapSet(m, k, v)</code> is
+  <code>m.set(k, v)</code>.</li>
+  <li>A prelude every file sees without an import: <code>Error</code>, the integer limits
+  (<code>I8_MIN</code> to <code>U64_MAX</code>), <code>EXIT_OK</code>/<code>EXIT_FAIL</code>.</li>
+  <li>Dates are formatted with <code>date.format(d, "%Y-%m-%d")</code>; printf's <code>%D</code>,
+  <code>%T</code> and <code>%F</code> are gone.</li>
+  <li>The TempleOS leftovers are gone (<code>Dir</code>, the directory printer, the verbose remove, the
+  <code>Fs</code> task block).</li>
+</ul>
+
+<h3 id="removed">Removed<a class="anchor" href="#removed" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The HolyC syntax: <code>U0</code>/<code>I64</code>/<code>F64</code>/<code>Bool</code>,
+  <code>class</code>/<code>public</code>, postfix casts, print statements, calls without parentheses,
+  <code>Main</code>, code at file scope, <code>(...)</code> with implicit <code>argc</code>/<code>argv</code>,
+  C function-pointer declarators, multi-character literals.</li>
+  <li><code>std.ktmh</code> and <code>defs.ktmh</code> (the library is imported as modules).</li>
+  <li><code>-transpile</code> (it could not read the new syntax).</li>
+  <li>The REPL builtins <code>Uf</code> and <code>ReplDel</code>: they are <code>replDisasm("name")</code>
+  and <code>replDel("name")</code>.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
+  <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
+  <li>Variadic C calls through a module's <code>extern "c"</code> pass their extra arguments correctly on
+  Apple arm64 (<code>open</code>'s mode was garbage).</li>
+  <li>A struct holding a not-yet-complete struct by value is an error (it compiled with size 0).</li>
+  <li>Statements after a <code>{ }</code> block inside a switch case were dropped.</li>
+  <li>Global <code>= null</code> initialisers are constant data; a field of the compiler state was read
+  uninitialised; narrow literals in untyped varargs filled only one byte; <code>#undef</code> took the
+  next line's first word; several test races on macOS and the LSP debounce test.</li>
+</ul>
+
+<h3 id="known-issue">Known issue<a class="anchor" href="#known-issue" aria-label="Link to this section">#</a></h3>
+<p>On macOS, a child forked by a program run with <code>-jit</code> can crash right after
+<code>fork()</code>, rarely and under load. Compiled programs are fine; see
+<a href="known-issues.html">Known issues</a> for the workaround.</p>
 
 <h2 id="v0-1-0-2026-10-10">v0.1.0 <small>(2026-10-10)</small><a class="anchor" href="#v0-1-0-2026-10-10" aria-label="Link to this section">#</a></h2>
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;

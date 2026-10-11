@@ -729,7 +729,7 @@ void main()
 like <code>f(acc, x)</code>.</p>
 <p>Any expression whose type is a function pointer can be called: a cast to a function pointer
 type (<code>((fn(i64) i64)p)(5)</code>),
-the result of a call that returns one, or of an assignment (<code>(f = &amp;Mul)(2, 3)</code>).
+the result of a call that returns one, or of an assignment (<code>(f = &amp;mul)(2, 3)</code>).
 The arguments are checked against the pointer's parameters, as for a named function:</p>
 <pre data-run><code>
 import str;
@@ -802,7 +802,7 @@ void main()
 signature: the same return type, the same parameter types and the same <code>...</code>.
 Anything else is an error naming both types, wherever the conversion happens (an
 assignment, an initialiser, an argument, a <code>return</code> or a conditional), so
-<code>i64 (*op)(u8 *) = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
+<code>fn(u8 *) i64 op = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
 <code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. A <code>void *</code> and
 <code>null</code> still convert without a cast. A function whose parameters are typed
 pointers, passed where one taking <code>void *</code> is expected (a comparator, a thread
@@ -824,9 +824,9 @@ void main()
 <pre class="output">
 1
 </pre>
-<p>The other C declarator forms work too: a function returning a function pointer is written
-<code>T (*Name(params))(fn_params)</code>, and a pointer to a function pointer is
-<code>T (**pp)(params)</code>, for locals, globals, struct fields and parameters alike.</p>
+<p>A function can return a function pointer (<code>fn(i64 x) i64 choose(bool square)</code>),
+and a pointer to a function pointer puts the fn type in parentheses,
+<code>(fn(i64 x) i64) *pp</code>, for locals, globals, struct fields and parameters alike.</p>
 <pre data-run><code>
 i64 dbl(i64 x) { return x * 2; }
 i64 sq(i64 x) { return x * x; }
@@ -902,9 +902,8 @@ yz 11 3 3 b
 </pre>
 <p><code>fn</code> is a keyword, like <code>self</code>, <code>module</code>,
 <code>import</code> and <code>fallthrough</code>: none of them can name a variable, a
-parameter or a declaration. The old C declarator form (<code>i64 (*)(i64)</code>, an array of them, a function
-returning one, a pointer to one) is documented above and keeps working; it is converted to
-<code>fn(...)</code> everywhere in a later pass.</p>
+parameter or a declaration. C's declarator form (<code>i64 (*f)(i64)</code>) is an error that shows
+the <code>fn(...)</code> spelling to write instead.</p>
 
 <h2>Pointers and arrays</h2>
 <pre data-run><code>
