@@ -1,7 +1,7 @@
 import fs, libc, mem, proc, str, test;
 
-/* `sizeof()` (and `sizeof;`, `alignof()`) segfaulted under -jit, AOT and
- * -transpile: the missing operand parsed as null. It is now an error at
+/* `sizeof()` (and `sizeof;`, `alignof()`) segfaulted under -jit and AOT:
+ * the missing operand parsed as null. It is now an error at
  * the token where the operand should be. */
 
 #define SZ_SRC "./ktm-227-sz.ktm"
@@ -21,19 +21,17 @@ u8 *diagnose(u8 *source, u8 *flags, i64 *statusArg) {
     return out;
 }
 
-/* Fails with status 1 (not a crash) under -jit, AOT and -transpile, and
- * the -jit output has `want` and `where` */
+/* Fails with status 1 (not a crash) under -jit and AOT, and the -jit
+ * output has `want` and `where` */
 bool rejected(u8 *source, u8 *want, u8 *where) {
-    i64 status, aotStatus, trStatus;
+    i64 status, aotStatus;
     u8 *out = diagnose(source, "-jit", &status);
     u8 *aot = diagnose(source, "-S -o /dev/null", &aotStatus);
-    u8 *tr = diagnose(source, "-transpile", &trStatus);
-    bool ok = status == 1 && aotStatus == 1 && trStatus == 1 && out &&
+    bool ok = status == 1 && aotStatus == 1 && out &&
                         libc.strstr(out, want) && libc.strstr(out, where);
-    if (!ok) { printf("got %d %d %d: '%s'\n", status, aotStatus, trStatus, out); }
+    if (!ok) { printf("got %d %d: '%s'\n", status, aotStatus, out); }
     mem.free(out);
     mem.free(aot);
-    mem.free(tr);
     return ok;
 }
 

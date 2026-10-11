@@ -48,7 +48,6 @@ enum CliArgType {
     CLI_RUN,
     CLI_TARGET,
     CLI_TO_STDOUT,
-    CLI_TRANSPILE,
     CLI_USE_LEGACY_X86,
     CLI_VERSION,
     CLI_VERBOSE,
@@ -93,7 +92,6 @@ typedef struct CliArgs {
     int memsafe;
     int repl;
     int assemble;
-    int transpile;
     int to_stdout;
     int use_legacy_x86;
     int fPIC;

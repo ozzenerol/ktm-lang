@@ -394,11 +394,6 @@ static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
         cctrlRaiseExceptionAt(cc, line, col, 3,
             "a variadic parameter needs a name, as in `i64 ...nums` or `...args`");
     }
-    if (cc->flags & CCTRL_TRANSPILING) {
-        cc->current_recovery = NULL;
-        cctrlRaiseExceptionAt(cc, line, col, 3,
-            "`...%.*s` is not supported with -transpile", name->len, name->start);
-    }
     if (elem && !parseIsVarArgElemType(elem)) {
         cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
             "the elements of `...%.*s` must be numbers or pointers, got %s",
@@ -705,38 +700,7 @@ static AstType *parseArrayDimensionsInternal(Cctrl *cc, AstType *base_type) {
         int ok = 1;
         dimension = evalIntConstExprOrErr(size, &ok);
 
-        if (!ok && (cc->flags & CCTRL_PASTE_DEFINES)) {
-            if (size->kind == AST_LVAR) {
-                dimension = -3;
-                type->clsname = size->lname;
-            } else if (astIsArithmetic(size,0)) {
-                /* Relent... otherwise this will get far too complicated for a
-                 * feature that likely will never be used */
-                Ast *left = size->left;
-                Ast *right = size->right;
-                AoStr *lname = NULL;
-                int literal;
-
-                if (left->kind == AST_LVAR && right->kind == AST_LITERAL) {
-                    literal = right->i64;
-                    lname = left->lname;
-                } else if (right->kind == AST_LVAR && left->kind == AST_LITERAL) {
-                    literal = left->i64;
-                    lname = right->lname;
-                } else {
-                    goto invalid_subscript;
-                }
-                
-                Lexeme *le = mapGet(cc->macro_defs,lname->data);
-                if (le->tk_type != TK_I64) {
-                    goto invalid_subscript;
-                }
-
-                dimension = literal + le->i64;
-            } else {
-                goto invalid_subscript;
-            }
-        } else if (!ok) {
+        if (!ok) {
             goto invalid_subscript;
         }
     }
@@ -2066,7 +2030,7 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
 
 
         rettype = maybe_fn->type->rettype;
-        if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+        if (maybe_fn->flags & AST_FLAG_INLINE) {
             if (maybe_fn->kind == AST_ASM_FUNC_BIND || maybe_fn->kind == AST_ASM_FUNCDEF) {
                 Ast *call = astAsmFunctionCall(rettype,
                                                aoStrDup(maybe_fn->asmfname),
@@ -2305,19 +2269,18 @@ static int parsePrintFormatIsktm(char *s, int len) {
  * bits, and the arguments are checked against the format either way. */
 Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
     Lexeme *tok = cctrlTokenPeek(cc);
-    if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR) {
+    if (tok && tok->tk_type == TK_STR) {
         char removed = parseFormatRemovedConv(tok->start, tok->len, 1);
         if (removed) {
             parseFormatRemovedError(cc, removed, tok->line, tok->col, tok->len);
         }
     }
-    if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR &&
+    if (tok && tok->tk_type == TK_STR &&
         parsePrintFormatIsktm(tok->start, tok->len)) {
         char *print = astRuntimeName("__ktmPrintf");
         return parseFunctionArguments(cc,print,strlen(print),terminator);
     }
     Ast *call = parseFunctionArguments(cc,"printf",6,terminator);
-    if (cc->flags & CCTRL_TRANSPILING) return call;
     if (call->kind != AST_FUNCALL || !call->args || call->args->size == 0)
         return call;
 
@@ -2493,7 +2456,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                 /* Default values convert to their parameter's type here
                  * too (a Bool default of 0x800 is 1), as with parens */
                 parseCoerceArgs(ast, argv);
-                if (ast->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+                if (ast->flags & AST_FLAG_INLINE) {
                     if (ast->kind == AST_ASM_FUNC_BIND || ast->kind == AST_ASM_FUNCDEF) {
                         Ast *call = astAsmFunctionCall(ast->type->rettype, aoStrDup(ast->asmfname), argv);
                         call->flags |= ast->flags;
@@ -2543,55 +2506,20 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     return ast;
 }
 
-/* When transpiling, #defines are kept (CCTRL_PASTE_DEFINES), so a string
- * macro reaches the parser as an identifier */
-static int parseIsStringMacro(Cctrl *cc, Lexeme *tok) {
-    if (!(cc->flags & CCTRL_PASTE_DEFINES) || !tok ||
-        tok->tk_type != TK_IDENT) {
-        return 0;
-    }
-    Lexeme *def = mapGetLen(cc->macro_defs, tok->start, tok->len);
-    return def && def->tk_type == TK_STR;
-}
-
-/* Adjacent string literals are one string, `"a" "b"`. When transpiling,
- * string macros can be part of it too (`"a" M "b"`, `M "x"`, `M N`): the
- * node then holds that C text as written (AST_FLAG_RAW_C_STRING), as the
- * #define is emitted and C pastes adjacent literals as ktm does.
- * Without this the parser stopped at the macro and the statement was
- * dropped from the C. `first` is the token just read, a string or a
- * string macro followed by one. */
+/* Adjacent string literals are one string, `"a" "b"`. `first` is the
+ * token just read, a string. */
 static Ast *parseStringLiterals(Cctrl *cc, Lexeme *first) {
     AoStr *str = aoStrNew();
-    AoStr *raw = aoStrNew();
     s64 real_len = 1;
-    int macros = 0;
     Lexeme *tok = first;
-    while (tok && (tok->tk_type == TK_STR || parseIsStringMacro(cc, tok))) {
-        if (raw->len) aoStrPutChar(raw, ' ');
-        if (tok->tk_type == TK_STR) {
-            aoStrCatFmt(str, "%.*s", tok->len, tok->start);
-            aoStrCatFmt(raw, "\"%.*s\"", tok->len, tok->start);
-            real_len += tok->i64 - 1;
-        } else {
-            Lexeme *def = mapGetLen(cc->macro_defs, tok->start, tok->len);
-            aoStrCatLen(raw, tok->start, tok->len);
-            real_len += def->i64 - 1;
-            macros++;
-        }
+    while (tok && tok->tk_type == TK_STR) {
+        aoStrCatFmt(str, "%.*s", tok->len, tok->start);
+        real_len += tok->i64 - 1;
         tok = cctrlTokenGet(cc);
     }
     if (tok) cctrlTokenRewind(cc);
-
-    Ast *ast;
-    if (macros) {
-        ast = astString(raw->data, raw->len, real_len);
-        ast->flags |= AST_FLAG_RAW_C_STRING;
-    } else {
-        ast = cctrlGetOrSetString(cc, str->data, str->len, real_len);
-    }
+    Ast *ast = cctrlGetOrSetString(cc, str->data, str->len, real_len);
     aoStrRelease(str);
-    aoStrRelease(raw);
     return ast;
 }
 
@@ -2614,14 +2542,6 @@ static Ast *parsePrimary(Cctrl *cc) {
 
     switch (tok->tk_type) {
     case TK_IDENT: {
-        /* `M "x"`, `M N`: a string macro pasted to strings (transpiling) */
-        if (parseIsStringMacro(cc, tok)) {
-            Lexeme *next = cctrlTokenPeek(cc);
-            if (next && (next->tk_type == TK_STR ||
-                         parseIsStringMacro(cc, next))) {
-                return parseStringLiterals(cc, tok);
-            }
-        }
         if ((ast = parseShadowedPrefix(cc, tok)) != NULL) {
             return ast;
         }
@@ -3076,7 +2996,6 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
         /* An integer `/` or `%` by a constant 0 always traps when it
          * runs, and the constant folder can't give it a value. */
         if ((operation == AST_BIN_OP_DIV || operation == AST_BIN_OP_MOD) &&
-            !(cc->flags & CCTRL_TRANSPILING) &&
             astIsIntType(left->type) && astIsIntType(right->type))
         {
             int ok = 1;
@@ -3090,7 +3009,7 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
             }
         }
         return binop;
-    } else if (is_err && !(cc->flags & CCTRL_TRANSPILING)) {
+    } else if (is_err) {
         if (op_tok) {
             cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
         }
@@ -3122,8 +3041,6 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                             opstr,
                             astTypeToString(right->type));
         cctrlRaiseSuggestion(cc,msg,"The `%s` operator cannot be applied to a %s with a %s of %s", opstr, left_kind, right_kind, right_type_kind);
-    } else if (cc->flags & CCTRL_TRANSPILING) {
-        binop->type = ast_int_type;
     }
     return binop;
 }
@@ -3420,9 +3337,6 @@ Ast *parseSizeof(Cctrl *cc) {
     }
 
     parseCheckSizeKnown(cc, type);
-    if (cc->flags & CCTRL_PRESERVE_SIZEOF) {
-        return astSizeOf(type);
-    }
 
     /* If we have a string we want the _true_ length of it which as the string
      * is escaped needs to be calculated manually. */
@@ -3616,7 +3530,6 @@ static void parseCheckArithmeticUnaryOp(Cctrl *cc, AstUnOp op, Ast *operand,
                                         int line, int col, int len)
 {
     AstType *ty = operand->type;
-    if (cc->flags & CCTRL_TRANSPILING) return;
     if (!ty || astIsIntType(ty) || astIsIntrinsicClass(ty) ||
         ty->kind == AST_TYPE_AUTO) {
         return;
@@ -3654,7 +3567,6 @@ static void parseCheckDerefOperand(Cctrl *cc, Ast *operand,
                                    int line, int col, int len)
 {
     AstType *ty = operand->type;
-    if (cc->flags & CCTRL_TRANSPILING) return;
     if (!ty || ty->ptr || ty->kind == AST_TYPE_AUTO) return;
 
     char *msg = mprintf("The `*` operator cannot be applied to a %s of %s, "
@@ -3889,14 +3801,6 @@ Ast *parseUnaryExpr(Cctrl *cc) {
                 }
                 parseCheckDerefOperand(cc, operand, op_line, op_col, op_len);
                 type = operand->type ? operand->type->ptr : NULL;
-                /* The transpiler doesn't report type errors (as for a
-                 * binary op): `**pp(I64 *)` dereferences the I64 that
-                 * `*pp(I64 *)` gives. Without a type the node crashed
-                 * it, so write it as an I64 and let the C compiler
-                 * reject it. */
-                if (!type && (cc->flags & CCTRL_TRANSPILING)) {
-                    type = ast_int_type;
-                }
                 break;
             case AST_UN_OP_BIT_NOT:
                 parseCheckArithmeticUnaryOp(cc, unary_op, operand,

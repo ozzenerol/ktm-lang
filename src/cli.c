@@ -120,7 +120,6 @@ static CliParser parsers[] = {
     {str_lit("-lsp"),       0, CLI_LSP, "-lsp", "Run a Language Server Protocol server over stdio (for editor integration)", &cliParseNop},
     {str_lit("-o"),         1, CLI_OUTPUT_FILENAME, "-o <binary_name>", "Output filename: `-o <name> ./<file>.ktm`", &cliParseString},
     {str_lit("-o-"),        0, CLI_TO_STDOUT, "-o-", "Output assembly to stdout, only for use with -S", &cliParseNop},
-    {str_lit("-transpile"), 0, CLI_TRANSPILE, "-transpile", "Transpile the code to C (experimental, frozen: no new features)", &cliParseNop},
     {str_lit("--target"),   0, CLI_TARGET, "--target", "Select the target, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu` this follows llvm style target triples", &cliParseString},
     {str_lit("--install-dir"), 1, CLI_INSTALL_DIR, "--install-dir <path>", "Override the install prefix (header dir = <path>/include, lib dir = <path>/lib). Defaults to /usr/local.", &cliParseString},
     {str_lit("-D"),         0, CLI_DEFINES_LIST, "-D<VAR>", "Set a compiler #define (does not accept a value)", &cliParseDefine},
@@ -485,7 +484,6 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             case CLI_REPL:               args->repl = 1; break;
             case CLI_LSP:                args->lsp = 1; break;
             case CLI_ASSEMBLE:           args->assemble = 1; break;
-            case CLI_TRANSPILE:          args->transpile = 1; break;
             case CLI_TO_STDOUT:          args->to_stdout = 1; break;
             case CLI_OUTPUT_FILENAME:    args->output_filename = mprintf("%s", value.str); break;
             case CLI_CLIBS:              args->clibs = mprintf("%s", value.str); break;

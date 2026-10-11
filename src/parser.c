@@ -67,11 +67,6 @@ static AoStr *getRangeLoopIdx(void) {
     return aoStrPrintf("___tmp%d___", ++range_loop_idx);
 }
 
-/* Start the range-loop temporaries from `___tmp1___` again, for a second
- * parse of the same input (-transpile checks it with a compile first) */
-void parseResetRangeLoopIdx(void) {
-    range_loop_idx = 0;
-}
 
 /* Kinda cheating converting it to a string and calling printf */
 Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
@@ -851,9 +846,6 @@ Map *parseClassOffsets(Cctrl *cc,
         offset = base_class->size;
         int ba = astTypeAlign(base_class);
         if (ba > max_align) max_align = ba;
-        if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-            mapAdd(fields_dict,astAnnonymousLabel(),base_class);
-        }
         parseFlattenAnnonymous(base_class,fields_dict,0,1);
     } else {
         offset = 0;
@@ -910,9 +902,6 @@ Map *parseClassOffsets(Cctrl *cc,
         int fa = astTypeAlign(field);
 
         if (field_name == NULL && parseIsClassOrUnion(field->kind)) {
-            if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-                mapAdd(fields_dict,astAnnonymousLabel(),field);
-            }
             offset += CalcPadding(offset, fa);
             /* A tagged one is also a type of its own: copy its fields
              * rather than moving them. */
@@ -946,6 +935,7 @@ Map *parseClassOffsets(Cctrl *cc,
 }
 
 Map *parseUnionOffsets(Cctrl *cc, int *real_size, int *out_align, List *fields) {
+    (void)cc;
     int max_size = 0, max_align = 1;
     AstType *field;
     Map *fields_dict = astTypeMapNew();
@@ -961,9 +951,6 @@ Map *parseUnionOffsets(Cctrl *cc, int *real_size, int *out_align, List *fields) 
             max_size = field->size;
         }
         if (field_name == NULL && parseIsClassOrUnion(field->kind)) {
-            if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-                mapAdd(fields_dict,astAnnonymousLabel(),field);
-            }
             /* A tagged one is also a type of its own: flatten copies of
              * its fields so marking them below doesn't change it. */
             Map *flat = astTypeMapNew();
@@ -1450,11 +1437,8 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
         }
         lit = astI64Type(v);
     } else if (t->kind == AST_TYPE_POINTER || t->kind == AST_TYPE_FUNC) {
-        /* AST_TYPE_FUNC: a function pointer, `I64 (*fp)(I64) = &Fn`.
-         * The transpiler keeps them as stores: it would print the folded
-         * `(U8 *)&arr + 16` as C's `&arr + 16`. */
+        /* AST_TYPE_FUNC: a function pointer, `fn(i64) i64 fp = &Fn` */
         Ast *target = NULL;
-        if (cc->flags & CCTRL_TRANSPILING) return NULL;
         s64 off = 0;
         /* `null` is `(void *)0`: the integer inside a pointer cast */
         while (rhs->kind == AST_CAST && rhs->operand && rhs->operand->type &&
@@ -1624,7 +1608,7 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
      * the same error as the assignment `z = p`, and the only diagnostic;
      * one it accepts with a different type gets the warning. */
     int is_err = 0;
-    if (!(cc->flags & CCTRL_TRANSPILING) && init->kind != AST_COMPOUND_STMT) {
+    if (init->kind != AST_COMPOUND_STMT) {
         astBinaryOp(AST_BIN_OP_ASSIGN,var,init,&is_err);
     }
     if (is_err) {
@@ -2629,7 +2613,7 @@ Ast *parseReturnStatement(Cctrl *cc) {
     else        check = ast_void_type;
 
     if (check->kind == AST_TYPE_VOID && maybe_fn->type->rettype->kind == AST_TYPE_VOID) {
-        if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+        if (maybe_fn->flags & AST_FLAG_INLINE) {
             /* `return Inc();`: keep the call, there is no value to set */
             return retval ? retval : astDecl(maybe_fn->inline_ret,NULL);
         }
@@ -2650,7 +2634,7 @@ Ast *parseReturnStatement(Cctrl *cc) {
         Ast *func = mapGet(cc->global_env, cc->tmp_fname->data);
         typeCheckReturnTypeWarn(cc,func,check,retval,&ret_tok,&semi_tok);
     }
-    if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+    if (maybe_fn->flags & AST_FLAG_INLINE) {
         return astDecl(maybe_fn->inline_ret,retval);
     }
     return astReturn(retval,cc->tmp_rettype);
@@ -2689,11 +2673,6 @@ static Ast *parseCatchBinding(Cctrl *cc) {
         cctrlRaiseException(cc, "Expected a name for the Error in `catch (Error <name>)`");
     }
     cctrlTokenExpect(cc, ')');
-    if (cc->flags & CCTRL_TRANSPILING) {
-        cc->current_recovery = NULL;
-        cctrlRaiseExceptionAt(cc, tline, tcol, tlen,
-            "`catch (Error e)` is not supported with -transpile");
-    }
 
     Map *outer = cc->localenv;
     cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -2737,14 +2716,12 @@ Ast *parseTryStatement(Cctrl *cc) {
     Ast *catch_body = parseCatchBinding(cc);
     if (!catch_body) {
         catch_body = parseStatement(cc);
-        if (!(cc->flags & CCTRL_TRANSPILING)) {
-            List *stmts = listNew();
-            char *forget = astRuntimeSymbol("__ktmErrorForget");
-            listAppend(stmts, astFunctionCall(ast_void_type, forget,
-                                              strlen(forget), astVecNew()));
-            if (catch_body) listAppend(stmts, catch_body);
-            catch_body = astCompountStatement(stmts);
-        }
+        List *stmts = listNew();
+        char *forget = astRuntimeSymbol("__ktmErrorForget");
+        listAppend(stmts, astFunctionCall(ast_void_type, forget,
+                                          strlen(forget), astVecNew()));
+        if (catch_body) listAppend(stmts, catch_body);
+        catch_body = astCompountStatement(stmts);
     }
     return astTry(try_body, catch_body);
 }
@@ -2773,10 +2750,6 @@ static Ast *parseThrowFile(Cctrl *cc) {
 Ast *parseThrowStatement(Cctrl *cc) {
     int line = cc->lineno;   /* of the `throw` just consumed */
     cctrlTokenExpect(cc,'(');
-    int open_line = cc->lineno, open_col = 0;
-    cctrlTokenRewind(cc);
-    Lexeme *open = cctrlTokenGet(cc);
-    if (open) open_col = open->col;
     if (tokenPunctIs(cctrlTokenPeek(cc), ')')) {
         /* `throw();`: reported as a missing expression */
         parseRequiredExpr(cc, "the value to `throw`");
@@ -2790,11 +2763,6 @@ Ast *parseThrowStatement(Cctrl *cc) {
     Ast *file = parseThrowFile(cc);
     Ast *code = NULL;
     Ast *call = parseThrowCall(cc, file, line, &code);
-    if (call && (cc->flags & CCTRL_TRANSPILING)) {
-        cc->current_recovery = NULL;
-        cctrlRaiseExceptionAt(cc, open_line, open_col, 1,
-            "`throw` with a message or an Error is not supported with -transpile");
-    }
     cctrlTokenExpect(cc,';');
     Ast *ast = astThrow(code);
     ast->throw_call = call;
@@ -2888,11 +2856,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         case_expr = parseRequiredExpr(cc, "a `case` value or `:`");
         begining = evalIntConstExprOrErr(case_expr, &ok);
         if (!ok) {
-            if (cc->flags & CCTRL_PASTE_DEFINES && case_expr->kind == AST_LVAR) {
-                label = case_expr->lname;
-            } else {
-                parseRaiseCaseException(cc,case_expr);
-            }
+            parseRaiseCaseException(cc,case_expr);
         } else {
             label = astMakeLabel();
         }
@@ -2900,7 +2864,6 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
 
     tok = cctrlTokenPeek(cc);
 
-    /* We're not doing label to label for transpilation */
     if (tokenPunctIs(tok,TK_ELLIPSIS)) {
         cctrlTokenGet(cc);
         case_expr = parseRequiredExpr(cc, "the end of the `case` range");
@@ -2921,13 +2884,8 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     List *stmts = listNew();
     peek = cctrlTokenPeek(cc);
 
-    if (!ok && cc->flags & CCTRL_PASTE_DEFINES) {
-        case_ = astCase(label,begining,end,stmts);
-        case_->type = ast_void_type;
-    } else {
-        case_ = astCase(label,begining,end,stmts);
-        assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
-    }
+    case_ = astCase(label,begining,end,stmts);
+    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
 
     vecPush(cc->tmp_case_list,case_);
     parseCaseArm(cc, case_);
@@ -3308,12 +3266,6 @@ static Ast *parseDeferStatement(Cctrl *cc) {
     if (!cc->tmp_fname) {
         cctrlRaiseExceptionAt(cc, line, col, len,
             "`defer` is only allowed inside a function");
-    }
-    if (cc->flags & CCTRL_TRANSPILING) {
-        /* The transpiler doesn't print recovered errors: fail now */
-        cc->current_recovery = NULL;
-        cctrlRaiseExceptionAt(cc, line, col, len,
-            "`defer` is not supported with -transpile");
     }
     Lexeme *peek = cctrlTokenPeek(cc);
     if (!peek || tokenPunctIs(peek, ';') || tokenPunctIs(peek, '}')) {
@@ -4717,10 +4669,6 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     char *tname = type_tok->start;
     int tlen = type_tok->len;
     AstType *cls = NULL;
-    if (cc->flags & CCTRL_TRANSPILING) {
-        cc->current_recovery = NULL;
-        cctrlRaiseException(cc, "methods are not supported with -transpile");
-    }
     char *qual = cctrlQualifyName(cc, tname, tlen);
     if (qual) cls = mapGet(cc->clsdefs, qual);
     if (!cls) cls = mapGetLen(cc->clsdefs, tname, tlen);
@@ -5152,13 +5100,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     /* `inline` is only a hint: compile the function as an
                      * ordinary one so it can be called normally, recursed
                      * into, have its address taken and use default
-                     * arguments. The transpiler keeps the flag so it can
-                     * re-emit the keyword. */
-                    int is_inline = !!(cc->flags & CCTRL_TRANSPILING);
-                    ast = parseFunctionOrDef(cc,type,name->start,name->len,is_inline);
-                    if (is_inline) {
-                        ast->flags |= AST_FLAG_INLINE;
-                    }
+                     * arguments. */
+                    ast = parseFunctionOrDef(cc,type,name->start,name->len,0);
                     ast->line = name->line;
                     ast->col = name->col;
                     return ast;

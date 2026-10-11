@@ -135,8 +135,6 @@ typedef enum AstKind {
     AST_PLACEHOLDER   = 291,
     AST_SWITCH        = 292,
     AST_DEFAULT       = 293,
-    AST_SIZEOF        = 294,
-    AST_COMMENT       = 295,
     AST_BINOP         = 296,
     AST_UNOP          = 297,
     AST_TRY           = 298,  /* try { ... } catch <stmt> */
@@ -230,10 +228,6 @@ typedef struct AstType {
  * 64-bit (`%d` -> `%lld`), so the IR widens every narrow integer
  * argument to a full 64-bit value before the call. */
 #define AST_FLAG_PRINT_STMT (1<<3)
-/* Set on an AST_STRING made when transpiling from string literals and
- * string macros pasted together (`"a" M "b"`): its `sval` is that C text
- * as written, quotes included, which C pastes the same way. */
-#define AST_FLAG_RAW_C_STRING (1<<4)
 /* Set on a function declared `static` at file scope: its symbol is local
  * to the object, so it neither overrides nor is overridden by a function
  * of the same name elsewhere (a library internal, a user function). */
@@ -631,10 +625,6 @@ Ast *astAsmFunctionBind(AstType *rettype, AoStr *asm_fname,
 Ast *astAsmFunctionCall(AstType *rettype, AoStr *asm_fname, Vec *argv);
 Ast *astAsmFunctionDef(AoStr *asm_fname, AoStr *asm_stmt);
 
-/* Only used when transpiling */
-Ast *astSizeOf(AstType *type);
-Ast *astComment(char *comment, int len);
-
 /* Gotos */
 Ast *astGoto(AoStr *label);
 Ast *astLabel(AoStr *label);
@@ -722,7 +712,6 @@ AoStr *astNormaliseFunctionName(char *fname);
 Ast *astMakeForeverSentinal(void);
 Ast *astMakeLoopSentinal(void);
 Ast *astMakePlaceHolder(void);
-char *astAnnonymousLabel(void);
 void astResetLVarId(void);
 
 /* Returns `1` on successful conversion and `0` on failure */

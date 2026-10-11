@@ -68,7 +68,6 @@ set(SOURCES
     prsasm.c
     prslib.c
     prsutil.c
-    transpiler.c
     x86_64.c
 )
 
@@ -100,7 +99,6 @@ set(HEADERS
     prslib.h
     prsutil.h
     util.h
-    transpiler.h
     version.h
     x86_64.h
 )

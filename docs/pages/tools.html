@@ -1,7 +1,7 @@
 <!-- title: Tools -->
 <h1>Tools</h1>
 <p class="lede">One binary, <code>ktm</code>, does everything: compiling, JIT, REPL, language
-server, transpiler and debugging output.</p>
+server and debugging output.</p>
 
 <h2>Compiling</h2>
 <pre><code>ktm main.ktm -o app          # build ./app
@@ -39,7 +39,6 @@ removed afterwards, so several compiles can run at once.</p>
     <tr><td><code>-Werror</code></td><td>Treat warnings as errors</td></tr>
     <tr><td><code>--install-dir &lt;dir&gt;</code></td><td>Use <code>&lt;dir&gt;/include</code> and <code>&lt;dir&gt;/lib</code> instead of the install prefix</td></tr>
     <tr><td><code>--target &lt;triple&gt;</code></td><td>Cross-compile: <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-apple-darwin</code>, <code>aarch64-apple-darwin</code>, …</td></tr>
-    <tr><td><code>-transpile</code></td><td>Print the program as C (best effort)</td></tr>
     <tr><td><code>-ast</code>, <code>-tokens</code></td><td>Print the syntax tree or the token stream and exit</td></tr>
     <tr><td><code>--dump-ir</code></td><td>Print the intermediate representation</td></tr>
     <tr><td><code>-cfg</code>, <code>-cfg-png</code>, <code>-cfg-svg</code></td><td>Write a Graphviz control flow graph (PNG and SVG need Graphviz)</td></tr>
@@ -107,20 +106,9 @@ Syntax highlighting for Vim is in <code>src/syntax-highlighting/ktm.vim</code>.<
 <p>This produces <code>libmylib.a</code> and a shared library in
 <code>$HOME/.local/lib</code>. Mark the functions and globals it exports
 <code>pub</code>. To use the library, declare its functions, and its globals with
-<code>extern</code> (<code>extern i64 count;</code>, <code>extern i64 (*hook)(i64);</code>),
+<code>extern</code> (<code>extern i64 count;</code>, <code>extern fn(i64) i64 hook;</code>),
 usually in a <code>.ktmh</code> header you <code>#include</code>, and add
 <code>#link &lt;mylib&gt;</code>.</p>
-
-<h2>The transpiler</h2>
-<pre><code>ktm -transpile main.ktm &gt; main.c</code></pre>
-<p>This prints a C version of the program. It's experimental and <strong>frozen</strong>: it
-supports the language as of v0.18 and gets no new features, so language and library features
-added later may not translate. Comments are dropped, and some programs need fixing by hand. Globals are written with their initialisers;
-code at file scope (initialisers that aren't constant, statements) goes into
-<code>__ktm_init()</code>, which <code>main</code> calls first.
-The program is checked by the compiler first: its warnings and errors are printed as for a
-compile, and an error stops the transpile with exit status 1, so a wrong program gives no C.
-The program is parsed twice, once for the check and once for the C.</p>
 
 <h2>Looking under the hood</h2>
 <pre><code>ktm -tokens main.ktm                 # what the lexer sees

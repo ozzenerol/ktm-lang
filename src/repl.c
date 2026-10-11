@@ -1250,7 +1250,7 @@ static int replIsEchoable(Ast *ast) {
         case AST_SWITCH: case AST_CASE: case AST_DEFAULT: case AST_JUMP:
         case AST_GOTO: case AST_LABEL: case AST_BREAK: case AST_CONTINUE:
         case AST_RETURN: case AST_COMPOUND_STMT: case AST_DECL:
-        case AST_ASM_STMT: case AST_TRY: case AST_THROW: case AST_DEFER: case AST_COMMENT:
+        case AST_ASM_STMT: case AST_TRY: case AST_THROW: case AST_DEFER:
         case AST_PLACEHOLDER:
             return 0;
         default:

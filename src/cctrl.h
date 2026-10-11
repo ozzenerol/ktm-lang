@@ -19,10 +19,6 @@
  * its size is plenty */
 #define CCTRL_MACRO_USE_CACHE_SIZE (CCTRL_TOKEN_BUFFER_SIZE*2)
 
-#define CCTRL_TRANSPILING          (1<<0)
-#define CCTRL_SAVE_ANONYMOUS       (1<<1)
-#define CCTRL_PASTE_DEFINES        (1<<2)
-#define CCTRL_PRESERVE_SIZEOF      (1<<3)
 #define CCTRL_ASM_HAS_INITIALISERS (1<<4)
 /* REPL mode: re-defining a function replaces the previous definition
  * instead of raising "Cannot redefine function", and floating
