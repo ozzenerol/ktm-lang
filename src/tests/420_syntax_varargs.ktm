@@ -85,11 +85,11 @@ i64 argcParam(i64 argc, i64 ...rest) {
 /* `source` fails to compile with exactly one error, `want` */
 bool fails(u8 *source, u8 *want) {
     proc.shell("rm -f " VA_SRC " " VA_OUT);
-    fs.writeAll(VA_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(VA_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " VA_SRC " -o /dev/null > " VA_OUT " 2>&1");
-    u8 *out = fs.readAll(VA_OUT);
+    u8 *out = fs.readAll(VA_OUT).take();
     proc.shell("rm -f " VA_SRC " " VA_OUT);
     i64 errors = 0;
     u8 *p = out;

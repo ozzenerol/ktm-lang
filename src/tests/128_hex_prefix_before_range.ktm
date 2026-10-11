@@ -24,7 +24,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupHexRangeTest();
 
-    if (!fs.writeAll(HEX_RANGE_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(HEX_RANGE_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -33,7 +33,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         printf("ktm exit status %d, expected a normal compile failure\n", res);
         ok = false;
     } else {
-        out = fs.readAll(HEX_RANGE_TEST_OUT);
+        out = fs.readAll(HEX_RANGE_TEST_OUT).take();
         reason = null;
         err = null;
         if (out) {

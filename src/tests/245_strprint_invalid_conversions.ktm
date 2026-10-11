@@ -56,12 +56,12 @@ i32 main() {
     u8 *prog = "import cstr, mem;\n\nvoid main() { u8 *s = cstr.formatTo(null, \"%k-%d-%\", 1, 2); "
                          "printf(\"[%s]\\n\", s); mem.free(s); }\n";
     proc.shell("rm -f " FB_SRC " " FB_OUT " " FB_ERR);
-    fs.writeAll(FB_SRC, prog, cstr.len(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FB_SRC, cstr.view(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-jit " FB_SRC " > " FB_OUT " 2> " FB_ERR);
-    u8 *out = fs.readAll(FB_OUT);
-    u8 *err = fs.readAll(FB_ERR);
+    u8 *out = fs.readAll(FB_OUT).take();
+    u8 *err = fs.readAll(FB_ERR).take();
     if (out && err && !cstr.cmp(out, "[%k-2-%]\n") &&
             libc.strstr(err, "Invalid format char: 'k'") &&
             libc.strstr(err, "'%' with no conversion at the end")) { correct++; }

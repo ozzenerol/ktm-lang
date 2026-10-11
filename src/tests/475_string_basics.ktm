@@ -32,7 +32,7 @@ String greeting(u8[] who) {
 u8 *errorOf(u8 *code) {
     u8 *src = cstr.format("import str;\ni32 main() {\n    String s = str.from(\"x\");\n"
                          "    %s\n    return 0;\n}\n", code);
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");

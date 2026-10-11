@@ -13,7 +13,7 @@ i32 main() {
               "i64 cubeIt(i64 x) { return x * x * x; }\n"
               "replListFn();\n"
               "replFindFn(\"cube\");\n";
-    fs.writeAll(IN_FILE, src, cstr.len(src));
+    fs.writeAll(IN_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-repl < " IN_FILE " 2>&1");

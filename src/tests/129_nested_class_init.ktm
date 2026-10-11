@@ -67,13 +67,13 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupNestedInitTest();
 
-    if (!fs.writeAll(NESTED_INIT_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NESTED_INIT_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " NESTED_INIT_FILE " > " NESTED_INIT_OUT " 2>&1");
 
-    out = fs.readAll(NESTED_INIT_OUT);
+    out = fs.readAll(NESTED_INIT_OUT).take();
     if (!out) {
         cleanupNestedInitTest();
         return false;

@@ -31,14 +31,14 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *useLoc) {
 
     cleanupNonConstTest();
 
-    if (!fs.writeAll(NONCONST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NONCONST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " NONCONST_FILE " > " NONCONST_OUT " 2>&1; exit $(( $? == 1 ? 7 : 0 ))");
     if (res == 0) { ok = false; }
 
-    out = fs.readAll(NONCONST_OUT);
+    out = fs.readAll(NONCONST_OUT).take();
     if (!out) {
         cleanupNonConstTest();
         return false;

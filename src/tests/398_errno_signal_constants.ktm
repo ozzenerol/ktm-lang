@@ -55,13 +55,13 @@ i64 compareWithC() {
         src = cstr.appendFormat(src, "  printf(\"%s %%ld\\n\", (long)%s);\n", gNames[i], gNames[i]);
     }
     src = cstr.appendFormat(src, "  return 0;\n}\n");
-    fs.writeAll(EC_C, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(EC_C, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     mem.free(src);
     if (proc.shell("cc -w -o " EC_EXE " " EC_C " > " EC_OUT " 2>&1 && ./" EC_EXE " > " EC_OUT) != 0) {
         printf("could not build the C program\n");
         return -1;
     }
-    out = fs.readAll(EC_OUT);
+    out = fs.readAll(EC_OUT).take();
     if (!out) { return -1; }
     line = out;
     for (i = 0; i < gN && line && *line; i++) {
@@ -148,7 +148,7 @@ i32 main() {
     tests++; if (!p && os.errno() == libc.ENOENT) { correct++; }
 
     /* EACCES: exec of a file without execute permission (root too) */
-    fs.writeAll(EC_NOX, "#!/bin/sh\n", 10, libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(EC_NOX, "#!/bin/sh\n", libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     argv[0] = "./" EC_NOX;
     o.noPath = true;
     p = proc.spawn(argv, &o);

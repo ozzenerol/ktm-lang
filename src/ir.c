@@ -2062,6 +2062,7 @@ static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast);
 static IrValue *irLowerSliceMake(IrCtx *ctx, Ast *ast);
 static IrValue *irLowerSliceElem(IrCtx *ctx, Ast *ast);
 static IrValue *irLowerSubSlice(IrCtx *ctx, Ast *ast);
+static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast);
 
 IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     /* Variable references are SHARED Ast nodes stamped with their
@@ -2081,6 +2082,13 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
 
         case AST_SUBSLICE:
             return irLowerSubSlice(ctx, ast);
+
+        case AST_TEMP_ADDR: {
+            /* the value into its hidden variable, whose address it is */
+            IrValue *addr = irLValueAddr(ctx, ast->slice_var);
+            irCopyAggregateTo(ctx, addr, ast->slice_ptr, ast->slice_var->type->size);
+            return addr;
+        }
 
         case AST_TERNARY: {
             /* cond ? then : els. Only the chosen branch runs: evaluate
@@ -3605,6 +3613,10 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_SLICE_MAKE:
             irEscapeWalk(ast->slice_ptr, escape);
             irEscapeWalk(ast->slice_len, escape);
+            return;
+
+        case AST_TEMP_ADDR:
+            irEscapeWalk(ast->slice_ptr, escape);
             return;
 
         case AST_SLICE_ELEM:

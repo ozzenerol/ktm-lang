@@ -25,7 +25,7 @@ u8 *capturedErr() {
     libc.fflush(null);
     dup2(gSaved, 2);
     libc.close(gSaved);
-    return fs.readAll(gErr);
+    return fs.readAll(gErr).take();
 }
 
 bool quiet(u8 *cmd, u8 *want) {

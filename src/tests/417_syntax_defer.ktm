@@ -237,7 +237,7 @@ bool throwInCoroutine() {
  * printed. */
 u8 *compileRun(u8 *source, bool run) {
     proc.shell("rm -f " DEFER_SRC " " DEFER_OUT " " DEFER_BIN);
-    fs.writeAll(DEFER_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(DEFER_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (run) {
         proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
@@ -248,7 +248,7 @@ u8 *compileRun(u8 *source, bool run) {
                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                      "-S " DEFER_SRC " -o /dev/null > " DEFER_OUT " 2>&1");
     }
-    u8 *out = fs.readAll(DEFER_OUT);
+    u8 *out = fs.readAll(DEFER_OUT).take();
     proc.shell("rm -f " DEFER_SRC " " DEFER_OUT " " DEFER_BIN);
     return out;
 }

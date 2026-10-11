@@ -1,4 +1,4 @@
-import fs, libc, mem, test;
+import cstr, fs, libc, mem, test;
 
 extern "c" i32 dup(i32 fd);
 extern "c" i32 dup2(i32 fd, i32 fd2);
@@ -50,7 +50,7 @@ i32 main() {
     /* A character constant statement prints its characters */
     tests++;
     u8 *path = "__191_char_const_out.txt";
-    fs.remove(path);
+    fs.remove(cstr.view(path));
     libc.fflush(null);
     i32 saved = dup(1), fd = libc.open(path, libc.O_WRONLY | libc.O_CREAT, 0x1A4);
     dup2(fd, 1);
@@ -65,14 +65,16 @@ i32 main() {
     dup2(saved, 1);
     libc.close(saved);
     i64 size = 0;
-    u8 *out = fs.readAll(path, &size);
+    String out_read = fs.readAll(cstr.view(path));
+    size = out_read.len;
+    u8 *out = out_read.take();
     if (out && size == 11 && out[0] == '"' && out[1] == '%' && out[2] == 'a' &&
             out[3] == '%' && out[4] == 'd' && out[5] == 'b' && out[6] == '\\' &&
             out[7] == 8 && out[8] == 1 && out[9] == 0x7F && out[10] == '\n') {
         correct++;
             }
     mem.free(out);
-    fs.remove(path);
+    fs.remove(cstr.view(path));
 
     test.printResult(correct, tests);
     printf("====\n");

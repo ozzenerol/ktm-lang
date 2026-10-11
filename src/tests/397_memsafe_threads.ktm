@@ -24,7 +24,7 @@ void check(bool ok, u8 *what) {
 
 /* Run `src` under -Memsafe: true if ktm exited 0 */
 bool runMt(u8 *src) {
-    fs.writeAll(MT_PROG, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(MT_PROG, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     return proc.shell(MT_RUN) == 0;
 }
 

@@ -11,7 +11,7 @@ i64 gCorrect = 0, gTests = 0;
 void expect(u8 *expr, u8 *want) {
     u8 *src = cstr.format("enum E { a, b };\ni64 f() { return 1; }\n"
                          "i32 main() {\n    i64 x = 1;\n    auto p = %s;\n    return 0;\n}\n", expr);
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit " SRC_FILE " 2>&1");

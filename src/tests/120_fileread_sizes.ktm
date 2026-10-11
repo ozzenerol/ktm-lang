@@ -16,13 +16,15 @@ bool readBackMatches(i64 len) {
         buf[i] = 'a' + i % 26;
     }
     buf[len] = '\0';
-    if (!fs.writeAll(FILEREAD_TEST_FILE, buf, len, libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FILEREAD_TEST_FILE, buf[0:len], libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         mem.free(buf);
         return false;
     }
 
     i64 size = -1;
-    u8 *got = fs.readAll(FILEREAD_TEST_FILE, &size);
+    String got_read = fs.readAll(FILEREAD_TEST_FILE);
+    size = got_read.len;
+    u8 *got = got_read.take();
     bool ok = got != null && size == len && libc.memcmp(got, buf, len) == 0 &&
                         got[len] == '\0';
     if (!ok) {

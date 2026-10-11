@@ -38,7 +38,7 @@ void main() {
   printf(\"%%d\\n\", %s);
 }
 ", expr);
-    if (!fs.writeAll(FNCMP_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FNCMP_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         mem.free(src);
         return false;
     }
@@ -50,7 +50,7 @@ void main() {
     res = proc.shell(cmd);
     mem.free(cmd);
     if (res != 0) {
-        out = fs.readAll(FNCMP_OUT);
+        out = fs.readAll(FNCMP_OUT).take();
         if (out) {
             if (libc.strstr(out, expected)) {
                 ok = true;

@@ -25,14 +25,14 @@ bool runs(bool jit, u8 *source, u8 *want) {
     u8 *out;
     i64 res;
     cleanup();
-    fs.writeAll(LP_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(LP_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (jit) {
         res = proc.shell(LP_KTM "-jit " LP_FILE " > " LP_OUT " 2>&1");
     } else {
         res = proc.shell(LP_KTM LP_FILE " -o " LP_EXE " > " LP_OUT " 2>&1 && "
                                  LP_TIMEOUT "./" LP_EXE " >> " LP_OUT " 2>&1");
     }
-    out = fs.readAll(LP_OUT);
+    out = fs.readAll(LP_OUT).take();
     bool ok = res == 0 && out && libc.strstr(out, want);
     if (!ok) { printf("jit=%d: exit status %d\n%s\n", jit, res, out); }
     mem.free(out);

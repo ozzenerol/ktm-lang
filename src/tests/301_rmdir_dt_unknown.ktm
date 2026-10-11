@@ -22,10 +22,10 @@ extern "c" u8 *mkdtemp(u8 *template);
 "}\n"
 
 #define PROG_SRC \
-"import fs;\n" \
+"import cstr, fs;\n" \
 "i32 main(i32 argc, u8 **argv)\n" \
 "{\n" \
-"  printf(\"result=%d\\n\", fs.removeDir(argv[1], fs.REMOVE_RECURSE));\n" \
+"  printf(\"result=%d\\n\", fs.removeDir(cstr.view(argv[1]), fs.REMOVE_RECURSE));\n" \
 "  return 0;\n" \
 "}\n"
 
@@ -53,13 +53,13 @@ i32 main() {
         return 0;
     }
 
-    fs.writeAll(cstr.formatTo(tree, "%s/dtunk.c", root), SHIM_SRC, cstr.len(SHIM_SRC));
+    fs.writeAll(cstr.view(cstr.formatTo(tree, "%s/dtunk.c", root)), cstr.view(SHIM_SRC));
     if (runFn("[ \"$(uname)\" = Linux ] && command -v cc >/dev/null 2>&1 && "
                     "cd '%s' && cc -shared -fPIC -o dtunk.so dtunk.c -ldl", root) != 0) {
         /* No shim possible here: nothing to test */
         correct = tests;
     } else {
-        fs.writeAll(cstr.formatTo(tree, "%s/p.ktm", root), PROG_SRC, cstr.len(PROG_SRC));
+        fs.writeAll(cstr.view(cstr.formatTo(tree, "%s/p.ktm", root)), cstr.view(PROG_SRC));
         runFn("mkdir -p '%s/t/a/b/c' '%s/t/d' && echo x > '%s/t/a/f' && "
                 "echo y > '%s/t/a/b/c/g' && echo z > '%s/t/top'", root);
         cstr.formatTo(tree, "%s/t", root);
@@ -69,7 +69,7 @@ i32 main() {
                         root) == 0) {
             correct++;
         }
-        out = fs.readAll(cstr.formatTo(tree, "%s/out", root));
+        out = fs.readAll(cstr.view(cstr.formatTo(tree, "%s/out", root))).take();
         if (out && libc.strstr(out, "result=0\n")) { correct++; }
         else if (out) { printf("%s\n", out); }
         if (out) { mem.free(out); }

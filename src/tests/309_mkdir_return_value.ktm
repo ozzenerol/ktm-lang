@@ -27,7 +27,7 @@ bool isDir(u8 *name) {
 i64 gCorrect = 0, gTests = 0;
 
 void expect(u8 *name, bool recurse, i64 want) {
-    i64 got = fs.makeDir(P(name),, recurse);
+    i64 got = fs.makeDir(cstr.view(P(name)),, recurse);
     gTests++;
     if (got == want && isDir(name) == (want == 0)) { gCorrect++; }
     else { printf("MkDir(%s, recurse=%d) -> %d, want %d\n", name, recurse, got, want); }
@@ -44,7 +44,7 @@ i32 main() {
         return 0;
     }
     gRoot = root;
-    fs.writeAll(P("file"), "k\n", 2);
+    fs.writeAll(cstr.view(P("file")), "k\n");
 
     expect("new", false, 0);
     expect("new", false, 0);          /* already there */
@@ -55,12 +55,12 @@ i32 main() {
     expect("t1/t2/", true, 0);        /* trailing '/' */
     expect("file/x/y", true, -1);     /* a file in the middle */
     expect("a/file2/", true, 0);
-    fs.writeAll(P("a/f3"), "k\n", 2);
+    fs.writeAll(cstr.view(P("a/f3")), "k\n");
     expect("a/f3", true, -1);         /* a file at the end */
 
     /* Permissions don't stop root */
     if (getuid() != 0) {
-        fs.makeDir(P("ro"));
+        fs.makeDir(cstr.view(P("ro")));
         chmod(P("ro"), 0x16D);          /* 0555 */
         expect("ro/x", false, -1);
         expect("ro/y", true, -1);
@@ -68,7 +68,7 @@ i32 main() {
         chmod(P("ro"), 0x1ED);          /* 0755 */
     }
 
-    gTests++; if (fs.makeDir(null) == -1) { gCorrect++; }
+    gTests++; if (fs.makeDir(cstr.view(null)) == -1) { gCorrect++; }
     gTests++; if (fs.makeDir("") == -1 && fs.makeDir("",, true) == -1) { gCorrect++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);

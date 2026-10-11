@@ -16,11 +16,11 @@ u8 *run(u8 *cmd) {
     u8 *full = cstr.format("cd " D " && %s > out 2>&1", cmd);
     proc.shell(full);
     mem.free(full);
-    return fs.readAll(D "/out");
+    return fs.readAll(D "/out").take();
 }
 
 void put(u8 *path, u8 *text) {
-    fs.writeAll(path, text, cstr.len(text), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(cstr.view(path), cstr.view(text), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 bool is(u8 *what, u8 *out, u8 *want) {

@@ -24,11 +24,11 @@ bool conflicts(u8 *src, u8 *name) {
     bool ok;
 
     cleanupRedecl();
-    if (!fs.writeAll(REDECL_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(REDECL_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " REDECL_FILE " > " REDECL_OUT " 2>&1");
-    out = fs.readAll(REDECL_OUT);
+    out = fs.readAll(REDECL_OUT).take();
     if (name) {
         cstr.formatTo(want, REDECL_MSG "%s`", name);
         ok = res != 0 && out && libc.strstr(out, want) != null;

@@ -22,13 +22,13 @@ bool jitRuns(u8 *source, bool wantOk, u8 *expected) {
     bool ok = true;
 
     cleanupNoMainTest();
-    if (!fs.writeAll(NM_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NM_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("T=; command -v timeout >/dev/null 2>&1 && T='timeout 30'; "
                              "$T ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                              "-jit " NM_FILE " > " NM_OUT " 2>&1");
-    out = fs.readAll(NM_OUT);
+    out = fs.readAll(NM_OUT).take();
     if (!out) {
         cleanupNoMainTest();
         return false;

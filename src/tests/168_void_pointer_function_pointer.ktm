@@ -32,9 +32,9 @@ u8 *compileOutput(u8 *body) {
                                             "  C c;\n  i64 *ip = null;\n%s\n}\n", body);
     u8 *out = null;
     cleanupVpTest();
-    if (fs.writeAll(VP_TEST_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(VP_TEST_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " VP_TEST_FILE " > " VP_TEST_OUT " 2>&1");
-        out = fs.readAll(VP_TEST_OUT);
+        out = fs.readAll(VP_TEST_OUT).take();
     }
     mem.free(src);
     cleanupVpTest();

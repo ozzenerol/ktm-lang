@@ -19,7 +19,7 @@ u8 *gWant = "3 80\n82 84 80\n84\n";
 bool output(u8 *cmd) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(MOD_OUT);
+    u8 *out = fs.readAll(MOD_OUT).take();
     bool ok = out && !cstr.cmp(out, gWant);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);

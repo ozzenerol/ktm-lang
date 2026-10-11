@@ -24,13 +24,13 @@ bool compilesCleanly(u8 *source) {
     u8 *out;
     bool ok;
     proc.shell("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
-    if (!fs.writeAll(SOCKLEN_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SOCKLEN_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  SOCKLEN_SRC " -o " SOCKLEN_BIN " > " SOCKLEN_OUT " 2>&1");
-    out = fs.readAll(SOCKLEN_OUT);
+    out = fs.readAll(SOCKLEN_OUT).take();
     ok = out != null && cstr.len(out) == 0;
     if (!ok && out) { printf("\n%s", out); }
     mem.free(out);

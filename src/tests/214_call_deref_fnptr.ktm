@@ -37,7 +37,7 @@ void cleanupFiles() {
 
 bool compileFailsWith(u8 *source, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(FNDEREF_FILE, source, cstr.len(source),
+    if (!fs.writeAll(FNDEREF_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
@@ -46,7 +46,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
                                      FNDEREF_FILE " -o " FNDEREF_BIN " > " FNDEREF_OUT " 2>&1");
     bool ok = res != 0;
     if (ok) {
-        u8 *out = fs.readAll(FNDEREF_OUT);
+        u8 *out = fs.readAll(FNDEREF_OUT).take();
         ok = out && libc.strstr(out, expected) != null;
         if (!ok && out) { printf("%s\n", out); }
         mem.free(out);

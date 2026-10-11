@@ -63,7 +63,8 @@ you own that grows as you add to it, and the functions that read text given as a
 <code>u8[]</code>, so a literal, a slice or a String. <code>cstr</code> is C's strings: a
 NUL-terminated <code>u8 *</code>, for C functions and the data they give you. A String's bytes
 are always followed by a NUL, so <code>s.cstr()</code> passes one to C for free, and
-<code>str.from</code> makes a String of C bytes (<code>p[0:cstr.len(p)]</code>). Case conversion
+<code>cstr.view(p)</code> is a C string's bytes as a <code>u8[]</code>, so <code>str.from(cstr.view(p))</code>
+makes a String of them. Case conversion
 and the case-insensitive compares only know ASCII letters.</p>
 
 <h3>String</h3>
@@ -325,52 +326,51 @@ void main()
 fixed
 </pre>
 <h3>Splitting paths and names</h3>
-<p><code>fs.cutExt(name, dst)</code> cuts the extension off <code>name</code> and puts it,
-without the dot, in <code>dst</code>. <code>fs.ext</code> finds the first <code>.</code>
-that isn't followed by <code>/</code> or <code>.</code>. <code>str.splitLast</code> splits a
-path at its last <code>/</code>.</p>
+<p><code>fs.ext(name)</code> is a file name's extension, from its first <code>.</code> that
+isn't followed by <code>/</code> or <code>.</code>, and <code>fs.cutExt(name)</code> the name
+without it; both are views of the name. <code>str.splitLast</code> splits a path at its last
+<code>/</code>.</p>
 <pre data-run><code>
-import cstr, fs, str;
+import fs, str;
 
 void main()
 {
   u8[] dir, file;
-  str.splitLast("usr/lib/libktm.a", "/", &dir, &file);
+  str.splitLast("usr/lib/libktm.tar.gz", "/", &dir, &file);
   printf("%s + %s\n", dir, file);
-  u8 last[16], ext[8];
-  cstr.copy(last, "libktm.a");
-  fs.cutExt(last, ext);
-  printf("%s . %s\n", last, ext);
+  printf("%s + %s\n", fs.cutExt(file), fs.ext(file));
 }
 </code></pre>
 <pre class="output">
-usr/lib + libktm.a
-libktm . a
+usr/lib + libktm.tar.gz
+libktm + .tar.gz
 </pre>
 
 <h2 id="files">Files</h2>
-<p><code>fs.writeAll</code> writes a buffer to a file and returns whether it worked.
-<code>fs.readAll</code> reads a whole file into a new NUL-terminated buffer, or returns
-<code>null</code> if it can't.</p>
+<p>Paths are a <code>u8[]</code> (a literal, a slice or a String; a C string through
+<code>cstr.view(p)</code>). <code>fs.writeAll(path, data)</code> writes <code>data</code>, a
+<code>u8[]</code>, to a file and returns whether it worked. <code>fs.readAll(path)</code> reads a
+whole file into a String that is yours, with a NUL after it; its <code>ptr</code> is
+<code>null</code> when the file can't be read (<code>os.errno()</code> says why), and an empty
+file gives an empty String that has one.</p>
 <pre data-run><code>
-import cstr, fs, mem, str;
+import fs;
 
 void main()
 {
-  u8 *path = "/tmp/ktm_docs_example.txt";
-  u8 *text = "first line\nsecond line\n";
-  if (!fs.writeAll(path, text, cstr.len(text))) {
+  u8[] path = "/tmp/ktm_docs_example.txt";
+  if (!fs.writeAll(path, "first line\nsecond line\n")) {
     printf("could not write %s\n", path);
     return;
   }
 
-  i64 size;
-  u8 *contents = fs.readAll(path, &size);
-  printf("%d bytes\n%s", size, contents);
-  mem.free(contents);
+  String contents = fs.readAll(path);
+  defer contents.free();
+  printf("%d bytes\n%s", contents.len, contents);
 
-  if (fs.readAll("/no/such/file", &size) == null) {
-    printf("missing files give NULL\n");
+  String missing = fs.readAll("/no/such/file");
+  if (!missing.ptr) {
+    printf("a missing file gives a String without a ptr\n");
   }
 }
 </code></pre>
@@ -378,17 +378,18 @@ void main()
 23 bytes
 first line
 second line
-missing files give NULL
+a missing file gives a String without a ptr
 </pre>
 <p><code>fs.writeAll</code> replaces the file's contents: by default it opens with
 <code>O_CREAT | O_WRONLY | O_TRUNC</code> (a new file gets mode 0644 minus the umask).
 Pass the flags yourself to do something else, <code>O_CREAT | O_WRONLY | O_APPEND</code>
-to add to the end. A <code>null</code> name or buffer or a negative size gives
-<code>false</code> and creates nothing. <code>fs.readAll</code> reads a regular file up to
-its size, and a FIFO, a pipe (<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a
-<code>/proc</code> file (which reports size 0) until end of file, so it waits for a
-FIFO's writer and never finishes on an endless device like <code>/dev/zero</code>. For a
-directory it returns <code>null</code>, and on any failure it sets <code>*_size</code> to 0.</p>
+to add to the end. A path that can't be opened gives <code>false</code> and creates nothing.
+<code>fs.readAll</code> reads a regular file up to its size, and a FIFO, a pipe
+(<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a <code>/proc</code> file (which
+reports size 0) until end of file, so it waits for a FIFO's writer and never finishes on an
+endless device like <code>/dev/zero</code>. For a directory it gives a String without a
+<code>ptr</code>. A path longer than 4095 bytes fails in every function here, with
+<code>ENAMETOOLONG</code>.</p>
 
 <p>Directories: <code>fs.makeDir(path)</code> makes one directory and
 <code>fs.makeDir(path,, true)</code> the missing parents too; both return 0 if the path is a
@@ -399,7 +400,7 @@ a directory and everything in it, with <code>fs.REMOVE_FORCE</code> a path that 
 is not an error. <code>fs.removeDir</code> is the directory half of it.
 <code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times),
 <code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
-<code>fs.currentDir()</code> returns the working directory as a new string to <code>mem.free</code>.</p>
+<code>fs.currentDir()</code> returns the working directory as a String.</p>
 <pre data-run><code>
 import cstr, fs, libc, mem, str;
 
@@ -407,28 +408,31 @@ extern "c" u8 *mkdtemp(u8 *template);
 
 void main()
 {
-  u8 root[32], path[64];
-  mem.copy(root, "/tmp/ktm_docs_XXXXXX", 21);
-  if (!mkdtemp(root)) { return; }    // a fresh directory to work in
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(dir)) { return; }    // a fresh directory to work in
+  u8[] root = cstr.view(dir);
 
-  cstr.formatTo(path, "%s/a/b", root);
+  String path = str.format("%s/a/b", root);
+  defer path.free();
   printf("fs.makeDir: %d\n", fs.makeDir(path,, true));
 
-  cstr.formatTo(path, "%s/a/notes.txt", root);
-  fs.writeAll(path, "a long first version\n", 21);
-  fs.writeAll(path, "short\n", 6);                  // replaces it
-  fs.writeAll(path, "more\n", 5, libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
-  i64 size;
-  u8 *text = fs.readAll(path, &size);
-  printf("%d bytes:\n%s", size, text);
-  mem.free(text);
+  String notes = str.format("%s/a/notes.txt", root);
+  defer notes.free();
+  fs.writeAll(notes, "a long first version\n");
+  fs.writeAll(notes, "short\n");                  // replaces it
+  fs.writeAll(notes, "more\n", libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
+  String text = fs.readAll(notes);
+  defer text.free();
+  printf("%d bytes:\n%s", text.len, text);
 
-  cstr.formatTo(path, "%s/a", root);
-  printf("fs.readAll of a directory: %d\n", fs.readAll(path) == null);
+  String a = str.format("%s/a", root);
+  defer a.free();
+  String what = fs.readAll(a);
+  printf("fs.readAll of a directory: %d\n", what.ptr == null);
 
   fs.FileStat fst;
-  cstr.formatTo(path, "%s/a/notes.txt", root);
-  if (fs.stat(&fst, path) == 0) { printf("notes.txt: %d bytes\n", fst.st_size); }
+  if (fs.stat(&fst, notes) == 0) { printf("notes.txt: %d bytes\n", fst.st_size); }
 
   printf("fs.remove: %d\n", fs.remove(root, fs.REMOVE_RECURSE));
   printf("fs.remove again with fs.REMOVE_FORCE: %d\n", fs.remove(root, fs.REMOVE_FORCE));

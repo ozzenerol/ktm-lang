@@ -36,9 +36,9 @@ bool badSubscriptAt(u8 *src, i64 line) {
     i64 res;
     bool ok;
     fs.remove(BAD_FILE);
-    fs.writeAll(BAD_FILE, src, cstr.len(src));
+    fs.writeAll(BAD_FILE, cstr.view(src));
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " BAD_FILE " > " BAD_OUT " 2>&1");
-    out = fs.readAll(BAD_OUT);
+    out = fs.readAll(BAD_OUT).take();
     cstr.formatTo(want, BAD_FILE ":%d:", line);
     ok = res != 0 && out && libc.strstr(out, want) &&
              libc.strstr(out, "Subscript expressions must evaluate to an integer type");

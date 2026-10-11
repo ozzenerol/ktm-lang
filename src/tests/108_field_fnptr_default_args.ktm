@@ -31,13 +31,13 @@ bool compileFailsWith(u8 *source, u8 *expected) {
     i64 res;
     bool ok = false;
 
-    if (!fs.writeAll(FIELD_FNPTR_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FIELD_FNPTR_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " FIELD_FNPTR_TEST_FILE " > " FIELD_FNPTR_TEST_OUT " 2>&1");
     if (res != 0) {
-        out = fs.readAll(FIELD_FNPTR_TEST_OUT);
+        out = fs.readAll(FIELD_FNPTR_TEST_OUT).take();
         if (out) {
             if (libc.strstr(out, expected)) { ok = true; }
             else { printf("%s\n", out); }

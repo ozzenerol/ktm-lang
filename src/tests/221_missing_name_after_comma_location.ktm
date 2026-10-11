@@ -11,11 +11,11 @@ import cstr, fs, libc, mem, proc, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " CNM_SRC " " CNM_OUT);
-    fs.writeAll(CNM_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CNM_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " CNM_SRC " -o /dev/null > " CNM_OUT " 2>&1");
-    u8 *out = fs.readAll(CNM_OUT);
+    u8 *out = fs.readAll(CNM_OUT).take();
     proc.shell("rm -f " CNM_SRC " " CNM_OUT);
     return out;
 }

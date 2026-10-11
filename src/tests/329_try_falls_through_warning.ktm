@@ -48,11 +48,11 @@ bool warnsIf(u8 *src, bool warn) {
     bool ok;
 
     cleanupTryFall();
-    if (!fs.writeAll(TRY_FALL_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(TRY_FALL_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " TRY_FALL_FILE " > " TRY_FALL_OUT " 2>&1");
-    out = fs.readAll(TRY_FALL_OUT);
+    out = fs.readAll(TRY_FALL_OUT).take();
     ok = res == 0 && out && (libc.strstr(out, TRY_FALL_MSG) != null) == warn;
     if (!ok && out) { printf("%s\n", out); }
     mem.free(out);

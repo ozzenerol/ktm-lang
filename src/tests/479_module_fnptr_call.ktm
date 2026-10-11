@@ -10,7 +10,7 @@ import cstr, fs, libc, proc, test;
             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
 void put(u8 *path, u8 *src) {
-    fs.writeAll(path, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(cstr.view(path), cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 i32 main() {

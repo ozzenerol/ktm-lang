@@ -886,6 +886,19 @@ Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line) {
     return ast;
 }
 
+/* `value` (a struct, a call's result) copied into the hidden `var`, whose
+ * address is the value: a method's self when it is called on a call's
+ * result (`fs.readAll(p).take()`). Uses the slice-make fields. */
+Ast *astTempAddr(Ast *var, Ast *value) {
+    Ast *ast = astNew();
+    ast->kind = AST_TEMP_ADDR;
+    ast->type = astMakePointerType(var->type);
+    ast->slice_var = var;
+    ast->slice_ptr = value;
+    ast->slice_len = NULL;
+    return ast;
+}
+
 Ast *astDefer(Ast *stmt) {
     Ast *ast = astNew();
     ast->kind = AST_DEFER;
@@ -2574,6 +2587,11 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             if (ast->sub_hi) _astToString(str, ast->sub_hi, depth+1);
             break;
 
+        case AST_TEMP_ADDR:
+            aoStrCatPrintf(str, "<temp>\n");
+            _astToString(str, ast->slice_ptr, depth+1);
+            break;
+
         case AST_SLICE_MAKE:
             aoStrCatPrintf(str, "<slice>\n");
             _astToString(str, ast->slice_ptr, depth+1);
@@ -2841,6 +2859,7 @@ char *astKindToString(AstKind kind) {
         case AST_SLICE_MAKE:    return "AST_SLICE_MAKE";
         case AST_SLICE_ELEM:    return "AST_SLICE_ELEM";
         case AST_SUBSLICE:      return "AST_SUBSLICE";
+        case AST_TEMP_ADDR:     return "AST_TEMP_ADDR";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -3116,6 +3135,7 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
             break;
 
         case AST_SLICE_MAKE:
+        case AST_TEMP_ADDR:
             _astLValueToString(str, ast->slice_ptr, lexeme_flags);
             break;
 
@@ -3285,6 +3305,7 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_SLICE_MAKE: return "slice";
         case AST_SLICE_ELEM: return "slice element";
         case AST_SUBSLICE: return "slice";
+        case AST_TEMP_ADDR: return "value";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";

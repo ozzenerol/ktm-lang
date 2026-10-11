@@ -15,7 +15,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupArgCountTest();
 
-    if (!fs.writeAll(ARG_COUNT_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ARG_COUNT_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -25,7 +25,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(ARG_COUNT_TEST_OUT);
+    out = fs.readAll(ARG_COUNT_TEST_OUT).take();
     if (!out) {
         cleanupArgCountTest();
         return false;

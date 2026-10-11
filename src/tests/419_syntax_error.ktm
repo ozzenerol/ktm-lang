@@ -222,7 +222,7 @@ bool noLeak() {
  * the program printed; *status is the program's exit status. */
 u8 *compileRun(u8 *source, u8 *flags, bool run, i64 *status=null) {
     proc.shell("rm -f " ERR_SRC " " ERR_OUT " " ERR_BIN);
-    fs.writeAll(ERR_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(ERR_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     u8 *cmd;
     if (run) {
         cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
@@ -237,7 +237,7 @@ u8 *compileRun(u8 *source, u8 *flags, bool run, i64 *status=null) {
     i64 res = proc.shell(cmd);
     if (status) { *status = res; }
     mem.free(cmd);
-    u8 *out = fs.readAll(ERR_OUT);
+    u8 *out = fs.readAll(ERR_OUT).take();
     proc.shell("rm -f " ERR_SRC " " ERR_OUT " " ERR_BIN);
     return out;
 }

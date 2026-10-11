@@ -26,7 +26,7 @@ bool compileFailsWith(u8 *name, u8 *source, u8 *expected) {
     i64 res;
 
     cleanupUnopTest();
-    if (!fs.writeAll(UNOP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNOP_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         printf("Failed - %s: could not write the source\n", name);
         return false;
     }
@@ -38,7 +38,7 @@ bool compileFailsWith(u8 *name, u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(UNOP_TEST_OUT);
+    out = fs.readAll(UNOP_TEST_OUT).take();
     if (!out || !libc.strstr(out, expected)) {
         printf("Failed - %s: expected '%s' in:\n%s\n", name, expected, out);
         mem.free(out);

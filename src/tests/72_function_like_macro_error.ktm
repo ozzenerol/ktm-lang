@@ -32,7 +32,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupFnMacroTest();
 
-    if (!fs.writeAll(FN_MACRO_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FN_MACRO_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -43,7 +43,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(FN_MACRO_TEST_OUT);
+    out = fs.readAll(FN_MACRO_TEST_OUT).take();
     if (!out) {
         cleanupFnMacroTest();
         return false;

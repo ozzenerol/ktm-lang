@@ -23,13 +23,13 @@ void cleanupMemsafeTest(void) {
 
 /* Write `source` and run it under -Memsafe; true if ktm exited 0 */
 bool runMemsafe(u8 *source, u8 *cmd = MS_RUN) {
-    fs.writeAll(MS_PROG, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(MS_PROG, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     return proc.shell(cmd) == 0;
 }
 
 /* The program's stdout must be exactly `expected` */
 bool stdoutIs(u8 *expected) {
-    u8 *out = fs.readAll(MS_OUT);
+    u8 *out = fs.readAll(MS_OUT).take();
     bool ok;
     if (!out) { return false; }
     ok = cstr.cmp(out, expected) == 0;

@@ -19,12 +19,12 @@ void cleanupRunTest(void) {
 }
 
 bool writeSource(u8 *path, u8 *source) {
-    return fs.writeAll(path, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    return fs.writeAll(cstr.view(path), cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 /* The captured output of the last run must be exactly `expected` */
 bool outputIs(u8 *expected) {
-    u8 *out = fs.readAll(RUN_TEST_OUT);
+    u8 *out = fs.readAll(RUN_TEST_OUT).take();
     bool ok;
     if (!out) { return false; }
     ok = cstr.cmp(out, expected) == 0;

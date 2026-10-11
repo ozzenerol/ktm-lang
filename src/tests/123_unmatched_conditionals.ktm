@@ -36,14 +36,14 @@ bool compileReports(u8 *source, i64 count, u8 *msg1, u8 *loc1,
 
     cleanupCondTest();
 
-    if (!fs.writeAll(COND_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(COND_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " COND_FILE " > " COND_OUT " 2>&1");
     if (res == 0) { ok = false; }
 
-    out = fs.readAll(COND_OUT);
+    out = fs.readAll(COND_OUT).take();
     if (!out) {
         cleanupCondTest();
         return false;

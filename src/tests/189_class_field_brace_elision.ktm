@@ -44,11 +44,11 @@ bool failsWith(u8 *source, u8 *expected) {
     bool ok;
 
     proc.shell("rm -f " ELIDE_TEST_SRC " " ELIDE_TEST_OUT);
-    fs.writeAll(ELIDE_TEST_SRC, source, cstr.len(source),
+    fs.writeAll(ELIDE_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(ELIDE_KTM ELIDE_TEST_SRC " > " ELIDE_TEST_OUT " 2>&1; "
                              "test $? -eq 1");
-    out = fs.readAll(ELIDE_TEST_OUT);
+    out = fs.readAll(ELIDE_TEST_OUT).take();
     ok = res == 0 && out && libc.strstr(out, expected);
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);

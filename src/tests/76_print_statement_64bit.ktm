@@ -19,7 +19,7 @@ void cleanupPrint64Test(void) {
 
 /* The captured output of the last run must be exactly `expected` */
 bool outputIs(u8 *expected) {
-    u8 *out = fs.readAll(PRINT64_TEST_OUT);
+    u8 *out = fs.readAll(PRINT64_TEST_OUT).take();
     bool ok;
     if (!out) { return false; }
     ok = cstr.cmp(out, expected) == 0;
@@ -66,7 +66,7 @@ i32 main() {
     i64 correct = 0;
 
     cleanupPrint64Test();
-    fs.writeAll(PRINT64_TEST_SRC, print64Source, cstr.len(print64Source),
+    fs.writeAll(PRINT64_TEST_SRC, cstr.view(print64Source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     if (proc.shell(PRINT64_KTM "-jit " PRINT64_TEST_SRC " > " PRINT64_TEST_OUT " 2>&1") == 0 &&

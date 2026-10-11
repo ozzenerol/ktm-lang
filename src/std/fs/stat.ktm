@@ -13,7 +13,7 @@ static i32 makeDirIfMissing(u8 *path, i32 mode=MAKE_DIR_DEFAULT) {
     return -1;
 }
 
-pub i32 removeDir(u8 *path, i64 flags=0) {
+static i32 removeDirC(u8 *path, i64 flags=0) {
     i32 result,r2;
     i64 pathlen,buflen;
     u8 *buf;
@@ -49,14 +49,14 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
         buf = cstr.formatTo(null,"%s/%s",path,ent.name);
         if (buf) {
             if (ent.type == libc.DT_DIR) {
-                r2 = removeDir(buf,flags);
+                r2 = removeDirC(buf,flags);
             } else if (ent.type != libc.DT_UNKNOWN) {
                 /* Anything but a directory, links included, is unlinked; the
                  * type is a number, not a bit mask (DT_SOCK & DT_DIR != 0) */
                 r2 = libc.unlink(buf);
             } else if (!libc.lstat(buf,&st)) {
                     if ((st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
-                        r2 = removeDir(buf,flags);
+                        r2 = removeDirC(buf,flags);
                     } else {
                         r2 = libc.unlink(buf);
                     }
@@ -77,7 +77,7 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     return result;
 }
 
-pub i32 remove(u8 *path, i64 flags=0)
+static i32 removeC(u8 *path, i64 flags=0)
 { /* DANGER Remove a file or directory, this is powerful but can cause a world 
      * of pain */
     i32 result;
@@ -94,14 +94,14 @@ pub i32 remove(u8 *path, i64 flags=0)
 
     /* An empty directory, or with RM_RECURSE everything in it */
     if ((st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
-        return removeDir(path,flags);
+        return removeDirC(path,flags);
     }
 
     result = libc.unlink(path);
     return result;
 }
 
-pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
+static i32 makeDirC(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
 { /* Make a directory, by default does not recurse. The mode is
      * MKDIR_DEFAULT minus the umask. Returns 0 if path is a directory
      * afterwards, -1 if not */
@@ -144,4 +144,25 @@ pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
         mem.free(tmp);
     }
     return result;
+}
+
+pub i32 removeDir(u8[] path, i64 flags=0)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return removeDirC(cpath, flags);
+}
+
+pub i32 remove(u8[] path, i64 flags=0)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return removeC(cpath, flags);
+}
+
+pub i32 makeDir(u8[] path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return makeDirC(cpath, mode, recurse);
 }

@@ -1,32 +1,20 @@
 module fs;
-import cstr;
 
-pub u8 *ext(u8 *src)
-{// Find dot char in name.
-    i64 ch;
-    if (!src) { return null; }
-    while (ch=*src++) {
-        if (ch=='.' && *src!='/' && *src!='.') {
-            return src-1;
+/* The extension of a file name: from its first `.` that isn't followed by
+ * `/` or `.` to the end (".tar.gz" of "archive.tar.gz"), a view of it;
+ * empty when it has none */
+pub u8[] ext(u8[] name)
+{
+    for (i64 i = 0; i < name.len; ++i) {
+        if (name[i] == '.' && (i + 1 >= name.len || (name[i + 1] != '/' && name[i + 1] != '.'))) {
+            return name[i:];
         }
     }
-    return null;
+    return name[name.len:];
 }
 
-pub u8 *cutExt(u8 *src,u8 *dst=null)
-{// Remove filename extension from str.
-    u8 *ptr;
-    if (!src) {
-        if (dst) { *dst=0; }
-        return dst;
-    }
-    if (ptr=ext(src)) {
-        if (dst) {
-            cstr.copy(dst,ptr+1);
-        }
-        *ptr=0;
-    } else if (dst) {
-        *dst=0;
-    }
-    return dst;
+/* The file name without its extension (see ext), a view of it */
+pub u8[] cutExt(u8[] name)
+{
+    return name[:name.len - ext(name).len];
 }

@@ -17,7 +17,7 @@ void check(bool ok, u8 *what) {
 }
 
 u8 *run(u8 *src) {
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");

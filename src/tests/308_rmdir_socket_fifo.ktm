@@ -63,16 +63,16 @@ i32 main() {
     }
     gRoot = root;
 
-    fs.makeDir(P("t"));
-    fs.makeDir(P("t/sub"));
-    fs.writeAll(P("t/f"), "k\n", 2);
+    fs.makeDir(cstr.view(P("t")));
+    fs.makeDir(cstr.view(P("t/sub")));
+    fs.writeAll(cstr.view(P("t/f")), "k\n");
     mkfifo(P("t/fifo"), 0x1A4);
     symlink("sub", P("t/link"));
     makeSocket(P("t/s"));
     makeSocket(P("t/sub/s2"));
     if (isSocket("t/s") && isSocket("t/sub/s2")) { correct++; }
 
-    if (fs.removeDir(P("t"), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.removeDir(cstr.view(P("t")), fs.REMOVE_RECURSE) == 0) { correct++; }
     if (!exists("t")) { correct++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);

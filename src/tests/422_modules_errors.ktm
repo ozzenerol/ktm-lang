@@ -30,7 +30,7 @@ bool reports(u8 *name, u8 *env, i64 errors, i64 warnings, u8 *want) {
                                             env, name);
     proc.shell("rm -f " ERR_OUT);
     proc.shell(cmd);
-    u8 *out = fs.readAll(ERR_OUT);
+    u8 *out = fs.readAll(ERR_OUT).take();
     bool ok = out && count(out, "error:") == errors &&
                         count(out, "warning:") == warnings && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", name, out); }

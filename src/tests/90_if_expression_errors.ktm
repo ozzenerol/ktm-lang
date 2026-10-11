@@ -24,7 +24,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
 
     cleanupIfTest();
 
-    if (!fs.writeAll(IF_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(IF_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -35,7 +35,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
         return false;
     }
 
-    out = fs.readAll(IF_TEST_OUT);
+    out = fs.readAll(IF_TEST_OUT).take();
     if (!out) {
         cleanupIfTest();
         return false;

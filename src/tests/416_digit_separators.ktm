@@ -27,7 +27,7 @@ bool compileFailsWithMisplaced(u8 *source) {
 
     cleanupSepTest();
 
-    if (!fs.writeAll(SEP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SEP_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -36,7 +36,7 @@ bool compileFailsWithMisplaced(u8 *source) {
         printf("ktm exit status %d, expected a normal compile failure\n", res);
         ok = false;
     } else {
-        out = fs.readAll(SEP_TEST_OUT);
+        out = fs.readAll(SEP_TEST_OUT).take();
         if (!out || !libc.strstr(out, "misplaced '_' in number")) {
             if (out) { printf("%s\n", out); }
             ok = false;

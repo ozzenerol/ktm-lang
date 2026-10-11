@@ -19,14 +19,14 @@ void cleanupFiles() {
  * stderr and not "unreachable" */
 bool runExpectingExit(u8 *src, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(VB_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(VB_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                      VB_FILE " -o " VB_BIN " > " VB_OUT " 2>&1 && "
                                      "./" VB_BIN " 2> " VB_OUT " >/dev/null; exit $?");
-    u8 *out = fs.readAll(VB_OUT);
+    u8 *out = fs.readAll(VB_OUT).take();
     bool ok = out && res == 1 && libc.strstr(out, expected) != null &&
                         libc.strstr(out, "unreachable") == null;
     if (!ok) { printf("status %d, output: %s\n", res, out); }

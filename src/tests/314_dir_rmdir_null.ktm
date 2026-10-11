@@ -1,4 +1,4 @@
-import fs, test;
+import cstr, fs, test;
 
 /* fs.removeDir(null, REMOVE_RECURSE) passed null to opendir() and
  * segfaulted. It returns -1 now, as do removeDir and remove of null.
@@ -9,9 +9,9 @@ i32 main() {
     i64 correct = 0, tests = 3;
     printf("Test - removeDir and remove with null: ");
 
-    if (fs.removeDir(null, fs.REMOVE_RECURSE) == -1) { correct++; }
-    if (fs.removeDir(null) == -1 && fs.removeDir(null, fs.REMOVE_RECURSE) == -1) { correct++; }
-    if (fs.remove(null) == -1) { correct++; }
+    if (fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (fs.removeDir(cstr.view(null)) == -1 && fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (fs.remove(cstr.view(null)) == -1) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

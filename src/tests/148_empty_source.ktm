@@ -36,7 +36,7 @@ i64 runKtm(u8 *flags, u8 **outArg) {
             "%s " EMPTY_FILE " > " EMPTY_OUT " 2>&1", flags);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
-    *outArg = fs.readAll(EMPTY_OUT);
+    *outArg = fs.readAll(EMPTY_OUT).take();
     return res;
 }
 

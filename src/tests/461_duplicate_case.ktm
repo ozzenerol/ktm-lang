@@ -31,7 +31,7 @@ i32 main() {
               "    }\n"
               "    return 0;\n"
               "}\n";
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit " SRC_FILE " 2>&1");
@@ -47,7 +47,7 @@ i32 main() {
     /* distinct values are fine */
     u8 *ok = "i32 main() {\n    i64 x = 6;\n    switch (x) {\n        case 1 ... 5: break;\n"
              "        case 6: printf(\"six\"); break;\n        case 7: break;\n    }\n    return 0;\n}\n";
-    fs.writeAll(SRC_FILE, ok, cstr.len(ok));
+    fs.writeAll(SRC_FILE, cstr.view(ok));
     out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                            "-jit " SRC_FILE " 2>&1");

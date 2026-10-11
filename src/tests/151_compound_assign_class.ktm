@@ -40,13 +40,13 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where, i64 errors=1) {
 
     cleanupCompoundAssignTest();
 
-    if (!fs.writeAll(CA_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(CA_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell(CA_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CA_TEST_FILE " > " CA_TEST_OUT " 2>&1");
 
-    out = fs.readAll(CA_TEST_OUT);
+    out = fs.readAll(CA_TEST_OUT).take();
     if (!out) {
         printf("status %d, no output\n", res);
         cleanupCompoundAssignTest();

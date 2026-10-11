@@ -32,7 +32,7 @@ bool compileCheck(u8 *source, i64 wantStatus, i64 nerrors, u8 **want, i64 nwant)
 
     cleanupBinopNoiseTest();
 
-    if (!fs.writeAll(BINOP_NOISE_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(BINOP_NOISE_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -41,7 +41,7 @@ bool compileCheck(u8 *source, i64 wantStatus, i64 nerrors, u8 **want, i64 nwant)
     if (wantStatus == 1 && res != 7) { ok = false; }
     if (wantStatus == 0 && res != 8) { ok = false; }
 
-    out = fs.readAll(BINOP_NOISE_OUT);
+    out = fs.readAll(BINOP_NOISE_OUT).take();
     if (!out) {
         cleanupBinopNoiseTest();
         return false;

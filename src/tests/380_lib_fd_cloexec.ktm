@@ -51,7 +51,7 @@ void kind(i32 fd, u8 *what) {
 u8 *gBig;
 void *writeFifo(void *arg)
 {// Blocks in fs.writeAll until main drains the fifo
-    fs.writeAll(FIFO, gBig, BIG, libc.O_WRONLY);
+    fs.writeAll(FIFO, gBig[0:BIG], libc.O_WRONLY);
     return null;
 }
 
@@ -112,7 +112,9 @@ u8 *gRead;
 i64 gReadLen;
 void *readFifo(void *arg)
 {// Blocks in fs.readAll (reading to EOF) until main closes its end
-    gRead = fs.readAll(FIFO, &gReadLen);
+    String gRead_read = fs.readAll(FIFO);
+    gReadLen = gRead_read.len;
+    gRead = gRead_read.take();
     return null;
 }
 

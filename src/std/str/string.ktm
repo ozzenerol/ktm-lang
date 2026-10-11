@@ -21,6 +21,19 @@ pub String format(u8 *fmt, ...args)
     return s;
 }
 
+/* A String owning `bytes`, a mem.alloc'd block of len bytes and a NUL
+ * after them (from C, or a reader): no copy, free it as any String */
+pub String adopt(u8 *bytes, i64 len)
+{
+    String s;
+    if (bytes) {
+        s.ptr = bytes;
+        s.len = len;
+        s.cap = len;
+    }
+    return s;
+}
+
 /* An empty String: nothing allocated until something is added */
 pub String new()
 {
@@ -175,6 +188,17 @@ pub void String.reverse()
         self.ptr[i] = self.ptr[j];
         self.ptr[j] = c;
     }
+}
+
+/* Its bytes as a C string that is now yours (mem.free it), null when it
+ * has none; it is empty after. For C: `u8 *text = fs.readAll(p).take();` */
+pub u8 *String.take()
+{
+    u8 *bytes = self.ptr;
+    self.ptr = null;
+    self.len = 0;
+    self.cap = 0;
+    return bytes;
 }
 
 /* Its bytes given back; it is empty after, so a second free() of the same

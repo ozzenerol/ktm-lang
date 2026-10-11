@@ -36,7 +36,7 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *msg) {
 
     cleanupDirErrTest();
 
-    if (!fs.writeAll(DIR_ERR_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DIR_ERR_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -46,7 +46,7 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *msg) {
         return false;
     }
 
-    out = fs.readAll(DIR_ERR_OUT);
+    out = fs.readAll(DIR_ERR_OUT).take();
     if (!out) {
         cleanupDirErrTest();
         return false;

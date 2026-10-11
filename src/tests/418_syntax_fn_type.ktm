@@ -78,11 +78,11 @@ i64 showColor(Color c) { return (i64)c; }
 /* Compile `source`, which must FAIL to compile, and return ktm's output. */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-    u8 *out = fs.readAll(AT_OUT);
+    u8 *out = fs.readAll(AT_OUT).take();
     proc.shell("rm -f " AT_SRC " " AT_OUT);
     return out;
 }

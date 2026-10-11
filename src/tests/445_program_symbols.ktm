@@ -30,8 +30,8 @@ u8 *gProgram =
 "i32 main() {\n"
 "    u8 *p = mem.alloc(16);\n"
 "    cstr.copy(p, \"abc\");\n"
-"    fs.writeAll(\"./ktm-445-prog.txt\", p, 3);\n"
-"    u8 *back = fs.readAll(\"./ktm-445-prog.txt\");\n"
+"    fs.writeAll(\"./ktm-445-prog.txt\", p[0:3]);\n"
+"    u8 *back = fs.readAll(\"./ktm-445-prog.txt\").take();\n"
 "    fs.remove(\"./ktm-445-prog.txt\");\n"
 "    i64 rc = proc.shell(\"exit 7\");\n"
 "    printf(\"%d %d %d %d %d %d %d %s %d %d\\n\", read(1), write(1), environ() == null,\n"
@@ -46,7 +46,7 @@ u8 *gWant = "2 3 1 4 5 6 7 abc 7 1\n";
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " PS_OUT);
     proc.shell(cmd);
-    u8 *out = fs.readAll(PS_OUT);
+    u8 *out = fs.readAll(PS_OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
@@ -56,7 +56,7 @@ bool output(u8 *cmd, u8 *want) {
 i32 main() {
     printf("Test - a program's functions have their own symbols: ");
     i64 correct = 0, tests = 0;
-    fs.writeAll(PS_SRC, gProgram, cstr.len(gProgram), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(PS_SRC, cstr.view(gProgram), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     tests++;
     if (output(KTM PS_SRC " -o " PS_BIN " > " PS_OUT " 2>&1 && " PS_BIN " >> " PS_OUT " 2>&1", gWant)) { correct++; }

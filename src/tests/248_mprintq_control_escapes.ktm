@@ -39,12 +39,14 @@ i32 main() {
     u8 *q = cstr.quote(all);
     u8 *src = cstr.formatTo(null, "void main() { printf(\"%%s\", \"%s\"); }\n", q);
     proc.shell("rm -f " PQ_SRC " " PQ_OUT);
-    fs.writeAll(PQ_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(PQ_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-jit " PQ_SRC " > " PQ_OUT);
     i64 len = 0;
-    u8 *back = fs.readAll(PQ_OUT, &len);
+    String back_read = fs.readAll(PQ_OUT);
+    len = back_read.len;
+    u8 *back = back_read.take();
     if (back && len == 255 && !cstr.cmp(back, all)) { correct++; }
     else { printf("read back %d bytes\n", len); }
     mem.free(back);

@@ -29,11 +29,11 @@ bool exists(u8 *name) {
 
 void makeTree(u8 *top) {
     u8 name[64];
-    fs.makeDir(P(top));
-    fs.writeAll(P(cstr.formatTo(name, "%s/f1", top)), "k\n", 2);
+    fs.makeDir(cstr.view(P(top)));
+    fs.writeAll(cstr.view(P(cstr.formatTo(name, "%s/f1", top))), "k\n", 2);
     mkfifo(P(cstr.formatTo(name, "%s/fifo", top)), 0x1A4);
-    fs.makeDir(P(cstr.formatTo(name, "%s/sub", top)));
-    fs.writeAll(P(cstr.formatTo(name, "%s/sub/f2", top)), "k\n", 2);
+    fs.makeDir(cstr.view(P(cstr.formatTo(name, "%s/sub", top))));
+    fs.writeAll(cstr.view(P(cstr.formatTo(name, "%s/sub/f2", top))), "k\n", 2);
 }
 
 void capture() {
@@ -49,7 +49,7 @@ u8 *captured() {
     libc.fflush(null);
     dup2(gSaved, 1);
     libc.close(gSaved);
-    u8 *got = fs.readAll(gOut);
+    u8 *got = fs.readAll(gOut).take();
     fs.remove(gOut);
     return got;
 }
@@ -78,7 +78,7 @@ i32 main() {
 
     makeTree("q");
     capture();
-    r = fs.removeDir(P("q"), fs.REMOVE_RECURSE);
+    r = fs.removeDir(cstr.view(P("q")), fs.REMOVE_RECURSE);
     out = captured();
     if (r == 0 && !exists("q")) { correct++; }
     if (out && !cstr.cmp(out, "")) { correct++; }

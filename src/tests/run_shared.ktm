@@ -221,15 +221,15 @@ void runnerInit() {
     }
     gRoot = absPath(gRoot);
     symlink(gKtm, cstr.format("%s/ktm", gRoot));
-    fs.makeDir(cstr.format("%s/w", gRoot));
-    fs.makeDir(cstr.format("%s/t", gRoot));
-    fs.makeDir(cstr.format("%s/b", gRoot));
-    fs.makeDir(cstr.format("%s/o", gRoot));
+    fs.makeDir(cstr.view(cstr.format("%s/w", gRoot)));
+    fs.makeDir(cstr.view(cstr.format("%s/t", gRoot)));
+    fs.makeDir(cstr.view(cstr.format("%s/b", gRoot)));
+    fs.makeDir(cstr.view(cstr.format("%s/o", gRoot)));
 }
 
 void runnerCleanup() {
     libc.unlink(cstr.format("%s/ktm", gRoot));
-    fs.removeDir(gRoot, fs.REMOVE_RECURSE);
+    fs.removeDir(cstr.view(gRoot), fs.REMOVE_RECURSE);
 }
 
 /* Defined by run.ktm / run_jit.ktm: compile and run `name` (relative to
@@ -244,8 +244,8 @@ void runTestChild(u8 *name, i64 idx) {
     libc.signal(libc.SIGTERM, libc.SIG_DFL);
     u8 *work = cstr.format("%s/w/%d", gRoot, idx);
     u8 *tmp = cstr.format("%s/t/%d", gRoot, idx);
-    fs.makeDir(work);
-    fs.makeDir(tmp);
+    fs.makeDir(cstr.view(work));
+    fs.makeDir(cstr.view(tmp));
     setenv("TMPDIR", tmp, 1);
 
     i32 fd = libc.creat(cstr.format("%s/o/%d", gRoot, idx), 0x1A4);
@@ -266,7 +266,9 @@ void runTestChild(u8 *name, i64 idx) {
 void printTestOutput(i64 idx) {
     i64 len = 0;
     u8 *path = cstr.format("%s/o/%d", gRoot, idx);
-    u8 *out = fs.readAll(path, &len);
+    String out_read = fs.readAll(cstr.view(path));
+    len = out_read.len;
+    u8 *out = out_read.take();
     libc.fflush(null);
     if (out) {
         libc.write(1, out, len);
@@ -285,7 +287,7 @@ void timeOutTest(u8 *name, i64 idx, i32 pid, i64 timeout) {
     u8 *path = cstr.format("%s/o/%d", gRoot, idx);
     u8 *msg = cstr.format("\033[0;31mFAILED\033[0;0m timed out after %d s: %s\n",
                                             timeout, name);
-    fs.writeAll(path, msg, cstr.len(msg), libc.O_CREAT|libc.O_WRONLY|libc.O_APPEND);
+    fs.writeAll(cstr.view(path), cstr.view(msg), libc.O_CREAT|libc.O_WRONLY|libc.O_APPEND);
     mem.free(msg);
     mem.free(path);
 }
@@ -328,7 +330,7 @@ void runTests(vec.PtrVec *names) {
                 if (running > 0) { break; }
                 u8 *msg = cstr.format("\033[0;31mFAILED\033[0;0m to run: %s (fork failed)\n",
                                                         entries[next]);
-                fs.writeAll(cstr.format("%s/o/%d", gRoot, next), msg, cstr.len(msg));
+                fs.writeAll(cstr.view(cstr.format("%s/o/%d", gRoot, next)), cstr.view(msg));
                 done[next] = true;
             } else {
                 /* also here, so the group exists before any kill below */

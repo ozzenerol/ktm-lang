@@ -23,13 +23,13 @@ bool failsWith(u8 *source, u8 *expected, u8 *unwanted) {
     bool good = true;
 
     cleanupHintTest();
-    if (!fs.writeAll(SH_TEST_FILE, source, cstr.len(source),
+    if (!fs.writeAll(SH_TEST_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " SH_TEST_FILE " > " SH_TEST_OUT " 2>&1");
     if (res == 0) { good = false; }
-    out = fs.readAll(SH_TEST_OUT);
+    out = fs.readAll(SH_TEST_OUT).take();
     if (!out) {
         cleanupHintTest();
         return false;

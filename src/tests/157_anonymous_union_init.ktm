@@ -110,11 +110,11 @@ bool compileFailsWith(u8 *source, u8 *msg, u8 *loc) {
     bool ok;
 
     cleanupUnionInitTest();
-    if (!fs.writeAll(UNION_INIT_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNION_INIT_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " UNION_INIT_FILE " > " UNION_INIT_OUT " 2>&1");
-    out = fs.readAll(UNION_INIT_OUT);
+    out = fs.readAll(UNION_INIT_OUT).take();
     if (!out) {
         cleanupUnionInitTest();
         return false;

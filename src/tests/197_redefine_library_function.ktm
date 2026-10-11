@@ -27,7 +27,7 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     bool ok = true;
 
     cleanupRedefineTest();
-    if (!fs.writeAll(RD_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(RD_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     if (jit) {
@@ -35,7 +35,7 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     } else {
         res = proc.shell(RD_KTM RD_FILE " -o " RD_EXE " > " RD_OUT " 2>&1 && " RD_TIMEOUT "./" RD_EXE " >> " RD_OUT " 2>&1");
     }
-    out = fs.readAll(RD_OUT);
+    out = fs.readAll(RD_OUT).take();
     if (!out) {
         cleanupRedefineTest();
         return false;
