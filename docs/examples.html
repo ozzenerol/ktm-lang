@@ -53,7 +53,7 @@ docs/examples/run.sh life     # just one</code></pre>
 
 <h2 id="word-frequency">Word frequency<a class="anchor" href="#word-frequency" aria-label="Link to this section">#</a></h2>
 <p>Reads a text file and prints its most common words. It shows reading a file, scanning
-characters, counting with a <code>map.StrMap</code>, ranking with <code>vec.ptrSort</code>, and
+characters, counting with a <code>map.StrMap</code>, ranking with a <code>vec.PtrVec</code>'s <code>sort</code>, and
 reading command-line arguments.</p>
 <pre><code>cd docs/examples/wordfreq
 ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>

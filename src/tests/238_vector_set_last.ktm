@@ -98,17 +98,17 @@ i32 main() {
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.IntVec *v = vec.intNew(); v.push(1);\n"
 "  v.set(1, 5); printf(\"unreachable\\n\"); return 0; }\n",
-            "IntVecSet: index 1 out of range (size 1)")) { correct++; }
+            "IntVec.set: index 1 out of range (size 1)")) { correct++; }
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.FloatVec *v = vec.floatNew();\n"
 "  v.set(0, 1.0); printf(\"unreachable\\n\"); return 0; }\n",
-            "FloatVecSet: index 0 out of range (size 0)")) { correct++; }
+            "FloatVec.set: index 0 out of range (size 0)")) { correct++; }
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.PtrVec *v = vec.ptrNew(); v.push(null);\n"
 "  v.set(-3, null); printf(\"unreachable\\n\"); return 0; }\n",
-            "PtrVecSet: index -3 out of range (size 1)")) { correct++; }
+            "PtrVec.set: index -3 out of range (size 1)")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");
