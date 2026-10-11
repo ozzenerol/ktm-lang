@@ -1,4 +1,5 @@
 module sql;
+import libc;
 
 #ifdef __KTM_LINK_SQLITE3__ 
 
@@ -42,11 +43,11 @@ const i64 SQLITE_NULL = 5;
 const i64 SQLITE_TEXT = 3;
 const i64 SQLITE3_TEXT = 3;
 
-pub const i64 INT = SQLITE_INTEGER;
-pub const i64 FLOAT = SQLITE_FLOAT;
-pub const i64 TEXT = SQLITE3_TEXT;
-pub const i64 BLOB = SQLITE_BLOB;
-pub const i64 NULL_TYPE = SQLITE_NULL;
+pub const i64 INT = libc.SQLITE_INTEGER;
+pub const i64 FLOAT = libc.SQLITE_FLOAT;
+pub const i64 TEXT = libc.SQLITE3_TEXT;
+pub const i64 BLOB = libc.SQLITE_BLOB;
+pub const i64 NULL_TYPE = libc.SQLITE_NULL;
 
 struct sqlite3_stmt {};
 struct sqlite3 {};
