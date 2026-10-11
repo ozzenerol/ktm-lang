@@ -333,7 +333,7 @@ static void replReportFault(void) {
                  * instruction before it, so attribute to addr-1. */
                 int line = ktmJitFindLineForAddr(jit,
                                                  (void *)(frame - 1));
-                fprintf(stderr, "`%s`+%zu", sym, off);
+                fprintf(stderr, "`%s`+%zu", astSymbolDisplayName(sym), off);
                 if (line) fprintf(stderr, ", line %d", line);
                 fprintf(stderr, "\n");
             } else {
@@ -371,7 +371,7 @@ static void replReportFault(void) {
     fflush(stderr);
 }
 
-/* `ReplHeap;` - live allocations, biggest first. The tracker itself
+/* `replHeap;` - live allocations, biggest first. The tracker itself
  * lives in memsafe.c; replRun installs it via memsafeInit. */
 static void replBuiltinReplHeap(void) {
     memsafeDumpLive(stdout);
@@ -494,7 +494,7 @@ static void replEvalString(char *code) {
     replExec(&b, INT_MAX);
 }
 
-/* --------- ReplReloadRc: Refresh the `~/.ktm_rc.ktm` ----------
+/* --------- replReloadRc: Refresh the `~/.ktm_rc.ktm` ----------
  * Reinclude the `~/.ktm_rc.ktm` this does not however delete the previous
  * function or `#define` definitions, so it won't delete stuff. But it will
  * re-define already existing symbols
@@ -515,7 +515,7 @@ static void replBuiltinReloadRc(void) {
     parseToAst(cc);
 
     if (cctrlDiagFlush(cc) > 0) {
-        fprintf(stderr, "ReplReloadRc: errors\n");
+        fprintf(stderr, "replReloadRc: errors\n");
     }
 
     cctrlDiagClear(cc);
@@ -528,16 +528,19 @@ static void replBuiltinReloadRc(void) {
     replLexerRelease(l);
 }
 
-/* --------- ReplListFn: List all defined functions ---------- */
+/* --------- replListFn: List all defined functions ---------- */
 static void replBuiltinListFn(void) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
     Cctrl *cc = jit->cc;
     MapIter it;
     mapIterInit(cc->global_env, &it);
+    /* a module's function is in global_env by its name and its symbol */
+    Set *seen = setNew(32, &set_uint_type);
     while (mapIterNext(&it)) {
         Ast *entry = it.node->value;
-        if (astIsFnLike(entry)) {
+        if (astIsFnLike(entry) && !setHas(seen, (void *)entry)) {
+            setAdd(seen, (void *)entry);
             /* Can't free the string as it belongs to the AoStr pool... We
              * need a way to be able to detach buffers from AoStr and free
              * the underlying buffer as we leak everywhere. */
@@ -548,7 +551,7 @@ static void replBuiltinListFn(void) {
 }
 
 
-/* --------- ReplFindFn: Find a function -------------------------------- */
+/* --------- replFindFn: Find a function -------------------------------- */
 static void replBuiltinFindFn(char *name) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
@@ -558,7 +561,9 @@ static void replBuiltinFindFn(char *name) {
     Vec *vec = vecNew(&vec_cstring_type);
     while (mapIterNext(&it)) {
         Ast *entry = it.node->value;
-        if (astIsFnLike(entry) && entry->fname && strstr(entry->fname->data, name)) {
+        if (astIsFnLike(entry) && entry->fname &&
+            strstr(astSymbolDisplayName(entry->fname->data), name) &&
+            !vecHas(vec, astFunctionToString(entry))) {
             char *fn_str = astFunctionToString(entry);
             vecPush(vec, fn_str);
         }
@@ -570,7 +575,7 @@ static void replBuiltinFindFn(char *name) {
     vecRelease(vec);
 }
 
-/* --------- ReplListGlobal: List all defined global variables ---------- */
+/* --------- replListGVars: List all defined global variables ---------- */
 static void replBuiltinListGVars(void) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
@@ -593,7 +598,7 @@ static void replBuiltinListGVars(void) {
     }
 }
 
-/* ---------------- ReplClassRep: Print a class or union --------- */
+/* ---------------- replClassRep: Print a class or union --------- */
 static void replBuiltinPrintClass(char *name) {
     KtmJit *jit = repl_jit;
     if (name == NULL || *name == '\0' || jit == NULL) return;
@@ -648,13 +653,15 @@ static void replBuiltinReplDel(char *name) {
      * chunks may still reference it. */
     char mangled[256];
     snprintf(mangled, sizeof(mangled), "_%s", name);
-    if (jit->host_symbols) {
-        mapRemove(jit->host_symbols, name);
-        mapRemove(jit->host_symbols, mangled);
-    }
-    if (jit->symbols) {
-        mapRemove(jit->symbols, name);
-        mapRemove(jit->symbols, mangled);
+    /* and as the program's symbol (`_K01x`), the one a session's own
+     * functions and globals are bound by */
+    char *prog = astProgramSymbol(name, (int)len);
+    char prog_mangled[256];
+    snprintf(prog_mangled, sizeof(prog_mangled), "_%s", prog);
+    const char *spellings[] = { name, mangled, prog, prog_mangled };
+    for (size_t i = 0; i < sizeof(spellings)/sizeof(spellings[0]); ++i) {
+        if (jit->host_symbols) mapRemove(jit->host_symbols, (char *)spellings[i]);
+        if (jit->symbols) mapRemove(jit->symbols, (char *)spellings[i]);
     }
 }
 
@@ -663,14 +670,14 @@ static void replBuiltinReplDel(char *name) {
  * hints). The implementations are registered via ktmJitDefineSymbol. */
 static const char repl_builtin_protos[] =
     "extern \"c\" void replDisasm(u8 *fname);\n"
-    "extern \"c\" void ReplReloadRc();\n"
-    "extern \"c\" void ReplListFn();\n"
-    "extern \"c\" void ReplFindFn(u8 *name);\n"
-    "extern \"c\" void ReplListGVars();\n"
-    "extern \"c\" void ReplClassRep(u8 *name);\n"
-    "extern \"c\" void ReplEval(u8 *code);\n"
+    "extern \"c\" void replReloadRc();\n"
+    "extern \"c\" void replListFn();\n"
+    "extern \"c\" void replFindFn(u8 *name);\n"
+    "extern \"c\" void replListGVars();\n"
+    "extern \"c\" void replClassRep(u8 *name);\n"
+    "extern \"c\" void replEval(u8 *code);\n"
     "extern \"c\" void replDel(u8 *name);\n"
-    "extern \"c\" void ReplHeap();\n";
+    "extern \"c\" void replHeap();\n";
 
 /* ---------------- tab completion ---------------- */
 
@@ -1470,7 +1477,7 @@ static void replExecInner(AoStr *input, int round) {
 }
 
 /* Fault-guard around an eval. Nested evals (JIT'd code calling the
- * ReplEval builtin re-enters here) stack: the outer jump point is
+ * replEval builtin re-enters here) stack: the outer jump point is
  * saved and restored either way, so a fault always unwinds to the
  * innermost live eval. sigsetjmp's savemask=1 restores the signal
  * mask on the jump - without it the delivered signal would stay
@@ -1482,7 +1489,7 @@ static void replExec(AoStr *input, int round) {
 
     if (sigsetjmp(repl_fault_env, 1) == 0) {
         repl_in_eval = 1;
-        /* Rounds tag memsafe reports; ReplEval's INT_MAX isn't a real
+        /* Rounds tag memsafe reports; replEval's INT_MAX isn't a real
          * round, so drop it to "untagged". */
         memsafeSetRound(round == INT_MAX ? 0 : round);
         replExecInner(input, round);
@@ -1513,13 +1520,13 @@ int replRun(Cctrl *cc, CliArgs *args) {
     /* Builtin helper functions */
     ktmJitDefineSymbol(jit, "replDisasm", (void *)(uintptr_t)replBuiltinUf);
     ktmJitDefineSymbol(jit, "replDel", (void *)(uintptr_t)replBuiltinReplDel);
-    ktmJitDefineSymbol(jit, "ReplReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
-    ktmJitDefineSymbol(jit, "ReplListFn", (void *)(uintptr_t)replBuiltinListFn);
-    ktmJitDefineSymbol(jit, "ReplListGVars", (void *)(uintptr_t)replBuiltinListGVars);
-    ktmJitDefineSymbol(jit, "ReplClassRep", (void *)(uintptr_t)replBuiltinPrintClass);
-    ktmJitDefineSymbol(jit, "ReplEval", (void *)(uintptr_t)replEvalString);
-    ktmJitDefineSymbol(jit, "ReplHeap", (void *)(uintptr_t)replBuiltinReplHeap);
-    ktmJitDefineSymbol(jit, "ReplFindFn", (void *)(uintptr_t)replBuiltinFindFn);
+    ktmJitDefineSymbol(jit, "replReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
+    ktmJitDefineSymbol(jit, "replListFn", (void *)(uintptr_t)replBuiltinListFn);
+    ktmJitDefineSymbol(jit, "replListGVars", (void *)(uintptr_t)replBuiltinListGVars);
+    ktmJitDefineSymbol(jit, "replClassRep", (void *)(uintptr_t)replBuiltinPrintClass);
+    ktmJitDefineSymbol(jit, "replEval", (void *)(uintptr_t)replEvalString);
+    ktmJitDefineSymbol(jit, "replHeap", (void *)(uintptr_t)replBuiltinReplHeap);
+    ktmJitDefineSymbol(jit, "replFindFn", (void *)(uintptr_t)replBuiltinFindFn);
 
     /* Tracking allocator (memsafe.c) - always on in the REPL, and
      * registered before the bootstrap so the very first chunk already
@@ -1553,7 +1560,7 @@ int replRun(Cctrl *cc, CliArgs *args) {
                      "%s/.ktm_repl_history", home);
             linenoiseHistoryLoad(repl_history_path);
         }
-        if (!mapHas(cc->macro_defs, "KTM_REPL_NO_HELLO")) {
+        if (!mapHas(cc->macro_defs, "KTM_NO_REPL_HELLO")) {
             printf("ktm %s [%s]\n"
                    "Statements run as typed; a trailing expression's value is "
                    "echoed.\nTab completes, arrows browse history, Ctrl-D "

@@ -255,6 +255,8 @@ typedef struct AstType {
  * `read` or `environ` can't replace the C library's or libktm's symbol of
  * that name. Messages and lookups keep the plain name. */
 #define AST_FLAG_PROGRAM (1<<9)
+/* `extern "c" T name;`: C data, its symbol the C name */
+#define AST_FLAG_EXTERN_C (1<<10)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */

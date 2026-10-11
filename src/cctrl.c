@@ -227,17 +227,6 @@ static void cctrlAddBuiltinMacros(Cctrl *cc) {
     mapAdd(cc->macro_defs,"__KTM_VERSION__",le);
 }
 
-void cctrlAddBuiltinFunctions(Cctrl *cc) {
-      Vec *params = vecNew(&vec_ast_type);
-      AstType *type = astMakePointerType(astMakePointerType(ast_u8_type));
-      Ast *var = astLVar(type,str_lit("fname"));
-      vecPush(params, var);
-      Ast *fn = astFunction(type,str_lit("Uf"),params,NULL,NULL,0);
-      fn->kind = AST_FUN_PROTO;
-      fn->flags |= AST_FLAG_BUILTIN;
-      mapAdd(cc->global_env,fn->fname->data,fn);
-}
-
 /* C's printf, built in (the stdlib map: no module, the compiler checks
  * it), declared as the old std.ktmh did: an install that still has that
  * header redeclares it the same */
@@ -283,6 +272,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
     cc->global_env = mapNew(32, &map_ast_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
+    cc->init_module_dirs = NULL;
     /* A postfix cast in a #define's value, `#define X (5(U64) % 3)`,
      * looks the type name up: give it the built-in types (classes and
      * unions are not known while lexing, so those stay empty). */
@@ -329,6 +319,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
+    cc->init_module_dirs = NULL;
     cc->macro_defs = cctrlCreateLexemeMap();
     cc->x86_registers = setNew(32, &set_cstring_type);
     cc->libc_functions = setNew(32, &set_cstring_type);
@@ -390,15 +381,13 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->target = target;
 
     cctrlAddBuiltinMacros(cc);
-    /* We have no real mechanism of adding compiler builtins */
-    // cctrlAddBuiltinFunctions(cc);
     cctrlAddBuiltinPrintf(cc);
 
     Ast *cmd_args = astGlobalCmdArgs();
     listAppend(cc->ast_list,cmd_args->argc);
     listAppend(cc->ast_list,cmd_args->argv);
-    mapAdd(cc->global_env,"argc",cmd_args->argc->declvar);
-    mapAdd(cc->global_env,"argv",cmd_args->argv->declvar);
+    /* not in scope: a function's `argc` used to find these, always 0
+     * and null (main's parameters are the real ones) */
     return cc;
 }
 
@@ -1240,6 +1229,19 @@ void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
         if (d->suggestion) aoStrRelease(d->suggestion);
         free(d);
         return;
+    }
+    /* The same diagnostic again (a module file is read in more than one
+     * pass, and a declaration can be checked in both): reported once */
+    for (u64 i = 0; d->message && i < cc->diagnostics->size; ++i) {
+        CctrlDiagnostic *e = cc->diagnostics->entries[i];
+        if (e && e->message && e->severity == d->severity &&
+            e->message->len == d->message->len &&
+            !memcmp(e->message->data, d->message->data, d->message->len)) {
+            aoStrRelease(d->message);
+            if (d->suggestion) aoStrRelease(d->suggestion);
+            free(d);
+            return;
+        }
     }
     vecPush(cc->diagnostics, d);
     if (d->severity == CCTRL_ERROR) cc->n_errors++;

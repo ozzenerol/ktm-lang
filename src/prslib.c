@@ -2403,6 +2403,14 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     if ((ast = cctrlGetVar(cc, name, len)) == NULL) {
         cctrlRewindUntilStrMatch(cc, name, len, NULL);
         peek = cctrlTokenPeek(cc);
+        /* the old implicit argc/argv of every function (always 0 and
+         * null outside an old `(...)` one): main's parameters now */
+        if (len == 4 && (!memcmp(name, "argc", 4) || !memcmp(name, "argv", 4))) {
+            cctrlRaiseSuggestion(cc,
+                    "they are main's parameters, `i32 main(i32 argc, u8 **argv)`: "
+                    "pass them to the function that needs them",
+                    "`%.*s` is not defined here", len, name);
+        }
         if (tok == NULL) {
             /* Identifier at end of input - nothing to suggest from. */
             cctrlRaiseException(cc,
@@ -3560,6 +3568,42 @@ static void parseCheckArithmeticUnaryOp(Cctrl *cc, AstUnOp op, Ast *operand,
     cctrlTerminate(cc);
 }
 
+/* `&x` of something without an address (`&5`, `&E.a`, `&f()`): an error
+ * here; it reached the code generator, which gave up ("&AST_LITERAL not
+ * supported in slice"). What has one: a variable, a field, an element
+ * (`*p`, `a[i]`) or a function. */
+static void parseCheckAddrOperand(Cctrl *cc, Ast *operand,
+                                  int line, int col, int len)
+{
+    switch (operand->kind) {
+        case AST_LVAR: case AST_GVAR: case AST_DEFAULT_PARAM:
+        case AST_FUNPTR: case AST_FUNC: case AST_FUN_PROTO:
+        case AST_EXTERN_FUNC: case AST_ASM_FUNCDEF: case AST_ASM_FUNC_BIND:
+        case AST_CLASS_REF:
+            return;
+        default:
+            if (astIsUnOpKind(operand, AST_UN_OP_DEREF)) return;
+            break;
+    }
+    char *msg = operand->kind == AST_LITERAL
+        ? mprintf("can't take the address of a constant")
+        : mprintf("can't take the address of a %s",
+                  astKindToHumanReadable(operand));
+    char *sug = mprintf("only a variable, a field, an element or a function "
+                        "has an address");
+    AoStr *bold = aoStrNew();
+    aoStrCatColoured(bold, ESC_BOLD, msg);
+    AoStr *buf = cctrlCreateErrorLineAt(cc, line, col, len, bold->data,
+                                        CCTRL_ERROR, sug);
+    aoStrRelease(bold);
+    CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, aoStrPrintf("%s", sug));
+    d->line = d->end_line = line;
+    d->col = col;
+    d->end_col = col + len;
+    cctrlDiagPush(cc, d);
+    cctrlTerminate(cc);
+}
+
 /* `*x` needs a pointer or an array: `1 +* 2` is `1 + (*2)` and
  * dereferencing an integer left the expression without a type, which
  * crashed ktm later on. */
@@ -3779,6 +3823,7 @@ Ast *parseUnaryExpr(Cctrl *cc) {
 
         switch (unary_op) {
             case AST_UN_OP_ADDR_OF: {
+                parseCheckAddrOperand(cc, operand, op_line, op_col, op_len);
                 if (parseIsFunction(operand)) {
                     /* TODO;
                      * Making this a pointer type effects the return type of 

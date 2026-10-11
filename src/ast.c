@@ -2065,10 +2065,12 @@ static char *astFunctionToStringInternal(Ast *func, AstType *type) {
     if (func->kind == AST_EXTERN_FUNC) {
         aoStrCatPrintf(str,"%s ", astExternCToString());
     }
+    /* by its name, not its symbol (`geo.area`, not `_K3geo4area`) */
+    const char *name = astSymbolDisplayName(func->fname->data);
     if (tmp->data[tmp->len - 1] == '*') {
-        aoStrCatPrintf(str,"%s%s",tmp->data,func->fname->data);
+        aoStrCatPrintf(str,"%s%s",tmp->data,name);
     } else {
-        aoStrCatPrintf(str,"%s %s",tmp->data,func->fname->data);
+        aoStrCatPrintf(str,"%s %s",tmp->data,name);
     }
 
     switch (func->kind) {

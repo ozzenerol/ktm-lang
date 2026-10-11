@@ -238,6 +238,14 @@ typedef struct LexModule {
     AoStr *dir;    /* the directory it was found in */
     u32 id;        /* index in Lexer.modules + 1 */
     int loaded;    /* all of its files have been lexed */
+    /* Run-time initialisers of its globals (M2): the parser collects
+     * them here (and their locals) to make the module's `_init`;
+     * has_init once it has one. A prebuilt module (`ktm -lib`) has one
+     * when its .ktmlib marker says `init`. */
+    int prebuilt;
+    int has_init;
+    struct List *init_stmts;
+    struct List *init_locals;
 } LexModule;
 
 /* `import [alias =] a.b;` in one file: `prefix.name` becomes the token
@@ -338,6 +346,10 @@ typedef struct Lexer {
      * module directory */
     LexModule **modules;
     int modules_len, modules_cap;
+    /* Module ids in the order their files finished lexing: a module's
+     * imports come before it, the order their `_init`s run in */
+    u32 *load_order;
+    int load_order_len, load_order_cap;
     /* The REPL: each round has a lexer of its own; the modules loaded and
      * the imports made in earlier rounds carry over (repl.c), and an
      * import isn't "unused" for being alone in its round */

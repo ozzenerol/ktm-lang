@@ -579,10 +579,12 @@ Repeating a default is allowed if it is the same value; a different value is an 
 <p>The standard library lives in modules, so a function of your own may have the same name
 as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
 <code>date.now()</code> and <code>os.exit()</code> stay the library's. The same holds for
-the C library: a program's functions have symbols of their own, so your <code>read()</code>
-or <code>free()</code> doesn't replace C's, which the standard library keeps calling. A C
-function you call is declared with <code>extern "c"</code>; a prototype without a body
-and without <code>extern "c"</code> is a ktm function that must be defined somewhere.</p>
+the C library: a program's functions and globals have symbols of their own, so your
+<code>read()</code>, <code>free()</code> or <code>environ</code> doesn't replace C's, which
+the standard library keeps using. A C function or variable you use is declared with
+<code>extern "c"</code>; a prototype without a body, or an <code>extern i64 x;</code>,
+without <code>extern "c"</code> is ktm's and must be defined somewhere: in the program, or
+in a library built with <code>-lib</code>. In a module it is that module's.</p>
 <p>A returned value is converted to the function's return type, as in C: an integer returned
 from an <code>f64</code> function becomes a float. In a
 <code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
@@ -1491,9 +1493,10 @@ again.</p>
 <code>ktm -lib geo lib/geo</code> writes <code>libgeo.a</code> and its shared object into
 <code>lib/geo</code>, with a <code>.ktmlib</code> file naming them. A program importing
 <code>geo</code> then reads only its declarations (the sources stay, as headers would) and
-links the library: the archive when compiled, the shared object in the JIT. A library has
-no code that runs before <code>main</code>, so in a module built this way a global needs a
-constant initialiser.</p>
+links the library: the archive when compiled, the shared object in the JIT. A module's
+globals with initialisers that run code (<code>i64 g = f();</code>) are set by the module's
+init function, which the program calls once before its own globals and <code>main</code>, a
+module's imports first, whether the module comes from source or from its library.</p>
 <p><code>ktm -lib name dir</code>, where <code>dir</code> is not the directory of a module
 <code>name</code>, builds every module under <code>dir</code> (<code>dir/net/http</code> is
 <code>net.http</code>) into one library, <code>dir/libname.a</code> and its shared object,
@@ -1787,6 +1790,16 @@ void main()
 }
 </code></pre>
 <pre class="output">5 1
+</pre>
+<p>C data is declared the same way, by its C name:</p>
+<pre data-run><code>extern "c" u8 **environ;
+
+void main()
+{
+  printf("%d\n", environ[0] != null);
+}
+</code></pre>
+<pre class="output">1
 </pre>
 <p>Use <code>f32</code> for C <code>float</code>, <code>i32</code> for <code>int</code> and
 <code>u8 *</code> for <code>char *</code>. To use another library, link it from the source

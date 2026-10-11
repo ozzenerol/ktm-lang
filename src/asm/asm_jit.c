@@ -7,6 +7,9 @@
 #include <sys/mman.h>
 
 #include "asm_jit.h"
+
+/* ast.c: a ktm symbol by its name (`_K3geo4area` is `geo.area`) */
+const char *astSymbolDisplayName(const char *sym);
 #include "enc_arm64.h"
 
 /* Apple Silicon JIT requires MAP_JIT + the per-thread write-protect
@@ -265,6 +268,41 @@ veneer_lookup(const struct VeneerSlot *vmap, int n, void *target)
     return NULL;
 }
 
+#if APPLE_SILICON_JIT
+/* A child forked by a JIT-run program (a program calling fork()) could
+ * start with its thread's JIT write protection off, so the JIT code it
+ * returns into from fork() wasn't executable: a SIGBUS (an instruction
+ * fetch permission fault) before it ran anything, about once in three
+ * hundred forks (F27). The child turns the protection back on. */
+static void asmJitChildProtect(void) {
+    pthread_jit_write_protect_np(1);
+}
+
+static void asmJitProtectForkedChildren(void) {
+    static int registered = 0;
+    if (!registered) {
+        registered = 1;
+        pthread_atfork(NULL, NULL, asmJitChildProtect);
+    }
+}
+#endif
+
+/* A symbol neither the JIT nor the process defines. `_K0...` is a ktm
+ * program function's or global's symbol: one declared but not defined,
+ * meant as C. */
+void
+asm_jit_unresolved(AsmEnc *enc, const char *sym)
+{
+    const char *k0 = sym[0] == '_' && sym[1] == '_' ? sym + 1 : sym;
+    asm_err_at(enc, NULL,
+               asm_tmp_printf("JIT: unresolved symbol '%s'%s",
+                   astSymbolDisplayName(sym),
+                   !strncmp(k0, "_K0", 3)
+                   ? ": declared but not defined; a C function or "
+                     "variable is declared with extern \"c\""
+                   : ""));
+}
+
 int
 asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
                  AsmJitCode *out)
@@ -312,6 +350,7 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
     }
 
 #if APPLE_SILICON_JIT
+    asmJitProtectForkedChildren();
     pthread_jit_write_protect_np(0);
 #endif
 
@@ -359,15 +398,7 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
                 target = resolver ? resolver(ud, f->sym) : NULL;
             desc = f->sym;
             if (target == NULL) {
-                /* `_K0...` is a ktm program function's symbol: one
-                 * declared without a body, meant as a C function */
-                const char *k0 = f->sym[0] == '_' && f->sym[1] == '_' ? f->sym + 1 : f->sym;
-                asm_err_at(enc, NULL,
-                           asm_tmp_printf("JIT: unresolved symbol '%s'%s", f->sym,
-                               !strncmp(k0, "_K0", 3)
-                               ? ": a function declared but not defined; a C function "
-                                 "is declared with extern \"c\""
-                               : ""));
+                asm_jit_unresolved(enc, f->sym);
                 rc = -1;
                 break;
             }
@@ -461,7 +492,8 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
             asm_err_at(enc, NULL,
                        asm_tmp_printf("JIT: '%s' out of range or unsupported "
                                       "reloc=%d",
-                                      desc ? desc : "<local>", (int)f->reloc));
+                                      desc ? astSymbolDisplayName(desc) : "<local>",
+                                      (int)f->reloc));
             rc = -1;
             break;
         }

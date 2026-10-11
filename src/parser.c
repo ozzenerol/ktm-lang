@@ -1479,6 +1479,25 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
  * so store it at startup like a scalar global's `I64 g = gx;`: append
  * `*(T *)((U8 *)&var + off) = item` to the file-scope initialisers and
  * leave its slot zero in the data. Offsets as in asmInitImageAt. */
+/* M2: the module whose `_init` a run-time initialiser being parsed goes
+ * into, NULL for the program's own (the entry runs those) and in the REPL
+ * (each input runs its own) */
+static LexModule *parseInitModule(Cctrl *cc) {
+    if (!cc->cur_module || !cc->lexer_ || (cc->flags & CCTRL_REPL)) return NULL;
+    return cc->lexer_->modules[cc->cur_module - 1];
+}
+
+/* A global's run-time initialiser: its module's, or the program's */
+static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
+    LexModule *m = parseInitModule(cc);
+    if (m) {
+        if (!m->init_stmts) m->init_stmts = listNew();
+        listAppend(m->init_stmts, ast);
+        return;
+    }
+    listAppend(cc->initalisers, ast);
+}
+
 static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
                                         AstType *type, int off)
 {
@@ -1522,7 +1541,7 @@ static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
                                 astTypeToString(item_ty),
                                 astTypeToString(item->type));
         }
-        listAppend(cc->initalisers, assign);
+        parseAddInitialiser(cc, assign);
     }
 }
 
@@ -1600,7 +1619,10 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
         init = astI64Type(evalIntConstExpr(init));
     }
 
-    if (var->type->kind == AST_TYPE_AUTO) {
+    /* `auto`: the type is the initialiser's, nothing to check it against
+     * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
+    int from_auto = var->type->kind == AST_TYPE_AUTO;
+    if (from_auto) {
         var->type = init->type;
     }
 
@@ -1613,7 +1635,7 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
     }
     if (is_err) {
         parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN,var,init);
-    } else if (!astTypeCheck(var->type,init,AST_BIN_OP_ASSIGN)) {
+    } else if (!from_auto && !astTypeCheck(var->type,init,AST_BIN_OP_ASSIGN)) {
         typeCheckWarn(cc,eq_line,eq_col,var,init);
     }
 
@@ -2302,6 +2324,30 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
                 astKindToString(container->kind), astToString(container));
 }
 
+/* A for loop's declaration `var = init` up to and including its `,` or
+ * `;` */
+static Ast *parseForDeclInit(Cctrl *cc, Ast *var, int is_const) {
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, var);
+    }
+    int is_auto = var->type->kind == AST_TYPE_AUTO;
+    Ast *ast = parseVariableInitialiser(cc,var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
+    if (is_auto) {
+        parseAssignAuto(cc,ast);
+    }
+    if (is_const && ast->kind == AST_DECL && ast->declinit &&
+        astIsIntType(var->type))
+    {
+        int const_ok = 1;
+        s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+        if (const_ok) {
+            var->deref_symbol = const_val;
+            var->flags |= AST_FLAG_CONST_VALUE;
+        }
+    }
+    return ast;
+}
+
 /* Either parse the initialiser or a range loop. Range loop is experimental */
 Ast *parseForLoopInitialiser(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
@@ -2328,11 +2374,17 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
     if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
-        AstType *type = parseDeclSpec(cc);
+        /* the base type for more declarations after a `,` */
+        AstType *base_type = parseBaseDeclSpec(cc);
+        if (base_type == NULL) {
+            cctrlRaiseException(cc, "Unexpected end of input, expected a type");
+        }
+        AstType *type = parsePointerType(cc, base_type);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
-            cctrlRaiseException(cc,"expected Identifier got: %s",
-                    lexemeToString(tok));
+            cctrlTokenRewind(cc);
+            cctrlRaiseException(cc,"expected an identifier, got `%s`",
+                    lexemeAsWritten(tok));
         }
 
         /* We have a for loop variable */
@@ -2354,24 +2406,37 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         if (tokenPunctIs(tok,':')) {
             return parseRangeLoop(cc,init_var);
         } else if (tokenPunctIs(tok, '=')) {
-            if (cc->tmp_locals) {
-                listAppend(cc->tmp_locals, init_var);
-            }
-            Ast *ast = parseVariableInitialiser(cc,init_var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
-            if (type->kind == AST_TYPE_AUTO) {
-                parseAssignAuto(cc,ast);
-            }
-            if (is_const && ast->kind == AST_DECL && ast->declinit &&
-                astIsIntType(init_var->type))
-            {
-                int const_ok = 1;
-                s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
-                if (const_ok) {
-                    init_var->deref_symbol = const_val;
-                    init_var->flags |= AST_FLAG_CONST_VALUE;
+            Ast *ast = parseForDeclInit(cc, init_var, is_const);
+            cctrlTokenRewind(cc);
+            if (!tokenPunctIs(cctrlTokenGet(cc), ',')) return ast;
+            /* `for (i64 i = 0, j = n; ...)`: more declarations of the
+             * base type, each with its own `*`s */
+            List *decls = listNew();
+            listAppend(decls, ast);
+            do {
+                type = parsePointerType(cc, base_type);
+                tok = cctrlTokenGetRequired(cc);
+                if (tok->tk_type != TK_IDENT) {
+                    cctrlTokenRewind(cc);
+                    cctrlRaiseException(cc,"expected an identifier, got `%s`",
+                            lexemeAsWritten(tok));
                 }
-            }
-            return ast;
+                Ast *var = astLVar(type,tok->start,tok->len);
+                var->line = tok->line;
+                var->col = tok->col;
+                if (is_const) var->flags |= AST_FLAG_CONST;
+                if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
+                    cctrlRaiseException(cc,"variable `%s` already declared!",
+                            astLValueToString(var,0));
+                }
+                if (is_const && !tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+                    cctrlRaiseException(cc,"const '%s' needs an initializer",
+                            var->lname->data);
+                }
+                listAppend(decls, parseForDeclInit(cc, var, is_const));
+                cctrlTokenRewind(cc);
+            } while (tokenPunctIs(cctrlTokenGet(cc), ','));
+            return astCompountStatement(decls);
         } else if (is_const) {
             cctrlRaiseException(cc,"const '%s' needs an initializer",
                     init_var->lname->data);
@@ -2429,6 +2494,16 @@ Ast *parseForStatement(Cctrl *cc) {
             forstep = NULL;
         } else {
             forstep = parseExpr(cc,16);
+            /* `i++, j--`: several steps, in order */
+            if (tokenPunctIs(cctrlTokenPeek(cc), ',')) {
+                List *steps = listNew();
+                listAppend(steps, forstep);
+                while (tokenPunctIs(cctrlTokenPeek(cc), ',')) {
+                    cctrlTokenGet(cc);
+                    listAppend(steps, parseExpr(cc,16));
+                }
+                forstep = astCompountStatement(steps);
+            }
         }
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
@@ -2836,7 +2911,8 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
     cc->fallthrough_pending = 0;
-    Ast *case_, *prev, *case_expr = NULL;
+    Lexeme *case_tok = tok;
+    Ast *case_, *prev, *case_expr = NULL, *value_expr = NULL;
     Lexeme *peek;
     AoStr *label;
     int begining,end;
@@ -2854,6 +2930,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     } else {
         /* A bare `case:` (above) is the previous value plus one */
         case_expr = parseRequiredExpr(cc, "a `case` value or `:`");
+        value_expr = case_expr;
         begining = evalIntConstExprOrErr(case_expr, &ok);
         if (!ok) {
             parseRaiseCaseException(cc,case_expr);
@@ -2885,7 +2962,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     peek = cctrlTokenPeek(cc);
 
     case_ = astCase(label,begining,end,stmts);
-    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
+    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_,value_expr,case_tok);
 
     vecPush(cc->tmp_case_list,case_);
     parseCaseArm(cc, case_);
@@ -4196,6 +4273,19 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     return func;
 }
 
+/* A main-program global (not static, not a module's) gets its own
+ * symbol, as its functions do (AST_FLAG_PROGRAM, astProgramSymbol): a
+ * program's `environ` or `errno` can't replace the C library's. */
+static void parseProgramGlobal(Cctrl *cc, Ast *gvar) {
+    if (!cc->decl_from_main || cc->cur_module || gvar->is_static ||
+        memchr(gvar->gname->data, '.', gvar->gname->len)) {
+        return;
+    }
+    char *sym = astProgramSymbol(gvar->gname->data, gvar->gname->len);
+    gvar->glabel = aoStrDupRaw(sym, strlen(sym));
+    gvar->flags |= AST_FLAG_PROGRAM;
+}
+
 Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len) {
     Ast *func;
     int has_var_args = 0;
@@ -4950,7 +5040,6 @@ static int parseGotParenFnType(Cctrl *cc) {
     cctrlTokenGet(cc);
     return 0;
 }
-
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
@@ -5039,6 +5128,25 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                         /* extern "c" func(...) - C-ABI function decl. */
                         type = parseDeclSpec(cc);
                         name = cctrlTokenGet(cc);
+                        if (name && name->tk_type == TK_IDENT &&
+                            !tokenPunctIs(cctrlTokenPeek(cc),'('))
+                        {
+                            /* `extern "c" T name;`: C data (environ),
+                             * known by its C name everywhere */
+                            type = parseArrayDimensions(cc, type);
+                            cctrlTokenExpect(cc,';');
+                            Ast *gvar = astGVar(type, name->start, name->len, 0);
+                            /* Mach-O spells a C symbol with a leading `_` */
+                            if (cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                                cc->target == TARGET_X86_64_APPLE_DARWIN) {
+                                gvar->glabel = aoStrPrintf("_%.*s", name->len, name->start);
+                            }
+                            Ast *decl = astDecl(gvar, NULL);
+                            decl->flags |= AST_FLAG_EXTERN;
+                            gvar->flags |= AST_FLAG_EXTERN | AST_FLAG_EXTERN_C;
+                            mapAdd(cc->global_env, gvar->gname->data, gvar);
+                            return decl;
+                        }
                         cctrlTokenExpect(cc,'(');
                         extern_func = parseExternFunctionProto(cc,type,
                                 name->start,name->len);
@@ -5075,7 +5183,20 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     type = parseArrayDimensions(cc, type);
                     cctrlTokenExpect(cc,';');
                     cctrlNoteHeaderName(cc, name->start, name->len);
-                    Ast *gvar = astGVar(type, name->start, name->len, 0);
+                    /* a ktm global defined elsewhere: a module's is named
+                     * as its other globals are, a program's gets the
+                     * program's symbol; C data is `extern "c"` */
+                    char *ext_name = name->start;
+                    int ext_len = name->len;
+                    if (cc->cur_module) {
+                        char *qual = cctrlDeclName(cc, name->start, name->len);
+                        if (qual) {
+                            ext_name = qual;
+                            ext_len = strlen(qual);
+                        }
+                    }
+                    Ast *gvar = astGVar(type, ext_name, ext_len, 0);
+                    parseProgramGlobal(cc, gvar);
                     Ast *decl = astDecl(gvar, NULL);
                     decl->flags |= AST_FLAG_EXTERN;
                     gvar->flags |= AST_FLAG_EXTERN;
@@ -5499,6 +5620,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             tokenPunctIs(cctrlTokenPeekBy(cc,1),'{'))
         {
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
@@ -5510,6 +5632,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         if (tokenPunctIs(tok,'=') && type->kind != AST_TYPE_ARRAY) {
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             Ast *ast_decl = astDecl(variable,NULL);
 
             listAppend(cc->ast_list,ast_decl);
@@ -5607,6 +5730,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                         name->len, name->start);
             }
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
@@ -5644,6 +5768,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             }
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             mapAdd(cc->global_env,variable->gname->data,variable);
             return astDecl(variable,NULL);
         }
@@ -5652,7 +5777,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 }
 
 /* The module `libc` only declares the C library: `extern "c"` functions
- * (called by their C names, as an extern "c" of any module is), structs,
+ * and data (known by their C names, as an extern "c" of any module is), structs,
  * unions, enums and constants. Its code would be the program's, under
  * the name of C's. Checked in its full pass only. */
 static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
@@ -5662,7 +5787,7 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
     }
     if (ast->kind == AST_EXTERN_FUNC || ast->kind == AST_ASM_FUNC_BIND) return;
     if (ast->kind == AST_DECL && ast->declvar &&
-        (ast->declvar->flags & AST_FLAG_CONST)) {
+        (ast->declvar->flags & (AST_FLAG_CONST | AST_FLAG_EXTERN_C))) {
         return;
     }
     const char *what = "a statement";
@@ -5674,8 +5799,60 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         default: break;
     }
     cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-        "module libc only declares C: extern \"c\" functions, structs, unions, "
-        "enums and constants, not %s", what);
+        "module libc only declares C: extern \"c\" functions and data, structs, "
+        "unions, enums and constants, not %s", what);
+}
+
+/* M2: each module whose globals have run-time initialisers gets a
+ * function `a.b._init` (its symbol `_K1a1b5_init`) that runs them once,
+ * however often it is called. The program's entry calls the `_init` of
+ * every module that has one, its own source's or a prebuilt one's (its
+ * .ktmlib marker says `init`), in the order the modules were loaded (a
+ * module's imports before it), before the program's own initialisers.
+ * A -lib build only makes the functions: its importers call them. */
+static void parseModuleInits(Cctrl *cc) {
+    Lexer *l = cc->lexer_;
+    if (!l || l->load_order_len == 0) return;
+    int library = l->building_module || l->building_tree;
+    List *calls = listNew();
+    for (int i = 0; i < l->load_order_len; ++i) {
+        LexModule *m = l->modules[l->load_order[i] - 1];
+        if (!m->prebuilt && m->init_stmts && !listEmpty(m->init_stmts)) {
+            AoStr *done_name = aoStrPrintf("%s.__initDone", m->path->data);
+            char *done_sym = astModuleMangle(done_name->data, done_name->len);
+            Ast *done = astGVar(ast_int_type, done_sym, strlen(done_sym), 1);
+            listAppend(cc->ast_list, astDecl(done, NULL));
+
+            List *stmts = listNew();
+            listAppend(stmts, astIf(done, astReturn(NULL, ast_void_type), NULL));
+            int err = 0;
+            listAppend(stmts, astBinaryOp(AST_BIN_OP_ASSIGN, done, astI64Type(1), &err));
+            listForEach(m->init_stmts) listAppend(stmts, it->value);
+            listAppend(stmts, astReturn(NULL, ast_void_type));
+
+            AoStr *init_name = aoStrPrintf("%s._init", m->path->data);
+            char *sym = astModuleMangle(init_name->data, init_name->len);
+            AstType *fn_type = astMakeFunctionType(ast_void_type, astVecNew());
+            Ast *fn = astFunction(fn_type, sym, strlen(sym), astVecNew(),
+                                  astCompountStatement(stmts),
+                                  m->init_locals ? m->init_locals : listNew(), 0);
+            listAppend(cc->ast_list, fn);
+            m->has_init = 1;
+            char *real = realpath(m->dir->data, NULL);
+            if (!cc->init_module_dirs) cc->init_module_dirs = setNew(8, &set_cstring_type);
+            setAdd(cc->init_module_dirs, real ? real : mprintf("%s", m->dir->data));
+        }
+        if (m->has_init && !library) {
+            AoStr *init_name = aoStrPrintf("%s._init", m->path->data);
+            char *sym = astModuleMangle(init_name->data, init_name->len);
+            listAppend(calls, astFunctionCall(ast_void_type, sym, strlen(sym),
+                                              astVecNew()));
+        }
+    }
+    if (listEmpty(calls)) return;
+    /* before the program's own initialisers */
+    listForEach(cc->initalisers) listAppend(calls, it->value);
+    cc->initalisers = calls;
 }
 
 void parseToAst(Cctrl *cc) {
@@ -5755,24 +5932,6 @@ void parseToAst(Cctrl *cc) {
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
         parseCheckCModuleItem(cc, ast);
-        /* A module built into a library (`ktm -lib`) has no code that
-         * runs before main: a run-time initialiser would never run */
-        if (is_global && cc->cur_module && cc->lexer_ &&
-            (cc->lexer_->building_module || cc->lexer_->building_tree)) {
-            is_global = 0;
-            if (ast->kind == AST_BINOP && ast->left &&
-                ast->left->kind == AST_GVAR) {
-                char *name = strrchr(ast->left->gname->data, '.');
-                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-                    "`%s` needs a constant initialiser in a module built with -lib "
-                    "(its library has no code that runs before main)",
-                    name ? name + 1 : ast->left->gname->data);
-            } else {
-                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-                    "a statement at the top of a module built with -lib would never run "
-                    "(its library has no code that runs before main)");
-            }
-        }
         /* The old file-scope code (ktm syntax v0.2 has none): a statement
          * there, not a global's initialiser; the REPL's input is that */
         if (is_global && !(cc->flags & CCTRL_REPL) &&
@@ -5783,9 +5942,15 @@ void parseToAst(Cctrl *cc) {
                 "code at file scope: put it in `main` (only declarations go there)");
         }
         if (is_global) {
-            listAppend(cc->initalisers,ast);
+            parseAddInitialiser(cc, ast);
+            LexModule *m = parseInitModule(cc);
             if (!listEmpty(cc->tmp_locals)) {
-                listMergeAppend(cc->initaliser_locals,cc->tmp_locals);
+                if (m) {
+                    if (!m->init_locals) m->init_locals = listNew();
+                    listMergeAppend(m->init_locals, cc->tmp_locals);
+                } else {
+                    listMergeAppend(cc->initaliser_locals,cc->tmp_locals);
+                }
             }
         } else if (ast->kind != AST_FUN_PROTO) {
             listAppend(cc->ast_list,ast);
@@ -5799,4 +5964,5 @@ void parseToAst(Cctrl *cc) {
     }
 
     cc->current_recovery = prev_recovery;
+    if (!(cc->flags & CCTRL_REPL)) parseModuleInits(cc);
 }

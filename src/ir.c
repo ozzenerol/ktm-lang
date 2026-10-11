@@ -1019,6 +1019,10 @@ static IrValue *irGlobalValue(Ast *gvar_ast) {
     v->as.global.name = gvar_ast->glabel ? gvar_ast->glabel
                                          : gvar_ast->gname;
     v->as.global.value = NULL;
+    /* Declared, not defined here (`extern`, or a prebuilt module's global):
+     * it may be in a shared library, so its address comes from the GOT
+     * (a shared object can't reach it PC-relatively) */
+    if (gvar_ast->flags & AST_FLAG_EXTERN) v->flags |= IR_VAL_FLAG_EXTERN;
     return v;
 }
 
