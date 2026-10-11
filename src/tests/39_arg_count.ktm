@@ -149,11 +149,11 @@ i64 Add(i64 i1, i64 i2)
 
 void main()
 {
-  i64 (*fn)(i64 i1, i64 i2) = &Add;
-  fn(1);
+  i64 (*f)(i64 i1, i64 i2) = &Add;
+  f(1);
 }
 ",
-        "Unexpected number of arguments 1 in call to fn(), expected 2 args");
+        "Unexpected number of arguments 1 in call to f(), expected 2 args");
 }
 
 i32 main() {

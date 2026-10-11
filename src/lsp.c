@@ -958,6 +958,7 @@ static const char *lsp_keywords[] = {
     "auto", "continue", "typeof", "F32", "alignof",
     "true", "false", "null",
     "struct", "pub", "private", "const", "enum", "defer",
+    "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
 };
 
 #define KTM_LSP_FUNCTION     3

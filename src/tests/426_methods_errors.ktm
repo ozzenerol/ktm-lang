@@ -60,7 +60,7 @@ i32 main() {
     if (fails(USER "void User.f() { self = null; }\n",
                         "cannot assign to const 'self'")) { correct++; }
     tests++;
-    if (fails(USER "void User.f(i64 self) {}\n", "variable self already declared")) { correct++; }
+    if (fails(USER "void User.f(i64 self) {}\n", "`self` is a keyword: it can't be a name")) { correct++; }
     tests++;
     if (fails(USER "void User.f() {}\nvoid G() { User u; u.f; }\n",
                         "`User.f` is a method: call it with `(...)`, or take its address with `&User.f`")) {

@@ -96,9 +96,10 @@ i32 main() {
     tests++; if (G(1) == 2) { correct++; }
     tests++; if (N(1) == 1 && N(2) == 30 && N(3) == 1100 && N(4) == 100 && N(7) == 5) { correct++; }
 
-    /* a variable of that name keeps it a name */
+    /* a keyword: no variable can have its name */
     tests++;
-    if (prints("i64 fallthrough = 3;\nvoid f(i64 x) { switch (x) { case 1: fallthrough; case 2: x++; } }", 0)) {
+    if (prints("i64 fallthrough = 3;\nvoid f(i64 x) { switch (x) { case 1: fallthrough; case 2: x++; } }",
+               1, "`fallthrough` is a keyword: it can't be a name")) {
         correct++;
     }
 
