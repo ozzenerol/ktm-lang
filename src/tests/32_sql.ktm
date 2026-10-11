@@ -10,8 +10,9 @@ bool testInsert(sql.Db *ctx) {
         (3,'Baz'),
         (4,'Dog'),
         (5,'Cat');");
-    if (err) {
+    if (err.len) {
         printf("%s\n",err);
+        err.free();
         return false;
     }
     return true;
@@ -106,8 +107,9 @@ bool testCreate(sql.Db *ctx) {
          id INTEGER PRIMARY KEY, 
          name TEXT
        );");
-    if (err) {
+    if (err.len) {
         printf("%s\n",err);
+        err.free();
         return false;
     }
     return true;
