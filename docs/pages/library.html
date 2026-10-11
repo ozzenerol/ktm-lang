@@ -1106,7 +1106,7 @@ void main()
 
 <h2 id="json">JSON</h2>
 <h3>Parsing and selecting</h3>
-<p><code>json.parse(text)</code> parses text into a tree of <code>json.Value</code> nodes and
+<p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
 returns its root; the text can be any one JSON value (an object, array, string, number,
 boolean or <code>null</code>). It always returns a root: check <code>json.ok</code> before
 using it, and free it with <code>json.release</code> either way. <code>json.select(node,
@@ -1117,11 +1117,11 @@ string, <code>:i</code> integer, <code>:f</code> float, <code>:b</code> boolean,
 <code>null</code> if the path doesn't match or is malformed (<code>[1x]</code>,
 <code>..a</code>, a trailing <code>.</code>).</p>
 <pre data-run><code>
-import cstr, json, mem;
+import json;
 
 void main()
 {
-  u8 *text = "{\"name\": \"ktm\", \"version\": 15, \"ratio\": 0.75, \"tags\": [\"jit\", \"repl\"], \"stable\": false, \"owner\": null}";
+  u8[] text = "{\"name\": \"ktm\", \"version\": 15, \"ratio\": 0.75, \"tags\": [\"jit\", \"repl\"], \"stable\": false, \"owner\": null}";
   json.Value *doc = json.parse(text);
   if (!json.ok(doc)) {
     json.printError(doc);
@@ -1141,9 +1141,9 @@ void main()
     printf("tag %s\n", t.str);
   }
 
-  u8 *out = json.toStr(doc);
+  String out = json.toStr(doc);
+  defer out.free();
   printf("%s\n", out);
-  mem.free(out);
   json.release(doc);
 }
 </code></pre>
@@ -1157,26 +1157,27 @@ tag repl
 {"name": "ktm","version": 15,"ratio": 0.75,"tags": ["jit","repl"],"stable": false,"owner": null}
 </pre>
 <p>Each node has a <code>type</code> and its value in the matching field:
-<code>json.STRING</code> in <code>str</code>, <code>json.INT</code> in <code>i64</code>,
-<code>json.FLOAT</code> in <code>f64</code>, <code>json.BOOL</code> in
+<code>json.STRING</code> in <code>str</code> (a <code>u8[]</code>), <code>json.INT</code> in <code>intVal</code>,
+<code>json.FLOAT</code> in <code>floatVal</code>, <code>json.BOOL</code> in
 <code>boolean</code>, <code>json.NULL</code>, <code>json.STRNUM</code> in
 <code>strnum</code> (see below), and <code>json.ARRAY</code> / <code>json.OBJECT</code>,
 whose <code>array</code> / <code>object</code> points at the first item or member - or is
 <code>null</code> when the array or object is empty. A member has its name in
-<code>key</code>, and <code>next</code> leads to the following item or member, so that is how
-you iterate.</p>
+<code>key</code> (a <code>u8[]</code>), and <code>next</code> leads to the following item or
+member, so that is how you iterate. <code>str</code> and <code>key</code> are views of bytes
+the document owns (each with a NUL after it, so <code>.ptr</code> is a C string).</p>
 
 <h3>Wildcards and getters</h3>
 <p>A <code>*</code> in a path takes the next argument: an <code>i64</code> inside
 <code>[]</code>, a string after <code>.</code>, and it can be part of a name
 (<code>.price_*</code>). Each part of a path is at most 256 bytes, and a key that contains
 <code>.</code> <code>[</code> <code>]</code> <code>:</code> or <code>*</code> can't be written
-in a path. <code>json.objectGet(obj, key)</code> and <code>json.arrayGet(arr, i)</code> take
+in a path. <code>json.objectGet(obj, key)</code> (any <code>u8[]</code>, all its bytes) and <code>json.arrayGet(arr, i)</code> take
 any key or index directly (<code>null</code> if it isn't there or the node has the wrong
 type), and <code>json.len</code> counts the items of an array or object (0 for anything
 else). If a key appears twice, both members are kept; selecting it finds the first.</p>
 <pre data-run><code>
-import cstr, json;
+import json;
 
 void main()
 {
@@ -1210,8 +1211,8 @@ rows[1][0] = 3, rows[5]: 1
 </pre>
 
 <h3>Writing JSON and freeing</h3>
-<p><code>json.toStr(node)</code> returns the JSON text of that node's value as a new
-string to <code>mem.free</code>: for an inner node just its value, without its key or the nodes
+<p><code>json.toStr(node)</code> returns the JSON text of that node's value as a String
+that is yours: for an inner node just its value, without its key or the nodes
 after it. Members are written as <code>"key": value</code> and items are separated by
 <code>,</code> without a space. Floats get 15, 16 or 17 significant digits, the fewest that
 read back as the same value, always with a decimal point (<code>0.75</code>,
@@ -1224,19 +1225,19 @@ parses back to the same values.</p>
 released. <code>json.release</code> frees a whole document, and only does something when given
 a root; on <code>null</code> or an inner node it does nothing.</p>
 <pre data-run><code>
-import cstr, json, mem;
+import json;
 
 void main()
 {
   json.Value *doc = json.parse("{\"user\": {\"id\": 7, \"roles\": [\"admin\"]}, \"n\": 1e400}");
   json.Value *user = json.select(doc, ".user");
-  u8 *s = json.toStr(user);      // just this node's value
+  String s = json.toStr(user);      // just this node's value
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(user);               // a view: ignored
-  s = json.toStr(doc);           // 1e400 is too big for an f64: null
+  s = json.toStr(doc);              // 1e400 is too big for an f64: null
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);                // frees everything
 }
 </code></pre>
@@ -1252,27 +1253,27 @@ top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
 strings, whitespace other than space, tab, newline and carriage return, anything but whitespace
 between a key and its <code>:</code>, and arrays and objects nested more than
 <code>json.MAX_DEPTH</code> (512) deep. On an error <code>json.errorStr(root)</code>
-returns a message to <code>mem.free</code> (<code>null</code> if there was no error) and
+returns the message as a String (one without a <code>ptr</code> if there was no error) and
 <code>json.printError</code> prints it; both say where, as a line and a byte column, also
 found in <code>root-&gt;state</code> with the error code (<code>error</code>, <code>line</code>,
 <code>col</code>, <code>offset</code>).</p>
 <pre data-run><code>
-import cstr, json, mem;
+import cstr, json;
 
 void main()
 {
   json.Value *doc = json.parse("{\n  \"a\": [1, 2],\n  \"b\" 3\n}");
   if (!json.ok(doc)) {
-    u8 *msg = json.errorStr(doc);
+    String msg = json.errorStr(doc);
     printf("%s\n", msg);
     printf("code %d, line %d, column %d\n", doc.state.error, doc.state.line, doc.state.col);
-    mem.free(msg);
+    msg.free();
   }
   json.release(doc);
 
   u8 *bad[6] = {"[1, 2,]", "[1] x", "[01]", "{\"a\": tru}", "[\"tab\there\"]", ""};
   for (i64 i = 0; i < 6; i++) {
-    doc = json.parse(bad[i]);
+    doc = json.parse(cstr.view(bad[i]));
     printf("%d ", doc.state.error);
     json.release(doc);
   }
@@ -1311,11 +1312,10 @@ longer produced.</p>
 becomes a <code>json.FLOAT</code>, as in JavaScript, and a number with a fraction or exponent
 is a float (one too big for an <code>f64</code> is infinity). String escapes are decoded,
 <code>\uXXXX</code> and surrogate pairs to UTF-8. A string can contain <code>\u0000</code>,
-so <code>str_len</code> and <code>key_len</code> give the full byte length of
-<code>str</code> and <code>key</code>; C-style functions and paths see them only up to the
-first <code>'\0'</code>.</p>
-<p><code>json.parse</code>'s optional arguments are the length to parse (-1, the default,
-reads up to the terminating NUL) and flags: <code>json.NO_FLAGS</code> or
+which <code>str.len</code> and <code>key.len</code> count; C-style functions and paths see
+them only up to the first <code>'\0'</code>.</p>
+<p><code>json.parse</code>'s optional argument is the flags (to parse part of a text, give it
+the part: <code>json.parse(text[0:n])</code>): <code>json.NO_FLAGS</code> or
 <code>json.STRNUM_FLAG</code>. With <code>json.STRNUM_FLAG</code> numbers are not converted:
 each one is still checked against the JSON grammar and becomes a <code>json.STRNUM</code>
 node whose <code>strnum</code> is the number exactly as written, so large integers and
@@ -1323,25 +1323,25 @@ decimals keep every digit, and <code>json.toStr</code> writes it back unchanged.
 <code>:i</code> and <code>:f</code> checks don't match these nodes; select them without
 one.</p>
 <pre data-run><code>
-import cstr, json, mem;
+import json;
 
 void main()
 {
   json.Value *doc = json.parse("[9007199254740993, 99999999999999999999, 2.50, \"a\\u0000b\"]");
   json.Value *big = json.arrayGet(doc, 1);
-  printf("%d %d %d\n", json.isInt(json.arrayGet(doc, 0)), json.isFloat(big), json.arrayGet(doc, 3).strLen);
-  u8 *s = json.toStr(doc);
+  printf("%d %d %d\n", json.isInt(json.arrayGet(doc, 0)), json.isFloat(big), json.arrayGet(doc, 3).str.len);
+  String s = json.toStr(doc);
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);
 
   doc = json.parse("{\"id\": 123456789012345678901234567890, \"price\": 9.90}",
-                  -1, json.STRNUM_FLAG);
+                  json.STRNUM_FLAG);
   printf("id %s\n", json.select(doc, ".id").strnum);
   printf("price %s\n", json.select(doc, ".price").strnum);
   s = json.toStr(doc);
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);
 }
 </code></pre>

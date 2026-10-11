@@ -24,10 +24,10 @@ u8 *nest(i64 n, bool obj) {
 i64 parseErr(i64 n, bool obj)
 { // the error (JSON_OK on success), after a json.toStr if it parsed
     u8 *s = nest(n, obj);
-    json.Value *j = json.parse(s);
+    json.Value *j = json.parse(cstr.view(s));
     i64 err = j.state.error;
     if (json.ok(j)) {
-        u8 *o = json.toStr(j);
+        u8 *o = json.toStr(j).take();
         if (cstr.len(o) < n) { err = -1; }
         mem.free(o);
     }
@@ -65,7 +65,7 @@ i32 main() {
     for (i64 i = 0; i < 2000; i++) { mem.copy(p, "[1],", 4); p += 4; }
     p[-1] = ']';
     *p = '\0';
-    json.Value *j = json.parse(wide);
+    json.Value *j = json.parse(cstr.view(wide));
     if (json.ok(j)) { correct++; }
     json.release(j);
     mem.free(wide);
@@ -73,8 +73,8 @@ i32 main() {
     /* The message */
     tests++;
     u8 *s = nest(600, false);
-    j = json.parse(s);
-    u8 *e = json.errorStr(j);
+    j = json.parse(cstr.view(s));
+    u8 *e = json.errorStr(j).take();
     if (e && !cstr.cmpLen(e, "Arrays and objects nested more than 512 deep", 44)) { correct++; }
     else { printf("message: %s\n", e); }
     mem.free(e);

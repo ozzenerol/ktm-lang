@@ -8,9 +8,9 @@ i64 gCorrect = 0, gTests = 0;
 
 void parses(u8 *text, u8 *want) {
     gTests++;
-    json.Value *j = json.parse(text);
+    json.Value *j = json.parse(cstr.view(text));
     if (json.ok(j)) {
-        u8 *s = json.toStr(j);
+        u8 *s = json.toStr(j).take();
         if (!cstr.cmp(s, want)) { gCorrect++; }
         else { printf("\n  [%s] gave [%s]\n", text, s); }
         mem.free(s);
@@ -22,8 +22,8 @@ void parses(u8 *text, u8 *want) {
 
 void rejects(u8 *what, u8 *text, u8 *message) {
     gTests++;
-    json.Value *j = json.parse(text);
-    u8 *msg = json.ok(j) ? "parsed" : json.errorStr(j);
+    json.Value *j = json.parse(cstr.view(text));
+    u8 *msg = json.ok(j) ? "parsed" : json.errorStr(j).take();
     if (!json.ok(j) && j.state.error == json.INVALID_UTF8 && libc.strstr(msg, message)) { gCorrect++; }
     else { printf("\n  %s: error %d [%s]\n", what, j.state.error, msg); }
     json.release(j);

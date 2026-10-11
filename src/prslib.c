@@ -3448,7 +3448,21 @@ static Ast *parseTernary(Cctrl *cc, Ast *cond) {
     if (!els) {
         cctrlRaiseException(cc, "Expected an expression after `:`");
     }
-    AstType *rt = parseTernaryResultType(cc, then, els);
+    /* a literal or an array beside a slice: that slice */
+    if (then->type && els->type) {
+        if (astTypeIsSlice(then->type)) els = parseSliceFrom(cc, then->type, els);
+        if (astTypeIsSlice(els->type)) then = parseSliceFrom(cc, els->type, then);
+    }
+    /* a struct (a slice, a String) only with one of its own type */
+    AstType *ta = then->type, *tb = els->type;
+    int agg_a = ta && (ta->kind == AST_TYPE_CLASS || ta->kind == AST_TYPE_UNION) && !ta->is_intrinsic;
+    int agg_b = tb && (tb->kind == AST_TYPE_CLASS || tb->kind == AST_TYPE_UNION) && !tb->is_intrinsic;
+    if ((agg_a || agg_b) &&
+        !(agg_a && agg_b && ta->clsname && tb->clsname && aoStrCmp(ta->clsname, tb->clsname))) {
+        cctrlRaiseException(cc, "the branches of `?:` have different types, %s and %s",
+                            astTypeToString(ta), astTypeToString(tb));
+    }
+    AstType *rt = (agg_a && agg_b) ? ta : parseTernaryResultType(cc, then, els);
     then = astCast(then, rt);
     els = astCast(els, rt);
     return astTernary(rt, cond, then, els);

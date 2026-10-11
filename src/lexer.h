@@ -310,6 +310,8 @@ typedef struct LexCond {
 } LexCond;
 
 typedef struct Lexer {
+    /* the token just lexed was `.` or `->`: an identifier next is a member */
+    int after_member;
     int tk_type;
     char *ptr;
     char *start;

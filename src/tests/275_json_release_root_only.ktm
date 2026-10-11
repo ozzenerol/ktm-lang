@@ -18,17 +18,17 @@ i32 main() {
     json.release(x);
     json.release(json.select(d, ".c"));
     json.release(null);
-    u8 *s = json.toStr(d);
+    u8 *s = json.toStr(d).take();
     tests++;
     if (!cstr.cmp(s, "{\"a\": [1,{\"x\": \"y\"}],\"b\": \"str\",\"c\": {\"k\": null}}") &&
-            !cstr.cmp(json.select(d, ".a[1].x").str, "y")) { correct++; }
+            !cstr.cmp(json.select(d, ".a[1].x").str.ptr, "y")) { correct++; }
     else { printf("document changed: %s\n", s); }
     mem.free(s);
 
     /* error functions on null and inner nodes */
     tests++;
-    if (json.errorStr(null) == null && json.errorStr(a) == null &&
-            json.errorStr(d) == null) { correct++; }
+    if (json.errorStr(null).ptr == null && json.errorStr(a).ptr == null &&
+            json.errorStr(d).ptr == null) { correct++; }
     json.printError(null);
     json.printError(x);
     json.release(d);
@@ -37,8 +37,8 @@ i32 main() {
     u8 *bad[4] = {"{\"a\": [1, 2", "[1, {\"k\": tru}]", "{\"a\" 1}", "[\"x\", ]"};
     bool ok = true;
     for (i64 i = 0; i < 4; ++i) {
-        json.Value *e = json.parse(bad[i]);
-        u8 *msg = json.errorStr(e);
+        json.Value *e = json.parse(cstr.view(bad[i]));
+        u8 *msg = json.errorStr(e).take();
         if (json.ok(e) || !msg) { ok = false; }
         mem.free(msg);
         json.release(e);

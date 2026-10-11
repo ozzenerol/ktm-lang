@@ -60,8 +60,8 @@ bool check(json.Value *node) {
             u8 sel[32];
             cstr.formatTo(sel, ".%s", it.key);
             if (json.objectGet(node, it.key) != json.select(node, sel)) { return false; }
-            if (json.objectGet(node, it.key).key != it.key &&
-                    cstr.cmp(json.objectGet(node, it.key).key, it.key)) { return false; }
+            if (json.objectGet(node, it.key).key.ptr != it.key.ptr &&
+                    !json.objectGet(node, it.key).key.equals(it.key)) { return false; }
             if (!check(it)) { return false; }
             n++;
             gChecks++;
@@ -80,7 +80,7 @@ i32 main() {
     bool ok = true;
     for (i64 i = 0; i < 300 && ok; ++i) {
         u8 *text = randValue(null, 0);
-        json.Value *d = json.parse(text);
+        json.Value *d = json.parse(cstr.view(text));
         if (!json.ok(d) || !check(d)) {
             printf("mismatch in %s\n", text);
             ok = false;
@@ -107,10 +107,10 @@ i32 main() {
             !json.arrayGet(arr, 3) && !json.arrayGet(arr, -1) &&
             !json.arrayGet(arr, 0x7FFFFFFFFFFFFFFF)) { correct++; }
 
-    /* wrong node types and null */
+    /* wrong node types and null (an empty u8[] is the key "") */
     tests++;
     if (!json.objectGet(arr, "0") && !json.arrayGet(d, 0) && !json.objectGet(null, "a") &&
-            !json.objectGet(d, null) && !json.arrayGet(null, 0) && json.len(null) == 0 &&
+            json.objectGet(d, cstr.view(null)).intVal == 4 && !json.arrayGet(null, 0) && json.len(null) == 0 &&
             json.len(json.arrayGet(arr, 0)) == 0) { correct++; }
 
     json.release(d);

@@ -9,8 +9,8 @@ import cstr, json, mem, test;
 i64 gBad = 0;
 
 bool errFn(u8 *jsonVal, i64 code, u8 *want) {
-    json.Value *j = json.parse(jsonVal);
-    u8 *e = json.errorStr(j);
+    json.Value *j = json.parse(cstr.view(jsonVal));
+    u8 *e = json.errorStr(j).take();
     bool ok = !json.ok(j) && j.state.error == code && e && !cstr.cmp(e, want);
     if (!ok) { printf("\"%s\": %d \"%s\"\n", jsonVal, j.state.error, e); }
     mem.free(e);
@@ -60,8 +60,8 @@ i32 main() {
     /* success, null and inner nodes */
     json.Value *ok = json.parse("{\"a\": [1]}");
     tests++;
-    if (json.errorStr(ok) == null && json.errorStr(null) == null &&
-            json.errorStr(json.select(ok, ".a")) == null) { correct++; }
+    if (json.errorStr(ok).ptr == null && json.errorStr(null).ptr == null &&
+            json.errorStr(json.select(ok, ".a")).ptr == null) { correct++; }
     json.printError(null);
     json.printError(json.select(ok, ".a[0]"));
     json.release(ok);

@@ -47,7 +47,7 @@ i64 jsonNumberLen(void *p, bool *is_int) { return 0; }
 void main()
 {
   json.Value *j = json.parse(\"[12]\");
-  u8 *s = json.toStr(j);
+  u8 *s = json.toStr(j).take();
   printf(\"ok=%d %s\\n\", json.ok(j), s);
   mem.free(s);
   json.release(j);

@@ -1281,6 +1281,18 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
     loggerPanic("irLowerAssign: unsupported LHS %s\n", astKindToString(lhs->kind));
 }
 
+static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast);
+
+/* The address of a struct value: a call's result in a temporary, anything
+ * else (a variable, a field, a made slice, `?:`) where it is */
+static IrValue *irAggregateAddr(IrCtx *ctx, Ast *ast) {
+    if ((ast->kind == AST_FUNCALL || ast->kind == AST_FUNPTR_CALL ||
+         ast->kind == AST_ASM_FUNCALL) && ast->type && irRetTypeIsAggregate(ast->type)) {
+        return irExpr(ctx, ast);
+    }
+    return irLValueAddr(ctx, ast);
+}
+
 /* Materialise the ADDRESS of an lvalue (lvar / global / class field / `*p`).
  * Reuses the assign-target machinery: an indirect target is already a
  * pointer, a direct one is a slot/alias we LEA. Used for by-value struct
@@ -1288,6 +1300,37 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
 static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast) {
     /* a made slice is its hidden variable's address already */
     if (ast->kind == AST_SLICE_MAKE || ast->kind == AST_SUBSLICE) return irExpr(ctx, ast);
+    /* `c ? a : b` of structs: the chosen one's address */
+    if (ast->kind == AST_TERNARY) {
+        IrBlock *then_block = irBlockNew();
+        IrBlock *else_block = irBlockNew();
+        IrBlock *end_block = irBlockNew();
+        IrValue *cond = irExpr(ctx, ast->cond);
+        IrValue *result = irTmp(IR_TYPE_PTR, 8);
+        irBranch(ctx->cur_func, ctx->cur_block, cond, then_block, else_block);
+
+        irFnAddBlock(ctx->cur_func, then_block);
+        ctx->cur_block = then_block;
+        Ast *then = ast->then->kind == AST_CAST ? ast->then->operand : ast->then;
+        IrValue *then_val = irAggregateAddr(ctx, then);
+        IrBlock *then_end = ctx->cur_block;
+        irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+        irFnAddBlock(ctx->cur_func, else_block);
+        ctx->cur_block = else_block;
+        Ast *els = ast->els->kind == AST_CAST ? ast->els->operand : ast->els;
+        IrValue *else_val = irAggregateAddr(ctx, els);
+        IrBlock *else_end = ctx->cur_block;
+        irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+        irFnAddBlock(ctx->cur_func, end_block);
+        ctx->cur_block = end_block;
+        IrInstr *phi = irPhi(result);
+        irBlockAddInstr(ctx, phi);
+        irAddPhiIncoming(phi, then_val, then_end);
+        irAddPhiIncoming(phi, else_val, else_end);
+        return result;
+    }
     IrAssignTarget t = irLowerAssignTarget(ctx, ast);
     if (t.indirect) {
         return t.target;
@@ -2206,7 +2249,12 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
          * out_ptr param's slot holds the destination address. */
         AstType *rt = ast->retval->type;
         if (rt && irRetTypeIsAggregate(rt)) {
-            IrValue *src_addr = irExpr(ctx, ast->retval);
+            /* `return f();` of a struct-returning call: it has no address
+             * of its own; it writes straight into the destination below */
+            Ast *rv_ast = ast->retval;
+            int is_call = (rv_ast->kind == AST_FUNCALL || rv_ast->kind == AST_FUNPTR_CALL ||
+                           rv_ast->kind == AST_ASM_FUNCALL);
+            IrValue *src_addr = is_call ? NULL : irExpr(ctx, ast->retval);
             IrValue *dst_addr = irTmp(IR_TYPE_PTR, 8);
             if (irRetIsIndirect(rt)) {
                 /* return_value holds the caller's hidden out-pointer: load
@@ -2220,7 +2268,11 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
                 irBlockAddInstr(ctx, irInstrNew(IR_LEA, dst_addr,
                                 ctx->cur_func->return_value, NULL));
             }
-            irEmitMemcpy(ctx, dst_addr, src_addr, rt->size);
+            if (is_call) {
+                irFnCallTo(ctx, rv_ast, dst_addr);
+            } else {
+                irEmitMemcpy(ctx, dst_addr, src_addr, rt->size);
+            }
         } else {
             IrValue *val = irExpr(ctx, ast->retval);
             IrValue *rv = ctx->cur_func->return_value;

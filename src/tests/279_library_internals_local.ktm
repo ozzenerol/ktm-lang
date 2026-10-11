@@ -55,7 +55,7 @@ void main()
   map.StrMap *sm = map.strNew();
   sm.set(\"k\", (void *)7);
   json.Value *j = json.parse(\"{\\\"a\\\": [3, 1, 2]}\");
-  u8 *js = json.toStr(j);
+  u8 *js = json.toStr(j).take();
   vec.IntVec *v = vec.intNew();
   v.push(3); v.push(1); v.push(2);
   v.sort();

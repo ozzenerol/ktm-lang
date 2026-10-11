@@ -31,9 +31,9 @@ i32 main() {
     u8 text[64];
     for (i = 0; i < 14; i++) {
         cstr.formatTo(text, "[%.16e]", vals[i]); /* an exponent, so a float */
-        json.Value *j = json.parse(text);
-        u8 *s = json.toStr(j);
-        json.Value *k = json.parse(s);
+        json.Value *j = json.parse(cstr.view(text));
+        u8 *s = json.toStr(j).take();
+        json.Value *k = json.parse(cstr.view(s));
         if (!json.ok(k) || k.array.type != json.FLOAT ||
                 !sameBits(k.array.floatVal, vals[i])) {
             printf("%.17g gave %s\n", vals[i], s);
@@ -48,7 +48,7 @@ i32 main() {
     /* Short values stay short */
     tests++;
     json.Value *j = json.parse("[0.1,0.5,100.0,2.5e-3,1e21,-0.0]");
-    u8 *s = json.toStr(j);
+    u8 *s = json.toStr(j).take();
     if (!cstr.cmp(s, "[0.1,0.5,100.0,0.0025,1.0e+21,-0.0]")) { correct++; }
     else { printf("[%s]\n", s); }
     mem.free(s);
@@ -66,8 +66,8 @@ i32 main() {
         mem.copy(&f, &seed, 8);
         if (((seed >> 52) & 0x7FF) == 0x7FF) { continue; } /* inf/nan */
         cstr.formatTo(text, "%.16e", f);
-        j = json.parse(text);
-        s = json.toStr(j);
+        j = json.parse(cstr.view(text));
+        s = json.toStr(j).take();
         if (!sameBits(libc.strtod(s, null), f)) {
             if (ok) { printf("%s -> %s\n", text, s); }
             ok = false;
