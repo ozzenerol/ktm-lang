@@ -695,6 +695,24 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
         }
         cc->token_buffer->pos++;
         cc->lineno = token->line;
+        /* `str.len(...)` where a local or parameter `str` hides the
+         * module str in its scope (Go's rule) */
+        if (token->qual_prefix && cc->localenv) {
+            Ast *local = mapGetLen(cc->localenv, token->qual_prefix,
+                                   token->qual_prefix_len);
+            if (local) {
+                const char *dot = strrchr(token->start, '.');
+                int mod_len = dot ? (int)(dot - token->start) : token->len;
+                AstType *type = local->kind == AST_DEFAULT_PARAM && local->declvar
+                              ? local->declvar->type : local->type;
+                cctrlRaiseExceptionAt(cc, token->line, token->col,
+                        token->qual_prefix_len,
+                        "`%.*s` is a local %s, it hides the module %.*s",
+                        token->qual_prefix_len, token->qual_prefix,
+                        type ? astTypeToString(type) : "variable", mod_len,
+                        token->start);
+            }
+        }
         ast_line_hint = token->line;
         ast_col_hint = token->col;
         /* Register the token's file lazily; the id rides on every
@@ -1565,10 +1583,10 @@ int cctrlInPrelude(Cctrl *cc) {
     return path && path->len == 7 && !memcmp(path->data, "prelude", 7);
 }
 
-/* Is the current module `c`, the C library's declarations? */
+/* Is the current module `libc`, the C library's declarations? */
 int cctrlInCModule(Cctrl *cc) {
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
-    return path && path->len == 1 && path->data[0] == 'c';
+    return path && path->len == 4 && !memcmp(path->data, "libc", 4);
 }
 
 /* The name a declaration is made under: as cctrlQualifyName, except

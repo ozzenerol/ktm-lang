@@ -1679,7 +1679,8 @@ Ast *parseDecl(Cctrl *cc) {
         cctrlTokenExpect(cc,';');
         return NULL;
     }
-    cctrlCheckPrefixHidden(cc, varname);
+    /* a local may shadow an import prefix for its scope (cctrlTokenGet
+     * reports `prefix.name` used there) */
     var = astLVar(type,varname->start,varname->len);
     /* astNew stamped the CURRENT token (post-name); anchor the decl
      * to the name itself for jump-to-definition. */
@@ -3376,7 +3377,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 if (!tokenPunctIs(peek,'(')) {
                     /* A normal variable */
                     varname = cctrlTokenGetRequired(cc);
-                    cctrlCheckPrefixHidden(cc, varname);
+                    /* may shadow an import prefix, see cctrlTokenGet */
                     if (varname->tk_type != TK_IDENT) {
                         cctrlTokenRewind(cc);
                         cctrlRaiseException(cc,"Expected type declaration with identifer got '%.*s' - should be"ESC_BLUE" '%s "ESC_RESET ESC_BOLD"<var_name>'",
@@ -5582,7 +5583,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     }
 }
 
-/* The module `c` only declares the C library: `extern "c"` functions
+/* The module `libc` only declares the C library: `extern "c"` functions
  * (called by their C names, as an extern "c" of any module is), structs,
  * unions, enums and constants. Its code would be the program's, under
  * the name of C's. Checked in its full pass only. */
@@ -5605,7 +5606,7 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         default: break;
     }
     cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-        "module c only declares C: extern \"c\" functions, structs, unions, "
+        "module libc only declares C: extern \"c\" functions, structs, unions, "
         "enums and constants, not %s", what);
 }
 

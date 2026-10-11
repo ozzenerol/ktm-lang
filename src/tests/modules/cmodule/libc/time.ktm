@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub struct timespec {
   i64 tv_sec;

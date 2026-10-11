@@ -2051,6 +2051,9 @@ static int lexCore(Lexer *l, Lexeme *le) {
 }
 
 int lex(Lexer *l, Lexeme *le) {
+    /* callers lex into stack Lexemes: no stale qualified prefix */
+    le->qual_prefix = NULL;
+    le->qual_prefix_len = 0;
     int rc = lexCore(l, le);
     if (rc != 1) return rc;
     le->line = l->tok_start_line;
@@ -3376,8 +3379,9 @@ static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
 /* The module path after `import` or `module`: ident {. ident}, then `;`.
  * NULL (reported) when malformed. */
 static AoStr *lexModulePath(Map *macro_defs, Lexer *l, Lexeme *first,
-                            Lexeme **_last)
+                            Lexeme **_last, int *_more)
 {
+    if (_more) *_more = 0;
     AoStr *path = aoStrNew();
     Lexeme *tok = first;
     while (1) {
@@ -3391,10 +3395,16 @@ static AoStr *lexModulePath(Map *macro_defs, Lexer *l, Lexeme *first,
         *_last = tok;
         tok = lexTokenRaw(macro_defs, l);
         if (tokenPunctIs(tok, ';')) return path;
+        /* `import a, b;`: another module follows */
+        if (_more && tokenPunctIs(tok, ',')) {
+            *_more = 1;
+            return path;
+        }
         if (!tokenPunctIs(tok, '.')) {
             Lexeme *at = tok ? tok : *_last;
             lexReportAt(l, at->line, at->col, at->len,
-                        "expected `;` after the module name");
+                        _more ? "expected `;` or `,` after the module name"
+                              : "expected `;` after the module name");
             return NULL;
         }
         aoStrPutChar(path, '.');
@@ -3402,24 +3412,51 @@ static AoStr *lexModulePath(Map *macro_defs, Lexer *l, Lexeme *first,
     }
 }
 
-/* `import [alias =] a.b;`, the `import` just lexed */
+static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
+                         AoStr *path, Lexeme *first, Lexeme *last);
+
+/* `import [alias =] a.b {, [alias =] c};`, the `import` just lexed. The
+ * whole list is read first: importing a module pushes its files, which
+ * are read next. They are pushed last first, so read in the list's order. */
 static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
+    /* the importing file: each import pushes its module's files */
     LexFile *file = l->cur_file;
-    Lexeme *first = lexTokenRaw(macro_defs, l);
-    AoStr *alias = NULL;
-    if (first && first->tk_type == TK_IDENT) {
-        Lexeme *eq = lexTokenRaw(macro_defs, l);
-        if (tokenPunctIs(eq, '=')) {
-            alias = aoStrDupRaw(first->start, first->len);
-            first = lexTokenRaw(macro_defs, l);
-        } else {
-            /* not an alias: give the token back by re-lexing from it */
-            l->ptr = eq ? eq->start : l->ptr;
+    AoStr *aliases[64], *paths[64];
+    Lexeme *firsts[64], *lasts[64];
+    int n = 0, more = 1;
+    while (more) {
+        Lexeme *first = lexTokenRaw(macro_defs, l);
+        AoStr *alias = NULL;
+        if (first && first->tk_type == TK_IDENT) {
+            Lexeme *eq = lexTokenRaw(macro_defs, l);
+            if (tokenPunctIs(eq, '=')) {
+                alias = aoStrDupRaw(first->start, first->len);
+                first = lexTokenRaw(macro_defs, l);
+            } else {
+                /* not an alias: give the token back by re-lexing from it */
+                l->ptr = eq ? eq->start : l->ptr;
+            }
+        }
+        Lexeme *last = first;
+        AoStr *path = lexModulePath(macro_defs, l, first, &last, &more);
+        if (!path) break;
+        if (n < 64) {
+            aliases[n] = alias;
+            paths[n] = path;
+            firsts[n] = first;
+            lasts[n] = last;
+            n++;
         }
     }
-    Lexeme *last = first;
-    AoStr *path = lexModulePath(macro_defs, l, first, &last);
-    if (!path) return;
+    for (int i = n - 1; i >= 0; --i) {
+        lexImportOne(l, file, kw, aliases[i], paths[i], firsts[i], lasts[i]);
+    }
+}
+
+/* One module of an `import` line of `file` */
+static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
+                         AoStr *path, Lexeme *first, Lexeme *last)
+{
     AoStr *prefix = alias ? alias : aoStrDupRaw(last->start, last->len);
     int auto_prelude = file && file->filename &&
                        !strcmp(file->filename->data, LEX_PRELUDE_FILE);
@@ -3538,7 +3575,7 @@ static void lexModuleLine(Map *macro_defs, Lexer *l, Lexeme *kw) {
     LexFile *file = l->cur_file;
     Lexeme *first = lexTokenRaw(macro_defs, l);
     Lexeme *last = first;
-    AoStr *name = lexModulePath(macro_defs, l, first, &last);
+    AoStr *name = lexModulePath(macro_defs, l, first, &last, NULL);
     if (!name) return;
     file->saw_module = 1;
     if (!file->module_id) {
@@ -3573,6 +3610,8 @@ static void lexQualify(Lexer *l, Lexeme *tok) {
         char *text = mprintf("%s.%.*s", imp->module->path->data,
                              (int)(end - name), name);
         l->ptr = end;
+        tok->qual_prefix = tok->start;
+        tok->qual_prefix_len = tok->len;
         tok->start = text;
         tok->len = strlen(text);
         imp->used = 1;
@@ -3598,6 +3637,8 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
             }
         }
         tok->is_prefix = 0;
+        tok->qual_prefix = NULL;
+        tok->qual_prefix_len = 0;
         if (file) {
             if (!file->header_done && file->module_id && !file->saw_module &&
                 file->mod_pass == LEX_PASS_FULL)
