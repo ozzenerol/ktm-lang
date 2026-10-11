@@ -25,3 +25,5 @@ for p in "$HERE"/std-fixes/*.patch; do
     [ -e "$p" ] || continue
     patch -s -p1 -d "$STD/../.." < "$p" || { echo "convert-std.sh: $p doesn't apply" >&2; exit 1; }
 done
+# a local named like a module its function also uses becomes <name>Val
+(cd "$STD/../.." && python3 -I "$HERE/fix-shadow.py" "$HERE/stdlib-modules.tsv" 'src/std/**/*.ktm' >&2)
