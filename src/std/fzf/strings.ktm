@@ -354,12 +354,12 @@ pub bool str.isSpace(u8 ch) {
                                     ch == '\v' || ch == '\f' || ch == '\r';
 }
 
-pub u64 str.hash(u8 *str)
+pub u64 str.hash(u8 *strVal)
 {// h = h*31 + c over the bytes (0 for ""), then the murmur3 finaliser;
     // must match _STRHASH on x86_64
         u64 h = 0;
-        for (i64 i = 0; str[i]; ++i) {
-                h = (h << 5) - h + str[i];
+        for (i64 i = 0; strVal[i]; ++i) {
+                h = (h << 5) - h + strVal[i];
         }
         h ^= h >> 33;
         h *= 0xFF51AFD7ED558CCD;

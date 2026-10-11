@@ -114,11 +114,11 @@ i32 indexByte(FzFString *str, u8 b) {
     return -1;
 }
 
-i64 leadingWhitespaces(FzFString *str)
+i64 leadingWhitespaces(FzFString *strVal)
 { // XXX: extract to strings.ktm
     i64 whitespaces = 0;
-    for (i64 i = 0; i < str.size; i++) {
-        if (!str.isSpace((u8)str.data[i])) {
+    for (i64 i = 0; i < strVal.size; i++) {
+        if (!str.isSpace((u8)strVal.data[i])) {
             break;
         }
         whitespaces++;
@@ -126,11 +126,11 @@ i64 leadingWhitespaces(FzFString *str)
     return whitespaces;
 }
 
-i64 trailingWhitespaces(FzFString *str)
+i64 trailingWhitespaces(FzFString *strVal)
 { // XXX: extract to strings.ktm
     i64 whitespaces = 0;
-    for (i64 i = str.size - 1; i >= 0; i--) {
-        if (!str.isSpace((u8)str.data[i])) {
+    for (i64 i = strVal.size - 1; i >= 0; i--) {
+        if (!str.isSpace((u8)strVal.data[i])) {
             break;
         }
         whitespaces++;
@@ -138,9 +138,9 @@ i64 trailingWhitespaces(FzFString *str)
     return whitespaces;
 }
 
-bool hasSuffix(u8 *str, i64 len, u8 *suffix, i64 suffixLen) {
+bool hasSuffix(u8 *strVal, i64 len, u8 *suffix, i64 suffixLen) {
     FzFStrSlice s;
-    sliceStr(&s, str, len - suffixLen, len);
+    sliceStr(&s, strVal, len - suffixLen, len);
     return len >= suffixLen && !str.cmpLen(s.data, suffix, suffixLen);
 }
 
@@ -195,10 +195,10 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
     return result;
 }
 
-u8 *strTolower(u8 *str, i64 size) {
+u8 *strTolower(u8 *strVal, i64 size) {
     u8 *lower = mem.alloc((size+2)*sizeof(u8));
     for (i64 i = 0; i < size; ++i) {
-        lower[i] = str.toLower(str[i]);
+        lower[i] = str.toLower(strVal[i]);
     }
     lower[size] = '\0';
     return lower;

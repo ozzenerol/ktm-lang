@@ -498,19 +498,19 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
 
 /* Appends the `len` bytes of `str` as a JSON string literal, quotes
     * included; a '\0' among them is written \u0000 */
-static void jsonCatQuoted(JsonStringBuilder *js, u8 *str, i64 len) {
-        if (!str) {
-                str = "";
+static void jsonCatQuoted(JsonStringBuilder *js, u8 *strVal, i64 len) {
+        if (!strVal) {
+                strVal = "";
                 len = 0;
         } else if (!len) { /* a node made or changed by hand */
-                len = str.len(str);
+                len = str.len(strVal);
         }
         u8 *buf = mem.alloc(len * 6 + 3), *dst = buf, *hex = "0123456789abcdef";
-        u8 *end = str + len;
+        u8 *end = strVal + len;
         u8 ch;
         *dst++ = '"';
-        while (str < end) {
-                ch = *str++;
+        while (strVal < end) {
+                ch = *strVal++;
                 switch (ch) {
                         case '"':  *dst++ = '\\'; *dst++ = '"';
                         case '\\': *dst++ = '\\'; *dst++ = '\\';

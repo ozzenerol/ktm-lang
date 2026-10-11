@@ -192,14 +192,14 @@ out:
 }
 
 pub vec.IntVec *IntSet.toVec() {
-    vec.IntVec *vec = vec.intNew();
+    vec.IntVec *vecVal = vec.intNew();
     IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     while ((entry = intIterNext(i1))) {
-        vec.push(entry.key);
+        vecVal.push(entry.key);
     }
     intIterRelease(i1);
-    return vec;
+    return vecVal;
 }
 
 pub IntSet *IntSet.symDiff(IntSet *s2) {
