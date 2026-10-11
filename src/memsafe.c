@@ -451,7 +451,13 @@ void memsafeReportLeaks(FILE *f) {
  * JIT has loaded libktm by now. Nothing when it isn't there. */
 static void memsafeSetHook(const char *name, void *fn) {
     char *sym = astModuleMangle((char *)name, (int)strlen(name));
-    void **slot = (void **)dlsym(RTLD_DEFAULT, sym);
+    void **slot = NULL;
+#if defined(__APPLE__)
+    /* Mach-O: dlsym adds the leading `_` itself, and ktm's own symbols
+     * are emitted without the extra one a C name gets */
+    slot = (void **)dlsym(RTLD_DEFAULT, sym + 1);
+#endif
+    if (!slot) slot = (void **)dlsym(RTLD_DEFAULT, sym);
     if (slot) *slot = fn;
 }
 
