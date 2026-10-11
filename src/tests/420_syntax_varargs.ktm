@@ -124,6 +124,12 @@ i64 Apply(fn(i64 ...) i64 f)
 /* a call at file scope */
 i64 g_file_scope = Sum(4, 5, 6);
 
+/* untyped extras are 64-bit slots: a narrow literal fills its slot */
+I64 Slot(I64 i, ...args)
+{
+  return args[i];
+}
+
 I32 Main()
 {
   "Test - syntax: named varargs: ";
@@ -173,6 +179,10 @@ I32 Main()
   for (i64 k = 0; k < 5; k++) acc += Sum(k, k, k);
   tests++; if (acc == 30) correct++;
   tests++; if (g_file_scope == 15) correct++;
+  U8 b200 = 200;
+  tests++;
+  if (Slot(0, true) == 1 && Slot(1, 'x', 'y') == 'y' && Slot(0, (I8)-3) == -3 &&
+      Slot(0, b200) == 200 && Slot(1, false, (U8)7) == 7) correct++;
   /* the old form is unchanged */
   tests++; if (!StrCmp(MStrPrint("%d-%s", 5, "x"), "5-x")) correct++;
 

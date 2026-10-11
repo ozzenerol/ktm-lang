@@ -2683,6 +2683,12 @@ static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast) {
         if (!ast->va_untyped) {
             val = irConvertFloatToTargetWidth(ctx, val, elem);
             val = irNarrowToTargetWidth(ctx, val, elem);
+        } else if (val && val->kind == IR_VAL_CONST_INT) {
+            /* a 64-bit slot: the store is sized from the value, and a
+             * constant keeps its literal's width (`true`, 'x': 1 byte) */
+            val = irConstInt(IR_TYPE_I64, val->as._i64);
+        } else {
+            val = irWidenToTargetWidth(ctx, val, item->type, ast_int_type);
         }
         IrValue *off = irConstInt(IR_TYPE_I64, (s64)i * esize);
         IrValue *slot = irTmp(IR_TYPE_PTR, 8);
