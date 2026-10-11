@@ -270,6 +270,11 @@ typedef struct AstType {
  * or its address taken (AST_FLAG_SLICE_MOVED) somewhere in the function */
 #define AST_FLAG_LIT_SLICE (1<<11)
 #define AST_FLAG_SLICE_MOVED (1<<12)
+/* An AST_SLICE_ELEM proven in range (`s[i]` in `for (i64 i = 0; i < s.len;
+ * i++)` when nothing else changes i or s): no bounds check */
+#define AST_FLAG_NOCHECK (1<<13)
+/* A local whose address is taken somewhere in the function */
+#define AST_FLAG_ADDR_TAKEN (1<<14)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */

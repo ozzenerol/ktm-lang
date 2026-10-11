@@ -710,11 +710,135 @@ void parseCheckLiteralWrites(Cctrl *cc) {
 }
 
 /* `&a` of a local a literal initialised: it may change through the
- * pointer, so writes through it are left to run time */
+ * pointer, so writes through it are left to run time. (Any local whose
+ * address is taken is marked, for bounds-check elision.) */
 void parseNoteSliceMoved(Ast *ast) {
     if (ast && ast->kind == AST_LVAR && (ast->flags & AST_FLAG_LIT_SLICE)) {
         ast->flags |= AST_FLAG_SLICE_MOVED;
     }
+    if (ast && ast->kind == AST_LVAR) {
+        ast->flags |= AST_FLAG_ADDR_TAKEN;
+    }
+}
+
+static Ast *parseElideStripCasts(Ast *ast) {
+    while (ast && ast->kind == AST_CAST) ast = ast->operand;
+    return ast;
+}
+
+/* A constant >= 0 */
+static int parseElideStartsOk(Ast *ast) {
+    ast = parseElideStripCasts(ast);
+    return ast && ast->kind == AST_LITERAL && ast->type && astIsIntType(ast->type) &&
+           ast->i64 >= 0;
+}
+
+/* `for (i64 i = 0; i < s.len; i++)` (or `i = 0`, `++i`, `i += 1`), with i
+ * a 64-bit local and s a local slice: the loop to watch while its body is
+ * parsed, else NULL */
+ElideLoop *parseElideLoopOpen(Cctrl *cc, Ast *init, Ast *cond, Ast *step) {
+    Ast *idx = NULL;
+    if (!init || !cond || !step || !cc->elide_open) return NULL;
+    if (init->kind == AST_DECL && init->declvar && init->declvar->kind == AST_LVAR &&
+        parseElideStartsOk(init->declinit)) {
+        idx = init->declvar;
+    } else if (init->kind == AST_BINOP && init->binop == AST_BIN_OP_ASSIGN &&
+               init->left && init->left->kind == AST_LVAR && parseElideStartsOk(init->right)) {
+        idx = init->left;
+    }
+    if (!idx || !idx->type || !astIsIntType(idx->type) || idx->type->size != 8) return NULL;
+
+    cond = parseElideStripCasts(cond);
+    if (cond->kind != AST_BINOP || cond->binop != AST_BIN_OP_LT) return NULL;
+    if (parseElideStripCasts(cond->left) != idx) return NULL;
+    Ast *len = parseElideStripCasts(cond->right);
+    if (!len || len->kind != AST_CLASS_REF || !len->field || strcmp(len->field, "len") ||
+        !len->cls || len->cls->kind != AST_LVAR || !astTypeIsSlice(len->cls->type)) {
+        return NULL;
+    }
+
+    step = parseElideStripCasts(step);
+    int step_ok = 0;
+    if (step->kind == AST_UNOP && (step->unop == AST_UN_OP_POST_INC ||
+                                   step->unop == AST_UN_OP_PRE_INC)) {
+        step_ok = parseElideStripCasts(step->operand) == idx;
+    } else if (step->kind == AST_BINOP && step->binop == AST_BIN_OP_ASSIGN &&
+               step->left == idx) {
+        /* `i += 1`, desugared to `i = i + 1` */
+        Ast *sum = parseElideStripCasts(step->right);
+        step_ok = sum && sum->kind == AST_BINOP && sum->binop == AST_BIN_OP_ADD &&
+                  parseElideStripCasts(sum->left) == idx &&
+                  parseElideStripCasts(sum->right) &&
+                  parseElideStripCasts(sum->right)->kind == AST_LITERAL &&
+                  parseElideStripCasts(sum->right)->i64 == 1;
+    }
+    if (!step_ok) return NULL;
+
+    ElideLoop *loop = calloc(1, sizeof(ElideLoop));
+    loop->idx = idx;
+    loop->slice = len->cls;
+    loop->elems = listNew();
+    listAppend(cc->elide_open, loop);
+    return loop;
+}
+
+/* The loop's body is parsed: keep it for the end of the function */
+void parseElideLoopClose(Cctrl *cc, ElideLoop *loop) {
+    if (!loop) return;
+    listRemoveValue(cc->elide_open, loop);
+    if (!loop->spoiled && cc->elide_done) {
+        listAppend(cc->elide_done, loop);
+    }
+}
+
+/* `base[index]` of a slice was made (elem): note it in the loops it
+ * belongs to */
+void parseElideNoteElem(Cctrl *cc, Ast *base, Ast *index, Ast *elem) {
+    if (!cc->elide_open) return;
+    index = parseElideStripCasts(index);
+    listForEach(cc->elide_open) {
+        ElideLoop *loop = (ElideLoop *)it->value;
+        if (base == loop->slice && index == loop->idx) {
+            listAppend(loop->elems, elem);
+        }
+    }
+}
+
+/* `ast` is written to (assigned, ++, --): a loop watching it is off */
+void parseElideNoteWrite(Cctrl *cc, Ast *ast) {
+    if (!cc->elide_open) return;
+    listForEach(cc->elide_open) {
+        ElideLoop *loop = (ElideLoop *)it->value;
+        if (ast == loop->idx || ast == loop->slice) loop->spoiled = 1;
+    }
+}
+
+/* A label in a loop's body: a goto can enter it without the condition */
+void parseElideNoteLabel(Cctrl *cc) {
+    if (!cc->elide_open) return;
+    listForEach(cc->elide_open) {
+        ((ElideLoop *)it->value)->spoiled = 1;
+    }
+}
+
+/* The end of the function: a loop whose i and s never had their address
+ * taken has its s[i] unchecked */
+void parseElideSettle(Cctrl *cc) {
+    if (cc->elide_done) {
+        listForEach(cc->elide_done) {
+            ElideLoop *loop = (ElideLoop *)it->value;
+            if (!(loop->idx->flags & AST_FLAG_ADDR_TAKEN) &&
+                !(loop->slice->flags & AST_FLAG_ADDR_TAKEN)) {
+                List *e = loop->elems->next;
+                while (e != loop->elems) {
+                    ((Ast *)e->value)->flags |= AST_FLAG_NOCHECK;
+                    e = e->next;
+                }
+            }
+        }
+    }
+    cc->elide_open = NULL;
+    cc->elide_done = NULL;
 }
 
 /* `ast` used as a truth value (`if`, `while`, `for`, `?:`, `!`, `&&`,
@@ -739,7 +863,10 @@ void parseCheckCondition(Cctrl *cc, Ast *ast) {
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
-    parseNoteSliceMoved(ast);
+    if (ast && ast->kind == AST_LVAR && (ast->flags & AST_FLAG_LIT_SLICE)) {
+        ast->flags |= AST_FLAG_SLICE_MOVED;
+    }
+    parseElideNoteWrite(cc, ast);
     parseCheckLiteralWrite(cc, ast);
     /* `s.len = n`: a slice's fields are set together, by assigning a
      * whole slice */

@@ -2535,7 +2535,9 @@ Ast *parseForStatement(Cctrl *cc) {
         cctrlRaiseException(cc,"Unexpected %s `%s` while parsing for loop body", 
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
+    ElideLoop *elide = parseElideLoopOpen(cc, forinit, forcond, forstep);
     forbody = parseBracedBody(cc, "for");
+    parseElideLoopClose(cc, elide);
     /* Go back up */
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
@@ -3321,6 +3323,7 @@ Ast *parseStatement(Cctrl *cc) {
         }
         label = createFunctionLevelGotoLabel(cc,tok);
         ret = astLabel(label);
+        parseElideNoteLabel(cc);
         /* consume ':' */
         cctrlTokenExpect(cc,':');
         return ret;
@@ -4189,6 +4192,8 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cc->tmp_locals = locals;
     cc->lit_writes = listNew();
+    cc->elide_open = listNew();
+    cc->elide_done = listNew();
 
     /* Upgrade a prototype to an actual function */
     func = mapGetLen(cc->global_env, fname, len);
@@ -4332,6 +4337,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     }
 
     parseCheckLiteralWrites(cc);
+    parseElideSettle(cc);
     cc->localenv = NULL;
     cc->tmp_locals = NULL;
     cc->tmp_rettype = NULL;
