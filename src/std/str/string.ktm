@@ -170,3 +170,176 @@ pub void String.free()
     self.len = 0;
     self.cap = 0;
 }
+
+/* ---- Reading bytes: these take a u8[], so a literal, a slice or a
+ * String; called as methods too (`s.find("x")` is str.find(s, "x")) ---- */
+
+/* Where needle first is in s, -1 when it isn't (an empty needle is at 0) */
+pub i64 find(u8[] s, u8[] needle)
+{
+    if (needle.len > s.len) { return -1; }
+    if (!needle.len) { return 0; }
+    u8 first = needle.ptr[0];
+    for (i64 i = 0; i <= s.len - needle.len; ++i) {
+        if (s.ptr[i] == first && !libc.memcmp(s.ptr + i, needle.ptr, needle.len)) { return i; }
+    }
+    return -1;
+}
+
+/* Where needle last is in s, -1 when it isn't */
+pub i64 findLast(u8[] s, u8[] needle)
+{
+    if (needle.len > s.len) { return -1; }
+    for (i64 i = s.len - needle.len; i >= 0; --i) {
+        if (!libc.memcmp(s.ptr + i, needle.ptr, needle.len)) { return i; }
+    }
+    return -1;
+}
+
+pub bool contains(u8[] s, u8[] needle)
+{
+    return find(s, needle) >= 0;
+}
+
+pub bool startsWith(u8[] s, u8[] prefix)
+{
+    return prefix.len <= s.len && !libc.memcmp(s.ptr, prefix.ptr, prefix.len);
+}
+
+pub bool endsWith(u8[] s, u8[] suffix)
+{
+    return suffix.len <= s.len &&
+           !libc.memcmp(s.ptr + s.len - suffix.len, suffix.ptr, suffix.len);
+}
+
+/* <0, 0 or >0 as a sorts before, with or after b (bytes, then length) */
+pub i64 compare(u8[] a, u8[] b)
+{
+    i64 n = a.len < b.len ? a.len : b.len;
+    i32 c = n ? libc.memcmp(a.ptr, b.ptr, n) : 0;
+    if (c) { return c; }
+    return a.len - b.len;
+}
+
+/* The same bytes */
+pub bool equals(u8[] a, u8[] b)
+{
+    return a.len == b.len && (!a.len || !libc.memcmp(a.ptr, b.ptr, a.len));
+}
+
+static bool viewIsSpace(u8 c)
+{
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
+}
+
+/* s without the whitespace at its ends: a view of it, nothing copied */
+pub u8[] trim(u8[] s)
+{
+    i64 a = 0, b = s.len;
+    while (a < b && viewIsSpace(s.ptr[a])) { a++; }
+    while (b > a && viewIsSpace(s.ptr[b - 1])) { b--; }
+    return s[a:b];
+}
+
+/* The parts of s between the seps, views of it (an empty sep: s whole).
+ * The list is allocated: `u8[][] parts = s.split(","); defer parts.free();` */
+pub u8[][] split(u8[] s, u8[] sep)
+{
+    i64 n = 1;
+    if (sep.len) {
+        for (i64 at = find(s, sep); at >= 0; ) {
+            n++;
+            i64 next = find(s[at + sep.len:], sep);
+            at = next >= 0 ? at + sep.len + next : -1;
+        }
+    }
+    u8[] *parts = mem.alloc(n * sizeof(u8[]));
+    u8[][] out = parts[0:n];
+    u8[] rest = s;
+    for (i64 i = 0; i < n - 1; ++i) {
+        i64 at = find(rest, sep);
+        out[i] = rest[:at];
+        rest = rest[at + sep.len:];
+    }
+    out[n - 1] = rest;
+    return out;
+}
+
+/* Every old in it replaced by new (an empty old changes nothing) */
+pub void String.replace(u8[] old, u8[] new)
+{
+    if (!old.len || !self.len) { return; }
+    String out = withCap(self.len);
+    u8[] rest = *self;
+    for (i64 at = find(rest, old); at >= 0; at = find(rest, old)) {
+        out.append(rest[:at]);
+        out.append(new);
+        rest = rest[at + old.len:];
+    }
+    out.append(rest);
+    mem.free(self.ptr);
+    self.ptr = out.ptr;
+    self.len = out.len;
+    self.cap = out.cap;
+}
+
+/* ---- UTF-8: a String's or a u8[]'s bytes as characters (s.len and s[i]
+ * stay bytes) ---- */
+
+/* The code point at byte *at of s, *at moved past it; U+FFFD for bytes
+ * that aren't UTF-8 (then *at moves one byte), -1 at the end */
+pub i32 decodeRune(u8[] s, i64 *at)
+{
+    i64 i = *at;
+    if (i < 0 || i >= s.len) { return -1; }
+    u8 b0 = s.ptr[i];
+    if (b0 < 0x80) {
+        *at = i + 1;
+        return b0;
+    }
+    i64 n = 0;
+    i32 cp = 0;
+    u8 lo = 0x80, hi = 0xBF; /* the second byte's range (RFC 3629) */
+    if (0xC2 <= b0 <= 0xDF) { n = 2; cp = b0 & 0x1F; }
+    else if (b0 == 0xE0) { n = 3; cp = b0 & 0x0F; lo = 0xA0; }
+    else if (b0 == 0xED) { n = 3; cp = b0 & 0x0F; hi = 0x9F; }
+    else if (0xE1 <= b0 <= 0xEF) { n = 3; cp = b0 & 0x0F; }
+    else if (b0 == 0xF0) { n = 4; cp = b0 & 0x07; lo = 0x90; }
+    else if (0xF1 <= b0 <= 0xF3) { n = 4; cp = b0 & 0x07; }
+    else if (b0 == 0xF4) { n = 4; cp = b0 & 0x07; hi = 0x8F; }
+    if (!n || i + n > s.len) {
+        *at = i + 1;
+        return 0xFFFD;
+    }
+    for (i64 k = 1; k < n; ++k) {
+        u8 b = s.ptr[i + k];
+        u8 min = k == 1 ? lo : 0x80, max = k == 1 ? hi : 0xBF;
+        if (b < min || b > max) {
+            *at = i + 1;
+            return 0xFFFD;
+        }
+        cp = (cp << 6) | (b & 0x3F);
+    }
+    *at = i + n;
+    return cp;
+}
+
+/* How many characters s holds (each byte that isn't UTF-8 counts as one) */
+pub i64 runeCount(u8[] s)
+{
+    i64 n = 0, at = 0;
+    while (decodeRune(s, &at) >= 0) { n++; }
+    return n;
+}
+
+/* Whether all of s is UTF-8 */
+pub bool validUtf8(u8[] s)
+{
+    i64 at = 0;
+    while (at < s.len) {
+        i64 before = at;
+        i32 cp = decodeRune(s, &at);
+        if (cp == 0xFFFD && !(at - before == 3 && s.ptr[before] == 0xEF)) { return false; }
+    }
+    return true;
+}
