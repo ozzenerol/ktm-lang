@@ -1,4 +1,4 @@
-import cstr, mem, set, test, vec;
+import set, test, vec;
 
 /* set.intRelease(null) and set.intSize(null) crashed. The set.IntSet functions
  * that only read a set now treat null as the empty set, and the release
@@ -10,7 +10,8 @@ i32 main() {
     set.IntSet *s = set.intNew(), *r;
     set.IntSetIter *it;
     vec.IntVec *v;
-    u8 *strVal;
+
+    String strVal;
 
     set.IntSet.release(null);
     tests++; correct++;
@@ -54,8 +55,8 @@ i32 main() {
     v.release();
 
     strVal = set.IntSet.toStr(null);
-    tests++; if (strVal != null && !cstr.cmp(strVal, "{}")) { correct++; }
-    mem.free(strVal);
+    tests++; if (strVal.equals("{}")) { correct++; }
+    strVal.free();
 
     /* Non-null sets are unaffected. */
     tests++; if (s.size() == 2 && s.has(3) && !s.has(4)) { correct++; }

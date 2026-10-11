@@ -84,11 +84,9 @@ void main()
   v.release(&freeIt);
   map.StrMap *m = map.strNew();
   m.setFreeValue(&mem.free);
-  m.setFreeKey(&mem.free);
+  u8 kb[16];
   for (i = 0; i < 2000; i++) {
-    s = mem.alloc(16);
-    cstr.formatTo(s, \"k%d\", i);
-    m.set(s, mem.allocZero(8));
+    m.set(cstr.view(cstr.formatTo(kb, \"k%d\", i)), mem.allocZero(8));
   }
   m.release();
   printf(\"ok\\n\");

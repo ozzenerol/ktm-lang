@@ -1,4 +1,4 @@
-import cstr, map, mem, test;
+import cstr, map, mem, str, test;
 
 /* map.strDelete wrote HT_DELETED into the insertion-order vector at the
  * *slot* index (a heap overflow once the slot was past the vector's end),
@@ -10,13 +10,7 @@ import cstr, map, mem, test;
  * freed value was freed again by map.intRelease. Every loop here is bounded so
  * a regression fails instead of hanging. */
 
-i64 gKeyFrees = 0;
 i64 gValueFrees = 0;
-
-void countingFreeKey(void *key) {
-    gKeyFrees++;
-    mem.free(key);
-}
 
 void countingFreeValue(void *value) {
     gValueFrees++;
@@ -42,8 +36,8 @@ i64 *box(i64 v) {
     return b;
 }
 
-u8 *intStr(void *v) {
-    return cstr.formatTo(null, "%d", (i64)v);
+String intStr(void *v) {
+    return str.format("%d", (i64)v);
 }
 
 i64 keyNum(u8 *key)
@@ -75,56 +69,54 @@ i32 main() {
     tests++;
     if (s.delete("") && !s.has("") && !s.delete("") &&
             s.size == 2) { correct++; }
-    u8 *keys = s.keysToStr();
+    String keys = s.keysToStr();
     tests++;
-    if (!cstr.cmp(keys, "{a, c}")) { correct++; }
-    mem.free(keys);
+    if (keys.equals("{a, c}")) { correct++; }
+    keys.free();
     keys = s.toStr(&intStr);
     tests++;
-    if (!cstr.cmp(keys, "{[a] => 1, [c] => 3}")) { correct++; }
-    mem.free(keys);
+    if (keys.equals("{[a] => 1, [c] => 3}")) { correct++; }
+    keys.free();
     s.set("b", (void *)5);
     keys = s.keysToStr();
     tests++;
-    if (!cstr.cmp(keys, "{a, c, b}") && (i64)s.get("b") == 5 &&
+    if (keys.equals("{a, c, b}") && (i64)s.get("b") == 5 &&
             s.size == 3) { correct++; }
-    mem.free(keys);
+    keys.free();
     s.release();
 
     /* 10,000 owned keys and values; delete the even half. */
     map.StrMap *big = map.strNew();
-    big.setFreeKey(&countingFreeKey);
     big.setFreeValue(&countingFreeValue);
     for (i = 0; i < 10000; i++) {
-        big.set(fmtFn("key-%d", i), box(i));
+        big.set(cstr.view(cstr.formatTo(buf, "key-%d", i)), box(i));
     }
     bad = 0;
     for (i = 0; i < 10000; i += 2) {
         cstr.formatTo(buf, "key-%d", i);
-        if (!big.delete(buf)) { bad++; }
+        if (!big.delete(cstr.view(buf))) { bad++; }
     }
     tests++;
-    if (bad == 0 && big.size == 5000 && gKeyFrees == 5000 &&
-            gValueFrees == 5000) { correct++; }
+    if (bad == 0 && big.size == 5000 && gValueFrees == 5000) { correct++; }
 
     /* Deleting again or deleting keys that never existed is false. */
     bad = 0;
     for (i = 0; i < 10000; i += 2) {
         cstr.formatTo(buf, "key-%d", i);
-        if (big.delete(buf)) { bad++; }
+        if (big.delete(cstr.view(buf))) { bad++; }
         cstr.formatTo(buf, "missing-%d", i);
-        if (big.delete(buf) || big.has(buf)) { bad++; }
+        if (big.delete(cstr.view(buf)) || big.has(cstr.view(buf))) { bad++; }
     }
     tests++;
-    if (bad == 0 && big.size == 5000 && gKeyFrees == 5000) { correct++; }
+    if (bad == 0 && big.size == 5000) { correct++; }
 
     bad = 0;
     for (i = 0; i < 10000; i++) {
         cstr.formatTo(buf, "key-%d", i);
-        i64 *v = big.get(buf);
+        i64 *v = big.get(cstr.view(buf));
         if (i & 1) {
             if (!v || *v != i) { bad++; }
-        } else if (v != null || big.has(buf)) {
+        } else if (v != null || big.has(cstr.view(buf))) {
             bad++;
         }
     }
@@ -136,7 +128,7 @@ i32 main() {
     n = 0;
     bad = 0;
     while (big.iter(&idx, &node) && n <= 10000) {
-        if (keyNum(node.key) != n * 2 + 1) { bad++; }
+        if (keyNum(node.key.ptr) != n * 2 + 1) { bad++; }
         n++;
     }
     tests++;
@@ -144,7 +136,7 @@ i32 main() {
 
     /* Updating surviving keys must not create duplicates. */
     for (i = 1; i < 10000; i += 2) {
-        big.set(fmtFn("key-%d", i), box(i + 100000));
+        big.set(cstr.view(cstr.formatTo(buf, "key-%d", i)), box(i + 100000));
     }
     idx = 0;
     n = 0;
@@ -152,12 +144,11 @@ i32 main() {
         n++;
     }
     tests++;
-    if (big.size == 5000 && n == 5000 && gKeyFrees == 10000 &&
-            gValueFrees == 10000) { correct++; }
+    if (big.size == 5000 && n == 5000 && gValueFrees == 10000) { correct++; }
 
     /* Re-insert the deleted half: they come after the survivors. */
     for (i = 0; i < 10000; i += 2) {
-        big.set(fmtFn("key-%d", i), box(i));
+        big.set(cstr.view(cstr.formatTo(buf, "key-%d", i)), box(i));
     }
     idx = 0;
     n = 0;
@@ -166,7 +157,7 @@ i32 main() {
         i64 want;
         if (n < 5000) { want = n * 2 + 1; }
         else { want = (n - 5000) * 2; }
-        if (keyNum(node.key) != want) { bad++; }
+        if (keyNum(node.key.ptr) != want) { bad++; }
         n++;
     }
     tests++;
@@ -175,7 +166,7 @@ i32 main() {
     bad = 0;
     for (i = 0; i < 10000; i++) {
         cstr.formatTo(buf, "key-%d", i);
-        i64 *v = big.get(buf);
+        i64 *v = big.get(cstr.view(buf));
         if (!v) { bad++; }
         else if ((i & 1) && *v != i + 100000) { bad++; }
         else if (!(i & 1) && *v != i) { bad++; }
@@ -187,40 +178,38 @@ i32 main() {
      * 20,000 keys and 20,000 values were handed to the map in total. */
     big.release();
     tests++;
-    if (gKeyFrees == 20000 && gValueFrees == 20000) { correct++; }
+    if (gValueFrees == 20000) { correct++; }
 
     /* Many delete/insert cycles on a small map: tombstones are recycled, the
      * table does not grow, and missing-key lookups still terminate. */
-    gKeyFrees = 0;
     gValueFrees = 0;
     map.StrMap *cyc = map.strNew(8);
-    cyc.setFreeKey(&countingFreeKey);
     cyc.setFreeValue(&countingFreeValue);
-    cyc.set(dup("keep"), box(-1));
+    cyc.set("keep", box(-1));
     bad = 0;
     for (i = 0; i < 20000; i++) {
-        cyc.set(fmtFn("key-%d", i), box(i));
+        cyc.set(cstr.view(cstr.formatTo(buf, "key-%d", i)), box(i));
         cstr.formatTo(buf, "key-%d", i);
-        if (!cyc.has(buf)) { bad++; }
-        if (!cyc.delete(buf)) { bad++; }
-        if (cyc.has(buf)) { bad++; }
+        if (!cyc.has(cstr.view(buf))) { bad++; }
+        if (!cyc.delete(cstr.view(buf))) { bad++; }
+        if (cyc.has(cstr.view(buf))) { bad++; }
         cstr.formatTo(buf, "never-%d", i);
-        if (cyc.has(buf)) { bad++; }
+        if (cyc.has(cstr.view(buf))) { bad++; }
     }
     tests++;
     if (bad == 0 && cyc.size == 1 && cyc.capacity <= 16 &&
-            gKeyFrees == 20000 && gValueFrees == 20000) { correct++; }
+            gValueFrees == 20000) { correct++; }
     idx = 0;
     n = 0;
     while (cyc.iter(&idx, &node) && n < 10) {
-        if (cstr.cmp(node.key, "keep")) { bad++; }
+        if (cstr.cmp(node.key.ptr, "keep")) { bad++; }
         n++;
     }
     tests++;
     if (bad == 0 && n == 1 && *((i64 *)cyc.get("keep")) == -1) { correct++; }
     cyc.release();
     tests++;
-    if (gKeyFrees == 20001 && gValueFrees == 20001) { correct++; }
+    if (gValueFrees == 20001) { correct++; }
 
     /* map.IntMap: 10,000 keys, delete half, re-insert, iterate, release. */
     gValueFrees = 0;
@@ -292,8 +281,8 @@ i32 main() {
     tests++;
     if (n == 3 && col.size == 3 && (i64)col.get(65) == 31 &&
             !col.has(1) && (i64)col.get(0x7fffffffffffffff) == 40 &&
-            !cstr.cmp(keys, "{33, 65, 9223372036854775807}")) { correct++; }
-    mem.free(keys);
+            keys.equals("{33, 65, 9223372036854775807}")) { correct++; }
+    keys.free();
     col.set(1, (void *)11);
     tests++;
     if (col.size == 4 && (i64)col.get(1) == 11 &&

@@ -142,8 +142,8 @@ i32 main() {
     }
     set.intIterRelease(it);
     if (ok && n == 9 && s.size() == 9 && s.has(10) && !s.has(4)) { correct++; }
-    u8 *str = s.toStr();
-    mem.free(str);
+    String text = s.toStr();
+    text.free();
     s.release();
 
     /* RBIter walks in order */

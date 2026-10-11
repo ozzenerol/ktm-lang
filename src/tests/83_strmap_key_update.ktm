@@ -1,19 +1,13 @@
 import cstr, map, mem, test;
 
-/* map.strSet stores the caller's key pointer (by design), but setting a key
- * that already existed replaced the stored pointer with the new one. Counting
+/* map.strSet stored the caller's key pointer, and setting a key that
+ * already existed replaced the stored pointer with the new one. Counting
  * words from a reused buffer then left the map's keys pointing at that
- * buffer, so every key turned into the last word read. Updates now keep the
- * stored key; with destructors registered the duplicate key and the replaced
- * value are freed exactly once. */
+ * buffer, so every key turned into the last word read. Since v0.3.0 the map
+ * copies every new key (a u8[]) and keeps that copy on updates; with a value
+ * destructor registered the replaced value is freed exactly once. */
 
-i64 gKeyFrees = 0;
 i64 gValueFrees = 0;
-
-void countingFreeKey(void *key) {
-    gKeyFrees++;
-    mem.free(key);
-}
 
 void countingFreeValue(void *value) {
     gValueFrees++;
@@ -55,17 +49,14 @@ i32 main() {
     words[6] = "the";
     words[7] = "cat";
 
-    /* Word count from a reused buffer: new words get a copy, updates pass
-     * the buffer itself. */
+    /* Word count from a reused buffer: the buffer itself is passed every
+     * time. */
     map.StrMap *counts = map.strNew();
     u8 buf[32];
     for (i = 0; i < 8; i++) {
         cstr.copy(buf, words[i]);
-        if (counts.has(buf)) {
-            counts.set(buf, (void *)((i64)counts.get(buf) + 1));
-        } else {
-            counts.set(dup(buf), (void *)1);
-        }
+        u8[] w = cstr.view(buf);
+        counts.set(w, (void *)((i64)counts.get(w) + 1));
     }
     cstr.copy(buf, "zzzzzz");
 
@@ -89,69 +80,59 @@ i32 main() {
     map.StrMapNode *node;
     bad = 0;
     while (counts.iter(&idx, &node) && n < 10) {
-        if (n >= 5 || node.key == buf || cstr.cmp(node.key, order[n])) { bad++; }
+        if (n >= 5 || node.key.ptr == buf || cstr.cmp(node.key.ptr, order[n])) { bad++; }
         n++;
     }
     tests++;
-    if (n == 5 && bad == 0) {
-        correct++;
-        /* Only free the keys if none of them is `buf`, which lives on the stack. */
-        counts.setFreeKey(&mem.free);
-    }
+    if (n == 5 && bad == 0) { correct++; }
     counts.release();
 
     /* Many updates through one buffer, across resizes. */
     map.StrMap *big = map.strNew(8);
     for (i = 0; i < 2000; i++) {
-        cstr.formatTo(buf, "word-%d", i);
-        big.set(dup(buf), (void *)0);
+        big.set(cstr.view(cstr.formatTo(buf, "word-%d", i)), (void *)0);
     }
     for (i64 round = 1; round <= 3; round++) {
         for (i = 0; i < 2000; i++) {
-            cstr.formatTo(buf, "word-%d", i);
-            big.set(buf, (void *)round);
+            big.set(cstr.view(cstr.formatTo(buf, "word-%d", i)), (void *)round);
         }
     }
     cstr.copy(buf, "gone");
     bad = 0;
     for (i = 0; i < 2000; i++) {
         u8 *k = fmtFn("word-%d", i);
-        if ((i64)big.get(k) != 3) { bad++; }
+        if ((i64)big.get(cstr.view(k)) != 3) { bad++; }
         mem.free(k);
     }
     idx = 0;
     n = 0;
     while (big.iter(&idx, &node) && n <= 2000) {
-        if (node.key == buf) { bad++; }
+        if (node.key.ptr == buf) { bad++; }
         n++;
     }
     tests++;
-    if (bad == 0 && n == 2000 && big.size == 2000) {
-        correct++;
-        big.setFreeKey(&mem.free);
-    }
+    if (bad == 0 && n == 2000 && big.size == 2000) { correct++; }
     big.release();
 
-    /* The map owns keys and values: an update frees the duplicate key that
-     * was passed and the value it replaces, never the stored key. */
+    /* The map owns its values with a destructor: an update frees the value
+     * it replaces, never the one stored again. */
     map.StrMap *own = map.strNew();
-    own.setFreeKey(&countingFreeKey);
     own.setFreeValue(&countingFreeValue);
     for (i = 0; i < 100; i++) {
         u8 *k = fmtFn("k%d", i);
-        own.set(dup(k), box(i));
+        own.set(cstr.view(k), box(i));
         mem.free(k);
     }
     tests++;
-    if (gKeyFrees == 0 && gValueFrees == 0 && own.size == 100) { correct++; }
+    if (gValueFrees == 0 && own.size == 100) { correct++; }
 
     for (i = 0; i < 100; i++) {
         u8 *k = fmtFn("k%d", i);
-        own.set(dup(k), box(i + 1000));
+        own.set(cstr.view(k), box(i + 1000));
         mem.free(k);
     }
     tests++;
-    if (gKeyFrees == 100 && gValueFrees == 100 && own.size == 100) { correct++; }
+    if (gValueFrees == 100 && own.size == 100) { correct++; }
 
     /* Setting the stored key and the stored value again frees nothing. */
     idx = 0;
@@ -161,12 +142,12 @@ i32 main() {
         n++;
     }
     tests++;
-    if (n == 100 && gKeyFrees == 100 && gValueFrees == 100) { correct++; }
+    if (n == 100 && gValueFrees == 100) { correct++; }
 
     bad = 0;
     for (i = 0; i < 100; i++) {
         u8 *k = fmtFn("k%d", i);
-        i64 *v = own.get(k);
+        i64 *v = own.get(cstr.view(k));
         if (!v || *v != i + 1000) { bad++; }
         mem.free(k);
     }
@@ -175,7 +156,7 @@ i32 main() {
 
     own.release();
     tests++;
-    if (gKeyFrees == 200 && gValueFrees == 200) { correct++; }
+    if (gValueFrees == 200) { correct++; }
 
     /* map.IntMap: replacing a value frees the old one once. */
     gValueFrees = 0;
