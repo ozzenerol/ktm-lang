@@ -12,4 +12,6 @@ cmake -S "$ROOT/src" -B "$HERE/build" -G 'Unix Makefiles' \
     -DCMAKE_INSTALL_PREFIX="$ROOT/build/prefix" >> "$HERE/build.log" 2>&1
 make -C "$HERE/build" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" ktm-convert \
     >> "$HERE/build.log" 2>&1 || { grep -E "error|warning" "$HERE/build.log" | head -20; exit 1; }
+# S2: the declarations the old stdlib's module files need to parse
+python3 -I "$HERE/stdlib-aid.py" "$ROOT/build/prefix" "$ROOT/src/std" || exit 1
 echo "built $HERE/ktm-convert (parses against $ROOT/build/prefix)"

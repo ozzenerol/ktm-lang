@@ -860,6 +860,14 @@ void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last) {
  * (and renames-locals.tsv); our own code the rule. */
 
 static Map *mig_map;
+
+/* A row of the stdlib map (--map), see migLoadMap */
+typedef struct MigName {
+    const char *kind;      /* function type macro c */
+    const char *module;    /* "-": dropped, "prelude": no prefix */
+    const char *name;
+    const char *note;
+} MigName;
 static char *migReadFile(char *path, s64 *_len);
 static int migIsStdFile(Cctrl *cc, u32 file_id);
 static Map *mig_renames = NULL;      /* old -> new, every kind */
@@ -951,6 +959,8 @@ static void migCollectWord(MigFile *f, s64 at, s64 len, void *ctx) {
 }
 static int migUsesWord(MigFile *f, s64 s, s64 e, const char *name);
 
+static const char *migFileModule(MigFile *f);
+
 /* The naming rule for the name at s (see migCamel) */
 static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
     if (!mig_names) return;
@@ -958,7 +968,22 @@ static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
     if (!strcmp(w, "Main") || !strcmp(w, "argc") || !strcmp(w, "argv")) return;
     char *to = NULL;
     if (f->real && strstr(f->real, "/src/std/")) {
-        to = mig_renames ? mapGet(mig_renames, w) : NULL;
+        /* a name the map moves into a module: the map's name. In its own
+         * module that is the definition and its uses, bare (`len`); in
+         * the others the map's edit (`str.len`) is the one */
+        MigName *m = mig_map ? mapGet(mig_map, w) : NULL;
+        if (m && strcmp(m->module, "-") && strcmp(m->kind, "c") && strcmp(m->kind, "macro") &&
+            strcmp(m->module, "prelude")) {
+            if (strcmp(migFileModule(f), m->module)) return;
+            /* the map's name, even next to a local of that name (`len`)
+             * or a C function the file calls (`free`, now c.free): a
+             * local that hides it where it is called shows when the
+             * module is compiled */
+            if (strcmp(m->name, w)) migAdd(f, s, s + len, (char *)m->name, "name");
+            return;
+        } else {
+            to = mig_renames ? mapGet(mig_renames, w) : NULL;
+        }
     } else {
         /* not a type, not the stdlib's (1i), not a C function */
         if (cctrlGetKeyWord(cc, w, len)) return;
@@ -1053,12 +1078,7 @@ void migrateNoteName(Cctrl *cc, Lexeme *name) {
 /* ------------------------------------------------------------------ */
 /* The stdlib map (--map stdlib-modules.tsv): old name -> module.new */
 
-typedef struct MigName {
-    const char *kind;      /* function type macro c */
-    const char *module;    /* "-": dropped, "prelude": no prefix */
-    const char *name;
-    const char *note;
-} MigName;
+
 
 static Map *mig_map = NULL;
 
