@@ -275,17 +275,23 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
         switch (param.type) {
             case INT:
                 rc = sqlite3_bind_int64(pstmt.stmt, i + 1, param.intVal);
+                break;
             case FLOAT:
                 rc = sqlite3_bind_double(pstmt.stmt, i + 1, param.floatVal);
+                break;
             case TEXT:
                 rc = sqlite3_bind_text(pstmt.stmt, i + 1, param.str, -1, (void *)SQLITE_TRANSIENT);
+                break;
             case BLOB:
                 rc = sqlite3_bind_blob(pstmt.stmt, i + 1, param.blob, param.blobLen,
                         (void *)SQLITE_TRANSIENT);
+                break;
             case NULL_TYPE:
                 rc = sqlite3_bind_null(pstmt.stmt, i + 1);
+                break;
             default:
                 rc = SQLITE_MISMATCH;
+                break;
         }
         if (rc != SQLITE_OK) {
             /* Don't run the statement with a parameter missing; the next
@@ -332,15 +338,20 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
                 /* The leftmost SQL parameter has an index of 1 ref:
                  * https://www.sqlite.org/c3ref/bind_blob.html */
                 rc = sqlite3_bind_int64(stmt, i + 1, params[i].intVal);
+                break;
             case FLOAT:
                 rc = sqlite3_bind_double(stmt, i + 1, params[i].floatVal);
+                break;
             case TEXT:
                 rc = sqlite3_bind_text(stmt, i + 1, params[i].str, -1, (void *)SQLITE_TRANSIENT);
+                break;
             case BLOB:
                 rc = sqlite3_bind_blob(stmt, i + 1, params[i].blob,
                         params[i].blobLen, (void *)SQLITE_TRANSIENT);
+                break;
             case NULL_TYPE:
                 rc = sqlite3_bind_null(stmt, i + 1);
+                break;
             default:
                 rc = SQLITE_MISMATCH;
                 goto err;
@@ -413,19 +424,24 @@ static bool sqlIterGeneric(Row *row) {
         switch (row.col[i].type) {
             case SQLITE_INTEGER:
                 row.col[i].intVal = sqlite3_column_int64(row.stmt,i);
+                break;
             case SQLITE_FLOAT:
                 row.col[i].floatVal = sqlite3_column_double(row.stmt,i);
+                break;
             case SQLITE3_TEXT:
                 row.col[i].str = (u8 *)sqlite3_column_text(row.stmt,i);
                 row.col[i].len = sqlite3_column_bytes(row.stmt,i);
+                break;
             case SQLITE_BLOB:
                 row.col[i].blob = (void *)sqlite3_column_blob(row.stmt,i);
                 row.col[i].len = sqlite3_column_bytes(row.stmt,i);
+                break;
             default:
                 /* XXX: You may want to handle this case differently */
                 row.col[i].str = null;
                 row.col[i].intVal = 0;
                 row.col[i].floatVal = 0;
+                break;
         }
     }
     return true;

@@ -30,6 +30,8 @@ Steps (plan approved by asuslab-33):
 - std-fixes 03 (coro's asm calls coroMain by its mangled symbol) and 04 (date.format(d, fmt)).
 - The whole tree builds into one libktm: `ktm -fPIC -lib ktm <prefix>/modules`, 0 errors, and programs
   link against it.
-- BLOCKER (asked asuslab-33): Y8 removed the arms' last breaks but S2 still falls through, so the
-  stdlib misbehaves at run time (str.format segfaults). Proposal: keep the breaks in S2.
+- Y8 (decided by asuslab-33): S2 keeps every break (feat/convert 52663b8), --drop-breaks removes them in S3
+  right after the flip, over src/std, tests, docs and the builder projects.
+- Runs: a program using str.format, %Q, date.format and throw/catch gives the right output AOT and JIT
+  against the tree-built libktm.
 - Left: A4 build scripts, A5 checks.

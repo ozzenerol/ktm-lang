@@ -769,25 +769,32 @@ pub u8 *quote(u8 *ptr,i64 flags = 0) {
                                                 if (flags&PRTF_SLASH) {
                                                         strPutChar(_dst,ch,_buf);
                                                 }
+                                                break;
                                         case '\n':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,'n',_buf);
+                                                break;
                                         case '\r':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,'r',_buf);
+                                                break;
                                         case '\t':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,'t',_buf);
+                                                break;
                                         case '\v':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,'v',_buf);
+                                                break;
                                         case '\f':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,'f',_buf);
+                                                break;
                                         case '"':
                                         case '\\':
                                                 strPutChar(_dst,'\\',_buf);
                                                 strPutChar(_dst,ch,_buf);
+                                                break;
                                         default:
                                                 if (ch>=CH_SHIFT_SPACE && ch!=0x7F) {
                                                         strPutChar(_dst,ch,_buf);
@@ -1102,6 +1109,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                         switch (*fmt++) {
                                 case '%': {
                                         strPutChar(&ptr,'%',grow);
+                                        break;
                                 }
 
                                 case 'Q': {
@@ -1109,6 +1117,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         strarg = quote(strarg,flags);
                                         outStr(strarg,grow,&ptr,tlen,flags);
                                         mem.free(strarg);
+                                        break;
                                 }
 
                                 /* Presently there is only f64, %f/%e/%g as C prints them */
@@ -1151,11 +1160,13 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                                 }
                                         }
                                         mem.free(strarg);
+                                        break;
                                 }
 
                                 case 's': {
                                         strarg = (u8 *)argv[sp++];
                                         outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
+                                        break;
                                 }
 
                                 /* %D, %T and %F were dates, times and a file's contents:
@@ -1176,6 +1187,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         for (tmp = spec; tmp < fmt; ++tmp) {
                                                 strPutChar(&ptr,*tmp,grow);
                                         }
+                                        break;
                                 }
 
                                 case 'c': {
@@ -1185,6 +1197,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         }
                                         buf[8] = '\0';
                                         outStr(buf,grow,&ptr,tlen,flags);
+                                        break;
                                 }
 
                                 case 'C': {
@@ -1194,6 +1207,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         }
                                         buf[8] = '\0';
                                         outStr(buf,grow,&ptr,tlen,flags);
+                                        break;
                                 }
 
                                 case 'd':
@@ -1204,12 +1218,14 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 case 'X': {
                                         uintarg = (u64)argv[sp++];
                                         strPrintInt(&ptr,grow,uintarg,*(fmt-1),flags,tlen,dec_len);
+                                        break;
                                 }
 
                                 case 'p': {
                                         uintarg = (u64)argv[sp++];
                                         len = hex(buf,uintarg);
                                         outStr(buf,grow,&ptr,tlen,flags);
+                                        break;
                                 }
 
                                 default: {
@@ -1241,6 +1257,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         for (tmp = spec; tmp < fmt; ++tmp) {
                                                 strPutChar(&ptr,*tmp,grow);
                                         }
+                                        break;
                                 }
                         }
                 } else {
