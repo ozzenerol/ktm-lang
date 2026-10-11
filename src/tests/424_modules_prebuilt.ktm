@@ -53,11 +53,13 @@ i32 main() {
 
     proc.shell("mkdir -p ./pre/cfg && printf 'module cfg;\\ni64 seven() { return 7; }\\n"
                  "i64 g_runtime = seven();\\npub i64 value() { return g_runtime; }\\n' > ./pre/cfg/cfg.ktm");
+    /* a run-time initialiser is the module's init function (M2, see 452):
+     * the library builds and its marker says so */
     tests++;
-    if (output(KTM "-lib cfg ./pre/cfg 2>&1 | grep -c '`g_runtime` needs a constant initialiser' > " PRE_OUT,
-                         "1\n")) {
+    if (output(KTM "-lib cfg ./pre/cfg > " PRE_OUT " 2>&1 && grep -x init ./pre/cfg/.ktmlib >> " PRE_OUT,
+                         "init\n")) {
         correct++;
-                         }
+    }
 
     proc.shell("rm -rf ./pre " PRE_OUT " " PRE_BIN);
     test.printResult(correct, tests);

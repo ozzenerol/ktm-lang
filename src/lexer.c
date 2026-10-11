@@ -401,6 +401,9 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->cond_depth = 0;
     l->cond_cap = 0;
     l->modules = NULL;
+    l->load_order = NULL;
+    l->load_order_len = 0;
+    l->load_order_cap = 0;
     l->modules_len = 0;
     l->modules_cap = 0;
     l->repl = 0;
@@ -764,6 +767,16 @@ static void lexFileEnded(Lexer *l, LexFile *file) {
     }
 }
 
+/* `m` has been lexed in full: one more in the load order */
+static void lexModuleLoaded(Lexer *l, LexModule *m) {
+    m->loaded = 1;
+    if (l->load_order_len == l->load_order_cap) {
+        l->load_order_cap = l->load_order_cap ? l->load_order_cap * 2 : 16;
+        l->load_order = realloc(l->load_order, sizeof(u32) * l->load_order_cap);
+    }
+    l->load_order[l->load_order_len++] = m->id;
+}
+
 static char lexNextChar(Lexer *l) {
     l->start = l->ptr;
     LexFile *lex_file;
@@ -779,7 +792,7 @@ static char lexNextChar(Lexer *l) {
         }
         /* The file that ended was its module's last: it is loaded */
         if (l->cur_file && l->cur_file->last_of_module) {
-            l->modules[l->cur_file->module_id - 1]->loaded = 1;
+            lexModuleLoaded(l, l->modules[l->cur_file->module_id - 1]);
             if (l->mod_depth > 0) l->mod_depth--;
         }
         l->cur_file = lex_file;
@@ -3365,6 +3378,12 @@ static int lexModulePrebuilt(Lexer *l, LexModule *m) {
          line = strtok_r(NULL, "\n", &save)) {
         char *path = NULL;
         List **libs = NULL;
+        /* its globals have run-time initialisers: the library has its
+         * `_init`, which the program calls (M2) */
+        if (!strcmp(line, "init")) {
+            m->has_init = 1;
+            continue;
+        }
         if (!jit && !strncmp(line, "static ", 7)) {
             path = line + 7;
             libs = &l->cc->object_files;
@@ -3413,12 +3432,13 @@ static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
         lexReportAt(l, at->line, at->col, at->len,
                     "module %s has no .ktm files in %s",
                     m->path->data, m->dir->data);
-        m->loaded = 1;
+        lexModuleLoaded(l, m);
         return;
     }
     qsort(names, n, sizeof(char *), lexCmpStr);
 
     int prebuilt = lexModulePrebuilt(l, m);
+    m->prebuilt = prebuilt;
     int last_pass = prebuilt ? LEX_PASS_DECLS : LEX_PASS_FULL;
     int passes[] = {LEX_PASS_FULL, LEX_PASS_DECLS, LEX_PASS_NAMES};
     l->mod_stack[l->mod_depth++] = m->id;

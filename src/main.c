@@ -393,6 +393,12 @@ static void emitModuleLibrary(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
         }
         fprintf(mf, "static %s\nshared %s\n", relativePath(mod_dir, archive),
                 relativePath(mod_dir, shared));
+        /* its globals' run-time initialisers are its `_init` (M2) */
+        char *real = realpath(mod_dir, NULL);
+        if (cc->init_module_dirs && setHas(cc->init_module_dirs, real ? real : mod_dir)) {
+            fprintf(mf, "init\n");
+        }
+        free(real);
         fclose(mf);
     }
 }
