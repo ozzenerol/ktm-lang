@@ -29,6 +29,7 @@
 #include <malloc/malloc.h> /* malloc_zone_from_ptr */
 #endif
 
+#include "ast.h"
 #include "containers.h"
 #include "jit-common.h"
 #include "memsafe.h"
@@ -170,7 +171,7 @@ static void memsafePrintSite(FILE *f, const uintptr_t *sites, int nsites) {
              * instruction before, so look the line up at addr-1 or
              * the report reads one statement late. */
             int line = ktmJitFindLineForAddr(jit, (void *)(sites[i] - 1));
-            fprintf(f, "in `%s`+%zu", sym, off);
+            fprintf(f, "in `%s`+%zu", astSymbolDisplayName(sym), off);
             if (line) fprintf(f, ", line %d", line);
         } else {
             fprintf(f, "at %p", (void *)sites[i]);

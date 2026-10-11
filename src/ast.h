@@ -256,6 +256,12 @@ typedef struct AstType {
  * them; `name` itself can't be assigned. */
 #define AST_FLAG_VARARGS (1<<8)
 
+/* A main-program function or global (not a module's, not extern "c", not
+ * main): its symbol is astProgramSymbol's `_K0<len><name>`, so a program's
+ * `read` or `environ` can't replace the C library's or libktm's symbol of
+ * that name. Messages and lookups keep the plain name. */
+#define AST_FLAG_PROGRAM (1<<9)
+
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
 #define LVAR_REG   1  /* pinned to a specific machine register */
@@ -569,6 +575,8 @@ char *astRuntimeName(const char *name);
 char *astRuntimeSymbol(const char *name);
 char *astModuleMangle(char *qual, int len);
 char *astModuleDemangle(char *sym, int len);
+char *astProgramSymbol(char *name, int len);
+const char *astSymbolDisplayName(const char *sym);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);
 
 /* More beefy data structures */

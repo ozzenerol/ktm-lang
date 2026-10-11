@@ -93,6 +93,16 @@ void asmEmitFunctionSymbol(Cctrl *cc, AoStr *buf, char *label, Ast *func) {
 
 char *asmNormaliseFunctionName(Cctrl *cc, AoStr *fname) {
     AoStr *newfn = aoStrNew();
+    /* A main-program function's symbol is its own (astProgramSymbol), so
+     * it can't replace a C or libktm function of the same name */
+    Ast *decl = mapGetLen(cc->global_env, fname->data, fname->len);
+    AoStr prog_sym;
+    if (decl && (decl->kind == AST_FUNC || decl->kind == AST_FUN_PROTO) &&
+        (decl->flags & AST_FLAG_PROGRAM)) {
+        char *sym = astProgramSymbol(fname->data, fname->len);
+        prog_sym = (AoStr){ .data = sym, .len = strlen(sym), .capacity = 0 };
+        fname = &prog_sym;
+    }
     switch(cc->target) {
         case TARGET_AARCH64_APPLE_DARWIN:
         case TARGET_X86_64_APPLE_DARWIN: {
