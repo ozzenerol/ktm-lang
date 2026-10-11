@@ -36,7 +36,7 @@ i32 main() {
 #ifdef IS_LINUX
     check(sizeof(tv.tv_usec) == 8, "tv_usec is a long on Linux");
 #else
-    Check(sizeof(tv.tv_usec) == 4, "tv_usec is an int on macOS");
+    check(sizeof(tv.tv_usec) == 4, "tv_usec is an int on macOS");
 #endif
 
     /* gettimeofday fills the whole field */

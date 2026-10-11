@@ -37,9 +37,9 @@ i32 main() {
     check(offFn(&m, &m.msg_controllen) == 40, "msg_controllen offset");
     check(offFn(&m, &m.msg_flags) == 48, "msg_flags offset");
 #else
-    Check(sizeof(libc.msghdr) == 48, "sizeof(msghdr)");
-    Check(offFn(&m, &m.msg_controllen) == 40, "msg_controllen offset");
-    Check(offFn(&m, &m.msg_flags) == 44, "msg_flags offset");
+    check(sizeof(libc.msghdr) == 48, "sizeof(msghdr)");
+    check(offFn(&m, &m.msg_controllen) == 40, "msg_controllen offset");
+    check(offFn(&m, &m.msg_flags) == 44, "msg_flags offset");
 #endif
     check(offFn(&m, &m.msg_iov) == 16, "msg_iov offset");
     check(offFn(&m, &m.msg_iovlen) == 24, "msg_iovlen offset");

@@ -183,7 +183,7 @@ void main()
     check(libc.MSG_CTRUNC == 0x8 && libc.MSG_TRUNC == 0x20 && libc.MSG_EOR == 0x80 && libc.MSG_WAITALL == 0x100,
                 "MSG_* (Linux)");
 #else
-    Check(libc.MSG_CTRUNC == 0x20 && libc.MSG_TRUNC == 0x10 && libc.MSG_EOR == 0x8 && libc.MSG_WAITALL == 0x40,
+    check(libc.MSG_CTRUNC == 0x20 && libc.MSG_TRUNC == 0x10 && libc.MSG_EOR == 0x8 && libc.MSG_WAITALL == 0x40,
                 "MSG_* (macOS)");
 #endif
 

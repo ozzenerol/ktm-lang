@@ -37,8 +37,8 @@ i32 main() {
     check(sizeof(libc.sockaddr_un) == 110, "sizeof(sockaddr_un)");
     check((u8 *)(&un.sun_path) - (u8 *)(&un) == 2, "sun_path offset");
 #else
-    Check(sizeof(libc.sockaddr_un) == 106, "sizeof(sockaddr_un)");
-    Check((u8 *)(&un.sun_path) - (u8 *)(&un) == 2, "sun_path offset");
+    check(sizeof(libc.sockaddr_un) == 106, "sizeof(sockaddr_un)");
+    check((u8 *)(&un.sun_path) - (u8 *)(&un) == 2, "sun_path offset");
 #endif
 
     /* a real AF_UNIX server and client in one process */

@@ -294,7 +294,7 @@ bool fpControl() {
     return fegetround() == FE_TONEAREST;
 }
 #else
-bool FpControl() {
+bool fpControl() {
     return true;                    /* FPCR is not switched on arm64 */
 }
 #endif

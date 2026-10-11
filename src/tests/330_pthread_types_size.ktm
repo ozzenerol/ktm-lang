@@ -36,17 +36,17 @@ i32 main() {
     printf("Test - pthread type sizes per architecture: ");
 
 #ifdef IS_MACOS
-    Check(sizeof(libc.pthread_attr_t) == 64, "sizeof(pthread_attr_t)");
-    Check(sizeof(libc.pthread_mutexattr_t) == 16, "sizeof(pthread_mutexattr_t)");
-    Check(sizeof(libc.pthread_condattr_t) == 16, "sizeof(pthread_condattr_t)");
-    Check(sizeof(libc.pthread_mutex_t) == 64, "sizeof(pthread_mutex_t)");
-    Check(sizeof(libc.pthread_cond_t) == 48, "sizeof(pthread_cond_t)");
+    check(sizeof(libc.pthread_attr_t) == 64, "sizeof(pthread_attr_t)");
+    check(sizeof(libc.pthread_mutexattr_t) == 16, "sizeof(pthread_mutexattr_t)");
+    check(sizeof(libc.pthread_condattr_t) == 16, "sizeof(pthread_condattr_t)");
+    check(sizeof(libc.pthread_mutex_t) == 64, "sizeof(pthread_mutex_t)");
+    check(sizeof(libc.pthread_cond_t) == 48, "sizeof(pthread_cond_t)");
 #elifdef IS_ARM_64
-    Check(sizeof(libc.pthread_attr_t) == 64, "sizeof(pthread_attr_t)");
-    Check(sizeof(libc.pthread_mutexattr_t) == 8, "sizeof(pthread_mutexattr_t)");
-    Check(sizeof(libc.pthread_condattr_t) == 8, "sizeof(pthread_condattr_t)");
-    Check(sizeof(libc.pthread_mutex_t) == 48, "sizeof(pthread_mutex_t)");
-    Check(sizeof(libc.pthread_cond_t) == 48, "sizeof(pthread_cond_t)");
+    check(sizeof(libc.pthread_attr_t) == 64, "sizeof(pthread_attr_t)");
+    check(sizeof(libc.pthread_mutexattr_t) == 8, "sizeof(pthread_mutexattr_t)");
+    check(sizeof(libc.pthread_condattr_t) == 8, "sizeof(pthread_condattr_t)");
+    check(sizeof(libc.pthread_mutex_t) == 48, "sizeof(pthread_mutex_t)");
+    check(sizeof(libc.pthread_cond_t) == 48, "sizeof(pthread_cond_t)");
 #else
     check(sizeof(libc.pthread_attr_t) == 56, "sizeof(pthread_attr_t)");
     check(sizeof(libc.pthread_mutexattr_t) == 4, "sizeof(pthread_mutexattr_t)");
