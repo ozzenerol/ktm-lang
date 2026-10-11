@@ -2324,6 +2324,30 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
                 astKindToString(container->kind), astToString(container));
 }
 
+/* A for loop's declaration `var = init` up to and including its `,` or
+ * `;` */
+static Ast *parseForDeclInit(Cctrl *cc, Ast *var, int is_const) {
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, var);
+    }
+    int is_auto = var->type->kind == AST_TYPE_AUTO;
+    Ast *ast = parseVariableInitialiser(cc,var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
+    if (is_auto) {
+        parseAssignAuto(cc,ast);
+    }
+    if (is_const && ast->kind == AST_DECL && ast->declinit &&
+        astIsIntType(var->type))
+    {
+        int const_ok = 1;
+        s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+        if (const_ok) {
+            var->deref_symbol = const_val;
+            var->flags |= AST_FLAG_CONST_VALUE;
+        }
+    }
+    return ast;
+}
+
 /* Either parse the initialiser or a range loop. Range loop is experimental */
 Ast *parseForLoopInitialiser(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
@@ -2350,11 +2374,17 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
     if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
-        AstType *type = parseDeclSpec(cc);
+        /* the base type for more declarations after a `,` */
+        AstType *base_type = parseBaseDeclSpec(cc);
+        if (base_type == NULL) {
+            cctrlRaiseException(cc, "Unexpected end of input, expected a type");
+        }
+        AstType *type = parsePointerType(cc, base_type);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
-            cctrlRaiseException(cc,"expected Identifier got: %s",
-                    lexemeToString(tok));
+            cctrlTokenRewind(cc);
+            cctrlRaiseException(cc,"expected an identifier, got `%s`",
+                    lexemeAsWritten(tok));
         }
 
         /* We have a for loop variable */
@@ -2376,24 +2406,37 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         if (tokenPunctIs(tok,':')) {
             return parseRangeLoop(cc,init_var);
         } else if (tokenPunctIs(tok, '=')) {
-            if (cc->tmp_locals) {
-                listAppend(cc->tmp_locals, init_var);
-            }
-            Ast *ast = parseVariableInitialiser(cc,init_var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
-            if (type->kind == AST_TYPE_AUTO) {
-                parseAssignAuto(cc,ast);
-            }
-            if (is_const && ast->kind == AST_DECL && ast->declinit &&
-                astIsIntType(init_var->type))
-            {
-                int const_ok = 1;
-                s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
-                if (const_ok) {
-                    init_var->deref_symbol = const_val;
-                    init_var->flags |= AST_FLAG_CONST_VALUE;
+            Ast *ast = parseForDeclInit(cc, init_var, is_const);
+            cctrlTokenRewind(cc);
+            if (!tokenPunctIs(cctrlTokenGet(cc), ',')) return ast;
+            /* `for (i64 i = 0, j = n; ...)`: more declarations of the
+             * base type, each with its own `*`s */
+            List *decls = listNew();
+            listAppend(decls, ast);
+            do {
+                type = parsePointerType(cc, base_type);
+                tok = cctrlTokenGetRequired(cc);
+                if (tok->tk_type != TK_IDENT) {
+                    cctrlTokenRewind(cc);
+                    cctrlRaiseException(cc,"expected an identifier, got `%s`",
+                            lexemeAsWritten(tok));
                 }
-            }
-            return ast;
+                Ast *var = astLVar(type,tok->start,tok->len);
+                var->line = tok->line;
+                var->col = tok->col;
+                if (is_const) var->flags |= AST_FLAG_CONST;
+                if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
+                    cctrlRaiseException(cc,"variable `%s` already declared!",
+                            astLValueToString(var,0));
+                }
+                if (is_const && !tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+                    cctrlRaiseException(cc,"const '%s' needs an initializer",
+                            var->lname->data);
+                }
+                listAppend(decls, parseForDeclInit(cc, var, is_const));
+                cctrlTokenRewind(cc);
+            } while (tokenPunctIs(cctrlTokenGet(cc), ','));
+            return astCompountStatement(decls);
         } else if (is_const) {
             cctrlRaiseException(cc,"const '%s' needs an initializer",
                     init_var->lname->data);
@@ -2451,6 +2494,16 @@ Ast *parseForStatement(Cctrl *cc) {
             forstep = NULL;
         } else {
             forstep = parseExpr(cc,16);
+            /* `i++, j--`: several steps, in order */
+            if (tokenPunctIs(cctrlTokenPeek(cc), ',')) {
+                List *steps = listNew();
+                listAppend(steps, forstep);
+                while (tokenPunctIs(cctrlTokenPeek(cc), ',')) {
+                    cctrlTokenGet(cc);
+                    listAppend(steps, parseExpr(cc,16));
+                }
+                forstep = astCompountStatement(steps);
+            }
         }
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
