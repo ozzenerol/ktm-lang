@@ -100,7 +100,7 @@ u8 *METH_HC;
 
 void initFixtures() {
     LIB_HC =
-        "i64 libAdd(i64 a, i64 b) {\n"
+        "i64 LibAdd(i64 a, i64 b) {\n"
         "  return a + b;\n"
         "}\n"
         "struct LibPoint {\n"
@@ -144,7 +144,7 @@ void initFixtures() {
         "#include \"lib.ktm\"\n"
         "#include \"./lib.ktm\"\n"
         "#include \"sub/deep.ktm\"\n"
-        "i64 main() {\n"
+        "i32 main() {\n"
         "  i64 total = LibAdd(1, 2);\n"
         "  LibPoint p;\n"
         "  p.x = total;\n"
@@ -180,7 +180,7 @@ void initFixtures() {
      * default params; stale symbols across edits and files. */
     REG_HC =
         "#include \"lib.ktm\"\n"
-        "const i64 REG_LIMIT = 8;\n"
+        "#define REG_LIMIT 8\n"
         "i64 Square(i64 n, i64 scale=2)\n"
         "{\n"
         "  return n * n * scale;\n"
@@ -324,7 +324,7 @@ bool lspPump(LspClient *l, i64 timeout_ms) {
     pfd.fd = l.rfd;
     pfd.events = LSP_POLLIN;
     pfd.revents = 0;
-    if (libc.poll(&pfd, 1, timeout_ms) <= 0) { return false; }
+    if (poll(&pfd, 1, timeout_ms) <= 0) { return false; }
     if (l.cap - l.len < 8193) {
         l.cap = l.cap * 2;
         u8 *bigger = mem.alloc(l.cap);
@@ -449,10 +449,15 @@ LspClient *lspStart() {
         if (devnull >= 0) { dup2(devnull, 2); }
         libc.close(toChild[1]);
         libc.close(fromChild[0]);
-        u8 *args[3];
+        /* the test's prefix (build.sh --test exports it), so the
+         * stdlib checks see its modules, not an installed ktm's */
+        u8 *args[4];
         args[0] = gKtm;
         args[1] = "-lsp";
         args[2] = null;
+        args[3] = null;
+        u8 *prefix = libc.getenv("KTM_INSTALL_DIR");
+        if (prefix && prefix[0]) { args[2] = str.format("--install-dir=%s", prefix); }
         execv(gKtm, args);
         os.exit(127);
     }
@@ -776,19 +781,6 @@ void testDefinition() {
     resp = lspPositionRequest(l, "textDocument/definition", buri, line, chr);
     check("missing include target answers null", isNullResult(resp));
 
-    /* Builtin <std.ktmh>: only when a stdlib is installed to point at. */
-    if (access("/usr/local/include/std.ktmh", 0) == 0) {
-        i64 cap = str.len(MAIN_HC) + 32;
-        u8 *withTos = mem.alloc(cap);
-        libc.snprintf(withTos, cap, "%s#include <std.ktmh>\n", MAIN_HC);
-        lspDidChange(l, uri, withTos);
-        posOf(withTos, "#include <std.ktmh>", 11, &line, &chr);
-        resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
-        check("include jump: <std.ktmh> via builtin root",
-                    locEq(resp, "file:///usr/local/include/std.ktmh", 0, 0, true));
-    } else {
-        printf("  (skipped <std.ktmh> jump: no installed stdlib)\n");
-    }
     check("clean shutdown", lspClose(l) == 0);
 }
 
@@ -1010,19 +1002,17 @@ void testRename() {
     resp = lspPositionRequest(l, "textDocument/prepareRename", uri, 0, 0);
     check("prepareRename on a non-symbol is null", isNullResult(resp));
 
-    /* Stdlib guard - only when an installed stdlib was bootstrapped. */
-    if (access("/usr/local/include/std.ktmh", 0) == 0) {
+    /* Stdlib guard: mem.alloc is defined in the stdlib's module mem */
+    {
         u8 *suri = uriOf("std.ktm");
         lspDidOpen(l, suri, STD_HC);
-        posOf(STD_HC, "MAlloc", 0, &line, &chr);
+        posOf(STD_HC, "alloc(16)", 0, &line, &chr);
         libc.snprintf(params, 512,
                          "{\"textDocument\":{\"uri\":\"%s\"},"
                          "\"position\":{\"line\":%lld,\"character\":%lld},"
-                         "\"newName\":\"MyAlloc\"}", suri, line, chr);
+                         "\"newName\":\"myAlloc\"}", suri, line, chr);
         resp = lspRequest(l, "textDocument/rename", params);
         check("stdlib symbol rename is refused", isErrorResult(resp));
-    } else {
-        printf("  (skipped stdlib rename guard: no installed stdlib)\n");
     }
     check("clean shutdown", lspClose(l) == 0);
 }
@@ -1152,21 +1142,19 @@ void testReferences() {
                 jsonArrayCount(arr) == 3);
 
     /* Stdlib references ALLOWED (rename refuses these): the use here +
-     * the declaration synthesized from std.ktmh provenance. */
-    if (access("/usr/local/include/std.ktmh", 0) == 0) {
+     * the declaration in the module mem. */
+    {
         u8 *suri = uriOf("std.ktm");
         lspDidOpen(l, suri, STD_HC);
-        posOf(STD_HC, "MAlloc", 0, &line, &chr);
+        posOf(STD_HC, "alloc(16)", 0, &line, &chr);
         libc.snprintf(params, 512,
                          "{\"textDocument\":{\"uri\":\"%s\"},"
                          "\"position\":{\"line\":%lld,\"character\":%lld},"
                          "\"context\":{\"includeDeclaration\":true}}", suri, line, chr);
         resp = lspRequest(l, "textDocument/references", params);
         arr = json.select(resp, ".result:a");
-        check("references: stdlib symbol allowed, decl from std.ktmh",
+        check("references: stdlib symbol allowed, decl in its module",
                     jsonArrayCount(arr) == 2 && hasLocation(arr, suri, line, chr));
-    } else {
-        printf("  (skipped stdlib references: no installed stdlib)\n");
     }
     check("clean shutdown", lspClose(l) == 0);
 }

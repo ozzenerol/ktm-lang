@@ -231,7 +231,7 @@ void main()
 {
   nextId();
   nextId();
-  printf("%d\n", nextId)();
+  printf("%d\n", nextId());
 }
 </code></pre>
 <pre class="output">
@@ -513,7 +513,7 @@ w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
 <h3>Range-based for</h3>
 <p>An ktm addition. Loop over a fixed-size array, or over any struct with an
 <code>entries</code> field and a <code>size</code> field, such as the library's
-<code>IntVec</code> and <code>PtrVec</code>:</p>
+<code>vec.IntVec</code> and <code>vec.PtrVec</code>:</p>
 <pre data-run><code>
 import vec;
 
@@ -570,20 +570,14 @@ void main()
 144
 </pre>
 <p>Declare a prototype to call a function before its definition:
-<code>i64 Later(i64 x);</code> Every prototype and the definition must agree on the return
+<code>i64 later(i64 x);</code> Every prototype and the definition must agree on the return
 and parameter types; a mismatch is an error ("conflicting types") at the later one.
-That includes the standard library's functions, whether <code>std.ktmh</code> declares them as
-prototypes or as <code>_extern</code> bindings: a function of your own named
-<code>Exit</code> or <code>MAlloc</code> must have the library's signature.
-Default arguments carry over: after <code>i64 Later(i64 x=1);</code> the definition can be
-written <code>i64 Later(i64 x) { ... }</code> and <code>Later()</code> still passes 1 (this
-includes the prototypes in <code>std.ktmh</code>). Repeating a default is allowed if it is the
-same value; a different value is an error.</p>
-<p>A program may define its own version of a standard-library function, with the same
-signature as in <code>std.ktmh</code> (<code>CDate Now()</code>, say): the program's calls go to
-its own version, in the JIT and in a compiled binary. The library's own internal calls are
-not redirected under the JIT; in a compiled binary, which links the static
-<code>libktm.a</code>, they may go to your version too, so keep its behaviour compatible.</p>
+Default arguments carry over: after <code>i64 later(i64 x=1);</code> the definition can be
+written <code>i64 later(i64 x) { ... }</code> and <code>later()</code> still passes 1.
+Repeating a default is allowed if it is the same value; a different value is an error.</p>
+<p>The standard library lives in modules, so a function of your own may have the same name
+as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
+<code>date.now()</code> and <code>os.exit()</code> stay the library's.</p>
 <p>A returned value is converted to the function's return type, as in C: an integer returned
 from an <code>f64</code> function becomes a float. In a
 <code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
@@ -720,7 +714,7 @@ void main()
 10 24
 </pre>
 <p>As in C, <code>*</code> on a function pointer gives the function pointer back, so
-<code>(*f)(acc, x)</code>, <code>(*libc.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
+<code>(*f)(acc, x)</code>, <code>(*c.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
 like <code>f(acc, x)</code>.</p>
 <p>Any expression whose type is a function pointer can be called: a cast to a function pointer
 type (<code>((fn(i64) i64)p)(5)</code>),
@@ -781,8 +775,8 @@ struct Calc { fn(i64 x = 21) i64 op; };
 void main()
 {
   Calc c;
-  libc.op = &dbl;
-  printf("%d %d\n", libc.op(5), libc.op());
+  c.op = &dbl;
+  printf("%d %d\n", c.op(5), c.op());
 
   void *raw = &dbl;
   fn(i64 x) i64 back = raw;
@@ -931,7 +925,7 @@ void main()
 <p>As in C, <code>n + p</code> is the same as <code>p + n</code>, a pointer can be
 compared with an integer on either side, and <code>n - p</code> is a compile error. An
 array can't be assigned as a whole (<code>a = b;</code> is an error): assign its elements or
-copy it with <code>MemCpy</code>.</p>
+copy it with <code>mem.copy</code>.</p>
 <p>Storing one pointer type in another is a warning, as in C: <code>i64 *q = &amp;f;</code>
 with <code>f64 f</code> (also when assigning, passing or returning it), and
 <code>q -= q</code>, which stores a pointer difference (an integer) back into the pointer.
@@ -1028,8 +1022,8 @@ square 49
 </pre>
 
 <h3>Heap memory</h3>
-<p><code>MAlloc</code> allocates, <code>CAlloc</code> allocates zeroed memory,
-<code>ReAlloc</code> resizes and <code>Free</code> releases. Nothing is garbage collected.</p>
+<p><code>mem.alloc</code> allocates, <code>mem.allocZero</code> allocates zeroed memory,
+<code>mem.realloc</code> resizes and <code>mem.free</code> releases. Nothing is garbage collected.</p>
 <pre data-run><code>
 import mem;
 
@@ -1119,11 +1113,11 @@ void main()
 {
   Point a = {1, 2};               // initialise fields in order
   Point c = make(11, 22);
-  printf("%d %d %d\n", libc.x, libc.y, sum(a));
+  printf("%d %d %d\n", c.x, c.y, sum(a));
 
   Point copy = c;                 // assignment copies
   copy.x = 0;
-  printf("%d %d\n", libc.x, copy.x);
+  printf("%d %d\n", c.x, copy.x);
 
   Point *p = mem.alloc(sizeof(Point));
   p.x = 5;                       // -> through a pointer
@@ -1204,15 +1198,15 @@ struct Rect : Shape
   f64 w, h;
 };
 
-f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * libc.r * libc.r; }
+f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * c.r * c.r; }
 f64 rectArea(Shape *s)   { Rect *r = s; return r.w * r.h; }
 
 void main()
 {
   Circle c;
-  libc.name = "circle";
-  libc.area = &circleArea;
-  libc.r = 1.0;
+  c.name = "circle";
+  c.area = &circleArea;
+  c.r = 1.0;
 
   Rect r;
   r.name = "rect";
@@ -1779,9 +1773,9 @@ block, through <code>return</code>, <code>break</code>, <code>continue</code> or
 way to a <code>catch</code> (after the deferred statements have run, the throw carries on
 to that catch). It keeps clean-up next to the code that needs it:</p>
 <pre data-run><code>
-enum Err { neg };
-
 import mem;
+
+enum Err { neg };
 
 void copy(i64 n)
 {
@@ -1832,14 +1826,14 @@ finish before outer ones.</li>
 not run on that return.</li>
 <li>The statement runs as written when the block is left, so it sees the values variables
 have then. <code>return</code> evaluates its value first: <code>return buf[0];</code> with
-<code>defer Free(buf);</code> returns the right value.</li>
+<code>defer mem.free(buf);</code> returns the right value.</li>
 <li>A <code>throw</code> from a deferred statement goes on like any other throw.</li>
 <li>A deferred statement can't be left by <code>return</code>, <code>break</code>,
 <code>continue</code> or <code>goto</code> (a loop inside it keeps its own
 <code>break</code> and <code>continue</code>), can't contain a label, and a
 <code>goto</code> can't jump past a <code>defer</code> into the rest of its block. These,
 and <code>defer</code> outside a function, are compile errors.</li>
-<li>Returning from <code>main</code> runs its defers, but <code>Exit()</code>, <code>exit()</code>
+<li>Returning from <code>main</code> runs its defers, but <code>os.exit()</code>, <code>exit()</code>
 and a crash end the program without running any. Switching coroutines doesn't leave a
 block either, so it runs no defers.</li>
 </ul>

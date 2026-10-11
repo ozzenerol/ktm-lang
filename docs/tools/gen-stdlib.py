@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Generate docs/stdlib.html from src/std/std.ktmh.
+"""Generate docs/stdlib.html from the standard library's modules (src/std/<module>).
 
-std.ktmh is what every program includes, so it is the real public API.
-Each declaration is grouped by the library file that defines it, and
-documented with the comment above it in std.ktmh or, failing that, the
-comment above its definition in the library source.
+A module's `pub` declarations are its API: functions, methods, structs,
+unions, enums and constants (and the prelude's macros). Each is documented
+with the comment above it in the module source.
 
 Usage: python3 docs/tools/gen-stdlib.py
 """
@@ -18,32 +17,30 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 LIB = os.path.join(ROOT, "src", "std")
 OUT = os.path.join(ROOT, "docs", "stdlib.html")
 
-# Library file -> (section title, one-line summary), in page order.
+# Module -> (section title, one-line summary), in page order. rt is the
+# runtime's own and has no API.
 MODULES = [
-    ("memory.ktm",    "Memory",            "Allocation and raw memory operations."),
-    ("strings.ktm",   "Strings",           "Formatting, comparison, searching and conversion of NUL-terminated strings."),
-    ("io.ktm",        "Files and I/O",     "Reading and writing files."),
-    ("dir.ktm",       "Directories",       "Listing and creating directories."),
-    ("stat.ktm",      "File status",       "Portable file metadata."),
-    ("system.ktm",    "System",            "Process exit, shell commands and raw output."),
-    ("list.ktm",      "Lists",             "Circular doubly linked lists of U0 * values."),
-    ("vector.ktm",    "Vectors",           "Growable arrays."),
-    ("hashtable.ktm", "Hash tables",       "String-keyed and integer-keyed hash tables."),
-    ("set.ktm",       "Sets",              "Integer and string sets."),
-    ("bitvec.ktm",    "Bit vectors",       "Growable bit sets."),
-    ("math.ktm",      "Maths",             "Numeric helpers and libm bindings."),
-    ("date.ktm",      "Dates and time",    "CDate values and conversions."),
-    ("json.ktm",      "JSON",              "Parsing, querying and printing JSON."),
-    ("csv.ktm",       "CSV",               "A streaming CSV tokenizer."),
-    ("fzf.ktm",       "Fuzzy matching",    "fzf-style fuzzy string matching."),
-    ("except.ktm",    "Exceptions",        "The runtime behind try / catch / throw."),
-    ("threads.ktm",   "Threads",           "pthreads bindings and helpers."),
-    ("net.ktm",       "Networking",        "Sockets and address resolution."),
-    ("signals.ktm",   "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
-    ("process.ktm",   "Processes",         "Running programs by argv without a shell, with pipes."),
-    ("coroutines.ktm","Coroutines",        "Functions that pause and resume on their own stacks."),
-    ("sqllite.ktm",   "SQLite",            "SQLite bindings, available when ktm is built with sqlite."),
-    (None,           "Other declarations","Declared in std.ktmh but not defined in a library .ktm file."),
+    ("prelude", "Prelude",           "In every program without an import: the Error struct, EXIT_* and the integer limits."),
+    ("mem",     "Memory",            "Allocation and raw memory operations."),
+    ("str",     "Strings",           "Formatting, comparison, searching and conversion of NUL-terminated strings."),
+    ("fs",      "Files",             "Reading and writing files, directories, file status and path names."),
+    ("os",      "System",            "Process exit, errno and the environment."),
+    ("proc",    "Processes",         "Shell commands, and running programs by argv without a shell, with pipes."),
+    ("list",    "Lists",             "Circular doubly linked lists of void * values."),
+    ("vec",     "Vectors",           "Growable arrays and bit vectors."),
+    ("map",     "Hash tables",       "String-keyed and integer-keyed hash tables, and red-black trees."),
+    ("set",     "Sets",              "Integer and string sets."),
+    ("math",    "Maths",             "Numeric helpers and libm bindings."),
+    ("date",    "Dates and time",    "date.Date values and conversions."),
+    ("json",    "JSON",              "Parsing, querying and printing JSON."),
+    ("csv",     "CSV",               "A streaming CSV tokenizer."),
+    ("fzf",     "Fuzzy matching",    "fzf-style fuzzy string matching."),
+    ("thread",  "Threads",           "pthreads helpers."),
+    ("net",     "Networking",        "Sockets and address resolution."),
+    ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
+    ("coro",    "Coroutines",        "Functions that pause and resume on their own stacks."),
+    ("sql",     "SQLite",            "SQLite bindings, available when ktm is built with sqlite."),
+    ("libc",    "C library",         "The C functions, structs and constants ktm programs call by their C names."),
 ]
 
 
@@ -65,6 +62,12 @@ def strip_comments_keep(text):
             while j < n and text[j] != '"':
                 j += 2 if text[j] == "\\" else 1
             out.append(text[i:j + 1])
+            i = j + 1
+        elif text[i] == "'":
+            j = i + 1
+            while j < n and text[j] not in "'\n":
+                j += 2 if text[j] == "\\" else 1
+            out.append("' '")
             i = j + 1
         else:
             out.append(text[i])
@@ -98,76 +101,75 @@ def comment_above(lines, idx):
     return text
 
 
-DECL_FN = re.compile(r"""^(?:public\s+)?
-    (?P<link>extern\s+"c"\s+|_extern\s+\w+\s+)?
-    (?P<sig>(?:const\s+)?[A-Za-z_]\w*[\s*]+(?P<name>[A-Za-z_]\w*)\s*\((?P<params>.*)\))\s*;\s*$""",
-    re.X | re.S)
-
-
-def parse_header():
-    raw = open(os.path.join(LIB, "std.ktmh")).read()
-    lines = raw.split("\n")
-    code = strip_comments_keep(raw).split("\n")
-    decls = {}           # name -> decl (first wins: arch variants are duplicates)
-    order = []
-    i, n = 0, len(code)
-    cond = []            # #ifdef stack, for platform notes
-    while i < n:
-        line = code[i].strip()
-        if not line:
-            i += 1
-            continue
-        if line.startswith("#"):
-            m = re.match(r"#\s*(ifdef|ifndef|if|else|endif|define)\b\s*(.*)", line)
-            if m:
-                kind, rest = m.groups()
-                if kind in ("ifdef", "ifndef", "if"):
-                    cond.append(rest.strip())
-                elif kind == "else" and cond:
-                    cond[-1] = "not " + cond[-1]
-                elif kind == "endif" and cond:
-                    cond.pop()
-                elif kind == "define":
-                    dm = re.match(r"([A-Za-z_]\w*)\s*(.*)", rest)
-                    if dm:
-                        name, value = dm.groups()
-                        add(decls, order, name, "define",
-                            f"#define {name} {value.strip()}".strip(), comment_above(lines, i), i, cond)
-            i += 1
-            continue
-        # class / union: read to the closing `};` (or a forward `;`)
-        cm = re.match(r"(?:public\s+)?(class|union)\s+([A-Za-z_]\w*)", line)
-        if cm:
-            start = i
-            buf = []
-            depth = 0
-            while i < n:
-                buf.append(code[i])
-                depth += code[i].count("{") - code[i].count("}")
-                if depth <= 0 and code[i].rstrip().endswith(";"):
-                    break
+def parse_module(mod):
+    """The `pub` declarations of one module, in file order."""
+    decls, order = {}, []
+    d = os.path.join(LIB, mod)
+    for fname in sorted(f for f in os.listdir(d) if f.endswith(".ktm")):
+        raw = open(os.path.join(d, fname)).read()
+        lines = raw.split("\n")
+        code = strip_comments_keep(raw).split("\n")
+        i, n, depth, cond = 0, len(code), 0, []
+        while i < n:
+            line = code[i].strip()
+            if line.startswith("#"):
+                m = re.match(r"#\s*(ifdef|ifndef|if|else|endif|define)\b\s*(.*)", line)
+                if m:
+                    kind, rest = m.groups()
+                    if kind in ("ifdef", "ifndef", "if"):
+                        cond.append(("not " if kind == "ifndef" else "") + rest.strip())
+                    elif kind == "else" and cond:
+                        cond[-1] = cond[-1][4:] if cond[-1].startswith("not ") else "not " + cond[-1]
+                    elif kind == "endif" and cond:
+                        cond.pop()
+                    elif kind == "define" and mod == "prelude" and depth == 0:
+                        dm = re.match(r"([A-Za-z_]\w*)\s+(.*)", rest)
+                        if dm and not dm.group(1).startswith("__"):
+                            add(decls, order, mod, dm.group(1), "define", dm.group(2).strip(),
+                                comment_above(lines, i), i, cond)
                 i += 1
-            text = "\n".join(buf).strip()
-            if "{" in text:
-                text = re.sub(r"^public\s+", "", text)
-                add(decls, order, cm.group(2), cm.group(1), tidy_class(text),
-                    comment_above(lines, start), start, cond)
+                continue
+            if depth == 0 and line.startswith("pub "):
+                start = i
+                buf = [line]
+                cm = re.match(r"pub\s+(?:[a-z0-9]+\s+)?(struct|union|enum)\s+([A-Za-z_]\w*)", line)
+                if cm:
+                    dd = line.count("{") - line.count("}")
+                    while (dd > 0 or not buf[-1].rstrip().endswith(";")) and i + 1 < n:
+                        i += 1
+                        buf.append(code[i].rstrip())
+                        dd += code[i].count("{") - code[i].count("}")
+                    text = tidy_class("\n".join(buf)[4:])
+                    add(decls, order, mod, cm.group(2), cm.group(1), text,
+                        comment_above(lines, start), start, cond)
+                    i += 1
+                    continue
+                km = re.match(r"pub\s+const\s+.*?([A-Za-z_]\w*)\s*=\s*(.*?);", line)
+                if km:
+                    add(decls, order, mod, km.group(1), "define", km.group(2).strip(),
+                        comment_above(lines, start), start, cond)
+                    i += 1
+                    continue
+                # a function, method or binding: read to its `{` or `;`
+                while not re.search(r"[{;]\s*$", buf[-1]) and i + 1 < n:
+                    i += 1
+                    buf.append(code[i].strip())
+                stmt = " ".join(buf)
+                body = stmt.rstrip().endswith("{")
+                stmt = re.sub(r"\s*[{;]\s*$", "", stmt)[4:]
+                cfunc = stmt.startswith('extern "c"')
+                stmt = re.sub(r'^extern\s+"c"\s+|^_extern\s+\S+\s+', "", stmt)
+                fm = re.match(r"(.*?)\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s*\((.*)\)\s*$", stmt, re.S)
+                if fm:
+                    sig = re.sub(r"\s+", " ", stmt).replace("( ", "(").replace(" )", ")") + ";"
+                    add(decls, order, mod, fm.group(2), "cfunc" if cfunc else "func", sig,
+                        comment_above(lines, start), start, cond)
+                for l in buf:
+                    depth += l.count("{") - l.count("}")
+                i += 1
+                continue
+            depth += line.count("{") - line.count("}")
             i += 1
-            continue
-        # function declaration, possibly spanning lines
-        start = i
-        buf = [line]
-        while not buf[-1].rstrip().endswith(";") and i + 1 < n:
-            i += 1
-            buf.append(code[i].strip())
-        stmt = " ".join(buf)
-        fm = DECL_FN.match(stmt)
-        if fm:
-            link = (fm.group("link") or "").strip()
-            sig = re.sub(r"\s+", " ", fm.group("sig")).replace("( ", "(").replace(" )", ")")
-            kind = "cfunc" if link.startswith("extern") else "func"
-            add(decls, order, fm.group("name"), kind, sig + ";", comment_above(lines, start), start, cond)
-        i += 1
     return decls, order
 
 
@@ -180,83 +182,44 @@ def tidy_class(text):
     return "\n".join(body)
 
 
-def add(decls, order, name, kind, sig, doc, line, cond):
-    if name in decls:
-        if not decls[name]["doc"] and doc:
-            decls[name]["doc"] = doc
+def add(decls, order, mod, name, kind, sig, doc, line, cond):
+    key = name if mod == "prelude" else f"{mod}.{name}"
+    if key in decls:
+        if not decls[key]["doc"] and doc:
+            decls[key]["doc"] = doc
         return
-    platform = [c for c in cond if re.match(r"(not )?IS_(LINUX|MACOS)$", c)]
-    decls[name] = {"name": name, "kind": kind, "sig": sig, "doc": doc,
-                   "line": line + 1, "platform": platform}
-    order.append(name)
-
-
-def find_definitions(decls):
-    """name -> (module file, doc comment above its definition)."""
-    where = {}
-    for fname in sorted(os.listdir(LIB)):
-        if not fname.endswith(".ktm") or fname == "all.ktm":
-            continue
-        raw = open(os.path.join(LIB, fname)).read()
-        lines = raw.split("\n")
-        for idx, l in enumerate(lines):
-            s = l.strip()
-            for m in re.finditer(r"([A-Za-z_]\w*)\s*\(", s):
-                name = m.group(1)
-                d = decls.get(name)
-                if d is None or d["kind"] == "define" or name in where:
-                    continue
-                before = s[:m.start()]
-                # a definition or prototype: type words before the name, not a
-                # call (`return StrPrint(...)` is a call, not a definition)
-                if re.match(r"^\s*(return|else|case|goto|do|sizeof)\b", before):
-                    continue
-                if re.match(r"^(public\s+)?(static\s+)?(inline\s+)?(extern\s+\"c\"\s+|_extern\s+\w+\s+)?[A-Za-z_]\w*[\s*]+$", before):
-                    where[name] = (fname, comment_above(lines, idx))
-            cm = re.match(r"(?:public\s+)?(?:class|union)\s+([A-Za-z_]\w*)", s)
-            if cm and cm.group(1) in decls and cm.group(1) not in where and "{" in s + (lines[idx + 1] if idx + 1 < len(lines) else ""):
-                where[cm.group(1)] = (fname, comment_above(lines, idx))
-            dm = re.match(r"#\s*define\s+([A-Za-z_]\w*)", s)
-            if dm and dm.group(1) in decls and dm.group(1) not in where:
-                where[dm.group(1)] = (fname, "")
-    return where
+    platform = [c for c in cond if re.match(r"(not )?(IS_LINUX|IS_MACOS|IS_X86_64|IS_ARM_64|__APPLE__)$", c)]
+    decls[key] = {"name": key, "kind": kind, "sig": sig, "doc": doc,
+                  "line": line + 1, "platform": platform}
+    order.append(key)
 
 
 def main():
-    decls, order = parse_header()
-    where = find_definitions(decls)
-    groups = {m[0]: [] for m in MODULES}
-    for name in order:
-        d = decls[name]
-        mod, src_doc = where.get(name, (None, ""))
-        if not d["doc"] and src_doc:
-            d["doc"] = src_doc
-        if mod not in groups:
-            mod = None
-        # plain libc bindings that live nowhere else: their own section
-        d["module"] = mod
-        groups[mod].append(d)
+    groups = {}
+    for mod, _, _ in MODULES:
+        decls, order = parse_module(mod)
+        groups[mod] = [decls[k] for k in order]
     if "--json" in sys.argv:
-        json.dump({k or "other": v for k, v in groups.items()}, sys.stdout, indent=1)
+        json.dump(groups, sys.stdout, indent=1)
         return
     write_html(groups)
 
 
 def write_html(groups):
     from page import page  # shared layout
-    kinds = {"func": "function", "cfunc": "C binding", "class": "class",
-             "union": "union", "define": "constant"}
+    kinds = {"func": "function", "cfunc": "C function", "struct": "struct",
+             "union": "union", "enum": "enum", "define": "constant"}
     toc, body = ['<li><a class="all" href="#">All modules</a></li>'], []
     total = 0
     for mod, title, summary in MODULES:
         items = groups.get(mod) or []
         if not items:
             continue
-        anchor = (mod or "other").replace(".ktm", "").lower()
+        anchor = mod
         toc.append(f'<li><a href="#{anchor}">{html.escape(title)}</a> <span class="count">{len(items)}</span></li>')
         body.append(f'<section id="{anchor}"><h2>{html.escape(title)}</h2>')
-        src = f' <code>src/std/{mod}</code>' if mod else ""
-        body.append(f'<p class="lede">{html.escape(summary)}{" Defined in" + src + "." if mod else ""}</p>')
+        imp = "" if mod == "prelude" else f" <code>import {mod};</code>"
+        body.append(f'<p class="lede">{html.escape(summary)}{imp}</p>')
         # constants as one compact table
         defs = [d for d in items if d["kind"] == "define"]
         rest = [d for d in items if d["kind"] != "define"]
@@ -274,17 +237,18 @@ def write_html(groups):
             total += len(defs)
             body.append('<table class="consts"><thead><tr><th>Constant</th><th>Value</th></tr></thead><tbody>')
             for d in defs:
-                value = d["sig"].split(None, 2)[2] if len(d["sig"].split(None, 2)) > 2 else ""
+                value = d["sig"]
                 body.append(f'<tr id="{html.escape(d["name"])}"><td><code>{html.escape(d["name"])}</code></td>'
                             f'<td><code>{html.escape(value)}</code></td></tr>')
             body.append("</tbody></table>")
         body.append("</section>")
     content = f'''<h1>Standard library reference</h1>
-<p class="lede">Everything declared in <code>std.ktmh</code>, the header every ktm program
-includes automatically: {total} functions, classes and constants. Generated from the
-library source by <code>docs/tools/gen-stdlib.py</code>; re-run it after changing
-<code>src/std</code>.</p>
-<input id="filter" type="search" placeholder="Filter by name, e.g. StrPrint" aria-label="Filter declarations">
+<p class="lede">The public names of every module of the standard library: {total} functions,
+methods, types and constants. A program imports a module (<code>import str;</code>) and
+uses its names with the module's prefix (<code>str.format</code>); the prelude's need no
+import. Generated from the modules' source by <code>docs/tools/gen-stdlib.py</code>; re-run
+it after changing <code>src/std</code>.</p>
+<input id="filter" type="search" placeholder="Filter by name, e.g. str.format" aria-label="Filter declarations">
 <nav class="modules"><ul>{"".join(toc)}</ul></nav>
 {"".join(body)}
 <script>

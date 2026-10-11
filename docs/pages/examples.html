@@ -9,7 +9,7 @@ docs/examples/run.sh life     # just one</code></pre>
 
 <h2>Word frequency</h2>
 <p>Reads a text file and prints its most common words. It shows reading a file, scanning
-characters, counting with a <code>StrMap</code>, ranking with <code>PtrVecSort</code>, and
+characters, counting with a <code>map.StrMap</code>, ranking with <code>vec.ptrSort</code>, and
 reading command-line arguments.</p>
 <pre><code>cd docs/examples/wordfreq
 ktm main.ktm -o wordfreq && ./wordfreq sample.txt</code></pre>
@@ -29,7 +29,7 @@ ktm main.ktm -o bank && ./bank</code></pre>
 <h2>Game of Life</h2>
 <p>Conway's Game of Life on a small board that wraps at the edges, with a glider and a
 blinker. It shows 2D arrays, nested loops, <code>%</code> for wrap-around and
-<code>MemCpy</code> on whole arrays.</p>
+<code>mem.copy</code> on whole arrays.</p>
 <pre><code>cd docs/examples/life
 ktm main.ktm -o life && ./life</code></pre>
 <pre><code class="language-ktm"><!-- include: examples/life/main.ktm --></code></pre>
