@@ -349,6 +349,51 @@ static i64 jsonUtf8Encode(u8 *dst, i64 cp) {
         return 4;
 }
 
+/* The length of the UTF-8 sequence at the current offset (1 for ASCII),
+    * or 0 if it isn't one (RFC 3629: no overlong forms, no surrogates,
+    * nothing past U+10FFFF) */
+static i64 jsonUtf8Len(JsonParser *p) {
+        u8 b0 = jsonPeek(p);
+        i64 n = 0;
+        u8 lo = 0x80, hi = 0xBF; /* the second byte's range */
+        if (b0 < 0x80) {
+                return 1;
+        } else if (0xC2 <= b0 <= 0xDF) {
+                n = 2;
+        } else if (b0 == 0xE0) {
+                n = 3;
+                lo = 0xA0;
+        } else if (b0 == 0xED) {
+                n = 3;
+                hi = 0x9F;
+        } else if (0xE1 <= b0 <= 0xEF) {
+                n = 3;
+        } else if (b0 == 0xF0) {
+                n = 4;
+                lo = 0x90;
+        } else if (0xF1 <= b0 <= 0xF3) {
+                n = 4;
+        } else if (b0 == 0xF4) {
+                n = 4;
+                hi = 0x8F;
+        } else {
+                return 0;
+        }
+        for (i64 i = 1; i < n; ++i) {
+                if (p.offset + i >= p.buflen) {
+                        return 0;
+                }
+                u8 b = jsonUnsafePeekAt(p, p.offset + i);
+                if (i == 1 && !(lo <= b <= hi)) {
+                        return 0;
+                }
+                if (i > 1 && !(0x80 <= b <= 0xBF)) {
+                        return 0;
+                }
+        }
+        return n;
+}
+
 /* The string at the current offset, decoded; its length (which a
     * \u0000 inside makes more than its StrLen) goes in *_len */
 static u8 *jsonParseString(JsonParser *p, i64 *_len) {
@@ -444,6 +489,18 @@ static u8 *jsonParseString(JsonParser *p, i64 *_len) {
                                 if (jsonPeek(p) < 0x20) { /* RFC 8259: control characters escaped */
                                         p.error = INVALID_CONTROL_CHARACTER;
                                         goto err;
+                                }
+                                if (jsonPeek(p) >= 0x80) { /* and the text UTF-8 */
+                                        i64 n = jsonUtf8Len(p);
+                                        if (n == 0) {
+                                                p.error = INVALID_UTF8;
+                                                goto err;
+                                        }
+                                        /* all but its last byte, which the loop's step takes */
+                                        for (i64 i = 1; i < n; ++i) {
+                                                str[len++] = jsonPeek(p);
+                                                jsonAdvance(p);
+                                        }
                                 }
                                 str[len++] = jsonPeek(p);
                 }
@@ -881,11 +938,11 @@ pub Value *parse(u8 *raw, i64 len=-1, i64 flags=0) {
 }
 
 /* The offending character for a message: 'x', '\0' at the end of the
-    * input, '\xNN' for other control characters */
+    * input, '\xNN' for other control characters and bytes past ASCII */
 static u8 *jsonErrorChar(u8 *buf, u8 ch) {
         if (ch == '\0') {
                 str.copy(buf, "'\\0'");
-        } else if (ch < 0x20 || ch == 0x7F) {
+        } else if (ch < 0x20 || ch >= 0x7F) {
                 str.formatTo(buf, "'\\x%02X'", ch);
         } else {
                 str.formatTo(buf, "'%c'", ch);
@@ -927,6 +984,9 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 case INVALID_CONTROL_CHARACTER:
                         return str.formatTo(null, "Unescaped control character %s in a string (write "
                                                                                         "it as \\u%04x) at line %d, column %d", c, ch, line, col);
+                case INVALID_UTF8:
+                        return str.formatTo(null, "Invalid UTF-8 sequence starting with %s in a "
+                                                                                        "string at line %d, column %d", c, line, col);
                 case NESTING_TOO_DEEP:
                         return str.formatTo(null, "Arrays and objects nested more than %d deep at "
                                                                                         "line %d, column %d", MAX_DEPTH, line, col);
