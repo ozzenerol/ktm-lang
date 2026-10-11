@@ -10,9 +10,9 @@ import fs, libc, mem, proc, str, test;
  * malloc, free, time and environ reach the C library. AOT and JIT; the
  * binary has no plain `read` or `environ` of its own (nm, if there). */
 
-#define PS_SRC "./ktm-444-prog.ktm"
-#define PS_BIN "./ktm-444-prog.bin"
-#define PS_OUT "./ktm-444-prog.out"
+#define PS_SRC "./ktm-445-prog.ktm"
+#define PS_BIN "./ktm-445-prog.bin"
+#define PS_OUT "./ktm-445-prog.out"
 #define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) " \
             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
@@ -30,9 +30,9 @@ u8 *gProgram =
 "i32 main() {\n"
 "    u8 *p = mem.alloc(16);\n"
 "    str.copy(p, \"abc\");\n"
-"    fs.writeAll(\"./ktm-444-prog.txt\", p, 3);\n"
-"    u8 *back = fs.readAll(\"./ktm-444-prog.txt\");\n"
-"    fs.remove(\"./ktm-444-prog.txt\");\n"
+"    fs.writeAll(\"./ktm-445-prog.txt\", p, 3);\n"
+"    u8 *back = fs.readAll(\"./ktm-445-prog.txt\");\n"
+"    fs.remove(\"./ktm-445-prog.txt\");\n"
 "    i64 rc = proc.shell(\"exit 7\");\n"
 "    printf(\"%d %d %d %d %d %d %d %s %d %d\\n\", read(1), write(1), environ() == null,\n"
 "           free(1), time(1), exit(1), malloc(1), back, rc, libc.getenv(\"HOME\") != null);\n"
