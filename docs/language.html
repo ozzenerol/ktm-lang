@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#classes">Classes</a></li><li><a href="#modules">Modules</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#defer">defer</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#structs">Structs</a></li><li><a href="#modules">Modules</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#defer">defer</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -50,10 +50,14 @@ will look familiar. The differences are where ktm gets interesting.</p>
 <h2 id="program-structure">Program structure<a class="anchor" href="#program-structure" aria-label="Link to this section">#</a></h2>
 <p>A program is one or more <code>.ktm</code> files. Its entry point is <code>main</code>, as in C:
 <code>i32 main()</code>, <code>i32 main(i32 argc, u8 **argv)</code> or <code>void main()</code>; the value
-it returns is the exit code (0 for <code>void main</code>). The older name <code>Main</code> still works for
-now; a program can't have both. Code at the top level runs in order before <code>main</code>
-(top-level code can't <code>return</code>: that is a compile error). A program can be a single line:</p>
-<pre data-run><code>"Hello\n";
+it returns is the exit code (0 for <code>void main</code>). The file scope holds declarations:
+types, functions, globals (whose initialisers may call functions and run before
+<code>main</code>, in order), constants and imports; statements go in functions. The smallest
+program:</p>
+<pre data-run><code>void main()
+{
+  printf("Hello\n");
+}
 </code></pre>
 <pre class="output">Hello
 </pre>
@@ -64,7 +68,7 @@ of a file is an error (<code>unterminated comment</code>). Statements end with <
 
 <h2 id="printing">Printing<a class="anchor" href="#printing" aria-label="Link to this section">#</a></h2>
 <p><code>printf(fmt, ...)</code> prints, as in C:</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
   printf("plain text\n");
   printf("%s is %d years old\n", "Ada", 36);
@@ -77,12 +81,12 @@ Ada is 36 years old
    42|42   |00042
 ff FF A 3.142
 </pre>
-<p>The conversions are the ones <code>StrPrint</code> knows (see the
+<p>The conversions are the ones <code>str.format</code> knows (see the
 <a href="library.html">library guide</a>), ktm's own included: <code>%Q</code> prints a
-string escaped as a C literal, <code>%C</code> a character in upper case, <code>%D</code> and
-<code>%T</code> the date and time of a <code>CDate</code>, and <code>%F</code> the contents of
-a file. The compiler checks the number of arguments against them.</p>
-<pre data-run><code>U0 Main()
+string escaped as a C literal and <code>%C</code> a character in upper case. A date is
+formatted with <code>date.format(d, "%m/%d/%Y %H:%M:%S")</code> and printed with
+<code>%s</code>. The compiler checks the number of arguments against the format.</p>
+<pre data-run><code>void main()
 {
   printf("%Q\n", "say \"hi\"\n");
   printf("%C%c\n", 'h', 'i');
@@ -93,15 +97,14 @@ Hi
 </pre>
 <p>The string is always a format, even without arguments, so write
 <code>%%</code> for a literal percent sign: <code>printf("100%%\n");</code> prints
-<code>100%</code>. The older print statement, a string on its own with the arguments after a
-comma (<code>"%d\n", x;</code>), does the same and still works for now.</p>
+<code>100%</code>.</p>
 <p><code>%d</code>, <code>%i</code>, <code>%u</code>, <code>%x</code>,
 <code>%X</code> and <code>%o</code> print the full 64-bit value, so there is no need for
 C's <code>%ld</code> (which also works):</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 big = 5000000000;
-  "%d vs %ld\n", big, big;
+  i64 big = 5000000000;
+  printf("%d vs %ld\n", big, big);
 }
 </code></pre>
 <pre class="output">5000000000 vs 5000000000
@@ -112,7 +115,7 @@ C's <code>%ld</code> (which also works):</p>
   <thead><tr><th>Type</th><th>Size</th><th>Meaning</th></tr></thead>
   <tbody>
     <tr><td><code>void</code></td><td>0</td><td>Nothing</td></tr>
-    <tr><td><code>bool</code></td><td>1</td><td><code>TRUE</code> (1) or <code>FALSE</code> (0): any other value converted to it is 1 if it isn't 0</td></tr>
+    <tr><td><code>bool</code></td><td>1</td><td><code>true</code> (1) or <code>false</code> (0): any other value converted to it is 1 if it isn't 0</td></tr>
     <tr><td><code>i8</code> / <code>u8</code></td><td>1</td><td>Signed / unsigned byte; <code>u8</code> is the character type</td></tr>
     <tr><td><code>i16</code> / <code>u16</code></td><td>2</td><td>16-bit integers</td></tr>
     <tr><td><code>i32</code> / <code>u32</code></td><td>4</td><td>32-bit integers</td></tr>
@@ -121,35 +124,32 @@ C's <code>%ld</code> (which also works):</p>
     <tr><td><code>f32</code></td><td>4</td><td>Single-precision float</td></tr>
   </tbody>
 </table></div>
-<p>The older names <code>U0</code>, <code>Bool</code>, <code>I8</code> ... <code>U64</code>,
-<code>F32</code> and <code>F64</code> still work for now and mean the same types. The new names
-are type names, not keywords, so a struct field can still be called <code>i64</code> or
+<p>The type names are not keywords, so a struct field can still be called <code>i64</code> or
 <code>f64</code>; a variable can't.</p>
-<p>Pointers are written as in C (<code>U8 *s</code>, <code>I64 **pp</code>) and are 8 bytes.
-<code>null</code> is the null pointer: 0 as a <code>U0 *</code>, so it can be assigned to any
-pointer or function pointer. <code>true</code> and <code>false</code> are <code>Bool</code>
-values, 1 and 0. The older <code>NULL</code>, <code>TRUE</code> and <code>FALSE</code> (plain
-0, 1 and 0) still work for now.</p>
-<p>As in C, a value becomes a <code>Bool</code> by comparing it with 0: an integer, float
-or pointer that isn't 0 (or <code>NULL</code>) is <code>TRUE</code>, whether it is assigned,
-passed as an argument, returned, stored in a field or cast with <code>x(Bool)</code>. Only the
-low byte is never kept, so <code>0x100</code> and <code>0.5</code> are <code>TRUE</code>.
-A pointer needs no cast to become a <code>Bool</code> (other integer types warn without one),
+<p>Pointers are written as in C (<code>u8 *s</code>, <code>i64 **pp</code>) and are 8 bytes.
+<code>null</code> is the null pointer: 0 as a <code>void *</code>, so it can be assigned to any
+pointer or function pointer. <code>true</code> and <code>false</code> are <code>bool</code>
+values, 1 and 0.</p>
+<p>As in C, a value becomes a <code>bool</code> by comparing it with 0: an integer, float
+or pointer that isn't 0 (or <code>null</code>) is <code>true</code>, whether it is assigned,
+passed as an argument, returned, stored in a field or cast with <code>(bool)x</code>. Only the
+low byte is never kept, so <code>0x100</code> and <code>0.5</code> are <code>true</code>.
+A pointer needs no cast to become a <code>bool</code> (other integer types warn without one),
 and messages and <code>typeof</code> call the type <code>bool</code>.</p>
-<pre data-run><code>Bool IsSet(I64 flags, I64 bit) { return flags &amp; bit; }
+<pre data-run><code>bool isSet(i64 flags, i64 bit) { return flags &amp; bit; }
 
-U0 Main()
+void main()
 {
-  Bool b = 0x100;
-  "%d %d %d %d\n", b, IsSet(0x800, 0x800), 0.5(Bool), (-1)(Bool);
+  bool b = 0x100;
+  printf("%d %d %d %d\n", b, isSet(0x800, 0x800), (bool)0.5, (bool)(-1));
 }
 </code></pre>
 <pre class="output">1 1 1 1
 </pre>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  "%d %d %d %d %d\n", sizeof(U8), sizeof(I16), sizeof(I32), sizeof(I64), sizeof(F32);
-  "%d %d\n", sizeof(U8 *), sizeof(Bool);
+  printf("%d %d %d %d %d\n", sizeof(u8), sizeof(i16), sizeof(i32), sizeof(i64), sizeof(f32));
+  printf("%d %d\n", sizeof(u8 *), sizeof(bool));
 }
 </code></pre>
 <pre class="output">1 2 4 8 4
@@ -157,18 +157,18 @@ U0 Main()
 </pre>
 
 <h2 id="literals">Literals<a class="anchor" href="#literals" aria-label="Link to this section">#</a></h2>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 dec = 42, hex = 0xFF, bin = 0b1010;
-  F64 f = 1.5e3, g = 2e-3;
-  "%d %d %d %.1f %.3f\n", dec, hex, bin, f, g;
+  i64 dec = 42, hex = 0xFF, bin = 0b1010;
+  f64 f = 1.5e3, g = 2e-3;
+  printf("%d %d %d %.1f %.3f\n", dec, hex, bin, f, g);
 
   // Character constants hold up to 8 characters, packed into an integer
   // (the first in the low byte), and take the same escapes as strings.
-  I64 one = 'A', many = 'Hi';
-  "%d %d %c\n", one, many, one;
+  i64 one = 'A', many = 'Hi';
+  printf("%d %d %c\n", one, many, one);
 
-  "tab:[\t] quote:[\"] backslash:[\\]\n";
+  printf("tab:[\t] quote:[\"] backslash:[\\]\n");
 }
 </code></pre>
 <pre class="output">42 255 10 1500.0 0.002
@@ -177,14 +177,14 @@ tab:[	] quote:["] backslash:[\]
 </pre>
 <p>Integers can be written in decimal, hex (<code>0x</code>) or binary
 (<code>0b</code>). A number with a <code>.</code> or an exponent (<code>1e3</code>,
-<code>2e-3</code>) is an <code>F64</code>. Multi-character constants are a ktm idiom for short tags, such as the values thrown by
-<a href="#exceptions">exceptions</a>. String literals are <code>U8 *</code>.</p>
+<code>2e-3</code>) is an <code>f64</code>. Multi-character constants are a ktm idiom for short tags, such as the values thrown by
+<a href="#exceptions">exceptions</a>. String literals are <code>u8 *</code>.</p>
 <p>Strings take the C escapes <code>\n \t \r \b \f \v \a
 \\ \' \"</code>, and <code>\d</code> for <code>$</code>. <code>\x</code> takes at most two hex digits, so <code>"\x01b"</code> is the
 bytes 1 and <code>'b'</code>, and <code>\0</code> to <code>\7</code> start an octal escape of
 up to three digits (<code>"\033"</code> is ESC). Every string literal ends in a NUL that
 <code>sizeof</code> counts: <code>sizeof("\x42")</code> is 2.</p>
-<p>An integer literal too big for <code>I64</code> is a <code>U64</code>. A malformed number
+<p>An integer literal too big for <code>i64</code> is a <code>u64</code>. A malformed number
 is a compile error that says what is wrong with it: <code>0x</code> or <code>0b</code> with
 no digits, a digit that doesn't fit the base (<code>0b102</code>), a letter after a decimal
 number (<code>12ab</code>) or an exponent with no digits (<code>1e</code>).</p>
@@ -199,12 +199,12 @@ group long ones for reading: <code>1_000_000</code>, <code>0xFF_FF</code>,
 the literal's own base, so misplaced at the start or end, next to <code>.</code> or the
 exponent, or doubled, it is a compile error. A leading <code>_</code> is still an
 identifier (<code>_100</code> is a name, not a number).</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 million = 1_000_000;
-  I64 word = 0xFF_FF;
-  F64 price = 1_000.25;
-  "%d %d %.2f\n", million, word, price;
+  i64 million = 1_000_000;
+  i64 word = 0xFF_FF;
+  f64 price = 1_000.25;
+  printf("%d %d %.2f\n", million, word, price);
 }
 </code></pre>
 <pre class="output">1000000 65535 1000.25
@@ -214,15 +214,15 @@ identifier (<code>_100</code> is a name, not a number).</p>
 <p>Declare variables anywhere in a block, or at file scope for globals. Several can
 share one declaration, inside a function or at global scope; each <code>*</code> belongs
 to the name after it:</p>
-<pre data-run><code>I64 g_total = 100, g_count; // globals, visible to everything below them
+<pre data-run><code>i64 gTotal = 100, gCount; // globals, visible to everything below them
 
-U0 Main()
+void main()
 {
-  I64 a = 1, b = 2, c;
+  i64 a = 1, b = 2, c;
   c = a + b;
-  F64 ratio = 0.25;
-  U8 *name = "ktm", letter = 'h';
-  "%d %d %d %.2f %s %c\n", c, g_total, g_count, ratio, name, letter;
+  f64 ratio = 0.25;
+  u8 *name = "ktm", letter = 'h';
+  printf("%d %d %d %.2f %s %c\n", c, gTotal, gCount, ratio, name, letter);
 }
 </code></pre>
 <pre class="output">3 100 0 0.25 ktm h
@@ -230,12 +230,12 @@ U0 Main()
 
 <h3 id="auto">auto<a class="anchor" href="#auto" aria-label="Link to this section">#</a></h3>
 <p><code>auto</code> takes its type from the initialiser:</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
   auto count = 3;
   auto price = 9.99;
   auto label = "total";
-  "%s %s %s\n", typeof(count), typeof(price), typeof(label);
+  printf("%s %s %s\n", typeof(count), typeof(price), typeof(label));
 }
 </code></pre>
 <pre class="output">i64 f64 u8[6]
@@ -243,18 +243,18 @@ U0 Main()
 
 <h3 id="static">static<a class="anchor" href="#static" aria-label="Link to this section">#</a></h3>
 <p>A <code>static</code> local keeps its value between calls:</p>
-<pre data-run><code>I64 NextId()
+<pre data-run><code>i64 nextId()
 {
-  static I64 id = 0;
+  static i64 id = 0;
   id++;
   return id;
 }
 
-U0 Main()
+void main()
 {
-  NextId;
-  NextId;
-  "%d\n", NextId;
+  nextId();
+  nextId();
+  printf("%d\n", nextId());
 }
 </code></pre>
 <pre class="output">3
@@ -270,11 +270,11 @@ Assigning to a <code>const</code> (<code>=</code>, a compound assignment,
 <code>++</code>/<code>--</code>), including a <code>const</code> parameter, is a
 compile error, and so is writing <code>const</code> anywhere but a declaration
 (a cast, a struct field, a return type, or after the type).</p>
-<pre data-run><code>const I64 MAX_USERS = 4;
-const I64 DOUBLE_MAX = MAX_USERS * 2;   // built from another const
-I64 g_users[MAX_USERS];                 // a const works as an array size
+<pre data-run><code>const i64 MAX_USERS = 4;
+const i64 DOUBLE_MAX = MAX_USERS * 2;   // built from another const
+i64 gUsers[MAX_USERS];                 // a const works as an array size
 
-I64 Classify(I64 n)
+i64 classify(i64 n)
 {
   switch (n) {
     case MAX_USERS: return 1;           // and as a case label
@@ -282,14 +282,14 @@ I64 Classify(I64 n)
   }
 }
 
-I64 Twice(const I64 n)                  // n cannot be assigned inside Twice
+i64 twice(const i64 n)                  // n cannot be assigned inside Twice
 {
   return n * 2;
 }
 
-U0 Main()
+void main()
 {
-  "%d %d %d %d\n", MAX_USERS, DOUBLE_MAX, Classify(4), Twice(21);
+  printf("%d %d %d %d\n", MAX_USERS, DOUBLE_MAX, classify(4), twice(21));
 }
 </code></pre>
 <pre class="output">4 8 1 42
@@ -299,14 +299,14 @@ U0 Main()
 <p>The C operators work as expected: <code>+ - * / %</code>, <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code>,
 <code>&amp;&amp; || !</code>, <code>== != &lt; &lt;= &gt; &gt;=</code>, compound assignment
 (<code>+=</code>, <code>&lt;&lt;=</code>, …) and <code>++</code> / <code>--</code>.</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 a = 7, b = 2;
-  "%d %d %d %d %d\n", a + b, a - b, a * b, a / b, a % b;
-  "%d %d %d %d %d\n", a &amp; b, a | b, a ^ b, a &lt;&lt; 2, a &gt;&gt; 1;
+  i64 a = 7, b = 2;
+  printf("%d %d %d %d %d\n", a + b, a - b, a * b, a / b, a % b);
+  printf("%d %d %d %d %d\n", a &amp; b, a | b, a ^ b, a &lt;&lt; 2, a &gt;&gt; 1);
   a += 3;
   a++;
-  "%d\n", a;
+  printf("%d\n", a);
 }
 </code></pre>
 <pre class="output">9 5 14 3 1
@@ -315,23 +315,23 @@ U0 Main()
 </pre>
 <p><code>&amp;&amp;</code>, <code>||</code>, <code>!</code> and the comparisons always give 0
 or 1. A float operand of <code>&amp;&amp;</code>, <code>||</code> or <code>!</code> is true
-when it isn't 0.0, and a pointer when it isn't <code>NULL</code>. Comparing an integer with
-a float compares them as floats. On <code>U64</code> values, <code>&gt;&gt;</code>,
+when it isn't 0.0, and a pointer when it isn't <code>null</code>. Comparing an integer with
+a float compares them as floats. On <code>u64</code> values, <code>&gt;&gt;</code>,
 <code>/</code>, <code>%</code> and the comparisons are unsigned. An assignment used as a value
 has the type of its left side, so the value is truncated to fit:</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  F64 half = 0.5;
-  U8 *none = NULL;
-  "%d %d %d %d\n", half &amp;&amp; 1, !half, none || 0, !none;
-  "%d\n", 2 &lt; 2.5;
+  f64 half = 0.5;
+  u8 *none = null;
+  printf("%d %d %d %d\n", half &amp;&amp; 1, !half, none || 0, !none);
+  printf("%d\n", 2 &lt; 2.5);
 
-  U64 big = 0xFFFFFFFFFFFFFFFF;
-  "%d %d\n", big &gt; 1, big &gt;&gt; 60;
+  u64 big = 0xFFFFFFFFFFFFFFFF;
+  printf("%d %d\n", big &gt; 1, big &gt;&gt; 60);
 
-  U8 c;
-  I64 v = (c = 300);
-  "%d\n", v;
+  u8 c;
+  i64 v = (c = 300);
+  printf("%d\n", v);
 }
 </code></pre>
 <pre class="output">1 0 0 1
@@ -340,14 +340,14 @@ has the type of its left side, so the value is truncated to fit:</p>
 44
 </pre>
 <p>Unary <code>-</code> and <code>+</code> need a number and <code>~</code> needs an
-integer: <code>-p</code> on a pointer or <code>~f</code> on an <code>F64</code> is a compile
-error. A narrower integer operand is widened to <code>I64</code> first.</p>
+integer: <code>-p</code> on a pointer or <code>~f</code> on an <code>f64</code> is a compile
+error. A narrower integer operand is widened to <code>i64</code> first.</p>
 <p>Comparisons can be chained, as in maths: <code>lo &lt; x &lt; hi</code> means
 <code>lo &lt; x &amp;&amp; x &lt; hi</code>.</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 x = 5;
-  "%d %d\n", 1 &lt; x &lt; 10, 1 &lt; x &lt; 3;
+  i64 x = 5;
+  printf("%d %d\n", 1 &lt; x &lt; 10, 1 &lt; x &lt; 3);
 }
 </code></pre>
 <pre class="output">1 0
@@ -355,14 +355,14 @@ error. A narrower integer operand is widened to <code>I64</code> first.</p>
 <div class="note"><p>There is no <code>?:</code> operator. Use <code>if</code>/<code>else</code>.</p></div>
 
 <h3 id="sizeof-alignof-typeof">sizeof, alignof, typeof<a class="anchor" href="#sizeof-alignof-typeof" aria-label="Link to this section">#</a></h3>
-<pre data-run><code>class Pair { I32 a; I64 b; };
+<pre data-run><code>struct Pair { i32 a; i64 b; };
 
-U0 Main()
+void main()
 {
-  I64 arr[10];
-  "%d %d\n", sizeof(arr), sizeof(arr) / sizeof(arr[0]);
-  "%d %d\n", sizeof(Pair), alignof(Pair);
-  "%s %s\n", typeof(1 + 1), typeof(&amp;arr[0]);
+  i64 arr[10];
+  printf("%d %d\n", sizeof(arr), sizeof(arr) / sizeof(arr[0]));
+  printf("%d %d\n", sizeof(Pair), alignof(Pair));
+  printf("%s %s\n", typeof(1 + 1), typeof(&amp;arr[0]));
 }
 </code></pre>
 <pre class="output">80 10
@@ -375,21 +375,21 @@ time, and its operand is never evaluated.</p>
 <h2 id="type-casts">Type casts<a class="anchor" href="#type-casts" aria-label="Link to this section">#</a></h2>
 <p>Casts are written as in C, <code>(T)x</code>: the type in parentheses before the value.
 A cast is a unary operator, so it binds tighter than any binary operator
-(<code>(F64)a / b</code> divides as floats) and applies to the whole postfix expression after it
-(<code>(I64)p-&gt;n</code> casts <code>p-&gt;n</code>). Any type works, including pointers, classes and
-function pointers (<code>(I64 (*)(I64))p</code>). A variable hides a type of the same name, so
+(<code>(f64)a / b</code> divides as floats) and applies to the whole postfix expression after it
+(<code>(i64)p-&gt;n</code> casts <code>p-&gt;n</code>). Any type works, including pointers, structs and
+function pointers (<code>(fn(i64) i64)p</code>). A variable hides a type of the same name, so
 <code>(x)</code> stays a value in parentheses.</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  F64 f = 3.9;
-  I64 i = (I64)f;            // truncates
-  "%d\n", i;
-  "%.1f %.1f\n", (F64)(7 / 2), (F64)7 / 2;
-  "%.1f\n", (F64)-i / 2;     // ((F64)-i) / 2
+  f64 f = 3.9;
+  i64 i = (i64)f;            // truncates
+  printf("%d\n", i);
+  printf("%.1f %.1f\n", (f64)(7 / 2), (f64)7 / 2);
+  printf("%.1f\n", (f64)-i / 2);     // ((f64)-i) / 2
 
-  U8 *s = "hey";
-  I64 address = (I64)s;
-  "%c\n", *(U8 *)address;
+  u8 *s = "hey";
+  i64 address = (i64)s;
+  printf("%c\n", *(u8 *)address);
 }
 </code></pre>
 <pre class="output">3
@@ -397,25 +397,24 @@ function pointers (<code>(I64 (*)(I64))p</code>). A variable hides a type of the
 -1.5
 h
 </pre>
-<p>The older postfix form, <code>x(F64)</code>, still works for now.</p>
 
 <h2 id="control-flow">Control flow<a class="anchor" href="#control-flow" aria-label="Link to this section">#</a></h2>
 
 <h3 id="if-and-else">if and else<a class="anchor" href="#if-and-else" aria-label="Link to this section">#</a></h3>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 n = 15;
+  i64 n = 15;
   if (n % 15 == 0) {
-    "FizzBuzz\n";
+    printf("FizzBuzz\n");
   } else if (n % 3 == 0) {
-    "Fizz\n";
+    printf("Fizz\n");
   } else {
-    "%d\n", n;
+    printf("%d\n", n);
   }
 
   // An initialiser can come before the condition, scoped to the if.
-  if (I64 half = n / 2; half &gt; 5) {
-    "half is %d\n", half;
+  if (i64 half = n / 2; half &gt; 5) {
+    printf("half is %d\n", half);
   }
 }
 </code></pre>
@@ -426,22 +425,22 @@ half is 7
 <h3 id="switch">switch<a class="anchor" href="#switch" aria-label="Link to this section">#</a></h3>
 <p><code>case</code> takes a value or a range <code>lo ... hi</code>. Cases fall through
 without <code>break</code>, as in C.</p>
-<pre data-run><code>U0 Grade(I64 score)
+<pre data-run><code>void grade(i64 score)
 {
   switch (score) {
-    case 90 ... 100: "A\n"; break;
-    case 80 ... 89:  "B\n"; break;
-    case 0:          "no score\n"; break;
-    default:         "C or below\n";
+    case 90 ... 100: printf("A\n"); break;
+    case 80 ... 89:  printf("B\n"); break;
+    case 0:          printf("no score\n"); break;
+    default:         printf("C or below\n");
   }
 }
 
-U0 Main()
+void main()
 {
-  Grade(95);
-  Grade(83);
-  Grade(0);
-  Grade(42);
+  grade(95);
+  grade(83);
+  grade(0);
+  grade(42);
 }
 </code></pre>
 <pre class="output">A
@@ -452,18 +451,18 @@ C or below
 <p>Two extras over C: a bare <code>case:</code> takes the previous case's value plus
 one (starting from 0), and <code>switch [x]</code> skips the range check on
 <code>x</code>, for speed when you know it's in range.</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  for (I64 i = 0; i &lt; 6; i++) {
+  for (i64 i = 0; i &lt; 6; i++) {
     switch [i] {
-      case 0: "zero "; break;
-      case:   "one "; break;      // 1
-      case:   "two "; break;      // 2
-      case 4...5: "four-five "; break;
-      default: "other "; break;
+      case 0: printf("zero "); break;
+      case:   printf("one "); break;      // 1
+      case:   printf("two "); break;      // 2
+      case 4...5: printf("four-five "); break;
+      default: printf("other "); break;
     }
   }
-  "\n";
+  printf("\n");
 }
 </code></pre>
 <pre class="output">zero one two other four-five four-five 
@@ -472,13 +471,13 @@ one (starting from 0), and <code>switch [x]</code> skips the range check on
 Cases fall through anyway for now, so it changes nothing yet; it is an error outside a
 switch and as the last statement of the last case, where there is no next case. A
 variable called <code>fallthrough</code> still works.</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  for (I64 i = 1; i &lt;= 3; i++) {
+  for (i64 i = 1; i &lt;= 3; i++) {
     switch (i) {
-      case 1: "one, "; fallthrough;
-      case 2: "two or after one\n"; break;
-      default: "three\n";
+      case 1: printf("one, "); fallthrough;
+      case 2: printf("two or after one\n"); break;
+      default: printf("three\n");
     }
   }
 }
@@ -489,46 +488,48 @@ three
 </pre>
 
 <h3 id="loops">Loops<a class="anchor" href="#loops" aria-label="Link to this section">#</a></h3>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 i = 0;
+  i64 i = 0;
   while (i &lt; 3) {
-    "w%d ", i;
+    printf("w%d ", i);
     i++;
   }
   do {
-    "d%d ", i;
+    printf("d%d ", i);
     i--;
   } while (i &gt; 0);
-  for (I64 j = 0; j &lt; 10; j++) {
-    if (j == 2) continue;
-    if (j == 5) break;
-    "f%d ", j;
+  for (i64 j = 0; j &lt; 10; j++) {
+    if (j == 2) { continue; }
+    if (j == 5) { break; }
+    printf("f%d ", j);
   }
-  "end\n";
+  printf("end\n");
 }
 </code></pre>
 <pre class="output">w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
 </pre>
 
 <h3 id="range-based-for">Range-based for<a class="anchor" href="#range-based-for" aria-label="Link to this section">#</a></h3>
-<p>An ktm addition. Loop over a fixed-size array, or over any class with an
+<p>An ktm addition. Loop over a fixed-size array, or over any struct with an
 <code>entries</code> field and a <code>size</code> field, such as the library's
-<code>IntVec</code> and <code>PtrVec</code>:</p>
-<pre data-run><code>U0 Main()
+<code>vec.IntVec</code> and <code>vec.PtrVec</code>:</p>
+<pre data-run><code>import vec;
+
+void main()
 {
-  I64 primes[] = {2, 3, 5, 7, 11};
-  I64 sum = 0;
+  i64 primes[] = {2, 3, 5, 7, 11};
+  i64 sum = 0;
   for (auto p : primes) {
     sum += p;
   }
-  "sum = %d\n", sum;
+  printf("sum = %d\n", sum);
 
-  IntVec *v = IntVecNew();
-  IntVecPush(v, 10);
-  IntVecPush(v, 20);
-  for (I64 x : v) "%d\n", x;
-  IntVecRelease(v);
+  vec.IntVec *v = vec.intNew();
+  v.push(10);
+  v.push(20);
+  for (i64 x : v) { printf("%d\n", x); }
+  v.release();
 }
 </code></pre>
 <pre class="output">sum = 28
@@ -537,61 +538,55 @@ three
 </pre>
 
 <h3 id="goto">goto<a class="anchor" href="#goto" aria-label="Link to this section">#</a></h3>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 tries = 0;
+  i64 tries = 0;
 retry:
   tries++;
-  if (tries &lt; 3) goto retry;
-  "gave up after %d tries\n", tries;
+  if (tries &lt; 3) { goto retry; }
+  printf("gave up after %d tries\n", tries);
 }
 </code></pre>
 <pre class="output">gave up after 3 tries
 </pre>
 
 <h2 id="functions">Functions<a class="anchor" href="#functions" aria-label="Link to this section">#</a></h2>
-<pre data-run><code>I64 Square(I64 n)
+<pre data-run><code>i64 square(i64 n)
 {
   return n * n;
 }
 
-U0 Main()
+void main()
 {
-  "%d\n", Square(12);
+  printf("%d\n", square(12));
 }
 </code></pre>
 <pre class="output">144
 </pre>
 <p>Declare a prototype to call a function before its definition:
-<code>I64 Later(I64 x);</code> Every prototype and the definition must agree on the return
+<code>i64 later(i64 x);</code> Every prototype and the definition must agree on the return
 and parameter types; a mismatch is an error ("conflicting types") at the later one.
-That includes the standard library's functions, whether <code>std.ktmh</code> declares them as
-prototypes or as <code>_extern</code> bindings: a function of your own named
-<code>Exit</code> or <code>MAlloc</code> must have the library's signature.
-Default arguments carry over: after <code>I64 Later(I64 x=1);</code> the definition can be
-written <code>I64 Later(I64 x) { ... }</code> and <code>Later()</code> still passes 1 (this
-includes the prototypes in <code>std.ktmh</code>). Repeating a default is allowed if it is the
-same value; a different value is an error.</p>
-<p>A program may define its own version of a standard-library function, with the same
-signature as in <code>std.ktmh</code> (<code>CDate Now()</code>, say): the program's calls go to
-its own version, in the JIT and in a compiled binary. The library's own internal calls are
-not redirected under the JIT; in a compiled binary, which links the static
-<code>libktm.a</code>, they may go to your version too, so keep its behaviour compatible.</p>
+Default arguments carry over: after <code>i64 later(i64 x=1);</code> the definition can be
+written <code>i64 later(i64 x) { ... }</code> and <code>later()</code> still passes 1.
+Repeating a default is allowed if it is the same value; a different value is an error.</p>
+<p>The standard library lives in modules, so a function of your own may have the same name
+as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
+<code>date.now()</code> and <code>os.exit()</code> stay the library's.</p>
 <p>A returned value is converted to the function's return type, as in C: an integer returned
-from an <code>F64</code> function becomes a float. In a
-<code>U0</code> function, <code>return expr;</code> is a warning ("unexpected return
+from an <code>f64</code> function becomes a float. In a
+<code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
 value"), but the expression is still evaluated for its side effects.</p>
 <p><code>inline</code> is accepted as a hint only: an <code>inline</code> function is compiled
 as an ordinary function, so it can recurse, take default arguments and have its address taken.</p>
-<pre data-run><code>inline I64 Twice(I64 x)
+<pre data-run><code>inline i64 twice(i64 x)
 {
   return x * 2;
 }
 
-U0 Main()
+void main()
 {
-  I64 (*fp)(I64 x) = &amp;Twice;
-  "%d %d\n", Twice(21), fp(4);
+  fn(i64 x) i64 fp = &amp;twice;
+  printf("%d %d\n", twice(21), fp(4));
 }
 </code></pre>
 <pre class="output">42 8
@@ -600,48 +595,23 @@ U0 Main()
 <h3 id="default-arguments">Default arguments<a class="anchor" href="#default-arguments" aria-label="Link to this section">#</a></h3>
 <p>Any parameter can have a default, not just trailing ones. Leave an argument empty to use
 its default:</p>
-<pre data-run><code>U0 Box(I64 w = 2, I64 h = 3, U8 *fill = "#")
+<pre data-run><code>void box(i64 w = 2, i64 h = 3, u8 *fill = "#")
 {
-  "%dx%d of %s\n", w, h, fill;
+  printf("%dx%d of %s\n", w, h, fill);
 }
 
-U0 Main()
+void main()
 {
-  Box(5, 1, "*");
-  Box(5);
-  Box(, 9);
-  Box(, , "@");
+  box(5, 1, "*");
+  box(5);
+  box(, 9);
+  box(, , "@");
 }
 </code></pre>
 <pre class="output">5x1 of *
 5x3 of #
 2x9 of #
 2x3 of @
-</pre>
-
-<h3 id="calling-without-parentheses">Calling without parentheses<a class="anchor" href="#calling-without-parentheses" aria-label="Link to this section">#</a></h3>
-<p>A function that needs no arguments can be called by name alone, anywhere
-in an expression. Use <code>&amp;Name</code> for the function's address:</p>
-<pre data-run><code>U0 Greet()
-{
-  "hi\n";
-}
-
-I64 Answer()
-{
-  return 42;
-}
-
-U0 Main()
-{
-  Greet;
-  "%d\n", Answer;
-  "%d\n", Answer + 1;
-}
-</code></pre>
-<pre class="output">hi
-42
-43
 </pre>
 
 <h3 id="variable-arguments">Variable arguments<a class="anchor" href="#variable-arguments" aria-label="Link to this section">#</a></h3>
@@ -652,30 +622,30 @@ Inside the function <code>name.len</code> is how many there are, <code>name[i]</
 one of them (<code>&amp;name[i]</code> works too) and <code>for (auto v : name)</code> goes
 through them; <code>name</code> itself can't be assigned. Fixed and default parameters can
 come before it.</p>
-<pre data-run><code>I64 Sum(I64 ...nums)
+<pre data-run><code>i64 sum(i64 ...nums)
 {
-  I64 total = 0;
-  for (auto n : nums) total += n;
+  i64 total = 0;
+  for (auto n : nums) { total += n; }
   return total;
 }
 
-F64 Avg(F64 ...xs)
+f64 avg(f64 ...xs)
 {
-  if (!xs.len) return 0;
-  F64 total = 0;
-  for (I64 i = 0; i &lt; xs.len; i++) total += xs[i];   // 1 and 2 become 1.0, 2.0
+  if (!xs.len) { return 0; }
+  f64 total = 0;
+  for (i64 i = 0; i &lt; xs.len; i++) { total += xs[i]; }   // 1 and 2 become 1.0, 2.0
   return total / xs.len;
 }
 
-I64 Total(I64 ...nums)
+i64 Total(i64 ...nums)
 {
-  return Sum(...nums);   // pass them all on
+  return sum(...nums);   // pass them all on
 }
 
-U0 Main()
+void main()
 {
-  "%d %d %d\n", Sum(), Sum(1, 2, 3, 4), Total(5, 6);
-  "%.2f\n", Avg(1, 2, 4);
+  printf("%d %d %d\n", sum(), sum(1, 2, 3, 4), Total(5, 6));
+  printf("%.2f\n", avg(1, 2, 4));
 }
 </code></pre>
 <pre class="output">0 10 11
@@ -685,15 +655,17 @@ U0 Main()
 parameter on, to a function that takes the same kind (it must be the only extra
 argument). Without a type, <code>...name</code> takes the extras as 64-bit slots, the way
 format functions want them: a number as is, a float as its bits (read it back with
-<code>name[i](F64)</code>), a pointer as its address:</p>
-<pre data-run><code>U0 Log(U8 *fmt, ...args)
+<code>name[i](f64)</code>), a pointer as its address:</p>
+<pre data-run><code>import mem, str;
+
+void Log(u8 *fmt, ...args)
 {
-  U8 *msg = StrPrintJoin(NULL, fmt, args.len, args);   // format the extras
-  "[log] %s\n", msg;
-  Free(msg);
+  u8 *msg = str.formatArgs(null, fmt, args.len, args);   // format the extras
+  printf("[log] %s\n", msg);
+  mem.free(msg);
 }
 
-U0 Main()
+void main()
 {
   Log("%d files in %s, %.1f%% full", 3, "/tmp", 42.5);
 }
@@ -701,28 +673,26 @@ U0 Main()
 <pre class="output">[log] 3 files in /tmp, 42.5% full
 </pre>
 <p>The extras are passed as their count and a pointer to an array the caller builds, so
-spreading them on costs nothing. The older <code>...</code> with no name, which gives the
-function hidden <code>argc</code> and <code>argv</code> variables, still works until the
-conversion.</p>
+spreading them on costs nothing.</p>
 
 <h3 id="function-pointers">Function pointers<a class="anchor" href="#function-pointers" aria-label="Link to this section">#</a></h3>
-<pre data-run><code>I64 Add(I64 a, I64 b) { return a + b; }
-I64 Mul(I64 a, I64 b) { return a * b; }
+<pre data-run><code>i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
 
-I64 Fold(I64 (*op)(I64 a, I64 b), I64 *nums, I64 n)
+i64 fold(fn(i64 a, i64 b) i64 op, i64 *nums, i64 n)
 {
-  I64 acc = nums[0];
-  for (I64 i = 1; i &lt; n; i++) {
+  i64 acc = nums[0];
+  for (i64 i = 1; i &lt; n; i++) {
     acc = op(acc, nums[i]);
   }
   return acc;
 }
 
-U0 Main()
+void main()
 {
-  I64 nums[] = {1, 2, 3, 4};
-  I64 (*f)(I64 a, I64 b) = &amp;Mul;
-  "%d %d\n", Fold(&amp;Add, nums, 4), Fold(f, nums, 4);
+  i64 nums[] = {1, 2, 3, 4};
+  fn(i64 a, i64 b) i64 f = &amp;mul;
+  printf("%d %d\n", fold(&amp;add, nums, 4), fold(f, nums, 4));
 }
 </code></pre>
 <pre class="output">10 24
@@ -731,24 +701,26 @@ U0 Main()
 <code>(*f)(acc, x)</code>, <code>(*c.op)(5)</code> and <code>(*ops[i])(5)</code> call it just
 like <code>f(acc, x)</code>.</p>
 <p>Any expression whose type is a function pointer can be called: a cast to a function pointer
-type (<code>((I64 (*)(I64))p)(5)</code>, or <code>p(I64 (*)(I64))(5)</code> as a postfix cast),
+type (<code>((fn(i64) i64)p)(5)</code>),
 the result of a call that returns one, or of an assignment (<code>(f = &amp;Mul)(2, 3)</code>).
 The arguments are checked against the pointer's parameters, as for a named function:</p>
-<pre data-run><code>I64 Add(I64 a, I64 b) { return a + b; }
-I64 Mul(I64 a, I64 b) { return a * b; }
+<pre data-run><code>import str;
 
-U0 *Lookup(U8 *name)
+i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
+
+void *lookup(u8 *name)
 {
-  if (!StrCmp(name, "add")) return &amp;Add;
-  return &amp;Mul;
+  if (!str.cmp(name, "add")) { return &amp;add; }
+  return &amp;mul;
 }
 
-U0 Main()
+void main()
 {
-  I64 (*f)(I64 a, I64 b);
-  "%d\n", ((I64 (*)(I64, I64))Lookup("add"))(2, 3);
-  "%d\n", Lookup("mul")(I64 (*)(I64, I64))(2, 3);
-  "%d\n", (f = &amp;Mul)(4, 5);
+  fn(i64 a, i64 b) i64 f;
+  printf("%d\n", ((fn(i64, i64) i64)lookup("add"))(2, 3));
+  printf("%d\n", ((fn(i64, i64) i64)lookup("mul"))(2, 3));
+  printf("%d\n", (f = &amp;mul)(4, 5));
 }
 </code></pre>
 <pre class="output">5
@@ -756,16 +728,16 @@ U0 Main()
 20
 </pre>
 <p>An array of function pointers puts the size after the name, as in C. It works for
-locals, globals, class fields and parameters:</p>
-<pre data-run><code>I64 Dbl(I64 x) { return x * 2; }
-I64 Sq(I64 x) { return x * x; }
+locals, globals, struct fields and parameters:</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x) { return x * x; }
 
-I64 (*ops[])(I64 x) = {&amp;Dbl, &amp;Sq};
+fn(i64 x) i64 ops[] = {&amp;dbl, &amp;sq};
 
-U0 Main()
+void main()
 {
-  for (I64 i = 0; i &lt; 2; i++) {
-    "%d\n", ops[i](5);
+  for (i64 i = 0; i &lt; 2; i++) {
+    printf("%d\n", ops[i](5));
   }
 }
 </code></pre>
@@ -773,21 +745,21 @@ U0 Main()
 25
 </pre>
 <p>A default in a function pointer's parameter list fills a left-out argument when you call
-through it, for variables and class fields alike. A <code>U0 *</code> converts to and from a
+through it, for variables and struct fields alike. A <code>void *</code> converts to and from a
 function pointer without a cast, and compares (<code>==</code>, <code>!=</code>) with one:</p>
-<pre data-run><code>I64 Dbl(I64 x) { return x * 2; }
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
 
-class Calc { I64 (*op)(I64 x = 21); };
+struct Calc { fn(i64 x = 21) i64 op; };
 
-U0 Main()
+void main()
 {
   Calc c;
-  c.op = &amp;Dbl;
-  "%d %d\n", c.op(5), c.op();
+  c.op = &amp;dbl;
+  printf("%d %d\n", c.op(5), c.op());
 
-  U0 *raw = &amp;Dbl;
-  I64 (*back)(I64 x) = raw;
-  "%d %d\n", back(4), raw == &amp;Dbl;
+  void *raw = &amp;dbl;
+  fn(i64 x) i64 back = raw;
+  printf("%d %d\n", back(4), raw == &amp;dbl);
 }
 </code></pre>
 <pre class="output">10 42
@@ -798,43 +770,43 @@ signature: the same return type, the same parameter types and the same <code>...
 Anything else is an error naming both types, wherever the conversion happens (an
 assignment, an initialiser, an argument, a <code>return</code> or a conditional), so
 <code>i64 (*op)(u8 *) = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
-<code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. A <code>U0 *</code> and
+<code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. A <code>void *</code> and
 <code>null</code> still convert without a cast. A function whose parameters are typed
-pointers, passed where one taking <code>U0 *</code> is expected (a comparator, a thread
+pointers, passed where one taking <code>void *</code> is expected (a comparator, a thread
 function), needs a cast, which makes the mismatch visible:</p>
-<pre data-run><code>class Item { I64 key; };
+<pre data-run><code>struct Item { i64 key; };
 
-I64 ItemLess(Item *a, Item *b) { return a-&gt;key &lt; b-&gt;key; }
+i64 itemLess(Item *a, Item *b) { return a.key &lt; b.key; }
 
-U0 Main()
+void main()
 {
   Item a, b;
   a.key = 1;
   b.key = 2;
-  I64 (*cmp)(U0 *, U0 *) = (&amp;ItemLess)(fn(U0 *, U0 *) I64);
-  "%d\n", cmp(&amp;a, &amp;b);
+  fn(void *, void *) i64 cmp = (fn(void *, void *) i64)(&amp;itemLess);
+  printf("%d\n", cmp(&amp;a, &amp;b));
 }
 </code></pre>
 <pre class="output">1
 </pre>
 <p>The other C declarator forms work too: a function returning a function pointer is written
 <code>T (*Name(params))(fn_params)</code>, and a pointer to a function pointer is
-<code>T (**pp)(params)</code>, for locals, globals, class fields and parameters alike.</p>
-<pre data-run><code>I64 Dbl(I64 x) { return x * 2; }
-I64 Sq(I64 x) { return x * x; }
+<code>T (**pp)(params)</code>, for locals, globals, struct fields and parameters alike.</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x) { return x * x; }
 
-I64 (*Choose(Bool square))(I64 x)
+fn(i64 x) i64 choose(bool square)
 {
-  if (square) return &amp;Sq;
-  return &amp;Dbl;
+  if (square) { return &amp;sq; }
+  return &amp;dbl;
 }
 
-U0 Main()
+void main()
 {
-  I64 (*f)(I64 x) = Choose(TRUE);
-  I64 (**pf)(I64 x) = &amp;f;
+  fn(i64 x) i64 f = choose(true);
+  (fn(i64 x) i64) *pf = &amp;f;
   printf("%d ", f(5));
-  *pf = Choose(FALSE);        // changes f through the pointer
+  *pf = choose(false);        // changes f through the pointer
   printf("%d\n", f(5));
 }
 </code></pre>
@@ -842,16 +814,16 @@ U0 Main()
 </pre>
 
 <h3 id="fn-types">fn(...) types<a class="anchor" href="#fn-types" aria-label="Link to this section">#</a></h3>
-<p>ktm syntax v0.2 adds <code>fn ( types ) RetType</code> as a way to write a function pointer
-type: <code>fn(i64) i64</code> is exactly <code>i64 (*)(i64)</code>, with the same size, the
-same calls, and the same argument checks. Parameter names are optional and ignored. RetType
+<p>A function pointer type is written <code>fn ( types ) RetType</code>: <code>fn(i64) i64</code>
+takes an <code>i64</code> and returns one, and has the same size, calls and argument checks
+as C's <code>i64 (*)(i64)</code>. Parameter names are optional and ignored. RetType
 can itself be another <code>fn(...)</code> type:</p>
 <pre data-run><code>i64 twice(i64 x) { return x * 2; }
 i64 addOne(i64 x) { return x + 1; }
 
 fn(i64) i64 op = &amp;twice;
-fn(i64) i64 pick(bool sq) { if (sq) return &amp;twice; return &amp;addOne; }
-void apply(fn(i64) i64 f, i64 x) { "%d\n", f(x); }
+fn(i64) i64 pick(bool sq) { if (sq) { return &amp;twice; } return &amp;addOne; }
+void apply(fn(i64) i64 f, i64 x) { printf("%d\n", f(x)); }
 
 i32 main()
 {
@@ -895,23 +867,23 @@ returning one, a pointer to one) is documented above and keeps working; it is co
 <code>fn(...)</code> everywhere in a later pass.</p>
 
 <h2 id="pointers-and-arrays">Pointers and arrays<a class="anchor" href="#pointers-and-arrays" aria-label="Link to this section">#</a></h2>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  I64 x = 5;
-  I64 *p = &amp;x;
+  i64 x = 5;
+  i64 *p = &amp;x;
   *p = 10;
-  "%d\n", x;
+  printf("%d\n", x);
 
-  I64 squares[5];
-  for (I64 i = 0; i &lt; 5; i++) {
+  i64 squares[5];
+  for (i64 i = 0; i &lt; 5; i++) {
     squares[i] = i * i;
   }
-  I64 *q = squares;              // arrays decay to pointers
-  "%d %d %d\n", q[3], *(q + 4), &amp;squares[4] - &amp;squares[1];
+  i64 *q = squares;              // arrays decay to pointers
+  printf("%d %d %d\n", q[3], *(q + 4), &amp;squares[4] - &amp;squares[1]);
 
-  I64 grid[3][4];
+  i64 grid[3][4];
   grid[2][3] = 7;
-  "%d %d\n", grid[2][3], sizeof(grid);
+  printf("%d %d\n", grid[2][3], sizeof(grid));
 }
 </code></pre>
 <pre class="output">10
@@ -921,62 +893,62 @@ returning one, a pointer to one) is documented above and keeps working; it is co
 <p>As in C, <code>n + p</code> is the same as <code>p + n</code>, a pointer can be
 compared with an integer on either side, and <code>n - p</code> is a compile error. An
 array can't be assigned as a whole (<code>a = b;</code> is an error): assign its elements or
-copy it with <code>MemCpy</code>.</p>
-<p>Storing one pointer type in another is a warning, as in C: <code>I64 *q = &amp;f;</code>
-with <code>F64 f</code> (also when assigning, passing or returning it), and
+copy it with <code>mem.copy</code>.</p>
+<p>Storing one pointer type in another is a warning, as in C: <code>i64 *q = &amp;f;</code>
+with <code>f64 f</code> (also when assigning, passing or returning it), and
 <code>q -= q</code>, which stores a pointer difference (an integer) back into the pointer.
-<code>U0 *</code> and byte pointers (<code>U8 *</code>, <code>I8 *</code>, <code>Bool *</code>)
+<code>void *</code> and byte pointers (<code>u8 *</code>, <code>i8 *</code>, <code>bool *</code>)
 convert to and from any pointer without one; otherwise cast:
-<code>(&amp;f)(I64 *)</code>.</p>
+<code>(&amp;f)(i64 *)</code>.</p>
 <p>Call arguments are checked against the parameter types as in C, for functions, function
 pointers and <code>extern</code> functions alike. Numbers convert silently (an
-<code>I64</code> passed for an <code>F64</code> becomes a float), <code>0</code> and
-<code>null</code> pass as any pointer, <code>U0 *</code> converts both ways, and a pointer to a
-derived class is a pointer to its base class. A pointer passed for an integer, an integer for a
+<code>i64</code> passed for an <code>f64</code> becomes a float), <code>0</code> and
+<code>null</code> pass as any pointer, <code>void *</code> converts both ways, and a pointer to a
+derived struct is a pointer to its base struct. A pointer passed for an integer, an integer for a
 pointer (other than <code>0</code>) and a pointer to an incompatible type are warnings
-(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a class passed
-where another class or a number is expected, or a number or pointer where a class or a float
+(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a struct passed
+where another struct or a number is expected, or a number or pointer where a struct or a float
 is, is an error. Extra arguments of a <code>...</code> function are not checked.</p>
-<p>An initialiser list may be shorter than the array or class it initialises; as in C,
+<p>An initialiser list may be shorter than the array or struct it initialises; as in C,
 everything it leaves out is zero, for locals and globals alike:</p>
-<pre data-run><code>class Point { I64 x, y, z; };
+<pre data-run><code>struct Point { i64 x, y, z; };
 
-I64 counts[4] = {1, 2};
+i64 counts[4] = {1, 2};
 
-U0 Main()
+void main()
 {
-  I64 grid[2][3] = {{1}, {4, 5}};
+  i64 grid[2][3] = {{1}, {4, 5}};
   Point p = {7};
-  "%d %d %d %d\n", counts[0], counts[1], counts[2], counts[3];
-  "%d %d %d | %d %d %d\n", grid[0][0], grid[0][1], grid[0][2],
-                           grid[1][0], grid[1][1], grid[1][2];
-  "%d %d %d\n", p.x, p.y, p.z;
+  printf("%d %d %d %d\n", counts[0], counts[1], counts[2], counts[3]);
+  printf("%d %d %d | %d %d %d\n", grid[0][0], grid[0][1], grid[0][2],
+                           grid[1][0], grid[1][1], grid[1][2]);
+  printf("%d %d %d\n", p.x, p.y, p.z);
 }
 </code></pre>
 <pre class="output">1 2 0 0
 1 0 0 | 4 5 0
 7 0 0
 </pre>
-<p>Unlike C, braces only go around an array, class or union: a scalar can't be
-initialised from a list (<code>I64 x = {1};</code>), and neither can a scalar
-element or field (<code>I64 a[2] = {1, {2}};</code>). Both are compile errors.</p>
-<p>As in C, the braces of an inner array or class can be left out: its items are then
+<p>Unlike C, braces only go around an array, struct or union: a scalar can't be
+initialised from a list (<code>i64 x = {1};</code>), and neither can a scalar
+element or field (<code>i64 a[2] = {1, {2}};</code>). Both are compile errors.</p>
+<p>As in C, the braces of an inner array or struct can be left out: its items are then
 taken from the list in order, as many as it has, and a list that ends early zero-fills
-the rest. A string still initialises a whole <code>U8</code> array, and a value of the
-class itself a whole class field.</p>
-<pre data-run><code>class Point { I64 x, y; };
-class Line { I64 id; Point a, b; };
+the rest. A string still initialises a whole <code>u8</code> array, and a value of the
+struct itself a whole struct field.</p>
+<pre data-run><code>struct Point { i64 x, y; };
+struct Line { i64 id; Point a, b; };
 
 Line ln = {1, 2, 3, 4, 5};
 Point pts[] = {1, 2, 3};
 
-U0 Main()
+void main()
 {
-  I64 m[2][2] = {1, 2, 3};
-  "%d (%d %d) (%d %d)\n", ln.id, ln.a.x, ln.a.y, ln.b.x, ln.b.y;
-  "%d: (%d %d) (%d %d)\n", sizeof(pts) / sizeof(Point), pts[0].x, pts[0].y,
-                           pts[1].x, pts[1].y;
-  "%d %d %d %d\n", m[0][0], m[0][1], m[1][0], m[1][1];
+  i64 m[2][2] = {1, 2, 3};
+  printf("%d (%d %d) (%d %d)\n", ln.id, ln.a.x, ln.a.y, ln.b.x, ln.b.y);
+  printf("%d: (%d %d) (%d %d)\n", sizeof(pts) / sizeof(Point), pts[0].x, pts[0].y,
+                           pts[1].x, pts[1].y);
+  printf("%d %d %d %d\n", m[0][0], m[0][1], m[1][0], m[1][1]);
 }
 </code></pre>
 <pre class="output">1 (2 3) (4 5)
@@ -984,25 +956,26 @@ U0 Main()
 1 2 3 0
 </pre>
 
-<p>The items of a global array or class initialiser need not be constants: an item
+<p>The items of a global array or struct initialiser need not be constants: an item
 such as another global's value or the address of a function or a global is stored
 when the program starts, in order with the other file-scope statements, the way
-<code>I64 g = other;</code> is.</p>
-<pre data-run><code>I64 Dbl(I64 v) { return v * 2; }
-I64 Sq(I64 v) { return v * v; }
+<code>i64 g = other;</code> is.</p>
+<pre data-run><code>i64 dbl(i64 v) { return v * 2; }
+i64 sq(i64 v) { return v * v; }
 
-class Op { U8 *name; I64 (*fn)(I64 v); };
+struct Op { u8 *name; fn(i64 v) i64 fn_; };
 
-I64 base = 10;
-I64 limits[3] = {base, base * 2, 99};
-Op ops[2] = {{"double", &amp;Dbl}, {"square", &amp;Sq}};
+i64 base = 10;
+i64 limits[3] = {base, base * 2, 99};
+Op ops[2] = {{"double", &amp;dbl}, {"square", &amp;sq}};
 
-U0 Main()
+void main()
 {
-  I64 i;
-  "%d %d %d\n", limits[0], limits[1], limits[2];
-  for (i = 0; i &lt; 2; i++)
-    "%s %d\n", ops[i].name, ops[i].fn(7);
+  i64 i;
+  printf("%d %d %d\n", limits[0], limits[1], limits[2]);
+  for (i = 0; i &lt; 2; i++) {
+    printf("%s %d\n", ops[i].name, ops[i].fn_(7));
+  }
 }
 </code></pre>
 <pre class="output">10 20 99
@@ -1011,68 +984,74 @@ square 49
 </pre>
 
 <h3 id="heap-memory">Heap memory<a class="anchor" href="#heap-memory" aria-label="Link to this section">#</a></h3>
-<p><code>MAlloc</code> allocates, <code>CAlloc</code> allocates zeroed memory,
-<code>ReAlloc</code> resizes and <code>Free</code> releases. Nothing is garbage collected.</p>
-<pre data-run><code>U0 Main()
+<p><code>mem.alloc</code> allocates, <code>mem.allocZero</code> allocates zeroed memory,
+<code>mem.realloc</code> resizes and <code>mem.free</code> releases. Nothing is garbage collected.</p>
+<pre data-run><code>import mem;
+
+void main()
 {
-  I64 n = 4;
-  I64 *nums = CAlloc(n * sizeof(I64));
+  i64 n = 4;
+  i64 *nums = mem.allocZero(n * sizeof(i64));
   nums[2] = 7;
-  nums = ReAlloc(nums, 8 * sizeof(I64));
-  "%d %d\n", nums[0], nums[2];
-  Free(nums);
+  nums = mem.realloc(nums, 8 * sizeof(i64));
+  printf("%d %d\n", nums[0], nums[2]);
+  mem.free(nums);
 }
 </code></pre>
 <pre class="output">0 7
 </pre>
 
 <h3 id="strings">Strings<a class="anchor" href="#strings" aria-label="Link to this section">#</a></h3>
-<p>Strings are NUL-terminated <code>U8</code> arrays, as in C. The library has the
+<p>Strings are NUL-terminated <code>u8</code> arrays, as in C. The library has the
 usual helpers (<a href="library.html#strings">more in the library guide</a>):</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>import mem, str;
+
+void main()
 {
-  U8 *copy = StrNew("hello");
-  "%s %d %d\n", copy, StrLen(copy), StrCmp(copy, "hello");
+  u8 *copy = str.dup("hello");
+  printf("%s %d %d\n", copy, str.len(copy), str.cmp(copy, "hello"));
 
-  U8 *msg = StrPrint(NULL, "%s has %d letters", copy, StrLen(copy));
-  "%s\n", msg;
+  u8 *msg = str.formatTo(null, "%s has %d letters", copy, str.len(copy));
+  printf("%s\n", msg);
 
-  I64 vowels = 0;
-  for (U8 *c = copy; *c; c++) {
-    if (*c == 'e' || *c == 'o') vowels++;
+  i64 vowels = 0;
+  for (u8 *c = copy; *c; c++) {
+    if (*c == 'e' || *c == 'o') { vowels++; }
   }
-  "%d vowels\n", vowels;
-  Free(copy);
-  Free(msg);
+  printf("%d vowels\n", vowels);
+  mem.free(copy);
+  mem.free(msg);
 }
 </code></pre>
 <pre class="output">hello 5 0
 hello has 5 letters
 2 vowels
 </pre>
-<p>A <code>U8</code> array initialised from a string gets its own writable copy. With an
+<p>A <code>u8</code> array initialised from a string gets its own writable copy. With an
 explicit size, the rest is zero-filled:</p>
-<pre data-run><code>U0 Main()
+<pre data-run><code>void main()
 {
-  U8 buf[] = "abc";               // 4 bytes: a, b, c, NUL
-  U8 name[8] = "hi";              // the 6 bytes after "hi" are zero
+  u8 buf[] = "abc";               // 4 bytes: a, b, c, NUL
+  u8 name[8] = "hi";              // the 6 bytes after "hi" are zero
   buf[0] = 'X';
-  "%s %d %s %d\n", buf, sizeof(buf), name, sizeof(name);
+  printf("%s %d %s %d\n", buf, sizeof(buf), name, sizeof(name));
 }
 </code></pre>
 <pre class="output">Xbc 4 hi 8
 </pre>
 
-<h2 id="classes">Classes<a class="anchor" href="#classes" aria-label="Link to this section">#</a></h2>
-<p>A <code>struct</code> (or <code>class</code>, the same thing) is a C <code>struct</code>,
+<h2 id="structs">Structs<a class="anchor" href="#structs" aria-label="Link to this section">#</a></h2>
+<p>A <code>struct</code> (or <code>struct</code>, the same thing) is a C <code>struct</code>,
 and its name is a type straight away, with no <code>typedef</code> needed. Several fields can
-share a line. <code>pub</code> (or <code>public</code>) marks what a library exports.</p>
-<pre data-run><code>class Point
+share a line. <code>pub</code> (or <code>pub</code>) marks what a library exports.</p>
+<pre data-run><code>import mem;
+
+struct Point
 {
-  I64 x, y;
+  i64 x, y;
 };
 
-Point Make(I64 x, I64 y)          // classes can be returned by value
+Point make(i64 x, i64 y)          // structs can be returned by value
 {
   Point r;
   r.x = x;
@@ -1080,68 +1059,68 @@ Point Make(I64 x, I64 y)          // classes can be returned by value
   return r;
 }
 
-I64 Sum(Point p)                  // and passed by value
+i64 sum(Point p)                  // and passed by value
 {
   return p.x + p.y;
 }
 
-U0 Main()
+void main()
 {
   Point a = {1, 2};               // initialise fields in order
-  Point c = Make(11, 22);
-  "%d %d %d\n", c.x, c.y, Sum(a);
+  Point c = make(11, 22);
+  printf("%d %d %d\n", c.x, c.y, sum(a));
 
   Point copy = c;                 // assignment copies
   copy.x = 0;
-  "%d %d\n", c.x, copy.x;
+  printf("%d %d\n", c.x, copy.x);
 
-  Point *p = MAlloc(sizeof(Point));
-  p-&gt;x = 5;                       // -&gt; through a pointer
+  Point *p = mem.alloc(sizeof(Point));
+  p.x = 5;                       // -&gt; through a pointer
   p.y = 6;                        // . works through one pointer too
-  "%d %d\n", p-&gt;x, p.y;
-  Free(p);
+  printf("%d %d\n", p.x, p.y);
+  mem.free(p);
 }
 </code></pre>
 <pre class="output">11 22 3
 11 0
 5 6
 </pre>
-<p><code>p.x</code> on a pointer to a class is <code>p-&gt;x</code>. It goes through one pointer
+<p><code>p.x</code> on a pointer to a struct is <code>p-&gt;x</code>. It goes through one pointer
 only: on a <code>Point **pp</code>, <code>pp.x</code> is an error and <code>(*pp).x</code> or
 <code>pp[0].x</code> is what you write.</p>
-<p>A field that is itself a class or an array takes a nested list:</p>
-<pre data-run><code>class Point { I64 x, y; };
-class Line  { Point from, to; I64 tags[2]; };
+<p>A field that is itself a struct or an array takes a nested list:</p>
+<pre data-run><code>struct Point { i64 x, y; };
+struct Line  { Point from, to; i64 tags[2]; };
 
 Line l = {{0, 0}, {3, 4}, {7, 8}};
 
-U0 Main()
+void main()
 {
   Line m = {{1, 2}, {5, 6}, {9, 10}};
-  "%d %d %d\n", l.to.x, l.to.y, l.tags[1];
-  "%d %d %d\n", m.from.y, m.to.x, m.tags[0];
+  printf("%d %d %d\n", l.to.x, l.to.y, l.tags[1]);
+  printf("%d %d %d\n", m.from.y, m.to.x, m.tags[0]);
 }
 </code></pre>
 <pre class="output">3 4 8
 2 5 9
 </pre>
-<p>A class declared ahead with <code>class Node;</code> can be pointed to straight away, but
+<p>A struct declared ahead with <code>struct Node;</code> can be pointed to straight away, but
 a field can hold it by value only once its definition has been seen, since until then its
-size isn't known: <code>class B; class A { B b; };</code> is the error
-<code>field `b` of A holds a B, which is not complete here: use a pointer</code>, as is a class
+size isn't known: <code>struct B; struct A { B b; };</code> is the error
+<code>field `b` of A holds a B, which is not complete here: use a pointer</code>, as is a struct
 holding itself. Define <code>B</code> first, or use a <code>B *</code> field.</p>
-<p>A string for a <code>U8</code> array field or row is copied in the same way, and
-must fit with its NUL. A <code>U8 *</code> field points at the string instead:</p>
-<pre data-run><code>class Item { I64 id; U8 name[8]; U8 *note; };
+<p>A string for a <code>u8</code> array field or row is copied in the same way, and
+must fit with its NUL. A <code>u8 *</code> field points at the string instead:</p>
+<pre data-run><code>struct Item { i64 id; u8 name[8]; u8 *note; };
 
-U8 days[3][4] = {"Mon", "Tue", "Wed"};
+u8 days[3][4] = {"Mon", "Tue", "Wed"};
 Item first = {1, "pen", "blue"};
 
-U0 Main()
+void main()
 {
   Item second = {2, "ink\n", "black"};
-  "%s %s %s\n", days[0], days[2], first.name;
-  "%s%s %s %d\n", second.name, first.note, second.note, sizeof(Item);
+  printf("%s %s %s\n", days[0], days[2], first.name);
+  printf("%s%s %s %d\n", second.name, first.note, second.note, sizeof(Item));
 }
 </code></pre>
 <pre class="output">Mon Wed pen
@@ -1150,45 +1129,45 @@ blue black 24
 </pre>
 
 <h3 id="inheritance">Inheritance<a class="anchor" href="#inheritance" aria-label="Link to this section">#</a></h3>
-<p>A class can extend one other class. It starts with all of the base class's fields, so a
-pointer to it can be used wherever the base class is expected:</p>
-<pre data-run><code>class Shape
+<p>A struct can extend one other struct. It starts with all of the base struct's fields, so a
+pointer to it can be used wherever the base struct is expected:</p>
+<pre data-run><code>struct Shape
 {
-  U8 *name;
-  F64 (*area)(Shape *s);
+  u8 *name;
+  fn(Shape *s) f64 area;
 };
 
-class Circle : Shape
+struct Circle : Shape
 {
-  F64 r;
+  f64 r;
 };
 
-class Rect : Shape
+struct Rect : Shape
 {
-  F64 w, h;
+  f64 w, h;
 };
 
-F64 CircleArea(Shape *s) { Circle *c = s; return 3.14159 * c-&gt;r * c-&gt;r; }
-F64 RectArea(Shape *s)   { Rect *r = s; return r-&gt;w * r-&gt;h; }
+f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * c.r * c.r; }
+f64 rectArea(Shape *s)   { Rect *r = s; return r.w * r.h; }
 
-U0 Main()
+void main()
 {
   Circle c;
   c.name = "circle";
-  c.area = &amp;CircleArea;
+  c.area = &amp;circleArea;
   c.r = 1.0;
 
   Rect r;
   r.name = "rect";
-  r.area = &amp;RectArea;
+  r.area = &amp;rectArea;
   r.w = 2.0;
   r.h = 3.0;
 
   Shape *shapes[2];
   shapes[0] = &amp;c;
   shapes[1] = &amp;r;
-  for (I64 i = 0; i &lt; 2; i++) {
-    "%s: %.2f\n", shapes[i]-&gt;name, shapes[i]-&gt;area(shapes[i]);
+  for (i64 i = 0; i &lt; 2; i++) {
+    printf("%s: %.2f\n", shapes[i].name, shapes[i].area(shapes[i]));
   }
 }
 </code></pre>
@@ -1273,57 +1252,57 @@ added to a type of the standard library or of another module, and a parameter na
 <p>All fields of a <code>union</code> share the same memory:</p>
 <pre data-run><code>union Bits
 {
-  I64 i;
-  F64 f;
-  U8 bytes[8];
+  i64 i;
+  f64 f;
+  u8 bytes[8];
 };
 
-U0 Main()
+void main()
 {
   Bits b;
   b.i = 0x41;
-  "%c %d\n", b.bytes[0], sizeof(Bits);
+  printf("%c %d\n", b.bytes[0], sizeof(Bits));
 }
 </code></pre>
 <pre class="output">A 8
 </pre>
 <p>An initialiser list gives a union one item, for its first field. A union can also be
-anonymous inside a class: its fields are used as the class's own, and it still takes one
+anonymous inside a struct: its fields are used as the struct's own, and it still takes one
 item:</p>
-<pre data-run><code>union Num { I32 i; F32 f; };
-class Token { U8 kind; union { I32 ival; F32 fval; }; I64 line; };
+<pre data-run><code>union Num { i32 i; f32 f; };
+struct Token { u8 kind; union { i32 ival; f32 fval; }; i64 line; };
 
 Num n = {7};
 Token t = {1, 42, 3};
 
-U0 Main()
+void main()
 {
   Token u = {2, 5, 9};
-  "%d %d %d %d\n", n.i, t.kind, t.ival, t.line;
-  "%d %d %d\n", u.kind, u.ival, u.line;
+  printf("%d %d %d %d\n", n.i, t.kind, t.ival, t.line);
+  printf("%d %d %d\n", u.kind, u.ival, u.line);
 }
 </code></pre>
 <pre class="output">7 1 42 3
 2 5 9
 </pre>
-<p>A class or union defined inside a class can also have a tag. Without a field name its
-fields are still the class's own, and the tag can be used as a type elsewhere; with a field
+<p>A struct or union defined inside a struct can also have a tag. Without a field name its
+fields are still the struct's own, and the tag can be used as a type elsewhere; with a field
 name it is the type of that field:</p>
-<pre data-run><code>class Shape
+<pre data-run><code>struct Shape
 {
-  U8 kind;
-  union Size { I32 side; F32 radius; };
-  class Pos { I32 x, y; } at;
+  u8 kind;
+  union Size { i32 side; f32 radius; };
+  struct Pos { i32 x, y; } at;
 };
 
-U0 Main()
+void main()
 {
   Shape s;
   s.side = 3;
   s.at.x = 10;
   Size z;
   z.radius = 1.5;
-  "%d %d %d %d\n", s.side, s.at.x, sizeof(Size), sizeof(Shape);
+  printf("%d %d %d %d\n", s.side, s.at.x, sizeof(Size), sizeof(Shape));
 }
 </code></pre>
 <pre class="output">3 10 4 16
@@ -1448,21 +1427,21 @@ pub struct Conn {
   private u8 *buf;     // only net uses it
 };
 
-pub u8 *peek(Conn *c) { return c.buf; }
+pub u8 *peek(Conn *c) { return libc.buf; }
 
 // main.ktm
 import net;
 
 i32 main() {
   net.Conn c;
-  c.fd = 3;            // fine
+  libc.fd = 3;            // fine
   net.Conn copy = c;   // fine
-  c.buf = NULL;        // error: `buf` is a private field of net.Conn
+  libc.buf = null;        // error: `buf` is a private field of net.Conn
   return 0;
 }</code></pre>
 <p><code>private</code> fields are only for a module's structs: in the main program, where
 there is nothing outside to hide them from, they are an error, and so is
-<code>public</code> on a field (fields are public unless marked). On a function, a method
+<code>pub</code> on a field (fields are public unless marked). On a function, a method
 or a type, <code>private</code> just says what leaving out <code>pub</code> already means;
 <code>pub private</code> together is an error. The editor's completion leaves out the
 private fields outside their module.</p>
@@ -1527,26 +1506,27 @@ one. Function-like macros (<code>#define F(x) ...</code>, no space before the
 supported"), so write a function instead. With a space, <code>#define CALC (2 * 21)</code>
 is an ordinary macro whose value is the expression in brackets. Names in a macro's value
 must be other macros. A numeric macro has the type of its value, as in C: if any operand
-is a float the macro is an <code>F64</code> (<code>#define AREA (1.5 * SIDE)</code> and
-<code>(SIDE * 1.5)</code> both are), otherwise an <code>I64</code>. A comparison or a
+is a float the macro is an <code>f64</code> (<code>#define AREA (1.5 * SIDE)</code> and
+<code>(SIDE * 1.5)</code> both are), otherwise an <code>i64</code>. A comparison or a
 logical operator (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>) is an
-<code>I64</code> 0 or 1 even with float operands, and a float counts as true when it isn't
+<code>i64</code> 0 or 1 even with float operands, and a float counts as true when it isn't
 0.0, as at run time: <code>#define ON (0.5 &amp;&amp; 1)</code> is 1.
-A postfix cast to a built-in type works and gives the macro that type:
-<code>#define BIG (5(U64) % 3)</code> is a <code>U64</code>, <code>#define HALF (5(F64) / 2)</code>
-an <code>F64</code> (2.5). Classes are not known to the preprocessor, so
-<code>0(MyClass*)</code> is an error in a macro. A long value can go on over several lines:
+A cast to a built-in type works and gives the macro that type:
+<code>#define BIG ((u64)5 % 3)</code> is a <code>u64</code>, <code>#define HALF ((f64)5 / 2)</code>
+an <code>f64</code> (2.5). Structs are not known to the preprocessor, so
+<code>(MyStruct *)0</code> is an error in a macro. A numeric constant is usually better
+written as <code>const</code>. A long value can go on over several lines:
 end each line but the last with a <code>\</code>, as in C.</p>
-<pre data-run><code>#define MAX_USERS 64
+<pre data-run><code>const i64 MAX_USERS = 64;
 #define APP_NAME  "demo"
-#define RATE      0.5
-#define BUFFER    (MAX_USERS * 16)
-#define BUDGET    (MAX_USERS * RATE)
+const f64 RATE = 0.5;
+const i64 BUFFER = (MAX_USERS * 16);
+const f64 BUDGET = (MAX_USERS * RATE);
 
-U0 Main()
+void main()
 {
-  "%s %d %.1f %d\n", APP_NAME, MAX_USERS, RATE, BUFFER;
-  "%.1f %s\n", BUDGET, typeof(BUDGET);
+  printf("%s %d %.1f %d\n", APP_NAME, MAX_USERS, RATE, BUFFER);
+  printf("%.1f %s\n", BUDGET, typeof(BUDGET));
 }
 </code></pre>
 <pre class="output">demo 64 0.5 1024
@@ -1557,12 +1537,12 @@ U0 Main()
 <p><code>#if</code>, <code>#ifdef</code>, <code>#ifndef</code>, <code>#elif</code>, <code>#else</code>,
 <code>#endif</code>, <code>#undef</code> and <code>#error</code> work as in C. Define a
 macro from the command line with <code>-D</code>:</p>
-<pre data-run data-args="-DVERBOSE"><code>U0 Main()
+<pre data-run data-args="-DVERBOSE"><code>void main()
 {
 #ifdef VERBOSE
-  "verbose mode\n";
+  printf("verbose mode\n");
 #else
-  "quiet mode\n";
+  printf("quiet mode\n");
 #endif
 }
 </code></pre>
@@ -1573,14 +1553,14 @@ macro from the command line with <code>-D</code>:</p>
 <code>defined(NAME)</code>, and they nest:</p>
 <pre data-run><code>#define LEVEL 2
 
-U0 Main()
+void main()
 {
 #if LEVEL &gt; 2
-  "high\n";
+  printf("high\n");
 #elif LEVEL == 2 &amp;&amp; !defined(QUIET)
-  "level two\n";
+  printf("level two\n");
 #else
-  "low\n";
+  printf("low\n");
 #endif
 }
 </code></pre>
@@ -1606,12 +1586,12 @@ appears: code above it keeps the old value. These macros are always predefined:<
 </table></div>
 <p><code>#ifjit</code> and <code>#ifaot</code> are shorthands for
 <code>#ifdef __KTM_JIT__</code> and <code>#ifdef __KTM_AOT__</code>:</p>
-<pre data-run data-mode="aot"><code>U0 Main()
+<pre data-run data-mode="aot"><code>void main()
 {
 #ifjit
-  "running in the JIT\n";
+  printf("running in the JIT\n");
 #else
-  "running as a compiled binary\n";
+  printf("running as a compiled binary\n");
 #endif
 }
 </code></pre>
@@ -1638,80 +1618,75 @@ the nearest enclosing <code>catch</code>; <code>catch (Error e)</code> gets the 
 <a href="#defer">defers</a> on the way.</p>
 <pre data-run><code>enum BankError { funds, locked };
 
-U0 Withdraw(I64 balance, I64 amount)
+void withdraw(i64 balance, i64 amount)
 {
-  if (amount &gt; balance) throw(BankError.funds, "need %d, have %d", amount, balance);
-  "withdrew %d\n", amount;
+  if (amount &gt; balance) { throw(BankError.funds, "need %d, have %d", amount, balance); }
+  printf("withdrew %d\n", amount);
 }
 
-U0 Main()
+void main()
 {
   try {
-    Withdraw(100, 30);
-    Withdraw(100, 500);
-    "never printed\n";
+    withdraw(100, 30);
+    withdraw(100, 500);
+    printf("never printed\n");
   } catch (Error e) {
     if (e.code == BankError.funds) {
-      "insufficient funds: %s\n", e.message;
+      printf("insufficient funds: %s\n", e.message);
     }
   }
-  "carrying on\n";
+  printf("carrying on\n");
 }
 </code></pre>
 <pre class="output">withdrew 30
 insufficient funds: need 500, have 100
 carrying on
 </pre>
-<p><code>e.message</code> is never <code>NULL</code> (it is <code>""</code> without a message)
-and is freed when the catch block is left: copy it (<code>StrNew(e.message)</code>) to keep
+<p><code>e.message</code> is never <code>null</code> (it is <code>""</code> without a message)
+and is freed when the catch block is left: copy it (<code>str.dup(e.message)</code>) to keep
 it. <code>throw(e)</code> throws the same error again, with its original message, file and
-line, so a handler can look at an error and pass it on. A <code>catch</code> without a
-binding still works and finds the code in <code>Fs->except_ch</code>; until the old code
-is converted, <code>throw('Funds')</code> with a character constant also still works (the
-constant is the code).</p>
+line, so a handler can look at an error and pass it on. A <code>catch</code> that doesn't
+need the error can leave out the binding.</p>
 <p>The code is converted like an argument to an integer parameter:
 <code>throw(42.75)</code> throws 42. The catch handler runs after its <code>try</code> has
 ended, so a <code>throw</code> inside it goes to the next enclosing <code>try</code>.</p>
 <p>A <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> may
 leave a <code>try</code> body (or a catch handler) at any depth of nesting; the tries it
 leaves stop catching:</p>
-<pre data-run><code>I64 Find(I64 *items, I64 n, I64 want)
+<pre data-run><code>enum Err { late };
+
+i64 find(i64 *items, i64 n, i64 want)
 {
-  I64 i;
+  i64 i;
   for (i = 0; i &lt; n; i++) {
     try {
-      if (items[i] == want) return i;
-      if (items[i] &lt; 0) break;
+      if (items[i] == want) { return i; }
+      if (items[i] &lt; 0) { break; }
     } catch {
     }
   }
   return -1;
 }
 
-U0 Main()
+void main()
 {
-  I64 items[4] = {3, 7, -1, 9};
+  i64 items[4] = {3, 7, -1, 9};
   try {
-    "%d %d\n", Find(items, 4, 7), Find(items, 4, 9);
-    throw('Late');
+    printf("%d %d\n", find(items, 4, 7), find(items, 4, 9));
+    throw(Err.late);
   } catch {
-    "caught here, not in Find\n";
+    printf("caught here, not in Find\n");
   }
 }
 </code></pre>
 <pre class="output">1 -1
 caught here, not in Find
 </pre>
-<p>Each thread has its own <code>Fs</code>: a <code>throw</code> is caught only by a
-<code>try</code> of the thread that threw, so threads can use try/catch at the same time.
-<code>Fs</code> is a function returning the calling thread's state, so
-<code>Fs->except_ch</code> reads that thread's last thrown value.</p>
+<p>Each thread has its own catch chain: a <code>throw</code> is caught only by a
+<code>try</code> of the thread that threw, so threads can use try/catch at the same time.</p>
 <p>An error that no <code>try</code> catches, in any thread, is printed on stderr (after
-what the program printed so far) and ends the program with exit code 1. A code that is a
-character constant with all bytes printable is shown as text, anything else as a
-number:</p>
-<pre><code>uncaught error 0: need 500, have 100 (bank.ktm:5)
-uncaught error 'Funds' (old.ktm:12)</code></pre>
+what the program printed so far) and ends the program with exit code 1:</p>
+<pre><code>uncaught error 0: need 500, have 100 (bank.ktm:5)</code></pre>
 <p>Each <code>try</code> and each <code>defer</code> reached saves the registers but not the
 signal mask, so they cost no system call; the flip side is that a <code>throw</code> out of a
 signal handler leaves that signal blocked.</p>
@@ -1723,29 +1698,33 @@ block, through <code>return</code>, <code>break</code>, <code>continue</code> or
 <code>goto</code> out of it, or because a <code>throw</code> is passing through it on its
 way to a <code>catch</code> (after the deferred statements have run, the throw carries on
 to that catch). It keeps clean-up next to the code that needs it:</p>
-<pre data-run><code>U0 Copy(I64 n)
+<pre data-run><code>import mem;
+
+enum Err { neg };
+
+void copy(i64 n)
 {
-  U8 *buf = MAlloc(64);
-  defer { Free(buf); "freed\n"; }
-  if (n &lt; 0) throw('Neg');
-  "copied %d\n", n;
+  u8 *buf = mem.alloc(64);
+  defer { mem.free(buf); printf("freed\n"); }
+  if (n &lt; 0) { throw(Err.neg); }
+  printf("copied %d\n", n);
 }
 
-U0 Main()
+void main()
 {
   {
-    defer "1st registered, runs last\n";
-    defer "2nd registered, runs first\n";
+    defer printf("1st registered, runs last\n");
+    defer printf("2nd registered, runs first\n");
   }
-  for (I64 i = 0; i &lt; 3; i++) {
-    defer "end of iteration %d\n", i;
-    if (i == 1) continue;
+  for (i64 i = 0; i &lt; 3; i++) {
+    defer printf("end of iteration %d\n", i);
+    if (i == 1) { continue; }
   }
-  Copy(5);
+  copy(5);
   try {
-    Copy(-1);
+    copy(-1);
   } catch {
-    "caught\n";
+    printf("caught\n");
   }
 }
 </code></pre>
@@ -1771,14 +1750,14 @@ finish before outer ones.</li>
 not run on that return.</li>
 <li>The statement runs as written when the block is left, so it sees the values variables
 have then. <code>return</code> evaluates its value first: <code>return buf[0];</code> with
-<code>defer Free(buf);</code> returns the right value.</li>
+<code>defer mem.free(buf);</code> returns the right value.</li>
 <li>A <code>throw</code> from a deferred statement goes on like any other throw.</li>
 <li>A deferred statement can't be left by <code>return</code>, <code>break</code>,
 <code>continue</code> or <code>goto</code> (a loop inside it keeps its own
 <code>break</code> and <code>continue</code>), can't contain a label, and a
 <code>goto</code> can't jump past a <code>defer</code> into the rest of its block. These,
 and <code>defer</code> outside a function, are compile errors.</li>
-<li>Returning from <code>Main</code> runs its defers, but <code>Exit()</code>, <code>exit()</code>
+<li>Returning from <code>main</code> runs its defers, but <code>os.exit()</code>, <code>exit()</code>
 and a crash end the program without running any. Switching coroutines doesn't leave a
 block either, so it runs no defers.</li>
 </ul>
@@ -1788,23 +1767,25 @@ like a <code>try</code> does); code without it compiles exactly as before.</p>
 <h2 id="calling-c">Calling C<a class="anchor" href="#calling-c" aria-label="Link to this section">#</a></h2>
 <p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always
 linked:</p>
-<pre data-run><code>extern "c" I32 abs(I32 x);
-extern "c" U8 *getenv(U8 *name);
+<pre data-run><code>import libc;
 
-U0 Main()
+extern "c" i32 abs(i32 x);
+extern "c" u8 *getenv(u8 *name);
+
+void main()
 {
-  "%d %d\n", abs(-5), getenv("PATH") != NULL;
+  printf("%d %d\n", abs(-5), libc.getenv("PATH") != null);
 }
 </code></pre>
 <pre class="output">5 1
 </pre>
-<p>Use <code>F32</code> for C <code>float</code>, <code>I32</code> for <code>int</code> and
-<code>U8 *</code> for <code>char *</code>. To use another library, link it from the source
+<p>Use <code>f32</code> for C <code>float</code>, <code>i32</code> for <code>int</code> and
+<code>u8 *</code> for <code>char *</code>. To use another library, link it from the source
 and it works in compiled programs, the JIT and the REPL alike:</p>
 <pre><code>#link &amp;lt;sqlite3&amp;gt;          // like -lsqlite3
 #link "./libmine.so"     // a path, relative to the working directory
 
-extern "c" I32 sqlite3_libversion_number();</code></pre>
+extern "c" i32 sqlite3_libversion_number();</code></pre>
 
 <h2 id="inline-assembly">Inline assembly<a class="anchor" href="#inline-assembly" aria-label="Link to this section">#</a></h2>
 <p>An <code>asm</code> block defines labelled routines. <code>_extern</code> binds one to a
@@ -1826,11 +1807,11 @@ _ADD_ONE::
 }
 #endif
 
-_extern _ADD_ONE I64 AddOne(I64 x);
+_extern _ADD_ONE i64 addOne(i64 x);
 
-U0 Main()
+void main()
 {
-  "%d\n", AddOne(41);
+  printf("%d\n", addOne(41));
 }
 </code></pre>
 <pre class="output">42
@@ -1843,13 +1824,13 @@ instead. The differences:</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Feature</th><th>ktm</th></tr></thead>
   <tbody>
-    <tr><td><code>F32</code></td><td>Added, for C libraries that use <code>float</code></td></tr>
+    <tr><td><code>f32</code></td><td>Added, for C libraries that use <code>float</code></td></tr>
     <tr><td><code>auto</code>, <code>typeof</code>, range-based <code>for</code>, <code>if (init; cond)</code></td><td>Added</td></tr>
     <tr><td><code>extern "c"</code>, <code>#link</code>, <code>#ifjit</code> / <code>#ifaot</code></td><td>Added, for working with the host system</td></tr>
     <tr><td><code>?:</code></td><td>Not supported</td></tr>
     <tr><td>Sub-integer access (<code>x.u8[1]</code>)</td><td>Not supported</td></tr>
-    <tr><td>Exponent operator <code>`</code></td><td>Not supported; use <code>Pow</code> or <code>pow</code></td></tr>
-    <tr><td><code>Fs</code></td><td>Exists for exceptions (<code>Fs->except_ch</code>), one per thread; there are no tasks</td></tr>
+    <tr><td>Exponent operator <code>`</code></td><td>Not supported; use <code>math.power</code> or <code>libc.pow</code></td></tr>
+    <tr><td><code>Fs</code></td><td>Gone: <code>catch (Error e)</code> gives the error; there are no tasks</td></tr>
     <tr><td>DolDoc, graphics, the system shell</td><td>Not available; use the C library through <code>extern "c"</code></td></tr>
   </tbody>
 </table></div>
