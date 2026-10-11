@@ -1,4 +1,4 @@
-import cstr, fs, fzf, libc, mem, os, vec;
+import cstr, fs, libc, mem, os, vec;
 
 i64 cmpFileNames(u8 *str1, u8 *str2) {
     if ('0'<=*str1<='9' && '0'<=*str2<='9') {
@@ -38,25 +38,20 @@ void qSortStrings(u8 **arr, i64 high, i64 low=0) {
 }
 
 
-bool shouldExclude(u8 *filename, i64 namelen) {
-    u8 *exclude[] = {
-        "run.ktm",
-        "run_shared.ktm",
-        "run_jit.ktm",
-        "tests.sh",
-        "Makefile",
-        "a.out",
-        "test-runner"};
-
+/* Only NN_name.ktm files are tests: digits, `_`, a name, `.ktm`. The
+ * runners, the test module and any helper or scratch .ktm next to them
+ * are not. */
+bool isTestFile(u8 *filename) {
+    i64 i = 0;
+    while (filename[i] >= '0' && filename[i] <= '9') { i++; }
+    if (i == 0 || filename[i] != '_') { return false; }
+    i64 len = cstr.len(filename);
+    if (len < i + 6 || cstr.cmp(filename + len - 4, ".ktm")) { return false; }
 #ifndef __KTM_LINK_SQLITE3__
     /* The NN_sql*.ktm tests need libktm built with --sqlite. */
-    if (libc.strstr(filename, "_sql")) { return true; }
+    if (libc.strstr(filename, "_sql")) { return false; }
 #endif
-
-    for (u8 *name : exclude) {
-        if (!cstr.cmpLen(name,filename,namelen)) { return true; }
-    }
-    return false;
+    return true;
 }
 
 /* Cross-compilation hook.
@@ -115,13 +110,9 @@ vec.PtrVec *collectTests() {
     libc.Dirent *ent;
     while ((ent = libc.readdir(dir)) != null) {
         if (ent.type & libc.DT_REG) {
-            auto len = cstr.len(ent.name);
-            auto res = fzf.match(ent.name,"ktm$");
-
-            if (shouldExclude(ent.name,len) || res == null) {
+            if (!isTestFile(ent.name)) {
                 continue;
             }
-            fzf.release(res);
             auto strVal = cstr.dup(ent.name);
             vecVal.push(strVal);
         }
