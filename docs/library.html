@@ -1231,6 +1231,7 @@ code 14, line 3, column 7
     <tr><td><code>json.INVALID_LITERAL</code> (18)</td><td>not <code>true</code>, <code>false</code> or <code>null</code></td></tr>
     <tr><td><code>json.INVALID_CONTROL_CHARACTER</code> (19)</td><td>a raw byte below 0x20 inside a string</td></tr>
     <tr><td><code>json.NESTING_TOO_DEEP</code> (20)</td><td>nested deeper than <code>json.MAX_DEPTH</code></td></tr>
+    <tr><td><code>json.INVALID_UTF8</code> (21)</td><td>bytes in a string that aren't UTF-8 (a stray continuation byte, a cut-off or overlong sequence, a surrogate, or past U+10FFFF); the position is the sequence's first byte</td></tr>
   </tbody>
 </table></div>
 <p><code>json.OK</code> is 0. The codes 1, 6, 7, 9, 10, 11 and 17 are still defined but no

@@ -91,5 +91,10 @@ pub const i64 INVALID_CONTROL_CHARACTER = 19;
 /* Arrays/objects nested deeper than JSON_MAX_DEPTH */
 pub const i64 NESTING_TOO_DEEP = 20;
 
+/* Bytes in a string that aren't UTF-8: a stray continuation byte, a
+ * sequence cut off or too long for its value, a surrogate, or past
+ * U+10FFFF (RFC 8259 text is UTF-8) */
+pub const i64 INVALID_UTF8 = 21;
+
 /* JsonParse rejects arrays and objects nested deeper than this */
 pub const i64 MAX_DEPTH = 512;
