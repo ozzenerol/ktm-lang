@@ -19,36 +19,36 @@ pub struct FloatVec {
 /* Get/Set with an index outside [0, size): report it on stderr and exit,
  * rather than read or write past the entries. */
 static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
-    u8 *msg = strPrint(null, "%s: index %d out of range (size %d)\n",
+    u8 *msg = str.formatTo(null, "%s: index %d out of range (size %d)\n",
                                          fnName, idx, size);
-    fdWrite(os.STDERR, msg, strLen(msg));
-    exitProgram(1);
+    fdWrite(os.STDERR, msg, str.len(msg));
+    os.exit(1);
 }
 
-pub FloatVec *floatVecNew(i64 size = 32) {
-    FloatVec *vec = memAlloc(sizeof(FloatVec));
+pub FloatVec *floatNew(i64 size = 32) {
+    FloatVec *vec = mem.alloc(sizeof(FloatVec));
     vec.size = 0;
     if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = memAlloc(sizeof(f64) * size);
+    vec.entries = mem.alloc(sizeof(f64) * size);
     return vec;
 }
 
-pub u64 floatVecCapacity(FloatVec *vec) {
-    return memSize(vec.entries)/sizeof(f64);
+pub u64 floatCapacity(FloatVec *vec) {
+    return mem.size(vec.entries)/sizeof(f64);
 }
 
-pub void floatVecPush(FloatVec *vec, f64 value) {
-    auto capacity = memSize(vec.entries)/sizeof(f64);
+pub void floatPush(FloatVec *vec, f64 value) {
+    auto capacity = mem.size(vec.entries)/sizeof(f64);
     if (vec.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(f64)));
+        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(f64)));
         vec.entries = newEntries;
     }
     vec.entries[vec.size++] = value;
 }
 
-pub f64 floatVecPop(FloatVec *vec, bool *_ok=null) {
+pub f64 floatPop(FloatVec *vec, bool *_ok=null) {
     if (vec.size > 0) {
         auto value = vec.entries[--vec.size];
         if (_ok) { *_ok = true; }
@@ -58,14 +58,14 @@ pub f64 floatVecPop(FloatVec *vec, bool *_ok=null) {
     return -1.0;
 }
 
-pub f64 floatVecGet(FloatVec *vec, i64 idx) {
+pub f64 floatGet(FloatVec *vec, i64 idx) {
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("FloatVecGet", idx, vec.size);
     }
     return vec.entries[idx];
 }
 
-pub void floatVecSet(FloatVec *vec, i64 idx, f64 value)
+pub void floatSet(FloatVec *vec, i64 idx, f64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("FloatVecSet", idx, vec.size);
@@ -73,7 +73,7 @@ pub void floatVecSet(FloatVec *vec, i64 idx, f64 value)
     vec.entries[idx] = value;
 }
 
-pub f64 floatVecLast(FloatVec *vec, bool *_ok=null)
+pub f64 floatLast(FloatVec *vec, bool *_ok=null)
 {// The last entry without removing it; -1.0 and *_ok = false when empty
     if (vec.size > 0) {
         if (_ok) { *_ok = true; }
@@ -92,45 +92,45 @@ i64 floatCmp(void *a, void *b) {
     return f1 < f2;
 }
 
-pub void floatVecSort(FloatVec *vec) {
-    qsortGeneric((void**)vec.entries,vec.size-1,0,&floatCmp);
+pub void floatSort(FloatVec *vec) {
+    qsort((void**)vec.entries,vec.size-1,0,&floatCmp);
 }
 
-pub void floatVecClear(FloatVec *vec) {
+pub void floatClear(FloatVec *vec) {
     vec.size = 0;
 }
 
-pub void floatVecRelease(FloatVec *vec) {
+pub void floatRelease(FloatVec *vec) {
     if (vec) {
-        memFree(vec.entries);
-        memFree(vec);
+        mem.free(vec.entries);
+        mem.free(vec);
     }
 }
 
-pub IntVec *intVecNew(i64 size = 32) {
-    IntVec *vec = memAlloc(sizeof(IntVec));
+pub IntVec *intNew(i64 size = 32) {
+    IntVec *vec = mem.alloc(sizeof(IntVec));
     vec.size = 0;
     if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = memAlloc(sizeof(i64) * size);
+    vec.entries = mem.alloc(sizeof(i64) * size);
     return vec;
 }
 
-pub u64 intVecCapacity(IntVec *vec) {
-    return memSize(vec.entries)/sizeof(i64);
+pub u64 intCapacity(IntVec *vec) {
+    return mem.size(vec.entries)/sizeof(i64);
 }
 
-pub void intVecPush(IntVec *vec, i64 value) {
-    auto capacity = intVecCapacity(vec);
+pub void intPush(IntVec *vec, i64 value) {
+    auto capacity = intCapacity(vec);
     if (vec.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(i64)));
+        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(i64)));
         vec.entries = newEntries;
     }
     vec.entries[vec.size++] = value;
 }
 
-pub i64 intVecPop(IntVec *vec, bool *_ok=null) {
+pub i64 intPop(IntVec *vec, bool *_ok=null) {
     if (vec.size > 0) {
         auto value = vec.entries[--vec.size];
         if (_ok) { *_ok = true; }
@@ -140,14 +140,14 @@ pub i64 intVecPop(IntVec *vec, bool *_ok=null) {
     return -1;
 }
 
-pub i64 intVecGet(IntVec *vec, i64 idx) {
+pub i64 intGet(IntVec *vec, i64 idx) {
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("IntVecGet", idx, vec.size);
     }
     return vec.entries[idx];
 }
 
-pub void intVecSet(IntVec *vec, i64 idx, i64 value)
+pub void intSet(IntVec *vec, i64 idx, i64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("IntVecSet", idx, vec.size);
@@ -155,7 +155,7 @@ pub void intVecSet(IntVec *vec, i64 idx, i64 value)
     vec.entries[idx] = value;
 }
 
-pub i64 intVecLast(IntVec *vec, bool *_ok=null)
+pub i64 intLast(IntVec *vec, bool *_ok=null)
 {// The last entry without removing it; -1 and *_ok = false when empty
     if (vec.size > 0) {
         if (_ok) { *_ok = true; }
@@ -169,45 +169,45 @@ i64 intCmp(void *i1, void *i2) {
     return (i64)i1 < (i64)i2;
 }
 
-pub void intVecSort(IntVec *vec) {
-    qsortGeneric((void**)vec.entries,vec.size-1,0,&intCmp);
+pub void intSort(IntVec *vec) {
+    qsort((void**)vec.entries,vec.size-1,0,&intCmp);
 }
 
-pub void intVecClear(IntVec *vec) {
+pub void intClear(IntVec *vec) {
     vec.size = 0;
 }
 
-pub void intVecRelease(IntVec *vec) {
+pub void intRelease(IntVec *vec) {
     if (vec) {
-        memFree(vec.entries);
-        memFree(vec);
+        mem.free(vec.entries);
+        mem.free(vec);
     }
 }
 
-pub PtrVec *ptrVecNew(i64 size = 32) {
-    PtrVec *vec = memAlloc(sizeof(PtrVec));
+pub PtrVec *ptrNew(i64 size = 32) {
+    PtrVec *vec = mem.alloc(sizeof(PtrVec));
     vec.size = 0;
     if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = memAlloc(sizeof(void*) * size);
+    vec.entries = mem.alloc(sizeof(void*) * size);
     return vec;
 }
 
-pub u64 ptrVecCapacity(PtrVec *vec) {
-    return memSize(vec.entries)/sizeof(void*);
+pub u64 ptrCapacity(PtrVec *vec) {
+    return mem.size(vec.entries)/sizeof(void*);
 }
 
-pub void ptrVecPush(PtrVec *vec, void *value) {
-    auto capacity = memSize(vec.entries)/sizeof(void*);
+pub void ptrPush(PtrVec *vec, void *value) {
+    auto capacity = mem.size(vec.entries)/sizeof(void*);
     if (vec.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(void*)));
+        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(void*)));
         vec.entries = newEntries;
     }
     vec.entries[vec.size++] = value;
 }
 
-pub void *ptrVecPop(PtrVec *vec, bool *_ok=null) {
+pub void *ptrPop(PtrVec *vec, bool *_ok=null) {
     if (vec.size > 0) {
         auto value = vec.entries[--vec.size];
         if (_ok) { *_ok = true; }
@@ -217,14 +217,14 @@ pub void *ptrVecPop(PtrVec *vec, bool *_ok=null) {
     return null;
 }
 
-pub void *ptrVecGet(PtrVec *vec, i64 idx) {
+pub void *ptrGet(PtrVec *vec, i64 idx) {
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("PtrVecGet", idx, vec.size);
     }
     return vec.entries[idx];
 }
 
-pub void ptrVecSet(PtrVec *vec, i64 idx, void *value)
+pub void ptrSet(PtrVec *vec, i64 idx, void *value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= vec.size) {
         vecIndexError("PtrVecSet", idx, vec.size);
@@ -232,7 +232,7 @@ pub void ptrVecSet(PtrVec *vec, i64 idx, void *value)
     vec.entries[idx] = value;
 }
 
-pub void *ptrVecLast(PtrVec *vec, bool *_ok=null)
+pub void *ptrLast(PtrVec *vec, bool *_ok=null)
 {// The last entry without removing it; null and *_ok = false when empty
     if (vec.size > 0) {
         if (_ok) { *_ok = true; }
@@ -248,7 +248,7 @@ pub void *ptrVecLast(PtrVec *vec, bool *_ok=null)
  * partition, so sorted, reversed and all-equal input stay O(n log n); it
  * recurses into the smaller part and loops on the larger one, so the
  * recursion depth is O(log n). Short ranges use an insertion sort. */
-pub void qsortGeneric(void **arr, i64 high, i64 low,
+pub void qsort(void **arr, i64 high, i64 low,
         fn(void *_arg1, void *_arg2) i64 _compare_fn) {
     void *tmp;
     while (high - low >= 16) {
@@ -293,10 +293,10 @@ pub void qsortGeneric(void **arr, i64 high, i64 low,
         }
 
         if (lt - low < high - gt) {
-            qsortGeneric(arr, lt - 1, low, _compare_fn);
+            qsort(arr, lt - 1, low, _compare_fn);
             low = gt + 1;
         } else {
-            qsortGeneric(arr, high, gt + 1, _compare_fn);
+            qsort(arr, high, gt + 1, _compare_fn);
             high = lt - 1;
         }
     }
@@ -312,15 +312,15 @@ pub void qsortGeneric(void **arr, i64 high, i64 low,
     }
 }
 
-pub void ptrVecSort(PtrVec *vec, fn(void *_arg1, void *_arg2) i64 _compare_fn) {
-    qsortGeneric(vec.entries,vec.size-1,0,_compare_fn);
+pub void ptrSort(PtrVec *vec, fn(void *_arg1, void *_arg2) i64 _compare_fn) {
+    qsort(vec.entries,vec.size-1,0,_compare_fn);
 }
 
-pub void ptrVecClear(PtrVec *vec) {
+pub void ptrClear(PtrVec *vec) {
     vec.size = 0;
 }
 
-pub void ptrVecRelease(PtrVec *vec, fn(void *_val) void _free_value = null)
+pub void ptrRelease(PtrVec *vec, fn(void *_val) void _free_value = null)
 { // Optionally pass a callback to free each item in the vector 
     if (vec) {
         if (_free_value) {
@@ -330,8 +330,8 @@ pub void ptrVecRelease(PtrVec *vec, fn(void *_val) void _free_value = null)
                 _free_value(entries[i]);
             }
         }
-        memFree(vec.entries);
-        memFree(vec);
+        mem.free(vec.entries);
+        mem.free(vec);
     }
 }
 

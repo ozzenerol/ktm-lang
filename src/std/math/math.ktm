@@ -67,7 +67,7 @@ pub f64 power(f64 a, f64 b) {
     return result;
 }
 
-pub u64 modU64(u64 *k, u64 m)
+pub u64 divModU64(u64 *k, u64 m)
 {// returns *k % m and sets *k to *k / m.
     u64 res = *k % m;
     *k /= m;

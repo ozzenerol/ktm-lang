@@ -46,11 +46,11 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     result = 0;
     while (!result && (ent = readdir(dir))) {
         r2 = -1;
-        if (!strCmp(ent.name,".") || !strCmp(ent.name,"..")) {
+        if (!str.cmp(ent.name,".") || !str.cmp(ent.name,"..")) {
             continue;
         }
 
-        buf = strPrint(null,"%s/%s",path,ent.name);
+        buf = str.formatTo(null,"%s/%s",path,ent.name);
         if (buf) {
             if (ent.type == c.DT_DIR) {
                 r2 = removeDir(buf,flags);
@@ -80,7 +80,7 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
                 }
 
             }
-            memFree(buf);
+            mem.free(buf);
             result = r2;
     }
     c.closedir(dir);
@@ -99,7 +99,7 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     return result;
 }
 
-pub i32 removePath(u8 *path, i64 flags=0)
+pub i32 remove(u8 *path, i64 flags=0)
 { /* DANGER Remove a file or directory, this is powerful but can cause a world 
      * of pain */
     i32 result;
@@ -145,7 +145,7 @@ pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
         return makeDirIfMissing(path,mode);
     } else {
         /* Each prefix of `path` is copied here, so it needs path's length */
-        if ((tmp = memAlloc(strLen(path)+1)) == null) {
+        if ((tmp = mem.alloc(str.len(path)+1)) == null) {
             return -1;
         }
         ptr = path;
@@ -158,7 +158,7 @@ pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
             if (i > 1 && *ptr == '/') {
                 tmp[i] = '\0';
                 if (makeDirIfMissing(tmp,mode) != 0) {
-                    memFree(tmp);
+                    mem.free(tmp);
                     return -1;
                 } 
             }
@@ -168,7 +168,7 @@ pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
             tmp[i] = '\0';
             result = makeDirIfMissing(tmp,mode);
         }
-        memFree(tmp);
+        mem.free(tmp);
     }
     return result;
 }

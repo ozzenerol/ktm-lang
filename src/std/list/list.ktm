@@ -6,20 +6,20 @@ pub struct List {
         List *next, *prev;
 };
 
-pub void listInit(List *l) {
+pub void init(List *l) {
         l.value = null;
         l.next = l.prev = l;
 }
 
-pub List *listNew() {
-        List *ll = memAlloc(sizeof(List));
+pub List *new() {
+        List *ll = mem.alloc(sizeof(List));
         ll.value = null;
         ll.next = ll.prev = ll;
         return ll;
 }
 
-pub void listPrepend(List *head, void *value) {
-        List *node = listNew();
+pub void prepend(List *head, void *value) {
+        List *node = new();
         node.value = value;
         node.prev = head;
         node.next = head.next;
@@ -27,13 +27,13 @@ pub void listPrepend(List *head, void *value) {
         head.next = node;
 }
 
-pub bool listEmpty(List *l) {
+pub bool isEmpty(List *l) {
         return (l == null || l.next == l);
 }
 
-pub void listAppend(List *head, void *value) {
+pub void append(List *head, void *value) {
         List *tail = head.prev;
-        List *node = listNew();
+        List *node = new();
         node.value = value;
         node.prev = tail;
         node.next = head;
@@ -41,7 +41,7 @@ pub void listAppend(List *head, void *value) {
         head.prev = node;
 }
 
-pub void *listDeque(List *l) {
+pub void *shift(List *l) {
         if (!l) { return null; }
         List *ll = (List *)l;
         if (ll.next == ll) {
@@ -51,24 +51,24 @@ pub void *listDeque(List *l) {
         void *val = node.value;
         node.next.prev = ll;
         ll.next = ll.next.next;
-        memFree(node);
+        mem.free(node);
         return val;
 }
 
-pub void listInsertBefore(List *ll, List *newNode) {
+pub void insertNodeBefore(List *ll, List *newNode) {
         newNode.next = ll;
         newNode.prev = ll.prev;
         ll.prev.next = newNode;
         ll.prev = newNode;
 }
 
-pub void listInsertValueBefore(List *ll, void *value) {
-        List *prev = listNew();
+pub void insertBefore(List *ll, void *value) {
+        List *prev = new();
         prev.value = value;
-        listInsertBefore(ll,prev);
+        insertNodeBefore(ll,prev);
 }
 
-pub void *listPop(List *l) {
+pub void *pop(List *l) {
         if (!l) { return null; }
         List *ll = (List *)l;
         if (ll.next == ll) {
@@ -78,11 +78,11 @@ pub void *listPop(List *l) {
         void *val = node.value;
         node.prev.next = ll;
         ll.prev = ll.prev.prev;
-        memFree(node);
+        mem.free(node);
         return val;
 }
 
-pub void listRelease(List *ll, fn(void *arg) void FreeValue) {
+pub void release(List *ll, fn(void *arg) void FreeValue) {
         if (!ll) { return; }
         List *node = ll.next;
         List *next;
@@ -91,13 +91,13 @@ pub void listRelease(List *ll, fn(void *arg) void FreeValue) {
                 if (FreeValue) {
                         FreeValue(node.value);
                 }
-                memFree(node);
+                mem.free(node);
                 node = next;
         }
-        memFree(ll);
+        mem.free(ll);
 }
 
-pub void listClear(List *l, fn(void *value) void free_value=null)
+pub void clear(List *l, fn(void *value) void free_value=null)
 {// Free every node (calling free_value on each value, if given) and keep
     // the head, empty: works on a ListInit head too. null is ignored.
         if (!l) { return; }
@@ -108,13 +108,13 @@ pub void listClear(List *l, fn(void *value) void free_value=null)
                 if (free_value) {
                         free_value(node.value);
                 }
-                memFree(node);
+                mem.free(node);
                 node = next;
         }
         l.next = l.prev = l;
 }
 
-pub void *listRemove(List *node)
+pub void *remove(List *node)
 {// Unlink `node` from its list, free it and return its value. Never pass
     // the list's head; an empty head (linked to itself) is left alone and
     // null is returned, as for a null node.
@@ -122,23 +122,23 @@ pub void *listRemove(List *node)
         void *value = node.value;
         node.prev.next = node.next;
         node.next.prev = node.prev;
-        memFree(node);
+        mem.free(node);
         return value;
 }
 
-pub void *listFirst(List *l)
+pub void *first(List *l)
 {// The first value, without removing it; null if the list is empty or null
         if (!l || l.next == l) { return null; }
         return l.next.value;
 }
 
-pub void *listLast(List *l)
+pub void *last(List *l)
 {// The last value, without removing it; null if the list is empty or null
         if (!l || l.prev == l) { return null; }
         return l.prev.value;
 }
 
-pub i64 listCount(List *ll) {
+pub i64 count(List *ll) {
         if (!ll || ll == ll.next) { return 0; }
         auto node = ll.next;
         i64 count = 0;
@@ -158,10 +158,10 @@ pub i64 listCount(List *ll) {
     * l2 has been freed and must not be used again. An empty l2 is just
     * freed; with l1 or l2 null nothing happens.
     */
-pub void listMergePrepend(List *l1, List *l2) {
+pub void mergePrepend(List *l1, List *l2) {
         if (!l1 || !l2) { return; }
         if (l2.next == l2) {
-                memFree(l2);
+                mem.free(l2);
                 return;
         }
         List *h1 = l1.next;
@@ -173,7 +173,7 @@ pub void listMergePrepend(List *l1, List *l2) {
         h2.prev = l1;
         t2.next = h1;
         h1.prev = t2;
-        memFree(l2);
+        mem.free(l2);
 }
 
 /* Move the nodes of l2 to the end of l1 and Free l2's head.
@@ -185,10 +185,10 @@ pub void listMergePrepend(List *l1, List *l2) {
     * l2 has been freed and must not be used again. An empty l2 is just
     * freed; with l1 or l2 null nothing happens.
     * */
-pub void listMergeAppend(List *l1, List *l2) {
+pub void mergeAppend(List *l1, List *l2) {
         if (!l1 || !l2) { return; }
         if (l2.next == l2) {
-                memFree(l2);
+                mem.free(l2);
                 return;
         }
         List *t1 = l1.prev;
@@ -200,5 +200,5 @@ pub void listMergeAppend(List *l1, List *l2) {
         t1.next = h2;
         t2.next = l1;
         l1.prev = t2;
-        memFree(l2);
+        mem.free(l2);
 }

@@ -8,30 +8,30 @@ pub struct BitVec {
     u32 *entries;
 };
 
-pub BitVec *bitVecNew() {
-    BitVec *bv = memAlloc(sizeof(BitVec));
-    bv.entries = memAllocZero(sizeof(u32));
+pub BitVec *bitNew() {
+    BitVec *bv = mem.alloc(sizeof(BitVec));
+    bv.entries = mem.allocZero(sizeof(u32));
     bv.blocks = 1;
     return bv;
 }
 
-pub void bitVecRelease(BitVec *bv) {
+pub void bitRelease(BitVec *bv) {
     if (!bv) { return; }
-    memFree(bv.entries);
-    memFree(bv);
+    mem.free(bv.entries);
+    mem.free(bv);
 }
 
-pub bool bitVecSet(BitVec *bv, u64 idx) {
+pub bool bitSet(BitVec *bv, u64 idx) {
     if (!bv) { return false; }
     u64 blockIdx = idx / BIT_VEC_BITS;
     if (blockIdx >= bv.blocks) {
         /* at least double, so setting bits in increasing order is linear */
         u64 blocks = blockIdx + 1;
         if (blocks < bv.blocks * 2) { blocks = bv.blocks * 2; }
-        u32 *entries = memAllocZero(sizeof(u32) * blocks);
+        u32 *entries = mem.allocZero(sizeof(u32) * blocks);
         if (!entries) { return false; }
-        memCpy(entries, bv.entries, sizeof(u32) * bv.blocks);
-        memFree(bv.entries);
+        mem.copy(entries, bv.entries, sizeof(u32) * bv.blocks);
+        mem.free(bv.entries);
         bv.entries = entries;
         bv.blocks = blocks;
     }
@@ -39,7 +39,7 @@ pub bool bitVecSet(BitVec *bv, u64 idx) {
     return true;
 }
 
-pub void bitVecUnSet(BitVec *bv, u64 idx) {
+pub void bitUnset(BitVec *bv, u64 idx) {
     if (!bv) { return; }
     u64 blockIdx = idx / BIT_VEC_BITS;
     if (blockIdx < bv.blocks) {
@@ -47,7 +47,7 @@ pub void bitVecUnSet(BitVec *bv, u64 idx) {
     }
 }
 
-pub bool bitVecTest(BitVec *bv, u64 idx) {
+pub bool bitTest(BitVec *bv, u64 idx) {
     if (!bv) { return false; }
     u64 blockIdx = idx / BIT_VEC_BITS;
     if (blockIdx < bv.blocks) {
@@ -56,7 +56,7 @@ pub bool bitVecTest(BitVec *bv, u64 idx) {
     return false;
 }
 
-pub void bitVecClear(BitVec *bv) {
+pub void bitClear(BitVec *bv) {
     if (!bv) { return; }
-    memSet(bv.entries, 0, sizeof(u32) * bv.blocks);
+    mem.set(bv.entries, 0, sizeof(u32) * bv.blocks);
 }

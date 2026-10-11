@@ -244,16 +244,16 @@ _REALLOC::
 
 #endif
 
-pub _extern _MALLOC void *memAlloc(u64 size);
+pub _extern _MALLOC void *alloc(u64 size);
 
-pub _extern _FREE void memFree(void *ptr);
+pub _extern _FREE void free(void *ptr);
 
-pub _extern _MSIZE u64 memSize(void *ptr);
+pub _extern _MSIZE u64 size(void *ptr);
 
-pub _extern _MEMSET void *memSet(void *dst, i32 ch, u64 len);
+pub _extern _MEMSET void *set(void *dst, i32 ch, u64 len);
 
-pub _extern _MEMCPY void *memCpy(void *dst, void *src, u64 len);
+pub _extern _MEMCPY void *copy(void *dst, void *src, u64 len);
 
-pub _extern _CALLOC void *memAllocZero(u64 newSize);
+pub _extern _CALLOC void *allocZero(u64 newSize);
 
-pub _extern _REALLOC void *memRealloc(void *ptr, u64 newSize);
+pub _extern _REALLOC void *realloc(void *ptr, u64 newSize);

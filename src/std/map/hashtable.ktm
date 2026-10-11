@@ -102,9 +102,9 @@ u64 intMapHashFunction(i64 key, u64 mask)
         return htFmix64(key) & mask;
 }
 
-pub IntMap *intMapNew(u64 capacity)
+pub IntMap *intNew(u64 capacity)
 {// null when out of memory
-        IntMap *map = memAlloc(sizeof(IntMap));
+        IntMap *map = mem.alloc(sizeof(IntMap));
         if (!map) {
                 return null;
         }
@@ -112,26 +112,26 @@ pub IntMap *intMapNew(u64 capacity)
         map.capacity = capacity;
         map.mask = capacity-1;
         map.size = 0;
-        map.indexes = intVecNew();
+        map.indexes = vec.intNew();
         map.threashold = (capacity * HT_LOAD)/100;
         map._free_value = null;
-        map.entries = memAllocZero(capacity * sizeof(IntMapNode *));
+        map.entries = mem.allocZero(capacity * sizeof(IntMapNode *));
         if (!map.entries) {
                 map.indexes.release();
-                memFree(map);
+                mem.free(map);
                 return null;
         }
         return map;
 }
 
-pub void intMapSetFreeValue(IntMap *map, fn(void *value) void _free_value) {
+pub void intSetFreeValue(IntMap *map, fn(void *value) void _free_value) {
         if (map) {
                 map._free_value = _free_value;
         }
 }
 
 IntMapNode *intMapNodeNew(i64 key, void *value) {
-        IntMapNode *n = memAlloc(sizeof(IntMapNode));
+        IntMapNode *n = mem.alloc(sizeof(IntMapNode));
         n.key = key;
         n.value = value;
         n.order = HT_DELETED;
@@ -181,7 +181,7 @@ static u64 intMapGetNextIdx(IntMap *map, i64 key, bool *_is_free)
         return idx;
 }
 
-pub void intMapRelease(IntMap *map)
+pub void intRelease(IntMap *map)
 {// free the entire hashtable
         if (map) {
                 auto indexes = map.indexes;
@@ -193,12 +193,12 @@ pub void intMapRelease(IntMap *map)
                                 if (free_value && n.order != HT_DELETED) {
                                         free_value(n.value);
                                 }
-                                memFree(n);
+                                mem.free(n);
                         }
                 }
                 indexes.release();
-                memFree(map.entries);
-                memFree(map);
+                mem.free(map.entries);
+                mem.free(map);
         }
 }
 
@@ -219,13 +219,13 @@ static bool intMapRehash(IntMap *map, u64 newCapacity)
         newMask = newCapacity - 1;
 
         /* OOM */
-        if ((newIndexes = memAllocZero(indexesCapacity * sizeof(i64))) == null) {
+        if ((newIndexes = mem.allocZero(indexesCapacity * sizeof(i64))) == null) {
                 return false;
         }
 
         /* OOM */
-        if ((newEntries = memAllocZero(newCapacity * sizeof(IntMapNode*))) == null) {
-                memFree(newIndexes);
+        if ((newEntries = mem.allocZero(newCapacity * sizeof(IntMapNode*))) == null) {
+                mem.free(newIndexes);
                 return false;
         }
 
@@ -249,12 +249,12 @@ static bool intMapRehash(IntMap *map, u64 newCapacity)
         for (u64 i = 0; i < oldCapacity; ++i) {
                 auto old = oldEntries[i];
                 if (old && old.order == HT_DELETED) {
-                        memFree(old);
+                        mem.free(old);
                 }
         }
 
-        memFree(oldEntries);
-        memFree(oldIndexes);
+        mem.free(oldEntries);
+        mem.free(oldIndexes);
         map.indexes.size = newSize;
         map.indexes.entries = newIndexes;
 
@@ -264,7 +264,7 @@ static bool intMapRehash(IntMap *map, u64 newCapacity)
         return true;
 }
 
-pub bool intMapResize(IntMap *map)
+pub bool intResize(IntMap *map)
 {// Double the hashtable, will return false if OOM
         if (!map) {
                 return false;
@@ -272,7 +272,7 @@ pub bool intMapResize(IntMap *map)
         return intMapRehash(map,map.capacity << 1);
 }
 
-pub bool intMapSet(IntMap *map, i64 key, void *value) {
+pub bool intSet(IntMap *map, i64 key, void *value) {
         bool isFree;
 
         if (!map) {
@@ -319,7 +319,7 @@ pub bool intMapSet(IntMap *map, i64 key, void *value) {
         }
 }
 
-pub bool intMapDelete(IntMap *map, i64 key)
+pub bool intDelete(IntMap *map, i64 key)
 {// Remove `key`, freeing its value if a destructor is registered. Returns
     // false if the key was not in the map.
         if (!map) {
@@ -340,7 +340,7 @@ pub bool intMapDelete(IntMap *map, i64 key)
         return false;
 }
 
-pub bool intMapHas(IntMap *map, i64 key) {
+pub bool intHas(IntMap *map, i64 key) {
         if (!map) {
                 return false;
         }
@@ -348,7 +348,7 @@ pub bool intMapHas(IntMap *map, i64 key) {
         return idx != HT_DELETED;
 }
 
-pub void *intMapGet(IntMap *map, i64 key, bool *_ok=null)
+pub void *intGet(IntMap *map, i64 key, bool *_ok=null)
 {// The value stored for `key`, or null. `*_ok` (when given) tells a
     // missing key (false) from a stored null or 0 (true).
         if (map) {
@@ -362,7 +362,7 @@ pub void *intMapGet(IntMap *map, i64 key, bool *_ok=null)
         return null;
 }
 
-pub void intMapClear(IntMap *map)
+pub void intClear(IntMap *map)
 {// Remove every entry, freeing the values if a destructor is registered.
     // The capacity is kept.
         if (!map) {
@@ -375,7 +375,7 @@ pub void intMapClear(IntMap *map)
                         if (map._free_value && n.order != HT_DELETED) {
                                 map._free_value(n.value);
                         }
-                        memFree(n);
+                        mem.free(n);
                         map.entries[i] = null;
                 }
         }
@@ -383,7 +383,7 @@ pub void intMapClear(IntMap *map)
         map.size = 0;
 }
 
-pub bool intMapIter(IntMap *map, i64 *_idx, IntMapNode **_node) {
+pub bool intIter(IntMap *map, i64 *_idx, IntMapNode **_node) {
         if (!map) {
                 return false;
         }
@@ -402,73 +402,73 @@ pub bool intMapIter(IntMap *map, i64 *_idx, IntMapNode **_node) {
         return false;
 }
 
-pub bool intMapValueIter(IntMap *map, i64 *_idx, void **_value) {
+pub bool intValueIter(IntMap *map, i64 *_idx, void **_value) {
         IntMapNode *node;
-        if (intMapIter(map,_idx,&node)) {
+        if (intIter(map,_idx,&node)) {
                 *_value = node.value;
                 return true;
         }
         return false;
 }
 
-pub bool intMapKeyIter(IntMap *map, i64 *_idx, i64 *_key) {
+pub bool intKeyIter(IntMap *map, i64 *_idx, i64 *_key) {
         IntMapNode *node;
-        if (intMapIter(map,_idx,&node)) {
+        if (intIter(map,_idx,&node)) {
                 *_key = node.key;
                 return true;
         }
         return false;
 }
 
-pub u8 *intMapToString(IntMap *map, fn(void *) u8 *stringifyValue) {
+pub u8 *intToStr(IntMap *map, fn(void *) u8 *stringifyValue) {
         if (!map) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
         auto mapSize = map.size;
         if (mapSize == 0) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
 
         IntMapNode *entry = null;
-        auto buffer = strPrint(null,"{");
+        auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; intMapIter(map,&i,&entry);) {
+        for (i64 i = 0; intIter(map,&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
-                        buffer = strAppendFormat(buffer, "[%d] => %s}",entry.key,strVal);
+                        buffer = str.appendFormat(buffer, "[%d] => %s}",entry.key,strVal);
                 } else {
-                        buffer = strAppendFormat(buffer, "[%d] => %s, ",entry.key,strVal);
+                        buffer = str.appendFormat(buffer, "[%d] => %s, ",entry.key,strVal);
                 }
-                memFree(strVal);
+                mem.free(strVal);
         }
         return buffer;
 }
 
-pub u8 *intMapKeysToString(IntMap *map) {
+pub u8 *intKeysToStr(IntMap *map) {
         if (!map) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
         auto mapSize = map.size;
         if (mapSize == 0) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
 
         IntMapNode *entry = null;
-        auto buffer = strPrint(null,"{");
+        auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; intMapIter(map,&i,&entry);) {
+        for (i64 i = 0; intIter(map,&i,&entry);) {
                 if (++printed == mapSize) {
-                        buffer = strAppendFormat(buffer, "%d}",entry.key);
+                        buffer = str.appendFormat(buffer, "%d}",entry.key);
                 } else {
-                        buffer = strAppendFormat(buffer, "%d, ",entry.key);
+                        buffer = str.appendFormat(buffer, "%d, ",entry.key);
                 }
         }
         return buffer;
 }
 
-pub StrMap *strMapNew(u64 capacity)
+pub StrMap *strNew(u64 capacity)
 {// null when out of memory
-        StrMap *map = memAlloc(sizeof(StrMap));
+        StrMap *map = mem.alloc(sizeof(StrMap));
         if (!map) {
                 return null;
         }
@@ -476,26 +476,26 @@ pub StrMap *strMapNew(u64 capacity)
         map.capacity = capacity;
         map.mask = capacity-1;
         map.size = 0;
-        map.indexes = intVecNew();
+        map.indexes = vec.intNew();
         map.threashold = (capacity * HT_LOAD)/100;
         map._free_value = null;
         map._free_key = null;
-        map.entries = memAllocZero(capacity * sizeof(StrMapNode *));
+        map.entries = mem.allocZero(capacity * sizeof(StrMapNode *));
         if (!map.entries) {
                 map.indexes.release();
-                memFree(map);
+                mem.free(map);
                 return null;
         }
         return map;
 }
 
-pub void strMapSetFreeValue(StrMap *map, fn(void *value) void _free_value) {
+pub void strSetFreeValue(StrMap *map, fn(void *value) void _free_value) {
         if (map) {
                 map._free_value = _free_value;
         }
 }
 
-pub void strMapSetFreeKey(StrMap *map, fn(void *key) void _free_key) {
+pub void strSetFreeKey(StrMap *map, fn(void *key) void _free_key) {
         if (map) {
                 map._free_key = _free_key;
         }
@@ -527,7 +527,7 @@ static u64 strMapHash(u8 *key, i64 key_len)
 }
 
 StrMapNode *strMapNodeNew(u8 *key, i64 key_len, void *value) {
-        StrMapNode *n = memAlloc(sizeof(StrMapNode));
+        StrMapNode *n = mem.alloc(sizeof(StrMapNode));
         n.key = key;
         n.key_len = key_len;
         n.value = value;
@@ -549,7 +549,7 @@ static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 key_len, bool *_is_free)
                         if (tombstone == HT_DELETED) {
                                 tombstone = idx;
                         }
-                } else if (key_len == cur.key_len && !strNCmp(cur.key,key,key_len)) {
+                } else if (key_len == cur.key_len && !str.cmpLen(cur.key,key,key_len)) {
                         *_is_free = false;
                         return idx;
                 }
@@ -571,7 +571,7 @@ static i64 strMapGetIdx(StrMap *map, u8 *key, i64 key_len)
 
         while ((cur = entries[idx]) != null) {
                 if (cur.order != HT_DELETED && cur.key_len == key_len &&
-                                !strNCmp(cur.key, key, key_len)) {
+                                !str.cmpLen(cur.key, key, key_len)) {
                         return idx;
                 }
                 idx = (idx + 1) & mask;
@@ -579,7 +579,7 @@ static i64 strMapGetIdx(StrMap *map, u8 *key, i64 key_len)
         return HT_DELETED;
 }
 
-pub void strMapRelease(StrMap *map)
+pub void strRelease(StrMap *map)
 {// free the entire hashtable
         if (map) {
                 for (auto i = 0; i < map.capacity; ++i) {
@@ -589,12 +589,12 @@ pub void strMapRelease(StrMap *map)
                                 if (n.order != HT_DELETED) {
                                         strMapFreeEntry(map,n);
                                 }
-                                memFree(n);
+                                mem.free(n);
                         }
                 }
-                memFree(map.entries);
+                mem.free(map.entries);
                 map.indexes.release();
-                memFree(map);
+                mem.free(map);
         }
 }
 
@@ -615,13 +615,13 @@ static bool strMapRehash(StrMap *map, u64 newCapacity)
         newMask = newCapacity - 1;
 
         /* OOM */
-        if ((newIndexes = memAllocZero(indexesCapacity * sizeof(i64))) == null) {
+        if ((newIndexes = mem.allocZero(indexesCapacity * sizeof(i64))) == null) {
                 return false;
         }
 
         /* OOM */
-        if ((newEntries = memAllocZero(newCapacity * sizeof(StrMapNode*))) == null) {
-                memFree(newIndexes);
+        if ((newEntries = mem.allocZero(newCapacity * sizeof(StrMapNode*))) == null) {
+                mem.free(newIndexes);
                 return false;
         }
 
@@ -646,12 +646,12 @@ static bool strMapRehash(StrMap *map, u64 newCapacity)
         for (i64 i = 0; i < oldCapacity; ++i) {
                 auto old = oldEntries[i];
                 if (old && old.order == HT_DELETED) {
-                        memFree(old);
+                        mem.free(old);
                 }
         }
 
-        memFree(oldEntries);
-        memFree(oldIndexes);
+        mem.free(oldEntries);
+        mem.free(oldIndexes);
         map.indexes.size = newSize;
         map.indexes.entries = newIndexes;
 
@@ -661,7 +661,7 @@ static bool strMapRehash(StrMap *map, u64 newCapacity)
         return true;
 }
 
-pub bool strMapResize(StrMap *map)
+pub bool strResize(StrMap *map)
 {// Double the hashtable, will return false if OOM
         if (!map) {
                 return false;
@@ -669,7 +669,7 @@ pub bool strMapResize(StrMap *map)
         return strMapRehash(map,map.capacity << 1);
 }
 
-pub bool strMapSet(StrMap *map, u8 *key, void *value) {
+pub bool strSet(StrMap *map, u8 *key, void *value) {
         bool isFree;
 
         if (!map || !key) {
@@ -690,7 +690,7 @@ pub bool strMapSet(StrMap *map, u8 *key, void *value) {
                 }
         }
 
-        i64 key_len = strLen(key);
+        i64 key_len = str.len(key);
         u64 idx = strMapGetNextIdx(map,key,key_len,&isFree);
 
         if (isFree) {
@@ -740,13 +740,13 @@ pub bool strMapSet(StrMap *map, u8 *key, void *value) {
         }
 }
 
-pub bool strMapDelete(StrMap *map, u8 *key)
+pub bool strDelete(StrMap *map, u8 *key)
 {// Remove `key`, freeing the stored key and value if destructors are
     // registered. Returns false if the key was not in the map.
         if (!map || !key) {
                 return false;
         }
-        i64 idx = strMapGetIdx(map,key,strLen(key));
+        i64 idx = strMapGetIdx(map,key,str.len(key));
         if (idx == HT_DELETED) {
                 return false;
         }
@@ -761,7 +761,7 @@ pub bool strMapDelete(StrMap *map, u8 *key)
         return true;
 }
 
-pub void *strMapGetLen(StrMap *map, u8 *key, i64 key_len, bool *_ok=null)
+pub void *strGetLen(StrMap *map, u8 *key, i64 key_len, bool *_ok=null)
 {// The value stored for the `key_len` bytes at `key`, or null. `*_ok`
     // (when given) tells a missing key (false) from a stored null (true).
         if (map && key) {
@@ -775,17 +775,17 @@ pub void *strMapGetLen(StrMap *map, u8 *key, i64 key_len, bool *_ok=null)
         return null;
 }
 
-pub void *strMapGet(StrMap *map, u8 *key, bool *_ok=null)
+pub void *strGet(StrMap *map, u8 *key, bool *_ok=null)
 {// See StrMapGetLen
         if (!map || !key) {
                 if (_ok) { *_ok = false; }
                 return null;
         }
-        i64 key_len = strLen(key);
-        return strMapGetLen(map,key,key_len,_ok);
+        i64 key_len = str.len(key);
+        return strGetLen(map,key,key_len,_ok);
 }
 
-pub void strMapClear(StrMap *map)
+pub void strClear(StrMap *map)
 {// Remove every entry, freeing keys and values if destructors are
     // registered. The capacity is kept.
         if (!map) {
@@ -798,7 +798,7 @@ pub void strMapClear(StrMap *map)
                         if (n.order != HT_DELETED) {
                                 strMapFreeEntry(map,n);
                         }
-                        memFree(n);
+                        mem.free(n);
                         map.entries[i] = null;
                 }
         }
@@ -806,7 +806,7 @@ pub void strMapClear(StrMap *map)
         map.size = 0;
 }
 
-pub bool strMapHasLen(StrMap *map, u8 *key, i64 key_len) {
+pub bool strHasLen(StrMap *map, u8 *key, i64 key_len) {
         if (!map || !key) {
                 return false;
         }
@@ -817,15 +817,15 @@ pub bool strMapHasLen(StrMap *map, u8 *key, i64 key_len) {
         return false;
 }
 
-pub bool strMapHas(StrMap *map, u8 *key) {
+pub bool strHas(StrMap *map, u8 *key) {
         if (!map || !key) {
                 return false;
         }
-        i64 key_len = strLen(key);
-        return strMapHasLen(map,key,key_len);
+        i64 key_len = str.len(key);
+        return strHasLen(map,key,key_len);
 }
 
-pub bool strMapIter(StrMap *map, i64 *_idx, StrMapNode **_node) {
+pub bool strIter(StrMap *map, i64 *_idx, StrMapNode **_node) {
         if (!map) {
                 return false;
         }
@@ -845,67 +845,67 @@ pub bool strMapIter(StrMap *map, i64 *_idx, StrMapNode **_node) {
         return false;
 }
 
-pub bool strMapValueIter(StrMap *map, i64 *_idx, void **_value) {
+pub bool strValueIter(StrMap *map, i64 *_idx, void **_value) {
         StrMapNode *node;
-        if (strMapIter(map,_idx,&node)) {
+        if (strIter(map,_idx,&node)) {
                 *_value = node.value;
                 return true;
         }
         return false;
 }
 
-pub bool strMapKeyIter(StrMap *map, i64 *_idx, u8 **_key) {
+pub bool strKeyIter(StrMap *map, i64 *_idx, u8 **_key) {
         StrMapNode *node;
-        if (strMapIter(map,_idx,&node)) {
+        if (strIter(map,_idx,&node)) {
                 *_key = node.key;
                 return true;
         }
         return false;
 }
 
-pub u8 *strMapToString(StrMap *map, fn(void *) u8 *stringifyValue) {
+pub u8 *strToStr(StrMap *map, fn(void *) u8 *stringifyValue) {
         if (!map) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
         auto mapSize = map.size;
 
         if (mapSize == 0) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
 
         StrMapNode *entry = null;
-        auto buffer = strPrint(null,"{");
+        auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; strMapIter(map,&i,&entry);) {
+        for (i64 i = 0; strIter(map,&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
-                        buffer = strAppendFormat(buffer, "[%s] => %s}",entry.key,strVal);
+                        buffer = str.appendFormat(buffer, "[%s] => %s}",entry.key,strVal);
                 } else {
-                        buffer = strAppendFormat(buffer, "[%s] => %s, ",entry.key,strVal);
+                        buffer = str.appendFormat(buffer, "[%s] => %s, ",entry.key,strVal);
                 }
-                memFree(strVal);
+                mem.free(strVal);
         }
         return buffer;
 
 }
 
-pub u8 *strMapKeysToString(StrMap *map) {
+pub u8 *strKeysToStr(StrMap *map) {
         if (!map) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
         auto mapSize = map.size;
         if (mapSize == 0) {
-                return strPrint(null,"{}");
+                return str.formatTo(null,"{}");
         }
 
         StrMapNode *entry = null;
-        auto buffer = strPrint(null,"{");
+        auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; strMapIter(map,&i,&entry);) {
+        for (i64 i = 0; strIter(map,&i,&entry);) {
                 if (++printed == mapSize) {
-                        buffer = strAppendFormat(buffer, "%s}",entry.key);
+                        buffer = str.appendFormat(buffer, "%s}",entry.key);
                 } else {
-                        buffer = strAppendFormat(buffer, "%s, ",entry.key);
+                        buffer = str.appendFormat(buffer, "%s, ",entry.key);
                 }
         }
         return buffer;

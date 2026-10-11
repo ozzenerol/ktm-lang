@@ -47,7 +47,7 @@ static u64 fsKey = 0;
 
 static void fsFree(void *p) {
     HCFs *fs = p;
-    if (ErrOwns(fs.error.message)) { memFree(fs.error.message); }
+    if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     coroStacksFree(fs);
     c.free(fs.coro_root);
     c.free(fs);
@@ -58,14 +58,14 @@ static void fsKeyCreate() {
 }
 
 /* The calling thread's HCFs, created on its first use. */
-pub HCFs *threadState() {
+pub HCFs *Fs() {
     c.pthread_once(fsOnce, &fsKeyCreate);
     HCFs *fs = c.pthread_getspecific(fsKey);
     if (!fs) {
         fs = c.calloc(1, sizeof(HCFs));
         if (!fs) {
             printf("out of memory for the exception state\n");
-            exitProgram(1);
+            os.exit(1);
         }
         c.pthread_setspecific(fsKey, fs);
     }
@@ -77,19 +77,19 @@ pub HCFs *threadState() {
  * and longjmp to a returned function's frame is UB), so the chain
  * mutation is the only thing we delegate to a helper. */
 pub void __ktmPushFrame(CatchFrame *f) {
-    HCFs *fs = threadState();
+    HCFs *fs = Fs();
     f.prev = fs.catch_top;
     fs.catch_top = f;
 }
 
 pub void __ktmTryLeave(CatchFrame *f) {
-    threadState().catch_top = f.prev;
+    Fs().catch_top = f.prev;
 }
 
 /* Make e (a struct copy) the thread's current error; the message moves
  * in, the one there before is freed. */
 static void ErrSet(HCFs *fs, u64 code, u8 *message, u8 *file, i64 line) {
-    if (ErrOwns(fs.error.message)) { memFree(fs.error.message); }
+    if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     fs.error.code = code;
     fs.error.message = message ? message : _err_none;
     fs.error.file = file ? file : _err_none;
@@ -159,7 +159,7 @@ static void __ktmUncaught(HCFs *fs) {
         WriteErr(buf);
     }
     WriteErr("\n");
-    exitProgram(1);
+    os.exit(1);
 }
 
 static void ErrJump(HCFs *fs) {
@@ -169,44 +169,44 @@ static void ErrJump(HCFs *fs) {
 }
 
 /* `throw(code)`: the compiler passes where the throw is. */
-pub void KTM_ThrowAt(u64 code, u8 *file, i64 line) {
-    HCFs *fs = threadState();
+pub void __ktmThrowAt(u64 code, u8 *file, i64 line) {
+    HCFs *fs = Fs();
     ErrSet(fs, code, null, file, line);
     ErrJump(fs);
 }
 
 /* `throw(code, fmt, ...)`: the compiler checks the call as one to
  * KTM_ThrowFmt, then calls this with where the throw is in front. */
-pub void KTM_ThrowFmtAt(u8 *file, i64 line, u64 code, u8 *fmt, ...args) {
-    u8 *message = strPrintJoin(null, fmt, args.len, args);
-    HCFs *fs = threadState();
+pub void __ktmThrowFmtAt(u8 *file, i64 line, u64 code, u8 *fmt, ...args) {
+    u8 *message = str.formatArgs(null, fmt, args.len, args);
+    HCFs *fs = Fs();
     ErrSet(fs, code, message, file, line);
     ErrJump(fs);
 }
 
-pub void KTM_ThrowFmt(u64 code, u8 *fmt, ...args) {
-    u8 *message = strPrintJoin(null, fmt, args.len, args);
-    HCFs *fs = threadState();
+pub void __ktmThrowFmt(u64 code, u8 *fmt, ...args) {
+    u8 *message = str.formatArgs(null, fmt, args.len, args);
+    HCFs *fs = Fs();
     ErrSet(fs, code, message, null, 0);
     ErrJump(fs);
 }
 
 /* `throw(e)`: the same error again, with a copy of its message (the
  * catch that holds e frees its own when it is left). */
-pub void KTM_ThrowError(Error *e) {
-    u8 *message = ErrOwns(e.message) ? strNew(e.message) : null;
-    HCFs *fs = threadState();
+pub void __ktmThrowError(Error *e) {
+    u8 *message = ErrOwns(e.message) ? str.dup(e.message) : null;
+    HCFs *fs = Fs();
     ErrSet(fs, e.code, message, e.file, e.line);
     ErrJump(fs);
 }
 
 pub void __ktmThrow(u64 v) {
-    KTM_ThrowAt(v, null, 0);
+    __ktmThrowAt(v, null, 0);
 }
 
 /* `catch (Error e)`: move the current error into e. */
-pub void KTM_ErrorTake(Error *e) {
-    HCFs *fs = threadState();
+pub void __ktmErrorTake(Error *e) {
+    HCFs *fs = Fs();
     e.code = fs.error.code;
     e.message = fs.error.message ? fs.error.message : _err_none;
     e.file = fs.error.file ? fs.error.file : _err_none;
@@ -215,39 +215,39 @@ pub void KTM_ErrorTake(Error *e) {
 }
 
 /* Free e's message (if it has one of its own). */
-pub void KTM_ErrorDrop(Error *e) {
-    if (ErrOwns(e.message)) { memFree(e.message); }
+pub void __ktmErrorDrop(Error *e) {
+    if (ErrOwns(e.message)) { mem.free(e.message); }
     e.message = _err_none;
 }
 
 /* dst = src, with its own copy of the message. */
-pub void KTM_ErrorCopy(Error *dst, Error *src) {
+pub void __ktmErrorCopy(Error *dst, Error *src) {
     dst.code = src.code;
-    dst.message = ErrOwns(src.message) ? strNew(src.message) : _err_none;
+    dst.message = ErrOwns(src.message) ? str.dup(src.message) : _err_none;
     dst.file = src.file ? src.file : _err_none;
     dst.line = src.line;
 }
 
 /* A catch without a binding: nothing can read the message, free it. */
-pub void KTM_ErrorForget() {
-    HCFs *fs = threadState();
-    if (ErrOwns(fs.error.message)) { memFree(fs.error.message); }
+pub void __ktmErrorForget() {
+    HCFs *fs = Fs();
+    if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     fs.error.message = _err_none;
 }
 
 /* A defer caught a throw leaving its block: make the try that was active
  * before f the innermost again and move the error into *saved, out of the
  * way of throws caught inside the deferred statement. */
-pub void KTM_DeferCaught(CatchFrame *f, Error *saved) {
-    HCFs *fs = threadState();
+pub void __ktmDeferCaught(CatchFrame *f, Error *saved) {
+    HCFs *fs = Fs();
     fs.catch_top = f.prev;
-    KTM_ErrorTake(saved);
+    __ktmErrorTake(saved);
 }
 
 /* After the deferred statement: *saved is the current error again (its
  * message moves back) and goes on to the next frame out. */
-pub void KTM_Rethrow(Error *saved) {
-    HCFs *fs = threadState();
+pub void __ktmRethrow(Error *saved) {
+    HCFs *fs = Fs();
     u8 *message = saved.message;
     saved.message = _err_none;
     ErrSet(fs, saved.code, message, saved.file, saved.line);

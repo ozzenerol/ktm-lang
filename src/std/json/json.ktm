@@ -75,7 +75,7 @@ struct JsonStringBuilder {
 };
 
 static Json *jsonNew() {
-        Json *J = memAlloc(sizeof(Json));
+        Json *J = mem.alloc(sizeof(Json));
         J.type = NULL;
         J.key = null;
         J.next = null;
@@ -86,7 +86,7 @@ static Json *jsonNew() {
 }
 
 static JsonState *jsonStateNew() {
-        JsonState *jsonState = memAlloc(sizeof(JsonState));
+        JsonState *jsonState = mem.alloc(sizeof(JsonState));
         jsonState.error = OK;
         jsonState.ch = '\0';
         jsonState.offset = 0;
@@ -193,7 +193,7 @@ static bool jsonIntFits(u8 *text, i64 len) {
                 len--;
         }
         if (len != 19) { return len < 19; }
-        return strNCmp(text, max, 19) <= 0;
+        return str.cmpLen(text, max, 19) <= 0;
 }
 
 static void jsonParseNumber(JsonParser *p) {
@@ -205,8 +205,8 @@ static void jsonParseNumber(JsonParser *p) {
         /* strtoll / strtod need the text on its own: `len` may end the input
             * mid-buffer, with more digits after it */
         u8 small[64], *text = small;
-        if (numLen >= 64) { text = memAlloc(numLen + 1); }
-        memCpy(text, p.buffer + p.offset, numLen);
+        if (numLen >= 64) { text = mem.alloc(numLen + 1); }
+        mem.copy(text, p.buffer + p.offset, numLen);
         text[numLen] = '\0';
 
         /* An integer outside i64 is read as an f64 (JSON_FLOAT), as JavaScript
@@ -219,7 +219,7 @@ static void jsonParseNumber(JsonParser *p) {
                 current.floatVal = c.strtod(text, null);
                 current.type = FLOAT;
         }
-        if (text != small) { memFree(text); }
+        if (text != small) { mem.free(text); }
         jsonUnsafeAdvanceBy(p, numLen);
 }
 
@@ -232,8 +232,8 @@ static void jsonParseStrNum(JsonParser *p) {
         i64 numLen = jsonNumberLen(p, &isInt);
         if (!numLen) { return; }
 
-        current.strnum = memAlloc(numLen + 1);
-        memCpy(current.strnum, p.buffer + p.offset, numLen);
+        current.strnum = mem.alloc(numLen + 1);
+        mem.copy(current.strnum, p.buffer + p.offset, numLen);
         current.strnum[numLen] = '\0';
         current.type = STRNUM;
         jsonUnsafeAdvanceBy(p, numLen);
@@ -251,14 +251,14 @@ static i64 jsonParseBool(JsonParser *p) {
 
         /* Check if the next character in the buffer is 't' for true */
         if (peek == 't') {
-                if (jsonHasChars(p, 4) && !strNCmp(p.buffer+p.offset,"true",4)) {
+                if (jsonHasChars(p, 4) && !str.cmpLen(p.buffer+p.offset,"true",4)) {
                         retval = true;
                         jsonUnsafeAdvanceBy(p, 4);
                 }
         }
         /* Check if the next character in the buffer is 'f' for false */
         else if (peek == 'f') {
-                if (jsonHasChars(p, 5) && !strNCmp(p.buffer+p.offset,"false",5)) {
+                if (jsonHasChars(p, 5) && !str.cmpLen(p.buffer+p.offset,"false",5)) {
                         retval = false;
                         jsonUnsafeAdvanceBy(p, 5);
                 }
@@ -277,7 +277,7 @@ static i64 jsonParseBool(JsonParser *p) {
     * -1: error
     */
 static i32 jsonParseNull(JsonParser *p) {
-        if (!jsonHasChars(p, 4) || strNCmp(p.buffer + p.offset,"null",4)) {
+        if (!jsonHasChars(p, 4) || str.cmpLen(p.buffer + p.offset,"null",4)) {
                 p.error = INVALID_LITERAL; /* where the literal starts */
                 return -1;
         }
@@ -388,7 +388,7 @@ static u8 *jsonParseString(JsonParser *p, i64 *_len) {
         }
 
         i64 len = 0;
-        u8 *str = memAlloc(sizeof(u8) * end - start);
+        u8 *str = mem.alloc(sizeof(u8) * end - start);
 
         while (run && jsonPeek(p) != '\0') {
                 switch (jsonPeek(p)) {
@@ -461,7 +461,7 @@ static u8 *jsonParseString(JsonParser *p, i64 *_len) {
 
 err:
         if (str) {
-                memFree(str);
+                mem.free(str);
         }
         return null;
 }
@@ -475,9 +475,9 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
         i64 prec = 15, len;
         u8 *e;
         u64 bits;
-        memCpy(&bits, &f, sizeof(f64));
+        mem.copy(&bits, &f, sizeof(f64));
         if (((bits >> 52) & 0x7FF) == 0x7FF) { /* inf/nan: JSON has none, null as JavaScript */
-                strCpy(buf, "null");
+                str.copy(buf, "null");
                 return buf;
         }
         while (true) {
@@ -485,9 +485,9 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
                 if (prec >= 17 || c.strtod(buf,null) == f) { break; }
                 prec++;
         }
-        if (!strCount(buf,'.') && !strCount(buf,'n')) { // not inf/nan
-                len = strLen(buf);
-                e = strFirstOf(buf,"e");
+        if (!str.count(buf,'.') && !str.count(buf,'n')) { // not inf/nan
+                len = str.len(buf);
+                e = str.firstOf(buf,"e");
                 if (!e) { e = buf + len; }
                 c.memmove(e+2,e,len - (e-buf) + 1);
                 e[0] = '.';
@@ -503,9 +503,9 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *str, i64 len) {
                 str = "";
                 len = 0;
         } else if (!len) { /* a node made or changed by hand */
-                len = strLen(str);
+                len = str.len(str);
         }
-        u8 *buf = memAlloc(len * 6 + 3), *dst = buf, *hex = "0123456789abcdef";
+        u8 *buf = mem.alloc(len * 6 + 3), *dst = buf, *hex = "0123456789abcdef";
         u8 *end = str + len;
         u8 ch;
         *dst++ = '"';
@@ -531,8 +531,8 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *str, i64 len) {
         }
         *dst++ = '"';
         *dst = '\0';
-        js.buf = strAppendFormatLen(js.buf,&js.len,"%s",buf);
-        memFree(buf);
+        js.buf = str.appendFormatLen(js.buf,&js.len,"%s",buf);
+        mem.free(buf);
 }
 
 /* `J` and, with `siblings`, the nodes after it (an array's or object's
@@ -541,40 +541,40 @@ static void jsonToStringInternal(Json *J, JsonStringBuilder *js,
                                                                                                                             bool siblings=true) {
         u8 fbuf[64];
         if (J == null) {
-                js.buf = strAppendFormatLen(js.buf,&js.len,"(nil)");
+                js.buf = str.appendFormatLen(js.buf,&js.len,"(nil)");
                 return;
         }
 
         while (J) {
                 if (J.key && siblings) {
                         jsonCatQuoted(js,J.key,J.key_len);
-                        js.buf = strAppendFormatLen(js.buf,&js.len,": ");
+                        js.buf = str.appendFormatLen(js.buf,&js.len,": ");
                 }
                 switch (J.type) {
                         case INT:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"%d",J.intVal);
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"%d",J.intVal);
                         case FLOAT:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"%s",jsonFloatToStr(fbuf,J.floatVal));
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"%s",jsonFloatToStr(fbuf,J.floatVal));
                         case STRNUM:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"%s",J.strnum);
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"%s",J.strnum);
                         case STRING:
                                 jsonCatQuoted(js,J.str,J.str_len);
                         case ARRAY:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"[");
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"[");
                                 if (J.array) { jsonToStringInternal(J.array,js); } /* null: empty */
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"]");
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"]");
                         case OBJECT:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"{");
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"{");
                                 if (J.object) { jsonToStringInternal(J.object,js); } /* null: empty */
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"}");
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"}");
                         case BOOL:
                                 if (J.boolean == true) {
-                                        js.buf = strAppendFormatLen(js.buf,&js.len,"true");
+                                        js.buf = str.appendFormatLen(js.buf,&js.len,"true");
                                 } else {
-                                        js.buf = strAppendFormatLen(js.buf,&js.len,"false");
+                                        js.buf = str.appendFormatLen(js.buf,&js.len,"false");
                                 }
                         case NULL:
-                                js.buf = strAppendFormatLen(js.buf,&js.len,"null");
+                                js.buf = str.appendFormatLen(js.buf,&js.len,"null");
                         default:
                                 break;
                 }
@@ -582,17 +582,17 @@ static void jsonToStringInternal(Json *J, JsonStringBuilder *js,
                         break;
                 }
                 if (J.next) {
-                        js.buf = strAppendFormatLen(js.buf,&js.len,",");
+                        js.buf = str.appendFormatLen(js.buf,&js.len,",");
                 }
                 J = J.next;
         }
 }
 
-pub u8 *jsonToString(Json *json)
+pub u8 *toStr(Json *json)
 {// The JSON text of json's value - only that node, not the nodes after
     // it or its key, so a node from JsonSelect gives just its value. A new
     // string to Free.
-        u8 *buf = memAlloc(sizeof(u8)*1<<10);
+        u8 *buf = mem.alloc(sizeof(u8)*1<<10);
         i64 len = 0;
         JsonStringBuilder sb;
         sb.buf = buf;
@@ -610,18 +610,18 @@ static void jsonReleaseList(Json *J) {
         while (ptr) {
                 next = ptr.next;
                 if (ptr.key) {
-                        memFree(ptr.key);
+                        mem.free(ptr.key);
                 }
 
                 switch (ptr.type) {
                         case STRNUM:
                                 if (ptr.strnum) {
-                                        memFree(ptr.strnum);
+                                        mem.free(ptr.strnum);
                                 }
 
                         case STRING:
                                 if (ptr.str) {
-                                        memFree(ptr.str);
+                                        mem.free(ptr.str);
                                 }
 
                         case ARRAY:
@@ -638,14 +638,14 @@ static void jsonReleaseList(Json *J) {
                 }
 
                 if (ptr.state) { /* only on the node JsonParse returns */
-                        memFree(ptr.state);
+                        mem.free(ptr.state);
                 }
-                memFree(ptr);
+                mem.free(ptr);
                 ptr = next;
         }
 }
 
-pub void jsonRelease(Json *J)
+pub void release(Json *J)
 {// Free a whole document: J must be what JsonParse returned (the root).
     // null, or a node inside a document (from JsonSelect, or an item of an
     // array or object), is ignored: those are views into the document.
@@ -874,9 +874,9 @@ Json *jsonParseWithLenAndFlags(u8 *raw, i64 len, i32 flags) {
     * nodes. `flags` is 0 or JSON_STRNUM_FLAG, which keeps numbers as the
     * text they were written as (type JSON_STRNUM, in `strnum`) instead of
     * converting them to JSON_INT / JSON_FLOAT. */
-pub Json *jsonParse(u8 *raw, i64 len=-1, i64 flags=0) {
+pub Json *parse(u8 *raw, i64 len=-1, i64 flags=0) {
         if (!raw) { return null; }
-        if (len == -1) { len = strLen(raw); }
+        if (len == -1) { len = str.len(raw); }
         return jsonParseWithLenAndFlags(raw,len,flags);
 }
 
@@ -884,11 +884,11 @@ pub Json *jsonParse(u8 *raw, i64 len=-1, i64 flags=0) {
     * input, '\xNN' for other control characters */
 static u8 *jsonErrorChar(u8 *buf, u8 ch) {
         if (ch == '\0') {
-                strCpy(buf, "'\\0'");
+                str.copy(buf, "'\\0'");
         } else if (ch < 0x20 || ch == 0x7F) {
-                strPrint(buf, "'\\x%02X'", ch);
+                str.formatTo(buf, "'\\x%02X'", ch);
         } else {
-                strPrint(buf, "'%c'", ch);
+                str.formatTo(buf, "'%c'", ch);
         }
         return buf;
 }
@@ -898,7 +898,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
         jsonErrorChar(c, ch);
         switch (error) {
                 case OK:
-                        return strPrint(null, "Success");
+                        return str.formatTo(null, "Success");
                 case INVALID_UTF16:
                         what = "Invalid UTF-16 code in a \\u escape";
                 case INVALID_UTF16_SURROGATE:
@@ -910,25 +910,25 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 case INVALID_NUMBER:
                 case INVALID_DECIMAL:
                 case INVALID_SIGN:
-                        return strPrint(null, "Invalid number at %s at line %d, column %d",
+                        return str.formatTo(null, "Invalid number at %s at line %d, column %d",
                                                                                         c, line, col);
                 case INVALID_KEY_TERMINATOR_CHARACTER:
-                        return strPrint(null, "Expected '\"' to start an object key, got %s at "
+                        return str.formatTo(null, "Expected '\"' to start an object key, got %s at "
                                                                                         "line %d, column %d", c, line, col);
                 case INVALID_KEY_VALUE_SEPARATOR:
-                        return strPrint(null, "Expected ':' after an object key, got %s at line "
+                        return str.formatTo(null, "Expected ':' after an object key, got %s at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_ARRAY_CHARACTER:
-                        return strPrint(null, "Expected ',' or ']' in an array, got %s at line "
+                        return str.formatTo(null, "Expected ',' or ']' in an array, got %s at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_ESCAPE_CHARACTER:
-                        return strPrint(null, "Invalid escape character %s after '\\' at line "
+                        return str.formatTo(null, "Invalid escape character %s after '\\' at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_CONTROL_CHARACTER:
-                        return strPrint(null, "Unescaped control character %s in a string (write "
+                        return str.formatTo(null, "Unescaped control character %s in a string (write "
                                                                                         "it as \\u%04x) at line %d, column %d", c, ch, line, col);
                 case NESTING_TOO_DEEP:
-                        return strPrint(null, "Arrays and objects nested more than %d deep at "
+                        return str.formatTo(null, "Arrays and objects nested more than %d deep at "
                                                                                         "line %d, column %d", MAX_DEPTH, line, col);
                 case INVALID_BOOL:
                 case INVALID_LITERAL:
@@ -938,7 +938,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                         if (ch == '\0') {
                                 what = "Unexpected end of the JSON text"; break;
                         }
-                        return strPrint(null, "Unexpected character %s where a value or ',' "
+                        return str.formatTo(null, "Unexpected character %s where a value or ',' "
                                                                                         "was expected at line %d, column %d", c, line, col);
                 case CANNOT_START_PARSE:
                         what = "Expected a JSON value (object, array, string, number, true, "
@@ -949,13 +949,13 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 default:
                         return null;
         }
-        return strPrint(null, "%s at line %d, column %d", what, line, col);
+        return str.formatTo(null, "%s at line %d, column %d", what, line, col);
 }
 
 /* If the json has state this will return the error as a human readable string
     * must be freed by the caller (allows it to be thread safe). It would be
     * advisable to use this for debugging purposes only as it calls malloc */
-pub u8 *jsonGetStrerror(Json *json) {
+pub u8 *errorStr(Json *json) {
         if (!json || !json.state) { /* null or not a root: nothing to report */
                 return null;
         }
@@ -969,55 +969,55 @@ pub u8 *jsonGetStrerror(Json *json) {
 
 /* Print the error to stdout ("No errors" if there was none); nothing for
     * null or a node that isn't a root */
-pub void jsonPrintError(Json *json) {
+pub void printError(Json *json) {
         if (!json || !json.state) { /* null or not a root: prints nothing */
                 return;
         }
-        u8 *strError = jsonGetStrerror(json);
+        u8 *strError = errorStr(json);
         if (strError) {
                 printf("%s\n", strError);
-                memFree(strError);
+                mem.free(strError);
         } else {
                 printf("No errors\n");
         }
 }
 
-pub bool jsonOk(Json *j) {
+pub bool ok(Json *j) {
         if (!j) { return false; }
         return j.state && j.state.error == OK;
 }
 
-pub bool jsonIsObject(Json *j) {
+pub bool isObject(Json *j) {
         if (!j) { return false; }
         return j.type == OBJECT;
 }
 
-pub bool jsonIsArray(Json *j) {
+pub bool isArray(Json *j) {
         if (!j) { return false; }
         return j.type == ARRAY;
 }
 
-pub bool jsonIsNull(Json *j) {
+pub bool isNull(Json *j) {
         if (!j) { return false; }
         return j.type == NULL;
 }
 
-pub bool jsonIsBool(Json *j) {
+pub bool isBool(Json *j) {
         if (!j) { return false; }
         return j.type == BOOL;
 }
 
-pub bool jsonIsString(Json *j) {
+pub bool isString(Json *j) {
         if (!j) { return false; }
         return j.type == STRING;
 }
 
-pub bool jsonIsInt(Json *j) {
+pub bool isInt(Json *j) {
         if (!j) { return false; }
         return j.type == INT;
 }
 
-pub bool jsonIsFloat(Json *j) {
+pub bool isFloat(Json *j) {
         if (!j) { return false; }
         return j.type == FLOAT;
 }
@@ -1025,37 +1025,37 @@ pub bool jsonIsFloat(Json *j) {
 static bool jsonTypeCheck(Json *j, u8 tk) {
         switch (tk) {
                 case 's':
-                        if (!jsonIsString(j)) {
+                        if (!isString(j)) {
                                 return false;
                         }
                         return true;
                 case 'i':
-                        if (!jsonIsInt(j)) {
+                        if (!isInt(j)) {
                                 return false;
                         }
                         return true;
                 case 'f':
-                        if (!jsonIsFloat(j)) {
+                        if (!isFloat(j)) {
                                 return false;
                         }
                         return true;
                 case 'o':
-                        if (!jsonIsObject(j)) {
+                        if (!isObject(j)) {
                                 return false;
                         }
                         return true;
                 case 'a':
-                        if (!jsonIsArray(j)) {
+                        if (!isArray(j)) {
                                 return false;
                         }
                         return true;
                 case 'b':
-                        if (!jsonIsBool(j)) {
+                        if (!isBool(j)) {
                                 return false;
                         }
                         return true;
                 case '!':
-                        if (!jsonIsNull(j)) {
+                        if (!isNull(j)) {
                                 return false;
                         }
                         return true;
@@ -1068,7 +1068,7 @@ static bool jsonTypeCheck(Json *j, u8 tk) {
     * Get item from an array of json or return null
     */
 Json *jsonArrayAt(Json *j, i64 idx) {
-        if (!jsonIsArray(j) || idx < 0) {
+        if (!isArray(j) || idx < 0) {
                 return null;
         }
 
@@ -1088,7 +1088,7 @@ Json *jsonArrayAt(Json *j, i64 idx) {
 }
 
 static Json *jsonObjectAt(Json *j, u8 *name) {
-        if (!jsonIsObject(j)) {
+        if (!isObject(j)) {
                 return null;
         }
         if (name == null) {
@@ -1096,7 +1096,7 @@ static Json *jsonObjectAt(Json *j, u8 *name) {
         }
 
         auto el = j.object;
-        while ((el != null) && (el.key != null) && strCmp(name,el.key) != 0) {
+        while ((el != null) && (el.key != null) && str.cmp(name,el.key) != 0) {
                 el = el.next;
         }
 
@@ -1107,26 +1107,26 @@ static Json *jsonObjectAt(Json *j, u8 *name) {
         return el;
 }
 
-pub Json *jsonObjectGet(Json *obj, u8 *key)
+pub Json *objectGet(Json *obj, u8 *key)
 {// The value stored under exactly `key` (the first one if it is repeated),
     // or null if obj isn't an object or has no such key. Any key works, also
     // ones JsonSelect can't spell ('.', '[', ':' ...). A view, don't release.
         return jsonObjectAt(obj, key);
 }
 
-pub Json *jsonArrayGet(Json *arr, i64 i)
+pub Json *arrayGet(Json *arr, i64 i)
 {// Item i (from 0) of an array, or null if arr isn't an array or i is
     // negative or past the end. A view, don't release.
         return jsonArrayAt(arr, i);
 }
 
-pub i64 jsonLen(Json *node)
+pub i64 len(Json *node)
 {// The number of items of an array or object; 0 for anything else and null
         Json *it;
         i64 n = 0;
-        if (jsonIsArray(node)) {
+        if (isArray(node)) {
                 it = node.array;
-        } else if (jsonIsObject(node)) {
+        } else if (isObject(node)) {
                 it = node.object;
         } else {
                 return 0;
@@ -1166,7 +1166,7 @@ pub i64 jsonLen(Json *node)
     *      "b" -> boolean
     *      "!" -> null
     */
-pub Json *jsonSelect(Json *j, u8 *fmt, ...args) {
+pub Json *select(Json *j, u8 *fmt, ...args) {
         /**
             * Heavily inspired by:
             * https://github.com/antirez/stonky/blob/main/stonky.c
@@ -1213,7 +1213,7 @@ pub Json *jsonSelect(Json *j, u8 *fmt, ...args) {
                                 } else if (kind == JSON_SEL_OBJ) {
                                         s = (u8 *)args[arg++];
                                         if (!s) { return null; }
-                                        len = strLen(s);
+                                        len = str.len(s);
                                 } else {
                                         return null;
                                 }
@@ -1224,7 +1224,7 @@ pub Json *jsonSelect(Json *j, u8 *fmt, ...args) {
                         if (pathLen + len > JSON_SEL_MAX_BUF) {
                                 return null;
                         }
-                        memCpy(path + pathLen, s, len);
+                        mem.copy(path + pathLen, s, len);
                         pathLen += len;
                         ptr++;
                 }

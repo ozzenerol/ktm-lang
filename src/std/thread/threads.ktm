@@ -172,10 +172,10 @@ pub struct ThreadPool {
         void *priv_data;
 };
 
-pub void threadPoolEnqueue(ThreadPool *pool, void *argv, fn(void *priv_data, void *argv) void callback)
+pub void poolEnqueue(ThreadPool *pool, void *argv, fn(void *priv_data, void *argv) void callback)
 {// Enqueue a job
         if (!pool) { return; }
-        ThreadWorkerJob *job = memAlloc(sizeof(ThreadWorkerJob));
+        ThreadWorkerJob *job = mem.alloc(sizeof(ThreadWorkerJob));
         job.callback = callback;
         job.argv = argv;
         job.next = null;
@@ -185,7 +185,7 @@ pub void threadPoolEnqueue(ThreadPool *pool, void *argv, fn(void *priv_data, voi
         c.pthread_mutex_unlock(&pool.lock);
 }
 
-pub void threadPoolWait(ThreadPool *pool)
+pub void poolWait(ThreadPool *pool)
 {//Wait for all jobs in the queue to be complete
         if (!pool) { return; }
         c.pthread_mutex_lock(&pool.lock);
@@ -215,7 +215,7 @@ static void *threadPoolMain(void *argv)
                 c.pthread_mutex_unlock(&pool.lock);
 
                 job.callback(pool.priv_data,job.argv);
-                memFree(job);
+                mem.free(job);
 
                 c.pthread_mutex_lock(&pool.lock);
                 pool.active_threads--;
@@ -228,17 +228,17 @@ static void *threadPoolMain(void *argv)
         return null;
 }
 
-pub ThreadPool *threadPoolNew(i64 worker_count)
+pub ThreadPool *poolNew(i64 worker_count)
 {// Create a pool of worker_count threads; null if worker_count <= 0 or
     // a thread can't be created (the ones already started are stopped)
         if (worker_count <= 0) {
                 return null;
         }
-        ThreadPool *pool = memAlloc(sizeof(ThreadPool));
-        ThreadWorker *workers = memAlloc(sizeof(ThreadWorker) * worker_count);
+        ThreadPool *pool = mem.alloc(sizeof(ThreadPool));
+        ThreadWorker *workers = mem.alloc(sizeof(ThreadWorker) * worker_count);
         i32 err;
 
-        pool.jobs = listNew();
+        pool.jobs = list.new();
         pool.run = true;
         pool.active_threads = 0;
         pool.alive_threads = 0;
@@ -256,7 +256,7 @@ pub ThreadPool *threadPoolNew(i64 worker_count)
                 worker.id = i;
                 err = c.pthread_create(&worker.th,null,&threadPoolMain,pool);
                 if (err != 0) {
-                        threadPoolRelease(pool);
+                        poolRelease(pool);
                         return null;
                 }
                 pool.worker_count++;
@@ -264,7 +264,7 @@ pub ThreadPool *threadPoolNew(i64 worker_count)
         return pool;
 }
 
-pub void threadPoolStop(ThreadPool *pool)
+pub void poolStop(ThreadPool *pool)
 {// Finish every queued job, then stop and join the workers
         if (!pool) { return; }
         c.pthread_mutex_lock(&pool.lock);
@@ -278,19 +278,19 @@ pub void threadPoolStop(ThreadPool *pool)
         pool.worker_count = 0;
 }
 
-pub void threadPoolRelease(ThreadPool *pool)
+pub void poolRelease(ThreadPool *pool)
 {// Stop the pool (queued jobs still run, see ThreadPoolStop), destroy
     // conditions and locks and free the structures
         if (pool) {
-                threadPoolStop(pool);
+                poolStop(pool);
 
                 c.pthread_cond_destroy(&pool.has_work);
                 c.pthread_cond_destroy(&pool.no_work);
                 c.pthread_mutex_destroy(&pool.lock);
                 /* Only jobs enqueued after ThreadPoolStop can be left */
-                pool.jobs.release(&memFree);
+                pool.jobs.release(&mem.free);
 
-                memFree(pool.workers);
-                memFree(pool);
+                mem.free(pool.workers);
+                mem.free(pool);
         }
 }

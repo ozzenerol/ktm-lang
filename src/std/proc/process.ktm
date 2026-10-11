@@ -167,7 +167,7 @@ static void procSetStatus(Proc *p, i32 st) {
  * null or all zero: the child inherits our stdin, stdout, stderr, working
  * directory and environment. null on failure, with Errno() saying why
  * (ENOENT for a program that doesn't exist, EACCES, ...). */
-pub Proc *procSpawn(u8 **argv, ProcOpts *opts=null) {
+pub Proc *spawn(u8 **argv, ProcOpts *opts=null) {
     return procSpawnEx(argv, opts, false);
 }
 
@@ -184,23 +184,23 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
     u8 **env;
 
     if (!argv || !argv[0]) {
-        setErrno(22); /* EINVAL */
+        os.setErrno(22); /* EINVAL */
         return null;
     }
     if (!opts) {
-        memSet(&zero, 0, sizeof(ProcOpts));
+        mem.set(&zero, 0, sizeof(ProcOpts));
         opts = &zero;
     }
     pin[0] = pin[1] = pout[0] = pout[1] = perr[0] = perr[1] = -1;
     if ((opts.in == PIPE && !procPipe(pin)) ||
             (opts.out == PIPE && !procPipe(pout)) ||
             (opts.err == PIPE && !procPipe(perr))) {
-        err = errno();
+        err = os.errno();
         procClose(&pin[0]);
         procClose(&pin[1]);
         procClose(&pout[0]);
         procClose(&pout[1]);
-        setErrno(err);
+        os.setErrno(err);
         return null;
     }
 
@@ -267,14 +267,14 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
         procClose(&pin[1]);
         procClose(&pout[0]);
         procClose(&perr[0]);
-        setErrno(err);
+        os.setErrno(err);
         return null;
     }
 
     Proc *p = c.calloc(1, sizeof(Proc));
     if (!p) {
         printf("out of memory for a Proc\n");
-        exitProgram(1);
+        os.exit(1);
     }
     p.pid = pid;
     p.in_fd = pin[1];
@@ -298,7 +298,7 @@ static bool procReap(Proc *p, i32 options) {
             return true;
         }
         if (r == 0) { return false; }            /* WNOHANG: still running */
-        if (errno() == PROC_EINTR) { continue; }
+        if (os.errno() == PROC_EINTR) { continue; }
         /* ECHILD: someone else reaped it (SIGCHLD set to SIG_IGN, or a
          * wait(-1) elsewhere): the status is lost */
         p.done = true;
@@ -310,20 +310,20 @@ static bool procReap(Proc *p, i32 options) {
 
 /* Wait until p ends. Returns its exit code (0-255), or -1 if a signal
  * killed it (the signal is in p->term_signal). */
-pub i64 procWait(Proc *p) {
+pub i64 wait(Proc *p) {
     procReap(p, 0);
     return p.exit_code;
 }
 
 /* Without waiting: true once p has ended (then reaped: p->exit_code and
  * p->term_signal are set), false while it runs. */
-pub bool procDone(Proc *p) {
+pub bool done(Proc *p) {
     return procReap(p, PROC_WNOHANG);
 }
 
 /* Send sig to p (to its whole process group if it was started with
  * new_group). false if p has already been reaped or kill fails. */
-pub bool procKill(Proc *p, i32 sig=PROC_SIGTERM) {
+pub bool kill(Proc *p, i32 sig=PROC_SIGTERM) {
     if (p.done) { return false; }
     if (p.group) { return c.kill(-p.pid, sig) == 0; }
     return c.kill(p.pid, sig) == 0;
@@ -349,14 +349,14 @@ static i64 procWriteNoSigpipe(i32 fd, u8 *buf, i64 len) {
     c.sigpending(pend);
     wasPending = c.sigismember(pend, PROC_SIGPIPE) == 1;
     n = c.write(fd, buf, len);
-    err = errno();
+    err = os.errno();
     if (n == -1 && err == PROC_EPIPE && !wasPending) {
         zero[0] = 0;
         zero[1] = 0;
-        while (sigtimedwait(set, null, zero) == -1 && errno() == PROC_EINTR) {}
+        while (sigtimedwait(set, null, zero) == -1 && os.errno() == PROC_EINTR) {}
     }
     c.pthread_sigmask(PROC_SIG_SETMASK, old, null);
-    setErrno(err);
+    os.setErrno(err);
     return n;
 #endif
 }
@@ -378,16 +378,16 @@ static bool procDrain(i32 fd, ProcBuf *b) {
             if (b) {
                 if (b.len + n + 1 > b.cap) {
                     b.cap = (b.len + n + 1) * 2;
-                    b.data = memRealloc(b.data, b.cap);
+                    b.data = mem.realloc(b.data, b.cap);
                 }
-                memCpy(b.data + b.len, tmp, n);
+                mem.copy(b.data + b.len, tmp, n);
                 b.len += n;
             }
             continue;
         }
         if (n == 0) { return false; }
-        if (errno() == PROC_EINTR) { continue; }
-        return errno() == PROC_EAGAIN;
+        if (os.errno() == PROC_EINTR) { continue; }
+        return os.errno() == PROC_EAGAIN;
     }
 }
 
@@ -398,7 +398,7 @@ static bool procDrain(i32 fd, ProcBuf *b) {
  * PROC_PIPE; pass null to read and drop a stream. A child that exits
  * without reading all of its input is fine: the rest is dropped. Returns
  * what ProcWait returns. */
-pub i64 procCommunicate(Proc *p, u8 *input, i64 inputLen,
+pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
                                                      u8 **out, i64 *outLen=null,
                                                      u8 **err=null, i64 *errLen=null) {
     ProcBuf ob, eb;
@@ -407,8 +407,8 @@ pub i64 procCommunicate(Proc *p, u8 *input, i64 inputLen,
     i32 inSlot, outSlot, errSlot;
     bool pipedOut = p.out_fd != -1, pipedErr = p.err_fd != -1;
 
-    memSet(&ob, 0, sizeof(ProcBuf));
-    memSet(&eb, 0, sizeof(ProcBuf));
+    mem.set(&ob, 0, sizeof(ProcBuf));
+    mem.set(&eb, 0, sizeof(ProcBuf));
     if (!input) { inputLen = 0; }
     if (p.in_fd != -1 && inputLen == 0) { procClose(&p.in_fd); }
     procNonBlocking(p.in_fd);
@@ -435,14 +435,14 @@ pub i64 procCommunicate(Proc *p, u8 *input, i64 inputLen,
         }
         for (i = 0; i < nfds; i++) { fds[i].revents = 0; }
         if (c.poll(fds, nfds, -1) < 0) {
-            if (errno() == PROC_EINTR) { continue; }
+            if (os.errno() == PROC_EINTR) { continue; }
             break;
         }
         if (inSlot != -1 && fds[inSlot].revents) {
             n = procWriteNoSigpipe(p.in_fd, input + sent, inputLen - sent);
             if (n > 0) { sent += n; }
             if (sent >= inputLen ||
-                    (n == -1 && errno() != PROC_EAGAIN && errno() != PROC_EINTR)) {
+                    (n == -1 && os.errno() != PROC_EAGAIN && os.errno() != PROC_EINTR)) {
                 procClose(&p.in_fd);
                     }              /* done, or the child is gone */
         }
@@ -464,7 +464,7 @@ pub i64 procCommunicate(Proc *p, u8 *input, i64 inputLen,
 
     if (out) {
         if (pipedOut) {
-            if (!ob.data) { ob.data = memAlloc(1); }
+            if (!ob.data) { ob.data = mem.alloc(1); }
             ob.data[ob.len] = 0;
         }
         *out = ob.data;
@@ -472,18 +472,18 @@ pub i64 procCommunicate(Proc *p, u8 *input, i64 inputLen,
     }
     if (err) {
         if (pipedErr) {
-            if (!eb.data) { eb.data = memAlloc(1); }
+            if (!eb.data) { eb.data = mem.alloc(1); }
             eb.data[eb.len] = 0;
         }
         *err = eb.data;
         if (errLen) { *errLen = eb.len; }
     }
-    return procWait(p);
+    return wait(p);
 }
 
 /* Close our pipe ends and free p (null is ignored). A child that is
  * still running is waited for: ProcKill it first to stop it. */
-pub void procRelease(Proc *p) {
+pub void release(Proc *p) {
     if (!p) { return; }
     procClose(&p.in_fd);
     procClose(&p.out_fd);
@@ -496,17 +496,17 @@ pub void procRelease(Proc *p) {
  * it printed on stdout as a new string to Free, with one trailing newline
  * removed; its exit code (as ProcWait) in *code. null if it couldn't be
  * started (Errno() says why). */
-pub u8 *procRun(u8 **argv, i64 *code=null) {
+pub u8 *run(u8 **argv, i64 *code=null) {
     ProcOpts o;
     u8 *out = null;
     i64 len = 0, rc;
-    memSet(&o, 0, sizeof(ProcOpts));
+    mem.set(&o, 0, sizeof(ProcOpts));
     o.in = DEVNULL;
     o.out = PIPE;
-    Proc *p = procSpawn(argv, &o);
+    Proc *p = spawn(argv, &o);
     if (!p) { return null; }
-    rc = procCommunicate(p, null, 0, &out, &len);
-    procRelease(p);
+    rc = communicate(p, null, 0, &out, &len);
+    release(p);
     if (len > 0 && out[len - 1] == '\n') { out[len - 1] = 0; }
     if (code) { *code = rc; }
     return out;
@@ -528,27 +528,27 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
     argv[1] = "-c";
     argv[2] = cmd;
     argv[3] = null;
-    memSet(&o, 0, sizeof(ProcOpts));
+    mem.set(&o, 0, sizeof(ProcOpts));
     o.out = PIPE;
     Proc *p = procSpawnEx(argv, &o, true);
     if (!p) { return null; }
-    memSet(&b, 0, sizeof(ProcBuf));
+    mem.set(&b, 0, sizeof(ProcBuf));
     procNonBlocking(p.out_fd);
     while (p.out_fd != -1) {
         fd.fd = p.out_fd;
         fd.events = PROC_POLLIN;
         fd.revents = 0;
         r = c.poll(&fd, 1, 10);
-        if (r < 0 && errno() != PROC_EINTR) { break; }
+        if (r < 0 && os.errno() != PROC_EINTR) { break; }
         if (r > 0 && !procDrain(p.out_fd, &b)) {
             procClose(&p.out_fd);               /* EOF */
-        } else if (procDone(p)) {
+        } else if (done(p)) {
             procDrain(p.out_fd, &b);            /* what is already there */
             procClose(&p.out_fd);
         }
     }
-    procRelease(p);
-    if (!b.data) { b.data = memAlloc(1); }
+    release(p);
+    if (!b.data) { b.data = mem.alloc(1); }
     b.data[b.len] = 0;
     *len = b.len;
     return b.data;

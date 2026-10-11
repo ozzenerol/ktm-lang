@@ -40,10 +40,10 @@ static bool rbIsNil(RBNode *n) {
         return n == null || n.left == null;
 }
 
-pub RBTree *rbTreeNew(fn(void *) void free_key, fn(void *) void free_value, 
+pub RBTree *rbNew(fn(void *) void free_key, fn(void *) void free_value, 
                                                                         fn(void *, void *) i64 key_cmp) {
-        RBTree *tree = memAlloc(sizeof(RBTree));
-        RBNode *nil = memAlloc(sizeof(RBNode));
+        RBTree *tree = mem.alloc(sizeof(RBTree));
+        RBNode *nil = mem.alloc(sizeof(RBNode));
         nil.color = __RB_BLACK__;
         nil.left = null;
         nil.right = null;
@@ -61,7 +61,7 @@ pub RBTree *rbTreeNew(fn(void *) void free_key, fn(void *) void free_value,
 }
 
 static RBNode *rbNodeNew(RBTree *tree, void *key, void *value) {
-        RBNode *n = memAlloc(sizeof(RBNode));
+        RBNode *n = mem.alloc(sizeof(RBNode));
         n.key = key;
         n.value = value;
         n.color = __RB_RED__;
@@ -75,7 +75,7 @@ static void rbNodeRelease(RBTree *tree, RBNode *n) {
         if (n && n != tree.nil) {
                 if (tree.free_key) { tree.free_key(n.key); }
                 if (tree.free_value) { tree.free_value(n.value); }
-                memFree(n);
+                mem.free(n);
         }
 }
 
@@ -158,7 +158,7 @@ static void rbInsertFixUp(RBTree *tree, RBNode *z) {
         tree.root.color = __RB_BLACK__;
 }
 
-pub void rbTreeInsert(RBTree *tree, void *key, void *value) {
+pub void rbSet(RBTree *tree, void *key, void *value) {
         if (!tree) { return; }
         RBNode *x = tree.root;
         RBNode *y = null;
@@ -227,14 +227,14 @@ static RBNode *rbNodeFind(RBTree *tree, RBNode *n, void *key) {
         return null;
 }
 
-pub void *rbTreeGet(RBTree *tree, void *key) {
+pub void *rbGet(RBTree *tree, void *key) {
         if (!tree) { return null; }
         RBNode *n = rbNodeFind(tree,tree.root,key);
         if (n) { return n.value; }
         return n;
 }
 
-pub bool rbTreeHas(RBTree *tree, void *key) {
+pub bool rbHas(RBTree *tree, void *key) {
         if (!tree) { return false; }
         RBNode *n = rbNodeFind(tree, tree.root, key);
         return n != null;
@@ -312,7 +312,7 @@ static void rbTreeFixDelete(RBTree *tree, RBNode *x) {
         x.color = __RB_BLACK__;
 }
 
-pub void rbTreeDelete(RBTree *tree, void *key) {
+pub void rbDelete(RBTree *tree, void *key) {
         if (!tree) { return; }
         RBNode *z = rbNodeFind(tree, tree.root, key);
         RBNode *y = null;
@@ -358,13 +358,13 @@ pub void rbTreeDelete(RBTree *tree, void *key) {
         tree.version++;
 }
 
-pub void rbTreeForEach(RBTree *tree,
+pub void rbForEach(RBTree *tree,
                                                                     void *userData,
                                                                     fn(void *userData,
                                                                                                                                 void *key, 
                                                                                                                                 void *value) void callback) {
         if (!tree) { return; }
-        RBNode **stack = memAlloc(sizeof(RBNode*)*tree.size);
+        RBNode **stack = mem.alloc(sizeof(RBNode*)*tree.size);
         i64 sp = 0, version = tree.version;
         RBNode *cur = tree.root;
 
@@ -383,7 +383,7 @@ pub void rbTreeForEach(RBTree *tree,
                 cur = cur.right;
         }
 
-        memFree(stack);
+        mem.free(stack);
 }
 
 pub struct RBIter {
@@ -395,7 +395,7 @@ pub struct RBIter {
 };
 
 pub RBIter *rbIterNew(RBTree *tree) {
-        RBIter *it = memAlloc(sizeof(RBIter));
+        RBIter *it = mem.alloc(sizeof(RBIter));
         it.sp = 0;
         it.cur = null;
         it.tree = tree;
@@ -405,7 +405,7 @@ pub RBIter *rbIterNew(RBTree *tree) {
                 return it; /* yields nothing */
         }
         it.version = tree.version;
-        it.stack = memAlloc(sizeof(RBNode*)*tree.size);
+        it.stack = mem.alloc(sizeof(RBNode*)*tree.size);
         RBNode *node = tree.root;
         while (!rbIsNil(node)) {
                 it.stack[it.sp++] = node;
@@ -417,8 +417,8 @@ pub RBIter *rbIterNew(RBTree *tree) {
 
 pub void rbIterRelease(RBIter *it) {
         if (!it) { return; }
-        memFree(it.stack);
-        memFree(it);
+        mem.free(it.stack);
+        mem.free(it);
 }
 
 pub RBNode *rbIterNext(RBIter *it) {
@@ -440,7 +440,7 @@ pub RBNode *rbIterNext(RBIter *it) {
         return node;
 }
 
-pub void rbTreeRelease(RBTree *tree)
+pub void rbRelease(RBTree *tree)
 {// Free every node, its key and value (with the tree's destructors, if
     // set) and the tree itself
         if (!tree) { return; }
@@ -452,6 +452,6 @@ pub void rbTreeRelease(RBTree *tree)
                 rbNodeRelease(tree, node);
         }
         rbIterRelease(it);
-        memFree(tree.nil);
-        memFree(tree);
+        mem.free(tree.nil);
+        mem.free(tree);
 }

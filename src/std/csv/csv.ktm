@@ -10,13 +10,13 @@ pub struct CsvSlice {
     u64 idx,off,len;
 };
 
-pub void csvParserInit(CsvParser *p, u8 *csv, u64 len) {
+pub void init(CsvParser *p, u8 *csv, u64 len) {
     p.csv = csv;
     p.len = len;
     p.off = p.row_off = p.nrows = p.nfields = p.state = 0;
 }
 
-pub i64 csvParse(CsvParser *p, CsvSlice *s) {
+pub i64 next(CsvParser *p, CsvSlice *s) {
     u8 *csv = p.csv;
     switch (p.state) {
         case 0:

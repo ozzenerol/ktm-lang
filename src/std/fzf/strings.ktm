@@ -217,10 +217,10 @@ _STRHASH::
                 RET
 }
 
-pub _extern _TOLOWER u8 toLower(u8 ch);
-pub _extern _TOUPPER u8 toUpper(u8 ch);
-pub _extern _ISSPACE bool isSpace(u8 ch);
-pub _extern _STRHASH u64 strHash(u8 *str);
+pub _extern _TOLOWER u8 ToLower(u8 ch);
+pub _extern _TOUPPER u8 ToUpper(u8 ch);
+pub _extern _ISSPACE bool IsSpace(u8 ch);
+pub _extern _STRHASH u64 StrHash(u8 *str);
 #endif
 
 #ifdef __aarch64__

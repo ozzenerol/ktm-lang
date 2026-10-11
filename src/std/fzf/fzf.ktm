@@ -118,7 +118,7 @@ i64 leadingWhitespaces(FzFString *str)
 { // XXX: extract to strings.ktm
     i64 whitespaces = 0;
     for (i64 i = 0; i < str.size; i++) {
-        if (!isSpace((u8)str.data[i])) {
+        if (!str.isSpace((u8)str.data[i])) {
             break;
         }
         whitespaces++;
@@ -130,7 +130,7 @@ i64 trailingWhitespaces(FzFString *str)
 { // XXX: extract to strings.ktm
     i64 whitespaces = 0;
     for (i64 i = str.size - 1; i >= 0; i--) {
-        if (!isSpace((u8)str.data[i])) {
+        if (!str.isSpace((u8)str.data[i])) {
             break;
         }
         whitespaces++;
@@ -141,7 +141,7 @@ i64 trailingWhitespaces(FzFString *str)
 bool hasSuffix(u8 *str, i64 len, u8 *suffix, i64 suffixLen) {
     FzFStrSlice s;
     sliceStr(&s, str, len - suffixLen, len);
-    return len >= suffixLen && !strNCmp(s.data, suffix, suffixLen);
+    return len >= suffixLen && !str.cmpLen(s.data, suffix, suffixLen);
 }
 
 u8 *strReplaceChar(u8 *str, u8 find, u8 replace) {
@@ -160,10 +160,10 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
 
     u8 *result,*ins,*tmp;
 
-    i64 lenRep = strLen(rep);
+    i64 lenRep = str.len(rep);
     i64 lenFront = 0;
-    i64 lenOrig = strLen(orig);
-    i64 lenWith = strLen(with);
+    i64 lenOrig = str.len(orig);
+    i64 lenWith = str.len(with);
     i64 count = 0;
 
     if (lenRep == 0) {
@@ -175,7 +175,7 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
         ins = tmp + lenRep;
     }
 
-    tmp = result = memAlloc(lenOrig + (lenWith - lenRep) * count + 1);
+    tmp = result = mem.alloc(lenOrig + (lenWith - lenRep) * count + 1);
     if (!result) {
         return null;
     }
@@ -183,22 +183,22 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
     while (count--) {
         ins = c.strstr(orig, rep);
         lenFront = ins - orig;
-        memCpy(tmp, orig, lenFront);  /* C's strncpy, not StrNCpy */
+        mem.copy(tmp, orig, lenFront);  /* C's strncpy, not StrNCpy */
         tmp += lenFront;
-        strCpy(tmp,with);
+        str.copy(tmp,with);
         tmp += lenWith;
         orig += lenFront + lenRep;
         lenOrig -= lenFront + lenRep;
     }
-    memCpy(tmp,orig,lenOrig);
+    mem.copy(tmp,orig,lenOrig);
     tmp[lenOrig] = 0;
     return result;
 }
 
 u8 *strTolower(u8 *str, i64 size) {
-    u8 *lower = memAlloc((size+2)*sizeof(u8));
+    u8 *lower = mem.alloc((size+2)*sizeof(u8));
     for (i64 i = 0; i < size; ++i) {
-        lower[i] = toLower(str[i]);
+        lower[i] = str.toLower(str[i]);
     }
     lower[size] = '\0';
     return lower;
@@ -210,11 +210,11 @@ i16 max16(i16 a, i16 b) {
 }
 
 FzFPosition *fzfPosArray(i64 len) {
-    FzFPosition *pos = memAlloc(sizeof(FzFPosition));
+    FzFPosition *pos = mem.alloc(sizeof(FzFPosition));
     pos.size = 0;
     pos.cap = len;
     if (len > 0) {
-        pos.data = memAlloc(len * sizeof(i64));
+        pos.data = mem.alloc(len * sizeof(i64));
     } else {
         pos.data = null;
     }
@@ -231,7 +231,7 @@ void resizePos(FzFPosition *pos, i64 addLen, i64 comp) {
         } else {
             pos.cap += 1;
         }
-        pos.data = memRealloc(pos.data, sizeof(i64) * pos.cap);
+        pos.data = mem.realloc(pos.data, sizeof(i64) * pos.cap);
     }
 }
 
@@ -358,7 +358,7 @@ i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
         u8 c = text.data[idx];
         i32 cls = charClsOf(c);
         if (!case_sensitive) {
-            c = toLower(c);
+            c = str.toLower(c);
         }
         if (c == pattern.data[pidx]) {
             appendPos(pos, idx);
@@ -405,7 +405,7 @@ void fzfPrefixMatch(FzFResult *res, bool case_sensitive, FzFString *text,
 
     if (M == 0) { goto no_match; }
 
-    if (!isSpace(pattern.data[0])) {
+    if (!str.isSpace(pattern.data[0])) {
         trimmedLen = leadingWhitespaces(text);
     }
 
@@ -413,7 +413,7 @@ void fzfPrefixMatch(FzFResult *res, bool case_sensitive, FzFString *text,
 
     for (i64 i = 0; i < M; ++i) {
         c = text.data[trimmedLen + i];
-        if (!case_sensitive) { c = toLower(c); }
+        if (!case_sensitive) { c = str.toLower(c); }
         if (c != pattern.data[i]) { goto no_match; }
     }
 
@@ -436,7 +436,7 @@ void fzfSuffixMatch(FzFResult *res, bool case_sensitive,
     i64 trimmedLen = text.size, M = pattern.size,diff,start,end;
     i32 score;
 
-    if (M == 0 || !isSpace(pattern.data[M - 1])) {
+    if (M == 0 || !str.isSpace(pattern.data[M - 1])) {
         trimmedLen -= trailingWhitespaces(text);
     }
 
@@ -447,7 +447,7 @@ void fzfSuffixMatch(FzFResult *res, bool case_sensitive,
 
     for (i64 i = 0; i < M; ++i) {
         u8 c = text.data[i+diff];
-        if (!case_sensitive) { c = toLower(c); }
+        if (!case_sensitive) { c = str.toLower(c); }
         if (c != pattern.data[i]) { goto no_match; }
     }
 
@@ -491,7 +491,7 @@ void fzfEqNaiveMatch(FzFResult *res, bool case_sensitive, FzFString *text,
 
     for (i64 i = 0; i < N; ++i) {
         c = text.data[i];
-        if (!case_sensitive) { c = toLower(c); }
+        if (!case_sensitive) { c = str.toLower(c); }
 
         if (c == pattern.data[pidx]) {
             if (pidx == 0) {
@@ -560,7 +560,7 @@ void fzfEqMatch(FzFResult *res, bool case_sensitive, FzFString *text,
     for (i64 i = 0; i < M; ++i) {
         pchar = pattern.data[i];
         c = text.data[trimmedLen+i];
-        if (!case_sensitive) { c = toLower(c); }
+        if (!case_sensitive) { c = str.toLower(c); }
         if (c != pchar) {
             match = false;
             break;
@@ -605,7 +605,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
     for (i64 idx = 0; idx < N; idx++) {
         u8 c = text.data[idx];
         if (!case_sensitive) {
-            c = toLower(c);
+            c = str.toLower(c);
         }
         if (c == pattern.data[pidx]) {
             if (sidx < 0) {
@@ -626,7 +626,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
         for (i64 idx = end - 1; idx >= start; idx--) {
             u8 c = text.data[idx];
             if (!case_sensitive) {
-                c = toLower(c);
+                c = str.toLower(c);
             }
             if (c == pattern.data[pidx]) {
                 pidx--;
@@ -651,18 +651,18 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
 }
 
 FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
-    FzFPattern *patObj = memAllocZero(sizeof(FzFPattern));
-    patObj.entries = listNew();
+    FzFPattern *patObj = mem.allocZero(sizeof(FzFPattern));
+    patObj.entries = list.new();
     FzFTerm term;
 
-    i64 patLen = strLen(pattern);
+    i64 patLen = str.len(pattern);
     if (patLen == 0) {
         return patObj;
     }
 
     /* Trimmed in a copy: the caller's string may be a literal. */
-    u8 *patternDup = strNew(pattern);
-    pattern = strTrimStart(patternDup,patLen,&patLen);
+    u8 *patternDup = str.dup(pattern);
+    pattern = str.trimStart(patternDup,patLen,&patLen);
     while (hasSuffix(pattern, patLen, " ", 1) &&
             !hasSuffix(pattern, patLen, "\\ ", 2)) {
         pattern[patLen - 1] = 0;
@@ -670,13 +670,13 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     }
 
     u8 *patternCopy = strReplace(pattern, "\\ ", "\t");
-    memFree(patternDup);
+    mem.free(patternDup);
     u8 *delim = " ";
     u8 *tokSave = null;
     u8 *ptr = c.strtok_r(patternCopy, delim, &tokSave);
 
-    FzFTermSet *set = memAllocZero(sizeof(FzFTermSet));
-    set.entries = listNew();
+    FzFTermSet *set = mem.allocZero(sizeof(FzFTermSet));
+    set.entries = list.new();
 
     bool switchSet = false;
     bool afterBar = false;
@@ -687,55 +687,55 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
 
         bool inv = false;
 
-        auto len = strLen(ptr);
+        auto len = str.len(ptr);
         strReplaceChar(ptr, '\t', ' ');
-        u8 *text = strNew(ptr);
+        u8 *text = str.dup(ptr);
 
         u8 *ogStr = text;
         u8 *lowerText = strTolower(text, len);
         bool case_sensitive = caseMode == CASE_RESPECT ||
                                                  (caseMode == CASE_SMART && 
-                                                    strCmp(text, lowerText) != 0);
+                                                    str.cmp(text, lowerText) != 0);
 
         if (!case_sensitive) {
             if (text) {
-                memFree(text);
+                mem.free(text);
             }
             text = lowerText;
             ogStr = lowerText;
         } else {
             if (lowerText) {
-                memFree(lowerText);
+                mem.free(lowerText);
             }
         }
 
         if (!fuzzy) {
             cb = &fzfEqNaiveMatch;
         }
-        if (set.size > 0 && !afterBar && strCmp(text, "|") == 0) {
+        if (set.size > 0 && !afterBar && str.cmp(text, "|") == 0) {
             switchSet = false;
             afterBar = true;
             ptr = c.strtok_r(null, delim, &tokSave);
             if (ogStr) {
-                memFree(ogStr);
+                mem.free(ogStr);
             }
             continue;
         }
         afterBar = false;
-        if (!strNCmp(text, "!", 1)) {
+        if (!str.cmpLen(text, "!", 1)) {
             inv = true;
             cb = &fzfEqNaiveMatch;
             text++;
             len--;
         }
 
-        if (strCmp(text, "$") != 0 && hasSuffix(text, len, "$", 1)) {
+        if (str.cmp(text, "$") != 0 && hasSuffix(text, len, "$", 1)) {
             cb = &fzfSuffixMatch;
             text[len - 1] = '\0';
             len--;
         }
 
-        if (!strNCmp(text, "'", 1)) {
+        if (!str.cmpLen(text, "'", 1)) {
             if (fuzzy && !inv) {
                 cb = &fzfEqNaiveMatch;
                 text++;
@@ -745,7 +745,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
                 text++;
                 len--;
             }
-        } else if (!strNCmp(text, "^", 1)) {
+        } else if (!str.cmpLen(text, "^", 1)) {
             if (cb == &fzfSuffixMatch) {
                 cb = &fzfEqMatch;
             } else {
@@ -758,15 +758,15 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
         if (len > 0) {
             if (switchSet) {
                 patObj.entries.append(set);
-                set = memAlloc(sizeof(FzFTermSet));
-                set.entries = listNew();
+                set = mem.alloc(sizeof(FzFTermSet));
+                set.entries = list.new();
                 set.cap = 0;
                 set.size = 0;
             }
-            FzFString *textPtr = memAlloc(sizeof(FzFString));
+            FzFString *textPtr = mem.alloc(sizeof(FzFString));
             textPtr.data = text;
             textPtr.size = len;
-            FzFTerm *t = memAlloc(sizeof(FzFTerm));
+            FzFTerm *t = mem.alloc(sizeof(FzFTerm));
             t.cb = cb;
             t.inv = inv;
             t.ptr = ogStr;
@@ -778,7 +778,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
             switchSet = true;
         } else {
             if (ogStr) {
-                memFree(ogStr);
+                mem.free(ogStr);
             }
         }
 
@@ -790,9 +790,9 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     } else {
         if (set) {
             if (set.entries) {
-                set.entries.release(&memFree);
+                set.entries.release(&mem.free);
             }
-            memFree(set);
+            mem.free(set);
         }
     }
     bool only = true;
@@ -813,7 +813,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
 
     patObj.only_inv = only;
     if (patternCopy) {
-        memFree(patternCopy);
+        mem.free(patternCopy);
     }
     return patObj;
 }
@@ -821,9 +821,9 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
 static void fzfTermRelease(void *_term) {
     FzFTerm *term = _term;
     if (term) {
-        memFree(term.ptr);
-        memFree(term.text);
-        memFree(term);
+        mem.free(term.ptr);
+        mem.free(term.text);
+        mem.free(term);
     }
 }
 
@@ -831,7 +831,7 @@ static void fzfTermSetRelease(void *_set) {
     FzFTermSet *set = _set;
     if (set) {
         set.entries.release(&fzfTermRelease);
-        memFree(set);
+        mem.free(set);
     }
 }
 
@@ -839,10 +839,10 @@ void fzfPatternRelease(FzFPattern *pattern) {
     if (pattern) {
         if (!pattern.entries.isEmpty()) {
             pattern.entries.release(&fzfTermSetRelease);
-            memFree(pattern);
+            mem.free(pattern);
         } else if (pattern) {
-            pattern.entries.release(&memFree);
-            memFree(pattern);
+            pattern.entries.release(&mem.free);
+            mem.free(pattern);
         }
     }
 }
@@ -853,7 +853,7 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     auto entries = pattern.entries;
     FzFString input;
     input.data = text;
-    input.size = strLen(text);
+    input.size = str.len(text);
 
     if (pattern.only_inv) {
         i64 final = 0;
@@ -908,12 +908,12 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     return totalScore;
 }
 
-pub void fzfPositionRelease(FzFPosition *pos) {
+pub void release(FzFPosition *pos) {
     if (pos) {
         if (pos.data) {
-            memFree(pos.data);
+            mem.free(pos.data);
         }
-        memFree(pos);
+        mem.free(pos);
     }
 }
 
@@ -929,7 +929,7 @@ FzFPosition *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     if (text == null || pattern.entries.isEmpty()) { return null; }
 
     input.data = text;
-    input.size = strLen(text);
+    input.size = str.len(text);
     allPos = fzfPosArray(0);
     auto entries = pattern.entries;
 
@@ -957,7 +957,7 @@ FzFPosition *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
             }
         }
         if (!matched) {
-            fzfPositionRelease(allPos);
+            release(allPos);
             return null;
         }
     }
@@ -965,15 +965,15 @@ FzFPosition *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
 }
 
 FzFSlab *fzfSlabNew(FzFSlabConfig *config) {
-    FzFSlab *slab = memAllocZero(sizeof(FzFSlab));
+    FzFSlab *slab = mem.allocZero(sizeof(FzFSlab));
 
-    slab.v16.data = memAllocZero(config.size_16 * sizeof(i16));
+    slab.v16.data = mem.allocZero(config.size_16 * sizeof(i16));
 
     slab.v16.cap = config.size_16;
     slab.v16.size = 0;
     slab.v16.allocated = true;
 
-    slab.v32.data = memAllocZero(config.size_32 * sizeof(i32));
+    slab.v32.data = mem.allocZero(config.size_32 * sizeof(i32));
     slab.v32.cap = config.size_32;
     slab.v32.size = 0;
     slab.v32.allocated = true;
@@ -990,13 +990,13 @@ FzFSlab *fzfDefaultSlab() {
 
 void fzfSlabRelease(FzFSlab *slab) {
     if (slab) {
-        memFree(slab.v16.data);
-        memFree(slab.v32.data);
-        memFree(slab);
+        mem.free(slab.v16.data);
+        mem.free(slab.v32.data);
+        mem.free(slab);
     }
 }
 
-pub FzFPosition *FzF(u8 *text, u8 *seq, i32 caseMode=CASE_SMART,
+pub FzFPosition *match(u8 *text, u8 *seq, i32 caseMode=CASE_SMART,
         bool fuzzy=true) {
     /* No slab: the matchers here (V1 and the exact/prefix/suffix ones)
      * never use one, and allocating the 200 KB default slab on every call

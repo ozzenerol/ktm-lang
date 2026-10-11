@@ -145,7 +145,7 @@ pub extern "c" i32 sqlite3_close_v2(sqlite3 *db);
 
 pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 
-pub SqlCtx *sqlCtxNew(u8 *dbname, bool printerror=false) {
+pub SqlCtx *open(u8 *dbname, bool printerror=false) {
     sqlite3 *db = null;
     SqlCtx *ctx;
     i32 rc = c.sqlite3_open(dbname, &db);
@@ -160,18 +160,18 @@ pub SqlCtx *sqlCtxNew(u8 *dbname, bool printerror=false) {
         return null;
     }
 
-    ctx = memAlloc(sizeof(SqlCtx));
+    ctx = mem.alloc(sizeof(SqlCtx));
     ctx.dbname = dbname;
     ctx.conn = db;
     return ctx;
 }
 
-pub void sqlCtxRelease(SqlCtx *ctx) {
+pub void close(SqlCtx *ctx) {
     if (!ctx) { return; }
     /* Unlike sqlite3_close, closes once the last statement is finalized
      * instead of failing with SQLITE_BUSY and leaking the connection. */
     c.sqlite3_close_v2(ctx.conn);
-    memFree(ctx);
+    mem.free(ctx);
 }
 
 /* Only one statement may be given: anything after the first one other
@@ -190,15 +190,15 @@ static bool sqlTailIsEmpty(SqlCtx *ctx, u8 *tail) {
     return rc == c.SQLITE_OK;
 }
 
-pub SqlPreparedStmt *sqlPrepare(SqlCtx *ctx, u8 *sql) {
-    SqlPreparedStmt *pstmt = memAlloc(sizeof(SqlPreparedStmt));
+pub SqlPreparedStmt *prepare(SqlCtx *ctx, u8 *sql) {
+    SqlPreparedStmt *pstmt = mem.alloc(sizeof(SqlPreparedStmt));
     u8 *tail = null;
     pstmt.stmt = null;
     if (c.sqlite3_prepare_v2(ctx.conn, sql, -1, &(pstmt.stmt), &tail) != c.SQLITE_OK ||
             pstmt.stmt == null || !sqlTailIsEmpty(ctx, tail)) {
         /* A failed prepare leaves stmt null; so does an empty string. */
         c.sqlite3_finalize(pstmt.stmt);
-        memFree(pstmt);
+        mem.free(pstmt);
         return null;
     }
     pstmt.params_count = sqlite3_bind_parameter_count(pstmt.stmt);
@@ -210,31 +210,31 @@ static void sqlReset(SqlPreparedStmt *pstmt) {
     c.sqlite3_reset(pstmt.stmt);
 }
 
-pub void sqlFinalizePrepared(SqlPreparedStmt *pstmt) {
+pub void finalize(SqlPreparedStmt *pstmt) {
     if (!pstmt) { return; }
     c.sqlite3_finalize(pstmt.stmt);
-    memFree(pstmt);
+    mem.free(pstmt);
 }
 
 extern "c" void sqlite3_free(void *ptr);
 
 /* Unsafe */ 
-pub u8 *sqlExecRaw(SqlCtx *ctx, u8 *sql) {
+pub u8 *execRaw(SqlCtx *ctx, u8 *sql) {
     u8 *errmsg = null, *copy;
     i32 rc = c.sqlite3_exec(ctx.conn, sql, 0, 0, &errmsg);
     if (rc == c.SQLITE_OK) {
         return null;
     }
     if (errmsg) {
-        copy = strNew(errmsg);
+        copy = str.dup(errmsg);
         sqlite3_free(errmsg);
     } else {
-        copy = strNew(c.sqlite3_errmsg(ctx.conn));
+        copy = str.dup(c.sqlite3_errmsg(ctx.conn));
     }
     return copy;
 }
 
-pub i32 sqlExecPrepared(SqlPreparedStmt *pstmt, SqlRow *row, SqlParam *params) {
+pub i32 execPrepared(SqlPreparedStmt *pstmt, SqlRow *row, SqlParam *params) {
     i32 rc = 0;
 
     if (row) {
@@ -343,11 +343,11 @@ err:
     return rc;
 }
 
-pub void sqlRowRelease(SqlRow *row) {
+pub void rowRelease(SqlRow *row) {
     if (row.stmt == null) {
         return;
     }
-    memFree(row.col);
+    mem.free(row.col);
     if (row.owns_stmt) {
         c.sqlite3_finalize(row.stmt);
     }
@@ -355,13 +355,13 @@ pub void sqlRowRelease(SqlRow *row) {
     row.stmt = null;
 }
 
-pub bool sqlSelect(SqlCtx *ctx, SqlRow *row, u8 *sql, SqlParam *params=null,
+pub bool select(SqlCtx *ctx, SqlRow *row, u8 *sql, SqlParam *params=null,
         i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,row,sql,params,paramCount);
     return result == c.SQLITE_DONE || result == c.SQLITE_ROW;
 }
 
-pub bool sqlQuery(SqlCtx *ctx, u8 *sql, SqlParam *params=null, i32 paramCount=0) {
+pub bool exec(SqlCtx *ctx, u8 *sql, SqlParam *params=null, i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,null,sql,params,paramCount);
     return result == c.SQLITE_DONE || result == c.SQLITE_ROW;
 }
@@ -373,16 +373,16 @@ static bool sqlIterGeneric(SqlRow *row) {
 
     if (row.col != null) {
         if (c.sqlite3_step(row.stmt) != c.SQLITE_ROW) {
-            sqlRowRelease(row);
+            rowRelease(row);
             return false;
         }
     }
 
     /* XXX: MAlloc's and Free's on each call which is a bit expensive seeing 
      * as this function will be called in a loop */
-    memFree(row.col);
+    mem.free(row.col);
     row.cols = c.sqlite3_data_count(row.stmt);
-    row.col = memAllocZero(row.cols * sizeof(SqlColumn));
+    row.col = mem.allocZero(row.cols * sizeof(SqlColumn));
 
     for (auto i = 0; i < row.cols; i++) {
         row.col[i].type = sqlite3_column_type(row.stmt,i);
@@ -407,10 +407,10 @@ static bool sqlIterGeneric(SqlRow *row) {
     return true;
 }
 
-pub i32 sqlIter(SqlRow *row) {
+pub i32 next(SqlRow *row) {
     return sqlIterGeneric(row);
 }
 
-pub i64 sqlIterPrepared(SqlRow *row) {
+pub i64 nextPrepared(SqlRow *row) {
     return sqlIterGeneric(row);
 }

@@ -18,18 +18,18 @@ const i64 PRTF_DECIMAL = 0x100;
 /* Compare at most len bytes like C's strncmp: < 0, 0 or > 0, bytes compared
  * as unsigned, stopping at a NUL. null sorts before every string (two NULLs
  * are equal), whatever len is. */
-pub _extern _STRNCMP i64 strNCmp(u8 *s1, u8 *s2, i64 len);
+pub _extern _STRNCMP i64 cmpLen(u8 *s1, u8 *s2, i64 len);
 
 /* StrNCmp ignoring ASCII case, like C's strncasecmp. */
-pub _extern _STRNICMP i64 strNICmp(u8 *s1, u8 *s2, i64 len);
+pub _extern _STRNICMP i64 cmpLenNoCase(u8 *s1, u8 *s2, i64 len);
 
 /* Copy src and its NUL into dst, which must be big enough. A null src
  * copies "" and a null dst does nothing. */
-pub _extern _STRCPY void strCpy(u8 *dst, u8 *src);
+pub _extern _STRCPY void copy(u8 *dst, u8 *src);
 
 /* Compare like C's strcmp: < 0, 0 or > 0, bytes compared as unsigned.
  * null sorts before every string; two NULLs are equal. */
-pub _extern _STRCMP i64 strCmp(u8 *s1, u8 *s2);
+pub _extern _STRCMP i64 cmp(u8 *s1, u8 *s2);
 
 #ifdef IS_X86_64
 /* ch in lower case: only 'A'-'Z' change (ASCII). */
@@ -41,7 +41,7 @@ pub _extern _ISSPACE bool isSpace(u8 ch);
 /* A 64-bit hash of str's bytes: h = h * 31 + c from 0, then a final mix
  * (murmur3's), so similar keys spread over the low bits; "" hashes to 0.
  * The same value on every target. */
-pub _extern _STRHASH u64 strHash(u8 *str);
+pub _extern _STRHASH u64 hash(u8 *str);
 #endif
 
 #ifdef IS_ARM_64

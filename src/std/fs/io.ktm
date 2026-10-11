@@ -47,7 +47,7 @@ import c, mem, str;
  * calling the libc version. This is just much easier to use.
  * With the added benifit of including when a file was created 
  * for linux, which mac includes with `st_birthtimespec` */
-pub i32 fileStat(Fstat *fst, u8 *pathname) {
+pub i32 stat(Fstat *fst, u8 *pathname) {
 #if IS_LINUX
     c.Statx stx;
 
@@ -124,11 +124,11 @@ pub i32 fileStat(Fstat *fst, u8 *pathname) {
  * pipes, FIFOs and devices have no size, and /proc files report 0. */
 static u8 *fileReadToEof(i32 fd, i64 *_len) {
     i64 cap = 4096, size = 0, rbytes;
-    u8 *s = memAlloc(cap), *bigger;
+    u8 *s = mem.alloc(cap), *bigger;
 
     while (s) {
         if (size + 1 >= cap) {
-            if ((bigger = memRealloc(s, cap * 2)) == null) {
+            if ((bigger = mem.realloc(s, cap * 2)) == null) {
                 break;
             }
             s = bigger;
@@ -145,11 +145,11 @@ static u8 *fileReadToEof(i32 fd, i64 *_len) {
         }
         size += rbytes;
     }
-    memFree(s);
+    mem.free(s);
     return null;
 }
 
-pub u8 *fileRead(u8 *path, i64 *_size=null) {
+pub u8 *readAll(u8 *path, i64 *_size=null) {
     if (_size) { *_size = 0; }
     if (!path) { return null; }
     i32 fd;
@@ -188,7 +188,7 @@ pub u8 *fileRead(u8 *path, i64 *_size=null) {
 
     c.lseek(fd,0,c.SEEK_SET);
 
-    if ((s = memAlloc(len+100)) == null) {
+    if ((s = mem.alloc(len+100)) == null) {
         c.close(fd);
         return null;
     }
@@ -203,7 +203,7 @@ pub u8 *fileRead(u8 *path, i64 *_size=null) {
 
     if (size != len) {
         c.close(fd);
-        memFree(s);
+        mem.free(s);
         return null;
     }
 
@@ -216,7 +216,7 @@ pub u8 *fileRead(u8 *path, i64 *_size=null) {
     return s;
 }
 
-pub bool fileWrite(u8 *filename, u8 *buf, i64 size,
+pub bool writeAll(u8 *filename, u8 *buf, i64 size,
         i64 flags=O_CREAT|c.O_WRONLY|O_TRUNC) {
     i64 towrite = size, nwritten = 0;
     i32 fd;
@@ -245,26 +245,26 @@ pub bool fileWrite(u8 *filename, u8 *buf, i64 size,
 
 pub i32 changeDir(u8 *path) {
     u8 *newPath = null;
-    u64 len = strLen(path);
+    u64 len = str.len(path);
     if ((len == 1 && path[0] == '~') ||
             (len == 2 && path[0] == '~' && path[1] == '/')) {
         u8 *home = c.getenv("HOME");
-        home = strNew(home);
+        home = str.dup(home);
         newPath = home;
     } else if (len >= 3 && path[0] == '~' && path[1] == '/') {
         u8 *home = c.getenv("HOME");
         u8 *p = path;
         if (*(p + 2) != '\0') {
-            newPath = strPrint(,"%s/%s",home,p+2);
+            newPath = str.formatTo(,"%s/%s",home,p+2);
         } else {
-            newPath = strPrint(,"%s",home);
+            newPath = str.formatTo(,"%s",home);
         }
     } else {
         newPath = path;
     }
     i32 retVal = c.chdir(newPath);
     if (newPath != path) {
-        memFree(newPath);
+        mem.free(newPath);
     }
     return retVal;
 }
@@ -276,7 +276,7 @@ pub u8 *currentDir(u8 *buf=null, u64 bufSize=0) {
     u8 *cwd, *copy;
     if (buf) { return c.getcwd(buf, bufSize); }
     if ((cwd = c.getcwd(null, 0)) == null) { return null; }
-    copy = strNew(cwd);
+    copy = str.dup(cwd);
     c.free(cwd);
     return copy;
 }
@@ -297,7 +297,7 @@ struct DirHuman {
 };
 
 DirHuman *dirHumanNew(u8 *pathname, Fstat *fst, u8 type) {
-    DirHuman *dh = memAlloc(sizeof(DirHuman));
+    DirHuman *dh = mem.alloc(sizeof(DirHuman));
     dh.pathname = pathname;
     dh.mode = fst.st_mode;
     dh.type = type;
@@ -307,8 +307,8 @@ DirHuman *dirHumanNew(u8 *pathname, Fstat *fst, u8 type) {
 void dirHumanRelease(void *_dh) {
     DirHuman *dh = _dh;
     if (dh) {
-        memFree(dh.pathname);
-        memFree(dh);
+        mem.free(dh.pathname);
+        mem.free(dh);
     }
 }
 
@@ -331,7 +331,7 @@ i64 cmpLeadingNumber(u8 *s1, u8 *s2) {
     while ('0'<=s1[n1]<='9') { n1++; }
     while ('0'<=s2[n2]<='9') { n2++; }
     if (n1 != n2) { return n1 - n2; }
-    return strNCmp(s1,s2,n1);
+    return str.cmpLen(s1,s2,n1);
 }
 
 /* true if dh1 is listed before dh2: names that both start with a number
@@ -344,5 +344,5 @@ i64 cmpDirHuman(void *_dh1, void *_dh2) {
     if ('0'<=*str1<='9' && '0'<=*str2<='9') {
         if ((cmp = cmpLeadingNumber(str1,str2)) != 0) { return cmp < 0; }
     }
-    return strCmp(str1,str2) < 0;
+    return str.cmp(str1,str2) < 0;
 }

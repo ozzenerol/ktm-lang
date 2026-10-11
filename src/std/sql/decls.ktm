@@ -161,20 +161,20 @@ pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 /* Open (or create) the database file dbname, ":memory:" for a private
  * in-memory one. null on failure, printing sqlite's message first when
  * printerror is true. dbname is kept, not copied. */
-pub SqlCtx *sqlCtxNew(u8 *dbname, bool printerror=false);
+pub SqlCtx *open(u8 *dbname, bool printerror=false);
 /* Close the database and free ctx. Statements not finalized yet keep
  * the connection open until SqlFinalizePrepared. null is ignored. */
-pub void sqlCtxRelease(SqlCtx *ctx);
+pub void close(SqlCtx *ctx);
 /* Compile one SQL statement with `?` parameters, to run many times with
  * SqlExecPrepared. Only whitespace and comments may follow it. null on
  * an error; free it with SqlFinalizePrepared. */
-pub SqlPreparedStmt *sqlPrepare(SqlCtx *ctx, u8 *Sql);
+pub SqlPreparedStmt *prepare(SqlCtx *ctx, u8 *Sql);
 /* Free a statement of SqlPrepare. null is ignored. */
-pub void sqlFinalizePrepared(SqlPreparedStmt *pstmt);
+pub void finalize(SqlPreparedStmt *pstmt);
 /* Run every statement in sql, with no parameters (so never with values
  * from outside the program). null on success, otherwise an error message
  * to Free. */
-pub u8 *sqlExecRaw(SqlCtx *ctx, u8 *sql);
+pub u8 *execRaw(SqlCtx *ctx, u8 *sql);
 /* Run a prepared statement with params[0] .. params[n - 1] for its n
  * parameters (null params binds them all to null). Returns sqlite's
  * code: SQLITE_ROW when row now holds the first row (read the rest with
@@ -184,7 +184,7 @@ pub u8 *sqlExecRaw(SqlCtx *ctx, u8 *sql);
  * (e.g. SQLITE_TOOBIG). On an error the statement does not run and row
  * holds no row. The row belongs to the statement:
  * it is valid until the next SqlExecPrepared or SqlFinalizePrepared. */
-pub i32 sqlExecPrepared(SqlPreparedStmt *pstmt, SqlRow *row,
+pub i32 execPrepared(SqlPreparedStmt *pstmt, SqlRow *row,
         SqlParam *params);
 /* Run one SQL statement with param_count parameters and point row at
  * its first row, if any; read the rows with SqlIter. true if the
@@ -192,20 +192,20 @@ pub i32 sqlExecPrepared(SqlPreparedStmt *pstmt, SqlRow *row,
  * parameter type or anything but whitespace and comments after the
  * statement. The row owns the statement: SqlIter frees it after the
  * last row, SqlRowRelease when you stop early. */
-pub bool sqlSelect(SqlCtx *ctx, SqlRow *row, u8 *sql,
+pub bool select(SqlCtx *ctx, SqlRow *row, u8 *sql,
         SqlParam *params=null, i32 paramCount=0);
 /* Like SqlSelect, for a statement whose rows you don't need (INSERT,
  * UPDATE, CREATE, ...). */
-pub bool sqlQuery(SqlCtx *ctx, u8 *sql, SqlParam *params=null,
+pub bool exec(SqlCtx *ctx, u8 *sql, SqlParam *params=null,
         i32 paramCount=0);
 /* Move row to its next row (the first one on the first call): true while
  * there is one, false after the last, when the row is released. */
-pub i32 sqlIter(SqlRow *row);
+pub i32 next(SqlRow *row);
 /* SqlIter for a row of SqlExecPrepared (the same, but returns i64). */
-pub i64 sqlIterPrepared(SqlRow *row);
+pub i64 nextPrepared(SqlRow *row);
 /* Release a row before its last row was read: free its columns and, for
  * a row of SqlSelect, its statement. A row of SqlExecPrepared leaves its
  * statement to SqlFinalizePrepared. Calling it again does nothing. */
-pub void sqlRowRelease(SqlRow *row);
+pub void rowRelease(SqlRow *row);
 
 #endif /* End of SQLite */

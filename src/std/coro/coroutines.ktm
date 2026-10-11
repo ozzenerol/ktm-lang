@@ -158,8 +158,8 @@ _extern _CORO_SWAP void *coroSwap(void **saveSp, void *newSp, void *value);
 _extern _CORO_ENTRY void coroEntry();
 
 static void coroDie(u8 *msg) {
-    fdWrite(os.STDERR, msg, strLen(msg));
-    exitProgram(1);
+    fdWrite(os.STDERR, msg, str.len(msg));
+    os.exit(1);
 }
 
 /* The save slot for the calling thread's own stack. */
@@ -202,7 +202,7 @@ void coroMain(Coroutine *c) {
     Coroutine *to = c.resumer;
     c.resumer = null;
     c.status = CORO_DONE;
-    coroSwitch(threadState(), c, to, result);
+    coroSwitch(rt.Fs(), c, to, result);
     coroDie("a finished coroutine was resumed\n");
 }
 
@@ -211,7 +211,7 @@ void coroMain(Coroutine *c) {
  * inaccessible guard page below it so an overflow crashes instead of
  * writing over other memory. Nothing runs until the first CoroutineNext.
  * null if the stack can't be mapped. */
-pub Coroutine *coroutineNew(fn(void *arg) void *body, void *arg=null,
+pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
                                                              i64 stackSize=0) {
     if (!body) { coroDie("CoroutineNew: null function\n"); }
     i64 page = c.getpagesize();
@@ -222,7 +222,7 @@ pub Coroutine *coroutineNew(fn(void *arg) void *body, void *arg=null,
     Coroutine *c = c.calloc(1, sizeof(Coroutine));
     if (!c) { return null; }
     c.stack_len = page + stackSize;
-    c.stack_base = coroStackGet(threadState(), c.stack_len);
+    c.stack_base = coroStackGet(rt.Fs(), c.stack_len);
     if (!c.stack_base) {
         c.stack_base = c.mmap(null, c.stack_len, CORO_PROT_READ|CORO_PROT_WRITE,
                 CORO_MAP_PRIVATE|CORO_MAP_ANONYMOUS, -1, 0);
@@ -246,7 +246,7 @@ pub Coroutine *coroutineNew(fn(void *arg) void *body, void *arg=null,
     u64 *top = (u64 *)(c.stack_base + c.stack_len);
 #ifdef IS_X86_64
     u64 *sp = top - 8;
-    memSet(sp, 0, 8 * sizeof(u64));
+    mem.set(sp, 0, 8 * sizeof(u64));
     sp[0] = 0x037F00001F80;      /* MXCSR 0x1F80, x87 control word 0x37F */
     sp[5] = (u64)c;              /* RBX */
     sp[7] = (u64)&coroEntry;     /* return address */
@@ -267,13 +267,13 @@ pub Coroutine *coroutineNew(fn(void *arg) void *body, void *arg=null,
  * CoroutineYield that c is paused in; the first CoroutineNext ignores it
  * (the function gets its arg). If c's function throws, the throw goes on
  * from here. null if c is already done. */
-pub void *coroutineNext(Coroutine *c, void *send=null) {
+pub void *next(Coroutine *c, void *send=null) {
     if (!c) { coroDie("CoroutineNext: null coroutine\n"); }
     if (c.status == CORO_DONE) { return null; }
     if (c.status == CORO_ACTIVE) {
         coroDie("CoroutineNext: the coroutine is already running\n");
     }
-    rt.HCFs *fs = threadState();
+    rt.HCFs *fs = rt.Fs();
     Coroutine *from = fs.coroCur;
     if (!from) { from = coroRoot(fs); }
     c.resumer = from;
@@ -289,8 +289,8 @@ pub void *coroutineNext(Coroutine *c, void *send=null) {
 /* Inside a coroutine: pause it and hand value to the CoroutineNext that
  * resumed it. Returns the `send` of the CoroutineNext that resumes it
  * again. */
-pub void *coroutineYield(void *value=null) {
-    rt.HCFs *fs = threadState();
+pub void *yield(void *value=null) {
+    rt.HCFs *fs = rt.Fs();
     Coroutine *c = fs.coroCur;
     if (!c) { coroDie("CoroutineYield: not inside a coroutine\n"); }
     Coroutine *to = c.resumer;
@@ -300,13 +300,13 @@ pub void *coroutineYield(void *value=null) {
 }
 
 /* true once c's function has returned or thrown (also for null). */
-pub bool coroutineDone(Coroutine *c) {
+pub bool done(Coroutine *c) {
     return !c || c.status == CORO_DONE;
 }
 
 /* The coroutine that is running, null on a thread's own stack. */
-pub Coroutine *coroutineSelf() {
-    return threadState().coroCur;
+pub Coroutine *current() {
+    return rt.Fs().coroCur;
 }
 
 /* Free c. Its stack goes to the calling thread's cache for the next
@@ -314,13 +314,13 @@ pub Coroutine *coroutineSelf() {
  * otherwise it is unmapped. A coroutine paused in CoroutineYield is
  * dropped where it is: whatever it allocated is not freed. c must not
  * be running. null is ignored. */
-pub void coroutineRelease(Coroutine *c) {
+pub void release(Coroutine *c) {
     if (!c) { return; }
     if (c.status == CORO_ACTIVE) {
         coroDie("CoroutineRelease: the coroutine is running\n");
     }
     rt.__ktmErrorDrop(&c.error);
-    if (!coroStackPut(threadState(), c.stack_base, c.stack_len)) {
+    if (!coroStackPut(rt.Fs(), c.stack_base, c.stack_len)) {
         c.munmap(c.stack_base, c.stack_len);
     }
     c.free(c);

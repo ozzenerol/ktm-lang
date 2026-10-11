@@ -21,14 +21,14 @@ u64 monStartDays1[12]={
 u64 monStartDays2[12]={
   0,31,60,91,121,152,182,213,244,274,305,335};
 
-pub u64 nowMilliseconds() {
+pub u64 nowMs() {
   c.timeval tm;
   c.gettimeofday(&tm,null);
   return (tm.tv_sec*1000) +
          (tm.tv_usec/1000);
 }
 
-pub void nowDateTimeStruct(CDateStruct *_ds) {
+pub void nowParts(CDateStruct *_ds) {
   c.timeval _tv;
   c.tm *ptm;
   u64 milliseconds,seconds;
@@ -59,7 +59,7 @@ pub void nowDateTimeStruct(CDateStruct *_ds) {
   else            { _ds.zone_diff = gmtoff/60*100 + gmtoff%60; }
 }
 
-pub i64 yearStartDate(i64 year)
+pub i64 yearStart(i64 year)
 {//32-bit day since AD 0, given year number.
   /* Proleptic Gregorian, year 0 a leap year. Day 0 is Jan 2 of year 0,
    * so years 1 to 3999 keep the day numbers of the original calendar
@@ -83,23 +83,23 @@ pub i64 dayOfWeek(i64 i)
   }
 }
 
-pub void dateToStruct(CDateStruct *_ds,CDate cdt)
+pub void toParts(CDateStruct *_ds,CDate cdt)
 {//Cvt CDate to CDateStruct.
   i64 i,k,date=cdt.date;
   _ds.day_of_week=dayOfWeek(date);
   /* An estimate, can be a year off either way */
   _ds.year=(date+1)*100000/YEAR_DAYS_INT;
-  i=yearStartDate(_ds.year);
+  i=yearStart(_ds.year);
   while (i>date) {
     _ds.year--;
-    i=yearStartDate(_ds.year);
+    i=yearStart(_ds.year);
   }
-  while (yearStartDate(_ds.year+1)<=date) {
+  while (yearStart(_ds.year+1)<=date) {
     _ds.year++;
-    i=yearStartDate(_ds.year);
+    i=yearStart(_ds.year);
   }
   date-=i;
-  if (yearStartDate(_ds.year+1)-i==365) {
+  if (yearStart(_ds.year+1)-i==365) {
     k=0;
     while (k<11 && date>=monStartDays1[k+1]) {
       k++;
@@ -115,14 +115,14 @@ pub void dateToStruct(CDateStruct *_ds,CDate cdt)
   _ds.mon=k+1;
   _ds.day_of_mon=date+1;
   k=((625*15*15*3*cdt.time)>>21)+1;
-  _ds.sec10000=modU64(&k,100);
-  _ds.sec100=modU64(&k,100);
-  _ds.sec=modU64(&k,60);
-  _ds.min=modU64(&k,60);
+  _ds.sec10000=math.divModU64(&k,100);
+  _ds.sec100=math.divModU64(&k,100);
+  _ds.sec=math.divModU64(&k,60);
+  _ds.min=math.divModU64(&k,60);
   _ds.hour  =k;
 }
 
-pub CDate structToDate(CDateStruct *_ds)
+pub CDate fromParts(CDateStruct *_ds)
 {//Cvt CDateStruct to CDate.
   CDate cdt;
   i64 i1,i2,year=_ds.year,mon=(i64)_ds.mon-1;
@@ -136,8 +136,8 @@ pub CDate structToDate(CDateStruct *_ds)
     year+=mon/12;
     mon%=12;
   }
-  i1=yearStartDate(year);
-  i2=yearStartDate(year+1);
+  i1=yearStart(year);
+  i2=yearStart(year+1);
   if (i2-i1==365) {
     i1+=monStartDays1[mon];
   } else {
@@ -158,30 +158,30 @@ pub CDate structToDate(CDateStruct *_ds)
   return cdt;
 }
 
-pub i32 firstDayOfMon(i64 i)
+pub i32 firstDayOfMonth(i64 i)
 {//First day of month, given 32-bit day since AD 0.
   CDateStruct ds;
   CDate cdt=0;
   cdt.date=i;
-  dateToStruct(&ds,cdt);
+  toParts(&ds,cdt);
   ds.day_of_mon=1;
-  cdt=structToDate(&ds);
+  cdt=fromParts(&ds);
   return cdt.date;
 }
 
-pub i64 lastDayOfMon(i64 i)
+pub i64 lastDayOfMonth(i64 i)
 {//Last day of month, given 32-bit day since AD 0.
   CDateStruct ds;
   CDate cdt=0;
   cdt.date=i;
-  dateToStruct(&ds,cdt);
+  toParts(&ds,cdt);
   ds.mon++;
   if (ds.mon==13) {
     ds.mon=1;
     ds.year++;
   }
   ds.day_of_mon=1;
-  cdt=structToDate(&ds);
+  cdt=fromParts(&ds);
   return cdt.date-1;
 }
 
@@ -190,10 +190,10 @@ pub i32 firstDayOfYear(i64 i)
   CDateStruct ds;
   CDate cdt=0;
   cdt.date=i;
-  dateToStruct(&ds,cdt);
+  toParts(&ds,cdt);
   ds.day_of_mon=1;
   ds.mon=1;
-  cdt=structToDate(&ds);
+  cdt=fromParts(&ds);
   return cdt.date;
 }
 
@@ -202,11 +202,11 @@ pub i64 lastDayOfYear(i64 i)
   CDateStruct ds;
   CDate cdt=0;
   cdt.date=i;
-  dateToStruct(&ds,cdt);
+  toParts(&ds,cdt);
   ds.day_of_mon=1;
   ds.mon=1;
   ds.year++;
-  cdt=structToDate(&ds);
+  cdt=fromParts(&ds);
   return cdt.date-1;
 }
 
@@ -214,8 +214,8 @@ pub CDate now()
 {//Current datetime.
   CDateStruct ds;
   CDate cdt = 0;
-  nowDateTimeStruct(&ds);
-  cdt=structToDate(&ds);
+  nowParts(&ds);
+  cdt=fromParts(&ds);
   return cdt;
 }
 
@@ -255,5 +255,5 @@ pub void isoFromTimespec(c.timespec *ts, u8 *buf) {
   i64 hh = rem/3600, mm = rem%3600/60, ss = rem%60;
   i64 y, mo, d;
   civilFromDays(days, &y, &mo, &d);
-  strPrint(buf, "%04d-%02d-%02dT%02d:%02d:%02d.%09dZ", y, mo, d, hh, mm, ss, nsec);
+  str.formatTo(buf, "%04d-%02d-%02dT%02d:%02d:%02d.%09dZ", y, mo, d, hh, mm, ss, nsec);
 }

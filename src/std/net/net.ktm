@@ -142,7 +142,7 @@ static i32 netAcceptCloexec(i32 socket, c.sockaddr *address, u32 *addressLen) {
 #endif
 }
 
-pub bool netSetSocketNonBlocking(i32 sockfd) {
+pub bool setNonBlocking(i32 sockfd) {
         i32 flags = c.fcntl(sockfd, c.F_GETFL, 0);
         if (c.fcntl(sockfd,c.F_SETFL,flags|c.O_NONBLOCK)) {
                 return false;
@@ -159,7 +159,7 @@ static bool netSetSocketBlocking(i32 sockfd) {
         return true;
 }
 
-pub bool netSetSockReuseAddr(i32 sockfd) {
+pub bool setReuseAddr(i32 sockfd) {
         i32 yes = 1;
 
         if (c.setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(i32)) == -1) {
@@ -174,7 +174,7 @@ pub bool netSetSockReuseAddr(i32 sockfd) {
     *
     * https://www.extrahop.com/company/blog/2016/tcp-nodelay-nagle-quickack-best-practices/
     * */
-pub bool netSetSocketNoDelay(i32 sockfd) {
+pub bool setNoDelay(i32 sockfd) {
         i32 yes = 1;
 
         if (c.setsockopt(sockfd, c.IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(i32)) == -1) {
@@ -196,7 +196,7 @@ static void *netGetInAddress(c.sockaddr *sa)
 }
 
 /* Fills out buf with the IPV4 address */
-pub bool netGetIpv4Address(c.sockaddr *sAddr, i32 ai_family, u8 *outbuf, i32 size) {
+pub bool addrToStr(c.sockaddr *sAddr, i32 ai_family, u8 *outbuf, i32 size) {
         void *address;
         if (sAddr.sa_family != ai_family) {
                 return false;
@@ -241,20 +241,20 @@ static i32 netConnectBefore(i32 sockfd, c.addrinfo *sa, i64 deadline) {
         u32 len = sizeof(i32);
         i64 left;
 
-        if (!netSetSocketNonBlocking(sockfd)) {
+        if (!setNonBlocking(sockfd)) {
                 return -1;
         }
         if (c.connect(sockfd, sa.ai_addr, sa.ai_addrlen) == 0) {
                 return 0;
         }
-        if (errno() != __NET_EINPROGRESS) {
+        if (os.errno() != __NET_EINPROGRESS) {
                 return -1;
         }
 
         while (1) {
-                left = deadline - nowMilliseconds();
+                left = deadline - date.nowMs();
                 if (left <= 0) {
-                        setErrno(__NET_ETIMEDOUT);
+                        os.setErrno(__NET_ETIMEDOUT);
                         return -1;
                 }
                 pfd.fd = sockfd;
@@ -264,7 +264,7 @@ static i32 netConnectBefore(i32 sockfd, c.addrinfo *sa, i64 deadline) {
                 if (n > 0) {
                         break;
                 }
-                if (n == -1 && errno() != __NET_EINTR) {
+                if (n == -1 && os.errno() != __NET_EINTR) {
                         return -1;
                 }
                 /* 0 (time is up) or EINTR: the loop checks the deadline again */
@@ -273,13 +273,13 @@ static i32 netConnectBefore(i32 sockfd, c.addrinfo *sa, i64 deadline) {
                 return -1;
         }
         if (err != 0) {
-                setErrno(err);
+                os.setErrno(err);
                 return -1;
         }
         return 0;
 }
 
-pub i32 netConnect(u8 *addr, i32 port, bool nonBlocking=false,
+pub i32 dial(u8 *addr, i32 port, bool nonBlocking=false,
                 i64 timeoutMs=0)
 {// Returns the connected socket, or -1 on failure
         u8 strport[6];
@@ -288,11 +288,11 @@ pub i32 netConnect(u8 *addr, i32 port, bool nonBlocking=false,
         i64 deadline = 0;
 
         if (port < 0 || port > 65535 || timeoutMs < 0) {
-                setErrno(__NET_EINVAL);
+                os.setErrno(__NET_EINVAL);
                 return -1;
         }
         c.snprintf(strport, sizeof(strport), "%d", port);
-        memSet(&hints, 0, sizeof(c.addrinfo));
+        mem.set(&hints, 0, sizeof(c.addrinfo));
         hints.ai_family = c.AF_UNSPEC; /* IPv4 or IPv6, whatever addr resolves to */
         hints.ai_socktype = c.SOCK_STREAM;
         sockfd = -1;
@@ -302,20 +302,20 @@ pub i32 netConnect(u8 *addr, i32 port, bool nonBlocking=false,
         }
         /* The name lookup above can't be cut short; the time counts from here */
         if (timeoutMs > 0) {
-                deadline = nowMilliseconds() + timeoutMs;
+                deadline = date.nowMs() + timeoutMs;
         }
 
         /* connect on the first one we can */
         for (ptr = servinfo; ptr != null; ptr = ptr.ai_next) {
                 if ((sockfd = netSocket(ptr.ai_family, ptr.ai_socktype,
                                                 ptr.ai_protocol)) == -1) {
-                        err = errno();
+                        err = os.errno();
                         continue;
                 }
 
                 if (timeoutMs > 0) {
                         if (netConnectBefore(sockfd, ptr, deadline) == -1) {
-                                err = errno();
+                                err = os.errno();
                                 c.close(sockfd); /* try the next address with the time that's left */
                                 sockfd = -1;
                                 if (err == __NET_ETIMEDOUT) { break; }
@@ -323,14 +323,14 @@ pub i32 netConnect(u8 *addr, i32 port, bool nonBlocking=false,
                         }
                         if (!nonBlocking && !netSetSocketBlocking(sockfd)) { goto error; }
                 } else if (c.connect(sockfd, ptr.ai_addr, ptr.ai_addrlen) == -1) {
-                        err = errno();
+                        err = os.errno();
                         c.close(sockfd); /* try the next address */
                         sockfd = -1;
                         continue;
                 }
-                if (!netSetSockReuseAddr(sockfd)) { goto error; }
+                if (!setReuseAddr(sockfd)) { goto error; }
                 if (nonBlocking) {
-                        if (!netSetSocketNonBlocking(sockfd)) { goto error; }
+                        if (!setNonBlocking(sockfd)) { goto error; }
                 }
 
                 break;
@@ -346,15 +346,15 @@ pub i32 netConnect(u8 *addr, i32 port, bool nonBlocking=false,
 
 error:
         if (sockfd != -1) {
-                err = errno();
+                err = os.errno();
                 c.close(sockfd);
         }
         c.freeaddrinfo(servinfo);
-        if (err) { setErrno(err); }
+        if (err) { os.setErrno(err); }
         return -1;
 }
 
-pub bool netListen(i32 sockfd, c.addrinfo *sa, i32 backlog) {
+pub bool bindListen(i32 sockfd, c.addrinfo *sa, i32 backlog) {
         if (c.bind(sockfd, sa.ai_addr, sa.ai_addrlen) == -1) {
                 c.close(sockfd);
                 return false;
@@ -367,7 +367,7 @@ pub bool netListen(i32 sockfd, c.addrinfo *sa, i32 backlog) {
         return true;
 }
 
-pub i32 netCreateServer(i32 port, u8 *bindaddr, i32 backlog,
+pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
                 i32 addrfam=c.AF_UNSPEC, bool nonBlocking=false)
 {// Returns the listening socket, or -1 on failure
         i32 sockfd = -1, rv;
@@ -378,7 +378,7 @@ pub i32 netCreateServer(i32 port, u8 *bindaddr, i32 backlog,
                 return -1;
         }
         c.snprintf(strport, sizeof(strport), "%d", port);
-        memSet(&hints, 0, sizeof(c.addrinfo));
+        mem.set(&hints, 0, sizeof(c.addrinfo));
 
         if (addrfam != c.AF_UNSPEC && addrfam != c.AF_INET && addrfam != AF_INET6) {
                 return -1;
@@ -387,13 +387,13 @@ pub i32 netCreateServer(i32 port, u8 *bindaddr, i32 backlog,
         /* "*" (or null) is any address of addrfam, IPv4 for AF_UNSPEC as it
             * always was; "::*" is any IPv6 address. Anything else must be a
             * numeric address: a host name would wait on DNS */
-        if (bindaddr != null && !strCmp("::*", bindaddr)) {
+        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
                 if (addrfam == c.AF_INET) {
                         return -1;
                 }
                 addrfam = AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !strCmp("*", bindaddr)) {
+        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == c.AF_UNSPEC) {
@@ -414,17 +414,17 @@ pub i32 netCreateServer(i32 port, u8 *bindaddr, i32 backlog,
                         continue;
                                                 }
 
-                if (!netSetSockReuseAddr(sockfd)) {
+                if (!setReuseAddr(sockfd)) {
                         c.close(sockfd); /* try the next address */
                         sockfd = -1;
                         continue;
                 }
-                if (!netListen(sockfd, ptr, backlog)) {
+                if (!bindListen(sockfd, ptr, backlog)) {
                         sockfd = -1; /* NetListen closed it; try the next address */
                         continue;
                 }
                 if (nonBlocking) {
-                        if (!netSetSocketNonBlocking(sockfd)) { goto error; }
+                        if (!setNonBlocking(sockfd)) { goto error; }
                 }
                 break;
         }
@@ -442,7 +442,7 @@ error:
         return -1;
 }
 
-pub i32 netAccept(i32 socket, bool nonBlocking=false)
+pub i32 accept(i32 socket, bool nonBlocking=false)
 {// Returns the accepted socket, or -1 on failure
         i32 accepted;
         u32 socklen = sizeof(c.sockaddr_storage);
@@ -455,7 +455,7 @@ pub i32 netAccept(i32 socket, bool nonBlocking=false)
         /* Set the mode either way: BSD accept (macOS) copies O_NONBLOCK from
             * the listening socket, Linux's doesn't. */
         if (nonBlocking) {
-                if (!netSetSocketNonBlocking(accepted)) {
+                if (!setNonBlocking(accepted)) {
                         c.close(accepted);
                         return -1;
                 }
@@ -472,7 +472,7 @@ pub i32 netAccept(i32 socket, bool nonBlocking=false)
 #define __NET_MSG_NOSIGNAL 0x80000
 #endif
 
-pub i64 netSend(i32 sockfd, void *buf, i64 len, i32 flags=0)
+pub i64 send(i32 sockfd, void *buf, i64 len, i32 flags=0)
 {// send() that never raises SIGPIPE: a closed peer gives -1 (EPIPE)
         return c.send(sockfd, buf, len, flags | __NET_MSG_NOSIGNAL);
 }
@@ -482,7 +482,7 @@ pub i64 netSend(i32 sockfd, void *buf, i64 len, i32 flags=0)
     * could probably be made as this only accepts IPV4 which doesn't feel
     * right.
     */
-pub bool netGetIpv4AddressFromAcceptedSocket(i32 sockfd, u8 *ipbuf, i32 outlen) {
+pub bool peerAddr(i32 sockfd, u8 *ipbuf, i32 outlen) {
         c.sockaddr_storage sa; /* a sockaddr is too small for an IPv6 peer */
         u32 len;
         i32 retval;
@@ -492,21 +492,21 @@ pub bool netGetIpv4AddressFromAcceptedSocket(i32 sockfd, u8 *ipbuf, i32 outlen) 
                 return false;
         }
 
-        return netGetIpv4Address((c.sockaddr *)(&sa), sa.ss_family, ipbuf, outlen);
+        return addrToStr((c.sockaddr *)(&sa), sa.ss_family, ipbuf, outlen);
 }
 
 /* Fills `addr` for the socket file `name`; false if the path doesn't fit */
 static bool netUnixAddress(c.sockaddr_un *addr, u8 *name) {
-        i64 len = strLen(name);
+        i64 len = str.len(name);
         if (len >= sizeof(addr.sun_path)) {
                 return false;
         }
-        memSet(addr, 0, sizeof(c.sockaddr_un));
+        mem.set(addr, 0, sizeof(c.sockaddr_un));
 #ifndef IS_LINUX
         addr->sun_len = sizeof(sockaddr_un);
 #endif
         addr.sun_family = c.AF_UNIX;
-        memCpy(addr.sun_path, name, len + 1);
+        mem.copy(addr.sun_path, name, len + 1);
         return true;
 }
 
@@ -531,12 +531,12 @@ static bool netUnixSocketIsStale(c.sockaddr_un *addr, u8 *name) {
                 return false;
         }
         rv = c.connect(fd, (c.sockaddr *)addr, sizeof(c.sockaddr_un));
-        bool stale = rv == -1 && errno() == __NET_ECONNREFUSED;
+        bool stale = rv == -1 && os.errno() == __NET_ECONNREFUSED;
         c.close(fd);
         return stale;
 }
 
-pub i32 netCreateUnixServerSocket(u8 *name, i32 backlog)
+pub i32 unixListen(u8 *name, i32 backlog)
 {// Listens on the socket file `name`; returns the socket or -1 on failure.
     // A stale socket file at `name` is replaced; any other file, or a socket
     // a server is listening on, makes it fail.
@@ -571,7 +571,7 @@ error:
         return -1;
 }
 
-pub i32 netCreateUnixClientSocket(u8 *name)
+pub i32 unixDial(u8 *name)
 {// Connects to the socket file `name`; returns the socket or -1 on failure
         i32 sockfd;
         c.sockaddr_un srv;
@@ -591,7 +591,7 @@ pub i32 netCreateUnixClientSocket(u8 *name)
         return sockfd;
 }
 
-pub i32 netGetSocketPort(i32 sockfd)
+pub i32 localPort(i32 sockfd)
 {// The local port of sockfd, or -1
         c.sockaddr_storage ss;
         u32 len = sizeof(c.sockaddr_storage);
@@ -608,7 +608,7 @@ pub i32 netGetSocketPort(i32 sockfd)
         return -1;
 }
 
-pub i32 netCreateUdpSocket(i32 port, u8 *bindaddr, i32 addrfam=c.AF_UNSPEC,
+pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=c.AF_UNSPEC,
                 bool nonBlocking=false)
 {// Returns the bound UDP socket, or -1 on failure
         i32 sockfd = -1;
@@ -624,20 +624,20 @@ pub i32 netCreateUdpSocket(i32 port, u8 *bindaddr, i32 addrfam=c.AF_UNSPEC,
         c.snprintf(strport, sizeof(strport), "%d", port);
 
         /* The same bind addresses as NetCreateServer */
-        if (bindaddr != null && !strCmp("::*", bindaddr)) {
+        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
                 if (addrfam == c.AF_INET) {
                         return -1;
                 }
                 addrfam = AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !strCmp("*", bindaddr)) {
+        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == c.AF_UNSPEC) {
                 addrfam = c.AF_INET;
         }
 
-        memSet(&hints, 0, sizeof(c.addrinfo));
+        mem.set(&hints, 0, sizeof(c.addrinfo));
         hints.ai_family = addrfam;
         hints.ai_socktype = c.SOCK_DGRAM;
         hints.ai_flags = c.AI_PASSIVE | c.AI_NUMERICHOST;
@@ -656,7 +656,7 @@ pub i32 netCreateUdpSocket(i32 port, u8 *bindaddr, i32 addrfam=c.AF_UNSPEC,
                         sockfd = -1;
                         continue;
                 }
-                if (nonBlocking && !netSetSocketNonBlocking(sockfd)) {
+                if (nonBlocking && !setNonBlocking(sockfd)) {
                         c.close(sockfd);
                         sockfd = -1;
                 }
@@ -667,7 +667,7 @@ pub i32 netCreateUdpSocket(i32 port, u8 *bindaddr, i32 addrfam=c.AF_UNSPEC,
         return sockfd;
 }
 
-pub i64 netSendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
+pub i64 sendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
 {// Returns the bytes sent, or -1 on failure
         c.sockaddr_storage me;
         u32 melen = sizeof(c.sockaddr_storage);
@@ -683,7 +683,7 @@ pub i64 netSendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
                 return -1;
         }
         c.snprintf(strport, sizeof(strport), "%d", port);
-        memSet(&hints, 0, sizeof(c.addrinfo));
+        mem.set(&hints, 0, sizeof(c.addrinfo));
         hints.ai_family = me.ss_family;
         hints.ai_socktype = c.SOCK_DGRAM;
 
@@ -697,7 +697,7 @@ pub i64 netSendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
         return sent;
 }
 
-pub i64 netRecvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
+pub i64 recvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
                 i64 fromSize=0, i32 *fromPort=null)
 {// Returns the bytes received, or -1
         c.sockaddr_storage from;
@@ -707,14 +707,14 @@ pub i64 netRecvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
         if (len < 0) {
                 return -1;
         }
-        memSet(&from, 0, sizeof(c.sockaddr_storage));
+        mem.set(&from, 0, sizeof(c.sockaddr_storage));
         got = c.recvfrom(sockfd, buf, len, 0, (c.sockaddr *)(&from), &fromlen);
         if (got == -1) {
                 return -1;
         }
 
         if (fromAddr != null && fromSize > 0) {
-                if (!netGetIpv4Address((c.sockaddr *)(&from), from.ss_family, fromAddr, fromSize)) {
+                if (!addrToStr((c.sockaddr *)(&from), from.ss_family, fromAddr, fromSize)) {
                         fromAddr[0] = '\0';
                 }
         }
@@ -738,18 +738,18 @@ static bool netSetTimeout(i32 sockfd, i32 opt, i64 ms) {
                 return false;
         }
         /* tv_usec is a long on Linux, an int on macOS: zero the whole struct */
-        memSet(&tv, 0, sizeof(c.timeval));
+        mem.set(&tv, 0, sizeof(c.timeval));
         tv.tv_sec = ms / 1000;
         tv.tv_usec = (ms % 1000) * 1000;
         return c.setsockopt(sockfd, SOL_SOCKET, opt, &tv, sizeof(c.timeval)) == 0;
 }
 
-pub bool netSetRecvTimeout(i32 sockfd, i64 ms)
+pub bool setRecvTimeout(i32 sockfd, i64 ms)
 {// true if SO_RCVTIMEO was set
         return netSetTimeout(sockfd, SO_RCVTIMEO, ms);
 }
 
-pub bool netSetSendTimeout(i32 sockfd, i64 ms)
+pub bool setSendTimeout(i32 sockfd, i64 ms)
 {// true if SO_SNDTIMEO was set
         return netSetTimeout(sockfd, SO_SNDTIMEO, ms);
 }

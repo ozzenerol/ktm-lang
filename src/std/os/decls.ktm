@@ -8,7 +8,7 @@ const i64 STDOUT = 1;
 const i64 STDERR = 2;
 
 #ifdef IS_X86_64
-pub _extern _EXIT void exitProgram(i64 exit_code = EXIT_FAIL);
+pub _extern _EXIT void exit(i64 exit_code = EXIT_FAIL);
 #endif
 
 #ifdef IS_ARM_64

@@ -21,9 +21,9 @@ pub i64 shell(u8 *command) {
 pub i32 shellf(u8 *fmt, ...args) {
     if (!fmt) { return -1; }
     /* Formatted even without arguments, so "%%" is always a single % */
-    u8 *cmd = strPrintJoin(null,fmt,args.len,args);
+    u8 *cmd = str.formatArgs(null,fmt,args.len,args);
     i32 retval = shell(cmd);
-    memFree(cmd);
+    mem.free(cmd);
     return retval;
 }
 
@@ -38,11 +38,11 @@ pub u8 *shellQuote(u8 *s) {
         if (s[i] == '\'') { len += 4; }
         else { len++; }
     }
-    q = memAlloc(len + 1);
+    q = mem.alloc(len + 1);
     q[j++] = '\'';
     for (i = 0; s[i]; i++) {
         if (s[i] == '\'') {
-            memCpy(q + j, "'\\''", 4);
+            mem.copy(q + j, "'\\''", 4);
             j += 4;
         } else {
             q[j++] = s[i];
@@ -62,13 +62,13 @@ pub u8 *shellQuote(u8 *s) {
 pub u8 *shellOutput(u8 *fmt, ...args) {
     if (!fmt) { return null; }
     i64 len = 0;
-    u8 *userCmd = strPrintJoin(null,fmt,args.len,args);
+    u8 *userCmd = str.formatArgs(null,fmt,args.len,args);
     /* The newline completes a command that ends in a backslash (a line
      * continuation) or in a here-doc delimiter */
-    u8 *cmd = strPrint(null,"%s\n",userCmd);
-    memFree(userCmd);
+    u8 *cmd = str.formatTo(null,"%s\n",userCmd);
+    mem.free(userCmd);
     u8 *output = procShellOutput(cmd,&len);
-    memFree(cmd);
+    mem.free(cmd);
     if (!output) { return null; }
     if (len > 0 && output[len-1] == '\n') {
         output[len-1] = '\0';

@@ -3,22 +3,22 @@ import c, mem, str;
 
 #define TIMESTAMP_FMT "%d-%02d-%02d %02d:%02d:%02d"
 
-pub u8 *timeToStr(CDate cdt) {
+pub u8 *formatTime(CDate cdt) {
         CDateStruct ds;
-        dateToStruct(&ds,cdt);
-        return strFormat("%02d:%02d:%02d",ds.hour,ds.min,ds.sec);
+        toParts(&ds,cdt);
+        return str.format("%02d:%02d:%02d",ds.hour,ds.min,ds.sec);
 }
 
-pub u8 *dateToStr(CDate cdt) {
+pub u8 *formatDate(CDate cdt) {
         CDateStruct ds;
-        dateToStruct(&ds,cdt);
-        return strFormat("%02d/%02d/%04d",ds.mon,ds.day_of_mon,ds.year);
+        toParts(&ds,cdt);
+        return str.format("%02d/%02d/%04d",ds.mon,ds.day_of_mon,ds.year);
 }
 
 pub u8 *timestampNow()
 {// Get a timestamp
-        i64 seconds = nowMilliseconds() / 1000; 
-        u8 *timestamp = memAlloc(sizeof(u8)*32);
+        i64 seconds = nowMs() / 1000; 
+        u8 *timestamp = mem.alloc(sizeof(u8)*32);
         auto ptm = c.localtime(&seconds);
         auto len = c.snprintf(timestamp,sizeof(u8)*32,TIMESTAMP_FMT,
                                         ptm.tm_year+1900,ptm.tm_mon+1,ptm.tm_mday,
@@ -57,14 +57,14 @@ static bool strDateNum(u8 **_s, i64 max_digits, i64 *_out) {
 static i64 strDateName(u8 **_s, u8 **names, i64 count) {
         u8 *s = *_s;
         for (i64 i = 0; i < count; ++i) {
-                i64 len = strLen(names[i]);
-                if (strNICmp(s, names[i], len) == 0) {
+                i64 len = str.len(names[i]);
+                if (str.cmpLenNoCase(s, names[i], len) == 0) {
                         *_s = s + len;
                         return i;
                 }
         }
         for (i64 i = 0; i < count; ++i) {
-                if (strNICmp(s, names[i], 3) == 0) {
+                if (str.cmpLenNoCase(s, names[i], 3) == 0) {
                         *_s = s + 3;
                         return i;
                 }
@@ -81,13 +81,13 @@ static i64 strDateName(u8 **_s, u8 **names, i64 count) {
     * Returns false for empty input, input that ends before the format, text
     * that doesn't match the format, an unknown conversion or a field out of
     * range; text after the end of the format is ignored. */
-pub bool strToDateStruct(u8 *strdate, u8 *format, CDateStruct *t) {
+pub bool parseParts(u8 *strdate, u8 *format, CDateStruct *t) {
         i64 year = -1, mon = -1, day = -1, hour = 0, min = 0, sec = 0;
         i64 dow = -1, zone = NO_ZONE, v, pm = -1, sign;
         bool hasHour = false;
 
         /* initialise the date struct's field to -1, error state */
-        memSet(t, -1, sizeof(CDateStruct));
+        mem.set(t, -1, sizeof(CDateStruct));
         t.sec10000 = 0;
         t.sec100 = 0;
         t.sec = 0;
@@ -123,9 +123,9 @@ pub bool strToDateStruct(u8 *strdate, u8 *format, CDateStruct *t) {
                                 case 'S': if (!strDateNum(&strdate, 2, &sec)) { return false; }
                                 case 'p': /* am or pm */
                                         while (*strdate == ' ') { strdate++; }
-                                        if (strNICmp(strdate, "AM", 2) == 0) {
+                                        if (str.cmpLenNoCase(strdate, "AM", 2) == 0) {
                                                 pm = 0;
-                                        } else if (strNICmp(strdate, "PM", 2) == 0) {
+                                        } else if (str.cmpLenNoCase(strdate, "PM", 2) == 0) {
                                                 pm = 1;
                                         } else {
                                                 return false;
@@ -205,15 +205,15 @@ pub bool strToDateStruct(u8 *strdate, u8 *format, CDateStruct *t) {
         return true;
 }
 
-pub CDate strToDate(u8 *_str, u8 *fmt)
+pub CDate parse(u8 *_str, u8 *fmt)
 {// Parse with Str2CDateStruct into a CDate; 0 if that fails or the
     // format doesn't give the year, month and day
         CDateStruct ds;
-        if (!strToDateStruct(_str,fmt,&ds)) {
+        if (!parseParts(_str,fmt,&ds)) {
                 return 0;
         }
         if ((i64)ds.year == -1 || (i64)ds.mon == -1 || (i64)ds.day_of_mon == -1) {
                 return 0;
         }
-        return structToDate(&ds);
+        return fromParts(&ds);
 }
