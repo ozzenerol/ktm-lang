@@ -794,6 +794,61 @@ Ast *astVaPack(Ast *array, Vec *items, int untyped) {
     return ast;
 }
 
+/* `elem[]`: a class `{elem *ptr; i64 len;}` named `elem[]`, the same
+ * AstType for every use of one element type (so two `i64[]` are the
+ * same class to the type checks, which compare class names) */
+AstType *astMakeSliceType(AstType *elem) {
+    static Map *interned = NULL;
+    if (!interned) interned = mapNew(32, &map_cstring_opaque_type);
+    AoStr *name = astTypeToAoStr(elem);
+    aoStrCatLen(name, str_lit("[]"));
+    AstType *slice = mapGet(interned, name->data);
+    if (slice) return slice;
+
+    Map *fields = astMapNew();
+    AstType *ptr = astTypeCopy(astMakePointerType(elem));
+    ptr->offset = 0;
+    AstType *len = astTypeCopy(ast_int_type);
+    len->offset = 8;
+    mapAdd(fields, "ptr", ptr);
+    mapAdd(fields, "len", len);
+    slice = astClassType(fields, name, 16, 0);
+    slice->is_slice = 1;
+    slice->elem = elem;
+    mapAdd(interned, name->data, slice);
+    return slice;
+}
+
+int astTypeIsSlice(AstType *type) {
+    return type && type->kind == AST_TYPE_CLASS && type->is_slice;
+}
+
+/* A slice, or a struct, union or array with one in it */
+int astTypeHasSlice(AstType *type) {
+    if (!type) return 0;
+    if (astTypeIsSlice(type)) return 1;
+    if (type->kind == AST_TYPE_ARRAY) return astTypeHasSlice(type->ptr);
+    if ((type->kind == AST_TYPE_CLASS || type->kind == AST_TYPE_UNION) &&
+        !type->is_intrinsic && type->fields) {
+        MapIter it;
+        mapIterInit(type->fields, &it);
+        while (mapIterNext(&it)) {
+            if (astTypeHasSlice((AstType *)it.node->value)) return 1;
+        }
+    }
+    return 0;
+}
+
+Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len) {
+    Ast *ast = astNew();
+    ast->kind = AST_SLICE_MAKE;
+    ast->type = var->type;
+    ast->slice_var = var;
+    ast->slice_ptr = ptr;
+    ast->slice_len = len;
+    return ast;
+}
+
 Ast *astDefer(Ast *stmt) {
     Ast *ast = astNew();
     ast->kind = AST_DEFER;
@@ -2474,6 +2529,12 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
                            ast->va_items ? (int)ast->va_items->size : 0);
             break;
 
+        case AST_SLICE_MAKE:
+            aoStrCatPrintf(str, "<slice>\n");
+            _astToString(str, ast->slice_ptr, depth+1);
+            _astToString(str, ast->slice_len, depth+1);
+            break;
+
         case AST_DEFER:
             aoStrCatPrintf(str, "<defer>\n");
             _astToString(str, ast->defer_stmt, depth+1);
@@ -2732,6 +2793,7 @@ char *astKindToString(AstKind kind) {
         case AST_THROW:         return "AST_THROW";
         case AST_DEFER:         return "AST_DEFER";
         case AST_VA_PACK:       return "AST_VA_PACK";
+        case AST_SLICE_MAKE:    return "AST_SLICE_MAKE";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -3006,6 +3068,10 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
                     lexemePunctToStringWithFlags(';',lexeme_flags));
             break;
 
+        case AST_SLICE_MAKE:
+            _astLValueToString(str, ast->slice_ptr, lexeme_flags);
+            break;
+
         case AST_VA_PACK:
             for (u64 i = 0; ast->va_items && i < ast->va_items->size; ++i) {
                 if (i) aoStrCatPrintf(str, ", ");
@@ -3159,6 +3225,7 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_THROW: return "throw statement";
         case AST_DEFER: return "defer statement";
         case AST_VA_PACK: return "variadic arguments";
+        case AST_SLICE_MAKE: return "slice";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";

@@ -56,10 +56,16 @@ AstType *parseReturnAuto(Cctrl *cc, Ast *retval) {
     }
 }
 
+/* The `*`s and `[]`s after a type: `u8 *`, `u8[]` (a slice), `u8*[][]` */
 AstType *parsePointerType(Cctrl *cc, AstType *type) {
     Lexeme *tok;
     while (1) {
         tok = cctrlTokenGet(cc);
+        if (tokenPunctIs(tok, '[') && tokenPunctIs(cctrlTokenPeek(cc), ']')) {
+            cctrlTokenGet(cc);
+            type = astMakeSliceType(type);
+            continue;
+        }
         if (!tokenPunctIs(tok, '*')) {
             cctrlTokenRewind(cc);
             return type;
@@ -67,6 +73,34 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
         type = astMakePointerType(type);
     }
     return type;
+}
+
+/* `expr` where a `want` is expected: an array of want's element type
+ * becomes a slice of it (its address and length, in a hidden variable),
+ * anything else is returned as is for the type checks */
+Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
+    if (!astTypeIsSlice(want) || !expr || !expr->type ||
+        expr->type->kind != AST_TYPE_ARRAY || expr->type->len < 0) {
+        return expr;
+    }
+    AoStr *want_elem = astTypeToAoStr(want->elem);
+    AoStr *got_elem = astTypeToAoStr(expr->type->ptr);
+    int same = aoStrCmp(want_elem, got_elem);
+    aoStrRelease(want_elem);
+    aoStrRelease(got_elem);
+    if (!same) return expr;
+
+    static int slice_id = 0;
+    AoStr *name = aoStrPrintf("#slice%d", slice_id++);
+    Ast *var;
+    if (cc->tmp_fname) {
+        var = astLVar(want, name->data, name->len);
+        if (cc->tmp_locals) listAppend(cc->tmp_locals, var);
+    } else {
+        var = astGVar(want, name->data, name->len, 1);
+        listAppend(cc->ast_list, astDecl(var, NULL));
+    }
+    return astSliceMake(var, expr, astI64Type(expr->type->len));
 }
 
 /* Words that are keywords though the lexer gives them as identifiers
@@ -617,7 +651,23 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
 }
 
 /* Does not parse pointer types, only the base type */
+static AstType *parseBaseDeclSpecName(Cctrl *cc);
+
+/* A declaration's base type: its name, and the `[]`s right after it,
+ * which are every declarator's (`u8[] a, b` are two slices); a `*` is
+ * one declarator's, as in C */
 AstType *parseBaseDeclSpec(Cctrl *cc) {
+    AstType *type = parseBaseDeclSpecName(cc);
+    while (type && tokenPunctIs(cctrlTokenPeek(cc), '[') &&
+           tokenPunctIs(cctrlTokenPeekBy(cc, 1), ']')) {
+        cctrlTokenGet(cc);
+        cctrlTokenGet(cc);
+        type = astMakeSliceType(type);
+    }
+    return type;
+}
+
+static AstType *parseBaseDeclSpecName(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
     AstType *type;
 
@@ -1130,6 +1180,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
                 }
                 AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
                 if (type && arg && arg->kind != AST_PLACEHOLDER) {
+                    argv->entries[i] = arg = parseSliceFrom(cc, type, arg);
                     parseCheckArgType(cc,type,arg,i,fname,len,loc);
                 }
             }
@@ -1169,7 +1220,10 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
         }
 
         AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
-        if (type) parseCheckArgType(cc,type,arg,i,fname,len,loc);
+        if (type) {
+            argv->entries[i] = arg = parseSliceFrom(cc, type, arg);
+            parseCheckArgType(cc,type,arg,i,fname,len,loc);
+        }
     }
 
     /* vararg calls allow extras, but still require fixed args */
@@ -2729,6 +2783,11 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
             astTypeToString(subscript->type));
     }
 
+    /* `s[i]` of a slice indexes its `ptr` */
+    if (astTypeIsSlice(ast->type)) {
+        ast = astClassRef(mapGetLen(ast->type->fields, str_lit("ptr")), ast, "ptr");
+    }
+
     /* An error points at the `[`: there is no `+` in the source to
      * rewind to, and looking for one lands on an earlier line. */
     Ast *binop = parseCreateBinaryOpAt(cc, AST_BIN_OP_ADD, ast, subscript, '[');
@@ -2998,6 +3057,18 @@ void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
+    if ((operation == AST_BIN_OP_EQ || operation == AST_BIN_OP_NE) &&
+        (astTypeIsSlice(left->type) || astTypeIsSlice(right->type))) {
+        if (op_tok) cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
+        cctrlRaiseSuggestion(cc,
+                "compare contents with .equals(), identity with a.ptr == b.ptr",
+                "`%s` can't compare slices",
+                operation == AST_BIN_OP_EQ ? "==" : "!=");
+    }
+    /* `s = array`: the array becomes a slice */
+    if (operation == AST_BIN_OP_ASSIGN && left->type) {
+        right = parseSliceFrom(cc, left->type, right);
+    }
     int is_err = 0;
     Ast *binop = astBinaryOp(operation,left,right,&is_err);
     if (!is_err) {
@@ -3192,9 +3263,10 @@ Ast *parseExpr(Cctrl *cc, int prec) {
         }
 
         if (tokenPunctIs(tok,'[')) {
-            if (LHS->type->kind != AST_TYPE_POINTER && LHS->type->kind != AST_TYPE_ARRAY) {
+            if (LHS->type->kind != AST_TYPE_POINTER && LHS->type->kind != AST_TYPE_ARRAY &&
+                !astTypeIsSlice(LHS->type)) {
                 cctrlRewindUntilPunctMatch(cc,'[',NULL);
-                cctrlRaiseException(cc,"Cannot subscript a %s, only pointers or arrays can be subscripted with '['",
+                cctrlRaiseException(cc,"Cannot subscript a %s, only pointers, arrays or slices can be subscripted with '['",
                                    astTypeKindToHumanReadable(LHS->type));
             }
             LHS = parseSubscriptExpr(cc,LHS);
@@ -3248,6 +3320,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                                  lexemeTypeToString(peek->tk_type),
                                  lexemeAsWritten(peek));
         }
+
+        /* `s = array`: the array becomes a slice */
+        if (LHS->type) RHS = parseSliceFrom(cc, LHS->type, RHS);
 
         /* This de-sugars the compound assign which I think is okay */
         if (compound_assign) {
@@ -3446,9 +3521,9 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
 
         if (tokenPunctIs(tok,'[')) {
             if (ast->type->kind != AST_TYPE_POINTER &&
-                ast->type->kind != AST_TYPE_ARRAY) {
+                ast->type->kind != AST_TYPE_ARRAY && !astTypeIsSlice(ast->type)) {
                 cctrlRewindUntilPunctMatch(cc,'[',NULL);
-                cctrlRaiseException(cc,"Cannot subscript a %s, only pointers or arrays can be subscripted with '['",
+                cctrlRaiseException(cc,"Cannot subscript a %s, only pointers, arrays or slices can be subscripted with '['",
                                    astTypeKindToHumanReadable(ast->type));
             }
             ast = parseSubscriptExpr(cc,ast);

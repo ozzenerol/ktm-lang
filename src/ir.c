@@ -1279,6 +1279,8 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
  * pointer, a direct one is a slot/alias we LEA. Used for by-value struct
  * copies, where both sides are addressed and the bytes memcpy'd. */
 static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast) {
+    /* a made slice is its hidden variable's address already */
+    if (ast->kind == AST_SLICE_MAKE) return irExpr(ctx, ast);
     IrAssignTarget t = irLowerAssignTarget(ctx, ast);
     if (t.indirect) {
         return t.target;
@@ -2049,6 +2051,7 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
 }
 
 static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast);
+static IrValue *irLowerSliceMake(IrCtx *ctx, Ast *ast);
 
 IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     /* Variable references are SHARED Ast nodes stamped with their
@@ -2059,6 +2062,9 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     switch (ast->kind) {
         case AST_VA_PACK:
             return irLowerVaPack(ctx, ast);
+
+        case AST_SLICE_MAKE:
+            return irLowerSliceMake(ctx, ast);
 
         case AST_TERNARY: {
             /* cond ? then : els. Only the chosen branch runs: evaluate
@@ -2707,6 +2713,44 @@ static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast) {
     return is_global ? addr : irLowerLVar(ctx, array);
 }
 
+/* A `T[]` made from a pointer and a length: both stored into the hidden
+ * variable (ptr at 0, len at 8), whose address is the value, as any
+ * struct's is. Lowered again (a defer) it keeps its slot. */
+static IrValue *irLowerSliceMake(IrCtx *ctx, Ast *ast) {
+    Ast *var = ast->slice_var;
+    int is_global = var->kind == AST_GVAR;
+    IrValue *base = NULL, *addr = NULL;
+    if (is_global) {
+        addr = irLowerGlobal(ctx, var);
+    } else {
+        base = irFnGetVar(ctx->cur_func, var->lvar_id);
+        if (!base) {
+            base = irMakeLocalSlot(ctx, irConvertType(var->type),
+                                   var->type->size, var->lvar_id);
+        }
+    }
+    IrValue *ptr = irExpr(ctx, ast->slice_ptr);
+    IrValue *len = irExpr(ctx, ast->slice_len);
+    if (len && len->kind == IR_VAL_CONST_INT) {
+        len = irConstInt(IR_TYPE_I64, len->as._i64);
+    } else {
+        len = irWidenToTargetWidth(ctx, len, ast->slice_len->type, ast_int_type);
+    }
+    IrValue *vals[2] = { ptr, len };
+    for (int i = 0; i < 2; ++i) {
+        IrValue *off = irConstInt(IR_TYPE_I64, (s64)i * 8);
+        IrValue *slot = irTmp(IR_TYPE_PTR, 8);
+        if (is_global) {
+            irBlockAddInstr(ctx, irInstrNew(IR_IADD, slot, addr, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, slot, vals[i], NULL));
+        } else {
+            irBlockAddInstr(ctx, irInstrNew(IR_GEP, slot, base, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE, slot, vals[i], NULL));
+        }
+    }
+    return is_global ? addr : irLowerLVar(ctx, var);
+}
+
 void irLowerDecl(IrCtx *ctx, Ast *ast) {
     Ast *var = ast->declvar;
     Ast *init = ast->declinit;
@@ -2746,6 +2790,20 @@ void irLowerDecl(IrCtx *ctx, Ast *ast) {
         var_id = var->lvar_id;
     }
     (void)var_id;
+
+    /* a slice without an initialiser is empty ({null, 0}), never
+     * whatever the slot held: its len guards its accesses. So is one in
+     * a struct or an array. */
+    if (!init && astTypeHasSlice(var->type)) {
+        int n = var->type->size;
+        if (n <= 64) {
+            irStoreConstBytes(ctx, local, 0, n, NULL, 0);
+        } else {
+            IrValue *dst_addr = irTmp(IR_TYPE_PTR, 8);
+            irBlockAddInstr(ctx, irInstrNew(IR_LEA, dst_addr, local, NULL));
+            irEmitMemset(ctx, dst_addr, n);
+        }
+    }
 
     if (init) {
         IrValue *ir_init = NULL;
@@ -3390,6 +3448,11 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
             }
             return;
         }
+
+        case AST_SLICE_MAKE:
+            irEscapeWalk(ast->slice_ptr, escape);
+            irEscapeWalk(ast->slice_len, escape);
+            return;
 
         case AST_COMPOUND_STMT: {
             irEscapeWalkList(ast->stms, escape);
