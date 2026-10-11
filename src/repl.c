@@ -1558,7 +1558,7 @@ int replRun(Cctrl *cc, CliArgs *args) {
                      "%s/.ktm_repl_history", home);
             linenoiseHistoryLoad(repl_history_path);
         }
-        if (!mapHas(cc->macro_defs, "KTM_REPL_NO_HELLO")) {
+        if (!mapHas(cc->macro_defs, "KTM_NO_REPL_HELLO")) {
             printf("ktm %s [%s]\n"
                    "Statements run as typed; a trailing expression's value is "
                    "echoed.\nTab completes, arrows browse history, Ctrl-D "

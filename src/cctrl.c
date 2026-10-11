@@ -227,17 +227,6 @@ static void cctrlAddBuiltinMacros(Cctrl *cc) {
     mapAdd(cc->macro_defs,"__KTM_VERSION__",le);
 }
 
-void cctrlAddBuiltinFunctions(Cctrl *cc) {
-      Vec *params = vecNew(&vec_ast_type);
-      AstType *type = astMakePointerType(astMakePointerType(ast_u8_type));
-      Ast *var = astLVar(type,str_lit("fname"));
-      vecPush(params, var);
-      Ast *fn = astFunction(type,str_lit("Uf"),params,NULL,NULL,0);
-      fn->kind = AST_FUN_PROTO;
-      fn->flags |= AST_FLAG_BUILTIN;
-      mapAdd(cc->global_env,fn->fname->data,fn);
-}
-
 /* C's printf, built in (the stdlib map: no module, the compiler checks
  * it), declared as the old std.ktmh did: an install that still has that
  * header redeclares it the same */
@@ -392,8 +381,6 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->target = target;
 
     cctrlAddBuiltinMacros(cc);
-    /* We have no real mechanism of adding compiler builtins */
-    // cctrlAddBuiltinFunctions(cc);
     cctrlAddBuiltinPrintf(cc);
 
     Ast *cmd_args = astGlobalCmdArgs();
