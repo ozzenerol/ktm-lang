@@ -2821,7 +2821,13 @@ static void migDefines(MigFile *f) {
         if (vs >= ve) continue;
         char *name = mprintf("%.*s", (int)nlen, t + nw);
         if (migPreprocUses(f, name, nlen)) continue;
-        migAddSegs(f, line_start, ve, "const", migLit(mprintf("const %s %s = ", d->type, name)),
+        /* pub when other modules use it: everything in libc, and a
+         * constant the map puts in this file's module */
+        const char *mod = migFileModule(f);
+        MigName *mn = mig_map ? mapGet(mig_map, name) : NULL;
+        int pub = *mod && (!strcmp(mod, "libc") || (mn && !strcmp(mn->module, mod)));
+        migAddSegs(f, line_start, ve, "const", migLit(mprintf("%sconst %s %s = ", pub ? "pub " : "",
+                                                              d->type, name)),
                    migRange(vs, ve), migLit(";"), NULL);
     }
 }

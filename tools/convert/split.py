@@ -24,7 +24,7 @@ DROP = {'Dir', 'IsDotZ', 'IsDotC', 'Write', 'CH_SPACE', 'CH_SHIFT_SPACE', 'RM_VE
 # module that uses them
 KEEP_IN = {'HCFs': 'rt', 'Fs': 'rt', 'HT_DELETED': 'map', 'STR_LEN': 'str',
            'PRTF_DECIMAL': 'str', 'PRTF_LEFT_JUSTIFY': 'str', 'PRTF_PAD_ZERO': 'str',
-           'PRTF_SLASH': 'str', 'PRTF_TRUNCATE': 'str', '_SS_PAD1SIZE': 'net', '_SS_PAD2SIZE': 'net'}
+           'PRTF_SLASH': 'str', 'PRTF_TRUNCATE': 'str', '_SS_PAD1SIZE': 'libc', '_SS_PAD2SIZE': 'libc'}
 
 # placed by hand: coroutine stack caching is the runtime's thread state
 # (rt frees it when a thread ends; coro uses rt, so rt can't use coro)
@@ -57,8 +57,27 @@ for f in files:
         if it['kind'] in ('func', 'global', 'define', 'type') and mapped_module(it) is None \
                 and it['name'] not in DROP and it['name'] not in KEEP_IN:
             helper_mod[it['name']] = None
+def libc_item(f, it):
+    # an item split.py sends to libc: a C declaration or a C name of the map
+    row = mp.get(it['name'])
+    return it['kind'] == 'cfunc' or (row is not None and (row[0] == 'c' or row[1] == 'libc'))
+
+libc_words = set()
+kept_c = set()        # a C function declared twice: the first (the header's) is kept
+for f in headers + files:
+    for i, it in enumerate(allit[f]):
+        if libc_item(f, it) and it['name'] not in DROP:
+            if it['kind'] == 'cfunc':
+                if it['name'] in kept_c or it['name'].startswith('sqlite3'):
+                    continue
+                kept_c.add(it['name'])
+            libc_words |= words[(f, i)]
+
 for _ in range(4):
     for h in helper_mod:
+        if h in libc_words:
+            helper_mod[h] = 'libc'     # libc imports nothing: its types live there
+            continue
         refs = collections.Counter()
         for f in files:
             for i, it in enumerate(allit[f]):
@@ -193,6 +212,11 @@ for f in headers + files:
                 mod = 'rt'
             else:
                 mod = helper_mod.get(name) or home
+        # everything in libc is pub: it is the C library, for every module
+        if mod == 'libc' and k in ('type', 'global', 'func', 'proto'):
+            lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
+            if not re.match(r'(public|static)\b', body[lead:]):
+                body = body[:lead] + 'public ' + body[lead:]
         # a public name's definition says so
         if row and row[0] in ('function', 'type') and k in ('func', 'type', 'proto') and mod == row[1]:
             lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
