@@ -110,8 +110,17 @@ static BuiltInType built_in_types[] = {
     {"F32",AST_TYPE_FLOAT,4,0},
     {"inline",AST_TYPE_INLINE,0,0},
     {"public",AST_TYPE_VIS_MODIFIER,0,0},
+    {"pub",AST_TYPE_VIS_MODIFIER,0,0},
     {"auto",AST_TYPE_AUTO,0,0},
     {"private",AST_TYPE_VIS_MODIFIER,0,0},
+};
+
+/* New name -> the built-in type it names. */
+static struct { const char *name, *old_name; } type_aliases[] = {
+    {"void", "U0"}, {"bool", "Bool"},
+    {"i8", "I8"},   {"u8", "U8"},   {"i16", "I16"}, {"u16", "U16"},
+    {"i32", "I32"}, {"u32", "U32"}, {"i64", "I64"}, {"u64", "U64"},
+    {"f32", "F32"}, {"f64", "F64"},
 };
 
 static void cctrlAddX86_64Defines(Cctrl *cc, Lexeme *le) {
@@ -229,6 +238,21 @@ void cctrlAddBuiltinFunctions(Cctrl *cc) {
       mapAdd(cc->global_env,fn->fname->data,fn);
 }
 
+/* C's printf, built in (the stdlib map: no module, the compiler checks
+ * it), declared as the old std.ktmh did: an install that still has that
+ * header redeclares it the same */
+static void cctrlAddBuiltinPrintf(Cctrl *cc) {
+      Vec *pf_params = vecNew(&vec_ast_type);
+      vecPush(pf_params, astLVar(astMakePointerType(ast_i8_type), str_lit("fmt")));
+      vecPush(pf_params, astVarArgs());
+      AstType *pf_type = astMakeFunctionType(ast_int_type, pf_params);
+      pf_type->has_var_args = 1;
+      Ast *pf = astFunction(pf_type, str_lit("printf"), pf_params, NULL, NULL, 0);
+      pf->kind = AST_EXTERN_FUNC;
+      pf->flags |= AST_FLAG_BUILTIN;
+      mapAdd(cc->global_env, pf->fname->data, pf);
+}
+
 static void cctrlAddBuiltinTypes(Map *symbol_table) {
     for (int i = 0; i < (int)static_size(built_in_types); ++i) {
         AstType *type = (AstType *)malloc(sizeof(AstType));
@@ -241,6 +265,12 @@ static void cctrlAddBuiltinTypes(Map *symbol_table) {
         type->ptr = NULL;
         mapAdd(symbol_table, built_in->name, type);
     }
+    /* The C-like names (ktm syntax v0.2) for the same types. They are type
+     * names, not keywords, so a struct field can still be called `i64`. */
+    for (int i = 0; i < (int)static_size(type_aliases); ++i) {
+        AstType *type = mapGet(symbol_table, type_aliases[i].old_name);
+        mapAdd(symbol_table, type_aliases[i].name, type);
+    }
 }
 
 Cctrl *ccMacroProcessor(Map *macro_defs) {
@@ -252,6 +282,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
      * dereference a garbage map. */
     cc->global_env = mapNew(32, &map_ast_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     /* A postfix cast in a #define's value, `#define X (5(U64) % 3)`,
      * looks the type name up: give it the built-in types (classes and
      * unions are not known while lexing, so those stay empty). */
@@ -273,15 +304,31 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
 
 /* Instantiate a new compiler control struct */
 Cctrl *cctrlNew(enum CliTarget target) {
-    Cctrl *cc = (Cctrl *)malloc(sizeof(Cctrl));
+    /* zeroed: a field nothing sets here (pending_unary) must start NULL */
+    Cctrl *cc = (Cctrl *)calloc(1, sizeof(Cctrl));
 
     cc->flags = 0;
+    cc->defer_depth = 0;
+    cc->cur_module = 0;
+    cc->decls_only = 0;
+    cc->mod_type_decls = vecNew(&vec_unsigned_long_type);
+    cc->mod_decls_done = setNew(16, &set_cstring_type);
+    cc->mod_types_done = setNew(16, &set_cstring_type);
+    cc->replaying = 0;
+    cc->quiet_errors = 0;
+    cc->decl_pub = 0;
+    cc->decl_from_main = 0;
+    cc->pub_names = setNew(16, &set_cstring_type);
+    cc->tok_file = NULL;
+    cc->main_names = setNew(16, &set_cstring_type);
+    cc->method_self = NULL;
     cc->file_map = mapNew(16, &map_u32_to_aostr_type);
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);
     cc->uniondefs = mapNew(32, &map_asttype_type);
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     cc->macro_defs = cctrlCreateLexemeMap();
     cc->x86_registers = setNew(32, &set_cstring_type);
     cc->libc_functions = setNew(32, &set_cstring_type);
@@ -345,6 +392,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cctrlAddBuiltinMacros(cc);
     /* We have no real mechanism of adding compiler builtins */
     // cctrlAddBuiltinFunctions(cc);
+    cctrlAddBuiltinPrintf(cc);
 
     Ast *cmd_args = astGlobalCmdArgs();
     listAppend(cc->ast_list,cmd_args->argc);
@@ -511,9 +559,6 @@ static Lexeme *cctrlMaybeExpandToken(Cctrl *cc, Lexeme *token) {
 
     Lexeme *maybe_define = mapGetLen(cc->macro_defs, token->start, token->len);
     if (maybe_define) {
-        if (cc->flags & CCTRL_PASTE_DEFINES) {
-            return token;
-        }
         /* The macro's value, at the line and column the macro is used:
          * the stored lexeme carries the #define's position, which put
          * an error on the use on the #define line. */
@@ -524,6 +569,11 @@ static Lexeme *cctrlMaybeExpandToken(Cctrl *cc, Lexeme *token) {
         mu->expansion = lexemeCopy(maybe_define);
         mu->expansion->line = token->line;
         mu->expansion->col = token->col;
+        mu->expansion->file = token->file;
+        mu->expansion->module_id = token->module_id;
+        mu->expansion->mod_pass = token->mod_pass;
+        mu->expansion->in_std = token->in_std;
+        mu->expansion->is_prefix = 0;
         return mu->expansion;
     }
     return token; 
@@ -628,8 +678,21 @@ static const char *cctrl_libktm_extra_exports[] = {
  * one does in a program or a user library. libktm is one translation
  * unit, so in it only what std.ktmh declares is exported (and argc/argv);
  * everything else is local and a program can't replace it. */
+/* The declaration a direct call to the symbol `name` calls, for the
+ * backends' calling convention (variadic or not): a function by its name,
+ * or a module's extern "c" by its C name */
+Ast *cctrlCalleeDecl(Cctrl *cc, char *name, int len) {
+    Ast *decl = mapGetLen(cc->global_env, name, len);
+    if (!decl && cc->c_externs) decl = mapGetLen(cc->c_externs, name, len);
+    return decl;
+}
+
 int cctrlIsExported(Cctrl *cc, AoStr *name) {
     if (!cc->is_libktm || !name) return 1;
+    /* libktm built from the stdlib's modules, without a header: module
+     * symbols are mangled apart and the asm labels are what `_extern`
+     * bindings call, so all but `static` (local already) are exported */
+    if (!cc->header_src) return 1;
     if (setHasLen(cc->header_names, name->data, name->len)) return 1;
     for (int i = 0; cctrl_libktm_extra_exports[i]; ++i) {
         if (!strcmp(name->data, cctrl_libktm_extra_exports[i])) return 1;
@@ -643,6 +706,13 @@ AoStr *cctrlLookUpFile(Cctrl *cc, u32 file_id) {
 }
 
 Lexeme *cctrlTokenGet(Cctrl *cc) {
+    /* the member of `local.member` the parser split from a qualified
+     * token (a local hides an import prefix, parseShadowedPrefix) */
+    if (cc->pending_token) {
+        Lexeme *member = cc->pending_token;
+        cc->pending_token = NULL;
+        return member;
+    }
     Lexeme *token = tokenRingBufferPeek(cc->token_buffer);
     cc->token_buffer->got_eof = 0;
     while (token) {
@@ -653,20 +723,21 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
             token = tokenRingBufferPeek(cc->token_buffer);
             continue;
         }
-        if (cc->token_buffer->size < 3 && cc->lexer_) {
+        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying) {
             cctrLoadNextTokens(cc,5);
         }
         cc->token_buffer->pos++;
         cc->lineno = token->line;
         ast_line_hint = token->line;
         ast_col_hint = token->col;
-        /* Register the lexer's current file lazily; the id rides on
-         * every astNew until the lexer crosses a file boundary. */
-        if (cc->lexer_ && cc->lexer_->cur_file) {
-            LexFile *f = cc->lexer_->cur_file;
+        /* Register the token's file lazily; the id rides on every
+         * astNew until a token from another file is taken. */
+        if (cc->lexer_ && (token->file || cc->lexer_->cur_file)) {
+            LexFile *f = token->file ? token->file : cc->lexer_->cur_file;
             if (f->file_id == 0)
                 f->file_id = cctrlRegisterFile(cc, f->filename);
             ast_file_hint = f->file_id;
+            cc->tok_file = f;
         }
         return token;
     }
@@ -721,7 +792,7 @@ void cctrlFileAndLine(Cctrl *cc, AoStr *buf, s64 lineno, s64 char_pos, char *msg
     }
 
     if (cc->lexer_) {
-        LexFile *file = cc->lexer_->cur_file;
+        LexFile *file = cctrlCurFile(cc);
         char *file_name = file->filename->data;
         aoStrPutChar(buf, ' ');
         aoStrCatColoured(buf, ESC_CYAN, "-->");
@@ -762,7 +833,7 @@ char *lexemeToColor(Cctrl *cc, Lexeme *tok, char *text, int len, int is_err) {
                 color = clr(ESC_PURPLE);
                 break;
             case TK_IDENT:
-                if (cctrlIsKeyword(cc, tok->start, tok->len)) {
+                if (cctrlTokIsKeyword(cc, tok)) {
                     color = clr(ESC_BLUE);
                 }
                 break;
@@ -960,7 +1031,7 @@ AoStr *cctrlCreateErrorLineAt(Cctrl *cc, s64 lineno, s64 col, s64 len,
     s64 tok_len  = len > 0 ? len : 1;
     cctrlFileAndLine(cc, buf, lineno, char_pos, msg, severity);
 
-    const char *line_buffer = lexerReportLine(cc->lexer_, lineno);
+    const char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), lineno);
     s64 line_len = strlen(line_buffer);
     AoStr *expanded = aoStrNew();
     for (s64 i = 0; i < line_len; ++i) {
@@ -1060,8 +1131,8 @@ void cctrlWarning(Cctrl *cc, char *fmt, ...) {
     }
 }
 
-static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
-                          s64 len, char *fmt, va_list ap)
+static void cctrlDiagAtVaRaise(Cctrl *cc, int severity, s64 lineno, s64 col,
+                               s64 len, int raise, char *fmt, va_list ap)
 {
     char *msg = mprintVa(fmt, ap, NULL);
     AoStr *bold_msg = aoStrNew();
@@ -1074,15 +1145,30 @@ static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
     d->severity = severity;
     d->message = rendered;
     d->suggestion = NULL;
-    d->file = cc->lexer_ ? cc->lexer_->cur_file : NULL;
+    d->file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
     d->line = (int)lineno;
     d->col = (int)col;
     d->end_line = (int)lineno;
     d->end_col = (int)(col + (len > 0 ? len : 1));
     cctrlDiagPush(cc, d);
-    if (severity == CCTRL_ERROR) {
+    if (severity == CCTRL_ERROR && raise) {
         cctrlTerminate(cc);
     }
+}
+
+static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
+                          s64 len, char *fmt, va_list ap)
+{
+    cctrlDiagAtVaRaise(cc, severity, lineno, col, len, 1, fmt, ap);
+}
+
+/* An error at (line, col) the parser can step over: reported, and
+ * parsing goes on where it is (no unwinding to the recovery point) */
+void cctrlErrorAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
+    va_list ap;
+    va_start(ap,fmt);
+    cctrlDiagAtVaRaise(cc, CCTRL_ERROR, lineno, col, len, 0, fmt, ap);
+    va_end(ap);
 }
 
 /* Like cctrlWarning, but anchored at an explicit (line, col) instead of
@@ -1116,7 +1202,7 @@ CctrlDiagnostic *cctrlMakeDiag(Cctrl *cc,
     d->severity = severity;
     d->message = rendered;
     d->suggestion = suggestion;
-    d->file = cc->lexer_ ? cc->lexer_->cur_file : NULL;
+    d->file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
 
     Lexeme *cur = cctrlTokenPeek(cc);
     if (cur) {
@@ -1144,6 +1230,15 @@ void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
             if (d->suggestion) aoStrRelease(d->suggestion);
             free(d);
         }
+        return;
+    }
+    /* A module type declaration parsed from its recorded tokens: the
+     * declarations pass reports what still fails (see Cctrl.replaying) */
+    if (cc->replaying) {
+        if (d->severity == CCTRL_ERROR) cc->quiet_errors++;
+        if (d->message) aoStrRelease(d->message);
+        if (d->suggestion) aoStrRelease(d->suggestion);
+        free(d);
         return;
     }
     vecPush(cc->diagnostics, d);
@@ -1447,7 +1542,7 @@ AoStr *cctrlRaiseFromTo(Cctrl *cc, int severity, char *suggestion, char from,
 
     s64 col = 0, len = 0;
     if (cur_tok && cc->lexer_) {
-        const char *line_buffer = lexerReportLine(cc->lexer_, line);
+        const char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), line);
         s64 from_idx = cctrlGetErrorIdx(cc, line, from, line_buffer);
         s64 to_idx   = cctrlGetErrorIdx(cc, line, to,   line_buffer);
         if (from_idx != -1 && to_idx != -1) {
@@ -1495,6 +1590,83 @@ void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *f
 }
 
 /* Get variable either from the local or global scope */
+/* The path ("a.b") of module `module_id`, NULL for the main program */
+AoStr *cctrlModulePath(Cctrl *cc, u32 module_id) {
+    if (!module_id || !cc->lexer_ || (int)module_id > cc->lexer_->modules_len) {
+        return NULL;
+    }
+    return cc->lexer_->modules[module_id - 1]->path;
+}
+
+/* `name` as declared in the current module ("a.b.name"), NULL in the
+ * main program or for a name that is already qualified */
+char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    if (!path || memchr(name, '.', len)) return NULL;
+    return mprintf("%s.%.*s", path->data, len, name);
+}
+
+/* Is the current module the prelude, whose pub names every file sees
+ * without a prefix or an import? */
+int cctrlInPrelude(Cctrl *cc) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    return path && path->len == 7 && !memcmp(path->data, "prelude", 7);
+}
+
+/* Is the current module `libc`, the C library's declarations? */
+int cctrlInCModule(Cctrl *cc) {
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    return path && path->len == 4 && !memcmp(path->data, "libc", 4);
+}
+
+/* The name a declaration is made under: as cctrlQualifyName, except
+ * that the prelude's pub names are flat (`Error`, not `prelude.Error`)
+ * so every file finds them as it finds the program's own */
+char *cctrlDeclName(Cctrl *cc, char *name, int len) {
+    if (cc->decl_pub && cctrlInPrelude(cc)) return NULL;
+    return cctrlQualifyName(cc, name, len);
+}
+
+/* The file diagnostics are about: the last taken token's */
+LexFile *cctrlCurFile(Cctrl *cc) {
+    if (cc->tok_file) return cc->tok_file;
+    return cc->lexer_ ? cc->lexer_->cur_file : NULL;
+}
+
+/* Inside a module, a flat name the main program declared: the module
+ * can't depend on the program that uses it */
+int cctrlModuleHides(Cctrl *cc, char *name, int len) {
+    if (!cc->cur_module || memchr(name, '.', len)) return 0;
+    char *flat = mprintf("%.*s", len, name);
+    return setHas(cc->main_names, flat);
+}
+
+/* `a.b.name` found: an error unless it is pub or used inside a.b */
+void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
+    char *dot = NULL;
+    for (int i = len - 1; i >= 0; --i) {
+        if (name[i] == '.') { dot = name + i; break; }
+    }
+    if (!dot) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    int mod_len = dot - name;
+    if (here && (int)here->len == mod_len && !memcmp(here->data, name, mod_len)) {
+        return;
+    }
+    char *full = mprintf("%.*s", len, name);
+    if (setHas(cc->pub_names, full)) return;
+    cctrlRaiseException(cc, "`%.*s` is private to module %.*s",
+                        len - mod_len - 1, dot + 1, mod_len, name);
+}
+
+/* A declaration named like one of its file's import prefixes */
+void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name) {
+    if (name && name->tk_type == TK_IDENT && name->is_prefix) {
+        cctrlRaiseException(cc, "`%.*s` hides the module imported as %.*s",
+                            name->len, name->start, name->len, name->start);
+    }
+}
+
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     Ast *ast_var;
     Lexeme *tok;
@@ -1503,11 +1675,24 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
         return ast_var;
     }
 
-    if ((ast_var = (Ast *)mapGetLen(cc->global_env, varname, len)) != NULL) {
+    /* In a module, its own names first */
+    char *qual = cctrlQualifyName(cc, varname, len);
+    if (qual && (ast_var = (Ast *)mapGet(cc->global_env, qual)) != NULL) {
+        return ast_var;
+    }
+
+    if (!cctrlModuleHides(cc, varname, len) &&
+        (ast_var = (Ast *)mapGetLen(cc->global_env, varname, len)) != NULL) {
+        cctrlCheckModuleAccess(cc, varname, len);
         return ast_var;
     }
 
     if ((ast_var = mapGetLen(cc->asm_funcs, varname, len)) != NULL) {
+        cctrlCheckModuleAccess(cc, varname, len);
+        return ast_var;
+    }
+    /* a module's own asm binding (`_extern _x I32 stat(...)`) */
+    if (qual && (ast_var = mapGet(cc->asm_funcs, qual)) != NULL) {
         return ast_var;
     }
 
@@ -1515,21 +1700,12 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     if ((tok = mapGetLen(cc->macro_defs, varname, len)) != NULL) {
         switch (tok->tk_type) {
         case TK_I64:
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(ast_int_type, varname, len);
-            }
             ast_var = astI64Type(tok->i64);
             if (tok->isu64) ast_var->type = astTypeCopy(ast_uint_type);
             return ast_var;
         case TK_F64:
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(ast_float_type, varname, len);
-            }
             return astF64Type(tok->f64);
         case TK_STR: {
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(astMakePointerType(ast_u8_type), varname, len);
-            }
             return cctrlGetOrSetString(cc, tok->start, tok->len, tok->i64);
         }
         default:
@@ -1545,6 +1721,18 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     if ((type = mapGetLen(cc->symbol_table, name, len)) != NULL) {
         return type;
     }
+    /* In a module, its own types first */
+    char *qual = cctrlQualifyName(cc, name, len);
+    if (qual) {
+        if ((type = mapGet(cc->clsdefs, qual)) != NULL) return type;
+        if ((type = mapGet(cc->uniondefs, qual)) != NULL) return type;
+    }
+    if (cctrlModuleHides(cc, name, len)) return NULL;
+    if (memchr(name, '.', len) &&
+        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len)))
+    {
+        cctrlCheckModuleAccess(cc, name, len);
+    }
     /* Classes are types */
     if ((type = mapGetLen(cc->clsdefs,name,len)) != NULL) {
         return type;
@@ -1557,6 +1745,16 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
 
 int cctrlIsKeyword(Cctrl *cc, char *name, int len) {
     return cctrlGetKeyWord(cc,name,len) != NULL;
+}
+
+/* Is the token a keyword or a type name: a string, character or number
+ * literal never is, whatever its text (`F("private")`) */
+int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok) {
+    if (tok->tk_type == TK_STR || tok->tk_type == TK_CHAR_CONST ||
+        tok->tk_type == TK_I64 || tok->tk_type == TK_F64) {
+        return 0;
+    }
+    return cctrlIsKeyword(cc, tok->start, tok->len);
 }
 
 void cctrlSetCommandLineDefines(Cctrl *cc, List *defines_list) {

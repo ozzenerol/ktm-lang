@@ -15,7 +15,6 @@
 #define PUNCT_TERM_RSQR   (1<<7) // ']'
 
 void parseToAst(Cctrl *cc);
-void parseResetRangeLoopIdx(void);
 Ast *parseStatement(Cctrl *cc);
 s64 evalIntConstExpr(Ast *ast);
 

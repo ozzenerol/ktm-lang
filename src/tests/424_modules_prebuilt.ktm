@@ -1,0 +1,66 @@
+import fs, mem, proc, str, test;
+
+/* Modules (M1): a precompiled module. `ktm -lib geo dir/geo` builds the
+ * module into libgeo.a and its shared object in dir/geo and writes the
+ * marker dir/geo/.ktmlib. A program importing geo then reads only geo's
+ * declarations (no geo code in its own output) and links the library:
+ * the archive AOT, the shared object in the JIT. A const of the module
+ * still works as an array size. Uses a copy of src/tests/modules/basic.
+ * A library has no code that runs before main, so a global with a
+ * run-time initialiser is an error in a module built with -lib. */
+
+#define PRE_OUT "./ktm-424-prebuilt.out"
+#define PRE_BIN "./ktm-424-prebuilt.bin"
+#define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) " \
+                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+
+u8 *gWant = "3 4\n25 12\n2 4 -2 1 7\n1\n";
+
+bool output(u8 *cmd, u8 *want) {
+    proc.shell("rm -f " PRE_OUT " " PRE_BIN);
+    proc.shell(cmd);
+    u8 *out = fs.readAll(PRE_OUT);
+    bool ok = out && !str.cmp(out, want);
+    if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
+    mem.free(out);
+    return ok;
+}
+
+i32 main() {
+    printf("Test - modules: precompiled: ");
+    i64 correct = 0, tests = 0;
+
+    proc.shell("rm -rf ./pre && mkdir -p ./pre && cp -r ${KTM_TEST_SRC:-.}/modules/basic/. ./pre/");
+
+    tests++;
+    if (output(KTM "-lib geo ./pre/geo > " PRE_OUT " 2>&1; "
+                         "test -f ./pre/geo/.ktmlib && test -f ./pre/geo/libgeo.a && echo built > " PRE_OUT,
+                         "built\n")) {
+        correct++;
+                         }
+    /* the program has none of geo's code: no `_K3geo...:` label */
+    tests++;
+    if (output(KTM "-S ./pre/main.ktm -o- 2>&1 | grep -c '^_K3geo' > " PRE_OUT, "0\n")) {
+        correct++;
+    }
+    tests++;
+    if (output(KTM "./pre/main.ktm -o " PRE_BIN " > " PRE_OUT " 2>&1 && " PRE_BIN " >> " PRE_OUT " 2>&1",
+                         gWant)) {
+        correct++;
+                         }
+    tests++;
+    if (output(KTM "-jit ./pre/main.ktm > " PRE_OUT " 2>&1", gWant)) { correct++; }
+
+    proc.shell("mkdir -p ./pre/cfg && printf 'module cfg;\\ni64 seven() { return 7; }\\n"
+                 "i64 g_runtime = seven();\\npub i64 value() { return g_runtime; }\\n' > ./pre/cfg/cfg.ktm");
+    tests++;
+    if (output(KTM "-lib cfg ./pre/cfg 2>&1 | grep -c '`g_runtime` needs a constant initialiser' > " PRE_OUT,
+                         "1\n")) {
+        correct++;
+                         }
+
+    proc.shell("rm -rf ./pre " PRE_OUT " " PRE_BIN);
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
+}

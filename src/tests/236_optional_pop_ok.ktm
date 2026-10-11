@@ -1,49 +1,48 @@
-#include "testhelper.ktm"
+import str, test, vec;
 
-/* IntVecPop/FloatVecPop/PtrVecPop wrote through `_ok` unconditionally, so
- * IntVecPop(v, NULL) crashed and the flag had to be passed. It now
- * defaults to NULL and is only written when given. The empty-vector
- * sentinels stay: -1, -1.0 and NULL. */
+/* vec.intPop/vec.floatPop/vec.ptrPop wrote through `_ok` unconditionally, so
+ * vec.intPop(v, null) crashed and the flag had to be passed. It now
+ * defaults to null and is only written when given. The empty-vector
+ * sentinels stay: -1, -1.0 and null. */
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  Bool ok;
-  "Test - optional pop ok flag: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    bool ok;
+    printf("Test - optional pop ok flag: ");
 
-  IntVec *iv = IntVecNew();
-  IntVecPush(iv, 10);
-  IntVecPush(iv, 20);
-  tests++;
-  if (IntVecPop(iv) == 20 && IntVecPop(iv, NULL) == 10 && IntVecPop(iv) == -1 &&
-      iv->size == 0) correct++;
-  ok = TRUE;
-  tests++; if (IntVecPop(iv, &ok) == -1 && !ok) correct++;
-  IntVecPush(iv, 5);
-  ok = FALSE;
-  tests++; if (IntVecPop(iv, &ok) == 5 && ok) correct++;
-  IntVecRelease(iv);
+    vec.IntVec *iv = vec.intNew();
+    iv.push(10);
+    iv.push(20);
+    tests++;
+    if (iv.pop() == 20 && iv.pop(null) == 10 && iv.pop() == -1 &&
+            iv.size == 0) { correct++; }
+    ok = true;
+    tests++; if (iv.pop(&ok) == -1 && !ok) { correct++; }
+    iv.push(5);
+    ok = false;
+    tests++; if (iv.pop(&ok) == 5 && ok) { correct++; }
+    iv.release();
 
-  FloatVec *fv = FloatVecNew();
-  FloatVecPush(fv, 2.5);
-  tests++;
-  if (FloatVecPop(fv) == 2.5 && FloatVecPop(fv) == -1.0 && fv->size == 0) correct++;
-  ok = TRUE;
-  tests++; if (FloatVecPop(fv, &ok) == -1.0 && !ok) correct++;
-  FloatVecRelease(fv);
+    vec.FloatVec *fv = vec.floatNew();
+    fv.push(2.5);
+    tests++;
+    if (fv.pop() == 2.5 && fv.pop() == -1.0 && fv.size == 0) { correct++; }
+    ok = true;
+    tests++; if (fv.pop(&ok) == -1.0 && !ok) { correct++; }
+    fv.release();
 
-  PtrVec *pv = PtrVecNew();
-  PtrVecPush(pv, "x");
-  PtrVecPush(pv, NULL);
-  ok = FALSE;
-  /* a stored NULL is told apart from empty only through `_ok` */
-  tests++; if (PtrVecPop(pv, &ok) == NULL && ok) correct++;
-  tests++; if (!StrCmp(PtrVecPop(pv), "x") && PtrVecPop(pv) == NULL) correct++;
-  ok = TRUE;
-  tests++; if (PtrVecPop(pv, &ok) == NULL && !ok && pv->size == 0) correct++;
-  PtrVecRelease(pv);
+    vec.PtrVec *pv = vec.ptrNew();
+    pv.push("x");
+    pv.push(null);
+    ok = false;
+    /* a stored null is told apart from empty only through `_ok` */
+    tests++; if (pv.pop(&ok) == null && ok) { correct++; }
+    tests++; if (!str.cmp(pv.pop(), "x") && pv.pop() == null) { correct++; }
+    ok = true;
+    tests++; if (pv.pop(&ok) == null && !ok && pv.size == 0) { correct++; }
+    pv.release();
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

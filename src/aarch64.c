@@ -1857,7 +1857,7 @@ static void aarch64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
 
             Ast *callee = NULL;
             if (!indirect) {
-                callee = (Ast *)mapGetLen(ctx->cc->global_env,
+                callee = (Ast *)cctrlCalleeDecl(ctx->cc,
                                           fname->data, fname->len);
             }
             int callee_va = 0;
@@ -2150,7 +2150,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
 void aarch64InitialiseEmptyGlobal(Cctrl *cc, AoStr *buf, Ast *global,
                                   int zerofill)
 {
-    AoStr *label = global->is_static ? global->glabel : global->gname;
+    AoStr *label = (global->glabel ? global->glabel : global->gname);
     label = asmNormaliseGlobalLabel(cc, label);
     int size = global->type->size;
     /* Matches x86: zerofill=1 means "real zero-init this TU owns"
@@ -2190,7 +2190,7 @@ void aarch64GlobalVar(Cctrl *cc, Set *seen_globals, AoStr *buf, Ast *ast) {
     Ast *declvar = ast->declvar;
     Ast *declinit = ast->declinit;
     AoStr *varname = declvar->gname;
-    AoStr *label = declvar->is_static ? declvar->glabel : declvar->gname;
+    AoStr *label = (declvar->glabel ? declvar->glabel : declvar->gname);
     /* Mach-O: escape an uppercase-`L` symbol so `.globl` accepts it. Must
      * match the references emitted via asmNormaliseGlobalLabel elsewhere. */
     label = asmNormaliseGlobalLabel(cc, label);

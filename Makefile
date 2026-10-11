@@ -53,15 +53,19 @@ jit-unit-test:
 # compiles the (ktm) harness against it, so the suite tests in-tree
 # sources - never whatever happens to be installed in /usr/local.
 lsp-test:
-	mkdir -p ./build/test-prefix/include ./build/test-prefix/lib
-	cp ./src/std/std.ktmh ./build/test-prefix/include/std.ktmh
-	cd ./src/std && ../../ktm -lib ktm --install-dir=$(CURDIR)/build/test-prefix ./all.ktm
+	rm -rf ./build/test-prefix
+	mkdir -p ./build/test-prefix/lib ./build/test-prefix/modules
+	cp -R ./src/std/. ./build/test-prefix/modules/
+	./ktm -fPIC -lib ktm --install-dir=$(CURDIR)/build/test-prefix $(CURDIR)/build/test-prefix/modules
 	cd ./src/tests/lsp && ../../../ktm --install-dir=$(CURDIR)/build/test-prefix ./run_lsp_tests.ktm -o lsp-test-runner && ./lsp-test-runner
 
+# The standard library's modules into $(LIB_PREFIX)/modules, compiled
+# into $(LIB_PREFIX)/lib
+LIB_PREFIX ?= /usr/local
 lib-ktm:
-	cd ./src/std \
-		&& ../../ktm -lib ktm ./all.ktm \
-		&& cd ../../
+	mkdir -p $(LIB_PREFIX)/lib $(LIB_PREFIX)/modules
+	cp -R ./src/std/. $(LIB_PREFIX)/modules/
+	./ktm -fPIC -lib ktm --install-dir=$(LIB_PREFIX) $(LIB_PREFIX)/modules
 
 clean:
 	rm -rf ./build ./ktm

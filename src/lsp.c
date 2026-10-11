@@ -36,6 +36,7 @@ typedef struct LspCtx {
     Cctrl *cc;              /* stdlib-only in the parent; see lspRunIsolated */
     Map *docs;              /* uri (char*) -> AoStr* text */
     char *root_dir;         /* builtin include root for <...> */
+    char *std_dir;          /* <install>/modules/: the standard library */
     enum CliTarget target;
     int shutdown_requested;
     int utf16;              /* wire columns are utf-16 units, not bytes */
@@ -182,18 +183,14 @@ static void lspInstallCrashHandlers(void) {
  * squiggle, and hover/completion have nothing to serve. Mirrors
  * replBootstrap; stdlib diagnostics are discarded. */
 static void lspBootstrap(LspCtx *ctx, Cctrl *cc) {
-    AoStr *builtin = aoStrPrintf("%sstd.ktmh", ctx->root_dir);
-    if (access(builtin->data, R_OK) != 0) {
-        lspLog(ctx, "lsp: %s not found; stdlib symbols unavailable",
-               builtin->data);
-        aoStrRelease(builtin);
-        return;
-    }
+    /* the prelude and the runtime (the stdlib is modules, read when
+     * imported) */
     Lexer *l = (Lexer *)malloc(sizeof(Lexer));
     lexInit(l, NULL, CCF_PRE_PROC);
     l->cc = cc; /* lex-time raises route through diagnostics, not exit */
     lexSetBuiltinRoot(l, ctx->root_dir);
-    lexPushFile(l, builtin);
+    lexPushRuntime(l);
+    lexPushPrelude(l);
 
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
@@ -730,6 +727,139 @@ static u32 lspDocId(LspCtx *ctx, const char *uri) {
     return doc_id;
 }
 
+/* ---- modules ----
+ * `prefix.name` where `prefix` is one of the document's imports means the
+ * module's `a.b.name`. The imports are read from the document's text: the
+ * lexer that loaded the modules is gone by the time a request runs. */
+
+/* The module path `import a.b;` (prefix b) or `import x = a.b;` (prefix
+ * x) in `text` gives `recv`; NULL if no import does */
+static char *lspImportPath(AoStr *text, const char *recv, size_t rlen) {
+    const char *s = text->data, *end = s + text->len;
+    while (s < end) {
+        const char *eol = memchr(s, '\n', end - s);
+        if (!eol) eol = end;
+        const char *p = s;
+        while (p < eol && isspace((unsigned char)*p)) p++;
+        if (eol - p > 7 && !memcmp(p, "import", 6) && isspace((unsigned char)p[6])) {
+            const char *w[2];
+            size_t wl[2];
+            int nw = 0, alias = 0;
+            p += 6;
+            while (p < eol && nw < 2) {
+                while (p < eol && isspace((unsigned char)*p)) p++;
+                if (p < eol && *p == '=') { alias = 1; p++; continue; }
+                const char *q = p;
+                while (q < eol && (lspIsIdentChar(*q) || *q == '.')) q++;
+                if (q == p) break;
+                w[nw] = p;
+                wl[nw++] = q - p;
+                p = q;
+            }
+            const char *path = NULL, *prefix = NULL;
+            size_t path_len = 0, prefix_len = 0;
+            if (alias && nw == 2) {
+                prefix = w[0]; prefix_len = wl[0];
+                path = w[1]; path_len = wl[1];
+            } else if (!alias && nw >= 1) {
+                path = w[0]; path_len = wl[0];
+                prefix = path;
+                for (size_t i = 0; i < path_len; ++i) {
+                    if (path[i] == '.') prefix = path + i + 1;
+                }
+                prefix_len = path + path_len - prefix;
+            }
+            if (path && prefix_len == rlen && !memcmp(prefix, recv, rlen)) {
+                return mprintf("%.*s", (int)path_len, path);
+            }
+        }
+        s = eol + 1;
+    }
+    return NULL;
+}
+
+/* `recv.name` at the cursor with `recv` an import prefix: "a.b.name",
+ * `name` running to the cursor with prefix_only (completion) or to its
+ * end; the module path in *_path. NULL otherwise. */
+static char *lspModuleRefAt(AoStr *text, int line, int character,
+                            int prefix_only, char **_path)
+{
+    const char *s = text->data;
+    size_t n = text->len, i = 0;
+    for (int l = 0; l < line && i < n; ++i) {
+        if (s[i] == '\n') l++;
+    }
+    size_t line_start = i, line_end = i;
+    while (line_end < n && s[line_end] != '\n') line_end++;
+    size_t pos = line_start + (size_t)character;
+    if (pos > line_end) pos = line_end;
+    size_t start = pos, end = pos;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    if (!prefix_only) {
+        while (end < line_end && lspIsIdentChar(s[end])) end++;
+    }
+    if (start <= line_start || s[start - 1] != '.') return NULL;
+    size_t r_end = start - 1, r_start = r_end;
+    while (r_start > line_start && lspIsIdentChar(s[r_start - 1])) r_start--;
+    if (r_start == r_end) return NULL;
+    char *path = lspImportPath(text, s + r_start, r_end - r_start);
+    if (!path) return NULL;
+    if (_path) *_path = path;
+    return mprintf("%s.%.*s", path, (int)(end - start), s + start);
+}
+
+/* A module's value `a.b.name`: a function or global, or an `_extern`
+ * binding to an asm label (mem.alloc), which lives in asm_funcs */
+static Ast *lspModuleValue(LspCtx *ctx, const char *qual) {
+    Ast *entry = mapGet(ctx->cc->global_env, (char *)qual);
+    return entry ? entry : mapGet(ctx->cc->asm_funcs, (char *)qual);
+}
+
+/* A module's function is named by its symbol: show `a.b.name` */
+static char *lspModuleFnString(Ast *fn, const char *qual) {
+    char *str = astFunctionToString(fn);
+    char *at = fn->fname ? strstr(str, fn->fname->data) : NULL;
+    if (!at) return str;
+    return mprintf("%.*s%s%s", (int)(at - str), str, qual,
+                   at + fn->fname->len);
+}
+
+/* A method: the function `Class.name` whose first parameter is its
+ * const `self` */
+static int lspIsMethod(Ast *fn) {
+    if (!lspIsFn(fn) || !fn->params || fn->params->size == 0) return 0;
+    Ast *self = fn->params->entries[0];
+    return self && self->kind == AST_LVAR && self->lname &&
+           !strcmp(self->lname->data, "self") && (self->flags & AST_FLAG_CONST);
+}
+
+/* The method `name` of `cls` or of the nearest class it inherits from */
+static Ast *lspFindMethod(LspCtx *ctx, AstType *cls, const char *name,
+                          s64 len, AstType **owner) {
+    for (AstType *t = cls; t; t = t->base_cls) {
+        if (!t->clsname) continue;
+        Ast *fn = mapGet(ctx->cc->global_env,
+                         mprintf("%s.%.*s", t->clsname->data, (int)len, name));
+        if (fn && lspIsMethod(fn)) {
+            if (owner) *owner = t;
+            return fn;
+        }
+    }
+    return NULL;
+}
+
+/* `i64 User.older(i64 years)`: the method's signature without `self` */
+static char *lspMethodString(Ast *fn, AstType *owner, const char *name) {
+    char *str = lspModuleFnString(fn, mprintf("%s.%s", owner->clsname->data, name));
+    char *open = strchr(str, '(');
+    char *self = open ? strstr(open, "self") : NULL;
+    if (!self) return str;
+    char *rest = self + 4;
+    if (*rest == ',') rest++;
+    while (*rest == ' ') rest++;
+    return mprintf("%.*s%s", (int)(open + 1 - str), str, rest);
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -750,15 +880,35 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
      * then a macro. */
     AoStr *rendered = aoStrNew();
     int is_member = 0;
-    AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
+    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = qual ? NULL
+                  : lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
-    if (is_member) {
-        AstType *f = mcls ? mapGetLen(mcls->fields, ident, ilen) : NULL;
+    if (qual) {
+        Ast *entry = lspModuleValue(ctx, qual);
+        AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
+        if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
+        if (entry && lspIsFn(entry)) {
+            aoStrCatPrintf(rendered, "%s", lspModuleFnString(entry, qual));
+        } else if (entry && entry->type) {
+            aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type), qual);
+        } else if (ty) {
+            AoStr *body = astClassToAoStr(ty);
+            aoStrCatLen(rendered, body->data, body->len);
+            aoStrRelease(body);
+        }
+    } else if (is_member) {
+        AstType *f = (mcls && mcls->fields) ? mapGetLen(mcls->fields, ident, ilen) : NULL;
+        AstType *owner = NULL;
+        Ast *method = (mcls && !f) ? lspFindMethod(ctx, mcls, ident, ilen, &owner)
+                                   : NULL;
         if (f && mcls->clsname)
             aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(f),
                            mcls->clsname->data, ident);
         else if (f)
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(f), ident);
+        else if (method)
+            aoStrCatPrintf(rendered, "%s", lspMethodString(method, owner, ident));
     } else {
         int in_doc = 0;
         Ast *entry = lspResolveValue(ctx, doc_id, line + 1, ident, ilen,
@@ -798,12 +948,15 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
 }
 
 static const char *lsp_keywords[] = {
-    "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64", "F64", "U0",
-    "Bool",  "break", "case", "class", "default", "do", "else", "extern",
-    "_extern", "for", "goto", "if", "public", "return", "sizeof", "static",
+    "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64",
+    "void", "bool",
+    "break", "case", "default", "do", "else", "extern",
+    "_extern", "for", "goto", "if", "return", "sizeof", "static",
     "switch", "union", "while",
-    /* Added */
-    "auto", "continue", "typeof", "F32", "alignof",
+    "auto", "continue", "typeof", "alignof",
+    "true", "false", "null",
+    "struct", "pub", "private", "const", "enum", "defer",
+    "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -880,6 +1033,11 @@ void lspScanMapForSuggestion(Map *suggestions,
         const char *name = (const char *)mi.node->key;
         if (strncmp(name, prefix, plen) != 0) continue;
         Ast *entry = (Ast *)mi.node->value;
+        /* a method is completed after `u.`, not on its own */
+        if (lsp_suggestion_resolver == lspGlobalSuggestionResolver &&
+            lspIsMethod(entry)) {
+            continue;
+        }
         int type = 0;
         char *str_suggestion = lsp_suggestion_resolver(entry, &type);
         lspCatCompletion(body, &emitted, name, type, str_suggestion);
@@ -917,6 +1075,8 @@ static void lspCatLocal(AoStr *body, int *emitted, Vec *seen, Ast *v,
 {
     if (v && v->kind == AST_DECL && v->declvar) v = v->declvar;
     if (v == NULL || v->kind != AST_LVAR || v->lname == NULL) return;
+    /* hidden locals (`nums#len`, a call's `#va0`) can't be named */
+    if (memchr(v->lname->data, '#', v->lname->len)) return;
     if (v->lname->len < plen || strncmp(v->lname->data, prefix, plen) != 0)
         return;
     if (lspNameSeen(seen, v->lname->data, v->lname->len)) return;
@@ -956,6 +1116,23 @@ static void lspCompleteLocals(LspCtx *ctx, u32 doc_id, int cursor_line,
     vecRelease(seen);
 }
 
+/* A `private` field is seen only from its module: the directory of the
+ * file it is declared in */
+static int lspFieldVisible(LspCtx *ctx, AstType *f, u32 doc_id) {
+    if (!f || !f->private_module) return 1;
+    AoStr *fpath = cctrlLookUpFile(ctx->cc, f->file_id);
+    AoStr *dpath = cctrlLookUpFile(ctx->cc, doc_id);
+    if (!fpath || !dpath) return 0;
+    char fabs[PATH_MAX], dabs[PATH_MAX];
+    const char *fp = realpath(fpath->data, fabs) ? fabs : fpath->data;
+    const char *dp = realpath(dpath->data, dabs) ? dabs : dpath->data;
+    const char *fslash = strrchr(fp, '/');
+    const char *dslash = strrchr(dp, '/');
+    int flen = fslash ? (int)(fslash - fp) : 0;
+    int dlen = dslash ? (int)(dslash - dp) : 0;
+    return flen == dlen && !strncmp(fp, dp, flen);
+}
+
 static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -982,6 +1159,41 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                      .capacity = 0 };
     u32 doc_id = cctrlRegisterFile(ctx->cc, &path_s);
     free(doc_path);
+    /* `prefix.` of an import: the module's pub names */
+    char *mod_path = NULL;
+    if (lspModuleRefAt(text, line, character, 1, &mod_path)) {
+        AoStr *mbody = aoStrNew();
+        aoStrCatPrintf(mbody, "{\"isIncomplete\":false,\"items\":[");
+        int memitted = 0;
+        size_t mlen = strlen(mod_path);
+        SetIter it;
+        setIterInit(ctx->cc->pub_names, &it);
+        char *qn;
+        while ((qn = setNext(&it)) != NULL) {
+            if (strncmp(qn, mod_path, mlen) || qn[mlen] != '.') continue;
+            const char *name = qn + mlen + 1;
+            if (strchr(name, '.') || strncmp(name, prefix, plen)) continue;
+            Ast *entry = lspModuleValue(ctx, qn);
+            int kind = KTM_LSP_CLASS;
+            const char *detail = NULL;
+            if (entry && lspIsFn(entry)) {
+                kind = KTM_LSP_FUNCTION;
+                detail = lspModuleFnString(entry, qn);
+            } else if (entry) {
+                kind = (entry->flags & AST_FLAG_CONST) ? KTM_LSP_CONSTANT
+                                                      : KTM_LSP_VARIABLE;
+                detail = entry->type ? astTypeToString(entry->type) : NULL;
+            }
+            lspCatCompletion(mbody, &memitted, name, kind, detail);
+        }
+        aoStrCatPrintf(mbody, "]}");
+        lspRespond(id, mbody->data);
+        aoStrRelease(mbody);
+        lspLog(ctx, "lsp: module completion '%s.%s' -> %d item(s)",
+               mod_path, prefix, memitted);
+        return;
+    }
+
     int is_member = 0;
     AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
@@ -996,10 +1208,33 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                 const char *fname = (const char *)mi.node->key;
                 if (strncmp(fname, prefix, plen) != 0) continue;
                 AstType *ft = (AstType *)mi.node->value;
+                if (!lspFieldVisible(ctx, ft, doc_id)) continue;
                 int kind = (ft && ft->kind == AST_TYPE_FUNC)
                          ? KTM_LSP_FUNCTION : KTM_LSP_FIELD;
                 lspCatCompletion(mbody, &memitted, fname, kind,
                                  ft ? astTypeToString(ft) : NULL);
+            }
+        }
+        /* then its methods and the ones it inherits (a hidden base
+         * method is listed once, as the derived one) */
+        for (AstType *t = mcls; t; t = t->base_cls) {
+            if (!t->clsname) continue;
+            size_t clen = t->clsname->len;
+            MapIter gi;
+            mapIterInit(ctx->cc->global_env, &gi);
+            while (mapIterNext(&gi)) {
+                const char *key = (const char *)gi.node->key;
+                if (strncmp(key, t->clsname->data, clen) || key[clen] != '.') continue;
+                const char *mname = key + clen + 1;
+                if (strchr(mname, '.') || strncmp(mname, prefix, plen)) continue;
+                Ast *fn = (Ast *)gi.node->value;
+                AstType *owner = NULL;
+                if (!lspIsMethod(fn) ||
+                    lspFindMethod(ctx, mcls, mname, strlen(mname), &owner) != fn) {
+                    continue;
+                }
+                lspCatCompletion(mbody, &memitted, mname, KTM_LSP_FUNCTION,
+                                 lspMethodString(fn, owner, mname));
             }
         }
         aoStrCatPrintf(mbody, "]}");
@@ -1222,12 +1457,21 @@ static AstType *lspMemberClassAt(LspCtx *ctx, AoStr *text, u32 doc_id,
               ? lspCanonicalClass(ctx, r->type->rettype) : NULL;
         else
             ty = lspCanonicalClass(ctx, r->type);
+    } else if (kinds[0] == KTM_LSP_SEG_PLAIN) {
+        /* `User.describe`: a method named through its type */
+        ty = mapGet(ctx->cc->clsdefs, chain[0]);
+        if (!ty) ty = mapGet(ctx->cc->uniondefs, chain[0]);
     }
     for (int seg = 1; seg < nseg && ty && ty->fields; ++seg) {
         AstType *f = (AstType *)mapGetLen(ty->fields, chain[seg],
                 (s64)strlen(chain[seg]));
         if (f && kinds[seg] == KTM_LSP_SEG_CALL)
             f = f->rettype; /* fn-pointer field call */
+        if (!f && kinds[seg] == KTM_LSP_SEG_CALL) {
+            /* `u.me().x`: a method call, typed by its return type */
+            Ast *m = lspFindMethod(ctx, ty, chain[seg], strlen(chain[seg]), NULL);
+            if (m && m->type) f = m->type->rettype;
+        }
         ty = f ? lspCanonicalClass(ctx, f) : NULL;
     }
     return (ty && ty->fields) ? ty : NULL;
@@ -1400,14 +1644,38 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
      * The canonical class AstTypes are shared with clsdefs, so fields
      * carry the provenance stamped at parse. */
     int is_member = 0;
-    AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
-                                     &is_member);
-    if (mcls) {
+    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = NULL;
+    if (qual) {
+        /* `prefix.name`: the module's declaration, in its own file */
+        Ast *entry = lspModuleValue(ctx, qual);
+        AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
+        if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
+        is_member = 1;
+        if (entry) {
+            def_line = entry->line;
+            def_col = entry->col;
+            def_file = entry->file_id;
+        } else if (ty) {
+            def_line = ty->line;
+            def_col = ty->col;
+            def_file = ty->file_id;
+        }
+    } else {
+        mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
+                                &is_member);
+    }
+    if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);
+        Ast *method = field ? NULL : lspFindMethod(ctx, mcls, ident, ilen, NULL);
         if (field && field->line > 0) {
             def_line = field->line;
             def_col = field->col;
             def_file = field->file_id;
+        } else if (method && method->line > 0) {
+            def_line = method->line;
+            def_col = method->col;
+            def_file = method->file_id;
         }
     }
 
@@ -1672,6 +1940,22 @@ static LspRenameTarget lspRenameTargetAt(LspCtx *ctx,
 {
     LspRenameTarget tg = {0};
 
+    /* `prefix.name` of an import: the module's `a.b.name` */
+    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    if (qual) {
+        Ast *entry = lspModuleValue(ctx, qual);
+        AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
+        if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
+        if (entry) {
+            tg.kind = KTM_LSP_RENAME_VALUE;
+            tg.value = entry;
+        } else if (ty) {
+            tg.kind = KTM_LSP_RENAME_TYPE;
+            tg.type = ty;
+        }
+        return tg;
+    }
+
     if (lspFieldDeclAt(ctx, doc_id, line + 1, character, ident, ilen,
                        &tg.cls, &tg.field)) {
         tg.kind = KTM_LSP_RENAME_FIELD;
@@ -1713,8 +1997,20 @@ static LspRenameTarget lspRenameTargetAt(LspCtx *ctx,
     return tg;
 }
 
+/* A file of the installed standard library: its modules (prelude and rt
+ * among them), or an old header in the include root */
 static int lspPathInStdlib(LspCtx *ctx, const char *path) {
-    return path && strncmp(path, ctx->root_dir, strlen(ctx->root_dir)) == 0;
+    if (!path) return 0;
+    if (!strncmp(path, ctx->root_dir, strlen(ctx->root_dir))) return 1;
+    if (!ctx->std_dir) return 0;
+    if (!strncmp(path, ctx->std_dir, strlen(ctx->std_dir))) return 1;
+    /* the same directory spelled another way (a relative --install-dir) */
+    char *real = realpath(path, NULL), *std = realpath(ctx->std_dir, NULL);
+    size_t sl = std ? strlen(std) : 0;
+    int in = real && std && !strncmp(real, std, sl) && real[sl] == '/';
+    free(real);
+    free(std);
+    return in;
 }
 
 static int lspValidNewName(const char *s) {
@@ -1796,6 +2092,45 @@ static AoStr *lspTextForPath(LspCtx *ctx, const char *path,
     return text;
 }
 
+/* `module a.b;` at the top of `text`: "a.b", else NULL */
+static char *lspDocModule(AoStr *text) {
+    const char *s = text->data, *end = s + text->len;
+    while (s < end) {
+        const char *eol = memchr(s, '\n', end - s);
+        if (!eol) eol = end;
+        const char *p = s;
+        while (p < eol && isspace((unsigned char)*p)) p++;
+        if (eol - p > 7 && !memcmp(p, "module", 6) && isspace((unsigned char)p[6])) {
+            p += 6;
+            while (p < eol && isspace((unsigned char)*p)) p++;
+            const char *q = p;
+            while (q < eol && (lspIsIdentChar(*q) || *q == '.')) q++;
+            return q > p ? mprintf("%.*s", (int)(q - p), p) : NULL;
+        }
+        s = eol + 1;
+    }
+    return NULL;
+}
+
+/* What a module's name at `o` is, when it is one: `prefix.name` of an
+ * import, or a bare name in one of the module's own files */
+static void *lspOccurrenceModuleName(LspCtx *ctx, AoStr *text,
+                                     LspOccurrence *o, const char *name,
+                                     s64 nlen, int want_type)
+{
+    char *qual = NULL;
+    if (o->member) {
+        qual = lspModuleRefAt(text, o->line, o->col, 0, NULL);
+    } else {
+        char *mod = lspDocModule(text);
+        if (mod) qual = mprintf("%s.%.*s", mod, (int)nlen, name);
+    }
+    if (!qual) return NULL;
+    if (!want_type) return lspModuleValue(ctx, qual);
+    AstType *ty = mapGet(ctx->cc->clsdefs, qual);
+    return ty ? ty : mapGet(ctx->cc->uniondefs, qual);
+}
+
 /* Does occurrence `o` (in `text`, registered as `doc_id`) actually
  * refer to the target? The semantic filter shared by rename,
  * references and documentHighlight. */
@@ -1805,10 +2140,15 @@ static int lspOccurrenceMatches(LspCtx *ctx, LspRenameTarget *tg,
 {
     int in_doc = 0, is_member = 0;
     switch (tg->kind) {
-    case KTM_LSP_RENAME_VALUE:
-        if (o->member || o->hash) return 0;
-        return lspResolveValue(ctx, doc_id, o->line + 1, name, nlen,
-                               &in_doc) == tg->value;
+    case KTM_LSP_RENAME_VALUE: {
+        if (o->hash) return 0;
+        if (!o->member) {
+            Ast *v = lspResolveValue(ctx, doc_id, o->line + 1, name, nlen,
+                                     &in_doc);
+            if (v) return v == tg->value;
+        }
+        return lspOccurrenceModuleName(ctx, text, o, name, nlen, 0) == tg->value;
+    }
     case KTM_LSP_RENAME_FIELD:
         if (o->hash) return 0;
         if (doc_id == tg->field->file_id &&
@@ -1819,9 +2159,16 @@ static int lspOccurrenceMatches(LspCtx *ctx, LspRenameTarget *tg,
         return lspMemberClassAt(ctx, text, doc_id, o->line, o->col,
                                 &is_member) == tg->cls;
     case KTM_LSP_RENAME_TYPE:
+        if (o->hash) return 0;
+        /* a module's type, `geo.Point` or `Point` in geo's files */
+        if (lspOccurrenceModuleName(ctx, text, o, name, nlen, 1) == tg->type)
+            return 1;
+        /* any other spelling of a module's type is another type */
+        if (tg->type->clsname && strchr(tg->type->clsname->data, '.'))
+            return 0;
         /* A same-named VALUE in scope shadows the type reading -
          * `Foo p;` never resolves as a value, a local `Foo` does. */
-        return !o->member && !o->hash &&
+        return !o->member &&
                lspResolveValue(ctx, doc_id, o->line + 1, name, nlen,
                                &in_doc) == NULL;
     case KTM_LSP_RENAME_MACRO:
@@ -2283,6 +2630,7 @@ int lspRun(CliArgs *args) {
     ctx->log_on = getenv("KTM_LSP_LOG") != NULL;
     ctx->target = args->target;
     ctx->root_dir = mprintf("%s/include/", args->install_dir);
+    ctx->std_dir = mprintf("%s/modules/", args->install_dir);
     ctx->docs = mapNew(16, &map_cstring_opaque_type);
     ctx->pending = vecNew(&vec_cstring_owned_type);
     ctx->cc = lspFreshCctrl(ctx);

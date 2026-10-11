@@ -69,14 +69,215 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
     return type;
 }
 
+/* Words that are keywords though the lexer gives them as identifiers
+ * (they mean something only where the parser looks for them): none of
+ * them can name a variable, parameter or declaration */
+int parseIsReservedName(char *s, int len) {
+    static const char *words[] = {"fn", "self", "module", "import", "fallthrough"};
+    for (u64 i = 0; i < sizeof(words) / sizeof(words[0]); ++i) {
+        if ((int)strlen(words[i]) == len && !memcmp(words[i], s, len)) return 1;
+    }
+    return 0;
+}
+
+/* `tok`, about to name something, isn't one of those keywords: 1 (and
+ * reported) when it is */
+int parseCheckNotReserved(Cctrl *cc, Lexeme *tok) {
+    if (tok && tok->tk_type == TK_IDENT && parseIsReservedName(tok->start, tok->len)) {
+        cctrlErrorAt(cc, tok->line, tok->col, tok->len,
+                     "`%.*s` is a keyword: it can't be a name", tok->len, tok->start);
+        return 1;
+    }
+    return 0;
+}
+
+/* `fn`, a keyword the lexer gives as an identifier: is `tok` it? */
+int tokenIsFnIdent(Lexeme *tok) {
+    return tok && tok->tk_type == TK_IDENT && tok->len == 2 &&
+           tok->start[0] == 'f' && tok->start[1] == 'n';
+}
+
+/* Can `tok` start an fn type: `fn`, or the `(` of the parenthesised
+ * `(fn(...) R)` (to which a `*` after it applies)? */
+int tokenMayStartFnType(Lexeme *tok) {
+    return tokenIsFnIdent(tok) || tokenPunctIs(tok,'(');
+}
+
+/* Does the current, unconsumed token start an fn type: `fn`, or the `(`
+ * of `(fn(...) R)`? `fn` is a keyword, so it always does. Never
+ * consumes. */
+int parseFnStartsType(Cctrl *cc) {
+    Lexeme *tok = cctrlTokenPeek(cc);
+    if (tokenIsFnIdent(tok)) return 1;
+    if (!tokenPunctIs(tok, '(')) return 0;
+    cctrlTokenGet(cc);
+    int result = tokenIsFnIdent(cctrlTokenPeek(cc));
+    cctrlTokenRewind(cc);
+    return result;
+}
+
+/* At a declaration/expression-statement fork, `fn` goes to the
+ * declaration side (a malformed one gets parseBaseDeclSpec's error) */
+int parseFnLooksLikeType(Cctrl *cc) {
+    return parseFnStartsType(cc);
+}
+
+static int parseIsVarArgElemType(AstType *t);
+Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var);
+
+/* The two hidden parameters of `T ...name` (elem NULL: `...name`, 64-bit
+ * slots): the count `name#len` and `name`, a pointer to the caller's
+ * array of the extras, flagged AST_FLAG_VARARGS. */
+static void parseVarArgsPair(Vec *params, AstType *elem, char *name, int len,
+                             Ast **_count, Ast **_data)
+{
+    if (!elem) {
+        elem = astTypeCopy(ast_int_type);
+        elem->has_var_args = 1;
+    }
+    AoStr *len_name = aoStrPrintf("%.*s#len", len, name);
+    Ast *count = astLVar(astTypeCopy(ast_int_type), len_name->data,
+                         len_name->len);
+    Ast *data = astLVar(astMakePointerType(elem), name, len);
+    data->flags |= AST_FLAG_VARARGS;
+    vecPush(params, count);
+    vecPush(params, data);
+    if (_count) *_count = count;
+    if (_data) *_data = data;
+}
+
+/* The parameter TYPES of an `fn(...)` type: `[type {, type}] [, ...]`,
+ * an optional, ignored name after each type. Not `parseParams`: that
+ * registers names, varargs' argc/argv and defaults into the current
+ * scope, which a type (not a real parameter list) must not do. */
+static Vec *parseFnTypeParams(Cctrl *cc, int *has_var_args) {
+    Vec *params = astVecNew();
+    *has_var_args = 0;
+
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (tokenPunctIs(tok,')')) {
+        return params;
+    }
+    cctrlTokenRewind(cc);
+
+    while (1) {
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            cctrlTokenGet(cc);
+            /* `...name`: the untyped named form (as `fn(u8 *, ...args)`) */
+            Lexeme *name = cctrlTokenPeek(cc);
+            if (name && name->tk_type == TK_IDENT) {
+                cctrlTokenGet(cc);
+                parseVarArgsPair(params, NULL, name->start, name->len, NULL, NULL);
+                cctrlTokenExpect(cc,')');
+                return params;
+            }
+            *has_var_args = 1;
+            /* The argument-count check (parseFunctionArgumentCheck) finds
+             * the vararg point by looking for an AST_VAR_ARGS entry in
+             * params, not just the has_var_args flag; unlike parseParams,
+             * its argc/argv are not registered anywhere (there is no
+             * real function body here to bind them in). */
+            vecPush(params, astVarArgs());
+            cctrlTokenExpect(cc,')');
+            return params;
+        }
+        AstType *type = parseDeclSpec(cc);
+        /* `T ...` (a name may follow): the typed named form */
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            Lexeme *ell = cctrlTokenGet(cc);
+            if (!parseIsVarArgElemType(type)) {
+                cctrlRaiseExceptionAt(cc, ell->line, ell->col, 3,
+                    "the elements of `...` must be numbers or pointers, got %s",
+                    astTypeToString(type));
+            }
+            Lexeme *name = cctrlTokenPeek(cc);
+            if (name && name->tk_type == TK_IDENT) {
+                cctrlTokenGet(cc);
+                parseVarArgsPair(params, type, name->start, name->len, NULL, NULL);
+            } else {
+                parseVarArgsPair(params, type, "_", 1, NULL, NULL);
+            }
+            cctrlTokenExpect(cc,')');
+            return params;
+        }
+        type = parseArrayDimensions(cc,type);
+        if (type->kind == AST_TYPE_ARRAY) {
+            type = astMakePointerType(type->ptr);
+        }
+        /* An optional parameter name, ignored, then an optional
+         * default, filled in by a call through it that leaves the
+         * argument out, as for `T (*f)(T x = 1)` */
+        Lexeme *maybe_name = cctrlTokenPeek(cc);
+        if (maybe_name && maybe_name->tk_type == TK_IDENT) {
+            cctrlTokenGet(cc);
+        }
+        Ast *param = astLVar(type,"_unknown",7);
+        if (tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+            cctrlTokenGet(cc);
+            param = parseDefaultFunctionParam(cc,param);
+        }
+        vecPush(params, param);
+
+        tok = cctrlTokenGet(cc);
+        if (tokenPunctIs(tok,')')) {
+            return params;
+        }
+        if (!tokenPunctIs(tok,',')) {
+            cctrlRaiseException(cc,
+                    "Expected `,` or `)` in `fn(...)`'s parameter list, got `%s`",
+                    lexemeAsWritten(tok));
+        }
+    }
+}
+
+/* `fn ( [type {, type}] [, ...] ) RetType`. Entry: the current,
+ * unconsumed token is the identifier `fn`. RetType is any type,
+ * including another `fn` type, and a `*` after it is part of it:
+ * `fn(u8 *) u8 *` returns a u8 *. A pointer to a function pointer
+ * puts the fn type in parentheses, `(fn(i64) i64) *slot` (see
+ * parseBaseDeclSpec). */
+AstType *parseFnType(Cctrl *cc) {
+    cctrlTokenGet(cc); /* `fn` */
+    Lexeme *open = cctrlTokenGet(cc);
+    if (!tokenPunctIs(open,'(')) {
+        cctrlRaiseException(cc,"Expected `(` after `fn`, got `%s`",
+                lexemeAsWritten(open));
+    }
+
+    int has_var_args = 0;
+    Vec *params = parseFnTypeParams(cc,&has_var_args);
+
+    Lexeme *ret_peek = cctrlTokenPeek(cc);
+    if (!ret_peek || (!cctrlTokIsKeyword(cc, ret_peek) &&
+                       !tokenIsFnIdent(ret_peek)))
+    {
+        cctrlRaiseException(cc,
+                "Expected a return type after `fn(...)`, got `%s`",
+                ret_peek ? lexemeAsWritten(ret_peek) : "end of input");
+    }
+    AstType *rettype = parsePointerType(cc,parseBaseDeclSpec(cc));
+
+    AstType *fn_type = astMakeFunctionType(rettype,params);
+    fn_type->has_var_args = has_var_args;
+    return fn_type;
+}
+
 AstType *parseFunctionPointerType(Cctrl *cc,
                                   char **fnptr_name,
                                   int *fnptr_name_len,
                                   AstType *rettype)
 {
-    int has_var_args;
+    int has_var_args, depth = 0;
     Lexeme *fname;
+    Lexeme *star = cctrlTokenPeek(cc);
+    s64 star_line = star ? star->line : 0, star_col = star ? star->col : 0;
     cctrlTokenExpect(cc,'*');
+    /* `T (**name)(params)`: a pointer to a function pointer, one more
+     * pointer for each further `*` */
+    while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+        cctrlTokenGet(cc);
+        depth++;
+    }
     fname = cctrlTokenGetRequired(cc);
     if (fname->tk_type != TK_IDENT) {
         /* `T (*)(params)`: report it at the token in place of the name
@@ -109,10 +310,20 @@ AstType *parseFunctionPointerType(Cctrl *cc,
     /* An array of function pointers `T (*name[N])(params)`: the element
      * type is filled in with the parameters once they are parsed. */
     AstType *fn_type = astMakeFunctionType(rettype, NULL);
-    AstType *type = parseArrayDimensions(cc,fn_type);
+    AstType *elem = fn_type;
+    for (int i = 0; i < depth; ++i) elem = astMakePointerType(elem);
+    AstType *type = parseArrayDimensions(cc,elem);
     cctrlTokenExpect(cc,')');
     cctrlTokenExpect(cc,'(');
     fn_type->params = parseParams(cc,')',&has_var_args,0);
+    fn_type->has_var_args = has_var_args;
+    /* the old C declarator `T (*name)(params)` (a nameless one has had
+     * its error: one per declarator) */
+    if (*fnptr_name_len > 0) {
+        cctrlErrorAt(cc, star_line, star_col - 1, 2,
+            "a C function-pointer declarator: write `%s %.*s`",
+            astTypeToString(type), *fnptr_name_len, *fnptr_name);
+    }
     return type;
 }
 
@@ -127,8 +338,10 @@ Ast *parseFunctionPointer(Cctrl *cc, AstType *rettype) {
             &fnptr_name_len,
             rettype);
 
-    /* An array of function pointers is an ordinary variable */
-    if (fnptr_type->kind == AST_TYPE_ARRAY) {
+    /* An array of function pointers, or a pointer to one, is an
+     * ordinary variable */
+    if (fnptr_type->kind == AST_TYPE_ARRAY ||
+        fnptr_type->kind == AST_TYPE_POINTER) {
         ast = astLVar(fnptr_type,fnptr_name,fnptr_name_len);
         return ast;
     }
@@ -152,6 +365,63 @@ Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var) {
     return astFunctionDefaultParam(var,init);
 }
 
+/* Whether a `T ...name` element type fits the caller's array: a number
+ * or a pointer (also an enum or an intrinsic class), not a struct */
+static int parseIsVarArgElemType(AstType *t) {
+    if (!t) return 0;
+    switch (t->kind) {
+        case AST_TYPE_INT: case AST_TYPE_CHAR: case AST_TYPE_FLOAT:
+        case AST_TYPE_POINTER: case AST_TYPE_FUNC:
+            return 1;
+        case AST_TYPE_CLASS:
+            return t->is_enum || t->is_intrinsic;
+        default:
+            return 0;
+    }
+}
+
+/* `T ...name` or `...name`, with the `...` just consumed (elem NULL for
+ * the untyped form): two hidden ordinary parameters, the count `name#len`
+ * (no source can name it) and `name`, a pointer to the caller's array of
+ * the extras (see parseVarArgsPack). Untyped elements are 64-bit slots
+ * like the old argv. Must be the last parameter. */
+static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
+                              Lexeme *ellipsis, s64 terminator, int store)
+{
+    int line = ellipsis->line, col = ellipsis->col;
+    Lexeme *name = cctrlTokenGet(cc);
+    if (!name || name->tk_type != TK_IDENT) {
+        cctrlRaiseExceptionAt(cc, line, col, 3,
+            "a variadic parameter needs a name, as in `i64 ...nums` or `...args`");
+    }
+    if (elem && !parseIsVarArgElemType(elem)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+            "the elements of `...%.*s` must be numbers or pointers, got %s",
+            name->len, name->start, astTypeToString(elem));
+    }
+    Ast *count, *data;
+    parseVarArgsPair(params, elem, name->start, name->len, &count, &data);
+    count->line = data->line = name->line;
+    count->col = data->col = name->col;
+    if (store) {
+        if (!mapAddOrErr(cc->localenv, data->lname->data, data)) {
+            cctrlRaiseException(cc, "variable %s already declared",
+                                astLValueToString(data, 0));
+        }
+        mapAdd(cc->localenv, count->lname->data, count);
+    }
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, count);
+        listAppend(cc->tmp_locals, data);
+    }
+
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (!tokenPunctIs(tok, terminator)) {
+        cctrlRaiseExceptionAt(cc, line, col, 3,
+            "`...%.*s` must be the last parameter", name->len, name->start);
+    }
+}
+
 Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
     Vec *params = astVecNew();
 
@@ -171,7 +441,12 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
 
         /* VarArgs */
         if (tokenPunctIs(pname, TK_ELLIPSIS)) {
-            cctrlTokenGet(cc);
+            Lexeme ellipsis = *cctrlTokenGet(cc);
+            Lexeme *after = cctrlTokenPeek(cc);
+            if (after && after->tk_type == TK_IDENT) {
+                parseNamedVarArgs(cc, params, NULL, &ellipsis, terminator, store);
+                return params;
+            }
             var = astVarArgs();
             mapAdd(cc->localenv,var->argc->lname->data,var->argc);
             mapAdd(cc->localenv,var->argv->lname->data,var->argv);
@@ -188,6 +463,14 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             return params;
         }
 
+        int param_is_const = 0;
+        Lexeme *const_tok = cctrlTokenPeek(cc);
+        if (const_tok && const_tok->tk_type == TK_KEYWORD &&
+            const_tok->i64 == KW_CONST)
+        {
+            cctrlTokenGet(cc);
+            param_is_const = 1;
+        }
         type = parseDeclSpec(cc);
         int pinned_kind;
         AoStr *pinned_reg;
@@ -197,6 +480,11 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             cctrlRaiseException(cc,
                     "Unexpected end of input in parameter list");
         }
+        if (tokenPunctIs(pname, TK_ELLIPSIS)) {
+            Lexeme ellipsis = *pname;
+            parseNamedVarArgs(cc, params, type, &ellipsis, terminator, store);
+            return params;
+        }
 
         if (tokenPunctIs(pname, ')') && arg_count == 0) {
             if (type->kind == AST_TYPE_VOID) {
@@ -205,6 +493,7 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         }
 
         arg_count++;
+        /* a parameter may shadow an import prefix, see cctrlTokenGet */
         if (pname->tk_type != TK_IDENT) {
             /* Function pointer */
             if (tokenPunctIs(pname, '(')) {
@@ -276,13 +565,20 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         if (type->kind == AST_TYPE_ARRAY) {
             type = astMakePointerType(type->ptr);
         }
-        var = astLVar(type,pname->start,pname->len);
+        /* (a keyword as the name: reported, and the parameter nameless,
+         * so a method's `self` isn't "declared twice" as well) */
+        var = parseCheckNotReserved(cc, pname)
+            ? astLVar(type,"_unknown",7)
+            : astLVar(type,pname->start,pname->len);
         /* Anchor the param to its name token (astNew stamped whatever
          * token the parser had just consumed). */
         var->line = pname->line;
         var->col = pname->col;
         var->pinned_kind = pinned_kind;
         var->pinned_reg = pinned_reg;
+        if (param_is_const) {
+            var->flags |= AST_FLAG_CONST;
+        }
 
         tok = cctrlTokenGet(cc);
         if (tokenPunctIs(tok, '=')) {
@@ -327,6 +623,28 @@ AstType *parseBaseDeclSpec(Cctrl *cc) {
 
     if (!tok) {
         return NULL;
+    }
+
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
+    }
+
+    /* `(fn(...) R)`: the fn type itself, so a `*` after the `)`
+     * makes a pointer to the function pointer */
+    if (tokenPunctIs(tok,'(') && tokenIsFnIdent(cctrlTokenPeek(cc))) {
+        AstType *fn_type = parseFnType(cc);
+        cctrlTokenExpect(cc,')');
+        return fn_type;
+    }
+
+    if (tokenIsFnIdent(tok)) {
+        Lexeme *after_fn = cctrlTokenPeek(cc);
+        if (tokenPunctIs(after_fn,'(')) {
+            cctrlTokenRewind(cc);
+            return parseFnType(cc);
+        }
+        cctrlRaiseException(cc,"Expected `(` after `fn`, got `%s`",
+                after_fn ? lexemeAsWritten(after_fn) : "end of input");
     }
 
     if (tok->tk_type == TK_KEYWORD || tok->tk_type == TK_IDENT) {
@@ -382,38 +700,7 @@ static AstType *parseArrayDimensionsInternal(Cctrl *cc, AstType *base_type) {
         int ok = 1;
         dimension = evalIntConstExprOrErr(size, &ok);
 
-        if (!ok && (cc->flags & CCTRL_PASTE_DEFINES)) {
-            if (size->kind == AST_LVAR) {
-                dimension = -3;
-                type->clsname = size->lname;
-            } else if (astIsArithmetic(size,0)) {
-                /* Relent... otherwise this will get far too complicated for a
-                 * feature that likely will never be used */
-                Ast *left = size->left;
-                Ast *right = size->right;
-                AoStr *lname = NULL;
-                int literal;
-
-                if (left->kind == AST_LVAR && right->kind == AST_LITERAL) {
-                    literal = right->i64;
-                    lname = left->lname;
-                } else if (right->kind == AST_LVAR && left->kind == AST_LITERAL) {
-                    literal = left->i64;
-                    lname = right->lname;
-                } else {
-                    goto invalid_subscript;
-                }
-                
-                Lexeme *le = mapGet(cc->macro_defs,lname->data);
-                if (le->tk_type != TK_I64) {
-                    goto invalid_subscript;
-                }
-
-                dimension = literal + le->i64;
-            } else {
-                goto invalid_subscript;
-            }
-        } else if (!ok) {
+        if (!ok) {
             goto invalid_subscript;
         }
     }
@@ -459,6 +746,10 @@ void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type) {
         return;
     }
 
+    if (_tok->tk_type == TK_KEYWORD && _tok->i64 == KW_CONST) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
+    }
+
     if (_tok->tk_type != TK_IDENT) {
         cctrlTokenRewind(cc);
         *tok = NULL;
@@ -471,7 +762,17 @@ void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type) {
 
 Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
     Ast *decl;
-    if ((decl = mapGetLen(cc->global_env,fname,len)) != NULL) {
+    /* In a module, its own functions first */
+    char *qual = cctrlQualifyName(cc, fname, len);
+    if (qual && (decl = mapGet(cc->global_env, qual)) != NULL &&
+        (decl->kind == AST_FUNC || decl->kind == AST_EXTERN_FUNC ||
+         decl->kind == AST_FUN_PROTO))
+    {
+        return decl;
+    }
+    if (!cctrlModuleHides(cc, fname, len) &&
+        (decl = mapGetLen(cc->global_env,fname,len)) != NULL) {
+        cctrlCheckModuleAccess(cc, fname, len);
         if (decl->kind == AST_FUNC ||
             decl->kind == AST_EXTERN_FUNC ||
             decl->kind == AST_FUN_PROTO || decl->kind == AST_ASM_FUNC_BIND) {
@@ -485,8 +786,18 @@ Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
         if (decl->kind == AST_FUNPTR || decl->kind == AST_LVAR) {
             return decl;
         }
+        /* `fn(i64) i64 f = &D`: a function pointer parameter with a
+         * default is in scope as its AST_DEFAULT_PARAM */
+        if (decl->kind == AST_DEFAULT_PARAM && decl->declvar &&
+            decl->declvar->type->kind == AST_TYPE_FUNC) {
+            return decl->declvar;
+        }
     } else if ((decl = mapGetLen(cc->asm_funcs,fname,len)) != NULL) {
         /* Assembly function */
+        cctrlCheckModuleAccess(cc, fname, len);
+        return decl;
+    } else if (qual && (decl = mapGet(cc->asm_funcs, qual)) != NULL) {
+        /* a binding of the module itself (`_extern _x I32 stat(...)`) */
         return decl;
     }
     return NULL;
@@ -534,7 +845,7 @@ static ParseCallLoc parseCallLocStart(Cctrl *cc, char *fname, int len) {
     loc.col = tok->col;
     loc.len = tok->len;
     if (cc->lexer_ && tokenPunctIs(tok,'(')) {
-        char *line_buffer = lexerReportLine(cc->lexer_, tok->line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), tok->line);
         int end = tok->col - 1; /* index of the `(` */
         if (end <= (int)strlen(line_buffer)) {
             while (end > 0 && isspace((unsigned char)line_buffer[end - 1])) end--;
@@ -582,6 +893,206 @@ static void parseRaiseCallError(Cctrl *cc, ParseCallLoc *loc, char *fmt, ...) {
 }
 
 /* We use this to check function calls against their definitions reusably */
+/* How a call argument converts to its parameter's type, as in C:
+ * numbers convert to each other silently, 0 and null to any pointer,
+ * void * to and from any pointer; other pointer pairs and pointer/integer
+ * mixes warn (C's -Wincompatible-pointer-types / -Wint-conversion); a
+ * struct where another struct or a scalar is expected, or a scalar where
+ * a struct is, is an error. */
+typedef enum {
+    ARG_OK,
+    ARG_WARN_POINTER,     /* pointers to incompatible types */
+    ARG_WARN_PTR_TO_INT,  /* a pointer where an integer is expected */
+    ARG_WARN_INT_TO_PTR,  /* an integer where a pointer is expected */
+    ARG_ERROR,
+    ARG_FN_MISMATCH,      /* function pointers with different signatures */
+} ParseArgCompat;
+
+static int parseIsAggregateType(AstType *t) {
+    return t && (t->kind == AST_TYPE_CLASS || t->kind == AST_TYPE_UNION) &&
+           !t->is_intrinsic;
+}
+
+static int parseIsNumberType(AstType *t) {
+    return astIsIntType(t) || astIsFloatType(t) || astIsIntrinsicClass(t);
+}
+
+static int parseSameAggregate(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (a->kind != b->kind) return 0;
+    if (a->clsname && b->clsname) return aoStrCmp(a->clsname, b->clsname);
+    return 0;
+}
+
+/* Do pointers to e and to a point at compatible types? Integers of the
+ * same size match whatever their sign (C would only warn with
+ * -Wpointer-sign), function types match each other, and a byte pointer
+ * (U8 *, I8 *, Bool *) matches any number pointer, as in assignments
+ * (code walks raw buffers through them). */
+static int parsePointeeCompatible(AstType *e, AstType *a) {
+    if (!e || !a || e == a) return 1;
+    if (e->kind == AST_TYPE_VOID || a->kind == AST_TYPE_VOID) return 1;
+    if (e->kind == AST_TYPE_ARRAY) e = e->ptr;
+    if (a->kind == AST_TYPE_ARRAY) a = a->ptr;
+    if (parseIsNumberType(e) && parseIsNumberType(a) &&
+        (e->size == 1 || a->size == 1)) {
+        return 1;
+    }
+    if (astIsIntrinsicClass(e) && astIsIntType(a)) return e->size == a->size;
+    if (astIsIntrinsicClass(a) && astIsIntType(e)) return e->size == a->size;
+    if (astIsIntType(e) && astIsIntType(a)) return e->size == a->size;
+    if (astIsFloatType(e) && astIsFloatType(a)) return e->size == a->size;
+    if (e->kind == AST_TYPE_POINTER && a->kind == AST_TYPE_POINTER) {
+        /* void ** and T ** are not compatible in C, but code passes
+         * U0 ** for "any pointer's address" */
+        if (e->ptr && a->ptr &&
+            (e->ptr->kind == AST_TYPE_VOID || a->ptr->kind == AST_TYPE_VOID)) {
+            return 1;
+        }
+        return parsePointeeCompatible(e->ptr, a->ptr);
+    }
+    if (e->kind == AST_TYPE_FUNC && a->kind == AST_TYPE_FUNC) return 1;
+    if (parseIsAggregateType(e) && parseIsAggregateType(a)) {
+        /* a derived class starts with its base: `Derived *` is a
+         * `Base *`, for any base up the chain */
+        for (AstType *cls = a; cls; cls = cls->base_cls) {
+            if (parseSameAggregate(e, cls)) return 1;
+        }
+        return 0;
+    }
+    if (astIsIntrinsicClass(e) && astIsIntrinsicClass(a)) {
+        return e->size == a->size;
+    }
+    return 0;
+}
+
+static int parseIsNullConstant(Ast *arg) {
+    return arg && arg->kind == AST_LITERAL && astIsIntType(arg->type) &&
+           arg->i64 == 0;
+}
+
+static ParseArgCompat parseArgCompat(AstType *param, Ast *arg) {
+    AstType *p = param, *a = arg ? arg->type : NULL;
+    if (!p || !a) return ARG_OK;
+    if (p->kind == AST_TYPE_ARRAY) p = astConvertArray(p);
+    if (a->kind == AST_TYPE_ARRAY) a = astConvertArray(a);
+
+    /* A scoped enum parameter only takes the SAME enum without a cast:
+     * `2` and a different enum's member are both errors, reusing this
+     * same check (test 413's). */
+    if (p->kind == AST_TYPE_CLASS && p->is_enum) {
+        if (a->kind == AST_TYPE_CLASS && a->is_enum && p->clsname &&
+            a->clsname && aoStrCmp(p->clsname, a->clsname)) {
+            return ARG_OK;
+        }
+        return ARG_ERROR;
+    }
+
+    if (parseIsAggregateType(p) || parseIsAggregateType(a)) {
+        if (parseIsAggregateType(p) && parseIsAggregateType(a) &&
+            parseSameAggregate(p, a)) {
+            return ARG_OK;
+        }
+        return ARG_ERROR;
+    }
+
+    int p_ptr = p->kind == AST_TYPE_POINTER || p->kind == AST_TYPE_FUNC;
+    int a_ptr = a->kind == AST_TYPE_POINTER || a->kind == AST_TYPE_FUNC;
+
+    if (p_ptr) {
+        if (a_ptr) {
+            int p_void = p->kind == AST_TYPE_POINTER && p->ptr &&
+                         p->ptr->kind == AST_TYPE_VOID;
+            int a_void = a->kind == AST_TYPE_POINTER && a->ptr &&
+                         a->ptr->kind == AST_TYPE_VOID;
+            if (p_void || a_void) return ARG_OK;
+            if (astFnPtrMismatch(p, a)) return ARG_FN_MISMATCH;
+            if (p->kind == AST_TYPE_FUNC || a->kind == AST_TYPE_FUNC) {
+                return p->kind == a->kind ? ARG_OK : ARG_WARN_POINTER;
+            }
+            return parsePointeeCompatible(p->ptr, a->ptr) ? ARG_OK
+                                                          : ARG_WARN_POINTER;
+        }
+        if (parseIsNullConstant(arg)) return ARG_OK;
+        if (astIsIntType(a) || astIsIntrinsicClass(a)) return ARG_WARN_INT_TO_PTR;
+        if (astIsFloatType(a)) return ARG_ERROR;
+        return ARG_OK;
+    }
+
+    if (parseIsNumberType(p)) {
+        if (parseIsNumberType(a)) return ARG_OK;
+        if (a_ptr) {
+            /* Bool takes a pointer as C's _Bool does: 0 or 1, no cast */
+            if (p->kind == AST_TYPE_CHAR && p->is_bool) return ARG_OK;
+            if (astIsFloatType(p)) return ARG_ERROR;
+            return ARG_WARN_PTR_TO_INT;
+        }
+    }
+    return ARG_OK;
+}
+
+/* Warn about (or reject) argument i of a call, per parseArgCompat */
+static void parseCheckArgType(Cctrl *cc, AstType *type, Ast *arg, int i,
+                              char *fname, int len, ParseCallLoc *loc)
+{
+    ParseArgCompat compat = parseArgCompat(type, arg);
+    if (compat == ARG_OK) return;
+
+    char *expected = astTypeToColorString(type);
+    char *got = astTypeToColorString(arg->type);
+    char *why = "";
+    switch (compat) {
+        case ARG_WARN_PTR_TO_INT: why = ": makes an integer from a pointer without a cast"; break;
+        case ARG_WARN_INT_TO_PTR: why = ": makes a pointer from an integer without a cast"; break;
+        default: break;
+    }
+    ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
+                       ? loc->args->entries[i] : NULL;
+    if (compat == ARG_FN_MISMATCH) {
+        char *msg_expected = astTypeToString(type);
+        char *msg_actual = astTypeToString(arg->type);
+        if (at) {
+            cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                    "cannot convert %s to %s", msg_actual, msg_expected);
+        } else {
+            parseRaiseFnConvert(cc, type, arg->type);
+        }
+        return;
+    }
+    if (compat == ARG_ERROR) {
+        if (astIsEnumType(type)) {
+            char *actual = astTypeToString(arg->type);
+            if (at) {
+                cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                        "Cannot convert `%s` to enum `%s` without a cast",
+                        actual, type->clsname->data);
+            } else {
+                cctrlRaiseException(cc,
+                        "Cannot convert `%s` to enum `%s` without a cast",
+                        actual, type->clsname->data);
+            }
+            return;
+        }
+        if (at) {
+            cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
+                    "Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
+                    expected,got,len,fname);
+        } else {
+            cctrlRaiseException(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
+                    expected,got,len,fname);
+        }
+        return;
+    }
+    if (at) {
+        cctrlWarningAt(cc,at->line,at->col,at->len,
+                "Incompatible function argument, expected '%s' got '%s' in function '%.*s'%s",
+                expected,got,len,fname,why);
+    } else {
+        cctrlWarning(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'%s",
+                expected,got,len,fname,why);
+    }
+}
+
 static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fname, int len,
                                        ParseCallLoc *loc)
 {
@@ -589,6 +1100,42 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
     int param_count = params ? (int)params->size : 0;
     int arg_count = argv ? (int)argv->size : 0;
     int default_count = 0, required_count = 0, fixed_param_count = param_count;
+
+    /* A `T ...name` callee: its hidden (count, data) parameters always got
+     * arguments (parseVarArgsPack), so only the fixed ones can be missing;
+     * report the arguments as written */
+    if (param_count >= 2) {
+        Ast *last = params->entries[param_count - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            int fixed = param_count - 2, written = 0;
+            for (int i = 0; i < fixed && i < arg_count; ++i) {
+                Ast *arg = argv->entries[i];
+                if (arg && arg->kind != AST_PLACEHOLDER) written = i + 1;
+            }
+            if (arg_count == param_count) {
+                Ast *data = argv->entries[param_count - 1];
+                if (data && data->kind == AST_VA_PACK) written = fixed + (int)data->va_items->size;
+                else if (data && data->kind == AST_LVAR) written = fixed + 1;
+            }
+            for (int i = 0; i < fixed; ++i) {
+                Ast *param = params->entries[i];
+                Ast *arg = i < arg_count ? argv->entries[i] : NULL;
+                if (param->kind != AST_DEFAULT_PARAM) required_count++;
+                if ((!arg || arg->kind == AST_PLACEHOLDER) &&
+                    param->kind != AST_DEFAULT_PARAM)
+                {
+                    parseRaiseCallError(cc, loc,
+                        "Unexpected number of arguments %d in call to %.*s(), argument %d is required",
+                        written, len, fname, i + 1);
+                }
+                AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
+                if (type && arg && arg->kind != AST_PLACEHOLDER) {
+                    parseCheckArgType(cc,type,arg,i,fname,len,loc);
+                }
+            }
+            return;
+        }
+    }
 
     /* count fixed/default/required params and find the varargs point if it exists */
     for (int i = 0; i < param_count; ++i) {
@@ -622,20 +1169,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
         }
 
         AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
-        if (type && astTypeCheck(type,arg,AST_BIN_OP_ASSIGN) == NULL) {
-            char *expected = astTypeToColorString(type);
-            char *got = astTypeToColorString(arg->type);
-            ParseCallLoc *at = loc && loc->args && vecInBounds(loc->args, (unsigned long)i)
-                               ? loc->args->entries[i] : NULL;
-            if (at) {
-                cctrlWarningAt(cc,at->line,at->col,at->len,
-                        "Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
-                        expected,got,len,fname);
-            } else {
-                cctrlWarning(cc,"Incompatible function argument, expected '%s' got '%s' in function '%.*s'",
-                        expected,got,len,fname);
-            }
-        }
+        if (type) parseCheckArgType(cc,type,arg,i,fname,len,loc);
     }
 
     /* vararg calls allow extras, but still require fixed args */
@@ -821,6 +1355,103 @@ static void parseCallLocFreeArgs(ParseCallLoc *loc) {
 
 /* `spans`, when not NULL, gets where each entry of the returned vector
  * is (see ParseCallLoc.args). */
+/* The (count, data) arguments for a `T ...name` parameter from the extras
+ * of a call: a spread `...other` passes other's count and pointer on;
+ * otherwise each extra is checked as an argument of type T (any mismatch
+ * is an error) and converted, and the call passes how many there are and
+ * the address of a hidden array in the caller's frame holding them (one
+ * per call site, so it lives as long as the call needs it). No extras: 0
+ * and a null pointer. Untyped extras go into 64-bit slots as the old
+ * argv's: floats as f64 bits, narrower integers widened. */
+static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
+                             AstType *elem, Vec *items, Vec *item_spans,
+                             Ast *spread, int spread_idx,
+                             int first_arg, char *fname, int len)
+{
+    static int va_array_id = 0;
+    int untyped = elem->has_var_args;
+    AstType *data_type = astMakePointerType(elem);
+    Ast *count, *data;
+
+    if (spread) {
+        ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, spread_idx);
+        if (items->size > 1) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "`...%s` must be the only extra argument in a call to `%.*s`",
+                spread->lname->data, len, fname);
+        }
+        AstType *from = spread->type->ptr;
+        int same = untyped ? from->has_var_args
+                           : !from->has_var_args &&
+                             !strcmp(astTypeToString(from), astTypeToString(elem));
+        if (!same) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "cannot spread `...%s` (%s) into `%.*s`, whose extra arguments are %s",
+                spread->lname->data,
+                from->has_var_args ? "untyped" : astTypeToString(from),
+                len, fname, untyped ? "untyped" : astTypeToString(elem));
+        }
+        AoStr *len_name = aoStrPrintf("%s#len", spread->lname->data);
+        count = cctrlGetVar(cc, len_name->data, len_name->len);
+        data = spread;
+    } else if (items->size == 0) {
+        count = astI64Type(0);
+        data = astCast(astI64Type(0), data_type);
+    } else {
+        Vec *converted = astVecNew();
+        for (u64 i = 0; i < items->size; ++i) {
+            Ast *arg = vecGet(Ast *, items, i);
+            ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, i);
+            AstType *at_type = arg->type;
+            if (untyped) {
+                if (at_type && (parseIsAggregateType(at_type))) {
+                    cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                        "argument %d of `%.*s`: a %s can't be passed as an untyped extra argument",
+                        first_arg + (int)i + 1, len, fname, astTypeToString(at_type));
+                }
+                if (at_type && astIsFloatType(at_type) && at_type->size < 8) {
+                    arg = astCast(arg, ast_float_type);
+                } else if (at_type && (astIsIntType(at_type) || at_type->is_bool ||
+                                       astIsEnumType(at_type)) &&
+                           at_type->size < 8) {
+                    arg = astCast(arg, ast_int_type);
+                }
+            } else {
+                if (parseArgCompat(elem, arg) != ARG_OK) {
+                    cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                        "argument %d of `%.*s`: expected %s, got %s",
+                        first_arg + (int)i + 1, len, fname,
+                        astTypeToString(elem), astTypeToString(at_type));
+                }
+                arg = astCast(arg, elem);
+            }
+            vecPush(converted, arg);
+        }
+        AoStr *arr_name = aoStrPrintf("#va%d", va_array_id++);
+        AstType *arr_type = astMakeArrayType(elem, (int)items->size);
+        Ast *array;
+        if (cc->tmp_fname) {
+            array = astLVar(arr_type, arr_name->data, arr_name->len);
+            if (cc->tmp_locals) {
+                listAppend(cc->tmp_locals, array);
+            }
+        } else {
+            /* A call in file-scope code, which runs once at startup:
+             * a static array */
+            array = astGVar(arr_type, arr_name->data, arr_name->len, 1);
+            listAppend(cc->ast_list, astDecl(array, NULL));
+        }
+        count = astI64Type((s64)items->size);
+        data = astVaPack(array, converted, untyped);
+    }
+    vecPush(argv_vec, count);
+    vecPush(argv_vec, data);
+    if (spans) {
+        vecPush(spans, NULL);
+        vecPush(spans, NULL);
+    }
+}
+
 Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                Vec *spans) {
     List *var_args = NULL;
@@ -831,11 +1462,68 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
 
     if (decl) params = parseGetFunctionParams(decl);
 
+    /* A `T ...name` callee: its last two parameters are the count and the
+     * data pointer, every argument from the count's position on is an
+     * extra (parseVarArgsPack) */
+    int va_at = -1;
+    AstType *va_elem = NULL;
+    Vec *va_items = NULL, *va_spans = NULL;
+    Ast *va_spread = NULL;
+    int va_spread_idx = -1;
+    if (params && params->size >= 2) {
+        Ast *last = params->entries[params->size - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            va_at = (int)params->size - 2;
+            va_elem = last->type->ptr;
+            va_items = astVecNew();
+            va_spans = vecNew(&vec_unsigned_long_type);
+        }
+    }
+
     Vec *argv_vec = astVecNew();
+    int saw_args = 0;
 
     tok = cctrlTokenPeek(cc);
 
     while (tok && !tokenPunctIs(tok, terminator)) {
+        saw_args = 1;
+        if (va_at >= 0 && (int)argv_vec->size >= va_at) {
+            Lexeme start = *tok;
+            Ast *extra;
+            int is_spread = tokenPunctIs(tok, TK_ELLIPSIS);
+            if (is_spread) cctrlTokenGet(cc);
+            extra = parseExpr(cc,16);
+            if (!extra) {
+                cctrlRaiseException(cc, "Expected an argument in the call to `%.*s`",
+                                    len, fname);
+            }
+            ParseCallLoc *span = parseArgSpan(cc, &start);
+            if (is_spread) {
+                if (extra->kind != AST_LVAR || !(extra->flags & AST_FLAG_VARARGS)) {
+                    cctrlRaiseExceptionAt(cc, span->line, span->col, span->len,
+                        "only a variadic parameter can be spread, as in `...nums`");
+                }
+                va_spread = extra;
+                va_spread_idx = (int)va_items->size;
+            }
+            vecPush(va_items, extra);
+            vecPush(va_spans, span);
+            tok = cctrlTokenGet(cc);
+            if (tokenPunctIs(tok, terminator)) break;
+            if (!tokenPunctIs(tok, ',')) {
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc, "Expected `,` or `)` in the call to `%.*s`, got `%s`",
+                                    len, fname, lexemeAsWritten(tok));
+            }
+            tok = cctrlTokenPeek(cc);
+            continue;
+        }
+        if (tokenPunctIs(tok, TK_ELLIPSIS)) {
+            cctrlRaiseException(cc,
+                "`...` spreads into a `T ...name` parameter, which `%.*s` doesn't have here",
+                len, fname);
+        }
+
         /* For a function with varadic arguments this will never be in bounds */
         int is_in_bounds = params && vecInBounds(params, (unsigned long)param_idx);
         if (is_in_bounds) {
@@ -926,6 +1614,20 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                 "(unterminated `( ... )`?)", len, fname);
     }
 
+    if (va_at >= 0) {
+        while ((int)argv_vec->size < va_at) {
+            vecPush(argv_vec, astMakePlaceHolder());
+            if (spans) vecPush(spans, NULL);
+        }
+        parseVarArgsPack(cc, argv_vec, spans, va_elem, va_items, va_spans,
+                         va_spread, va_spread_idx, va_at, fname, len);
+        /* With no argument at all the `)` is still there */
+        if (!saw_args) {
+            cctrlTokenGet(cc);
+        }
+        return argv_vec;
+    }
+
     if (var_args) {
         /* set the argument count and merge lists */
         vecPush(argv_vec,astI64Type(listCount(var_args)));
@@ -1006,6 +1708,43 @@ next_spec: ;
     return n;
 }
 
+/* %D %T and %F left the format engine (dates and files are not str's):
+ * the first of them a format uses, raw source text (`raw`, with escapes)
+ * or the literal's value, and 0 if none */
+static char parseFormatRemovedConv(const char *s, int len, int raw) {
+    int i = 0;
+    while (i < len) {
+        if (raw && s[i] == '\\' && i + 1 < len) {
+            i += 2;
+            continue;
+        }
+        if (s[i] != '%') {
+            i++;
+            continue;
+        }
+        i++;
+        while (i < len && strchr("-0+ #", s[i])) i++;
+        while (i < len && (strchr("*.", s[i]) || (s[i] >= '0' && s[i] <= '9'))) i++;
+        while (i < len && strchr("lhzjtLq", s[i])) i++;
+        if (i < len && strchr("DTF", s[i])) return s[i];
+        i++; /* the conversion, `%` of `%%` included */
+    }
+    return 0;
+}
+
+/* The error for a removed conversion, naming what replaces it */
+static void parseFormatRemovedError(Cctrl *cc, char conv, int line, int col,
+                                    int len)
+{
+    char *msg = conv == 'F'
+        ? "`%%F` is no longer a format conversion: read the file with fs.readAll"
+        : "`%%%c` is no longer a format conversion: use date.format(...)";
+    if (line > 0) {
+        cctrlRaiseExceptionAt(cc, line, col, len, msg, conv);
+    }
+    cctrlRaiseException(cc, msg, conv);
+}
+
 /* The same for the ktm library's StrPrint (StrPrintJoin): a spec is `%`,
  * flags `-0+ #`, a width (digits or `*`), a precision (`.` then digits or
  * `*`), length modifiers (l ll h hh z j t L q, which change nothing) and
@@ -1049,7 +1788,7 @@ static int parseCountktmFormatSpecs(const char *fmt, int len,
         if (ch == '%') {
             continue;
         }
-        if (strchr("diuoxXcsfegpQDTCF", ch)) {
+        if (strchr("diuoxXcsfegpQC", ch)) {
             n++;
         } else if (!*_unknown) {
             *_unknown = ch;
@@ -1077,12 +1816,14 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 8 && !strncmp(fname, str_lit("snprintf"))) return 0;
     /* May as well type-check ktm's library too which is even more
      * prone to erroring. */
-    else if (len == 9 && !strncmp(fname, str_lit("MStrPrint"))) return 0;
-    else if (len == 5 && !strncmp(fname, str_lit("Print"))) return 0;
-    else if (len == 8 && !strncmp(fname, str_lit("StrPrint"))) return 1;
-    else if (len == 8 && !strncmp(fname, str_lit("CatPrint"))) return 1;
-    else if (len == 11 && !strncmp(fname, str_lit("CatLenPrint"))) return 2;
-    else if (len == 9 && !strncmp(fname, str_lit("StrNPrint"))) return 2;
+    else if (len == 10 && !strncmp(fname, str_lit("str.format"))) return 0;
+    else if (len == 14 && !strncmp(fname, str_lit("rt.__ktmPrintf"))) return 0;
+    else if (len == 12 && !strncmp(fname, str_lit("str.formatTo"))) return 1;
+    else if (len == 16 && !strncmp(fname, str_lit("str.appendFormat"))) return 1;
+    else if (len == 19 && !strncmp(fname, str_lit("str.appendFormatLen"))) return 2;
+    else if (len == 16 && !strncmp(fname, str_lit("str.formatToSize"))) return 2;
+    /* `throw(code, fmt, ...)`, checked as a call to it */
+    else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
 }
 
@@ -1117,6 +1858,12 @@ static void parsePrintfFormatCheck(Cctrl *cc,
         expected = parseCountPrintfFormatSpecs(fmt_ast->sval->data,
                 fmt_ast->sval->len);
     } else {
+        char removed = parseFormatRemovedConv(fmt_ast->sval->data,
+                fmt_ast->sval->len, 0);
+        if (removed) {
+            parseFormatRemovedError(cc, removed, at ? at->line : 0,
+                                    at ? at->col : 0, at ? at->len : 0);
+        }
         char unknown = 0;
         expected = parseCountktmFormatSpecs(fmt_ast->sval->data,
                 fmt_ast->sval->len, &unknown);
@@ -1145,6 +1892,17 @@ static void parsePrintfFormatCheck(Cctrl *cc,
                        maybe_fn->type->has_var_args &&
                        maybe_fn->kind != AST_EXTERN_FUNC;
     if (ktm_vararg && supplied > 0) supplied -= 1;
+    /* `...name`: the extras are passed as their count and an array, a
+     * spread `...other` with a count only known at run time */
+    Vec *params = maybe_fn ? parseGetFunctionParams(maybe_fn) : NULL;
+    if (params && params->size >= 2 && argv->size == params->size) {
+        Ast *last = params->entries[params->size - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            Ast *count = argv->entries[argv->size - 2];
+            if (!count || count->kind != AST_LITERAL) return;
+            supplied = (int)count->i64;
+        }
+    }
     if (supplied == expected)
         return;
 
@@ -1168,6 +1926,90 @@ static void parsePrintfFormatCheck(Cctrl *cc,
     cctrlTerminate(cc);
 }
 
+/* The stdlib's `struct Error`, which a throw carries */
+int parseIsErrorType(AstType *type) {
+    return type && type->kind == AST_TYPE_CLASS && type->clsname &&
+           type->clsname->len == 5 && !memcmp(type->clsname->data, "Error", 5);
+}
+
+/* The arguments of `throw(`...`)`, the `(` just consumed:
+ *   throw(code)            *_code = code, NULL returned (irLowerThrow
+ *                          calls KTM_ThrowAt with the code, file, line)
+ *   throw(code, fmt, ...)  checked as a call to KTM_ThrowFmt (types and
+ *                          the format), returned as KTM_ThrowFmtAt(file,
+ *                          line, code, fmt, ...)
+ *   throw(e)               e an Error: KTM_ThrowError(&e) */
+Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
+    char *fname = astRuntimeName("__ktmThrowFmt");
+    int len = strlen(fname);
+    Ast *decl = findFunctionDecl(cc, fname, len);
+    *_code = NULL;
+
+    ParseCallLoc loc = parseCallLocStart(cc, fname, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, decl, ')', fname, len, loc.args);
+    parseCallLocEnd(cc, &loc);
+
+    /* rt.__ktmThrowFmt's `...args` pads the call to its fixed parameters
+     * and the (count, data) pair: `throw(code)` and `throw()` come back
+     * with placeholders after what was written */
+    for (u64 i = 0; i < argv->size; ++i) {
+        Ast *arg = argv->entries[i];
+        if (!arg || arg->kind == AST_PLACEHOLDER) {
+            if (i <= 1) argv->size = i;
+            break;
+        }
+    }
+    if (argv->size == 0 || !argv->entries[0]) {
+        parseCallLocFreeArgs(&loc);
+        parseRaiseCallError(cc, &loc, "`throw` needs a code, or an Error to throw again");
+    }
+    if (argv->size == 1) {
+        Ast *arg = argv->entries[0];
+        if (!parseIsErrorType(arg->type)) {
+            if (arg->type && (arg->type->kind == AST_TYPE_CLASS ||
+                              arg->type->kind == AST_TYPE_UNION) &&
+                !arg->type->is_intrinsic)
+            {
+                parseRaiseCallError(cc, &loc,
+                    "`throw` needs an integer code (usually an enum member) "
+                    "or an Error, got %s", astTypeToString(arg->type));
+            }
+            parseCallLocFreeArgs(&loc);
+            *_code = arg;
+            return NULL;
+        }
+        if (!assertLValue(arg)) {
+            parseRaiseCallError(cc, &loc, "`throw` of an Error needs a variable, as in `throw(e)`");
+        }
+        parseCallLocFreeArgs(&loc);
+        Vec *args = astVecNew();
+        vecPush(args, astUnaryOperator(astMakePointerType(arg->type),
+                                       AST_UN_OP_ADDR_OF, arg));
+        char *sym = astRuntimeSymbol("__ktmThrowError");
+        return astFunctionCall(ast_void_type, sym, strlen(sym), args);
+    }
+    if (!decl) {
+        parseCallLocFreeArgs(&loc);
+        parseRaiseCallError(cc, &loc, "`throw` with a message needs the runtime (rt.__ktmThrowFmt)");
+    }
+    parseFunctionArgumentCheck(cc, decl, argv, "throw", 5, &loc);
+    parseFlattenDefaultArgs(decl, argv);
+    parseAddEmptyVarArgCount(decl, argv);
+    parseCoerceArgs(decl, argv);
+    parsePrintfFormatCheck(cc, decl, argv, fname, len, &loc);
+    parseCallLocFreeArgs(&loc);
+
+    Vec *at = astVecNew();
+    vecPush(at, file);
+    vecPush(at, astI64Type(line));
+    for (u64 i = 0; i < argv->size; ++i) {
+        vecPush(at, argv->entries[i]);
+    }
+    char *sym = astRuntimeSymbol("__ktmThrowFmtAt");
+    return astFunctionCall(ast_void_type, sym, strlen(sym), at);
+}
+
 /* Read function arguments for a function being called */
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     AstType *rettype = NULL;
@@ -1188,7 +2030,7 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
 
 
         rettype = maybe_fn->type->rettype;
-        if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+        if (maybe_fn->flags & AST_FLAG_INLINE) {
             if (maybe_fn->kind == AST_ASM_FUNC_BIND || maybe_fn->kind == AST_ASM_FUNCDEF) {
                 Ast *call = astAsmFunctionCall(rettype,
                                                aoStrDup(maybe_fn->asmfname),
@@ -1243,11 +2085,106 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
         case AST_EXTERN_FUNC:
         case AST_FUNC:
         case AST_FUN_PROTO:
+            /* A module's function is called by its symbol (`a.b.f` or
+             * `f` in its module names `_K1a1b1f`) */
+            if (cc->cur_module || memchr(fname, '.', len)) {
+                return astFunctionCall(rettype, maybe_fn->fname->data,
+                                       maybe_fn->fname->len, argv);
+            }
             return astFunctionCall(rettype,fname,len,argv);
         default: {
             cctrlRaiseException(cc,"Unknown function: %.*s", len, fname);
         }
     }
+}
+
+/* The method `name` of `cls` or of a class it inherits from, the
+ * nearest one (a method of a derived class hides its base's), with
+ * `*owner` the class that has it; NULL if there is none. A method is
+ * the function `Class.name`. */
+static Ast *parseShadowedPrefix(Cctrl *cc, Lexeme *tok);
+Ast *parseGetClassField(Cctrl *cc, Ast *cls);
+
+static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
+                            AstType **owner) {
+    for (AstType *t = cls; t; t = t->base_cls) {
+        if (!t->clsname) continue;
+        char *key = mprintf("%s.%.*s", t->clsname->data, len, name);
+        Ast *fn = mapGet(cc->global_env, key);
+        /* inside its own body (a recursive call) only its symbol is
+         * registered yet */
+        if (!fn) fn = mapGet(cc->global_env, astModuleMangle(key, strlen(key)));
+        if (fn && (fn->kind == AST_FUNC || fn->kind == AST_FUN_PROTO)) {
+            *owner = t;
+            return fn;
+        }
+    }
+    return NULL;
+}
+
+/* A method of a module's type, used outside that module: it must be pub */
+static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
+                                   int len) {
+    AoStr *cls = owner->clsname;
+    int mod_len = -1;
+    for (int i = (int)cls->len - 1; i >= 0; --i) {
+        if (cls->data[i] == '.') { mod_len = i; break; }
+    }
+    if (mod_len < 0) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    if (here && (int)here->len == mod_len && !memcmp(here->data, cls->data, mod_len)) {
+        return;
+    }
+    char *key = mprintf("%s.%.*s", cls->data, len, name);
+    if (setHas(cc->pub_names, key)) return;
+    cctrlRewindUntilStrMatch(cc, name, len, NULL);
+    cctrlRaiseException(cc, "the method `%.*s` of `%s` is private to module %.*s",
+                        len, name, cls->data, mod_len, cls->data);
+}
+
+/* The arguments of a call to the method `fn`, the `(` just taken. With
+ * `recv` (`u.name(...)`, a pointer to the object) the arguments are the
+ * method's own and `recv` becomes `self`; without (`User.name(p, ...)`)
+ * the first argument is `self`. */
+static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
+                            char *name, int len) {
+    Ast *decl = fn;
+    if (recv) {
+        /* The method as seen by the caller: without `self` */
+        Vec *params = astVecNew();
+        for (u64 i = 1; i < fn->params->size; ++i) {
+            vecPush(params, fn->params->entries[i]);
+        }
+        decl = (Ast *)malloc(sizeof(Ast));
+        *decl = *fn;
+        decl->params = params;
+        decl->type = astTypeCopy(fn->type);
+        decl->type->params = params;
+    }
+    char *fname = mprintf("%s.%.*s", owner->clsname->data, len, name);
+    int flen = strlen(fname);
+
+    ParseCallLoc loc = parseCallLocStart(cc, name, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, decl, ')', fname, flen, loc.args);
+    parseCallLocEnd(cc, &loc);
+    parseFunctionArgumentCheck(cc, decl, argv, fname, flen, &loc);
+    parseFlattenDefaultArgs(decl, argv);
+    parseAddEmptyVarArgCount(decl, argv);
+    parseCoerceArgs(decl, argv);
+    parsePrintfFormatCheck(cc, decl, argv, fname, flen, &loc);
+    parseCallLocFreeArgs(&loc);
+
+    if (recv) {
+        AstType *self_type = ((Ast *)fn->params->entries[0])->type;
+        if (recv->type->ptr != self_type->ptr) {
+            /* a derived class's object, for its base's method */
+            recv = astCast(recv, self_type);
+        }
+        vecInsertAt(argv, recv, 0);
+    }
+    return astFunctionCall(fn->type->rettype, fn->fname->data,
+                           fn->fname->len, argv);
 }
 
 /* Rewrite a print statement's format literal so integer conversions with
@@ -1295,7 +2232,7 @@ static AoStr *parsePrintFormatTo64(AoStr *fmt, int *added) {
 }
 
 /* Whether a print statement's format literal (raw source text) uses a
- * conversion C's printf doesn't have or reads differently: %Q %D %T %C %F */
+ * conversion C's printf doesn't have or reads differently: %Q %C */
 static int parsePrintFormatIsktm(char *s, int len) {
     int i = 0;
     while (i < len) {
@@ -1311,7 +2248,7 @@ static int parsePrintFormatIsktm(char *s, int len) {
         while (i < len && strchr("-0+ #", s[i])) i++;
         while (i < len && (strchr("*.", s[i]) || (s[i] >= '0' && s[i] <= '9'))) i++;
         while (i < len && strchr("lhzjtLq", s[i])) i++;
-        if (i < len && strchr("QDTCF", s[i])) return 1;
+        if (i < len && strchr("QC", s[i])) return 1;
         i++; /* the conversion, `%` of `%%` included */
     }
     return 0;
@@ -1322,17 +2259,28 @@ static int parsePrintFormatIsktm(char *s, int len) {
  * made 64-bit to match ktm's `%d` (see parsePrintFormatTo64) and the
  * call is flagged so the IR widens narrow integer arguments to match.
  * A non-literal format is passed through as written. A literal that uses
- * a ktm-only conversion (%Q %D %T %C %F) calls the library's Print
+ * a ktm-only conversion (%Q %C) calls the library's Print
  * instead, which formats like StrPrint; plain formats keep the direct
  * printf call. */
-Ast *parsePrintStatement(Cctrl *cc) {
+/* A print: the arguments of `"fmt", args;` (terminator `;`) or of
+ * `printf(fmt, args)` (terminator `)`), with the format still to come.
+ * A literal format using ktm's conversions (%Q %C) calls Print;
+ * any other calls C's printf with its integer conversions widened to 64
+ * bits, and the arguments are checked against the format either way. */
+Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
     Lexeme *tok = cctrlTokenPeek(cc);
-    if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR &&
-        parsePrintFormatIsktm(tok->start, tok->len)) {
-        return parseFunctionArguments(cc,"Print",5,';');
+    if (tok && tok->tk_type == TK_STR) {
+        char removed = parseFormatRemovedConv(tok->start, tok->len, 1);
+        if (removed) {
+            parseFormatRemovedError(cc, removed, tok->line, tok->col, tok->len);
+        }
     }
-    Ast *call = parseFunctionArguments(cc,"printf",6,';');
-    if (cc->flags & CCTRL_TRANSPILING) return call;
+    if (tok && tok->tk_type == TK_STR &&
+        parsePrintFormatIsktm(tok->start, tok->len)) {
+        char *print = astRuntimeName("__ktmPrintf");
+        return parseFunctionArguments(cc,print,strlen(print),terminator);
+    }
+    Ast *call = parseFunctionArguments(cc,"printf",6,terminator);
     if (call->kind != AST_FUNCALL || !call->args || call->args->size == 0)
         return call;
 
@@ -1352,9 +2300,49 @@ Ast *parsePrintStatement(Cctrl *cc) {
     return call;
 }
 
+/* The old print statement, `"fmt", args;`: an error naming printf (the
+ * REPL's input aside), parsed on as before */
+Ast *parsePrintStatement(Cctrl *cc) {
+    Lexeme *tok = cctrlTokenPeek(cc);
+    if (tok && !(cc->flags & CCTRL_REPL)) {
+        cctrlErrorAt(cc, tok->line, tok->col, tok->len,
+                     "a print statement: write `printf(\"...\", ...)`");
+    }
+    return parsePrintCall(cc, ';');
+}
+
+/* The arguments of a call to `name`, the `(` just read. `printf(...)` is
+ * ktm's print (see parsePrintCall), not a bare call to C's printf. */
+Ast *parseCallArguments(Cctrl *cc, char *name, int len) {
+    if (len == 6 && !memcmp(name, "printf", 6)) {
+        return parsePrintCall(cc, ')');
+    }
+    return parseFunctionArguments(cc, name, len, ')');
+}
+
+/* `Name.member`: `member`'s constant value, typed as the enum `Name`.
+ * Only reached when `name` names an enum (see below); the `.` is
+ * already consumed. */
+static Ast *parseEnumMemberRef(Cctrl *cc, AstType *enum_type, char *name,
+                               int len)
+{
+    Lexeme *tok = cctrlTokenGet(cc);
+    if (!tok || tok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc,"Expected an enum member name after `%.*s.`",
+                len, name);
+    }
+    Ast *member = mapGetLen(enum_type->enum_members, tok->start, tok->len);
+    if (!member) {
+        cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);
+        cctrlRaiseException(cc,"enum `%.*s` has no member `%.*s`",
+                len, name, tok->len, tok->start);
+    }
+    return member;
+}
+
 /* parse either a function call or a variable being used */
-static Ast *parseIdentifierOrFunction(Cctrl *cc, 
-                                      char *name, 
+static Ast *parseIdentifierOrFunction(Cctrl *cc,
+                                      char *name,
                                       int len,
                                       int can_call_function)
 {
@@ -1363,6 +2351,54 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     Lexeme *tok = cctrlTokenGet(cc);
     Lexeme *peek = cctrlTokenPeek(cc);
     int is_lparen = tokenPunctIs(tok,'(');
+
+    if (tokenPunctIs(tok,'.')) {
+        AstType *enum_type = NULL;
+        char *qual = cctrlQualifyName(cc, name, len);
+        if (qual) enum_type = mapGet(cc->clsdefs, qual);
+        if (!enum_type && !cctrlModuleHides(cc, name, len)) {
+            enum_type = mapGetLen(cc->clsdefs, name, len);
+            if (enum_type) cctrlCheckModuleAccess(cc, name, len);
+        }
+        if (enum_type && enum_type->kind == AST_TYPE_CLASS &&
+            enum_type->is_enum)
+        {
+            return parseEnumMemberRef(cc, enum_type, name, len);
+        }
+        if (!enum_type && !cctrlModuleHides(cc, name, len)) {
+            enum_type = mapGetLen(cc->uniondefs, name, len);
+        }
+        /* `User.name`: a method, called with its `self` as the first
+         * argument (`User.describe(self)` from a derived class's method)
+         * or its address taken (`&User.describe`) */
+        if (enum_type && !enum_type->is_intrinsic &&
+            parseIsClassOrUnion(enum_type->kind) &&
+            !(cc->localenv && mapGetLen(cc->localenv, name, len)) &&
+            !mapGetLen(cc->global_env, name, len))
+        {
+            Lexeme *mtok = cctrlTokenGetRequired(cc);
+            AstType *owner = NULL;
+            Ast *method = mtok->tk_type != TK_IDENT ? NULL :
+                parseFindMethod(cc, enum_type, mtok->start, mtok->len, &owner);
+            if (!method) {
+                cctrlRaiseException(cc, "`%.*s` has no method `%s`",
+                        len, name, lexemeAsWritten(mtok));
+            }
+            parseCheckMethodAccess(cc, owner, mtok->start, mtok->len);
+            if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+                cctrlTokenGet(cc);
+                return parseMethodCall(cc, method, owner, NULL,
+                                       mtok->start, mtok->len);
+            }
+            if (can_call_function) {
+                cctrlRaiseException(cc, "`%s.%.*s` needs its `self`, as in "
+                        "`%s.%.*s(p)`", owner->clsname->data, mtok->len,
+                        mtok->start, owner->clsname->data, mtok->len,
+                        mtok->start);
+            }
+            return method;
+        }
+    }
 
     if ((ast = cctrlGetVar(cc, name, len)) == NULL) {
         cctrlRewindUntilStrMatch(cc, name, len, NULL);
@@ -1381,7 +2417,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                     break;
                 }
                 case '[': {
-                    char *msg = mprintf("Try defining array `I64 %.*s[] = {1, 2, 3}`?",len,name);
+                    char *msg = mprintf("Try defining array `i64 %.*s[] = {1, 2, 3}`?",len,name);
                     cctrlRaiseSuggestion(cc,msg,"Variable or function `%.*s` has not been defined", len, name);
                     break;
                 }
@@ -1402,6 +2438,12 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                 Vec *argv = astVecNew();
                 /* Underline the name, the token before the one in hand */
                 Lexeme *name_tok = parseLastToken(cc);
+                /* the old call without `(`: an error, parsed on as one */
+                if (name_tok && !(cc->flags & CCTRL_REPL)) {
+                    cctrlErrorAt(cc, name_tok->line, name_tok->col, name_tok->len,
+                                 "a call needs its `()`: write `%.*s()`",
+                                 name_tok->len, name_tok->start);
+                }
                 ParseCallLoc loc = {0, 0, 0, NULL};
                 if (name_tok) {
                     loc.line = name_tok->line;
@@ -1414,7 +2456,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                 /* Default values convert to their parameter's type here
                  * too (a Bool default of 0x800 is 1), as with parens */
                 parseCoerceArgs(ast, argv);
-                if (ast->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+                if (ast->flags & AST_FLAG_INLINE) {
                     if (ast->kind == AST_ASM_FUNC_BIND || ast->kind == AST_ASM_FUNCDEF) {
                         Ast *call = astAsmFunctionCall(ast->type->rettype, aoStrDup(ast->asmfname), argv);
                         call->flags |= ast->flags;
@@ -1436,9 +2478,27 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
 
     /* Is a function call if the next char is '(' and the peek is not a
      * type. peek == NULL (end of input) counts as a call attempt - the
-     * argument parser raises the unterminated-`(` diagnostic. */
-    if (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len)) {
-        return parseFunctionArguments(cc,name,len,')');
+     * argument parser raises the unterminated-`(` diagnostic. A type
+     * name is never followed by `.`, so `f(Color.red)` is a call whose
+     * first argument is an enum member, not a postfix cast. */
+    Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
+    int peek_is_fn_type = peek && tokenMayStartFnType(peek) && parseFnStartsType(cc);
+    /* `Call((fn(i64) i64)raw)` passes a cast; only something that can't
+     * be called takes `((fn(i64) i64) *)` as a postfix cast */
+    if (peek_is_fn_type && tokenPunctIs(peek,'(')) {
+        Ast *callee = findFunctionDecl(cc,name,len);
+        if (callee && callee->type && (callee->type->kind == AST_TYPE_FUNC ||
+                                       callee->kind == AST_FUNC ||
+                                       callee->kind == AST_FUN_PROTO ||
+                                       callee->kind == AST_EXTERN_FUNC)) {
+            peek_is_fn_type = 0;
+        }
+    }
+    if (peek == NULL ||
+        (!cctrlTokIsKeyword(cc, peek) && !peek_is_fn_type) ||
+        tokenPunctIs(after_peek,'.'))
+    {
+        return parseCallArguments(cc,name,len);
     }
 
     /* Is a postfix typecast, need to grap the variable and 'ParsePostFixExpr' will do the cast */
@@ -1446,55 +2506,20 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     return ast;
 }
 
-/* When transpiling, #defines are kept (CCTRL_PASTE_DEFINES), so a string
- * macro reaches the parser as an identifier */
-static int parseIsStringMacro(Cctrl *cc, Lexeme *tok) {
-    if (!(cc->flags & CCTRL_PASTE_DEFINES) || !tok ||
-        tok->tk_type != TK_IDENT) {
-        return 0;
-    }
-    Lexeme *def = mapGetLen(cc->macro_defs, tok->start, tok->len);
-    return def && def->tk_type == TK_STR;
-}
-
-/* Adjacent string literals are one string, `"a" "b"`. When transpiling,
- * string macros can be part of it too (`"a" M "b"`, `M "x"`, `M N`): the
- * node then holds that C text as written (AST_FLAG_RAW_C_STRING), as the
- * #define is emitted and C pastes adjacent literals as ktm does.
- * Without this the parser stopped at the macro and the statement was
- * dropped from the C. `first` is the token just read, a string or a
- * string macro followed by one. */
+/* Adjacent string literals are one string, `"a" "b"`. `first` is the
+ * token just read, a string. */
 static Ast *parseStringLiterals(Cctrl *cc, Lexeme *first) {
     AoStr *str = aoStrNew();
-    AoStr *raw = aoStrNew();
     s64 real_len = 1;
-    int macros = 0;
     Lexeme *tok = first;
-    while (tok && (tok->tk_type == TK_STR || parseIsStringMacro(cc, tok))) {
-        if (raw->len) aoStrPutChar(raw, ' ');
-        if (tok->tk_type == TK_STR) {
-            aoStrCatFmt(str, "%.*s", tok->len, tok->start);
-            aoStrCatFmt(raw, "\"%.*s\"", tok->len, tok->start);
-            real_len += tok->i64 - 1;
-        } else {
-            Lexeme *def = mapGetLen(cc->macro_defs, tok->start, tok->len);
-            aoStrCatLen(raw, tok->start, tok->len);
-            real_len += def->i64 - 1;
-            macros++;
-        }
+    while (tok && tok->tk_type == TK_STR) {
+        aoStrCatFmt(str, "%.*s", tok->len, tok->start);
+        real_len += tok->i64 - 1;
         tok = cctrlTokenGet(cc);
     }
     if (tok) cctrlTokenRewind(cc);
-
-    Ast *ast;
-    if (macros) {
-        ast = astString(raw->data, raw->len, real_len);
-        ast->flags |= AST_FLAG_RAW_C_STRING;
-    } else {
-        ast = cctrlGetOrSetString(cc, str->data, str->len, real_len);
-    }
+    Ast *ast = cctrlGetOrSetString(cc, str->data, str->len, real_len);
     aoStrRelease(str);
-    aoStrRelease(raw);
     return ast;
 }
 
@@ -1517,13 +2542,8 @@ static Ast *parsePrimary(Cctrl *cc) {
 
     switch (tok->tk_type) {
     case TK_IDENT: {
-        /* `M "x"`, `M N`: a string macro pasted to strings (transpiling) */
-        if (parseIsStringMacro(cc, tok)) {
-            Lexeme *next = cctrlTokenPeek(cc);
-            if (next && (next->tk_type == TK_STR ||
-                         parseIsStringMacro(cc, next))) {
-                return parseStringLiterals(cc, tok);
-            }
+        if ((ast = parseShadowedPrefix(cc, tok)) != NULL) {
+            return ast;
         }
         ast = parseIdentifierOrFunction(cc, tok->start, tok->len,
                 can_call_function);
@@ -1563,6 +2583,48 @@ static Ast *parsePrimary(Cctrl *cc) {
     default:
         cctrlRaiseException(cc,"Unexpected input %s",astKindToString(tok->tk_type));
     }
+}
+
+/* `str.x` where a local or parameter `str` is in scope: as in Go the
+ * local hides the module imported as str, so it is the local's member x
+ * (the lexer had made the one token `str.x`). Not in the local's own
+ * initialiser, which still sees the module. NULL when no local hides the
+ * prefix. */
+static Ast *parseShadowedPrefix(Cctrl *cc, Lexeme *tok) {
+    if (!tok->qual_prefix || !cc->localenv) return NULL;
+    Ast *local = mapGetLen(cc->localenv, tok->qual_prefix, tok->qual_prefix_len);
+    if (!local || local == cc->decl_in_init) return NULL;
+    const char *dot = strrchr(tok->start, '.');
+    if (!dot) return NULL;
+    Lexeme *member = lexemeCopy(tok);
+    member->start = (char *)dot + 1;
+    member->len = tok->len - (int)(dot + 1 - tok->start);
+    member->col = tok->col + tok->qual_prefix_len + 1;
+    member->qual_prefix = NULL;
+    member->qual_prefix_len = 0;
+
+    /* a member it doesn't have: say so, and why the module isn't used */
+    AstType *type = local->type;
+    if (type && type->kind == AST_TYPE_POINTER && type->ptr &&
+        parseIsClassOrUnion(type->ptr->kind)) {
+        type = type->ptr;
+    }
+    int has = local->kind == AST_LVAR && (local->flags & AST_FLAG_VARARGS) &&
+              member->len == 3 && !memcmp(member->start, "len", 3);
+    if (!has && type && parseIsClassOrUnion(type->kind)) {
+        AstType *owner = NULL;
+        has = (type->fields && mapGetLen(type->fields, member->start, member->len)) ||
+              parseFindMethod(cc, type, member->start, member->len, &owner);
+    }
+    if (!has) {
+        cctrlRaiseExceptionAt(cc, member->line, member->col, member->len,
+                "%s has no member `%.*s` (note: the local `%.*s` hides the "
+                "module %.*s)", astTypeToString(local->type), member->len,
+                member->start, tok->qual_prefix_len, tok->qual_prefix,
+                (int)(dot - tok->start), tok->start);
+    }
+    cc->pending_token = member;
+    return parseGetClassField(cc, local);
 }
 
 static int parseGetPriority(Lexeme *tok) {
@@ -1617,6 +2679,9 @@ static int parseGetPriority(Lexeme *tok) {
     case TK_OR_OR:
         return 13;
 
+    case '?':   /* the conditional operator: looser than ||, like assignment */
+        return 14;
+
     case '=':
     case TK_ADD_EQU: 
     case TK_SUB_EQU: 
@@ -1628,7 +2693,7 @@ static int parseGetPriority(Lexeme *tok) {
     case TK_XOR_EQU: 
     case TK_SHL_EQU: 
     case TK_SHR_EQU:
-        return 14;
+        return 15;
 
     default:
         return -1;
@@ -1647,7 +2712,7 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
                 lexemeTypeToString(tok->tk_type),lexemeAsWritten(tok));
     }
     cctrlTokenExpect(cc, ']');
-    if (!astIsIntType(subscript->type)) {
+    if (!astIsIntOrIntrinsic(subscript->type)) {
         cctrlRaiseExceptionFromTo(cc, "Subscript expressions must evaluate to an integer type",
             '[', ']',
             "Cannot subscript `%s` with a %s of type `%s`",
@@ -1675,8 +2740,44 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     return astUnaryOperator(binop->type->ptr, AST_UN_OP_DEREF, binop);
 }
 
+/* `field` (named `name`) is private to another module than this code's */
+void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len) {
+    if (!field || !field->private_module ||
+        field->private_module == cc->cur_module) {
+        return;
+    }
+    cctrlRaiseException(cc, "`%.*s` is a private field of %s", len, name,
+                        field->private_of ? field->private_of->data
+                                          : "its struct");
+}
+
 Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     AstType *type;
+    /* `nums.len` of a `T ...nums` parameter: its hidden count */
+    if (cls->kind == AST_LVAR && (cls->flags & AST_FLAG_VARARGS)) {
+        Lexeme *field = cctrlTokenGetRequired(cc);
+        if (field->tk_type != TK_IDENT || field->len != 3 ||
+            memcmp(field->start, "len", 3))
+        {
+            cctrlRaiseExceptionAt(cc, field->line, field->col, field->len,
+                "the variadic parameter `%s` only has `.len`",
+                cls->lname->data);
+        }
+        AoStr *len_name = aoStrPrintf("%s#len", cls->lname->data);
+        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
+        if (!count) {
+            cctrlRaiseException(cc, "`%s.len` is not available here",
+                                cls->lname->data);
+        }
+        return count;
+    }
+    /* `p.x` on a pointer to a class is `p->x` (one level: not `pp.x`) */
+    if (cls->type->kind == AST_TYPE_POINTER && cls->type->ptr &&
+        parseIsClassOrUnion(cls->type->ptr->kind))
+    {
+        cls = astUnaryOperator(cls->type->ptr, AST_UN_OP_DEREF, cls);
+        cls->deref_symbol = TK_ARROW;
+    }
     if (!parseIsClassOrUnion(cls->type->kind)) {
         char *type_str = astTypeToString(cls->type);
         char *var_str = astLValueToString(cls,0);
@@ -1716,20 +2817,51 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
                 tok->len, tok->start, astTypeToString(cls->type));
     }
     AstType *field = mapGetLen(type->fields, tok->start, tok->len);
+    AstType *owner = NULL;
+    Ast *method = field ? NULL : parseFindMethod(cc, type, tok->start,
+                                                 tok->len, &owner);
+    if (method) {
+        parseCheckMethodAccess(cc, owner, tok->start, tok->len);
+        if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+            cctrlRaiseException(cc, "`%s.%.*s` is a method: call it with "
+                    "`(...)`, or take its address with `&%s.%.*s`",
+                    owner->clsname->data, tok->len, tok->start,
+                    owner->clsname->data, tok->len, tok->start);
+        }
+        cctrlTokenGet(cc);
+        Ast *recv;
+        if (astIsDeref(cls)) {
+            recv = cls->operand;
+        } else {
+            if (!assertLValue(cls)) {
+                cctrlRaiseException(cc, "a method is called on a variable "
+                                        "or a pointer, not on a %s",
+                                    astKindToHumanReadable(cls));
+            }
+            recv = astUnaryOperator(astMakePointerType(cls->type),
+                                    AST_UN_OP_ADDR_OF, cls);
+        }
+        return parseMethodCall(cc, method, owner, recv, tok->start, tok->len);
+    }
     if (!field) {
         cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);
         cctrlRaiseException(cc,"Property: %.*s does not exist on class", 
                 tok->len, tok->start);
     }
+    parseCheckPrivateField(cc, field, tok->start, tok->len);
 
     AoStr *field_name = aoStrDupRaw(tok->start, tok->len);
     Ast *class_ref = astClassRef(field, cls, aoStrMove(field_name));
     return class_ref;
 }
 
+static AstType *parseCastTypeName(Cctrl *cc);
+
 /* A function pointer value that `(` after it calls: a class field, an
- * array element or, after a parenthesised `(*fp)`/`(fp)`, the variable
- * itself. A function name is not one: `F` alone is already a call. */
+ * array element, the variable itself after a parenthesised `(*fp)`/`(fp)`,
+ * a cast to a function pointer type (`(fv(I64 (*)(I64)))(x)`), the result
+ * of a call that returns one (`GetHandler()(x)`) or of an assignment. A
+ * function name is not one: `F` alone is already a call. */
 static int parseIsCallableFnPtr(Ast *ast) {
     if (!ast || !ast->type || ast->type->kind != AST_TYPE_FUNC) return 0;
     switch (ast->kind) {
@@ -1738,6 +2870,13 @@ static int parseIsCallableFnPtr(Ast *ast) {
         case AST_FUNPTR:
         case AST_LVAR:
         case AST_GVAR:
+        case AST_CAST:
+        case AST_FUNCALL:
+        case AST_FUNPTR_CALL:
+        case AST_ASM_FUNCALL:
+        case AST_BINOP:
+        case AST_TERNARY:
+        case AST_DEFAULT_PARAM: /* `(*f)(x)`, f a parameter with a default */
             return 1;
         default:
             return 0;
@@ -1763,6 +2902,10 @@ static Ast *parseClassFnPtrCall(Cctrl *cc, Ast *class_ref) {
         name = class_ref->lname->data;
     } else if (class_ref->kind == AST_GVAR) {
         name = class_ref->gname->data;
+    } else if ((class_ref->kind == AST_FUNCALL ||
+                class_ref->kind == AST_FUNPTR_CALL ||
+                class_ref->kind == AST_ASM_FUNCALL) && class_ref->fname) {
+        name = class_ref->fname->data;
     }
     int len = strlen(name);
     ParseCallLoc loc = parseCallLocStart(cc, name, len);
@@ -1836,6 +2979,14 @@ static s64 astBinOpToTokenPunct(AstBinOp op) {
  * that is `+=`, not `+`: rewinding for a `+` that is not there would
  * land before the statement and the per-statement recovery would then
  * re-parse it forever. */
+/* A function pointer given one with a different signature: an error
+ * naming both, wherever the conversion happens (assignment,
+ * initialiser, argument, return, conditional) */
+void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
+    cctrlRaiseException(cc, "cannot convert %s to %s",
+            astTypeToString(actual), astTypeToString(expected));
+}
+
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
@@ -1845,7 +2996,6 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
         /* An integer `/` or `%` by a constant 0 always traps when it
          * runs, and the constant folder can't give it a value. */
         if ((operation == AST_BIN_OP_DIV || operation == AST_BIN_OP_MOD) &&
-            !(cc->flags & CCTRL_TRANSPILING) &&
             astIsIntType(left->type) && astIsIntType(right->type))
         {
             int ok = 1;
@@ -1859,22 +3009,38 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
             }
         }
         return binop;
-    } else if (is_err && !(cc->flags & CCTRL_TRANSPILING)) {
+    } else if (is_err) {
+        if (op_tok) {
+            cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
+        }
+        /* Enum mismatches get a message naming the enum, not the
+         * generic "operator cannot be applied" one. */
+        int is_cmp = operation == AST_BIN_OP_EQ || operation == AST_BIN_OP_NE ||
+                     operation == AST_BIN_OP_LT || operation == AST_BIN_OP_LE ||
+                     operation == AST_BIN_OP_GT || operation == AST_BIN_OP_GE;
+        if (is_cmp && astIsDifferentEnum(left->type, right->type)) {
+            cctrlRaiseException(cc,"Cannot compare enum `%s` with enum `%s`",
+                    left->type->clsname->data, right->type->clsname->data);
+        }
+        if (operation == AST_BIN_OP_ASSIGN &&
+            astFnPtrMismatch(left->type, right->type)) {
+            parseRaiseFnConvert(cc, left->type, right->type);
+        }
+        if (operation == AST_BIN_OP_ASSIGN && astIsEnumType(left->type)) {
+            cctrlRaiseException(cc,
+                    "Cannot convert `%s` to enum `%s` without a cast",
+                    astTypeToString(right->type), left->type->clsname->data);
+        }
         const char *opstr = op_tok ? lexemePunctToStringWithFlags(op_tok,0)
                                    : astBinOpKindToString(operation);
         const char *left_kind = astTypeKindToHumanReadable(left->type);
         const char *right_kind = astKindToHumanReadable(right);
         const char *right_type_kind = astTypeKindToHumanReadable(right->type);
-        if (op_tok) {
-            cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
-        }
         char *msg = mprintf("`%s %s %s` is invalid",
                             astTypeToString(left->type),
                             opstr,
                             astTypeToString(right->type));
         cctrlRaiseSuggestion(cc,msg,"The `%s` operator cannot be applied to a %s with a %s of %s", opstr, left_kind, right_kind, right_type_kind);
-    } else if (cc->flags & CCTRL_TRANSPILING) {
-        binop->type = ast_int_type;
     }
     return binop;
 }
@@ -1882,6 +3048,52 @@ static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
 Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right) {
     return parseCreateBinaryOpAt(cc,operation,left,right,
                                  astBinOpToTokenPunct(operation));
+}
+
+/* Usual arithmetic conversions between the two branches of a conditional:
+ * a pointer branch wins (the other is an integer or null), otherwise the
+ * arithmetic result type as for a binary operator. */
+static AstType *parseTernaryResultType(Cctrl *cc, Ast *then, Ast *els) {
+    /* Arrays and string literals decay to pointers; a function name is
+     * a function pointer. Any such branch gives the pointer type (the
+     * other branch is a pointer, an array or a null/integer). */
+    AstType *a = astConvertArray(then->type);
+    AstType *b = astConvertArray(els->type);
+    int a_ptr = a->kind == AST_TYPE_POINTER || a->kind == AST_TYPE_FUNC;
+    int b_ptr = b->kind == AST_TYPE_POINTER || b->kind == AST_TYPE_FUNC;
+    if (astFnPtrMismatch(a, b)) parseRaiseFnConvert(cc, a, b);
+    if (a_ptr) return a;
+    if (b_ptr) return b;
+    /* Both branches the same enum: keep it (as an assignment would),
+     * rather than degrading to the arithmetic result (an integer), as
+     * mixed enum/integer branches still do below. */
+    if (a->kind == AST_TYPE_CLASS && a->is_enum && b->kind == AST_TYPE_CLASS &&
+        b->is_enum && a->clsname && b->clsname &&
+        aoStrCmp(a->clsname, b->clsname)) {
+        return a;
+    }
+    AstType *r = astGetResultType(AST_BIN_OP_ADD, a, b);
+    return r ? r : a;
+}
+
+/* `cond ? then : els`. Only the chosen branch runs (the IR lowers it with
+ * a branch and a phi); the result has the common type of the branches,
+ * which both are cast to so the phi is well typed. Right-associative and
+ * not an lvalue (assertLValue has no AST_TERNARY case), as in C. */
+static Ast *parseTernary(Cctrl *cc, Ast *cond) {
+    Ast *then = parseExpr(cc, 16);
+    if (!then) {
+        cctrlRaiseException(cc, "Expected an expression after `?`");
+    }
+    cctrlTokenExpect(cc, ':');
+    Ast *els = parseExpr(cc, 16);
+    if (!els) {
+        cctrlRaiseException(cc, "Expected an expression after `:`");
+    }
+    AstType *rt = parseTernaryResultType(cc, then, els);
+    then = astCast(then, rt);
+    els = astCast(els, rt);
+    return astTernary(rt, cond, then, els);
 }
 
 Ast *parseExpr(Cctrl *cc, int prec) {
@@ -1915,20 +3127,41 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             continue;
         }
 
+        if (tokenPunctIs(tok,'?')) {
+            LHS = parseTernary(cc,LHS);
+            continue;
+        }
+
         if (tokenPunctIs(tok,'(')) {
             /* `arr[i]->f(x)`, `GetS()->f(x)` etc. reach here rather than
              * parsePostFixExpr, so a function pointer field followed by
              * something that is not a type is a call, not a cast */
             Lexeme *peek = cctrlTokenPeek(cc);
+            int peek_is_fn_type = peek && tokenMayStartFnType(peek) &&
+                                  parseFnStartsType(cc);
+            /* `s.cb((fn(i64) i64)raw)`: a call with a cast argument */
+            if (peek_is_fn_type && tokenPunctIs(peek,'(') &&
+                parseIsCallableFnPtr(LHS)) {
+                peek_is_fn_type = 0;
+            }
             if (parseIsCallableFnPtr(LHS) &&
-                (peek == NULL || !cctrlIsKeyword(cc,peek->start,peek->len))) {
+                (peek == NULL || (!cctrlTokIsKeyword(cc, peek) &&
+                                   !peek_is_fn_type))) {
                 LHS = parseClassFnPtrCall(cc,LHS);
                 continue;
+            }
+            /* `(x)(3)`: not a cast (no type follows) and nothing to call */
+            if (peek && !cctrlTokIsKeyword(cc, peek) &&
+                !peek_is_fn_type) {
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc,"Cannot call %s `%s`: only functions and function pointers can be called",
+                        astTypeKindToHumanReadable(LHS->type),
+                        astLValueToString(LHS,0));
             }
             /* XXX: Should this check still be here ? Not sure as 
              * casting _anything_ makes sense */
             // assertLValue(LHS,cc->lineno);
-            AstType *type = parseDeclSpec(cc);
+            AstType *type = parseCastTypeName(cc);
             LHS = astCast(LHS,type);
             cctrlTokenExpect(cc,')');
             continue;
@@ -1936,11 +3169,11 @@ Ast *parseExpr(Cctrl *cc, int prec) {
 
         if (tokenPunctIs(tok, TK_PLUS_PLUS) || tokenPunctIs(tok, TK_MINUS_MINUS)) {
             if (!assertLValue(LHS)) {
-                char *ast_str = astLValueToString(LHS,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(LHS), ast_str);
+                parseRaiseNotLValue(cc,LHS);
             }
             assertNotArrayAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotEnumArithAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotConstAssign(cc,LHS);
             AstUnOp op;
             if (!astUnaryOpFromToken(tok->i64, &op)) {
                 /* This should be impossible to hit as we've already pre-validated */
@@ -1975,10 +3208,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
         compound_assign = parseCompoundAssign(tok, &deconstructed_compound_op);
         if (tokenPunctIs(tok, '=') || compound_assign) {
             if (!assertLValue(LHS)) {
-                char *ast_str = astLValueToString(LHS,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(LHS), ast_str);
+                parseRaiseNotLValue(cc,LHS);
             }
+            assertNotConstAssign(cc,LHS);
         }
         
         next_prec = prec2;
@@ -1990,6 +3222,8 @@ Ast *parseExpr(Cctrl *cc, int prec) {
         int op_line = tok->line, op_col = tok->col;
         int is_array_assign = (tokenPunctIs(tok, '=') || compound_assign) &&
                 assertNotArrayAssign(cc,LHS,op_line,op_col,tok->len);
+        int is_enum_arith_assign = compound_assign &&
+                assertNotEnumArithAssign(cc,LHS,op_line,op_col,tok->len);
 
         RHS = parseExpr(cc,next_prec);
         if (!RHS) {
@@ -2014,9 +3248,9 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             Ast *value = parseCreateBinaryOpAt(cc, deconstructed_compound_op,
                                                LHS, RHS, tok->i64);
             AstType *ok = astTypeCheck(LHS->type,RHS,compound_assign);
-            if (!ok && !is_array_assign) {
+            if (!ok && !is_array_assign && !is_enum_arith_assign) {
                 typeCheckWarn(cc,op_line,op_col,LHS,RHS);
-            } else if (!is_array_assign && LHS->type &&
+            } else if (!is_array_assign && !is_enum_arith_assign && LHS->type &&
                        LHS->type->kind == AST_TYPE_POINTER &&
                        value->type && !astTypeCheck(LHS->type,value,
                                                     AST_BIN_OP_ASSIGN)) {
@@ -2024,7 +3258,11 @@ Ast *parseExpr(Cctrl *cc, int prec) {
                  * back into the pointer, as `q = q - q` would */
                 typeCheckWarn(cc,op_line,op_col,LHS,value);
             }
-            LHS = parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN, LHS, value);
+            /* Already reported above: building `c = (c + 1 as int)` here
+             * would error again (int -> enum needs a cast), at a stale
+             * position. */
+            LHS = is_enum_arith_assign ? value
+                                       : parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN, LHS, value);
         } else {
             AstBinOp binop;
             if (!astBinOpFromToken(tok->i64,&binop)) {
@@ -2056,6 +3294,19 @@ static void parseRaiseMissingSizeofOperand(Cctrl *cc, char *keyword) {
     cctrlRaiseException(cc, "`%s` needs a type or an expression", keyword);
 }
 
+/* sizeof/alignof of a module type that isn't complete yet, while a
+ * module's type declarations are parsed from their tokens: fail, so it
+ * is tried again once the type is complete (parseModuleTypes) instead of
+ * folding to a size of 0 */
+static void parseCheckSizeKnown(Cctrl *cc, AstType *type) {
+    while (type && type->kind == AST_TYPE_ARRAY) type = type->ptr;
+    if (cc->replaying && type && !type->is_intrinsic && !type->fields &&
+        (type->kind == AST_TYPE_CLASS || type->kind == AST_TYPE_UNION)) {
+        cctrlRaiseException(cc, "the size of %s is not known yet",
+                            astTypeToString(type));
+    }
+}
+
 Ast *parseSizeof(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
     Lexeme *peek = cctrlTokenPeek(cc);
@@ -2072,7 +3323,8 @@ Ast *parseSizeof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "sizeof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlTokIsKeyword(cc, peek) ||
+         (tokenMayStartFnType(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2084,9 +3336,7 @@ Ast *parseSizeof(Cctrl *cc) {
         type = ast->type;
     }
 
-    if (cc->flags & CCTRL_PRESERVE_SIZEOF) {
-        return astSizeOf(type);
-    }
+    parseCheckSizeKnown(cc, type);
 
     /* If we have a string we want the _true_ length of it which as the string
      * is escaped needs to be calculated manually. */
@@ -2118,7 +3368,8 @@ Ast *parseAlignof(Cctrl *cc) {
         parseRaiseMissingSizeofOperand(cc, "alignof");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlTokIsKeyword(cc, peek) ||
+         (tokenMayStartFnType(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2130,12 +3381,13 @@ Ast *parseAlignof(Cctrl *cc) {
         type = ast->type;
     }
 
+    parseCheckSizeKnown(cc, type);
     return astI64Type(astTypeAlign(type));
 }
 
 /* `typeof(<type or expr>)` - same operand handling as sizeof/alignof
- * but folds to a string literal naming the type: typeof(1+1) == "I64",
- * typeof("s") == "U8[2]", typeof(&f) == "F64 *". The expression is
+ * but folds to a string literal naming the type: typeof(1+1) == "i64",
+ * typeof("s") == "u8[2]", typeof(&f) == "f64 *". The expression is
  * only type-checked, never evaluated. */
 Ast *parseTypeof(Cctrl *cc) {
     Lexeme *tok = cctrlTokenGet(cc);
@@ -2146,7 +3398,8 @@ Ast *parseTypeof(Cctrl *cc) {
         cctrlRaiseException(cc, "Unexpected end of input after `typeof`");
     }
     if (tokenPunctIs(tok,'(') && peek &&
-        cctrlIsKeyword(cc,peek->start,peek->len)) {
+        (cctrlTokIsKeyword(cc, peek) ||
+         (tokenMayStartFnType(peek) && parseFnStartsType(cc)))) {
         type = parseFullType(cc);
         cctrlTokenExpect(cc,')');
     } else {
@@ -2201,9 +3454,20 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 cctrlRaiseException(cc,
                         "Unexpected end of input after '('");
             }
-            if (cctrlIsKeyword(cc,peek->start,peek->len)) {
-                type = parseDeclSpec(cc);
+            /* `cb((fn(i64) i64)raw)` calls cb with a cast argument */
+            int paren_arg = tokenPunctIs(peek,'(') &&
+                            (ast->kind == AST_CLASS_REF ||
+                             parseIsCallableFnPtr(ast));
+            if (cctrlTokIsKeyword(cc, peek) ||
+                (!paren_arg && tokenMayStartFnType(peek) &&
+                 parseFnStartsType(cc))) {
+                s64 open_line = tok->line, open_col = tok->col;
+                type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
+                /* the old postfix cast `x(T)` */
+                cctrlErrorAt(cc, open_line, open_col, 1,
+                    "a postfix cast: write `(%s)` before the value",
+                    astTypeToString(type));
                 ast = astCast(ast,type);
                 continue;
             } else if (ast->kind == AST_CLASS_REF ||
@@ -2231,11 +3495,11 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
         if (tokenPunctIs(tok,TK_PLUS_PLUS) || 
             tokenPunctIs(tok,TK_MINUS_MINUS)) {
             if (!assertLValue(ast)) {
-                char *ast_str = astLValueToString(ast,0);
-                cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
-                        astKindToHumanReadable(ast), ast_str);
+                parseRaiseNotLValue(cc,ast);
             }
             assertNotArrayAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotEnumArithAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotConstAssign(cc,ast);
             if (tok->i64 == TK_PLUS_PLUS) {
                 return astUnaryOperator(ast->type,AST_UN_OP_POST_INC,ast);
             } else {
@@ -2266,7 +3530,6 @@ static void parseCheckArithmeticUnaryOp(Cctrl *cc, AstUnOp op, Ast *operand,
                                         int line, int col, int len)
 {
     AstType *ty = operand->type;
-    if (cc->flags & CCTRL_TRANSPILING) return;
     if (!ty || astIsIntType(ty) || astIsIntrinsicClass(ty) ||
         ty->kind == AST_TYPE_AUTO) {
         return;
@@ -2275,9 +3538,13 @@ static void parseCheckArithmeticUnaryOp(Cctrl *cc, AstUnOp op, Ast *operand,
 
     const char *opstr = op == AST_UN_OP_MINUS ? "-" :
                         op == AST_UN_OP_PLUS  ? "+" : "~";
-    char *msg = mprintf("The `%s` operator cannot be applied to a %s of %s",
-                        opstr, astKindToHumanReadable(operand),
-                        astTypeKindToHumanReadable(ty));
+    /* a variable of an fn type is a function pointer, as the old
+     * declarator's was */
+    char *msg = ty->kind == AST_TYPE_FUNC
+        ? mprintf("The `%s` operator cannot be applied to a function pointer", opstr)
+        : mprintf("The `%s` operator cannot be applied to a %s of %s",
+                  opstr, astKindToHumanReadable(operand),
+                  astTypeKindToHumanReadable(ty));
     char *sug = mprintf("`%s` on `%s` is invalid",
                         opstr, astTypeToString(ty));
     AoStr *bold = aoStrNew();
@@ -2300,7 +3567,6 @@ static void parseCheckDerefOperand(Cctrl *cc, Ast *operand,
                                    int line, int col, int len)
 {
     AstType *ty = operand->type;
-    if (cc->flags & CCTRL_TRANSPILING) return;
     if (!ty || ty->ptr || ty->kind == AST_TYPE_AUTO) return;
 
     char *msg = mprintf("The `*` operator cannot be applied to a %s of %s, "
@@ -2323,9 +3589,71 @@ static void parseCheckDerefOperand(Cctrl *cc, Ast *operand,
     cctrlTerminate(cc);
 }
 
+/* Does `tok` start a type name (a built-in type, a class, a union or a
+ * typedef-like name), so that `(` before it opens a prefix cast? */
+static int parseIsCastTypeName(Cctrl *cc, Lexeme *tok) {
+    /* `((fn(i64) i64) *)p` */
+    if (tokenPunctIs(tok,'(')) {
+        return parseFnStartsType(cc);
+    }
+    if (tok == NULL ||
+        (tok->tk_type != TK_IDENT && tok->tk_type != TK_KEYWORD)) {
+        return 0;
+    }
+    /* `(const ...)`: not a real cast (`const` isn't a type), but routing
+     * it through parseCastTypeName reports the specific "const is only
+     * allowed on declarations" rather than a parenthesised-expression
+     * error. */
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        return 1;
+    }
+    /* As in C, a variable in scope hides a type of the same name:
+     * `(tm.tv_sec)` reads the variable `tm`, not the class. */
+    if (tok->tk_type == TK_IDENT &&
+        ((cc->localenv && mapGetLen(cc->localenv, tok->start, tok->len)) ||
+         mapGetLen(cc->global_env, tok->start, tok->len))) {
+        return 0;
+    }
+    if (tokenIsFnIdent(tok)) {
+        return parseFnStartsType(cc);
+    }
+    AstType *type = cctrlGetKeyWord(cc, tok->start, tok->len);
+    /* `(Color.red ^ 1)`: an enum member, not a cast to the enum */
+    if (type && type->kind == AST_TYPE_CLASS && type->is_enum &&
+        tokenPunctIs(cctrlTokenPeekBy(cc,1),'.')) {
+        return 0;
+    }
+    return type != NULL && type->kind != AST_TYPE_VIS_MODIFIER &&
+           type->kind != AST_TYPE_INLINE && type->kind != AST_TYPE_AUTO;
+}
+
+/* The type in a prefix cast: `T`, `T *`, ... or a function pointer
+ * `T (*)(params)`, whose parameters may be unnamed. */
+static AstType *parseCastTypeName(Cctrl *cc) {
+    AstType *type = parseDeclSpec(cc);
+    if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        int has_var_args = 0;
+        cctrlTokenGet(cc);
+        cctrlTokenExpect(cc,'*');
+        cctrlTokenExpect(cc,')');
+        cctrlTokenExpect(cc,'(');
+        AstType *fn_type = astMakeFunctionType(type, NULL);
+        fn_type->params = parseParams(cc,')',&has_var_args,0);
+        fn_type->has_var_args = has_var_args;
+        return fn_type;
+    }
+    return type;
+}
+
 Ast *parseUnaryExpr(Cctrl *cc) {
     Lexeme *tok;
     Ast *ast;
+
+    if (cc->pending_unary) {
+        ast = cc->pending_unary;
+        cc->pending_unary = NULL;
+        return ast;
+    }
 
     if ((tok = cctrlTokenGet(cc)) == NULL) {
         cctrlRaiseException(cc,"Unexpected end of input");
@@ -2336,6 +3664,14 @@ Ast *parseUnaryExpr(Cctrl *cc) {
             case KW_SIZEOF: return parseSizeof(cc);
             case KW_ALIGNOF: return parseAlignof(cc);
             case KW_TYPEOF: return parseTypeof(cc);
+            case KW_TRUE:
+            case KW_FALSE: {
+                ast = astI64Type(tok->i64 == KW_TRUE);
+                ast->type = cctrlGetKeyWord(cc, "Bool", 4);
+                return ast;
+            }
+            case KW_NULL:
+                return astCast(astI64Type(0), astMakePointerType(ast_void_type));
             case KW_DEFINED: {
                 cctrlTokenExpect(cc,'(');
                 tok = cctrlTokenGetRequired(cc);
@@ -2359,6 +3695,33 @@ Ast *parseUnaryExpr(Cctrl *cc) {
     }
 
     if (tokenPunctIs(tok,'(')) {
+        /* `(T)x`: a C prefix cast when what follows the `(` names a type.
+         * Its operand is a unary expression, so the cast binds tighter
+         * than any binary operator and `(T)p->f` casts `p->f`, as in C. */
+        if (parseIsCastTypeName(cc, cctrlTokenPeek(cc))) {
+            if (tokenPunctIs(cctrlTokenPeek(cc),'(')) {
+                /* `((fn(i64) i64) *)pp` is a cast to a pointer to a
+                 * function pointer, `((fn(i64) i64)raw)(6)` a cast in
+                 * parentheses: what follows the inner `)` tells which
+                 * (the tokens can't be looked ahead that far) */
+                cctrlTokenGet(cc);
+                AstType *fn_type = parseFnType(cc);
+                cctrlTokenExpect(cc,')');
+                Lexeme *after = cctrlTokenPeek(cc);
+                if (!tokenPunctIs(after,'*') && !tokenPunctIs(after,')')) {
+                    cc->pending_unary = astCast(parseUnaryExpr(cc), fn_type);
+                    ast = parseExpr(cc,16);
+                    cctrlTokenExpect(cc,')');
+                    return parsePostFixOps(cc,ast);
+                }
+                AstType *type = parsePointerType(cc,fn_type);
+                cctrlTokenExpect(cc,')');
+                return astCast(parseUnaryExpr(cc), type);
+            }
+            AstType *type = parseCastTypeName(cc);
+            cctrlTokenExpect(cc,')');
+            return astCast(parseUnaryExpr(cc), type);
+        }
         ast = parseExpr(cc,16);
         cctrlTokenExpect(cc,')');
         return parsePostFixOps(cc,ast);
@@ -2410,6 +3773,8 @@ Ast *parseUnaryExpr(Cctrl *cc) {
 
         if (unary_op == AST_UN_OP_PRE_INC || unary_op == AST_UN_OP_PRE_DEC) {
             assertNotArrayAssign(cc,operand,op_line,op_col,op_len);
+            assertNotEnumArithAssign(cc,operand,op_line,op_col,op_len);
+            assertNotConstAssign(cc,operand);
         }
 
         switch (unary_op) {
@@ -2436,14 +3801,6 @@ Ast *parseUnaryExpr(Cctrl *cc) {
                 }
                 parseCheckDerefOperand(cc, operand, op_line, op_col, op_len);
                 type = operand->type ? operand->type->ptr : NULL;
-                /* The transpiler doesn't report type errors (as for a
-                 * binary op): `**pp(I64 *)` dereferences the I64 that
-                 * `*pp(I64 *)` gives. Without a type the node crashed
-                 * it, so write it as an I64 and let the C compiler
-                 * reject it. */
-                if (!type && (cc->flags & CCTRL_TRANSPILING)) {
-                    type = ast_int_type;
-                }
                 break;
             case AST_UN_OP_BIT_NOT:
                 parseCheckArithmeticUnaryOp(cc, unary_op, operand,

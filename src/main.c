@@ -30,7 +30,6 @@
 #include "list.h"
 #include "lsp.h"
 #include "memory.h"
-#include "transpiler.h"
 #include "types.h"
 #include "util.h"
 
@@ -79,6 +78,21 @@ typedef struct ktmLib {
  * its own (Homebrew on Apple Silicon most notably) - but only ones
  * that exist, so ld doesn't warn, and only when a `#link <name>` is
  * actually in play. */
+/* After a failed link: the program's functions that are declared but
+ * never defined. Their symbols are the program's own (`_K06strlen`), so
+ * one meant as a C function needs `extern "c"`. */
+static void noteUndefinedPrototypes(Cctrl *cc) {
+    MapIter it;
+    mapIterInit(cc->global_env, &it);
+    while (mapIterNext(&it)) {
+        Ast *fn = (Ast *)it.node->value;
+        if (fn && fn->kind == AST_FUN_PROTO && (fn->flags & AST_FLAG_PROGRAM)) {
+            fprintf(stderr, "note: `%s` is declared but not defined; a C function "
+                    "is declared with extern \"c\"\n", fn->fname->data);
+        }
+    }
+}
+
 static AoStr *linkLibFlags(Cctrl *cc) {
     AoStr *flags = aoStrNew();
     flags->data[0] = '\0';
@@ -303,6 +317,86 @@ int writeAsmToTmp(AoStr *asmbuf) {
     return 1;
 } 
 
+/* File `to` as a path relative to directory `from`, both real paths:
+ * up from `from` to their longest common directory, then down */
+static char *relativePath(const char *from, const char *to) {
+    size_t common = 0, i = 0;
+    while (from[i] && from[i] == to[i]) {
+        if (from[i] == '/') common = i;
+        i++;
+    }
+    if (from[i] == '\0' && to[i] == '/') common = i;
+    AoStr *rel = aoStrNew();
+    for (const char *p = from + common; *p; ++p) {
+        if (*p == '/') aoStrCatPrintf(rel, "../");
+    }
+    aoStrCatPrintf(rel, "%s", to + common + 1);
+    return aoStrMove(rel);
+}
+
+/* `ktm -lib a.b dir/a/b`: liba.b.a and the shared object next to the
+ * module's sources; `ktm -lib name dir` over a tree: libname.a and the
+ * shared object in dir, from every module under it (libktm: in the
+ * install directory's lib/, see below). Each module's
+ * directory gets a .ktmlib marker an importer finds the library by,
+ * relative to the marker. The object file is a temporary one, nothing
+ * is installed, and the commands are printed only with -v. */
+static void emitModuleLibrary(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
+    writeAsmToTmp(asmbuf);
+    char *dir = realpath(args->module_dir, NULL);
+    if (!dir) dir = args->module_dir;
+#if IS_BSD
+    char *shared = mprintf("%s/lib%s.dylib", dir, args->lib_name);
+    char *shared_flags = "-dynamiclib -undefined dynamic_lookup";
+#else
+    char *shared = mprintf("%s/lib%s.so", dir, args->lib_name);
+    char *shared_flags = "-shared -Wl,-Bsymbolic";
+#endif
+    char *archive = mprintf("%s/lib%s.a", dir, args->lib_name);
+    char *shared_libs = "";
+    if (cc->is_libktm && args->lib_tree_dirs) {
+        /* `ktm -lib ktm <prefix>/modules`: the stdlib, into <prefix>/lib
+         * as ktmLibInit names it: the archive `-lktm` finds, and only the
+         * versioned shared object the JIT loads (an unversioned one would
+         * make `-lktm` link dynamically) */
+        char *lib_dir = mprintf("%s/lib", args->install_dir);
+        safeSystem(mprintf("mkdir -p %s", lib_dir), args->verbose);
+        char *real = realpath(lib_dir, NULL);
+        if (real) lib_dir = real;
+        archive = mprintf("%s/libktm.a", lib_dir);
+#if IS_BSD
+        shared = mprintf("%s/libktm.0.0.1.dylib", lib_dir);
+        shared_flags = mprintf("-dynamiclib -Wl,-install_name,%s", shared);
+#else
+        shared = mprintf("%s/libktm.so.0.0.1", lib_dir);
+        shared_flags = "-shared -Wl,-Bsymbolic -Wl,-soname,libktm.so.0.0.1";
+#endif
+        shared_libs = mprintf(CLIBS" %s", linkLibFlags(cc)->data);
+    }
+    close(makeTmpFile(run_tmp_file, "obj", ".o"));
+    char *object = run_tmp_file;
+    safeSystem(mprintf("%s -fPIC -c %s -o %s", cc->CC, asm_tmp_file, object),
+               args->verbose);
+    safeSystem(mprintf("rm -f %s && ar rcs %s %s", archive, archive, object),
+               args->verbose);
+    safeSystem(mprintf("%s -fPIC %s %s -o %s %s", cc->CC, shared_flags, object,
+                       shared, shared_libs), args->verbose);
+
+    int count = args->lib_tree_dirs ? (int)args->lib_tree_dirs->size : 1;
+    for (int i = 0; i < count; ++i) {
+        char *mod_dir = args->lib_tree_dirs
+                      ? (char *)args->lib_tree_dirs->entries[i] : dir;
+        char *marker = mprintf("%s/.ktmlib", mod_dir);
+        FILE *mf = fopen(marker, "w");
+        if (!mf) {
+            loggerPanic("Failed to write '%s': %s\n", marker, strerror(errno));
+        }
+        fprintf(mf, "static %s\nshared %s\n", relativePath(mod_dir, archive),
+                relativePath(mod_dir, shared));
+        fclose(mf);
+    }
+}
+
 void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
     AoStr *cmd = aoStrNew();
     ktmLib lib;
@@ -340,18 +434,20 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                     (s64)asmbuf->len, written);
         }
         close(fd);
+    } else if (args->emit_dylib && args->module_dir) {
+        emitModuleLibrary(cc, asmbuf, args);
     } else if (args->emit_dylib) {
         writeAsmToTmp(asmbuf);
         ktmLibInit(cc, &lib,args,args->lib_name);
         aoStrCatPrintf(cmd, "%s -shared -fPIC -c %s -o ./%s",
                 cc->CC,
                 asm_tmp_file,args->obj_outfile);
-        safeSystem(cmd->data,1);
+        safeSystem(cmd->data, args->verbose);
         /* The archive first: install_cmd copies it, so building it
          * afterwards would ship a stale (or absent) one. */
-        safeSystem(lib.stylib_cmd, 1);
-        safeSystem(lib.dylib_cmd, 1);
-        safeSystem(lib.install_cmd, 1);
+        safeSystem(lib.stylib_cmd, args->verbose);
+        safeSystem(lib.dylib_cmd, args->verbose);
+        safeSystem(lib.install_cmd, args->verbose);
     } else {
         AoStr *ofiles = aoStrNew();
         AoStr *link_flags = linkLibFlags(cc);
@@ -394,6 +490,7 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
             unlink(asm_tmp_file);
             asm_tmp_file[0] = '\0';
             if (link_ok != 0) {
+                noteUndefinedPrototypes(cc);
                 loggerPanic("Failed to execute command: '%s'\n", cmd->data);
             }
 
@@ -447,7 +544,10 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                 clibs,
                 args->output_filename);
 
-        safeSystem(cmd->data, 0);
+        if (system(cmd->data) != 0) {
+            noteUndefinedPrototypes(cc);
+            loggerPanic("Failed to execute command: '%s'\n", cmd->data);
+        }
     }
     removeTmpFiles();
     aoStrRelease(cmd);
@@ -606,26 +706,6 @@ int main(int argc, char **argv) {
 
     if (args.print_tokens) {
         compileToTokens(cc,&args,lexer_flags);
-        goto success;
-    }
-
-    if (args.transpile) {
-        /* The transpiler parses with macros left unexpanded and without
-         * the type checks, so it can't report errors itself (and could
-         * crash on what error recovery leaves behind). Check the program
-         * with the compiler's own front end first: its diagnostics are
-         * printed as for a compile, and an error stops here. */
-        if (!compileToAst(cc,&args,lexer_flags)) {
-            memoryRelease();
-            return 1;
-        }
-        cc = mainNewCctrl(&args);
-        parseResetRangeLoopIdx();
-        AoStr *buf = transpileToC(cc,&args);
-        printf("/* This code has been automatically generated by running: \n"
-               " * `ktm -transpile %s`\n"
-               " * please check for errors! */\n\n"
-               "%s",args.infile, buf->data);
         goto success;
     }
 

@@ -1,198 +1,188 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 #define ARG_COUNT_TEST_FILE "__39_arg_count_fail.ktm"
 #define ARG_COUNT_TEST_OUT  "__39_arg_count_fail.out"
 
-U0 CleanupArgCountTest(U0)
-{
-  Rm(ARG_COUNT_TEST_FILE);
-  Rm(ARG_COUNT_TEST_OUT);
-  Rm("./a.out");
+void cleanupArgCountTest(void) {
+    fs.remove(ARG_COUNT_TEST_FILE);
+    fs.remove(ARG_COUNT_TEST_OUT);
+    fs.remove("./a.out");
 }
 
-Bool CompileFailsWith(U8 *source, U8 *expected)
-{
-  U8 *out;
-  I64 res;
+bool compileFailsWith(u8 *source, u8 *expected) {
+    u8 *out;
+    i64 res;
 
-  CleanupArgCountTest;
+    cleanupArgCountTest();
 
-  if (!FileWrite(ARG_COUNT_TEST_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(ARG_COUNT_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " ARG_COUNT_TEST_FILE " > " ARG_COUNT_TEST_OUT " 2>&1");
-  if (res == 0) {
-    CleanupArgCountTest;
-    return FALSE;
-  }
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " ARG_COUNT_TEST_FILE " > " ARG_COUNT_TEST_OUT " 2>&1");
+    if (res == 0) {
+        cleanupArgCountTest();
+        return false;
+    }
 
-  out = FileRead(ARG_COUNT_TEST_OUT);
-  if (!out) {
-    CleanupArgCountTest;
-    return FALSE;
-  }
+    out = fs.readAll(ARG_COUNT_TEST_OUT);
+    if (!out) {
+        cleanupArgCountTest();
+        return false;
+    }
 
-  if (!strstr(out, expected)) {
-    "%s\n", out;
-    Free(out);
-    CleanupArgCountTest;
-    return FALSE;
-  }
+    if (!libc.strstr(out, expected)) {
+        printf("%s\n", out);
+        mem.free(out);
+        cleanupArgCountTest();
+        return false;
+    }
 
-  Free(out);
-  CleanupArgCountTest;
-  return TRUE;
+    mem.free(out);
+    cleanupArgCountTest();
+    return true;
 }
 
-Bool TestOverArgs(U0)
-{
-  return CompileFailsWith(
+bool testOverArgs(void) {
+    return compileFailsWith(
 "
-U0 DoNothing(I32 a, I32 b) {
+void DoNothing(i32 a, i32 b) {
   return;
 }
 
-U0 Main() {
+void main() {
   DoNothing(1,2,3,4);
 }
 ",
-    "Unexpected number of arguments 4 in call to DoNothing(), expected 2 args");
+        "Unexpected number of arguments 4 in call to DoNothing(), expected 2 args");
 }
 
-Bool TestUnderArgs(U0)
-{
-  return CompileFailsWith(
+bool testUnderArgs(void) {
+    return compileFailsWith(
 "
-U0 DoNothing(I32 a, I32 b) {
+void DoNothing(i32 a, i32 b) {
   return;
 }
 
-U0 Main() {
+void main() {
   DoNothing(1);
 }
 ",
-    "Unexpected number of arguments 1 in call to DoNothing(), expected 2 args");
+        "Unexpected number of arguments 1 in call to DoNothing(), expected 2 args");
 }
 
-Bool TestOverDefaultArgs(U0)
-{
-  return CompileFailsWith(
+bool testOverDefaultArgs(void) {
+    return compileFailsWith(
 "
-I64 AddS(I64 i1,
-         I64 i2=2,
-         I64 i3)
+i64 AddS(i64 i1,
+         i64 i2=2,
+         i64 i3)
 {
   return i1+i2+i3;
 }
 
-U0 Main()
+void main()
 {
-  I64 res = AddS(3,4,5,6);
+  i64 res = AddS(3,4,5,6);
 }
 ",
-    "Unexpected number of arguments 4 in call to AddS(), expected args in range 2 to 3");
+        "Unexpected number of arguments 4 in call to AddS(), expected args in range 2 to 3");
 }
 
-Bool TestUnderDefaultArgs(U0)
-{
-  return CompileFailsWith(
+bool testUnderDefaultArgs(void) {
+    return compileFailsWith(
 "
-I64 AddS(I64 i1,
-         I64 i2=2,
-         I64 i3)
+i64 AddS(i64 i1,
+         i64 i2=2,
+         i64 i3)
 {
   return i1+i2+i3;
 }
 
-U0 Main()
+void main()
 {
-  I64 res = AddS(3);
+  i64 res = AddS(3);
 }
 ",
-    "Unexpected number of arguments 1 in call to AddS(), argument 3 is required");
+        "Unexpected number of arguments 1 in call to AddS(), argument 3 is required");
 }
 
-Bool TestMidDefaultMissingRequiredArg(U0)
-{
-  return CompileFailsWith(
+bool testMidDefaultMissingRequiredArg(void) {
+    return compileFailsWith(
 "
-I64 AddS(I64 i1, I64 i2=2, I64 i3)
+i64 AddS(i64 i1, i64 i2=2, i64 i3)
 {
   return i1+i2+i3;
 }
 
-U0 Main()
+void main()
 {
   AddS(1,2);
 }
 ",
-    "Unexpected number of arguments 2 in call to AddS(), argument 3 is required");
+        "Unexpected number of arguments 2 in call to AddS(), argument 3 is required");
 }
 
-Bool TestUnderVarArgs(U0)
-{
-  return CompileFailsWith(
+bool testUnderVarArgs(void) {
+    return compileFailsWith(
 "
-I64 AddS(I64 i1, ...)
+i64 AddS(i64 i1, ...)
 {
   return i1;
 }
 
-U0 Main()
+void main()
 {
   AddS();
 }
 ",
-    "Unexpected number of arguments 0 in call to AddS(), expected 1 args");
+        "Unexpected number of arguments 0 in call to AddS(), expected 1 args");
 }
 
-Bool TestUnderFunctionPointerArgs(U0)
-{
-  return CompileFailsWith(
+bool testUnderFunctionPointerArgs(void) {
+    return compileFailsWith(
 "
-I64 Add(I64 i1, I64 i2)
+i64 Add(i64 i1, i64 i2)
 {
   return i1+i2;
 }
 
-U0 Main()
+void main()
 {
-  I64 (*fn)(I64 i1, I64 i2) = &Add;
-  fn(1);
+  fn(i64 i1, i64 i2) i64 f = &Add;
+  f(1);
 }
 ",
-    "Unexpected number of arguments 1 in call to fn(), expected 2 args");
+        "Unexpected number of arguments 1 in call to f(), expected 2 args");
 }
 
-I32 Main()
-{
-  "Test - Argument count errors: \n";
-  I64 tests = 7;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - Argument count errors: \n");
+    i64 tests = 7;
+    i64 correct = 0;
 
-  if (TestOverArgs()) correct++;
-  else "Failed - TestOverArgs()\n";
+    if (testOverArgs()) { correct++; }
+    else { printf("Failed - TestOverArgs()\n"); }
 
-  if (TestUnderArgs()) correct++;
-  else "Failed - TestUnderArgs()\n";
+    if (testUnderArgs()) { correct++; }
+    else { printf("Failed - TestUnderArgs()\n"); }
 
-  if (TestOverDefaultArgs()) correct++;
-  else "Failed - TestOverDefaultArgs()\n";
+    if (testOverDefaultArgs()) { correct++; }
+    else { printf("Failed - TestOverDefaultArgs()\n"); }
 
-  if (TestUnderDefaultArgs()) correct++;
-  else "Failed - TestUnderDefaultArgs()\n";
+    if (testUnderDefaultArgs()) { correct++; }
+    else { printf("Failed - TestUnderDefaultArgs()\n"); }
 
-  if (TestMidDefaultMissingRequiredArg()) correct++;
-  else "Failed - TestMidDefaultMissingRequiredArg()\n";
+    if (testMidDefaultMissingRequiredArg()) { correct++; }
+    else { printf("Failed - TestMidDefaultMissingRequiredArg()\n"); }
 
-  if (TestUnderVarArgs()) correct++;
-  else "Failed - TestUnderVarArgs()\n";
+    if (testUnderVarArgs()) { correct++; }
+    else { printf("Failed - TestUnderVarArgs()\n"); }
 
-  if (TestUnderFunctionPointerArgs()) correct++;
-  else "Failed - TestUnderFunctionPointerArgs()\n";
+    if (testUnderFunctionPointerArgs()) { correct++; }
+    else { printf("Failed - TestUnderFunctionPointerArgs()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

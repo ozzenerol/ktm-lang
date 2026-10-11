@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* Rm marked a directory with an internal flag 0x6, which is
  * RM_VERBOSE|RM_FORCE: Rm(file, RM_VERBOSE / RM_FORCE / RM_RECURSE)
@@ -7,133 +7,127 @@
  * returned -1 although RM_FORCE means "ignore nonexistent files".
  * Everything happens in a fresh mkdtemp directory. */
 
-extern "c" U8 *mkdtemp(U8 *template);
-extern "c" I32 dup(I32 fd);
-extern "c" I32 dup2(I32 fd, I32 fd2);
-extern "c" I32 fflush(U0 *stream);
+extern "c" u8 *mkdtemp(u8 *template);
+extern "c" i32 dup(i32 fd);
+extern "c" i32 dup2(i32 fd, i32 fd2);
+extern "c" i32 fflush(void *stream);
 
-U8 *g_root;
-U8 g_path[256];
-U8 g_out[256];
-I32 g_saved;
+u8 *gRoot;
+u8 gPath[256];
+u8 gOut[256];
+i32 gSaved;
 
-U8 *P(U8 *name)
-{
-  StrPrint(g_path, "%s/%s", g_root, name);
-  return g_path;
+u8 *P(u8 *name) {
+    str.formatTo(gPath, "%s/%s", gRoot, name);
+    return gPath;
 }
 
-Bool Exists(U8 *name)
-{
-  cStat st;
-  return lstat(P(name), &st) == 0;
+bool exists(u8 *name) {
+    libc.cStat st;
+    return libc.lstat(P(name), &st) == 0;
 }
 
-U0 MakeFile(U8 *name)
-{
-  FileWrite(P(name), "k\n", 2);
+void makeFile(u8 *name) {
+    fs.writeAll(P(name), "k\n", 2);
 }
 
 /* Send stdout to a file until Captured() */
-U0 Capture()
-{
-  fflush(NULL);
-  g_saved = dup(1);
-  I32 fd = open(g_out, O_WRONLY|O_CREAT|O_TRUNC, 0x1A4);
-  dup2(fd, 1);
-  close(fd);
+void capture() {
+    libc.fflush(null);
+    gSaved = dup(1);
+    i32 fd = libc.open(gOut, libc.O_WRONLY|libc.O_CREAT|libc.O_TRUNC, 0x1A4);
+    dup2(fd, 1);
+    libc.close(fd);
 }
 
-/* Restore stdout; TRUE if what was printed is `want` (with %s = path) */
-Bool Captured(U8 *want, U8 *path=NULL)
-{
-  fflush(NULL);
-  dup2(g_saved, 1);
-  close(g_saved);
-  U8 *got = FileRead(g_out), *exp = StrPrint(NULL, want, path);
-  Bool ok = got && !StrCmp(got, exp);
-  if (!ok) "printed '%s' want '%s'\n", got, exp;
-  Free(got);
-  Free(exp);
-  return ok;
+/* Restore stdout; true if what was printed is `want` (with %s = path) */
+bool captured(u8 *want, u8 *path=null) {
+    libc.fflush(null);
+    dup2(gSaved, 1);
+    libc.close(gSaved);
+    u8 *got = fs.readAll(gOut), *exp = str.formatTo(null, want, path);
+    bool ok = got && !str.cmp(got, exp);
+    if (!ok) { printf("printed '%s' want '%s'\n", got, exp); }
+    mem.free(got);
+    mem.free(exp);
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  U8 root[64], *full;
-  I32 r;
-  "Test - Rm flags: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    u8 root[64], *full;
+    i32 r;
+    printf("Test - Rm flags: ");
 
-  StrCpy(root, "./ktm-test-306-XXXXXX");
-  if (!mkdtemp(root)) {
-    PrintResult(0, 1);
-    "====\n";
+    str.copy(root, "./ktm-test-306-XXXXXX");
+    if (!mkdtemp(root)) {
+        test.printResult(0, 1);
+        printf("====\n");
+        return 0;
+    }
+    gRoot = root;
+    str.formatTo(gOut, "%s/out.txt", root);
+    fs.makeDir(P("w"));
+    makeFile("w/a");
+    makeFile("w/b");
+    makeFile("w/c");
+    makeFile("w/d");
+    fs.makeDir(P("w/empty"));
+    fs.makeDir(P("w/empty2"));
+    fs.makeDir(P("w/full"));
+    makeFile("w/full/f");
+    fs.makeDir(P("w/full/sub"));
+    makeFile("w/full/sub/g");
+
+    /* A file goes with any flags, quietly unless RM_VERBOSE */
+    capture();
+    r = fs.remove(P("w/a"));
+    tests++; if (captured("") && r == 0 && !exists("w/a")) { correct++; }
+    capture();
+    r = fs.remove(P("w/b"), fs.REMOVE_FORCE);
+    tests++; if (captured("") && r == 0 && !exists("w/b")) { correct++; }
+    capture();
+    r = fs.remove(P("w/c"), fs.REMOVE_RECURSE);
+    tests++; if (captured("") && r == 0 && !exists("w/c")) { correct++; }
+    full = str.dup(P("w/d"));
+    capture();
+    r = fs.remove(full);
+    tests++; if (captured("") && r == 0 && !exists("w/d")) { correct++; }
+    mem.free(full);
+
+    /* A missing file: an error, unless RM_FORCE */
+    tests++; if (fs.remove(P("w/zz")) == -1) { correct++; }
+    capture();
+    r = fs.remove(P("w/zz"), fs.REMOVE_FORCE);
+    tests++; if (captured("") && r == 0) { correct++; }
+    tests++; if (fs.remove(P("w/zz"), fs.REMOVE_FORCE|fs.REMOVE_RECURSE) == 0) { correct++; }
+    tests++; if (fs.remove(null) == -1) { correct++; }
+
+    /* An empty directory goes quietly; with RM_VERBOSE it says so */
+    capture();
+    r = fs.remove(P("w/empty"));
+    tests++; if (captured("") && r == 0 && !exists("w/empty")) { correct++; }
+    full = str.dup(P("w/empty2"));
+    capture();
+    r = fs.remove(full);
+    tests++; if (captured("") && r == 0 &&
+                             !exists("w/empty2")) { correct++; }
+    mem.free(full);
+
+    /* A full directory needs RM_RECURSE */
+    capture();
+    r = fs.remove(P("w/full"));
+    tests++; if (captured("") && r == -1 && exists("w/full/f")) { correct++; }
+    tests++; if (fs.remove(P("w/full"), fs.REMOVE_FORCE) == -1 && exists("w/full/f")) { correct++; }
+    tests++; if (fs.remove(P("w/full"), fs.REMOVE_RECURSE) == 0 && !exists("w/full")) { correct++; }
+
+    fs.remove(gOut);
+    tests++; if (fs.remove(P("w"), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
+    full = str.formatTo(null, "rm -rf '%s'", root);
+    proc.shell(full);
+    mem.free(full);
+
+    test.printResult(correct, tests);
+    printf("====\n");
     return 0;
-  }
-  g_root = root;
-  StrPrint(g_out, "%s/out.txt", root);
-  MkDir(P("w"));
-  MakeFile("w/a");
-  MakeFile("w/b");
-  MakeFile("w/c");
-  MakeFile("w/d");
-  MkDir(P("w/empty"));
-  MkDir(P("w/empty2"));
-  MkDir(P("w/full"));
-  MakeFile("w/full/f");
-  MkDir(P("w/full/sub"));
-  MakeFile("w/full/sub/g");
-
-  /* A file goes with any flags, quietly unless RM_VERBOSE */
-  Capture;
-  r = Rm(P("w/a"));
-  tests++; if (Captured("") && r == 0 && !Exists("w/a")) correct++;
-  Capture;
-  r = Rm(P("w/b"), RM_FORCE);
-  tests++; if (Captured("") && r == 0 && !Exists("w/b")) correct++;
-  Capture;
-  r = Rm(P("w/c"), RM_RECURSE);
-  tests++; if (Captured("") && r == 0 && !Exists("w/c")) correct++;
-  full = StrNew(P("w/d"));
-  Capture;
-  r = Rm(full, RM_VERBOSE);
-  tests++; if (Captured("Rm '%s'\n", full) && r == 0 && !Exists("w/d")) correct++;
-  Free(full);
-
-  /* A missing file: an error, unless RM_FORCE */
-  tests++; if (Rm(P("w/zz")) == -1) correct++;
-  Capture;
-  r = Rm(P("w/zz"), RM_FORCE);
-  tests++; if (Captured("") && r == 0) correct++;
-  tests++; if (Rm(P("w/zz"), RM_FORCE|RM_RECURSE) == 0) correct++;
-  tests++; if (Rm(NULL) == -1) correct++;
-
-  /* An empty directory goes quietly; with RM_VERBOSE it says so */
-  Capture;
-  r = Rm(P("w/empty"));
-  tests++; if (Captured("") && r == 0 && !Exists("w/empty")) correct++;
-  full = StrNew(P("w/empty2"));
-  Capture;
-  r = Rm(full, RM_VERBOSE);
-  tests++; if (Captured("removed dir '%s'\n", full) && r == 0 &&
-               !Exists("w/empty2")) correct++;
-  Free(full);
-
-  /* A full directory needs RM_RECURSE */
-  Capture;
-  r = Rm(P("w/full"));
-  tests++; if (Captured("") && r == -1 && Exists("w/full/f")) correct++;
-  tests++; if (Rm(P("w/full"), RM_FORCE) == -1 && Exists("w/full/f")) correct++;
-  tests++; if (Rm(P("w/full"), RM_RECURSE) == 0 && !Exists("w/full")) correct++;
-
-  Rm(g_out);
-  tests++; if (Rm(P("w"), RM_RECURSE) == 0 && !Exists("w")) correct++;
-  full = StrPrint(NULL, "rm -rf '%s'", root);
-  System(full);
-  Free(full);
-
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
 }

@@ -39,13 +39,13 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a></li><li><a href="#libraries">Libraries</a></li><li><a href="#the-transpiler">The transpiler</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a></li><li><a href="#libraries">Libraries</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
 <h1>Tools</h1>
 <p class="lede">One binary, <code>ktm</code>, does everything: compiling, JIT, REPL, language
-server, transpiler and debugging output.</p>
+server and debugging output.</p>
 
 <h2 id="compiling">Compiling<a class="anchor" href="#compiling" aria-label="Link to this section">#</a></h2>
 <pre><code>ktm main.ktm -o app          # build ./app
@@ -83,7 +83,6 @@ removed afterwards, so several compiles can run at once.</p>
     <tr><td><code>-Werror</code></td><td>Treat warnings as errors</td></tr>
     <tr><td><code>--install-dir &lt;dir&gt;</code></td><td>Use <code>&lt;dir&gt;/include</code> and <code>&lt;dir&gt;/lib</code> instead of the install prefix</td></tr>
     <tr><td><code>--target &lt;triple&gt;</code></td><td>Cross-compile: <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-apple-darwin</code>, <code>aarch64-apple-darwin</code>, …</td></tr>
-    <tr><td><code>-transpile</code></td><td>Print the program as C (best effort)</td></tr>
     <tr><td><code>-ast</code>, <code>-tokens</code></td><td>Print the syntax tree or the token stream and exit</td></tr>
     <tr><td><code>--dump-ir</code></td><td>Print the intermediate representation</td></tr>
     <tr><td><code>-cfg</code>, <code>-cfg-png</code>, <code>-cfg-svg</code></td><td>Write a Graphviz control flow graph (PNG and SVG need Graphviz)</td></tr>
@@ -95,25 +94,25 @@ removed afterwards, so several compiles can run at once.</p>
 <h2 id="the-jit">The JIT<a class="anchor" href="#the-jit" aria-label="Link to this section">#</a></h2>
 <p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's built-in
 assembler and runs it. No C compiler, linker or files are involved, so it starts fast.
-Arguments after the file are passed to the program. A file with no <code>Main</code> and
-no code at file scope has nothing to run: <code>-jit</code> says so and exits with 1. Use
+Arguments after the file are passed to the program. A file with no <code>main</code> has nothing to
+run: <code>-jit</code> says so and exits with 1. Use
 <code>#ifjit</code> / <code>#ifaot</code> for code that should differ between the two modes.</p>
 <pre><code>ktm -jit server.ktm 8080</code></pre>
 
 <h2 id="the-repl">The REPL<a class="anchor" href="#the-repl" aria-label="Link to this section">#</a></h2>
 <pre><code>ktm -repl</code></pre>
-<p>ktm runs as you type it. Functions, classes, globals and
+<p>ktm runs as you type it. Functions, structs, globals and
 <code>#define</code>s accumulate across the session, and the value of a trailing expression
 is echoed:</p>
-<pre><code>&amp;gt; I64 Sq(I64 x) { return x * x; }
+<pre><code>&amp;gt; i64 Sq(i64 x) { return x * x; }
 &amp;gt; Sq(7);
 49
-&amp;gt; "hello %d\n", Sq(3);
+&amp;gt; printf("hello %d\n", Sq(3));
 hello 9</code></pre>
 <ul>
   <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
   <li><code>~/.ktm_rc.ktm</code> is included at start-up. Put <code>#define KTM_NO_REPL_HELLO</code> in it to hide the welcome message.</li>
-  <li><code>Uf("Name");</code> disassembles a function. <code>ReplDel("name");</code> forgets a definition so you can redefine it.</li>
+  <li><code>replDisasm("name");</code> disassembles a function. <code>replDel("name");</code> forgets a definition so you can redefine it.</li>
   <li><code>@ ls -la</code> runs a shell command. It goes through <code>system()</code>, so <code>@ cd</code> doesn't change the REPL's directory.</li>
   <li>Allocations are tracked, so leaks and bad frees are reported.</li>
 </ul>
@@ -150,21 +149,10 @@ Syntax highlighting for Vim is in <code>src/syntax-highlighting/ktm.vim</code>.<
 <pre><code>ktm -lib mylib --install-dir=$HOME/.local mylib.ktm</code></pre>
 <p>This produces <code>libmylib.a</code> and a shared library in
 <code>$HOME/.local/lib</code>. Mark the functions and globals it exports
-<code>public</code>. To use the library, declare its functions, and its globals with
-<code>extern</code> (<code>extern I64 count;</code>, <code>extern I64 (*hook)(I64);</code>),
+<code>pub</code>. To use the library, declare its functions, and its globals with
+<code>extern</code> (<code>extern i64 count;</code>, <code>extern fn(i64) i64 hook;</code>),
 usually in a <code>.ktmh</code> header you <code>#include</code>, and add
 <code>#link &lt;mylib&gt;</code>.</p>
-
-<h2 id="the-transpiler">The transpiler<a class="anchor" href="#the-transpiler" aria-label="Link to this section">#</a></h2>
-<pre><code>ktm -transpile main.ktm &amp;gt; main.c</code></pre>
-<p>This prints a C version of the program. It's experimental and <strong>frozen</strong>: it
-supports the language as of v0.18 and gets no new features, so language and library features
-added later may not translate. Comments are dropped, and some programs need fixing by hand. Globals are written with their initialisers;
-code at file scope (initialisers that aren't constant, statements) goes into
-<code>__ktm_init()</code>, which <code>main</code> calls first.
-The program is checked by the compiler first: its warnings and errors are printed as for a
-compile, and an error stops the transpile with exit status 1, so a wrong program gives no C.
-The program is parsed twice, once for the check and once for the C.</p>
 
 <h2 id="looking-under-the-hood">Looking under the hood<a class="anchor" href="#looking-under-the-hood" aria-label="Link to this section">#</a></h2>
 <pre><code>ktm -tokens main.ktm                 # what the lexer sees

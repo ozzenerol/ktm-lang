@@ -1,42 +1,19 @@
-#include "testhelper.ktm"
+import fs, test;
 
-/* Dir(NULL) and RmDir(NULL, RM_RECURSE) passed NULL to opendir() and
- * segfaulted. Both return -1 now; Dir also returns -1 (not 0, which is
- * an empty directory) for a path it can't open as a directory.
- * Everything happens in a fresh mkdtemp directory. */
+/* fs.removeDir(null, REMOVE_RECURSE) passed null to opendir() and
+ * segfaulted. It returns -1 now, as do removeDir and remove of null.
+ * (The test also covered Dir, the TempleOS-style listing, which left the
+ * standard library: decision 9 of the stdlib map.) */
 
-extern "c" U8 *mkdtemp(U8 *template);
+i32 main() {
+    i64 correct = 0, tests = 3;
+    printf("Test - removeDir and remove with null: ");
 
-I32 Main()
-{
-  I64 correct = 0, tests = 7;
-  U8 root[64], *f, *cmd;
-  "Test - Dir and RmDir with NULL: ";
+    if (fs.removeDir(null, fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (fs.removeDir(null) == -1 && fs.removeDir(null, fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (fs.remove(null) == -1) { correct++; }
 
-  if (Dir(NULL) == -1) correct++;
-  if (RmDir(NULL, RM_RECURSE) == -1) correct++;
-  if (RmDir(NULL) == -1 && RmDir(NULL, RM_RECURSE|RM_VERBOSE) == -1) correct++;
-  if (Rm(NULL) == -1) correct++;
-
-  StrCpy(root, "./ktm-test-314-XXXXXX");
-  if (mkdtemp(root)) {
-    f = StrPrint(NULL, "%s/f", root);
-    FileWrite(f, "k\n", 2);
-    if (Dir(f) == -1) correct++;
-    Free(f);
-    f = StrPrint(NULL, "%s/empty", root);
-    MkDir(f);
-    if (Dir(f) == 0) correct++;  /* an empty directory is not an error */
-    Free(f);
-    f = StrPrint(NULL, "%s/missing", root);
-    if (Dir(f) == -1) correct++;
-    Free(f);
-    cmd = StrPrint(NULL, "rm -rf '%s'", root);
-    System(cmd);
-    Free(cmd);
-  }
-
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

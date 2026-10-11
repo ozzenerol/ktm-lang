@@ -1,61 +1,57 @@
-#include "testhelper.ktm"
+import test;
 
-U0 TestForLoop()
-{
-  "Testing For Loop: ";
-  I64 test_cases = 2, passed = 0;
+void testForLoop() {
+    printf("Testing For Loop: ");
+    i64 testCases = 2, passed = 0;
 
-  I64 x = 0, i = 0;
-  for (I64 i = 0; i < 10; ++i) {
-    x = i;
-  }
+    i64 x = 0, i = 0;
+    for (i64 i = 0; i < 10; ++i) {
+        x = i;
+    }
 
-  if (x == 9) {
-    passed++;
-  }
+    if (x == 9) {
+        passed++;
+    }
 
-  for (i = x; i >= 0; --i) {
-    x = i;
-  }
+    for (i = x; i >= 0; --i) {
+        x = i;
+    }
 
-  if (x == 0) {
-    passed++;
-  }
+    if (x == 0) {
+        passed++;
+    }
 
-  PrintResult(passed,test_cases);
+    test.printResult(passed,testCases);
 }
 
-U0 TestWhileLoop()
-{
-  "Testing while loop: ";
-  I64 i = 0;
-  I64 passed = 0, test_cases = 1;
-  while (i < 9) {
-    i++;
-  }
-  if (i == 9) {
-    passed++;
-  }
-  PrintResult(passed,test_cases);
+void testWhileLoop() {
+    printf("Testing while loop: ");
+    i64 i = 0;
+    i64 passed = 0, testCases = 1;
+    while (i < 9) {
+        i++;
+    }
+    if (i == 9) {
+        passed++;
+    }
+    test.printResult(passed,testCases);
 }
 
-U0 TestDoWhileLoop()
-{
-  "Testing do-while loop: ";
-  I64 i = 10;
-  do {
-    i = i + 1;
+void testDoWhileLoop() {
+    printf("Testing do-while loop: ");
+    i64 i = 10;
+    do {
+        i = i + 1;
 
-  } while (i < 10);
-  PrintResult(i == 11, 1);
+    } while (i < 10);
+    test.printResult(i == 11, 1);
 }
 
-I32 Main()
-{
-  "Loop test suite\n";
-  TestForLoop();
-  TestWhileLoop();  
-  TestDoWhileLoop();
-  "=====\n";
-  return 0;
+i32 main() {
+    printf("Loop test suite\n");
+    testForLoop();
+    testWhileLoop();  
+    testDoWhileLoop();
+    printf("=====\n");
+    return 0;
 }

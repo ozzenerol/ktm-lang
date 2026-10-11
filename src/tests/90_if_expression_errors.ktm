@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 #define IF_TEST_FILE "__90_if_expr_fail.ktm"
 #define IF_TEST_OUT  "__90_if_expr_fail.out"
@@ -8,171 +8,162 @@
 #define IF_FLAG
 #define IF_STR "abc"
 
-U0 CleanupIfTest(U0)
-{
-  Rm(IF_TEST_FILE);
-  Rm(IF_TEST_OUT);
-  Rm("./a.out");
+void cleanupIfTest(void) {
+    fs.remove(IF_TEST_FILE);
+    fs.remove(IF_TEST_OUT);
+    fs.remove("./a.out");
 }
 
 /* A bad #if/#elif condition used to exit from the macro processor with
  * "Unexpected end of input Parsing macro:1" - no file, no line. It must
  * be a normal compile failure (exit status 1) reporting `expected` and
  * the directive's file:line. */
-Bool CompileFailsWith(U8 *source, U8 *expected, U8 *where)
-{
-  U8 *out;
-  I64 res;
+bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
+    u8 *out;
+    i64 res;
 
-  CleanupIfTest;
+    cleanupIfTest();
 
-  if (!FileWrite(IF_TEST_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(IF_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " IF_TEST_FILE " > " IF_TEST_OUT " 2>&1");
-  if (res != 1) {
-    "ktm exit status %d, expected a normal compile failure\n", res;
-    CleanupIfTest;
-    return FALSE;
-  }
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " IF_TEST_FILE " > " IF_TEST_OUT " 2>&1");
+    if (res != 1) {
+        printf("ktm exit status %d, expected a normal compile failure\n", res);
+        cleanupIfTest();
+        return false;
+    }
 
-  out = FileRead(IF_TEST_OUT);
-  if (!out) {
-    CleanupIfTest;
-    return FALSE;
-  }
+    out = fs.readAll(IF_TEST_OUT);
+    if (!out) {
+        cleanupIfTest();
+        return false;
+    }
 
-  if (!strstr(out, expected) || !strstr(out, where) ||
-      strstr(out, "Parsing macro")) {
-    "%s\n", out;
-    Free(out);
-    CleanupIfTest;
-    return FALSE;
-  }
+    if (!libc.strstr(out, expected) || !libc.strstr(out, where) ||
+            libc.strstr(out, "Parsing macro")) {
+        printf("%s\n", out);
+        mem.free(out);
+        cleanupIfTest();
+        return false;
+    }
 
-  Free(out);
-  CleanupIfTest;
-  return TRUE;
+    mem.free(out);
+    cleanupIfTest();
+    return true;
 }
 
-Bool TestIfTrailingOp(U0)
-{
-  return CompileFailsWith(
-"U0 Main() { }
+bool testIfTrailingOp(void) {
+    return compileFailsWith(
+"void Main() { }
 #if 1 +
 #endif
 ",
-    "#if: the condition must be a constant expression",
-    IF_TEST_FILE ":2:");
+        "#if: the condition must be a constant expression",
+        IF_TEST_FILE ":2:");
 }
 
-Bool TestIfOpenParen(U0)
-{
-  return CompileFailsWith(
-"U0 Main() { }
+bool testIfOpenParen(void) {
+    return compileFailsWith(
+"void Main() { }
 
 #if (
 #endif
 ",
-    "#if: the condition must be a constant expression",
-    IF_TEST_FILE ":3:");
+        "#if: the condition must be a constant expression",
+        IF_TEST_FILE ":3:");
 }
 
-Bool TestIfCall(U0)
-{
-  return CompileFailsWith(
+bool testIfCall(void) {
+    return compileFailsWith(
 "#if foo(
 #endif
-U0 Main() { }
+void Main() { }
 ",
-    "#if: the condition must be a constant expression",
-    IF_TEST_FILE ":1:");
+        "#if: the condition must be a constant expression",
+        IF_TEST_FILE ":1:");
 }
 
-Bool TestElifTrailingOp(U0)
-{
-  return CompileFailsWith(
-"U0 Main()
+bool testElifTrailingOp(void) {
+    return compileFailsWith(
+"void main()
 {
 #if 0
-  \"a\\n\";
+  printf(\"a\\n\");
 #elif 1 *
-  \"b\\n\";
+  printf(\"b\\n\");
 #endif
 }
 ",
-    "#elif: the condition must be a constant expression",
-    IF_TEST_FILE ":5:");
+        "#elif: the condition must be a constant expression",
+        IF_TEST_FILE ":5:");
 }
 
 /* A string is not a number: this used to panic in the evaluator. */
-Bool TestIfString(U0)
-{
-  return CompileFailsWith(
+bool testIfString(void) {
+    return compileFailsWith(
 "#if \"s\"
 #endif
-U0 Main() { }
+void Main() { }
 ",
-    "#if: the condition must be a constant expression",
-    IF_TEST_FILE ":1:");
+        "#if: the condition must be a constant expression",
+        IF_TEST_FILE ":1:");
 }
 
-Bool TestValidConditions(U0)
-{
-  I64 hits = 0;
+bool testValidConditions(void) {
+    i64 hits = 0;
 #if 1
-  hits++;
+    hits++;
 #endif
 #if IF_THREE * 2 - 6
-  hits = -100;
+    hits = -100;
 #elif IF_THREE > 2 && defined(IF_FLAG)
-  hits++;
+    hits++;
 #endif
 #if !defined(IF_NOT_DEFINED) && (IF_THREE + 1) == 4
-  hits++;
+    hits++;
 #endif
 #if defined(IF_STR)
-  hits++;
+    hits++;
 #endif
 #if UNDEFINED_NAME
-  hits = -100;
+    hits = -100;
 #else
-  hits++;
+    hits++;
 #endif
 #if 0
-  hits = -100;
+    hits = -100;
 #elif 2 / 2
-  hits++;
+    hits++;
 #endif
-  return hits == 6;
+    return hits == 6;
 }
 
-I32 Main()
-{
-  "Test - #if expression errors: \n";
-  I64 tests = 6;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - #if expression errors: \n");
+    i64 tests = 6;
+    i64 correct = 0;
 
-  if (TestIfTrailingOp()) correct++;
-  else "Failed - TestIfTrailingOp()\n";
+    if (testIfTrailingOp()) { correct++; }
+    else { printf("Failed - TestIfTrailingOp()\n"); }
 
-  if (TestIfOpenParen()) correct++;
-  else "Failed - TestIfOpenParen()\n";
+    if (testIfOpenParen()) { correct++; }
+    else { printf("Failed - TestIfOpenParen()\n"); }
 
-  if (TestIfCall()) correct++;
-  else "Failed - TestIfCall()\n";
+    if (testIfCall()) { correct++; }
+    else { printf("Failed - TestIfCall()\n"); }
 
-  if (TestElifTrailingOp()) correct++;
-  else "Failed - TestElifTrailingOp()\n";
+    if (testElifTrailingOp()) { correct++; }
+    else { printf("Failed - TestElifTrailingOp()\n"); }
 
-  if (TestIfString()) correct++;
-  else "Failed - TestIfString()\n";
+    if (testIfString()) { correct++; }
+    else { printf("Failed - TestIfString()\n"); }
 
-  if (TestValidConditions()) correct++;
-  else "Failed - TestValidConditions()\n";
+    if (testValidConditions()) { correct++; }
+    else { printf("Failed - TestValidConditions()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

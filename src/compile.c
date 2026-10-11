@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "aostr.h"
 #include "ast.h"
@@ -69,21 +70,40 @@ void compileToTokens(Cctrl *cc, CliArgs *args, int lexer_flags) {
 
 int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     Lexer *l = (Lexer *)globalArenaAllocate(sizeof(Lexer));
-    AoStr *builtin_path = aoStrPrintf("%s/include/std.ktmh", args->install_dir);
     char *root_dir = mprintf("%s/include/", args->install_dir);
 
     lexInit(l,NULL,CCF_PRE_PROC|lexer_flags);
     l->lineno = 1;
     lexSetBuiltinRoot(l,root_dir);
 
-    lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
-    /* library files */
-    /* the structure is a so this will get popped first */
-    lexPushFile(l,builtin_path);
-    if (l->cur_file && l->cur_file->src) {
-        cc->header_src = l->cur_file->src->data;
-        cc->header_len = l->cur_file->src->len;
+    if (args->module_dir) {
+        /* `ktm -lib a.b dir/a/b`: compile the module as a program that
+         * imports it, found from dir (dir/a/b less the a/b) */
+        char *src;
+        if (lexSetModuleLibRoot(l, args->module_dir, args->lib_name)) {
+            src = mprintf("import %s;\n", args->lib_name);
+        } else {
+            /* `ktm -lib name dir`: every module under dir, one library */
+            args->lib_tree_paths = vecNew(&vec_unsigned_long_type);
+            args->lib_tree_dirs = vecNew(&vec_unsigned_long_type);
+            src = lexModuleTreeImports(l, args->module_dir,
+                                       args->lib_tree_paths,
+                                       args->lib_tree_dirs);
+            if (!src) {
+                fprintf(stderr, "ktm: %s is neither module %s's directory (one "
+                        "ending in %s) nor a tree with modules under it\n",
+                        args->module_dir, args->lib_name, args->lib_name);
+                return 0;
+            }
+        }
+        lexPushString(l, "<module library>", src, strlen(src));
+    } else {
+        lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
     }
+    /* the runtime, after the header and before the program */
+    lexPushRuntime(l);
+    /* the prelude, read first (the stdlib is modules, read when imported) */
+    lexPushPrelude(l);
 
     cctrlInitParse(cc,l);
 

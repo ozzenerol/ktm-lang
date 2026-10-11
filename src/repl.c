@@ -71,7 +71,7 @@
 
 /* linenoise callbacks carry no user-data pointer, so the completion
  * callback reaches the compiler state through these. repl_jit is for
- * the `Uf` builtin, which JIT'd code calls back into. */
+ * the `replDisasm` builtin, which JIT'd code calls back into. */
 static Cctrl *repl_cc = NULL;
 static KtmJit *repl_jit = NULL;
 static char repl_history_path[512];
@@ -313,7 +313,7 @@ static void replReportFault(void) {
 
     if (sym) {
         int line = ktmJitFindLineForAddr(jit, pc);
-        fprintf(stderr, " in `%s`+%zu", sym, off);
+        fprintf(stderr, " in `%s`+%zu", astSymbolDisplayName(sym), off);
         if (line) fprintf(stderr, ", line %d", line);
         fprintf(stderr, "\n");
     } else if (chunk) {
@@ -377,9 +377,9 @@ static void replBuiltinReplHeap(void) {
     memsafeDumpLive(stdout);
 }
 
-/* ---------------- Uf: the unassembler builtin ----------------
+/* ---------------- replDisasm: the unassembler builtin ----------------
  *
- * `Uf("Fib");` prints the disassembly of a JIT-compiled function,
+ * `replDisasm("fib");` prints the disassembly of a JIT-compiled function,
  * the classic "unassemble function", pointed at libtasm's disassembler. It's a
  * host C function registered in the jit's symbol table, so compiled ktm
  * calls straight back into the compiler. */
@@ -390,7 +390,13 @@ static void replBuiltinUf(char *name) {
 
     uint8_t *addr = (uint8_t *)ktmJitLookup(jit, name);
     if (addr == NULL) {
-        printf("Uf: `%s` is not a JIT-compiled function in this session\n",
+        /* a program's own function: its symbol is `_K0<len><name>` */
+        char sym[512];
+        snprintf(sym, sizeof(sym), "_K0%zu%s", strlen(name), name);
+        addr = (uint8_t *)ktmJitLookup(jit, sym);
+    }
+    if (addr == NULL) {
+        printf("replDisasm: `%s` is not a JIT-compiled function in this session\n",
                name);
         return;
     }
@@ -409,7 +415,7 @@ static void replBuiltinUf(char *name) {
         }
     }
     if (end == NULL) {
-        printf("Uf: cannot locate the code chunk for `%s`\n", name);
+        printf("replDisasm: cannot locate the code chunk for `%s`\n", name);
         return;
     }
 
@@ -450,6 +456,33 @@ static void replBuiltinUf(char *name) {
     fflush(stdout);
 }
 
+/* The modules loaded and the imports made so far: a round's lexer starts
+ * with them (an import in one round serves the next ones, and a module is
+ * loaded once) and leaves them for the next */
+static LexModule **repl_modules = NULL;
+static int repl_modules_len = 0, repl_modules_cap = 0;
+static LexImport *repl_imports = NULL;
+
+static Lexer *replLexerNew(char *root_dir) {
+    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
+    lexInit(l, NULL, CCF_PRE_PROC);
+    lexSetBuiltinRoot(l, root_dir);
+    l->repl = 1;
+    l->modules = repl_modules;
+    l->modules_len = repl_modules_len;
+    l->modules_cap = repl_modules_cap;
+    l->repl_imports = repl_imports;
+    return l;
+}
+
+static void replLexerRelease(Lexer *l) {
+    repl_modules = l->modules;
+    repl_modules_len = l->modules_len;
+    repl_modules_cap = l->modules_cap;
+    repl_imports = l->repl_imports;
+    lexerRelease(l);
+}
+
 static void replEvalString(char *code) {
     if (!code) return;
     u64 len = strlen(code);
@@ -474,9 +507,7 @@ static void replBuiltinReloadRc(void) {
     AoStr *ktm_rc = replGetRcPath();
     if (!ktm_rc) return;
 
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, repl_root_dir);
+    Lexer *l = replLexerNew(repl_root_dir);
     lexPushFile(l, ktm_rc);
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
@@ -494,7 +525,7 @@ static void replBuiltinReloadRc(void) {
         fprintf(stderr, "repl: warning: failed to compile rc file\n");
     }
 
-    lexerRelease(l);
+    replLexerRelease(l);
 }
 
 /* --------- ReplListFn: List all defined functions ---------- */
@@ -577,9 +608,9 @@ static void replBuiltinPrintClass(char *name) {
     }
 }
 
-/* ---------------- ReplDel: drop a definition ----------------
+/* ---------------- replDel: drop a definition ----------------
  *
- * `ReplDel("name");` removes a global variable, function, class,
+ * `replDel("name");` removes a global variable, function, class,
  * union or #define from the session so the name can be redefined
  * from scratch. Already-compiled code that captured the old
  * definition keeps working - this only frees the NAME (and, for
@@ -603,12 +634,12 @@ static void replBuiltinReplDel(char *name) {
     for (size_t i = 0; i < sizeof(tables)/sizeof(tables[0]); ++i) {
         if (tables[i].m && mapGetLen(tables[i].m, name, len)) {
             mapRemove(tables[i].m, name);
-            printf("ReplDel: removed %s `%s`\n", tables[i].what, name);
+            printf("replDel: removed %s `%s`\n", tables[i].what, name);
             removed = 1;
         }
     }
     if (!removed) {
-        printf("ReplDel: nothing named `%s`\n", name);
+        printf("replDel: nothing named `%s`\n", name);
         return;
     }
 
@@ -631,15 +662,15 @@ static void replBuiltinReplDel(char *name) {
  * type-check like any other function (and show up in completion and
  * hints). The implementations are registered via ktmJitDefineSymbol. */
 static const char repl_builtin_protos[] =
-    "extern \"c\" U0 Uf(U8 *fname);\n"
-    "extern \"c\" U0 ReplReloadRc();\n"
-    "extern \"c\" U0 ReplListFn();\n"
-    "extern \"c\" U0 ReplFindFn(U8 *name);\n"
-    "extern \"c\" U0 ReplListGVars();\n"
-    "extern \"c\" U0 ReplClassRep(U8 *name);\n"
-    "extern \"c\" U0 ReplEval(U8 *code);\n"
-    "extern \"c\" U0 ReplDel(U8 *name);\n"
-    "extern \"c\" U0 ReplHeap();\n";
+    "extern \"c\" void replDisasm(u8 *fname);\n"
+    "extern \"c\" void ReplReloadRc();\n"
+    "extern \"c\" void ReplListFn();\n"
+    "extern \"c\" void ReplFindFn(u8 *name);\n"
+    "extern \"c\" void ReplListGVars();\n"
+    "extern \"c\" void ReplClassRep(u8 *name);\n"
+    "extern \"c\" void ReplEval(u8 *code);\n"
+    "extern \"c\" void replDel(u8 *name);\n"
+    "extern \"c\" void ReplHeap();\n";
 
 /* ---------------- tab completion ---------------- */
 
@@ -1225,7 +1256,7 @@ static int replIsEchoable(Ast *ast) {
         case AST_SWITCH: case AST_CASE: case AST_DEFAULT: case AST_JUMP:
         case AST_GOTO: case AST_LABEL: case AST_BREAK: case AST_CONTINUE:
         case AST_RETURN: case AST_COMPOUND_STMT: case AST_DECL:
-        case AST_ASM_STMT: case AST_TRY: case AST_THROW: case AST_COMMENT:
+        case AST_ASM_STMT: case AST_TRY: case AST_THROW: case AST_DEFER:
         case AST_PLACEHOLDER:
             return 0;
         default:
@@ -1324,9 +1355,7 @@ static void replDropInitialisers(Cctrl *cc) {
 /* Parse one buffer into the shared Cctrl. Returns the number of
  * errors (diagnostics already printed). */
 static int replParse(Cctrl *cc, char *root_dir, char *name, AoStr *src) {
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, root_dir);
+    Lexer *l = replLexerNew(root_dir);
     lexPushString(l, name, src->data, src->len);
 
     cctrlDiagClear(cc);
@@ -1348,7 +1377,7 @@ static int replParse(Cctrl *cc, char *root_dir, char *name, AoStr *src) {
 
     int errors = cctrlDiagFlush(cc);
     cctrlDiagClear(cc);
-    lexerRelease(l);
+    replLexerRelease(l);
     return errors;
 }
 
@@ -1370,43 +1399,32 @@ static AoStr *replGetRcPath(void) {
  * compile whatever it defines as chunk 0. */
 static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
                           char *root_dir) {
-    AoStr *builtin = aoStrPrintf("%s/include/std.ktmh", args->install_dir);
-    if (access(builtin->data, R_OK) != 0) {
-        fprintf(stderr,
-                "repl: warning: %s not found; the ktm standard library "
-                "will be unavailable\n", builtin->data);
-        aoStrRelease(builtin);
-        builtin = NULL;
-    }
-    
+    /* the prelude and the runtime (the stdlib is modules, read when
+     * imported) */
+    (void)args;
     AoStr *ktm_rc = replGetRcPath();
 
-    /* We have nothing to preload */
-    if (!builtin && !ktm_rc)
-        return;
-
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, root_dir);
+    Lexer *l = replLexerNew(root_dir);
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
-    if (builtin) lexPushFile(l, builtin);
+    lexPushRuntime(l);
+    lexPushPrelude(l);
 
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
     cctrlInitParse(cc, l);
     parseToAst(cc);
     if (cctrlDiagFlush(cc) > 0) {
-        fprintf(stderr, "repl: warning: errors in %s\n", builtin->data);
+        fprintf(stderr, "repl: warning: errors in %s\n", "the prelude or the runtime");
     }
     cctrlDiagClear(cc);
     replDropInitialisers(cc);
 
     if (ktmJitCompileChunk(jit, NULL) != 0) {
-        fprintf(stderr, "repl: warning: failed to compile the standard "
-                "library header\n");
+        fprintf(stderr, "repl: warning: failed to compile the prelude "
+                "and the runtime\n");
     }
-    lexerRelease(l);
+    replLexerRelease(l);
 }
 
 static void replExecInner(AoStr *input, int round) {
@@ -1493,8 +1511,8 @@ int replRun(Cctrl *cc, CliArgs *args) {
     repl_jit = jit;
 
     /* Builtin helper functions */
-    ktmJitDefineSymbol(jit, "Uf", (void *)(uintptr_t)replBuiltinUf);
-    ktmJitDefineSymbol(jit, "ReplDel", (void *)(uintptr_t)replBuiltinReplDel);
+    ktmJitDefineSymbol(jit, "replDisasm", (void *)(uintptr_t)replBuiltinUf);
+    ktmJitDefineSymbol(jit, "replDel", (void *)(uintptr_t)replBuiltinReplDel);
     ktmJitDefineSymbol(jit, "ReplReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
     ktmJitDefineSymbol(jit, "ReplListFn", (void *)(uintptr_t)replBuiltinListFn);
     ktmJitDefineSymbol(jit, "ReplListGVars", (void *)(uintptr_t)replBuiltinListGVars);

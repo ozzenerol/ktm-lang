@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import str, test;
 
 #define _SOME_STRING      ("Hello World")
 #define _SOME_INT_MATHS   (10+(2*5+8-1))
@@ -16,28 +16,24 @@
 #define BAR 4
 #endif
 
-
 #if defined(__FOO__)
 #define _INTVAL (420)
 #elif defined(_SOME_STRING) && 32 && 1 && \
-  defined(_SOME_INT_MATHS)
+    defined(_SOME_INT_MATHS)
 #define _INTVAL (42)
 #endif
 
+i32 main() {
+    i64 correct = 0, tests = 6;
+    printf("Test - Preprocessor: ");
 
-I32 Main()
-{
-  I64 correct = 0, tests = 6;
-  "Test - Preprocessor: ";
-
-  if (!StrCmp(_SOME_STRING,"Hello World")) correct++;
-  if (_SOME_INT_MATHS == 27) correct++;
-  if (_SOME_FLOAT_MATHS == 18.64) correct++;
-  if (FOO == 24) correct++;
-  if (BAR == 32) correct++;
-  if (_INTVAL == 42) correct++;
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+    if (!str.cmp(_SOME_STRING,"Hello World")) { correct++; }
+    if (_SOME_INT_MATHS == 27) { correct++; }
+    if (_SOME_FLOAT_MATHS == 18.64) { correct++; }
+    if (FOO == 24) { correct++; }
+    if (BAR == 32) { correct++; }
+    if (_INTVAL == 42) { correct++; }
+    test.printResult(correct,tests);
+    printf("====\n");
+    return 0;
 }
-

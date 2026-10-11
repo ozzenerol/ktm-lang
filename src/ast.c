@@ -345,13 +345,6 @@ AoStr *astMakeTmpName(void) {
     return s;
 }
 
-static int tmp_anonymous_label = 0;
-char *astAnnonymousLabel(void) {
-    /* Adding a space makes this an invalid name for other classes as no 
-     * identifier can have spaces. */
-    return mprintf("cls_label %d",tmp_anonymous_label++);
-}
-
 /* For assigning a unique identifier to variables */
 static u32 lvar_unique_id = 1;
 void astResetLVarId(void) {
@@ -366,13 +359,84 @@ Ast *astLVar(AstType *type, char *name, int len) {
     return ast;
 }
 
+/* The symbol of a module's name `a.b.name` (only [A-Za-z0-9_], which
+ * every assembler and the JIT take): `_K1a1b4name`, each part prefixed
+ * with its length. `_K` and a capital is reserved in C, so it can't be a
+ * C name or a main-program one. */
+/* The runtime's (module rt's) name `rt.name`, and its symbol: what the
+ * compiler calls for try/catch/throw and ktm's print conversions */
+char *astRuntimeName(const char *name) {
+    return mprintf("rt.%s", name);
+}
+
+char *astRuntimeSymbol(const char *name) {
+    char *qual = astRuntimeName(name);
+    return astModuleMangle(qual, strlen(qual));
+}
+
+char *astModuleMangle(char *qual, int len) {
+    AoStr *out = aoStrNew();
+    aoStrCatLen(out, "_K", 2);
+    int start = 0;
+    for (int i = 0; i <= len; ++i) {
+        if (i == len || qual[i] == '.') {
+            aoStrCatPrintf(out, "%d%.*s", i - start, i - start, qual + start);
+            start = i + 1;
+        }
+    }
+    return aoStrMove(out);
+}
+
+/* The symbol of a main-program function or global `name`: the module
+ * scheme with an empty module, `_K0` and the name with its length
+ * (`read` -> `_K04read`). A module part never has a leading 0, so it
+ * can't be a module's symbol, and astModuleDemangle reads it back as
+ * `read`. */
+char *astProgramSymbol(char *name, int len) {
+    return mprintf("_K0%d%.*s", len, len, name);
+}
+
+/* A symbol as a report shows it: `_K04read` or Mach-O's `__K3net4dial`
+ * as `read` / `net.dial`, anything else as is */
+const char *astSymbolDisplayName(const char *sym) {
+    if (sym[0] == '_' && sym[1] == '_' && sym[2] == 'K') sym++;
+    if (sym[0] != '_' || sym[1] != 'K') return sym;
+    return astModuleDemangle((char *)sym, strlen(sym));
+}
+
+/* `_K3net4dial` back to `net.dial`, for messages; any other name as is */
+char *astModuleDemangle(char *sym, int len) {
+    if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||
+        !isdigit((unsigned char)sym[2])) {
+        return mprintf("%.*s", len, sym);
+    }
+    AoStr *out = aoStrNew();
+    int i = 2;
+    while (i < len) {
+        int n = 0;
+        while (i < len && isdigit((unsigned char)sym[i])) n = n * 10 + (sym[i++] - '0');
+        if (n == 0 || i + n > len) return mprintf("%.*s", len, sym);
+        if (out->len) aoStrPutChar(out, '.');
+        aoStrCatLen(out, sym + i, n);
+        i += n;
+    }
+    return aoStrMove(out);
+}
+
 Ast *astGVar(AstType *type, char *name, int len, int is_static) {
     Ast *ast = astNew();
     ast->kind = AST_GVAR;
     ast->type = type;
     ast->gname = aoStrDupRaw(name, len);
     ast->is_static = is_static;
-    ast->glabel = is_static ? astMakeLabel() : ast->gname;
+    if (is_static) {
+        ast->glabel = astMakeLabel();
+    } else if (memchr(name, '.', len)) {
+        char *sym = astModuleMangle(name, len);
+        ast->glabel = aoStrDupRaw(sym, strlen(sym));
+    } else {
+        ast->glabel = ast->gname;
+    }
     return ast;
 }
 
@@ -534,6 +598,16 @@ Ast *astIf(Ast *cond, Ast *then, Ast *els) {
     Ast *ast = astNew();
     ast->type = NULL;
     ast->kind = AST_IF;
+    ast->cond = cond;
+    ast->then = then;
+    ast->els = els;
+    return ast;
+}
+
+Ast *astTernary(AstType *type, Ast *cond, Ast *then, Ast *els) {
+    Ast *ast = astNew();
+    ast->type = type;
+    ast->kind = AST_TERNARY;
     ast->cond = cond;
     ast->then = then;
     ast->els = els;
@@ -710,6 +784,23 @@ Ast *astThrow(Ast *value) {
     return ast;
 }
 
+Ast *astVaPack(Ast *array, Vec *items, int untyped) {
+    Ast *ast = astNew();
+    ast->kind = AST_VA_PACK;
+    ast->type = astMakePointerType(array->type->ptr);
+    ast->va_array = array;
+    ast->va_items = items;
+    ast->va_untyped = untyped;
+    return ast;
+}
+
+Ast *astDefer(Ast *stmt) {
+    Ast *ast = astNew();
+    ast->kind = AST_DEFER;
+    ast->defer_stmt = stmt;
+    return ast;
+}
+
 AstType *astMakePointerType(AstType *type) {
     AstType *pointer_type = astTypeNew();
     pointer_type->kind = AST_TYPE_POINTER;
@@ -734,13 +825,6 @@ AstType *astConvertArray(AstType *ast_type) {
         return ast_type;
     }
     return astMakePointerType(ast_type->ptr);
-}
-
-Ast *astSizeOf(AstType *type) {
-    Ast *ast = astNew();
-    ast->kind = AST_SIZEOF;
-    ast->type = type;
-    return ast;
 }
 
 Ast *astGoto(AoStr *label) {
@@ -772,6 +856,9 @@ AstType *astMakeClassField(AstType *type, int offset) {
     AstType *field_type = astTypeNew();
     memcpy(field_type,type,sizeof(AstType));
     field_type->clsname = NULL;
+    /* a field is public unless marked `private` itself */
+    field_type->private_module = 0;
+    field_type->private_of = NULL;
     field_type->offset = offset;
     field_type->size = type->size;
     return field_type;
@@ -900,14 +987,6 @@ Ast *astCast(Ast *var, AstType *to) {
     return ast;
 }
 
-Ast *astComment(char *comment, int len) {
-    Ast *ast = astNew();
-    ast->type = NULL;
-    ast->kind = AST_COMMENT;
-    printf("astComment(): %.*s\n",len,comment);
-    ast->sval = aoStrDupRaw(comment, len);
-    return ast;
-}
 
 AoStr *astNormaliseFunctionName(char *fname) {
         AoStr *newfn = aoStrNew();
@@ -1031,6 +1110,89 @@ int astIsIntrinsicClass(AstType *ty) {
     return ty && ty->kind == AST_TYPE_CLASS && ty->is_intrinsic;
 }
 
+/* Do two declarations of a function, or a function pointer and what is
+ * assigned to it, agree on a type? Integers match
+ * by size and signedness (an `I64 class` like CDate is its integer),
+ * classes and unions by name, an array parameter is its pointer and
+ * `auto` matches anything. */
+int astFnTypesMatch(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+    if (a->kind == AST_TYPE_AUTO || b->kind == AST_TYPE_AUTO) return 1;
+    if (a->kind == AST_TYPE_ARRAY) a = astMakePointerType(a->ptr);
+    if (b->kind == AST_TYPE_ARRAY) b = astMakePointerType(b->ptr);
+
+    int a_int = a->kind == AST_TYPE_INT || a->kind == AST_TYPE_CHAR;
+    int b_int = b->kind == AST_TYPE_INT || b->kind == AST_TYPE_CHAR;
+    if ((a_int || astIsIntrinsicClass(a)) && (b_int || astIsIntrinsicClass(b))) {
+        if (a->size != b->size) return 0;
+        return !a_int || !b_int || a->issigned == b->issigned;
+    }
+    if (a->kind != b->kind) return 0;
+
+    switch (a->kind) {
+        case AST_TYPE_FLOAT:
+            return a->size == b->size;
+        case AST_TYPE_POINTER:
+            return astFnTypesMatch(a->ptr, b->ptr);
+        case AST_TYPE_CLASS:
+        case AST_TYPE_UNION:
+            if (!a->clsname || !b->clsname) return 0;
+            return aoStrCmp(a->clsname, b->clsname);
+        case AST_TYPE_FUNC: {
+            if (!astFnTypesMatch(a->rettype, b->rettype)) return 0;
+            u64 na = a->params ? a->params->size : 0;
+            u64 nb = b->params ? b->params->size : 0;
+            if (na != nb) return 0;
+            for (u64 i = 0; i < na; ++i) {
+                Ast *pa = a->params->entries[i];
+                Ast *pb = b->params->entries[i];
+                if (!pa || !pb) return pa == pb;
+                if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
+                    return 0;
+                }
+                if ((pa->flags & AST_FLAG_VARARGS) != (pb->flags & AST_FLAG_VARARGS)) {
+                    return 0;
+                }
+                if (pa->kind == AST_VAR_ARGS) continue;
+                if (!astFnTypesMatch(pa->type, pb->type)) return 0;
+            }
+            return 1;
+        }
+        default:
+            return 1;
+    }
+}
+
+/* `expected` and `actual` are both function pointers (or pointers to
+ * them, as deep as each other) whose signatures differ: a conversion C
+ * would only warn about and that calls through with the wrong arguments.
+ * A void * (or null) on either side is not one: they convert freely. */
+int astFnPtrMismatch(AstType *expected, AstType *actual) {
+    if (!expected || !actual) return 0;
+    if (expected->kind == AST_TYPE_ARRAY) expected = astMakePointerType(expected->ptr);
+    if (actual->kind == AST_TYPE_ARRAY) actual = astMakePointerType(actual->ptr);
+    while (expected->kind == AST_TYPE_POINTER && actual->kind == AST_TYPE_POINTER &&
+           expected->ptr && actual->ptr) {
+        expected = expected->ptr;
+        actual = actual->ptr;
+    }
+    if (expected->kind != AST_TYPE_FUNC || actual->kind != AST_TYPE_FUNC) return 0;
+    return !astFnTypesMatch(expected, actual);
+}
+
+int astIsEnumType(AstType *ty) {
+    return ty && ty->kind == AST_TYPE_CLASS && ty->is_enum;
+}
+
+/* `a` and `b` are different enums (both enums, not the same one). Two
+ * NULLs or two non-enums are not "different enums". */
+int astIsDifferentEnum(AstType *a, AstType *b) {
+    if (!astIsEnumType(a) || !astIsEnumType(b)) return 0;
+    if (a == b) return 0;
+    return !(a->clsname && b->clsname && aoStrCmp(a->clsname, b->clsname));
+}
+
 int astIsFnLike(Ast *maybe_fn) {
     return maybe_fn && (maybe_fn->kind == AST_FUNC ||
                         maybe_fn->kind == AST_ASM_FUNCDEF ||
@@ -1044,6 +1206,43 @@ AstType *astGetResultType(AstBinOp op, AstType *a, AstType *b) {
     AstType *ptr1, *ptr2;
     ptr1 = astConvertArray(a);
     ptr2 = astConvertArray(b);
+
+    /* `Color d = 2;` and `Color d = someOtherEnum;` both need a cast:
+     * checked here (before the kind-sort below loses which side is the
+     * assignment's target) so only the SAME enum assigns without one. */
+    if (op == AST_BIN_OP_ASSIGN && ptr1->kind == AST_TYPE_CLASS &&
+        ptr1->is_enum)
+    {
+        if (ptr2->kind == AST_TYPE_CLASS && ptr2->is_enum && ptr1->clsname &&
+            ptr2->clsname && aoStrCmp(ptr1->clsname, ptr2->clsname))
+        {
+            return astTypeCopy(ptr1);
+        }
+        goto error;
+    }
+
+    /* A function pointer only takes one with the same signature (or a
+     * void * or null, which are not function types) */
+    if (op == AST_BIN_OP_ASSIGN && astFnPtrMismatch(ptr1, ptr2)) {
+        goto error;
+    }
+
+    /* An intrinsic class (an enum member included) offsets or indexes a
+     * pointer/array like its underlying integer does, e.g.
+     * `sizes[Color.blue]`, `p + Color.blue`. CLASS sorts after POINTER
+     * below, so without this `ptr2` would never land on the pointer. */
+    if (op != AST_BIN_OP_ASSIGN && astIsValidPointerOp(op) &&
+        (op == AST_BIN_OP_ADD || op == AST_BIN_OP_SUB))
+    {
+        if ((ptr1->kind == AST_TYPE_POINTER || ptr1->kind == AST_TYPE_FUNC) &&
+            astIsIntrinsicClass(ptr2)) {
+            return ptr1;
+        }
+        if ((ptr2->kind == AST_TYPE_POINTER || ptr2->kind == AST_TYPE_FUNC) &&
+            astIsIntrinsicClass(ptr1)) {
+            return ptr2;
+        }
+    }
 
 start_routine:
     if (ptr1->kind > ptr2->kind) {
@@ -1143,6 +1342,14 @@ start_routine:
             ptr2 = ptr2->ptr;
             goto start_routine;
         case AST_TYPE_CLASS:
+            /* Two different enum types never mix without a cast, even in
+             * arithmetic/comparisons: `Color.red == Status.ok` is an error. */
+            if ((ptr1->is_enum || ptr2->is_enum) &&
+                !(ptr1->is_enum && ptr2->is_enum && ptr1->clsname &&
+                  ptr2->clsname && aoStrCmp(ptr1->clsname, ptr2->clsname)))
+            {
+                goto error;
+            }
             /* Struct/class copy: `dst = src` between two non-intrinsic
              * classes of the same type is a by-value copy (lowered to a
              * memcpy in the IR). */
@@ -1297,6 +1504,15 @@ check_type:
          * does: the lowering inserts a sitofp / fptosi. */
         ret = e;
         goto out;
+    } else if (e->kind == AST_TYPE_CLASS && e->is_enum) {
+        /* A scoped enum only takes another value of the SAME enum
+         * without a cast: `Color d = 2;` and `Color d = someStatus;`
+         * both need `(Color)...`, unlike a plain intrinsic class. */
+        if (a->kind == AST_TYPE_CLASS && a->is_enum && e->clsname &&
+            a->clsname && aoStrCmp(e->clsname, a->clsname)) {
+            ret = e;
+        }
+        goto out;
     } else if (e->kind == a->kind) {
         ret = e;
         goto out;
@@ -1308,7 +1524,7 @@ check_type:
             } else {
                 goto out;
             }
-        } else if (e->kind == AST_TYPE_CLASS && e->is_intrinsic && astIsIntType(a)) {
+        } else if (e->kind == AST_TYPE_CLASS && e->is_intrinsic && !e->is_enum && astIsIntType(a)) {
             ret = e;
             goto out;
         } 
@@ -1557,30 +1773,30 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
 
     switch (type->kind) {
     case AST_TYPE_VOID:
-        aoStrCatPrintf(str, "U0");
+        aoStrCatPrintf(str, "void");
         return str;
     
     case AST_TYPE_INT:
         switch (type->size) {
             case 0:
-                if (type->issigned) aoStrCatPrintf(str, "I0");
-                else                aoStrCatPrintf(str, "U0");
+                if (type->issigned) aoStrCatPrintf(str, "i0");
+                else                aoStrCatPrintf(str, "void");
                 break;
             case 1:
-                if (type->issigned) aoStrCatPrintf(str, "I8");
-                else                aoStrCatPrintf(str, "U8");
+                if (type->issigned) aoStrCatPrintf(str, "i8");
+                else                aoStrCatPrintf(str, "u8");
                 break;
             case 2:
-                if (type->issigned) aoStrCatPrintf(str, "I16");
-                else                aoStrCatPrintf(str, "U16");
+                if (type->issigned) aoStrCatPrintf(str, "i16");
+                else                aoStrCatPrintf(str, "u16");
                 break;
             case 4:
-                if (type->issigned) aoStrCatPrintf(str, "I32");
-                else                aoStrCatPrintf(str, "U32");
+                if (type->issigned) aoStrCatPrintf(str, "i32");
+                else                aoStrCatPrintf(str, "u32");
                 break;
             case 8:
-                if (type->issigned) aoStrCatPrintf(str, "I64");
-                else                aoStrCatPrintf(str, "U64");
+                if (type->issigned) aoStrCatPrintf(str, "i64");
+                else                aoStrCatPrintf(str, "u64");
                 break;
             default: loggerPanic("Unknown integer size: %d\n", type->size);
 
@@ -1588,21 +1804,27 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
         return str;
     
     case AST_TYPE_CHAR:
-        if (type->is_bool)       aoStrCatPrintf(str, "Bool");
-        else if (type->issigned) aoStrCatPrintf(str, "I8");
-        else                     aoStrCatPrintf(str, "U8");
+        if (type->is_bool)       aoStrCatPrintf(str, "bool");
+        else if (type->issigned) aoStrCatPrintf(str, "i8");
+        else                     aoStrCatPrintf(str, "u8");
         return str;
 
     case AST_TYPE_FLOAT:
         if (type->size == 8)
-            aoStrCatLen(str,str_lit("F64"));
+            aoStrCatLen(str,str_lit("f64"));
         else
-            aoStrCatLen(str,str_lit("F32"));
+            aoStrCatLen(str,str_lit("f32"));
         return str;
 
     case AST_TYPE_POINTER: {
         AoStr *ptr_type = astTypeToAoStrInternal(type->ptr);
-        aoStrCatPrintf(str, "%s*", ptr_type->data);
+        /* `(fn(i64) i64) *`: a pointer to a function pointer, written
+         * as it is declared; `fn(i64) i64 *` returns an i64 * */
+        if (type->ptr && type->ptr->kind == AST_TYPE_FUNC) {
+            aoStrCatPrintf(str, "(%s)*", ptr_type->data);
+        } else {
+            aoStrCatPrintf(str, "%s*", ptr_type->data);
+        }
         return str;
     }
 
@@ -1637,8 +1859,40 @@ static AoStr *astTypeToAoStrInternal(AstType *type) {
     }
 
     case AST_TYPE_FUNC: {
+        /* ktm syntax v0.2: `fn(T1, T2) RetType`, the new form, printed
+         * even for a function pointer declared the old way. */
+        aoStrCatPrintf(str, "fn(");
+        if (type->params) {
+            int printed = 0;
+            for (u64 i = 0; i < type->params->size; ++i) {
+                Ast *param = type->params->entries[i];
+                if (!param) continue;
+                /* `T ...`: its hidden count isn't shown */
+                Ast *next = i + 1 < type->params->size
+                          ? type->params->entries[i + 1] : NULL;
+                if (next && next->kind == AST_LVAR &&
+                    (next->flags & AST_FLAG_VARARGS)) {
+                    continue;
+                }
+                if (printed++) aoStrCatPrintf(str, ", ");
+                if (param->kind == AST_LVAR && (param->flags & AST_FLAG_VARARGS)) {
+                    AstType *elem = param->type->ptr;
+                    if (elem->has_var_args) {
+                        aoStrCatPrintf(str, "...%s", param->lname->data);
+                    } else {
+                        AoStr *etype = astTypeToAoStrInternal(elem);
+                        aoStrCatPrintf(str, "%s ...", etype->data);
+                    }
+                } else if (param->kind == AST_VAR_ARGS) {
+                    aoStrCatPrintf(str, "...");
+                } else {
+                    AoStr *ptype = astTypeToAoStrInternal(param->type);
+                    aoStrCatPrintf(str, "%s", ptype->data);
+                }
+            }
+        }
         AoStr *return_type = astTypeToAoStrInternal(type->rettype);
-        aoStrCatPrintf(str, "<fn> %s", return_type->data);
+        aoStrCatPrintf(str, ") %s", return_type->data);
         return str;
     }
 
@@ -1748,7 +2002,20 @@ static char *astParamsToString(Vec *params) {
             Ast *param = params->entries[i];
             int is_last = i+1 == params->size;
             if (!param) break;
-            if (param->kind == AST_VAR_ARGS) {
+            /* `T ...name`: the hidden count before it isn't shown */
+            Ast *next = is_last ? NULL : params->entries[i + 1];
+            if (next && next->kind == AST_LVAR && (next->flags & AST_FLAG_VARARGS)) {
+                continue;
+            }
+            if (param->kind == AST_LVAR && (param->flags & AST_FLAG_VARARGS)) {
+                AstType *elem = param->type->ptr;
+                if (elem->has_var_args) {
+                    aoStrCatFmt(str,"...%s",param->lname->data);
+                } else {
+                    AoStr *t = astTypeToColorAoStr(elem);
+                    aoStrCatFmt(str,"%S ...%s",t,param->lname->data);
+                }
+            } else if (param->kind == AST_VAR_ARGS) {
                 if (!is_last) aoStrCatFmt(str,"..., ");
                 else          aoStrCatFmt(str,"..."); 
             } else {
@@ -1825,7 +2092,7 @@ static char *astFunctionToStringInternal(Ast *func, AstType *type) {
     if (strparams) {
         aoStrCatPrintf(str,"(%s);",strparams);
     } else {
-        aoStrCatPrintf(str,"(U0);");
+        aoStrCatPrintf(str,"(void);");
     }
     return aoStrMove(str);
 }
@@ -1849,7 +2116,7 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
         case AST_LITERAL: {
             aoStrCatPrintf(str,"<ast_literal> ");
             switch (ast->type->kind) {
-            case AST_TYPE_VOID:  aoStrCatPrintf(str, "<U0>"); break;
+            case AST_TYPE_VOID:  aoStrCatPrintf(str, "<void>"); break;
             case AST_TYPE_INT: {
                 if (!isatty(STDOUT_FILENO)) {
                     aoStrCatPrintf(str, "<integer> %ld", ast->i64);
@@ -1882,6 +2149,17 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
                     aoStrCatPrintf(str, "<float> %g", ast->f64);
                 } else {
                     aoStrCatPrintf(str, "\033[0;35m%g\033[0m", ast->f64);
+                }
+                break;
+            }
+            case AST_TYPE_CLASS: {
+                /* An enum member: its value, typed as the enum. */
+                const char *name = ast->type->clsname ? ast->type->clsname->data
+                                                       : "<anonymous>";
+                if (!isatty(STDOUT_FILENO)) {
+                    aoStrCatPrintf(str, "<enum %s> %ld", name, ast->i64);
+                } else {
+                    aoStrCatPrintf(str, "<enum %s> \033[0;35m%ld\033[0m", name, ast->i64);
                 }
                 break;
             }
@@ -2099,6 +2377,14 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             }
             break;
 
+        case AST_TERNARY:
+            aoStrCatPrintf(str, "<ternary_cond>\n");
+            _astToString(str,ast->cond,depth+1);
+            astStringEndStmt(str);
+            _astToString(str,ast->then,depth+1);
+            _astToString(str,ast->els,depth+1);
+            break;
+
         case AST_IF:
             aoStrCatPrintf(str, "<if_cond>\n");
             _astToString(str,ast->cond,depth+1);
@@ -2176,7 +2462,19 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
 
         case AST_THROW:
             aoStrCatPrintf(str, "<throw>\n");
-            _astToString(str, ast->throw_value, depth+1);
+            _astToString(str, ast->throw_call ? ast->throw_call
+                                              : ast->throw_value, depth+1);
+            astStringEndStmt(str);
+            break;
+
+        case AST_VA_PACK:
+            aoStrCatPrintf(str, "<va_pack %d items>\n",
+                           ast->va_items ? (int)ast->va_items->size : 0);
+            break;
+
+        case AST_DEFER:
+            aoStrCatPrintf(str, "<defer>\n");
+            _astToString(str, ast->defer_stmt, depth+1);
             astStringEndStmt(str);
             break;
 
@@ -2344,13 +2642,6 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             break;
         }
 
-        case AST_COMMENT: {
-            aoStrCatPrintf(str, "<comment>\n");
-            aoStrCatRepeat(str, "  ", depth+1);
-            aoStrCatPrintf(str, "%s\n", ast->sval->data);
-            break;
-        }
-
         case AST_BINOP: {
             const char *bin_op_str = astBinOpKindToString(ast->binop);
             astBinaryOpToString(str,bin_op_str,ast,depth);
@@ -2369,7 +2660,6 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             break;
         }
         
-        case AST_SIZEOF:
         case AST_ASM_FUNCDEF:
             loggerWarning("Unhandled ast kind: %s\n",
                     astKindToString(ast->kind));
@@ -2409,6 +2699,7 @@ char *astKindToString(AstKind kind) {
         case AST_LITERAL:       return "AST_LITERAL";
         case AST_ARRAY_INIT:    return "AST_ARRAY_INIT";
         case AST_IF:            return "AST_IF";
+        case AST_TERNARY:       return "AST_TERNARY";
         case AST_FOR:           return "AST_FOR";
         case AST_RETURN:        return "AST_RETURN";
         case AST_WHILE:         return "AST_WHILE";
@@ -2433,12 +2724,12 @@ char *astKindToString(AstKind kind) {
         case AST_PLACEHOLDER:   return "AST_PLACEHOLDER";
         case AST_SWITCH:        return "AST_SWITCH";
         case AST_DEFAULT:       return "AST_DEFAULT";
-        case AST_SIZEOF:        return "AST_SIZEOF";
-        case AST_COMMENT:       return "AST_COMMENT";
         case AST_BINOP:         return "AST_BINOP";
         case AST_UNOP:          return "AST_UNOP";
         case AST_TRY:           return "AST_TRY";
         case AST_THROW:         return "AST_THROW";
+        case AST_DEFER:         return "AST_DEFER";
+        case AST_VA_PACK:       return "AST_VA_PACK";
             break;
     }
     loggerPanic("Cannot find kind: %d\n", kind);
@@ -2548,6 +2839,13 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
         return;
     }
     switch(ast->kind) {
+        case AST_TERNARY:
+            _astLValueToString(str, ast->cond, lexeme_flags);
+            aoStrCatPrintf(str, " ? ");
+            _astLValueToString(str, ast->then, lexeme_flags);
+            aoStrCatPrintf(str, " : ");
+            _astLValueToString(str, ast->els, lexeme_flags);
+            break;
         case AST_LITERAL:
             switch (ast->type->kind) {
             case AST_TYPE_VOID:  aoStrCatPrintf(str, "void"); break;
@@ -2565,6 +2863,14 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
                 break;
             }
             case AST_TYPE_FLOAT: aoStrCatPrintf(str, "%g", ast->f64); break;
+            case AST_TYPE_CLASS: {
+                /* An enum member: its value, typed as the enum. The
+                 * member's own name isn't kept on the literal. */
+                const char *name = ast->type->clsname ? ast->type->clsname->data
+                                                       : "<anonymous>";
+                aoStrCatPrintf(str, "(%s)%ld", name, ast->i64);
+                break;
+            }
             default:
                 loggerPanic("Unhandled type: %d\n", ast->type->kind);
             }
@@ -2689,11 +2995,26 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
 
         case AST_THROW:
             aoStrCatPrintf(str, "throw(");
-            _astLValueToString(str, ast->throw_value, lexeme_flags);
+            _astLValueToString(str, ast->throw_call ? ast->throw_call
+                                                    : ast->throw_value,
+                               lexeme_flags);
             aoStrCatPrintf(str, "%s",
                     lexemePunctToStringWithFlags(')',lexeme_flags));
             aoStrCatPrintf(str,"%s",
                     lexemePunctToStringWithFlags(';',lexeme_flags));
+            break;
+
+        case AST_VA_PACK:
+            for (u64 i = 0; ast->va_items && i < ast->va_items->size; ++i) {
+                if (i) aoStrCatPrintf(str, ", ");
+                _astLValueToString(str, vecGet(Ast *, ast->va_items, i),
+                                   lexeme_flags);
+            }
+            break;
+
+        case AST_DEFER:
+            aoStrCatPrintf(str, "defer ");
+            _astLValueToString(str, ast->defer_stmt, lexeme_flags);
             break;
 
         case AST_DEFAULT:
@@ -2710,20 +3031,9 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
             break;
         }
 
-        case AST_SIZEOF: {
-            char *type_str = astTypeToString(ast->type);
-            aoStrCatPrintf(str, "sizeof(%s)",type_str);
-            break;
-        }
-
         case AST_BREAK:
             aoStrCatPrintf(str, "break;");
             break;
-
-        case AST_COMMENT: {
-            aoStrCatPrintf(str, "%s\n", ast->sval->data);
-            break;
-        }
 
         case AST_BINOP: {
             const char *bin_op_str = astBinOpKindToString(ast->binop);
@@ -2812,7 +3122,7 @@ const char *astTypeKindToHumanReadable(AstType *type) {
         case AST_TYPE_VOID:    return "void type";
         case AST_TYPE_INT:     return "integer type";
         case AST_TYPE_FLOAT:   return "float type";
-        case AST_TYPE_CHAR:    return type->is_bool ? "Bool type" : "character type";
+        case AST_TYPE_CHAR:    return type->is_bool ? "bool type" : "character type";
         case AST_TYPE_ARRAY:   return "array type";
         case AST_TYPE_POINTER: return "pointer type";
         case AST_TYPE_FUNC:    return "function";
@@ -2840,10 +3150,13 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_FUNCALL: return "function call";
         case AST_ARRAY_INIT: return "array initialization";
         case AST_IF: return "if statement";
+        case AST_TERNARY: return "conditional operator";
         case AST_FOR: return "for loop";
         case AST_RETURN: return "return statement";
         case AST_TRY: return "try/catch statement";
         case AST_THROW: return "throw statement";
+        case AST_DEFER: return "defer statement";
+        case AST_VA_PACK: return "variadic arguments";
         case AST_DO_WHILE: return "do-while loop";
         case AST_WHILE: return "while loop";
         case AST_CLASS_REF: return "class reference";
@@ -2862,8 +3175,6 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_SWITCH: return "switch statement";
         case AST_CASE: return "case statement";
         case AST_DEFAULT: return "default statement";
-        case AST_SIZEOF: return "size of";
-        case AST_COMMENT: return "comment";
         case AST_PLACEHOLDER: return "placeholder";
         case AST_BINOP: return "binary op";
         case AST_UNOP: return "unary op";
@@ -2877,6 +3188,7 @@ static void astClassFieldsToString(Map *fields,
                                    AoStr *buf,
                                    s64 *indent)
 {
+    (void)clsname;
     /* Fields */
     MapIter it;
     mapIterInit(fields, &it);
@@ -2885,32 +3197,18 @@ static void astClassFieldsToString(Map *fields,
         AstType *field = n->value;
         char *field_name = n->key;
         
-        /* So we do not double up. This code is very similar to that in
-         * transpile.c */
+        /* So we do not double up */
         if (setHasLen(seen,n->key,n->key_len))
             continue;
 
         aoStrCatRepeat(buf, " ", *indent);
-        if (!strncmp(field_name, str_lit("cls_label "))) {
-            if (field->kind == AST_TYPE_UNION) {
-                aoStrCatFmt(buf, "%sunion {%s\n", clr(ESC_BLUE), clr(ESC_RESET));
-            } else {
-                aoStrCatFmt(buf, "%sclass%s {\n", clr(ESC_BLUE), clr(ESC_RESET));
-            }
-            *indent += 2;
-            astClassFieldsToString(field->fields,seen,clsname,buf,indent);
-            *indent -= 2;
-            aoStrCatRepeat(buf, " ", *indent);
-            aoStrCatLen(buf, str_lit("};\n"));
+        AoStr *ty_str = astTypeToColorAoStr(field);
+        if (astTypeIsPtr(field)) {
+            aoStrCatFmt(buf, "%S%s;\n", ty_str, field_name);
         } else {
-            AoStr *ty_str = astTypeToColorAoStr(field);
-            if (astTypeIsPtr(field)) {
-                aoStrCatFmt(buf, "%S%s;\n", ty_str, field_name);
-            } else {
-                aoStrCatFmt(buf, "%S %s;\n", ty_str, field_name);
-            }
-            aoStrRelease(ty_str);
+            aoStrCatFmt(buf, "%S %s;\n", ty_str, field_name);
         }
+        aoStrRelease(ty_str);
         setAdd(seen, field_name);
     }
 }

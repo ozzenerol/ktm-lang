@@ -19,10 +19,6 @@
  * its size is plenty */
 #define CCTRL_MACRO_USE_CACHE_SIZE (CCTRL_TOKEN_BUFFER_SIZE*2)
 
-#define CCTRL_TRANSPILING          (1<<0)
-#define CCTRL_SAVE_ANONYMOUS       (1<<1)
-#define CCTRL_PASTE_DEFINES        (1<<2)
-#define CCTRL_PRESERVE_SIZEOF      (1<<3)
 #define CCTRL_ASM_HAS_INITIALISERS (1<<4)
 /* REPL mode: re-defining a function replaces the previous definition
  * instead of raising "Cannot redefine function", and floating
@@ -94,6 +90,9 @@ typedef struct Cctrl {
     /* The global environment for user defined types, functions and global
      * variables */
     Map *global_env;
+    /* A module's extern "c" functions by their C name (they are in
+     * global_env as `a.b.name`): what a call to the C symbol calls */
+    Map *c_externs;
 
     /* key words defined in the language */
     Map *symbol_table;
@@ -158,6 +157,8 @@ typedef struct Cctrl {
 
     /* For parsing a switch */
     Ast *tmp_default_case;
+    /* how many cases came before the switch's `default` */
+    int tmp_default_at;
 
     /* Function being parsed */
     Ast *tmp_func;
@@ -177,6 +178,52 @@ typedef struct Cctrl {
      * current loop's labels */
     AoStr *tmp_loop_begin;
     AoStr *tmp_loop_end;
+    /* A `fallthrough;` not yet followed by a case or default label of
+     * its switch: where it is, for the error if the switch ends first */
+    int fallthrough_pending;
+    /* The local whose initialiser is being parsed (it doesn't hide an
+     * import prefix there yet) */
+    struct Ast *decl_in_init;
+    /* A token to hand out before the ring's next one (cctrlTokenGet) */
+    struct Lexeme *pending_token;
+    s64 fallthrough_line, fallthrough_col;
+    /* Deferred statements (`defer <stmt>`) being parsed around the
+     * current token: a return, or a break/continue with no loop inside
+     * the deferred statement, would leave one. */
+    int defer_depth;
+    /* The module of the declaration being parsed (Lexer.modules, 1-based;
+     * 0: the main program), and whether this is its declarations-only
+     * pass (function bodies and global initialisers skipped) */
+    u32 cur_module;
+    int decls_only;
+    /* M5: a module's type declarations (struct/union bodies, enums,
+     * consts), recorded by its names pass and parsed again from the
+     * recorded tokens until no more succeed, so the files of a module can
+     * use each other's types in any order. `replaying` is set while one
+     * is parsed from its tokens; diagnostics are then dropped and only
+     * counted (`quiet_errors`), the declarations pass reports them. */
+    Vec *mod_type_decls;
+    Set *mod_decls_done;
+    Set *mod_types_done;   /* module ids parseModuleTypes has run for */
+    int replaying;
+    /* `((fn(i64) i64)raw + 1)`: the cast already parsed, handed back
+     * by the next parseUnaryExpr as the start of the expression */
+    Ast *pending_unary;
+    int quiet_errors;
+    /* The declaration being parsed is `pub`; it comes from the main
+     * program (not a module, not a stdlib header) */
+    int decl_pub;
+    int decl_from_main;
+    /* `a.b.name`s declared pub; names the main program declares, which
+     * a module must not see */
+    Set *pub_names;
+    Set *main_names;
+    /* A method definition (`void User.describe()`) being parsed: the
+     * type of its implicit `self` parameter (`User *`), NULL otherwise */
+    AstType *method_self;
+    /* The file of the last token the parser took: where diagnostics
+     * and new Ast nodes are (the lexer may already be in the next) */
+    LexFile *tok_file;
 
     /* Temporary asm function name */
     AoStr *tmp_asm_fname;
@@ -267,6 +314,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs);
 u32 cctrlRegisterFile(Cctrl *cc, AoStr *filename);
 void cctrlNoteHeaderName(Cctrl *cc, char *start, int len);
 int cctrlIsExported(Cctrl *cc, AoStr *name);
+Ast *cctrlCalleeDecl(Cctrl *cc, char *name, int len);
 AoStr *cctrlLookUpFile(Cctrl *cc, u32 file_id);
 
 Lexeme *cctrlTokenGet(Cctrl *cc);
@@ -283,11 +331,22 @@ void cctrlInitParse(Cctrl *cc, Lexer *lexer_);
 
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len);
 int cctrlIsKeyword(Cctrl *cc, char *name, int len);
+int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok);
+AoStr *cctrlModulePath(Cctrl *cc, u32 module_id);
+char *cctrlQualifyName(Cctrl *cc, char *name, int len);
+int cctrlInPrelude(Cctrl *cc);
+int cctrlInCModule(Cctrl *cc);
+char *cctrlDeclName(Cctrl *cc, char *name, int len);
+int cctrlModuleHides(Cctrl *cc, char *name, int len);
+LexFile *cctrlCurFile(Cctrl *cc);
+void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len);
+void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name);
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len);
 void cctrlInfo(Cctrl *cc, char *fmt, ...);
 void cctrlWarning(Cctrl *cc, char *fmt, ...);
 void cctrlWarningAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlRaiseExceptionAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
+void cctrlErrorAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseExceptionFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseException(Cctrl *cc, char *fmt, ...);

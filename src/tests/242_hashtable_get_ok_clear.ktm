@@ -1,206 +1,203 @@
-#include "testhelper.ktm"
+import map, mem, str, test;
 
 /* Hash table API additions and fixes:
- *  - IntMapGet/StrMapGet/StrMapGetLen take an optional `Bool *_ok`, TRUE
- *    when the key is there, so a stored NULL or 0 can be told from a
+ *  - map.intGet/map.strGet/map.strGetLen take an optional `bool *_ok`, true
+ *    when the key is there, so a stored null or 0 can be told from a
  *    missing key (calls without it still work);
- *  - a pointer that is both the key and the value (`StrMapSet(m,s,s)`)
+ *  - a pointer that is both the key and the value (`map.strSet(m,s,s)`)
  *    with both destructors registered was freed twice; it is now freed
  *    once, on release, delete, clear and update;
- *  - IntMapClear/StrMapClear remove every entry (running the
+ *  - map.intClear/map.strClear remove every entry (running the
  *    destructors) and keep the capacity;
- *  - a NULL map or key no longer crashes: Get/Has give NULL/FALSE,
- *    Set/Delete FALSE.
+ *  - a null map or key no longer crashes: Get/Has give null/false,
+ *    Set/Delete false.
  * Every allocation is counted against the frees (valgrind-clean). */
 
-I64 g_allocs = 0;
-I64 g_key_frees = 0;
-I64 g_value_frees = 0;
+i64 gAllocs = 0;
+i64 gKeyFrees = 0;
+i64 gValueFrees = 0;
 
-U8 *New(U8 *s)
-{
-  g_allocs++;
-  return StrNew(s);
+u8 *new(u8 *s) {
+    gAllocs++;
+    return str.dup(s);
 }
 
-U0 FreeKey(U0 *p)
-{
-  g_key_frees++;
-  Free(p);
+void freeKey(void *p) {
+    gKeyFrees++;
+    mem.free(p);
 }
 
-U0 FreeValue(U0 *p)
-{
-  g_value_frees++;
-  Free(p);
+void freeValue(void *p) {
+    gValueFrees++;
+    mem.free(p);
 }
 
-StrMap *CountingMap()
-{
-  StrMap *m = StrMapNew();
-  StrMapSetFreeKey(m, &FreeKey);
-  StrMapSetFreeValue(m, &FreeValue);
-  return m;
+map.StrMap *countingMap() {
+    map.StrMap *m = map.strNew();
+    m.setFreeKey(&freeKey);
+    m.setFreeValue(&freeValue);
+    return m;
 }
 
-Bool AllFreed()
-{
-  return g_key_frees + g_value_frees == g_allocs;
+bool allFreed() {
+    return gKeyFrees + gValueFrees == gAllocs;
 }
 
-I32 Main()
-{
-  "Test - hash table _ok, Clear, shared keys and NULL: ";
-  I64 tests = 0;
-  I64 correct = 0;
-  Bool ok;
+i32 main() {
+    printf("Test - hash table _ok, Clear, shared keys and null: ");
+    i64 tests = 0;
+    i64 correct = 0;
+    bool ok;
 
-  /* _ok */
-  IntMap *im = IntMapNew();
-  IntMapSet(im, 7, NULL);
-  IntMapSet(im, 8, 0(U0 *));
-  IntMapSet(im, 9, 99(U0 *));
-  tests++;
-  ok = TRUE;
-  Bool ok7 = FALSE, ok8 = FALSE, ok9 = FALSE;
-  if (IntMapGet(im, 1, &ok) == NULL && !ok &&
-      IntMapGet(im, 7, &ok7) == NULL && ok7 &&
-      IntMapGet(im, 8, &ok8) == NULL && ok8 &&
-      IntMapGet(im, 9, &ok9)(I64) == 99 && ok9 &&
-      IntMapGet(im, 9)(I64) == 99)
-    correct++;
-  else "Failed - IntMapGet _ok\n";
+    /* _ok */
+    map.IntMap *im = map.intNew();
+    im.set(7, null);
+    im.set(8, (void *)0);
+    im.set(9, (void *)99);
+    tests++;
+    ok = true;
+    bool ok7 = false, ok8 = false, ok9 = false;
+    if (im.get(1, &ok) == null && !ok &&
+            im.get(7, &ok7) == null && ok7 &&
+            im.get(8, &ok8) == null && ok8 &&
+            (i64)im.get(9, &ok9) == 99 && ok9 &&
+            (i64)im.get(9) == 99) {
+        correct++;
+            } else { printf("Failed - IntMapGet _ok\n"); }
 
-  StrMap *sm = StrMapNew();
-  StrMapSet(sm, "null", NULL);
-  StrMapSet(sm, "one", 1(U0 *));
-  tests++;
-  Bool okn = FALSE, ok1 = FALSE, okl = FALSE, okm = TRUE, okml = TRUE;
-  if (StrMapGet(sm, "null", &okn) == NULL && okn &&
-      StrMapGet(sm, "one", &ok1)(I64) == 1 && ok1 &&
-      StrMapGet(sm, "two", &okm) == NULL && !okm &&
-      StrMapGetLen(sm, "one", 3, &okl)(I64) == 1 && okl &&
-      StrMapGetLen(sm, "one", 2, &okml) == NULL && !okml &&
-      StrMapGet(sm, "one")(I64) == 1)
-    correct++;
-  else "Failed - StrMapGet _ok\n";
+    map.StrMap *sm = map.strNew();
+    sm.set("null", null);
+    sm.set("one", (void *)1);
+    tests++;
+    bool okn = false, ok1 = false, okl = false, okm = true, okml = true;
+    if (sm.get("null", &okn) == null && okn &&
+            (i64)sm.get("one", &ok1) == 1 && ok1 &&
+            sm.get("two", &okm) == null && !okm &&
+            (i64)sm.getLen("one", 3, &okl) == 1 && okl &&
+            sm.getLen("one", 2, &okml) == null && !okml &&
+            (i64)sm.get("one") == 1) {
+        correct++;
+            } else { printf("Failed - StrMapGet _ok\n"); }
 
-  /* Clear keeps the capacity, empties iteration, and the map is reusable */
-  for (I64 i = 0; i < 100; i++) IntMapSet(im, i * 3, i(U0 *));
-  I64 cap = im->capacity;
-  IntMapClear(im);
-  I64 it = 0;
-  IntMapNode *inode;
-  Bool iter_empty = !IntMapIter(im, &it, &inode);
-  IntMapSet(im, 5, 6(U0 *));
-  tests++;
-  if (im->size == 1 && im->capacity == cap && iter_empty &&
-      !IntMapHas(im, 9) && IntMapGet(im, 5)(I64) == 6)
-    correct++;
-  else "Failed - IntMapClear\n";
-  IntMapRelease(im);
-  StrMapRelease(sm);
+    /* Clear keeps the capacity, empties iteration, and the map is reusable */
+    for (i64 i = 0; i < 100; i++) { im.set(i * 3, (void *)i); }
+    i64 cap = im.capacity;
+    im.clear();
+    i64 it = 0;
+    map.IntMapNode *inode;
+    bool iterEmpty = !im.iter(&it, &inode);
+    im.set(5, (void *)6);
+    tests++;
+    if (im.size == 1 && im.capacity == cap && iterEmpty &&
+            !im.has(9) && (i64)im.get(5) == 6) {
+        correct++;
+            } else { printf("Failed - IntMapClear\n"); }
+    im.release();
+    sm.release();
 
-  /* IntMapClear runs the value destructor, also after deletes */
-  im = IntMapNew();
-  IntMapSetFreeValue(im, &FreeValue);
-  for (I64 i = 0; i < 50; i++) IntMapSet(im, i, New("v"));
-  for (I64 i = 0; i < 50; i += 5) IntMapDelete(im, i);
-  IntMapClear(im);
-  tests++;
-  if (g_value_frees == 50 && im->size == 0) correct++;
-  else "Failed - IntMapClear destructors: %d\n", g_value_frees;
-  IntMapRelease(im);
+    /* map.intClear runs the value destructor, also after deletes */
+    im = map.intNew();
+    im.setFreeValue(&freeValue);
+    for (i64 i = 0; i < 50; i++) { im.set(i, new("v")); }
+    for (i64 i = 0; i < 50; i += 5) { im.delete(i); }
+    im.clear();
+    tests++;
+    if (gValueFrees == 50 && im.size == 0) { correct++; }
+    else { printf("Failed - IntMapClear destructors: %d\n", gValueFrees); }
+    im.release();
 
-  /* StrMapClear with destructors, shared and separate pointers */
-  sm = CountingMap();
-  for (I64 i = 0; i < 40; i++) {
-    U8 *k = StrPrint(NULL, "k%d", i);
-    g_allocs++;
-    if (i % 2) StrMapSet(sm, k, k);
-    else       StrMapSet(sm, k, New("v"));
-  }
-  cap = sm->capacity;
-  StrMapDelete(sm, "k1");
-  StrMapDelete(sm, "k2");
-  StrMapClear(sm);
-  tests++;
-  if (AllFreed() && sm->size == 0 && sm->capacity == cap && !StrMapHas(sm, "k3"))
-    correct++;
-  else "Failed - StrMapClear: allocs %d, freed %d + %d\n",
-         g_allocs, g_key_frees, g_value_frees;
-  StrMapSet(sm, New("again"), New("v"));
-  StrMapRelease(sm);
-  tests++;
-  if (AllFreed()) correct++;
-  else "Failed - release after clear\n";
+    /* map.strClear with destructors, shared and separate pointers */
+    sm = countingMap();
+    for (i64 i = 0; i < 40; i++) {
+        u8 *k = str.formatTo(null, "k%d", i);
+        gAllocs++;
+        if (i % 2) { sm.set(k, k); }
+        else       { sm.set(k, new("v")); }
+    }
+    cap = sm.capacity;
+    sm.delete("k1");
+    sm.delete("k2");
+    sm.clear();
+    tests++;
+    if (allFreed() && sm.size == 0 && sm.capacity == cap && !sm.has("k3")) {
+        correct++;
+    } else { printf("Failed - StrMapClear: allocs %d, freed %d + %d\n",
+                 gAllocs, gKeyFrees, gValueFrees);
+    }
+    sm.set(new("again"), new("v"));
+    sm.release();
+    tests++;
+    if (allFreed()) { correct++; }
+    else { printf("Failed - release after clear\n"); }
 
-  /* Shared key and value: release, delete, and every kind of update */
-  sm = CountingMap();
-  I64 freed_before = g_key_frees + g_value_frees;
-  U8 *s = New("a");
-  StrMapSet(sm, s, s);               /* insert shared */
-  StrMapSet(sm, s, s);               /* same again: nothing freed */
-  U8 *s2 = New("a");
-  StrMapSet(sm, s2, s2);             /* shared over shared: s freed once */
-  tests++;
-  if (g_key_frees + g_value_frees == freed_before + 1 &&
-      StrMapGet(sm, "a") == s2)
-    correct++;
-  else "Failed - shared over shared: %d %d %d\n", g_key_frees, g_value_frees,
-         StrMapGet(sm, "a") == s2;
-  StrMapSet(sm, New("a"), New("x")); /* separate over shared */
-  U8 *s3 = New("a");
-  StrMapSet(sm, s3, s3);             /* shared over separate */
-  StrMapSet(sm, New("b"), New("y"));
-  U8 *s4 = New("c");
-  StrMapSet(sm, s4, s4);
-  StrMapDelete(sm, "c");             /* delete shared */
-  StrMapRelease(sm);
-  tests++;
-  if (AllFreed()) correct++;
-  else "Failed - shared keys: allocs %d, freed %d + %d\n",
-         g_allocs, g_key_frees, g_value_frees;
+    /* Shared key and value: release, delete, and every kind of update */
+    sm = countingMap();
+    i64 freedBefore = gKeyFrees + gValueFrees;
+    u8 *s = new("a");
+    sm.set(s, s);               /* insert shared */
+    sm.set(s, s);               /* same again: nothing freed */
+    u8 *s2 = new("a");
+    sm.set(s2, s2);             /* shared over shared: s freed once */
+    tests++;
+    if (gKeyFrees + gValueFrees == freedBefore + 1 &&
+            sm.get("a") == s2) {
+        correct++;
+            } else { printf("Failed - shared over shared: %d %d %d\n", gKeyFrees, gValueFrees,
+                 sm.get("a") == s2);
+    }
+    sm.set(new("a"), new("x")); /* separate over shared */
+    u8 *s3 = new("a");
+    sm.set(s3, s3);             /* shared over separate */
+    sm.set(new("b"), new("y"));
+    u8 *s4 = new("c");
+    sm.set(s4, s4);
+    sm.delete("c");             /* delete shared */
+    sm.release();
+    tests++;
+    if (allFreed()) { correct++; }
+    else { printf("Failed - shared keys: allocs %d, freed %d + %d\n",
+                 gAllocs, gKeyFrees, gValueFrees);
+    }
 
-  /* NULL map and NULL key */
-  ok = TRUE;
-  Bool ok2 = TRUE, ok3 = TRUE;
-  I64 cursor = 0;
-  StrMapNode *snode;
-  U8 *str;
-  tests++;
-  if (IntMapGet(NULL, 1, &ok) == NULL && !ok && !IntMapHas(NULL, 1) &&
-      !IntMapSet(NULL, 1, NULL) && !IntMapDelete(NULL, 1) &&
-      !IntMapIter(NULL, &cursor, &inode) && !IntMapResize(NULL) &&
-      StrMapGet(NULL, "a", &ok2) == NULL && !ok2 && !StrMapHas(NULL, "a") &&
-      !StrMapSet(NULL, "a", NULL) && !StrMapDelete(NULL, "a") &&
-      !StrMapHasLen(NULL, "a", 1) && !StrMapIter(NULL, &cursor, &snode) &&
-      !StrMapResize(NULL))
-    correct++;
-  else "Failed - NULL map\n";
-  IntMapClear(NULL);
-  StrMapClear(NULL);
-  IntMapRelease(NULL);
-  StrMapRelease(NULL);
-  IntMapSetFreeValue(NULL, &FreeValue);
-  StrMapSetFreeKey(NULL, &FreeKey);
-  StrMapSetFreeValue(NULL, &FreeValue);
-  str = IntMapKeysToString(NULL);
-  Bool empty_str = !StrCmp(str, "{}");
-  Free(str);
+    /* null map and null key */
+    ok = true;
+    bool ok2 = true, ok3 = true;
+    i64 cursor = 0;
+    map.StrMapNode *snode;
+    u8 *strVal;
+    tests++;
+    if (map.IntMap.get(null, 1, &ok) == null && !ok && !map.IntMap.has(null, 1) &&
+            !map.IntMap.set(null, 1, null) && !map.IntMap.delete(null, 1) &&
+            !map.IntMap.iter(null, &cursor, &inode) && !map.IntMap.resize(null) &&
+            map.StrMap.get(null, "a", &ok2) == null && !ok2 && !map.StrMap.has(null, "a") &&
+            !map.StrMap.set(null, "a", null) && !map.StrMap.delete(null, "a") &&
+            !map.StrMap.hasLen(null, "a", 1) && !map.StrMap.iter(null, &cursor, &snode) &&
+            !map.StrMap.resize(null)) {
+        correct++;
+            } else { printf("Failed - null map\n"); }
+    map.IntMap.clear(null);
+    map.StrMap.clear(null);
+    map.IntMap.release(null);
+    map.StrMap.release(null);
+    map.IntMap.setFreeValue(null, &freeValue);
+    map.StrMap.setFreeKey(null, &freeKey);
+    map.StrMap.setFreeValue(null, &freeValue);
+    strVal = map.IntMap.keysToStr(null);
+    bool emptyStr = !str.cmp(strVal, "{}");
+    mem.free(strVal);
 
-  sm = StrMapNew();
-  StrMapSet(sm, "a", 1(U0 *));
-  tests++;
-  if (empty_str && StrMapGet(sm, NULL, &ok3) == NULL && !ok3 &&
-      !StrMapHas(sm, NULL) && !StrMapSet(sm, NULL, 2(U0 *)) &&
-      !StrMapDelete(sm, NULL) && StrMapGetLen(sm, NULL, 3) == NULL &&
-      !StrMapHasLen(sm, NULL, 0) && sm->size == 1)
-    correct++;
-  else "Failed - NULL key\n";
-  StrMapRelease(sm);
+    sm = map.strNew();
+    sm.set("a", (void *)1);
+    tests++;
+    if (emptyStr && sm.get(null, &ok3) == null && !ok3 &&
+            !sm.has(null) && !sm.set(null, (void *)2) &&
+            !sm.delete(null) && sm.getLen(null, 3) == null &&
+            !sm.hasLen(null, 0) && sm.size == 1) {
+        correct++;
+            } else { printf("Failed - null key\n"); }
+    sm.release();
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

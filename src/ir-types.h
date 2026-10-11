@@ -450,6 +450,10 @@ typedef struct IrCtx {
     Ast *try_stack[IR_TRY_STACK_MAX];
     IrValue *try_frames[IR_TRY_STACK_MAX];
     u16 try_depth;
+    /* Deferred statements being lowered. Each one is lowered once per
+     * way out of its block, so its locals are declared again: they
+     * reuse the slot of the first copy. */
+    u16 defer_lowering;
     /* `Map<AoStr *label_name, IrTryChain *>`: the try bodies around each
      * label of the current function, so a goto knows which to leave. */
     Map *label_tries;

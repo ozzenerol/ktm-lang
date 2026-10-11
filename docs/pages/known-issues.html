@@ -11,7 +11,15 @@ there works as shown.</p>
 <p>No known issues: everything found while writing these docs has been fixed.</p>
 
 <h2>JIT and code generation</h2>
-<p>No known issues: everything found while writing these docs has been fixed.</p>
+<h3>A child forked by a JIT-run program on macOS can crash</h3>
+<p>On macOS (Apple Silicon), a program run with <code>ktm -jit</code> that calls
+<code>libc.fork()</code> sometimes gets a child that is killed by SIGBUS right after the fork,
+before it runs any of its own code: about once in a hundred runs, under heavy load. Compiled
+programs are not affected, and neither is Linux. <code>proc.spawn</code> uses
+<code>posix_spawn</code>, not <code>fork</code>.</p>
+<p><strong>Workaround:</strong> on macOS, compile a program that forks
+(<code>ktm main.ktm -o main &amp;&amp; ./main</code>) instead of running it with
+<code>-jit</code>, or start processes with <code>proc.spawn</code>.</p>
 
 <h2>Standard library</h2>
 <p>No known issues: everything found while writing these docs has been fixed.</p>

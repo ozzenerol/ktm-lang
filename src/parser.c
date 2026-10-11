@@ -31,6 +31,8 @@ Ast *parseTryStatement(Cctrl *cc);
 Ast *parseThrowStatement(Cctrl *cc);
 AstType *parseClassDef(Cctrl *cc, AstType *intrinsic_base);
 AstType *parseUnionDef(Cctrl *cc);
+AstType *parseEnumDef(Cctrl *cc);
+static int parseTypeNameFollowedByDot(Cctrl *cc);
 
 /* `reg <REG>` / `noreg` modifier after a decl type.
  * If the next token is `reg`, consume it plus the following register-
@@ -65,11 +67,6 @@ static AoStr *getRangeLoopIdx(void) {
     return aoStrPrintf("___tmp%d___", ++range_loop_idx);
 }
 
-/* Start the range-loop temporaries from `___tmp1___` again, for a second
- * parse of the same input (-transpile checks it with a compile first) */
-void parseResetRangeLoopIdx(void) {
-    range_loop_idx = 0;
-}
 
 /* Kinda cheating converting it to a string and calling printf */
 Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
@@ -116,6 +113,9 @@ Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
 void parseTypeCheckClassFieldInitaliser(Cctrl *cc, AstType *cls_field_type, Ast *init,
                                         Lexeme *start)
 {
+    if (astFnPtrMismatch(cls_field_type, init->type)) {
+        parseRaiseFnConvert(cc, cls_field_type, init->type);
+    }
     if (!astTypeCheck(cls_field_type, init, AST_BIN_OP_ASSIGN)) {
         char *cls_field_str = astTypeToColorString(cls_field_type);
         char *init_field = astTypeToColorString(init->type);
@@ -250,6 +250,8 @@ static Ast *parseDeclNestedInit(Cctrl *cc, AstType *type, int is_class,
                     astTypeToString(type));
         }
         sub_type = entry->value;
+        parseCheckPrivateField(cc, sub_type, (char *)entry->key,
+                               strlen((char *)entry->key));
         if (sub_type->kind != AST_TYPE_ARRAY &&
             ((sub_type->kind != AST_TYPE_CLASS &&
               sub_type->kind != AST_TYPE_UNION) ||
@@ -286,6 +288,9 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                                 Lexeme *start)
 {
     if (type->ptr) {
+        if (astFnPtrMismatch(type->ptr, init->type)) {
+            parseRaiseFnConvert(cc, type->ptr, init->type);
+        }
         if ((astGetResultType(AST_BIN_OP_ASSIGN, init->type, type->ptr)) == NULL) {
             cctrlRaiseException(cc,"Incompatiable types: %s %s",
                     astTypeToString(init->type),
@@ -301,6 +306,8 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                     astTypeToString(type));
         }
         AstType *cls_field_type = entry->value;
+        parseCheckPrivateField(cc, cls_field_type, (char *)entry->key,
+                               strlen((char *)entry->key));
         if (init->kind == AST_STRING &&
             cls_field_type->kind == AST_TYPE_ARRAY &&
             cls_field_type->ptr->kind == AST_TYPE_CHAR)
@@ -461,7 +468,8 @@ static Ast *parseDeclArrayInitList(Cctrl *cc, AstType *type, volatile int *depth
         elem_type = elem_type->ptr;
     }
     if ((elem_type->kind == AST_TYPE_CLASS ||
-         elem_type->kind == AST_TYPE_UNION) && elem_type->fields == NULL) {
+         elem_type->kind == AST_TYPE_UNION) && elem_type->fields == NULL &&
+        !elem_type->is_intrinsic) {
         cctrlTokenRewind(cc);
         cctrlRaiseException(cc,"Cannot use an initialiser list, %s is incomplete",
                 astTypeToString(elem_type));
@@ -618,9 +626,34 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             cctrlRaiseException(cc,
                     "Unexpected end of input in class/union body");
         }
+        /* `private T name;`: only the class's module can use the field */
+        int is_private = 0;
+        if (tok_name->tk_type == TK_KEYWORD &&
+            (tok_name->i64 == KW_PRIVATE || tok_name->i64 == KW_PUBLIC))
+        {
+            Lexeme *vis = cctrlTokenGet(cc);
+            if (vis->i64 == KW_PUBLIC) {
+                cctrlRaiseExceptionAt(cc, vis->line, vis->col, vis->len,
+                        "a field is public unless it is marked `private`");
+            }
+            if (!cc->cur_module) {
+                cctrlRaiseExceptionAt(cc, vis->line, vis->col, vis->len,
+                        "`private` fields are for the structs of a module: "
+                        "outside one there is nothing to hide them from");
+            }
+            is_private = 1;
+            tok_name = cctrlTokenPeek(cc);
+            if (tok_name == NULL) {
+                cc->current_recovery = outer_recovery;
+                cctrlRaiseException(cc,
+                        "Unexpected end of input in class/union body");
+            }
+        }
         if (tokenPunctIs(tok_name,'}')) {
             break;
-        } else if (cctrlIsKeyword(cc,tok_name->start,tok_name->len)) {
+        } else if (cctrlTokIsKeyword(cc, tok_name)) {
+            base_type = parseBaseDeclSpec(cc);
+        } else if (tokenMayStartFnType(tok_name) && parseFnLooksLikeType(cc)) {
             base_type = parseBaseDeclSpec(cc);
         } else if (name && !memcmp(name->data,tok_name->start,tok_name->len)) {
             base_type = parseBaseDeclSpec(cc);
@@ -653,6 +686,8 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                     base_type = nested;
                     break;
                 }
+                case KW_CONST:
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
                 default:
                     cctrlRaiseException(cc,"Unexpected keyword: `%.*s` while parsing class %s",
                             tok_name->len,
@@ -689,6 +724,23 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                 field_name = aoStrDupRaw(tok_name->start,tok_name->len);
             }
 
+            /* A field can hold a class by value only once that class is
+             * complete: before, its size isn't known (`class B;` alone,
+             * or in a module a type of a later file, see
+             * parseModuleTypes). A pointer to it is fine. */
+            AstType *by_value = next_type;
+            while (by_value && by_value->kind == AST_TYPE_ARRAY) by_value = by_value->ptr;
+            if (by_value && !by_value->is_intrinsic &&
+                !by_value->fields &&
+                (by_value->kind == AST_TYPE_CLASS || by_value->kind == AST_TYPE_UNION))
+            {
+                cctrlRewindUntilStrMatch(cc, tok_name->start, tok_name->len, NULL);
+                cctrlRaiseException(cc, "field `%.*s` of %s holds a %s, which is not "
+                        "complete here: use a pointer, or a type that doesn't "
+                        "contain %s", (int)field_name->len, field_name->data,
+                        cls_str, astTypeToString(by_value), cls_str);
+            }
+
             field_type = astMakeClassField(next_type, 0);
             /* Field provenance for jump-to-definition: the name token
              * is in hand ('(' for fn-pointer fields - same line). */
@@ -697,6 +749,10 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             field_type->file_id = ast_file_hint;
             if (next_type && next_type->clsname) {
                 field_type->clsname = next_type->clsname;
+            }
+            if (is_private) {
+                field_type->private_module = cc->cur_module;
+                field_type->private_of = name;
             }
             /* The list is here to ease calculating the offset of the class 
              * fields as they have been defined by the programmer... Hashing 
@@ -790,9 +846,6 @@ Map *parseClassOffsets(Cctrl *cc,
         offset = base_class->size;
         int ba = astTypeAlign(base_class);
         if (ba > max_align) max_align = ba;
-        if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-            mapAdd(fields_dict,astAnnonymousLabel(),base_class);
-        }
         parseFlattenAnnonymous(base_class,fields_dict,0,1);
     } else {
         offset = 0;
@@ -849,9 +902,6 @@ Map *parseClassOffsets(Cctrl *cc,
         int fa = astTypeAlign(field);
 
         if (field_name == NULL && parseIsClassOrUnion(field->kind)) {
-            if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-                mapAdd(fields_dict,astAnnonymousLabel(),field);
-            }
             offset += CalcPadding(offset, fa);
             /* A tagged one is also a type of its own: copy its fields
              * rather than moving them. */
@@ -885,6 +935,7 @@ Map *parseClassOffsets(Cctrl *cc,
 }
 
 Map *parseUnionOffsets(Cctrl *cc, int *real_size, int *out_align, List *fields) {
+    (void)cc;
     int max_size = 0, max_align = 1;
     AstType *field;
     Map *fields_dict = astTypeMapNew();
@@ -900,9 +951,6 @@ Map *parseUnionOffsets(Cctrl *cc, int *real_size, int *out_align, List *fields) 
             max_size = field->size;
         }
         if (field_name == NULL && parseIsClassOrUnion(field->kind)) {
-            if (cc->flags & CCTRL_SAVE_ANONYMOUS) {
-                mapAdd(fields_dict,astAnnonymousLabel(),field);
-            }
             /* A tagged one is also a type of its own: flatten copies of
              * its fields so marking them below doesn't change it. */
             Map *flat = astTypeMapNew();
@@ -956,7 +1004,10 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     int tag_line = 0, tag_col = 0;
     u32 tag_file = 0;
     if (tok->tk_type == TK_IDENT) {
-        tag = aoStrDupRaw(tok->start,tok->len);
+        /* A module's type is named `a.b.Name` */
+        char *qual = cctrlDeclName(cc, tok->start, tok->len);
+        tag = qual ? aoStrDupRaw(qual, strlen(qual))
+                   : aoStrDupRaw(tok->start,tok->len);
         tag_line = tok->line;
         tag_col = tok->col;
         tag_file = ast_file_hint;
@@ -971,6 +1022,10 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
                 cctrlRaiseException(cc, "Expected Identifier for class inheritance");
             }
             base_class = mapGetLen(cc->clsdefs,tok->start,tok->len);
+            if (base_class == NULL) {
+                char *qual_base = cctrlQualifyName(cc, tok->start, tok->len);
+                if (qual_base) base_class = mapGet(cc->clsdefs, qual_base);
+            }
             if (base_class == NULL) {
                 cctrlRaiseException(cc,"class %.*s has not been defined\n",
                         tok->len,tok->start);
@@ -988,7 +1043,27 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     }
 
     if (tag) {
+        if (memchr(tag->data, '.', tag->len)) {
+            if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+        } else if (cc->decl_from_main && !cc->cur_module) {
+            setAdd(cc->main_names, tag->data);
+        }
         prev = mapGetLen(env, tag->data, tag->len);
+        if (prev && prev->is_enum) {
+            cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
+        }
+        /* A module's full pass: the declarations pass defined it */
+        if (prev && prev->fields && cc->cur_module && !cc->decls_only &&
+            tokenPunctIs(cctrlTokenPeek(cc), '{'))
+        {
+            int depth = 0;
+            Lexeme *t;
+            while ((t = cctrlTokenGet(cc)) != NULL) {
+                if (tokenPunctIs(t, '{')) depth++;
+                else if (tokenPunctIs(t, '}') && --depth == 0) break;
+            }
+            return prev;
+        }
     }
 
     /* Pre-register the tag with an incomplete placeholder so a self-reference
@@ -1001,10 +1076,18 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         prev->line = tag_line;
         prev->col = tag_col;
         prev->file_id = tag_file;
+        prev->in_std = !cc->cur_module && !cc->decl_from_main;
         mapAdd(env, tag->data, prev);
     }
 
+    int errors_before = cc->quiet_errors;
     fields = parseClassOrUnionFields(cc,tag,computeSize,&class_size);
+    /* A field's error is recovered inside the body; parsed from its
+     * recorded tokens (parseModuleTypes), the type must then stay
+     * incomplete, not be completed without that field */
+    if (cc->replaying && cc->quiet_errors != errors_before) {
+        cctrlRaiseException(cc, "a field of %s failed", tag ? tag->data : "a class");
+    }
 
     if (prev && !fields) {
         return prev;
@@ -1019,6 +1102,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
 
     if (prev && fields_dict) {
         prev->fields = fields_dict;
+        prev->base_cls = base_class;
         prev->size = aligned_size;
         prev->alignment = (u32)aligned;
         if (intrinsic_base) prev->issigned = intrinsic_base->issigned;
@@ -1041,11 +1125,13 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         ref = astClassType(NULL,tag,aligned_size,is_intrinsic);
     }
     ref->alignment = (u32)aligned;
+    ref->base_cls = base_class;
     if (intrinsic_base) ref->issigned = intrinsic_base->issigned;
     if (!is_class) ref->kind = AST_TYPE_UNION;
     ref->line = tag_line;
     ref->col = tag_col;
     ref->file_id = tag_file;
+    ref->in_std = !cc->cur_module && !cc->decl_from_main;
     if (tag) {
         mapAdd(env,tag->data,ref);
     }
@@ -1060,6 +1146,157 @@ AstType *parseUnionDef(Cctrl *cc) {
     AstType *_union = parseClassOrUnion(cc,cc->uniondefs,0,CalcUnionSize,NULL);
     _union->kind = AST_TYPE_UNION;
     return _union;
+}
+
+/* Does `value` fit in `type`'s width and signedness? */
+static int parseEnumValueFits(AstType *type, s64 value) {
+    int size = type->size > 0 ? type->size : 8;
+    if (size >= 8) return 1;
+    if (type->issigned) {
+        s64 min = -(1LL << (size * 8 - 1));
+        s64 max = (1LL << (size * 8 - 1)) - 1;
+        return value >= min && value <= max;
+    }
+    u64 max = (1ULL << (size * 8)) - 1;
+    return value >= 0 && (u64)value <= max;
+}
+
+/* `enum Name [: IntType] { member [= constexpr], ... };` at file scope.
+ * The members are only reachable qualified (`Name.member`, parsed in
+ * parseIdentifierOrFunction); unqualified they are bound in a scratch
+ * scope just for the body, so `both = read | write` can use `read` and
+ * `write` plainly while they are being defined. */
+AstType *parseEnumDef(Cctrl *cc) {
+    Lexeme *tok = cctrlTokenGetRequired(cc);
+    if (tok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc,"Expected a name after `enum`, got `%s`",
+                lexemeAsWritten(tok));
+    }
+    /* A module's enum is named `a.b.Name` */
+    char *qual = cctrlDeclName(cc, tok->start, tok->len);
+    AoStr *tag = qual ? aoStrDupRaw(qual, strlen(qual))
+                      : aoStrDupRaw(tok->start, tok->len);
+    if (qual) {
+        if (cc->decl_pub) setAdd(cc->pub_names, tag->data);
+    } else if (cc->decl_from_main && !cc->cur_module) {
+        setAdd(cc->main_names, tag->data);
+    }
+    AstType *defined = mapGetLen(cc->clsdefs, tag->data, tag->len);
+    if (defined && defined->is_enum && cc->cur_module && !cc->decls_only) {
+        /* A module's full pass: the declarations pass defined it */
+        int depth = 0;
+        Lexeme *t;
+        while ((t = cctrlTokenGet(cc)) != NULL) {
+            if (tokenPunctIs(t, '{')) depth++;
+            else if (tokenPunctIs(t, '}') && --depth == 0) break;
+        }
+        return defined;
+    }
+    if (defined || mapGetLen(cc->uniondefs, tag->data, tag->len)) {
+        cctrlRaiseException(cc,"`%s` has already been defined", tag->data);
+    }
+
+    AstType *underlying;
+    if (tokenPunctIs(cctrlTokenPeek(cc), ':')) {
+        cctrlTokenGet(cc);
+        Lexeme *ty_tok = cctrlTokenGetRequired(cc);
+        underlying = parseGetType(cc, ty_tok);
+        if (!underlying || !astIsIntType(underlying) || underlying->is_bool) {
+            cctrlRaiseException(cc,
+                    "enum `%s`'s underlying type must be an integer type, got `%s`",
+                    tag->data, lexemeAsWritten(ty_tok));
+        }
+    } else {
+        underlying = cctrlGetKeyWord(cc, str_lit("i32"));
+    }
+
+    cctrlTokenExpect(cc,'{');
+
+    AstType *enum_type = astClassType(NULL, tag, underlying->size, 1);
+    enum_type->is_enum = 1;
+    enum_type->alignment = (u32)underlying->size;
+    enum_type->issigned = underlying->issigned;
+    enum_type->enum_members = astMapNew();
+
+    Map *scope = cctrlCreateAstMap(cc->localenv);
+    Map *saved_localenv = cc->localenv;
+    cc->localenv = scope;
+
+    s64 next_val = 0;
+    int member_count = 0;
+    for (;;) {
+        Lexeme *mtok = cctrlTokenGet(cc);
+        if (tokenPunctIs(mtok,'}')) {
+            break;
+        }
+        if (!mtok || mtok->tk_type != TK_IDENT) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "Expected an enum member name in `%s`, got `%s`",
+                    tag->data, lexemeAsWritten(mtok));
+        }
+        if (mapGetLen(enum_type->enum_members, mtok->start, mtok->len)) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,"enum `%s` already has a member `%.*s`",
+                    tag->data, mtok->len, mtok->start);
+        }
+        AoStr *member_name = aoStrDupRaw(mtok->start, mtok->len);
+
+        s64 value = next_val;
+        if (tokenPunctIs(cctrlTokenPeek(cc), '=')) {
+            cctrlTokenGet(cc);
+            Ast *expr = parseExpr(cc,16);
+            int ok = 1;
+            value = expr ? evalIntConstExprOrErr(expr, &ok) : 0;
+            if (!expr || !ok) {
+                cc->localenv = saved_localenv;
+                cctrlRaiseException(cc,
+                        "enum member `%s.%s` needs a constant integer expression",
+                        tag->data, member_name->data);
+            }
+        }
+        if (!parseEnumValueFits(enum_type, value)) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "enum member `%s.%s` value %lld does not fit in `%s`",
+                    tag->data, member_name->data, value,
+                    astTypeToString(underlying));
+        }
+        next_val = value + 1;
+        member_count++;
+
+        Ast *unqualified = astI64Type(value);
+        unqualified->type = astTypeCopy(underlying);
+        mapAdd(scope, member_name->data, unqualified);
+
+        Ast *qualified = astI64Type(value);
+        qualified->type = enum_type;
+        mapAdd(enum_type->enum_members, member_name->data, qualified);
+
+        Lexeme *sep = cctrlTokenGetRequired(cc);
+        if (tokenPunctIs(sep,'}')) {
+            break;
+        }
+        if (!tokenPunctIs(sep,',')) {
+            cc->localenv = saved_localenv;
+            cctrlRaiseException(cc,
+                    "Expected `,` or `}` after enum member `%s.%s`, got `%s`",
+                    tag->data, member_name->data, lexemeAsWritten(sep));
+        }
+        if (tokenPunctIs(cctrlTokenPeek(cc),'}')) {
+            cctrlTokenGet(cc);
+            break;
+        }
+    }
+
+    cc->localenv = saved_localenv;
+
+    if (member_count == 0) {
+        cctrlRaiseException(cc,"enum `%s` has no members", tag->data);
+    }
+
+    mapAdd(cc->clsdefs, tag->data, enum_type);
+    return enum_type;
 }
 
 /* No `/` or `%` in `ast` has a divisor that folds to 0 (folding it would
@@ -1200,12 +1437,15 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
         }
         lit = astI64Type(v);
     } else if (t->kind == AST_TYPE_POINTER || t->kind == AST_TYPE_FUNC) {
-        /* AST_TYPE_FUNC: a function pointer, `I64 (*fp)(I64) = &Fn`.
-         * The transpiler keeps them as stores: it would print the folded
-         * `(U8 *)&arr + 16` as C's `&arr + 16`. */
+        /* AST_TYPE_FUNC: a function pointer, `fn(i64) i64 fp = &Fn` */
         Ast *target = NULL;
-        if (cc->flags & CCTRL_TRANSPILING) return NULL;
         s64 off = 0;
+        /* `null` is `(void *)0`: the integer inside a pointer cast */
+        while (rhs->kind == AST_CAST && rhs->operand && rhs->operand->type &&
+               (astIsIntType(rhs->operand->type) ||
+                rhs->operand->kind == AST_CAST)) {
+            rhs = rhs->operand;
+        }
         if (astIsIntType(rhs->type)) {
             /* `U8 *p = NULL`, `0x1000` */
             s64 v = evalIntConstExprOrErr(rhs, &ok);
@@ -1368,7 +1608,7 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
      * the same error as the assignment `z = p`, and the only diagnostic;
      * one it accepts with a different type gets the warning. */
     int is_err = 0;
-    if (!(cc->flags & CCTRL_TRANSPILING) && init->kind != AST_COMPOUND_STMT) {
+    if (init->kind != AST_COMPOUND_STMT) {
         astBinaryOp(AST_BIN_OP_ASSIGN,var,init,&is_err);
     }
     if (is_err) {
@@ -1393,8 +1633,15 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
 Ast *parseVariableInitialiser(Cctrl *cc, Ast *var, s64 terminator_flags) {
     Lexeme *tok = cctrlTokenGet(cc);
     if (tokenPunctIs(tok,'=')) {
-        return parseVariableAssignment(cc,var,terminator_flags,
-                                       tok->line,tok->col);
+        /* as in Go, a local named like an import prefix shadows it only
+         * after its declaration: its initialiser still sees the module
+         * (`u8 *str = str.format(...)`, see cctrlTokenGet) */
+        Ast *outer = cc->decl_in_init;
+        cc->decl_in_init = var;
+        Ast *ast = parseVariableAssignment(cc,var,terminator_flags,
+                                           tok->line,tok->col);
+        cc->decl_in_init = outer;
+        return ast;
     }
     if (var->type->len == -1) {
         cctrlRaiseException(cc, "Missing array initializer: %s",astToString(var));
@@ -1410,17 +1657,33 @@ Ast *parseDecl(Cctrl *cc) {
     AstType *type;
     Lexeme *varname;
     Ast *var, *ast;
+    int is_const = 0;
+
+    Lexeme *lead = cctrlTokenPeek(cc);
+    if (lead && lead->tk_type == TK_KEYWORD && lead->i64 == KW_CONST) {
+        cctrlTokenGet(cc);
+        is_const = 1;
+    }
 
     parseDeclInternal(cc,&varname,&type);
     if (varname == NULL) {
         cctrlTokenExpect(cc,';');
         return NULL;
     }
+    /* a local may shadow an import prefix for its scope (cctrlTokenGet
+     * reports `prefix.name` used there) */
     var = astLVar(type,varname->start,varname->len);
     /* astNew stamped the CURRENT token (post-name); anchor the decl
      * to the name itself for jump-to-definition. */
     var->line = varname->line;
     var->col = varname->col;
+    if (is_const) {
+        var->flags |= AST_FLAG_CONST;
+        if (!tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+            cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                    varname->len, varname->start);
+        }
+    }
     if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
         cctrlRaiseException(cc,"variable %s already declared",astLValueToString(var,0));
     }
@@ -1430,6 +1693,16 @@ Ast *parseDecl(Cctrl *cc) {
     ast = parseVariableInitialiser(cc,var,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
     if (type->kind == AST_TYPE_AUTO) {
         parseAssignAuto(cc,ast);
+    }
+    if (is_const && ast->kind == AST_DECL && ast->declinit &&
+        astIsIntType(var->type))
+    {
+        int const_ok = 1;
+        s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+        if (const_ok) {
+            var->deref_symbol = const_val;
+            var->flags |= AST_FLAG_CONST_VALUE;
+        }
     }
     return ast;
 }
@@ -1462,6 +1735,7 @@ int parseValidPostControlFlowToken(Lexeme *tok) {
             case KW_TRY:
             case KW_THROW:
             case KW_ASM:
+            case KW_DEFER:  /* reported by parseStatement */
                 return 1;
         }
     }
@@ -1503,12 +1777,13 @@ static void parseCondGuardInit(Cctrl *cc, ParseCondGuard *g, Lexeme *open,
     g->armed = 0;
     g->outer = cc->current_recovery;
     g->localenv = cc->localenv;
-    if (!open || !cc->lexer_ || !cc->lexer_->cur_file ||
-        !cc->lexer_->cur_file->src || open->line <= 0 || open->col <= 0) {
+    LexFile *open_file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
+    if (!open || !open_file || !open_file->src || open->line <= 0 ||
+        open->col <= 0) {
         return;
     }
-    char *src = cc->lexer_->cur_file->src->data;
-    s64 size = cc->lexer_->cur_file->src->len;
+    char *src = open_file->src->data;
+    s64 size = open_file->src->len;
     s64 i = 0, line = 1;
     while (i < size && line < open->line) {
         if (src[i] == '\n') line++;
@@ -1659,34 +1934,43 @@ static Ast *parseRequiredExpr(Cctrl *cc, char *what) {
 static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     Ast *clause;
     Lexeme *tok = cctrlTokenPeek(cc);
-    if (tok && cctrlIsKeyword(cc, tok->start, tok->len)) {
+    if (tok && (cctrlTokIsKeyword(cc, tok) ||
+                (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc)))) {
         AstType *type = parseDeclSpec(cc);
-        Lexeme *name = cctrlTokenGet(cc);
-        if (!name || name->tk_type != TK_IDENT) {
-            cctrlRaiseException(cc,
-                "Expected identifier in `if` declaration, got `%.*s`",
-                name ? name->len : 0, name ? name->start : "");
-        }
-        Ast *var = astLVar(type, name->start, name->len);
-        var->line = name->line;
-        var->col = name->col;
-        if (!mapAddOrErr(cc->localenv, var->lname->data, var)) {
-            cctrlRaiseException(cc, "variable %s already declared",
-                                astLValueToString(var, 0));
-        }
-        if (cc->tmp_locals) {
-            listAppend(cc->tmp_locals, var);
-        }
-        Lexeme *eq = cctrlTokenGet(cc);
-        if (tokenPunctIs(eq, '=')) {
-            Ast *init = parseRequiredExpr(cc, "an initial value");
-            clause = astDecl(var, init);
-            if (type->kind == AST_TYPE_AUTO) {
-                parseAssignAuto(cc, clause);
-            }
-        } else {
+        if (tokenPunctIs(cctrlTokenPeek(cc), '.')) {
+            /* `if (Color.red == c)`: an enum member reference, not an
+             * `if (Type name)` declaration. `type` is a bare name here
+             * (no `*`), so rewinding once puts it back. */
             cctrlTokenRewind(cc);
-            clause = astDecl(var, NULL);
+            clause = parseExpr(cc, 16);
+        } else {
+            Lexeme *name = cctrlTokenGet(cc);
+            if (!name || name->tk_type != TK_IDENT) {
+                cctrlRaiseException(cc,
+                    "Expected identifier in `if` declaration, got `%.*s`",
+                    name ? name->len : 0, name ? name->start : "");
+            }
+            Ast *var = astLVar(type, name->start, name->len);
+            var->line = name->line;
+            var->col = name->col;
+            if (!mapAddOrErr(cc->localenv, var->lname->data, var)) {
+                cctrlRaiseException(cc, "variable %s already declared",
+                                    astLValueToString(var, 0));
+            }
+            if (cc->tmp_locals) {
+                listAppend(cc->tmp_locals, var);
+            }
+            Lexeme *eq = cctrlTokenGet(cc);
+            if (tokenPunctIs(eq, '=')) {
+                Ast *init = parseRequiredExpr(cc, "an initial value");
+                clause = astDecl(var, init);
+                if (type->kind == AST_TYPE_AUTO) {
+                    parseAssignAuto(cc, clause);
+                }
+            } else {
+                cctrlTokenRewind(cc);
+                clause = astDecl(var, NULL);
+            }
         }
     } else {
         clause = parseExpr(cc, 16);
@@ -1703,6 +1987,24 @@ static Ast *parseIfClause(Cctrl *cc, char *term_out) {
             t ? t->len : 0, t ? t->start : "");
     }
     return clause;
+}
+
+/* Y13: the body of an if, else, for, while or do is a `{ ... }` block
+ * (`else if` aside): a lone statement there reads as guarded when the
+ * next one isn't, or the other way round */
+static Ast *parseBracedBody(Cctrl *cc, const char *what) {
+    Lexeme *peek = cctrlTokenPeek(cc);
+    if (peek && !tokenPunctIs(peek, '{')) {
+        /* reported, and the statement parsed on as the body */
+        cctrlErrorAt(cc, peek->line, peek->col, peek->len,
+            "braces required: the body of `%s` goes in `{ ... }`", what);
+        if (peek->tk_type == TK_KEYWORD && peek->i64 == KW_DEFER) {
+            /* (not "`defer` must be in a block" too): skip it */
+            cctrlSyncStatement(cc);
+            return NULL;
+        }
+    }
+    return parseStatement(cc);
 }
 
 Ast *parseIfStatement(Cctrl *cc) {
@@ -1761,7 +2063,7 @@ Ast *parseIfStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    Ast *then = parseStatement(cc);
+    Ast *then = parseBracedBody(cc, "if");
     Lexeme *tok = cctrlTokenGet(cc);
     Ast *els = NULL;
 
@@ -1776,7 +2078,9 @@ Ast *parseIfStatement(Cctrl *cc) {
             cctrlRaiseException(cc,"Unexpected %s `%s` while parsing else body",
                     lexemeTypeToString(epeek->tk_type), lexemeAsWritten(epeek));
         }
-        els = parseStatement(cc);
+        els = epeek->tk_type == TK_KEYWORD && epeek->i64 == KW_IF
+            ? parseStatement(cc)        /* else if */
+            : parseBracedBody(cc, "else");
     } else {
         cctrlTokenRewind(cc);
     }
@@ -1816,7 +2120,7 @@ Ast *parseOptExpr(Cctrl *cc) {
  * variable. A body without braces is a single statement, so it is wrapped
  * in a compound statement to have a statement list to prepend to. */
 static Ast *parseRangeLoopBody(Cctrl *cc, Ast *iterator) {
-    Ast *forbody = parseStatement(cc);
+    Ast *forbody = parseBracedBody(cc, "for");
     if (forbody == NULL || forbody->kind != AST_COMPOUND_STMT) {
         List *stmts = listNew();
         if (forbody) listAppend(stmts,forbody); /* NULL: an empty `;` body */
@@ -1890,6 +2194,8 @@ void parseAssertContainerHasFields(Cctrl *cc, AstType *size_field,
     if (entries_field->ptr->kind == AST_TYPE_VOID) {
         cctrlRaiseException(cc,"cannot dereference void pointer");
     }
+    parseCheckPrivateField(cc, size_field, "size", 4);
+    parseCheckPrivateField(cc, entries_field, "entries", 7);
 }
 
 Ast *parseCreateForRange(Cctrl *cc, Ast *iteratee,
@@ -1924,10 +2230,19 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
+    if (container->kind == AST_LVAR && (container->flags & AST_FLAG_VARARGS)) {
+        /* `for (auto v : nums)` over a `T ...nums` parameter */
+        AoStr *len_name = aoStrPrintf("%s#len", container->lname->data);
+        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
+        if (iteratee->type->kind == AST_TYPE_AUTO) {
+            iteratee->type = container->type->ptr;
+        }
+        return parseCreateForRange(cc, iteratee, count, container);
+    }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
             if (container->type->ptr->kind != AST_TYPE_CLASS) {
-                cctrlRaiseException(cc,"pointer '%s' has no fields; range requires 'I64 size' and '<type> *entries'",
+                cctrlRaiseException(cc,"pointer '%s' has no fields; range requires 'i64 size' and '<type> *entries'",
                         astLValueToString(container, 0));
             }
 
@@ -2000,26 +2315,41 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
         return NULL;
     }
 
-    if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+    int is_const = 0;
+    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+        is_const = 1;
+        cctrlTokenGet(cc);
+        tok = cctrlTokenPeek(cc);
+        if (!tok) {
+            cctrlRaiseException(cc,"Unexpected end of input after `const`");
+        }
+    }
+
+    if ((cctrlTokIsKeyword(cc, tok) &&
+         !parseTypeNameFollowedByDot(cc)) ||
+        (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
         AstType *type = parseDeclSpec(cc);
         tok = cctrlTokenGetRequired(cc);
         if (tok->tk_type != TK_IDENT) {
             cctrlRaiseException(cc,"expected Identifier got: %s",
-                    lexemeToString(tok)); 
+                    lexemeToString(tok));
         }
 
         /* We have a for loop variable */
         Ast *init_var = astLVar(type,tok->start,tok->len);
+        if (is_const) {
+            init_var->flags |= AST_FLAG_CONST;
+        }
 
         /* can be : for an auto loop or ';' for a normal loop */
-        tok = cctrlTokenPeek(cc); 
+        tok = cctrlTokenPeek(cc);
         if (!mapAddOrErr(cc->localenv,init_var->lname->data,init_var)) {
             cctrlRaiseException(cc,"variable `%s` already declared!",
                     astLValueToString(init_var,0));
         }
-        
+
         /* For this to work the type must have:
-         * 1) a pointer called entries 
+         * 1) a pointer called entries
          * 2) a size value that must be an integer */
         if (tokenPunctIs(tok,':')) {
             return parseRangeLoop(cc,init_var);
@@ -2031,8 +2361,23 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
             if (type->kind == AST_TYPE_AUTO) {
                 parseAssignAuto(cc,ast);
             }
+            if (is_const && ast->kind == AST_DECL && ast->declinit &&
+                astIsIntType(init_var->type))
+            {
+                int const_ok = 1;
+                s64 const_val = evalIntConstExprOrErr(ast->declinit, &const_ok);
+                if (const_ok) {
+                    init_var->deref_symbol = const_val;
+                    init_var->flags |= AST_FLAG_CONST_VALUE;
+                }
+            }
             return ast;
+        } else if (is_const) {
+            cctrlRaiseException(cc,"const '%s' needs an initializer",
+                    init_var->lname->data);
         }
+    } else if (is_const) {
+        cctrlRaiseException(cc,"const is only allowed on declarations");
     }
     return parseStatement(cc);
 }
@@ -2097,7 +2442,7 @@ Ast *parseForStatement(Cctrl *cc) {
         cctrlRaiseException(cc,"Unexpected %s `%s` while parsing for loop body", 
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
-    forbody = parseStatement(cc);
+    forbody = parseBracedBody(cc, "for");
     /* Go back up */
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
@@ -2144,7 +2489,7 @@ Ast *parseWhileStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBracedBody(cc, "while");
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
     cc->tmp_loop_end = prev_end;
@@ -2180,7 +2525,7 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
     }
 
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBracedBody(cc, "do");
     
     tok = cctrlTokenGetRequired(cc);
 
@@ -2212,6 +2557,10 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
 }
 
 Ast *parseBreakStatement(Cctrl *cc) {
+    if (cc->tmp_loop_end == NULL && cc->defer_depth) {
+        cctrlTokenRewind(cc);
+        cctrlRaiseException(cc,"`break` can't leave a deferred statement");
+    }
     if (cc->tmp_loop_end == NULL) {
         cctrlRaiseException(cc,"Floating break, not inside a breakable statement");
     }
@@ -2221,6 +2570,10 @@ Ast *parseBreakStatement(Cctrl *cc) {
 }
 
 Ast *parseContinueStatement(Cctrl *cc) {
+    if (cc->tmp_loop_begin == NULL && cc->defer_depth) {
+        cctrlTokenRewind(cc);
+        cctrlRaiseException(cc,"`continue` can't leave a deferred statement");
+    }
     if (cc->tmp_loop_begin == NULL) {
         cctrlRaiseException(cc,"Floating continue, not inside a loop");
     }
@@ -2240,6 +2593,10 @@ Ast *parseReturnStatement(Cctrl *cc) {
                 "`return` outside a function");
         cctrlTerminate(cc);
     }
+    if (cc->defer_depth) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "`return` can't leave a deferred statement");
+    }
     Ast *retval = parseExpr(cc,16);
     AstType *check;
     cctrlTokenExpect(cc,';');
@@ -2256,28 +2613,92 @@ Ast *parseReturnStatement(Cctrl *cc) {
     else        check = ast_void_type;
 
     if (check->kind == AST_TYPE_VOID && maybe_fn->type->rettype->kind == AST_TYPE_VOID) {
-        if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+        if (maybe_fn->flags & AST_FLAG_INLINE) {
             /* `return Inc();`: keep the call, there is no value to set */
             return retval ? retval : astDecl(maybe_fn->inline_ret,NULL);
         }
         return astReturn(retval,cc->tmp_rettype);
     }
 
+    if (retval && astFnPtrMismatch(cc->tmp_rettype, check)) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "cannot convert %s to %s",
+                astTypeToString(check), astTypeToString(cc->tmp_rettype));
+    }
     AstType *ok = astTypeCheck(cc->tmp_rettype,retval,'\0');
-    if (!ok) {
+    if (!ok && astIsEnumType(cc->tmp_rettype)) {
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "Cannot convert `%s` to enum `%s` without a cast",
+                astTypeToString(check), cc->tmp_rettype->clsname->data);
+    } else if (!ok) {
         Ast *func = mapGet(cc->global_env, cc->tmp_fname->data);
         typeCheckReturnTypeWarn(cc,func,check,retval,&ret_tok,&semi_tok);
     }
-    if (maybe_fn->flags & AST_FLAG_INLINE && !(cc->flags & CCTRL_TRANSPILING)) {
+    if (maybe_fn->flags & AST_FLAG_INLINE) {
         return astDecl(maybe_fn->inline_ret,retval);
     }
     return astReturn(retval,cc->tmp_rettype);
 }
 
-/* strict `try { ... } catch <stmt>`. The catch handler is a
- * single statement (often `{...}` so braces still work via the
- * normal block-statement path) and does NOT bind the thrown value -
- * read it via the global `Fs->except_ch`. */
+/* A call to a runtime helper taking &var, for the lowerings below */
+static Ast *parseCallWithAddrOf(char *fname, Ast *var) {
+    Vec *args = astVecNew();
+    vecPush(args, astUnaryOperator(astMakePointerType(var->type),
+                                   AST_UN_OP_ADDR_OF, var));
+    return astFunctionCall(ast_void_type, fname, strlen(fname), args);
+}
+
+/* `catch (Error e) <stmt>` after the `catch`: the handler becomes
+ *     { Error e; KTM_ErrorTake(&e); defer KTM_ErrorDrop(&e); <stmt> }
+ * so e owns the message until the handler is left, however it is left.
+ * NULL (nothing consumed) when no `(Type name)` follows. */
+static Ast *parseCatchBinding(Cctrl *cc) {
+    Lexeme *open = cctrlTokenPeek(cc);
+    if (!tokenPunctIs(open, '(')) return NULL;
+    cctrlTokenGet(cc);
+    Lexeme *tname = cctrlTokenPeek(cc);
+    if (!tname || !cctrlGetKeyWord(cc, tname->start, tname->len)) {
+        cctrlTokenRewind(cc);
+        return NULL;
+    }
+    int tline = tname->line, tcol = tname->col, tlen = tname->len;
+    AstType *type = parseDeclSpec(cc);
+    if (!parseIsErrorType(type)) {
+        cctrlRaiseExceptionAt(cc, tline, tcol, tlen,
+            "`catch` can only bind an Error, as in `catch (Error e)`, got %s",
+            astTypeToString(type));
+    }
+    Lexeme *name = cctrlTokenGetRequired(cc);
+    if (name->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc, "Expected a name for the Error in `catch (Error <name>)`");
+    }
+    cctrlTokenExpect(cc, ')');
+
+    Map *outer = cc->localenv;
+    cc->localenv = cctrlCreateAstMap(cc->localenv);
+    Ast *var = astLVar(type, name->start, name->len);
+    var->line = name->line;
+    var->col = name->col;
+    mapAdd(cc->localenv, var->lname->data, var);
+    if (cc->tmp_locals) {
+        listAppend(cc->tmp_locals, var);
+    }
+    Ast *handler = parseStatement(cc);
+    cc->localenv = outer;
+
+    List *stmts = listNew();
+    listAppend(stmts, astDecl(var, NULL));
+    listAppend(stmts, parseCallWithAddrOf(astRuntimeSymbol("__ktmErrorTake"), var));
+    listAppend(stmts, astDefer(parseCallWithAddrOf(astRuntimeSymbol("__ktmErrorDrop"), var)));
+    if (handler) listAppend(stmts, handler);
+    return astCompountStatement(stmts);
+}
+
+/* `try { ... } catch <stmt>` or `try { ... } catch (Error e) <stmt>`.
+ * The handler is a single statement (often `{...}`). The binding form
+ * gets the error (see parseCatchBinding); without one the code is in
+ * `Fs->except_ch`, and the message, which nothing can read, is freed
+ * when the handler starts. */
 Ast *parseTryStatement(Cctrl *cc) {
     cctrlTokenExpect(cc,'{');
     Ast *try_body = parseCompoundStatement(cc);
@@ -2292,20 +2713,62 @@ Ast *parseTryStatement(Cctrl *cc) {
             lexemeAsWritten(tok));
     }
     cctrlTokenGet(cc);  /* consume `catch` */
-    Ast *catch_body = parseStatement(cc);
+    Ast *catch_body = parseCatchBinding(cc);
+    if (!catch_body) {
+        catch_body = parseStatement(cc);
+        List *stmts = listNew();
+        char *forget = astRuntimeSymbol("__ktmErrorForget");
+        listAppend(stmts, astFunctionCall(ast_void_type, forget,
+                                          strlen(forget), astVecNew()));
+        if (catch_body) listAppend(stmts, catch_body);
+        catch_body = astCompountStatement(stmts);
+    }
     return astTry(try_body, catch_body);
 }
 
-/* `throw(expr);` - the expression yields a u64 (commonly a multi-
- * char constant like `'BlkDev'` which the lexer packs into 8 bytes
- * via TK_CHAR_CONST). The runtime stashes it into `Fs->except_ch`
- * and longjmps to the nearest enclosing catch. */
+/* The file a throw is in, as a string literal: the path it was compiled
+ * from, as diagnostics show it. */
+static Ast *parseThrowFile(Cctrl *cc) {
+    char *path = "";
+    if (cc->lexer_ && cc->lexer_->cur_file && cc->lexer_->cur_file->filename) {
+        path = cc->lexer_->cur_file->filename->data;
+    }
+    AoStr *esc = aoStrNew();
+    s64 real_len = 1;
+    for (char *p = path; *p; ++p, ++real_len) {
+        if (*p == '\\' || *p == '"') aoStrPutChar(esc, '\\');
+        aoStrPutChar(esc, *p);
+    }
+    return cctrlGetOrSetString(cc, esc->data, esc->len, real_len);
+}
+
+/* `throw(code);`, `throw(code, fmt, ...);` or `throw(e);` with an Error
+ * (see parseThrowCall). The code is usually an enum member (or, from
+ * before Error, a character constant like 'BlkDev'); the runtime sets the
+ * thread's Error, file and line included, and longjmps to the nearest
+ * enclosing catch. */
 Ast *parseThrowStatement(Cctrl *cc) {
+    int line = cc->lineno;   /* of the `throw` just consumed */
     cctrlTokenExpect(cc,'(');
-    Ast *value = parseRequiredExpr(cc, "the value to `throw`");
-    cctrlTokenExpect(cc,')');
+    if (tokenPunctIs(cctrlTokenPeek(cc), ')')) {
+        /* `throw();`: reported as a missing expression */
+        parseRequiredExpr(cc, "the value to `throw`");
+    }
+    /* the old `throw('X')`: a character as the code */
+    Lexeme *code_tok = cctrlTokenPeek(cc);
+    if (code_tok && code_tok->tk_type == TK_CHAR_CONST) {
+        cctrlErrorAt(cc, code_tok->line, code_tok->col, code_tok->len + 2,
+            "a character as the code of `throw`: use an enum member or a number");
+    }
+    Ast *file = parseThrowFile(cc);
+    Ast *code = NULL;
+    Ast *call = parseThrowCall(cc, file, line, &code);
     cctrlTokenExpect(cc,';');
-    return astThrow(value);
+    Ast *ast = astThrow(code);
+    ast->throw_call = call;
+    ast->throw_file = file;
+    ast->line = line;
+    return ast;
 }
 
 void parseRaiseCaseException(Cctrl *cc, Ast *case_expr) {
@@ -2316,10 +2779,63 @@ void parseRaiseCaseException(Cctrl *cc, Ast *case_expr) {
     cctrlRaiseExceptionFromTo(cc, suggestion, 'c', ':', "`case` must be followed by an integer constant got - %s", exp);
 }
 
+/* Does `peek` end a case's arm: the next `case`, `default` or the
+ * switch's `}`? */
+static int parseArmEnds(Lexeme *peek) {
+    return !peek || tokenPunctIs(peek, '}') ||
+           (peek->tk_type == TK_KEYWORD &&
+            (peek->i64 == KW_CASE || peek->i64 == KW_DEFAULT));
+}
+
+/* The statements of a `case` or `default` (Y8): every one up to the next
+ * label. The arm leaves the switch at its end, unless its last statement
+ * is `fallthrough;`, which runs on into the next arm. An empty arm
+ * (`case 1: case 2: ...`) shares the next one's statements. */
+static void parseCaseArm(Cctrl *cc, Ast *arm) {
+    List *stmts = arm->case_asts;
+    int ft = 0;
+    s64 ft_line = 0, ft_col = 0;
+    while (!parseArmEnds(cctrlTokenPeek(cc))) {
+        if (ft) {
+            cctrlRaiseExceptionAt(cc, ft_line, ft_col, 11,
+                "`fallthrough` must be the last statement of its case");
+        }
+        cc->fallthrough_pending = 0;
+        Ast *stmt = parseStatement(cc);
+        if (cc->fallthrough_pending) {
+            /* a `{...}` arm ending in it is fine (the block checked it) */
+            if (stmt && stmt->kind != AST_COMPOUND_STMT) {
+                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
+                cc->fallthrough_pending = 0;
+                cctrlRaiseExceptionAt(cc, line, col, 11,
+                    "`fallthrough` must be the last statement of its case, "
+                    "not inside a block or another statement");
+            }
+            if (stmt) listAppend(stmts, stmt);    /* `{ ...; fallthrough; }` */
+            ft = 1;
+            ft_line = cc->fallthrough_line;
+            ft_col = cc->fallthrough_col;
+            continue;
+        }
+        if (stmt) listAppend(stmts, stmt);
+    }
+    arm->case_fallthrough = ft;
+    arm->case_ft_line = ft_line;
+    arm->case_ft_col = ft_col;
+    if (!ft && !listEmpty(stmts)) {
+        listAppend(stmts, astBreak(cc->tmp_loop_end));
+    }
+    /* the switch reports a `fallthrough` with no next case */
+    cc->fallthrough_pending = ft;
+    cc->fallthrough_line = ft_line;
+    cc->fallthrough_col = ft_col;
+}
+
 Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
+    cc->fallthrough_pending = 0;
     Ast *case_, *prev, *case_expr = NULL;
     Lexeme *peek;
     AoStr *label;
@@ -2340,11 +2856,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         case_expr = parseRequiredExpr(cc, "a `case` value or `:`");
         begining = evalIntConstExprOrErr(case_expr, &ok);
         if (!ok) {
-            if (cc->flags & CCTRL_PASTE_DEFINES && case_expr->kind == AST_LVAR) {
-                label = case_expr->lname;
-            } else {
-                parseRaiseCaseException(cc,case_expr);
-            }
+            parseRaiseCaseException(cc,case_expr);
         } else {
             label = astMakeLabel();
         }
@@ -2352,7 +2864,6 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
 
     tok = cctrlTokenPeek(cc);
 
-    /* We're not doing label to label for transpilation */
     if (tokenPunctIs(tok,TK_ELLIPSIS)) {
         cctrlTokenGet(cc);
         case_expr = parseRequiredExpr(cc, "the end of the `case` range");
@@ -2373,70 +2884,26 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     List *stmts = listNew();
     peek = cctrlTokenPeek(cc);
 
-    if (!ok && cc->flags & CCTRL_PASTE_DEFINES) {
-        case_ = astCase(label,begining,end,stmts);
-        case_->type = ast_void_type;
-    } else {
-        case_ = astCase(label,begining,end,stmts);
-        assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
-    }
+    case_ = astCase(label,begining,end,stmts);
+    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
 
     vecPush(cc->tmp_case_list,case_);
-
-    do {
-        Ast *stmt = parseStatement(cc);
-        if (!stmt) {
-            /* `case 1: ;` - the empty statement */
-            peek = cctrlTokenPeek(cc);
-            if (!peek || tokenPunctIs(peek,'}')) break;
-            continue;
-        }
-        if (stmt->kind != AST_CASE && stmt->kind != AST_DEFAULT) {
-            listAppend(stmts,stmt);
-        }
-        if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE ||
-                stmt->kind == AST_DEFAULT || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
-                || stmt->kind == AST_GOTO) break;
-        peek = cctrlTokenPeek(cc);
-   
-        /* @Bug - Something is afoot, this ensures we don't go on forever
-         * parsing if there isn't a break and the case is a fall through...
-         * feels as though we could go on and just ommit the case. Which would
-         * avoid the call to `astCasesCompress()`? */
-        if (tokenPunctIs(peek,'}')) break;
-    } while (1);
-
+    parseCaseArm(cc, case_);
     return case_;
 }
 
 Ast *parseDefaultStatement(Cctrl *cc) {
     cctrlTokenExpect(cc,':');
+    cc->fallthrough_pending = 0;
     if (cc->tmp_default_case) {
         cctrlRaiseException(cc,"Duplicate default case");
     }
-    Lexeme *peek;
     List *stmts = listNew();
     AoStr *default_label = astMakeLabel();
     /* set here so this is non-null for the next call to parseStatement */
     cc->tmp_default_case = astDefault(default_label,stmts);
-
-    do {
-        Ast *stmt = parseStatement(cc);
-        if (!stmt) {
-            /* `default: ;` - the empty statement */
-            peek = cctrlTokenPeek(cc);
-            if (!peek || tokenPunctIs(peek,'}')) break;
-            continue;
-        }
-        if (stmt->kind != AST_CASE) {
-            listAppend(stmts,stmt);
-        }
-        if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
-                || stmt->kind == AST_GOTO) break;
-        peek = cctrlTokenPeek(cc);
-        if (tokenPunctIs(peek,'}')) break;
-    } while (1);
-
+    cc->tmp_default_at = (int)cc->tmp_case_list->size;
+    parseCaseArm(cc, cc->tmp_default_case);
     return cc->tmp_default_case;
 }
 
@@ -2473,7 +2940,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         cond = parseRequiredExpr(cc, "the `switch` value");
-        if (!astIsIntType(cond->type)) {
+        if (!astIsIntOrIntrinsic(cond->type)) {
             cctrlRaiseException(cc,"Switch can only have int's at this time");
         }
         cctrlTokenExpect(cc,terminating_char);
@@ -2483,6 +2950,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     original_break = cc->tmp_loop_end;
     original_default_label = cc->tmp_default_case;
     original_cases = cc->tmp_case_list;
+    int original_default_at = cc->tmp_default_at;
 
     cc->tmp_case_list = astVecNew();
     cc->tmp_default_case = NULL;
@@ -2497,8 +2965,16 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     tmp = astLVar(cond->type, tmp_name->data, tmp_name->len);
     listAppend(cc->tmp_locals,tmp);
 
+    int outer_fallthrough = cc->fallthrough_pending;
+    s64 outer_ft_line = cc->fallthrough_line, outer_ft_col = cc->fallthrough_col;
+    cc->fallthrough_pending = 0;
     parseStatement(cc);
     aoStrRelease(tmp_name);
+    int last_fallthrough = cc->fallthrough_pending;
+    s64 last_ft_line = cc->fallthrough_line, last_ft_col = cc->fallthrough_col;
+    cc->fallthrough_pending = outer_fallthrough;
+    cc->fallthrough_line = outer_ft_line;
+    cc->fallthrough_col = outer_ft_col;
 
     Ast *switch_ast = astSwitch(
         cond,
@@ -2508,10 +2984,55 @@ Ast *parseSwitchStatement(Cctrl *cc) {
         switch_bounds_checked
     );
 
+    Ast *dflt = cc->tmp_default_case;
+    Vec *cases = cc->tmp_case_list;
+    int default_at = cc->tmp_default_at;
     cc->tmp_loop_end = original_break;
     cc->tmp_case_list = original_cases;
     cc->tmp_default_case = original_default_label;
+    cc->tmp_default_at = original_default_at;
+    if (last_fallthrough) {
+        cctrlRaiseExceptionAt(cc, last_ft_line, last_ft_col, 11,
+                "`fallthrough` in the last case of a switch: there is no next case");
+    }
+    /* `default` runs after every case (its code is placed last), so it
+     * can't be fallen into or out of from the middle of the cases */
+    if (dflt && default_at < (int)cases->size) {
+        Ast *before = default_at > 0 ? vecGet(Ast *, cases, default_at - 1) : NULL;
+        Ast *ft = dflt->case_fallthrough ? dflt
+                : before && before->case_fallthrough ? before : NULL;
+        if (ft) {
+            cctrlRaiseExceptionAt(cc, ft->case_ft_line, ft->case_ft_col, 11,
+                "`fallthrough` into or out of a `default` that isn't the "
+                "switch's last label: put `default` last");
+        }
+    }
     return switch_ast;
+}
+
+/* `fallthrough`, a keyword the lexer gives as an identifier (no
+ * variable can have its name, see parseCheckNotReserved) */
+static int parseIsFallthrough(Cctrl *cc, Lexeme *tok, Lexeme *peek) {
+    (void)cc;
+    (void)peek;
+    return tok->tk_type == TK_IDENT && tok->len == 11 &&
+           memcmp(tok->start, "fallthrough", 11) == 0;
+}
+
+/* A case of a switch says it goes on into the next one (Y8: otherwise it
+ * leaves the switch); only inside a switch, as the last statement of a
+ * case (parseCaseArm) and not of its last one (parseSwitchStatement). */
+static Ast *parseFallthrough(Cctrl *cc, Lexeme *tok) {
+    s64 line = tok->line, col = tok->col;
+    cctrlTokenExpect(cc, ';');
+    if (cc->tmp_case_list == NULL) {
+        cctrlRaiseExceptionAt(cc, line, col, 11,
+                "`fallthrough` can only be used in a case of a switch");
+    }
+    cc->fallthrough_pending = 1;
+    cc->fallthrough_line = line;
+    cc->fallthrough_col = col;
+    return NULL;
 }
 
 /* Concatinate the label of the goto with the name of the function 
@@ -2542,10 +3063,21 @@ Ast *parseStatement(Cctrl *cc) {
             case KW_RETURN:   return parseReturnStatement(cc);
             case KW_TRY:      return parseTryStatement(cc);
             case KW_THROW:    return parseThrowStatement(cc);
+            case KW_DEFER:
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc,
+                    "`defer` must be a statement of a { } block");
             case KW_SWITCH:   return parseSwitchStatement(cc);
             case KW_CASE:     return parseCaseLabel(cc,tok);
             case KW_DEFAULT:  return parseDefaultStatement(cc);
-            case KW_BREAK:    return parseBreakStatement(cc);
+            case KW_BREAK: {
+                /* at the `break`, not the token after it */
+                s64 line = tok->line, col = tok->col;
+                Ast *brk = parseBreakStatement(cc);
+                brk->line = line;
+                brk->col = col;
+                return brk;
+            }
             case KW_CONTINUE: return parseContinueStatement(cc);
             case KW_ASM: {
                 /* Inline `asm { ... }` block as a statement:
@@ -2626,6 +3158,10 @@ Ast *parseStatement(Cctrl *cc) {
 
             case KW_GOTO: {
                 int goto_line = tok->line, goto_col = tok->col;
+                if (cc->defer_depth) {
+                    cctrlRaiseExceptionAt(cc, goto_line, goto_col, tok->len,
+                        "`goto` can't leave a deferred statement");
+                }
                 tok = cctrlTokenGet(cc);
                 if (tok == NULL) {
                     cctrlRaiseException(cc,
@@ -2648,6 +3184,11 @@ Ast *parseStatement(Cctrl *cc) {
     }
 
     if (tok->tk_type == TK_CHAR_CONST) {
+        /* the old print of a character constant */
+        if (!(cc->flags & CCTRL_REPL)) {
+            cctrlErrorAt(cc, tok->line, tok->col, tok->len + 2,
+                "a character printed as a statement: write `printf(\"%%c\", ...)`");
+        }
         return parseFloatingCharConst(cc,tok);
     }
 
@@ -2659,7 +3200,14 @@ Ast *parseStatement(Cctrl *cc) {
 
     /* Hacked in goto label ;) */
     peek = cctrlTokenPeek(cc);
+    if (parseIsFallthrough(cc, tok, peek)) {
+        return parseFallthrough(cc, tok);
+    }
     if (tok->tk_type == TK_IDENT && tokenPunctIs(peek,':')) {
+        if (cc->defer_depth) {
+            cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                "a label can't be inside a deferred statement");
+        }
         label = createFunctionLevelGotoLabel(cc,tok);
         ret = astLabel(label);
         /* consume ':' */
@@ -2693,12 +3241,61 @@ Ast *parseStatement(Cctrl *cc) {
     return ast;
 }
 
+/* Is `tok` (a type/class/enum name, not yet consumed) followed by `.`?
+ * A type name is never followed by `.` in real code; `Name.member` is an
+ * enum member reference, not the start of a declaration (`Name var`).
+ * Gets and rewinds rather than peeking further ahead, which the token
+ * ring buffer does not support reliably beyond one token. */
+static int parseTypeNameFollowedByDot(Cctrl *cc) {
+    Lexeme *t1 = cctrlTokenGet(cc);
+    Lexeme *t2 = cctrlTokenGet(cc);
+    int dot = tokenPunctIs(t2, '.');
+    cctrlTokenRewind(cc);
+    cctrlTokenRewind(cc);
+    (void)t1;
+    return dot;
+}
+
+/* `defer <stmt>`: <stmt> (one statement or a block) runs whenever the
+ * enclosing block is left. Only a statement of a { } block: the block is
+ * its scope. Inside <stmt> nothing can jump out of it, so the loop
+ * markers are cleared while it is parsed (a loop inside sets its own). */
+static Ast *parseDeferStatement(Cctrl *cc) {
+    Lexeme *kw = cctrlTokenGet(cc);
+    int line = kw->line, col = kw->col, len = kw->len;
+    if (!cc->tmp_fname) {
+        cctrlRaiseExceptionAt(cc, line, col, len,
+            "`defer` is only allowed inside a function");
+    }
+    Lexeme *peek = cctrlTokenPeek(cc);
+    if (!peek || tokenPunctIs(peek, ';') || tokenPunctIs(peek, '}')) {
+        cctrlRaiseExceptionAt(cc, line, col, len,
+            "expected a statement after `defer`");
+    }
+    AoStr *loop_begin = cc->tmp_loop_begin;
+    AoStr *loop_end = cc->tmp_loop_end;
+    cc->tmp_loop_begin = NULL;
+    cc->tmp_loop_end = NULL;
+    cc->defer_depth++;
+    Ast *stmt = parseStatement(cc);
+    cc->defer_depth--;
+    cc->tmp_loop_begin = loop_begin;
+    cc->tmp_loop_end = loop_end;
+    Ast *ast = astDefer(stmt);
+    ast->line = line;
+    ast->col = col;
+    return ast;
+}
+
 Ast *parseDeclOrStatement(Cctrl *cc) {
     Lexeme *tok = cctrlTokenPeek(cc);
     if (!tok) {
         return NULL;
     }
-    if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+    if ((cctrlTokIsKeyword(cc, tok) &&
+         !parseTypeNameFollowedByDot(cc)) ||
+        (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
+        (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
         return parseDecl(cc);
     }
     return parseStatement(cc);
@@ -2709,6 +3306,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
     Ast *var = NULL;
     AstType *base_type, *type, *next_type;
     Lexeme *tok, *varname, *peek;
+    int is_const;
     Map *block_scope = cctrlCreateAstMap(cc->localenv);
     cc->localenv = block_scope;
     tok = NULL;
@@ -2742,9 +3340,17 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                                                     : NULL;
         /* Where this statement starts in the token stream */
         volatile s64 stmt_start = cc->token_buffer->pos;
+        /* An error inside a `defer <stmt>` unwinds past the code that
+         * restores these (parseDeferStatement) */
+        volatile int stmt_defer_depth = cc->defer_depth;
+        AoStr *volatile stmt_loop_begin = cc->tmp_loop_begin;
+        AoStr *volatile stmt_loop_end = cc->tmp_loop_end;
 
         if (setjmp(stmt_recovery) != 0) {
             cc->localenv = block_scope;
+            cc->defer_depth = stmt_defer_depth;
+            cc->tmp_loop_begin = stmt_loop_begin;
+            cc->tmp_loop_end = stmt_loop_end;
             if (body && body->stms && body_tail) {
                 body_tail->next = body->stms;
                 body->stms->prev = body_tail;
@@ -2765,7 +3371,22 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
             continue;
         }
 
-        if (cctrlIsKeyword(cc,tok->start,tok->len)) {
+        if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_DEFER) {
+            listAppend(body->stms, parseDeferStatement(cc));
+            tok = cctrlTokenPeek(cc);
+            continue;
+        }
+
+        is_const = 0;
+        if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
+            is_const = 1;
+            cctrlTokenGet(cc);
+            tok = cctrlTokenPeek(cc);
+        }
+
+        if ((cctrlTokIsKeyword(cc, tok) &&
+             !parseTypeNameFollowedByDot(cc)) ||
+            (tokenMayStartFnType(tok) && parseFnLooksLikeType(cc))) {
             base_type = parseBaseDeclSpec(cc);
             while (1) {
                 next_type = parsePointerType(cc,base_type);
@@ -2777,18 +3398,27 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 if (!tokenPunctIs(peek,'(')) {
                     /* A normal variable */
                     varname = cctrlTokenGetRequired(cc);
+                    /* may shadow an import prefix, see cctrlTokenGet */
                     if (varname->tk_type != TK_IDENT) {
                         cctrlTokenRewind(cc);
                         cctrlRaiseException(cc,"Expected type declaration with identifer got '%.*s' - should be"ESC_BLUE" '%s "ESC_RESET ESC_BOLD"<var_name>'",
                                 peek->len, peek->start, astTypeToString(next_type));
                         break;
                     }
+                    parseCheckNotReserved(cc, varname);
                     type = parseArrayDimensions(cc,next_type);
                     var = astLVar(type,varname->start,varname->len);
                     var->line = varname->line;
                     var->col = varname->col;
                     var->pinned_kind = pinned_kind;
                     var->pinned_reg = pinned_reg;
+                    if (is_const) {
+                        var->flags |= AST_FLAG_CONST;
+                        if (!tokenPunctIs(cctrlTokenPeek(cc),'=')) {
+                            cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                                    varname->len, varname->start);
+                        }
+                    }
                     if (!mapAddOrErr(cc->localenv,var->lname->data,var)) {
                         cctrlRewindUntilStrMatch(cc,var->lname->data,var->lname->len,NULL);
                         cctrlRaiseException(cc,"variable `%s` already declared",
@@ -2811,6 +3441,17 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                     parseAssignAuto(cc,stmt);
                 }
 
+                if (is_const && stmt && stmt->kind == AST_DECL &&
+                    stmt->declinit && astIsIntType(var->type))
+                {
+                    int const_ok = 1;
+                    s64 const_val = evalIntConstExprOrErr(stmt->declinit, &const_ok);
+                    if (const_ok) {
+                        var->deref_symbol = const_val;
+                        var->flags |= AST_FLAG_CONST_VALUE;
+                    }
+                }
+
                 if (stmt) {
                     listAppend(body->stms,stmt);
                 }
@@ -2831,7 +3472,32 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
              * statement a "perhaps you meant `}`" error */
             cctrlTokenGet(cc);
         } else { 
-            if ((stmt = parseStatement(cc)) != NULL) {
+            int ft_before = cc->fallthrough_pending;
+            stmt = parseStatement(cc);
+            /* (a `case` of the switch's own block carries its arm's
+             * `fallthrough` out to parseSwitchStatement) */
+            if (!ft_before && cc->fallthrough_pending &&
+                !(stmt && (stmt->kind == AST_CASE || stmt->kind == AST_DEFAULT))) {
+                /* `fallthrough;` here, or a block ending in it: only as
+                 * the block's last statement, and not under an `if`, a
+                 * loop or the like */
+                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
+                if (stmt && stmt->kind != AST_COMPOUND_STMT) {
+                    cc->fallthrough_pending = 0;
+                    cctrlRaiseExceptionAt(cc, line, col, 11,
+                        "`fallthrough` must be the last statement of its case, "
+                        "not inside a block or another statement");
+                }
+                if (stmt) listAppend(body->stms, stmt);
+                tok = cctrlTokenPeek(cc);
+                if (tok && !tokenPunctIs(tok, '}')) {
+                    cc->fallthrough_pending = 0;
+                    cctrlRaiseExceptionAt(cc, line, col, 11,
+                        "`fallthrough` must be the last statement of its case");
+                }
+                continue;
+            }
+            if (stmt != NULL) {
                 if (stmt->kind == AST_DECL && stmt->declvar->kind == AST_GVAR) {
                     tok = cctrlTokenPeek(cc);
                     continue;
@@ -2867,9 +3533,10 @@ Ast *parseCompoundStatement(Cctrl *cc) {
  * safe assumption, so we under-warn rather than cry wolf. */
 
 static int astIsConstTrueCond(Ast *c) {
-    /* `while(1)` / `for(;1;)` / `for(;;)` style infinite loops. */
+    /* `while(1)` / `while (true)` / `for(;1;)` / `for(;;)` style infinite
+     * loops (`true` is a literal of type bool) */
     return c && c->kind == AST_LITERAL && c->type &&
-           c->type->kind == AST_TYPE_INT && c->i64 != 0;
+           (c->type->kind == AST_TYPE_INT || c->type->is_bool) && c->i64 != 0;
 }
 
 /* Does `s` contain a `break` that targets the *enclosing* loop/switch
@@ -3062,7 +3729,8 @@ static void parseLabelTriesWalkList(Map *label_try, List *l, Ast *inner_try) {
 }
 
 /* Record the innermost try body around each label (labels outside any
- * try are left out). */
+ * try are left out). The rest of a block after a `defer` counts as a try
+ * body too: jumping into it would skip registering the defer. */
 static void parseLabelTriesWalk(Map *label_try, Ast *s, Ast *inner_try) {
     if (!s) return;
     switch (s->kind) {
@@ -3073,7 +3741,13 @@ static void parseLabelTriesWalk(Map *label_try, Ast *s, Ast *inner_try) {
             }
             return;
         case AST_COMPOUND_STMT:
-            parseLabelTriesWalkList(label_try, s->stms, inner_try);
+            if (s->stms) {
+                listForEach(s->stms) {
+                    Ast *stmt = (Ast *)it->value;
+                    if (stmt && stmt->kind == AST_DEFER) inner_try = stmt;
+                    parseLabelTriesWalk(label_try, stmt, inner_try);
+                }
+            }
             return;
         case AST_IF:
             parseLabelTriesWalk(label_try, s->then, inner_try);
@@ -3140,14 +3814,42 @@ static void parseGotoIntoTryWalk(Cctrl *cc, Map *label_try, Ast *s,
             if (cc->tmp_fname && s->slabel->len > cc->tmp_fname->len + 2) {
                 name += cc->tmp_fname->len + 2;
             }
+            if (target_try->kind == AST_DEFER) {
+                cctrlRaiseExceptionAt(cc, s->line, s->col, 4,
+                    "`goto %s` jumps past a `defer` into its scope", name);
+                return;
+            }
             cctrlRaiseExceptionAt(cc, s->line, s->col, 4,
                 "`goto %s` jumps into a try body from outside it; "
                 "a try body can only be entered from its start", name);
             return;
         }
-        case AST_COMPOUND_STMT:
-            parseGotoIntoTryWalkList(cc, label_try, s->stms, scope);
+        case AST_COMPOUND_STMT: {
+            if (!s->stms) return;
+            /* Each `defer` opens a scope for the rest of the block, held
+             * on this frame; the walk is depth first so they outlive it */
+            ParseTryScope *defers = NULL;
+            int ndefers = 0;
+            listForEach(s->stms) {
+                Ast *stmt = (Ast *)it->value;
+                if (stmt && stmt->kind == AST_DEFER) ndefers++;
+            }
+            if (ndefers) {
+                defers = (ParseTryScope *)malloc(sizeof(ParseTryScope) * ndefers);
+            }
+            int d = 0;
+            listForEach(s->stms) {
+                Ast *stmt = (Ast *)it->value;
+                if (stmt && stmt->kind == AST_DEFER) {
+                    defers[d].try_ast = stmt;
+                    defers[d].outer = scope;
+                    scope = &defers[d++];
+                }
+                parseGotoIntoTryWalk(cc, label_try, stmt, scope);
+            }
+            free(defers);
             return;
+        }
         case AST_IF:
             parseGotoIntoTryWalk(cc, label_try, s->then, scope);
             parseGotoIntoTryWalk(cc, label_try, s->els, scope);
@@ -3303,15 +4005,17 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             Ast *asm_function = astAsmFunctionDef(asm_fname, asm_block->asm_stmt);
 
             listAppend(asm_block->funcs, asm_function);
-            listAppend(cc->asm_blocks, asm_block);
+            /* a module's declarations pass: the full pass emits it */
+            if (!cc->decls_only) listAppend(cc->asm_blocks, asm_block);
 
             Ast *asm_func = astAsmFunctionBind(
                     astMakeFunctionType(rettype, params),
                     asm_fname,asm_fname,params);
 
-            /* REPL/LSP: a reparse redefines; shadow rather than abort. */
+            /* REPL/LSP: a reparse redefines; shadow rather than abort.
+             * So does a module's next pass over the same file. */
             if (!mapAddOrErr(cc->asm_functions, asm_fname->data, asm_func)) {
-                if (cc->flags & CCTRL_REPL) {
+                if ((cc->flags & CCTRL_REPL) || cc->cur_module) {
                     mapRemove(cc->asm_functions, asm_fname->data);
                     mapAdd(cc->asm_functions, asm_fname->data, asm_func);
                 } else {
@@ -3320,7 +4024,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             }
 
             if (!mapAddOrErr(cc->global_env, fname_duped->data, asm_func)) {
-                if (cc->flags & CCTRL_REPL) {
+                if ((cc->flags & CCTRL_REPL) || cc->cur_module) {
                     mapRemove(cc->global_env, fname_duped->data);
                     mapAdd(cc->global_env, fname_duped->data, asm_func);
                 } else {
@@ -3386,7 +4090,8 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
                     mapAdd(cc->global_env, func->fname->data, func);
                     break;
                 }
-                cctrlRaiseException(cc,"Cannot redefine function: %.*s",len,fname);
+                cctrlRaiseException(cc,"Cannot redefine function: %s",
+                        astModuleDemangle(fname, len));
 
             case AST_ASM_FUNC_BIND:
                 cctrlRaiseException(cc,"Cannot redefine asm function: %.*s",
@@ -3477,9 +4182,9 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
         !has_asm && astStmtFallsThrough(func_body))
     {
         cctrlWarningAt(cc, name_line, name_col, len,
-            "control may reach the end of non-void function '%.*s' "
+            "control may reach the end of non-void function '%s' "
             "without returning a value",
-            len, fname);
+            astModuleDemangle(fname, len));
     }
 
     cc->localenv = NULL;
@@ -3508,59 +4213,24 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
     AstType *type = astMakeFunctionType(rettype, params);
     func = astFunction(type,fname,len,params,NULL,NULL,0);
     func->kind = AST_EXTERN_FUNC;
+    /* In a module it is the module's name (`a.b.open`, private unless
+     * pub), still calling the C symbol `open` */
+    char *qual = cctrlDeclName(cc, fname, len);
+    if (qual) {
+        mapAdd(cc->global_env, qual, func);
+        mapAdd(cc->c_externs, func->fname->data, func);
+        if (cc->decl_pub) setAdd(cc->pub_names, qual);
+        return func;
+    }
+    /* The program's own C declaration (not one the stdlib headers
+     * already make, which modules may use) */
+    if (cc->decl_from_main && !mapGet(cc->global_env, func->fname->data)) {
+        setAdd(cc->main_names, func->fname->data);
+    }
     mapAdd(cc->global_env,func->fname->data,func);
     return func;
 }
 
-/* Do two declarations of a function agree on a type? Integers match
- * by size and signedness (an `I64 class` like CDate is its integer),
- * classes and unions by name, an array parameter is its pointer and
- * `auto` matches anything. */
-static int parseFnTypesMatch(AstType *a, AstType *b) {
-    if (a == b) return 1;
-    if (!a || !b) return 0;
-    if (a->kind == AST_TYPE_AUTO || b->kind == AST_TYPE_AUTO) return 1;
-    if (a->kind == AST_TYPE_ARRAY) a = astMakePointerType(a->ptr);
-    if (b->kind == AST_TYPE_ARRAY) b = astMakePointerType(b->ptr);
-
-    int a_int = a->kind == AST_TYPE_INT || a->kind == AST_TYPE_CHAR;
-    int b_int = b->kind == AST_TYPE_INT || b->kind == AST_TYPE_CHAR;
-    if ((a_int || astIsIntrinsicClass(a)) && (b_int || astIsIntrinsicClass(b))) {
-        if (a->size != b->size) return 0;
-        return !a_int || !b_int || a->issigned == b->issigned;
-    }
-    if (a->kind != b->kind) return 0;
-
-    switch (a->kind) {
-        case AST_TYPE_FLOAT:
-            return a->size == b->size;
-        case AST_TYPE_POINTER:
-            return parseFnTypesMatch(a->ptr, b->ptr);
-        case AST_TYPE_CLASS:
-        case AST_TYPE_UNION:
-            if (!a->clsname || !b->clsname) return 0;
-            return aoStrCmp(a->clsname, b->clsname);
-        case AST_TYPE_FUNC: {
-            if (!parseFnTypesMatch(a->rettype, b->rettype)) return 0;
-            u64 na = a->params ? a->params->size : 0;
-            u64 nb = b->params ? b->params->size : 0;
-            if (na != nb) return 0;
-            for (u64 i = 0; i < na; ++i) {
-                Ast *pa = a->params->entries[i];
-                Ast *pb = b->params->entries[i];
-                if (!pa || !pb) return pa == pb;
-                if ((pa->kind == AST_VAR_ARGS) != (pb->kind == AST_VAR_ARGS)) {
-                    return 0;
-                }
-                if (pa->kind == AST_VAR_ARGS) continue;
-                if (!parseFnTypesMatch(pa->type, pb->type)) return 0;
-            }
-            return 1;
-        }
-        default:
-            return 1;
-    }
-}
 
 /* `fname` is being declared or defined again with `rettype`/`params`:
  * a different signature from the earlier prototype or definition (the
@@ -3584,7 +4254,7 @@ static void parseCheckFunctionRedeclaration(Cctrl *cc, AstType *rettype,
         return;
     }
     AstType *type = astMakeFunctionType(rettype, params);
-    if (parseFnTypesMatch(type, prev->type) &&
+    if (astFnTypesMatch(type, prev->type) &&
         !has_var_args == !prev->has_var_args) {
         return;
     }
@@ -3662,7 +4332,7 @@ static void parseInheritDefaultParams(Cctrl *cc, AstType *rettype,
     /* A conflicting signature is reported by
      * parseCheckFunctionRedeclaration; inherit nothing from it */
     AstType *type = astMakeFunctionType(rettype, params);
-    if (!parseFnTypesMatch(type, prev->type) ||
+    if (!astFnTypesMatch(type, prev->type) ||
         !has_var_args != !prev->has_var_args) {
         return;
     }
@@ -3717,7 +4387,32 @@ static void parseInheritDefaultParams(Cctrl *cc, AstType *rettype,
     }
 }
 
+/* The name in a function pointer declarator `(*name)`, `(**name)`, ...
+ * whose `(` was just read (the `*`s are still to come). */
+static Lexeme *parseFnPtrDeclName(Cctrl *cc) {
+    int stars = 0;
+    while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+        cctrlTokenGet(cc);
+        stars++;
+    }
+    Lexeme *name = cctrlTokenGet(cc);
+    if (name) cctrlTokenRewind(cc);
+    while (stars--) cctrlTokenRewind(cc);
+    return name;
+}
+
+/* `ret_fnptr` > 0: the function returns a function pointer, declared C's
+ * way, `T (*Name(params))(fn_params)`, with `ret_fnptr` stars; rettype is
+ * then the T those pointed-to functions return. */
+static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
+                                   int len, int is_inline, int ret_fnptr);
+
 Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int is_inline) {
+    return parseFunctionOrDefImpl(cc, rettype, fname, len, is_inline, 0);
+}
+
+static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
+                                   int len, int is_inline, int ret_fnptr) {
     cctrlNoteHeaderName(cc, fname, len);
     /* Anchor: the name token was just consumed, so the cursor still
      * sits on its line - stamp the function Ast with the NAME's
@@ -3735,6 +4430,35 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
         name_tok_line = name_tok->line;
         name_tok_col = name_tok->col;
     }
+    /* A module's function `a.b.f`: named by its symbol (see
+     * astModuleMangle), `a.b.f` kept as a second name for lookups */
+    char *module_name = NULL;
+    if (memchr(fname, '.', len)) {
+        module_name = mprintf("%.*s", len, fname);
+        fname = astModuleMangle(fname, len);
+        len = strlen(fname);
+    }
+    /* `main` (ktm syntax v0.2) is the entry point `Main`: inside it is
+     * named Main, so every backend, the JIT and the file-scope
+     * initialiser driver treat it as the entry, and `main` is kept as
+     * a second name for calls. */
+    int is_lower_main = len == 4 && !memcmp(fname, "main", 4);
+    if (len == 4 && !memcmp(fname, "Main", 4) && !(cc->flags & CCTRL_REPL)) {
+        cctrlErrorAt(cc, name_tok_line, name_tok_col, 4,
+                     "`Main` is the old entry point: write `main`");
+    }
+    if (is_lower_main) {
+        Ast *other = mapGetLen(cc->global_env, "Main", 4);
+        if (other && other->kind == AST_FUNC) {
+            cctrlRaiseException(cc, "both `main` and `Main` are defined: "
+                                    "a program has one entry point");
+        }
+        fname = "Main";
+    }
+    /* A main-program function (not a module's, not the entry point) gets
+     * its own symbol (AST_FLAG_PROGRAM, astProgramSymbol) */
+    int is_program_fn = cc->decl_from_main && !cc->cur_module &&
+                        !module_name && !(len == 4 && !memcmp(fname, "Main", 4));
     int has_var_args = 0;
     cctrlTokenExpect(cc,'(');
     cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -3743,8 +4467,58 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
     /* Reset the unique id counter otherwise we get ridiculous numbers */
     astResetLVarId();
 
+    /* A method: `self`, a const pointer to the type, is its first
+     * parameter */
+    Ast *self = NULL;
+    if (cc->method_self) {
+        self = astLVar(cc->method_self, "self", 4);
+        self->flags |= AST_FLAG_CONST;
+        cc->method_self = NULL;
+        mapAdd(cc->localenv, self->lname->data, self);
+        listAppend(cc->tmp_locals, self);
+    }
     Vec *params = parseParams(cc,')',&has_var_args,1);
+    if (self) vecInsertAt(params, self, 0);
+    /* the old `(...)`, with the implicit argc and argv */
+    for (u64 i = 0; params && i < params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (p && p->kind == AST_VAR_ARGS) {
+            cctrlErrorAt(cc, name_tok_line, name_tok_col, len,
+                "`...` needs a name: write `...args` (args.len and args[i] "
+                "replace argc and argv)");
+        }
+    }
+    if (ret_fnptr) {
+        /* `)(fn_params)` after the parameters: what the returned function
+         * pointer points to */
+        int fn_var_args = 0;
+        cctrlTokenExpect(cc,')');
+        cctrlTokenExpect(cc,'(');
+        AstType *fn_type = astMakeFunctionType(rettype,
+                parseParams(cc,')',&fn_var_args,0));
+        fn_type->has_var_args = fn_var_args;
+        rettype = fn_type;
+        for (int i = 1; i < ret_fnptr; ++i) {
+            rettype = astMakePointerType(rettype);
+        }
+    }
     Lexeme *tok = cctrlTokenGet(cc);
+    /* A module's declarations-only pass: the body comes in the full
+     * pass, this declares the function so every file can call it */
+    int skipped_body = 0;
+    if (cc->decls_only && tokenPunctIs(tok, '{')) {
+        int depth = 1;
+        while (depth) {
+            Lexeme *t = cctrlTokenGet(cc);
+            if (!t) {
+                cctrlRaiseException(cc, "Unexpected end of input in the body of `%.*s()`",
+                                    len, fname);
+            }
+            if (tokenPunctIs(t, '{')) depth++;
+            else if (tokenPunctIs(t, '}')) depth--;
+        }
+        skipped_body = 1;
+    }
     if (tokenPunctIs(tok, '{') || tokenPunctIs(tok, ';')) {
         parseCheckFunctionRedeclaration(cc, rettype, fname, len, params,
                                         has_var_args, name_tok_line,
@@ -3752,7 +4526,7 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
         parseInheritDefaultParams(cc, rettype, fname, len, params,
                                   has_var_args);
     }
-    if (tokenPunctIs(tok, '{')) {
+    if (tokenPunctIs(tok, '{') && !skipped_body) {
         Ast *fn = parseFunctionDef(cc,rettype,fname,len,params,
                                    has_var_args,is_inline,
                                    name_tok_line,name_tok_col);
@@ -3760,9 +4534,12 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
             fn->line = name_line;
             fn->col = name_col;
             fn->file_id = name_file;
+            if (is_program_fn) fn->flags |= AST_FLAG_PROGRAM;
+            if (is_lower_main) mapAdd(cc->global_env, "main", fn);
+            if (module_name) mapAdd(cc->global_env, module_name, fn);
         }
         return fn;
-    } else if (tokenPunctIs(tok, ';')) {
+    } else if (tokenPunctIs(tok, ';') || skipped_body) {
         if (rettype->kind == AST_TYPE_AUTO) {
             cctrlRaiseException(cc,"auto cannot be used with a function prototype %.*s() at this time",
                     len,fname);
@@ -3770,7 +4547,10 @@ Ast *parseFunctionOrDef(Cctrl *cc, AstType *rettype, char *fname, int len, int i
         AstType *type = astMakeFunctionType(rettype, params);
         Ast *fn = astFunction(type,fname,len,params,NULL,NULL,has_var_args);
         fn->kind = AST_FUN_PROTO;
+        if (is_program_fn) fn->flags |= AST_FLAG_PROGRAM;
         mapAdd(cc->global_env,fn->fname->data,fn);
+        if (is_lower_main) mapAdd(cc->global_env, "main", fn);
+        if (module_name) mapAdd(cc->global_env, module_name, fn);
         return fn;
     } else {
         /* Neither `{ ... }` (definition) nor `;` (prototype). Almost
@@ -3847,8 +4627,11 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
     }
 
     cc->localenv = NULL;
-    /* Map a c function to an ASM function */
-    mapAdd(cc->asm_funcs,c_fname->data,asm_func);
+    /* Map a c function to an ASM function; in a module, under the
+     * module's name (`c.stat`), pub or private like any declaration */
+    char *qual = cctrlDeclName(cc, c_fname->data, c_fname->len);
+    mapAdd(cc->asm_funcs, qual ? qual : c_fname->data, asm_func);
+    if (qual && cc->decl_pub) setAdd(cc->pub_names, qual);
     cctrlTokenExpect(cc,';');
     if (is_inline) {
         asm_func->flags |= AST_FLAG_INLINE;
@@ -3861,6 +4644,8 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
 /* Whether the file-scope declaration list being continued (`static T a,
  * b;`) is static; set with tmp_gvar_base_type */
 static int parse_gvar_list_static = 0;
+/* Same as parse_gvar_list_static, for `const T a = 1, b = 2;` */
+static int parse_gvar_list_const = 0;
 
 static void parseGlobalDeclListNext(Cctrl *cc, Lexeme *tok, AstType *base_type) {
     assertTokenIsTerminator(cc,tok,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
@@ -3875,11 +4660,305 @@ static void parseGlobalDeclListNextPrev(Cctrl *cc, AstType *base_type) {
     parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
 }
 
+/* `T User.name(params)`, a method of the class or union `User`: a
+ * definition or a prototype. `type_tok` is `User`, the `.` was taken. It
+ * is the function `User.name` with a `User *self` first parameter, and
+ * only the module (or the standard library) defining `User` can add it. */
+static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
+                           int is_static) {
+    char *tname = type_tok->start;
+    int tlen = type_tok->len;
+    AstType *cls = NULL;
+    char *qual = cctrlQualifyName(cc, tname, tlen);
+    if (qual) cls = mapGet(cc->clsdefs, qual);
+    if (!cls) cls = mapGetLen(cc->clsdefs, tname, tlen);
+    if (!cls) cls = mapGetLen(cc->uniondefs, tname, tlen);
+    if (!cls || cls->is_enum || cls->is_intrinsic ||
+        (cls->kind != AST_TYPE_CLASS && cls->kind != AST_TYPE_UNION))
+    {
+        cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        cctrlRaiseException(cc, "`%.*s` is not a struct: only a struct or "
+                                "union can have methods", tlen, tname);
+    }
+    int here_std = !cc->cur_module && !cc->decl_from_main;
+    AoStr *path = cctrlModulePath(cc, cc->cur_module);
+    char *dot = NULL;
+    for (int i = (int)cls->clsname->len - 1; i >= 0 && !dot; --i) {
+        if (cls->clsname->data[i] == '.') dot = cls->clsname->data + i;
+    }
+    int mine = cls->in_std == here_std;
+    if (dot) {
+        int mod_len = dot - cls->clsname->data;
+        mine = mine && path && (int)path->len == mod_len &&
+               !memcmp(path->data, cls->clsname->data, mod_len);
+    } else {
+        mine = mine && !path;
+    }
+    /* (reported once, by a module's full pass) */
+    if (!mine && !cc->decls_only) {
+        cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        cctrlRaiseException(cc, "methods of `%s` can only be defined %s",
+                cls->clsname->data,
+                cls->in_std ? "by the standard library"
+                            : "in the module that defines it");
+    }
+
+    Lexeme *mtok = cctrlTokenGetRequired(cc);
+    if (mtok->tk_type != TK_IDENT) {
+        cctrlRaiseException(cc, "Expected a method name after `%.*s.`, got `%s`",
+                            tlen, tname, lexemeAsWritten(mtok));
+    }
+    if (cls->fields && mapGetLen(cls->fields, mtok->start, mtok->len) &&
+        !cc->decls_only) {
+        cctrlRaiseException(cc, "`%s` has a field named `%.*s`: a method "
+                            "cannot have the same name",
+                            cls->clsname->data, mtok->len, mtok->start);
+    }
+    if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        cctrlRaiseException(cc, "Expected `(` after the method name `%.*s.%.*s`",
+                            tlen, tname, mtok->len, mtok->start);
+    }
+    char *name = mprintf("%s.%.*s", cls->clsname->data, mtok->len, mtok->start);
+    if (cc->decl_pub && dot) setAdd(cc->pub_names, name);
+
+    cc->method_self = astMakePointerType(cls);
+    Ast *fn = parseFunctionOrDef(cc, rettype, name, strlen(name), 0);
+    if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
+    if (fn) {
+        fn->line = mtok->line;
+        fn->col = mtok->col;
+    }
+    return fn;
+}
+
+/* M5: the files of a module can use each other's types in any order.
+ * Its names pass (LEX_PASS_NAMES) records every top-level declaration's
+ * tokens and declares every struct/union/class name, so pointers and
+ * signatures can name a type of any file. Its type declarations (struct
+ * and union bodies, enums, consts) are then parsed from their tokens,
+ * over and over while more of them succeed, so a body can use a later
+ * file's type by value, its enum or its const as an array size. What
+ * never succeeds is left to the declarations pass, which reports it as
+ * before; what did succeed it skips. */
+Ast *parseToplevelDef(Cctrl *cc, int *is_global);
+
+typedef struct ParseModDecl {
+    u32 module_id;
+    Vec *toks;      /* Lexeme *, the whole declaration */
+    int is_type;    /* a struct/union body, an enum or a const */
+    int replayed;   /* parseModuleTypes is done with it */
+} ParseModDecl;
+
+/* "file:line:col" of tok: the same declaration in another pass */
+static char *parseModDeclKey(Lexeme *tok) {
+    LexFile *f = tok->file;
+    return mprintf("%s:%d:%d", f && f->filename ? f->filename->data : "",
+                   tok->line, tok->col);
+}
+
+/* The rest of the top-level declaration that starts with `first`
+ * (already taken), appended to `toks` when not NULL: up to a `;`, or the
+ * `}` closing a body (and a `;` right after it), never past its file */
+static void parseModDeclRest(Cctrl *cc, Lexeme *first, Vec *toks) {
+    int depth = 0;
+    Lexeme *t = first;
+    while (1) {
+        if (toks) vecPush(toks, t);
+        if (tokenPunctIs(t, '(') || tokenPunctIs(t, '[') ||
+            tokenPunctIs(t, '{')) {
+            depth++;
+        } else if (tokenPunctIs(t, ')') || tokenPunctIs(t, ']') ||
+                   tokenPunctIs(t, '}')) {
+            depth--;
+            if (depth == 0 && tokenPunctIs(t, '}')) {
+                Lexeme *peek = cctrlTokenPeek(cc);
+                if (peek && tokenPunctIs(peek, ';') && peek->file == first->file) {
+                    t = cctrlTokenGet(cc);
+                    if (toks) vecPush(toks, t);
+                }
+                return;
+            }
+        } else if (depth <= 0 && tokenPunctIs(t, ';')) {
+            return;
+        }
+        Lexeme *peek = cctrlTokenPeek(cc);
+        if (!peek || peek->file != first->file ||
+            peek->mod_pass != first->mod_pass) {
+            return;
+        }
+        t = cctrlTokenGet(cc);
+    }
+}
+
+/* Parse the declarations in `toks` as the declarations pass would, from
+ * the tokens instead of the lexer, diagnostics dropped (Cctrl.replaying).
+ * 1 if it went through without an error. */
+static int parseModReplay(Cctrl *cc, Vec *toks) {
+    u64 cap = roundUpToNextPowerOf2(toks->size + 1);
+    Lexeme **ring = (Lexeme **)malloc(cap * sizeof(Lexeme *));
+    /* padded with sentinels, as for a #define's value: error paths
+     * rewind past the ends */
+    for (u64 i = 0; i < cap; ++i) {
+        ring[i] = i < toks->size ? (Lexeme *)toks->entries[i] : lexemeSentinal();
+    }
+    TokenRingBuffer replay = {0};
+    replay.entries = ring;
+    replay.size = toks->size;
+    replay.capacity = cap;
+
+    TokenRingBuffer *saved_ring = cc->token_buffer;
+    jmp_buf *saved_recovery = cc->current_recovery;
+    Map *saved_localenv = cc->localenv;
+    List *saved_tmp_locals = cc->tmp_locals;
+    AstType *saved_gvar_base = cc->tmp_gvar_base_type;
+    Ast *saved_gvar_decl = cc->tmp_gvar_decl;
+    u32 saved_module = cc->cur_module;
+    int saved_decls_only = cc->decls_only;
+    int saved_pub = cc->decl_pub;
+    int saved_from_main = cc->decl_from_main;
+    s64 saved_lineno = cc->lineno;
+    LexFile *saved_tok_file = cc->tok_file;
+    List *volatile ast_tail = cc->ast_list ? cc->ast_list->prev : NULL;
+    int errors = cc->quiet_errors;
+    volatile int ok = 1;
+
+    jmp_buf recovery;
+    cc->token_buffer = &replay;
+    cc->current_recovery = &recovery;
+    cc->replaying = 1;
+    cc->localenv = NULL;
+    cc->tmp_locals = NULL;
+    cc->tmp_gvar_base_type = NULL;
+    cc->tmp_gvar_decl = NULL;
+    if (setjmp(recovery) != 0) {
+        ok = 0;
+    } else {
+        int is_global = 0;
+        Ast *ast;
+        while ((ast = parseToplevelDef(cc, &is_global)) != NULL) {
+            if (!is_global && ast->kind != AST_FUN_PROTO) {
+                listAppend(cc->ast_list, ast);
+            }
+            is_global = 0;
+            cc->localenv = NULL;
+        }
+    }
+    if (cc->quiet_errors != errors) ok = 0;
+    if (!ok && cc->ast_list && ast_tail) {
+        ast_tail->next = cc->ast_list;
+        cc->ast_list->prev = ast_tail;
+    }
+    cc->replaying = 0;
+    cc->token_buffer = saved_ring;
+    cc->current_recovery = saved_recovery;
+    cc->localenv = saved_localenv;
+    cc->tmp_locals = saved_tmp_locals;
+    cc->tmp_gvar_base_type = saved_gvar_base;
+    cc->tmp_gvar_decl = saved_gvar_decl;
+    cc->cur_module = saved_module;
+    cc->decls_only = saved_decls_only;
+    cc->decl_pub = saved_pub;
+    cc->decl_from_main = saved_from_main;
+    cc->lineno = saved_lineno;
+    cc->tok_file = saved_tok_file;
+    free(ring);
+    return ok;
+}
+
+/* The names pass: record the declaration starting with `first`, and
+ * declare the struct/union/class it defines (`pub struct Box;`) */
+static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
+    ParseModDecl *d = malloc(sizeof(ParseModDecl));
+    d->module_id = first->module_id;
+    d->toks = vecNew(&vec_unsigned_long_type);
+    d->is_type = 0;
+    d->replayed = 0;
+    parseModDeclRest(cc, first, d->toks);
+    /* replayed as the declarations pass */
+    for (u64 i = 0; i < d->toks->size; ++i) {
+        ((Lexeme *)d->toks->entries[i])->mod_pass = LEX_PASS_DECLS;
+    }
+
+    u64 i = 0;
+    while (i < d->toks->size) {
+        Lexeme *t = d->toks->entries[i];
+        if (t->tk_type != TK_KEYWORD ||
+            (t->i64 != KW_PUBLIC && t->i64 != KW_PRIVATE &&
+             t->i64 != KW_STATIC && t->i64 != KW_ATOMIC)) break;
+        i++;
+    }
+    Lexeme *kw = i < d->toks->size ? d->toks->entries[i] : NULL;
+    if (kw && kw->tk_type == TK_KEYWORD &&
+        (kw->i64 == KW_CLASS || kw->i64 == KW_UNION) &&
+        i + 1 < d->toks->size &&
+        ((Lexeme *)d->toks->entries[i + 1])->tk_type == TK_IDENT)
+    {
+        /* `[pub] struct Name;`: the name now, the body later */
+        Vec *fwd = vecNew(&vec_unsigned_long_type);
+        for (u64 j = 0; j <= i + 1; ++j) vecPush(fwd, d->toks->entries[j]);
+        Lexeme *semi = lexemeCopy(d->toks->entries[i + 1]);
+        semi->tk_type = TK_PUNCT;
+        semi->i64 = ';';
+        semi->start = ";";
+        semi->len = 1;
+        vecPush(fwd, semi);
+        parseModReplay(cc, fwd);
+        vecRelease(fwd);
+        for (u64 j = i + 2; j < d->toks->size; ++j) {
+            if (tokenPunctIs(d->toks->entries[j], '{')) {
+                d->is_type = 1;
+                break;
+            }
+        }
+    } else if (kw && kw->tk_type == TK_KEYWORD &&
+               (kw->i64 == KW_ENUM || kw->i64 == KW_CONST)) {
+        d->is_type = 1;
+    }
+    vecPush(cc->mod_type_decls, d);
+}
+
+/* Module `module_id`'s names pass is over: parse its type declarations
+ * from their tokens while more of them succeed. The declarations pass
+ * skips the ones that did. */
+static void parseModuleTypes(Cctrl *cc, u32 module_id) {
+    int progress = 1;
+    while (progress) {
+        progress = 0;
+        for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+            ParseModDecl *d = cc->mod_type_decls->entries[i];
+            if (d->module_id != module_id || d->replayed || !d->is_type) continue;
+            if (parseModReplay(cc, d->toks)) {
+                setAdd(cc->mod_decls_done, parseModDeclKey(d->toks->entries[0]));
+                d->replayed = 1;
+                progress = 1;
+            }
+        }
+    }
+    for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+        ParseModDecl *d = cc->mod_type_decls->entries[i];
+        if (d->module_id == module_id) d->replayed = 1;
+    }
+}
+
+/* The `(` just gotten starts `(fn(...) R)`: put it back for
+ * parseBaseDeclSpec. Otherwise it stays gotten. */
+static int parseGotParenFnType(Cctrl *cc) {
+    cctrlTokenRewind(cc);
+    if (parseFnStartsType(cc)) {
+        return 1;
+    }
+    cctrlTokenGet(cc);
+    return 0;
+}
+
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
     Lexeme *tok, *name, *peek;
     int is_static = 0;
+    int is_const = 0;
+    int saw_private = 0;
+    cc->decl_pub = 0;
 
     while (1) {
         if ((tok = cctrlTokenGet(cc)) == NULL) {
@@ -3888,6 +4967,30 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 cctrlRaiseException(cc,"Unexpected end of input, expected a declaration after `,`");
             }
             return NULL;
+        }
+        /* A module's names pass (see parseModuleNamesDecl) */
+        if (tok->mod_pass == LEX_PASS_NAMES) {
+            parseModuleNamesDecl(cc, tok);
+            continue;
+        }
+        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying &&
+            !cc->tmp_gvar_base_type) {
+            char *mod_key = mprintf("%u", tok->module_id);
+            if (!setHas(cc->mod_types_done, mod_key)) {
+                setAdd(cc->mod_types_done, mod_key);
+                parseModuleTypes(cc, tok->module_id);
+            }
+            char *key = parseModDeclKey(tok);
+            if (setHas(cc->mod_decls_done, key)) {
+                parseModDeclRest(cc, tok, NULL);
+                continue;
+            }
+        }
+        /* Which module this declaration is in, and its pass */
+        cc->cur_module = tok->module_id;
+        cc->decls_only = tok->mod_pass == LEX_PASS_DECLS;
+        if (!cc->tmp_gvar_base_type) {
+            cc->decl_from_main = tok->module_id == 0 && !tok->in_std;
         }
 
         /* An empty declaration: a stray `;` as in `I64 x = 1;;` or
@@ -3904,6 +5007,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             base_type = cc->tmp_gvar_base_type;
             cc->tmp_gvar_base_type = NULL;
             is_static = parse_gvar_list_static;
+            is_const = parse_gvar_list_const;
             cctrlTokenRewind(cc);
             type = parsePointerType(cc,base_type);
         } else if (tok->tk_type == TK_KEYWORD) {
@@ -3919,6 +5023,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     peek = cctrlTokenPeek(cc);
                     if (tokenPunctIs(peek,'{')) {
                         asm_block = prsAsm(cc, 0);
+                        /* a module's declarations pass only learns its
+                         * functions; the full pass emits the block */
+                        if (cc->decls_only) continue;
                         listAppend(cc->asm_blocks,asm_block);
                         return asm_block;
                     }
@@ -3947,7 +5054,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                      * global defined elsewhere (a library's), parsed as
                      * the global definition parses it */
                     if (name && tokenPunctIs(name,'(')) {
-                        Lexeme *fnptr_name = cctrlTokenPeekBy(cc,1);
+                        Lexeme *fnptr_name = parseFnPtrDeclName(cc);
                         char *fname;
                         int flen;
                         cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -3976,6 +5083,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     return decl;
                 }
                 case KW_INLINE: {
+                    if (is_const) {
+                        cctrlRaiseException(cc,"const is only allowed on declarations");
+                    }
                     peek = cctrlTokenPeek(cc);
                     if (!peek) {
                         cctrlRaiseException(cc,"Unexpected end of input after `inline`");
@@ -3990,21 +5100,36 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     /* `inline` is only a hint: compile the function as an
                      * ordinary one so it can be called normally, recursed
                      * into, have its address taken and use default
-                     * arguments. The transpiler keeps the flag so it can
-                     * re-emit the keyword. */
-                    int is_inline = !!(cc->flags & CCTRL_TRANSPILING);
-                    ast = parseFunctionOrDef(cc,type,name->start,name->len,is_inline);
-                    if (is_inline) {
-                        ast->flags |= AST_FLAG_INLINE;
-                    }
+                     * arguments. */
+                    ast = parseFunctionOrDef(cc,type,name->start,name->len,0);
                     ast->line = name->line;
                     ast->col = name->col;
                     return ast;
                 }
                 case KW_PUBLIC:
+                    if (saw_private) {
+                        cctrlRaiseException(cc, "a declaration is either `pub` or `private`, not both");
+                    }
+                    cc->decl_pub = 1;
+                    continue;
+                /* `private` says what leaving out `pub` means */
                 case KW_PRIVATE:
+                    if (cc->decl_pub) {
+                        cctrlRaiseException(cc, "a declaration is either `pub` or `private`, not both");
+                    }
+                    saw_private = 1;
+                    continue;
                 case KW_ATOMIC:
                     continue;
+
+                case KW_CONST:
+                    is_const = 1;
+                    continue;
+
+                case KW_DEFER:
+                    cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                        "`defer` is only allowed inside a function");
+                    cctrlTerminate(cc);
 
                 case KW_STATIC:
                     base_type = parseBaseDeclSpec(cc);
@@ -4027,7 +5152,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlTokenExpect(cc,';');
                     continue;
 
-                case KW_U0: 
+                case KW_ENUM:
+                    parseEnumDef(cc);
+                    cctrlTokenExpect(cc,';');
+                    continue;
+
+                case KW_U0:
                 case KW_BOOL:
                 case KW_I8:
                 case KW_U8:
@@ -4085,16 +5215,32 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlRaiseException(cc,"Unexpected floating keyword: %.*s",
                             tok->len,tok->start);
             }
+        } else if (tok->tk_type == TK_IDENT &&
+                   parseIsFallthrough(cc, tok, cctrlTokenPeek(cc))) {
+            parseFallthrough(cc, tok);
         } else if (tok->tk_type == TK_IDENT) {
-            /* top level function call */
+            /* top level function call, unless the name is a type: then
+             * `i64 (*fp)(i64);` declares a function pointer. `fn` is a
+             * contextual keyword (ktm syntax v0.2): old code uses it as
+             * a plain identifier, so check whether THIS `fn` starts a
+             * type before treating it as a call or a variable. */
             peek = cctrlTokenPeek(cc);
-            if (tokenPunctIs(peek,'(')) {
+            int fn_is_type = 0;
+            if (tokenIsFnIdent(tok)) {
+                cctrlTokenRewind(cc);
+                fn_is_type = parseFnStartsType(cc);
                 cctrlTokenGet(cc);
-                ast = parseFunctionArguments(cc,tok->start,tok->len,')');
+            }
+            if (!fn_is_type && tokenPunctIs(peek,'(') &&
+                (mapGetLen(cc->global_env, tok->start, tok->len) ||
+                 !cctrlTokIsKeyword(cc, tok))) {
+                cctrlTokenGet(cc);
+                ast = parseCallArguments(cc,tok->start,tok->len);
                 cctrlTokenExpect(cc,';');
                 *is_global = 1;
                 return ast;
-            } else if ((variable = mapGetLen(cc->global_env,tok->start, tok->len))) {
+            } else if (!fn_is_type &&
+                       (variable = mapGetLen(cc->global_env,tok->start, tok->len))) {
                 cctrlTokenRewind(cc);
                 ast = parseExpr(cc,16);
                 cctrlTokenExpect(cc,';');
@@ -4136,6 +5282,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 return ast;
             }
             cctrlRaiseException(cc,"Floating float constant '%f' cannot be used in this context", tok->f64);
+        } else if (tokenPunctIs(tok,'(') && parseGotParenFnType(cc)) {
+            /* `(fn(i64) i64) *slot;`: a pointer to a function pointer */
+            base_type = parseBaseDeclSpec(cc);
+            type = parsePointerType(cc,base_type);
         } else if (tokenPunctIs(tok,TK_PLUS_PLUS) ||
                    tokenPunctIs(tok,TK_MINUS_MINUS))
         {
@@ -4162,7 +5312,32 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
+        cctrlCheckPrefixHidden(cc, name);
+        parseCheckNotReserved(cc, name);
+        /* `T User.name(...)`: a method */
+        if (type && name->tk_type == TK_IDENT &&
+            tokenPunctIs(cctrlTokenPeek(cc), '.'))
+        {
+            if (is_const) {
+                cctrlRaiseException(cc,"const is only allowed on declarations");
+            }
+            cctrlTokenGet(cc);
+            return parseMethodDef(cc, type, name, is_static);
+        }
+        /* A module's declaration is named `a.b.name` */
+        if (cc->cur_module && name->tk_type == TK_IDENT) {
+            char *qual = cctrlDeclName(cc, name->start, name->len);
+            if (qual) {
+                name = lexemeCopy(name);
+                name->start = qual;
+                name->len = strlen(qual);
+                if (cc->decl_pub) setAdd(cc->pub_names, qual);
+            }
+        } else if (cc->decl_from_main && name->tk_type == TK_IDENT) {
+            setAdd(cc->main_names, mprintf("%.*s", name->len, name->start));
+        }
         parse_gvar_list_static = is_static;
+        parse_gvar_list_const = is_const;
 
         /* A keyword after a type: `I64 class X`. Without a type (a
          * stray punct before `class`) it is reported below. */
@@ -4182,6 +5357,8 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     parseClassDef(cc,type);
                     cctrlTokenExpect(cc,';');
                     continue;
+                case KW_CONST:
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
                 default: {
                     cctrlRaiseException(cc,"%s can only prefix a class",lexemeToString(name));
                 }
@@ -4193,8 +5370,36 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * function pointer params, as in parseAsmFunctionBinding. */
         int is_fnptr = 0;
         if (tokenPunctIs(name,'(') && type != NULL) {
+            /* `T (*Name(params))(fn_params)`: a function returning a
+             * function pointer, not a variable */
+            int stars = 0;
+            while (tokenPunctIs(cctrlTokenPeek(cc), '*')) {
+                cctrlTokenGet(cc);
+                stars++;
+            }
+            Lexeme *fn_name = cctrlTokenGet(cc);
+            int is_function = stars > 0 && fn_name &&
+                              fn_name->tk_type == TK_IDENT &&
+                              tokenPunctIs(cctrlTokenPeek(cc), '(');
+            if (!is_function) {
+                /* a function pointer variable: give the tokens back */
+                if (fn_name) cctrlTokenRewind(cc);
+                for (int i = 0; i < stars; ++i) cctrlTokenRewind(cc);
+            } else {
+                if (is_const) {
+                    cctrlRaiseException(cc,"const is only allowed on declarations");
+                }
+                Ast *fn = parseFunctionOrDefImpl(cc, type, fn_name->start,
+                                                 fn_name->len, 0, stars);
+                if (fn && is_static) fn->flags |= AST_FLAG_STATIC;
+                if (fn) {
+                    fn->line = fn_name->line;
+                    fn->col = fn_name->col;
+                }
+                return fn;
+            }
             is_fnptr = 1;
-            Lexeme *fnptr_name = cctrlTokenPeekBy(cc,1);
+            Lexeme *fnptr_name = parseFnPtrDeclName(cc);
             char *fname;
             int flen;
             cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -4228,6 +5433,59 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         type = parseArrayDimensions(cc,type);
         tok = cctrlTokenPeek(cc);
 
+        /* A module's declarations-only pass: a global is declared (as
+         * an extern) so every file of the module can use it; the full
+         * pass defines it. Its initialiser is skipped. */
+        if (cc->decls_only && !tokenPunctIs(tok, '(')) {
+            int depth = 0;
+            Lexeme *t = NULL;
+            /* A const integer's value is known here already, so another
+             * file (or a program using a prebuilt module) can use it in
+             * a constant expression */
+            s64 const_val = 0;
+            int const_ok = 0;
+            if (is_const && astIsIntType(type) && tokenPunctIs(tok, '=')) {
+                cctrlTokenGet(cc);
+                Ast *init = parseExpr(cc, 16);
+                const_ok = init != NULL;
+                if (init) const_val = evalIntConstExprOrErr(init, &const_ok);
+                t = cctrlTokenGet(cc);
+                if (!tokenPunctIs(t, ';') && !tokenPunctIs(t, ',')) {
+                    cctrlRaiseException(cc, "Expected `;` after `%.*s`",
+                                        name->len, name->start);
+                }
+            }
+            while (!t && (t = cctrlTokenGet(cc)) != NULL) {
+                if (tokenPunctIs(t,'(') || tokenPunctIs(t,'[') ||
+                    tokenPunctIs(t,'{')) {
+                    depth++;
+                } else if (tokenPunctIs(t,')') || tokenPunctIs(t,']') ||
+                           tokenPunctIs(t,'}')) {
+                    depth--;
+                } else if (depth == 0 && (tokenPunctIs(t,';') ||
+                                          tokenPunctIs(t,','))) {
+                    break;
+                }
+                t = NULL;
+            }
+            Ast *gvar = astGVar(type, name->start, name->len, 0);
+            gvar->flags |= AST_FLAG_EXTERN;
+            if (is_const) gvar->flags |= AST_FLAG_CONST;
+            if (const_ok) {
+                gvar->deref_symbol = const_val;
+                gvar->flags |= AST_FLAG_CONST_VALUE;
+            }
+            Ast *decl = astDecl(gvar, NULL);
+            decl->flags |= AST_FLAG_EXTERN;
+            if (!is_static) {
+                mapAdd(cc->global_env, gvar->gname->data, gvar);
+            }
+            if (t && tokenPunctIs(t, ',')) {
+                cc->tmp_gvar_base_type = base_type;
+            }
+            return decl;
+        }
+
         /* Global class/struct/union with an aggregate initialiser:
          *   Color Black = {0,0,0};
          * Route through parseVariableInitialiser like arrays do: its
@@ -4241,6 +5499,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             tokenPunctIs(cctrlTokenPeekBy(cc,1),'{'))
         {
             variable = astGVar(type,name->start,name->len,is_static);
+            if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
             ast = parseVariableInitialiser(cc,variable,
@@ -4270,6 +5529,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlRaiseException(cc,
                             "auto cannot be used without an initialiser");
                 }
+                if (is_const) variable->flags |= AST_FLAG_CONST;
                 variable->type = rhs->type;
                 if (rhs->kind == AST_STRING) {
                     ast_decl->declinit = rhs;
@@ -4297,14 +5557,31 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 Lexeme *eq = cctrlTokenGet(cc);     /* consume '=' */
                 int eq_line = eq->line, eq_col = eq->col;
                 Ast *rhs = parseExpr(cc,16);
+                if (astFnPtrMismatch(type, rhs->type)) {
+                    parseRaiseFnConvert(cc, type, rhs->type);
+                }
                 if (!astTypeCheck(type,rhs,AST_BIN_OP_ASSIGN)) {
                     typeCheckWarn(cc,eq_line,eq_col,variable,rhs);
                 }
                 int is_err = 0;
                 ast_expr = astBinaryOp(AST_BIN_OP_ASSIGN,variable,rhs,&is_err);
+                if (is_const) variable->flags |= AST_FLAG_CONST;
             } else {
                 cctrlTokenRewind(cc);
+                /* `variable` must not carry AST_FLAG_CONST yet: this
+                 * re-parses `name = rhs` as a real assignment
+                 * expression, and the LHS is `variable` itself. */
                 ast_expr = parseExpr(cc,16); // parseVariableInitialiser(cc,variable,PUNCT_TERM_COMMA|PUNCT_TERM_SEMI);
+                if (is_const) variable->flags |= AST_FLAG_CONST;
+            }
+
+            if (is_const && astIsIntType(variable->type)) {
+                int const_ok = 1;
+                s64 const_val = evalIntConstExprOrErr(ast_expr->right, &const_ok);
+                if (const_ok) {
+                    variable->deref_symbol = const_val;
+                    variable->flags |= AST_FLAG_CONST_VALUE;
+                }
             }
 
             Ast *folded = NULL;
@@ -4325,7 +5602,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             return ast_expr;
         } else if (type->kind == AST_TYPE_ARRAY) {
+            if (is_const && !tokenPunctIs(tok,'=')) {
+                cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                        name->len, name->start);
+            }
             variable = astGVar(type,name->start,name->len,is_static);
+            if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
             ast = parseVariableInitialiser(cc,variable,PUNCT_TERM_COMMA|PUNCT_TERM_SEMI);
@@ -4337,6 +5619,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
 
         if (tokenPunctIs(tok, '(')) {
+            if (is_const) {
+                cctrlRaiseException(cc,"const is only allowed on declarations");
+            }
             Ast *fn = parseFunctionOrDef(cc,type,name->start,name->len,0);
             /* `static` on the prototype or the definition makes it local */
             if (fn && is_static) {
@@ -4353,6 +5638,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
 
         if (tokenPunctIs(tok,';') || tokenPunctIs(tok, ',')) {
+            if (is_const) {
+                cctrlRaiseException(cc,"const '%.*s' needs an initializer",
+                        name->len, name->start);
+            }
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             variable = astGVar(type,name->start,name->len,is_static);
             mapAdd(cc->global_env,variable->gname->data,variable);
@@ -4360,6 +5649,33 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
         cctrlRaiseException(cc,"Cannot handle '%s'",lexemeToString(tok));
     }
+}
+
+/* The module `libc` only declares the C library: `extern "c"` functions
+ * (called by their C names, as an extern "c" of any module is), structs,
+ * unions, enums and constants. Its code would be the program's, under
+ * the name of C's. Checked in its full pass only. */
+static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
+    if (!cc->cur_module || cc->decls_only || cc->replaying ||
+        !cctrlInCModule(cc)) {
+        return;
+    }
+    if (ast->kind == AST_EXTERN_FUNC || ast->kind == AST_ASM_FUNC_BIND) return;
+    if (ast->kind == AST_DECL && ast->declvar &&
+        (ast->declvar->flags & AST_FLAG_CONST)) {
+        return;
+    }
+    const char *what = "a statement";
+    switch (ast->kind) {
+        case AST_FUNC:      what = "a function with a body"; break;
+        case AST_FUN_PROTO: what = "a ktm function's prototype"; break;
+        case AST_DECL:
+        case AST_GVAR:      what = "a variable"; break;
+        default: break;
+    }
+    cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+        "module libc only declares C: extern \"c\" functions, structs, unions, "
+        "enums and constants, not %s", what);
 }
 
 void parseToAst(Cctrl *cc) {
@@ -4432,9 +5748,40 @@ void parseToAst(Cctrl *cc) {
             continue;
         }
 
+        Lexeme *item_first = cctrlTokenPeek(cc);
+        s64 item_line = item_first ? item_first->line : 0;
+        s64 item_col = item_first ? item_first->col : 0;
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
+        parseCheckCModuleItem(cc, ast);
+        /* A module built into a library (`ktm -lib`) has no code that
+         * runs before main: a run-time initialiser would never run */
+        if (is_global && cc->cur_module && cc->lexer_ &&
+            (cc->lexer_->building_module || cc->lexer_->building_tree)) {
+            is_global = 0;
+            if (ast->kind == AST_BINOP && ast->left &&
+                ast->left->kind == AST_GVAR) {
+                char *name = strrchr(ast->left->gname->data, '.');
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "`%s` needs a constant initialiser in a module built with -lib "
+                    "(its library has no code that runs before main)",
+                    name ? name + 1 : ast->left->gname->data);
+            } else {
+                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
+                    "a statement at the top of a module built with -lib would never run "
+                    "(its library has no code that runs before main)");
+            }
+        }
+        /* The old file-scope code (ktm syntax v0.2 has none): a statement
+         * there, not a global's initialiser; the REPL's input is that */
+        if (is_global && !(cc->flags & CCTRL_REPL) &&
+            !(ast->kind == AST_BINOP && ast->left && ast->left->kind == AST_GVAR) &&
+            ast->kind != AST_DECL) {
+            cctrlErrorAt(cc, item_line ? item_line : ast->line,
+                item_line ? item_col : ast->col, 1,
+                "code at file scope: put it in `main` (only declarations go there)");
+        }
         if (is_global) {
             listAppend(cc->initalisers,ast);
             if (!listEmpty(cc->tmp_locals)) {

@@ -148,6 +148,17 @@
 /* Compile-time type query: `typeof(<type or expr>)` folds to a string
  * literal naming the type, e.g. typeof(1+1) == "I64". */
 #define KW_TYPEOF       90
+/* Literals (ktm syntax v0.2): true and false are bool, null is a void *. */
+#define KW_TRUE         91
+#define KW_FALSE        92
+#define KW_NULL         93
+/* `const` on a declaration (ktm syntax v0.2): marks it read-only, not a
+ * type qualifier like C's. */
+#define KW_CONST        94
+/* ktm syntax v0.2: a scoped enum, `enum Name [: IntType] { ... };` */
+#define KW_ENUM         95
+/* `defer <stmt>` (ktm syntax v0.2): run <stmt> when the block is left. */
+#define KW_DEFER        96
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)
@@ -191,7 +202,53 @@ typedef struct Lexeme {
         s64 i64;
         double f64;
     };
+    /* The module the token's file belongs to (Lexer.modules, 1-based; 0:
+     * the main program or a header) and which pass of it (LEX_PASS_*) */
+    u32 module_id;
+    u8 mod_pass;
+    /* From a stdlib header (under the builtin root), not the program */
+    u8 in_std;
+    /* An identifier that is one of its file's import prefixes, not
+     * followed by `.`: declaring it would hide the module */
+    u8 is_prefix;
+    /* `prefix.name` turned into the token `a.b.name`: the prefix as
+     * written (a local of that name hides the module, see cctrlTokenGet);
+     * NULL for any other token */
+    char *qual_prefix;
+    int qual_prefix_len;
+    /* The file it was lexed from (the lexer runs ahead of the parser,
+     * so its current file can already be the next one) */
+    struct LexFile *file;
 } Lexeme;
+
+/* A module's files are lexed three times: its type names (the parser
+ * records its type declarations and parses them in an order that works,
+ * see parseModuleTypes), then declarations only, then in full */
+#define LEX_PASS_NONE  0
+#define LEX_PASS_DECLS 1
+#define LEX_PASS_FULL  2
+#define LEX_PASS_NAMES 3
+/* A pass that only reads declarations: nothing in it is reported twice */
+#define LEX_PASS_QUIET(pass) \
+    ((pass) == LEX_PASS_DECLS || (pass) == LEX_PASS_NAMES)
+
+/* A module (a directory of .ktm files) as `import a.b;` finds it */
+typedef struct LexModule {
+    AoStr *path;   /* "a.b" */
+    AoStr *dir;    /* the directory it was found in */
+    u32 id;        /* index in Lexer.modules + 1 */
+    int loaded;    /* all of its files have been lexed */
+} LexModule;
+
+/* `import [alias =] a.b;` in one file: `prefix.name` becomes the token
+ * `a.b.name` */
+typedef struct LexImport {
+    AoStr *prefix;
+    LexModule *module;
+    int used;
+    s64 line, col, len;
+    struct LexImport *next;
+} LexImport;
 
 /* Forward declaration. The lexer holds a back-pointer to its
  * owning Cctrl (when there is one) so user-visible lex errors
@@ -201,6 +258,7 @@ typedef struct Lexeme {
  * diagnostic renderer). */
 struct Cctrl;
 
+struct LexFile;
 typedef struct LexFile {
     AoStr *filename; /* name of the file */
     /* cctrlRegisterFile id, assigned lazily on first token consumed
@@ -213,6 +271,23 @@ typedef struct LexFile {
      * columns stays consistent across includes. */
     char *line_start_ptr;
     AoStr *src; /* source */
+    /* Module files: which module and pass (see Lexeme.module_id), and
+     * whether it is the module's last file in its last pass */
+    u32 module_id;
+    u8 mod_pass;
+    u8 last_of_module;
+    /* Past the `module` and `import` lines at the top */
+    u8 header_done;
+    /* A module's file had its `module` line; under the builtin root */
+    u8 saw_module;
+    u8 is_std;
+    /* Its unused imports were reported */
+    u8 ended;
+    LexImport *imports;
+    /* The rest of an `import a, b;` line, read once `a` is loaded: its
+     * imports are the file's that wrote the line */
+    struct LexFile *import_owner;
+    Lexeme *import_kw;   /* that line's `import`, for diagnostics */
 } LexFile;
 
 /* An open #if/#ifdef/#ifndef/#ifjit/#ifaot: where it is (for
@@ -258,6 +333,25 @@ typedef struct Lexer {
     Set *seen_files;
     Map *symbol_table;
     LexFile *cur_file;
+    /* Modules: those found so far, the chain being loaded (for cycles),
+     * the directory of the program's main file and the stdlib's
+     * module directory */
+    LexModule **modules;
+    int modules_len, modules_cap;
+    /* The REPL: each round has a lexer of its own; the modules loaded and
+     * the imports made in earlier rounds carry over (repl.c), and an
+     * import isn't "unused" for being alone in its round */
+    int repl;
+    LexImport *repl_imports;
+    u32 mod_stack[64];
+    int mod_depth;
+    char *program_root;
+    /* `ktm -lib a.b dir/a/b`: the module being built into a library,
+     * compiled in full even if it has a .ktmlib marker */
+    char *building_module;
+    /* `ktm -lib name dir` over a tree of modules: dir (a real path),
+     * whose modules are all compiled in full */
+    char *building_tree;
     /* Diagnostic engine back-pointer. When non-NULL the lexer
      * routes user-visible errors through cctrlRaiseException so
      * they accumulate in the same Vec the parser writes to and
@@ -283,8 +377,16 @@ void lexPushFile(Lexer *l, AoStr *filename);
 /* Push an in-memory buffer as if it were a file (REPL input). `src`
  * is borrowed and must outlive the parse of this buffer. */
 void lexPushString(Lexer *l, char *name, char *src, s64 len);
+/* The name of the internal file that imports the prelude */
+#define LEX_PRELUDE_FILE "<prelude>"
+void lexPushPrelude(Lexer *l);
+/* The name of the internal file that loads the runtime, rt */
+#define LEX_RT_FILE "<rt>"
+void lexPushRuntime(Lexer *l);
 int lex(Lexer *l, Lexeme *le);
 Lexeme *lexToken(Map *macro_defs, Lexer *l);
+int lexSetModuleLibRoot(Lexer *l, char *dir, char *path);
+char *lexModuleTreeImports(Lexer *l, char *dir, Vec *paths, Vec *dirs);
 void lexemePrint(Lexeme *le);
 char *lexemeTypeToString(int tk_type);
 char *lexemePunctToString(s64 op);
@@ -298,6 +400,7 @@ int tokenPunctIs(Lexeme *tok, s64 ch);
 int tokenIdentIs(Lexeme *tok, char *ident, int len);
 void lexemeFree(void *_le);
 char *lexerReportLine(Lexer *l, s64 lineno);
+char *lexerReportLineIn(LexFile *file, s64 lineno);
 int lexemeEq(Lexeme *l1, Lexeme *l2);
 char *lexReadfile(char *path, s64 *_len);
 

@@ -40,16 +40,15 @@ compile. If you haven't installed ktm, point it at the local build with
 <h2>Your first program</h2>
 <p>Create <code>hello.ktm</code>:</p>
 <pre data-run><code>
-U0 Main()
+void main()
 {
-  "Hello, %s!\n", "world";
+  printf("Hello, %s!\n", "world");
 }
 </code></pre>
 <pre class="output">
 Hello, world!
 </pre>
-<p>A string literal on its own line is a print statement: it works like <code>printf</code>,
-with any arguments after a comma. Compile and run it:</p>
+<p>Compile and run it:</p>
 <pre><code>ktm hello.ktm -o hello
 ./hello</code></pre>
 <p>Without <code>-o</code> the binary is called <code>a.out</code>.</p>
@@ -60,62 +59,49 @@ with any arguments after a comma. Compile and run it:</p>
 <p>Make a file executable as a script with a shebang line. ktm skips a first line that
 starts with <code>#!</code>:</p>
 <pre><code>#!/usr/bin/env -S ktm -jit
-"Hello from a script\n";</code></pre>
+void main() { printf("Hello from a script\n"); }</code></pre>
 <pre><code>chmod +x hello.ktm
 ./hello.ktm</code></pre>
 
 <h2>How a program runs</h2>
-<p>Statements at the top level of a file run in order, as in a script. If you define
-<code>Main</code>, it runs after them:</p>
-<pre data-run><code>
-"first\n";
-
-U0 Main()
-{
-  "last\n";
-}
-
-"second\n";
-</code></pre>
-<pre class="output">
-first
-second
-last
-</pre>
-<p>Small programs can skip <code>Main</code> entirely and just write statements. Larger
-ones usually keep their code in functions.</p>
-<p>Return a value from <code>Main</code> to set the exit code:</p>
-<pre><code>I32 Main()
+<p>A program starts at <code>main</code>. The file scope holds declarations (types,
+functions, globals, constants, imports); globals with an initialiser that runs code are set
+up in order before <code>main</code>.</p>
+<p>Return a value from <code>main</code> to set the exit code:</p>
+<pre><code>i32 main()
 {
   return 3;   // ./a.out; echo $? prints 3
 }</code></pre>
 
 <h2>The standard library</h2>
-<p>Every program can use the whole standard library (<code>MAlloc</code>, <code>StrPrint</code>,
-hash tables, JSON and the rest) without an <code>#include</code>. The compiler reads its
-header, <code>std.ktmh</code>, automatically and links <code>libktm</code>. See the
-<a href="library.html">library guide</a>.</p>
+<p>The standard library is a set of modules: import the ones a file uses and call their
+names with the module in front (<code>import str, mem;</code> then <code>str.len(s)</code>,
+<code>mem.alloc(n)</code>). C's own functions are in <code>libc</code>. The compiler links
+<code>libktm</code> automatically. See the <a href="library.html">library guide</a>.</p>
 
 <h2>Several files</h2>
-<p>Pull other files in with <code>#include</code>. Paths in quotes are relative to the
-including file:</p>
-<pre><code>// main.ktm
-#include "geometry.ktm"
+<p>Put related code in a module: a directory whose files start with <code>module</code> and
+the directory's name. Mark what other code may use with <code>pub</code>:</p>
+<pre><code>// geometry/area.ktm
+module geometry;
 
-U0 Main()
+pub i64 area(i64 w, i64 h)
 {
-  "%d\n", Area(3, 4);
+    return w * h;
 }</code></pre>
-<pre><code>// geometry.ktm
-I64 Area(I64 w, I64 h)
+<pre><code>// main.ktm
+import geometry;
+
+void main()
 {
-  return w * h;
+    printf("%d\n", geometry.area(3, 4));
 }</code></pre>
 <pre><code>ktm main.ktm -o shapes</code></pre>
+<p>See <a href="language.html#modules">Modules</a> for the rest.</p>
 
 <h2>Next steps</h2>
 <ul>
-  <li><a href="language.html">The language</a>: types, classes, control flow, functions and more.</li>
+  <li><a href="language.html">The language</a>: types, structs, control flow, functions and more.</li>
   <li><a href="tools.html">Tools</a>: every compiler flag, the REPL and editor setup.</li>
   <li><a href="examples.html">Examples</a>: complete projects to read and run.</li>
 </ul>

@@ -1,73 +1,71 @@
-#include "testhelper.ktm"
+import set, test;
 
-/* `return <expr>;` in a U0 function dropped the expression: the
+/* `return <expr>;` in a void function dropped the expression: the
  * function has no return slot, and the value was only evaluated to be
- * stored there, so `U0 Wrap() { return Inc(); }` never called Inc.
+ * stored there, so `void Wrap() { return Inc(); }` never called Inc.
  * It is now evaluated for its side effects and the value discarded.
- * IntSetAdd in the stdlib is written this way. */
+ * set.intAdd in the stdlib is written this way. */
 
-I64 g = 0;
+i64 g = 0;
 
-U0 Inc() { g++; }
-U0 Wrap() { return Inc(); }
+void inc() { g++; }
+void wrap() { return inc(); }
 
-I64 Inc2() { g++; return g; }
-U0 Wrap2() { return Inc2(); }
+i64 inc2() { g++; return g; }
+void wrap2() { return inc2(); }
 
-U0 Early(I64 n)
-{
-  if (n > 0) return Inc();
-  g += 100;
+void early(i64 n) {
+    if (n > 0) { return inc(); }
+    g += 100;
 }
 
-U0 Assign() { return g = 50; }
-U0 PostInc() { return g++; }
+void assign() { return g = 50; }
+void postInc() { return g++; }
 
-inline U0 InlWrap() { return Inc(); }
-inline U0 InlWrap2() { return Inc2(); }
+inline void inlWrap() { return inc(); }
+inline void inlWrap2() { return inc2(); }
 
-I64 Twice(I64 x) { g += x; return x * 2; }
-U0 Nested() { return Twice(Twice(1)); }
+i64 twice(i64 x) { g += x; return x * 2; }
+void nested() { return twice(twice(1)); }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  IntSet *s;
+i32 main() {
+    i64 correct = 0, tests = 0;
+    set.IntSet *s;
 
-  "Test - return with an expression in a U0 function: ";
+    printf("Test - return with an expression in a void function: ");
 
-  Wrap();
-  tests++; if (g == 1) correct++;
-  Wrap2();
-  tests++; if (g == 2) correct++;
-  Early(1);
-  tests++; if (g == 3) correct++;
-  Early(0);
-  tests++; if (g == 103) correct++;
-  Assign();
-  tests++; if (g == 50) correct++;
-  PostInc();
-  tests++; if (g == 51) correct++;
-  g = 0;
-  Nested();
-  tests++; if (g == 3) correct++;
+    wrap();
+    tests++; if (g == 1) { correct++; }
+    wrap2();
+    tests++; if (g == 2) { correct++; }
+    early(1);
+    tests++; if (g == 3) { correct++; }
+    early(0);
+    tests++; if (g == 103) { correct++; }
+    assign();
+    tests++; if (g == 50) { correct++; }
+    postInc();
+    tests++; if (g == 51) { correct++; }
+    g = 0;
+    nested();
+    tests++; if (g == 3) { correct++; }
 
-  g = 0;
-  InlWrap();
-  tests++; if (g == 1) correct++;
-  InlWrap2();
-  tests++; if (g == 2) correct++;
+    g = 0;
+    inlWrap();
+    tests++; if (g == 1) { correct++; }
+    inlWrap2();
+    tests++; if (g == 2) { correct++; }
 
-  /* IntSetAdd is `U0 ... { return RBTreeInsert(...); }` */
-  s = IntSetNew();
-  IntSetAdd(s, 5);
-  IntSetAdd(s, 7);
-  IntSetAdd(s, 5);
-  tests++; if (IntSetHas(s, 5) && IntSetHas(s, 7) && !IntSetHas(s, 6)) correct++;
-  tests++; if (IntSetSize(s) == 2) correct++;
-  IntSetRelease(s);
+    /* set.intAdd is `void ... { return map.rbSet(...); }` */
+    s = set.intNew();
+    s.add(5);
+    s.add(7);
+    s.add(5);
+    tests++; if (s.has(5) && s.has(7) && !s.has(6)) { correct++; }
+    tests++; if (s.size() == 2) { correct++; }
+    s.release();
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

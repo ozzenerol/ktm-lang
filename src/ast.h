@@ -135,12 +135,13 @@ typedef enum AstKind {
     AST_PLACEHOLDER   = 291,
     AST_SWITCH        = 292,
     AST_DEFAULT       = 293,
-    AST_SIZEOF        = 294,
-    AST_COMMENT       = 295,
     AST_BINOP         = 296,
     AST_UNOP          = 297,
     AST_TRY           = 298,  /* try { ... } catch <stmt> */
     AST_THROW         = 299,  /* throw(u64_value); */
+    AST_TERNARY       = 300,  /* cond ? then : els (the conditional operator) */
+    AST_DEFER         = 301,  /* defer <stmt>; runs <stmt> when its block is left */
+    AST_VA_PACK       = 302,  /* the extras of a `T ...name` call, see astVaPack */
 } AstKind;
 
 /* @Cleanup
@@ -182,9 +183,26 @@ typedef struct AstType {
     Map *fields;
     int offset;
     int is_intrinsic;
+    /* `class D : B`: B, whose fields D starts with; NULL otherwise */
+    struct AstType *base_cls;
+    /* A class or union the standard library defines: only it can add
+     * methods to it */
+    u8 in_std;
+    /* On a class field marked `private`: the module that defines its
+     * class (Lexer.modules, 1-based; 0 for a public field), the only one
+     * that can use it, and the class's name for the messages */
+    u32 private_module;
+    AoStr *private_of;
     /* Bool: a 1-byte char type, but a value converted to it becomes 0 or
      * 1 (value != 0), as in C, instead of keeping its low byte. */
     u8 is_bool;
+    /* A scoped enum (`enum Name : IntType { ... };`): an intrinsic class
+     * (`is_intrinsic`) with no instance fields, whose members live in
+     * `enum_members` (member name -> its constant Ast, typed as this
+     * enum) instead. Only another enum of the SAME name converts to/from
+     * it without a cast; every other integer type needs one. */
+    u8 is_enum;
+    Map *enum_members;
     /* On a class field: a union member after the first one (directly or
      * through an anonymous class/union flattened into the class). A
      * union takes one initialiser item, for its first member, so
@@ -210,14 +228,33 @@ typedef struct AstType {
  * 64-bit (`%d` -> `%lld`), so the IR widens every narrow integer
  * argument to a full 64-bit value before the call. */
 #define AST_FLAG_PRINT_STMT (1<<3)
-/* Set on an AST_STRING made when transpiling from string literals and
- * string macros pasted together (`"a" M "b"`): its `sval` is that C text
- * as written, quotes included, which C pastes the same way. */
-#define AST_FLAG_RAW_C_STRING (1<<4)
 /* Set on a function declared `static` at file scope: its symbol is local
  * to the object, so it neither overrides nor is overridden by a function
  * of the same name elsewhere (a library internal, a user function). */
 #define AST_FLAG_STATIC (1<<5)
+/* Set on an AST_GVAR / AST_LVAR declared `const`: assigning to it (`=`,
+ * a compound assignment, `++`/`--`) is a compile error. */
+#define AST_FLAG_CONST (1<<6)
+/* Set alongside AST_FLAG_CONST only when the const's own initialiser
+ * was itself a compile-time-constant integer expression: `deref_symbol`
+ * (otherwise unused on these kinds) then holds that value, so the
+ * variable itself folds in evalIntConstExprOrErr - usable in array
+ * sizes, case labels and other constant expressions. A `const` whose
+ * initialiser is not foldable (`const i64 n = f();`) keeps AST_FLAG_CONST
+ * (still not assignable) without this one: it behaves like an ordinary
+ * runtime variable everywhere evalIntConstExprOrErr is consulted. */
+#define AST_FLAG_CONST_VALUE (1<<7)
+/* Set on the AST_LVAR `name` of a `T ...name` / `...name` parameter: a
+ * pointer to the caller's array of the extra arguments, next to a hidden
+ * count parameter `name#len`. `name.len`, `name[i]` and range-for read
+ * them; `name` itself can't be assigned. */
+#define AST_FLAG_VARARGS (1<<8)
+
+/* A main-program function or global (not a module's, not extern "c", not
+ * main): its symbol is astProgramSymbol's `_K0<len><name>`, so a program's
+ * `read` or `environ` can't replace the C library's or libktm's symbol of
+ * that name. Messages and lookups keep the plain name. */
+#define AST_FLAG_PROGRAM (1<<9)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
@@ -398,9 +435,25 @@ typedef struct Ast {
             Ast *catch_body;
         };
 
-        /* throw(value) */
+        /* throw(code), or throw(code, fmt, ...) / throw(e) as a call */
         struct {
-            Ast *throw_value;
+            Ast *throw_value;  /* the code; NULL with throw_call */
+            Ast *throw_call;   /* KTM_ThrowFmtAt(...) or KTM_ThrowError(&e) */
+            Ast *throw_file;   /* AST_STRING: the file the throw is in */
+        };
+
+        /* defer <stmt> */
+        struct {
+            Ast *defer_stmt;
+        };
+
+        /* The extras of a call to a `T ...name` function, stored into the
+         * caller's hidden array va_array (an AST_LVAR) one per item;
+         * evaluates to its address. Untyped (`...name`): 64-bit slots. */
+        struct {
+            Ast *va_array;
+            Vec *va_items;
+            int va_untyped;
         };
 
         /* @Typeo
@@ -434,6 +487,11 @@ typedef struct Ast {
              * feasible... or degrade into a series of 'ifs' if the range is 
              * sparse */
             List *case_asts;
+            /* the arm ends in `fallthrough;` (at case_ft_line:col) and
+             * runs on into the next one; every other arm leaves the
+             * switch at its end */
+            int case_fallthrough;
+            s64 case_ft_line, case_ft_col;
         };
 
         /* For a switch */
@@ -507,6 +565,12 @@ Ast *astUnaryOperator(AstType *type, AstUnOp operation, Ast *operand);
 
 /* Variable definitions */
 Ast *astLVar(AstType *type, char *name, int len);
+char *astRuntimeName(const char *name);
+char *astRuntimeSymbol(const char *name);
+char *astModuleMangle(char *qual, int len);
+char *astModuleDemangle(char *sym, int len);
+char *astProgramSymbol(char *name, int len);
+const char *astSymbolDisplayName(const char *sym);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);
 
 /* More beefy data structures */
@@ -517,6 +581,7 @@ Ast *astCompountStatement(List *stmts);
 Ast *astFor(Ast *init, Ast *cond, Ast *step, Ast *body, AoStr *for_begin,
         AoStr *for_middle, AoStr *for_end);
 Ast *astIf(Ast *cond, Ast *then, Ast *els);
+Ast *astTernary(AstType *type, Ast *cond, Ast *then, Ast *els);
 Ast *astWhile(Ast *whilecond, Ast *whilebody, AoStr *while_begin,
         AoStr *while_end);
 Ast *astDoWhile(Ast *whilecond, Ast *whilebody, AoStr *while_begin, 
@@ -536,6 +601,8 @@ Ast *astFunction(AstType *rettype, char *fname, int len, Vec *params,
 Ast *astReturn(Ast *retval, AstType *rettype);
 Ast *astTry(Ast *try_body, Ast *catch_body);
 Ast *astThrow(Ast *value);
+Ast *astDefer(Ast *stmt);
+Ast *astVaPack(Ast *array, Vec *items, int untyped);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 
@@ -557,10 +624,6 @@ Ast *astAsmFunctionBind(AstType *rettype, AoStr *asm_fname,
         AoStr *fname, Vec *params);
 Ast *astAsmFunctionCall(AstType *rettype, AoStr *asm_fname, Vec *argv);
 Ast *astAsmFunctionDef(AoStr *asm_fname, AoStr *asm_stmt);
-
-/* Only used when transpiling */
-Ast *astSizeOf(AstType *type);
-Ast *astComment(char *comment, int len);
 
 /* Gotos */
 Ast *astGoto(AoStr *label);
@@ -618,6 +681,10 @@ int astSysvClassify(AstType *type, SysvClass *classes, int *n_eightbytes);
 int astTypeIsPtr(AstType *type);
 int astTypeIsArray(AstType *type);
 int astIsIntrinsicClass(AstType *ty);
+int astIsEnumType(AstType *ty);
+int astFnTypesMatch(AstType *a, AstType *b);
+int astFnPtrMismatch(AstType *expected, AstType *actual);
+int astIsDifferentEnum(AstType *a, AstType *b);
 int astIsVarArg(Ast *ast);
 int astIsRangeOperator(AstBinOp op);
 int astIsBinCmp(s64 op);
@@ -645,7 +712,6 @@ AoStr *astNormaliseFunctionName(char *fname);
 Ast *astMakeForeverSentinal(void);
 Ast *astMakeLoopSentinal(void);
 Ast *astMakePlaceHolder(void);
-char *astAnnonymousLabel(void);
 void astResetLVarId(void);
 
 /* Returns `1` on successful conversion and `0` on failure */

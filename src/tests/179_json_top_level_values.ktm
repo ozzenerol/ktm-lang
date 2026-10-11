@@ -1,103 +1,100 @@
-#include "testhelper.ktm"
+import json, str, test;
 
-/* JsonParse only accepted a non-empty object or array at the top level:
+/* json.parse only accepted a non-empty object or array at the top level:
  * `{}`, `[]`, `42`, `"text"`, `true` and `null` were errors (moving past the
  * last character of the input was treated as running off the end). */
 
-I64 g_correct = 0;
+i64 gCorrect = 0;
 
 /* Parses `text`, checks it is ok and has type `type` */
-Json *Ok(U8 *text, I64 type)
-{
-  Json *j = JsonParse(text);
-  if (JsonOk(j) && j->type == type) {
-    g_correct++;
-  } else {
-    "\n  '%s' failed (type %d)\n", text, j->type;
-  }
-  return j;
+json.Value *ok(u8 *text, i64 type) {
+    json.Value *j = json.parse(text);
+    if (json.ok(j) && j.type == type) {
+        gCorrect++;
+    } else {
+        printf("\n  '%s' failed (type %d)\n", text, j.type);
+    }
+    return j;
 }
 
-U0 Bad(U8 *text)
-{
-  Json *j = JsonParse(text);
-  if (!JsonOk(j)) g_correct++;
-  else "\n  '%s' should be rejected\n", text;
-  JsonRelease(j);
+void bad(u8 *text) {
+    json.Value *j = json.parse(text);
+    if (!json.ok(j)) { gCorrect++; }
+    else { printf("\n  '%s' should be rejected\n", text); }
+    json.release(j);
 }
 
-I32 Main()
-{
-  I64 tests = 41;
-  Json *j;
-  "Test - JsonParse top-level values: ";
+i32 main() {
+    i64 tests = 41;
+    json.Value *j;
+    printf("Test - JsonParse top-level values: ");
 
-  j = Ok("{}", JSON_OBJECT);
-  if (j->object == NULL) g_correct++;
-  JsonRelease(j);
-  j = Ok("[]", JSON_ARRAY);
-  if (j->array == NULL) g_correct++;
-  JsonRelease(j);
-  JsonRelease(Ok("  { }  ", JSON_OBJECT));
-  JsonRelease(Ok("\n[\t]\n", JSON_ARRAY));
+    j = ok("{}", json.OBJECT);
+    if (j.object == null) { gCorrect++; }
+    json.release(j);
+    j = ok("[]", json.ARRAY);
+    if (j.array == null) { gCorrect++; }
+    json.release(j);
+    json.release(ok("  { }  ", json.OBJECT));
+    json.release(ok("\n[\t]\n", json.ARRAY));
 
-  j = Ok("42", JSON_INT);
-  if (j->i64 == 42) g_correct++;
-  JsonRelease(j);
-  j = Ok("7", JSON_INT);       /* single digit */
-  if (j->i64 == 7) g_correct++;
-  JsonRelease(j);
-  j = Ok("-12", JSON_INT);
-  if (j->i64 == -12) g_correct++;
-  JsonRelease(j);
-  j = Ok("2.5", JSON_FLOAT);
-  if (j->f64 == 2.5) g_correct++;
-  JsonRelease(j);
-  j = Ok("\"text\"", JSON_STRING);
-  if (!StrCmp(j->str, "text")) g_correct++;
-  JsonRelease(j);
-  j = Ok("\"\"", JSON_STRING);
-  if (!StrCmp(j->str, "")) g_correct++;
-  JsonRelease(j);
-  j = Ok("true", JSON_BOOL);
-  if (j->boolean == TRUE) g_correct++;
-  JsonRelease(j);
-  j = Ok(" false ", JSON_BOOL);
-  if (j->boolean == FALSE) g_correct++;
-  JsonRelease(j);
-  JsonRelease(Ok("null", JSON_NULL));
+    j = ok("42", json.INT);
+    if (j.intVal == 42) { gCorrect++; }
+    json.release(j);
+    j = ok("7", json.INT);       /* single digit */
+    if (j.intVal == 7) { gCorrect++; }
+    json.release(j);
+    j = ok("-12", json.INT);
+    if (j.intVal == -12) { gCorrect++; }
+    json.release(j);
+    j = ok("2.5", json.FLOAT);
+    if (j.floatVal == 2.5) { gCorrect++; }
+    json.release(j);
+    j = ok("\"text\"", json.STRING);
+    if (!str.cmp(j.str, "text")) { gCorrect++; }
+    json.release(j);
+    j = ok("\"\"", json.STRING);
+    if (!str.cmp(j.str, "")) { gCorrect++; }
+    json.release(j);
+    j = ok("true", json.BOOL);
+    if (j.boolean == true) { gCorrect++; }
+    json.release(j);
+    j = ok(" false ", json.BOOL);
+    if (j.boolean == false) { gCorrect++; }
+    json.release(j);
+    json.release(ok("null", json.NULL));
 
-  /* Non-empty objects and arrays still work, also as the last thing */
-  j = Ok("{\"a\": [1, 2]}", JSON_OBJECT);
-  if (JsonSelect(j, ".a[1]:i")->i64 == 2) g_correct++;
-  JsonRelease(j);
-  j = Ok("[{}, [], \"x\"]", JSON_ARRAY);
-  if (j->array->type == JSON_OBJECT && j->array->next->type == JSON_ARRAY) g_correct++;
-  JsonRelease(j);
-  JsonRelease(Ok("{\"a\": true}", JSON_OBJECT));
-  JsonRelease(Ok("[null]", JSON_ARRAY));
+    /* Non-empty objects and arrays still work, also as the last thing */
+    j = ok("{\"a\": [1, 2]}", json.OBJECT);
+    if (json.select(j, ".a[1]:i").intVal == 2) { gCorrect++; }
+    json.release(j);
+    j = ok("[{}, [], \"x\"]", json.ARRAY);
+    if (j.array.type == json.OBJECT && j.array.next.type == json.ARRAY) { gCorrect++; }
+    json.release(j);
+    json.release(ok("{\"a\": true}", json.OBJECT));
+    json.release(ok("[null]", json.ARRAY));
 
-  /* The explicit length is respected */
-  j = JsonParse("[1]trailing", 3);
-  if (JsonOk(j) && j->array->i64 == 1) g_correct++;
-  JsonRelease(j);
-  j = JsonParse("truex", 4);
-  if (JsonOk(j) && j->type == JSON_BOOL) g_correct++;
-  JsonRelease(j);
+    /* The explicit length is respected */
+    j = json.parse("[1]trailing", 3);
+    if (json.ok(j) && j.array.intVal == 1) { gCorrect++; }
+    json.release(j);
+    j = json.parse("truex", 4);
+    if (json.ok(j) && j.type == json.BOOL) { gCorrect++; }
+    json.release(j);
 
-  /* Still errors */
-  Bad("");
-  Bad("   ");
-  Bad("{");
-  Bad("[");
-  Bad("[1,");
-  Bad("\"abc");
-  Bad("tru");
-  Bad("nul");
-  Bad("nulx");
-  Bad("x");
+    /* Still errors */
+    bad("");
+    bad("   ");
+    bad("{");
+    bad("[");
+    bad("[1,");
+    bad("\"abc");
+    bad("tru");
+    bad("nul");
+    bad("nulx");
+    bad("x");
 
-  PrintResult(g_correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(gCorrect, tests);
+    printf("====\n");
+    return 0;
 }

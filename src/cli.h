@@ -48,9 +48,9 @@ enum CliArgType {
     CLI_RUN,
     CLI_TARGET,
     CLI_TO_STDOUT,
-    CLI_TRANSPILE,
     CLI_USE_LEGACY_X86,
     CLI_VERSION,
+    CLI_VERBOSE,
     CLI_WERROR,
 };
 
@@ -92,7 +92,6 @@ typedef struct CliArgs {
     int memsafe;
     int repl;
     int assemble;
-    int transpile;
     int to_stdout;
     int use_legacy_x86;
     int fPIC;
@@ -102,10 +101,19 @@ typedef struct CliArgs {
     char *asm_outfile;
     char *obj_outfile;
     char *lib_name;
+    /* `ktm -lib a.b dir/a/b`: build the module in dir/a/b into a library
+     * there, with a .ktmlib marker importers link it by */
+    char *module_dir;
     char *output_filename;
     char *clibs;
     char *install_dir;
     int is_cross_compile;
+    /* -v: print the commands that build a library */
+    int verbose;
+    /* `ktm -lib name dir` over a tree of modules: their paths and
+     * directories (the library is dir/lib<name>) */
+    Vec *lib_tree_paths;
+    Vec *lib_tree_dirs;
     enum CliTarget target;
     List *defines_list;
     List *object_files;

@@ -1,86 +1,81 @@
-#include "testhelper.ktm"
+import libc, net, os, test;
 
 /* Writing to a socket whose peer had closed raised SIGPIPE, which ended
  * the program, and there was no way to avoid it: no Net* send helper,
- * no MSG_NOSIGNAL and no signal(). NetSend now passes MSG_NOSIGNAL, and
+ * no MSG_NOSIGNAL and no signal(). net.send now passes MSG_NOSIGNAL, and
  * signal(SIGPIPE, SIG_IGN) is available for plain write(). Reaching the
  * end of this test at all is the main check. */
 
-extern "c" I32 socketpair(I32 d, I32 t, I32 p, I32 *sv);
+extern "c" i32 socketpair(i32 d, i32 t, i32 p, i32 *sv);
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
 /* The repro from the known-issues page: close the accepted socket, then
  * write to the client end twice */
-U0 TcpClosedPeer()
-{
-  I32 srv, cli, conn, i;
-  U32 len = sizeof(sockaddr_in);
-  I64 rv = 0;
-  sockaddr_in sa;
+void tcpClosedPeer() {
+    i32 srv, cli, conn, i;
+    u32 len = sizeof(libc.sockaddr_in);
+    i64 rv = 0;
+    libc.sockaddr_in sa;
 
-  srv = NetCreateServer(0, "127.0.0.1", 4);
-  Check(srv != -1, "NetCreateServer");
-  Check(getsockname(srv, &sa, &len) == 0, "getsockname");
-  cli = NetConnect("127.0.0.1", Ntohs(sa.sin_port));
-  Check(cli != -1, "NetConnect");
-  conn = NetAccept(srv);
-  Check(conn != -1, "NetAccept");
-  close(conn);
+    srv = net.listen(0, "127.0.0.1", 4);
+    check(srv != -1, "NetCreateServer");
+    check(libc.getsockname(srv, (libc.sockaddr *)&sa, &len) == 0, "getsockname");
+    cli = net.dial("127.0.0.1", net.ntohs(sa.sin_port));
+    check(cli != -1, "NetConnect");
+    conn = net.accept(srv);
+    check(conn != -1, "NetAccept");
+    libc.close(conn);
 
-  /* The first write may still succeed (the peer answers it with a RST),
-   * a later one fails */
-  for (i = 0; i < 50 && rv != -1; i++) {
-    rv = NetSend(cli, "x", 1);
-    if (rv != -1) poll(NULL, 0, 10);   // 10 ms
-  }
-  Check(rv == -1, "NetSend to a closed peer returns -1");
-  Check(Errno() == EPIPE || Errno() == ECONNRESET,
-      "NetSend: EPIPE or ECONNRESET");
-  close(cli);
-  close(srv);
+    /* The first write may still succeed (the peer answers it with a RST),
+     * a later one fails */
+    for (i = 0; i < 50 && rv != -1; i++) {
+        rv = net.send(cli, "x", 1);
+        if (rv != -1) { libc.poll(null, 0, 10); }   // 10 ms
+    }
+    check(rv == -1, "NetSend to a closed peer returns -1");
+    check(os.errno() == libc.EPIPE || os.errno() == libc.ECONNRESET,
+            "NetSend: EPIPE or ECONNRESET");
+    libc.close(cli);
+    libc.close(srv);
 }
 
-U0 UnixClosedPeer()
-{
-  I32 sv[2];
-  Check(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0, "socketpair");
-  Check(NetSend(sv[0], "ok", 2) == 2, "NetSend to an open peer");
-  close(sv[1]);
-  Check(NetSend(sv[0], "x", 1) == -1 && Errno() == EPIPE,
-      "NetSend to a closed peer: EPIPE");
-  /* Caller flags are kept */
-  Check(NetSend(sv[0], "x", 1, MSG_DONTWAIT) == -1 && Errno() == EPIPE,
-      "NetSend with flags: EPIPE");
-  close(sv[0]);
+void unixClosedPeer() {
+    i32 sv[2];
+    check(socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, sv) == 0, "socketpair");
+    check(net.send(sv[0], "ok", 2) == 2, "NetSend to an open peer");
+    libc.close(sv[1]);
+    check(net.send(sv[0], "x", 1) == -1 && os.errno() == libc.EPIPE,
+            "NetSend to a closed peer: EPIPE");
+    /* Caller flags are kept */
+    check(net.send(sv[0], "x", 1, libc.MSG_DONTWAIT) == -1 && os.errno() == libc.EPIPE,
+            "NetSend with flags: EPIPE");
+    libc.close(sv[0]);
 }
 
-U0 IgnoreSigpipe()
-{
-  I32 sv[2];
-  Check(signal(SIGPIPE, SIG_IGN) != SIG_ERR, "signal(SIGPIPE, SIG_IGN)");
-  Check(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0, "socketpair 2");
-  close(sv[1]);
-  Check(write(sv[0], "x", 1) == -1 && Errno() == EPIPE,
-      "write with SIGPIPE ignored: EPIPE");
-  close(sv[0]);
-  Check(signal(SIGPIPE, SIG_DFL) == SIG_IGN,
-      "signal returns the previous handler");
+void ignoreSigpipe() {
+    i32 sv[2];
+    check(libc.signal(libc.SIGPIPE, libc.SIG_IGN) != libc.SIG_ERR, "signal(SIGPIPE, SIG_IGN)");
+    check(socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, sv) == 0, "socketpair 2");
+    libc.close(sv[1]);
+    check(libc.write(sv[0], "x", 1) == -1 && os.errno() == libc.EPIPE,
+            "write with SIGPIPE ignored: EPIPE");
+    libc.close(sv[0]);
+    check(libc.signal(libc.SIGPIPE, libc.SIG_DFL) == libc.SIG_IGN,
+            "signal returns the previous handler");
 }
 
-I32 Main()
-{
-  "Test - net sigpipe: ";
-  TcpClosedPeer;
-  UnixClosedPeer;
-  IgnoreSigpipe;
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - net sigpipe: ");
+    tcpClosedPeer();
+    unixClosedPeer();
+    ignoreSigpipe();
+    test.printResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

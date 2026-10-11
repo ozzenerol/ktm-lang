@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -119,12 +120,12 @@ static CliParser parsers[] = {
     {str_lit("-lsp"),       0, CLI_LSP, "-lsp", "Run a Language Server Protocol server over stdio (for editor integration)", &cliParseNop},
     {str_lit("-o"),         1, CLI_OUTPUT_FILENAME, "-o <binary_name>", "Output filename: `-o <name> ./<file>.ktm`", &cliParseString},
     {str_lit("-o-"),        0, CLI_TO_STDOUT, "-o-", "Output assembly to stdout, only for use with -S", &cliParseNop},
-    {str_lit("-transpile"), 0, CLI_TRANSPILE, "-transpile", "Transpile the code to C (experimental, frozen: no new features)", &cliParseNop},
     {str_lit("--target"),   0, CLI_TARGET, "--target", "Select the target, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu` this follows llvm style target triples", &cliParseString},
     {str_lit("--install-dir"), 1, CLI_INSTALL_DIR, "--install-dir <path>", "Override the install prefix (header dir = <path>/include, lib dir = <path>/lib). Defaults to /usr/local.", &cliParseString},
     {str_lit("-D"),         0, CLI_DEFINES_LIST, "-D<VAR>", "Set a compiler #define (does not accept a value)", &cliParseDefine},
     {str_lit("--dump-ir"),  0, CLI_DUMP_IR, "--dump-ir", "Dump ir to stdout" , &cliParseNop},
     {str_lit("--mem-stats"),  0, CLI_MEM_STATS, "--mem-stats", "Stats about memory usage when compiling" , &cliParseNop},
+    CliNopParser("-v", CLI_VERBOSE, "-v print the commands that build a library (-lib)"),
     {str_lit("--version"),  0, CLI_VERSION, "--version", "Print the version of the compiler", &cliParseNop},
     {str_lit("--help"),     0, CLI_HELP, "--help", "Print this message", &cliParseNop},
     {str_lit("--use-legacy-x86"), 0, CLI_USE_LEGACY_X86, "--use-legacy-x86", "Removed in v0.4.0: the legacy x86_64 codegen is gone, ktm reports an error.", &cliParseNop},
@@ -418,6 +419,12 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             /* A clean break from the old extensions: as the input file
              * they're an error (after it, they are the program's own
              * arguments, like any other word). */
+            struct stat st;
+            if (file_type == FT_INVALID && !args->infile && !args->module_dir &&
+                stat(arg, &st) == 0 && S_ISDIR(st.st_mode)) {
+                args->module_dir = mprintf("%s", arg);
+                continue;
+            }
             if (file_type == FT_OLD_SOURCE && !args->infile) {
                 fprintf(stderr, "ktm: `%s`: ktm sources use .ktm (headers .ktmh)\n", arg);
                 exit(EXIT_FAILURE);
@@ -470,13 +477,13 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             }
             case CLI_EMIT_OBJECT:        args->emit_object = 1; break;
             case CLI_fPIC:               args->fPIC = 1; break;
+            case CLI_VERBOSE:            args->verbose = 1; break;
             case CLI_RUN:                args->run = 1; break;
             case CLI_JIT:                args->jit = 1; break;
             case CLI_MEMSAFE:            args->memsafe = 1; break;
             case CLI_REPL:               args->repl = 1; break;
             case CLI_LSP:                args->lsp = 1; break;
             case CLI_ASSEMBLE:           args->assemble = 1; break;
-            case CLI_TRANSPILE:          args->transpile = 1; break;
             case CLI_TO_STDOUT:          args->to_stdout = 1; break;
             case CLI_OUTPUT_FILENAME:    args->output_filename = mprintf("%s", value.str); break;
             case CLI_CLIBS:              args->clibs = mprintf("%s", value.str); break;
@@ -535,6 +542,17 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
         cliPanic("Unknown commandline options: %s\n", s->data);
     }
 
+    if (args->module_dir) {
+        if (!args->emit_dylib) {
+            cliPanic("a module directory (%s) is built with -lib <module>, "
+                     "as in `ktm -lib net.http lib/net/http`\n", args->module_dir);
+        }
+        args->infile = args->module_dir;
+        args->infile_no_ext = mprintf("lib%s", args->lib_name);
+        args->asm_outfile = mprintf("%s/lib%s.s", args->module_dir, args->lib_name);
+        args->obj_outfile = mprintf("%s/lib%s.o", args->module_dir, args->lib_name);
+    }
+
     /* The REPL and the LSP read from stdin - the two modes with no
      * input file. */
     if (args->infile == NULL && !args->repl && !args->lsp) {
@@ -548,6 +566,7 @@ void cliArgsInit(CliArgs *args) {
     args->clibs = "";
     args->defines_list = NULL;
     args->object_files = NULL;
+    args->module_dir = NULL;
     args->shared_object_files = NULL;
     args->argv = listNew();
 

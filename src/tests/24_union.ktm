@@ -1,115 +1,106 @@
-#include "testhelper.ktm"
+import mem, str, test;
 
-class BaseClass
-{
-  I64 base;
-  U8 *base_name;
+struct BaseClass {
+    i64 base;
+    u8 *baseName;
 };
 
-class SuperClass:BaseClass
-{
-  I64 super;
-  U8 *super_name;
+struct SuperClass:BaseClass {
+    i64 super;
+    u8 *superName;
 };
 
-Bool TestInheritanceOneLevel()
-{
-  I64 correct = 0, tests = 4;
-  SuperClass *s = MAlloc(sizeof(SuperClass));
+bool testInheritanceOneLevel() {
+    i64 correct = 0, tests = 4;
+    SuperClass *s = mem.alloc(sizeof(SuperClass));
 
-  s->base = 420;
-  s->base_name = "base_class";
-  s->super = 69;
-  s->super_name = "super_name";
+    s.base = 420;
+    s.baseName = "base_class";
+    s.super = 69;
+    s.superName = "super_name";
 
-  if (!StrCmp(s->base_name,"base_class")) correct++;
-  if (s->base == 420) correct++;
-  if (!StrCmp(s->super_name,"super_name")) correct++;
-  if (s->super == 69) correct++;
+    if (!str.cmp(s.baseName,"base_class")) { correct++; }
+    if (s.base == 420) { correct++; }
+    if (!str.cmp(s.superName,"super_name")) { correct++; }
+    if (s.super == 69) { correct++; }
 
-  Free(s);
-  return correct == tests;
+    mem.free(s);
+    return correct == tests;
 }
 
-public class Another:SuperClass
-{
-  I64 another;
-  U8 *another_name;
+pub struct Another:SuperClass {
+    i64 another;
+    u8 *anotherName;
 };
 
-Bool TestInheritanceTwoLevels()
-{
-  I64 correct = 0, tests = 6;
-  Another *a = MAlloc(sizeof(Another)); 
+bool testInheritanceTwoLevels() {
+    i64 correct = 0, tests = 6;
+    Another *a = mem.alloc(sizeof(Another)); 
 
-  a->base = 420;
-  a->base_name = "base_class";
-  a->super = 69;
-  a->super_name = "super_name";
-  a->another = 42;
-  a->another_name = "another_name";
+    a.base = 420;
+    a.baseName = "base_class";
+    a.super = 69;
+    a.superName = "super_name";
+    a.another = 42;
+    a.anotherName = "another_name";
 
-  if (a->base == 420) correct++;
-  if (!StrCmp(a->base_name,"base_class")) correct++;
+    if (a.base == 420) { correct++; }
+    if (!str.cmp(a.baseName,"base_class")) { correct++; }
 
-  if (a->super == 69) correct++;
-  if (!StrCmp(a->super_name,"super_name")) correct++;
+    if (a.super == 69) { correct++; }
+    if (!str.cmp(a.superName,"super_name")) { correct++; }
 
-  if (a->another == 42) correct++;
-  if (!StrCmp(a->another_name,"another_name")) correct++;
+    if (a.another == 42) { correct++; }
+    if (!str.cmp(a.anotherName,"another_name")) { correct++; }
 
-  Free(a);
-  return correct == tests;
+    mem.free(a);
+    return correct == tests;
 }
 
-class UnionClass 
-{
-  I64 type;
-  union {
-    U8 *name;
-    Bool is_ok;
-  };
-};
-
-union Cat
-{
-  U8 *fish;
-  I64 is;
-};
-
-Bool TestSimpleUnion()
-{
-  I64 correct = 0, tests = 2;
-  UnionClass *u = MAlloc(sizeof(UnionClass));
-  Cat cat;
-  u->type = 0;
-  u->name = "Foo";
-
-  cat.fish = "food";
-  if (!StrCmp(cat.fish,"food")) {
-    correct++;
-  }
-
-  if (!StrCmp(u->name,"Foo")) {
-    correct++;
-  }
-  Free(u);
-  return correct == tests;
-}
-
-class UnionClass2
-{
-  I64 type;
-  union {
-    class {
-      U8 *name;
-      I64 age;
+struct UnionClass {
+    i64 type;
+    union {
+        u8 *name;
+        bool isOk;
     };
-    class {
-      U8 *car;
-      I64 milage;
+};
+
+union Cat {
+    u8 *fish;
+    i64 is;
+};
+
+bool testSimpleUnion() {
+    i64 correct = 0, tests = 2;
+    UnionClass *u = mem.alloc(sizeof(UnionClass));
+    Cat cat;
+    u.type = 0;
+    u.name = "Foo";
+
+    cat.fish = "food";
+    if (!str.cmp(cat.fish,"food")) {
+        correct++;
+    }
+
+    if (!str.cmp(u.name,"Foo")) {
+        correct++;
+    }
+    mem.free(u);
+    return correct == tests;
+}
+
+struct UnionClass2 {
+    i64 type;
+    union {
+        struct {
+            u8 *name;
+            i64 age;
+        };
+        struct {
+            u8 *car;
+            i64 milage;
+        };
     };
-  };
 };
 
 /**
@@ -119,37 +110,34 @@ class UnionClass2
  * accessing a member of one references the other. ie:
  * car == name and age == milage
  */
-Bool TestComplexUnion()
-{
-  I64 correct = 0, tests = 4;
-  UnionClass2 *u = MAlloc(sizeof(UnionClass2));
-  u->name = "Brian";
-  u->age = 46;
+bool testComplexUnion() {
+    i64 correct = 0, tests = 4;
+    UnionClass2 *u = mem.alloc(sizeof(UnionClass2));
+    u.name = "Brian";
+    u.age = 46;
 
-  if (!StrCmp(u->name,"Brian") && u->age == 46) correct++;
-  /* This is how unions work, despite it looking weird*/
-  if (!StrCmp(u->car,"Brian") && u->milage == 46) correct++;
+    if (!str.cmp(u.name,"Brian") && u.age == 46) { correct++; }
+    /* This is how unions work, despite it looking weird*/
+    if (!str.cmp(u.car,"Brian") && u.milage == 46) { correct++; }
 
-  u->car = "Suzuki";
-  u->milage = 17;
+    u.car = "Suzuki";
+    u.milage = 17;
 
-  if (!StrCmp(u->car,"Suzuki") && u->milage == 17) correct++;
-  if (!StrCmp(u->name,"Suzuki") && u->age == 17) correct++;
+    if (!str.cmp(u.car,"Suzuki") && u.milage == 17) { correct++; }
+    if (!str.cmp(u.name,"Suzuki") && u.age == 17) { correct++; }
 
-  Free(u);
-  return correct == tests;
+    mem.free(u);
+    return correct == tests;
 }
 
-
-I32 Main()
-{
-  I64 correct = 0, tests = 4;
-  "Test: Union and class inheritance: ";
-  if (TestInheritanceOneLevel()) correct++;
-  if (TestInheritanceTwoLevels()) correct++;
-  if (TestSimpleUnion()) correct++;
-  if (TestComplexUnion()) correct++;
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+i32 main() {
+    i64 correct = 0, tests = 4;
+    printf("Test: Union and class inheritance: ");
+    if (testInheritanceOneLevel()) { correct++; }
+    if (testInheritanceTwoLevels()) { correct++; }
+    if (testSimpleUnion()) { correct++; }
+    if (testComplexUnion()) { correct++; }
+    test.printResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

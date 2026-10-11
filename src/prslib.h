@@ -6,7 +6,11 @@
 Ast *parseUnaryExpr(Cctrl *cc);
 Ast *parseExpr(Cctrl *cc, int prec);
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator);
+Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code);
+int parseIsErrorType(AstType *type);
 Ast *parsePrintStatement(Cctrl *cc);
+Ast *parsePrintCall(Cctrl *cc, s64 terminator);
+Ast *parseCallArguments(Cctrl *cc, char *name, int len);
 Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store);
 void parseDeclInternal(Cctrl *cc, Lexeme **tok, AstType **type);
 void parseAssignAuto(Cctrl *cc, Ast *ast);
@@ -19,8 +23,16 @@ AstType *parseFullType(Cctrl *cc);
 Ast *parseFunctionPointer(Cctrl *cc, AstType *rettype);
 AstType *parseFunctionPointerType(Cctrl *cc,
         char **fnptr_name, int *fnptr_name_len, AstType *rettype);
+int tokenIsFnIdent(Lexeme *tok);
+int parseIsReservedName(char *s, int len);
+int parseCheckNotReserved(Cctrl *cc, Lexeme *tok);
+int tokenMayStartFnType(Lexeme *tok);
+int parseFnStartsType(Cctrl *cc);
+int parseFnLooksLikeType(Cctrl *cc);
+AstType *parseFnType(Cctrl *cc);
 Ast *findFunctionDecl(Cctrl *cc, char *fname, int len);
 Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right);
+void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual);
 Ast *parseSizeof(Cctrl *cc);
 Ast *parseAlignof(Cctrl *cc);
 Ast *parseTypeof(Cctrl *cc);

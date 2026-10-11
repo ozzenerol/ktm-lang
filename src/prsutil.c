@@ -176,7 +176,7 @@ AstType *parseGetType(Cctrl *cc, Lexeme *tok) {
 }
 
 int parseIsKeyword(Lexeme *tok, Cctrl *cc) {
-    return cctrlIsKeyword(cc,tok->start,tok->len) || NULL;
+    return cctrlTokIsKeyword(cc, tok) || NULL;
 }
 
 int evalClassRef(Ast *ast, int offset) {
@@ -213,7 +213,7 @@ int astCanEval(Ast *ast, int *_ok, int is_float) {
                astCanEval(ast->right, _ok,is_float);
     } else if (astIsArithmetic(ast, is_float)) {
         return 1;
-    } else if (ast->kind == AST_LITERAL && (astIsIntType(ast->type) || astIsFloatType(ast->type))) {
+    } else if (ast->kind == AST_LITERAL && (astIsIntOrIntrinsic(ast->type) || astIsFloatType(ast->type))) {
         return 1;
     } else {
         *_ok = 0;
@@ -235,9 +235,15 @@ static s64 evalIntCast(s64 value, AstType *to) {
     return value;
 }
 
+static int evalIsTrue(Ast *ast, int *_ok);
+
 double evalFloatExprOrErr(Ast *ast, int *_ok) {
 #define eval evalFloatExprOrErr
     switch (ast->kind) {
+        case AST_TERNARY:
+            /* Only the chosen branch is evaluated, as at runtime. */
+            return evalIsTrue(ast->cond, _ok) ? eval(ast->then, _ok)
+                                              : eval(ast->els, _ok);
         case AST_CAST: {
             double value;
             if (!astIsFloatType(ast->type)) {
@@ -321,7 +327,7 @@ s64 evalIntArithmeticOrErr(Ast *ast, int *_ok) {
 
     switch (ast->kind) {
         case AST_LITERAL: {
-            if (astIsIntType(ast->type)) {
+            if (astIsIntOrIntrinsic(ast->type)) {
                 return ast->i64;
             } else if (astIsFloatType(ast->type)) {
                 return (long)ast->f64;
@@ -425,6 +431,11 @@ static s64 evalIntDivMod(Ast *ast, int *_ok) {
 
 s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
     switch (ast->kind) {
+        case AST_TERNARY:
+            /* Only the chosen branch is evaluated, as at runtime. */
+            return evalIsTrue(ast->cond, _ok)
+                 ? evalIntConstExprOrErr(ast->then, _ok)
+                 : evalIntConstExprOrErr(ast->els, _ok);
         case AST_CAST: {
             /* To Bool: 0 or 1, as in C (0.5(Bool) and 0x100(Bool) are 1) */
             if (ast->type && ast->type->is_bool) {
@@ -439,7 +450,7 @@ s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
             return evalIntCast(value, ast->type);
         }
         case AST_LITERAL: {
-            if (astIsIntType(ast->type)) {
+            if (astIsIntOrIntrinsic(ast->type)) {
                 return ast->i64;
             } else if (astIsFloatType(ast->type)) {
                 return (long)ast->f64;
@@ -447,6 +458,19 @@ s64 evalIntConstExprOrErr(Ast *ast, int *_ok) {
                 *_ok = 0;
                 return 0;
             }
+        }
+        case AST_GVAR:
+        case AST_LVAR: {
+            /* A `const` integer whose own initialiser folded to a
+             * constant: see AST_FLAG_CONST_VALUE's comment in ast.h.
+             * A `const` with a runtime initialiser is not constant
+             * (it reaches here and falls through to *_ok = 0, the same
+             * as any other variable). */
+            if (ast->flags & AST_FLAG_CONST_VALUE) {
+                return ast->deref_symbol;
+            }
+            *_ok = 0;
+            return 0;
         }
         case AST_UNOP: {
             switch (ast->unop) {
@@ -593,6 +617,46 @@ int assertLValue(Ast *ast) {
     }
 }
 
+/* `ast` is not an lvalue: a plain diagnostic, unless it is an enum
+ * member (`Name.member = x`), which gets a message naming it. Member
+ * literals are interned per name, so pointer identity finds which one.
+ * Reported at `cc`'s current position without unwinding. */
+void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
+    if (ast->kind == AST_LITERAL && ast->type &&
+        ast->type->kind == AST_TYPE_CLASS && ast->type->is_enum &&
+        ast->type->enum_members)
+    {
+        MapIter it;
+        mapIterInit(ast->type->enum_members, &it);
+        while (mapIterNext(&it)) {
+            if (it.node->value == ast) {
+                cctrlRaiseException(cc,"Cannot assign to enum member `%s.%s`",
+                        ast->type->clsname ? ast->type->clsname->data
+                                           : "<anonymous>",
+                        (char *)it.node->key);
+            }
+        }
+    }
+    char *ast_str = astLValueToString(ast,0);
+    cctrlRaiseException(cc,"Expected an L-Value however got a %s - `%s`",
+            astKindToHumanReadable(ast), ast_str);
+}
+
+/* `ast` is about to be written to (`=`, a compound assignment, `++`,
+ * `--`): error out if it is a `const` variable or parameter. */
+void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    if (ast->kind == AST_LVAR && (ast->flags & AST_FLAG_VARARGS)) {
+        cctrlRaiseException(cc,"cannot assign to the variadic parameter '%s'",
+                            ast->lname->data);
+    }
+    if ((ast->kind == AST_LVAR || ast->kind == AST_GVAR) &&
+        (ast->flags & AST_FLAG_CONST))
+    {
+        char *name = ast->kind == AST_LVAR ? ast->lname->data : ast->gname->data;
+        cctrlRaiseException(cc,"cannot assign to const '%s'", name);
+    }
+}
+
 void assertUniqueSwitchCaseLabels(Cctrl *cc, Vec *case_vector, Ast *case_) {
     for (u64 i = 0; i < case_vector->size; ++i) {
         Ast *cur = case_vector->entries[i];
@@ -624,7 +688,7 @@ void typeCheckWarn(Cctrl *cc, int op_line, int op_col, Ast *expected,
 
     s64 len = 1;
     if (cc->lexer_ && op_col > 0) {
-        char *line_buffer = lexerReportLine(cc->lexer_, op_line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), op_line);
         s64 start = op_col - 1, end = start;
         if (start < (s64)strlen(line_buffer)) {
             while (line_buffer[end] && line_buffer[end] != ';') end++;
@@ -682,6 +746,37 @@ int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
     return 1;
 }
 
+/* A scoped enum is like C++'s `enum class`: `++`, `--` and a compound
+ * assignment (`+=`, `|=`, ...) are all errors, not just an integer
+ * assigned to it without a cast. Plain `c = Color.green` and
+ * `c = (Color)(c + 1)` stay fine. Reported at the operator without
+ * unwinding. Returns 1 if `lhs` is an enum. */
+int assertNotEnumArithAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                             int op_len)
+{
+    if (!lhs || !lhs->type || lhs->type->kind != AST_TYPE_CLASS ||
+        !lhs->type->is_enum)
+    {
+        return 0;
+    }
+    char *name = astLValueToString(lhs,0);
+    char *msg = mprintf(
+            "Cannot do arithmetic assignment on enum `%s`, cast it: `%s`",
+            lhs->type->clsname ? lhs->type->clsname->data : "<anonymous>",
+            name);
+    AoStr *bold = aoStrNew();
+    aoStrCatColoured(bold, ESC_BOLD, msg);
+    AoStr *buf = cctrlCreateErrorLineAt(cc, op_line, op_col, op_len, bold->data,
+                                        CCTRL_ERROR, NULL);
+    aoStrRelease(bold);
+    CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+    d->line = d->end_line = op_line;
+    d->col = op_col;
+    d->end_col = op_col + op_len;
+    cctrlDiagPush(cc, d);
+    return 1;
+}
+
 /* `return retval;` in a function whose return type `retval` doesn't
  * suit. `ret_tok` is the `return` and `semi_tok` the `;`: when they are on
  * the same line the expression is shown as written, from after the
@@ -707,7 +802,7 @@ void typeCheckReturnTypeWarn(Cctrl *cc, Ast *maybe_func,
     if (cc->lexer_ && semi_tok && semi_tok->line == ret_tok->line &&
         semi_tok->col > ret_tok->col + ret_tok->len)
     {
-        char *line_buffer = lexerReportLine(cc->lexer_, ret_tok->line);
+        char *line_buffer = lexerReportLineIn(cctrlCurFile(cc), ret_tok->line);
         s64 start = ret_tok->col - 1 + ret_tok->len;
         s64 end = semi_tok->col - 1;
         if (end <= (s64)strlen(line_buffer)) {

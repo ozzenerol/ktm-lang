@@ -1,55 +1,54 @@
-#include "testhelper.ktm"
+import json, mem, str, test;
 
-/* JsonToString on a node from JsonSelect also printed the nodes after it
+/* json.toStr on a node from json.select also printed the nodes after it
  * and its key ("b": 2,"c": 3 for .b). It now serialises only that node's
  * value; a whole document prints as before. */
 
-Bool Is(Json *n, U8 *want)
-{
-  U8 *s = JsonToString(n);
-  Bool ok = !StrCmp(s, want);
-  if (!ok) "got %s, want %s\n", s, want;
-  Free(s);
-  return ok;
+bool is(json.Value *n, u8 *want) {
+    u8 *s = json.toStr(n);
+    bool ok = !str.cmp(s, want);
+    if (!ok) { printf("got %s, want %s\n", s, want); }
+    mem.free(s);
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  "Test - JsonToString single node: ";
-  Json *d = JsonParse("{\"a\": 1, \"b\": [2, {\"x\": null}, \"s\"], \"c\": {\"k\": true}, \"d\": 1.5}");
+i32 main() {
+    i64 correct = 0, tests = 0;
+    printf("Test - JsonToString single node: ");
+    json.Value *d = json.parse("{\"a\": 1, \"b\": [2, {\"x\": null}, \"s\"], \"c\": {\"k\": true}, \"d\": 1.5}");
 
-  tests++;
-  if (Is(d, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) correct++;
+    tests++;
+    if (is(d, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) { correct++; }
 
-  tests++;
-  if (Is(JsonSelect(d, ".a"), "1") && Is(JsonSelect(d, ".b"), "[2,{\"x\": null},\"s\"]") &&
-      Is(JsonSelect(d, ".b[0]"), "2") && Is(JsonSelect(d, ".b[1]"), "{\"x\": null}") &&
-      Is(JsonSelect(d, ".b[2]"), "\"s\"") && Is(JsonSelect(d, ".c"), "{\"k\": true}") &&
-      Is(JsonSelect(d, ".c.k"), "true") && Is(JsonSelect(d, ".d"), "1.5") &&
-      Is(JsonSelect(d, ".b[1].x"), "null")) correct++;
+    tests++;
+    if (is(json.select(d, ".a"), "1") && is(json.select(d, ".b"), "[2,{\"x\": null},\"s\"]") &&
+            is(json.select(d, ".b[0]"), "2") && is(json.select(d, ".b[1]"), "{\"x\": null}") &&
+            is(json.select(d, ".b[2]"), "\"s\"") && is(json.select(d, ".c"), "{\"k\": true}") &&
+            is(json.select(d, ".c.k"), "true") && is(json.select(d, ".d"), "1.5") &&
+            is(json.select(d, ".b[1].x"), "null")) { correct++; }
 
-  /* the selected node is left as it was */
-  Json *b = JsonSelect(d, ".b");
-  U8 *again = JsonToString(d);
-  tests++;
-  if (b->next && !StrCmp(b->key, "b") &&
-      !StrCmp(again, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}"))
-    correct++;
-  Free(again);
+    /* the selected node is left as it was */
+    json.Value *b = json.select(d, ".b");
+    u8 *again = json.toStr(d);
+    tests++;
+    if (b.next && !str.cmp(b.key, "b") &&
+            !str.cmp(again, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) {
+        correct++;
+            }
+    mem.free(again);
 
-  /* top-level arrays and scalars */
-  Json *arr = JsonParse("[[1, 2], [], {}]");
-  Json *num = JsonParse("42");
-  tests++;
-  if (Is(arr, "[[1,2],[],{}]") && Is(JsonSelect(arr, "[0]"), "[1,2]") &&
-      Is(JsonSelect(arr, "[1]"), "[]") && Is(JsonSelect(arr, "[2]"), "{}") &&
-      Is(num, "42")) correct++;
+    /* top-level arrays and scalars */
+    json.Value *arr = json.parse("[[1, 2], [], {}]");
+    json.Value *num = json.parse("42");
+    tests++;
+    if (is(arr, "[[1,2],[],{}]") && is(json.select(arr, "[0]"), "[1,2]") &&
+            is(json.select(arr, "[1]"), "[]") && is(json.select(arr, "[2]"), "{}") &&
+            is(num, "42")) { correct++; }
 
-  JsonRelease(arr);
-  JsonRelease(num);
-  JsonRelease(d);
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    json.release(arr);
+    json.release(num);
+    json.release(d);
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

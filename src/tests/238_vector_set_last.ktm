@@ -1,121 +1,116 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test, vec;
 
-/* New vector functions: IntVecSet/FloatVecSet/PtrVecSet (bounds checked
+/* New vector functions: vec.intSet/vec.floatSet/vec.ptrSet (bounds checked
  * like Get: an index outside [0, size) prints an error and exits 1) and
- * IntVecLast/FloatVecLast/PtrVecLast (peek; sentinel -1 / -1.0 / NULL and
- * *_ok = FALSE when empty). */
+ * vec.intLast/vec.floatLast/vec.ptrLast (peek; sentinel -1 / -1.0 / null and
+ * *_ok = false when empty). */
 
 #define VS_FILE "__238_vecset.ktm"
 #define VS_OUT  "__238_vecset.out"
 #define VS_BIN  "__238_vecset.bin"
 
-U0 CleanupFiles()
-{
-  Rm(VS_FILE);
-  Rm(VS_OUT);
-  Rm(VS_BIN);
+void cleanupFiles() {
+    fs.remove(VS_FILE);
+    fs.remove(VS_OUT);
+    fs.remove(VS_BIN);
 }
 
-Bool RunExpectingExit(U8 *src, U8 *expected)
-{
-  CleanupFiles;
-  if (!FileWrite(VS_FILE, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  I64 res = System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
-                   "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                   VS_FILE " -o " VS_BIN " > " VS_OUT " 2>&1 && "
-                   "./" VS_BIN " 2> " VS_OUT " >/dev/null; exit $?");
-  U8 *out = FileRead(VS_OUT);
-  Bool ok = out && res == 1 && strstr(out, expected) != NULL &&
-            strstr(out, "unreachable") == NULL;
-  if (!ok) "status %d, output: %s\n", res, out;
-  Free(out);
-  CleanupFiles;
-  return ok;
+bool runExpectingExit(u8 *src, u8 *expected) {
+    cleanupFiles();
+    if (!fs.writeAll(VS_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                                     VS_FILE " -o " VS_BIN " > " VS_OUT " 2>&1 && "
+                                     "./" VS_BIN " 2> " VS_OUT " >/dev/null; exit $?");
+    u8 *out = fs.readAll(VS_OUT);
+    bool ok = out && res == 1 && libc.strstr(out, expected) != null &&
+                        libc.strstr(out, "unreachable") == null;
+    if (!ok) { printf("status %d, output: %s\n", res, out); }
+    mem.free(out);
+    cleanupFiles();
+    return ok;
 }
 
-I64 g_seed = 3;
-I64 NextRand()
-{
-  g_seed = (g_seed * 6364136223846793005 + 1442695040888963407);
-  return (g_seed >> 33) & 0x7FFFFFFF;
+i64 gSeed = 3;
+i64 nextRand() {
+    gSeed = (gSeed * 6364136223846793005 + 1442695040888963407);
+    return (gSeed >> 33) & 0x7FFFFFFF;
 }
 
 /* Random push/pop/set/last against an array model, all three types */
-Bool ModelRun(I64 ops)
-{
-  I64 model[2048];
-  I64 n = 0;
-  IntVec *iv = IntVecNew(1);
-  FloatVec *fv = FloatVecNew(1);
-  PtrVec *pv = PtrVecNew(1);
-  Bool ok = TRUE, has;
-  for (I64 op = 0; op < ops && ok; ++op) {
-    I64 r = NextRand() % 10, x = NextRand() % 100000;
-    if (r < 4 && n < 2048) {
-      IntVecPush(iv, x);
-      FloatVecPush(fv, x(F64) / 4.0);
-      PtrVecPush(pv, x(U0 *));
-      model[n++] = x;
-    } else if (r < 6 && n > 0) {
-      n--;
-      IntVecPop(iv, &has);
-      FloatVecPop(fv, &has);
-      PtrVecPop(pv, &has);
-    } else if (r < 9 && n > 0) {
-      I64 idx = NextRand() % n;
-      IntVecSet(iv, idx, x);
-      FloatVecSet(fv, idx, x(F64) / 4.0);
-      PtrVecSet(pv, idx, x(U0 *));
-      model[idx] = x;
+bool modelRun(i64 ops) {
+    i64 model[2048];
+    i64 n = 0;
+    vec.IntVec *iv = vec.intNew(1);
+    vec.FloatVec *fv = vec.floatNew(1);
+    vec.PtrVec *pv = vec.ptrNew(1);
+    bool ok = true, has;
+    for (i64 op = 0; op < ops && ok; ++op) {
+        i64 r = nextRand() % 10, x = nextRand() % 100000;
+        if (r < 4 && n < 2048) {
+            iv.push(x);
+            fv.push((f64)x / 4.0);
+            pv.push((void *)x);
+            model[n++] = x;
+        } else if (r < 6 && n > 0) {
+            n--;
+            iv.pop(&has);
+            fv.pop(&has);
+            pv.pop(&has);
+        } else if (r < 9 && n > 0) {
+            i64 idx = nextRand() % n;
+            iv.set(idx, x);
+            fv.set(idx, (f64)x / 4.0);
+            pv.set(idx, (void *)x);
+            model[idx] = x;
+        }
+        if (n > 0) {
+            i64 last = model[n - 1];
+            ok = iv.last(&has) == last && has &&
+                     fv.last() == (f64)last / 4.0 && (i64)pv.last() == last;
+            i64 idx = nextRand() % n;
+            ok = ok && iv.get(idx) == model[idx] &&
+                     fv.get(idx) == (f64)model[idx] / 4.0 &&
+                     (i64)pv.get(idx) == model[idx];
+        } else {
+            ok = iv.last(&has) == -1 && !has;
+            ok = ok && fv.last(&has) == -1.0 && !has;
+            ok = ok && pv.last(&has) == null && !has;
+        }
+        ok = ok && iv.size == n && fv.size == n && pv.size == n;
     }
-    if (n > 0) {
-      I64 last = model[n - 1];
-      ok = IntVecLast(iv, &has) == last && has &&
-           FloatVecLast(fv) == last(F64) / 4.0 && PtrVecLast(pv)(I64) == last;
-      I64 idx = NextRand() % n;
-      ok = ok && IntVecGet(iv, idx) == model[idx] &&
-           FloatVecGet(fv, idx) == model[idx](F64) / 4.0 &&
-           PtrVecGet(pv, idx)(I64) == model[idx];
-    } else {
-      ok = IntVecLast(iv, &has) == -1 && !has;
-      ok = ok && FloatVecLast(fv, &has) == -1.0 && !has;
-      ok = ok && PtrVecLast(pv, &has) == NULL && !has;
-    }
-    ok = ok && iv->size == n && fv->size == n && pv->size == n;
-  }
-  IntVecRelease(iv);
-  FloatVecRelease(fv);
-  PtrVecRelease(pv);
-  return ok;
+    iv.release();
+    fv.release();
+    pv.release();
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  "Test - vector set and last: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    printf("Test - vector set and last: ");
 
-  tests++; if (ModelRun(20000)) correct++;
-  else "model mismatch\n";
+    tests++; if (modelRun(20000)) { correct++; }
+    else { printf("model mismatch\n"); }
 
-  tests++;
-  if (RunExpectingExit(
-"I32 Main() { IntVec *v = IntVecNew(); IntVecPush(v, 1);\n"
-"  IntVecSet(v, 1, 5); \"unreachable\\n\"; return 0; }\n",
-      "IntVecSet: index 1 out of range (size 1)")) correct++;
-  tests++;
-  if (RunExpectingExit(
-"I32 Main() { FloatVec *v = FloatVecNew();\n"
-"  FloatVecSet(v, 0, 1.0); \"unreachable\\n\"; return 0; }\n",
-      "FloatVecSet: index 0 out of range (size 0)")) correct++;
-  tests++;
-  if (RunExpectingExit(
-"I32 Main() { PtrVec *v = PtrVecNew(); PtrVecPush(v, NULL);\n"
-"  PtrVecSet(v, -3, NULL); \"unreachable\\n\"; return 0; }\n",
-      "PtrVecSet: index -3 out of range (size 1)")) correct++;
+    tests++;
+    if (runExpectingExit(
+"import vec;\n\ni32 main() { vec.IntVec *v = vec.intNew(); v.push(1);\n"
+"  v.set(1, 5); printf(\"unreachable\\n\"); return 0; }\n",
+            "IntVecSet: index 1 out of range (size 1)")) { correct++; }
+    tests++;
+    if (runExpectingExit(
+"import vec;\n\ni32 main() { vec.FloatVec *v = vec.floatNew();\n"
+"  v.set(0, 1.0); printf(\"unreachable\\n\"); return 0; }\n",
+            "FloatVecSet: index 0 out of range (size 0)")) { correct++; }
+    tests++;
+    if (runExpectingExit(
+"import vec;\n\ni32 main() { vec.PtrVec *v = vec.ptrNew(); v.push(null);\n"
+"  v.set(-3, null); printf(\"unreachable\\n\"); return 0; }\n",
+            "PtrVecSet: index -3 out of range (size 1)")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

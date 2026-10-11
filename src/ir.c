@@ -69,15 +69,55 @@ static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
                                     IrValueType ret_type, int ret_size,
                                     IrValue *arg);
 
+void irLowerAst(IrCtx *ctx, Ast *ast);
+
 /* A jump to code that is inside only the outer `depth` try bodies of
  * the current ones pops the catch frames of the others. They are a
  * stack, so restoring the chain to what it was before the outermost
- * one we leave pops them all. */
+ * one we leave pops them all.
+ *
+ * A `defer` reached in a block is on the same stack (see irLowerDefer).
+ * When one is left, the frames are popped one at a time, innermost
+ * first, and each deferred statement runs right after its own frame is
+ * popped, so a throw from it goes on to the frames further out. */
 static void irLeaveTries(IrCtx *ctx, u16 depth) {
-    if (ctx->try_depth > depth) {
-        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
-                            IR_TYPE_VOID, 8, ctx->try_frames[depth]);
+    if (ctx->try_depth <= depth) return;
+
+    int has_defer = 0;
+    for (u16 i = depth; i < ctx->try_depth; ++i) {
+        if (ctx->try_stack[i]->kind == AST_DEFER) {
+            has_defer = 1;
+            break;
+        }
     }
+    if (!has_defer) {
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
+                            IR_TYPE_VOID, 8, ctx->try_frames[depth]);
+        return;
+    }
+
+    /* A try in a deferred statement reuses the stack slots from its
+     * depth up: keep the entries, code after this jump still needs them */
+    u16 saved_depth = ctx->try_depth;
+    Ast *saved_stack[IR_TRY_STACK_MAX];
+    IrValue *saved_frames[IR_TRY_STACK_MAX];
+    memcpy(saved_stack, ctx->try_stack, sizeof(saved_stack));
+    memcpy(saved_frames, ctx->try_frames, sizeof(saved_frames));
+
+    for (u16 i = saved_depth; i-- > depth; ) {
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
+                            IR_TYPE_VOID, 8, saved_frames[i]);
+        if (saved_stack[i]->kind == AST_DEFER) {
+            ctx->try_depth = i;
+            ctx->defer_lowering++;
+            irLowerAst(ctx, saved_stack[i]->defer_stmt);
+            ctx->defer_lowering--;
+        }
+    }
+
+    memcpy(ctx->try_stack, saved_stack, sizeof(saved_stack));
+    memcpy(ctx->try_frames, saved_frames, sizeof(saved_frames));
+    ctx->try_depth = saved_depth;
 }
 
 /* Collapse something that looks like `a.b.c` or `p->a.b`*/
@@ -444,18 +484,26 @@ static void irEmitMemset(IrCtx *ctx, IrValue *dst, int n_bytes) {
  * asmNormaliseFunctionName adds the leading underscore at emit time.
  * Returns the call's dst tmp (for the I64-returning variant) or
  * NULL for the void variant. */
-static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
+static IrValue *irEmitRuntimeCallN(IrCtx *ctx, const char *fname,
                                     IrValueType ret_type, int ret_size,
-                                    IrValue *arg) {
+                                    int argc, IrValue **argv) {
     IrValue *args_wrap = irValueNew(IR_TYPE_ARRAY, IR_VAL_UNRESOLVED);
     args_wrap->as.array.label = aoStrPrintf("%s", fname);
     Vec *args = irValueVecNew();
     args_wrap->as.array.values = args;
-    vecPush(args, arg);
+    for (int i = 0; i < argc; ++i) {
+        vecPush(args, argv[i]);
+    }
     IrValue *ret = irTmp(ret_type, ret_size);
     IrInstr *call = irInstrNew(IR_CALL, ret, args_wrap, NULL);
     irBlockAddInstr(ctx, call);
     return ret;
+}
+
+static IrValue *irEmitRuntimeCall1(IrCtx *ctx, const char *fname,
+                                    IrValueType ret_type, int ret_size,
+                                    IrValue *arg) {
+    return irEmitRuntimeCallN(ctx, fname, ret_type, ret_size, 1, &arg);
 }
 
 
@@ -968,9 +1016,8 @@ IrValue *irLowerBinOpExpr(IrCtx *ctx, Ast *ast) {
 static IrValue *irGlobalValue(Ast *gvar_ast) {
     IrValue *v = irValueNew(IR_TYPE_PTR, IR_VAL_GLOBAL);
     /* @TODO, this should really be fixed; one label field on the struct */
-    v->as.global.name = (gvar_ast->is_static && gvar_ast->glabel)
-                        ? gvar_ast->glabel
-                        : gvar_ast->gname;
+    v->as.global.name = gvar_ast->glabel ? gvar_ast->glabel
+                                         : gvar_ast->gname;
     v->as.global.value = NULL;
     return v;
 }
@@ -1083,10 +1130,20 @@ static IrValue *irLowerCast(IrCtx *ctx,
         int from_size = from_type->size ? from_type->size : 8;
         int to_size = to_type->size ? to_type->size : 8;
         if (to_size < from_size && to_size < 8) {
+            /* Narrow to the destination's bytes, then re-extend to full
+             * width by the destination's signedness, so the value is
+             * canonical (`200(I8)` is the i64 -56, not the raw byte 0xC8)
+             * wherever it is used next: a compare, arithmetic, an
+             * argument or a return. A store into a narrow slot re-narrows
+             * on its own. Without the extend a signed narrowing cast kept
+             * its low bits and `200(I8) == -56` was false. */
             IrValueType t = irConvertType(to_type);
-            IrValue *dst = irTmp(t, to_size);
-            irBlockAddInstr(ctx, irInstrNew(IR_TRUNC, dst, src, NULL));
-            return dst;
+            IrValue *narrow = irTmp(t, to_size);
+            irBlockAddInstr(ctx, irInstrNew(IR_TRUNC, narrow, src, NULL));
+            IrValue *wide = irTmp(IR_TYPE_I64, 8);
+            IrOp ext = to_type->issigned ? IR_SEXT : IR_ZEXT;
+            irBlockAddInstr(ctx, irInstrNew(ext, wide, narrow, NULL));
+            return wide;
         }
     }
     return src;
@@ -1829,6 +1886,11 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
             if (!src) loggerPanic("&lvar on unknown lvar\n");
         } else if (operand->kind == AST_GVAR) {
             src = irGlobalValue(operand);
+        } else if (operand->kind == AST_FUNPTR) {
+            /* `&fp` on a local function pointer: its slot, as for an lvar
+             * (a pointer to a function pointer, `T (**pp)(...)`) */
+            src = irFnGetVar(ctx->cur_func, operand->fn_ptr_id);
+            if (!src) loggerPanic("&fnptr on unknown local\n");
         } else if (operand->kind == AST_FUNC ||
                    operand->kind == AST_FUN_PROTO ||
                    operand->kind == AST_EXTERN_FUNC)
@@ -1982,6 +2044,8 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
     return is_post ? cur : new_val;
 }
 
+static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast);
+
 IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     /* Variable references are SHARED Ast nodes stamped with their
      * declaration line - letting them touch the hint would attribute
@@ -1989,6 +2053,45 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     if (ast && ast->line && ast->kind != AST_LVAR && ast->kind != AST_GVAR)
         ir_line_hint = ast->line;
     switch (ast->kind) {
+        case AST_VA_PACK:
+            return irLowerVaPack(ctx, ast);
+
+        case AST_TERNARY: {
+            /* cond ? then : els. Only the chosen branch runs: evaluate
+             * the condition, branch, compute each branch in its own
+             * block, and phi the two values. Both branches were cast to
+             * ast->type by the parser, so the phi is well typed. Mirrors
+             * the && / || short-circuit lowering. */
+            IrBlock *then_block = irBlockNew();
+            IrBlock *else_block = irBlockNew();
+            IrBlock *end_block = irBlockNew();
+
+            IrValue *cond = irExpr(ctx, ast->cond);
+            IrBlock *cond_block = ctx->cur_block;
+            IrValue *result = irTmp(irConvertType(ast->type), ast->type->size);
+            irBranch(ctx->cur_func, cond_block, cond, then_block, else_block);
+
+            irFnAddBlock(ctx->cur_func, then_block);
+            ctx->cur_block = then_block;
+            IrValue *then_val = irExpr(ctx, ast->then);
+            IrBlock *then_end = ctx->cur_block;
+            irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+            irFnAddBlock(ctx->cur_func, else_block);
+            ctx->cur_block = else_block;
+            IrValue *else_val = irExpr(ctx, ast->els);
+            IrBlock *else_end = ctx->cur_block;
+            irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+            irFnAddBlock(ctx->cur_func, end_block);
+            ctx->cur_block = end_block;
+            IrInstr *phi = irPhi(result);
+            irBlockAddInstr(ctx, phi);
+            irAddPhiIncoming(phi, then_val, then_end);
+            irAddPhiIncoming(phi, else_val, else_end);
+            return result;
+        }
+
         case AST_BINOP: {
             if (astIsBinOpKind(ast, AST_BIN_OP_ASSIGN) ||
                     irBinOpIsCompoundAssign(ast->binop)) {
@@ -2006,6 +2109,13 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
                         // irAddConstFloat(ctx->ir_program, value);
                         return value;
                     }
+                case AST_TYPE_CLASS:
+                    /* An enum member (`Color.red`): an intrinsic class
+                     * literal, int-shaped underneath. */
+                    if (astIsIntrinsicClass(ast->type)) {
+                        return irConstInt(irConvertType(ast->type), ast->i64);
+                    }
+                    /* fallthrough */
                 default:
                     loggerPanic("Unknown literal: %s\n",
                             astTypeKindToString(ast->type->kind));
@@ -2148,6 +2258,19 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
     irBlockAddInstr(ctx, jmp);
 }
 
+/* The try and defer frames use _setjmp, which unlike setjmp doesn't save
+ * the signal mask (one sigprocmask syscall per try or defer reached).
+ * Runtime call names are written as the assembler sees them, and on
+ * Mach-O a name starting with `_` is taken as already mangled: the C
+ * `_setjmp` is `__setjmp` there. */
+static const char *irSetjmpName(IrCtx *ctx) {
+    if (ctx->cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+        ctx->cc->target == TARGET_X86_64_APPLE_DARWIN) {
+        return "__setjmp";
+    }
+    return "_setjmp";
+}
+
 /* try { try_body } catch <catch_body> compiles to:
  *
  *     frame = alloca(CatchFrame)                 ; ~256 bytes, opaque
@@ -2194,9 +2317,9 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    longjmp fires - calling it inside KTM_TryEnter (a returned
      *    helper) was UB. The helper that managed the chain is split
      *    out so the IR stays declarative. */
-    irEmitRuntimeCall1(ctx, "KTM_PushFrame",
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushFrame"),
                         IR_TYPE_VOID, 8, frame_addr);
-    IrValue *enter_ret = irEmitRuntimeCall1(ctx, "setjmp",
+    IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                               IR_TYPE_I64, 8, frame_addr);
 
     /* 4. Branch: (enter_ret == 0) -> body, else -> catch. */
@@ -2223,7 +2346,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
     irLowerAst(ctx, ast->try_body);
     ctx->try_depth--;
     if (!ctx->cur_block->sealed) {
-        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                             IR_TYPE_VOID, 8, frame_addr);
         IrInstr *jmp = irJump(ctx->cur_func, ctx->cur_block, end_block);
         irBlockAddInstr(ctx, jmp);
@@ -2234,7 +2357,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    then lower the handler, then jump to end. */
     irFnAddBlock(ctx->cur_func, catch_block);
     ctx->cur_block = catch_block;
-    irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                         IR_TYPE_VOID, 8, frame_addr);
     irLowerAst(ctx, ast->catch_body);
     if (!ctx->cur_block->sealed) {
@@ -2247,10 +2370,94 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
     ctx->cur_block = end_block;
 }
 
-/* throw(value) lowers to a single KTM_Throw(value) call. The runtime
- * longjmps so control never returns; mark the current block sealed
- * so the lowering driver doesn't append a fall-through edge. */
+/* `defer <stmt>` registers <stmt> for every way out of the enclosing
+ * block. It is a catch frame from here to the end of the block:
+ *
+ *     frame = alloca(CatchFrame)
+ *     KTM_PushFrame(&frame)
+ *     t = setjmp(&frame)
+ *     br (t == 0), cont_block, unwind_block
+ *   unwind_block:                     ; a throw is leaving the block
+ *     KTM_DeferCaught(&frame, &saved) ; pop the frame, move the Error
+ *     <lower stmt>                    ; (a throw caught in here can't
+ *     KTM_Rethrow(&saved)             ;  clobber it), then on it goes
+ *   cont_block:
+ *
+ * and stays on the try stack, so the end of the block and every
+ * return/break/continue/goto that leaves it runs <stmt> (irLeaveTries).
+ * Only functions with a defer get any of this. */
+static void irLowerDefer(IrCtx *ctx, Ast *ast) {
+    int frame_size = 256;
+    IrValue *size_const = irConstInt(IR_TYPE_I64, frame_size);
+    IrValue *frame_tmp = irTmp(IR_TYPE_PTR, frame_size);
+    irBlockAddInstr(ctx, irInstrNew(IR_ALLOCA, frame_tmp, size_const, NULL));
+    irAddStackSpace(ctx, frame_size);
+
+    IrValue *frame_addr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, frame_addr, frame_tmp, NULL));
+
+    /* The in-flight Error while the deferred statement runs (`struct
+     * Error`: code, message, file, line) */
+    int saved_size = 32;
+    IrValue *saved_tmp = irTmp(IR_TYPE_PTR, saved_size);
+    irBlockAddInstr(ctx, irInstrNew(IR_ALLOCA, saved_tmp,
+                                    irConstInt(IR_TYPE_I64, saved_size), NULL));
+    irAddStackSpace(ctx, saved_size);
+
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushFrame"), IR_TYPE_VOID, 8, frame_addr);
+    IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
+                                            IR_TYPE_I64, 8, frame_addr);
+
+    IrBlock *unwind_block = irBlockNew();
+    IrBlock *cont_block = irBlockNew();
+    IrValue *cmp_zero = irTmp(IR_TYPE_I64, 8);
+    irBlockAddInstr(ctx, irICmp(cmp_zero, IR_CMP_EQ, enter_ret,
+                                irConstInt(IR_TYPE_I64, 0)));
+    irBranch(ctx->cur_func, ctx->cur_block, cmp_zero,
+             cont_block, unwind_block);
+
+    /* Reached by longjmp from anywhere later in the block, an edge the
+     * register allocator doesn't see: frame_addr may be dead (and its
+     * slot reused) by then, so take the address again. */
+    irFnAddBlock(ctx->cur_func, unwind_block);
+    ctx->cur_block = unwind_block;
+    IrValue *caught[2];
+    caught[0] = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[0], frame_tmp, NULL));
+    caught[1] = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[1], saved_tmp, NULL));
+    irEmitRuntimeCallN(ctx, astRuntimeSymbol("__ktmDeferCaught"), IR_TYPE_VOID, 8, 2, caught);
+    ctx->defer_lowering++;
+    irLowerAst(ctx, ast->defer_stmt);
+    ctx->defer_lowering--;
+    if (!ctx->cur_block->sealed) {
+        IrValue *saved_addr = irTmp(IR_TYPE_PTR, 8);
+        irBlockAddInstr(ctx, irInstrNew(IR_LEA, saved_addr, saved_tmp, NULL));
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmRethrow"), IR_TYPE_VOID, 8, saved_addr);
+        ctx->cur_block->sealed = 1;
+    }
+
+    irFnAddBlock(ctx->cur_func, cont_block);
+    ctx->cur_block = cont_block;
+    if (ctx->try_depth >= IR_TRY_STACK_MAX) {
+        loggerPanic("try and defer nesting above %d not supported\n",
+                    IR_TRY_STACK_MAX);
+    }
+    ctx->try_stack[ctx->try_depth] = ast;
+    ctx->try_frames[ctx->try_depth] = frame_addr;
+    ctx->try_depth++;
+}
+
+/* throw(code) lowers to KTM_ThrowAt(code, file, line); the other forms
+ * are already a call (parseThrowCall). The runtime longjmps so control
+ * never returns; mark the current block sealed so the lowering driver
+ * doesn't append a fall-through edge. */
 void irLowerThrow(IrCtx *ctx, Ast *ast) {
+    if (ast->throw_call) {
+        irExpr(ctx, ast->throw_call);
+        ctx->cur_block->sealed = 1;
+        return;
+    }
     IrValue *v = irExpr(ctx, ast->throw_value);
     /* KTM_Throw takes a U64: convert the value like an argument to a
      * U64 parameter, so a float is truncated to an integer (not passed
@@ -2261,7 +2468,11 @@ void irLowerThrow(IrCtx *ctx, Ast *ast) {
     } else if (vt && (vt->kind == AST_TYPE_INT || vt->kind == AST_TYPE_CHAR)) {
         v = irWidenToTargetWidth(ctx, v, vt, ast_uint_type);
     }
-    irEmitRuntimeCall1(ctx, "KTM_Throw", IR_TYPE_VOID, 8, v);
+    IrValue *args[3];
+    args[0] = v;
+    args[1] = irExpr(ctx, ast->throw_file);
+    args[2] = irConstInt(IR_TYPE_I64, ast->line);
+    irEmitRuntimeCallN(ctx, astRuntimeSymbol("__ktmThrowAt"), IR_TYPE_VOID, 8, 3, args);
     ctx->cur_block->sealed = 1;
 }
 
@@ -2435,11 +2646,61 @@ static IrValue *irMakeLocalSlot(IrCtx *ctx,
                                 int size,
                                 u32 var_id)
 {
+    if (ctx->defer_lowering) {
+        IrValue *again = irFnGetVar(ctx->cur_func, var_id);
+        if (again) return again;
+    }
     IrValue *local = irTmp(ir_type, size);
     local->kind = IR_VAL_LOCAL;
     irFnAddVar(ctx->cur_func, var_id, local);
     irAddStackSpace(ctx, size);
     return local;
+}
+
+/* The extras of a call to a `T ...name` function: each item (already
+ * converted by the parser) is stored in turn into the call site's hidden
+ * array, whose address is the value. The array is an ordinary local of
+ * the calling function, so it outlives the call; lowered again (a defer)
+ * it keeps its slot. */
+static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast) {
+    Ast *array = ast->va_array;
+    AstType *elem = array->type->ptr;
+    int is_global = array->kind == AST_GVAR;
+    IrValue *base = NULL, *addr = NULL;
+    if (is_global) {
+        addr = irLowerGlobal(ctx, array);
+    } else {
+        base = irFnGetVar(ctx->cur_func, array->lvar_id);
+        if (!base) {
+            base = irMakeLocalSlot(ctx, irConvertType(array->type),
+                                   array->type->size, array->lvar_id);
+        }
+    }
+    int esize = ast->va_untyped ? 8 : elem->size;
+    for (u64 i = 0; i < ast->va_items->size; ++i) {
+        Ast *item = vecGet(Ast *, ast->va_items, i);
+        IrValue *val = irExpr(ctx, item);
+        if (!ast->va_untyped) {
+            val = irConvertFloatToTargetWidth(ctx, val, elem);
+            val = irNarrowToTargetWidth(ctx, val, elem);
+        } else if (val && val->kind == IR_VAL_CONST_INT) {
+            /* a 64-bit slot: the store is sized from the value, and a
+             * constant keeps its literal's width (`true`, 'x': 1 byte) */
+            val = irConstInt(IR_TYPE_I64, val->as._i64);
+        } else {
+            val = irWidenToTargetWidth(ctx, val, item->type, ast_int_type);
+        }
+        IrValue *off = irConstInt(IR_TYPE_I64, (s64)i * esize);
+        IrValue *slot = irTmp(IR_TYPE_PTR, 8);
+        if (is_global) {
+            irBlockAddInstr(ctx, irInstrNew(IR_IADD, slot, addr, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, slot, val, NULL));
+        } else {
+            irBlockAddInstr(ctx, irInstrNew(IR_GEP, slot, base, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE, slot, val, NULL));
+        }
+    }
+    return is_global ? addr : irLowerLVar(ctx, array);
 }
 
 void irLowerDecl(IrCtx *ctx, Ast *ast) {
@@ -2452,11 +2713,15 @@ void irLowerDecl(IrCtx *ctx, Ast *ast) {
      * whole function. The per-arch emitter sees the IrValue's
      * `pinned_reg` and writes the register directly. */
     if (var->kind == AST_LVAR && var->pinned_kind == LVAR_REG) {
-        IrValue *local = irValueNew(irConvertType(var->type), IR_VAL_LOCAL);
-        local->as.var.id = var->lvar_id;
-        local->as.var.size = var->type ? var->type->size : 8;
-        local->pinned_reg = var->pinned_reg;
-        irFnAddVar(ctx->cur_func, var->lvar_id, local);
+        IrValue *local = ctx->defer_lowering
+            ? irFnGetVar(ctx->cur_func, var->lvar_id) : NULL;
+        if (!local) {
+            local = irValueNew(irConvertType(var->type), IR_VAL_LOCAL);
+            local->as.var.id = var->lvar_id;
+            local->as.var.size = var->type ? var->type->size : 8;
+            local->pinned_reg = var->pinned_reg;
+            irFnAddVar(ctx->cur_func, var->lvar_id, local);
+        }
         if (init) {
             IrValue *iv = irExpr(ctx, init);
             IrInstr *st = irInstrNew(IR_STORE, local, iv, NULL);
@@ -2837,10 +3102,24 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
 
     switch (ast->kind) {
         case AST_COMPOUND_STMT: {
+            /* The defers reached in this block are on the try stack
+             * above `depth`: falling off the end runs them */
+            u16 depth = ctx->try_depth;
             listForEach(ast->stms) {
                 Ast *next = (Ast *)it->value;
                 irLowerAst(ctx, next);
             }
+            if (ctx->try_depth > depth) {
+                if (!ctx->cur_block->sealed) {
+                    irLeaveTries(ctx, depth);
+                }
+                ctx->try_depth = depth;
+            }
+            break;
+        }
+
+        case AST_DEFER: {
+            irLowerDefer(ctx, ast);
             break;
         }
 
@@ -2848,6 +3127,7 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
         case AST_LVAR:
             break;
 
+        case AST_TERNARY:
         case AST_BINOP: {
             irExpr(ctx, ast);
             break;
@@ -3005,7 +3285,6 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_GOTO:
         case AST_LABEL:
         case AST_JUMP:
-        case AST_COMMENT:
         case AST_PLACEHOLDER:
         case AST_FUNPTR:
         case AST_FUN_PROTO:
@@ -3023,6 +3302,8 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
                 Ast *target = irUnwrapDefaultParam(ast->operand);
                 if (target && target->kind == AST_LVAR) {
                     setAdd(escape, (void *)(u64)target->lvar_id);
+                } else if (target && target->kind == AST_FUNPTR) {
+                    setAdd(escape, (void *)(u64)target->fn_ptr_id);
                 }
             }
             irEscapeWalk(ast->operand, escape);
@@ -3037,6 +3318,13 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_BINOP: {
             irEscapeWalk(ast->left, escape);
             irEscapeWalk(ast->right, escape);
+            return;
+        }
+
+        case AST_TERNARY: {
+            irEscapeWalk(ast->cond, escape);
+            irEscapeWalk(ast->then, escape);
+            irEscapeWalk(ast->els, escape);
             return;
         }
 
@@ -3083,6 +3371,19 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
 
         case AST_THROW: {
             irEscapeWalk(ast->throw_value, escape);
+            irEscapeWalk(ast->throw_call, escape);
+            return;
+        }
+
+        case AST_DEFER: {
+            irEscapeWalk(ast->defer_stmt, escape);
+            return;
+        }
+
+        case AST_VA_PACK: {
+            for (u64 i = 0; i < ast->va_items->size; ++i) {
+                irEscapeWalk(vecGet(Ast *, ast->va_items, i), escape);
+            }
             return;
         }
 
@@ -3113,13 +3414,6 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_CASE:
         case AST_DEFAULT: {
             irEscapeWalkList(ast->case_asts, escape);
-            return;
-        }
-
-        case AST_SIZEOF: {
-            /* sizeof's operand isn't evaluated, but `&x` inside still
-             * marks x: cheap and keeps the walker pessimistic. */
-            irEscapeWalk(ast->operand, escape);
             return;
         }
 
@@ -3177,9 +3471,24 @@ static void irTryLabelWalk(IrCtx *ctx, Ast *ast, IrTryChain *chain) {
             mapAddLen(ctx->label_tries, lname->data, lname->len, copy);
             return;
         }
-        case AST_COMPOUND_STMT:
-            irTryLabelWalkList(ctx, ast->stms, chain);
+        case AST_COMPOUND_STMT: {
+            /* A defer is on the try stack for the rest of its block */
+            u16 depth = chain->depth;
+            if (ast->stms) {
+                listForEach(ast->stms) {
+                    Ast *stmt = (Ast *)it->value;
+                    if (stmt && stmt->kind == AST_DEFER) {
+                        if (chain->depth < IR_TRY_STACK_MAX) {
+                            chain->tries[chain->depth++] = stmt;
+                        }
+                        continue;
+                    }
+                    irTryLabelWalk(ctx, stmt, chain);
+                }
+            }
+            chain->depth = depth;
             return;
+        }
         case AST_IF:
             irTryLabelWalk(ctx, ast->then, chain);
             irTryLabelWalk(ctx, ast->els, chain);

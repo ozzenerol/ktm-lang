@@ -691,6 +691,7 @@ IrCtx *irCtxNew(Cctrl *cc) {
     memset(ctx->loop_stack, 0, sizeof(ctx->loop_stack));
     ctx->labels = NULL;
     ctx->try_depth = 0;
+    ctx->defer_lowering = 0;
     ctx->label_tries = NULL;
     ctx->escape_set = NULL;
     return ctx;

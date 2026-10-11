@@ -1,7 +1,7 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* An inner list (or string) in a multi-dimensional array initialiser
- * must fit its dimension. ktm used to accept `I64 m[2][2] = {{1,2,3},..}`
+ * must fit its dimension. ktm used to accept `i64 m[2][2] = {{1,2,3},..}`
  * silently and write the extra item over the next row. */
 
 #define NESTED_INIT_FILE "__139_nested_array_init_overflow.ktm"
@@ -10,195 +10,181 @@
 #define MSG_2_3 "Invalid array initializer: expected 2 items but got 3"
 
 /* Initialisers that fit are still accepted, globally and locally. */
-I64 g_139_m[2][3] = {{1,2,3},{4,5,6}};
-I64 g_139_unsized[][2] = {{1,2},{3,4},{5,6}};
-I64 g_139_cube[2][2][2] = {{{1,2},{3,4}},{{5,6},{7,8}}};
+i64 g139M[2][3] = {{1,2,3},{4,5,6}};
+i64 g139Unsized[][2] = {{1,2},{3,4},{5,6}};
+i64 g139Cube[2][2][2] = {{{1,2},{3,4}},{{5,6},{7,8}}};
 
-U0 CleanupNestedInitTest(U0)
-{
-  Rm(NESTED_INIT_FILE);
-  Rm(NESTED_INIT_OUT);
-  Rm("./a.out");
+void cleanupNestedInitTest(void) {
+    fs.remove(NESTED_INIT_FILE);
+    fs.remove(NESTED_INIT_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p += 7;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p += 7;
+    }
+    return n;
 }
 
 /* Compile `source`: ktm must exit with status 1 and print exactly one
  * error, `msg` at `loc`; the recovery skips the rest of the initialiser. */
-Bool CompileFailsWith(U8 *source, U8 *msg, U8 *loc)
-{
-  U8 *out, *first;
-  I64 res;
-  Bool ok;
+bool compileFailsWith(u8 *source, u8 *msg, u8 *loc) {
+    u8 *out, *first;
+    i64 res;
+    bool ok;
 
-  CleanupNestedInitTest;
+    cleanupNestedInitTest();
 
-  if (!FileWrite(NESTED_INIT_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(NESTED_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " NESTED_INIT_FILE " > " NESTED_INIT_OUT " 2>&1");
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " NESTED_INIT_FILE " > " NESTED_INIT_OUT " 2>&1");
 
-  out = FileRead(NESTED_INIT_OUT);
-  if (!out) {
-    CleanupNestedInitTest;
-    return FALSE;
-  }
+    out = fs.readAll(NESTED_INIT_OUT);
+    if (!out) {
+        cleanupNestedInitTest();
+        return false;
+    }
 
-  ok = res == 1 && CountErrors(out) == 1;
-  first = strstr(out, "error: ");
-  if (!first || StrNCmp(first + 7, msg, StrLen(msg))) ok = FALSE;
-  else if (!strstr(first, loc)) ok = FALSE;
-  if (!ok) "status %d\n%s\n", res, out;
+    ok = res == 1 && countErrors(out) == 1;
+    first = libc.strstr(out, "error: ");
+    if (!first || str.cmpLen(first + 7, msg, str.len(msg))) { ok = false; }
+    else if (!libc.strstr(first, loc)) { ok = false; }
+    if (!ok) { printf("status %d\n%s\n", res, out); }
 
-  Free(out);
-  CleanupNestedInitTest;
-  return ok;
+    mem.free(out);
+    cleanupNestedInitTest();
+    return ok;
 }
 
-Bool TestLocalRowTooLong(U0)
-{
-  return CompileFailsWith(
-"U0 Main() {
-  I64 m[2][2] = {{1,2,3},{4,5}};
+bool testLocalRowTooLong(void) {
+    return compileFailsWith(
+"void main() {
+  i64 m[2][2] = {{1,2,3},{4,5}};
 }
 ", MSG_2_3, "2:24");
 }
 
-Bool TestLocalLastRowTooLong(U0)
-{
-  return CompileFailsWith(
-"U0 Main() {
-  I64 m[2][2] = {{1,2},{3,4,5}};
+bool testLocalLastRowTooLong(void) {
+    return compileFailsWith(
+"void main() {
+  i64 m[2][2] = {{1,2},{3,4,5}};
 }
 ", MSG_2_3, "2:30");
 }
 
-Bool TestGlobalRowTooLong(U0)
-{
-  return CompileFailsWith(
-"I64 g[2][2] = {{1,2,3},{4,5}};
-U0 Main() {}
+bool testGlobalRowTooLong(void) {
+    return compileFailsWith(
+"i64 g[2][2] = {{1,2,3},{4,5}};
+void main() {}
 ", MSG_2_3, "1:22");
 }
 
-Bool TestTooManyRows(U0)
-{
-  return CompileFailsWith(
-"U0 Main() {
-  I64 m[2][2] = {{1},{2},{3}};
+bool testTooManyRows(void) {
+    return compileFailsWith(
+"void main() {
+  i64 m[2][2] = {{1},{2},{3}};
 }
 ", MSG_2_3, "2:17");
 }
 
-Bool TestUnsizedOuterRowTooLong(U0)
-{
-  return CompileFailsWith(
-"U0 Main() {
-  I64 m[][2] = {{1,2},{3,4,5}};
+bool testUnsizedOuterRowTooLong(void) {
+    return compileFailsWith(
+"void main() {
+  i64 m[][2] = {{1,2},{3,4,5}};
 }
 ", MSG_2_3, "2:29");
 }
 
-Bool TestCubeInnerTooLong(U0)
-{
-  return CompileFailsWith(
-"U0 Main() {
-  I64 c[2][2][2] = {{{1,2},{3,4}},{{5,6,7},{8,9}}};
+bool testCubeInnerTooLong(void) {
+    return compileFailsWith(
+"void main() {
+  i64 c[2][2][2] = {{{1,2},{3,4}},{{5,6,7},{8,9}}};
 }
 ", MSG_2_3, "2:42");
 }
 
-Bool TestCubeMiddleTooLong(U0)
-{
-  return CompileFailsWith(
-"I64 c[2][2][2] = {{{1,2},{3,4},{5,6}},{{7,8},{9,10}}};
-U0 Main() {}
+bool testCubeMiddleTooLong(void) {
+    return compileFailsWith(
+"i64 c[2][2][2] = {{{1,2},{3,4},{5,6}},{{7,8},{9,10}}};
+void main() {}
 ", MSG_2_3, "1:37");
 }
 
-Bool TestStringTooLong(U0)
-{
-  /* "abc" needs 4 bytes with its NUL, like a top-level U8 buf[3]. */
-  return CompileFailsWith(
-"U0 Main() {
-  U8 s[2][3] = {\"ab\",\"abc\"};
+bool testStringTooLong(void) {
+    /* "abc" needs 4 bytes with its NUL, like a top-level u8 buf[3]. */
+    return compileFailsWith(
+"void main() {
+  u8 s[2][3] = {\"ab\",\"abc\"};
 }
 ", "Invalid array initializer: expected 3 items but got 4", "2:22");
 }
 
-Bool TestGlobalStringTooLong(U0)
-{
-  return CompileFailsWith(
-"U8 s[2][3] = {\"abcdef\",\"x\"};
-U0 Main() {}
+bool testGlobalStringTooLong(void) {
+    return compileFailsWith(
+"u8 s[2][3] = {\"abcdef\",\"x\"};
+void main() {}
 ", "Invalid array initializer: expected 3 items but got 7", "1:15");
 }
 
-Bool TestValidInits(U0)
-{
-  I64 m[2][3] = {{1,2,3},{4,5,6}};
-  I64 u[][2] = {{1,2},{3,4},{5,6}};
-  I64 c[2][2][2] = {{{1,2},{3,4}},{{5,6},{7,8}}};
-  U8 s[2][4] = {"abc","de"};
-  Bool ok = TRUE;
+bool testValidInits(void) {
+    i64 m[2][3] = {{1,2,3},{4,5,6}};
+    i64 u[][2] = {{1,2},{3,4},{5,6}};
+    i64 c[2][2][2] = {{{1,2},{3,4}},{{5,6},{7,8}}};
+    u8 s[2][4] = {"abc","de"};
+    bool ok = true;
 
-  if (m[0][2] != 3 || m[1][0] != 4 || m[1][2] != 6) ok = FALSE;
-  if (sizeof(u) != 48 || u[2][0] != 5 || u[2][1] != 6) ok = FALSE;
-  if (c[0][1][1] != 4 || c[1][0][0] != 5 || c[1][1][1] != 8) ok = FALSE;
-  if (StrCmp(s[0], "abc") || StrCmp(s[1], "de")) ok = FALSE;
-  if (g_139_m[0][2] != 3 || g_139_m[1][0] != 4) ok = FALSE;
-  if (sizeof(g_139_unsized) != 48 || g_139_unsized[2][1] != 6) ok = FALSE;
-  if (g_139_cube[1][0][1] != 6 || g_139_cube[1][1][1] != 8) ok = FALSE;
-  return ok;
+    if (m[0][2] != 3 || m[1][0] != 4 || m[1][2] != 6) { ok = false; }
+    if (sizeof(u) != 48 || u[2][0] != 5 || u[2][1] != 6) { ok = false; }
+    if (c[0][1][1] != 4 || c[1][0][0] != 5 || c[1][1][1] != 8) { ok = false; }
+    if (str.cmp(s[0], "abc") || str.cmp(s[1], "de")) { ok = false; }
+    if (g139M[0][2] != 3 || g139M[1][0] != 4) { ok = false; }
+    if (sizeof(g139Unsized) != 48 || g139Unsized[2][1] != 6) { ok = false; }
+    if (g139Cube[1][0][1] != 6 || g139Cube[1][1][1] != 8) { ok = false; }
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - Nested array initialiser overflow: ";
-  I64 tests = 10;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - Nested array initialiser overflow: ");
+    i64 tests = 10;
+    i64 correct = 0;
 
-  if (TestLocalRowTooLong()) correct++;
-  else "Failed - TestLocalRowTooLong()\n";
+    if (testLocalRowTooLong()) { correct++; }
+    else { printf("Failed - TestLocalRowTooLong()\n"); }
 
-  if (TestLocalLastRowTooLong()) correct++;
-  else "Failed - TestLocalLastRowTooLong()\n";
+    if (testLocalLastRowTooLong()) { correct++; }
+    else { printf("Failed - TestLocalLastRowTooLong()\n"); }
 
-  if (TestGlobalRowTooLong()) correct++;
-  else "Failed - TestGlobalRowTooLong()\n";
+    if (testGlobalRowTooLong()) { correct++; }
+    else { printf("Failed - TestGlobalRowTooLong()\n"); }
 
-  if (TestTooManyRows()) correct++;
-  else "Failed - TestTooManyRows()\n";
+    if (testTooManyRows()) { correct++; }
+    else { printf("Failed - TestTooManyRows()\n"); }
 
-  if (TestUnsizedOuterRowTooLong()) correct++;
-  else "Failed - TestUnsizedOuterRowTooLong()\n";
+    if (testUnsizedOuterRowTooLong()) { correct++; }
+    else { printf("Failed - TestUnsizedOuterRowTooLong()\n"); }
 
-  if (TestCubeInnerTooLong()) correct++;
-  else "Failed - TestCubeInnerTooLong()\n";
+    if (testCubeInnerTooLong()) { correct++; }
+    else { printf("Failed - TestCubeInnerTooLong()\n"); }
 
-  if (TestCubeMiddleTooLong()) correct++;
-  else "Failed - TestCubeMiddleTooLong()\n";
+    if (testCubeMiddleTooLong()) { correct++; }
+    else { printf("Failed - TestCubeMiddleTooLong()\n"); }
 
-  if (TestStringTooLong()) correct++;
-  else "Failed - TestStringTooLong()\n";
+    if (testStringTooLong()) { correct++; }
+    else { printf("Failed - TestStringTooLong()\n"); }
 
-  if (TestGlobalStringTooLong()) correct++;
-  else "Failed - TestGlobalStringTooLong()\n";
+    if (testGlobalStringTooLong()) { correct++; }
+    else { printf("Failed - TestGlobalStringTooLong()\n"); }
 
-  if (TestValidInits()) correct++;
-  else "Failed - TestValidInits()\n";
+    if (testValidInits()) { correct++; }
+    else { printf("Failed - TestValidInits()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

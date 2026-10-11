@@ -29,6 +29,7 @@
 #include <malloc/malloc.h> /* malloc_zone_from_ptr */
 #endif
 
+#include "ast.h"
 #include "containers.h"
 #include "jit-common.h"
 #include "memsafe.h"
@@ -170,7 +171,7 @@ static void memsafePrintSite(FILE *f, const uintptr_t *sites, int nsites) {
              * instruction before, so look the line up at addr-1 or
              * the report reads one statement late. */
             int line = ktmJitFindLineForAddr(jit, (void *)(sites[i] - 1));
-            fprintf(f, "in `%s`+%zu", sym, off);
+            fprintf(f, "in `%s`+%zu", astSymbolDisplayName(sym), off);
             if (line) fprintf(f, ", line %d", line);
         } else {
             fprintf(f, "at %p", (void *)sites[i]);
@@ -472,4 +473,9 @@ void memsafeInit(KtmJit *jit) {
     ktmJitDefineSymbol(jit, "Free",     (void *)(uintptr_t)memsafeFree);
     ktmJitDefineSymbol(jit, "CAlloc",   (void *)(uintptr_t)memsafeCAlloc);
     ktmJitDefineSymbol(jit, "ReAlloc",  (void *)(uintptr_t)memsafeReAlloc);
+    /* the stdlib as modules: mem's functions by their symbols */
+    ktmJitDefineSymbol(jit, "_K3mem5alloc",     (void *)(uintptr_t)memsafeMAlloc);
+    ktmJitDefineSymbol(jit, "_K3mem4free",      (void *)(uintptr_t)memsafeFree);
+    ktmJitDefineSymbol(jit, "_K3mem9allocZero", (void *)(uintptr_t)memsafeCAlloc);
+    ktmJitDefineSymbol(jit, "_K3mem7realloc",   (void *)(uintptr_t)memsafeReAlloc);
 }

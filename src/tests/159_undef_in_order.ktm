@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import str, test;
 
 /* The parser reads tokens from a 16-token ring that the lexer fills
  * ahead of it, and macros were expanded only as the parser took each
@@ -6,62 +6,60 @@
  * already run, so a use just before it saw the new value (or none). */
 
 #define N 3
-I64 g_a = N;
+i64 gA = N;
 #undef N
 #define N 4
-I64 g_b = N;
+i64 gB = N;
 
 #define S "one"
-U8 *g_s1 = S;
+u8 *gS1 = S;
 #undef S
 #define S "two"
-U8 *g_s2 = S;
+u8 *gS2 = S;
 
 #define V 10
-I64 g_c = V;
+i64 gC = V;
 #undef V
-I64 V = 7;
+i64 V = 7;
 
 #define K (2 * 3)
-I64 g_k1 = K;
+i64 gK1 = K;
 #undef K
 #define K (N * 10)
 
 #define F 1.5
-F64 g_f1 = F;
+f64 gF1 = F;
 #undef F
 #define F 2.5
-F64 g_f2 = F;
+f64 gF2 = F;
 
-I64 InFunc()
-{
-  I64 x = 0;
+i64 inFunc() {
+    i64 x = 0;
 #define M 100
-  x += M;
+    x += M;
 #undef M
 #define M 1
-  x += M;
+    x += M;
 #undef M
-  return x;
+    return x;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 9;
+i32 main() {
+    i64 correct = 0, tests = 9;
 
-  "Test - #undef and redefinitions apply in source order: ";
+    printf("Test - #undef and redefinitions apply in source order: ");
 
-  if (g_a == 3) correct++;
-  if (g_b == 4) correct++;
-  if (!StrCmp(g_s1, "one")) correct++;
-  if (!StrCmp(g_s2, "two")) correct++;
-  if (g_c == 10) correct++;
-  if (V == 7) correct++;
-  if (g_k1 == 6 && K == 40) correct++;
-  if (g_f1 == 1.5 && g_f2 == 2.5) correct++;
-  if (InFunc() == 101) correct++;
+    if (gA == 3) { correct++; }
+    if (gB == 4) { correct++; }
+    if (!str.cmp(gS1, "one")) { correct++; }
+    if (!str.cmp(gS2, "two")) { correct++; }
+    if (gC == 10) { correct++; }
+    if (V == 7) { correct++; }
+    if (gK1 == 6 && K == 40) { correct++; }
+    if (gF1 == 1.5 && gF2 == 2.5) { correct++; }
+    if (inFunc() == 101) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }
