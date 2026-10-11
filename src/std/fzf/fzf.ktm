@@ -1,13 +1,5 @@
 module fzf;
 
-/* This code has been adapted from a C fzf implementation:
- * https://github.com/nvim-telescope/telescope-fzf-native.nvim */
-#define FZF_CASE_SMART   0
-
-#define FZF_CASE_IGNORE  1
-
-#define FZF_CASE_RESPECT 2
-
 #define FZF_SCORE_MATCH 16
 
 #define FZF_SCORE_GAP_START -3

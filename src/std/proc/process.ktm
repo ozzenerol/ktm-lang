@@ -1,13 +1,5 @@
 module proc;
 
-#define PROC_INHERIT 0
-
-#define PROC_PIPE    1
-
-#define PROC_NULL    2
-
-#define PROC_STDOUT  3
-
 #define PROC_WNOHANG        1
 
 #define PROC_F_GETFD        1

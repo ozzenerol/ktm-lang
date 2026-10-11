@@ -1,24 +1,5 @@
 module csv;
 
-/**
- * The original can be found:
- * https://github.com/skeeto/scratch/blob/master/parsers/csv.c 
- * 
- * From the docs:
- * Parses a CSV file in memory, building an index over a chosen field
- * allowing for exact-match searches against that field, returning the
- * row index/offset/length. The library itself makes no allocations,
- * which is left to the caller, and the index is just a single, large
- * allocation. While the index references the CSV buffer, it contains no
- * pointers into that buffer, only offsets, so it can be serialized for
- * later use with a different copy of the CSV buffer.
- */
-#define CSV_EOF   0
-
-#define CSV_ROW   1
-
-#define CSV_FIELD 2
-
 public class CsvParser
 {
   U8 *csv;

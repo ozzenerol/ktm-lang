@@ -1,9 +1,5 @@
 module fs;
 
-#define RM_RECURSE  0x1
-
-#define RM_FORCE    0x4
-
 /* 0 if `path` is a directory afterwards (made now or already there) */
 static I32 MkDirIfNotExist(U8 *path, I32 mode=MKDIR_DEFAULT)
 {

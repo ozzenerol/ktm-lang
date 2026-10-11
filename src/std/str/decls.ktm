@@ -1,5 +1,20 @@
 module str;
 
+/* The size StrPrint and MPrintQ start a new buffer at (it grows). */
+#define STR_LEN 256
+
+/* StrPrint's internal format flags; MPrintQ's `flags` takes PRTF_SLASH,
+ * which doubles each '%'. */
+#define PRTF_PAD_ZERO        0x001
+
+#define PRTF_LEFT_JUSTIFY    0x002
+
+#define PRTF_TRUNCATE        0x004
+
+#define PRTF_SLASH           0x020
+
+#define PRTF_DECIMAL         0x100
+
 /* Compare at most len bytes like C's strncmp: < 0, 0 or > 0, bytes compared
  * as unsigned, stopping at a NUL. NULL sorts before every string (two NULLs
  * are equal), whatever len is. */

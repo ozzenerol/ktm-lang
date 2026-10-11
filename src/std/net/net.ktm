@@ -93,10 +93,6 @@ module net;
   #define	AI_UNUSABLE	0x10000000 /* return addresses even if unusable (i.e. opposite of AI_DEFAULT) */
 #endif
 
-#define _SS_PAD1SIZE (6)
-
-#define _SS_PAD2SIZE (112)
-
 /* Byte order: the network is big endian, every target ktm supports is
  * little endian, so these swap the bytes. */
 public U16 Htons(U16 x)

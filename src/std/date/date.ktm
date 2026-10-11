@@ -1,11 +1,5 @@
 module date;
 
-#define CDATE_YEAR_DAYS		365.2425
-
-#define CDATE_YEAR_DAYS_INT	36524250
-
-#define CDATE_BASE_DAY_OF_WEEK	0
-
 public I64 class CDate
 {
   U32 time;
@@ -21,9 +15,6 @@ public class CDateStruct
   I32 year;
   I64 zone_diff;
 };
-
-/* zone_diff when there is no zone; no +-hhmm offset can be this */
-#define CDATE_NO_ZONE I64_MIN
 
 U64 mon_start_days1[12]={
   0,31,59,90,120,151,181,212,243,273,304,334};

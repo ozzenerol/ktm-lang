@@ -1,24 +1,10 @@
 module str;
 
-#define STR_LEN 256
-
-#define PRTF_PAD_ZERO        0x001
-
-#define PRTF_LEFT_JUSTIFY	 0x002
-
-#define PRTF_TRUNCATE		 0x004
-
-#define PRTF_SLASH		     0x020
-
-#define PRTF_DECIMAL		 0x100
-
 #define PRTF_PLUS            0x1000 /* `+`: a sign on positive numbers too */
 
 #define PRTF_SPACE           0x2000 /* ` `: a space where `+` would go */
 
 #define PRTF_ALT             0x4000 /* `#`: 0x/0X before hex, a leading 0 in octal */
-
-#define TIMESTAMP_FMT "%d-%02d-%02d %02d:%02d:%02d"
 
 #ifdef IS_X86_64
 asm {
@@ -1362,53 +1348,6 @@ public U8 *CatLenPrint(U8 *_dst, I64 *_len, U8 *fmt, ...)
   *_len = len;
   Free(s2); /* the formatted text, now copied */
   return _dst;
-}
-
-static U8 *_str_date_days[7] = {
-  "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
-};
-
-static U8 *_str_date_months[12] = {
-  "january", "february", "march", "april", "may", "june", "july",
-  "august", "september", "october", "november", "december"
-};
-
-/* Read up to `max_digits` decimal digits (after any spaces) */
-static Bool _StrDateNum(U8 **_s, I64 max_digits, I64 *_out)
-{
-  U8 *s = *_s;
-  I64 v = 0, n = 0;
-  while (*s == ' ' || *s == '\t') s++;
-  while (n < max_digits && *s >= '0' && *s <= '9') {
-    v = v * 10 + (*s - '0');
-    s++;
-    n++;
-  }
-  if (n == 0) return FALSE;
-  *_s = s;
-  *_out = v;
-  return TRUE;
-}
-
-/* A day or month name: the full name or its first three letters, any
- * case. Returns the index or -1. */
-static I64 _StrDateName(U8 **_s, U8 **names, I64 count)
-{
-  U8 *s = *_s;
-  for (I64 i = 0; i < count; ++i) {
-    I64 len = StrLen(names[i]);
-    if (StrNICmp(s, names[i], len) == 0) {
-      *_s = s + len;
-      return i;
-    }
-  }
-  for (I64 i = 0; i < count; ++i) {
-    if (StrNICmp(s, names[i], 3) == 0) {
-      *_s = s + 3;
-      return i;
-    }
-  }
-  return -1;
 }
 
 public Bool WildMatch(U8 *test_str, U8 *wild_str)

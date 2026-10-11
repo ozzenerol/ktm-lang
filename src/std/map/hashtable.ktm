@@ -2,8 +2,6 @@ module map;
 
 #define HT_LOAD 60
 
-#define HT_DELETED 0x7fffffffffffffff
-
 #define HT_MIN_CAPACITY 8
 
 #define HT_MAX_CAPACITY (1 << 28)

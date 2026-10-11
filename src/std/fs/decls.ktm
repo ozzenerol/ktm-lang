@@ -60,3 +60,7 @@ public class Fstat
 /* Default MkDir mode, 04775 (rwxrwxr-x; the set-user-ID bit means nothing
  * on a directory), minus the umask: drwxr-xr-x with the usual 022. */
 #define MKDIR_DEFAULT (S_ISUID|S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH)
+
+#define RM_RECURSE  0x1  /* Remove directories and their contents recursively */
+
+#define RM_FORCE    0x4  /* A path that doesn't exist is not an error for Rm */
