@@ -269,6 +269,8 @@ AstType *parseFunctionPointerType(Cctrl *cc,
 {
     int has_var_args, depth = 0;
     Lexeme *fname;
+    Lexeme *star = cctrlTokenPeek(cc);
+    s64 star_line = star ? star->line : 0, star_col = star ? star->col : 0;
     cctrlTokenExpect(cc,'*');
     /* `T (**name)(params)`: a pointer to a function pointer, one more
      * pointer for each further `*` */
@@ -314,6 +316,14 @@ AstType *parseFunctionPointerType(Cctrl *cc,
     cctrlTokenExpect(cc,')');
     cctrlTokenExpect(cc,'(');
     fn_type->params = parseParams(cc,')',&has_var_args,0);
+    fn_type->has_var_args = has_var_args;
+    /* the old C declarator `T (*name)(params)` (a nameless one has had
+     * its error: one per declarator) */
+    if (*fnptr_name_len > 0) {
+        cctrlErrorAt(cc, star_line, star_col - 1, 2,
+            "a C function-pointer declarator: write `%s %.*s`",
+            astTypeToString(type), *fnptr_name_len, *fnptr_name);
+    }
     return type;
 }
 
@@ -3537,8 +3547,13 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
             if (cctrlTokIsKeyword(cc, peek) ||
                 (!paren_arg && tokenMayStartFnType(peek) &&
                  parseFnStartsType(cc))) {
+                s64 open_line = tok->line, open_col = tok->col;
                 type = parseCastTypeName(cc);
                 cctrlTokenExpect(cc,')');
+                /* the old postfix cast `x(T)` */
+                cctrlErrorAt(cc, open_line, open_col, 1,
+                    "a postfix cast: write `(%s)` before the value",
+                    astTypeToString(type));
                 ast = astCast(ast,type);
                 continue;
             } else if (ast->kind == AST_CLASS_REF ||
@@ -3610,9 +3625,13 @@ static void parseCheckArithmeticUnaryOp(Cctrl *cc, AstUnOp op, Ast *operand,
 
     const char *opstr = op == AST_UN_OP_MINUS ? "-" :
                         op == AST_UN_OP_PLUS  ? "+" : "~";
-    char *msg = mprintf("The `%s` operator cannot be applied to a %s of %s",
-                        opstr, astKindToHumanReadable(operand),
-                        astTypeKindToHumanReadable(ty));
+    /* a variable of an fn type is a function pointer, as the old
+     * declarator's was */
+    char *msg = ty->kind == AST_TYPE_FUNC
+        ? mprintf("The `%s` operator cannot be applied to a function pointer", opstr)
+        : mprintf("The `%s` operator cannot be applied to a %s of %s",
+                  opstr, astKindToHumanReadable(operand),
+                  astTypeKindToHumanReadable(ty));
     char *sug = mprintf("`%s` on `%s` is invalid",
                         opstr, astTypeToString(ty));
     AoStr *bold = aoStrNew();

@@ -34,7 +34,7 @@ bool compileFailsWith(u8 *expr, u8 *expected) {
     src = str.format(
 "void F() {}
 void main() {
-  void *w = &F; void (*fp)() = &F; i64 *q = null; f64 d = 1.0;
+  void *w = &F; fn() void fp = &F; i64 *q = null; f64 d = 1.0;
   printf(\"%%d\\n\", %s);
 }
 ", expr);

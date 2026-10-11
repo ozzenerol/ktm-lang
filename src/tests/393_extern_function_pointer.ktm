@@ -64,7 +64,7 @@ void main() { printf(\"%d\\n\", fp(4)); }
                      "cp -P $D/lib/libktm.* ./ktm-393-prefix/lib/ && "
                      "printf 'i64 LibTriple(i64 x) { return x * 3; }\\n"
                      "i64 LibSquare(i64 x) { return x * x; }\\n"
-                     "pub i64 (*triple)(i64) = &LibTriple;\\n"
+                     "pub fn(i64) i64 triple = &LibTriple;\\n"
                      "pub void Ktm393UseSquare() { triple = &LibSquare; }\\n'"
                      " > ./ktm-393-work/ktm393.ktm && "
                      "cd ./ktm-393-work && "
@@ -72,7 +72,7 @@ void main() { printf(\"%d\\n\", fp(4)); }
                 "build the -lib library");
     /* calls it, then sees the library repoint it */
     proc.shell("printf '#link <ktm393>\\n"
-                 "extern i64 (*triple)(i64);\\nvoid Ktm393UseSquare();\\n"
+                 "extern fn(i64) i64 triple;\\nvoid Ktm393UseSquare();\\n"
                  "i32 main() { if (triple(4) != 12) { return 1; } Ktm393UseSquare();"
                  " if (triple(5) != 25) { return 2; } return 0; }\\n'"
                  " > ./ktm-393-use.ktm");

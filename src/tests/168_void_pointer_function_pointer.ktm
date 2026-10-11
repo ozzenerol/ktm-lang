@@ -26,9 +26,9 @@ void cleanupVpTest() {
 /* Compiles `body` inside Main; returns the compiler output (or null) */
 u8 *compileOutput(u8 *body) {
     u8 *src = str.format("i64 Inc(i64 x) { return x + 1; }\n"
-                                            "struct C { i64 (*f)(i64 x); };\n"
-                                            "i64 Call(i64 (*fn)(i64 x), i64 v) { return fn(v); }\n"
-                                            "void main()\n{\n  void *v = &Inc;\n  i64 (*fp)(i64 x) = &Inc;\n"
+                                            "struct C { fn(i64 x) i64 f; };\n"
+                                            "i64 Call(fn(i64 x) i64 f, i64 v) { return f(v); }\n"
+                                            "void main()\n{\n  void *v = &Inc;\n  fn(i64 x) i64 fp = &Inc;\n"
                                             "  C c;\n  i64 *ip = null;\n%s\n}\n", body);
     u8 *out = null;
     cleanupVpTest();
@@ -77,7 +77,7 @@ i32 main() {
     tests++; if (call(v, 6) == 12) { correct++; }
 
     /* No diagnostics */
-    tests++; if (silent("  i64 (*g)(i64 x) = v;")) { correct++; }
+    tests++; if (silent("  fn(i64 x) i64 g = v;")) { correct++; }
     tests++; if (silent("  fp = v;")) { correct++; }
     tests++; if (silent("  v = fp;")) { correct++; }
     tests++; if (silent("  void *w = fp;")) { correct++; }

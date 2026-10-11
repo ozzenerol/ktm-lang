@@ -40,11 +40,11 @@ bool prints(u8 *body, i64 errors, u8 *want=null) {
     u8 *src = str.format(
 "i64 t(i64 x) { return x; }
 i64 s(u8 *p) { return 0; }
-i64 v(i64 n, ...) { return n; }
+extern \"c\" i64 v(i64 n, ...);
 i64 nv(i64 n, i64 ...xs) { return n; }
 u8 r8(i64 x) { return 0; }
 i64 take(fn(i64) i64 f) { return f(1); }
-i64 takeold(i64 (*f)(u8 *)) { return 0; }
+i64 takeold(fn(u8 *) i64 f) { return 0; }
 i64 takev(void *p) { return 0; }
 struct S { fn(u8 *) i64 cb; };
 %s
@@ -73,14 +73,14 @@ i32 main() {
     /* the same signature, void * both ways, null: no diagnostic */
     tests++;
     if (prints(
-"i64 (*g1)(i64) = &t;
+"fn(i64) i64 g1 = &t;
 fn(u8 *) i64 g2 = &s;
 fn(i64) i64 g3[2] = { &t, &t };
 fn(i64) i64 r() { return &t; }
 void f()
 {
   fn(i64) i64 a = &t;
-  i64 (*b)(u8 *) = &s;
+  fn(u8 *) i64 b = &s;
   a = &t; b = &s; a = g1; b = g2;
   take(&t); take(a); take(null); takeold(&s); takev(&t);
   S x = { &s };
@@ -96,9 +96,9 @@ void f()
 }", 0)) { correct++; }
 
     /* initialisers: global and local, old and fn form */
-    tests++; if (prints("i64 (*op)(u8 *) = &t;", 1, WRONG)) { correct++; }
     tests++; if (prints("fn(u8 *) i64 op = &t;", 1, WRONG)) { correct++; }
-    tests++; if (prints("void f() { i64 (*a)(u8 *) = &t; }", 1, WRONG)) { correct++; }
+    tests++; if (prints("fn(u8 *) i64 op = &t;", 1, WRONG)) { correct++; }
+    tests++; if (prints("void f() { fn(u8 *) i64 a = &t; }", 1, WRONG)) { correct++; }
     tests++; if (prints("void f() { fn(u8 *) i64 a = &t; }", 1, WRONG)) { correct++; }
 
     /* assignment, from a function and from a function pointer */

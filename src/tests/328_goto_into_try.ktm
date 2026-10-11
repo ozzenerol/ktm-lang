@@ -152,7 +152,7 @@ inside:
 "void main()
 {
   try {
-    throw('A');
+    throw(0x41);
 again:
     printf(\"again\\n\");
   } catch {

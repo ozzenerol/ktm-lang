@@ -1,7 +1,7 @@
 import fs, libc, mem, proc, str, test;
 
 /* Default arguments declared on a class field function pointer were
- * ignored: `c.f(1)` with `i64 (*f)(i64 a, i64 b=10)` passed whatever was
+ * ignored: `c.f(1)` with `fn(i64 a, i64 b=10) i64 f` passed whatever was
  * in the register for `b` instead of 10. Plain and local function
  * pointers already filled them in. */
 
@@ -97,7 +97,7 @@ i32 main() {
     if (compileFailsWith(
 "
 i64 Add(i64 a, i64 b) { return a + b; }
-struct C { i64 (*f)(i64 a, i64 b); };
+struct C { fn(i64 a, i64 b) i64 f; };
 void main() { C c; c.f = &Add; c.f(1); }
 ",
             "Unexpected number of arguments 1 in call to f(), expected 2 args")) {
