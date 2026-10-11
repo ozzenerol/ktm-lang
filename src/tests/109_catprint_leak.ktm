@@ -1,4 +1,4 @@
-import cstr, libc, map, mem, test;
+import cstr, libc, map, mem, str, test;
 
 /* cstr.appendFormat returned a brand new string and never freed the one passed
  * in, so the idiomatic `s = cstr.appendFormat(s, ...)` loop leaked every old s.
@@ -8,8 +8,8 @@ import cstr, libc, map, mem, test;
 
 /* test.heapInUse() is in the test module (src/tests/test) */
 
-u8 *valueStr(void *v) {
-    return cstr.formatTo(null, "v%d", (i64)v);
+String valueStr(void *v) {
+    return str.format("v%d", (i64)v);
 }
 
 i32 main() {
@@ -71,25 +71,26 @@ i32 main() {
             s[300] == 'r' && s[301] == ']') { correct++; }
     mem.free(s);
 
-    /* 8, 9: the map printers use cstr.appendFormat; no double free, no leak */
+    /* 8, 9: the map printers (Strings now); no double free, no leak */
     map.IntMap *im = map.intNew();
     for (i = 0; i < 50; i++) { im.set(i, (void *)i); }
-    s = im.keysToStr();
-    t = im.toStr(&valueStr);
-    if (s[0] == '{' && s[cstr.len(s) - 1] == '}' && cstr.count(s, ',') == 49 &&
-            t[0] == '{' && t[cstr.len(t) - 1] == '}' && cstr.count(t, ',') == 49) {
+    String ks = im.keysToStr();
+    String vs = im.toStr(&valueStr);
+    if (ks.startsWith("{0, 1, ") && ks.endsWith(", 49}") && cstr.count(ks.cstr(), ',') == 49 &&
+            vs.startsWith("{[0] => v0, ") && vs.endsWith("[49] => v49}") &&
+            cstr.count(vs.cstr(), ',') == 49) {
         correct++;
     }
-    mem.free(s);
-    mem.free(t);
+    ks.free();
+    vs.free();
     before = test.heapInUse();
     for (i = 0; i < 200; i++) {
-        s = im.toStr(&valueStr);
-        mem.free(s);
+        vs = im.toStr(&valueStr);
+        vs.free();
     }
     delta = test.heapInUse() - before;
     if (delta < 65536) { correct++; }
-    else { printf("\n  IntMapToString leaked %d bytes\n", delta); }
+    else { printf("\n  IntMap.toStr leaked %d bytes\n", delta); }
     im.release();
 
     test.printResult(correct, tests);

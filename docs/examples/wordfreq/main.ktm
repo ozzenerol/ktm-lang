@@ -12,7 +12,7 @@ const i64 TOP_N = 8;
 const i64 MAX_WORD = 64;
 
 struct WordCount {
-    u8 *word;
+    String word;
     i64 count;
 };
 
@@ -24,20 +24,20 @@ i64 ranksHigher(void *aArg, void *bArg) {
     if (a.count != b.count) {
         return a.count > b.count;
     }
-    return cstr.cmp(a.word, b.word) < 0;
+    return str.compare(a.word, b.word) < 0;
 }
 
 bool isLetter(u8 c) {
     return ('a' <= c <= 'z') || ('A' <= c <= 'Z');
 }
 
-void countWord(map.StrMap *counts, u8 *word) {
+void countWord(map.StrMap *counts, u8[] word) {
     WordCount *wc = counts.get(word);
     if (wc == null) {
         wc = mem.alloc(sizeof(WordCount));
-        wc.word = cstr.dup(word);       // the map keeps this pointer as its key
+        wc.word = str.from(word);
         wc.count = 0;
-        counts.set(wc.word, wc);
+        counts.set(word, wc);           // the map copies the key
     }
     wc.count++;
 }
@@ -69,8 +69,7 @@ i32 main(i32 argc, u8 **argv) {
                 word[len++] = str.toLower(c);
             }
         } else if (len > 0) {
-            word[len] = 0;
-            countWord(counts, word);
+            countWord(counts, word[0:len]);
             total++;
             len = 0;
         }
@@ -87,7 +86,7 @@ i32 main(i32 argc, u8 **argv) {
     printf("%d words, %d distinct\n", total, ranked.size);
     for (i64 i = 0; i < TOP_N && i < ranked.size; i++) {
         WordCount *top = ranked.entries[i];
-        printf("%2d. %-10s %d\n", i + 1, top.word, top.count);
+        printf("%2d. %-10s %d\n", i + 1, top.word.cstr(), top.count);
     }
 
     return 0;

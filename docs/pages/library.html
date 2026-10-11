@@ -895,9 +895,9 @@ void main()
     evens.has(4), evens.has(5), evens.size());
 
   set.IntSet *both = evens.intersection(threes);
-  u8 *str = both.toStr();
-  printf("both: %s\n", str);
-  mem.free(str);
+  String text = both.toStr();
+  printf("both: %s\n", text);
+  text.free();
 
   set.IntSet *either = evens.unionWith(threes);
   set.IntSetIter *it = either.iterNew();
@@ -962,15 +962,22 @@ linus = 55
 </pre>
 
 <h2 id="hash-tables">Hash tables</h2>
-<p><code>map.StrMap</code> maps strings to <code>void *</code> values and <code>map.IntMap</code> maps
+<p><code>map.StrMap</code> maps text keys to <code>void *</code> values and <code>map.IntMap</code> maps
 <code>i64</code> keys. Values are pointers, so cast integers when storing them:
 <code>count(void *)</code>. Setting an existing key replaces its value.</p>
+<p>A <code>StrMap</code> key is a <code>u8[]</code>: a literal, a <code>String</code> or a view into a
+buffer, matched on all its bytes. The map stores its own copy of every new key and frees it
+itself, so the key you pass can be a reused buffer or a String you free right after.
+<code>node.key</code> and <code>keyIter</code> give views of the map's copy (with a NUL after it, so
+<code>key.ptr</code> is also a C string), valid until that key is deleted or the map is cleared or
+released.</p>
 <pre data-run><code>
-import cstr, map;
+import map;
 
 void main()
 {
   map.StrMap *stock = map.strNew();
+  defer stock.release();
   stock.set("apples", (void *)3);
   stock.set("pears", (void *)5);
   stock.set("apples", (void *)4);
@@ -985,14 +992,13 @@ void main()
   while (stock.iter(&idx, &node)) {
     printf("%s = %d\n", node.key, node.value);
   }
-  stock.release();
 
   map.IntMap *names = map.intNew();
+  defer names.release();
   names.set(404, "not found");
   names.set(200, "ok");
   printf("%s\n", names.get(404));
   printf("deleted 200: %d, deleted 500: %d\n", names.delete(200), names.delete(500));
-  names.release();
 }
 </code></pre>
 <pre class="output">
@@ -1002,20 +1008,18 @@ pears = 5
 not found
 deleted 200: 1, deleted 500: 0
 </pre>
-<p><code>map.strGet</code> and <code>map.intGet</code> return <code>null</code> for a missing
-key, which is also what a stored <code>null</code> or <code>0</code> gives. Pass a
-<code>bool</code> as the optional last argument to tell them apart: it is set to
-<code>true</code> when the key is there (<code>map.strHas</code> and <code>map.intHas</code> answer
-the same question). <code>map.strGetLen</code> and <code>map.strHasLen</code> look up the first
-<code>key_len</code> bytes at a pointer, so a word inside a larger buffer can be looked up
-without copying it out. <code>map.strClear</code> and <code>map.intClear</code> remove every
-entry and keep the capacity.</p>
+<p><code>get</code> returns <code>null</code> for a missing key, which is also what a stored
+<code>null</code> or <code>0</code> gives. Pass a <code>bool</code> as the optional last argument to
+tell them apart: it is set to <code>true</code> when the key is there (<code>has</code> answers the
+same question). A word inside a larger buffer is looked up with a sub-slice, without copying it out.
+<code>clear</code> removes every entry and keeps the capacity.</p>
 <pre data-run><code>
-import cstr, map;
+import map;
 
 void main()
 {
   map.IntMap *seen = map.intNew();
+  defer seen.release();
   seen.set(7, (void *)0);
   bool ok;
   i64 v = seen.get(7, &ok);
@@ -1024,15 +1028,14 @@ void main()
   printf("8: %d (there: %d)\n", v, ok);
 
   map.StrMap *words = map.strNew();
+  defer words.release();
   words.set("let", (void *)1);
   words.set("for", (void *)2);
-  u8 *line = "for x in xs";
-  printf("first word: %d\n", words.getLen(line, 3));
+  u8[] line = "for x in xs";
+  printf("first word: %d\n", words.get(line[0:3]));
 
   words.clear();
   printf("after clear: %d keys, %d slots\n", words.size, words.capacity);
-  words.release();
-  seen.release();
 }
 </code></pre>
 <pre class="output">
@@ -1041,39 +1044,54 @@ void main()
 first word: 2
 after clear: 0 keys, 32 slots
 </pre>
-<p>Iteration (<code>map.strIter</code>, <code>map.strKeyIter</code>, <code>map.strValueIter</code>
-and the <code>map.IntMap</code> ones) follows insertion order. Start the cursor at 0 and call
-until it returns <code>false</code>; the cursor is opaque, so don't compute with it.
-Deleting entries while iterating is safe (the loop above could delete
-<code>node.key</code>); adding entries is not, as an added entry can be skipped or the
-table rebuilt under the loop. A deleted key can be set again and then comes last.
-<code>map.strToStr</code>, <code>map.intToStr</code> and the <code>KeysToString</code>
-versions print a map, in insertion order, into a new string you free.</p>
+<p>Iteration (<code>iter</code>, <code>keyIter</code> and <code>valueIter</code>, on both kinds of
+map) follows insertion order. Start the cursor at 0 and call until it returns <code>false</code>;
+the cursor is opaque, so don't compute with it. Deleting entries while iterating is safe (the
+loop above could delete <code>node.key</code>); adding entries is not, as an added entry can be
+skipped or the table rebuilt under the loop. A deleted key can be set again and then comes last.
+<code>toStr</code> and <code>keysToStr</code> print a map, in insertion order, into a new
+<code>String</code> (free it); <code>toStr</code> takes a function that turns a value into a
+<code>String</code>, which it frees after use.</p>
+<pre data-run><code>
+import map, str;
+
+String showCount(void *v)
+{
+  return str.format("%d", (i64)v);
+}
+
+void main()
+{
+  map.StrMap *m = map.strNew();
+  defer m.release();
+  m.set("a", (void *)1);
+  m.set("b", (void *)2);
+  String keys = m.keysToStr();
+  defer keys.free();
+  String all = m.toStr(&showCount);
+  defer all.free();
+  printf("%s %s\n", keys, all);
+}
+</code></pre>
+<pre class="output">
+{a, b} {[a] => 1, [b] => 2}
+</pre>
 <p><code>map.strNew</code> and <code>map.intNew</code> take an optional starting capacity
 (default 32): the number of slots, rounded up to a power of two, at least 8 (a negative
 request gets 8 and one above 2<sup>28</sup> gets 2<sup>28</sup>). The table is rebuilt,
 doubling, when its entries and deleted holes fill 60% of the slots, so a capacity of 1024
 holds about 600 entries before it grows. It never shrinks, not on delete and not on clear;
-release it and make a new one to give the memory back. <code>map.strResize</code> and
-<code>map.intResize</code> double it ahead of time. They and the <code>New</code> functions
-return <code>false</code> or <code>null</code> when out of memory, as does a
-<code>Set</code> that needed to grow the table.</p>
-<p><code>map.strSetFreeKey</code>, <code>map.strSetFreeValue</code> and
-<code>map.intSetFreeValue</code> register destructors. With them the map owns what you give
-it: they run on <code>Delete</code>, <code>Clear</code> and <code>Release</code>, and when
-<code>Set</code> replaces a value. Setting a key that is already there keeps the key the map
-stores and frees the old value and the key you passed (nothing is freed when you pass the
-stored pointers again). A pointer used as both the key and the value
-(<code>map.strSet(m, s, s)</code>) is freed once. <code>Set</code> returns <code>true</code>
-for a new key and an update alike; check <code>Has</code> first to know which. A
-<code>null</code> map or key is safe everywhere: <code>Get</code> and <code>Has</code> give
-<code>null</code> and <code>false</code>, <code>Set</code> and <code>Delete</code>
-<code>false</code>, and <code>Release</code> and <code>Clear</code> do nothing.</p>
-<div class="warn"><p>The map keeps the key pointer you pass the first time a key is set,
-instead of copying it. Use keys that live as long as the map, such as
-<code>cstr.dup</code> copies; updating an existing key from a reused buffer is fine. With a
-key destructor registered, an update frees the key you passed: don't use it after
-<code>map.strSet</code> returns.</p></div>
+release it and make a new one to give the memory back. <code>resize</code> doubles it ahead of
+time. It and the <code>New</code> functions return <code>false</code> or <code>null</code> when
+out of memory, as does a <code>set</code> that needed to grow the table or copy a key.</p>
+<p><code>setFreeValue</code> registers a value destructor. With it the map owns the values you
+give it: it runs on <code>delete</code>, <code>clear</code> and <code>release</code>, and when
+<code>set</code> replaces a value (not when you set the stored pointer again). <code>set</code>
+returns <code>true</code> for a new key and an update alike; check <code>has</code> first to know
+which. A <code>null</code> map is safe everywhere: <code>get</code> and <code>has</code> give
+<code>null</code> and <code>false</code>, <code>set</code> and <code>delete</code>
+<code>false</code>, and <code>release</code> and <code>clear</code> do nothing. An empty
+<code>u8[]</code> is the key <code>""</code>.</p>
 
 <h2 id="bit-vectors">Bit vectors</h2>
 <p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>vec.bitSet</code>

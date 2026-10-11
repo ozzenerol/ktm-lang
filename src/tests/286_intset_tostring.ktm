@@ -12,10 +12,10 @@ i64 digits(i64 v) {
     return n;
 }
 
-bool strIs(u8 *got, u8 *want) {
-    bool ok = got != null && !cstr.cmp(got, want);
+bool strIs(String got, u8[] want) {
+    bool ok = got.equals(want);
     if (!ok) { printf("\n  got \"%s\" want \"%s\"\n", got, want); }
-    mem.free(got);
+    got.free();
     return ok;
 }
 
@@ -23,7 +23,7 @@ i32 main() {
     printf("Test - IntSetToString: ");
     i64 correct = 0, tests = 0, i, n, len, t;
     set.IntSet *s = set.intNew();
-    u8 *strVal;
+    String strVal;
 
     tests++; if (strIs(s.toStr(), "{}")) { correct++; }
     s.add(42);
@@ -50,13 +50,13 @@ i32 main() {
     t = clock();
     strVal = s.toStr();
     t = (clock() - t) / 1000; /* CLOCKS_PER_SEC is 1000000 on POSIX */
-    tests++; if (cstr.len(strVal) == len && mem.size(strVal) > len) { correct++; }
-    tests++; if (!cstr.cmpLen(strVal, "{-149999, -149998, ", 19)) { correct++; }
-    tests++; if (!cstr.cmp(strVal + len - 17, ", 149999, 150000}")) { correct++; }
+    tests++; if (strVal.len == len && strVal.ptr[len] == 0) { correct++; }
+    tests++; if (strVal.startsWith("{-149999, -149998, ")) { correct++; }
+    tests++; if (strVal.endsWith(", 149999, 150000}")) { correct++; }
     tests++;
     if (t < 2000) { correct++; }
     else { printf("\n  IntSetToString of %d elements took %d ms\n", n, t); }
-    mem.free(strVal);
+    strVal.free();
     s.release();
 
     test.printResult(correct, tests);
