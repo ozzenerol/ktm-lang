@@ -1376,7 +1376,10 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name) {
     Ast *decl = findFunctionDecl(cc, key, strlen(key));
     if (!decl) decl = mapGet(cc->global_env, key);
     if (!decl || (cc->localenv && mapGet(cc->localenv, key))) return;
-    if (!migIsStdFile(cc, decl->file_id) && !(decl->kind == AST_EXTERN_FUNC)) return;
+    /* in src/std the declaration found is the stdlib's: a module's own
+     * function has no header file to tell */
+    int in_std = f->real && strstr(f->real, "/src/std/");
+    if (!in_std && !migIsStdFile(cc, decl->file_id) && !(decl->kind == AST_EXTERN_FUNC)) return;
     if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
         /* printf: C's, built in; and the stdlib's own private helpers
          * and runtime stay what they are inside src/std (S2) */
