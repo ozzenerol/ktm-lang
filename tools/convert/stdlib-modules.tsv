@@ -406,10 +406,10 @@ function	PtrVecRelease	vec	ptrRelease	vector.ktm
 function	PtrVecSet	vec	ptrSet	vector.ktm
 function	PtrVecSort	vec	ptrSort	vector.ktm
 function	QSortGeneric	vec	qsort	fix: vec.qsort(arr, low, high, lessThan), low before high (today high, low; decision 11); vector.ktm
-type	HCFs	-	drop	leaves the public API with Fs (decision 6); stays a runtime internal; except.ktm
+type	HCFs	rt	HCFs	leaves the public API with Fs (decision 6); stays a runtime internal; except.ktm
 type	cStat	c	cStat	the raw platform struct stat behind fs.stat, a C struct in module c; std.ktmh
 function	Dir	-	drop	TempleOS `Dir` command, prints an ls-style listing (decision 9); io.ktm
-function	Fs	-	drop	HolyC `Fs->except_ch`, leaves the public API: `catch (Error e)` replaces it (decision 6); stays a runtime internal; except.ktm
+function	Fs	rt	Fs	HolyC `Fs->except_ch`, leaves the public API: `catch (Error e)` replaces it (decision 6); stays a runtime internal; except.ktm
 function	IsDotC	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
 function	IsDotZ	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
 function	Write	-	drop	duplicate of C write(2), which os re-exports (would collide as os.write); its users (coroutines, except, vector, test 84) call write; system.ktm
@@ -463,3 +463,6 @@ cconstants	(sockets and TCP options; topic net)	c	AF_INET AF_INET6 AF_UNIX AF_UN
 cconstants	(SQLite result codes and types; topic sql)	c	SQLITE3_TEXT SQLITE_ABORT SQLITE_AUTH SQLITE_BLOB SQLITE_BUSY SQLITE_CANTOPEN SQLITE_CONSTRAINT SQLITE_CORRUPT SQLITE_DONE SQLITE_EMPTY SQLITE_ERROR SQLITE_FLOAT SQLITE_FORMAT SQLITE_FULL SQLITE_INTEGER SQLITE_INTERNAL SQLITE_INTERRUPT SQLITE_IOERR SQLITE_LOCKED SQLITE_MISMATCH SQLITE_MISUSE SQLITE_NOLFS SQLITE_NOMEM SQLITE_NOTADB SQLITE_NOTFOUND SQLITE_NOTICE SQLITE_NULL SQLITE_OK SQLITE_PERM SQLITE_PROTOCOL SQLITE_RANGE SQLITE_READONLY SQLITE_ROW SQLITE_SCHEMA SQLITE_TEXT SQLITE_TOOBIG SQLITE_WARNING	37 C constants, unchanged, as c.<NAME>
 cconstants	(struct-size helpers (private))	-	__MUTEX_LOCK_ATTR_SIZE__ __MUTEX_LOCK_PADDING__ __SIZEOF_PTHREAD_ATTR_T __SIZEOF_PTHREAD_BARRIERATTR_T __SIZEOF_PTHREAD_BARRIER_T __SIZEOF_PTHREAD_CONDATTR_T __SIZEOF_PTHREAD_COND_T __SIZEOF_PTHREAD_MUTEXATTR_T __SIZEOF_PTHREAD_MUTEX_T __SIZEOF_PTHREAD_RWLOCKATTR_T __SIZEOF_PTHREAD_RWLOCK_T __THREAD_ATTR_SIZE__ __THREAD_CONDATTR_SIZE__ __THREAD_COND_SIZE__ __THREAD_SIZE__	15 constants, private
 type	cTimespec	c	timespec	C struct timespec (the header called it cTimespec); std.ktmh
+cfunctions	(the other C functions the stdlib declared privately; S2)	c	_longjmp calloc exit fflush getcwd getenv getpagesize isatty memcpy memset mmap mprotect munmap opendir pipe posix_spawn posix_spawn_file_actions_addchdir_np posix_spawn_file_actions_adddup2 posix_spawn_file_actions_addopen posix_spawn_file_actions_destroy posix_spawn_file_actions_init posix_spawnattr_destroy posix_spawnattr_init posix_spawnattr_setflags posix_spawnattr_setpgroup posix_spawnattr_setsigdefault posix_spawnattr_setsigmask posix_spawnp pthread_getspecific pthread_key_create pthread_once pthread_setspecific pthread_sigmask readdir realloc sigaction sigaddset sigemptyset sigfillset sigismember sigpending strtok_r system	C names, unchanged, as c.<name>
+type	CoroCached	rt	CoroCached	runtime: a coroutine stack cached in its thread's HCFs (S2); coroutines.ktm
+function	CoroStacksFree	rt	coroStacksFree	runtime: frees a thread's cached coroutine stacks (S2); coroutines.ktm

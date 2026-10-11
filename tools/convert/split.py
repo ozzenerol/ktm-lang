@@ -26,6 +26,12 @@ KEEP_IN = {'HCFs': 'rt', 'Fs': 'rt', 'HT_DELETED': 'map', 'STR_LEN': 'str',
            'PRTF_DECIMAL': 'str', 'PRTF_LEFT_JUSTIFY': 'str', 'PRTF_PAD_ZERO': 'str',
            'PRTF_SLASH': 'str', 'PRTF_TRUNCATE': 'str', '_SS_PAD1SIZE': 'net', '_SS_PAD2SIZE': 'net'}
 
+# placed by hand: coroutine stack caching is the runtime's thread state
+# (rt frees it when a thread ends; coro uses rt, so rt can't use coro)
+FORCE = {'CoroStacksFree': 'rt', 'CoroCached': 'rt'}
+# a tiny private helper both its users need a copy of
+COPY = {'RBIsNil': ['map', 'set']}
+
 def home_of(f):
     c = collections.Counter(mp[i['name']][1] for i in allit[f]
                             if i['name'] in mp and i['kind'] in ('func', 'type', 'global', 'proto')
@@ -64,6 +70,34 @@ for _ in range(4):
         if refs:
             helper_mod[h] = refs.most_common(1)[0][0]
 
+# `auto F(...)` definitions get the return type the header declared
+hdr_ret = {}
+for it in allit['std.ktmh']:
+    if it['kind'] == 'proto':
+        head = text['std.ktmh'][it['s']:it['e']]
+        head = re.sub(r'^(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', '', head, flags=re.S)
+        m = re.match(r'(?:public\s+)?([\w\s\*]+?)\b' + re.escape(it['name']) + r'\s*\(', head)
+        if m:
+            hdr_ret[it['name']] = m.group(1).strip()
+
+# a platform #if block of a .ktm file goes where the helpers it defines are
+# used (os's ErrnoPtr is in system.ktm's #ifdef IS_LINUX)
+def block_defs(body):
+    return set(re.findall(r'^\s*(?:static\s+|public\s+)?(?:_extern\s+\S+\s+)?[A-Za-z_]\w*[\s\*]+(\w+)\s*\(',
+                          body, re.M)) - {'if', 'while', 'for', 'switch', 'return'}
+
+def block_module(f, idx, body):
+    defs = block_defs(body)
+    refs = collections.Counter()
+    for g in files:
+        for j, it in enumerate(allit[g]):
+            if (g, j) == (f, idx) or not (defs & words[(g, j)]):
+                continue
+            m = mapped_module(it) or helper_mod.get(it['name'])
+            if m and m != 'c':
+                refs[m] += 1
+    return refs.most_common(1)[0][0] if refs else None
+
 outputs = collections.defaultdict(list)     # (module, file) -> [text]
 seen_c = set()
 seen_defines = set()
@@ -71,11 +105,24 @@ unplaced = []
 dropped = []
 for f in headers + files:
     home = home_of(f) or 'c'      # dir.ktm: nothing but C bindings
-    for it in allit[f]:
+    for idx, it in enumerate(allit[f]):
         k, name = it['kind'], it['name']
         body = text[f][it['s']:it['e']]
         if k == 'directive':
             continue
+        if name in FORCE and k != 'proto':
+            lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
+            rest = re.sub(r'^(public|static)\s+', '', body[lead:])
+            outputs[(FORCE[name], f)].append(body[:lead] + 'public ' + rest)
+            continue
+        if name in FORCE or (k == 'proto' and name in defined):
+            continue          # FORCE's forward declarations; see also below
+        if name in COPY:
+            for m in COPY[name]:
+                outputs[(m, f)].append(body)
+            continue
+        if k == 'func' and name in hdr_ret:
+            body = re.sub(r'\bauto(\s+' + re.escape(name) + r'\s*\()', hdr_ret[name] + r'\1', body, count=1)
         row = mp.get(name)
         mod = row[1] if row else None
         if name in DROP:
@@ -138,6 +185,8 @@ for f in headers + files:
                 if mods:
                     unplaced.append((f, it['start'], k, name + ' (several modules: %s, put in c)' % ','.join(sorted(mods))))
                 mod = 'c'
+        if mod is None and k == 'ifblock' and f not in headers:
+            mod = block_module(f, idx, body)
         if mod is None:
             if f in headers:
                 unplaced.append((f, it['start'], k, name))

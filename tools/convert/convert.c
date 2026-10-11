@@ -1269,7 +1269,11 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name) {
         /* printf: C's, built in; and the stdlib's own private helpers
          * and runtime stay what they are inside src/std (S2) */
         if (!strcmp(m->kind, "c")) return;
-        if (f->real && strstr(f->real, "/src/std/")) return;
+        if (f->real && strstr(f->real, "/src/std/")) {
+            /* the stdlib's own modules use the runtime: rt.x */
+            if (!strcmp(m->module, "rt")) migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
+            return;
+        }
         migNote(f, s, "can't convert `%s`: %s in the stdlib map (%s)", key,
                 !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
         return;
@@ -1289,9 +1293,13 @@ void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type) {
     if (s < 0) return;
     char *key = mprintf("%.*s", (int)name->len, f->text + s);
     MigName *m = mapGet(mig_map, key);
-    if (!m || strcmp(m->kind, "type")) return;
+    /* a stdlib type, or a C one (the map's ctypes rows: c.pthread_t) */
+    if (!m || (strcmp(m->kind, "type") && strcmp(m->kind, "c"))) return;
     if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
-        if (f->real && strstr(f->real, "/src/std/")) return;
+        if (f->real && strstr(f->real, "/src/std/")) {
+            if (!strcmp(m->module, "rt")) migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
+            return;
+        }
         migNote(f, s, "can't convert the type `%s`: %s in the stdlib map (%s)", key,
                 !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
         return;
@@ -1322,7 +1330,10 @@ void migrateNoteMacro(Cctrl *cc, Lexeme *use) {
     if (migDefinesMacro(f, key)) return;
     if (!strcmp(m->module, "-") || !strcmp(m->module, "rt")) {
         if (!strcmp(m->name, "removed")) return;      /* TRUE FALSE NULL: stage 1 */
-        if (f->real && strstr(f->real, "/src/std/")) return;
+        if (f->real && strstr(f->real, "/src/std/")) {
+            if (!strcmp(m->module, "rt")) migAdd(f, s, s + use->len, migQualified(f, m), "stdlib");
+            return;
+        }
         migNote(f, s, "can't convert the macro `%s`: %s in the stdlib map (%s)", key,
                 !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
         return;
