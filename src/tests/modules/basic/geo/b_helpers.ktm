@@ -1,17 +1,18 @@
 module geo;
+import mem;
 
-i64 g_calls = 0;
+i64 gCalls = 0;
 
 i64 square(i64 n) {
-  g_calls++;
-  return n * n;
+    gCalls++;
+    return n * n;
 }
 
 pub Point *makePoint(i64 x, i64 y) {
-  Point *p = MAlloc(sizeof(Point));
-  p->x = x;
-  p->y = y;
-  return p;
+    Point *p = mem.alloc(sizeof(Point));
+    p.x = x;
+    p.y = y;
+    return p;
 }
 
-pub i64 calls() { return g_calls; }
+pub i64 calls() { return gCalls; }

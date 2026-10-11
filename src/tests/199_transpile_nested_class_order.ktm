@@ -1,10 +1,12 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* `-transpile` wrote the classes first and the unions after them, so a
  * class holding a named union by value used it before its typedef, and
- * it turned F32 into double. Each class or union is now written after
+ * it turned f32 into double. Each class or union is now written after
  * the ones it holds by value (members, array members, members of an
- * anonymous nested union), and F32 is float. */
+ * anonymous nested union), and f32 is float. */
 
 #define TR_FILE "__199_transpile.ktm"
 #define TR_C    "__199_transpile.c"
@@ -13,38 +15,37 @@
 /* `timeout` is coreutils; without it the command just runs */
 #define TR_TIMEOUT "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
 
-U0 CleanupTranspileTest(U0)
-{
-  System("rm -f " TR_FILE " " TR_C " " TR_EXE " " TR_OUT);
+void cleanupTranspileTest(void) {
+    proc.shell("rm -f " TR_FILE " " TR_C " " TR_EXE " " TR_OUT);
 }
 
-U8 *tr_source =
-"class Zeta
+u8 *trSource =
+"struct Zeta
 {
-  F32 z;
-  I32 pad;
+  f32 z;
+  i32 pad;
 };
 
 union Word
 {
-  I64 i;
-  F64 f;
+  i64 i;
+  f64 f;
   Zeta zeta;
 };
 
-class Yak
+struct Yak
 {
   Zeta zeta;
   Word word;
-  F32 scale;
+  f32 scale;
 };
 
-class Apple
+struct Apple
 {
   Yak yak;
   union {
     Word inner;
-    I64 raw;
+    i64 raw;
   };
   Apple *next;
 };
@@ -52,101 +53,99 @@ class Apple
 union Holder
 {
   Apple apple;
-  I64 tag;
+  i64 tag;
 };
 
-class Base
+struct Base
 {
   Holder holder;
   Yak yaks[2];
-  F32 ratio;
+  f32 ratio;
 };
 
-U0 Main()
+void main()
 {
   Base b;
   b.holder.apple.yak.zeta.z = 2.5;
   b.holder.apple.yak.word.zeta.pad = 4;
   b.holder.apple.inner.i = 9;
-  b.holder.apple.next = NULL;
+  b.holder.apple.next = null;
   b.ratio = 0.25;
-  \"%.2f %d %d %.2f\\n\", b.holder.apple.yak.zeta.z,
-    b.holder.apple.yak.word.zeta.pad, b.holder.apple.inner.i, b.ratio;
+  printf(\"%.2f %d %d %.2f\\n\", b.holder.apple.yak.zeta.z,
+    b.holder.apple.yak.word.zeta.pad, b.holder.apple.inner.i, b.ratio);
 }
 ";
 
 /* `first` appears in `code`, and before `second` */
-Bool Before(U8 *code, U8 *first, U8 *second)
-{
-  U8 *a = strstr(code, first), *b = strstr(code, second);
-  if (!a || !b || a > b) {
-    "\"%s\" is not before \"%s\"\n", first, second;
-    return FALSE;
-  }
-  return TRUE;
+bool before(u8 *code, u8 *first, u8 *second) {
+    u8 *a = libc.strstr(code, first), *b = libc.strstr(code, second);
+    if (!a || !b || a > b) {
+        printf("\"%s\" is not before \"%s\"\n", first, second);
+        return false;
+    }
+    return true;
 }
 
-U0 Main()
-{
-  "Test - transpile nested class order: ";
-  I64 correct = 0, tests = 0, res;
-  U8 *code, *out;
+void main() {
+    printf("Test - transpile nested class order: ");
+    i64 correct = 0, tests = 0, res;
+    u8 *code, *out;
 
-  CleanupTranspileTest;
-  FileWrite(TR_FILE, tr_source, StrLen(tr_source), O_CREAT | O_RDWR | O_TRUNC);
-  res = System(TR_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -transpile " TR_FILE " > " TR_C " 2>/dev/null");
-  code = FileRead(TR_C);
+    cleanupTranspileTest();
+    fs.writeAll(TR_FILE, trSource, str.len(trSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    res = proc.shell(TR_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -transpile " TR_FILE " > " TR_C " 2>/dev/null");
+    code = fs.readAll(TR_C);
 
-  tests++;
-  if (res == 0 && code) correct++;
-  if (!code) code = StrNew("");
+    tests++;
+    if (res == 0 && code) { correct++; }
+    if (!code) { code = str.dup(""); }
 
-  /* Every by-value dependency comes first, through unions, arrays and
-   * an anonymous union */
-  tests++;
-  if (Before(code, "typedef struct Zeta {", "typedef union Word {") &&
-      Before(code, "typedef union Word {", "typedef struct Yak {") &&
-      Before(code, "typedef struct Yak {", "typedef struct Apple {") &&
-      Before(code, "typedef struct Apple {", "typedef union Holder {") &&
-      Before(code, "typedef union Holder {", "typedef struct Base {")) {
-    correct++;
-  }
-
-  /* Each written once */
-  tests++;
-  U8 *w = strstr(code, "typedef union Word {");
-  if (w && !strstr(w + 1, "typedef union Word {")) correct++;
-
-  /* F32 is float, F64 double */
-  tests++;
-  if (strstr(code, "float z;") && strstr(code, "float scale;") &&
-      strstr(code, "float ratio;") && strstr(code, "double f;")) {
-    correct++;
-  }
-
-  /* A pointer to the class being written still uses its tag */
-  tests++;
-  if (strstr(code, "struct Apple *next;")) correct++;
-
-  /* The C compiles and prints what the JIT does (only with a C
-   * compiler on the PATH) */
-  tests++;
-  res = System("command -v cc >/dev/null 2>&1");
-  if (res != 0) {
-    correct++;
-  } else {
-    res = System("cc -w -o " TR_EXE " " TR_C " -lm > " TR_OUT " 2>&1 && " TR_TIMEOUT "./" TR_EXE " > " TR_OUT " 2>&1");
-    out = FileRead(TR_OUT);
-    if (res == 0 && out && !StrCmp(out, "2.50 4 9 0.25\n")) {
-      correct++;
-    } else if (out) {
-      "%s\n", out;
+    /* Every by-value dependency comes first, through unions, arrays and
+     * an anonymous union */
+    tests++;
+    if (before(code, "typedef struct Zeta {", "typedef union Word {") &&
+            before(code, "typedef union Word {", "typedef struct Yak {") &&
+            before(code, "typedef struct Yak {", "typedef struct Apple {") &&
+            before(code, "typedef struct Apple {", "typedef union Holder {") &&
+            before(code, "typedef union Holder {", "typedef struct Base {")) {
+        correct++;
     }
-    if (out) Free(out);
-  }
 
-  Free(code);
-  CleanupTranspileTest;
-  PrintResult(correct, tests);
-  "====\n";
+    /* Each written once */
+    tests++;
+    u8 *w = libc.strstr(code, "typedef union Word {");
+    if (w && !libc.strstr(w + 1, "typedef union Word {")) { correct++; }
+
+    /* f32 is float, f64 double */
+    tests++;
+    if (libc.strstr(code, "float z;") && libc.strstr(code, "float scale;") &&
+            libc.strstr(code, "float ratio;") && libc.strstr(code, "double f;")) {
+        correct++;
+    }
+
+    /* A pointer to the class being written still uses its tag */
+    tests++;
+    if (libc.strstr(code, "struct Apple *next;")) { correct++; }
+
+    /* The C compiles and prints what the JIT does (only with a C
+     * compiler on the PATH) */
+    tests++;
+    res = proc.shell("command -v cc >/dev/null 2>&1");
+    if (res != 0) {
+        correct++;
+    } else {
+        res = proc.shell("cc -w -o " TR_EXE " " TR_C " -lm > " TR_OUT " 2>&1 && " TR_TIMEOUT "./" TR_EXE " > " TR_OUT " 2>&1");
+        out = fs.readAll(TR_OUT);
+        if (res == 0 && out && !str.cmp(out, "2.50 4 9 0.25\n")) {
+            correct++;
+        } else if (out) {
+            printf("%s\n", out);
+        }
+        if (out) { mem.free(out); }
+    }
+
+    mem.free(code);
+    cleanupTranspileTest();
+    PrintResult(correct, tests);
+    printf("====\n");
 }

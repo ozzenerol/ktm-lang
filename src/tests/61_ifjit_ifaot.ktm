@@ -1,5 +1,6 @@
-"Test - #ifjit / #ifaot: ";
 #include "testhelper.ktm"
+
+import os;
 
 /* The suite compiles AOT, so #ifaot branches must be taken and #ifjit
  * branches skipped. The JIT side is covered by run_jit compiling the
@@ -7,44 +8,46 @@
  * Mode() returns which branch was compiled in and the assert adapts
  * via __KTM_AOT__. */
 
-I64 correct = 0;
-I64 tests = 3;
+i64 correct = 0;
+i64 tests = 3;
 
-I64 Mode()
-{
+i64 Mode() {
 #ifjit
-  return 1;
+    return 1;
 #else
-  return 2;
+    return 2;
 #endif
 }
 
-I64 Mode2()
-{
+i64 mode2() {
 #ifaot
-  return 2;
+    return 2;
 #else
-  return 1;
+    return 1;
 #endif
 }
 
 #ifaot
-I64 aot_only = 42;
+i64 aotOnly = 42;
 #endif
 #ifjit
-I64 aot_only = 0;
+i64 aot_only = 0;
 #endif
 
 #ifdef __KTM_AOT__
-if (Mode() == 2) correct++;
-if (Mode2() == 2) correct++;
-if (aot_only == 42) correct++;
 #else
 if (Mode() == 1) correct++;
 if (Mode2() == 1) correct++;
 if (aot_only == 0) correct++;
 #endif
 
-PrintResult(correct, tests);
-'===\n';
-Exit(0);
+
+void main() {
+    printf("Test - #ifjit / #ifaot: ");
+    if (Mode() == 2) { correct++; }
+    if (mode2() == 2) { correct++; }
+    if (aotOnly == 42) { correct++; }
+    PrintResult(correct, tests);
+    printf("===\n");
+    os.exit(0);
+}

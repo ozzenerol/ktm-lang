@@ -1,85 +1,84 @@
 #include "testhelper.ktm"
 
+import vec;
+
 /* IntVecNew(0)/FloatVecNew(0) never grew (capacity * 2 of 0) and every
  * push wrote past the block; PtrVecNew ignored its size and always made
  * room for 32. A size below 1 (0 or negative) now starts with room for
  * one entry, and growing from a tiny capacity goes to at least 8. */
 
-Bool IntVecFrom(I64 size, I64 n)
-{
-  IntVec *v = IntVecNew(size);
-  if (IntVecCapacity(v) < 1) return FALSE;
-  for (I64 i = 0; i < n; ++i) IntVecPush(v, i * 3);
-  Bool ok = v->size == n && IntVecCapacity(v) > n;
-  for (I64 i = 0; i < n; ++i) if (IntVecGet(v, i) != i * 3) ok = FALSE;
-  IntVecRelease(v);
-  return ok;
+bool intVecFrom(i64 size, i64 n) {
+    vec.IntVec *v = vec.intNew(size);
+    if (v.capacity() < 1) { return false; }
+    for (i64 i = 0; i < n; ++i) { v.push(i * 3); }
+    bool ok = v.size == n && v.capacity() > n;
+    for (i64 i = 0; i < n; ++i) { if (v.get(i) != i * 3) { ok = false; } }
+    v.release();
+    return ok;
 }
 
-Bool FloatVecFrom(I64 size, I64 n)
-{
-  FloatVec *v = FloatVecNew(size);
-  for (I64 i = 0; i < n; ++i) FloatVecPush(v, i * 0.5);
-  Bool ok = v->size == n;
-  for (I64 i = 0; i < n; ++i) if (FloatVecGet(v, i) != i * 0.5) ok = FALSE;
-  FloatVecRelease(v);
-  return ok;
+bool floatVecFrom(i64 size, i64 n) {
+    vec.FloatVec *v = vec.floatNew(size);
+    for (i64 i = 0; i < n; ++i) { v.push(i * 0.5); }
+    bool ok = v.size == n;
+    for (i64 i = 0; i < n; ++i) { if (v.get(i) != i * 0.5) { ok = false; } }
+    v.release();
+    return ok;
 }
 
-Bool PtrVecFrom(I64 size, I64 n)
-{
-  PtrVec *v = PtrVecNew(size);
-  for (I64 i = 0; i < n; ++i) PtrVecPush(v, (i + 1)(U0 *));
-  Bool ok = v->size == n;
-  for (I64 i = 0; i < n; ++i) if (PtrVecGet(v, i)(I64) != i + 1) ok = FALSE;
-  PtrVecRelease(v);
-  return ok;
+bool ptrVecFrom(i64 size, i64 n) {
+    vec.PtrVec *v = vec.ptrNew(size);
+    for (i64 i = 0; i < n; ++i) { v.push((void *)(i + 1)); }
+    bool ok = v.size == n;
+    for (i64 i = 0; i < n; ++i) { if ((i64)v.get(i) != i + 1) { ok = false; } }
+    v.release();
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  "Test - vector zero capacity: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    printf("Test - vector zero capacity: ");
 
-  I64 sizes[5] = {0, -1, -1000, 1, 2};
-  Bool ok = TRUE;
-  for (I64 i = 0; i < 5; ++i) {
-    if (!IntVecFrom(sizes[i], 1000)) { ok = FALSE; "IntVec size %d\n", sizes[i]; }
-  }
-  tests++; if (ok) correct++;
+    i64 sizes[5] = {0, -1, -1000, 1, 2};
+    bool ok = true;
+    for (i64 i = 0; i < 5; ++i) {
+        if (!intVecFrom(sizes[i], 1000)) { ok = false; printf("IntVec size %d\n", sizes[i]); }
+    }
+    tests++; if (ok) { correct++; }
 
-  ok = TRUE;
-  for (I64 i = 0; i < 5; ++i) {
-    if (!FloatVecFrom(sizes[i], 1000)) { ok = FALSE; "FloatVec size %d\n", sizes[i]; }
-  }
-  tests++; if (ok) correct++;
+    ok = true;
+    for (i64 i = 0; i < 5; ++i) {
+        if (!floatVecFrom(sizes[i], 1000)) { ok = false; printf("FloatVec size %d\n", sizes[i]); }
+    }
+    tests++; if (ok) { correct++; }
 
-  ok = TRUE;
-  for (I64 i = 0; i < 5; ++i) {
-    if (!PtrVecFrom(sizes[i], 1000)) { ok = FALSE; "PtrVec size %d\n", sizes[i]; }
-  }
-  tests++; if (ok) correct++;
+    ok = true;
+    for (i64 i = 0; i < 5; ++i) {
+        if (!ptrVecFrom(sizes[i], 1000)) { ok = false; printf("PtrVec size %d\n", sizes[i]); }
+    }
+    tests++; if (ok) { correct++; }
 
-  /* The requested size is the initial capacity, for all three */
-  IntVec *iv = IntVecNew(100);
-  FloatVec *fv = FloatVecNew(100);
-  PtrVec *pv = PtrVecNew(100);
-  PtrVec *pv0 = PtrVecNew(0);
-  PtrVec *pvd = PtrVecNew();
-  tests++;
-  if (IntVecCapacity(iv) == 100 && FloatVecCapacity(fv) == 100 &&
-      PtrVecCapacity(pv) == 100 && PtrVecCapacity(pv0) == 1 &&
-      PtrVecCapacity(pvd) == 32) correct++;
-  else "initial capacity: %d %d %d %d %d\n", IntVecCapacity(iv),
-       FloatVecCapacity(fv), PtrVecCapacity(pv), PtrVecCapacity(pv0),
-       PtrVecCapacity(pvd);
-  IntVecRelease(iv);
-  FloatVecRelease(fv);
-  PtrVecRelease(pv);
-  PtrVecRelease(pv0);
-  PtrVecRelease(pvd);
+    /* The requested size is the initial capacity, for all three */
+    vec.IntVec *iv = vec.intNew(100);
+    vec.FloatVec *fv = vec.floatNew(100);
+    vec.PtrVec *pv = vec.ptrNew(100);
+    vec.PtrVec *pv0 = vec.ptrNew(0);
+    vec.PtrVec *pvd = vec.ptrNew();
+    tests++;
+    if (iv.capacity() == 100 && fv.capacity() == 100 &&
+            pv.capacity() == 100 && pv0.capacity() == 1 &&
+            pvd.capacity() == 32) { correct++; }
+    else { printf("initial capacity: %d %d %d %d %d\n", iv.capacity(),
+             fv.capacity(), pv.capacity(), pv0.capacity(),
+             pvd.capacity());
+    }
+    iv.release();
+    fv.release();
+    pv.release();
+    pv0.release();
+    pvd.release();
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

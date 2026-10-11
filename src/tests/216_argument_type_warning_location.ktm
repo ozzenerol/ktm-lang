@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* A call argument of the wrong type was reported at the call's `)` (or
  * the token after it) instead of at the argument. It is now reported at
  * the argument, underlining all of it. */
@@ -8,77 +10,74 @@
 #define ARGLOC_OUT "./ktm-216-argloc.out"
 
 /* Compile `source` and return what ktm printed */
-U8 *Diagnose(U8 *source)
-{
-  System("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
-  FileWrite(ARGLOC_SRC, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC);
-  System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
-         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-         "-S " ARGLOC_SRC " -o /dev/null > " ARGLOC_OUT " 2>&1");
-  U8 *out = FileRead(ARGLOC_OUT);
-  System("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
-  return out;
+u8 *diagnose(u8 *source) {
+    proc.shell("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
+    fs.writeAll(ARGLOC_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+                 "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                 "-S " ARGLOC_SRC " -o /dev/null > " ARGLOC_OUT " 2>&1");
+    u8 *out = fs.readAll(ARGLOC_OUT);
+    proc.shell("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
+    return out;
 }
 
 /* ktm's output has every one of `want` */
-Bool Has(U8 *source, U8 *want1, U8 *want2, U8 *want3 = NULL)
-{
-  U8 *out = Diagnose(source);
-  Bool ok = out && strstr(out, want1) && strstr(out, want2) &&
-            (!want3 || strstr(out, want3));
-  if (!ok) "got: '%s'\n", out;
-  Free(out);
-  return ok;
+bool has(u8 *source, u8 *want1, u8 *want2, u8 *want3 = null) {
+    u8 *out = diagnose(source);
+    bool ok = out && libc.strstr(out, want1) && libc.strstr(out, want2) &&
+                        (!want3 || libc.strstr(out, want3));
+    if (!ok) { printf("got: '%s'\n", out); }
+    mem.free(out);
+    return ok;
 }
 
-#define CLS "class P { i64 x, y; };\nclass S { void (*f)(P *p); };\n" \
-            "void Take(P *p) { }\nU0 TakeV(P p) { }\nU0 Two(i64 a, P *p) { }\n"
+#define CLS "struct P { i64 x, y; };\nstruct S { fn(P *p) void f; };\n" \
+                        "void Take(P *p) { }\nU0 TakeV(P p) { }\nU0 Two(i64 a, P *p) { }\n"
 
-I32 Main()
-{
-  "Test - argument type warning location: ";
-  I64 tests = 0;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - argument type warning location: ");
+    i64 tests = 0;
+    i64 correct = 0;
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Take(y);\n}\n",
-          "expected 'P *' got 'i64' in function 'Take'",
-          "216-argloc.ktm:8:8\n", "|           ^\n"))
-    correct++;
-  else "Failed - pointer parameter\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  Take(y);\n}\n",
+                    "expected 'P *' got 'i64' in function 'Take'",
+                    "216-argloc.ktm:8:8\n", "|           ^\n")) {
+        correct++;
+                    } else { printf("Failed - pointer parameter\n"); }
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  TakeV(y);\n}\n",
-          "expected 'P' got 'i64' in function 'TakeV'",
-          "216-argloc.ktm:8:9\n"))
-    correct++;
-  else "Failed - class parameter\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  TakeV(y);\n}\n",
+                    "expected 'P' got 'i64' in function 'TakeV'",
+                    "216-argloc.ktm:8:9\n")) {
+        correct++;
+                    } else { printf("Failed - class parameter\n"); }
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Two(1, y);\n}\n",
-          "in function 'Two'", "216-argloc.ktm:8:10\n"))
-    correct++;
-  else "Failed - second argument\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  Two(1, y);\n}\n",
+                    "in function 'Two'", "216-argloc.ktm:8:10\n")) {
+        correct++;
+                    } else { printf("Failed - second argument\n"); }
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Take(y + 1);\n}\n",
-          "216-argloc.ktm:8:8\n", "|           ^^^^^\n"))
-    correct++;
-  else "Failed - expression argument\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  Take(y + 1);\n}\n",
+                    "216-argloc.ktm:8:8\n", "|           ^^^^^\n")) {
+        correct++;
+                    } else { printf("Failed - expression argument\n"); }
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  S s;\n  s.f(y);\n}\n",
-          "in function 'f'", "216-argloc.ktm:9:7\n"))
-    correct++;
-  else "Failed - function pointer field\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  S s;\n  s.f(y);\n}\n",
+                    "in function 'f'", "216-argloc.ktm:9:7\n")) {
+        correct++;
+                    } else { printf("Failed - function pointer field\n"); }
 
-  tests++;
-  if (Has(CLS "void Main() {\n  i64 y = 1;\n  Two(1,\n      y);\n}\n",
-          "in function 'Two'", "216-argloc.ktm:9:7\n"))
-    correct++;
-  else "Failed - argument on the next line\n";
+    tests++;
+    if (has(CLS "void main() {\n  i64 y = 1;\n  Two(1,\n      y);\n}\n",
+                    "in function 'Two'", "216-argloc.ktm:9:7\n")) {
+        correct++;
+                    } else { printf("Failed - argument on the next line\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

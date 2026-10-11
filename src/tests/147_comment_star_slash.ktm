@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* The block comment scan started on the opener's `*`, so `/` `*` `/`
  * opened and closed a comment in three characters and what followed
  * was compiled as code. As in C, the `*` of the opener can't also be
@@ -9,133 +11,123 @@
 #define SLASH_FILE "__147_comment_slash.ktm"
 #define SLASH_OUT  "__147_comment_slash.out"
 
-U0 CleanupSlashTest(U0)
-{
-  Rm(SLASH_FILE);
-  Rm(SLASH_OUT);
-  Rm("./a.out");
+void cleanupSlashTest(void) {
+    fs.remove(SLASH_FILE);
+    fs.remove(SLASH_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p++;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p++;
+    }
+    return n;
 }
 
 /* Compile `source`. With `count` 0 it must compile cleanly; otherwise
  * ktm must exit 1 with exactly `count` errors, the output containing
- * `want` (when not NULL). */
-Bool Compile(U8 *source, I64 count, U8 *want)
-{
-  U8 *out;
-  I64 res;
-  Bool ok = TRUE;
+ * `want` (when not null). */
+bool compile(u8 *source, i64 count, u8 *want) {
+    u8 *out;
+    i64 res;
+    bool ok = true;
 
-  CleanupSlashTest;
+    cleanupSlashTest();
 
-  if (!FileWrite(SLASH_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(SLASH_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " SLASH_FILE " > " SLASH_OUT " 2>&1");
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " SLASH_FILE " > " SLASH_OUT " 2>&1");
 
-  out = FileRead(SLASH_OUT);
-  if (!out) {
-    CleanupSlashTest;
-    return FALSE;
-  }
+    out = fs.readAll(SLASH_OUT);
+    if (!out) {
+        cleanupSlashTest();
+        return false;
+    }
 
-  if (count == 0) {
-    if (res != 0) ok = FALSE;
-  } else {
-    if (res != 1) ok = FALSE;
-  }
-  if (want && !strstr(out, want)) ok = FALSE;
-  if (CountErrors(out) != count) ok = FALSE;
-  if (!ok) "exit status %d\n%s\n", res, out;
+    if (count == 0) {
+        if (res != 0) { ok = false; }
+    } else {
+        if (res != 1) { ok = false; }
+    }
+    if (want && !libc.strstr(out, want)) { ok = false; }
+    if (countErrors(out) != count) { ok = false; }
+    if (!ok) { printf("exit status %d\n%s\n", res, out); }
 
-  Free(out);
-  CleanupSlashTest;
-  return ok;
+    mem.free(out);
+    cleanupSlashTest();
+    return ok;
 }
 
-Bool TestSlashStarSlash(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
+bool testSlashStarSlash(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
 /*/ x
 */
-", 0, NULL);
+", 0, null);
 }
 
 /* Code between it and the real end is commented out */
-Bool TestSpansLines(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
+bool testSpansLines(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
 /*/
-I64 x = ;
-U0 F( {
+i64 x = ;
+void F( {
 / */
-", 0, NULL);
+", 0, null);
 }
 
 /* `/` `*` `/` `*` `/` is one whole comment */
-Bool TestFiveChars(U0)
-{
-  return Compile(
-"U0 Main() { /*/*/ \"hi\\n\"; }
-", 0, NULL);
+bool testFiveChars(void) {
+    return compile(
+"void main() { /*/*/ printf(\"hi\\n\"); }
+", 0, null);
 }
 
-Bool TestShortComments(U0)
-{
-  return Compile(
-"U0 Main() { I64 a /**/ = 1 /***/ + /****/ 2; \"%d\\n\", a; }
-", 0, NULL);
+bool testShortComments(void) {
+    return compile(
+"void main() { i64 a /**/ = 1 /***/ + /****/ 2; printf(\"%d\\n\", a); }
+", 0, null);
 }
 
 /* Left open at the end of the file it is still reported */
-Bool TestUnterminatedAtEof(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
+bool testUnterminatedAtEof(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
 /*/", 1, "error: unterminated comment\n --> " SLASH_FILE ":2:1\n");
 }
 
-Bool TestUnterminatedLine(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
+bool testUnterminatedLine(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
   /*/ never closed
 ", 1, "error: unterminated comment\n --> " SLASH_FILE ":2:3\n");
 }
 
-I32 Main()
-{
-  "Test - comment star slash: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - comment star slash: ");
+    i64 correct = 0, tests = 0;
 
-  tests++; if (TestSlashStarSlash)    correct++;
-  tests++; if (TestSpansLines)        correct++;
-  tests++; if (TestFiveChars)         correct++;
-  tests++; if (TestShortComments)     correct++;
-  tests++; if (TestUnterminatedAtEof) correct++;
-  tests++; if (TestUnterminatedLine)  correct++;
+    tests++; if (testSlashStarSlash())    { correct++; }
+    tests++; if (testSpansLines())        { correct++; }
+    tests++; if (testFiveChars())         { correct++; }
+    tests++; if (testShortComments())     { correct++; }
+    tests++; if (testUnterminatedAtEof()) { correct++; }
+    tests++; if (testUnterminatedLine())  { correct++; }
 
-  /* The same in this file itself */
-  I64 n = 1 /**/ + /***/ 1;
-  tests++; if (n == 2) correct++;
-  tests++; /*/ correct--; */ correct++;
-  tests++; /*/*/ correct++;
+    /* The same in this file itself */
+    i64 n = 1 /**/ + /***/ 1;
+    tests++; if (n == 2) { correct++; }
+    tests++; /*/ correct--; */ correct++;
+    tests++; /*/*/ correct++;
 
-  CleanupSlashTest;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    cleanupSlashTest();
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

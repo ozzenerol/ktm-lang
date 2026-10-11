@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, mem, proc, str;
+
 /* `ktm -lib name dir`, dir not module name's directory: every module
  * under dir (net/http is net.http) goes into one library, dir/libname.a
  * and its shared object, and each module's directory gets a .ktmlib
@@ -15,76 +17,80 @@
 #define TREE "./ktm-439-tree"
 #define MOVED "./ktm-439-moved"
 #define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) " \
-            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
-U8 *g_want = "9 5 4\n";
+u8 *gWant = "9 5 4\n";
 
-Bool Output(U8 *cmd, U8 *want)
-{
-  System("rm -f " OUT " " BIN);
-  System(cmd);
-  U8 *out = FileRead(OUT);
-  Bool ok = out && !StrCmp(out, want);
-  if (!ok) "\n%s\n----\n%s\n", cmd, out;
-  Free(out);
-  System("rm -f " OUT " " BIN);
-  return ok;
+bool output(u8 *cmd, u8 *want) {
+    proc.shell("rm -f " OUT " " BIN);
+    proc.shell(cmd);
+    u8 *out = fs.readAll(OUT);
+    bool ok = out && !str.cmp(out, want);
+    if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
+    mem.free(out);
+    proc.shell("rm -f " OUT " " BIN);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - one library from a tree of modules: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - one library from a tree of modules: ");
+    i64 correct = 0, tests = 0;
 
-  System("rm -rf " TREE " " MOVED " && mkdir -p " TREE
-         " && cp -r ${KTM_TEST_SRC:-.}/modules/libtree/. " TREE "/");
+    proc.shell("rm -rf " TREE " " MOVED " && mkdir -p " TREE
+                 " && cp -r ${KTM_TEST_SRC:-.}/modules/libtree/. " TREE "/");
 
-  /* quiet, one library, a relative marker per module, no object file */
-  tests++;
-  if (Output(KTM "-lib tree " TREE " > " OUT " 2>&1", "")) correct++;
-  tests++;
-  if (Output("cat " TREE "/geo/.ktmlib " TREE "/net/http/.ktmlib | grep static > " OUT,
-             "static ../libtree.a\nstatic ../../libtree.a\n"))
-    correct++;
-  tests++;
-  if (Output("ls " TREE "/libtree.a > /dev/null && test ! -e " TREE "/prelude/.ktmlib && "
-             "test -z \"$(find " TREE " -name '*.o')\" && echo ok > " OUT, "ok\n"))
-    correct++;
+    /* quiet, one library, a relative marker per module, no object file */
+    tests++;
+    if (output(KTM "-lib tree " TREE " > " OUT " 2>&1", "")) { correct++; }
+    tests++;
+    if (output("cat " TREE "/geo/.ktmlib " TREE "/net/http/.ktmlib | grep static > " OUT,
+                         "static ../libtree.a\nstatic ../../libtree.a\n")) {
+        correct++;
+                         }
+    tests++;
+    if (output("ls " TREE "/libtree.a > /dev/null && test ! -e " TREE "/prelude/.ktmlib && "
+                         "test -z \"$(find " TREE " -name '*.o')\" && echo ok > " OUT, "ok\n")) {
+        correct++;
+                         }
 
-  /* the program links it: none of the modules' code is compiled in */
-  tests++;
-  if (Output(KTM "-S " TREE "/main.ktm -o " BIN " && grep -c '^_K3geo4area:' " BIN " > " OUT,
-             "0\n"))
-    correct++;
-  tests++;
-  if (Output(KTM TREE "/main.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, g_want))
-    correct++;
-  tests++;
-  if (Output(KTM "-jit " TREE "/main.ktm > " OUT " 2>&1", g_want)) correct++;
+    /* the program links it: none of the modules' code is compiled in */
+    tests++;
+    if (output(KTM "-S " TREE "/main.ktm -o " BIN " && grep -c '^_K3geo4area:' " BIN " > " OUT,
+                         "0\n")) {
+        correct++;
+                         }
+    tests++;
+    if (output(KTM TREE "/main.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, gWant)) {
+        correct++;
+    }
+    tests++;
+    if (output(KTM "-jit " TREE "/main.ktm > " OUT " 2>&1", gWant)) { correct++; }
 
-  /* the markers are relative: the tree still works moved */
-  System("mv " TREE " " MOVED);
-  tests++;
-  if (Output(KTM MOVED "/main.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, g_want))
-    correct++;
-  tests++;
-  if (Output(KTM "-jit " MOVED "/main.ktm > " OUT " 2>&1", g_want)) correct++;
+    /* the markers are relative: the tree still works moved */
+    proc.shell("mv " TREE " " MOVED);
+    tests++;
+    if (output(KTM MOVED "/main.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, gWant)) {
+        correct++;
+    }
+    tests++;
+    if (output(KTM "-jit " MOVED "/main.ktm > " OUT " 2>&1", gWant)) { correct++; }
 
-  /* -v prints the commands; one module's library, relative too */
-  System("rm -f " MOVED "/geo/.ktmlib " MOVED "/net/http/.ktmlib " MOVED "/libtree.*");
-  tests++;
-  if (Output(KTM "-v -lib geo " MOVED "/geo 2>&1 | grep -c 'ar rcs' > " OUT, "1\n")) correct++;
-  tests++;
-  if (Output("grep static " MOVED "/geo/.ktmlib > " OUT, "static libgeo.a\n")) correct++;
+    /* -v prints the commands; one module's library, relative too */
+    proc.shell("rm -f " MOVED "/geo/.ktmlib " MOVED "/net/http/.ktmlib " MOVED "/libtree.*");
+    tests++;
+    if (output(KTM "-v -lib geo " MOVED "/geo 2>&1 | grep -c 'ar rcs' > " OUT, "1\n")) { correct++; }
+    tests++;
+    if (output("grep static " MOVED "/geo/.ktmlib > " OUT, "static libgeo.a\n")) { correct++; }
 
-  /* a directory that is neither */
-  tests++;
-  if (Output(KTM "-lib nothing " MOVED "/geo 2>&1 | grep -c 'is neither module nothing.s "
-             "directory (one ending in nothing) nor a tree with modules under it' > " OUT, "1\n"))
-    correct++;
+    /* a directory that is neither */
+    tests++;
+    if (output(KTM "-lib nothing " MOVED "/geo 2>&1 | grep -c 'is neither module nothing.s "
+                         "directory (one ending in nothing) nor a tree with modules under it' > " OUT, "1\n")) {
+        correct++;
+                         }
 
-  System("rm -rf " TREE " " MOVED " " OUT " " BIN);
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    proc.shell("rm -rf " TREE " " MOVED " " OUT " " BIN);
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

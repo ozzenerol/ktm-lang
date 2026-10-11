@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import libc, mem, net, str;
+
 /* NetCreateUnixServerSocket unlink()ed whatever was at the path before
  * binding: a regular file there was deleted, and a second server on the
  * path of a live one silently took it over, leaving the first one
@@ -8,109 +10,105 @@
  * Before the fix accepting on the first server blocked forever, so a
  * watchdog alarm turns a hang into a failure. */
 
-extern "c" U8 *mkdtemp(U8 *tmpl);
-extern "c" I32 symlink(U8 *target, U8 *linkpath);
-extern "c" U32 alarm(U32 seconds);
+extern "c" u8 *mkdtemp(u8 *tmpl);
+extern "c" i32 symlink(u8 *target, u8 *linkpath);
+extern "c" u32 alarm(u32 seconds);
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
-Bool HasData(U8 *path)
-{
-  U8 b[8];
-  I32 fd = open(path, O_RDONLY);
-  if (fd == -1) return FALSE;
-  MemSet(b, 0, sizeof(b));
-  I64 n = read(fd, b, 5);
-  close(fd);
-  return n == 5 && !StrNCmp(b, "data\n", 5);
+bool hasData(u8 *path) {
+    u8 b[8];
+    i32 fd = libc.open(path, libc.O_RDONLY);
+    if (fd == -1) { return false; }
+    mem.set(b, 0, sizeof(b));
+    i64 n = libc.read(fd, b, 5);
+    libc.close(fd);
+    return n == 5 && !str.cmpLen(b, "data\n", 5);
 }
 
-Bool IsMode(U8 *path, I64 kind)
-{
-  cStat st;
-  return lstat(path, &st) == 0 && (st.st_mode & S_IFMT) == kind;
+bool isMode(u8 *path, i64 kind) {
+    libc.cStat st;
+    return libc.lstat(path, &st) == 0 && (st.st_mode & libc.S_IFMT) == kind;
 }
 
-Bool Talk(I32 srv, U8 *path)
+bool talk(i32 srv, u8 *path)
 {// A client on path reaches srv
-  U8 b = 0;
-  I32 c = NetCreateUnixClientSocket(path);
-  if (c == -1) return FALSE;
-  I32 a = NetAccept(srv);
-  Bool ok = a != -1 && write(c, "x", 1) == 1 && read(a, &b, 1) == 1 && b == 'x';
-  if (a != -1) close(a);
-  close(c);
-  return ok;
+    u8 b = 0;
+    i32 c = net.unixDial(path);
+    if (c == -1) { return false; }
+    i32 a = net.accept(srv);
+    bool ok = a != -1 && libc.write(c, "x", 1) == 1 && libc.read(a, &b, 1) == 1 && b == 'x';
+    if (a != -1) { libc.close(a); }
+    libc.close(c);
+    return ok;
 }
 
-I32 Main()
-{
-  U8 dir[64], file[128], sock[128], sub[128], link[128];
-  I32 a, b, c, fd;
-  "Test - unix server socket keeps other files: ";
-  alarm(30);
+i32 main() {
+    u8 dir[64], file[128], sock[128], sub[128], link[128];
+    i32 a, b, c, fd;
+    printf("Test - unix server socket keeps other files: ");
+    alarm(30);
 
-  StrCpy(dir, "./ktm336-XXXXXX");
-  Check(mkdtemp(dir) != NULL, "mkdtemp");
-  StrPrint(file, "%s/file", dir);
-  StrPrint(sock, "%s/s.sock", dir);
-  StrPrint(sub, "%s/sub", dir);
-  StrPrint(link, "%s/link", dir);
+    str.copy(dir, "./ktm336-XXXXXX");
+    check(mkdtemp(dir) != null, "mkdtemp");
+    str.formatTo(file, "%s/file", dir);
+    str.formatTo(sock, "%s/s.sock", dir);
+    str.formatTo(sub, "%s/sub", dir);
+    str.formatTo(link, "%s/link", dir);
 
-  /* a regular file is left alone */
-  fd = open(file, O_CREAT | O_WRONLY | O_TRUNC, 0x1A4);
-  write(fd, "data\n", 5);
-  close(fd);
-  a = NetCreateUnixServerSocket(file, 4);
-  Check(a == -1, "server on a regular file fails");
-  if (a != -1) close(a);
-  Check(IsMode(file, S_IFREG) && HasData(file), "regular file kept");
+    /* a regular file is left alone */
+    fd = libc.open(file, libc.O_CREAT | libc.O_WRONLY | libc.O_TRUNC, 0x1A4);
+    libc.write(fd, "data\n", 5);
+    libc.close(fd);
+    a = net.unixListen(file, 4);
+    check(a == -1, "server on a regular file fails");
+    if (a != -1) { libc.close(a); }
+    check(isMode(file, libc.S_IFREG) && hasData(file), "regular file kept");
 
-  /* so are a directory and a symlink */
-  mkdir(sub, 0x1ED);
-  a = NetCreateUnixServerSocket(sub, 4);
-  Check(a == -1 && IsMode(sub, S_IFDIR), "directory kept");
-  if (a != -1) close(a);
-  symlink(file, link);
-  a = NetCreateUnixServerSocket(link, 4);
-  Check(a == -1 && IsMode(link, S_IFLNK) && HasData(file), "symlink kept");
-  if (a != -1) close(a);
+    /* so are a directory and a symlink */
+    libc.mkdir(sub, 0x1ED);
+    a = net.unixListen(sub, 4);
+    check(a == -1 && isMode(sub, libc.S_IFDIR), "directory kept");
+    if (a != -1) { libc.close(a); }
+    symlink(file, link);
+    a = net.unixListen(link, 4);
+    check(a == -1 && isMode(link, libc.S_IFLNK) && hasData(file), "symlink kept");
+    if (a != -1) { libc.close(a); }
 
-  /* a live server keeps its path */
-  a = NetCreateUnixServerSocket(sock, 4);
-  Check(a != -1, "first server");
-  b = NetCreateUnixServerSocket(sock, 4);
-  Check(b == -1, "second server on a live path fails");
-  if (b != -1) close(b);
-  /* finding out the path is live took one connection, closed at once */
-  U8 eof;
-  c = NetAccept(a);
-  Check(c != -1 && read(c, &eof, 1) == 0, "probe connection");
-  if (c != -1) close(c);
-  Check(a != -1 && Talk(a, sock), "first server still reachable");
-  if (a != -1) close(a);
+    /* a live server keeps its path */
+    a = net.unixListen(sock, 4);
+    check(a != -1, "first server");
+    b = net.unixListen(sock, 4);
+    check(b == -1, "second server on a live path fails");
+    if (b != -1) { libc.close(b); }
+    /* finding out the path is live took one connection, closed at once */
+    u8 eof;
+    c = net.accept(a);
+    check(c != -1 && libc.read(c, &eof, 1) == 0, "probe connection");
+    if (c != -1) { libc.close(c); }
+    check(a != -1 && talk(a, sock), "first server still reachable");
+    if (a != -1) { libc.close(a); }
 
-  /* the socket file it left behind is stale and is replaced */
-  Check(IsMode(sock, S_IFSOCK), "stale socket file left");
-  c = NetCreateUnixServerSocket(sock, 4);
-  Check(c != -1, "server replaces a stale socket");
-  Check(c != -1 && Talk(c, sock), "new server reachable");
-  if (c != -1) close(c);
+    /* the socket file it left behind is stale and is replaced */
+    check(isMode(sock, libc.S_IFSOCK), "stale socket file left");
+    c = net.unixListen(sock, 4);
+    check(c != -1, "server replaces a stale socket");
+    check(c != -1 && talk(c, sock), "new server reachable");
+    if (c != -1) { libc.close(c); }
 
-  unlink(sock);
-  unlink(link);
-  unlink(file);
-  rmdir(sub);
-  Check(rmdir(dir) == 0, "temp dir cleaned");
+    libc.unlink(sock);
+    libc.unlink(link);
+    libc.unlink(file);
+    libc.rmdir(sub);
+    check(libc.rmdir(dir) == 0, "temp dir cleaned");
 
-  alarm(0);
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+    alarm(0);
+    PrintResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

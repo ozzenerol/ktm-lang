@@ -1,20 +1,17 @@
 #include "testhelper.ktm"
 
-I64 Add(I64 a, I64 b=76)
-{
-  return a + b;
+i64 add(i64 a, i64 b=76) {
+    return a + b;
 }
 
-I64 Add2(I64 a=10, I64 b=43)
-{
-  return a + b;
+i64 add2(i64 a=10, i64 b=43) {
+    return a + b;
 }
 
-I32 Main()
-{
-  "Test - Default function parameters: ";
-  I64 i = Add(20);
-  PrintResult(i == 96 && Add2(,43) == 53, 1);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - Default function parameters: ");
+    i64 i = add(20);
+    PrintResult(i == 96 && add2(,43) == 53, 1);
+    printf("====\n");
+    return 0;
 }

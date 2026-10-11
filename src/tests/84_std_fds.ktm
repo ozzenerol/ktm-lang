@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, os, proc, str;
+
 /* std.ktmh (and the library's defs.ktmh) defined STDOUT as 0 and STDIN as
  * 2, so Write(STDOUT, ...) wrote to stdin: it only worked while fd 0
  * happened to be a read/write terminal and was lost when stdout was
@@ -13,71 +15,70 @@
 /* A single literal: adjacent strings don't concatenate inside #define */
 #define FD_TEST_KTM "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit ./ktm-84-prog.ktm"
 
-U0 CleanupFdTest(U0)
-{
-  System("rm -f " FD_TEST_PROG " " FD_TEST_OUT " " FD_TEST_ERR);
+void cleanupFdTest(void) {
+    proc.shell("rm -f " FD_TEST_PROG " " FD_TEST_OUT " " FD_TEST_ERR);
 }
 
 /* The file at `path` holds exactly `expected` */
-Bool FileIs(U8 *path, U8 *expected)
-{
-  U8 *got = FileRead(path);
-  Bool ok;
-  if (!got) {
-    "%s missing\n", path;
-    return FALSE;
-  }
-  ok = StrCmp(got, expected) == 0;
-  if (!ok) "%s: got '%s', want '%s'\n", path, got, expected;
-  Free(got);
-  return ok;
+bool fileIs(u8 *path, u8 *expected) {
+    u8 *got = fs.readAll(path);
+    bool ok;
+    if (!got) {
+        printf("%s missing\n", path);
+        return false;
+    }
+    ok = str.cmp(got, expected) == 0;
+    if (!ok) { printf("%s: got '%s', want '%s'\n", path, got, expected); }
+    mem.free(got);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - STDIN, STDOUT and STDERR: ";
-  I64 tests = 7, correct = 0;
-  U8 *prog;
+i32 main() {
+    printf("Test - STDIN, STDOUT and STDERR: ");
+    i64 tests = 7, correct = 0;
+    u8 *prog;
 
-  if (STDIN == 0 && STDOUT == 1 && STDERR == 2) correct++;
-  else "Failed - STDIN %d, STDOUT %d, STDERR %d\n", STDIN, STDOUT, STDERR;
+    if (os.STDIN == 0 && os.STDOUT == 1 && os.STDERR == 2) { correct++; }
+    else { printf("Failed - STDIN %d, STDOUT %d, STDERR %d\n", os.STDIN, os.STDOUT, os.STDERR); }
 
-  CleanupFdTest;
-  /* Copies stdin to stdout, then writes one line to each stream */
-  prog =
-"I32 Main()
+    cleanupFdTest();
+    /* Copies stdin to stdout, then writes one line to each stream */
+    prog =
+"import libc, os;
+
+i32 main()
 {
-  U8 buf[64];
-  I64 n = read(STDIN, buf, 64);
-  if (n > 0) Write(STDOUT, buf, n);
-  Write(STDOUT, \"to stdout\\n\", 10);
-  Write(STDERR, \"to stderr\\n\", 10);
+  u8 buf[64];
+  i64 n = libc.read(os.STDIN, buf, 64);
+  if (n > 0) { libc.write(os.STDOUT, buf, n); }
+  libc.write(os.STDOUT, \"to stdout\\n\", 10);
+  libc.write(os.STDERR, \"to stderr\\n\", 10);
   return 0;
 }
 ";
-  FileWrite(FD_TEST_PROG, prog, StrLen(prog), O_CREAT | O_RDWR | O_TRUNC);
+    fs.writeAll(FD_TEST_PROG, prog, str.len(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
-  /* stdin is /dev/null (read-only), stdout and stderr are files */
-  if (System(FD_TEST_KTM " < /dev/null > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) correct++;
-  else "Failed - running the program\n";
-  if (FileIs(FD_TEST_OUT, "to stdout\n")) correct++;
-  else "Failed - Write(STDOUT, ...) to a redirected stdout\n";
-  if (FileIs(FD_TEST_ERR, "to stderr\n")) correct++;
-  else "Failed - Write(STDERR, ...) to a redirected stderr\n";
+    /* stdin is /dev/null (read-only), stdout and stderr are files */
+    if (proc.shell(FD_TEST_KTM " < /dev/null > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) { correct++; }
+    else { printf("Failed - running the program\n"); }
+    if (fileIs(FD_TEST_OUT, "to stdout\n")) { correct++; }
+    else { printf("Failed - Write(STDOUT, ...) to a redirected stdout\n"); }
+    if (fileIs(FD_TEST_ERR, "to stderr\n")) { correct++; }
+    else { printf("Failed - Write(STDERR, ...) to a redirected stderr\n"); }
 
-  /* STDIN reads piped input */
-  if (System("printf 'piped\\n' | " FD_TEST_KTM " > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) correct++;
-  else "Failed - running the program with piped stdin\n";
-  if (FileIs(FD_TEST_OUT, "piped\nto stdout\n")) correct++;
-  else "Failed - read(STDIN, ...) from a pipe\n";
+    /* STDIN reads piped input */
+    if (proc.shell("printf 'piped\\n' | " FD_TEST_KTM " > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) { correct++; }
+    else { printf("Failed - running the program with piped stdin\n"); }
+    if (fileIs(FD_TEST_OUT, "piped\nto stdout\n")) { correct++; }
+    else { printf("Failed - read(STDIN, ...) from a pipe\n"); }
 
-  /* stdout and stderr stay separate when both go to one pipe */
-  if (System(FD_TEST_KTM " < /dev/null 2>/dev/null | grep -qx 'to stdout'") == 0
-      && System(FD_TEST_KTM " < /dev/null 2>&1 >/dev/null | grep -qx 'to stderr'") == 0) correct++;
-  else "Failed - stdout and stderr through pipes\n";
+    /* stdout and stderr stay separate when both go to one pipe */
+    if (proc.shell(FD_TEST_KTM " < /dev/null 2>/dev/null | grep -qx 'to stdout'") == 0
+            && proc.shell(FD_TEST_KTM " < /dev/null 2>&1 >/dev/null | grep -qx 'to stderr'") == 0) { correct++; }
+    else { printf("Failed - stdout and stderr through pipes\n"); }
 
-  CleanupFdTest;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    cleanupFdTest();
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

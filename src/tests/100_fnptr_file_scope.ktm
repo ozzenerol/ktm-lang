@@ -1,70 +1,70 @@
 #include "testhelper.ktm"
 
-/* A function pointer declared at file scope - `I64 (*g)(I64 a, I64 b)
+import str;
+
+/* A function pointer declared at file scope - `i64 (*g)(i64 a, i64 b)
  * = &Add;` - failed with "Identifier expected", with or without
  * parameter names, initialiser or not. */
 
-class S
-{
-  I64 (*f)(I64 x);
+struct S {
+    fn(i64 x) i64 f;
 };
 
-I64 Add(I64 a, I64 b) { return a + b; }
-I64 Sub(I64 a, I64 b) { return a - b; }
-I64 Dbl(I64 x) { return x * 2; }
-I64 Apply(I64 (*f)(I64 x), I64 v) { return f(v); }
-U8 *Name(I64 i) { if (i) return "one"; return "zero"; }
-I64 g_hits = 0;
-U0 Hit() { g_hits++; }
-I64 Count(...) { return argc; }
+i64 add(i64 a, i64 b) { return a + b; }
+i64 sub(i64 a, i64 b) { return a - b; }
+i64 dbl(i64 x) { return x * 2; }
+i64 apply(fn(i64 x) i64 f, i64 v) { return f(v); }
+u8 *Name(i64 i) { if (i) { return "one"; } return "zero"; }
+i64 gHits = 0;
+void hit() { gHits++; }
+i64 count(...args) { return args.len; }
 
-I64 (*g)(I64 a, I64 b) = &Add;
-I64 (*h)(I64, I64) = &Sub;
-I64 (*later)(I64 a, I64 b);
-I64 (*k)(I64 a, I64 b = 10) = &Add;
-I64 (*p1)(I64 x) = &Dbl, (*p2)(I64 x);
-I64 (*ap)(I64 (*f)(I64 x), I64 v) = &Apply;
-U8 *(*nm)(I64 i) = &Name;
-U0 (*cb)() = &Hit;
-I64 (*va)(...) = &Count;
-static I64 (*st)(I64 x) = &Dbl;
-I64 after = 41;
+fn(i64 a, i64 b) i64 g = &add;
+fn(i64, i64) i64 h = &sub;
+fn(i64 a, i64 b) i64 later;
+fn(i64 a, i64 b = 10) i64 k = &add;
+fn(i64 x) i64 p1 = &dbl; fn(i64 x) i64 p2;
+fn(fn(i64 x) i64 f, i64 v) i64 ap = &apply;
+fn(i64 i) u8 *nm = &Name;
+fn() void cb = &hit;
+fn(...args) i64 va = &count;
+static fn(i64 x) i64 st = &dbl;
+i64 after = 41;
 
-I64 CallG(I64 a, I64 b) { return g(a, b); }
+i64 callG(i64 a, i64 b) { return g(a, b); }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 14;
+i32 main() {
+    i64 correct = 0, tests = 14;
 
-  "Test - function pointer at file scope: ";
+    printf("Test - function pointer at file scope: ");
 
-  if (g(2, 3) == 5) correct++;
-  if (h(9, 4) == 5) correct++;
-  later = &Sub;
-  if (later(10, 3) == 7) correct++;
-  if (k(5) == 15 && k(5, 1) == 6) correct++;
-  p2 = &Dbl;
-  if (p1(4) == 8 && p2(5) == 10) correct++;
-  if (ap(&Dbl, 21) == 42 && ap(p1, 3) == 6) correct++;
-  if (!StrCmp(nm(1), "one") && !StrCmp(nm(0), "zero")) correct++;
-  cb(); cb();
-  if (g_hits == 2) correct++;
-  if (va(1, 2, 3) == 3) correct++;
-  if (st(8) == 16 && after == 41) correct++;
+    if (g(2, 3) == 5) { correct++; }
+    if (h(9, 4) == 5) { correct++; }
+    later = &sub;
+    if (later(10, 3) == 7) { correct++; }
+    if (k(5) == 15 && k(5, 1) == 6) { correct++; }
+    p2 = &dbl;
+    if (p1(4) == 8 && p2(5) == 10) { correct++; }
+    if (ap(&dbl, 21) == 42 && ap(p1, 3) == 6) { correct++; }
+    if (!str.cmp(nm(1), "one") && !str.cmp(nm(0), "zero")) { correct++; }
+    cb(); cb();
+    if (gHits == 2) { correct++; }
+    if (va(1, 2, 3) == 3) { correct++; }
+    if (st(8) == 16 && after == 41) { correct++; }
 
-  /* Reassigned, called from another function, passed as an argument. */
-  g = &Sub;
-  if (CallG(7, 2) == 5) correct++;
-  if (Apply(p1, 6) == 12) correct++;
+    /* Reassigned, called from another function, passed as an argument. */
+    g = &sub;
+    if (callG(7, 2) == 5) { correct++; }
+    if (apply(p1, 6) == 12) { correct++; }
 
-  /* Local and class-field function pointers unchanged. */
-  I64 (*lp)(I64 a, I64 b) = &Add;
-  if (lp(1, 2) == 3) correct++;
-  S s;
-  s.f = &Dbl;
-  if (s.f(7) == 14) correct++;
+    /* Local and class-field function pointers unchanged. */
+    fn(i64 a, i64 b) i64 lp = &add;
+    if (lp(1, 2) == 3) { correct++; }
+    S s;
+    s.f = &dbl;
+    if (s.f(7) == 14) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

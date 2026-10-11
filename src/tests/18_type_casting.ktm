@@ -1,117 +1,110 @@
 #include "testhelper.ktm"
 
+import mem;
+
 /**
  * Type casting is a postfix cast of a functional style. */
 
-class Foo
-{
-  I32 x;
+struct Foo {
+    i32 x;
 };
 
-class Ptr
-{
-  I64 x,y;
-  I64 (*fn)(I64 x);
-  U0 *priv;
+struct Ptr {
+    i64 x,y;
+    fn(i64 x) i64 fn_;
+    void *priv;
 };
 
-I64 Add2(I64 x)
-{
-  return x + 2;
+i64 add2(i64 x) {
+    return x + 2;
 }
 
-I64 PtrCast(U0 *ptr)
-{ // This shows we've casted from 'U0 *' to a 'Ptr *'
-  return ptr(Ptr *)->y == 11;
+i64 ptrCast(void *ptr)
+{ // This shows we've casted from 'void *' to a 'Ptr *'
+    return ((Ptr *)ptr).y == 11;
 }
 
-I64 I64ToI8Cast(I64 ll)
+i64 i64ToI8Cast(i64 ll)
 { // down cast
-  return ll(U8) == 'h'; 
+    return (u8)ll == 'h'; 
 }
 
-I64 I64ToU8Cast(I64 ll)
+i64 i64ToU8Cast(i64 ll)
 { // down cast
-  return ll(U8) == 0xFF; 
+    return (u8)ll == 0xFF; 
 }
 
-I64 U8ToI64(U8 ch)
+i64 u8ToI64(u8 ch)
 { // Upcast
-  return ch(I64) == 99;
+    return (i64)ch == 99;
 }
 
-I64 Varadic(...)
-{
-  for (I64 i = 0; i < argc; ++i) {
-    argv[i](Ptr *)->x = 10;
-  }
-  return argc;
+i64 varadic(...args) {
+    for (i64 i = 0; i < args.len; ++i) {
+        ((Ptr *)args[i]).x = 10;
+    }
+    return args.len;
 }
 
-Bool VaradicTest()
-{
-  Ptr *p1 = MAlloc(sizeof(Ptr)),
-      *p2 = MAlloc(sizeof(Ptr)),
-      *p3 = MAlloc(sizeof(Ptr)),
-      *p4 = MAlloc(sizeof(Ptr));
-  Varadic(p1,p2,p3,p4);
-  return p1->x == 10 &&
-         p2->x == 10 &&
-         p3->x == 10 && 
-         p4->x == 10;
+bool varadicTest() {
+    Ptr *p1 = mem.alloc(sizeof(Ptr)),
+            *p2 = mem.alloc(sizeof(Ptr)),
+            *p3 = mem.alloc(sizeof(Ptr)),
+            *p4 = mem.alloc(sizeof(Ptr));
+    varadic(p1,p2,p3,p4);
+    return p1.x == 10 &&
+                 p2.x == 10 &&
+                 p3.x == 10 && 
+                 p4.x == 10;
 }
 
-Bool CallingAFunctionPointer(U0 *ptr)
+bool callingAFunctionPointer(void *ptr)
 { // This is the most amount of casting possible to do
-  ptr(Ptr *)->fn = &Add2;
-  return ptr(Ptr *)->fn(5)(I32) == 7;
+    ((Ptr *)ptr).fn_ = &add2;
+    return (i32)((Ptr *)ptr).fn_(5) == 7;
 }
 
-Bool CallingAFunctionPointerPart2(U0 *_ptr)
-{
-  Ptr *ptr = _ptr(Ptr *);
-  ptr->fn = &Add2;
-  return ptr->fn(5)(I32) == 7;
+bool callingAFunctionPointerPart2(void *_ptr) {
+    Ptr *ptr = (Ptr *)_ptr;
+    ptr.fn_ = &add2;
+    return (i32)ptr.fn_(5) == 7;
 }
 
-Bool CastingClassMember(Ptr *p)
-{
-  Foo *foo = p->priv(Foo *);
-  return foo->x == 32;
+bool castingClassMember(Ptr *p) {
+    Foo *foo = (Foo *)p.priv;
+    return foo.x == 32;
 }
 
-Bool CastingArray()
-{
-  U64 arr[3] = {1,2,3};
-  return arr[0](I32) == 1 && 
-         arr[1](I16) == 2 && 
-         arr[2](I8) == 3;
+bool castingArray() {
+    u64 arr[3] = {1,2,3};
+    return (i32)arr[0] == 1 && 
+                 (i16)arr[1] == 2 && 
+                 (i8)arr[2] == 3;
 }
 
-I32 Main()
-{
-  "Test - Type casting:\n";
-  I64 correct = 0, tests = 9;
-  Ptr *p = MAlloc(sizeof(Ptr));
-  p->x = 10;
-  p->y = 11;
+i32 main() {
+    printf("Test - Type casting:\n");
+    i64 correct = 0, tests = 9;
+    Ptr *p = mem.alloc(sizeof(Ptr));
+    p.x = 10;
+    p.y = 11;
 
-  if (PtrCast(p)) ++correct;
-  /* hello in hexidecimal */
-  if (I64ToI8Cast(0x6F6C6C6568)) ++correct;
-  if (U8ToI64(99)) ++correct;
-  if (I64ToU8Cast(0xAAFF)) ++correct;
-  if (VaradicTest()) ++correct;
-  if (CallingAFunctionPointer(p)) ++correct;
-  if (CallingAFunctionPointerPart2(p)) ++correct;
-  if (CastingArray()) ++correct;
-  Foo *foo = MAlloc(sizeof(Foo));
-  foo->x = 32;
-  p->priv = foo;
-  if (CastingClassMember(p)) ++correct;
-  Free(foo);
+    if (ptrCast(p)) { ++correct; }
+    /* hello in hexidecimal */
+    if (i64ToI8Cast(0x6F6C6C6568)) { ++correct; }
+    if (u8ToI64(99)) { ++correct; }
+    if (i64ToU8Cast(0xAAFF)) { ++correct; }
+    if (varadicTest()) { ++correct; }
+    if (callingAFunctionPointer(p)) { ++correct; }
+    if (callingAFunctionPointerPart2(p)) { ++correct; }
+    if (castingArray()) { ++correct; }
+    Foo *foo = mem.alloc(sizeof(Foo));
+    foo.x = 32;
+    p.priv = foo;
+    if (castingClassMember(p)) { ++correct; }
+    mem.free(foo);
 
-  PrintResult(correct,tests);
-  "=====\n";
-  return 0;
+    PrintResult(correct,tests);
+    printf("=====\n");
+    return 0;
 }

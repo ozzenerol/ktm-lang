@@ -1,113 +1,121 @@
 #include "testhelper.ktm"
 
+enum Err { help, aaa, foo, in, inn, out, aAA, bBB, big };
+
 /* try/catch/throw. Each test sets `marker` to a
  * known value and reads `Fs->except_ch` inside the catch handler
  * to verify the thrown u64 made it through unchanged. */
 
-U0 ThrowFromHelper()
-{
-  throw('Help');
+void throwFromHelper() {
+    throw(Err.help);
 }
 
-U0 ChainedThrowA()
-{
-  throw('Aaa');
+void chainedThrowA() {
+    throw(Err.aaa);
 }
 
-U0 ChainedThrowB()
-{
-  ChainedThrowA();
+void chainedThrowB() {
+    chainedThrowA();
 }
 
-I32 Main()
-{
-  "Test - try/catch/throw: ";
-  I64 correct = 0, tests = 8;
+i32 main() {
+    printf("Test - try/catch/throw: ");
+    i64 correct = 0, tests = 8;
 
-  /* 1. Basic: throw fires, catch runs, value preserved. */
-  I64 marker_1 = 0;
-  try {
-    throw('Foo');
-    marker_1 = 0xBAD;          /* unreachable */
-  } catch
-    marker_1 = Fs->except_ch;
-  if (marker_1 == 'Foo') correct++;
-
-  /* 2. No-throw: try body completes, catch skipped. */
-  I64 marker_2 = 0;
-  try {
-    marker_2 = 1;
-  } catch
-    marker_2 = 0xBAD;
-  if (marker_2 == 1) correct++;
-
-  /* 3. Throw escapes a function boundary. */
-  I64 marker_3 = 0;
-  try {
-    ThrowFromHelper();
-    marker_3 = 0xBAD;
-  } catch
-    marker_3 = Fs->except_ch;
-  if (marker_3 == 'Help') correct++;
-
-  /* 4. Throw escapes two function levels. */
-  I64 marker_4 = 0;
-  try {
-    ChainedThrowB();
-    marker_4 = 0xBAD;
-  } catch
-    marker_4 = Fs->except_ch;
-  if (marker_4 == 'Aaa') correct++;
-
-  /* 5. Nested try: inner catch handles, outer doesn't fire. */
-  I64 marker_5_inner = 0, marker_5_outer = 0;
-  try {
+    /* 1. Basic: throw fires, catch runs, value preserved. */
+    i64 marker1 = 0;
     try {
-      throw('In');
-    } catch
-      marker_5_inner = Fs->except_ch;
-    /* This statement should run after the inner catch completes. */
-    marker_5_inner += 1;
-  } catch
-    marker_5_outer = 0xBAD;
-  if (marker_5_inner == 'In' + 1 && marker_5_outer == 0) correct++;
+        throw(Err.foo);
+        marker1 = 0xBAD;          /* unreachable */
+    } catch (Error e) {
+        marker1 = e.code;
+    }
+    if (marker1 == Err.foo) { correct++; }
 
-  /* 6. Rethrow from inside catch: inner handler throws a new
-   *    value, outer catches it. */
-  I64 marker_6_outer = 0;
-  try {
+    /* 2. No-throw: try body completes, catch skipped. */
+    i64 marker2 = 0;
     try {
-      throw('Inn');
-    } catch
-      throw('Out');
-  } catch
-    marker_6_outer = Fs->except_ch;
-  if (marker_6_outer == 'Out') correct++;
+        marker2 = 1;
+    } catch {
+        marker2 = 0xBAD;
+    }
+    if (marker2 == 1) { correct++; }
 
-  /* 7. Sequential try blocks: second try is independent of first. */
-  I64 marker_7a = 0, marker_7b = 0;
-  try {
-    throw('AAA');
-  } catch
-    marker_7a = Fs->except_ch;
-  try {
-    throw('BBB');
-  } catch
-    marker_7b = Fs->except_ch;
-  if (marker_7a == 'AAA' && marker_7b == 'BBB') correct++;
+    /* 3. Throw escapes a function boundary. */
+    i64 marker3 = 0;
+    try {
+        throwFromHelper();
+        marker3 = 0xBAD;
+    } catch (Error e) {
+        marker3 = e.code;
+    }
+    if (marker3 == Err.help) { correct++; }
 
-  /* 8. Catch handler with a compound statement body, runs more
-   *    than a single expression. */
-  I64 marker_8 = 0;
-  try {
-    throw('Big');
-  } catch {
-    marker_8 = Fs->except_ch;
-    marker_8 = marker_8 ^ 0xFF;
-  }
-  if (marker_8 == ('Big' ^ 0xFF)) correct++;
+    /* 4. Throw escapes two function levels. */
+    i64 marker4 = 0;
+    try {
+        chainedThrowB();
+        marker4 = 0xBAD;
+    } catch (Error e) {
+        marker4 = e.code;
+    }
+    if (marker4 == Err.aaa) { correct++; }
 
-  PrintResult(correct, tests);
-  "=====\n";
-  return 0;
+    /* 5. Nested try: inner catch handles, outer doesn't fire. */
+    i64 marker5Inner = 0, marker5Outer = 0;
+    try {
+        try {
+            throw(Err.in);
+        } catch (Error e) {
+            marker5Inner = e.code;
+        }
+        /* This statement should run after the inner catch completes. */
+        marker5Inner += 1;
+    } catch {
+        marker5Outer = 0xBAD;
+    }
+    if (marker5Inner == Err.in + 1 && marker5Outer == 0) { correct++; }
+
+    /* 6. Rethrow from inside catch: inner handler throws a new
+     *    value, outer catches it. */
+    i64 marker6Outer = 0;
+    try {
+        try {
+            throw(Err.inn);
+        } catch {
+            throw(Err.out);
+        }
+    } catch (Error e) {
+        marker6Outer = e.code;
+    }
+    if (marker6Outer == Err.out) { correct++; }
+
+    /* 7. Sequential try blocks: second try is independent of first. */
+    i64 marker7a = 0, marker7b = 0;
+    try {
+        throw(Err.aAA);
+    } catch (Error e) {
+        marker7a = e.code;
+    }
+    try {
+        throw(Err.bBB);
+    } catch (Error e) {
+        marker7b = e.code;
+    }
+    if (marker7a == Err.aAA && marker7b == Err.bBB) { correct++; }
+
+    /* 8. Catch handler with a compound statement body, runs more
+     *    than a single expression. */
+    i64 marker8 = 0;
+    try {
+        throw(Err.big);
+    } catch (Error e) {
+        marker8 = e.code;
+        marker8 = marker8 ^ 0xFF;
+    }
+    if (marker8 == (Err.big ^ 0xFF)) { correct++; }
+
+    PrintResult(correct, tests);
+    printf("=====\n");
+    return 0;
 }

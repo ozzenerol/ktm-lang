@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import libc, mem, net;
+
 /* NetConnect gave up when connecting to the first address a name resolved
  * to failed, instead of trying the next one: "localhost" resolving to ::1
  * and then 127.0.0.1 could not reach a server listening on 127.0.0.1 only
@@ -8,96 +10,91 @@
  * bindable and localhost to resolve to both families; otherwise they are
  * skipped. Only loopback addresses and kernel-chosen ports are used. */
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
-I64 Port(I32 sockfd)
-{
-  sockaddr_storage ss;
-  U32 len = sizeof(sockaddr_storage);
-  if (sockfd == -1 || getsockname(sockfd, (&ss)(sockaddr *), &len) == -1) return -1;
-  U16 p = (&ss)(sockaddr_in *)->sin_port;
-  return ((p & 0xff) << 8) | (p >> 8);
+i64 Port(i32 sockfd) {
+    libc.sockaddr_storage ss;
+    u32 len = sizeof(libc.sockaddr_storage);
+    if (sockfd == -1 || libc.getsockname(sockfd, (libc.sockaddr *)(&ss), &len) == -1) { return -1; }
+    u16 p = ((libc.sockaddr_in *)(&ss)).sin_port;
+    return ((p & 0xff) << 8) | (p >> 8);
 }
 
-I32 Listen6()
+i32 listen6()
 {// A server on ::1 only, -1 if IPv6 isn't there
-  sockaddr_in6 a;
-  I32 fd = socket(AF_INET6, SOCK_STREAM, 0);
-  if (fd == -1) return -1;
-  MemSet(&a, 0, sizeof(sockaddr_in6));
+    libc.sockaddr_in6 a;
+    i32 fd = libc.socket(libc.AF_INET6, libc.SOCK_STREAM, 0);
+    if (fd == -1) { return -1; }
+    mem.set(&a, 0, sizeof(libc.sockaddr_in6));
 #ifndef IS_LINUX
-  a.sin6_len = sizeof(sockaddr_in6);
+    a.sin6_len = sizeof(libc.sockaddr_in6);
 #endif
-  a.sin6_family = AF_INET6;
-  inet_pton(AF_INET6, "::1", &a.sin6_addr);
-  if (bind(fd, (&a)(sockaddr *), sizeof(sockaddr_in6)) == -1 || listen(fd, 4) == -1) {
-    close(fd);
-    return -1;
-  }
-  return fd;
+    a.sin6_family = libc.AF_INET6;
+    libc.inet_pton(libc.AF_INET6, "::1", &a.sin6_addr);
+    if (libc.bind(fd, (libc.sockaddr *)(&a), sizeof(libc.sockaddr_in6)) == -1 || libc.listen(fd, 4) == -1) {
+        libc.close(fd);
+        return -1;
+    }
+    return fd;
 }
 
-Bool Resolves(U8 *name, I32 family)
-{
-  addrinfo hints, *res = NULL;
-  MemSet(&hints, 0, sizeof(addrinfo));
-  hints.ai_family = family;
-  hints.ai_socktype = SOCK_STREAM;
-  if (getaddrinfo(name, "80", &hints, &res) != 0) return FALSE;
-  freeaddrinfo(res);
-  return TRUE;
+bool resolves(u8 *name, i32 family) {
+    libc.addrinfo hints, *res = null;
+    mem.set(&hints, 0, sizeof(libc.addrinfo));
+    hints.ai_family = family;
+    hints.ai_socktype = libc.SOCK_STREAM;
+    if (libc.getaddrinfo(name, "80", &hints, &res) != 0) { return false; }
+    libc.freeaddrinfo(res);
+    return true;
 }
 
-Bool Reach(U8 *name, I32 srv)
+bool reach(u8 *name, i32 srv)
 {// NetConnect(name) gets to srv
-  I32 c = NetConnect(name, Port(srv));
-  if (c == -1) return FALSE;
-  I32 a = NetAccept(srv);
-  Bool ok = a != -1;
-  if (a != -1) close(a);
-  close(c);
-  return ok;
+    i32 c = net.dial(name, Port(srv));
+    if (c == -1) { return false; }
+    i32 a = net.accept(srv);
+    bool ok = a != -1;
+    if (a != -1) { libc.close(a); }
+    libc.close(c);
+    return ok;
 }
 
-I32 LowestFreeFd()
-{
-  I32 fd = open("/dev/null", O_RDONLY);
-  if (fd != -1) close(fd);
-  return fd;
+i32 lowestFreeFd() {
+    i32 fd = libc.open("/dev/null", libc.O_RDONLY);
+    if (fd != -1) { libc.close(fd); }
+    return fd;
 }
 
-I32 Main()
-{
-  "Test - NetConnect tries every address: ";
+i32 main() {
+    printf("Test - NetConnect tries every address: ");
 
-  I32 s4 = NetCreateServer(0, "127.0.0.1", 4);
-  Check(s4 != -1, "IPv4 server");
-  Check(Reach("127.0.0.1", s4), "connect to 127.0.0.1");
-  Check(Reach("localhost", s4), "localhost reaches an IPv4-only server");
+    i32 s4 = net.listen(0, "127.0.0.1", 4);
+    check(s4 != -1, "IPv4 server");
+    check(reach("127.0.0.1", s4), "connect to 127.0.0.1");
+    check(reach("localhost", s4), "localhost reaches an IPv4-only server");
 
-  I32 s6 = Listen6();
-  if (s6 != -1 && Reach("::1", s6) &&
-      Resolves("localhost", AF_INET) && Resolves("localhost", AF_INET6)) {
-    /* whichever family localhost lists first, both servers are reached */
-    Check(Reach("localhost", s6), "localhost reaches an IPv6-only server");
-    Check(Reach("localhost", s4), "localhost reaches an IPv4-only server again");
-  }
+    i32 s6 = listen6();
+    if (s6 != -1 && reach("::1", s6) &&
+            resolves("localhost", libc.AF_INET) && resolves("localhost", libc.AF_INET6)) {
+        /* whichever family localhost lists first, both servers are reached */
+        check(reach("localhost", s6), "localhost reaches an IPv6-only server");
+        check(reach("localhost", s4), "localhost reaches an IPv4-only server again");
+    }
 
-  /* nobody listening on any of localhost's addresses: -1, nothing leaked */
-  I64 port = Port(s4);
-  close(s4);
-  if (s6 != -1) close(s6);
-  I32 fd_before = LowestFreeFd();
-  Check(NetConnect("localhost", port) == -1, "closed port gives -1");
-  Check(LowestFreeFd() == fd_before, "no socket leaked");
+    /* nobody listening on any of localhost's addresses: -1, nothing leaked */
+    i64 port = Port(s4);
+    libc.close(s4);
+    if (s6 != -1) { libc.close(s6); }
+    i32 fdBefore = lowestFreeFd();
+    check(net.dial("localhost", port) == -1, "closed port gives -1");
+    check(lowestFreeFd() == fdBefore, "no socket leaked");
 
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+    PrintResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

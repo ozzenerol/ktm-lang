@@ -1,82 +1,75 @@
 #include "testhelper.ktm"
 
 /* Narrow signed integer reads must sign-extend on load (C integer promotion):
- * a signed I8/I16 read in an expression widens to 64-bit with its sign. The
+ * a signed i8/i16 read in an expression widens to 64-bit with its sign. The
  * IR is signedness-lossy, so the builder emits SEXT/ZEXT at every read that
  * loads a scalar through an address.
  *
  * Regression for a pre-existing hole: only plain scalar *local* variable
  * reads promoted; scalar globals, global AND local class fields, array
- * elements and pointer derefs did not - so a signed I8 of -1 read full-width
+ * elements and pointer derefs did not - so a signed i8 of -1 read full-width
  * (==, "%d", widening into a wider slot) came back as 255. Unsigned narrows
  * are checked too, to confirm they still zero-extend. */
 
-class S { I8 a; I16 b; I32 c; U8 ua; U16 ub; };
+struct S { i8 a; i16 b; i32 c; u8 ua; u16 ub; };
 
-I8  g_i8;
-I16 g_i16;
-U8  g_u8;
-U16 g_u16;
-S   g_s;
-I8  g_i8arr[3];
-I16 g_i16arr[3];
+i8  gI8;
+i16 gI16;
+u8  gU8;
+u16 gU16;
+S   gS;
+i8  gI8arr[3];
+i16 gI16arr[3];
 
-Bool ScalarGlobals()
-{
-  g_i8 = -1; g_i16 = -1000; g_u8 = 200; g_u16 = 50000;
-  return g_i8 == -1 && g_i16 == -1000 && g_u8 == 200 && g_u16 == 50000;
+bool scalarGlobals() {
+    gI8 = -1; gI16 = -1000; gU8 = 200; gU16 = 50000;
+    return gI8 == -1 && gI16 == -1000 && gU8 == 200 && gU16 == 50000;
 }
 
-Bool GlobalFields()
-{
-  g_s.a = -5; g_s.b = -2000; g_s.c = -100000; g_s.ua = 200; g_s.ub = 50000;
-  return g_s.a == -5 && g_s.b == -2000 && g_s.c == -100000 &&
-         g_s.ua == 200 && g_s.ub == 50000;
+bool globalFields() {
+    gS.a = -5; gS.b = -2000; gS.c = -100000; gS.ua = 200; gS.ub = 50000;
+    return gS.a == -5 && gS.b == -2000 && gS.c == -100000 &&
+                 gS.ua == 200 && gS.ub == 50000;
 }
 
-Bool GlobalArrays()
-{
-  g_i8arr[0]  = -3;   g_i8arr[1]  = -7;   g_i8arr[2]  = 100;
-  g_i16arr[0] = -300; g_i16arr[1] = 4000; g_i16arr[2] = -5000;
-  return g_i8arr[0]  == -3   && g_i8arr[1]  == -7   && g_i8arr[2]  == 100 &&
-         g_i16arr[0] == -300 && g_i16arr[1] == 4000 && g_i16arr[2] == -5000;
+bool globalArrays() {
+    gI8arr[0]  = -3;   gI8arr[1]  = -7;   gI8arr[2]  = 100;
+    gI16arr[0] = -300; gI16arr[1] = 4000; gI16arr[2] = -5000;
+    return gI8arr[0]  == -3   && gI8arr[1]  == -7   && gI8arr[2]  == 100 &&
+                 gI16arr[0] == -300 && gI16arr[1] == 4000 && gI16arr[2] == -5000;
 }
 
-Bool LocalFieldsAndArrays()
-{
-  S sl; sl.a = -11; sl.b = -3000; sl.ua = 250;
-  I8 la[3]; la[0] = -9; la[1] = 5; la[2] = -1;
-  return sl.a == -11 && sl.b == -3000 && sl.ua == 250 &&
-         la[0] == -9 && la[1] == 5 && la[2] == -1;
+bool localFieldsAndArrays() {
+    S sl; sl.a = -11; sl.b = -3000; sl.ua = 250;
+    i8 la[3]; la[0] = -9; la[1] = 5; la[2] = -1;
+    return sl.a == -11 && sl.b == -3000 && sl.ua == 250 &&
+                 la[0] == -9 && la[1] == 5 && la[2] == -1;
 }
 
-Bool PointerDeref()
-{
-  I8  v = -42;   I8  *p = &v;
-  I16 w = -1234; I16 *q = &w;
-  return *p == -42 && *q == -1234;
+bool pointerDeref() {
+    i8  v = -42;   i8  *p = &v;
+    i16 w = -1234; i16 *q = &w;
+    return *p == -42 && *q == -1234;
 }
 
-Bool WidenIntoWiderSlot()
-{
-  /* The sign must survive widening into a wider slot, not only comparison. */
-  g_i8 = -1;     I64 x = g_i8;
-  g_i16 = -1000; I64 y = g_i16;
-  g_s.a = -5;    I64 z = g_s.a;
-  return x == -1 && y == -1000 && z == -5;
+bool widenIntoWiderSlot() {
+    /* The sign must survive widening into a wider slot, not only comparison. */
+    gI8 = -1;     i64 x = gI8;
+    gI16 = -1000; i64 y = gI16;
+    gS.a = -5;    i64 z = gS.a;
+    return x == -1 && y == -1000 && z == -5;
 }
 
-I32 Main()
-{
-  "Test - narrow signed integer reads sign-extend (all read paths):\n";
-  I64 tests = 6, correct = 0;
-  if (ScalarGlobals())        correct++;
-  if (GlobalFields())         correct++;
-  if (GlobalArrays())         correct++;
-  if (LocalFieldsAndArrays()) correct++;
-  if (PointerDeref())         correct++;
-  if (WidenIntoWiderSlot())   correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - narrow signed integer reads sign-extend (all read paths):\n");
+    i64 tests = 6, correct = 0;
+    if (scalarGlobals())        { correct++; }
+    if (globalFields())         { correct++; }
+    if (globalArrays())         { correct++; }
+    if (localFieldsAndArrays()) { correct++; }
+    if (pointerDeref())         { correct++; }
+    if (widenIntoWiderSlot())   { correct++; }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

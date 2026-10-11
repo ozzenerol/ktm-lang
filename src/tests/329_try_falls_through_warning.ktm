@@ -1,5 +1,9 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
+enum Err { x, in, out };
+
 /* "control may reach the end of non-void function" was reported for a
  * try whose body and catch handler both end in return: the fall-through
  * analysis did not know AST_TRY. A try falls through iff its body or its
@@ -9,117 +13,119 @@
 #define TRY_FALL_OUT  "__329_try_fall.out"
 #define TRY_FALL_MSG  "control may reach the end of non-void function"
 
-I64 BothReturn(I64 x)
-{
-  try {
-    if (x) throw('X');
-    return 1;
-  } catch {
-    return 2;
-  }
-}
-
-I64 Nested(I64 x)
-{
-  try {
+i64 bothReturn(i64 x) {
     try {
-      if (x == 1) throw('In');
-      if (x == 2) throw('Out');
-      return 10;
+        if (x) { throw(Err.x); }
+        return 1;
     } catch {
-      if (Fs->except_ch == 'Out') throw('Out');
-      return 20;
+        return 2;
     }
-  } catch {
-    return 30;
-  }
 }
 
-U0 CleanupTryFall(U0)
-{
-  Rm(TRY_FALL_FILE);
-  Rm(TRY_FALL_OUT);
+i64 nested(i64 x) {
+    try {
+        try {
+            if (x == 1) { throw(Err.in); }
+            if (x == 2) { throw(Err.out); }
+            return 10;
+        } catch (Error e) {
+            if (e.code == Err.out) { throw(Err.out); }
+            return 20;
+        }
+    } catch {
+        return 30;
+    }
 }
 
-/* Compiles and runs `src` with the JIT; TRUE when it succeeds and the
+void cleanupTryFall(void) {
+    fs.remove(TRY_FALL_FILE);
+    fs.remove(TRY_FALL_OUT);
+}
+
+/* Compiles and runs `src` with the JIT; true when it succeeds and the
  * warning shows up exactly when `warn` says it should. */
-Bool WarnsIf(U8 *src, Bool warn)
-{
-  U8 *out;
-  I64 res;
-  Bool ok;
+bool warnsIf(u8 *src, bool warn) {
+    u8 *out;
+    i64 res;
+    bool ok;
 
-  CleanupTryFall;
-  if (!FileWrite(TRY_FALL_FILE, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  res = System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " TRY_FALL_FILE " > " TRY_FALL_OUT " 2>&1");
-  out = FileRead(TRY_FALL_OUT);
-  ok = res == 0 && out && (strstr(out, TRY_FALL_MSG) != NULL) == warn;
-  if (!ok && out) "%s\n", out;
-  Free(out);
-  CleanupTryFall;
-  return ok;
+    cleanupTryFall();
+    if (!fs.writeAll(TRY_FALL_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " TRY_FALL_FILE " > " TRY_FALL_OUT " 2>&1");
+    out = fs.readAll(TRY_FALL_OUT);
+    ok = res == 0 && out && (libc.strstr(out, TRY_FALL_MSG) != null) == warn;
+    if (!ok && out) { printf("%s\n", out); }
+    mem.free(out);
+    cleanupTryFall();
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - try falls through warning: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - try falls through warning: ");
+    i64 correct = 0, tests = 0;
 
-  tests++; if (BothReturn(0) == 1 && BothReturn(1) == 2) correct++;
-  tests++; if (Nested(0) == 10 && Nested(1) == 20 && Nested(2) == 30) correct++;
+    tests++; if (bothReturn(0) == 1 && bothReturn(1) == 2) { correct++; }
+    tests++; if (nested(0) == 10 && nested(1) == 20 && nested(2) == 30) { correct++; }
 
-  /* body and handler return */
-  tests++;
-  if (WarnsIf(
-"I64 F(I64 x)
+    /* body and handler return */
+    tests++;
+    if (warnsIf(
+"enum Err { x };
+
+i64 F(i64 x)
 {
   try {
-    if (x) throw('X');
+    if (x) { throw(Err.x); }
     return 1;
   } catch {
     return 2;
   }
 }
-U0 Main() { F(1); }
-", FALSE)) correct++;
+void main() { F(1); }
+", false)) { correct++; }
 
-  /* body throws, handler returns */
-  tests++;
-  if (WarnsIf(
-"I64 F()
+    /* body throws, handler returns */
+    tests++;
+    if (warnsIf(
+"enum Err { x };
+
+i64 F()
 {
   try {
-    throw('X');
-  } catch
+    throw(Err.x);
+  } catch {
     return 2;
+  }
 }
-U0 Main() { F; }
-", FALSE)) correct++;
+void main() { F(); }
+", false)) { correct++; }
 
-  /* nested tries, every path returns or throws */
-  tests++;
-  if (WarnsIf(
-"I64 F(I64 x)
+    /* nested tries, every path returns or throws */
+    tests++;
+    if (warnsIf(
+"enum Err { again };
+
+i64 F(i64 x)
 {
   try {
     try {
       return x;
     } catch {
-      throw('Again');
+      throw(Err.again);
     }
   } catch {
     return -1;
   }
 }
-U0 Main() { F(1); }
-", FALSE)) correct++;
+void main() { F(1); }
+", false)) { correct++; }
 
-  /* handler falls through */
-  tests++;
-  if (WarnsIf(
-"I64 F(I64 x)
+    /* handler falls through */
+    tests++;
+    if (warnsIf(
+"i64 F(i64 x)
 {
   try {
     return x;
@@ -127,13 +133,13 @@ U0 Main() { F(1); }
     x = 0;
   }
 }
-U0 Main() { F(1); }
-", TRUE)) correct++;
+void main() { F(1); }
+", true)) { correct++; }
 
-  /* body falls through */
-  tests++;
-  if (WarnsIf(
-"I64 F(I64 x)
+    /* body falls through */
+    tests++;
+    if (warnsIf(
+"i64 F(i64 x)
 {
   try {
     x++;
@@ -141,13 +147,13 @@ U0 Main() { F(1); }
     return 0;
   }
 }
-U0 Main() { F(1); }
-", TRUE)) correct++;
+void main() { F(1); }
+", true)) { correct++; }
 
-  /* falling through the try, then a return */
-  tests++;
-  if (WarnsIf(
-"I64 F(I64 x)
+    /* falling through the try, then a return */
+    tests++;
+    if (warnsIf(
+"i64 F(i64 x)
 {
   try {
     x++;
@@ -155,10 +161,10 @@ U0 Main() { F(1); }
   }
   return x;
 }
-U0 Main() { F(1); }
-", FALSE)) correct++;
+void main() { F(1); }
+", false)) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

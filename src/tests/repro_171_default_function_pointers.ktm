@@ -1,34 +1,33 @@
 #include "testhelper.ktm"
 
-U0 FN()
-{
-  "FN()\n";
+import mem, str;
+
+void FN() {
+    printf("FN()\n");
 }
 
-U8 *PrintMessage(U8 *msg,
-                 I64 i,
-                 U0 (*fn)() = NULL,
-                 I64 N)
-{
-  if (fn) fn();
-  U8 *buffer = MStrPrint("%s i=%d N=%d\n",msg, i, N);
-  return buffer;
+u8 *printMessage(u8 *msg,
+                                 i64 i,
+                                 fn() void fn_ = null,
+                                 i64 N) {
+    if (fn_) { fn_(); }
+    u8 *buffer = str.format("%s i=%d N=%d\n",msg, i, N);
+    return buffer;
 }
 
-I32 Main()
-{
-  "Repro 171 (Default function pointer arguments): ";
-  I64 correct = 0;
-  I64 total = 1;
+i32 main() {
+    printf("Repro 171 (Default function pointer arguments): ");
+    i64 correct = 0;
+    i64 total = 1;
 
-  U8 *msg = PrintMessage("hello!",24,,4);
+    u8 *msg = printMessage("hello!",24,,4);
 
-  if (!StrCmp(msg, "hello! i=24 N=4\n")) {
-    correct++;
-  }
-  PrintResult(correct,total);
-  Free(msg);
+    if (!str.cmp(msg, "hello! i=24 N=4\n")) {
+        correct++;
+    }
+    PrintResult(correct,total);
+    mem.free(msg);
 
-  "====\n";
-  return 0;
+    printf("====\n");
+    return 0;
 }

@@ -1,87 +1,89 @@
 #include "testhelper.ktm"
 
+import json, mem, str;
+
 /* A JSON string ending in an escaped backslash ("C:\\") was rejected:
  * the end-of-string scan took `\"` for an escaped quote. Raw control
  * characters (bytes below 0x20) were accepted inside strings; RFC 8259
  * requires them escaped, so they are now JSON_INVALID_CONTROL_CHARACTER. */
 
-Bool Parses(U8 *text, U8 *want)
+bool parses(u8 *text, u8 *want)
 { // parses, and JsonToString gives `want`
-  Json *j = JsonParse(text);
-  Bool ok = JsonOk(j);
-  if (ok) {
-    U8 *s = JsonToString(j);
-    ok = !StrCmp(s, want);
-    if (!ok) "[%s] gave [%s] want [%s]\n", text, s, want;
-    Free(s);
-  } else {
-    "[%s] rejected: error %d\n", text, j->state->error;
-  }
-  JsonRelease(j);
-  return ok;
+    json.Value *j = json.parse(text);
+    bool ok = json.ok(j);
+    if (ok) {
+        u8 *s = json.toStr(j);
+        ok = !str.cmp(s, want);
+        if (!ok) { printf("[%s] gave [%s] want [%s]\n", text, s, want); }
+        mem.free(s);
+    } else {
+        printf("[%s] rejected: error %d\n", text, j.state.error);
+    }
+    json.release(j);
+    return ok;
 }
 
-Bool Rejected(U8 *text, I64 len, I64 error)
-{
-  Json *j = JsonParse(text, len);
-  Bool ok = !JsonOk(j) && j->state->error == error;
-  if (!ok) "[%s] error %d want %d\n", text, j->state->error, error;
-  JsonRelease(j);
-  return ok;
+bool rejected(u8 *text, i64 len, i64 error) {
+    json.Value *j = json.parse(text, len);
+    bool ok = !json.ok(j) && j.state.error == error;
+    if (!ok) { printf("[%s] error %d want %d\n", text, j.state.error, error); }
+    json.release(j);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - JSON strings: trailing backslash, control characters: ";
-  I64 correct = 0, tests = 0, i;
+i32 main() {
+    printf("Test - JSON strings: trailing backslash, control characters: ");
+    i64 correct = 0, tests = 0, i;
 
-  tests++;
-  if (Parses("{\"path\":\"C:\\\\\"}", "{\"path\": \"C:\\\\\"}") &&
-      Parses("[\"\\\\\"]", "[\"\\\\\"]") &&
-      Parses("{\"\\\\\":1}", "{\"\\\\\": 1}") &&
-      Parses("[\"\\\\\",\"x\"]", "[\"\\\\\",\"x\"]") &&
-      Parses("[\"\\\\\\\"\"]", "[\"\\\\\\\"\"]") &&
-      Parses("\"a\\\\\\\\b\\\\\"", "\"a\\\\\\\\b\\\\\""))
-    correct++;
+    tests++;
+    if (parses("{\"path\":\"C:\\\\\"}", "{\"path\": \"C:\\\\\"}") &&
+            parses("[\"\\\\\"]", "[\"\\\\\"]") &&
+            parses("{\"\\\\\":1}", "{\"\\\\\": 1}") &&
+            parses("[\"\\\\\",\"x\"]", "[\"\\\\\",\"x\"]") &&
+            parses("[\"\\\\\\\"\"]", "[\"\\\\\\\"\"]") &&
+            parses("\"a\\\\\\\\b\\\\\"", "\"a\\\\\\\\b\\\\\"")) {
+        correct++;
+            }
 
-  /* The value is right too */
-  tests++;
-  Json *j = JsonParse("{\"p\":\"C:\\\\\",\"q\":\"\\\"x\\\"\"}");
-  if (JsonOk(j) && !StrCmp(JsonSelect(j, ".p:s")->str, "C:\\") &&
-      !StrCmp(JsonSelect(j, ".q:s")->str, "\"x\"")) correct++;
-  JsonRelease(j);
+    /* The value is right too */
+    tests++;
+    json.Value *j = json.parse("{\"p\":\"C:\\\\\",\"q\":\"\\\"x\\\"\"}");
+    if (json.ok(j) && !str.cmp(json.select(j, ".p:s").str, "C:\\") &&
+            !str.cmp(json.select(j, ".q:s").str, "\"x\"")) { correct++; }
+    json.release(j);
 
-  /* Every raw control character is rejected, in values and keys */
-  tests++;
-  U8 buf[16];
-  Bool ok = TRUE;
-  for (i = 1; i < 0x20; i++) {
-    StrCpy(buf, "[\"a?b\"]");
-    buf[3] = i;
-    if (!Rejected(buf, 7, JSON_INVALID_CONTROL_CHARACTER)) ok = FALSE;
-    StrCpy(buf, "{\"k?\":1}");
-    buf[3] = i;
-    if (!Rejected(buf, 8, JSON_INVALID_CONTROL_CHARACTER)) ok = FALSE;
-  }
-  if (ok) correct++;
+    /* Every raw control character is rejected, in values and keys */
+    tests++;
+    u8 buf[16];
+    bool ok = true;
+    for (i = 1; i < 0x20; i++) {
+        str.copy(buf, "[\"a?b\"]");
+        buf[3] = i;
+        if (!rejected(buf, 7, json.INVALID_CONTROL_CHARACTER)) { ok = false; }
+        str.copy(buf, "{\"k?\":1}");
+        buf[3] = i;
+        if (!rejected(buf, 8, json.INVALID_CONTROL_CHARACTER)) { ok = false; }
+    }
+    if (ok) { correct++; }
 
-  /* Escaped control characters, DEL and UTF-8 are fine */
-  tests++;
-  if (Parses("[\"a\\tb\\n\\u0001\"]", "[\"a\\tb\\n\\u0001\"]") &&
-      Parses("[\"\x7f\xc3\xa9\"]", "[\"\x7f\xc3\xa9\"]"))
-    correct++;
+    /* Escaped control characters, DEL and UTF-8 are fine */
+    tests++;
+    if (parses("[\"a\\tb\\n\\u0001\"]", "[\"a\\tb\\n\\u0001\"]") &&
+            parses("[\"\x7f\xc3\xa9\"]", "[\"\x7f\xc3\xa9\"]")) {
+        correct++;
+            }
 
-  /* The error message names it */
-  tests++;
-  j = JsonParse("[\"a\tb\"]");
-  U8 *e = JsonGetStrerror(j);
-  if (e && !StrCmp(e, "Unescaped control character '\\x09' in a string "
-                     "(write it as \\u0009) at line 1, column 4")) correct++;
-  else "message: %s\n", e;
-  Free(e);
-  JsonRelease(j);
+    /* The error message names it */
+    tests++;
+    j = json.parse("[\"a\tb\"]");
+    u8 *e = json.errorStr(j);
+    if (e && !str.cmp(e, "Unescaped control character '\\x09' in a string "
+                                         "(write it as \\u0009) at line 1, column 4")) { correct++; }
+    else { printf("message: %s\n", e); }
+    mem.free(e);
+    json.release(j);
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

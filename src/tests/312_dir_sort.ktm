@@ -1,114 +1,114 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* Dir sorted names that start with a number by that number only: names
  * with the same number came out in any order, a number too big for an
- * I64 overflowed, and its own quicksort went quadratic (and n deep) on
+ * i64 overflowed, and its own quicksort went quadratic (and n deep) on
  * equal keys. Entries whose Stat failed, like a dangling symlink, were
  * left out. Everything happens in a fresh mkdtemp directory. */
 
-extern "c" U8 *mkdtemp(U8 *template);
-extern "c" I32 symlink(U8 *target, U8 *linkpath);
-extern "c" I32 dup(I32 fd);
-extern "c" I32 dup2(I32 fd, I32 fd2);
-extern "c" I32 fflush(U0 *stream);
+extern "c" u8 *mkdtemp(u8 *template);
+extern "c" i32 symlink(u8 *target, u8 *linkpath);
+extern "c" i32 dup(i32 fd);
+extern "c" i32 dup2(i32 fd, i32 fd2);
+extern "c" i32 fflush(void *stream);
 
-U8 g_out[256];
-I32 g_saved;
+u8 gOut[256];
+i32 gSaved;
 
-U0 Capture()
-{
-  fflush(NULL);
-  g_saved = dup(1);
-  I32 fd = open(g_out, O_WRONLY|O_CREAT|O_TRUNC, 0x1A4);
-  dup2(fd, 1);
-  close(fd);
+void capture() {
+    libc.fflush(null);
+    gSaved = dup(1);
+    i32 fd = libc.open(gOut, libc.O_WRONLY|libc.O_CREAT|libc.O_TRUNC, 0x1A4);
+    dup2(fd, 1);
+    libc.close(fd);
 }
 
-U8 *Captured()
-{
-  fflush(NULL);
-  dup2(g_saved, 1);
-  close(g_saved);
-  U8 *got = FileRead(g_out);
-  Rm(g_out);
-  return got;
+u8 *captured() {
+    libc.fflush(null);
+    dup2(gSaved, 1);
+    libc.close(gSaved);
+    u8 *got = fs.readAll(gOut);
+    fs.remove(gOut);
+    return got;
 }
 
-U0 Touch(U8 *dir, U8 *name)
-{
-  U8 *p = StrPrint(NULL, "%s/%s", dir, name);
-  FileWrite(p, "", 0);
-  Free(p);
+void touch(u8 *dir, u8 *name) {
+    u8 *p = str.formatTo(null, "%s/%s", dir, name);
+    fs.writeAll(p, "", 0);
+    mem.free(p);
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 6, n, i;
-  U8 root[64], *d, *big, *out, *p, name[32];
-  U8 *names[17] = {"7_j", "7_c", "7_a", "7_h", "7_e", "7_b", "7_i", "7_d",
-                   "7_g", "7_f", "18446744073709551617", "3", "2.5", "2.10",
-                   "02", "B", "a"};
-  "Test - Dir sort order: ";
+i32 main() {
+    i64 correct = 0, tests = 6, n, i;
+    u8 root[64], *d, *big, *out, *p, name[32];
+    u8 *names[17] = {"7_j", "7_c", "7_a", "7_h", "7_e", "7_b", "7_i", "7_d",
+                                     "7_g", "7_f", "18446744073709551617", "3", "2.5", "2.10",
+                                     "02", "B", "a"};
+    printf("Test - Dir sort order: ");
 
-  StrCpy(root, "./ktm-test-312-XXXXXX");
-  if (!mkdtemp(root)) {
-    PrintResult(0, tests);
-    "====\n";
+    str.copy(root, "./ktm-test-312-XXXXXX");
+    if (!mkdtemp(root)) {
+        PrintResult(0, tests);
+        printf("====\n");
+        return 0;
+    }
+    str.formatTo(gOut, "%s/out.txt", root);
+    d = str.formatTo(null, "%s/d", root);
+    big = str.formatTo(null, "%s/big", root);
+    fs.makeDir(d);
+    fs.makeDir(big);
+    for (i = 0; i < 17; i++) { touch(d, names[i]); }
+    p = str.formatTo(null, "%s/dangling", d);
+    symlink("nowhere", p);
+    mem.free(p);
+
+    capture();
+    n = Dir(d);
+    out = captured();
+    if (n == 18) { correct++; }
+    else { printf("count %d\n", n); }
+    if (out && !str.cmp(out,
+            "02\n2.10\n2.5\n3\n7_a\n7_b\n7_c\n7_d\n7_e\n7_f\n7_g\n7_h\n7_i\n7_j\n"
+            "18446744073709551617\nB\na\ndangling\n")) { correct++; }
+    else { printf("got:\n%s\n", out); }
+    mem.free(out);
+
+    /* Many names with the same leading number */
+    for (i = 0; i < 3000; i++) {
+        str.formatTo(name, "1_%d", i);
+        touch(big, name);
+    }
+    capture();
+    n = Dir(big);
+    out = captured();
+    if (n == 3000) { correct++; }
+    if (out && !str.cmpLen(out, "1_0\n1_1\n1_10\n1_100\n1_1000\n1_1001\n", 33)) {
+        correct++;
+    }
+    if (out && str.len(out) > 6 && !str.cmp(out + str.len(out) - 6, "\n1_999\n"+1)) {
+        correct++;
+    }
+    mem.free(out);
+
+    /* An empty directory */
+    p = str.formatTo(null, "%s/empty", root);
+    fs.makeDir(p);
+    capture();
+    n = Dir(p);
+    out = captured();
+    if (n == 0 && out && !str.cmp(out, "")) { correct++; }
+    mem.free(out);
+    mem.free(p);
+
+    mem.free(d);
+    mem.free(big);
+    p = str.formatTo(null, "rm -rf '%s'", root);
+    proc.shell(p);
+    mem.free(p);
+
+    PrintResult(correct, tests);
+    printf("====\n");
     return 0;
-  }
-  StrPrint(g_out, "%s/out.txt", root);
-  d = StrPrint(NULL, "%s/d", root);
-  big = StrPrint(NULL, "%s/big", root);
-  MkDir(d);
-  MkDir(big);
-  for (i = 0; i < 17; i++) Touch(d, names[i]);
-  p = StrPrint(NULL, "%s/dangling", d);
-  symlink("nowhere", p);
-  Free(p);
-
-  Capture;
-  n = Dir(d);
-  out = Captured;
-  if (n == 18) correct++;
-  else "count %d\n", n;
-  if (out && !StrCmp(out,
-      "02\n2.10\n2.5\n3\n7_a\n7_b\n7_c\n7_d\n7_e\n7_f\n7_g\n7_h\n7_i\n7_j\n"
-      "18446744073709551617\nB\na\ndangling\n")) correct++;
-  else "got:\n%s\n", out;
-  Free(out);
-
-  /* Many names with the same leading number */
-  for (i = 0; i < 3000; i++) {
-    StrPrint(name, "1_%d", i);
-    Touch(big, name);
-  }
-  Capture;
-  n = Dir(big);
-  out = Captured;
-  if (n == 3000) correct++;
-  if (out && !StrNCmp(out, "1_0\n1_1\n1_10\n1_100\n1_1000\n1_1001\n", 33))
-    correct++;
-  if (out && StrLen(out) > 6 && !StrCmp(out + StrLen(out) - 6, "\n1_999\n"+1))
-    correct++;
-  Free(out);
-
-  /* An empty directory */
-  p = StrPrint(NULL, "%s/empty", root);
-  MkDir(p);
-  Capture;
-  n = Dir(p);
-  out = Captured;
-  if (n == 0 && out && !StrCmp(out, "")) correct++;
-  Free(out);
-  Free(p);
-
-  Free(d);
-  Free(big);
-  p = StrPrint(NULL, "rm -rf '%s'", root);
-  System(p);
-  Free(p);
-
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
 }

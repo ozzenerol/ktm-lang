@@ -1,120 +1,116 @@
 #include "testhelper.ktm"
 
+import mem, sql, str;
+
 /* Text and blob parameters were bound with SQLITE_STATIC, so sqlite kept
  * reading the caller's buffer while the rows were stepped: reusing or
  * freeing it after SqlSelect/SqlExecPrepared changed (or read freed)
  * data. They are bound with SQLITE_TRANSIENT now (sqlite copies them). */
 
-Bool AllRows(SqlRow *row, U8 *want, I64 count, Bool prepared)
-{
-  I64 n = 0;
-  Bool ok = TRUE;
-  while (TRUE) {
-    if (prepared) {
-      if (!SqlIterPrepared(row)) break;
-    } else if (!SqlIter(row)) {
-      break;
+bool allRows(sql.Row *row, u8 *want, i64 count, bool prepared) {
+    i64 n = 0;
+    bool ok = true;
+    while (true) {
+        if (prepared) {
+            if (!sql.nextPrepared(row)) { break; }
+        } else if (!sql.next(row)) {
+            break;
+        }
+        if (row.col[0].type != sql.SQLITE_TEXT || str.cmp(row.col[0].str, want)) {
+            ok = false;
+        }
+        n++;
     }
-    if (row->col[0].type != SQLITE_TEXT || StrCmp(row->col[0].str, want)) {
-      ok = FALSE;
+    return ok && n == count;
+}
+
+bool selectText(sql.Db *ctx) {
+    sql.Row row;
+    sql.Param q[1];
+    u8 *key = str.dup("original");
+    q[0].type = sql.SQLITE_TEXT;
+    q[0].str = key;
+    if (!sql.select(ctx, &row, "SELECT ?, id FROM t;", q, 1)) { return false; }
+    str.copy(key, "CHANGED!");
+    mem.free(key);
+    return allRows(&row, "original", 3, false);
+}
+
+bool selectBlob(sql.Db *ctx) {
+    sql.Row row;
+    sql.Param q[1];
+    u8 *blob = mem.alloc(4);
+    i64 n = 0;
+    bool ok = true;
+    mem.copy(blob, "\x01\x02\x03\x04", 4);
+    q[0].type = sql.SQLITE_BLOB;
+    q[0].blob = blob;
+    q[0].blobLen = 4;
+    if (!sql.select(ctx, &row, "SELECT ?, id FROM t;", q, 1)) { return false; }
+    mem.set(blob, 0xEE, 4);
+    mem.free(blob);
+    while (sql.next(&row)) {
+        u8 *b = row.col[0].blob;
+        if (row.col[0].type != sql.SQLITE_BLOB || row.col[0].len != 4 ||
+                b[0] != 1 || b[1] != 2 || b[2] != 3 || b[3] != 4) {
+            ok = false;
+        }
+        n++;
     }
-    n++;
-  }
-  return ok && n == count;
+    return ok && n == 3;
 }
 
-Bool SelectText(SqlCtx *ctx)
-{
-  SqlRow row;
-  SqlParam q[1];
-  U8 *key = StrNew("original");
-  q[0].type = SQLITE_TEXT;
-  q[0].str = key;
-  if (!SqlSelect(ctx, &row, "SELECT ?, id FROM t;", q, 1)) return FALSE;
-  StrCpy(key, "CHANGED!");
-  Free(key);
-  return AllRows(&row, "original", 3, FALSE);
+bool insertThenFree(sql.Db *ctx) {
+    sql.Row row;
+    sql.Param q[1];
+    u8 *name = str.dup("kept");
+    q[0].type = sql.SQLITE_TEXT;
+    q[0].str = name;
+    if (!sql.exec(ctx, "INSERT INTO names(name) VALUES(?);", q, 1)) { return false; }
+    str.copy(name, "gone");
+    mem.free(name);
+    if (!sql.select(ctx, &row, "SELECT name FROM names;")) { return false; }
+    return allRows(&row, "kept", 1, false);
 }
 
-Bool SelectBlob(SqlCtx *ctx)
-{
-  SqlRow row;
-  SqlParam q[1];
-  U8 *blob = MAlloc(4);
-  I64 n = 0;
-  Bool ok = TRUE;
-  MemCpy(blob, "\x01\x02\x03\x04", 4);
-  q[0].type = SQLITE_BLOB;
-  q[0].blob = blob;
-  q[0].blob_len = 4;
-  if (!SqlSelect(ctx, &row, "SELECT ?, id FROM t;", q, 1)) return FALSE;
-  MemSet(blob, 0xEE, 4);
-  Free(blob);
-  while (SqlIter(&row)) {
-    U8 *b = row.col[0].blob;
-    if (row.col[0].type != SQLITE_BLOB || row.col[0].len != 4 ||
-        b[0] != 1 || b[1] != 2 || b[2] != 3 || b[3] != 4) {
-      ok = FALSE;
+bool preparedText(sql.Db *ctx) {
+    sql.Row row;
+    sql.Param q[1];
+    bool ok;
+    sql.Stmt *st = sql.prepare(ctx, "SELECT ?, id FROM t;");
+    u8 *key = str.dup("prepared");
+    q[0].type = sql.SQLITE_TEXT;
+    q[0].str = key;
+    if (sql.execPrepared(st, &row, q) != sql.SQLITE_ROW) {
+        sql.finalize(st);
+        return false;
     }
-    n++;
-  }
-  return ok && n == 3;
+    str.copy(key, "XXXXXXXX");
+    mem.free(key);
+    ok = allRows(&row, "prepared", 3, true);
+    sql.finalize(st);
+    return ok;
 }
 
-Bool InsertThenFree(SqlCtx *ctx)
-{
-  SqlRow row;
-  SqlParam q[1];
-  U8 *name = StrNew("kept");
-  q[0].type = SQLITE_TEXT;
-  q[0].str = name;
-  if (!SqlQuery(ctx, "INSERT INTO names(name) VALUES(?);", q, 1)) return FALSE;
-  StrCpy(name, "gone");
-  Free(name);
-  if (!SqlSelect(ctx, &row, "SELECT name FROM names;")) return FALSE;
-  return AllRows(&row, "kept", 1, FALSE);
-}
+i32 main() {
+    printf("Test - sql bind transient: ");
+    i64 correct = 0, tests = 0;
+    sql.Db *ctx = sql.open(":memory:");
 
-Bool PreparedText(SqlCtx *ctx)
-{
-  SqlRow row;
-  SqlParam q[1];
-  Bool ok;
-  SqlPreparedStmt *st = SqlPrepare(ctx, "SELECT ?, id FROM t;");
-  U8 *key = StrNew("prepared");
-  q[0].type = SQLITE_TEXT;
-  q[0].str = key;
-  if (SqlExecPrepared(st, &row, q) != SQLITE_ROW) {
-    SqlFinalizePrepared(st);
-    return FALSE;
-  }
-  StrCpy(key, "XXXXXXXX");
-  Free(key);
-  ok = AllRows(&row, "prepared", 3, TRUE);
-  SqlFinalizePrepared(st);
-  return ok;
-}
+    if (ctx) {
+        sql.execRaw(ctx, "CREATE TABLE t(id INTEGER);");
+        sql.execRaw(ctx, "INSERT INTO t VALUES(1),(2),(3);");
+        sql.execRaw(ctx, "CREATE TABLE names(name TEXT);");
+    }
 
-I32 Main()
-{
-  "Test - sql bind transient: ";
-  I64 correct = 0, tests = 0;
-  SqlCtx *ctx = SqlCtxNew(":memory:");
+    tests++; if (ctx) { correct++; }
+    tests++; if (ctx && selectText(ctx)) { correct++; }
+    tests++; if (ctx && selectBlob(ctx)) { correct++; }
+    tests++; if (ctx && insertThenFree(ctx)) { correct++; }
+    tests++; if (ctx && preparedText(ctx)) { correct++; }
 
-  if (ctx) {
-    SqlExecRaw(ctx, "CREATE TABLE t(id INTEGER);");
-    SqlExecRaw(ctx, "INSERT INTO t VALUES(1),(2),(3);");
-    SqlExecRaw(ctx, "CREATE TABLE names(name TEXT);");
-  }
-
-  tests++; if (ctx) correct++;
-  tests++; if (ctx && SelectText(ctx)) correct++;
-  tests++; if (ctx && SelectBlob(ctx)) correct++;
-  tests++; if (ctx && InsertThenFree(ctx)) correct++;
-  tests++; if (ctx && PreparedText(ctx)) correct++;
-
-  if (ctx) SqlCtxRelease(ctx);
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    if (ctx) { sql.close(ctx); }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

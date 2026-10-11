@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import libc, mem, net, os, proc, str;
+
 /* Processes (process.ktm): ProcSpawn runs argv without a shell; exit codes
  * and signals from ProcWait; ENOENT for a missing program; PROC_NULL,
  * PROC_STDOUT, cwd and env; ProcDone; ProcKill of a whole process group;
@@ -14,314 +16,303 @@
  * made, so "missing program" and "ProcKill of a process group" fail
  * there; native arm64 Linux (Docker on the Mac) passes. */
 
-extern "c" U32 alarm(U32 seconds);
-extern "c" U0 _exit(I32 code);
-extern "c" I32 fflush(U0 *stream);
-extern "c" I32 setenv(U8 *name, U8 *value, I32 overwrite);
+extern "c" u32 alarm(u32 seconds);
+extern "c" void _exit(i32 code);
+extern "c" i32 fflush(void *stream);
+extern "c" i32 setenv(u8 *name, u8 *value, i32 overwrite);
 
 
-ProcOpts *Opts(I64 in, I64 out, I64 err)
-{
-  ProcOpts *o = CAlloc(sizeof(ProcOpts));
-  o->in = in;
-  o->out = out;
-  o->err = err;
-  return o;
+proc.Opts *opts(i64 in, i64 out, i64 err) {
+    proc.Opts *o = mem.allocZero(sizeof(proc.Opts));
+    o.in = in;
+    o.out = out;
+    o.err = err;
+    return o;
 }
 
 /* Run argv with stdout piped; its output (Free it) and exit code. */
-U8 *Out(U8 **argv, ProcOpts *o, I64 *code)
-{
-  U8 *out = NULL;
-  Proc *p = ProcSpawn(argv, o);
-  if (!p) return NULL;
-  *code = ProcCommunicate(p, NULL, 0, &out);
-  ProcRelease(p);
-  return out;
+u8 *Out(u8 **argv, proc.Opts *o, i64 *code) {
+    u8 *out = null;
+    proc.Proc *p = proc.spawn(argv, o);
+    if (!p) { return null; }
+    *code = proc.communicate(p, null, 0, &out);
+    proc.release(p);
+    return out;
 }
 
-Bool ExitCodes()
-{
-  U8 *a0[] = {"sh", "-c", "exit 0", NULL};
-  U8 *a3[] = {"sh", "-c", "exit 3", NULL};
-  U8 *a255[] = {"sh", "-c", "exit 255", NULL};
-  U8 *k[] = {"sh", "-c", "kill -9 $$", NULL};
-  Proc *p;
-  I64 r0, r3, r255, rk;
-  p = ProcSpawn(a0);   r0 = ProcWait(p);   ProcRelease(p);
-  p = ProcSpawn(a3);   r3 = ProcWait(p);   ProcRelease(p);
-  p = ProcSpawn(a255); r255 = ProcWait(p); ProcRelease(p);
-  p = ProcSpawn(k);
-  rk = ProcWait(p);
-  Bool killed = rk == -1 && p->term_signal == 9 && p->done;
-  Bool again = ProcWait(p) == -1;                 /* stored, no second wait */
-  ProcRelease(p);
-  return r0 == 0 && r3 == 3 && r255 == 255 && killed && again;
+bool exitCodes() {
+    u8 *a0[] = {"sh", "-c", "exit 0", null};
+    u8 *a3[] = {"sh", "-c", "exit 3", null};
+    u8 *a255[] = {"sh", "-c", "exit 255", null};
+    u8 *k[] = {"sh", "-c", "kill -9 $$", null};
+    proc.Proc *p;
+    i64 r0, r3, r255, rk;
+    p = proc.spawn(a0);   r0 = proc.wait(p);   proc.release(p);
+    p = proc.spawn(a3);   r3 = proc.wait(p);   proc.release(p);
+    p = proc.spawn(a255); r255 = proc.wait(p); proc.release(p);
+    p = proc.spawn(k);
+    rk = proc.wait(p);
+    bool killed = rk == -1 && p.termSignal == 9 && p.done;
+    bool again = proc.wait(p) == -1;                 /* stored, no second wait */
+    proc.release(p);
+    return r0 == 0 && r3 == 3 && r255 == 255 && killed && again;
 }
 
-Bool Missing()
-{
-  U8 *a[] = {"ktm-no-such-program-379", NULL};
-  U8 *b[] = {"sh", "-c", "exit 7", NULL};
-  ProcOpts o;
-  MemSet(&o, 0, sizeof(ProcOpts));
-  if (ProcSpawn(a) != NULL || Errno != ENOENT) return FALSE;
-  o.no_path = TRUE;                               /* "sh" is not a path */
-  if (ProcSpawn(b, &o) != NULL || Errno != ENOENT) return FALSE;
-  b[0] = "/bin/sh";
-  Proc *p = ProcSpawn(b, &o);
-  if (!p) return FALSE;
-  I64 rc = ProcWait(p);
-  ProcRelease(p);
-  return rc == 7;
+bool missing() {
+    u8 *a[] = {"ktm-no-such-program-379", null};
+    u8 *b[] = {"sh", "-c", "exit 7", null};
+    proc.Opts o;
+    mem.set(&o, 0, sizeof(proc.Opts));
+    if (proc.spawn(a) != null || os.errno() != libc.ENOENT) { return false; }
+    o.noPath = true;                               /* "sh" is not a path */
+    if (proc.spawn(b, &o) != null || os.errno() != libc.ENOENT) { return false; }
+    b[0] = "/bin/sh";
+    proc.Proc *p = proc.spawn(b, &o);
+    if (!p) { return false; }
+    i64 rc = proc.wait(p);
+    proc.release(p);
+    return rc == 7;
 }
 
-Bool NoShell()
+bool noShell()
 {// every argument arrives as it was, nothing is expanded or split
-  U8 *a[] = {"printf", "%s|", "a b", "it's", "$HOME", ";", "*", "", "\"q\"", NULL};
-  I64 code = -2;
-  U8 *s = Out(a, Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT), &code);
-  Bool ok = s && !StrCmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
-  Free(s);
-  U8 *e[] = {"echo", "hello", NULL};
-  s = ProcRun(e, &code);
-  ok = ok && s && !StrCmp(s, "hello") && code == 0; /* newline removed */
-  Free(s);
-  return ok;
+    u8 *a[] = {"printf", "%s|", "a b", "it's", "$HOME", ";", "*", "", "\"q\"", null};
+    i64 code = -2;
+    u8 *s = Out(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    bool ok = s && !str.cmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
+    mem.free(s);
+    u8 *e[] = {"echo", "hello", null};
+    s = proc.run(e, &code);
+    ok = ok && s && !str.cmp(s, "hello") && code == 0; /* newline removed */
+    mem.free(s);
+    return ok;
 }
 
-Bool Redirects()
-{
-  I64 code;
-  U8 *cat[] = {"cat", NULL};
-  U8 *s = Out(cat, Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT), &code);
-  Bool ok = s && !StrCmp(s, "") && code == 0;     /* stdin /dev/null: EOF */
-  Free(s);
+bool redirects() {
+    i64 code;
+    u8 *cat[] = {"cat", null};
+    u8 *s = Out(cat, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    bool ok = s && !str.cmp(s, "") && code == 0;     /* stdin /dev/null: EOF */
+    mem.free(s);
 
-  U8 *both[] = {"sh", "-c", "echo out; echo err >&2", NULL};
-  s = Out(both, Opts(PROC_NULL, PROC_PIPE, PROC_STDOUT), &code);
-  ok = ok && s && !StrCmp(s, "out\nerr\n");
-  Free(s);
-  s = Out(both, Opts(PROC_NULL, PROC_PIPE, PROC_NULL), &code);
-  ok = ok && s && !StrCmp(s, "out\n");
-  Free(s);
+    u8 *both[] = {"sh", "-c", "echo out; echo err >&2", null};
+    s = Out(both, opts(proc.DEVNULL, proc.PIPE, proc.STDOUT), &code);
+    ok = ok && s && !str.cmp(s, "out\nerr\n");
+    mem.free(s);
+    s = Out(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL), &code);
+    ok = ok && s && !str.cmp(s, "out\n");
+    mem.free(s);
 
-  U8 *out = NULL, *err = NULL;
-  I64 olen = -1, elen = -1;
-  Proc *p = ProcSpawn(both, Opts(PROC_NULL, PROC_PIPE, PROC_PIPE));
-  ProcCommunicate(p, NULL, 0, &out, &olen, &err, &elen);
-  ok = ok && !StrCmp(out, "out\n") && olen == 4 && !StrCmp(err, "err\n") && elen == 4;
-  ProcRelease(p);
-  Free(out);
-  Free(err);
+    u8 *out = null, *err = null;
+    i64 olen = -1, elen = -1;
+    proc.Proc *p = proc.spawn(both, opts(proc.DEVNULL, proc.PIPE, proc.PIPE));
+    proc.communicate(p, null, 0, &out, &olen, &err, &elen);
+    ok = ok && !str.cmp(out, "out\n") && olen == 4 && !str.cmp(err, "err\n") && elen == 4;
+    proc.release(p);
+    mem.free(out);
+    mem.free(err);
 
-  /* a stream that isn't piped gives NULL */
-  p = ProcSpawn(both, Opts(PROC_NULL, PROC_PIPE, PROC_NULL));
-  err = "x";
-  ProcCommunicate(p, NULL, 0, &out, NULL, &err, &elen);
-  ok = ok && err == NULL && elen == 0;
-  ProcRelease(p);
-  Free(out);
-  return ok;
+    /* a stream that isn't piped gives null */
+    p = proc.spawn(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL));
+    err = "x";
+    proc.communicate(p, null, 0, &out, null, &err, &elen);
+    ok = ok && err == null && elen == 0;
+    proc.release(p);
+    mem.free(out);
+    return ok;
 }
 
-Bool CwdEnv()
-{
-  I64 code;
-  U8 *pwd[] = {"pwd", NULL};
-  ProcOpts *o = Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT);
-  o->cwd = "/";
-  U8 *s = Out(pwd, o, &code);
-  Bool ok = s && !StrCmp(s, "/\n");
-  Free(s);
+bool cwdEnv() {
+    i64 code;
+    u8 *pwd[] = {"pwd", null};
+    proc.Opts *o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
+    o.cwd = "/";
+    u8 *s = Out(pwd, o, &code);
+    bool ok = s && !str.cmp(s, "/\n");
+    mem.free(s);
 
-  U8 *show[] = {"sh", "-c", "echo \"$KTM_379|$HOME\"", NULL};
-  U8 *env[] = {"KTM_379=replaced", NULL};
-  o = Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT);
-  o->env = env;
-  s = Out(show, o, &code);
-  ok = ok && s && !StrCmp(s, "replaced|\n");      /* HOME is gone */
-  Free(s);
+    u8 *show[] = {"sh", "-c", "echo \"$KTM_379|$HOME\"", null};
+    u8 *env[] = {"KTM_379=replaced", null};
+    o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
+    o.env = env;
+    s = Out(show, o, &code);
+    ok = ok && s && !str.cmp(s, "replaced|\n");      /* HOME is gone */
+    mem.free(s);
 
-  setenv("KTM_379", "inherited", 1);              /* set at run time */
-  s = Out(show, Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT), &code);
-  ok = ok && s && StrLen(s) > 10 && !StrNCmp(s, "inherited|", 10);
-  Free(s);
-  return ok;
+    setenv("KTM_379", "inherited", 1);              /* set at run time */
+    s = Out(show, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    ok = ok && s && str.len(s) > 10 && !str.cmpLen(s, "inherited|", 10);
+    mem.free(s);
+    return ok;
 }
 
-Bool DoneAndKill()
-{
-  U8 *rd[] = {"sh", "-c", "read x; exit 4", NULL};
-  Proc *p = ProcSpawn(rd, Opts(PROC_PIPE, PROC_INHERIT, PROC_INHERIT));
-  Bool ok = !ProcDone(p);                         /* waiting for a line */
-  write(p->in_fd, "go\n", 3);
-  ok = ok && ProcWait(p) == 4 && ProcDone(p);
-  ok = ok && !ProcKill(p);                        /* reaped: refused */
-  ProcRelease(p);
+bool doneAndKill() {
+    u8 *rd[] = {"sh", "-c", "read x; exit 4", null};
+    proc.Proc *p = proc.spawn(rd, opts(proc.PIPE, proc.INHERIT, proc.INHERIT));
+    bool ok = !proc.done(p);                         /* waiting for a line */
+    libc.write(p.inFd, "go\n", 3);
+    ok = ok && proc.wait(p) == 4 && proc.done(p);
+    ok = ok && !proc.kill(p);                        /* reaped: refused */
+    proc.release(p);
 
-  /* the group: sh and its background sleep both hold stdout; only
-   * killing the whole group lets stdout reach EOF */
-  U8 *tree[] = {"sh", "-c", "sleep 30 & sleep 30", NULL};
-  ProcOpts *o = Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT);
-  o->new_group = TRUE;
-  p = ProcSpawn(tree, o);
-  ok = ok && ProcKill(p, SIGKILL);
-  U8 *out;
-  I64 rc = ProcCommunicate(p, NULL, 0, &out);     /* returns at EOF */
-  ok = ok && rc == -1 && p->term_signal == SIGKILL && !StrCmp(out, "");
-  Free(out);
-  ProcRelease(p);
-  return ok;
+    /* the group: sh and its background sleep both hold stdout; only
+     * killing the whole group lets stdout reach EOF */
+    u8 *tree[] = {"sh", "-c", "sleep 30 & sleep 30", null};
+    proc.Opts *o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
+    o.newGroup = true;
+    p = proc.spawn(tree, o);
+    ok = ok && proc.kill(p, libc.SIGKILL);
+    u8 *out;
+    i64 rc = proc.communicate(p, null, 0, &out);     /* returns at EOF */
+    ok = ok && rc == -1 && p.termSignal == libc.SIGKILL && !str.cmp(out, "");
+    mem.free(out);
+    proc.release(p);
+    return ok;
 }
 
-#define MIB (1024 * 1024)
+const i64 MIB = (1024 * 1024);
 
-Bool NoDeadlock()
+bool noDeadlock()
 {// 1 MiB in and out through cat while 1 MiB of 'y' lines goes to stderr
-  U8 *a[] = {"sh", "-c", "yes | head -c 1048576 >&2 & cat; wait", NULL};
-  U8 *in = MAlloc(MIB), *out = NULL, *err = NULL;
-  I64 i, olen = 0, elen = 0;
-  for (i = 0; i < MIB; i++) in[i] = 'a' + i % 23;
-  Proc *p = ProcSpawn(a, Opts(PROC_PIPE, PROC_PIPE, PROC_PIPE));
-  I64 rc = ProcCommunicate(p, in, MIB, &out, &olen, &err, &elen);
-  Bool ok = rc == 0 && olen == MIB && elen == MIB && !memcmp(in, out, MIB);
-  ok = ok && err[0] == 'y' && err[1] == '\n' && err[MIB - 1] == '\n';
-  ProcRelease(p);
-  Free(in);
-  Free(out);
-  Free(err);
+    u8 *a[] = {"sh", "-c", "yes | head -c 1048576 >&2 & cat; wait", null};
+    u8 *in = mem.alloc(MIB), *out = null, *err = null;
+    i64 i, olen = 0, elen = 0;
+    for (i = 0; i < MIB; i++) { in[i] = 'a' + i % 23; }
+    proc.Proc *p = proc.spawn(a, opts(proc.PIPE, proc.PIPE, proc.PIPE));
+    i64 rc = proc.communicate(p, in, MIB, &out, &olen, &err, &elen);
+    bool ok = rc == 0 && olen == MIB && elen == MIB && !libc.memcmp(in, out, MIB);
+    ok = ok && err[0] == 'y' && err[1] == '\n' && err[MIB - 1] == '\n';
+    proc.release(p);
+    mem.free(in);
+    mem.free(out);
+    mem.free(err);
 
-  /* output dropped (NULL) is still drained */
-  U8 *big[] = {"sh", "-c", "yes | head -c 1048576", NULL};
-  p = ProcSpawn(big, Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT));
-  ok = ok && ProcCommunicate(p, NULL, 0, NULL) == 0;
-  ProcRelease(p);
-  return ok;
+    /* output dropped (null) is still drained */
+    u8 *big[] = {"sh", "-c", "yes | head -c 1048576", null};
+    p = proc.spawn(big, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT));
+    ok = ok && proc.communicate(p, null, 0, null) == 0;
+    proc.release(p);
+    return ok;
 }
 
-I32 ChildNoSigpipe()
+i32 childNoSigpipe()
 {// the child exits at once; 1 MiB for its stdin must not kill us
-  U8 *a[] = {"sh", "-c", "exit 0", NULL};
-  U8 *in = CAlloc(MIB);
-  Proc *p = ProcSpawn(a, Opts(PROC_PIPE, PROC_INHERIT, PROC_INHERIT));
-  I64 rc = ProcCommunicate(p, in, MIB, NULL);
-  ProcRelease(p);
-  return rc;                      /* 0 */
+    u8 *a[] = {"sh", "-c", "exit 0", null};
+    u8 *in = mem.allocZero(MIB);
+    proc.Proc *p = proc.spawn(a, opts(proc.PIPE, proc.INHERIT, proc.INHERIT));
+    i64 rc = proc.communicate(p, in, MIB, null);
+    proc.release(p);
+    return rc;                      /* 0 */
 }
 
-Bool NoLeak()
-{
-  I32 srv = NetCreateServer(0, "127.0.0.1", 4);  /* inheritable socket */
-  U8 *cat[] = {"cat", NULL};
-  Proc *keep = ProcSpawn(cat, Opts(PROC_PIPE, PROC_PIPE, PROC_INHERIT));
-  if (srv < 3 || !keep) return FALSE;
-  /* our pipe ends are close-on-exec */
-  Bool ok = (fcntl(keep->in_fd, F_GETFD) & FD_CLOEXEC) &&
-            (fcntl(keep->out_fd, F_GETFD) & FD_CLOEXEC);
-  U8 *script = MStrPrint("for fd in %d %d %d; do (: <&$fd) 2>/dev/null && echo open || echo closed; done",
-                         srv, keep->in_fd, keep->out_fd);
-  U8 *a[] = {"sh", "-c", script, NULL};
-  I64 code;
-  U8 *s = Out(a, Opts(PROC_NULL, PROC_PIPE, PROC_INHERIT), &code);
-  ok = ok && s && !StrCmp(s, "closed\nclosed\nclosed\n");
-  Free(s);
-  Free(script);
-  ProcRelease(keep);              /* cat sees EOF and ends */
-  close(srv);
-  return ok;
+bool noLeak() {
+    i32 srv = net.listen(0, "127.0.0.1", 4);  /* inheritable socket */
+    u8 *cat[] = {"cat", null};
+    proc.Proc *keep = proc.spawn(cat, opts(proc.PIPE, proc.PIPE, proc.INHERIT));
+    if (srv < 3 || !keep) { return false; }
+    /* our pipe ends are close-on-exec */
+    bool ok = (libc.fcntl(keep.inFd, libc.F_GETFD) & libc.FD_CLOEXEC) &&
+                        (libc.fcntl(keep.outFd, libc.F_GETFD) & libc.FD_CLOEXEC);
+    u8 *script = str.format("for fd in %d %d %d; do (: <&$fd) 2>/dev/null && echo open || echo closed; done",
+                                                 srv, keep.inFd, keep.outFd);
+    u8 *a[] = {"sh", "-c", script, null};
+    i64 code;
+    u8 *s = Out(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
+    ok = ok && s && !str.cmp(s, "closed\nclosed\nclosed\n");
+    mem.free(s);
+    mem.free(script);
+    proc.release(keep);              /* cat sees EOF and ends */
+    libc.close(srv);
+    return ok;
 }
 
-U0 *Spawner(U0 *arg)
-{
-  I64 id = arg(I64), j, code, *bad = MAlloc(sizeof(I64));
-  *bad = 0;
-  for (j = 0; j < 25; j++) {
-    U8 *want = MStrPrint("t%d-%d", id, j);
-    U8 *a[] = {"echo", want, NULL};
-    U8 *s = ProcRun(a, &code);
-    if (!s || StrCmp(s, want) || code != 0) *bad += 1;
-    Free(s);
-    Free(want);
-  }
-  return bad;
+void *spawner(void *arg) {
+    i64 id = (i64)arg, j, code, *bad = mem.alloc(sizeof(i64));
+    *bad = 0;
+    for (j = 0; j < 25; j++) {
+        u8 *want = str.format("t%d-%d", id, j);
+        u8 *a[] = {"echo", want, null};
+        u8 *s = proc.run(a, &code);
+        if (!s || str.cmp(s, want) || code != 0) { *bad += 1; }
+        mem.free(s);
+        mem.free(want);
+    }
+    return bad;
 }
 
-Bool Threads()
-{
-  pthread_t *t[4];
-  I64 i, bad = 0, *r;
-  for (i = 0; i < 4; i++) pthread_create(&t[i], NULL, &Spawner, i(U0 *));
-  for (i = 0; i < 4; i++) {
-    pthread_join(t[i], &r);
-    bad += *r;
-    Free(r);
-  }
-  return bad == 0;
+bool threads() {
+    libc.pthread_t *t[4];
+    i64 i, bad = 0, *r;
+    for (i = 0; i < 4; i++) { libc.pthread_create(&t[i], null, &spawner, (void *)i); }
+    for (i = 0; i < 4; i++) {
+        libc.pthread_join(t[i], &r);
+        bad += *r;
+        mem.free(r);
+    }
+    return bad == 0;
 }
 
-I32 RunInChild(I32 (*fn)())
+i32 runInChild(fn() i32 fn_)
 {// fn's result, or 100 + the signal that killed it
-  fflush(NULL);
-  I32 pid = fork();
-  if (pid == 0) {
-    alarm(30);
-    _exit(fn());
-  }
-  I32 status = 0;
-  waitpid(pid, &status, 0);
-  if (status & 0x7f) return 100 + (status & 0x7f);
-  return (status >> 8) & 0xff;
+    libc.fflush(null);
+    i32 pid = libc.fork();
+    if (pid == 0) {
+        alarm(30);
+        _exit(fn_());
+    }
+    i32 status = 0;
+    libc.waitpid(pid, &status, 0);
+    if (status & 0x7f) { return 100 + (status & 0x7f); }
+    return (status >> 8) & 0xff;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  alarm(120);
-  "Test - processes: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    alarm(120);
+    printf("Test - processes: ");
 
-  tests++;
-  if (ExitCodes) correct++;
-  else "\n  exit codes / killed by a signal\n";
+    tests++;
+    if (exitCodes()) { correct++; }
+    else { printf("\n  exit codes / killed by a signal\n"); }
 
-  tests++;
-  if (Missing) correct++;
-  else "\n  missing program: ENOENT / no_path\n";
+    tests++;
+    if (missing()) { correct++; }
+    else { printf("\n  missing program: ENOENT / no_path\n"); }
 
-  tests++;
-  if (NoShell) correct++;
-  else "\n  argv reaches the program unchanged\n";
+    tests++;
+    if (noShell()) { correct++; }
+    else { printf("\n  argv reaches the program unchanged\n"); }
 
-  tests++;
-  if (Redirects) correct++;
-  else "\n  PROC_NULL / PROC_STDOUT / both pipes\n";
+    tests++;
+    if (redirects()) { correct++; }
+    else { printf("\n  PROC_NULL / PROC_STDOUT / both pipes\n"); }
 
-  tests++;
-  if (CwdEnv) correct++;
-  else "\n  cwd and env\n";
+    tests++;
+    if (cwdEnv()) { correct++; }
+    else { printf("\n  cwd and env\n"); }
 
-  tests++;
-  if (DoneAndKill) correct++;
-  else "\n  ProcDone / ProcKill of a process group\n";
+    tests++;
+    if (doneAndKill()) { correct++; }
+    else { printf("\n  ProcDone / ProcKill of a process group\n"); }
 
-  tests++;
-  if (NoDeadlock) correct++;
-  else "\n  1 MiB both ways plus 1 MiB on stderr\n";
+    tests++;
+    if (noDeadlock()) { correct++; }
+    else { printf("\n  1 MiB both ways plus 1 MiB on stderr\n"); }
 
-  tests++;
-  I32 rc = RunInChild(&ChildNoSigpipe);
-  if (rc == 0) correct++;
-  else "\n  writing to a child that exited (%d)\n", rc;
+    tests++;
+    i32 rc = runInChild(&childNoSigpipe);
+    if (rc == 0) { correct++; }
+    else { printf("\n  writing to a child that exited (%d)\n", rc); }
 
-  tests++;
-  if (NoLeak) correct++;
-  else "\n  our fds leak into the child\n";
+    tests++;
+    if (noLeak()) { correct++; }
+    else { printf("\n  our fds leak into the child\n"); }
 
-  tests++;
-  if (Threads) correct++;
-  else "\n  spawning from 4 threads\n";
+    tests++;
+    if (threads()) { correct++; }
+    else { printf("\n  spawning from 4 threads\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

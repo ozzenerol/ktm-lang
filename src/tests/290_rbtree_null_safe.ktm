@@ -1,106 +1,100 @@
 #include "testhelper.ktm"
 
+import map;
+
 /* RBTreeGet, RBTreeHas, RBTreeInsert, RBTreeDelete, RBTreeForEach and
- * RBIterNew dereferenced a NULL tree; only RBTreeRelease checked. Reads
- * now give NULL/FALSE, writes do nothing and RBIterNew(NULL) gives an
+ * RBIterNew dereferenced a null tree; only RBTreeRelease checked. Reads
+ * now give null/false, writes do nothing and RBIterNew(null) gives an
  * iterator that yields nothing. */
 
-I64 g_calls;
+i64 gCalls;
 
-U0 CountCall(U0 *user_data, U0 *key, U0 *value) { g_calls++; }
+void countCall(void *user_data, void *key, void *value) { gCalls++; }
 
-I64 IntCmp(U0 *a, U0 *b)
-{
-  if (a(I64) < b(I64)) return -1;
-  if (a(I64) > b(I64)) return 1;
-  return 0;
+i64 intCmp(void *a, void *b) {
+    if ((i64)a < (i64)b) { return -1; }
+    if ((i64)a > (i64)b) { return 1; }
+    return 0;
 }
 
-Bool NullReads()
-{
-  return RBTreeGet(NULL, 1(U0 *)) == NULL &&
-         RBTreeGet(NULL, NULL) == NULL &&
-         RBTreeHas(NULL, 1(U0 *)) == FALSE &&
-         RBTreeHas(NULL, NULL) == FALSE;
+bool nullReads() {
+    return map.RBTree.get(null, (void *)1) == null &&
+                 map.RBTree.get(null, null) == null &&
+                 map.RBTree.has(null, (void *)1) == false &&
+                 map.RBTree.has(null, null) == false;
 }
 
-Bool NullWrites()
-{
-  RBTreeInsert(NULL, 1(U0 *), 10(U0 *));
-  RBTreeInsert(NULL, NULL, NULL);
-  RBTreeDelete(NULL, 1(U0 *));
-  RBTreeDelete(NULL, NULL);
-  RBTreeRelease(NULL);
-  return TRUE;
+bool nullWrites() {
+    map.RBTree.set(null, (void *)1, (void *)10);
+    map.RBTree.set(null, null, null);
+    map.RBTree.delete(null, (void *)1);
+    map.RBTree.delete(null, null);
+    map.RBTree.release(null);
+    return true;
 }
 
-Bool NullForEach()
-{
-  g_calls = 0;
-  RBTreeForEach(NULL, NULL, &CountCall);
-  return g_calls == 0;
+bool nullForEach() {
+    gCalls = 0;
+    map.RBTree.forEach(null, null, &countCall);
+    return gCalls == 0;
 }
 
-Bool NullIter()
-{
-  RBIter *it = RBIterNew(NULL);
-  if (!it) return FALSE;
-  I64 n = 0;
-  while (RBIterNext(it)) n++;
-  Bool ok = n == 0 && RBIterNext(it) == NULL;
-  RBIterRelease(it);
-  RBIterRelease(NULL);
-  return ok && RBIterNext(NULL) == NULL;
+bool nullIter() {
+    map.RBIter *it = map.RBTree.iterNew(null);
+    if (!it) { return false; }
+    i64 n = 0;
+    while (map.rbIterNext(it)) { n++; }
+    bool ok = n == 0 && map.rbIterNext(it) == null;
+    map.rbIterRelease(it);
+    map.rbIterRelease(null);
+    return ok && map.rbIterNext(null) == null;
 }
 
-Bool RealTreeUnchanged()
-{
-  RBTree *t = RBTreeNew(NULL, NULL, &IntCmp);
-  for (I64 i = 1; i <= 30; ++i) RBTreeInsert(t, i(U0 *), (i * 2)(U0 *));
-  RBTreeDelete(t, 7(U0 *));
-  Bool ok = t->size == 29 && RBTreeGet(t, 8(U0 *))(I64) == 16 &&
-            RBTreeHas(t, 30(U0 *)) && !RBTreeHas(t, 7(U0 *));
-  g_calls = 0;
-  RBTreeForEach(t, NULL, &CountCall);
-  ok = ok && g_calls == 29;
-  RBIter *it = RBIterNew(t);
-  RBNode *node;
-  I64 n = 0, prev = 0;
-  while ((node = RBIterNext(it))) {
-    if (node->key(I64) <= prev) ok = FALSE;
-    prev = node->key(I64);
-    n++;
-  }
-  RBIterRelease(it);
-  RBTreeRelease(t);
-  return ok && n == 29;
+bool realTreeUnchanged() {
+    map.RBTree *t = map.rbNew(null, null, &intCmp);
+    for (i64 i = 1; i <= 30; ++i) { t.set((void *)i, (void *)(i * 2)); }
+    t.delete((void *)7);
+    bool ok = t.size == 29 && (i64)t.get((void *)8) == 16 &&
+                        t.has((void *)30) && !t.has((void *)7);
+    gCalls = 0;
+    t.forEach(null, &countCall);
+    ok = ok && gCalls == 29;
+    map.RBIter *it = t.iterNew();
+    map.RBNode *node;
+    i64 n = 0, prev = 0;
+    while ((node = map.rbIterNext(it))) {
+        if ((i64)node.key <= prev) { ok = false; }
+        prev = (i64)node.key;
+        n++;
+    }
+    map.rbIterRelease(it);
+    t.release();
+    return ok && n == 29;
 }
 
-Bool EmptyTreeIter()
-{
-  RBTree *t = RBTreeNew(NULL, NULL, &IntCmp);
-  RBIter *it = RBIterNew(t);
-  Bool ok = RBIterNext(it) == NULL && RBTreeGet(t, 1(U0 *)) == NULL;
-  RBIterRelease(it);
-  RBTreeRelease(t);
-  return ok;
+bool emptyTreeIter() {
+    map.RBTree *t = map.rbNew(null, null, &intCmp);
+    map.RBIter *it = t.iterNew();
+    bool ok = map.rbIterNext(it) == null && t.get((void *)1) == null;
+    map.rbIterRelease(it);
+    t.release();
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  "Test - RBTree functions accept a NULL tree: ";
-  tests++; if (NullReads()) correct++;
-  else "RBTreeGet/RBTreeHas on NULL\n";
-  tests++; if (NullWrites()) correct++;
-  tests++; if (NullForEach()) correct++;
-  else "RBTreeForEach(NULL) called the callback\n";
-  tests++; if (NullIter()) correct++;
-  else "RBIterNew(NULL) did not give an empty iterator\n";
-  tests++; if (RealTreeUnchanged()) correct++;
-  else "a real tree misbehaved\n";
-  tests++; if (EmptyTreeIter()) correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    i64 correct = 0, tests = 0;
+    printf("Test - RBTree functions accept a null tree: ");
+    tests++; if (nullReads()) { correct++; }
+    else { printf("RBTreeGet/RBTreeHas on null\n"); }
+    tests++; if (nullWrites()) { correct++; }
+    tests++; if (nullForEach()) { correct++; }
+    else { printf("RBTreeForEach(null) called the callback\n"); }
+    tests++; if (nullIter()) { correct++; }
+    else { printf("RBIterNew(null) did not give an empty iterator\n"); }
+    tests++; if (realTreeUnchanged()) { correct++; }
+    else { printf("a real tree misbehaved\n"); }
+    tests++; if (emptyTreeIter()) { correct++; }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

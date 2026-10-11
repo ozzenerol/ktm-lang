@@ -1,5 +1,9 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
+enum Err { done };
+
 /* A goto into a try body from outside it (or from its catch handler)
  * skipped KTM_PushFrame, and the body's normal exit then popped a frame
  * that was never pushed. It is a compile error now; jumps inside a try
@@ -8,174 +12,165 @@
 #define GOTO_TRY_FILE "__328_goto_into_try.ktm"
 #define GOTO_TRY_OUT  "__328_goto_into_try.out"
 
-I64 CatchDepth()
-{
-  if (!Fs) return 0;
-  I64 n = 0;
-  CatchFrame *f = Fs->catch_top;
-  while (f) {
-    n++;
-    f = f->prev;
-  }
-  return n;
-}
-
-I64 WithinBody(I64 x)
-{
-  I64 n = 0;
-  try {
-    if (x) goto skip;
-    n += 1;
-skip:
-    n += 10;
-    if (n < 30) goto skip;
-  } catch {
-    n = -1;
-  }
-  return n;
-}
-
-I64 OutOfBody(I64 x)
-{
-  I64 n = 0;
-  try {
-    if (x) goto out;
-    n = 1;
-  } catch {
-    n = -1;
-  }
-  return n;
-out:
-  return 100 + CatchDepth;
-}
-
-I64 InnerToOuter()
-{
-  I64 n = 0;
-  try {
-    try {
-      goto outer_label;
-    } catch {
+i64 catchDepth() {
+    if (!Fs()) { return 0; }
+    i64 n = 0;
+    CatchFrame *f = Fs().catchTop;
+    while (f) {
+        n++;
+        f = f.prev;
     }
-    n = -1;
+    return n;
+}
+
+i64 withinBody(i64 x) {
+    i64 n = 0;
+    try {
+        if (x) { goto skip; }
+        n += 1;
+skip:
+        n += 10;
+        if (n < 30) { goto skip; }
+    } catch {
+        n = -1;
+    }
+    return n;
+}
+
+i64 outOfBody(i64 x) {
+    i64 n = 0;
+    try {
+        if (x) { goto out; }
+        n = 1;
+    } catch {
+        n = -1;
+    }
+    return n;
+out:
+    return 100 + catchDepth();
+}
+
+i64 innerToOuter() {
+    i64 n = 0;
+    try {
+        try {
+            goto outer_label;
+        } catch {
+        }
+        n = -1;
 outer_label:
-    n += CatchDepth;
-  } catch {
-    n = -2;
-  }
-  return n;
+        n += catchDepth();
+    } catch {
+        n = -2;
+    }
+    return n;
 }
 
-I64 IntoCatchHandler(I64 x)
-{
-  I64 n = 0;
-  if (x) goto handler;
-  try {
-    n = 1;
-  } catch {
+i64 intoCatchHandler(i64 x) {
+    i64 n = 0;
+    if (x) { goto handler; }
+    try {
+        n = 1;
+    } catch {
 handler:
-    n += 50;
-  }
-  return n + CatchDepth;
+        n += 50;
+    }
+    return n + catchDepth();
 }
 
-I64 ThrowAfterJumps()
-{
-  I64 n = 0;
-  try {
-    WithinBody(1);
-    OutOfBody(1);
-    InnerToOuter;
-    throw('Done');
-  } catch {
-    n = 1;
-  }
-  return n;
+i64 throwAfterJumps() {
+    i64 n = 0;
+    try {
+        withinBody(1);
+        outOfBody(1);
+        innerToOuter();
+        throw(Err.done);
+    } catch {
+        n = 1;
+    }
+    return n;
 }
 
-U0 CleanupGotoTry(U0)
-{
-  Rm(GOTO_TRY_FILE);
-  Rm(GOTO_TRY_OUT);
-  Rm("./a.out");
+void cleanupGotoTry(void) {
+    fs.remove(GOTO_TRY_FILE);
+    fs.remove(GOTO_TRY_OUT);
+    fs.remove("./a.out");
 }
 
-Bool CompileFailsWith(U8 *src, U8 *expected)
-{
-  U8 *out;
-  I64 res;
-  Bool ok;
+bool compileFailsWith(u8 *src, u8 *expected) {
+    u8 *out;
+    i64 res;
+    bool ok;
 
-  CleanupGotoTry;
-  if (!FileWrite(GOTO_TRY_FILE, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  res = System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " GOTO_TRY_FILE " > " GOTO_TRY_OUT " 2>&1");
-  out = FileRead(GOTO_TRY_OUT);
-  ok = res != 0 && out && strstr(out, expected) != NULL;
-  if (!ok && out) "%s\n", out;
-  Free(out);
-  CleanupGotoTry;
-  return ok;
+    cleanupGotoTry();
+    if (!fs.writeAll(GOTO_TRY_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " GOTO_TRY_FILE " > " GOTO_TRY_OUT " 2>&1");
+    out = fs.readAll(GOTO_TRY_OUT);
+    ok = res != 0 && out && libc.strstr(out, expected) != null;
+    if (!ok && out) { printf("%s\n", out); }
+    mem.free(out);
+    cleanupGotoTry();
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - goto into try: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - goto into try: ");
+    i64 correct = 0, tests = 0;
 
-  tests++; if (WithinBody(0) == 31 && WithinBody(1) == 30) correct++;
-  tests++; if (OutOfBody(0) == 1 && OutOfBody(1) == 100) correct++;
-  tests++; if (InnerToOuter == 1) correct++;
-  tests++; if (IntoCatchHandler(0) == 1 && IntoCatchHandler(1) == 50) correct++;
-  tests++; if (ThrowAfterJumps == 1 && CatchDepth == 0) correct++;
+    tests++; if (withinBody(0) == 31 && withinBody(1) == 30) { correct++; }
+    tests++; if (outOfBody(0) == 1 && outOfBody(1) == 100) { correct++; }
+    tests++; if (innerToOuter() == 1) { correct++; }
+    tests++; if (intoCatchHandler(0) == 1 && intoCatchHandler(1) == 50) { correct++; }
+    tests++; if (throwAfterJumps() == 1 && catchDepth() == 0) { correct++; }
 
-  tests++;
-  if (CompileFailsWith(
-"U0 Main()
+    tests++;
+    if (compileFailsWith(
+"void main()
 {
-  I64 x = 1;
+  i64 x = 1;
   if (x) goto inside;
   try {
 inside:
-    \"in\\n\";
+    printf(\"in\\n\");
   } catch {
   }
 }
-", "`goto inside` jumps into a try body")) correct++;
+", "`goto inside` jumps into a try body")) { correct++; }
 
-  tests++;
-  if (CompileFailsWith(
-"U0 Main()
+    tests++;
+    if (compileFailsWith(
+"void main()
 {
   try {
     throw('A');
 again:
-    \"again\\n\";
+    printf(\"again\\n\");
   } catch {
     goto again;
   }
 }
-", ":8:")) correct++;
+", ":8:")) { correct++; }
 
-  tests++;
-  if (CompileFailsWith(
-"U0 Main()
+    tests++;
+    if (compileFailsWith(
+"void main()
 {
-  I64 i = 0;
+  i64 i = 0;
   try {
-    \"x\\n\";
+    printf(\"x\\n\");
 back:
     i++;
   } catch {
   }
   if (i < 3) goto back;
 }
-", "`goto back` jumps into a try body")) correct++;
+", "`goto back` jumps into a try body")) { correct++; }
 
-  tests++;
-  if (CompileFailsWith(
-"U0 Main()
+    tests++;
+    if (compileFailsWith(
+"void main()
 {
   try {
     goto deeper;
@@ -193,9 +188,9 @@ deeper:
   } catch {
   }
 }
-", "`goto deeper` jumps into a try body")) correct++;
+", "`goto deeper` jumps into a try body")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

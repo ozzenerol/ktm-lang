@@ -1,30 +1,30 @@
 #include "testhelper.ktm"
 
+import mem, proc, str;
+
 /* Sh and Shlurp ran fmt as-is when no arguments followed, so
  * Sh("echo '100%%'") printed 100%% and the same command meant different
  * things with and without arguments. fmt is now always formatted. */
 
-Bool Is(U8 *got, U8 *want)
-{
-  Bool ok = got && !StrCmp(got, want);
-  if (!ok) "got '%s' want '%s'\n", got, want;
-  Free(got);
-  return ok;
+bool is(u8 *got, u8 *want) {
+    bool ok = got && !str.cmp(got, want);
+    if (!ok) { printf("got '%s' want '%s'\n", got, want); }
+    mem.free(got);
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 6;
-  "Test - Sh and Shlurp format without arguments: ";
+i32 main() {
+    i64 correct = 0, tests = 6;
+    printf("Test - Sh and Shlurp format without arguments: ");
 
-  if (Sh("exit $(printf '%%d' 7)") == 7) correct++;
-  if (Sh("exit $(printf '%%d' %d)", 9) == 9) correct++;
-  if (Is(Shlurp("echo 100%%"), "100%")) correct++;
-  if (Is(Shlurp("printf '%%s-%%s' a b"), "a-b")) correct++;
-  if (Is(Shlurp("echo %d%%", 5), "5%")) correct++;
-  if (Is(Shlurp("echo plain"), "plain")) correct++;
+    if (proc.shellf("exit $(printf '%%d' 7)") == 7) { correct++; }
+    if (proc.shellf("exit $(printf '%%d' %d)", 9) == 9) { correct++; }
+    if (is(proc.shellOutput("echo 100%%"), "100%")) { correct++; }
+    if (is(proc.shellOutput("printf '%%s-%%s' a b"), "a-b")) { correct++; }
+    if (is(proc.shellOutput("echo %d%%", 5), "5%")) { correct++; }
+    if (is(proc.shellOutput("echo plain"), "plain")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

@@ -1,80 +1,73 @@
 #include "testhelper.ktm"
 
-#define STRINGS_LEN 9
+import fzf;
 
-Bool _TestStrings(U8 **strings, U8 *pattern, I32 expected_matches, I32 case_mode, Bool fuzzy)
-{
-  I32 matches = 0;
-  for (auto i = 0; i < STRINGS_LEN; ++i) {
-    auto res = FzF(strings[i],pattern,case_mode,fuzzy);
-    if (res) {
-      matches++;
-      FzFPositionRelease(res);
+const i64 STRINGS_LEN = 9;
+
+bool testStrings(u8 **strings, u8 *pattern, i32 expectedMatches, i32 case_mode, bool fuzzy) {
+    i32 matches = 0;
+    for (auto i = 0; i < STRINGS_LEN; ++i) {
+        auto res = fzf.match(strings[i],pattern,case_mode,fuzzy);
+        if (res) {
+            matches++;
+            fzf.release(res);
+        }
     }
-  }
-  return matches == expected_matches;
+    return matches == expectedMatches;
 }
 
-Bool TestNoMatch(U8 **strings)
-{
-  return _TestStrings(strings,"HEY HOW ARE YOU?",0,FZF_CASE_SMART,TRUE);
+bool testNoMatch(u8 **strings) {
+    return testStrings(strings,"HEY HOW ARE YOU?",0,fzf.CASE_SMART,true);
 }
 
-Bool TestSuffix(U8 **strings)
-{
-  return _TestStrings(strings,"ktm$",2,FZF_CASE_SMART,TRUE);
+bool testSuffix(u8 **strings) {
+    return testStrings(strings,"ktm$",2,fzf.CASE_SMART,true);
 }
 
-Bool TestSuffixCaseInsensative(U8 **strings)
-{
-  return _TestStrings(strings,"M$",2,FZF_CASE_IGNORE,TRUE);  /* the .ktm names */
+bool testSuffixCaseInsensative(u8 **strings) {
+    return testStrings(strings,"M$",2,fzf.CASE_IGNORE,true);  /* the .ktm names */
 }
 
-Bool TestPrefix(U8 **strings)
-{
-  return _TestStrings(strings,"^He",2,FZF_CASE_SMART,TRUE);
+bool testPrefix(u8 **strings) {
+    return testStrings(strings,"^He",2,fzf.CASE_SMART,true);
 }
 
-Bool TestPrefixCaseInsensative(U8 **strings)
-{
-  return _TestStrings(strings,"^w",4,FZF_CASE_IGNORE,TRUE);
+bool testPrefixCaseInsensative(u8 **strings) {
+    return testStrings(strings,"^w",4,fzf.CASE_IGNORE,true);
 }
 
-Bool TextMatchExact(U8 **strings)
-{
-  return _TestStrings(strings,"'hey.c",1,FZF_CASE_RESPECT,FALSE);
+bool textMatchExact(u8 **strings) {
+    return testStrings(strings,"'hey.c",1,fzf.CASE_RESPECT,false);
 }
 
-Bool TextMatchExactCaseInsensative(U8 **strings)
-{
-  return _TestStrings(strings,"'hey.c",2,FZF_CASE_IGNORE,FALSE);
+bool textMatchExactCaseInsensative(u8 **strings) {
+    return testStrings(strings,"'hey.c",2,fzf.CASE_IGNORE,false);
 }
 
-I32 Main()
-{
-  "Test - FzF fuzzy finding: ";
-  I32 tests = 7, correct = 0;
-  U8 *strings[STRINGS_LEN] = {
-    "Hello.ktm",
-    "Hey.c",
-    "hey.c",
-    "woof",
-    "foo",
-    "WHO",
-    "wHo",
-    "another.ktm",
-    "woo"
-  };
+i32 main() {
+    printf("Test - FzF fuzzy finding: ");
+    i32 tests = 7, correct = 0;
+    u8 *strings[STRINGS_LEN] = {
+        "Hello.ktm",
+        "Hey.c",
+        "hey.c",
+        "woof",
+        "foo",
+        "WHO",
+        "wHo",
+        "another.ktm",
+        "woo"
+    };
 
-  if (TestNoMatch(strings)) correct++;
-  if (TestSuffix(strings)) correct++;
-  if (TestSuffixCaseInsensative(strings)) correct++;
-  if (TestPrefix(strings)) correct++;
-  if (TestPrefixCaseInsensative(strings)) correct++;
-  if (TextMatchExact(strings)) correct++;
-  if (TextMatchExactCaseInsensative(strings)) correct++;
-  
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+    if (testNoMatch(strings)) { correct++; }
+    if (testSuffix(strings)) { correct++; }
+    if (testSuffixCaseInsensative(strings)) { correct++; }
+    if (testPrefix(strings)) { correct++; }
+    if (testPrefixCaseInsensative(strings)) { correct++; }
+    if (textMatchExact(strings)) { correct++; }
+    if (textMatchExactCaseInsensative(strings)) { correct++; }
+
+    PrintResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

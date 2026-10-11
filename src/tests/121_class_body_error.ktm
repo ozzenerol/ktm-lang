@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* A syntax error inside a class/union body is reported where it is,
  * the rest of the body is still parsed, and the class keeps the fields
  * that did parse. ktm used to leave the class registered without a
@@ -11,193 +13,178 @@
 #define MSG_TOKEN_C   "Unexpected token 'c' while parsing class Foo, perhaps you meant to terminate the field with `;`?"
 #define MSG_NO_C      "Property: c does not exist on class"
 
-U0 CleanupClassErrTest(U0)
-{
-  Rm(CLS_ERR_FILE);
-  Rm(CLS_ERR_OUT);
-  Rm("./a.out");
+void cleanupClassErrTest(void) {
+    fs.remove(CLS_ERR_FILE);
+    fs.remove(CLS_ERR_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p += 7;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p += 7;
+    }
+    return n;
 }
 
 /* Compile `source`: ktm must exit with status 1 (not crash) and print
- * exactly `n_expected` errors, `m1`/`m2` (when not NULL) among them. */
-Bool CompileFailsExactly(U8 *source, I64 n_expected, U8 *m1, U8 *m2)
-{
-  U8 *out;
-  I64 res;
-  Bool ok;
+ * exactly `n_expected` errors, `m1`/`m2` (when not null) among them. */
+bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
+    u8 *out;
+    i64 res;
+    bool ok;
 
-  CleanupClassErrTest;
+    cleanupClassErrTest();
 
-  if (!FileWrite(CLS_ERR_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(CLS_ERR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CLS_ERR_FILE " > " CLS_ERR_OUT " 2>&1");
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CLS_ERR_FILE " > " CLS_ERR_OUT " 2>&1");
 
-  out = FileRead(CLS_ERR_OUT);
-  if (!out) {
-    CleanupClassErrTest;
-    return FALSE;
-  }
+    out = fs.readAll(CLS_ERR_OUT);
+    if (!out) {
+        cleanupClassErrTest();
+        return false;
+    }
 
-  /* System gives the exit code: 1 for a compile error; a segfault
-   * would be 139 (from the shell) or -1 (killed by a signal). */
-  ok = res == 1;
-  if (CountErrors(out) != n_expected) ok = FALSE;
-  if (m1 && !strstr(out, m1)) ok = FALSE;
-  if (m2 && !strstr(out, m2)) ok = FALSE;
-  if (!ok) "status %d\n%s\n", res, out;
+    /* System gives the exit code: 1 for a compile error; a segfault
+     * would be 139 (from the shell) or -1 (killed by a signal). */
+    ok = res == 1;
+    if (countErrors(out) != nExpected) { ok = false; }
+    if (m1 && !libc.strstr(out, m1)) { ok = false; }
+    if (m2 && !libc.strstr(out, m2)) { ok = false; }
+    if (!ok) { printf("status %d\n%s\n", res, out); }
 
-  Free(out);
-  CleanupClassErrTest;
-  return ok;
+    mem.free(out);
+    cleanupClassErrTest();
+    return ok;
 }
 
-Bool TestFieldAccess(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; };
-U0 Main() { Foo f; f.a = 1; f.b = 2; }
+bool testFieldAccess(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; };
+void main() { Foo f; f.a = 1; f.b = 2; }
 ", 1, MSG_TOKEN_C, "1:26");
 }
 
 /* Fields after the bad one are still parsed; the bad name is not a field */
-Bool TestFieldsAfterError(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; I64 d; };
-U0 Main() { Foo f; f.d = 1; f.c = 2; }
+bool testFieldsAfterError(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; i64 d; };
+void main() { Foo f; f.d = 1; f.c = 2; }
 ", 2, MSG_TOKEN_C, MSG_NO_C);
 }
 
-Bool TestThroughPointer(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; };
-U0 Main() { Foo *p = NULL; p->a = 1; }
-", 1, MSG_TOKEN_C, NULL);
+bool testThroughPointer(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; };
+void main() { Foo *p = null; p->a = 1; }
+", 1, MSG_TOKEN_C, null);
 }
 
-Bool TestSizeof(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; };
-U0 Main() { I64 n = sizeof(Foo); }
-", 1, MSG_TOKEN_C, NULL);
+bool testSizeof(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; };
+void main() { i64 n = sizeof(Foo); }
+", 1, MSG_TOKEN_C, null);
 }
 
-Bool TestUnion(U0)
-{
-  return CompileFailsExactly(
-"union U { I64 a; I64 b c; };
-U0 Main() { U u; u.a = 1; }
-", 1, "Unexpected token 'c' while parsing class U", NULL);
+bool testUnion(void) {
+    return compileFailsExactly(
+"union U { i64 a; i64 b c; };
+void main() { U u; u.a = 1; }
+", 1, "Unexpected token 'c' while parsing class U", null);
 }
 
 /* The anonymous nested class has no name; this used to crash in the
  * error path itself */
-Bool TestNestedAnonymousClass(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 x; class { I64 a; I64 b c; }; I64 y; };
-U0 Main() { Foo f; f.a = 1; f.x = 2; f.y = 3; }
-", 1, "Unexpected token 'c' while parsing class <anonymous>", NULL);
+bool testNestedAnonymousClass(void) {
+    return compileFailsExactly(
+"struct Foo { i64 x; struct { i64 a; i64 b c; }; i64 y; };
+void main() { Foo f; f.a = 1; f.x = 2; f.y = 3; }
+", 1, "Unexpected token 'c' while parsing class <anonymous>", null);
 }
 
-Bool TestNestedAnonymousUnion(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 x; union { I64 a; I64 5; }; I64 y; };
-U0 Main() { Foo f; f.a = 1; f.y = 2; }
-", 1, "Unexpected character `5` while parsing class <anonymous>", NULL);
+bool testNestedAnonymousUnion(void) {
+    return compileFailsExactly(
+"struct Foo { i64 x; union { i64 a; i64 5; }; i64 y; };
+void main() { Foo f; f.a = 1; f.y = 2; }
+", 1, "Unexpected character `5` while parsing class <anonymous>", null);
 }
 
-Bool TestAsFieldOfAnotherClass(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; };
-class Bar { Foo f; I64 z; };
-U0 Main() { Bar b; b.f.a = 1; b.z = 2; }
-", 1, MSG_TOKEN_C, NULL);
+bool testAsFieldOfAnotherClass(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; };
+struct Bar { Foo f; i64 z; };
+void main() { Bar b; b.f.a = 1; b.z = 2; }
+", 1, MSG_TOKEN_C, null);
 }
 
-Bool TestInherited(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; I64 b c; };
-class B : Foo { I64 z; };
-U0 Main() { B b; b.a = 1; b.z = 2; }
-", 1, MSG_TOKEN_C, NULL);
+bool testInherited(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; i64 b c; };
+struct B : Foo { i64 z; };
+void main() { B b; b.a = 1; b.z = 2; }
+", 1, MSG_TOKEN_C, null);
 }
 
-Bool TestUnknownFieldType(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; Nope b; I64 c; };
-U0 Main() { Foo f; f.c = 1; }
-", 1, "Unexpected type `Nope` while parsing class Foo", NULL);
+bool testUnknownFieldType(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; Nope b; i64 c; };
+void main() { Foo f; f.c = 1; }
+", 1, "Unexpected type `Nope` while parsing class Foo", null);
 }
 
 /* No body at all: the member access is an error, not a crash */
-Bool TestForwardDeclared(U0)
-{
-  return CompileFailsExactly(
-"class Foo;
-U0 Main() { Foo *p; p->a = 1; }
-", 1, "Cannot access `a`, Foo is incomplete", NULL);
+bool testForwardDeclared(void) {
+    return compileFailsExactly(
+"struct Foo;
+void main() { Foo *p; p->a = 1; }
+", 1, "Cannot access `a`, Foo is incomplete", null);
 }
 
-I32 Main()
-{
-  "Test - Class body errors: \n";
-  I64 tests = 11;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - Class body errors: \n");
+    i64 tests = 11;
+    i64 correct = 0;
 
-  if (TestFieldAccess()) correct++;
-  else "Failed - TestFieldAccess()\n";
+    if (testFieldAccess()) { correct++; }
+    else { printf("Failed - TestFieldAccess()\n"); }
 
-  if (TestFieldsAfterError()) correct++;
-  else "Failed - TestFieldsAfterError()\n";
+    if (testFieldsAfterError()) { correct++; }
+    else { printf("Failed - TestFieldsAfterError()\n"); }
 
-  if (TestThroughPointer()) correct++;
-  else "Failed - TestThroughPointer()\n";
+    if (testThroughPointer()) { correct++; }
+    else { printf("Failed - TestThroughPointer()\n"); }
 
-  if (TestSizeof()) correct++;
-  else "Failed - TestSizeof()\n";
+    if (testSizeof()) { correct++; }
+    else { printf("Failed - TestSizeof()\n"); }
 
-  if (TestUnion()) correct++;
-  else "Failed - TestUnion()\n";
+    if (testUnion()) { correct++; }
+    else { printf("Failed - TestUnion()\n"); }
 
-  if (TestNestedAnonymousClass()) correct++;
-  else "Failed - TestNestedAnonymousClass()\n";
+    if (testNestedAnonymousClass()) { correct++; }
+    else { printf("Failed - TestNestedAnonymousClass()\n"); }
 
-  if (TestNestedAnonymousUnion()) correct++;
-  else "Failed - TestNestedAnonymousUnion()\n";
+    if (testNestedAnonymousUnion()) { correct++; }
+    else { printf("Failed - TestNestedAnonymousUnion()\n"); }
 
-  if (TestAsFieldOfAnotherClass()) correct++;
-  else "Failed - TestAsFieldOfAnotherClass()\n";
+    if (testAsFieldOfAnotherClass()) { correct++; }
+    else { printf("Failed - TestAsFieldOfAnotherClass()\n"); }
 
-  if (TestInherited()) correct++;
-  else "Failed - TestInherited()\n";
+    if (testInherited()) { correct++; }
+    else { printf("Failed - TestInherited()\n"); }
 
-  if (TestUnknownFieldType()) correct++;
-  else "Failed - TestUnknownFieldType()\n";
+    if (testUnknownFieldType()) { correct++; }
+    else { printf("Failed - TestUnknownFieldType()\n"); }
 
-  if (TestForwardDeclared()) correct++;
-  else "Failed - TestForwardDeclared()\n";
+    if (testForwardDeclared()) { correct++; }
+    else { printf("Failed - TestForwardDeclared()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

@@ -1,7 +1,9 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* A block comment left open at the end of a file was silently taken
- * as running to the end of the file, so `U0 Main() { ... }` followed
+ * as running to the end of the file, so `void Main() { ... }` followed
  * by `/` `*` never closed compiled and ran. It must be reported at the
  * opener as "unterminated comment" and ktm must exit 1. */
 
@@ -9,151 +11,140 @@
 #define COMMENT_INC  "__135_unclosed_comment.ktmh"
 #define COMMENT_OUT  "__135_unclosed_comment.out"
 
-U0 CleanupCommentTest(U0)
-{
-  Rm(COMMENT_FILE);
-  Rm(COMMENT_INC);
-  Rm(COMMENT_OUT);
-  Rm("./a.out");
+void cleanupCommentTest(void) {
+    fs.remove(COMMENT_FILE);
+    fs.remove(COMMENT_INC);
+    fs.remove(COMMENT_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p++;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p++;
+    }
+    return n;
 }
 
-/* Compile `source` (and `inc` as COMMENT_INC when not NULL). With
+/* Compile `source` (and `inc` as COMMENT_INC when not null). With
  * `count` 0 it must compile cleanly; otherwise ktm must exit 1 with
  * exactly `count` errors, among them "unterminated comment" at `loc`
  * (" --> file:line:col"). */
-Bool Compile(U8 *source, U8 *inc, I64 count, U8 *loc)
-{
-  U8 *out, *want;
-  I64 res;
-  Bool ok = TRUE;
+bool compile(u8 *source, u8 *inc, i64 count, u8 *loc) {
+    u8 *out, *want;
+    i64 res;
+    bool ok = true;
 
-  CleanupCommentTest;
+    cleanupCommentTest();
 
-  if (!FileWrite(COMMENT_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  if (inc && !FileWrite(COMMENT_INC, inc, StrLen(inc), O_CREAT | O_RDWR | O_TRUNC)) {
-    CleanupCommentTest;
-    return FALSE;
-  }
+    if (!fs.writeAll(COMMENT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    if (inc && !fs.writeAll(COMMENT_INC, inc, str.len(inc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        cleanupCommentTest();
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " COMMENT_FILE " > " COMMENT_OUT " 2>&1");
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " COMMENT_FILE " > " COMMENT_OUT " 2>&1");
 
-  out = FileRead(COMMENT_OUT);
-  if (!out) {
-    CleanupCommentTest;
-    return FALSE;
-  }
+    out = fs.readAll(COMMENT_OUT);
+    if (!out) {
+        cleanupCommentTest();
+        return false;
+    }
 
-  if (count == 0) {
-    if (res != 0) ok = FALSE;
-  } else {
-    if (res != 1) ok = FALSE;
-    want = MStrPrint("error: unterminated comment\n --> %s\n", loc);
-    if (!strstr(out, want)) ok = FALSE;
-    Free(want);
-  }
-  if (CountErrors(out) != count) ok = FALSE;
-  if (!ok) "exit status %d\n%s\n", res, out;
+    if (count == 0) {
+        if (res != 0) { ok = false; }
+    } else {
+        if (res != 1) { ok = false; }
+        want = str.format("error: unterminated comment\n --> %s\n", loc);
+        if (!libc.strstr(out, want)) { ok = false; }
+        mem.free(want);
+    }
+    if (countErrors(out) != count) { ok = false; }
+    if (!ok) { printf("exit status %d\n%s\n", res, out); }
 
-  Free(out);
-  CleanupCommentTest;
-  return ok;
+    mem.free(out);
+    cleanupCommentTest();
+    return ok;
 }
 
-Bool TestUnclosedAtEof(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
+bool testUnclosedAtEof(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
 /* never closed
-", NULL, 1, COMMENT_FILE ":2:1");
+", null, 1, COMMENT_FILE ":2:1");
 }
 
 /* Opened mid-line, no newline at all after it */
-Bool TestUnclosedMidLine(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
-I64 x;   /* never closed", NULL, 1, COMMENT_FILE ":2:10");
+bool testUnclosedMidLine(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
+i64 x;   /* never closed", null, 1, COMMENT_FILE ":2:10");
 }
 
 /* `/ * / * * /` is one comment: comments don't nest */
-Bool TestNestedLooking(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; } /* /* */
-", NULL, 0, NULL);
+bool testNestedLooking(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); } /* /* */
+", null, 0, null);
 }
 
-Bool TestOpenerInString(U0)
-{
-  return Compile(
-"U0 Main() { \"/* not a comment\\n\"; }
-", NULL, 0, NULL);
+bool testOpenerInString(void) {
+    return compile(
+"void main() { printf(\"/* not a comment\\n\"); }
+", null, 0, null);
 }
 
 /* A line comment ending the file without a newline is fine */
-Bool TestLineCommentAtEof(U0)
-{
-  return Compile(
-"U0 Main() { \"hi\\n\"; }
-// no newline after this", NULL, 0, NULL);
+bool testLineCommentAtEof(void) {
+    return compile(
+"void main() { printf(\"hi\\n\"); }
+// no newline after this", null, 0, null);
 }
 
 /* Reported in the included file, then the including file carries on */
-Bool TestUnclosedInInclude(U0)
-{
-  return Compile(
+bool testUnclosedInInclude(void) {
+    return compile(
 "#include \"" COMMENT_INC "\"
-U0 Main() { \"%d\\n\", x; }
+void main() { printf(\"%d\\n\", x); }
 ",
-"I64 x = 1;
+"i64 x = 1;
   /* never closed
 ", 1, COMMENT_INC ":2:3");
 }
 
 /* Like C, still reported inside a skipped #if 0 block, where it also
  * swallows the #endif */
-Bool TestUnclosedInIfZero(U0)
-{
-  return Compile(
+bool testUnclosedInIfZero(void) {
+    return compile(
 "#if 0
 /* never closed
 #endif
-U0 Main() { \"hi\\n\"; }
-", NULL, 2, COMMENT_FILE ":2:1");
+void Main() { \"hi\\n\"; }
+", null, 2, COMMENT_FILE ":2:1");
 }
 
-I32 Main()
-{
-  "Test - unclosed block comment: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - unclosed block comment: ");
+    i64 correct = 0, tests = 0;
 
-  tests++; if (TestUnclosedAtEof)     correct++;
-  tests++; if (TestUnclosedMidLine)   correct++;
-  tests++; if (TestNestedLooking)     correct++;
-  tests++; if (TestOpenerInString)    correct++;
-  tests++; if (TestLineCommentAtEof)  correct++;
-  tests++; if (TestUnclosedInInclude) correct++;
-  tests++; if (TestUnclosedInIfZero)  correct++;
+    tests++; if (testUnclosedAtEof())     { correct++; }
+    tests++; if (testUnclosedMidLine())   { correct++; }
+    tests++; if (testNestedLooking())     { correct++; }
+    tests++; if (testOpenerInString())    { correct++; }
+    tests++; if (testLineCommentAtEof())  { correct++; }
+    tests++; if (testUnclosedInInclude()) { correct++; }
+    tests++; if (testUnclosedInIfZero())  { correct++; }
 
-  /* The same edge cases in this file itself */
-  tests++; /* /* */ correct++;
-  tests++; if (StrLen("/*") == 2) correct++;
+    /* The same edge cases in this file itself */
+    tests++; /* /* */ correct++;
+    tests++; if (str.len("/*") == 2) { correct++; }
 
-  CleanupCommentTest;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    cleanupCommentTest();
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

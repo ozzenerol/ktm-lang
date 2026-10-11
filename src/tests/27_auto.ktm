@@ -1,68 +1,62 @@
 #include "testhelper.ktm"
 
-class Person
-{
-  U8 name[10];
-  I64 age;
+import mem, str;
+
+struct Person {
+    u8 name[10];
+    i64 age;
 };
 
-auto PersonNew(U8 name[10], I64 age)
-{
-  Person *p = MAlloc(sizeof(Person));
-  p->age = age;
-  MemCpy(p->name,name,sizeof(p->name));
-  return p;
+auto personNew(u8 name[10], i64 age) {
+    Person *p = mem.alloc(sizeof(Person));
+    p.age = age;
+    mem.copy(p.name,name,sizeof(p.name));
+    return p;
 }
 
-auto CreateRandom()
-{
-  return PersonNew("PersonA", 42);
+auto createRandom() {
+    return personNew("PersonA", 42);
 }
 
-auto Add(I64 i, I64 x)
-{
-  return i + x;
+auto add(i64 i, i64 x) {
+    return i + x;
 }
 
-auto Identity(I64 i)
-{
-  return i;
+auto identity(i64 i) {
+    return i;
 }
 
-Bool VariableAutos()
-{
-  auto correct = 0, tests = 5;
-  auto x = 1<<2,
-       f = 4.5,
-       ch = 'hello', 
-       p = MAlloc(sizeof(Person))(Person *);
-  if (x + 4 == 8)    correct++;
-  if (f + 4.5 == 9)  correct++;
-  if (ch == 'hello') correct++;
-  p->age = 42;
-  MemCpy(p->name,"PersonB",7);
-  if (p->age == 42) correct++;
-  if (!StrNCmp(p->name,"PersonB",7)) correct++;
-  return correct == tests;
+bool variableAutos() {
+    auto correct = 0, tests = 5;
+    auto x = 1<<2,
+             f = 4.5,
+             ch = 'hello', 
+             p = (Person *)mem.alloc(sizeof(Person));
+    if (x + 4 == 8)    { correct++; }
+    if (f + 4.5 == 9)  { correct++; }
+    if (ch == 'hello') { correct++; }
+    p.age = 42;
+    mem.copy(p.name,"PersonB",7);
+    if (p.age == 42) { correct++; }
+    if (!str.cmpLen(p.name,"PersonB",7)) { correct++; }
+    return correct == tests;
 }
 
-Bool FunctionCalls()
-{
-  I64 correct = 0, tests = 3;
-  auto p = CreateRandom();
-  if (p->age == 42 && !StrNCmp(p->name,"PersonA",7)) correct++;
-  if (Identity(10) == 10) correct++;
-  if (Add(420,36) == 456) correct++;
-  return correct == tests;
+bool functionCalls() {
+    i64 correct = 0, tests = 3;
+    auto p = createRandom();
+    if (p.age == 42 && !str.cmpLen(p.name,"PersonA",7)) { correct++; }
+    if (identity(10) == 10) { correct++; }
+    if (add(420,36) == 456) { correct++; }
+    return correct == tests;
 }
 
-I32 Main()
-{
-  "Test - auto keyword: ";
-  I64 correct = 0, tests = 2;
-  if (VariableAutos()) correct++;
-  if (FunctionCalls()) correct++;
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - auto keyword: ");
+    i64 correct = 0, tests = 2;
+    if (variableAutos()) { correct++; }
+    if (functionCalls()) { correct++; }
+    PrintResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

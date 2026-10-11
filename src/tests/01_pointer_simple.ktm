@@ -1,26 +1,25 @@
 #include "testhelper.ktm"
 
-class Example
-{
-  I64 i1;
-  I64 i2;
-  I64 i3;
-  I64 x;
-  I64 i4;
+import mem;
+
+struct Example {
+    i64 i1;
+    i64 i2;
+    i64 i3;
+    i64 x;
+    i64 i4;
 };
 
-U0 Assign(I64 *i)
-{
-  *i = 9;
+void assign(i64 *i) {
+    *i = 9;
 }
 
-I32 Main()
-{
-  "Test Assigning pointer to a pointer from a class, with brackets: ";
-  Example *e = MAlloc(sizeof(Example));
-  I64 *p = &(e->x); 
-  Assign(p);
-  PrintResult(*p == 9, 1);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test Assigning pointer to a pointer from a class, with brackets: ");
+    Example *e = mem.alloc(sizeof(Example));
+    i64 *p = &(e.x); 
+    assign(p);
+    PrintResult(*p == 9, 1);
+    printf("====\n");
+    return 0;
 }

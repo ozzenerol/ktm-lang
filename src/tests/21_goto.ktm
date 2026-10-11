@@ -1,37 +1,36 @@
 #include "testhelper.ktm"
 
-Bool testGoto() {
-  for (I64 i = 0; i < 9; ++i) {
-    if (i == 4) {
-      goto passed;
-    }
-  } 
-  return FALSE;
+bool testGoto() {
+    for (i64 i = 0; i < 9; ++i) {
+        if (i == 4) {
+            goto passed;
+        }
+    } 
+    return false;
 
 passed:
-  return TRUE;
+    return true;
 }
 
 /* test that we can use the same label between functions */
-Bool testGoto2() {
-  for (I64 i = 0; i < 9; ++i) {
-    if (i == 4) {
-      goto passed;
-    }
-  } 
-  return FALSE;
+bool testGoto2() {
+    for (i64 i = 0; i < 9; ++i) {
+        if (i == 4) {
+            goto passed;
+        }
+    } 
+    return false;
 
 passed:
-  return TRUE;
+    return true;
 }
 
-I32 Main()
-{
-  I64 correct = 0, test_cases = 2;
-  "Testing GOTO: ";
-  if (testGoto()) ++correct;
-  if (testGoto2()) ++correct;
-  PrintResult(correct,test_cases);
-  "=====\n";
-  return 0;
+i32 main() {
+    i64 correct = 0, testCases = 2;
+    printf("Testing GOTO: ");
+    if (testGoto()) { ++correct; }
+    if (testGoto2()) { ++correct; }
+    PrintResult(correct,testCases);
+    printf("=====\n");
+    return 0;
 }

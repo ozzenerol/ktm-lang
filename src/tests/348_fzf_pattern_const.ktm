@@ -1,60 +1,59 @@
 #include "testhelper.ktm"
 
+import fzf, mem, str;
+
 /* FzF trimmed the pattern in place: the caller's string was changed, and
  * a string literal with leading or trailing spaces segfaulted under AOT
  * (literals are read-only). It works on a copy now. */
 
-Bool Literal(U8 *text, I64 want_score, I64 want_first)
-{
-  FzFPosition *pos;
-  Bool ok;
-  pos = FzF(text, "  ab  ");
-  ok = pos && pos->score == want_score && pos->size == 2 && pos->data[0] == want_first;
-  FzFPositionRelease(pos);
-  return ok;
+bool literal(u8 *text, i64 wantScore, i64 wantFirst) {
+    fzf.Position *pos;
+    bool ok;
+    pos = fzf.match(text, "  ab  ");
+    ok = pos && pos.score == wantScore && pos.size == 2 && pos.data[0] == wantFirst;
+    fzf.release(pos);
+    return ok;
 }
 
-Bool Unchanged(U8 *pat, U8 *text)
-{
-  U8 *copy = StrNew(pat);
-  FzFPosition *pos = FzF(text, copy);
-  Bool ok = !StrCmp(copy, pat);
-  if (!ok) "\n  [%s] became [%s]", pat, copy;
-  if (pos) FzFPositionRelease(pos);
-  Free(copy);
-  return ok;
+bool unchanged(u8 *pat, u8 *text) {
+    u8 *copy = str.dup(pat);
+    fzf.Position *pos = fzf.match(text, copy);
+    bool ok = !str.cmp(copy, pat);
+    if (!ok) { printf("\n  [%s] became [%s]", pat, copy); }
+    if (pos) { fzf.release(pos); }
+    mem.free(copy);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - fzf pattern const: ";
-  I64 correct = 0, tests = 0;
-  FzFPosition *pos;
+i32 main() {
+    printf("Test - fzf pattern const: ");
+    i64 correct = 0, tests = 0;
+    fzf.Position *pos;
 
-  tests++; if (Literal("abc", 56, 0)) correct++;
+    tests++; if (literal("abc", 56, 0)) { correct++; }
 
-  pos = FzF("abc", "ab ");
-  tests++; if (pos && pos->size == 2) correct++;
-  FzFPositionRelease(pos);
+    pos = fzf.match("abc", "ab ");
+    tests++; if (pos && pos.size == 2) { correct++; }
+    fzf.release(pos);
 
-  pos = FzF("abc", "   ");
-  tests++; if (pos == NULL) correct++;
+    pos = fzf.match("abc", "   ");
+    tests++; if (pos == null) { correct++; }
 
-  pos = FzF("foo bar", "  foo\\ bar  ");
-  tests++; if (pos && pos->score == 176 && pos->size == 7) correct++;
-  FzFPositionRelease(pos);
+    pos = fzf.match("foo bar", "  foo\\ bar  ");
+    tests++; if (pos && pos.score == 176 && pos.size == 7) { correct++; }
+    fzf.release(pos);
 
-  pos = FzF("abc", "  b   c ");
-  tests++; if (pos && pos->score == 32 && pos->size == 2) correct++;
-  FzFPositionRelease(pos);
+    pos = fzf.match("abc", "  b   c ");
+    tests++; if (pos && pos.score == 32 && pos.size == 2) { correct++; }
+    fzf.release(pos);
 
-  tests++; if (Unchanged("ab  ", "abc")) correct++;
-  tests++; if (Unchanged("   ab", "abc")) correct++;
-  tests++; if (Unchanged("  x\\ y  ", "x y")) correct++;
-  tests++; if (Unchanged("   ", "abc")) correct++;
+    tests++; if (unchanged("ab  ", "abc")) { correct++; }
+    tests++; if (unchanged("   ab", "abc")) { correct++; }
+    tests++; if (unchanged("  x\\ y  ", "x y")) { correct++; }
+    tests++; if (unchanged("   ", "abc")) { correct++; }
 
-  if (correct != tests) "\n";
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    if (correct != tests) { printf("\n"); }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

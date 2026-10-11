@@ -1,5 +1,7 @@
 #include "testhelper.ktm"
 
+import fs, mem, proc, str;
+
 /* Modules (M1): a precompiled module. `ktm -lib geo dir/geo` builds the
  * module into libgeo.a and its shared object in dir/geo and writes the
  * marker dir/geo/.ktmlib. A program importing geo then reads only geo's
@@ -12,53 +14,55 @@
 #define PRE_OUT "./ktm-424-prebuilt.out"
 #define PRE_BIN "./ktm-424-prebuilt.bin"
 #define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) " \
-            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
-U8 *g_want = "3 4\n25 12\n2 4 -2 1 7\n1\n";
+u8 *gWant = "3 4\n25 12\n2 4 -2 1 7\n1\n";
 
-Bool Output(U8 *cmd, U8 *want)
-{
-  System("rm -f " PRE_OUT " " PRE_BIN);
-  System(cmd);
-  U8 *out = FileRead(PRE_OUT);
-  Bool ok = out && !StrCmp(out, want);
-  if (!ok) "\n%s\n----\n%s\n", cmd, out;
-  Free(out);
-  return ok;
+bool output(u8 *cmd, u8 *want) {
+    proc.shell("rm -f " PRE_OUT " " PRE_BIN);
+    proc.shell(cmd);
+    u8 *out = fs.readAll(PRE_OUT);
+    bool ok = out && !str.cmp(out, want);
+    if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
+    mem.free(out);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - modules: precompiled: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - modules: precompiled: ");
+    i64 correct = 0, tests = 0;
 
-  System("rm -rf ./pre && mkdir -p ./pre && cp -r ${KTM_TEST_SRC:-.}/modules/basic/. ./pre/");
+    proc.shell("rm -rf ./pre && mkdir -p ./pre && cp -r ${KTM_TEST_SRC:-.}/modules/basic/. ./pre/");
 
-  tests++;
-  if (Output(KTM "-lib geo ./pre/geo > " PRE_OUT " 2>&1; "
-             "test -f ./pre/geo/.ktmlib && test -f ./pre/geo/libgeo.a && echo built > " PRE_OUT,
-             "built\n"))
-    correct++;
-  /* the program has none of geo's code: no `_K3geo...:` label */
-  tests++;
-  if (Output(KTM "-S ./pre/main.ktm -o- 2>&1 | grep -c '^_K3geo' > " PRE_OUT, "0\n"))
-    correct++;
-  tests++;
-  if (Output(KTM "./pre/main.ktm -o " PRE_BIN " > " PRE_OUT " 2>&1 && " PRE_BIN " >> " PRE_OUT " 2>&1",
-             g_want))
-    correct++;
-  tests++;
-  if (Output(KTM "-jit ./pre/main.ktm > " PRE_OUT " 2>&1", g_want)) correct++;
+    tests++;
+    if (output(KTM "-lib geo ./pre/geo > " PRE_OUT " 2>&1; "
+                         "test -f ./pre/geo/.ktmlib && test -f ./pre/geo/libgeo.a && echo built > " PRE_OUT,
+                         "built\n")) {
+        correct++;
+                         }
+    /* the program has none of geo's code: no `_K3geo...:` label */
+    tests++;
+    if (output(KTM "-S ./pre/main.ktm -o- 2>&1 | grep -c '^_K3geo' > " PRE_OUT, "0\n")) {
+        correct++;
+    }
+    tests++;
+    if (output(KTM "./pre/main.ktm -o " PRE_BIN " > " PRE_OUT " 2>&1 && " PRE_BIN " >> " PRE_OUT " 2>&1",
+                         gWant)) {
+        correct++;
+                         }
+    tests++;
+    if (output(KTM "-jit ./pre/main.ktm > " PRE_OUT " 2>&1", gWant)) { correct++; }
 
-  System("mkdir -p ./pre/cfg && printf 'module cfg;\\ni64 seven() { return 7; }\\n"
-         "i64 g_runtime = seven();\\npub i64 value() { return g_runtime; }\\n' > ./pre/cfg/cfg.ktm");
-  tests++;
-  if (Output(KTM "-lib cfg ./pre/cfg 2>&1 | grep -c '`g_runtime` needs a constant initialiser' > " PRE_OUT,
-             "1\n"))
-    correct++;
+    proc.shell("mkdir -p ./pre/cfg && printf 'module cfg;\\ni64 seven() { return 7; }\\n"
+                 "i64 g_runtime = seven();\\npub i64 value() { return g_runtime; }\\n' > ./pre/cfg/cfg.ktm");
+    tests++;
+    if (output(KTM "-lib cfg ./pre/cfg 2>&1 | grep -c '`g_runtime` needs a constant initialiser' > " PRE_OUT,
+                         "1\n")) {
+        correct++;
+                         }
 
-  System("rm -rf ./pre " PRE_OUT " " PRE_BIN);
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    proc.shell("rm -rf ./pre " PRE_OUT " " PRE_BIN);
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

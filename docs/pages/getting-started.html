@@ -40,9 +40,9 @@ compile. If you haven't installed ktm, point it at the local build with
 <h2>Your first program</h2>
 <p>Create <code>hello.ktm</code>:</p>
 <pre data-run><code>
-U0 Main()
+void main()
 {
-  "Hello, %s!\n", "world";
+  printf("Hello, %s!\n", "world");
 }
 </code></pre>
 <pre class="output">
@@ -66,26 +66,26 @@ starts with <code>#!</code>:</p>
 
 <h2>How a program runs</h2>
 <p>Statements at the top level of a file run in order, as in a script. If you define
-<code>Main</code>, it runs after them:</p>
+<code>main</code>, it runs after them:</p>
 <pre data-run><code>
-"first\n";
 
-U0 Main()
+void main()
 {
-  "last\n";
+  printf("first\n");
+  printf("second\n");
+  printf("last\n");
 }
 
-"second\n";
 </code></pre>
 <pre class="output">
 first
 second
 last
 </pre>
-<p>Small programs can skip <code>Main</code> entirely and just write statements. Larger
+<p>Small programs can skip <code>main</code> entirely and just write statements. Larger
 ones usually keep their code in functions.</p>
-<p>Return a value from <code>Main</code> to set the exit code:</p>
-<pre><code>I32 Main()
+<p>Return a value from <code>main</code> to set the exit code:</p>
+<pre><code>i32 main()
 {
   return 3;   // ./a.out; echo $? prints 3
 }</code></pre>
@@ -102,12 +102,12 @@ including file:</p>
 <pre><code>// main.ktm
 #include "geometry.ktm"
 
-U0 Main()
+void main()
 {
-  "%d\n", Area(3, 4);
+  printf("%d\n", Area(3, 4));
 }</code></pre>
 <pre><code>// geometry.ktm
-I64 Area(I64 w, I64 h)
+i64 area(i64 w, i64 h)
 {
   return w * h;
 }</code></pre>

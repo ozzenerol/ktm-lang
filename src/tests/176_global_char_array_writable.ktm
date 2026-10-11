@@ -1,39 +1,40 @@
 #include "testhelper.ktm"
 
-/* `U8 buf[] = "abc"` at file scope was emitted with no section
+import str;
+
+/* `u8 buf[] = "abc"` at file scope was emitted with no section
  * directive by the AOT backends, so it landed in whatever section the
  * global before it left open: after the string literals, in a
  * read-only section, where writing to it crashed. It now goes in
  * .data like other initialised globals. */
 
-U8 g_first[] = "abc";
-U8 g_padded[8] = "de";
-static U8 g_static[] = "xyz";
-U8 *g_ptr = "lit";
-U8 g_after_ptr[] = "mno";
-U8 g_esc[] = "a\tb";
+u8 gFirst[] = "abc";
+u8 gPadded[8] = "de";
+static u8 gStatic[] = "xyz";
+u8 *gPtr = "lit";
+u8 gAfterPtr[] = "mno";
+u8 gEsc[] = "a\tb";
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
+i32 main() {
+    i64 correct = 0, tests = 0;
 
-  "Test - file-scope char arrays initialised from a string are writable: ";
+    printf("Test - file-scope char arrays initialised from a string are writable: ");
 
-  g_first[0] = 'X';
-  tests++; if (!StrCmp(g_first, "Xbc")) correct++;
-  g_padded[2] = 'f';
-  g_padded[6] = 'Y';
-  tests++; if (!StrCmp(g_padded, "def") && g_padded[6] == 'Y' && !g_padded[7]) correct++;
-  g_static[2] = 'Z';
-  tests++; if (!StrCmp(g_static, "xyZ")) correct++;
-  tests++; if (!StrCmp(g_ptr, "lit")) correct++;
-  g_after_ptr[1] = 'N';
-  tests++; if (!StrCmp(g_after_ptr, "mNo")) correct++;
-  tests++; if (sizeof(g_first) == 4 && sizeof(g_padded) == 8) correct++;
-  g_esc[0] = 'A';
-  tests++; if (!StrCmp(g_esc, "A\tb")) correct++;
+    gFirst[0] = 'X';
+    tests++; if (!str.cmp(gFirst, "Xbc")) { correct++; }
+    gPadded[2] = 'f';
+    gPadded[6] = 'Y';
+    tests++; if (!str.cmp(gPadded, "def") && gPadded[6] == 'Y' && !gPadded[7]) { correct++; }
+    gStatic[2] = 'Z';
+    tests++; if (!str.cmp(gStatic, "xyZ")) { correct++; }
+    tests++; if (!str.cmp(gPtr, "lit")) { correct++; }
+    gAfterPtr[1] = 'N';
+    tests++; if (!str.cmp(gAfterPtr, "mNo")) { correct++; }
+    tests++; if (sizeof(gFirst) == 4 && sizeof(gPadded) == 8) { correct++; }
+    gEsc[0] = 'A';
+    tests++; if (!str.cmp(gEsc, "A\tb")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

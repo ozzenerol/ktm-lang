@@ -1,68 +1,69 @@
 #include "testhelper.ktm"
 
-/* IntSetRelease(NULL) and IntSetSize(NULL) crashed. The IntSet functions
- * that only read a set now treat NULL as the empty set, and the release
- * functions ignore NULL, like the vector and map APIs. */
+import mem, set, str, vec;
 
-I32 Main()
-{
-  "Test - IntSet NULL safety: ";
-  I64 correct = 0, tests = 0;
-  IntSet *s = IntSetNew, *r;
-  IntSetIter *it;
-  IntVec *v;
-  U8 *str;
+/* IntSetRelease(null) and IntSetSize(null) crashed. The IntSet functions
+ * that only read a set now treat null as the empty set, and the release
+ * functions ignore null, like the vector and map APIs. */
 
-  IntSetRelease(NULL);
-  tests++; correct++;
-  IntSetIterRelease(NULL);
-  tests++; correct++;
-  tests++; if (IntSetSize(NULL) == 0) correct++;
-  tests++; if (!IntSetHas(NULL, 0)) correct++;
-  tests++; if (IntSetIterNext(NULL) == NULL) correct++;
+i32 main() {
+    printf("Test - IntSet null safety: ");
+    i64 correct = 0, tests = 0;
+    set.IntSet *s = set.intNew(), *r;
+    set.IntSetIter *it;
+    vec.IntVec *v;
+    u8 *str;
 
-  it = IntSetIterNew(NULL);
-  tests++; if (it != NULL && IntSetIterNext(it) == NULL) correct++;
-  IntSetIterRelease(it);
+    set.IntSet.release(null);
+    tests++; correct++;
+    set.intIterRelease(null);
+    tests++; correct++;
+    tests++; if (set.IntSet.size(null) == 0) { correct++; }
+    tests++; if (!set.IntSet.has(null, 0)) { correct++; }
+    tests++; if (set.intIterNext(null) == null) { correct++; }
 
-  IntSetAdd(s, 3);
-  IntSetAdd(s, -1);
+    it = set.IntSet.iterNew(null);
+    tests++; if (it != null && set.intIterNext(it) == null) { correct++; }
+    set.intIterRelease(it);
 
-  r = IntSetUnion(s, NULL);
-  tests++; if (IntSetEq(r, s)) correct++;
-  IntSetRelease(r);
-  r = IntSetUnion(NULL, NULL);
-  tests++; if (IntSetSize(r) == 0) correct++;
-  IntSetRelease(r);
-  r = IntSetDiff(s, NULL);
-  tests++; if (IntSetEq(r, s)) correct++;
-  IntSetRelease(r);
-  r = IntSetDiff(NULL, s);
-  tests++; if (IntSetSize(r) == 0) correct++;
-  IntSetRelease(r);
-  r = IntSetIntersection(s, NULL);
-  tests++; if (IntSetSize(r) == 0) correct++;
-  IntSetRelease(r);
-  r = IntSetSymDiff(NULL, s);
-  tests++; if (IntSetEq(r, s)) correct++;
-  IntSetRelease(r);
+    s.add(3);
+    s.add(-1);
 
-  tests++; if (IntSetEq(NULL, NULL)) correct++;
-  tests++; if (!IntSetEq(s, NULL) && !IntSetEq(NULL, s)) correct++;
+    r = s.unionWith(null);
+    tests++; if (r.eq(s)) { correct++; }
+    r.release();
+    r = set.IntSet.unionWith(null, null);
+    tests++; if (r.size() == 0) { correct++; }
+    r.release();
+    r = s.diff(null);
+    tests++; if (r.eq(s)) { correct++; }
+    r.release();
+    r = set.IntSet.diff(null, s);
+    tests++; if (r.size() == 0) { correct++; }
+    r.release();
+    r = s.intersection(null);
+    tests++; if (r.size() == 0) { correct++; }
+    r.release();
+    r = set.IntSet.symDiff(null, s);
+    tests++; if (r.eq(s)) { correct++; }
+    r.release();
 
-  v = IntSetToVec(NULL);
-  tests++; if (v != NULL && v->size == 0) correct++;
-  IntVecRelease(v);
+    tests++; if (set.IntSet.eq(null, null)) { correct++; }
+    tests++; if (!s.eq(null) && !set.IntSet.eq(null, s)) { correct++; }
 
-  str = IntSetToString(NULL);
-  tests++; if (str != NULL && !StrCmp(str, "{}")) correct++;
-  Free(str);
+    v = set.IntSet.toVec(null);
+    tests++; if (v != null && v.size == 0) { correct++; }
+    v.release();
 
-  /* Non-NULL sets are unaffected. */
-  tests++; if (IntSetSize(s) == 2 && IntSetHas(s, 3) && !IntSetHas(s, 4)) correct++;
-  IntSetRelease(s);
+    str = set.IntSet.toStr(null);
+    tests++; if (str != null && !str.cmp(str, "{}")) { correct++; }
+    mem.free(str);
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    /* Non-null sets are unaffected. */
+    tests++; if (s.size() == 2 && s.has(3) && !s.has(4)) { correct++; }
+    s.release();
+
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

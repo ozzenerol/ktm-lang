@@ -5,48 +5,44 @@
  * already allowed them; pointer arithmetic loops (e.g. `while (p<end)`)
  * depended on this. */
 
-Bool U8PtrCompare()
-{
-  U8 buf[16];
-  U8 *a = buf;
-  U8 *b = buf + 7;
-  return a < b &&
-         b > a &&
-         a <= a &&
-         b >= b &&
-         !(a > b) &&
-         !(b < a);
+bool u8PtrCompare() {
+    u8 buf[16];
+    u8 *a = buf;
+    u8 *b = buf + 7;
+    return a < b &&
+                 b > a &&
+                 a <= a &&
+                 b >= b &&
+                 !(a > b) &&
+                 !(b < a);
 }
 
-Bool I64PtrCompare()
-{
-  I64 arr[4];
-  I64 *p = arr;
-  I64 *q = arr + 3;
-  return p < q && q > p && !(p > q);
+bool i64PtrCompare() {
+    i64 arr[4];
+    i64 *p = arr;
+    i64 *q = arr + 3;
+    return p < q && q > p && !(p > q);
 }
 
-Bool WhileLoopOverBuffer()
-{
-  U8 buf[5] = {1, 2, 3, 4, 5};
-  U8 *p = buf;
-  U8 *end = buf + 5;
-  I64 sum = 0;
-  while (p < end) {
-    sum += *p;
-    p++;
-  }
-  return sum == 15;
+bool whileLoopOverBuffer() {
+    u8 buf[5] = {1, 2, 3, 4, 5};
+    u8 *p = buf;
+    u8 *end = buf + 5;
+    i64 sum = 0;
+    while (p < end) {
+        sum += *p;
+        p++;
+    }
+    return sum == 15;
 }
 
-I32 Main()
-{
-  "Test - Pointer relational comparisons: ";
-  I64 correct = 0, tests = 3;
-  if (U8PtrCompare) correct++;
-  if (I64PtrCompare) correct++;
-  if (WhileLoopOverBuffer) correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - Pointer relational comparisons: ");
+    i64 correct = 0, tests = 3;
+    if (u8PtrCompare()) { correct++; }
+    if (i64PtrCompare()) { correct++; }
+    if (whileLoopOverBuffer()) { correct++; }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

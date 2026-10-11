@@ -1,60 +1,60 @@
 #include "run_shared.ktm"
 
-U0 RunTest(U8 *filename, I64 idx)
-{
-  /* Use the local build (../../ktm relative to src/tests/) so we
-   * always test what's actually been compiled, not whatever older
-   * ktm happens to be on PATH (e.g. an installed /usr/local/bin/ktm
-   * from a prior version - this trap cost us a session of confused
-   * cross-test triage). It compiles from src/tests, so its messages
-   * name the file as before; the binary runs in the test's own
-   * directory (see RunTests). */
-  U8 *bin = MStrPrint("%s/b/%d", g_root, idx);
-  U8 *cmd = MStrPrint("cd '%s' && '%s' %s '%s' -o '%s'",
-                      g_start_dir, g_ktm, g_ktm_flags, filename, bin);
-  auto res = System(cmd);
+import fs, libc, mem, proc, str, vec;
 
-  if (res != 0) {
-    "\033[0;31mFailed to compile\033[0;0m: %s\n",filename;
-  } else {
-    fflush(NULL);
-    if ((res = System(bin)) != 0) {
-      "\033[0;31mFAILED\033[0;0m to run: %s\n",filename;
+void runTest(u8 *filename, i64 idx) {
+    /* Use the local build (../../ktm relative to src/tests/) so we
+     * always test what's actually been compiled, not whatever older
+     * ktm happens to be on PATH (e.g. an installed /usr/local/bin/ktm
+     * from a prior version - this trap cost us a session of confused
+     * cross-test triage). It compiles from src/tests, so its messages
+     * name the file as before; the binary runs in the test's own
+     * directory (see RunTests). */
+    u8 *bin = str.format("%s/b/%d", gRoot, idx);
+    u8 *cmd = str.format("cd '%s' && '%s' %s '%s' -o '%s'",
+                                            gStartDir, gKtm, gKtmFlags, filename, bin);
+    auto res = proc.shell(cmd);
+
+    if (res != 0) {
+        printf("\033[0;31mFailed to compile\033[0;0m: %s\n",filename);
+    } else {
+        libc.fflush(null);
+        if ((res = proc.shell(bin)) != 0) {
+            printf("\033[0;31mFAILED\033[0;0m to run: %s\n",filename);
+        }
+        fs.remove(bin);
     }
-    Rm(bin);
-  }
-  Free(cmd);
-  Free(bin);
+    mem.free(cmd);
+    mem.free(bin);
 }
 
-I32 Main(I32 argc, U8 **argv)
-{
-  /* Argv contract:
-   *   ./run                     -> host arch, all tests
-   *   ./run --target=<triple>   -> cross to <triple>, all tests
-   *   ./run <file.ktm>           -> host arch, single file
-   *   ./run --target=<triple> <file.ktm>
-   *                             -> cross to <triple>, single file
-   *
-   * Disambiguation is by the --target= prefix so the existing
-   * single-file workflow keeps working unchanged. */
-  g_target = "";
-  I64 arg_idx = 1;
-  if (argc >= 2 && StrNCmp(argv[1], "--target=", 9) == 0) {
-    g_target = argv[1] + 9;
-    arg_idx = 2;
-  }
+i32 main(i32 argc, u8 **argv) {
+    /* Argv contract:
+     *   ./run                     -> host arch, all tests
+     *   ./run --target=<triple>   -> cross to <triple>, all tests
+     *   ./run <file.ktm>           -> host arch, single file
+     *   ./run --target=<triple> <file.ktm>
+     *                             -> cross to <triple>, single file
+     *
+     * Disambiguation is by the --target= prefix so the existing
+     * single-file workflow keeps working unchanged. */
+    gTarget = "";
+    i64 argIdx = 1;
+    if (argc >= 2 && str.cmpLen(argv[1], "--target=", 9) == 0) {
+        gTarget = argv[1] + 9;
+        argIdx = 2;
+    }
 
-  PtrVec *vec;
-  if (argc > arg_idx) {
-    vec = PtrVecNew;
-    PtrVecPush(vec, StrNew(argv[arg_idx]));
-  } else {
-    vec = CollectTests;
-  }
+    vec.PtrVec *vec;
+    if (argc > argIdx) {
+        vec = vec.ptrNew();
+        vec.push(str.dup(argv[argIdx]));
+    } else {
+        vec = collectTests();
+    }
 
-  RunTests(vec);
+    runTests(vec);
 
-  PtrVecRelease(vec, &Free);
-  return 0;
+    vec.release(&mem.free);
+    return 0;
 }

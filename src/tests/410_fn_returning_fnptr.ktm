@@ -1,65 +1,64 @@
 #include "testhelper.ktm"
 
+import str;
+
 /* A function returning a function pointer, declared C's way,
- * `I64 (*GetH())(I64) { ... }`, was a syntax error. Now: definitions and
+ * `i64 (*GetH())(i64) { ... }`, was a syntax error. Now: definitions and
  * prototypes, with parameters, old and new type names, void and pointer
  * returns of the pointed-to function, and `(**Name(...))(...)` returning
  * a pointer to a function pointer. */
 
-I64 Twice(I64 x) { return x * 2; }
-I64 Thrice(I64 x) { return x * 3; }
-U8 g_last[16];
-void Hello(u8 *who) { StrCpy(g_last, who); }
-u8 *Echo(u8 *s) { return s; }
+i64 twice(i64 x) { return x * 2; }
+i64 thrice(i64 x) { return x * 3; }
+u8 gLast[16];
+void hello(u8 *who) { str.copy(gLast, who); }
+u8 *echo(u8 *s) { return s; }
 
-I64 (*GetH())(I64) { return &Twice; }
+fn(i64) i64 getH() { return &twice; }
 
-I64 (*Pick(I64 which))(I64);          /* prototype first */
-I64 (*Pick(I64 which))(I64)
-{
-  if (which) return &Thrice;
-  return &Twice;
+fn(i64) i64 pick(i64 which);          /* prototype first */
+fn(i64) i64 pick(i64 which) {
+    if (which) { return &thrice; }
+    return &twice;
 }
 
-i64 (*PickNew(bool b, i64 unused))(i64)
-{
-  if (b) return &Thrice;
-  return &Twice;
+fn(i64) i64 pickNew(bool b, i64 unused) {
+    if (b) { return &thrice; }
+    return &twice;
 }
 
-void (*Greeter())(u8 *who) { return &Hello; }
-u8 *(*Echoer())(u8 *) { return &Echo; }
+fn(u8 *who) void greeter() { return &hello; }
+fn(u8 *) u8 *echoer() { return &echo; }
 
-I64 (*g_fp)(I64) = NULL;
-I64 (**AddrOfG())(I64) { return &g_fp; }
+fn(i64) i64 gFp = null;
+(fn(i64) i64) *addrOfG() { return &gFp; }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 0;
-  "Test - functions returning function pointers: ";
+i32 main() {
+    i64 correct = 0, tests = 0;
+    printf("Test - functions returning function pointers: ");
 
-  tests++;
-  I64 (*h)(I64) = GetH();
-  I64 (*p1)(I64) = Pick(1);
-  I64 (*p0)(I64) = Pick(0);
-  i64 (*p2)(i64) = PickNew(false, 9);
-  if (h(7) == 14 && p1(5) == 15 && p0(5) == 10 && p2(4) == 8) correct++;
-  else "\n  returned pointers\n";
+    tests++;
+    fn(i64) i64 h = getH();
+    fn(i64) i64 p1 = pick(1);
+    fn(i64) i64 p0 = pick(0);
+    fn(i64) i64 p2 = pickNew(false, 9);
+    if (h(7) == 14 && p1(5) == 15 && p0(5) == 10 && p2(4) == 8) { correct++; }
+    else { printf("\n  returned pointers\n"); }
 
-  tests++;
-  void (*gr)(u8 *) = Greeter();
-  gr("ktm");
-  u8 *(*ec)(u8 *) = Echoer();
-  if (!StrCmp(g_last, "ktm") && !StrCmp(ec("x"), "x")) correct++;
-  else "\n  void and pointer returns\n";
+    tests++;
+    fn(u8 *) void gr = greeter();
+    gr("ktm");
+    fn(u8 *) u8 *ec = echoer();
+    if (!str.cmp(gLast, "ktm") && !str.cmp(ec("x"), "x")) { correct++; }
+    else { printf("\n  void and pointer returns\n"); }
 
-  tests++;   /* a pointer to a function pointer, written through */
-  I64 (**pg)(I64) = AddrOfG();
-  *pg = &Thrice;
-  if (g_fp(10) == 30 && pg == &g_fp) correct++;
-  else "\n  pointer to function pointer return\n";
+    tests++;   /* a pointer to a function pointer, written through */
+    (fn(i64) i64) *pg = addrOfG();
+    *pg = &thrice;
+    if (gFp(10) == 30 && pg == &gFp) { correct++; }
+    else { printf("\n  pointer to function pointer return\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

@@ -7,62 +7,57 @@
  * 24_union.ktm covers inheritance where the derived class adds fields;
  * this covers the empty-derived shape plus layout/copy details. */
 
-class Base
-{
-  I64 a;
-  U8 b;
+struct Base {
+    i64 a;
+    u8 b;
 };
 
-class Empty:Base
-{
+struct Empty:Base {
 };
 
-class Grand:Empty
-{
-  I64 c;
+struct Grand:Empty {
+    i64 c;
 };
 
-class NarrowBase { U8 lo; };
-class WideDerived:NarrowBase { I64 wide; };
+struct NarrowBase { u8 lo; };
+struct WideDerived:NarrowBase { i64 wide; };
 
-U0 FillBase(Base *base)
-{
-  base->a = 111;
-  base->b = 7;
+void fillBase(Base *base) {
+    base.a = 111;
+    base.b = 7;
 }
 
-I32 Main()
-{
-  "Test - class inheritance (empty derived, layout, upcast): ";
-  I64 correct = 0, tests = 7;
+i32 main() {
+    printf("Test - class inheritance (empty derived, layout, upcast): ");
+    i64 correct = 0, tests = 7;
 
-  if (sizeof(Empty) == sizeof(Base)) correct++;
+    if (sizeof(Empty) == sizeof(Base)) { correct++; }
 
-  Empty e;
-  e.a = 42;
-  e.b = 9;
-  if (e.a == 42 && e.b == 9) correct++;
+    Empty e;
+    e.a = 42;
+    e.b = 9;
+    if (e.a == 42 && e.b == 9) { correct++; }
 
-  /* An empty derived class still works as a base one level down. */
-  Grand g;
-  g.a = 1;
-  g.b = 2;
-  g.c = 3;
-  if (g.a == 1 && g.b == 2 && g.c == 3) correct++;
-  if (sizeof(Grand) == sizeof(Base) + 8) correct++;
+    /* An empty derived class still works as a base one level down. */
+    Grand g;
+    g.a = 1;
+    g.b = 2;
+    g.c = 3;
+    if (g.a == 1 && g.b == 2 && g.c == 3) { correct++; }
+    if (sizeof(Grand) == sizeof(Base) + 8) { correct++; }
 
-  /* Derived's first own field re-aligns past a small base. */
-  WideDerived w;
-  w.lo = 5;
-  w.wide = 123456789;
-  if (w.lo == 5 && w.wide == 123456789) correct++;
-  if (sizeof(WideDerived) == 16) correct++;
+    /* Derived's first own field re-aligns past a small base. */
+    WideDerived w;
+    w.lo = 5;
+    w.wide = 123456789;
+    if (w.lo == 5 && w.wide == 123456789) { correct++; }
+    if (sizeof(WideDerived) == 16) { correct++; }
 
-  /* Upcast: base fields sit at offset 0, so a Base* view works. */
-  FillBase(&e);
-  if (e.a == 111 && e.b == 7) correct++;
+    /* Upcast: base fields sit at offset 0, so a Base* view works. */
+    fillBase(&e);
+    if (e.a == 111 && e.b == 7) { correct++; }
 
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+    PrintResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

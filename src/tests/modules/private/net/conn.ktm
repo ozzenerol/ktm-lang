@@ -1,29 +1,29 @@
 module net;
+import mem;
 
 pub struct Conn {
-  i32 fd;
-  private u8 *buf;
-  private i64 used;
+    i32 fd;
+    private u8 *buf;
+    private i64 used;
 };
 
 /* inherits Conn's private fields: still private to net */
 pub struct Tls : Conn {
-  i64 level;
+    i64 level;
 };
 
 /* a range-for container whose fields are private */
 pub struct Bytes {
-  private i64 size;
-  private u8 *entries;
+    private i64 size;
+    private u8 *entries;
 };
 
-pub Conn *dial(i32 fd)
-{
-  Conn *c = MAlloc(sizeof(Conn));
-  c.fd = fd;
-  c.buf = "hello";
-  c->used = 5;
-  return c;
+pub Conn *dial(i32 fd) {
+    Conn *c = mem.alloc(sizeof(Conn));
+    c.fd = fd;
+    c.buf = "hello";
+    c.used = 5;
+    return c;
 }
 
 pub i64 Conn.count() { return self.used; }

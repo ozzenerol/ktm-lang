@@ -6,92 +6,89 @@
 // Shows: reading files, scanning strings, StrMap, PtrVec sorting,
 // classes and command-line arguments.
 
-#define TOP_N    8
-#define MAX_WORD 64
+import fs, map, mem, str, vec;
 
-class WordCount
-{
-  U8 *word;
-  I64 count;
+const i64 TOP_N = 8;
+const i64 MAX_WORD = 64;
+
+struct WordCount {
+    u8 *word;
+    i64 count;
 };
 
-// Sort predicate: TRUE when a ranks above b. Most frequent first, then
+// Sort predicate: true when a ranks above b. Most frequent first, then
 // alphabetical so ties have a stable order.
-I64 RanksHigher(U0 *_a, U0 *_b)
-{
-  WordCount *a = _a;
-  WordCount *b = _b;
-  if (a->count != b->count) {
-    return a->count > b->count;
-  }
-  return StrCmp(a->word, b->word) < 0;
-}
-
-Bool IsLetter(U8 c)
-{
-  return ('a' <= c <= 'z') || ('A' <= c <= 'Z');
-}
-
-U0 CountWord(StrMap *counts, U8 *word)
-{
-  WordCount *wc = StrMapGet(counts, word);
-  if (wc == NULL) {
-    wc = MAlloc(sizeof(WordCount));
-    wc->word = StrNew(word);       // the map keeps this pointer as its key
-    wc->count = 0;
-    StrMapSet(counts, wc->word, wc);
-  }
-  wc->count++;
-}
-
-I32 Main(I32 argc, U8 **argv)
-{
-  U8 *path = "sample.txt";
-  if (argc > 1) {
-    path = argv[1];
-  }
-
-  I64 size;
-  U8 *text = FileRead(path, &size);
-  if (text == NULL) {
-    "cannot read %s\n", path;
-    return 1;
-  }
-
-  StrMap *counts = StrMapNew();
-  U8 word[MAX_WORD];
-  I64 len = 0, total = 0;
-
-  // One pass over the text; i == size flushes the final word.
-  for (I64 i = 0; i <= size; i++) {
-    U8 c = 0;
-    if (i < size) c = text[i];
-    if (IsLetter(c)) {
-      if (len < MAX_WORD - 1) {
-        word[len++] = ToLower(c);
-      }
-    } else if (len > 0) {
-      word[len] = 0;
-      CountWord(counts, word);
-      total++;
-      len = 0;
+i64 ranksHigher(void *_a, void *_b) {
+    WordCount *a = _a;
+    WordCount *b = _b;
+    if (a.count != b.count) {
+        return a.count > b.count;
     }
-  }
+    return str.cmp(a.word, b.word) < 0;
+}
 
-  PtrVec *ranked = PtrVecNew();
-  I64 idx = 0;
-  WordCount *wc;
-  while (StrMapValueIter(counts, &idx, &wc)) {
-    PtrVecPush(ranked, wc);
-  }
-  PtrVecSort(ranked, &RanksHigher);
+bool isLetter(u8 c) {
+    return ('a' <= c <= 'z') || ('A' <= c <= 'Z');
+}
 
-  "%d words, %d distinct\n", total, ranked->size;
-  for (I64 i = 0; i < TOP_N && i < ranked->size; i++) {
-    WordCount *top = ranked->entries[i];
-    "%2d. %-10s %d\n", i + 1, top->word, top->count;
-  }
+void countWord(map.StrMap *counts, u8 *word) {
+    WordCount *wc = counts.get(word);
+    if (wc == null) {
+        wc = mem.alloc(sizeof(WordCount));
+        wc.word = str.dup(word);       // the map keeps this pointer as its key
+        wc.count = 0;
+        counts.set(wc.word, wc);
+    }
+    wc.count++;
+}
 
-  Free(text);
-  return 0;
+i32 main(i32 argc, u8 **argv) {
+    u8 *path = "sample.txt";
+    if (argc > 1) {
+        path = argv[1];
+    }
+
+    i64 size;
+    u8 *text = fs.readAll(path, &size);
+    if (text == null) {
+        printf("cannot read %s\n", path);
+        return 1;
+    }
+
+    map.StrMap *counts = map.strNew();
+    u8 word[MAX_WORD];
+    i64 len = 0, total = 0;
+
+    // One pass over the text; i == size flushes the final word.
+    for (i64 i = 0; i <= size; i++) {
+        u8 c = 0;
+        if (i < size) { c = text[i]; }
+        if (isLetter(c)) {
+            if (len < MAX_WORD - 1) {
+                word[len++] = str.toLower(c);
+            }
+        } else if (len > 0) {
+            word[len] = 0;
+            countWord(counts, word);
+            total++;
+            len = 0;
+        }
+    }
+
+    vec.PtrVec *ranked = vec.ptrNew();
+    i64 idx = 0;
+    WordCount *wc;
+    while (counts.valueIter(&idx, &wc)) {
+        ranked.push(wc);
+    }
+    ranked.sort(&ranksHigher);
+
+    printf("%d words, %d distinct\n", total, ranked.size);
+    for (i64 i = 0; i < TOP_N && i < ranked.size; i++) {
+        WordCount *top = ranked.entries[i];
+        printf("%2d. %-10s %d\n", i + 1, top.word, top.count);
+    }
+
+    mem.free(text);
+    return 0;
 }

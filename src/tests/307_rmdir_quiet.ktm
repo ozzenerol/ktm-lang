@@ -1,115 +1,111 @@
 #include "testhelper.ktm"
 
+import fs, libc, mem, proc, str;
+
 /* RmDir(path, RM_RECURSE) without RM_VERBOSE printed "Error Rm: <file>"
  * for every file it deleted successfully: the else of
  * `if (unlink(..) == 0 && verbose)` caught the quiet successes too. It
  * now prints nothing without RM_VERBOSE and the right line with it.
  * Everything happens in a fresh mkdtemp directory. */
 
-extern "c" U8 *mkdtemp(U8 *template);
-extern "c" I32 mkfifo(U8 *path, U32 mode);
-extern "c" I32 dup(I32 fd);
-extern "c" I32 dup2(I32 fd, I32 fd2);
-extern "c" I32 fflush(U0 *stream);
+extern "c" u8 *mkdtemp(u8 *template);
+extern "c" i32 mkfifo(u8 *path, u32 mode);
+extern "c" i32 dup(i32 fd);
+extern "c" i32 dup2(i32 fd, i32 fd2);
+extern "c" i32 fflush(void *stream);
 
-U8 *g_root;
-U8 g_path[256];
-U8 g_out[256];
-I32 g_saved;
+u8 *gRoot;
+u8 gPath[256];
+u8 gOut[256];
+i32 gSaved;
 
-U8 *P(U8 *name)
-{
-  StrPrint(g_path, "%s/%s", g_root, name);
-  return g_path;
+u8 *P(u8 *name) {
+    str.formatTo(gPath, "%s/%s", gRoot, name);
+    return gPath;
 }
 
-Bool Exists(U8 *name)
-{
-  cStat st;
-  return lstat(P(name), &st) == 0;
+bool exists(u8 *name) {
+    libc.cStat st;
+    return libc.lstat(P(name), &st) == 0;
 }
 
-U0 MakeTree(U8 *top)
-{
-  U8 name[64];
-  MkDir(P(top));
-  FileWrite(P(StrPrint(name, "%s/f1", top)), "k\n", 2);
-  mkfifo(P(StrPrint(name, "%s/fifo", top)), 0x1A4);
-  MkDir(P(StrPrint(name, "%s/sub", top)));
-  FileWrite(P(StrPrint(name, "%s/sub/f2", top)), "k\n", 2);
+void makeTree(u8 *top) {
+    u8 name[64];
+    fs.makeDir(P(top));
+    fs.writeAll(P(str.formatTo(name, "%s/f1", top)), "k\n", 2);
+    mkfifo(P(str.formatTo(name, "%s/fifo", top)), 0x1A4);
+    fs.makeDir(P(str.formatTo(name, "%s/sub", top)));
+    fs.writeAll(P(str.formatTo(name, "%s/sub/f2", top)), "k\n", 2);
 }
 
-U0 Capture()
-{
-  fflush(NULL);
-  g_saved = dup(1);
-  I32 fd = open(g_out, O_WRONLY|O_CREAT|O_TRUNC, 0x1A4);
-  dup2(fd, 1);
-  close(fd);
+void capture() {
+    libc.fflush(null);
+    gSaved = dup(1);
+    i32 fd = libc.open(gOut, libc.O_WRONLY|libc.O_CREAT|libc.O_TRUNC, 0x1A4);
+    dup2(fd, 1);
+    libc.close(fd);
 }
 
 /* Restore stdout and return what was printed */
-U8 *Captured()
-{
-  fflush(NULL);
-  dup2(g_saved, 1);
-  close(g_saved);
-  U8 *got = FileRead(g_out);
-  Rm(g_out);
-  return got;
+u8 *captured() {
+    libc.fflush(null);
+    dup2(gSaved, 1);
+    libc.close(gSaved);
+    u8 *got = fs.readAll(gOut);
+    fs.remove(gOut);
+    return got;
 }
 
 /* `out` has the line `fmt` (with %s = the path of `name`) */
-Bool HasLine(U8 *out, U8 *fmt, U8 *name)
-{
-  U8 line[512];
-  StrPrint(line, fmt, P(name));
-  return out && strstr(out, line) != NULL;
+bool hasLine(u8 *out, u8 *fmt, u8 *name) {
+    u8 line[512];
+    str.formatTo(line, fmt, P(name));
+    return out && libc.strstr(out, line) != null;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 6;
-  U8 root[64], *out;
-  I32 r;
-  "Test - RmDir quiet without RM_VERBOSE: ";
+i32 main() {
+    i64 correct = 0, tests = 6;
+    u8 root[64], *out;
+    i32 r;
+    printf("Test - RmDir quiet without RM_VERBOSE: ");
 
-  StrCpy(root, "./ktm-test-307-XXXXXX");
-  if (!mkdtemp(root)) {
-    PrintResult(0, tests);
-    "====\n";
+    str.copy(root, "./ktm-test-307-XXXXXX");
+    if (!mkdtemp(root)) {
+        PrintResult(0, tests);
+        printf("====\n");
+        return 0;
+    }
+    gRoot = root;
+    str.formatTo(gOut, "%s/out.txt", root);
+
+    makeTree("q");
+    capture();
+    r = fs.removeDir(P("q"), fs.REMOVE_RECURSE);
+    out = captured();
+    if (r == 0 && !exists("q")) { correct++; }
+    if (out && !str.cmp(out, "")) { correct++; }
+    else { printf("printed '%s'\n", out); }
+    mem.free(out);
+
+    makeTree("v");
+    capture();
+    r = fs.removeDir(P("v"), fs.REMOVE_RECURSE|RM_VERBOSE);
+    out = captured();
+    if (r == 0 && !exists("v")) { correct++; }
+    if (hasLine(out, "Rm: %s\n", "v/f1") && hasLine(out, "Rm: %s\n", "v/fifo") &&
+            hasLine(out, "Rm: %s\n", "v/sub/f2")) { correct++; }
+    if (hasLine(out, "RmDir %s\n", "v/sub") && hasLine(out, "RmDir %s\n", "v")) {
+        correct++;
+    }
+    if (out && !libc.strstr(out, "Error") && !libc.strstr(out, "ERROR")) { correct++; }
+    else { printf("printed '%s'\n", out); }
+    mem.free(out);
+
+    out = str.formatTo(null, "rm -rf '%s'", root);
+    proc.shell(out);
+    mem.free(out);
+
+    PrintResult(correct, tests);
+    printf("====\n");
     return 0;
-  }
-  g_root = root;
-  StrPrint(g_out, "%s/out.txt", root);
-
-  MakeTree("q");
-  Capture;
-  r = RmDir(P("q"), RM_RECURSE);
-  out = Captured;
-  if (r == 0 && !Exists("q")) correct++;
-  if (out && !StrCmp(out, "")) correct++;
-  else "printed '%s'\n", out;
-  Free(out);
-
-  MakeTree("v");
-  Capture;
-  r = RmDir(P("v"), RM_RECURSE|RM_VERBOSE);
-  out = Captured;
-  if (r == 0 && !Exists("v")) correct++;
-  if (HasLine(out, "Rm: %s\n", "v/f1") && HasLine(out, "Rm: %s\n", "v/fifo") &&
-      HasLine(out, "Rm: %s\n", "v/sub/f2")) correct++;
-  if (HasLine(out, "RmDir %s\n", "v/sub") && HasLine(out, "RmDir %s\n", "v"))
-    correct++;
-  if (out && !strstr(out, "Error") && !strstr(out, "ERROR")) correct++;
-  else "printed '%s'\n", out;
-  Free(out);
-
-  out = StrPrint(NULL, "rm -rf '%s'", root);
-  System(out);
-  Free(out);
-
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
 }

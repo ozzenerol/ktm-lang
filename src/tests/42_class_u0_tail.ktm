@@ -1,73 +1,69 @@
 #include "testhelper.ktm"
 
-/* The "flexible array" trick: a trailing `U0 body;` member is a
+import mem, str;
+
+/* The "flexible array" trick: a trailing `void body;` member is a
  * zero-size placeholder whose address points to the byte just past the
  * real fields. Allocate `sizeof(Hdr) + N`, then read/write N payload
  * bytes via `&hdr->body`. */
 
-class Hdr
-{
-  I64 size;
-  /* Flexibly array member */
-  U0  body;
+struct Hdr {
+    i64 size;
+    /* Flexibly array member */
+    void  body;
 };
 
-Bool LayoutMatchesSizeof()
-{
-  Hdr *h = MAlloc(64);
-  I64 base   = h(U8 *);
-  I64 bodyat = &h->body;
-  I64 ok = sizeof(Hdr) == 8 && bodyat - base == 8;
-  Free(h);
-  return ok;
+bool layoutMatchesSizeof() {
+    Hdr *h = mem.alloc(64);
+    i64 base   = (u8 *)h;
+    i64 bodyat = &h.body;
+    i64 ok = sizeof(Hdr) == 8 && bodyat - base == 8;
+    mem.free(h);
+    return ok;
 }
 
-Bool RoundTripPayload()
-{
-  U8 *src = "hello";
-  I64 n = 5;
-  /* Creating the flexible Array, all be it dynamically. You can only `MemCpy`
-   * in and out of it*/
-  Hdr *h = MAlloc(sizeof(Hdr) + n);
-  h->size = n;
-  MemCpy(&h->body, src, n);
+bool roundTripPayload() {
+    u8 *src = "hello";
+    i64 n = 5;
+    /* Creating the flexible Array, all be it dynamically. You can only `MemCpy`
+     * in and out of it*/
+    Hdr *h = mem.alloc(sizeof(Hdr) + n);
+    h.size = n;
+    mem.copy(&h.body, src, n);
 
-  U8 buf[8];
-  MemCpy(buf, &h->body, h->size);
-  buf[h->size] = 0;
+    u8 buf[8];
+    mem.copy(buf, &h.body, h.size);
+    buf[h.size] = 0;
 
-  Bool ok = h->size == 5 && !StrCmp(buf, "hello");
-  Free(h);
-  return ok;
+    bool ok = h.size == 5 && !str.cmp(buf, "hello");
+    mem.free(h);
+    return ok;
 }
 
-class HdrMixed
-{
-  I64 a;
-  U8  b;
-  U0  body;
+struct HdrMixed {
+    i64 a;
+    u8  b;
+    void  body;
 };
 
-Bool MixedFieldsAligned()
-{
-  HdrMixed *h = MAlloc(64);
-  I64 base   = h(U8 *);
-  I64 bodyat = &h->body;
-  /* Real fields occupy 0..8 (I64) + 8..9 (U8) = 9 bytes. body sits at
-   * offset 9; class size pads up to the next 8-byte boundary. */
-  Bool ok = bodyat - base == 9 && sizeof(HdrMixed) == 16;
-  Free(h);
-  return ok;
+bool mixedFieldsAligned() {
+    HdrMixed *h = mem.alloc(64);
+    i64 base   = (u8 *)h;
+    i64 bodyat = &h.body;
+    /* Real fields occupy 0..8 (i64) + 8..9 (u8) = 9 bytes. body sits at
+     * offset 9; class size pads up to the next 8-byte boundary. */
+    bool ok = bodyat - base == 9 && sizeof(HdrMixed) == 16;
+    mem.free(h);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - Trailing U0 placeholder fields: ";
-  I64 correct = 0, tests = 3;
-  if (LayoutMatchesSizeof) correct++;
-  if (RoundTripPayload) correct++;
-  if (MixedFieldsAligned) correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - Trailing void placeholder fields: ");
+    i64 correct = 0, tests = 3;
+    if (layoutMatchesSizeof()) { correct++; }
+    if (roundTripPayload()) { correct++; }
+    if (mixedFieldsAligned()) { correct++; }
+    PrintResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

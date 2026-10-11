@@ -1,216 +1,203 @@
 #include "./testhelper.ktm"
 
-#define TEST_CAPACITY 32
+import mem, vec;
 
-class Container
-{
-  I64 *entries;
-  I64 size;
+const i64 TEST_CAPACITY = 32;
+
+struct Container {
+    i64 *entries;
+    i64 size;
 };
 
-Bool TestContainerLoop(U0)
-{
-  Container *c = MAlloc(sizeof(Container));
-  c->entries = MAlloc(sizeof(I64) * TEST_CAPACITY);
-  c->size = 0;
-  c->entries[c->size++] = 11;
-  c->entries[c->size++] = 22;
-  c->entries[c->size++] = 32;
-  c->entries[c->size++] = 43;
-  I64 cases[] = {11,22,32,43};
-  I64 i = 0;
+bool testContainerLoop(void) {
+    Container *c = mem.alloc(sizeof(Container));
+    c.entries = mem.alloc(sizeof(i64) * TEST_CAPACITY);
+    c.size = 0;
+    c.entries[c.size++] = 11;
+    c.entries[c.size++] = 22;
+    c.entries[c.size++] = 32;
+    c.entries[c.size++] = 43;
+    i64 cases[] = {11,22,32,43};
+    i64 i = 0;
 
-  for (auto it : c) {
-    if (cases[i] != it) {
-      break;
+    for (auto it : c) {
+        if (cases[i] != it) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  Free(c->entries);
-  Free(c);
-  return i == sizeof(cases)/sizeof(cases[0]);
+    mem.free(c.entries);
+    mem.free(c);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-class StaticContainer
-{
-  I64 entries[8];
-  I64 size;
+struct StaticContainer {
+    i64 entries[8];
+    i64 size;
 };
 
-Bool TestStaticContainerEntriesLoop(U0)
-{
-  StaticContainer *c = MAlloc(sizeof(StaticContainer));
-  c->size = 0;
-  c->entries[c->size++] = 91;
-  c->entries[c->size++] = 79;
-  c->entries[c->size++] = 33;
-  c->entries[c->size++] = 47;
-  I64 cases[] = {91,79,33,47};
-  I64 i = 0;
+bool testStaticContainerEntriesLoop(void) {
+    StaticContainer *c = mem.alloc(sizeof(StaticContainer));
+    c.size = 0;
+    c.entries[c.size++] = 91;
+    c.entries[c.size++] = 79;
+    c.entries[c.size++] = 33;
+    c.entries[c.size++] = 47;
+    i64 cases[] = {91,79,33,47};
+    i64 i = 0;
 
-  for (auto it : c) {
-    if (cases[i] != it) {
-      break;
+    for (auto it : c) {
+        if (cases[i] != it) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  Free(c);
-  return i == sizeof(cases)/sizeof(cases[0]);
+    mem.free(c);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-class StructWithArray
-{
-  I64 entries[8];
+struct StructWithArray {
+    i64 entries[8];
 };
 
-Bool TestStructWithArrayLoop(U0)
-{
-  StructWithArray *c = MAlloc(sizeof(StructWithArray));
-  I64 size = 0;
-  c->entries[size++] = 91;
-  c->entries[size++] = 79;
-  c->entries[size++] = 33;
-  c->entries[size++] = 47;
+bool testStructWithArrayLoop(void) {
+    StructWithArray *c = mem.alloc(sizeof(StructWithArray));
+    i64 size = 0;
+    c.entries[size++] = 91;
+    c.entries[size++] = 79;
+    c.entries[size++] = 33;
+    c.entries[size++] = 47;
 
-  c->entries[size++] = 102;
-  c->entries[size++] = 14;
-  c->entries[size++] = 90;
-  c->entries[size++] = 77;
-  I64 cases[] = {91,79,33,47,102,14,90,77};
-  I64 i = 0;
+    c.entries[size++] = 102;
+    c.entries[size++] = 14;
+    c.entries[size++] = 90;
+    c.entries[size++] = 77;
+    i64 cases[] = {91,79,33,47,102,14,90,77};
+    i64 i = 0;
 
-  /* Can range over arrays in structs */
-  for (auto it : c->entries) {
-    if (cases[i] != it) {
-      break;
+    /* Can range over arrays in structs */
+    for (auto it : c.entries) {
+        if (cases[i] != it) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  Free(c);
-  return i == sizeof(cases)/sizeof(cases[0]);
+    mem.free(c);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-Bool TestFloatVecLoop(U0)
-{
-  FloatVec *fvec = FloatVecNew();
+bool testFloatVecLoop(void) {
+    vec.FloatVec *fvec = vec.floatNew();
 
-  F64 cases[] = {8.8, 4.2, 3.8};
-  I64 i = 0;
-  FloatVecPush(fvec,8.8);
-  FloatVecPush(fvec,4.2);
-  FloatVecPush(fvec,3.8);
+    f64 cases[] = {8.8, 4.2, 3.8};
+    i64 i = 0;
+    fvec.push(8.8);
+    fvec.push(4.2);
+    fvec.push(3.8);
 
-  for (auto it : fvec) {
-    if (cases[i] != it) {
-      break;
+    for (auto it : fvec) {
+        if (cases[i] != it) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  FloatVecRelease(fvec);
-  return i == sizeof(cases)/sizeof(cases[0]);
+    fvec.release();
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-class BoxInt
-{
-  I64 i;
+struct BoxInt {
+    i64 i;
 };
 
-BoxInt *BInt(I64 i)
-{
-  BoxInt *b = MAlloc(sizeof(BoxInt));
-  b->i = i;
-  return b;
+BoxInt *bInt(i64 i) {
+    BoxInt *b = mem.alloc(sizeof(BoxInt));
+    b.i = i;
+    return b;
 }
 
-Bool TestPtrVecLoop(U0)
-{
-  PtrVec *vec = PtrVecNew();
-  PtrVecPush(vec,BInt(1));
-  PtrVecPush(vec,BInt(4));
-  PtrVecPush(vec,BInt(8));
-  PtrVecPush(vec,BInt(9));
-  I64 cases[] = {1,4,8,9};
-  I64 i = 0;
+bool testPtrVecLoop(void) {
+    vec.PtrVec *vec = vec.ptrNew();
+    vec.push(bInt(1));
+    vec.push(bInt(4));
+    vec.push(bInt(8));
+    vec.push(bInt(9));
+    i64 cases[] = {1,4,8,9};
+    i64 i = 0;
 
-  for (BoxInt *b : vec) {
-    if (cases[i] != b->i) {
-      break;
+    for (BoxInt *b : vec) {
+        if (cases[i] != b.i) {
+            break;
+        }
+        i++;
+        mem.free(b);
     }
-    i++;
-    Free(b);
-  }
-  return i == sizeof(cases)/sizeof(cases[0]);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-Bool TestArrayLoop(U0)
-{
-  F64 arr[]   = {9.2, 8.1, 7.8, 5.6, 3.33, 1.12313};
-  F64 cases[] = {9.2, 8.1, 7.8, 5.6, 3.33, 1.12313};
-  I64 i = 0;
+bool testArrayLoop(void) {
+    f64 arr[]   = {9.2, 8.1, 7.8, 5.6, 3.33, 1.12313};
+    f64 cases[] = {9.2, 8.1, 7.8, 5.6, 3.33, 1.12313};
+    i64 i = 0;
 
-  for (auto it : arr) {
-    if (it != cases[i]) {
-      break;
+    for (auto it : arr) {
+        if (it != cases[i]) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  return i == sizeof(cases)/sizeof(cases[0]);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-class C2
-{
-  IntVec *v;
+struct C2 {
+    vec.IntVec *v;
 };
 
-class C1
-{
-  I32 padding;
-  C2 *c2;
+struct C1 {
+    i32 padding;
+    C2 *c2;
 };
 
-Bool TestNested(U0)
-{
-  C1 c1;
-  c1.c2 = MAlloc(sizeof(C2));
-  c1.c2->v = IntVecNew();
+bool testNested(void) {
+    C1 c1;
+    c1.c2 = mem.alloc(sizeof(C2));
+    c1.c2.v = vec.intNew();
 
-  IntVecPush(c1.c2->v,10);
-  IntVecPush(c1.c2->v,100);
-  IntVecPush(c1.c2->v,101);
-  IntVecPush(c1.c2->v,1011);
+    c1.c2.v.push(10);
+    c1.c2.v.push(100);
+    c1.c2.v.push(101);
+    c1.c2.v.push(1011);
 
-  I64 cases[] = {10,100,101,1011};
-  I64 i = 0;
-  
-  for (auto it : c1.c2->v) {
-    if (cases[i] != it) {
-      break;
+    i64 cases[] = {10,100,101,1011};
+    i64 i = 0;
+
+    for (auto it : c1.c2.v) {
+        if (cases[i] != it) {
+            break;
+        }
+        i++;
     }
-    i++;
-  }
 
-  IntVecRelease(c1.c2->v);
-  Free(c1.c2);
-  return i == sizeof(cases)/sizeof(cases[0]);
+    c1.c2.v.release();
+    mem.free(c1.c2);
+    return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-I32 Main(U0)
-{
-  "Test - Range loop: \n";
-  I64 correct = 0, tests = 7;
-  if (TestContainerLoop()) correct++;
-  if (TestStaticContainerEntriesLoop()) correct++;
-  if (TestStructWithArrayLoop()) correct++;
-  if (TestFloatVecLoop()) correct++;
-  if (TestPtrVecLoop()) correct++;
-  if (TestArrayLoop()) correct++;
-  if (TestNested()) correct++;
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+i32 main(void) {
+    printf("Test - Range loop: \n");
+    i64 correct = 0, tests = 7;
+    if (testContainerLoop()) { correct++; }
+    if (testStaticContainerEntriesLoop()) { correct++; }
+    if (testStructWithArrayLoop()) { correct++; }
+    if (testFloatVecLoop()) { correct++; }
+    if (testPtrVecLoop()) { correct++; }
+    if (testArrayLoop()) { correct++; }
+    if (testNested()) { correct++; }
+    PrintResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

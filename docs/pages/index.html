@@ -18,17 +18,17 @@ Linux (x86_64 and arm64) and macOS (Apple Silicon) as an ahead-of-time compiler,
 language server.</p>
 
 <pre data-run><code>
-U0 Main()
+void main()
 {
-  "Hello world\n";
+  printf("Hello world\n");
 }
 </code></pre>
 <pre class="output">
 Hello world
 </pre>
 
-<p>A string on its own is a print statement, <code>U0</code> is <code>void</code>, and
-<code>Main</code> is called for you. Save it as <code>hello.ktm</code> and run it either way:</p>
+<p>A string on its own is a print statement, <code>void</code> is <code>void</code>, and
+<code>main</code> is called for you. Save it as <code>hello.ktm</code> and run it either way:</p>
 
 <pre><code>ktm hello.ktm -o hello && ./hello   # compile to a native binary
 ktm -jit hello.ktm                    # or compile in memory and run straight away</code></pre>
@@ -40,30 +40,32 @@ ktm -jit hello.ktm                    # or compile in memory and run straight aw
 <p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
 Unix sockets, IPv4 and IPv6.</p>
 <pre data-run><code>
-U0 Main()
+import libc, mem, net, str;
+
+void main()
 {
-  I32 srv = NetCreateServer(0, "127.0.0.1", 4);
-  I32 cli = NetConnect("127.0.0.1", NetGetSocketPort(srv));
-  I32 conn = NetAccept(srv);
-  U8 req[256], resp[256];
-  I64 n;
+  i32 srv = net.listen(0, "127.0.0.1", 4);
+  i32 cli = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  u8 req[256], resp[256];
+  i64 n;
 
-  NetSend(cli, "GET /hello HTTP/1.0\r\n\r\n", 23);
+  net.send(cli, "GET /hello HTTP/1.0\r\n\r\n", 23);
 
-  n = recv(conn, req, sizeof(req) - 1, 0);   // the server side
+  n = libc.recv(conn, req, sizeof(req) - 1, 0);   // the server side
   req[n] = '\0';
-  U8 *path = req + 4;                          // after "GET "
-  *StrFirstOcc(path, " ") = '\0';
-  U8 *reply = MStrPrint("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
-  NetSend(conn, reply, StrLen(reply));
-  close(conn);
+  u8 *path = req + 4;                          // after "GET "
+  *str.firstOf(path, " ") = '\0';
+  u8 *reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  net.send(conn, reply, str.len(reply));
+  libc.close(conn);
 
-  n = recv(cli, resp, sizeof(resp) - 1, MSG_WAITALL);  // the client side
+  n = libc.recv(cli, resp, sizeof(resp) - 1, libc.MSG_WAITALL);  // the client side
   resp[n] = '\0';
-  "%s", strstr(resp, "\r\n\r\n") + 4;
-  Free(reply);
-  close(cli);
-  close(srv);
+  printf("%s", libc.strstr(resp, "\r\n\r\n") + 4);
+  mem.free(reply);
+  libc.close(cli);
+  libc.close(srv);
 }
 </code></pre>
 <pre class="output">
@@ -75,14 +77,16 @@ you asked for /hello
 <p><code>ProcRun</code> runs a command and returns what it printed; <code>ProcSpawn</code> gives
 you its pipes.</p>
 <pre data-run><code>
-U0 Main()
+import mem, proc;
+
+void main()
 {
-  U8 *argv[] = {"echo", "hello from a child process", NULL};
-  I64 code;
-  U8 *out = ProcRun(argv, &code);
-  "%s\n", out;
-  "exit code %d\n", code;
-  Free(out);
+  u8 *argv[] = {"echo", "hello from a child process", null};
+  i64 code;
+  u8 *out = proc.run(argv, &code);
+  printf("%s\n", out);
+  printf("exit code %d\n", code);
+  mem.free(out);
 }
 </code></pre>
 <pre class="output">
@@ -94,26 +98,28 @@ exit code 0
 <h3>Threads</h3>
 <p>POSIX threads directly, or a thread pool from the library.</p>
 <pre data-run><code>
-I64 sums[4];
+import libc;
 
-U0 *Sum(U0 *arg)
+i64 sums[4];
+
+void *sum(void *arg)
 {
-  I64 part = arg(I64), total = 0;
-  for (I64 i = part * 250 + 1; i <= (part + 1) * 250; i++) total += i;
+  i64 part = (i64)arg, total = 0;
+  for (i64 i = part * 250 + 1; i <= (part + 1) * 250; i++) { total += i; }
   sums[part] = total;
-  return NULL;
+  return null;
 }
 
-U0 Main()
+void main()
 {
-  pthread_t *th[4];
-  I64 i, total = 0;
-  for (i = 0; i < 4; i++) pthread_create(&th[i], NULL, &Sum, i(U0 *));
+  libc.pthread_t *th[4];
+  i64 i, total = 0;
+  for (i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &sum, (void *)i); }
   for (i = 0; i < 4; i++) {
-    pthread_join(th[i]);
+    libc.pthread_join(th[i]);
     total += sums[i];
   }
-  "1 + 2 + ... + 1000 = %d\n", total;
+  printf("1 + 2 + ... + 1000 = %d\n", total);
 }
 </code></pre>
 <pre class="output">
@@ -124,39 +130,39 @@ U0 Main()
 <h3>A taste of the language</h3>
 <p>Classes with inheritance, default arguments and ranges in <code>case</code>.</p>
 <pre data-run><code>
-class Animal
+struct Animal
 {
-  U8 *name;
-  I64 legs;
+  u8 *name;
+  i64 legs;
 };
 
-class Bird : Animal
+struct Bird : Animal
 {
-  Bool can_fly;
+  bool canFly;
 };
 
-U0 Describe(Animal *a, U8 *sound = "...")
+void describe(Animal *a, u8 *sound = "...")
 {
-  "%s has %d legs and says %s\n", a->name, a->legs, sound;
+  printf("%s has %d legs and says %s\n", a.name, a.legs, sound);
 }
 
-U0 Main()
+void main()
 {
   Bird b;
   b.name = "Tweety";
   b.legs = 2;
-  b.can_fly = TRUE;
+  b.canFly = true;
 
-  Describe(&b, "tweet");   // a Bird is an Animal
-  Describe(&b);            // default argument
+  describe(&b, "tweet");   // a Bird is an Animal
+  describe(&b);            // default argument
 
-  for (I64 i = 1; i <= 3; i++) {
+  for (i64 i = 1; i <= 3; i++) {
     switch (i) {
-      case 1: "one"; break;
-      case 2 ... 3: ", more"; break;
+      case 1: printf("one"); break;
+      case 2 ... 3: printf(", more"); break;
     }
   }
-  "\n";
+  printf("\n");
 }
 </code></pre>
 <pre class="output">
