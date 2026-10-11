@@ -149,7 +149,7 @@ i64 Add(i64 i1, i64 i2)
 
 void main()
 {
-  i64 (*f)(i64 i1, i64 i2) = &Add;
+  fn(i64 i1, i64 i2) i64 f = &Add;
   f(1);
 }
 ",

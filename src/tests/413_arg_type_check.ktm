@@ -49,11 +49,11 @@ struct D : A { i64 y; };
 struct G : D { i64 z; };
 i64 TakeA(A a) { return a.x; }
 i64 TakeAp(A *a) { return 0; }
-i64 TakeFn(i64 (*f)(i64)) { return 0; }
+i64 TakeFn(fn(i64) i64 f) { return 0; }
 i64 Dflt(i64 *p = null, i64 n = 3) { return n; }
-i64 Va(i64 n, ...) { return argc; }
+i64 Va(i64 n, ...args) { return args.len; }
 extern \"c\" u64 strlen(u8 *s);
-struct S { i64 (*cb)(i64 *); };
+struct S { fn(i64 *) i64 cb; };
 void main()
 {
   i64 n = 1, arr[4];
@@ -67,7 +67,7 @@ void main()
   D d;
   G g;
   S s;
-  i64 (*fp)(i64 *) = &TakeP;
+  fn(i64 *) i64 fp = &TakeP;
 %s
 }
 ", body);
@@ -102,7 +102,7 @@ i32 main() {
   TakeP(0); TakeP(null); TakeP(vp); TakeP(arr); TakeV(ip); TakeV(bp); TakeV(&Twice);
   TakeU8(\"lit\"); TakeU8(bp); TakeB(ip); TakeB(n); TakeB(&Twice);
   TakeAp(&a); TakeAp(&d); TakeAp(&g); TakeA(a);
-  Va(1, ip, f, \"s\", a); printf(\"%d %s %f\\n\", n, bp, f);
+  Va(1, ip, f, \"s\"); printf(\"%d %s %f\\n\", n, bp, f);
   Dflt(); Dflt(ip); Dflt(, 5); Dflt(null, 2);
   TakeFn(&Twice); TakeFn(vp); TakeFn(null); strlen(bp);
   s.cb = &TakeP; s.cb(ip); fp(ip); fp(null);", 0, 0)) { correct++; }

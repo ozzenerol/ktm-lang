@@ -2781,6 +2781,12 @@ Ast *parseThrowStatement(Cctrl *cc) {
         /* `throw();`: reported as a missing expression */
         parseRequiredExpr(cc, "the value to `throw`");
     }
+    /* the old `throw('X')`: a character as the code */
+    Lexeme *code_tok = cctrlTokenPeek(cc);
+    if (code_tok && code_tok->tk_type == TK_CHAR_CONST) {
+        cctrlErrorAt(cc, code_tok->line, code_tok->col, code_tok->len + 2,
+            "a character as the code of `throw`: use an enum member or a number");
+    }
     Ast *file = parseThrowFile(cc);
     Ast *code = NULL;
     Ast *call = parseThrowCall(cc, file, line, &code);
@@ -3220,6 +3226,11 @@ Ast *parseStatement(Cctrl *cc) {
     }
 
     if (tok->tk_type == TK_CHAR_CONST) {
+        /* the old print of a character constant */
+        if (!(cc->flags & CCTRL_REPL)) {
+            cctrlErrorAt(cc, tok->line, tok->col, tok->len + 2,
+                "a character printed as a statement: write `printf(\"%%c\", ...)`");
+        }
         return parseFloatingCharConst(cc,tok);
     }
 
@@ -4516,6 +4527,15 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
     }
     Vec *params = parseParams(cc,')',&has_var_args,1);
     if (self) vecInsertAt(params, self, 0);
+    /* the old `(...)`, with the implicit argc and argv */
+    for (u64 i = 0; params && i < params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (p && p->kind == AST_VAR_ARGS) {
+            cctrlErrorAt(cc, name_tok_line, name_tok_col, len,
+                "`...` needs a name: write `...args` (args.len and args[i] "
+                "replace argc and argv)");
+        }
+    }
     if (ret_fnptr) {
         /* `)(fn_params)` after the parameters: what the returned function
          * pointer points to */

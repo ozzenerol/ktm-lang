@@ -85,7 +85,7 @@ pub struct pthread_condattr_t {
 
 pub struct pthread_handler_rec;
 pub struct pthread_handler_rec {
-    void (*__routine)(void *__arg); // Routine to call
+    fn(void *__arg) void __routine; // Routine to call
     void *__arg;                  // Argument to pass
     pthread_handler_rec *__next;
 };

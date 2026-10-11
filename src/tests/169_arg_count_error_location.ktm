@@ -20,7 +20,7 @@ bool errorAt(u8 *body, u8 *where, u8 *underline) {
     u8 *src = str.format("i64 One(i64 a) { return a; }\n"
                                             "i64 Two(i64 a, i64 b) { return a + b; }\n"
                                             "i64 Va(i64 a, ...) { return a; }\n"
-                                            "struct C { i64 (*f)(i64 a); };\n"
+                                            "struct C { fn(i64 a) i64 f; };\n"
                                             "C c;\n"
                                             "void main() { %s }\n", body);
     u8 *out;
@@ -52,7 +52,7 @@ i32 main() {
     tests++;
     if (errorAt("i64 y = Two (1, 2, 3);", ":6:23", "|                          ^^^^^^^^^^^^^\n")) { correct++; }
     tests++;
-    if (errorAt("i64 (*fp)(i64 a, i64 b) = &Two; i64 y = fp(1);", ":6:55", "^^^^^\n")) { correct++; }
+    if (errorAt("fn(i64 a, i64 b) i64 fp = &Two; i64 y = fp(1);", ":6:55", "^^^^^\n")) { correct++; }
     tests++;
     if (errorAt("c.f = &One; i64 y = c.f();", ":6:37", "|                                        ^^^\n")) { correct++; }
     tests++;

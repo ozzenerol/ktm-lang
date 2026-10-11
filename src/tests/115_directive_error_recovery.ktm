@@ -180,7 +180,7 @@ bool testBadEscape(void) {
 }
 
 bool testDotDot(void) {
-    return errorOnlyEverywhere("..", "void F(i64 a, ..) {}\n",
+    return errorOnlyEverywhere("..", "void F(i64 a, ..args) {}\n",
                                                          "`..` is an invalid token sequence");
 }
 

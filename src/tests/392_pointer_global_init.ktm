@@ -80,7 +80,7 @@ void main()
                      "printf 'static i64 table[4] = {5, 6, 7, 8};\\n"
                      "i64 LibTriple(i64 x) { return x * 3; }\\n"
                      "pub i64 *third = &table[2];\\n"
-                     "pub i64 (*triple)(i64) = &LibTriple;\\n"
+                     "pub fn(i64) i64 triple = &LibTriple;\\n"
                      "pub u8 *none = null;\\n"
                      "pub i64 Ktm392Check() { return *third + triple(2) + (none == null); }\\n'"
                      " > ./ktm-392-work/ktm392.ktm && "

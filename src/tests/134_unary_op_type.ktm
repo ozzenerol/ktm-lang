@@ -76,7 +76,7 @@ i64 testErrors(void) {
             "struct C { i64 x; };\nvoid main() { C c; i64 u = -c; }\n",
             "cannot be applied to a local variable of class")) { ok++; }
     if (compileFailsWith("-fnptr",
-            "i64 F(i64 a) { return a; }\nvoid main() { i64 (*fp)(i64 a) = &F; i64 u = -fp; }\n",
+            "i64 F(i64 a) { return a; }\nvoid main() { fn(i64 a) i64 fp = &F; i64 u = -fp; }\n",
             "The `-` operator cannot be applied to a function pointer")) { ok++; }
     if (compileFailsWith("-&fn",
             "void F() {}\nvoid main() { i64 u = -&F; }\n",

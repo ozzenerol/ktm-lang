@@ -36,8 +36,8 @@ i32 main() {
     printf("Test - uncaught throw message: ");
     i64 correct = 0, tests = 8;
 
-    if (uncaught("throw('L');", "uncaught error 'L' (" UT_SRC ":3)\n", "")) { correct++; }
-    if (uncaught("printf(\"before\\n\"); throw('A');",
+    if (uncaught("throw(0x4C);", "uncaught error 'L' (" UT_SRC ":3)\n", "")) { correct++; }
+    if (uncaught("printf(\"before\\n\"); throw(0x41);",
                              "uncaught error 'A' (" UT_SRC ":3)\n", "before\n")) { correct++; }
     /* a code whose bytes are all printable is shown as text, low byte first */
     if (uncaught("throw(0x656D614E676E6F4C);", "uncaught error 'LongName' (" UT_SRC ":3)\n", "")) {
@@ -49,7 +49,7 @@ i32 main() {
     if (uncaught("throw(0x8000000000000000);",
                              "uncaught error -9223372036854775808 (" UT_SRC ":3)\n", "")) { correct++; }
     /* After a try has been used and left, the chain is empty again. */
-    if (uncaught("try { throw(1); } catch { printf(\"c\\n\"); } throw('B');",
+    if (uncaught("try { throw(1); } catch { printf(\"c\\n\"); } throw(0x42);",
                              "uncaught error 'B' (" UT_SRC ":3)\n", "c\n")) { correct++; }
 
     test.printResult(correct, tests);
