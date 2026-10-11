@@ -90,6 +90,12 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
     libc.pipe(pi);
     libc.pipe(po);
     libc.pipe(pe);
+    /* The input goes into the pipe before the fork (it's small, the pipe
+     * holds it): written after it, a child that doesn't read its stdin
+     * could be gone already under load, and the write's SIGPIPE ended
+     * the whole test (exit 141). */
+    libc.write(pi[1], input, str.len(input));
+    libc.close(pi[1]);
     libc.fflush(null);
     i32 pid = libc.fork();
     if (pid == 0) {
@@ -97,7 +103,7 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
         dup2(pi[0], 0);
         dup2(po[1], 1);
         dup2(pe[1], 2);
-        libc.close(pi[0]); libc.close(pi[1]); libc.close(po[0]); libc.close(po[1]); libc.close(pe[0]); libc.close(pe[1]);
+        libc.close(pi[0]); libc.close(po[0]); libc.close(po[1]); libc.close(pe[0]); libc.close(pe[1]);
         i32 rc = fn_();
         libc.fflush(null);
         _exit(rc);
@@ -105,8 +111,6 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
     libc.close(pi[0]);
     libc.close(po[1]);
     libc.close(pe[1]);
-    libc.write(pi[1], input, str.len(input));
-    libc.close(pi[1]);
     /* small outputs: read stdout to EOF, then stderr */
     while ((n = libc.read(po[0], out + no, 255 - no)) > 0) { no += n; }
     while ((n = libc.read(pe[0], err + ne, 255 - ne)) > 0) { ne += n; }
