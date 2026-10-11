@@ -1,5 +1,9 @@
 import coro, libc, mem, test;
 
+const i64 END_MARK = 1001;
+const i64 SELF_MARK = 1002;
+const i64 NO_MARK = 1003;
+
 enum Err { main, boom };
 
 /* Coroutines as a library module (coroutines.ktm), on x86_64 and arm64:
@@ -23,7 +27,7 @@ void *fib(void *max) {
         a = b;
         b = t;
     }
-    return (void *)'end';
+    return (void *)END_MARK;
 }
 
 bool generator() {
@@ -35,7 +39,7 @@ bool generator() {
         if (n >= 7 || (i64)v != want[n]) { return false; }
         n++;
     }
-    if (n != 7 || (i64)v != 'end') { return false; }    /* fn's return value */
+    if (n != 7 || (i64)v != END_MARK) { return false; }    /* fn's return value */
     if (coro.next(c) != null) { return false; }     /* done: null */
     if (!coro.done(c)) { return false; }
     coro.release(c);
@@ -62,7 +66,7 @@ bool sendValues() {
 void *doubler(void *max) {
     coro.Coroutine *inner = coro.spawn(&fib, max);
     void *v;
-    if (coro.current() == null) { return (void *)'self'; }
+    if (coro.current() == null) { return (void *)SELF_MARK; }
     for (v = coro.next(inner); !coro.done(inner); v = coro.next(inner)) {
         coro.yield((void *)((i64)v * 2));
     }
@@ -133,7 +137,7 @@ void *middle(void *arg)
     coro.Coroutine *t = coro.spawn(&thrower);
     coro.yield(coro.next(t));
     coro.next(t);
-    return (void *)'no';
+    return (void *)NO_MARK;
 }
 
 bool throwOut() {

@@ -10,15 +10,16 @@ enum Err { done };
 #define GOTO_TRY_FILE "__328_goto_into_try.ktm"
 #define GOTO_TRY_OUT  "__328_goto_into_try.out"
 
-i64 catchDepth() {
-    if (!Fs()) { return 0; }
-    i64 n = 0;
-    CatchFrame *f = Fs().catchTop;
-    while (f) {
-        n++;
-        f = f.prev;
+/* A throw now reaches the nearest live catch (a frame left behind by a
+ * jump would take it somewhere else) */
+bool throwLands() {
+    i64 got = 0;
+    try {
+        throw(77);
+    } catch (Error e) {
+        got = e.code;
     }
-    return n;
+    return got == 77;
 }
 
 i64 withinBody(i64 x) {
@@ -45,7 +46,7 @@ i64 outOfBody(i64 x) {
     }
     return n;
 out:
-    return 100 + catchDepth();
+    return 100;
 }
 
 i64 innerToOuter() {
@@ -57,7 +58,7 @@ i64 innerToOuter() {
         }
         n = -1;
 outer_label:
-        n += catchDepth();
+        n += 1;
     } catch {
         n = -2;
     }
@@ -73,7 +74,7 @@ i64 intoCatchHandler(i64 x) {
 handler:
         n += 50;
     }
-    return n + catchDepth();
+    return n;
 }
 
 i64 throwAfterJumps() {
@@ -121,7 +122,16 @@ i32 main() {
     tests++; if (outOfBody(0) == 1 && outOfBody(1) == 100) { correct++; }
     tests++; if (innerToOuter() == 1) { correct++; }
     tests++; if (intoCatchHandler(0) == 1 && intoCatchHandler(1) == 50) { correct++; }
-    tests++; if (throwAfterJumps() == 1 && catchDepth() == 0) { correct++; }
+    tests++; if (throwAfterJumps() == 1 && throwLands()) { correct++; }
+    i64 before = test.heapInUse();
+    for (i64 i = 0; i < 20000; i++) {
+        withinBody(i & 1);
+        outOfBody(i & 1);
+        innerToOuter();
+        intoCatchHandler(i & 1);
+        throwAfterJumps();
+    }
+    tests++; if (test.heapInUse() - before < 64 * 1024 && throwLands()) { correct++; }
 
     tests++;
     if (compileFailsWith(

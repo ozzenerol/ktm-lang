@@ -7,7 +7,7 @@ enum Err { old };
  * `throw(code, fmt, ...)` (formatted like printf, format checked at
  * compile time) and `throw(e)` (the same error again, file and line
  * kept). `catch (Error e)` binds it, `catch` without a binding still
- * works and Fs->except_ch still holds the code. Uncaught it prints
+ * works. Uncaught it prints
  * `uncaught error <code>: <message> (<file>:<line>)` and exits 1. The
  * error is intact after defers, two call frames, a coroutine and in
  * another thread, and the runtime frees every message. */
@@ -44,7 +44,7 @@ bool codeOnly() {
         throw(BankError.locked);
     } catch (Error e) {
         return e.code == BankError.locked && e.message && e.message[0] == 0 &&
-                     inThisFile(&e) && Fs().exceptCh == BankError.locked;
+                     inThisFile(&e);
     }
     return false;
 }

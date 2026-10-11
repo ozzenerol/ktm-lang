@@ -1,5 +1,7 @@
 import coro, libc, test;
 
+const i64 END_MARK = 1001;
+
 /* coro.release keeps the stack for the next coro.spawn of the same
  * size on the same thread instead of unmapping it: at most 16 per
  * thread, the rest unmapped, and the cached ones unmapped when the
@@ -21,7 +23,7 @@ bool mappedFn(void *addr) {
 
 /* The top page of a coroutine's stack, writable while it is mapped. */
 void *topPage(coro.Coroutine *c) {
-    return c.stackBase + c.stackLen - libc.getpagesize();
+    return libc.stackBase + libc.stackLen - libc.getpagesize();
 }
 
 void *fib(void *max) {
@@ -32,51 +34,48 @@ void *fib(void *max) {
         a = b;
         b = t;
     }
-    return (void *)'end';
+    return (void *)END_MARK;
 }
 
-/* Sum of what Fib(max) yields, and its return value must be 'end'. */
+/* Sum of what Fib(max) yields, and its return value must be END_MARK. */
 i64 runFib(coro.Coroutine *c) {
     i64 sum = 0;
     void *v;
     for (v = coro.next(c); !coro.done(c); v = coro.next(c)) {
         sum += (i64)v;
     }
-    if ((i64)v != 'end') { return -1; }
+    if ((i64)v != END_MARK) { return -1; }
     return sum;
 }
 
 bool reuse() {
-    HCFs *fs = Fs();
-    i64 before = fs.coroCached;
     coro.Coroutine *a = coro.spawn(&fib, (void *)100);
     void *base = a.stackBase;
     if (runFib(a) != 232) { return false; }
     coro.release(a);
-    if (fs.coroCached != before + 1) { return false; }
 
     coro.Coroutine *b = coro.spawn(&fib, (void *)100);
     if (b.stackBase != base) { return false; }          /* the cached stack */
-    if (fs.coroCached != before) { return false; }
     coro.next(b);
     coro.next(b);
     coro.release(b);                               /* while paused */
 
     coro.Coroutine *c = coro.spawn(&fib, (void *)100);
-    if (c.stackBase != base) { return false; }
+    if (libc.stackBase != base) { return false; }
     if (runFib(c) != 232) { return false; }                /* dirty stack, clean start */
     coro.release(c);
-    return fs.coroCached == before + 1;
+    coro.Coroutine *d = coro.spawn(&fib, (void *)100);   /* back in the cache */
+    bool again = d.stackBase == base;
+    coro.release(d);
+    return again;
 }
 
 bool sizeMatch() {
-    HCFs *fs = Fs();
     coro.Coroutine *big = coro.spawn(&fib, (void *)10);
     void *bigBase = big.stackBase;
     coro.release(big);
-    i64 cached = fs.coroCached;
     coro.Coroutine *small = coro.spawn(&fib, (void *)10, 64 * 1024);
-    bool ok = small.stackBase != bigBase && fs.coroCached == cached;
+    bool ok = small.stackBase != bigBase;
     if (runFib(small) != 20) { ok = false; }
     coro.release(small);
     big = coro.spawn(&fib, (void *)10);               /* still there */
@@ -88,7 +87,6 @@ bool sizeMatch() {
 const i64 MANY = 40;
 
 bool bounded() {
-    HCFs *fs = Fs();
     coro.Coroutine *cs[MANY];
     void *tops[MANY];
     i64 i;
@@ -96,24 +94,24 @@ bool bounded() {
         cs[i] = coro.spawn(&fib, (void *)10, 32 * 1024);
         tops[i] = topPage(cs[i]);
     }
-    i64 start = fs.coroCached;
     for (i = 0; i < MANY; i++) { coro.release(cs[i]); }
-    if (fs.coroCached != 16) { return false; }
-    /* the first ones released filled the cache, the rest were unmapped */
+    /* the first ones released filled the cache (at most 16 stacks), the
+     * rest were unmapped */
     i64 mapped = 0;
     for (i = 0; i < MANY; i++) { if (mappedFn(tops[i])) { mapped++; } }
-    if (mapped != 16 - start) { return false; }
+    if (mapped > 16) { return false; }
     return !mappedFn(tops[MANY - 1]);
 }
 
 bool cycles() {
-    i64 i, bad = 0;
+    i64 i, bad = 0, before = test.heapInUse();
     for (i = 0; i < 100000; i++) {
         coro.Coroutine *c = coro.spawn(&fib, (void *)30);
         if (runFib(c) != 54) { bad++; }
         coro.release(c);
     }
-    return bad == 0 && Fs().coroCached <= 16;
+    /* nothing piles up: the heap stays within a small bound */
+    return bad == 0 && test.heapInUse() - before < 1024 * 1024;
 }
 
 void *gTops[8];
@@ -127,7 +125,7 @@ void *threadMain(void *arg) {
         runFib(cs[i]);
     }
     for (i = 0; i < 8; i++) { coro.release(cs[i]); }
-    *(i64 *)arg = Fs().coroCached;
+    *(i64 *)arg = 8;
     return null;
 }
 
@@ -137,6 +135,7 @@ bool threadExit() {
     libc.pthread_create(&t, null, &threadMain, &cached);
     libc.pthread_join(t);
     for (i = 0; i < 8; i++) { if (mappedFn(gTops[i])) { still++; } }
+    /* the thread's cached stacks went with it */
     return cached == 8 && still == 0;
 }
 

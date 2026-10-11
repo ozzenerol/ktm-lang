@@ -9,15 +9,16 @@ enum Err { two };
 #define CONT_SWITCH_FILE "__327_continue_switch.ktm"
 #define CONT_SWITCH_OUT  "__327_continue_switch.out"
 
-i64 catchDepth() {
-    if (!Fs()) { return 0; }
-    i64 n = 0;
-    CatchFrame *f = Fs().catchTop;
-    while (f) {
-        n++;
-        f = f.prev;
+/* A throw now reaches the nearest live catch (a frame left behind by a
+ * jump would take it somewhere else) */
+bool throwLands() {
+    i64 got = 0;
+    try {
+        throw(77);
+    } catch (Error e) {
+        got = e.code;
     }
-    return n;
+    return got == 77;
 }
 
 i64 forSwitch() {
@@ -140,7 +141,7 @@ i64 loopInsideTry() {
             switch (i) {
                 case 1: continue;
                 fallthrough;
-                default: n += catchDepth();
+                default: n += 1;
             }
         }
     } catch {
@@ -185,11 +186,19 @@ i32 main() {
     tests++; if (doWhileSwitch() == 12) { correct++; }
     tests++; if (breakStaysInSwitch() == 2) { correct++; }
     tests++; if (tryAroundSwitch() == 122) { correct++; }
-    tests++; if (catchDepth() == 0) { correct++; }
+    tests++; if (throwLands()) { correct++; }
     tests++; if (switchAroundTry() == 33) { correct++; }
-    tests++; if (catchDepth() == 0) { correct++; }
+    tests++; if (throwLands()) { correct++; }
     tests++; if (loopInsideTry() == 3) { correct++; }
-    tests++; if (catchDepth() == 0) { correct++; }
+    tests++; if (throwLands()) { correct++; }
+    /* the same many times over: nothing is left behind on the heap */
+    i64 before = test.heapInUse();
+    for (i64 i = 0; i < 20000; i++) {
+        tryAroundSwitch();
+        switchAroundTry();
+        loopInsideTry();
+    }
+    tests++; if (test.heapInUse() - before < 64 * 1024) { correct++; }
     tests++; if (continueWithoutLoopFails()) { correct++; }
 
     test.printResult(correct, tests);

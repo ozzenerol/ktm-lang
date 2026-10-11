@@ -119,15 +119,16 @@ void middle(i64 *seen) {
 }
 
 bool unwinds() {
-    i64 seen = 0;
+    i64 seen = 0, code = 0;
     try {
         defer logFn("o");
         middle(&seen);
         logFn("Y");
-    } catch {
+    } catch (Error e) {
         logFn("c");
+        code = e.code;
     }
-    return got("tmoc") && seen == 9 && Fs().exceptCh == Err.oops;
+    return got("tmoc") && seen == 9 && code == Err.oops;
 }
 
 /* a try inside a block with a defer: caught inside, the block's defer
@@ -157,8 +158,9 @@ void throwInDefer() {
 }
 
 bool throwFromDefer() {
-    try { throwInDefer(); } catch { logFn("c"); }
-    return got("12c") && Fs().exceptCh == Err.def;
+    i64 code = 0;
+    try { throwInDefer(); } catch (Error e) { logFn("c"); code = e.code; }
+    return got("12c") && code == Err.def;
 }
 
 /* in a switch case's block, and with loops inside the deferred statement

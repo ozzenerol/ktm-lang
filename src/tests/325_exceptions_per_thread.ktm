@@ -2,7 +2,7 @@ import fs, libc, mem, proc, str, test;
 
 /* The catch chain was one process-wide global, so a throw in one thread
  * could longjmp onto another thread's stack ("stack smashing detected").
- * Each thread now has its own Fs. */
+ * Each thread now has its own catch chain. */
 
 const i64 WORKERS = 8;
 const i64 ROUNDS = 5000;
@@ -17,15 +17,13 @@ struct Work {
     i64 inner;
     i64 outer;
     i64 wrong;
-    HCFs *fs;
 };
 
 extern "c" i32 usleep(u32 usec);
 
 /* Workers wait here until all of them are running, so none has exited
- * (freeing its Fs, which the next thread could get at the same address)
- * when their Fs are compared. */
-libc.pthread_mutex_t startedLock;
+ * (and the next thread reused its state) while the others throw. */
+pthread_mutex_t startedLock;
 i64 started;
 
 void waitForAllWorkers() {
@@ -47,7 +45,6 @@ void raiseFn(i64 v) {
 
 void *worker(Work *w) {
     i64 i, v;
-    w.fs = Fs();
     waitForAllWorkers();
     for (i = 0; i < ROUNDS; i++) {
         v = w.id * 1000000 + i;
@@ -63,15 +60,13 @@ void *worker(Work *w) {
             if (e.code == v + 1) { w.outer++; }
             else { w.wrong++; }
         }
-        if (Fs().catchTop != null) { w.wrong++; }
     }
     return null;
 }
 
 bool uncaughtInThreadExits() {
     u8 *src = "
-
-enum Err { thr };
+enum Err { thr, again, main };
 
 void *T(void *a)
 {
@@ -115,9 +110,9 @@ void main()
 
 i32 main() {
     printf("Test - each thread has its own catch chain: ");
-    i64 correct = 0, tests = 6, i, j;
+    i64 correct = 0, tests = 5, i;
     Work work[WORKERS];
-    bool counts = true, distinct = true;
+    bool counts = true;
     i64 after = 0;
 
     mem.set(work, 0, sizeof(work));
@@ -132,11 +127,11 @@ i32 main() {
             libc.pthread_join(work[i].th);
         }
         /* Still inside this thread's try: the workers never touched it. */
-        raiseFn('Main');
+        raiseFn(Err.main);
     } catch (Error e) {
         after = e.code;
     }
-    if (after == 'Main') { correct++; }
+    if (after == Err.main) { correct++; }
 
     for (i = 0; i < WORKERS; i++) {
         if (work[i].inner != ROUNDS || work[i].outer != ROUNDS ||
@@ -145,19 +140,22 @@ i32 main() {
             printf("worker %d: inner %d outer %d wrong %d\n", i, work[i].inner,
                     work[i].outer, work[i].wrong);
         }
-        if (work[i].fs == Fs() || work[i].fs == null) { distinct = false; }
-        for (j = 0; j < i; j++) {
-            if (work[i].fs == work[j].fs) { distinct = false; }
-        }
     }
     if (counts) { correct++; }
-    if (distinct) { correct++; }
-    if (Fs() == Fs() && Fs().catchTop == null) { correct++; }
+    /* the workers' throws never reached this thread's catches, nor the
+     * other way round: a throw here still lands here */
+    i64 back = 0;
+    try {
+        raiseFn(42);
+    } catch (Error e) {
+        back = e.code;
+    }
+    if (back == 42) { correct++; }
 
     try {
-        raiseFn('Again');
+        raiseFn(Err.again);
     } catch (Error e) {
-        if (e.code == 'Again') { correct++; }
+        if (e.code == Err.again) { correct++; }
     }
 
     if (uncaughtInThreadExits()) { correct++; }

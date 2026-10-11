@@ -1,21 +1,10 @@
 import test;
 
-enum Err { neg, in };
+enum Err { neg, in, mid, loop, mine, ok, out };
 
 /* A return, break, continue or goto that left a try body never popped
  * its catch frame, so the next throw longjmp'd into the stack of a
  * function that had already returned (segfault or endless loop). */
-
-i64 depthFn() {
-    if (!Fs()) { return 0; }
-    i64 n = 0;
-    CatchFrame *f = Fs().catchTop;
-    while (f) {
-        n++;
-        f = f.prev;
-    }
-    return n;
-}
 
 void boom(i64 v) {
     throw(v);
@@ -147,9 +136,9 @@ i64 breakInsideTry() {
             default:
                 r = 0;
         }
-        boom('Mine');
+        boom(Err.mine);
     } catch (Error e) {
-        if (e.code == 'Mine') { r += 10; }
+        if (e.code == Err.mine) { r += 10; }
     }
     return r;
 }
@@ -164,45 +153,42 @@ i64 gotos() {
     } catch {
     }
 out:
-    r += depthFn();
     try {
         try {
             goto mid;
         } catch {
         }
 mid:
-        r += depthFn() * 10;
-        boom('Mid');
+        boom(Err.mid);
     } catch (Error e) {
-        if (e.code == 'Mid') { r += 100; }
+        if (e.code == Err.mid) { r += 100; }
     }
     try {
 again:
         i++;
         if (i < 3) { goto again; }
-        boom('Loop');
+        boom(Err.loop);
     } catch (Error e) {
-        if (e.code == 'Loop') { r += 1000 * i; }
+        if (e.code == Err.loop) { r += 1000 * i; }
     }
     return r;
 }
 
 i32 main() {
     printf("Test - jumping out of a try body pops its catch frame: ");
-    i64 correct = 0, tests = 16, base = depthFn();
+    i64 correct = 0, tests = 16;
 
-    if (retInTry(5) == 10 && depthFn() == base) { correct++; }
-    if (retInTry(0) == -2 && depthFn() == base) { correct++; }
-    if (retComputed(4) == 15 && depthFn() == base) { correct++; }
-    if (retComputed(-1) == -Err.neg && depthFn() == base) { correct++; }
-    if (retNested(1) == 100 && retNested(2) == 200 && retNested(3) == 300 &&
-            depthFn() == base) { correct++; }
-    if (retFromCatch() == 7 && depthFn() == base) { correct++; }
-    if (retInLoopInTry(4) == 4 && depthFn() == base) { correct++; }
-    if (breakLoops() == 500 + 5 + 3 && depthFn() == base) { correct++; }
-    if (switchBreak(1) == 1 && switchBreak(0) == 2 && depthFn() == base) { correct++; }
-    if (breakInsideTry() == 11 && depthFn() == base) { correct++; }
-    if (gotos() == 0 + 10 + 100 + 3000 && depthFn() == base) { correct++; }
+    if (retInTry(5) == 10) { correct++; }
+    if (retInTry(0) == -2) { correct++; }
+    if (retComputed(4) == 15) { correct++; }
+    if (retComputed(-1) == -Err.neg) { correct++; }
+    if (retNested(1) == 100 && retNested(2) == 200 && retNested(3) == 300 ) { correct++; }
+    if (retFromCatch() == 7) { correct++; }
+    if (retInLoopInTry(4) == 4) { correct++; }
+    if (breakLoops() == 500 + 5 + 3) { correct++; }
+    if (switchBreak(1) == 1 && switchBreak(0) == 2) { correct++; }
+    if (breakInsideTry() == 11) { correct++; }
+    if (gotos() == 100 + 3000) { correct++; }
 
     /* After all of that a throw reaches the live try, not a dead frame. */
     i64 caught = 0, i;
@@ -222,22 +208,36 @@ i32 main() {
         retInTry(3);
         retNested(1);
         gotos();
-        boom('Out');
+        boom(Err.out);
     } catch (Error e) {
         outer = e.code;
     }
-    if (outer == 'Out') { correct++; }
+    if (outer == Err.out) { correct++; }
 
     /* A return inside the outer try leaves only the inner frames. */
     i64 got = 0;
     try {
-        if (retInLoopInTry(2) == 2) { boom('Ok'); }
+        if (retInLoopInTry(2) == 2) { boom(Err.ok); }
     } catch (Error e) {
         got = e.code;
     }
-    if (got == 'Ok') { correct++; }
+    if (got == Err.ok) { correct++; }
 
-    if (depthFn() == base) { correct++; }
+    /* Every way out of a try, many times over: no frame or message is left
+     * behind (the heap doesn't grow) */
+    i64 before = test.heapInUse();
+    for (i = 0; i < 20000; i++) {
+        retInTry(i % 3);
+        retComputed(i % 5 - 1);
+        retNested(1 + i % 3);
+        retFromCatch();
+        retInLoopInTry(3);
+        breakLoops();
+        switchBreak(i & 1);
+        breakInsideTry();
+        gotos();
+    }
+    if (test.heapInUse() - before < 64 * 1024) { correct++; }
     if (retComputed(9) == 30) { correct++; }
 
     test.printResult(correct, tests);

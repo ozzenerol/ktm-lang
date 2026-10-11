@@ -3,13 +3,12 @@
 //   ktm main.ktm -o bank && ./bank
 //   ktm -jit main.ktm
 //
-// Shows: classes and inheritance, function pointers as "methods",
-// exceptions for errors, linked lists, and integer money (cents).
+// Shows: structs and inheritance, function pointers in a struct,
+// exceptions with an error enum, the list module, and integer money (cents).
 
 import list, mem;
 
-const i64 ERR_FUNDS = 'Funds';
-const i64 ERR_FROZEN = 'Frozen';
+enum BankError { funds = 1, frozen };
 
 struct Account {
     u8 *owner;
@@ -56,14 +55,14 @@ void record(Account *a, u8 *what, i64 amount) {
 }
 
 void withdraw(Account *a, i64 cents) {
-    if (a.frozen) { throw(ERR_FROZEN); }
-    if (cents > a.balance) { throw(ERR_FUNDS); }
+    if (a.frozen) { throw(BankError.frozen); }
+    if (cents > a.balance) { throw(BankError.funds); }
     a.balance -= cents;
     record(a, "withdraw", -cents);
 }
 
 void deposit(Account *a, i64 cents) {
-    if (a.frozen) { throw(ERR_FROZEN); }
+    if (a.frozen) { throw(BankError.frozen); }
     a.balance += cents;
     record(a, "deposit", cents);
 }
@@ -81,7 +80,7 @@ bool transfer(Account *from, Account *to, i64 cents) {
             record(from, "refund", cents);
         }
         u8 *why = "account frozen";
-        if (e.code == ERR_FUNDS) { why = "insufficient funds"; }
+        if (e.code == BankError.funds) { why = "insufficient funds"; }
         printf("  transfer %s -> %s refused: %s\n", from.owner, to.owner, why);
         return false;
     }
