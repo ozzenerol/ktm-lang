@@ -210,14 +210,17 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
      * 0-2 included: name the ones the child inherits. Only open ones: a
      * closed fd named here makes the spawn fail, where Linux just leaves it
      * closed in the child. */
-    if (!like_system) {
-        if (opts->in == INHERIT && libc.fcntl(0, PROC_F_GETFD) != -1)
+    if (!likeSystem) {
+        if (opts.in == INHERIT && libc.fcntl(0, PROC_F_GETFD) != -1) {
             posix_spawn_file_actions_addinherit_np(fa, 0);
-        if ((opts->out == INHERIT || opts->err == STDOUT) &&
-                libc.fcntl(1, PROC_F_GETFD) != -1)
+        }
+        if ((opts.out == INHERIT || opts.err == STDOUT) &&
+                libc.fcntl(1, PROC_F_GETFD) != -1) {
             posix_spawn_file_actions_addinherit_np(fa, 1);
-        if (opts->err == INHERIT && libc.fcntl(2, PROC_F_GETFD) != -1)
+        }
+        if (opts.err == INHERIT && libc.fcntl(2, PROC_F_GETFD) != -1) {
             posix_spawn_file_actions_addinherit_np(fa, 2);
+        }
     }
 #endif
     if (opts.in == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pin[0], 0); }
@@ -282,7 +285,7 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
     p.errFd = perr[0];
     p.group = opts.newGroup;
 #ifdef IS_MACOS
-    if (p->in_fd != -1) libc.fcntl(p->in_fd, PROC_F_SETNOSIGPIPE, 1);
+    if (p.inFd != -1) { libc.fcntl(p.inFd, PROC_F_SETNOSIGPIPE, 1); }
 #endif
     return p;
 }
@@ -434,7 +437,7 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
             fds[nfds++].events = PROC_POLLIN;
         }
         for (i = 0; i < nfds; i++) { fds[i].revents = 0; }
-        if (libc.poll(fds, nfds, -1) < 0) {
+        if (libc.poll((libc.pollfd *)fds, nfds, -1) < 0) {
             if (os.errno() == PROC_EINTR) { continue; }
             break;
         }
@@ -538,7 +541,7 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
         fd.fd = p.outFd;
         fd.events = PROC_POLLIN;
         fd.revents = 0;
-        r = libc.poll(&fd, 1, 10);
+        r = libc.poll((libc.pollfd *)&fd, 1, 10);
         if (r < 0 && os.errno() != PROC_EINTR) { break; }
         if (r > 0 && !procDrain(p.outFd, &b)) {
             procClose(&p.outFd);               /* EOF */

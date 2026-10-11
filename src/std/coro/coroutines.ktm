@@ -256,7 +256,7 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
     u64 *sp = top - 20;
     mem.set(sp, 0, 20 * sizeof(u64));
     sp[0] = (u64)c;              /* X19 */
-    sp[11] = (u64)&CoroEntry;    /* X30 (lr); X29 (fp) stays 0 */
+    sp[11] = (u64)&coroEntry;    /* X30 (lr); X29 (fp) stays 0 */
 #endif
     c.sp = sp;
     return c;

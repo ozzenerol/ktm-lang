@@ -45,4 +45,10 @@ Steps (plan approved by asuslab-33):
   439. Left for (b): 422 (base drift, hides), 423/428 (fixture module `net` is found twice with the
   stdlib's net: rename it), 426 (StrMap is map.StrMap), 433 (`fn(...)` became `fn(...args)` in a
   typeof expectation), 438 (libc, base drift), 440 (copies include/std.ktmh; a prefix is lib/ + modules/).
-- Left: unused-import warnings while building the stdlib; 441-443 once conv-ae is rebased.
+- feat/convert 88a603c: std-fixes 05 (the non-host #if branches the converter left in old names:
+  macOS errno/fsOnce/net/proc, aarch64 coroEntry; os.exit is one function; map.intNew/strNew get
+  std.ktmh's defaults; the dead KTM_HT_TEST block dropped; sql's imports inside its #ifdef; poll casts).
+  The stdlib compiles for x86_64/aarch64 Linux and macOS (-S) with 0 errors and 0 warnings.
+- fix/while-true (aca04d6, from the rc tip, cherry-picked here): while (true) ends the flow.
+- Converter: a container call on a receiver that isn't the container's pointer becomes
+  mod.Type.method(...) (corpus method_receiver).

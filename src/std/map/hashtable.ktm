@@ -1,5 +1,5 @@
 module map;
-import mem, os, str, vec;
+import mem, str, vec;
 
 const i64 HT_LOAD = 60;
 
@@ -102,7 +102,7 @@ u64 intMapHashFunction(i64 key, u64 mask)
         return htFmix64(key) & mask;
 }
 
-pub IntMap *intNew(u64 capacity)
+pub IntMap *intNew(u64 capacity = 32)
 {// null when out of memory
         IntMap *map = mem.alloc(sizeof(IntMap));
         if (!map) {
@@ -466,7 +466,7 @@ pub u8 *IntMap.keysToStr() {
         return buffer;
 }
 
-pub StrMap *strNew(u64 capacity)
+pub StrMap *strNew(u64 capacity = 32)
 {// null when out of memory
         StrMap *map = mem.alloc(sizeof(StrMap));
         if (!map) {
@@ -910,129 +910,3 @@ pub u8 *StrMap.keysToStr() {
         }
         return buffer;
 }
-
-#ifdef KTM_HT_TEST
-void IntMapTests(void) {
-        IntMap *map = intNew(8);
-        IntMapNode *n;
-        u8 *strs[] = {
-                printf("hello",
-                "world",
-                "foo",
-                "bar",
-                "baz",
-                "cat",
-                "dog",
-                "owl"
-        });
-        i64 len = sizeof(strs)/sizeof(strs[0]);
-
-        for (i64 i = 0; i < len; i++) {
-                intSet(map,i,strs[i]);
-        }
-
-
-        for (i64 i = 0; i < len; i++) {
-                u8 *value = intGet(map,i);
-                if (value != strs[i]) {
-                        printf("Failed IntMapTests -> IntMapGet: %d=>%s\n",i,value);
-                        os.exit;
-                }
-        }
-
-        for (i64 i = 0; i < len; i++) {
-                if (!intHas(map,i)) {
-                        printf("Failed IntMapTests -> IntMapHas\n");
-                        os.exit;
-                }
-        }
-
-        /* Inorder iteration */
-        for (i64 i = 0; intIter(map,&i,&n);) {
-                if (strs[i-1] != n->value) {
-                        printf("Failed IntMapTests -> IntMapIter i=%d key=%d => value=%s str = %s\n",
-                                i,n->key,n->value,strs[i]);
-                        os.exit;
-                }
-        }
-
-        for (i64 i = 0; i < len; i++) {
-                if (!intDelete(map,i)) {
-                        printf("Failed IntMapTests -> IntMapDelete\n");
-                        os.exit;
-                }
-        }
-
-        intRelease(map);
-        printf("PASS IntMap\n");
-}
-
-void StrMapTests(void) {
-        StrMap *map = strNew(8);
-        StrMapNode *n;
-        u8 *keys[] = {
-                printf("card",
-                "can",
-                "will",
-                "shill",
-                "cup",
-                "mug",
-                "glass",
-                "tin"
-        });
-        u8 *strs[] = {
-                printf("hello",
-                "world",
-                "foo",
-                "bar",
-                "baz",
-                "cat",
-                "dog",
-                "owl"
-        });
-
-        i64 len = sizeof(strs)/sizeof(strs[0]);
-
-
-        for (i64 i = 0; i < len; i++) {
-                strSet(map,keys[i],strs[i]);
-        }
-
-        for (i64 i = 0; i < len; i++) {
-                if (strGet(map,keys[i]) != strs[i]) {
-                        printf("Failed StrMapTests -> StrMapGet\n");
-                        os.exit;
-                }
-        }
-
-        for (i64 i = 0; i < len; i++) {
-                if (!strHas(map,keys[i])) {
-                        printf("Failed StrMapTests -> StrMapHas\n");
-                        os.exit;
-                }
-        }
-
-        /* Inorder iteration */
-        for (i64 i = 0; strIter(map,&i,&n);) {
-                if (keys[i-1] != n->key || strs[i-1] != n->value) {
-                        printf("Failed StrMapTests -> StrMapIter\n");
-                        os.exit;
-                }
-        }
-
-        for (i64 i = 0; i < len; i++) {
-                if (!strDelete(map,keys[i])) {
-                        printf("Failed StrMapTests -> StrMapDelete\n");
-                        os.exit;
-                }
-        }
-
-        strRelease(map);
-        printf("PASS StrMap\n");
-}
-
-void main(void) {
-        IntMapTests;
-        StrMapTests;
-}
-#endif

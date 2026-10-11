@@ -1,28 +1,18 @@
 module os;
 import libc;
 
-#ifdef IS_X86_64
-asm {
-_EXIT::
-        CALL    exit
-        RET
+/* End the program with exitCode (C's exit: atexit handlers run, stdio
+ * is flushed) */
+pub void exit(i64 exitCode=EXIT_FAIL) {
+    libc.exit(exitCode);
 }
-
-pub _extern _EXIT void exit(i64 exitCode=EXIT_FAIL);
-#endif
-
-#ifdef IS_ARM_64
-pub void exit(i64 exit_code=EXIT_FAIL) {
-    libc.exit(exit_code);
-}
-#endif
 
 #ifdef IS_LINUX
 extern "c" i32 *__errno_location();
 static i32 *errnoPtr() { return __errno_location(); }
 #else
 /* errno is *__error(); the raw name, as ktm doesn't prefix names starting with _ */
-_extern ___error i32 *ErrnoPtr();
+_extern ___error i32 *errnoPtr();
 #endif
 
 /* The calling thread's C errno: the reason the last failing libc call

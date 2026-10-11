@@ -38,7 +38,7 @@ static bool ErrOwns(u8 *message) {
  * (PTHREAD_ONCE_INIT is {0x30B1BCBA, {0}}); pthread_key_t is 4 bytes on
  * Linux and 8 on macOS, so 8 zeroed bytes hold either. */
 #ifdef IS_MACOS
-static i64 _fs_once[2] = {0x30B1BCBA, 0};
+static i64 fsOnce[2] = {0x30B1BCBA, 0};
 #else
 static i64 fsOnce[2] = {0, 0};
 #endif

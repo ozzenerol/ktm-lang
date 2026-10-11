@@ -1,7 +1,7 @@
 module sql;
-import mem, str;
 
 #ifdef __KTM_LINK_SQLITE3__
+import mem, str;
 
 pub const i64 SQLITE_OK = 0;   /* Successful result */
 

@@ -43,7 +43,7 @@ static i32 netAcceptCloexec(i32 socket, libc.sockaddr *address, u32 *addressLen)
 #ifdef IS_LINUX
         return accept4(socket, address, addressLen, __NET_SOCK_CLOEXEC);
 #else
-        i32 fd = libc.accept(libc.socket, address, address_len);
+        i32 fd = libc.accept(socket, address, addressLen);
         if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
         return fd;
 #endif
@@ -167,7 +167,7 @@ static i32 netConnectBefore(i32 sockfd, libc.addrinfo *sa, i64 deadline) {
                 pfd.fd = sockfd;
                 pfd.events = __NET_POLLOUT;
                 pfd.revents = 0;
-                n = libc.poll(&pfd, 1, left);
+                n = libc.poll((libc.pollfd *)&pfd, 1, left);
                 if (n > 0) {
                         break;
                 }
