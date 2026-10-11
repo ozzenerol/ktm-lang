@@ -284,6 +284,10 @@ typedef struct LexFile {
     /* Its unused imports were reported */
     u8 ended;
     LexImport *imports;
+    /* The rest of an `import a, b;` line, read once `a` is loaded: its
+     * imports are the file's that wrote the line */
+    struct LexFile *import_owner;
+    Lexeme *import_kw;   /* that line's `import`, for diagnostics */
 } LexFile;
 
 /* An open #if/#ifdef/#ifndef/#ifjit/#ifaot: where it is (for

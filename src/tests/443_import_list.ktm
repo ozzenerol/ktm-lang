@@ -3,7 +3,8 @@
 /* `import a, b, h = net.http;`: one line imports several modules, each
  * with its own alias if it has one (the stdlib map's decision 3). Before,
  * `import` took one module and `,` was "expected `;` after the module
- * name". The modules load in the order written. The fixture is
+ * name". The modules load one after the other, in the order written,
+ * so one listed before a module it imports still finds it loaded. The fixture is
  * src/tests/modules/importlist; AOT and JIT. */
 
 #define OUT "./ktm-443-imports.out"
@@ -34,6 +35,13 @@ I32 Main()
     correct++;
   tests++;
   if (Output(KTM "-jit " FIX "/main.ktm > " OUT " 2>&1", "1 2 3\n")) correct++;
+  /* b imports a: listed first, it still sees a loaded (they load one
+   * after the other), no "circular import" */
+  tests++;
+  if (Output(KTM FIX "/reversed.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, "1 2 3\n"))
+    correct++;
+  tests++;
+  if (Output(KTM "-jit " FIX "/reversed.ktm > " OUT " 2>&1", "1 2 3\n")) correct++;
   tests++;
   if (Output(KTM "-S " FIX "/bad.ktm -o /dev/null > " OUT " 2>&1",
              "error: expected `;` or `,` after the module name"))
