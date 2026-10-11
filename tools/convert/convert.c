@@ -992,6 +992,9 @@ static void migRename(Cctrl *cc, MigFile *f, s64 s, s64 len) {
             return;
         } else {
             to = mig_renames ? mapGet(mig_renames, w) : NULL;
+            /* a struct field's definition, renamed as its uses are
+             * (migrateNoteStdField): `coro_cache` is `coroCache` */
+            if (!to && mig_field_renames) to = mapGet(mig_field_renames, w);
         }
     } else {
         /* not a type, not the stdlib's (1i), not a C function */
