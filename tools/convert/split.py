@@ -35,7 +35,7 @@ COPY = {'RBIsNil': ['map', 'set']}
 def home_of(f):
     c = collections.Counter(mp[i['name']][1] for i in allit[f]
                             if i['name'] in mp and i['kind'] in ('func', 'type', 'global', 'proto')
-                            and mp[i['name']][1] not in ('c', '-', 'prelude'))
+                            and mp[i['name']][1] not in ('libc', '-', 'prelude'))
     return c.most_common(1)[0][0] if c else None
 
 # Private helpers go where they are used: a helper (no module of its own in
@@ -65,7 +65,7 @@ for _ in range(4):
                 if it['name'] == h or h not in words[(f, i)]:
                     continue
                 m = mapped_module(it) or helper_mod.get(it['name'])
-                if m and m != 'c':
+                if m and m != 'libc':
                     refs[m] += 1
         if refs:
             helper_mod[h] = refs.most_common(1)[0][0]
@@ -94,7 +94,7 @@ def block_module(f, idx, body):
             if (g, j) == (f, idx) or not (defs & words[(g, j)]):
                 continue
             m = mapped_module(it) or helper_mod.get(it['name'])
-            if m and m != 'c':
+            if m and m != 'libc':
                 refs[m] += 1
     return refs.most_common(1)[0][0] if refs else None
 
@@ -104,7 +104,7 @@ seen_defines = set()
 unplaced = []
 dropped = []
 for f in headers + files:
-    home = home_of(f) or 'c'      # dir.ktm: nothing but C bindings
+    home = home_of(f) or 'libc'   # dir.ktm: nothing but C bindings
     for idx, it in enumerate(allit[f]):
         k, name = it['kind'], it['name']
         body = text[f][it['s']:it['e']]
@@ -128,13 +128,13 @@ for f in headers + files:
         if name in DROP:
             dropped.append((f, it['start'], k, name))
             continue
-        if k == 'cfunc' or mod == 'c' or (row and row[0] == 'c'):
+        if k == 'cfunc' or mod == 'libc' or (row and row[0] == 'c'):
             if name in seen_c:
                 continue
             seen_c.add(name)
             # sqlite's C functions are the sql module's (optional, like it)
-            target = 'sql' if name.startswith('sqlite3') else 'c'
-            if target == 'c':
+            target = 'sql' if name.startswith('sqlite3') else 'libc'
+            if target == 'libc':
                 # everything in c is pub: it is the C library, for every module
                 lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
                 if not re.match(r'(public|static)\b', body[lead:]):
@@ -178,13 +178,13 @@ for f in headers + files:
             # a platform block of the header: C declarations, unless it
             # holds the ktm names of one module
             mods = set(mp[w][1] for w in re.findall(r'\w+', body) if w in mp
-                       and mp[w][1] not in ('c', '-', 'prelude') and mp[w][0] != 'c')
+                       and mp[w][1] not in ('libc', '-', 'prelude') and mp[w][0] != 'c')
             if len(mods) == 1:
                 mod = mods.pop()
             else:
                 if mods:
                     unplaced.append((f, it['start'], k, name + ' (several modules: %s, put in c)' % ','.join(sorted(mods))))
-                mod = 'c'
+                mod = 'libc'
         if mod is None and k == 'ifblock' and f not in headers:
             mod = block_module(f, idx, body)
         if mod is None:

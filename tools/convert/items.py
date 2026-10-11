@@ -13,7 +13,7 @@ def load_map(tsv):
             continue
         if c[0] in ('cfunctions', 'ctypes', 'cconstants'):
             for w in c[3].split():
-                m[w] = ('c', 'c', w)
+                m[w] = ('c', c[2], w)
         else:
             m[c[1]] = (c[0], c[2], c[3])
     return m

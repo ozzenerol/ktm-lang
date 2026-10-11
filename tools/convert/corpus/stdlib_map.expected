@@ -7,7 +7,7 @@
 // Shows: reading files, scanning strings, StrMap, PtrVec sorting,
 // classes and command-line arguments.
 
-import c, fs, json, map, mem, str, vec;
+import fs, json, libc, map, mem, str, vec;
 
 const i64 TOP_N = 8;
 const i64 MAX_WORD = 64;
@@ -105,8 +105,8 @@ void Extra(map.IntMap *m, vec.PtrVec **pv, u8 *s)
   (*pv).push(s);
   i64 n = str.len(s) + I64_MAX * 0;
   void *p = mem.alloc(n + 1);
-  c.memmove(p, s, n);
+  libc.memmove(p, s, n);
   mem.free(p);
   json.Value *j = json.parse("1");
-  printf("%d %d\n", n, c.O_RDONLY);
+  printf("%d %d\n", n, libc.O_RDONLY);
 }
