@@ -60,6 +60,7 @@ i32 main() {
     if (out && !str.cmp(out, "notes.HC")) { correct++; }
     else { printf("\n  a .HC program argument after the input: [%s]\n", out); }
 
+    proc.shell("rm -rf __399_*");   /* the files this test wrote */
     test.printResult(correct, tests);
     printf("====\n");
     return 0;

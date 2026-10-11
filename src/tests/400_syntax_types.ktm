@@ -99,6 +99,7 @@ i32 main() {
     if (out && libc.strstr(out, "of type 'i64' expected 'void'")) { correct++; }
     else { printf("\n  diagnostic names: [%s]\n", out); }
 
+    proc.shell("rm -rf __400_*");   /* the files this test wrote */
     test.printResult(correct, tests);
     printf("====\n");
     return 0;

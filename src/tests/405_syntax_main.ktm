@@ -54,6 +54,7 @@ i32 main() {
     if (err && libc.strstr(err, "both `main` and `Main` are defined")) { correct++; }
     else { printf("\n  main and Main: [%s]\n", err); }
 
+    proc.shell("rm -rf __405_*");   /* the files this test wrote */
     test.printResult(correct, tests);
     printf("====\n");
     return 0;
