@@ -680,6 +680,13 @@ AoStr *cctrlLookUpFile(Cctrl *cc, u32 file_id) {
 }
 
 Lexeme *cctrlTokenGet(Cctrl *cc) {
+    /* the member of `local.member` the parser split from a qualified
+     * token (a local hides an import prefix, parseShadowedPrefix) */
+    if (cc->pending_token) {
+        Lexeme *member = cc->pending_token;
+        cc->pending_token = NULL;
+        return member;
+    }
     Lexeme *token = tokenRingBufferPeek(cc->token_buffer);
     cc->token_buffer->got_eof = 0;
     while (token) {
@@ -695,24 +702,6 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
         }
         cc->token_buffer->pos++;
         cc->lineno = token->line;
-        /* `str.len(...)` where a local or parameter `str` hides the
-         * module str in its scope (Go's rule) */
-        if (token->qual_prefix && cc->localenv) {
-            Ast *local = mapGetLen(cc->localenv, token->qual_prefix,
-                                   token->qual_prefix_len);
-            if (local && local != cc->decl_in_init) {
-                const char *dot = strrchr(token->start, '.');
-                int mod_len = dot ? (int)(dot - token->start) : token->len;
-                AstType *type = local->kind == AST_DEFAULT_PARAM && local->declvar
-                              ? local->declvar->type : local->type;
-                cctrlRaiseExceptionAt(cc, token->line, token->col,
-                        token->qual_prefix_len,
-                        "`%.*s` is a local %s, it hides the module %.*s",
-                        token->qual_prefix_len, token->qual_prefix,
-                        type ? astTypeToString(type) : "variable", mod_len,
-                        token->start);
-            }
-        }
         ast_line_hint = token->line;
         ast_col_hint = token->col;
         /* Register the token's file lazily; the id rides on every

@@ -2089,6 +2089,9 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
  * nearest one (a method of a derived class hides its base's), with
  * `*owner` the class that has it; NULL if there is none. A method is
  * the function `Class.name`. */
+static Ast *parseShadowedPrefix(Cctrl *cc, Lexeme *tok);
+Ast *parseGetClassField(Cctrl *cc, Ast *cls);
+
 static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
                             AstType **owner) {
     for (AstType *t = cls; t; t = t->base_cls) {
@@ -2550,6 +2553,9 @@ static Ast *parsePrimary(Cctrl *cc) {
                 return parseStringLiterals(cc, tok);
             }
         }
+        if ((ast = parseShadowedPrefix(cc, tok)) != NULL) {
+            return ast;
+        }
         ast = parseIdentifierOrFunction(cc, tok->start, tok->len,
                 can_call_function);
         if (tokenPunctIs(prev, '&')) {
@@ -2588,6 +2594,48 @@ static Ast *parsePrimary(Cctrl *cc) {
     default:
         cctrlRaiseException(cc,"Unexpected input %s",astKindToString(tok->tk_type));
     }
+}
+
+/* `str.x` where a local or parameter `str` is in scope: as in Go the
+ * local hides the module imported as str, so it is the local's member x
+ * (the lexer had made the one token `str.x`). Not in the local's own
+ * initialiser, which still sees the module. NULL when no local hides the
+ * prefix. */
+static Ast *parseShadowedPrefix(Cctrl *cc, Lexeme *tok) {
+    if (!tok->qual_prefix || !cc->localenv) return NULL;
+    Ast *local = mapGetLen(cc->localenv, tok->qual_prefix, tok->qual_prefix_len);
+    if (!local || local == cc->decl_in_init) return NULL;
+    const char *dot = strrchr(tok->start, '.');
+    if (!dot) return NULL;
+    Lexeme *member = lexemeCopy(tok);
+    member->start = (char *)dot + 1;
+    member->len = tok->len - (int)(dot + 1 - tok->start);
+    member->col = tok->col + tok->qual_prefix_len + 1;
+    member->qual_prefix = NULL;
+    member->qual_prefix_len = 0;
+
+    /* a member it doesn't have: say so, and why the module isn't used */
+    AstType *type = local->type;
+    if (type && type->kind == AST_TYPE_POINTER && type->ptr &&
+        parseIsClassOrUnion(type->ptr->kind)) {
+        type = type->ptr;
+    }
+    int has = local->kind == AST_LVAR && (local->flags & AST_FLAG_VARARGS) &&
+              member->len == 3 && !memcmp(member->start, "len", 3);
+    if (!has && type && parseIsClassOrUnion(type->kind)) {
+        AstType *owner = NULL;
+        has = (type->fields && mapGetLen(type->fields, member->start, member->len)) ||
+              parseFindMethod(cc, type, member->start, member->len, &owner);
+    }
+    if (!has) {
+        cctrlRaiseExceptionAt(cc, member->line, member->col, member->len,
+                "%s has no member `%.*s` (note: the local `%.*s` hides the "
+                "module %.*s)", astTypeToString(local->type), member->len,
+                member->start, tok->qual_prefix_len, tok->qual_prefix,
+                (int)(dot - tok->start), tok->start);
+    }
+    cc->pending_token = member;
+    return parseGetClassField(cc, local);
 }
 
 static int parseGetPriority(Lexeme *tok) {

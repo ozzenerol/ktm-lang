@@ -1,12 +1,14 @@
 #include "testhelper.ktm"
 
 /* Go's rule for an import prefix: a local or a parameter named like one
- * (`u8 *str`, `i64 geo`) shadows the module for its scope instead of
- * being an error, and `geo.name` inside that scope is the error "`geo`
- * is a local i64, it hides the module geo". Outside the scope the module
- * is there again, and in the local's own initialiser (its scope starts
- * after its declaration). A file-scope name like a prefix is still an error
- * (test 422). The fixture is src/tests/modules/shadow; AOT and JIT. */
+ * (`u8 *str`, `Box geo`) shadows the module for its scope: there `geo.x`
+ * is the local's field or method, not the module's x, and a member it
+ * doesn't have is the error "u8 * has no member `one` (note: the local
+ * `geo` hides the module geo)". Its own initialiser still sees the module
+ * (the scope starts after the declaration), and outside the scope the
+ * module is there again. A type name (`geo.Point`) is the module's. A
+ * file-scope name like a prefix is still an error (test 422). The
+ * fixture is src/tests/modules/shadow; AOT and JIT. */
 
 #define OUT "./ktm-442-shadow.out"
 #define BIN "./ktm-442-shadow.bin"
@@ -28,7 +30,7 @@ Bool Output(U8 *cmd, U8 *want)
 
 I32 Main()
 {
-  "Test - a local may shadow an import prefix: ";
+  "Test - a local shadows an import prefix: ";
   I64 correct = 0, tests = 0;
 
   tests++;
@@ -43,13 +45,19 @@ I32 Main()
     correct++;
   tests++;
   if (Output(KTM "-jit " FIX "/init.ktm > " OUT " 2>&1", "2\n")) correct++;
+  /* fields and methods of the local, the module again after its scope */
   tests++;
-  if (Output(KTM "-S " FIX "/local.ktm -o /dev/null > " OUT " 2>&1",
-             "error: `geo` is a local u8 *, it hides the module geo"))
+  if (Output(KTM FIX "/members.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, "43 42 1\n"))
     correct++;
   tests++;
-  if (Output(KTM "-S " FIX "/param.ktm -o /dev/null > " OUT " 2>&1",
-             "error: `geo` is a local i64, it hides the module geo"))
+  if (Output(KTM "-jit " FIX "/members.ktm > " OUT " 2>&1", "43 42 1\n")) correct++;
+  tests++;
+  if (Output(KTM "-S " FIX "/local.ktm -o /dev/null > " OUT " 2>&1",
+             "error: u8 * has no member `one` (note: the local `geo` hides the module geo)"))
+    correct++;
+  /* a type name is the module's */
+  tests++;
+  if (Output(KTM "-S " FIX "/param.ktm -o /dev/null > " OUT " 2>&1 && echo ok >> " OUT, "ok\n"))
     correct++;
 
   PrintResult(correct, tests);

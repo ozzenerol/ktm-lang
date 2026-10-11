@@ -1493,9 +1493,12 @@ module, a module that isn't found or is found twice, an import cycle (the messag
 match its directory, and a global named like an import's prefix (<code>i64 geo;</code> at
 file scope would hide the module). An import that is never used is a warning.</p>
 <p>A local variable or a parameter may have an import's name: as in Go, it shadows the
-module for its scope (<code>u8 *str</code> in a file that imports <code>str</code>), and
-<code>str.len(s)</code> there is the error "<code>str</code> is a local u8 *, it hides the
-module str". Outside that scope the module is there again.</p>
+module for its scope (<code>u8 *str</code> in a file that imports <code>str</code>). There
+<code>str.x</code> is the local's field or method, and a member the local doesn't have is the
+error "u8 * has no member `len` (note: the local `str` hides the module str)". The local's
+own initialiser still sees the module (<code>u8 *str = str.format(...)</code>), a type name
+(<code>str.Thing</code>) is still the module's, and outside the scope the module is there
+again.</p>
 <p>A module can be built into a library once and used from there:
 <code>ktm -lib geo lib/geo</code> writes <code>libgeo.a</code> and its shared object into
 <code>lib/geo</code>, with a <code>.ktmlib</code> file naming them. A program importing
