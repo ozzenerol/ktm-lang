@@ -32,12 +32,44 @@ def home_of(f):
                             and mp[i['name']][1] not in ('c', '-', 'prelude'))
     return c.most_common(1)[0][0] if c else None
 
+# Private helpers go where they are used: a helper (no module of its own in
+# the map) lands in the module whose items use it most, so a module never
+# calls another one's private helper (set.ktm's RB* helpers are map's,
+# strings.ktm's date helpers date's). Repeated so helpers of helpers settle.
+words = {(f, i): set(re.findall(r'\w+', text[f][it['s']:it['e']]))
+         for f in files + headers for i, it in enumerate(allit[f])}
+
+def mapped_module(it):
+    row = mp.get(it['name'])
+    if row and row[1] not in ('-', 'prelude', None):
+        return row[1]
+    return None
+
+helper_mod = {}
+for f in files:
+    for it in allit[f]:
+        if it['kind'] in ('func', 'global', 'define', 'type') and mapped_module(it) is None \
+                and it['name'] not in DROP and it['name'] not in KEEP_IN:
+            helper_mod[it['name']] = None
+for _ in range(4):
+    for h in helper_mod:
+        refs = collections.Counter()
+        for f in files:
+            for i, it in enumerate(allit[f]):
+                if it['name'] == h or h not in words[(f, i)]:
+                    continue
+                m = mapped_module(it) or helper_mod.get(it['name'])
+                if m and m != 'c':
+                    refs[m] += 1
+        if refs:
+            helper_mod[h] = refs.most_common(1)[0][0]
+
 outputs = collections.defaultdict(list)     # (module, file) -> [text]
 seen_c = set()
 seen_defines = set()
 unplaced = []
 dropped = []
-for f in files + headers:
+for f in headers + files:
     home = home_of(f) or 'c'      # dir.ktm: nothing but C bindings
     for it in allit[f]:
         k, name = it['kind'], it['name']
@@ -54,7 +86,13 @@ for f in files + headers:
                 continue
             seen_c.add(name)
             # sqlite's C functions are the sql module's (optional, like it)
-            outputs[('sql' if name.startswith('sqlite3') else 'c', f)].append(body)
+            target = 'sql' if name.startswith('sqlite3') else 'c'
+            if target == 'c':
+                # everything in c is pub: it is the C library, for every module
+                lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
+                if not re.match(r'(public|static)\b', body[lead:]):
+                    body = body[:lead] + 'public ' + body[lead:]
+            outputs[(target, f)].append(body)
             continue
         if mod == 'prelude':
             dropped.append((f, it['start'], k, name + ' (prelude)'))
@@ -73,7 +111,8 @@ for f in files + headers:
             if name in KEEP_IN:
                 mod = KEEP_IN[name]
             elif f not in headers:
-                mod = home   # a helper that leaves the API: private to its module
+                # a helper that leaves the API: private to the module using it
+                mod = helper_mod.get(name) or home
             else:
                 dropped.append((f, it['start'], k, name))
                 continue
@@ -104,7 +143,7 @@ for f in files + headers:
                 unplaced.append((f, it['start'], k, name))
                 mod = 'rt'
             else:
-                mod = home
+                mod = helper_mod.get(name) or home
         # a public name's definition says so
         if row and row[0] in ('function', 'type') and k in ('func', 'type', 'proto') and mod == row[1]:
             lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
