@@ -425,7 +425,9 @@ half is 7
 <p><code>case</code> takes a value or a range <code>lo ... hi</code>. A case ends at the
 next one: unlike C it doesn't fall through, so no <code>break</code> is needed (one still
 leaves the switch early). Labels stacked with nothing between them share the code
-that follows.</p>
+that follows. Each case is a block of its own, without braces: it can declare variables
+(two cases can use the same name, and one case's variables aren't seen in the next) and
+<code>defer</code>, which runs at the end of the case.</p>
 <pre data-run><code>
 void grade(i64 score)
 {
