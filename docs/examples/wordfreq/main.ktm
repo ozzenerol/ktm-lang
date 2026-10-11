@@ -3,8 +3,8 @@
 //   ktm main.ktm -o wordfreq && ./wordfreq sample.txt
 //   ktm -jit main.ktm sample.txt
 //
-// Shows: reading files, scanning strings, map.StrMap, vec.PtrVec sorting,
-// classes and command-line arguments.
+// Shows: reading a file (fs), scanning strings, counting in a map.StrMap,
+// sorting a vec.PtrVec, structs and command-line arguments.
 
 import fs, map, mem, str, vec;
 

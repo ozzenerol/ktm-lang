@@ -4,7 +4,7 @@
 //   ktm -jit main.ktm
 //
 // Shows: 2D arrays, nested loops, the % operator for wrap-around,
-// #define constants and building output a line at a time.
+// constants and building output a line at a time.
 
 import mem;
 
