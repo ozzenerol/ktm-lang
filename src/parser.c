@@ -2673,6 +2673,21 @@ Ast *parseContinueStatement(Cctrl *cc) {
     return ast;
 }
 
+/* A struct or union by value (String and slices included), not an
+ * intrinsic class */
+static int parseIsStructType(AstType *t) {
+    return t && (t->kind == AST_TYPE_CLASS || t->kind == AST_TYPE_UNION) &&
+           !t->is_intrinsic;
+}
+
+/* Two struct types that are the same one */
+static int parseSameStructType(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (!parseIsStructType(a) || !parseIsStructType(b) || a->kind != b->kind) return 0;
+    if (a->fields && a->fields == b->fields) return 1;
+    return a->clsname && b->clsname && aoStrCmp(a->clsname, b->clsname);
+}
+
 Ast *parseReturnStatement(Cctrl *cc) {
     /* The `return`, just consumed, and the `;`, for the warning below */
     cctrlTokenRewind(cc);
@@ -2722,6 +2737,14 @@ Ast *parseReturnStatement(Cctrl *cc) {
         cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
                 "Cannot convert `%s` to enum `%s` without a cast",
                 astTypeToString(check), cc->tmp_rettype->clsname->data);
+    } else if (retval && (parseIsStructType(check) || parseIsStructType(cc->tmp_rettype)) &&
+               (!ok || !parseSameStructType(check, cc->tmp_rettype))) {
+        /* a struct (a String, a slice) for something else, or the other way
+         * round: there is nothing to convert, the value would be garbage
+         * (a call or an assignment says the same) */
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "cannot return a %s from a function returning %s",
+                astTypeToString(check), astTypeToString(cc->tmp_rettype));
     } else if (!ok) {
         Ast *func = mapGet(cc->global_env, cc->tmp_fname->data);
         typeCheckReturnTypeWarn(cc,func,check,retval,&ret_tok,&semi_tok);
