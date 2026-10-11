@@ -852,6 +852,14 @@ Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
     {
         return decl;
     }
+    /* and its global function pointers (`op(x)` of `fn(i64) i64 op`),
+     * unless a local of that name hides it */
+    if (qual && (decl = mapGet(cc->global_env, qual)) != NULL &&
+        decl->kind == AST_GVAR && decl->type->kind == AST_TYPE_FUNC &&
+        !(cc->localenv && mapGetLen(cc->localenv, fname, len)))
+    {
+        return decl;
+    }
     if (!cctrlModuleHides(cc, fname, len) &&
         (decl = mapGetLen(cc->global_env,fname,len)) != NULL) {
         cctrlCheckModuleAccess(cc, fname, len);
