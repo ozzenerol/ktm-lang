@@ -143,6 +143,8 @@ typedef enum AstKind {
     AST_DEFER         = 301,  /* defer <stmt>; runs <stmt> when its block is left */
     AST_VA_PACK       = 302,  /* the extras of a `T ...name` call, see astVaPack */
     AST_SLICE_MAKE    = 303,  /* a `T[]` built from a pointer and a length, see astSliceMake */
+    AST_SLICE_ELEM    = 304,  /* &s[i] of a slice, bounds-checked, see astSliceElem */
+    AST_SUBSLICE      = 305,  /* s[a:b] of a slice, array or pointer, see astSubSlice */
 } AstKind;
 
 /* @Cleanup
@@ -472,6 +474,19 @@ typedef struct Ast {
             Ast *slice_len;
         };
 
+        /* `&s[i]` (AST_SLICE_ELEM: sub_lo is i) and `s[a:b]`
+         * (AST_SUBSLICE, into the hidden sub_var; sub_lo/sub_hi NULL when
+         * left out) of `sub_base`, a slice, an array or (a sub-slice only,
+         * unchecked) a pointer. A failed check throws rt.ERR_BOUNDS at
+         * `sub_file`:line. */
+        struct {
+            Ast *sub_base;
+            Ast *sub_lo;
+            Ast *sub_hi;
+            Ast *sub_var;
+            Ast *sub_file;
+        };
+
         /* @Typeo
          * Compound statement */
         struct {
@@ -623,6 +638,8 @@ AstType *astMakeSliceType(AstType *elem);
 int astTypeIsSlice(AstType *type);
 int astTypeHasSlice(AstType *type);
 Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len);
+Ast *astSliceElem(Ast *base, Ast *index, Ast *file, int line);
+Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 

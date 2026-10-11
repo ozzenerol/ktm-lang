@@ -200,6 +200,22 @@ pub void __ktmThrowError(Error *e) {
     ErrJump(fs);
 }
 
+/* A failed bounds check (the compiler calls these): `s[i]` with i not
+ * below the length, `s[a:b]` not within 0 <= a <= b <= length */
+pub void __ktmBoundsIndex(i64 index, i64 len, u8 *file, i64 line) {
+    HCFs *fs = Fs();
+    ErrSet(fs, ERR_BOUNDS, str.format("index %d out of range for length %d", index, len),
+           file, line);
+    ErrJump(fs);
+}
+
+pub void __ktmBoundsSlice(i64 lo, i64 hi, i64 len, u8 *file, i64 line) {
+    HCFs *fs = Fs();
+    ErrSet(fs, ERR_BOUNDS, str.format("slice %d:%d out of range for length %d", lo, hi, len),
+           file, line);
+    ErrJump(fs);
+}
+
 pub void __ktmThrow(u64 v) {
     __ktmThrowAt(v, null, 0);
 }

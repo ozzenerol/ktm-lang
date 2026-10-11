@@ -1943,7 +1943,7 @@ static void parseCondGuardDone(Cctrl *cc, ParseCondGuard *g) {
 /* An expression where one is required: parseExpr gives NULL when the next
  * token can't start one (`while ()`), which compiled to nothing or
  * crashed later. Reported at that token. */
-static Ast *parseRequiredExpr(Cctrl *cc, char *what) {
+Ast *parseRequiredExpr(Cctrl *cc, char *what) {
     Ast *expr = parseExpr(cc,16);
     if (!expr) {
         Lexeme *bad = cctrlTokenGet(cc);
@@ -2817,7 +2817,7 @@ Ast *parseTryStatement(Cctrl *cc) {
 
 /* The file a throw is in, as a string literal: the path it was compiled
  * from, as diagnostics show it. */
-static Ast *parseThrowFile(Cctrl *cc) {
+Ast *parseThrowFile(Cctrl *cc) {
     char *path = "";
     if (cc->lexer_ && cc->lexer_->cur_file && cc->lexer_->cur_file->filename) {
         path = cc->lexer_->cur_file->filename->data;
