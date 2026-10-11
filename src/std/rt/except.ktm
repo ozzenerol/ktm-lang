@@ -178,14 +178,14 @@ pub void __ktmThrowAt(u64 code, u8 *file, i64 line) {
 /* `throw(code, fmt, ...)`: the compiler checks the call as one to
  * KTM_ThrowFmt, then calls this with where the throw is in front. */
 pub void __ktmThrowFmtAt(u8 *file, i64 line, u64 code, u8 *fmt, ...args) {
-    u8 *message = str.formatArgs(null, fmt, args.len, args);
+    u8 *message = str.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, file, line);
     ErrJump(fs);
 }
 
 pub void __ktmThrowFmt(u64 code, u8 *fmt, ...args) {
-    u8 *message = str.formatArgs(null, fmt, args.len, args);
+    u8 *message = str.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, null, 0);
     ErrJump(fs);

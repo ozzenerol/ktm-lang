@@ -2265,15 +2265,6 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
         }
         return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
     }
-    if (container->kind == AST_LVAR && (container->flags & AST_FLAG_VARARGS)) {
-        /* `for (auto v : nums)` over a `T ...nums` parameter */
-        AoStr *len_name = aoStrPrintf("%s#len", container->lname->data);
-        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
-        if (iteratee->type->kind == AST_TYPE_AUTO) {
-            iteratee->type = container->type->ptr;
-        }
-        return parseCreateForRange(cc, iteratee, count, container);
-    }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
             if (container->type->ptr->kind != AST_TYPE_CLASS) {
@@ -4215,6 +4206,22 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     if (is_inline) {
         func->flags |= AST_FLAG_INLINE;
         func->inline_ret = astLVar(func->type->rettype, str_lit("retval"));
+    }
+    /* `T ...name`: in the body, name is a `T[]` (u64[] untyped) of the
+     * hidden pointer and count parameters, made first thing */
+    if (params && params->size >= 2) {
+        Ast *data = params->entries[params->size - 1];
+        Ast *count = params->entries[params->size - 2];
+        if (data && data->kind == AST_LVAR && (data->flags & AST_FLAG_VARARGS)) {
+            Ast *slice = astLVar(astMakeSliceType(data->type->ptr),
+                                 data->lname->data, data->lname->len);
+            slice->flags |= AST_FLAG_VARARGS;
+            slice->line = data->line;
+            slice->col = data->col;
+            mapAdd(cc->localenv, slice->lname->data, slice);
+            listAppend(locals, slice);
+            listAppend(body, astSliceMake(slice, data, count));
+        }
     }
     parseCompoundStatementInternal(cc, func_body);
     parseCheckGotoIntoTry(cc, func_body);

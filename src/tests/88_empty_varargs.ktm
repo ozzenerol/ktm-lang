@@ -27,7 +27,7 @@ i64 allDefault(i64 a = 1, ...args) {
 /* As Shlurp and Sh do: use fmt as-is when there is nothing to format */
 u8 *format(u8 *fmt, ...args) {
     if (args.len == 0) { return str.dup(fmt); }
-    return str.formatArgs(null, fmt, args.len, args);
+    return str.formatArgs(null, fmt, args);
 }
 
 /* Leaves a non-zero value where a following call's argc would go */

@@ -1170,6 +1170,7 @@ static IrOp irCompoundAssignToIrOp(AstBinOp op, int issigned) {
     }
 }
 
+static IrValue *irMakeLocalSlot(IrCtx *ctx, IrValueType ir_type, int size, u32 var_id);
 static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
     IrAssignTarget out = { NULL, NULL, 0 };
 
@@ -1177,6 +1178,12 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
 
     if (lhs->kind == AST_LVAR) {
         IrValue *local = irFnGetVar(ctx->cur_func, lhs->lvar_id);
+        /* a hidden variable (`#slice3`) gets its slot where it is first
+         * assigned: it has no declaration */
+        if (!local && lhs->lname && lhs->lname->data[0] == '#') {
+            local = irMakeLocalSlot(ctx, irConvertType(lhs->type),
+                                    lhs->type->size, lhs->lvar_id);
+        }
         if (!local) loggerPanic("irLowerAssign: unknown local %s\n",
                                 astToString(lhs));
         out.target = local;
@@ -3431,7 +3438,8 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
             break;
         }
 
-        case AST_STRING: {
+        case AST_STRING:
+        case AST_SLICE_MAKE: {
             irExpr(ctx, ast);
             break;
         }

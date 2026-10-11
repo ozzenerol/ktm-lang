@@ -802,7 +802,10 @@ AstType *astMakeSliceType(AstType *elem) {
     if (!interned) interned = mapNew(32, &map_cstring_opaque_type);
     AoStr *name = astTypeToAoStr(elem);
     aoStrCatLen(name, str_lit("[]"));
-    AstType *slice = mapGet(interned, name->data);
+    /* the untyped extras of `...args` (u64 slots) are kept apart from an
+     * ordinary u64[], under the same name */
+    char *key = elem->has_var_args ? mprintf("%s#untyped", name->data) : name->data;
+    AstType *slice = mapGet(interned, key);
     if (slice) return slice;
 
     Map *fields = astMapNew();
@@ -815,7 +818,7 @@ AstType *astMakeSliceType(AstType *elem) {
     slice = astClassType(fields, name, 16, 0);
     slice->is_slice = 1;
     slice->elem = elem;
-    mapAdd(interned, name->data, slice);
+    mapAdd(interned, key, slice);
     return slice;
 }
 
