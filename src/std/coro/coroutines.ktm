@@ -76,10 +76,11 @@ _CORO_SWAP::
         RET
 
 // A new stack's first CoroSwap returns here with RSP 16-byte aligned and
-// the coroutine in RBX. CoroMain never returns.
+// the coroutine in RBX. coro.coroMain (its symbol: modules mangle their
+// names) never returns.
 _CORO_ENTRY::
         MOV    RDI, RBX
-        CALL   CoroMain
+        CALL   _K4coro8coroMain
         DU8    0x0F, 0x0B               // UD2
 }
 #endif
@@ -119,10 +120,10 @@ _CORO_SWAP::
         RET
 
 // A new stack's first CoroSwap returns here (via the saved lr) with the
-// coroutine in X19. CoroMain never returns.
+// coroutine in X19. coro.coroMain (its symbol) never returns.
 _CORO_ENTRY::
         MOV    X0, X19
-        BL     CoroMain
+        BL     _K4coro8coroMain
         DU8    0x00, 0x00, 0x20, 0xD4   // BRK 0
 }
 #endif

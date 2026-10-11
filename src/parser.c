@@ -2689,8 +2689,8 @@ static Ast *parseCatchBinding(Cctrl *cc) {
 
     List *stmts = listNew();
     listAppend(stmts, astDecl(var, NULL));
-    listAppend(stmts, parseCallWithAddrOf("KTM_ErrorTake", var));
-    listAppend(stmts, astDefer(parseCallWithAddrOf("KTM_ErrorDrop", var)));
+    listAppend(stmts, parseCallWithAddrOf(astRuntimeSymbol("__ktmErrorTake"), var));
+    listAppend(stmts, astDefer(parseCallWithAddrOf(astRuntimeSymbol("__ktmErrorDrop"), var)));
     if (handler) listAppend(stmts, handler);
     return astCompountStatement(stmts);
 }
@@ -2719,8 +2719,9 @@ Ast *parseTryStatement(Cctrl *cc) {
         catch_body = parseStatement(cc);
         if (!(cc->flags & CCTRL_TRANSPILING)) {
             List *stmts = listNew();
-            listAppend(stmts, astFunctionCall(ast_void_type, "KTM_ErrorForget",
-                                              15, astVecNew()));
+            char *forget = astRuntimeSymbol("__ktmErrorForget");
+            listAppend(stmts, astFunctionCall(ast_void_type, forget,
+                                              strlen(forget), astVecNew()));
             if (catch_body) listAppend(stmts, catch_body);
             catch_body = astCompountStatement(stmts);
         }

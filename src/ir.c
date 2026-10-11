@@ -91,7 +91,7 @@ static void irLeaveTries(IrCtx *ctx, u16 depth) {
         }
     }
     if (!has_defer) {
-        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                             IR_TYPE_VOID, 8, ctx->try_frames[depth]);
         return;
     }
@@ -105,7 +105,7 @@ static void irLeaveTries(IrCtx *ctx, u16 depth) {
     memcpy(saved_frames, ctx->try_frames, sizeof(saved_frames));
 
     for (u16 i = saved_depth; i-- > depth; ) {
-        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                             IR_TYPE_VOID, 8, saved_frames[i]);
         if (saved_stack[i]->kind == AST_DEFER) {
             ctx->try_depth = i;
@@ -2317,7 +2317,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    longjmp fires - calling it inside KTM_TryEnter (a returned
      *    helper) was UB. The helper that managed the chain is split
      *    out so the IR stays declarative. */
-    irEmitRuntimeCall1(ctx, "KTM_PushFrame",
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushFrame"),
                         IR_TYPE_VOID, 8, frame_addr);
     IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                               IR_TYPE_I64, 8, frame_addr);
@@ -2346,7 +2346,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
     irLowerAst(ctx, ast->try_body);
     ctx->try_depth--;
     if (!ctx->cur_block->sealed) {
-        irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                             IR_TYPE_VOID, 8, frame_addr);
         IrInstr *jmp = irJump(ctx->cur_func, ctx->cur_block, end_block);
         irBlockAddInstr(ctx, jmp);
@@ -2357,7 +2357,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    then lower the handler, then jump to end. */
     irFnAddBlock(ctx->cur_func, catch_block);
     ctx->cur_block = catch_block;
-    irEmitRuntimeCall1(ctx, "KTM_TryLeave",
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
                         IR_TYPE_VOID, 8, frame_addr);
     irLowerAst(ctx, ast->catch_body);
     if (!ctx->cur_block->sealed) {
@@ -2404,7 +2404,7 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
                                     irConstInt(IR_TYPE_I64, saved_size), NULL));
     irAddStackSpace(ctx, saved_size);
 
-    irEmitRuntimeCall1(ctx, "KTM_PushFrame", IR_TYPE_VOID, 8, frame_addr);
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushFrame"), IR_TYPE_VOID, 8, frame_addr);
     IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                             IR_TYPE_I64, 8, frame_addr);
 
@@ -2426,14 +2426,14 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
     irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[0], frame_tmp, NULL));
     caught[1] = irTmp(IR_TYPE_PTR, 8);
     irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught[1], saved_tmp, NULL));
-    irEmitRuntimeCallN(ctx, "KTM_DeferCaught", IR_TYPE_VOID, 8, 2, caught);
+    irEmitRuntimeCallN(ctx, astRuntimeSymbol("__ktmDeferCaught"), IR_TYPE_VOID, 8, 2, caught);
     ctx->defer_lowering++;
     irLowerAst(ctx, ast->defer_stmt);
     ctx->defer_lowering--;
     if (!ctx->cur_block->sealed) {
         IrValue *saved_addr = irTmp(IR_TYPE_PTR, 8);
         irBlockAddInstr(ctx, irInstrNew(IR_LEA, saved_addr, saved_tmp, NULL));
-        irEmitRuntimeCall1(ctx, "KTM_Rethrow", IR_TYPE_VOID, 8, saved_addr);
+        irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmRethrow"), IR_TYPE_VOID, 8, saved_addr);
         ctx->cur_block->sealed = 1;
     }
 
@@ -2472,7 +2472,7 @@ void irLowerThrow(IrCtx *ctx, Ast *ast) {
     args[0] = v;
     args[1] = irExpr(ctx, ast->throw_file);
     args[2] = irConstInt(IR_TYPE_I64, ast->line);
-    irEmitRuntimeCallN(ctx, "KTM_ThrowAt", IR_TYPE_VOID, 8, 3, args);
+    irEmitRuntimeCallN(ctx, astRuntimeSymbol("__ktmThrowAt"), IR_TYPE_VOID, 8, 3, args);
     ctx->cur_block->sealed = 1;
 }
 

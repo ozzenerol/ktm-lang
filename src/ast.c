@@ -370,6 +370,17 @@ Ast *astLVar(AstType *type, char *name, int len) {
  * every assembler and the JIT take): `_K1a1b4name`, each part prefixed
  * with its length. `_K` and a capital is reserved in C, so it can't be a
  * C name or a main-program one. */
+/* The runtime's (module rt's) name `rt.name`, and its symbol: what the
+ * compiler calls for try/catch/throw and ktm's print conversions */
+char *astRuntimeName(const char *name) {
+    return mprintf("rt.%s", name);
+}
+
+char *astRuntimeSymbol(const char *name) {
+    char *qual = astRuntimeName(name);
+    return astModuleMangle(qual, strlen(qual));
+}
+
 char *astModuleMangle(char *qual, int len) {
     AoStr *out = aoStrNew();
     aoStrCatLen(out, "_K", 2);
