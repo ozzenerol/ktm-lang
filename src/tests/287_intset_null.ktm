@@ -1,4 +1,4 @@
-import cstr, mem, set, test, vec;
+import cstr, set, test, vec;
 
 /* set.intRelease(null) and set.intSize(null) crashed. The set.IntSet functions
  * that only read a set now treat null as the empty set, and the release

@@ -1,4 +1,4 @@
-import cstr, mem, set, test;
+import cstr, set, test;
 
 /* set.intToStr appended every element with cstr.appendFormat, which measures
  * the whole string each time: O(n^2), about 24 s for 500k elements. */
