@@ -26,9 +26,9 @@ void check(bool ok, u8 *what) {
 }
 
 /* The result is `want`; frees it */
-bool is(u8 *got, u8 *want) {
-    bool ok = got && !cstr.cmp(got, want);
-    mem.free(got);
+bool is(String got, u8[] want) {
+    bool ok = got.ptr && got.equals(want);
+    got.free();
     return ok;
 }
 
@@ -37,7 +37,7 @@ void *worker(void *arg) {
     *bad = 0;
     for (j = 0; j < 25; j++) {
         u8 *want = cstr.format("w%d-%d", id, j);
-        if (!is(proc.shellOutput("echo %s", want), want)) { *bad += 1; }
+        if (!is(proc.shellOutput("echo %s", want), cstr.view(want))) { *bad += 1; }
         mem.free(want);
     }
     return bad;
@@ -58,7 +58,7 @@ i32 main() {
     /* nothing is created in $TMPDIR */
     fs.makeDir(DIR);
     setenv("TMPDIR", DIR, 1);
-    for (i = 0; i < 10; i++) { mem.free(proc.shellOutput("echo %d", i)); }
+    for (i = 0; i < 10; i++) { mem.free(proc.shellOutput("echo %d", i).take()); }
     check(is(proc.shellOutput("ls -A %s | wc -l | tr -d ' '", DIR), "0"),
                 "no file in $TMPDIR");
     libc.rmdir(DIR);
@@ -67,7 +67,7 @@ i32 main() {
     mem.free(tmpdir);
 
     /* more than a pipe buffer, with one trailing newline removed */
-    out = proc.shellOutput("yes | head -c 1048576");
+    out = proc.shellOutput("yes | head -c 1048576").take();
     check(out && cstr.len(out) == 1048575 && out[0] == 'y' && out[1] == '\n',
                 "1 MiB of output");
     mem.free(out);
@@ -75,7 +75,7 @@ i32 main() {
     /* a background job keeps the pipe open; Shlurp still returns when the
      * shell exits */
     t0 = time(null);
-    out = proc.shellOutput("echo first; sleep 5 > /dev/null 2>&1 & sleep 5 &");
+    out = proc.shellOutput("echo first; sleep 5 > /dev/null 2>&1 & sleep 5 &").take();
     check(out && !cstr.cmp(out, "first") && time(null) - t0 < 4,
                 "background job not waited for");
     mem.free(out);

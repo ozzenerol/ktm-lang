@@ -18,7 +18,7 @@ i32 main() {
     fs.writeAll(IN_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-repl < " IN_FILE " 2>&1");
+                               "-repl < " IN_FILE " 2>&1").take();
     if (out && libc.strstr(out, "fib @ ")) { correct++; }
     else { printf("\n  replDisasm: [%s]\n", out); }
     if (out && libc.strstr(out, "replDel: removed")) { correct++; }

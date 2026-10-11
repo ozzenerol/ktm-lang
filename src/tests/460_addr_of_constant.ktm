@@ -14,7 +14,7 @@ void expect(u8 *expr, u8 *want) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-jit " SRC_FILE " 2>&1");
+                               "-jit " SRC_FILE " 2>&1").take();
     gTests++;
     bool ok = want ? out && libc.strstr(out, want) && libc.strstr(out, " --> " SRC_FILE ":5:14") &&
                      !libc.strstr(out, "not supported")

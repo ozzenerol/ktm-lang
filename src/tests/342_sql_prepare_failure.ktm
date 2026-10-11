@@ -1,4 +1,4 @@
-import sql, test;
+import cstr, sql, test;
 
 /* sql.prepare ignored sqlite3_prepare_v2's result and returned an object
  * with a null stmt, which sql.execPrepared then crashed on. It returns null
@@ -8,7 +8,7 @@ import sql, test;
 i64 countRows(sql.Db *ctx, u8 *sqlVal) {
     sql.Row row;
     i64 n = 0;
-    if (!sql.select(ctx, &row, sqlVal)) { return -1; }
+    if (!sql.select(ctx, &row, cstr.view(sqlVal))) { return -1; }
     while (sql.next(&row)) { n++; }
     return n;
 }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* rt, the runtime: a module in the install's modules/ that is in every
  * program, imported or not, but that no program imports: `import rt;`
@@ -17,7 +17,7 @@ import fs, libc, mem, proc, test;
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " OUT " " BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(OUT).take();
     bool ok = out && libc.strstr(out, want) != null;
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

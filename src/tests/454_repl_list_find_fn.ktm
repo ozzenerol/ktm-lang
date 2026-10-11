@@ -16,7 +16,7 @@ i32 main() {
     fs.writeAll(IN_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-repl < " IN_FILE " 2>&1");
+                               "-repl < " IN_FILE " 2>&1").take();
     /* replListFn lists both, replFindFn("cube") cubeIt again */
     u8 *sq = out ? libc.strstr(out, "squareIt(") : null;
     u8 *cube = out ? libc.strstr(out, "cubeIt(") : null;

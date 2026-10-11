@@ -96,14 +96,14 @@ i32 main() {
     tests++;   /* and so do diagnostics */
     u8 *src = "i64 g;\nvoid A() { return g; }\nvoid main() { A(); }\n";
     fs.writeAll("__400_warn.ktm", cstr.view(src));
-    u8 *out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit __400_warn.ktm 2>&1");
+    u8 *out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit __400_warn.ktm 2>&1").take();
     if (out && libc.strstr(out, "of type 'i64' expected 'void'")) { correct++; }
     else { printf("\n  diagnostic names: [%s]\n", out); }
 
     tests++;   /* the old spellings, one error each */
     src = "class P { I64 x; };\npublic U0 F(Bool b) { }\nvoid main() { }\n";
     fs.writeAll("__400_warn.ktm", cstr.view(src));
-    out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -S -o /dev/null __400_warn.ktm 2>&1");
+    out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -S -o /dev/null __400_warn.ktm 2>&1").take();
     if (out && libc.strstr(out, "`class` is the old spelling: write `struct`") &&
         libc.strstr(out, "`I64` is the old spelling: write `i64`") &&
         libc.strstr(out, "`public` is the old spelling: write `pub`") &&

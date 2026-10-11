@@ -54,7 +54,7 @@ i32 main() {
 
     String cmd = str.format("rm -rf '%s'", root);
     defer cmd.free();
-    proc.shell(cmd.cstr());
+    proc.shell(cstr.view(cmd.cstr()));
 
     test.printResult(correct, tests);
     printf("====\n");

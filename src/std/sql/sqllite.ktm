@@ -1,7 +1,7 @@
 module sql;
 
 #ifdef __KTM_LINK_SQLITE3__
-import cstr, mem;
+import cstr, mem, str;
 
 pub const i64 SQLITE_OK = 0;   /* Successful result */
 
@@ -169,10 +169,11 @@ pub extern "c" i32 sqlite3_close_v2(sqlite3 *db);
 
 pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 
-pub Db *open(u8 *dbname, bool printerror=false) {
+pub Db *open(u8[] dbname, bool printerror=false) {
     sqlite3 *db = null;
     Db *ctx;
-    i32 rc = sqlite3_open(dbname, &db);
+    String name = str.from(dbname);     /* sqlite wants its NUL */
+    i32 rc = sqlite3_open(name.cstr(), &db);
 
     if (rc != SQLITE_OK) {
         if (printerror) {
@@ -181,11 +182,12 @@ pub Db *open(u8 *dbname, bool printerror=false) {
         }
         /* The handle is allocated even when opening fails. */
         sqlite3_close(db);
+        name.free();
         return null;
     }
 
     ctx = mem.alloc(sizeof(Db));
-    ctx.dbname = dbname;
+    ctx.dbname = name;
     ctx.conn = db;
     return ctx;
 }
@@ -195,18 +197,21 @@ pub void close(Db *ctx) {
     /* Unlike sqlite3_close, closes once the last statement is finalized
      * instead of failing with SQLITE_BUSY and leaking the connection. */
     sqlite3_close_v2(ctx.conn);
+    ctx.dbname.free();
     mem.free(ctx);
 }
 
 /* Only one statement may be given: anything after the first one other
  * than whitespace and comments is an error, rather than silently not
- * run. Preparing such a tail gives SQLITE_OK and no statement. */
-static bool sqlTailIsEmpty(Db *ctx, u8 *tail) {
+ * run. Preparing such a tail gives SQLITE_OK and no statement. `tail` is
+ * where sqlite stopped in `sql`. */
+static bool sqlTailIsEmpty(Db *ctx, u8[] sql, u8 *tail) {
     sqlite3_stmt *extra = null;
-    if (!tail || !*tail) {
+    i64 left = tail ? sql.ptr + sql.len - tail : 0;
+    if (left <= 0) {
         return true;
     }
-    i32 rc = sqlite3_prepare_v2(ctx.conn, tail, -1, &extra, null);
+    i32 rc = sqlite3_prepare_v2(ctx.conn, tail, left, &extra, null);
     if (extra) {
         sqlite3_finalize(extra);
         return false;
@@ -214,12 +219,12 @@ static bool sqlTailIsEmpty(Db *ctx, u8 *tail) {
     return rc == SQLITE_OK;
 }
 
-pub Stmt *prepare(Db *ctx, u8 *sql) {
+pub Stmt *prepare(Db *ctx, u8[] sql) {
     Stmt *pstmt = mem.alloc(sizeof(Stmt));
     u8 *tail = null;
     pstmt.stmt = null;
-    if (sqlite3_prepare_v2(ctx.conn, sql, -1, &(pstmt.stmt), &tail) != SQLITE_OK ||
-            pstmt.stmt == null || !sqlTailIsEmpty(ctx, tail)) {
+    if (sqlite3_prepare_v2(ctx.conn, sql.ptr, sql.len, &(pstmt.stmt), &tail) != SQLITE_OK ||
+            pstmt.stmt == null || !sqlTailIsEmpty(ctx, sql, tail)) {
         /* A failed prepare leaves stmt null; so does an empty string. */
         sqlite3_finalize(pstmt.stmt);
         mem.free(pstmt);
@@ -242,20 +247,25 @@ pub void finalize(Stmt *pstmt) {
 
 pub extern "c" void sqlite3_free(void *ptr);
 
-/* Unsafe */ 
-pub u8 *execRaw(Db *ctx, u8 *sql) {
-    u8 *errmsg = null, *copy;
-    i32 rc = sqlite3_exec(ctx.conn, sql, 0, 0, &errmsg);
+/* Run sql as it is (any number of statements, no parameters: never with
+ * values from outside). The error as a new String (yours), empty when
+ * it ran. */
+pub String execRaw(Db *ctx, u8[] sql) {
+    u8 *errmsg = null;
+    String text = str.from(sql);        /* sqlite3_exec wants its NUL */
+    i32 rc = sqlite3_exec(ctx.conn, text.cstr(), 0, 0, &errmsg);
+    text.free();
+    String err;
     if (rc == SQLITE_OK) {
-        return null;
+        return err;
     }
     if (errmsg) {
-        copy = cstr.dup(errmsg);
+        err = str.from(cstr.view(errmsg));
         sqlite3_free(errmsg);
     } else {
-        copy = cstr.dup(sqlite3_errmsg(ctx.conn));
+        err = str.from(cstr.view(sqlite3_errmsg(ctx.conn)));
     }
-    return copy;
+    return err;
 }
 
 pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
@@ -280,7 +290,8 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
                 rc = sqlite3_bind_double(pstmt.stmt, i + 1, param.floatVal);
                 break;
             case TEXT:
-                rc = sqlite3_bind_text(pstmt.stmt, i + 1, param.str, -1, (void *)SQLITE_TRANSIENT);
+                rc = sqlite3_bind_text(pstmt.stmt, i + 1, param.str.ptr ? param.str.ptr : "", param.str.len,
+                                       (void *)SQLITE_TRANSIENT);
                 break;
             case BLOB:
                 rc = sqlite3_bind_blob(pstmt.stmt, i + 1, param.blob, param.blobLen,
@@ -312,7 +323,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
     return rc;
 }
 
-static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
+static i32 sqlExecQuery(Db *ctx, Row *row, u8[] sql, Param *params,
                                                 i32 paramCount) {
     i32 rc = SQLITE_ERROR;
     sqlite3_stmt *stmt = null;
@@ -322,12 +333,12 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
         row.stmt = null;
     }
 
-    rc = sqlite3_prepare_v2(ctx.conn, sql, -1, &stmt, &tail);
+    rc = sqlite3_prepare_v2(ctx.conn, sql.ptr, sql.len, &stmt, &tail);
 
     if (rc != SQLITE_OK) {
         goto err;
     }
-    if (!sqlTailIsEmpty(ctx, tail)) {
+    if (!sqlTailIsEmpty(ctx, sql, tail)) {
         rc = SQLITE_ERROR;
         goto err;
     }
@@ -343,7 +354,8 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
                 rc = sqlite3_bind_double(stmt, i + 1, params[i].floatVal);
                 break;
             case TEXT:
-                rc = sqlite3_bind_text(stmt, i + 1, params[i].str, -1, (void *)SQLITE_TRANSIENT);
+                rc = sqlite3_bind_text(stmt, i + 1, params[i].str.ptr ? params[i].str.ptr : "", params[i].str.len,
+                                       (void *)SQLITE_TRANSIENT);
                 break;
             case BLOB:
                 rc = sqlite3_bind_blob(stmt, i + 1, params[i].blob,
@@ -390,13 +402,13 @@ pub void rowRelease(Row *row) {
     row.stmt = null;
 }
 
-pub bool select(Db *ctx, Row *row, u8 *sql, Param *params=null,
+pub bool select(Db *ctx, Row *row, u8[] sql, Param *params=null,
         i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,row,sql,params,paramCount);
     return result == SQLITE_DONE || result == SQLITE_ROW;
 }
 
-pub bool exec(Db *ctx, u8 *sql, Param *params=null, i32 paramCount=0) {
+pub bool exec(Db *ctx, u8[] sql, Param *params=null, i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,null,sql,params,paramCount);
     return result == SQLITE_DONE || result == SQLITE_ROW;
 }
@@ -429,8 +441,9 @@ static bool sqlIterGeneric(Row *row) {
                 row.col[i].floatVal = sqlite3_column_double(row.stmt,i);
                 break;
             case SQLITE3_TEXT:
-                row.col[i].str = (u8 *)sqlite3_column_text(row.stmt,i);
+                u8 *text = (u8 *)sqlite3_column_text(row.stmt,i);
                 row.col[i].len = sqlite3_column_bytes(row.stmt,i);
+                row.col[i].str = text[0:row.col[i].len];
                 break;
             case SQLITE_BLOB:
                 row.col[i].blob = (void *)sqlite3_column_blob(row.stmt,i);
@@ -438,7 +451,6 @@ static bool sqlIterGeneric(Row *row) {
                 break;
             default:
                 /* XXX: You may want to handle this case differently */
-                row.col[i].str = null;
                 row.col[i].intVal = 0;
                 row.col[i].floatVal = 0;
                 break;

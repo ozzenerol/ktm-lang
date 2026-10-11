@@ -72,7 +72,7 @@ i32 main() {
     gTests++; if (fs.makeDir("") == -1 && fs.makeDir("",, true) == -1) { gCorrect++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     test.printResult(gCorrect, gTests);

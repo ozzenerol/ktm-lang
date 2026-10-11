@@ -30,7 +30,7 @@ u8 *capturedErr() {
 
 bool quiet(u8 *cmd, u8 *want) {
     captureErr();
-    u8 *got = proc.shellOutput(cmd), *err = capturedErr();
+    u8 *got = proc.shellOutput(cmd).take(), *err = capturedErr();
     bool ok = got && !cstr.cmp(got, want) && err && !cstr.cmp(err, "");
     if (!ok) { printf("Shlurp(\"%s\"): got '%s' want '%s', stderr '%s'\n",
                      cmd, got, want, err);
@@ -61,7 +61,7 @@ i32 main() {
     if (quiet("echo x\necho y", "x\ny")) { correct++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     test.printResult(correct, tests);

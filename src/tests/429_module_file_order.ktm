@@ -23,7 +23,7 @@ u8 *gWant = "132 5 6 7\n10 6 1\n";
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " FO_OUT " " FO_BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(FO_OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

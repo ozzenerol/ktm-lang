@@ -1,4 +1,4 @@
-import sql, test;
+import cstr, sql, test;
 
 /* sql.exec, sql.select and sql.prepare ran only the first statement of a
  * string holding several and silently dropped the rest. They fail now
@@ -10,7 +10,7 @@ bool hasTable(sql.Db *ctx, u8 *name) {
     sql.Param p[1];
     bool found = false;
     p[0].type = sql.SQLITE_TEXT;
-    p[0].str = name;
+    p[0].str = cstr.view(name);
     if (!sql.select(ctx, &row, "SELECT name FROM sqlite_master WHERE name = ?;", p, 1)) {
         return false;
     }
@@ -56,7 +56,7 @@ i32 main() {
     tests++; if (n == 2) { correct++; }
 
     /* sql.execRaw runs every statement */
-    tests++; if (sql.execRaw(ctx, "CREATE TABLE d(x); CREATE TABLE e(y);") == null) { correct++; }
+    tests++; if (!sql.execRaw(ctx, "CREATE TABLE d(x); CREATE TABLE e(y);").ptr) { correct++; }
     tests++; if (hasTable(ctx, "d") && hasTable(ctx, "e")) { correct++; }
 
     sql.close(ctx);

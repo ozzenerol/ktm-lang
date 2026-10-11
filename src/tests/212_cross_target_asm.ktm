@@ -28,7 +28,7 @@ void main()
  * ktm failed */
 i64 hasGnuStack(u8 *target) {
     u8 *cmd = cstr.format(CT_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --target=%s -S -o " CT_ASM " " CT_FILE " > /dev/null 2>&1", target);
-    i64 res = proc.shell(cmd);
+    i64 res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     if (res != 0) { return -1; }
     return proc.shell("grep -q 'note.GNU-stack' " CT_ASM) == 0;
@@ -42,12 +42,12 @@ bool assemblesOrSkipped(u8 *target) {
     if (proc.shell("command -v clang >/dev/null 2>&1") != 0) { return true; }
     proc.shell("printf '.text\\n' > " CT_PROBE);
     cmd = cstr.format("clang --target=%s -c " CT_PROBE " -o " CT_OBJ " > /dev/null 2>&1", target);
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     if (res != 0) { return true; }
     if (hasGnuStack(target) < 0) { return false; }
     cmd = cstr.format("clang --target=%s -c " CT_ASM " -o " CT_OBJ " > /dev/null 2>&1", target);
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     return res == 0;
 }

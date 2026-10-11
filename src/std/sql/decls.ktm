@@ -52,16 +52,16 @@ pub struct sqlite3_stmt {};
 pub struct sqlite3 {};
 pub struct sqlite3_value {};
 
-/* A value for a `?` parameter: type is SQL_INT (i64), SQL_FLOAT (f64),
- * SQL_TEXT (str, NUL-terminated), SQL_BLOB (blob, blob_len bytes) or
- * SQL_NULL. Text and blobs are copied when bound, so the caller may free
- * or reuse them right after the call. */
+/* A value for a `?` parameter: type is sql.INT (i64), sql.FLOAT (f64),
+ * sql.TEXT (str, a u8[]), sql.BLOB (blob, blobLen bytes) or sql.NULL_TYPE.
+ * Text and blobs are copied when bound, so the caller may free or reuse
+ * them right after the call. */
 pub struct Param {
     i64 type;
     union {
         i64 intVal;
         f64 floatVal;
-        u8 *str;
+        u8[] str;
         struct {
             void *blob;
             i64 blobLen;
@@ -74,17 +74,18 @@ pub struct Stmt {
     i64  paramsCount;
 };
 
-/* One column of the current row: type is SQL_INT, SQL_FLOAT, SQL_TEXT,
- * SQL_BLOB or SQL_NULL. str and blob point into sqlite's memory and are
- * only valid until the next SqlIter/SqlIterPrepared or SqlRowRelease;
- * len is their size in bytes, 0 for the other types. */
+/* One column of the current row: type is sql.SQLITE_INTEGER,
+ * SQLITE_FLOAT, SQLITE_TEXT, SQLITE_BLOB or SQLITE_NULL. str (a u8[]) and
+ * blob are views of sqlite's memory, only valid until the next next(),
+ * nextPrepared() or rowRelease(); len is their size in bytes, 0 for the
+ * other types. */
 pub struct Column {
     i64 len;
     i64 type;
     union
     {
         i64 intVal;
-        u8 *str;
+        u8[] str;
         void *blob;
         f64 floatVal;
     };
@@ -102,7 +103,7 @@ pub struct Row {
 
 pub struct Db {
     sqlite3 *conn;
-    u8 *dbname;
+    String dbname;  /* its own copy */
 };
 
 pub extern "c" i32 sqlite3_prepare_v2(
@@ -160,21 +161,21 @@ pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 
 /* Open (or create) the database file dbname, ":memory:" for a private
  * in-memory one. null on failure, printing sqlite's message first when
- * printerror is true. dbname is kept, not copied. */
-pub Db *open(u8 *dbname, bool printerror=false);
+ * printerror is true. The Db keeps its own copy of dbname. */
+pub Db *open(u8[] dbname, bool printerror=false);
 /* Close the database and free ctx. Statements not finalized yet keep
  * the connection open until SqlFinalizePrepared. null is ignored. */
 pub void close(Db *ctx);
 /* Compile one SQL statement with `?` parameters, to run many times with
  * SqlExecPrepared. Only whitespace and comments may follow it. null on
  * an error; free it with SqlFinalizePrepared. */
-pub Stmt *prepare(Db *ctx, u8 *Sql);
+pub Stmt *prepare(Db *ctx, u8[] sql);
 /* Free a statement of SqlPrepare. null is ignored. */
 pub void finalize(Stmt *pstmt);
 /* Run every statement in sql, with no parameters (so never with values
- * from outside the program). null on success, otherwise an error message
- * to Free. */
-pub u8 *execRaw(Db *ctx, u8 *sql);
+ * from outside the program). An empty String on success, otherwise the
+ * error message as a new String (yours). */
+pub String execRaw(Db *ctx, u8[] sql);
 /* Run a prepared statement with params[0] .. params[n - 1] for its n
  * parameters (null params binds them all to null). Returns sqlite's
  * code: SQLITE_ROW when row now holds the first row (read the rest with
@@ -192,11 +193,11 @@ pub i32 execPrepared(Stmt *pstmt, Row *row,
  * parameter type or anything but whitespace and comments after the
  * statement. The row owns the statement: SqlIter frees it after the
  * last row, SqlRowRelease when you stop early. */
-pub bool select(Db *ctx, Row *row, u8 *sql,
+pub bool select(Db *ctx, Row *row, u8[] sql,
         Param *params=null, i32 paramCount=0);
 /* Like SqlSelect, for a statement whose rows you don't need (INSERT,
  * UPDATE, CREATE, ...). */
-pub bool exec(Db *ctx, u8 *sql, Param *params=null,
+pub bool exec(Db *ctx, u8[] sql, Param *params=null,
         i32 paramCount=0);
 /* Move row to its next row (the first one on the first call): true while
  * there is one, false after the last, when the row is released. */

@@ -30,33 +30,33 @@ i32 main() {
     put("__399_x.c", "int x;\n");
 
     tests++;
-    out = proc.shellOutput(KTM "-jit __399_main.ktm 2>&1");
+    out = proc.shellOutput(KTM "-jit __399_main.ktm 2>&1").take();
     if (out && !cstr.cmp(out, "15")) { correct++; }
     else { printf("\n  .ktm with .ktmh and extensionless includes: [%s]\n", out); }
 
     tests++;
-    out = proc.shellOutput(KTM "__399_old.HC -o __399_old 2>&1; echo \"rc=$?\"");
+    out = proc.shellOutput(KTM "__399_old.HC -o __399_old 2>&1; echo \"rc=$?\"").take();
     if (has(out, "`__399_old.HC`: ktm sources use .ktm (headers .ktmh)") && has(out, "rc=1")) { correct++; }
     else { printf("\n  .HC input is rejected: [%s]\n", out); }
 
     tests++;
-    out = proc.shellOutput(KTM "-jit __399_old.HC 2>&1; echo \"rc=$?\"");
+    out = proc.shellOutput(KTM "-jit __399_old.HC 2>&1; echo \"rc=$?\"").take();
     if (has(out, "ktm sources use .ktm") && has(out, "rc=1")) { correct++; }
     else { printf("\n  .HC input is rejected under -jit: [%s]\n", out); }
 
     tests++;
-    out = proc.shellOutput(KTM "-jit __399_inc_old.ktm 2>&1");
+    out = proc.shellOutput(KTM "-jit __399_inc_old.ktm 2>&1").take();
     if (has(out, "#include: `") && has(out, "__399_old.HC`: ktm sources use .ktm (headers .ktmh)")) { correct++; }
     else { printf("\n  #include of a .HC file is an error: [%s]\n", out); }
 
     tests++;
-    out = proc.shellOutput(KTM "-jit __399_inc_c.ktm 2>&1");
+    out = proc.shellOutput(KTM "-jit __399_inc_c.ktm 2>&1").take();
     if (has(out, "__399_x.c`: ktm sources use .ktm")) { correct++; }
     else { printf("\n  #include of a .c file is an error: [%s]\n", out); }
 
     tests++;   /* after the input, a .HC word is just an argument for the program */
     put("__399_args.ktm", "i32 main(i32 argc, u8 **argv) { printf(\"%s\\n\", argv[1]); return 0; }\n");
-    out = proc.shellOutput(KTM "-jit __399_args.ktm notes.HC 2>&1");
+    out = proc.shellOutput(KTM "-jit __399_args.ktm notes.HC 2>&1").take();
     if (out && !cstr.cmp(out, "notes.HC")) { correct++; }
     else { printf("\n  a .HC program argument after the input: [%s]\n", out); }
 

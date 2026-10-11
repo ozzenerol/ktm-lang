@@ -55,7 +55,7 @@ i32 main(i32 argc, u8 **argv) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-jit " SRC_FILE " 2>&1");
+                               "-jit " SRC_FILE " 2>&1").take();
     check(out && libc.strstr(out, "error: the branches of `?:` have different types"), "?: of a String and a u8 *");
     fs.remove(SRC_FILE);
 

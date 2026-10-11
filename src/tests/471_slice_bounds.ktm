@@ -69,7 +69,7 @@ i32 main() {
     fs.writeAll("__471_src.ktm", cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-jit __471_src.ktm 2>&1");
+                               "-jit __471_src.ktm 2>&1").take();
     check(out && libc.strstr(out, "index 2 out of range for length 2 (__471_src.ktm:4)"), "uncaught");
     fs.remove("__471_src.ktm");
 

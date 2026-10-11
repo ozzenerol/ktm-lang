@@ -24,7 +24,7 @@ u8 *ktm(u8 *src, u8 *flags, i64 *resArg) {
     cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " XF_SRC " > " XF_OUT " 2>&1", flags);
-    *resArg = proc.shell(cmd);
+    *resArg = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     return fs.readAll(XF_OUT).take();
 }

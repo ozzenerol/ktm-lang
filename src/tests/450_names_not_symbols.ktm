@@ -13,7 +13,7 @@ import cstr, fs, libc, mem, proc, test;
 /* the output of `cmd` run in D */
 u8 *run(u8 *cmd) {
     u8 *full = cstr.format("cd " D " && %s > out 2>&1", cmd);
-    proc.shell(full);
+    proc.shell(cstr.view(full));
     mem.free(full);
     return fs.readAll(D "/out").take();
 }

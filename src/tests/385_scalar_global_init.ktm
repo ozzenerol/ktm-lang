@@ -20,7 +20,7 @@ void check(bool ok, u8 *what) {
 
 u8 *slurp(u8 *cmd) {
     proc.shell("rm -f " GI_OUT);
-    if (proc.shell(cmd) != 0) { return null; }
+    if (proc.shell(cstr.view(cmd)) != 0) { return null; }
     return fs.readAll(GI_OUT).take();
 }
 

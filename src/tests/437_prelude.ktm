@@ -20,7 +20,7 @@ u8 *gWant = "1 383 42\nError 5\n";
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(MOD_OUT).take();
     bool ok = out && libc.strstr(out, want) != null;
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

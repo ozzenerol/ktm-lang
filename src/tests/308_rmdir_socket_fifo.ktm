@@ -76,7 +76,7 @@ i32 main() {
     if (!exists("t")) { correct++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     test.printResult(correct, tests);

@@ -18,7 +18,7 @@ void runTest(u8 *name, i64 idx) {
         /* the shell writes its pid, then becomes the sleep */
         u8 *cmd = cstr.format("echo $$ > '%s/__381_pid'; exec sleep %d",
                                                 gTestDir, HANG_SECS);
-        proc.shell(cmd);
+        proc.shell(cstr.view(cmd));
         mem.free(cmd);
         printf("hang finished\n");
     } else {

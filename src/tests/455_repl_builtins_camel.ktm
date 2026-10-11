@@ -21,7 +21,7 @@ i32 main() {
     /* HOME here, so no ~/.ktm_rc.ktm is read */
     u8 *out = proc.shellOutput("HOME=. $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-repl < " IN_FILE " 2>&1");
+                               "-repl < " IN_FILE " 2>&1").take();
     if (out && libc.strstr(out, "gCount455")) { correct++; }
     else { printf("\n  replListGVars: [%s]\n", out); }
     if (out && libc.strstr(out, "Pt455") && libc.strstr(out, "yCoord")) { correct++; }

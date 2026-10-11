@@ -47,7 +47,7 @@ i32 main() {
     mem.free(q);
     mem.free(p);
     q = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(q);
+    proc.shell(cstr.view(q));
     mem.free(q);
 
     test.printResult(correct, tests);
