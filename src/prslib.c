@@ -3339,6 +3339,10 @@ void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
+    if (operation == AST_BIN_OP_LOG_AND || operation == AST_BIN_OP_LOG_OR) {
+        parseCheckCondition(cc, left);
+        parseCheckCondition(cc, right);
+    }
     if ((operation == AST_BIN_OP_EQ || operation == AST_BIN_OP_NE) &&
         (astTypeIsSlice(left->type) || astTypeIsSlice(right->type))) {
         if (op_tok) cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
@@ -3442,6 +3446,7 @@ static AstType *parseTernaryResultType(Cctrl *cc, Ast *then, Ast *els) {
  * which both are cast to so the phi is well typed. Right-associative and
  * not an lvalue (assertLValue has no AST_TERNARY case), as in C. */
 static Ast *parseTernary(Cctrl *cc, Ast *cond) {
+    parseCheckCondition(cc, cond);
     Ast *then = parseExpr(cc, 16);
     if (!then) {
         cctrlRaiseException(cc, "Expected an expression after `?`");
@@ -4243,7 +4248,10 @@ Ast *parseUnaryExpr(Cctrl *cc) {
                 break;
             /* 0/1 whatever the operand: typed as the operand, `!f` on
              * an F64 was converted back from a float and read as 0. */
-            case AST_UN_OP_LOG_NOT: type = ast_int_type; break;
+            case AST_UN_OP_LOG_NOT:
+                parseCheckCondition(cc, operand);
+                type = ast_int_type;
+                break;
             default:                type = operand->type; break;
         }
 

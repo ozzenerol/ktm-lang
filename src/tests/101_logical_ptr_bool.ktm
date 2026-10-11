@@ -132,16 +132,17 @@ i32 main() {
     while (q && n < 4) { n++; }
     if (n == 4) { correct++; }
 
-    /* Still invalid: a pointer next to a class value. */
+    /* Still invalid: a pointer next to a class value (a class value has no
+     * truth value). */
     if (compileFailsWith("
 struct C { i64 a; };
 void main() { C c; u8 *p = null; if (p || c) printf(\"x\\n\"); }
-", "operator cannot be applied")) { correct++; }
+", "error: a C can't be a condition")) { correct++; }
     else { printf("Failed - p || class value\n"); }
     if (compileFailsWith("
 struct C { i64 a; };
 void main() { C c; u8 *p = null; if (c && p) printf(\"x\\n\"); }
-", "operator cannot be applied")) { correct++; }
+", "error: a C can't be a condition")) { correct++; }
     else { printf("Failed - class value && p\n"); }
 
     test.printResult(correct, tests);
