@@ -1553,9 +1553,10 @@ again.</p>
 <code>ktm -lib geo lib/geo</code> writes <code>libgeo.a</code> and its shared object into
 <code>lib/geo</code>, with a <code>.ktmlib</code> file naming them. A program importing
 <code>geo</code> then reads only its declarations (the sources stay, as headers would) and
-links the library: the archive when compiled, the shared object in the JIT. A library has
-no code that runs before <code>main</code>, so in a module built this way a global needs a
-constant initialiser.</p>
+links the library: the archive when compiled, the shared object in the JIT. A module's
+globals with initialisers that run code (<code>i64 g = f();</code>) are set by the module's
+init function, which the program calls once before its own globals and <code>main</code>, a
+module's imports first, whether the module comes from source or from its library.</p>
 <p><code>ktm -lib name dir</code>, where <code>dir</code> is not the directory of a module
 <code>name</code>, builds every module under <code>dir</code> (<code>dir/net/http</code> is
 <code>net.http</code>) into one library, <code>dir/libname.a</code> and its shared object,

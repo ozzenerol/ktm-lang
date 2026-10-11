@@ -93,6 +93,9 @@ typedef struct Cctrl {
     /* A module's extern "c" functions by their C name (they are in
      * global_env as `a.b.name`): what a call to the C symbol calls */
     Map *c_externs;
+    /* M2: the directories (real paths) of the modules with an `_init`,
+     * whose .ktmlib markers a -lib build marks `init` */
+    Set *init_module_dirs;
 
     /* key words defined in the language */
     Map *symbol_table;

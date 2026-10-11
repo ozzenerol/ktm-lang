@@ -1479,6 +1479,25 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
  * so store it at startup like a scalar global's `I64 g = gx;`: append
  * `*(T *)((U8 *)&var + off) = item` to the file-scope initialisers and
  * leave its slot zero in the data. Offsets as in asmInitImageAt. */
+/* M2: the module whose `_init` a run-time initialiser being parsed goes
+ * into, NULL for the program's own (the entry runs those) and in the REPL
+ * (each input runs its own) */
+static LexModule *parseInitModule(Cctrl *cc) {
+    if (!cc->cur_module || !cc->lexer_ || (cc->flags & CCTRL_REPL)) return NULL;
+    return cc->lexer_->modules[cc->cur_module - 1];
+}
+
+/* A global's run-time initialiser: its module's, or the program's */
+static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
+    LexModule *m = parseInitModule(cc);
+    if (m) {
+        if (!m->init_stmts) m->init_stmts = listNew();
+        listAppend(m->init_stmts, ast);
+        return;
+    }
+    listAppend(cc->initalisers, ast);
+}
+
 static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
                                         AstType *type, int off)
 {
@@ -1522,7 +1541,7 @@ static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
                                 astTypeToString(item_ty),
                                 astTypeToString(item->type));
         }
-        listAppend(cc->initalisers, assign);
+        parseAddInitialiser(cc, assign);
     }
 }
 
@@ -5678,6 +5697,58 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         "enums and constants, not %s", what);
 }
 
+/* M2: each module whose globals have run-time initialisers gets a
+ * function `a.b._init` (its symbol `_K1a1b5_init`) that runs them once,
+ * however often it is called. The program's entry calls the `_init` of
+ * every module that has one, its own source's or a prebuilt one's (its
+ * .ktmlib marker says `init`), in the order the modules were loaded (a
+ * module's imports before it), before the program's own initialisers.
+ * A -lib build only makes the functions: its importers call them. */
+static void parseModuleInits(Cctrl *cc) {
+    Lexer *l = cc->lexer_;
+    if (!l || l->load_order_len == 0) return;
+    int library = l->building_module || l->building_tree;
+    List *calls = listNew();
+    for (int i = 0; i < l->load_order_len; ++i) {
+        LexModule *m = l->modules[l->load_order[i] - 1];
+        if (!m->prebuilt && m->init_stmts && !listEmpty(m->init_stmts)) {
+            AoStr *done_name = aoStrPrintf("%s.__initDone", m->path->data);
+            char *done_sym = astModuleMangle(done_name->data, done_name->len);
+            Ast *done = astGVar(ast_int_type, done_sym, strlen(done_sym), 1);
+            listAppend(cc->ast_list, astDecl(done, NULL));
+
+            List *stmts = listNew();
+            listAppend(stmts, astIf(done, astReturn(NULL, ast_void_type), NULL));
+            int err = 0;
+            listAppend(stmts, astBinaryOp(AST_BIN_OP_ASSIGN, done, astI64Type(1), &err));
+            listForEach(m->init_stmts) listAppend(stmts, it->value);
+            listAppend(stmts, astReturn(NULL, ast_void_type));
+
+            AoStr *init_name = aoStrPrintf("%s._init", m->path->data);
+            char *sym = astModuleMangle(init_name->data, init_name->len);
+            AstType *fn_type = astMakeFunctionType(ast_void_type, astVecNew());
+            Ast *fn = astFunction(fn_type, sym, strlen(sym), astVecNew(),
+                                  astCompountStatement(stmts),
+                                  m->init_locals ? m->init_locals : listNew(), 0);
+            listAppend(cc->ast_list, fn);
+            m->has_init = 1;
+            char *real = realpath(m->dir->data, NULL);
+            if (!cc->init_module_dirs) cc->init_module_dirs = setNew(8, &set_cstring_type);
+            setAdd(cc->init_module_dirs, real ? real : mprintf("%s", m->dir->data));
+        }
+        if (m->has_init && !library) {
+            AoStr *init_name = aoStrPrintf("%s._init", m->path->data);
+            char *sym = astModuleMangle(init_name->data, init_name->len);
+            listAppend(calls, astFunctionCall(ast_void_type, sym, strlen(sym),
+                                              astVecNew()));
+        }
+    }
+    if (listEmpty(calls)) return;
+    /* before the program's own initialisers */
+    listForEach(cc->initalisers) listAppend(calls, it->value);
+    cc->initalisers = calls;
+}
+
 void parseToAst(Cctrl *cc) {
     Ast *ast;
     Lexeme *tok;
@@ -5755,24 +5826,6 @@ void parseToAst(Cctrl *cc) {
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
         parseCheckCModuleItem(cc, ast);
-        /* A module built into a library (`ktm -lib`) has no code that
-         * runs before main: a run-time initialiser would never run */
-        if (is_global && cc->cur_module && cc->lexer_ &&
-            (cc->lexer_->building_module || cc->lexer_->building_tree)) {
-            is_global = 0;
-            if (ast->kind == AST_BINOP && ast->left &&
-                ast->left->kind == AST_GVAR) {
-                char *name = strrchr(ast->left->gname->data, '.');
-                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-                    "`%s` needs a constant initialiser in a module built with -lib "
-                    "(its library has no code that runs before main)",
-                    name ? name + 1 : ast->left->gname->data);
-            } else {
-                cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-                    "a statement at the top of a module built with -lib would never run "
-                    "(its library has no code that runs before main)");
-            }
-        }
         /* The old file-scope code (ktm syntax v0.2 has none): a statement
          * there, not a global's initialiser; the REPL's input is that */
         if (is_global && !(cc->flags & CCTRL_REPL) &&
@@ -5783,9 +5836,15 @@ void parseToAst(Cctrl *cc) {
                 "code at file scope: put it in `main` (only declarations go there)");
         }
         if (is_global) {
-            listAppend(cc->initalisers,ast);
+            parseAddInitialiser(cc, ast);
+            LexModule *m = parseInitModule(cc);
             if (!listEmpty(cc->tmp_locals)) {
-                listMergeAppend(cc->initaliser_locals,cc->tmp_locals);
+                if (m) {
+                    if (!m->init_locals) m->init_locals = listNew();
+                    listMergeAppend(m->init_locals, cc->tmp_locals);
+                } else {
+                    listMergeAppend(cc->initaliser_locals,cc->tmp_locals);
+                }
             }
         } else if (ast->kind != AST_FUN_PROTO) {
             listAppend(cc->ast_list,ast);
@@ -5799,4 +5858,5 @@ void parseToAst(Cctrl *cc) {
     }
 
     cc->current_recovery = prev_recovery;
+    if (!(cc->flags & CCTRL_REPL)) parseModuleInits(cc);
 }

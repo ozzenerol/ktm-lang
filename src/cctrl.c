@@ -283,6 +283,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
     cc->global_env = mapNew(32, &map_ast_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
+    cc->init_module_dirs = NULL;
     /* A postfix cast in a #define's value, `#define X (5(U64) % 3)`,
      * looks the type name up: give it the built-in types (classes and
      * unions are not known while lexing, so those stay empty). */
@@ -329,6 +330,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
+    cc->init_module_dirs = NULL;
     cc->macro_defs = cctrlCreateLexemeMap();
     cc->x86_registers = setNew(32, &set_cstring_type);
     cc->libc_functions = setNew(32, &set_cstring_type);
