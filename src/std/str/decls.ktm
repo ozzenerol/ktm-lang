@@ -15,6 +15,11 @@ const i64 PRTF_SLASH = 0x020;
 
 const i64 PRTF_DECIMAL = 0x100;
 
+/* Character codes: below CH_SHIFT_SPACE is a control byte. */
+const i64 CH_SHIFT_SPACE = 0x1F;
+
+const i64 CH_SPACE = 0x20;
+
 /* Compare at most len bytes like C's strncmp: < 0, 0 or > 0, bytes compared
  * as unsigned, stopping at a NUL. null sorts before every string (two NULLs
  * are equal), whatever len is. */
