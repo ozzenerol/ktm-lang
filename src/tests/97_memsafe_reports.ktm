@@ -24,7 +24,7 @@ void cleanupMemsafeTest(void) {
 /* Write `source` and run it under -Memsafe; true if ktm exited 0 */
 bool runMemsafe(u8 *source, u8 *cmd = MS_RUN) {
     fs.writeAll(MS_PROG, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    return proc.shell(cmd) == 0;
+    return proc.shell(cstr.view(cmd)) == 0;
 }
 
 /* The program's stdout must be exactly `expected` */
@@ -40,7 +40,7 @@ bool stdoutIs(u8 *expected) {
 
 /* A shell test over the captured report */
 bool check(u8 *cmd) {
-    if (proc.shell(cmd) == 0) { return true; }
+    if (proc.shell(cstr.view(cmd)) == 0) { return true; }
     proc.shell("cat " MS_ERR);
     return false;
 }

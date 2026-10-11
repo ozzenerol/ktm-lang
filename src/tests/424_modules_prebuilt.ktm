@@ -18,7 +18,7 @@ u8 *gWant = "3 4\n25 12\n2 4 -2 1 7\n1\n";
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " PRE_OUT " " PRE_BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(PRE_OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

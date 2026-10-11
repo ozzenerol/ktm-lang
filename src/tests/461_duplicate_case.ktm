@@ -34,7 +34,7 @@ i32 main() {
     fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-jit " SRC_FILE " 2>&1");
+                               "-jit " SRC_FILE " 2>&1").take();
     if (out && libc.strstr(out, "error: duplicate case value 1\n --> " SRC_FILE ":6:9")) { correct++; }
     else { printf("\n  int: [%s]\n", out); }
     if (out && libc.strstr(out, "error: duplicate case value Color.red\n --> " SRC_FILE ":12:9")) { correct++; }
@@ -50,7 +50,7 @@ i32 main() {
     fs.writeAll(SRC_FILE, cstr.view(ok));
     out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                           "-jit " SRC_FILE " 2>&1");
+                           "-jit " SRC_FILE " 2>&1").take();
     if (out && !cstr.cmp(out, "six")) { correct++; }
     else { printf("\n  distinct: [%s]\n", out); }
     fs.remove(SRC_FILE);

@@ -36,7 +36,7 @@ bool exists(u8 *path) {
 
 i64 runFn(u8 *fmt, u8 *root) {
     u8 *cmd = cstr.formatTo(null, fmt, root, root, root, root, root, root);
-    i64 res = proc.shell(cmd);
+    i64 res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     return res;
 }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A module's asm blocks and `_extern` bindings: a module's file is read
  * once per pass (declarations, then in full), and an asm block was
@@ -16,7 +16,7 @@ import fs, libc, mem, proc, test;
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " OUT " " BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(OUT).take();
     bool ok = out && libc.strstr(out, want) != null;
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

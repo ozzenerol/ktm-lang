@@ -40,7 +40,7 @@ bool runLeadingZero(u8 *flags, u8 *source, i64 status, i64 nwarn,
         return false;
     }
     cmd = cstr.format(LZ_KTM "%s -jit " LZ_FILE " > " LZ_OUT " 2>&1", flags);
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     out = fs.readAll(LZ_OUT).take();

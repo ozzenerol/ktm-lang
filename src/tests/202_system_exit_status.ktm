@@ -19,7 +19,7 @@ i32 main() {
     /* Killed by a signal */
     if (proc.shell("kill -9 $$") == -1) { correct++; }
     if (proc.shell("kill -TERM $$") == -1) { correct++; }
-    if (proc.shell(null) == -1) { correct++; }
+    correct++;          /* (proc.shell(null) was -1: a u8[] can't be null) */
 
     /* Sh returns the same, with or without format arguments */
     if (proc.shellf("exit 3") == 3) { correct++; }

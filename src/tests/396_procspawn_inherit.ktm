@@ -38,11 +38,13 @@ i32 spawn(u8 *script, i64 in, i64 out, i64 err, u8 *wantOut=null, u8 *wantErr=nu
     o.err = err;
     proc.Proc *p = proc.spawn(argv, &o);
     if (!p) { return 99; }
-    u8 *gout = null, *gerr = null;
-    i64 rc = proc.communicate(p, null, 0, &gout, null, &gerr);
+    String gout, gerr;
+    i64 rc = proc.communicate(p, "", &gout, &gerr);
     proc.release(p);
-    if (wantOut && (!gout || cstr.cmp(gout, wantOut))) { return 101; }
-    if (wantErr && (!gerr || cstr.cmp(gerr, wantErr))) { return 102; }
+    if (wantOut && (!gout.ptr || !gout.equals(cstr.view(wantOut)))) { return 101; }
+    if (wantErr && (!gerr.ptr || !gerr.equals(cstr.view(wantErr)))) { return 102; }
+    gout.free();
+    gerr.free();
     return rc;
 }
 
@@ -71,7 +73,7 @@ i32 runErr() {
     argv[2] = "echo o; echo e >&2; exit 3";
     argv[3] = null;
     i64 code;
-    u8 *out = proc.run(argv, &code);
+    u8 *out = proc.run(argv, &code).take();
     i32 rc = 0;
     if (!out || cstr.cmp(out, "o") || code != 3) { rc = 1; }
     mem.free(out);

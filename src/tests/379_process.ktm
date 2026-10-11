@@ -1,4 +1,4 @@
-import cstr, libc, mem, net, os, proc, test;
+import cstr, libc, mem, net, os, proc, str, test;
 
 /* Processes (process.ktm): proc.spawn runs argv without a shell; exit codes
  * and signals from proc.wait; ENOENT for a missing program; PROC_NULL,
@@ -29,12 +29,12 @@ proc.Opts *opts(i64 in, i64 out, i64 err) {
 
 /* Run argv with stdout piped; its output (Free it) and exit code. */
 u8 *outFn(u8 **argv, proc.Opts *o, i64 *code) {
-    u8 *out = null;
+    String out;
     proc.Proc *p = proc.spawn(argv, o);
     if (!p) { return null; }
-    *code = proc.communicate(p, null, 0, &out);
+    *code = proc.communicate(p, "", &out);
     proc.release(p);
-    return out;
+    return out.take();
 }
 
 bool exitCodes() {
@@ -79,7 +79,7 @@ bool noShell()
     bool ok = s && !cstr.cmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
     mem.free(s);
     u8 *e[] = {"echo", "hello", null};
-    s = proc.run(e, &code);
+    s = proc.run(e, &code).take();
     ok = ok && s && !cstr.cmp(s, "hello") && code == 0; /* newline removed */
     mem.free(s);
     return ok;
@@ -100,22 +100,23 @@ bool redirects() {
     ok = ok && s && !cstr.cmp(s, "out\n");
     mem.free(s);
 
-    u8 *out = null, *err = null;
-    i64 olen = -1, elen = -1;
+    String out, err;
     proc.Proc *p = proc.spawn(both, opts(proc.DEVNULL, proc.PIPE, proc.PIPE));
-    proc.communicate(p, null, 0, &out, &olen, &err, &elen);
-    ok = ok && !cstr.cmp(out, "out\n") && olen == 4 && !cstr.cmp(err, "err\n") && elen == 4;
+    proc.communicate(p, "", &out, &err);
+    ok = ok && out.equals("out\n") && out.len == 4 && err.equals("err\n") && err.len == 4;
     proc.release(p);
-    mem.free(out);
-    mem.free(err);
+    out.free();
+    err.free();
 
-    /* a stream that isn't piped gives null */
+    /* a stream that isn't piped gives an empty String with a null ptr */
     p = proc.spawn(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL));
-    err = "x";
-    proc.communicate(p, null, 0, &out, null, &err, &elen);
-    ok = ok && err == null && elen == 0;
+    err = str.from("x");
+    String was = err;
+    proc.communicate(p, "", &out, &err);
+    ok = ok && err.ptr == null && err.len == 0;
+    was.free();
     proc.release(p);
-    mem.free(out);
+    out.free();
     return ok;
 }
 
@@ -159,10 +160,10 @@ bool doneAndKill() {
     o.newGroup = true;
     p = proc.spawn(tree, o);
     ok = ok && proc.kill(p, libc.SIGKILL);
-    u8 *out;
-    i64 rc = proc.communicate(p, null, 0, &out);     /* returns at EOF */
-    ok = ok && rc == -1 && p.termSignal == libc.SIGKILL && !cstr.cmp(out, "");
-    mem.free(out);
+    String out;
+    i64 rc = proc.communicate(p, "", &out);     /* returns at EOF */
+    ok = ok && rc == -1 && p.termSignal == libc.SIGKILL && out.equals("");
+    out.free();
     proc.release(p);
     return ok;
 }
@@ -172,22 +173,23 @@ const i64 MIB = (1024 * 1024);
 bool noDeadlock()
 {// 1 MiB in and out through cat while 1 MiB of 'y' lines goes to stderr
     u8 *a[] = {"sh", "-c", "yes | head -c 1048576 >&2 & cat; wait", null};
-    u8 *in = mem.alloc(MIB), *out = null, *err = null;
-    i64 i, olen = 0, elen = 0;
+    u8 *in = mem.alloc(MIB);
+    String out, err;
+    i64 i;
     for (i = 0; i < MIB; i++) { in[i] = 'a' + i % 23; }
     proc.Proc *p = proc.spawn(a, opts(proc.PIPE, proc.PIPE, proc.PIPE));
-    i64 rc = proc.communicate(p, in, MIB, &out, &olen, &err, &elen);
-    bool ok = rc == 0 && olen == MIB && elen == MIB && !libc.memcmp(in, out, MIB);
+    i64 rc = proc.communicate(p, in[0:MIB], &out, &err);
+    bool ok = rc == 0 && out.len == MIB && err.len == MIB && !libc.memcmp(in, out.ptr, MIB);
     ok = ok && err[0] == 'y' && err[1] == '\n' && err[MIB - 1] == '\n';
     proc.release(p);
     mem.free(in);
-    mem.free(out);
-    mem.free(err);
+    out.free();
+    err.free();
 
     /* output dropped (null) is still drained */
     u8 *big[] = {"sh", "-c", "yes | head -c 1048576", null};
     p = proc.spawn(big, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT));
-    ok = ok && proc.communicate(p, null, 0, null) == 0;
+    ok = ok && proc.communicate(p, "") == 0;
     proc.release(p);
     return ok;
 }
@@ -197,7 +199,7 @@ i32 childNoSigpipe()
     u8 *a[] = {"sh", "-c", "exit 0", null};
     u8 *in = mem.allocZero(MIB);
     proc.Proc *p = proc.spawn(a, opts(proc.PIPE, proc.INHERIT, proc.INHERIT));
-    i64 rc = proc.communicate(p, in, MIB, null);
+    i64 rc = proc.communicate(p, in[0:MIB]);
     proc.release(p);
     return rc;                      /* 0 */
 }
@@ -229,7 +231,7 @@ void *spawner(void *arg) {
     for (j = 0; j < 25; j++) {
         u8 *want = cstr.format("t%d-%d", id, j);
         u8 *a[] = {"echo", want, null};
-        u8 *s = proc.run(a, &code);
+        u8 *s = proc.run(a, &code).take();
         if (!s || cstr.cmp(s, want) || code != 0) { *bad += 1; }
         mem.free(s);
         mem.free(want);

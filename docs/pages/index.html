@@ -77,16 +77,16 @@ you asked for /hello
 <p><code>proc.run</code> runs a command and returns what it printed; <code>proc.spawn</code> gives
 you its pipes.</p>
 <pre data-run><code>
-import cstr, mem, proc;
+import proc;
 
 void main()
 {
   u8 *argv[] = {"echo", "hello from a child process", null};
   i64 code;
-  u8 *out = proc.run(argv, &code);
+  String out = proc.run(argv, &code);
+  defer out.free();
   printf("%s\n", out);
   printf("exit code %d\n", code);
-  mem.free(out);
 }
 </code></pre>
 <pre class="output">

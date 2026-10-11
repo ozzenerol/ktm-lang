@@ -47,7 +47,7 @@ void main() {
             "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
             FNCMP_FILE " > " FNCMP_OUT " 2>&1");
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     if (res != 0) {
         out = fs.readAll(FNCMP_OUT).take();

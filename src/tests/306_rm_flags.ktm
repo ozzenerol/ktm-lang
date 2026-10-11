@@ -124,7 +124,7 @@ i32 main() {
     fs.remove(gOut);
     tests++; if (fs.remove(cstr.view(P("w")), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
     full = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(full);
+    proc.shell(cstr.view(full));
     mem.free(full);
 
     test.printResult(correct, tests);

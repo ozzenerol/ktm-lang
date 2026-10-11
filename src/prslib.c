@@ -2070,6 +2070,9 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 17 && !strncmp(fname, str_lit("cstr.formatToSize"))) return 2;
     /* s.appendFormat(fmt, ...) of a String (its arguments without self) */
     else if (len == 19 && !strncmp(fname, str_lit("String.appendFormat"))) return 0;
+    /* the shell commands built from a format */
+    else if (len == 11 && !strncmp(fname, str_lit("proc.shellf"))) return 0;
+    else if (len == 16 && !strncmp(fname, str_lit("proc.shellOutput"))) return 0;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;

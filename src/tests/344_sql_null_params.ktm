@@ -8,7 +8,7 @@ import cstr, sql, test;
 i64 count(sql.Db *ctx, u8 *sqlVal) {
     sql.Row row;
     i64 n = 0;
-    if (!sql.select(ctx, &row, sqlVal)) { return -1; }
+    if (!sql.select(ctx, &row, cstr.view(sqlVal))) { return -1; }
     while (sql.next(&row)) { n++; }
     return n;
 }
@@ -43,7 +43,7 @@ i32 main() {
     ok = sql.select(ctx, &row, "SELECT ? IS null, typeof(?1);", p, 1);
     tests++;
     if (ok && sql.next(&row) && row.col[0].intVal == 1 && row.col[1].type == sql.SQLITE_TEXT &&
-            !cstr.cmp(row.col[1].str, "null")) {
+            row.col[1].str.equals("null")) {
         correct++;
     }
     if (ok) { sql.rowRelease(&row); }

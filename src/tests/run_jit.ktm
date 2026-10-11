@@ -12,7 +12,7 @@ void runTest(u8 *filename, i64 idx) {
     u8 *path = filename;
     if (path[0] != '/') { path = cstr.format("%s/%s", gStartDir, filename); }
     u8 *cmd = cstr.format("'%s' -jit %s '%s'", gKtm, gKtmFlags, path);
-    auto res = proc.shell(cmd);
+    auto res = proc.shell(cstr.view(cmd));
 
     if (res != 0) {
         printf("\033[0;31mFailed to compile\033[0;0m: %s\n",filename);

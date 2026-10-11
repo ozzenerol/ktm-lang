@@ -17,7 +17,7 @@ bool fails(u8 *source, u8 *want, u8 *flags = "-S") {
     u8 *cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                             "%s " M_SRC " -o /dev/null > " M_OUT " 2>&1", flags);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
     u8 *out = fs.readAll(M_OUT).take();
     proc.shell("rm -f " M_SRC " " M_OUT);

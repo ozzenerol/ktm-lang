@@ -25,10 +25,10 @@ i32 main() {
     fs.writeAll(SH_FILE, cstr.view(sh));
 
     /* without the define the greeting shows: the REPL did get a terminal */
-    u8 *out = proc.shellOutput(RUN " loud 2>&1");
+    u8 *out = proc.shellOutput(RUN " loud 2>&1").take();
     if (out && libc.strstr(out, "Ctrl-D exits")) { correct++; }
     else { printf("\n  no define: [%s]\n", out); }
-    out = proc.shellOutput(RUN " quiet 2>&1");
+    out = proc.shellOutput(RUN " quiet 2>&1").take();
     if (out && libc.strstr(out, ">>>") && !libc.strstr(out, "Ctrl-D exits")) { correct++; }
     else { printf("\n  with the define: [%s]\n", out); }
     fs.remove(SH_FILE);

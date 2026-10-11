@@ -22,7 +22,7 @@ void cleanupEmptyTest(void) {
  * `file` through the shell */
 bool writeFile(u8 *file, u8 *printfFmt) {
     u8 *cmd = cstr.format("printf '%s' > %s", printfFmt, file);
-    i64 res = proc.shell(cmd);
+    i64 res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     return res == 0;
 }
@@ -34,7 +34,7 @@ i64 runKtm(u8 *flags, u8 **outArg) {
             "T=; command -v timeout >/dev/null 2>&1 && T='timeout 10'; "
             "$T ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
             "%s " EMPTY_FILE " > " EMPTY_OUT " 2>&1", flags);
-    i64 res = proc.shell(cmd);
+    i64 res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     *outArg = fs.readAll(EMPTY_OUT).take();
     return res;

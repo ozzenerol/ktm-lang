@@ -57,7 +57,7 @@ i32 main() {
 #endif
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
     mem.free(f);
     mem.free(d);

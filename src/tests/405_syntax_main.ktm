@@ -16,8 +16,8 @@ void put(u8 *name, u8 *text) {
 /* Output and exit code of the program in file, run with args, both ways:
  * true when both print `want` and exit with `code`. */
 bool runs(u8 *file, u8 *want, i64 code) {
-    u8 *jit = proc.shellOutput(KTM "-jit %s one two; echo \"rc=$?\"", file);
-    u8 *aot = proc.shellOutput(KTM "%s -o __405_bin && ./__405_bin one two; echo \"rc=$?\"", file);
+    u8 *jit = proc.shellOutput(KTM "-jit %s one two; echo \"rc=$?\"", file).take();
+    u8 *aot = proc.shellOutput(KTM "%s -o __405_bin && ./__405_bin one two; echo \"rc=$?\"", file).take();
     u8 *expect = cstr.format("%s\nrc=%d", want, code);
     bool ok = jit && aot && !cstr.cmp(jit, expect) && !cstr.cmp(aot, expect);
     if (!ok) { printf("\n  %s: want [%s]\n    jit [%s]\n    aot [%s]\n", file, expect, jit, aot); }
@@ -50,7 +50,7 @@ i32 main() {
 
     tests++;   /* one entry point only */
     put("__405_f.ktm", "void Main() {}\nvoid main() {}\n");
-    u8 *err = proc.shellOutput(KTM "-jit __405_f.ktm 2>&1");
+    u8 *err = proc.shellOutput(KTM "-jit __405_f.ktm 2>&1").take();
     if (err && libc.strstr(err, "both `main` and `Main` are defined")) { correct++; }
     else { printf("\n  main and Main: [%s]\n", err); }
 

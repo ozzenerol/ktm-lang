@@ -1,5 +1,5 @@
 module proc;
-import libc, mem, os;
+import libc, mem, os, str;
 
 const i64 PROC_WNOHANG = 1;
 
@@ -394,16 +394,15 @@ static bool procDrain(i32 fd, ProcBuf *b) {
     }
 }
 
-/* Write input (input_len bytes; nothing if null) to p's stdin and close
- * it, read p's stdout and stderr until both reach EOF, then wait for p.
- * *out / *err get what was read as a new NUL-terminated string to Free
- * (the length in *out_len / *err_len), or null for a stream that isn't a
- * PROC_PIPE; pass null to read and drop a stream. A child that exits
- * without reading all of its input is fine: the rest is dropped. Returns
- * what ProcWait returns. */
-pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
-                                                     u8 **out, i64 *outLen=null,
-                                                     u8 **err=null, i64 *errLen=null) {
+/* Write input (nothing if it is empty) to p's stdin and close it, read
+ * p's stdout and stderr until both reach EOF, then wait for p. *out /
+ * *err get what was read as a new String (yours; what was in them is
+ * replaced, not freed), empty with a null ptr for a stream that isn't a
+ * PIPE; pass null to read and drop a stream. A child that exits without
+ * reading all of its input is fine: the rest is dropped. Returns what
+ * wait returns. */
+pub i64 communicate(Proc *p, u8[] input, String *out=null, String *err=null) {
+    i64 inputLen = input.len;
     ProcBuf ob, eb;
     ProcPollFd fds[3];
     i64 nfds, i, n, sent = 0;
@@ -412,7 +411,6 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
 
     mem.set(&ob, 0, sizeof(ProcBuf));
     mem.set(&eb, 0, sizeof(ProcBuf));
-    if (!input) { inputLen = 0; }
     if (p.inFd != -1 && inputLen == 0) { procClose(&p.inFd); }
     procNonBlocking(p.inFd);
     procNonBlocking(p.outFd);
@@ -442,7 +440,7 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
             break;
         }
         if (inSlot != -1 && fds[inSlot].revents) {
-            n = procWriteNoSigpipe(p.inFd, input + sent, inputLen - sent);
+            n = procWriteNoSigpipe(p.inFd, input.ptr + sent, inputLen - sent);
             if (n > 0) { sent += n; }
             if (sent >= inputLen ||
                     (n == -1 && os.errno() != PROC_EAGAIN && os.errno() != PROC_EINTR)) {
@@ -470,16 +468,14 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
             if (!ob.data) { ob.data = mem.alloc(1); }
             ob.data[ob.len] = 0;
         }
-        *out = ob.data;
-        if (outLen) { *outLen = ob.len; }
+        *out = str.adopt(ob.data, ob.len);
     }
     if (err) {
         if (pipedErr) {
             if (!eb.data) { eb.data = mem.alloc(1); }
             eb.data[eb.len] = 0;
         }
-        *err = eb.data;
-        if (errLen) { *errLen = eb.len; }
+        *err = str.adopt(eb.data, eb.len);
     }
     return wait(p);
 }
@@ -496,21 +492,22 @@ pub void release(Proc *p) {
 }
 
 /* Run argv (no shell; stdin /dev/null, stderr inherited) and return what
- * it printed on stdout as a new string to Free, with one trailing newline
- * removed; its exit code (as ProcWait) in *code. null if it couldn't be
- * started (Errno() says why). */
-pub u8 *run(u8 **argv, i64 *code=null) {
+ * it printed on stdout as a new String (yours), with one trailing newline
+ * removed; its exit code (as wait) in *code. Empty with a null ptr if it
+ * couldn't be started (os.errno() says why). */
+pub String run(u8 **argv, i64 *code=null) {
     Opts o;
-    u8 *out = null;
-    i64 len = 0, rc;
+    String out;
+    u8[] none;
+    i64 rc;
     mem.set(&o, 0, sizeof(Opts));
     o.in = DEVNULL;
     o.out = PIPE;
     Proc *p = spawn(argv, &o);
-    if (!p) { return null; }
-    rc = communicate(p, null, 0, &out, &len);
+    if (!p) { return out; }
+    rc = communicate(p, none, &out);
     release(p);
-    if (len > 0 && out[len - 1] == '\n') { out[len - 1] = 0; }
+    if (out.len > 0 && out.ptr[out.len - 1] == '\n') { out.remove(out.len - 1, out.len); }
     if (code) { *code = rc; }
     return out;
 }

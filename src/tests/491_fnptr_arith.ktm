@@ -14,7 +14,7 @@ u8 *compileErr(u8 *body) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                            "-jit " SRC_FILE " 2>&1");
+                            "-jit " SRC_FILE " 2>&1").take();
 }
 
 i32 main() {

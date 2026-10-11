@@ -1,13 +1,13 @@
-import cstr, mem, proc, test;
+import proc, test;
 
 /* Sh and Shlurp ran fmt as-is when no arguments followed, so
  * Sh("echo '100%%'") printed 100%% and the same command meant different
  * things with and without arguments. fmt is now always formatted. */
 
-bool is(u8 *got, u8 *want) {
-    bool ok = got && !cstr.cmp(got, want);
+bool is(String got, u8[] want) {
+    bool ok = got.ptr && got.equals(want);
     if (!ok) { printf("got '%s' want '%s'\n", got, want); }
-    mem.free(got);
+    got.free();
     return ok;
 }
 
