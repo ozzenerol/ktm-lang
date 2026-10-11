@@ -183,6 +183,8 @@ typedef struct Cctrl {
     /* The local whose initialiser is being parsed (it doesn't hide an
      * import prefix there yet) */
     struct Ast *decl_in_init;
+    /* A token to hand out before the ring's next one (cctrlTokenGet) */
+    struct Lexeme *pending_token;
     s64 fallthrough_line, fallthrough_col;
     /* Deferred statements (`defer <stmt>`) being parsed around the
      * current token: a return, or a break/continue with no loop inside
