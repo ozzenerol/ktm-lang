@@ -14,7 +14,7 @@ u8 *printMessage(u8 *msg,
 }
 
 i32 main() {
-    printf("Repro 171 (Default function pointer arguments): ");
+    printf("Test - default function pointer arguments: ");
     i64 correct = 0;
     i64 total = 1;
 
