@@ -2051,6 +2051,9 @@ static int lexCore(Lexer *l, Lexeme *le) {
 }
 
 int lex(Lexer *l, Lexeme *le) {
+    /* callers lex into stack Lexemes: no stale qualified prefix */
+    le->qual_prefix = NULL;
+    le->qual_prefix_len = 0;
     int rc = lexCore(l, le);
     if (rc != 1) return rc;
     le->line = l->tok_start_line;
@@ -3573,6 +3576,8 @@ static void lexQualify(Lexer *l, Lexeme *tok) {
         char *text = mprintf("%s.%.*s", imp->module->path->data,
                              (int)(end - name), name);
         l->ptr = end;
+        tok->qual_prefix = tok->start;
+        tok->qual_prefix_len = tok->len;
         tok->start = text;
         tok->len = strlen(text);
         imp->used = 1;
@@ -3598,6 +3603,8 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
             }
         }
         tok->is_prefix = 0;
+        tok->qual_prefix = NULL;
+        tok->qual_prefix_len = 0;
         if (file) {
             if (!file->header_done && file->module_id && !file->saw_module &&
                 file->mod_pass == LEX_PASS_FULL)

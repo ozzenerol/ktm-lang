@@ -1,10 +1,10 @@
 #include "testhelper.ktm"
 
-/* The `c` module declares the C library: its files hold only extern "c"
- * functions, structs, unions, enums and constants, and `c.write(...)`
+/* The `libc` module declares the C library: its files hold only extern "c"
+ * functions, structs, unions, enums and constants, and `libc.write(...)`
  * calls C's write. An extern "c" in any module is emitted with its C
  * name, not a module symbol (_K...), whether pub or not, called or taken
- * the address of. In module c a function with a body, a ktm prototype,
+ * the address of. In module libc a function with a body, a ktm prototype,
  * a method or a variable is an error. The fixture is
  * src/tests/modules/cmodule; AOT and JIT. */
 
@@ -29,13 +29,13 @@ Bool Output(U8 *cmd, U8 *want, U8 *not=NULL)
   return ok;
 }
 
-/* a `c` module with `extra` added: the diagnostics have want */
+/* a `libc` module with `extra` added: the diagnostics have want */
 Bool CModule(U8 *extra, U8 *want)
 {
-  System("rm -rf " TMP_DIR " && mkdir -p " TMP_DIR "/c");
-  U8 *mod = MStrPrint("module c;\npub extern \"c\" u64 strlen(u8 *s);\n%s\n", extra);
-  U8 *main = "import c;\ni32 main() { return c.strlen(\"\"); }\n";
-  FileWrite(TMP_DIR "/c/c.ktm", mod, StrLen(mod), O_CREAT | O_RDWR | O_TRUNC);
+  System("rm -rf " TMP_DIR " && mkdir -p " TMP_DIR "/libc");
+  U8 *mod = MStrPrint("module libc;\npub extern \"c\" u64 strlen(u8 *s);\n%s\n", extra);
+  U8 *main = "import libc;\ni32 main() { return libc.strlen(\"\"); }\n";
+  FileWrite(TMP_DIR "/libc/libc.ktm", mod, StrLen(mod), O_CREAT | O_RDWR | O_TRUNC);
   FileWrite(TMP_DIR "/main.ktm", main, StrLen(main), O_CREAT | O_RDWR | O_TRUNC);
   Bool ok = Output(KTM "-S " TMP_DIR "/main.ktm -o /dev/null > " MOD_OUT " 2>&1", want);
   System("rm -rf " TMP_DIR);
@@ -43,11 +43,11 @@ Bool CModule(U8 *extra, U8 *want)
   return ok;
 }
 
-#define ONLY "error: module c only declares C: extern \"c\" functions, structs, unions, enums and constants, not "
+#define ONLY "error: module libc only declares C: extern \"c\" functions, structs, unions, enums and constants, not "
 
 I32 Main()
 {
-  "Test - the c module: ";
+  "Test - the libc module: ";
   I64 correct = 0, tests = 0;
 
   tests++;
@@ -65,7 +65,7 @@ I32 Main()
              "grep -qE '(call|bl)[a-z]*[[:space:]]+_?write$' " MOD_BIN " && "
              "grep -qE '(call|bl)[a-z]*[[:space:]]+_?abs$' " MOD_BIN " && "
              "grep -qE ':got:strlen|_?strlen@' " MOD_BIN " && "
-             "! grep -qE '_K[0-9]+c[0-9]+(write|strlen|clock_gettime)|_K3net4sock3abs' " MOD_BIN " && "
+             "! grep -qE '_K[0-9]+libc[0-9]+(write|strlen|clock_gettime)|_K3net4sock3abs' " MOD_BIN " && "
              "echo c-names > " MOD_OUT, "c-names"))
     correct++;
 

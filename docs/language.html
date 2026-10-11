@@ -1401,8 +1401,8 @@ in constant expressions too). A module can't use the names its program defines: 
 doesn't depend on whoever uses it. The C functions it declares with <code>extern "c"</code>
 are its own names as well, private unless <code>pub</code>.</p>
 <p>A C function declared with <code>extern "c"</code> in a module keeps its C symbol, so
-<code>c.write(fd, buf, n)</code>, or <code>&amp;c.write</code>, is C's <code>write</code>. A
-module named <code>c</code> holds the C library's declarations and nothing else: its files
+<code>libc.write(fd, buf, n)</code>, or <code>&amp;libc.write</code>, is C's <code>write</code>. A
+module named <code>libc</code> holds the C library's declarations and nothing else: its files
 contain only <code>extern "c"</code> functions, structs, unions, enums and constants, and a
 function with a body, a ktm prototype, a method or a variable there is an error.</p>
 <p>Only the module that defines a type can define its methods. Outside it, the
@@ -1489,9 +1489,12 @@ prefix <code>rt</code>; only the standard library's modules may import it.</p>
 <p>These are compile errors: using a name that isn't <code>pub</code> from outside its
 module, a module that isn't found or is found twice, an import cycle (the message shows it,
 <code>a -&gt; b -&gt; a</code>), a file whose <code>module</code> line is missing or doesn't
-match its directory, and a variable or parameter named like an import's prefix
-(<code>i64 geo;</code> would hide the module). An import that is never used is a
-warning.</p>
+match its directory, and a global named like an import's prefix (<code>i64 geo;</code> at
+file scope would hide the module). An import that is never used is a warning.</p>
+<p>A local variable or a parameter may have an import's name: as in Go, it shadows the
+module for its scope (<code>u8 *str</code> in a file that imports <code>str</code>), and
+<code>str.len(s)</code> there is the error "<code>str</code> is a local u8 *, it hides the
+module str". Outside that scope the module is there again.</p>
 <p>A module can be built into a library once and used from there:
 <code>ktm -lib geo lib/geo</code> writes <code>libgeo.a</code> and its shared object into
 <code>lib/geo</code>, with a <code>.ktmlib</code> file naming them. A program importing

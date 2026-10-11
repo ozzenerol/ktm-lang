@@ -523,7 +523,7 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         }
 
         arg_count++;
-        cctrlCheckPrefixHidden(cc, pname);
+        /* a parameter may shadow an import prefix, see cctrlTokenGet */
         if (pname->tk_type != TK_IDENT) {
             /* Function pointer */
             if (tokenPunctIs(pname, '(')) {

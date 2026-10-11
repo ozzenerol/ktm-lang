@@ -211,6 +211,11 @@ typedef struct Lexeme {
     /* An identifier that is one of its file's import prefixes, not
      * followed by `.`: declaring it would hide the module */
     u8 is_prefix;
+    /* `prefix.name` turned into the token `a.b.name`: the prefix as
+     * written (a local of that name hides the module, see cctrlTokenGet);
+     * NULL for any other token */
+    char *qual_prefix;
+    int qual_prefix_len;
     /* The file it was lexed from (the lexer runs ahead of the parser,
      * so its current file can already be the next one) */
     struct LexFile *file;
