@@ -2066,6 +2066,38 @@ static void migSkippedPrints(MigFile *f, s64 s, s64 e) {
     }
 }
 
+/* Is the name at [at, at+len) a function the text defines or declares
+ * (`u8 *Now() {`, `i64 Exit(i64);`), not a call? */
+static int migIsDefinitionAt(MigFile *f, s64 at, s64 len) {
+    char *t = f->text;
+    s64 p = at + len;
+    while (p < f->len && isspace((unsigned char)t[p])) p++;
+    if (p >= f->len || t[p] != '(') return 0;
+    s64 depth = 0;
+    for (; p < f->len; ++p) {
+        if (t[p] == '(') depth++;
+        else if (t[p] == ')' && --depth == 0) break;
+    }
+    p++;
+    while (p < f->len && isspace((unsigned char)t[p])) p++;
+    s64 b = at - 1;
+    while (b >= 0 && (t[b] == ' ' || t[b] == '\t')) b--;
+    int after_type = b >= 0 && (migIsIdent(t[b]) || t[b] == '*');
+    if (after_type && migIsIdent(t[b])) {
+        s64 w = b;
+        while (w > 0 && migIsIdent(t[w - 1])) w--;
+        if ((b - w + 1 == 6 && !memcmp(t + w, "return", 6)) ||
+            (b - w + 1 == 4 && !memcmp(t + w, "else", 4)) ||
+            (b - w + 1 == 2 && !memcmp(t + w, "do", 2))) after_type = 0;
+    }
+    return after_type && p < f->len && (t[p] == '{' || t[p] == ';');
+}
+
+static void migCollectDefined(MigFile *f, s64 at, s64 len, void *ctx) {
+    if (migIsDefinitionAt(f, at, len))
+        setAdd((Set *)ctx, mprintf("%.*s", (int)len, f->text + at));
+}
+
 /* A stdlib name in text an #if skipped (the parser never saw it): the
  * map's name, as the parser's notes would have made it */
 static void migSkippedMapWord(MigFile *f, s64 at, s64 len, void *ctx) {
@@ -2075,6 +2107,9 @@ static void migSkippedMapWord(MigFile *f, s64 at, s64 len, void *ctx) {
     MigName *m = mapGet(mig_map, key);
     if (!m || !strcmp(m->module, "-") || !strcmp(m->module, "prelude")) return;
     if (at > 0 && f->text[at - 1] == '.') return;           /* a field */
+    /* a function the text defines (`u8 *Now() {`): the program's own,
+     * there and wherever the text calls it */
+    if (ctx && setHas((Set *)ctx, key)) return;
     int in_std = f->real && strstr(f->real, "/src/std/");
     if (!strcmp(m->module, "rt") && !in_std) return;
     migAdd(f, at, at + len, migQualified(f, m), "stdlib");
@@ -2153,7 +2188,11 @@ static void migSkippedCasts(MigFile *f) {
         for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
             s64 s = (s64)(intptr_t)f->skipped->entries[r];
             s64 e = (s64)(intptr_t)f->skipped->entries[r + 1];
-            migScanWords(f, f->text, s, e, migSkippedMapWord, NULL);
+            /* (src/std's own branches define its names: those are renamed) */
+            Set *defined = setNew(16, &set_cstring_type);
+            if (!f->real || !strstr(f->real, "/src/std/"))
+                migScanWords(f, f->text, s, e, migCollectDefined, defined);
+            migScanWords(f, f->text, s, e, migSkippedMapWord, defined);
         }
     }
     char *t = f->text;
