@@ -3285,7 +3285,6 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_GOTO:
         case AST_LABEL:
         case AST_JUMP:
-        case AST_COMMENT:
         case AST_PLACEHOLDER:
         case AST_FUNPTR:
         case AST_FUN_PROTO:
@@ -3415,13 +3414,6 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
         case AST_CASE:
         case AST_DEFAULT: {
             irEscapeWalkList(ast->case_asts, escape);
-            return;
-        }
-
-        case AST_SIZEOF: {
-            /* sizeof's operand isn't evaluated, but `&x` inside still
-             * marks x: cheap and keeps the walker pessimistic. */
-            irEscapeWalk(ast->operand, escape);
             return;
         }
 

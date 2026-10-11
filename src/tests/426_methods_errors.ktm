@@ -5,7 +5,7 @@ import fs, libc, mem, proc, str, test;
  * the code that defines the type (not on a stdlib type from a program),
  * `self` is const and can't be redeclared, a method is called (or its
  * address taken with `&User.name`), `.` reaches through one pointer only
- * (`pp.x` on a `T **` is an error), and -transpile doesn't support them. */
+ * (`pp.x` on a `T **` is an error). */
 
 #define M_SRC "./ktm-426-methods.ktm"
 #define M_OUT "./ktm-426-methods.out"
@@ -83,9 +83,6 @@ i32 main() {
     tests++;
     if (fails(USER "void User.f() {}\nvoid G() { User u; User *p = &u; User **pp = &p; pp.f(); }\n",
                         "Expected as class however got pointer type `User ** pp`")) { correct++; }
-    tests++;
-    if (fails(USER "void User.f() {}\n", "methods are not supported with -transpile",
-                        "-transpile")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

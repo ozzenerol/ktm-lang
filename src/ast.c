@@ -345,13 +345,6 @@ AoStr *astMakeTmpName(void) {
     return s;
 }
 
-static int tmp_anonymous_label = 0;
-char *astAnnonymousLabel(void) {
-    /* Adding a space makes this an invalid name for other classes as no 
-     * identifier can have spaces. */
-    return mprintf("cls_label %d",tmp_anonymous_label++);
-}
-
 /* For assigning a unique identifier to variables */
 static u32 lvar_unique_id = 1;
 void astResetLVarId(void) {
@@ -834,13 +827,6 @@ AstType *astConvertArray(AstType *ast_type) {
     return astMakePointerType(ast_type->ptr);
 }
 
-Ast *astSizeOf(AstType *type) {
-    Ast *ast = astNew();
-    ast->kind = AST_SIZEOF;
-    ast->type = type;
-    return ast;
-}
-
 Ast *astGoto(AoStr *label) {
     Ast *ast = astNew();
     ast->type = NULL;
@@ -1001,14 +987,6 @@ Ast *astCast(Ast *var, AstType *to) {
     return ast;
 }
 
-Ast *astComment(char *comment, int len) {
-    Ast *ast = astNew();
-    ast->type = NULL;
-    ast->kind = AST_COMMENT;
-    printf("astComment(): %.*s\n",len,comment);
-    ast->sval = aoStrDupRaw(comment, len);
-    return ast;
-}
 
 AoStr *astNormaliseFunctionName(char *fname) {
         AoStr *newfn = aoStrNew();
@@ -2664,13 +2642,6 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             break;
         }
 
-        case AST_COMMENT: {
-            aoStrCatPrintf(str, "<comment>\n");
-            aoStrCatRepeat(str, "  ", depth+1);
-            aoStrCatPrintf(str, "%s\n", ast->sval->data);
-            break;
-        }
-
         case AST_BINOP: {
             const char *bin_op_str = astBinOpKindToString(ast->binop);
             astBinaryOpToString(str,bin_op_str,ast,depth);
@@ -2689,7 +2660,6 @@ void _astToString(AoStr *str, Ast *ast, int depth) {
             break;
         }
         
-        case AST_SIZEOF:
         case AST_ASM_FUNCDEF:
             loggerWarning("Unhandled ast kind: %s\n",
                     astKindToString(ast->kind));
@@ -2754,8 +2724,6 @@ char *astKindToString(AstKind kind) {
         case AST_PLACEHOLDER:   return "AST_PLACEHOLDER";
         case AST_SWITCH:        return "AST_SWITCH";
         case AST_DEFAULT:       return "AST_DEFAULT";
-        case AST_SIZEOF:        return "AST_SIZEOF";
-        case AST_COMMENT:       return "AST_COMMENT";
         case AST_BINOP:         return "AST_BINOP";
         case AST_UNOP:          return "AST_UNOP";
         case AST_TRY:           return "AST_TRY";
@@ -3063,20 +3031,9 @@ static void _astLValueToString(AoStr *str, Ast *ast, u64 lexeme_flags) {
             break;
         }
 
-        case AST_SIZEOF: {
-            char *type_str = astTypeToString(ast->type);
-            aoStrCatPrintf(str, "sizeof(%s)",type_str);
-            break;
-        }
-
         case AST_BREAK:
             aoStrCatPrintf(str, "break;");
             break;
-
-        case AST_COMMENT: {
-            aoStrCatPrintf(str, "%s\n", ast->sval->data);
-            break;
-        }
 
         case AST_BINOP: {
             const char *bin_op_str = astBinOpKindToString(ast->binop);
@@ -3218,8 +3175,6 @@ const char *astKindToHumanReadable(Ast *ast) {
         case AST_SWITCH: return "switch statement";
         case AST_CASE: return "case statement";
         case AST_DEFAULT: return "default statement";
-        case AST_SIZEOF: return "size of";
-        case AST_COMMENT: return "comment";
         case AST_PLACEHOLDER: return "placeholder";
         case AST_BINOP: return "binary op";
         case AST_UNOP: return "unary op";
@@ -3233,6 +3188,7 @@ static void astClassFieldsToString(Map *fields,
                                    AoStr *buf,
                                    s64 *indent)
 {
+    (void)clsname;
     /* Fields */
     MapIter it;
     mapIterInit(fields, &it);
@@ -3241,32 +3197,18 @@ static void astClassFieldsToString(Map *fields,
         AstType *field = n->value;
         char *field_name = n->key;
         
-        /* So we do not double up. This code is very similar to that in
-         * transpile.c */
+        /* So we do not double up */
         if (setHasLen(seen,n->key,n->key_len))
             continue;
 
         aoStrCatRepeat(buf, " ", *indent);
-        if (!strncmp(field_name, str_lit("cls_label "))) {
-            if (field->kind == AST_TYPE_UNION) {
-                aoStrCatFmt(buf, "%sunion {%s\n", clr(ESC_BLUE), clr(ESC_RESET));
-            } else {
-                aoStrCatFmt(buf, "%sclass%s {\n", clr(ESC_BLUE), clr(ESC_RESET));
-            }
-            *indent += 2;
-            astClassFieldsToString(field->fields,seen,clsname,buf,indent);
-            *indent -= 2;
-            aoStrCatRepeat(buf, " ", *indent);
-            aoStrCatLen(buf, str_lit("};\n"));
+        AoStr *ty_str = astTypeToColorAoStr(field);
+        if (astTypeIsPtr(field)) {
+            aoStrCatFmt(buf, "%S%s;\n", ty_str, field_name);
         } else {
-            AoStr *ty_str = astTypeToColorAoStr(field);
-            if (astTypeIsPtr(field)) {
-                aoStrCatFmt(buf, "%S%s;\n", ty_str, field_name);
-            } else {
-                aoStrCatFmt(buf, "%S %s;\n", ty_str, field_name);
-            }
-            aoStrRelease(ty_str);
+            aoStrCatFmt(buf, "%S %s;\n", ty_str, field_name);
         }
+        aoStrRelease(ty_str);
         setAdd(seen, field_name);
     }
 }

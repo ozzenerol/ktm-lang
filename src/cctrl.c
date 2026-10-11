@@ -559,9 +559,6 @@ static Lexeme *cctrlMaybeExpandToken(Cctrl *cc, Lexeme *token) {
 
     Lexeme *maybe_define = mapGetLen(cc->macro_defs, token->start, token->len);
     if (maybe_define) {
-        if (cc->flags & CCTRL_PASTE_DEFINES) {
-            return token;
-        }
         /* The macro's value, at the line and column the macro is used:
          * the stored lexeme carries the #define's position, which put
          * an error on the use on the #define line. */
@@ -1703,21 +1700,12 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     if ((tok = mapGetLen(cc->macro_defs, varname, len)) != NULL) {
         switch (tok->tk_type) {
         case TK_I64:
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(ast_int_type, varname, len);
-            }
             ast_var = astI64Type(tok->i64);
             if (tok->isu64) ast_var->type = astTypeCopy(ast_uint_type);
             return ast_var;
         case TK_F64:
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(ast_float_type, varname, len);
-            }
             return astF64Type(tok->f64);
         case TK_STR: {
-            if (cc->flags & CCTRL_PASTE_DEFINES) {
-                return astLVar(astMakePointerType(ast_u8_type), varname, len);
-            }
             return cctrlGetOrSetString(cc, tok->start, tok->len, tok->i64);
         }
         default:
