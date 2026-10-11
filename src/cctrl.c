@@ -1241,6 +1241,19 @@ void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
         free(d);
         return;
     }
+    /* The same diagnostic again (a module file is read in more than one
+     * pass, and a declaration can be checked in both): reported once */
+    for (u64 i = 0; d->message && i < cc->diagnostics->size; ++i) {
+        CctrlDiagnostic *e = cc->diagnostics->entries[i];
+        if (e && e->message && e->severity == d->severity &&
+            e->message->len == d->message->len &&
+            !memcmp(e->message->data, d->message->data, d->message->len)) {
+            aoStrRelease(d->message);
+            if (d->suggestion) aoStrRelease(d->suggestion);
+            free(d);
+            return;
+        }
+    }
     vecPush(cc->diagnostics, d);
     if (d->severity == CCTRL_ERROR) cc->n_errors++;
 }
