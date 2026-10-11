@@ -265,6 +265,25 @@ veneer_lookup(const struct VeneerSlot *vmap, int n, void *target)
     return NULL;
 }
 
+#if APPLE_SILICON_JIT
+/* A child forked by a JIT-run program (a program calling fork()) could
+ * start with its thread's JIT write protection off, so the JIT code it
+ * returns into from fork() wasn't executable: a SIGBUS (an instruction
+ * fetch permission fault) before it ran anything, about once in three
+ * hundred forks (F27). The child turns the protection back on. */
+static void asmJitChildProtect(void) {
+    pthread_jit_write_protect_np(1);
+}
+
+static void asmJitProtectForkedChildren(void) {
+    static int registered = 0;
+    if (!registered) {
+        registered = 1;
+        pthread_atfork(NULL, NULL, asmJitChildProtect);
+    }
+}
+#endif
+
 int
 asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
                  AsmJitCode *out)
@@ -312,6 +331,7 @@ asm_jit_finalize(AsmEnc *enc, asm_jit_resolver_fn resolver, void *ud,
     }
 
 #if APPLE_SILICON_JIT
+    asmJitProtectForkedChildren();
     pthread_jit_write_protect_np(0);
 #endif
 
