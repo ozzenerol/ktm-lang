@@ -1,4 +1,4 @@
-import libc, mem, net, test;
+import cstr, libc, mem, net, test;
 
 /* net.dial gave up when connecting to the first address a name resolved
  * to failed, instead of trying the next one: "localhost" resolving to ::1
@@ -53,7 +53,7 @@ bool resolves(u8 *name, i32 family) {
 
 bool reach(u8 *name, i32 srv)
 {// net.dial(name) gets to srv
-    i32 c = net.dial(name, portFn(srv));
+    i32 c = net.dial(cstr.view(name), portFn(srv));
     if (c == -1) { return false; }
     i32 a = net.accept(srv);
     bool ok = a != -1;

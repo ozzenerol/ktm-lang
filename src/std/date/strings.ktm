@@ -3,19 +3,19 @@ import cstr, libc, mem, str;
 
 #define TIMESTAMP_FMT "%d-%02d-%02d %02d:%02d:%02d"
 
-pub u8 *formatTime(Date cdt) {
+static u8 *formatTimeC(Date cdt) {
         Parts ds;
         toParts(&ds,cdt);
         return cstr.format("%02d:%02d:%02d",ds.hour,ds.min,ds.sec);
 }
 
-pub u8 *formatDate(Date cdt) {
+static u8 *formatDateC(Date cdt) {
         Parts ds;
         toParts(&ds,cdt);
         return cstr.format("%02d/%02d/%04d",ds.mon,ds.dayOfMon,ds.year);
 }
 
-pub u8 *timestampNow()
+static u8 *timestampNowC()
 {// Get a timestamp
         i64 seconds = nowMs() / 1000; 
         u8 *timestamp = mem.alloc(sizeof(u8)*32);
@@ -81,7 +81,7 @@ static i64 strDateName(u8 **_s, u8 **names, i64 count) {
     * Returns false for empty input, input that ends before the format, text
     * that doesn't match the format, an unknown conversion or a field out of
     * range; text after the end of the format is ignored. */
-pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
+static bool parsePartsC(u8 *strdate, u8 *format, Parts *t) {
         i64 year = -1, mon = -1, day = -1, hour = 0, min = 0, sec = 0;
         i64 dow = -1, zone = NO_ZONE, v, pm = -1, sign;
         bool hasHour = false;
@@ -205,11 +205,11 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
         return true;
 }
 
-pub Date parse(u8 *_str, u8 *fmt)
+static Date parseC(u8 *_str, u8 *fmt)
 {// Parse with Str2CDateStruct into a CDate; 0 if that fails or the
     // format doesn't give the year, month and day
         Parts ds;
-        if (!parseParts(_str,fmt,&ds)) {
+        if (!parsePartsC(_str,fmt,&ds)) {
                 return 0;
         }
         if ((i64)ds.year == -1 || (i64)ds.mon == -1 || (i64)ds.dayOfMon == -1) {
@@ -222,7 +222,7 @@ pub Date parse(u8 *_str, u8 *fmt)
     * (00-23), %M minutes, %S seconds, %a day name (Mon), %b month name
     * (Jan), %p AM or PM, %% a `%`. Any other text is copied as written,
     * an unknown conversion included. The result is from mem.alloc. */
-pub u8 *format(Date d, u8 *fmt) {
+static u8 *formatC(Date d, u8 *fmt) {
         Parts ds;
         toParts(&ds,d);
         i64 len = 0;
@@ -258,4 +258,54 @@ pub u8 *format(Date d, u8 *fmt) {
                 }
         }
         return out;
+}
+
+/* ---- The API: text as u8[] in, Strings out ---- */
+
+/* `s` as a C string in buf (size bytes; cut to fit) */
+static u8 *dateCStr(u8[] s, u8 *buf, i64 size)
+{
+        i64 n = s.len < size - 1 ? s.len : size - 1;
+        if (n > 0) { mem.copy(buf, s.ptr, n); }
+        buf[n] = 0;
+        return buf;
+}
+
+/* A mem block (with its NUL) as a String */
+static String dateString(u8 *text)
+{
+        return str.adopt(text, cstr.len(text));
+}
+
+/* "hh:mm:ss" */
+pub String formatTime(Date cdt) { return dateString(formatTimeC(cdt)); }
+
+/* "mm/dd/yyyy" */
+pub String formatDate(Date cdt) { return dateString(formatDateC(cdt)); }
+
+/* The local time now as "yyyy-mm-dd hh:mm:ss" */
+pub String timestampNow() { return dateString(timestampNowC()); }
+
+/* strdate read with format into *t: false if it doesn't match */
+pub bool parseParts(u8[] strdate, u8[] format, Parts *t)
+{
+        u8 a[256], b[256];
+        return parsePartsC(dateCStr(strdate, a, sizeof(a)), dateCStr(format, b, sizeof(b)), t);
+}
+
+/* text read with fmt into a Date; 0 if that fails or the format doesn't give
+ * the year, month and day */
+pub Date parse(u8[] text, u8[] fmt)
+{
+        u8 a[256], b[256];
+        return parseC(dateCStr(text, a, sizeof(a)), dateCStr(fmt, b, sizeof(b)));
+}
+
+/* d written with fmt, like strftime: %Y year, %m month (01-12), %d day
+ * (01-31), %H hour (00-23), %M minutes, %S seconds, %a day name (Mon), %b
+ * month name (Jan), %p AM or PM, %% a `%`; a String */
+pub String format(Date d, u8[] fmt)
+{
+        u8 b[256];
+        return dateString(formatC(d, dateCStr(fmt, b, sizeof(b))));
 }

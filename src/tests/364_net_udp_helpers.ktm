@@ -1,5 +1,27 @@
 import cstr, date, libc, mem, net, os, test;
 
+/* the String forms of net's address functions, into a C buffer here */
+bool copyOut(String *s, u8 *buf, i64 size) {
+    bool ok = s.ptr && s.len < size;
+    if (ok) { cstr.copy(buf, s.cstr()); }
+    s.free();
+    return ok;
+}
+bool peerInto(i32 fd, u8 *buf, i64 size) {
+    String s = net.peerAddr(fd);
+    return copyOut(&s, buf, size);
+}
+bool addrInto(libc.sockaddr *sa, i32 fam, u8 *buf, i64 size) {
+    String s = net.addrToStr(sa, fam);
+    return copyOut(&s, buf, size);
+}
+i64 recvInto(i32 fd, u8 *buf, i64 len, u8 *from, i64 fromSize, i32 *port) {
+    String f;
+    i64 n = net.recvFrom(fd, buf[0:len], &f, port);
+    if (!copyOut(&f, from, fromSize)) { from[0] = 0; }
+    return n;
+}
+
 /* net.udpSocket, net.sendTo, net.recvFrom, net.setRecvTimeout and
  * net.localPort: loopback only, ports picked by the kernel. Ends with a
  * DNS-style exchange: a client sends an A query, a server parses it and
@@ -15,7 +37,7 @@ void check(bool ok, u8 *what) {
 /* Round trip between two sockets of one family: client -> server, then the
  * server answers whoever sent it */
 void echo(u8 *ip, i32 fam, u8 *name) {
-    i32 srv = net.udpSocket(0, ip, fam), cli = net.udpSocket(0, ip, fam);
+    i32 srv = net.udpSocket(0, cstr.view(ip), fam), cli = net.udpSocket(0, cstr.view(ip), fam);
     i32 sport, cport, from_port = -1;
     u8 buf[64], from[libc.INET6_ADDRSTRLEN], what[64];
     i64 n;
@@ -36,18 +58,18 @@ void echo(u8 *ip, i32 fam, u8 *name) {
     check(sport > 0 && cport > 0 && sport != cport, what);
 
     cstr.formatTo(what, "%s NetSendTo", name);
-    check(net.sendTo(cli, "hello", 5, ip, sport) == 5, what);
+    check(net.sendTo(cli, "hello"[0:5], cstr.view(ip), sport) == 5, what);
     mem.set(buf, 0, sizeof(buf));
-    n = net.recvFrom(srv, buf, sizeof(buf), from, sizeof(from), &from_port);
+    n = recvInto(srv, buf, sizeof(buf), from, sizeof(from), &from_port);
     cstr.formatTo(what, "%s NetRecvFrom", name);
     check(n == 5 && !cstr.cmp(buf, "hello"), what);
     cstr.formatTo(what, "%s sender address and port", name);
     check(!cstr.cmp(from, ip) && from_port == cport, what);
 
     /* answer the sender */
-    net.sendTo(srv, "world", 5, from, from_port);
+    net.sendTo(srv, "world"[0:5], from, from_port);
     mem.set(buf, 0, sizeof(buf));
-    n = net.recvFrom(cli, buf, sizeof(buf));
+    n = net.recvFrom(cli, buf[0:sizeof(buf)]);
     cstr.formatTo(what, "%s reply", name);
     check(n == 5 && !cstr.cmp(buf, "world"), what);
     libc.close(srv);
@@ -91,7 +113,7 @@ i64 dnsQuery(u8 *pkt, i64 id, u8 *host) {
 bool dnsServe(i32 srv) {
     u8 pkt[512], from[libc.INET6_ADDRSTRLEN], name[256];
     i32 port;
-    i64 n = net.recvFrom(srv, pkt, sizeof(pkt), from, sizeof(from), &port);
+    i64 n = recvInto(srv, pkt, sizeof(pkt), from, sizeof(from), &port);
     i64 q = 12, len = 0;
 
     if (n < 12 || get16(pkt + 4) != 1) { return false; }
@@ -114,7 +136,7 @@ bool dnsServe(i32 srv) {
     put16(pkt + q + 8, 300);
     put16(pkt + q + 10, 4);  /* 4 bytes of data */
     pkt[q + 12] = 10; pkt[q + 13] = 1; pkt[q + 14] = 2; pkt[q + 15] = 3;
-    return net.sendTo(srv, pkt, q + 16, from, port) == q + 16;
+    return net.sendTo(srv, pkt[0:q + 16], from, port) == q + 16;
 }
 
 void dns() {
@@ -122,11 +144,11 @@ void dns() {
     u8 pkt[512];
     i64 n = dnsQuery(pkt, 0xBEEF, "example.ktm"), q;
 
-    check(net.sendTo(cli, pkt, n, "127.0.0.1", net.localPort(srv)) == n, "dns query sent");
+    check(net.sendTo(cli, pkt[0:n], "127.0.0.1", net.localPort(srv)) == n, "dns query sent");
     check(dnsServe(srv), "dns server parses and answers");
     net.setRecvTimeout(cli, 2000);
     mem.set(pkt, 0, sizeof(pkt));
-    n = net.recvFrom(cli, pkt, sizeof(pkt));
+    n = net.recvFrom(cli, pkt[0:sizeof(pkt)]);
     q = n - 4;
     check(n > 12 && get16(pkt) == 0xBEEF && get16(pkt + 2) == 0x8180 && get16(pkt + 6) == 1 &&
                 pkt[q] == 10 && pkt[q + 1] == 1 && pkt[q + 2] == 2 && pkt[q + 3] == 3,
@@ -148,10 +170,10 @@ i32 main() {
     fd = net.udpSocket(0, "*");
     check(fd != -1 && net.localPort(fd) > 0, "\"*\" binds any IPv4 address");
     /* an IPv4 socket can't send to an IPv6 address */
-    check(net.sendTo(fd, "x", 1, "::1", 9) == -1, "family mismatch");
-    check(net.sendTo(fd, "x", 1, "127.0.0.1", 70000) == -1, "bad port in NetSendTo");
+    check(net.sendTo(fd, "x"[0:1], "::1", 9) == -1, "family mismatch");
+    check(net.sendTo(fd, "x"[0:1], "127.0.0.1", 70000) == -1, "bad port in NetSendTo");
     libc.close(fd);
-    check(net.udpSocket(-1, "127.0.0.1") == -1 && net.udpSocket(65536, null) == -1,
+    check(net.udpSocket(-1, "127.0.0.1") == -1 && net.udpSocket(65536, "") == -1,
                 "bad port");
     check(net.udpSocket(0, "127.0.0.1", libc.AF_UNIX) == -1, "bad family");
     check(net.udpSocket(0, "::*", libc.AF_INET) == -1, "\"::*\" with AF_INET");
@@ -163,16 +185,16 @@ i32 main() {
 
     /* a datagram longer than the buffer: the rest is dropped */
     fd = net.udpSocket(0, "127.0.0.1");
-    net.sendTo(fd, "toolong", 7, "127.0.0.1", net.localPort(fd));
-    net.sendTo(fd, "next", 4, "127.0.0.1", net.localPort(fd));
+    net.sendTo(fd, "toolong"[0:7], "127.0.0.1", net.localPort(fd));
+    net.sendTo(fd, "next"[0:4], "127.0.0.1", net.localPort(fd));
     mem.set(buf, 0, sizeof(buf));
-    check(net.recvFrom(fd, buf, 4) == 4 && !cstr.cmpLen(buf, "tool", 4), "long datagram cut");
-    check(net.recvFrom(fd, buf, 4) == 4 && !cstr.cmpLen(buf, "next", 4), "next datagram whole");
+    check(net.recvFrom(fd, buf[0:4]) == 4 && !cstr.cmpLen(buf, "tool", 4), "long datagram cut");
+    check(net.recvFrom(fd, buf[0:4]) == 4 && !cstr.cmpLen(buf, "next", 4), "next datagram whole");
 
     /* timeout: -1 after about 150 ms instead of waiting forever */
     check(net.setRecvTimeout(fd, 150), "NetSetRecvTimeout");
     t = date.nowMs();
-    n = net.recvFrom(fd, buf, 4);
+    n = net.recvFrom(fd, buf[0:4]);
     t = date.nowMs() - t;
     check(n == -1 && os.errno() == libc.EAGAIN && t >= 100 && t < 3000, "recv times out with EAGAIN");
     check(net.setRecvTimeout(fd, 0) && !net.setRecvTimeout(fd, -1), "timeout 0 and -1");
@@ -181,7 +203,7 @@ i32 main() {
     /* non-blocking: nothing queued gives -1 at once */
     fd = net.udpSocket(0, "127.0.0.1", libc.AF_INET, true);
     t = date.nowMs();
-    check(fd != -1 && net.recvFrom(fd, buf, 4) == -1 && os.errno() == libc.EAGAIN &&
+    check(fd != -1 && net.recvFrom(fd, buf[0:4]) == -1 && os.errno() == libc.EAGAIN &&
                 date.nowMs() - t < 1000, "non-blocking");
     libc.close(fd);
     check(net.localPort(-1) == -1, "NetGetSocketPort on a bad socket");

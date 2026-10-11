@@ -133,8 +133,8 @@ i32 main() {
     date.toParts(&out, d);
     if (out.year == 2024 && out.mon == 2 && out.dayOfMon == 29 &&
             out.hour == 13 && out.min == 14 && out.sec == 15 &&
-            !cstr.cmp(date.formatDate(d), "02/29/2024") &&
-            !cstr.cmp(date.formatTime(d), "13:14:15")) { correct++; }
+            !cstr.cmp(date.formatDate(d).take(), "02/29/2024") &&
+            !cstr.cmp(date.formatTime(d).take(), "13:14:15")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

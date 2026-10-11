@@ -1,5 +1,5 @@
 module date;
-import cstr, libc, math;
+import cstr, libc, math, str;
 
 pub i64 struct Date {
   u32 time;
@@ -245,7 +245,7 @@ void civilFromDays(i64 z, i64 *y, i64 *m, i64 *d) {
 }
 
 // Writes e.g. 2026-07-05T14:30:00.123456789Z  (UTC)
-pub void isoFromTimespec(libc.timespec *ts, u8 *buf) {
+static void isoFromTimespecC(libc.timespec *ts, u8 *buf) {
   i64 sec = ts.tv_sec, nsec = ts.tv_nsec;
   i64 days = sec / 86400, rem = sec % 86400;
   if (rem < 0) {
@@ -256,4 +256,12 @@ pub void isoFromTimespec(libc.timespec *ts, u8 *buf) {
   i64 y, mo, d;
   civilFromDays(days, &y, &mo, &d);
   cstr.formatTo(buf, "%04d-%02d-%02dT%02d:%02d:%02d.%09dZ", y, mo, d, hh, mm, ss, nsec);
+}
+
+/* ts as e.g. 2026-07-05T14:30:00.123456789Z (UTC), a String */
+pub String isoFromTimespec(libc.timespec *ts)
+{
+        u8 buf[64];
+        isoFromTimespecC(ts, buf);
+        return str.from(cstr.view(buf));
 }

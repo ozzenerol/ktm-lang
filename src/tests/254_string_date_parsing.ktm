@@ -1,4 +1,4 @@
-import date, test;
+import cstr, date, test;
 
 /* date.parseParts: %a/%b never matched (and read past short input), %b
  * stored a 0-based month, 12 PM became hour 24, a format without seconds
@@ -7,7 +7,7 @@ import date, test;
 
 bool parse(u8 *s, u8 *f, i64 y, i64 mon, i64 d, i64 h, i64 mi, i64 sec, i64 dow) {
     date.Parts t;
-    if (!date.parseParts(s, f, &t)) {
+    if (!date.parseParts(cstr.view(s), cstr.view(f), &t)) {
         printf("\"%s\" \"%s\": failed\n", s, f);
         return false;
     }
@@ -23,7 +23,7 @@ bool parse(u8 *s, u8 *f, i64 y, i64 mon, i64 d, i64 h, i64 mi, i64 sec, i64 dow)
 
 bool fails(u8 *s, u8 *f) {
     date.Parts t;
-    if (date.parseParts(s, f, &t)) {
+    if (date.parseParts(cstr.view(s), cstr.view(f), &t)) {
         printf("\"%s\" \"%s\": accepted\n", s, f);
         return false;
     }

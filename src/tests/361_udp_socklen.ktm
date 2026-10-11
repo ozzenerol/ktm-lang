@@ -1,5 +1,27 @@
 import cstr, fs, libc, mem, net, proc, test;
 
+/* the String forms of net's address functions, into a C buffer here */
+bool copyOut(String *s, u8 *buf, i64 size) {
+    bool ok = s.ptr && s.len < size;
+    if (ok) { cstr.copy(buf, s.cstr()); }
+    s.free();
+    return ok;
+}
+bool peerInto(i32 fd, u8 *buf, i64 size) {
+    String s = net.peerAddr(fd);
+    return copyOut(&s, buf, size);
+}
+bool addrInto(libc.sockaddr *sa, i32 fam, u8 *buf, i64 size) {
+    String s = net.addrToStr(sa, fam);
+    return copyOut(&s, buf, size);
+}
+i64 recvInto(i32 fd, u8 *buf, i64 len, u8 *from, i64 fromSize, i32 *port) {
+    String f;
+    i64 n = net.recvFrom(fd, buf[0:len], &f, port);
+    if (!copyOut(&f, from, fromSize)) { from[0] = 0; }
+    return n;
+}
+
 /* accept, getpeername, getsockname, recvfrom and getsockopt took their
  * length as an i64* or u64*, but C's socklen_t is 32 bits on Linux and
  * macOS: the kernel writes 4 bytes and the upper half of an 8-byte length
@@ -120,7 +142,7 @@ void roundTrip(i32 fam, u8 *ip, u8 *name) {
         check(v6.sin6_family == libc.AF_INET6 && v6.sin6_port == ((libc.sockaddr_in6 *)(&a)).sin6_port, what);
     }
     cstr.formatTo(what, "%s sender address", name);
-    check(net.addrToStr((libc.sockaddr *)(&from), fam, txt, sizeof(txt)) && !cstr.cmp(txt, ip), what);
+    check(addrInto((libc.sockaddr *)(&from), fam, txt, sizeof(txt)) && !cstr.cmp(txt, ip), what);
     libc.close(sa);
     libc.close(sb);
 }
