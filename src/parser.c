@@ -1619,7 +1619,10 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
         init = astI64Type(evalIntConstExpr(init));
     }
 
-    if (var->type->kind == AST_TYPE_AUTO) {
+    /* `auto`: the type is the initialiser's, nothing to check it against
+     * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
+    int from_auto = var->type->kind == AST_TYPE_AUTO;
+    if (from_auto) {
         var->type = init->type;
     }
 
@@ -1632,7 +1635,7 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
     }
     if (is_err) {
         parseCreateBinaryOp(cc,AST_BIN_OP_ASSIGN,var,init);
-    } else if (!astTypeCheck(var->type,init,AST_BIN_OP_ASSIGN)) {
+    } else if (!from_auto && !astTypeCheck(var->type,init,AST_BIN_OP_ASSIGN)) {
         typeCheckWarn(cc,eq_line,eq_col,var,init);
     }
 
