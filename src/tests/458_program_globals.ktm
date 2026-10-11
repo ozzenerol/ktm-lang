@@ -52,7 +52,7 @@ i64 environ = 0;
 i64 optind = 6;
 i32 main() {
     u8 *argv[4] = {\"sh\", \"-c\", \"echo home=$HOME\", null};
-    u8 *out = proc.run(argv);
+    String out = proc.run(argv);
     printf(\"%d %d %s\", environ, optind, out);
     return 0;
 }
