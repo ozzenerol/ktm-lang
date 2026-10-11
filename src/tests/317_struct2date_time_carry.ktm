@@ -25,7 +25,7 @@ i64 gCorrect = 0, gTests = 0;
 
 void expect(date.Date c, u8 *want) {
     gTests++;
-    u8 *got = str.format("%D %T", c, c);
+    u8 *got = date.format(c, "%m/%d/%Y %H:%M:%S");
     if (!str.cmp(got, want)) { gCorrect++; }
     else { printf("Failed - got '%s' want '%s'\n", got, want); }
     mem.free(got);

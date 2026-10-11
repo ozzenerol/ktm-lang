@@ -30,7 +30,7 @@ date.Date mkDate(i64 y, i64 mo, i64 d, i64 h, i64 mi, i64 s) {
 
 i64 mkDay(i64 y, i64 mo, i64 d) {
     date.Date c = mkDate(y, mo, d, 0, 0, 0);
-    return c.date;
+    return libc.date;
 }
 
 /* Round trip through date.toParts and check every field. */
@@ -80,7 +80,7 @@ i32 main() {
     c = mkDate(2024, 2, 29, 12, 34, 56);
     if (strIs(date.formatDate(c), "02/29/2024")) { correct++; }
     if (strIs(date.formatTime(c), "12:34:56")) { correct++; }
-    if (strIs(str.format("%D %T", c, c), "02/29/2024 12:34:56")) { correct++; }
+    if (strIs(date.format(c, "%m/%d/%Y %H:%M:%S"), "02/29/2024 12:34:56")) { correct++; }
 
     /* Day helpers. */
     d = mkDay(2024, 2, 15);

@@ -135,11 +135,11 @@ i32 main() {
             !str.cmp(str.formatTo(buf, "[%20p][%-20p]", 0xab, 0xab),
                             "[  0x00000000000000AB][0x00000000000000AB  ]")) { correct++; }
 
-    /* 13: %D and %T with widths */
+    /* 13: a date and a time (date.format) with widths */
     date.Date cdt = date.now();
-    u8 *d = date.formatDate(cdt), *t = date.formatTime(cdt);
+    u8 *d = date.formatDate(cdt), *t = date.format(cdt, "%H:%M:%S");
     libc.snprintf(want, sizeof(want), "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
-    str.formatTo(ours, "[%12D][%-12D][%10T][%-10T]", cdt, cdt, cdt, cdt);
+    str.formatTo(ours, "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
     if (!str.cmp(ours, want)) { correct++; }
     mem.free(d);
     mem.free(t);

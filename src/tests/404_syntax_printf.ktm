@@ -2,7 +2,7 @@ import fs, libc, proc, str, test;
 
 /* ktm syntax v0.2: printf(fmt, ...) is ktm's print, the same as the print
  * statement "fmt", ...; : %d/%x/%u print the full 64-bit value (narrow
- * integers are widened), a format using ktm's conversions (%Q %D %T %C %F)
+ * integers are widened), a format using ktm's conversions (%Q %C)
  * goes through Print, and the arguments are checked against a literal
  * format at compile time. A snippet prints every case both ways; the two
  * outputs must match line for line. */
@@ -28,8 +28,6 @@ u8 *both =
 "  printf(\"%s|%5.2f|%c|%%\\n\", \"str\", pi, 'A');\n"
 "  printf(\"%Q\\n\", \"a\\\"b\");\n"
 "  printf(\"%Q\\n\", \"a\\\"b\");\n"
-"  printf(\"%D\\n\", day);\n"
-"  printf(\"%D\\n\", day);\n"
 "  printf(\"no arguments\\n\");\n"
 "  printf(\"no arguments\\n\");\n"
 "  if (big > 0) { printf(\"in if %d\\n\", 2); }\n"
@@ -63,10 +61,10 @@ i32 main() {
     i64 pairsOk = 1;
     u8 *copy = str.dup(out), *lines[32];
     i64 count = linesFn(copy, lines, 32);
-    if (count == 19) {
-        /* 8 pairs, then the 42 whose length printf returns, then 2 counts */
-        for (i = 0; i < 16; i += 2) { if (str.cmp(lines[i], lines[i + 1])) { pairsOk = 0; } }
-        if (str.cmp(lines[16], "42") || str.cmp(lines[17], "count 3") || str.cmp(lines[18], "count 3")) {
+    if (count == 17) {
+        /* 7 pairs, then the 42 whose length printf returns, then 2 counts */
+        for (i = 0; i < 14; i += 2) { if (str.cmp(lines[i], lines[i + 1])) { pairsOk = 0; } }
+        if (str.cmp(lines[14], "42") || str.cmp(lines[15], "count 3") || str.cmp(lines[16], "count 3")) {
             pairsOk = 0;
         }
     } else {
@@ -75,8 +73,8 @@ i32 main() {
     if (pairsOk) { correct++; }
     else { printf("\n  printf and the print statement differ (jit):\n%s\n", out); }
 
-    tests++;   /* the 64-bit, narrow, Q and D lines have the right text */
-    if (count == 19 && !str.cmp(lines[0], "top level 1") &&
+    tests++;   /* the 64-bit, narrow and Q lines have the right text */
+    if (count == 17 && !str.cmp(lines[0], "top level 1") &&
             !str.cmp(lines[2], "5000000000 -3 200 -2") && !str.cmp(lines[4], "12a05f200 FF 10") &&
             !str.cmp(lines[6], "str| 3.14|A|%") && !str.cmp(lines[8], "a\\\"b")) { correct++; }
     else { printf("\n  printf output: [%s]\n", out); }

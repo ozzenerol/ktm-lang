@@ -1,7 +1,7 @@
 import fs, libc, mem, proc, str, test;
 
 /* Print statements ("%Q\n", s;) went straight to C's printf, so the ktm
- * conversions %Q %D %T %C %F printed garbage or the letter, and the
+ * conversions %Q %C printed garbage or the letter, and the
  * compile-time argument check counted the format the C way. A literal
  * format that uses one of them now calls the library's Print, which
  * formats like str.formatTo; other print statements still call printf. */
@@ -87,43 +87,13 @@ plain 003.1
 xY|AB  |  Z|
 ")) { correct++; }
 
-    /* %D %T print what str.formatTo prints (the time changes from run to run,
-     * so the two lines are compared with each other), %F a file's contents */
-    tests++;
-    {
-        i64 res;
-        u8 *out = runPrint(
-"import date, fs, str;
-
-void main()
-{
-  date.Date d = date.now();
-  u8 *a = str.format(\"%D %T\", d, d);
-  fs.writeAll(\"" PF_DATA "\", \"FILE\", 4);
-  printf(\"%D %T\\n\", d, d);
-  printf(\"%s\\n\", a);
-  printf(\"[%F]\\n\", \"" PF_DATA "\");
-}
-", "-o", &res);
-        u8 *nl = null;
-        if (out) { nl = str.firstOf(out, "\n"); }
-        if (res == 0 && nl && str.len(out) > 20 && !str.cmpLen(out, nl + 1, 19) &&
-                !str.cmp(nl + 21, "[FILE]\n")) {
-            correct++;
-        } else {
-            printf("\n  %%D %%T %%F printed:\n%s\n", out);
-        }
-        mem.free(out);
-        cleanupPrintFmt();
-    }
-
     /* %%Q is a literal, not a conversion */
     tests++;
     if (prints("void main() { printf(\"100%%Q %d\\n\", 1); }\n", "100%Q 1\n")) { correct++; }
 
-    /* Print itself, with a format that isn't a literal */
+    /* str.format with a format that isn't a literal */
     tests++;
-    if (prints("void main() { u8 *f = \"%Q|%d\\n\"; Print(f, \"t\\tab\", 5); }\n",
+    if (prints("import str;\nvoid main() { u8 *f = \"%Q|%d\\n\"; printf(\"%s\", str.format(f, \"t\\tab\", 5)); }\n",
                          "t\\tab|5\n")) { correct++; }
 
     /* the argument check counts ktm conversions */
@@ -134,7 +104,7 @@ void main()
     if (rejects("void main() { printf(\"%Q %d\\n\", \"a\"); }\n",
                             "expects 2 arguments but 1 was supplied")) { correct++; }
     tests++;
-    if (rejects("import date;\n\nvoid main() { printf(\"%D %d\\n\", date.now, 1, 2); }\n",
+    if (rejects("void main() { printf(\"%C %d\\n\", 'a', 1, 2); }\n",
                             "expects 2 arguments but 3 were supplied")) { correct++; }
 
     test.printResult(correct, tests);
