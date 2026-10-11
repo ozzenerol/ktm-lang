@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <ctype.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -49,6 +50,48 @@ int is_terminal;
 #define CLIBS CLIBS_BASE
 #endif
 
+/* Run the link command `cmd`, its messages (ld's "undefined reference to
+ * `_K3geo4area'") printed with ktm's symbols by their names (`geo.area`).
+ * The command's exit status. */
+static AoStr *link_messages = NULL;  /* the last link's, names demangled */
+
+static int linkCommand(const char *cmd) {
+    char errfile[PATH_MAX];
+    const char *dir = getenv("TMPDIR");
+    if (!dir || !*dir) dir = "/tmp";
+    snprintf(errfile, sizeof(errfile), "%s/ktm-link-XXXXXX", dir);
+    int fd = mkstemp(errfile);
+    if (fd < 0) return system(cmd);
+    close(fd);
+    char *full = mprintf("%s 2> %s", cmd, errfile);
+    int rc = system(full);
+    FILE *f = fopen(errfile, "r");
+    if (f) {
+        AoStr *out = aoStrNew();
+        int ch;
+        AoStr *word = aoStrNew();
+        while (1) {
+            ch = fgetc(f);
+            if (ch != EOF && (isalnum(ch) || ch == '_')) {
+                aoStrPutChar(word, (char)ch);
+                continue;
+            }
+            if (word->len) {
+                aoStrCat(out, (char *)astSymbolDisplayName(word->data));
+                word->len = 0;
+                word->data[0] = '\0';
+            }
+            if (ch == EOF) break;
+            aoStrPutChar(out, (char)ch);
+        }
+        fclose(f);
+        fwrite(out->data, 1, out->len, stderr);
+        link_messages = out;
+    }
+    unlink(errfile);
+    return rc;
+}
+
 void safeSystem(const char *cmd, int print_cmd) {
     int ok = system(cmd);
     if (print_cmd)
@@ -84,11 +127,22 @@ typedef struct ktmLib {
 static void noteUndefinedPrototypes(Cctrl *cc) {
     MapIter it;
     mapIterInit(cc->global_env, &it);
+    /* a module's function is in global_env by its name and its symbol */
+    Set *seen = setNew(32, &set_uint_type);
     while (mapIterNext(&it)) {
         Ast *fn = (Ast *)it.node->value;
-        if (fn && fn->kind == AST_FUN_PROTO && (fn->flags & AST_FLAG_PROGRAM)) {
+        if (!fn || setHas(seen, (void *)fn)) continue;
+        setAdd(seen, (void *)fn);
+        int module_fn = fn->fname && !strncmp(fn->fname->data, "_K", 2);
+        /* only what the linker reported missing (a prebuilt module's
+         * functions are prototypes here, defined in its library) */
+        const char *name = fn->fname ? astSymbolDisplayName(fn->fname->data) : NULL;
+        int missing = name && (!link_messages || strstr(link_messages->data, name));
+        if (fn->kind == AST_FUN_PROTO && missing &&
+            ((fn->flags & AST_FLAG_PROGRAM) || module_fn)) {
             fprintf(stderr, "note: `%s` is declared but not defined; a C function "
-                    "is declared with extern \"c\"\n", fn->fname->data);
+                    "is declared with extern \"c\"\n",
+                    astSymbolDisplayName(fn->fname->data));
         }
     }
 }
@@ -492,7 +546,7 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                     link_flags->data,
                     args->clibs ? args->clibs : "",
                     bin);
-            int link_ok = system(cmd->data);
+            int link_ok = linkCommand(cmd->data);
             unlink(asm_tmp_file);
             asm_tmp_file[0] = '\0';
             if (link_ok != 0) {
@@ -550,7 +604,7 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                 clibs,
                 args->output_filename);
 
-        if (system(cmd->data) != 0) {
+        if (linkCommand(cmd->data) != 0) {
             noteUndefinedPrototypes(cc);
             loggerPanic("Failed to execute command: '%s'\n", cmd->data);
         }
