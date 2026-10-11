@@ -151,6 +151,8 @@ i32 main() {
   <li><code>return f();</code> of a function returning a struct crashed the compiler; <code>c ? a : b</code>
   of structs works, and mixing a struct with a pointer in a conditional is an error (it compiled to
   garbage); a field named like an imported module (<code>v.str</code>) is a field.</li>
+  <li>A vector's index error names the method: <code>IntVec.get: index 5 out of range (size 3)</code>
+  (it said <code>IntVecGet</code>).</li>
   <li>A slice in an initialiser list takes one item (<code>Path p = {"name", points};</code>), in
   locals, globals, structs and arrays.</li>
 </ul>
