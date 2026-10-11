@@ -25,7 +25,7 @@ u8 *compileOutput(u8 *source) {
     i64 res;
 
     cleanupPtrConvTest();
-    if (!fs.writeAll(PTRCONV_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(PTRCONV_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return null;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
@@ -34,7 +34,7 @@ u8 *compileOutput(u8 *source) {
     if (res != 0) {
         return null;
     }
-    return fs.readAll(PTRCONV_OUT);
+    return fs.readAll(PTRCONV_OUT).take();
 }
 
 /* Run ./a.out and check what it prints */
@@ -45,7 +45,7 @@ bool runPrints(u8 *expected) {
                          "./a.out > " PTRCONV_RUN " 2>&1") != 0) {
         return false;
     }
-    out = fs.readAll(PTRCONV_RUN);
+    out = fs.readAll(PTRCONV_RUN).take();
     if (out) {
         ok = cstr.cmp(out, expected) == 0;
         if (!ok) { printf("got: %s\n", out); }

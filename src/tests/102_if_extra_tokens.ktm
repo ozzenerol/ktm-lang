@@ -22,7 +22,7 @@ bool compileCheck(u8 *source, bool shouldFail, u8 *expected) {
 
     cleanupIfExtraTest();
 
-    if (!fs.writeAll(IF_EXTRA_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(IF_EXTRA_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -32,7 +32,7 @@ bool compileCheck(u8 *source, bool shouldFail, u8 *expected) {
         if (res == 0) {
             ok = false;
         } else {
-            out = fs.readAll(IF_EXTRA_TEST_OUT);
+            out = fs.readAll(IF_EXTRA_TEST_OUT).take();
             if (!out || !libc.strstr(out, expected)) {
                 if (out) { printf("%s\n", out); }
                 ok = false;
@@ -40,7 +40,7 @@ bool compileCheck(u8 *source, bool shouldFail, u8 *expected) {
             mem.free(out);
         }
     } else if (res != 0) {
-        out = fs.readAll(IF_EXTRA_TEST_OUT);
+        out = fs.readAll(IF_EXTRA_TEST_OUT).take();
         if (out) { printf("%s\n", out); }
         mem.free(out);
         ok = false;

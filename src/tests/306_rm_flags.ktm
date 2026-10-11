@@ -28,7 +28,7 @@ bool exists(u8 *name) {
 }
 
 void makeFile(u8 *name) {
-    fs.writeAll(P(name), "k\n", 2);
+    fs.writeAll(cstr.view(P(name)), "k\n");
 }
 
 /* Send stdout to a file until Captured() */
@@ -45,7 +45,7 @@ bool captured(u8 *want, u8 *path=null) {
     libc.fflush(null);
     dup2(gSaved, 1);
     libc.close(gSaved);
-    u8 *got = fs.readAll(gOut), *exp = cstr.formatTo(null, want, path);
+    u8 *got = fs.readAll(gOut).take(), *exp = cstr.formatTo(null, want, path);
     bool ok = got && !cstr.cmp(got, exp);
     if (!ok) { printf("printed '%s' want '%s'\n", got, exp); }
     mem.free(got);
@@ -67,62 +67,62 @@ i32 main() {
     }
     gRoot = root;
     cstr.formatTo(gOut, "%s/out.txt", root);
-    fs.makeDir(P("w"));
+    fs.makeDir(cstr.view(P("w")));
     makeFile("w/a");
     makeFile("w/b");
     makeFile("w/c");
     makeFile("w/d");
-    fs.makeDir(P("w/empty"));
-    fs.makeDir(P("w/empty2"));
-    fs.makeDir(P("w/full"));
+    fs.makeDir(cstr.view(P("w/empty")));
+    fs.makeDir(cstr.view(P("w/empty2")));
+    fs.makeDir(cstr.view(P("w/full")));
     makeFile("w/full/f");
-    fs.makeDir(P("w/full/sub"));
+    fs.makeDir(cstr.view(P("w/full/sub")));
     makeFile("w/full/sub/g");
 
     /* A file goes with any flags, quietly unless RM_VERBOSE */
     capture();
-    r = fs.remove(P("w/a"));
+    r = fs.remove(cstr.view(P("w/a")));
     tests++; if (captured("") && r == 0 && !exists("w/a")) { correct++; }
     capture();
-    r = fs.remove(P("w/b"), fs.REMOVE_FORCE);
+    r = fs.remove(cstr.view(P("w/b")), fs.REMOVE_FORCE);
     tests++; if (captured("") && r == 0 && !exists("w/b")) { correct++; }
     capture();
-    r = fs.remove(P("w/c"), fs.REMOVE_RECURSE);
+    r = fs.remove(cstr.view(P("w/c")), fs.REMOVE_RECURSE);
     tests++; if (captured("") && r == 0 && !exists("w/c")) { correct++; }
     full = cstr.dup(P("w/d"));
     capture();
-    r = fs.remove(full);
+    r = fs.remove(cstr.view(full));
     tests++; if (captured("") && r == 0 && !exists("w/d")) { correct++; }
     mem.free(full);
 
     /* A missing file: an error, unless RM_FORCE */
-    tests++; if (fs.remove(P("w/zz")) == -1) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/zz"))) == -1) { correct++; }
     capture();
-    r = fs.remove(P("w/zz"), fs.REMOVE_FORCE);
+    r = fs.remove(cstr.view(P("w/zz")), fs.REMOVE_FORCE);
     tests++; if (captured("") && r == 0) { correct++; }
-    tests++; if (fs.remove(P("w/zz"), fs.REMOVE_FORCE|fs.REMOVE_RECURSE) == 0) { correct++; }
-    tests++; if (fs.remove(null) == -1) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/zz")), fs.REMOVE_FORCE|fs.REMOVE_RECURSE) == 0) { correct++; }
+    tests++; if (fs.remove(cstr.view(null)) == -1) { correct++; }
 
     /* An empty directory goes quietly; with RM_VERBOSE it says so */
     capture();
-    r = fs.remove(P("w/empty"));
+    r = fs.remove(cstr.view(P("w/empty")));
     tests++; if (captured("") && r == 0 && !exists("w/empty")) { correct++; }
     full = cstr.dup(P("w/empty2"));
     capture();
-    r = fs.remove(full);
+    r = fs.remove(cstr.view(full));
     tests++; if (captured("") && r == 0 &&
                              !exists("w/empty2")) { correct++; }
     mem.free(full);
 
     /* A full directory needs RM_RECURSE */
     capture();
-    r = fs.remove(P("w/full"));
+    r = fs.remove(cstr.view(P("w/full")));
     tests++; if (captured("") && r == -1 && exists("w/full/f")) { correct++; }
-    tests++; if (fs.remove(P("w/full"), fs.REMOVE_FORCE) == -1 && exists("w/full/f")) { correct++; }
-    tests++; if (fs.remove(P("w/full"), fs.REMOVE_RECURSE) == 0 && !exists("w/full")) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/full")), fs.REMOVE_FORCE) == -1 && exists("w/full/f")) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/full")), fs.REMOVE_RECURSE) == 0 && !exists("w/full")) { correct++; }
 
     fs.remove(gOut);
-    tests++; if (fs.remove(P("w"), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w")), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
     full = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(full);
     mem.free(full);

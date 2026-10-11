@@ -1291,7 +1291,7 @@ void runGroups() {
             libc.fflush(null);
             libc.snprintf(path, 512, "%s/counts.%lld", gDir, group);
             u8 *counts = cstr.format("%d %d", gPass, gFail);
-            fs.writeAll(path, counts, cstr.len(counts));
+            fs.writeAll(path, cstr.view(counts));
             _exit(0);
         } else if (pids[group] == -1) {
             runGroup(group);
@@ -1302,10 +1302,10 @@ void runGroups() {
         if (pids[group] == -1) { continue; }
         libc.waitpid(pids[group], &status, 0);
         libc.snprintf(path, 512, "%s/report.%lld", gDir, group);
-        u8 *report = fs.readAll(path);
+        u8 *report = fs.readAll(path).take();
         if (report) { printf("%s", report); }
         libc.snprintf(path, 512, "%s/counts.%lld", gDir, group);
-        u8 *counts = fs.readAll(path);
+        u8 *counts = fs.readAll(path).take();
         u8 *end;
         if (counts) {
             pass = strtol(counts, &end, 10);
@@ -1343,25 +1343,25 @@ i32 main() {
 
     u8 path[512];
     libc.snprintf(path, 512, "%s/lib.ktm", gDir);
-    fs.writeAll(path, LIB_HC, cstr.len(LIB_HC));
+    fs.writeAll(path, cstr.view(LIB_HC));
     libc.snprintf(path, 512, "%s/sub/deep.ktm", gDir);
-    fs.writeAll(path, DEEP_HC, cstr.len(DEEP_HC));
+    fs.writeAll(path, cstr.view(DEEP_HC));
     libc.snprintf(path, 512, "%s/main.ktm", gDir);
-    fs.writeAll(path, MAIN_HC, cstr.len(MAIN_HC));
+    fs.writeAll(path, cstr.view(MAIN_HC));
     libc.snprintf(path, 512, "%s/bad.ktm", gDir);
-    fs.writeAll(path, BAD_INCLUDE_HC, cstr.len(BAD_INCLUDE_HC));
+    fs.writeAll(path, cstr.view(BAD_INCLUDE_HC));
     libc.snprintf(path, 512, "%s/broken.ktm", gDir);
-    fs.writeAll(path, BROKEN_HC, cstr.len(BROKEN_HC));
+    fs.writeAll(path, cstr.view(BROKEN_HC));
     libc.snprintf(path, 512, "%s/crash.ktm", gDir);
-    fs.writeAll(path, CRASHER_HC, cstr.len(CRASHER_HC));
+    fs.writeAll(path, cstr.view(CRASHER_HC));
     libc.snprintf(path, 512, "%s/rename.ktm", gDir);
-    fs.writeAll(path, RENAME_HC, cstr.len(RENAME_HC));
+    fs.writeAll(path, cstr.view(RENAME_HC));
     libc.snprintf(path, 512, "%s/std.ktm", gDir);
-    fs.writeAll(path, STD_HC, cstr.len(STD_HC));
+    fs.writeAll(path, cstr.view(STD_HC));
     libc.snprintf(path, 512, "%s/geo/geo.ktm", gDir);
-    fs.writeAll(path, MOD_GEO_HC, cstr.len(MOD_GEO_HC));
+    fs.writeAll(path, cstr.view(MOD_GEO_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
-    fs.writeAll(path, MOD_MAIN_HC, cstr.len(MOD_MAIN_HC));
+    fs.writeAll(path, cstr.view(MOD_MAIN_HC));
 
     printf("ktm -lsp tests (%s)\n", gKtm);
     runGroups();

@@ -671,11 +671,11 @@ i32 main() {
 
     tests++;
     proc.shell("rm -f " FF_SRC " " FF_OUT);
-    fs.writeAll(FF_SRC, stmtSrc, cstr.len(stmtSrc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FF_SRC, cstr.view(stmtSrc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-jit " FF_SRC " > " FF_OUT " 2>&1");
-    u8 *out = fs.readAll(FF_OUT);
+    u8 *out = fs.readAll(FF_OUT).take();
     u8 *lines[4];
     i64 n = 0;
     u8 *p = out;

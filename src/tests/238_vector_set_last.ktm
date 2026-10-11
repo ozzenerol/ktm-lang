@@ -17,14 +17,14 @@ void cleanupFiles() {
 
 bool runExpectingExit(u8 *src, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(VS_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(VS_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                      VS_FILE " -o " VS_BIN " > " VS_OUT " 2>&1 && "
                                      "./" VS_BIN " 2> " VS_OUT " >/dev/null; exit $?");
-    u8 *out = fs.readAll(VS_OUT);
+    u8 *out = fs.readAll(VS_OUT).take();
     bool ok = out && res == 1 && libc.strstr(out, expected) != null &&
                         libc.strstr(out, "unreachable") == null;
     if (!ok) { printf("status %d, output: %s\n", res, out); }

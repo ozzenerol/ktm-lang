@@ -20,13 +20,13 @@ void check(bool ok, u8 *what) {
  * exit status */
 u8 *ktm(u8 *src, u8 *flags, i64 *resArg) {
     u8 *cmd;
-    fs.writeAll(XF_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(XF_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " XF_SRC " > " XF_OUT " 2>&1", flags);
     *resArg = proc.shell(cmd);
     mem.free(cmd);
-    return fs.readAll(XF_OUT);
+    return fs.readAll(XF_OUT).take();
 }
 
 i32 main() {

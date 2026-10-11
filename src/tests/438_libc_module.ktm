@@ -21,7 +21,7 @@ u8 *gWant = "hello\n16 3 7\n";
 bool output(u8 *cmd, u8 *want, u8 *not=null) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(MOD_OUT);
+    u8 *out = fs.readAll(MOD_OUT).take();
     bool ok = out && libc.strstr(out, want) != null && (!not || !libc.strstr(out, not));
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
@@ -38,8 +38,8 @@ bool cModule(u8 *extra, u8 *want) {
                "rm -f " TMP_DIR "/p/modules/libc/.ktmlib");
     u8 *mod = cstr.format("module libc;\n%s\n", extra);
     u8 *main = "import libc;\ni32 main() { return libc.strlen(\"\"); }\n";
-    fs.writeAll(TMP_DIR "/p/modules/libc/extra.ktm", mod, cstr.len(mod), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    fs.writeAll(TMP_DIR "/main.ktm", main, cstr.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(TMP_DIR "/p/modules/libc/extra.ktm", cstr.view(mod), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(TMP_DIR "/main.ktm", cstr.view(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     bool ok = output(TIMEOUT "../../ktm --install-dir=" TMP_DIR "/p -S " TMP_DIR "/main.ktm -o /dev/null > " MOD_OUT " 2>&1", want);
     proc.shell("rm -rf " TMP_DIR);
     mem.free(mod);
@@ -79,7 +79,7 @@ i32 main() {
     tests++;
     proc.shell("rm -rf " TMP_DIR " && mkdir -p " TMP_DIR);
     u8 *openSrc = "import libc;\ni32 main() { return libc.open(\"x\", libc.O_CREAT | libc.O_WRONLY, 420); }\n";
-    fs.writeAll(TMP_DIR "/open.ktm", openSrc, cstr.len(openSrc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(TMP_DIR "/open.ktm", cstr.view(openSrc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (output(KTM "--target=aarch64-apple-darwin -S " TMP_DIR "/open.ktm -o " MOD_BIN " && "
                "awk '/str[[:space:]]+x9, \\[sp/ { s = 1 } /bl[[:space:]]+_open$/ { if (s) ok = 1; exit } "
                "END { exit !ok }' " MOD_BIN " && echo variadic > " MOD_OUT, "variadic")) {

@@ -23,7 +23,7 @@ u8 *gWant = "3 24 5 hello lit 3\n";
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " P_OUT " " P_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(P_OUT);
+    u8 *out = fs.readAll(P_OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
@@ -45,13 +45,13 @@ i64 count(u8 *s, u8 *what) {
 bool fails(u8 *main, u8 *shop, u8 *want) {
     proc.shell("rm -rf " P_DIR " && mkdir -p " P_DIR " && "
                  "cp -r ${KTM_TEST_SRC:-.}/modules/private/web " P_DIR "/");
-    fs.writeAll(P_DIR "/main.ktm", main, cstr.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(P_DIR "/main.ktm", cstr.view(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (shop) {
         proc.shell("mkdir -p " P_DIR "/shop");
-        fs.writeAll(P_DIR "/shop/shop.ktm", shop, cstr.len(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+        fs.writeAll(P_DIR "/shop/shop.ktm", cstr.view(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     }
     proc.shell(KTM "-S " P_DIR "/main.ktm -o /dev/null > " P_OUT " 2>&1");
-    u8 *out = fs.readAll(P_OUT);
+    u8 *out = fs.readAll(P_OUT).take();
     bool ok = out && count(out, "error:") == 1 && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", main, out); }
     mem.free(out);

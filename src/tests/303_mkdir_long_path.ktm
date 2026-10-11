@@ -30,18 +30,18 @@ i32 main() {
         p = cstr.appendFormat(p, "/%s", "dddddddddddddddddddddddddddddddddddddddddddddddd");
     }
     if (cstr.len(p) > 800 && cstr.len(p) < 1000) { correct++; }
-    fs.makeDir(p,, true);
+    fs.makeDir(cstr.view(p),, true);
     if (isDir(p)) { correct++; }
 
     /* Again with a trailing '/', over the existing directories */
     q = cstr.formatTo(null, "%s/e/", p);
-    fs.makeDir(q,, true);
+    fs.makeDir(cstr.view(q),, true);
     if (isDir(q)) { correct++; }
 
     /* A short one still works */
     mem.free(q);
     q = cstr.formatTo(null, "%s/x/y/z", root);
-    fs.makeDir(q,, true);
+    fs.makeDir(cstr.view(q),, true);
     if (isDir(q)) { correct++; }
 
     mem.free(q);

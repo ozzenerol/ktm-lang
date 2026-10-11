@@ -13,13 +13,13 @@ import cstr, fs, libc, mem, proc, test;
 /* `source` compiled with `flags` fails with exactly one error, `want` */
 bool fails(u8 *source, u8 *want, u8 *flags = "-S") {
     proc.shell("rm -f " M_SRC " " M_OUT);
-    fs.writeAll(M_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(M_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     u8 *cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                             "%s " M_SRC " -o /dev/null > " M_OUT " 2>&1", flags);
     proc.shell(cmd);
     mem.free(cmd);
-    u8 *out = fs.readAll(M_OUT);
+    u8 *out = fs.readAll(M_OUT).take();
     proc.shell("rm -f " M_SRC " " M_OUT);
     i64 errors = 0;
     u8 *p = out;

@@ -20,13 +20,13 @@ void check(bool ok, u8 *what) {
 u8 *slurp(u8 *cmd) {
     proc.shell("rm -f " PG_OUT);
     if (proc.shell(cmd) != 0) { return null; }
-    return fs.readAll(PG_OUT);
+    return fs.readAll(PG_OUT).take();
 }
 
 /* `src` with -jit and as a binary prints `want` */
 void runsAs(u8 *src, u8 *want, u8 *what) {
     u8 *out, label[128];
-    fs.writeAll(PG_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(PG_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " PG_SRC " > " PG_OUT " 2>/dev/null");
     cstr.formatTo(label, "%s (JIT)", what);
     check(out && !cstr.cmp(out, want), label);

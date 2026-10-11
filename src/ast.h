@@ -145,6 +145,7 @@ typedef enum AstKind {
     AST_SLICE_MAKE    = 303,  /* a `T[]` built from a pointer and a length, see astSliceMake */
     AST_SLICE_ELEM    = 304,  /* &s[i] of a slice, bounds-checked, see astSliceElem */
     AST_SUBSLICE      = 305,  /* s[a:b] of a slice, array or pointer, see astSubSlice */
+    AST_TEMP_ADDR     = 306,  /* &tmp of a struct value put in a hidden variable, see astTempAddr */
 } AstKind;
 
 /* @Cleanup
@@ -641,6 +642,7 @@ int astTypeIsString(AstType *type);
 Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len);
 Ast *astSliceElem(Ast *base, Ast *index, Ast *file, int line);
 Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line);
+Ast *astTempAddr(Ast *var, Ast *value);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 

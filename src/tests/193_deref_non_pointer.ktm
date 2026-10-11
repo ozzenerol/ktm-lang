@@ -24,11 +24,11 @@ bool failsWith(u8 *source, u8 *e1, u8 *e2 = null) {
     bool ok;
 
     cleanupDerefTest();
-    fs.writeAll(DEREF_TEST_SRC, source, cstr.len(source),
+    fs.writeAll(DEREF_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(DEREF_KTM DEREF_TEST_SRC " -o " DEREF_TEST_BIN " > "
                              DEREF_TEST_OUT " 2>&1; test $? -eq 1");
-    out = fs.readAll(DEREF_TEST_OUT);
+    out = fs.readAll(DEREF_TEST_OUT).take();
     ok = res == 0 && out && libc.strstr(out, e1) && (!e2 || libc.strstr(out, e2));
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);
@@ -43,11 +43,11 @@ bool prints(u8 *source, u8 *expected) {
     bool ok;
 
     cleanupDerefTest();
-    fs.writeAll(DEREF_TEST_SRC, source, cstr.len(source),
+    fs.writeAll(DEREF_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(DEREF_KTM DEREF_TEST_SRC " -o " DEREF_TEST_BIN " && "
                              DEREF_TEST_BIN " > " DEREF_TEST_OUT " 2>&1");
-    out = fs.readAll(DEREF_TEST_OUT);
+    out = fs.readAll(DEREF_TEST_OUT).take();
     ok = res == 0 && out && !cstr.cmp(out, expected);
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);

@@ -20,8 +20,8 @@ i32 main() {
     }
     f = cstr.formatTo(null, "%s/file", root);
     d = cstr.formatTo(null, "%s/dir", root);
-    fs.writeAll(f, "hello world\n", 12);
-    fs.makeDir(d);
+    fs.writeAll(cstr.view(f), "hello world\n");
+    fs.makeDir(cstr.view(d));
 
     tests++;
     if (libc.stat(f, &st) == 0 && (st.st_mode & libc.S_IFMT) == libc.S_IFREG) { correct++; }
@@ -41,7 +41,9 @@ i32 main() {
 
     tests++;
     i64 len = -1;
-    u8 *buf = fs.readAll(f, &len);
+    String buf_read = fs.readAll(cstr.view(f));
+    len = buf_read.len;
+    u8 *buf = buf_read.take();
     if (buf && len == 12 && !cstr.cmpLen(buf, "hello world\n", 12)) { correct++; }
     mem.free(buf);
 

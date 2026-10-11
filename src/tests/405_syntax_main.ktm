@@ -10,7 +10,7 @@ import cstr, fs, libc, proc, test;
 #define KTM "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
 void put(u8 *name, u8 *text) {
-    fs.writeAll(name, text, cstr.len(text));
+    fs.writeAll(cstr.view(name), cstr.view(text));
 }
 
 /* Output and exit code of the program in file, run with args, both ways:

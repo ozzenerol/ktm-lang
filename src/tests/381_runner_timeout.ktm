@@ -60,7 +60,9 @@ i32 main() {
     }
     libc.waitpid(pid, &status, 0);
     took = nowMs() - began;
-    u8 *out = fs.readAll("__381_out", &len);
+    String out_read = fs.readAll("__381_out");
+    len = out_read.len;
+    u8 *out = out_read.take();
 
     tests++;
     if (contains(out, "FAILED") && contains(out, "timed out after 2 s: hang")) {
@@ -75,7 +77,7 @@ i32 main() {
     else { printf("took %d ms ", took); }
 
     /* the sleep the hanging test started was killed too */
-    u8 *pidText = fs.readAll("__381_pid");
+    u8 *pidText = fs.readAll("__381_pid").take();
     if (pidText) { sleepPid = cstr.toInt(pidText); }
     for (i = 0; i < 300 && sleepPid > 0 && libc.kill(sleepPid, 0) == 0; i++) {
         usleep(10000);

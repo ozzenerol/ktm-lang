@@ -3167,6 +3167,13 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
         Ast *recv;
         if (astIsDeref(cls)) {
             recv = cls->operand;
+        } else if ((cls->kind == AST_FUNCALL || cls->kind == AST_FUNPTR_CALL ||
+                    cls->kind == AST_ASM_FUNCALL) &&
+                   (cls->type->kind == AST_TYPE_CLASS || cls->type->kind == AST_TYPE_UNION) &&
+                   !cls->type->is_intrinsic) {
+            /* a call's result (`fs.readAll(p).take()`): its value in a
+             * hidden variable, for self to point at */
+            recv = astTempAddr(parseHiddenSliceVar(cc, cls->type), cls);
         } else {
             if (!assertLValue(cls)) {
                 cctrlRaiseException(cc, "a method is called on a variable "

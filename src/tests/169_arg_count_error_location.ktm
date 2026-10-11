@@ -26,9 +26,9 @@ bool errorAt(u8 *body, u8 *where, u8 *underline) {
     u8 *out;
     bool ok = false;
     cleanupAcTest();
-    if (fs.writeAll(AC_TEST_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(AC_TEST_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " AC_TEST_FILE " > " AC_TEST_OUT " 2>&1") != 0) {
-            out = fs.readAll(AC_TEST_OUT);
+            out = fs.readAll(AC_TEST_OUT).take();
             if (out) {
                 ok = libc.strstr(out, "Unexpected number of arguments") && libc.strstr(out, where) &&
                          libc.strstr(out, underline);

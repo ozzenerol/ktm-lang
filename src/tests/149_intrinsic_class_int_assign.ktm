@@ -18,11 +18,11 @@ void cleanupIcTest(void) {
 /* Runs `source` with the JIT; the combined stdout and stderr, or null. */
 u8 *runKtm(u8 *source) {
     cleanupIcTest();
-    if (!fs.writeAll(IC_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(IC_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return null;
     }
     proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " IC_TEST_FILE " > " IC_TEST_OUT " 2>&1");
-    u8 *out = fs.readAll(IC_TEST_OUT);
+    u8 *out = fs.readAll(IC_TEST_OUT).take();
     cleanupIcTest();
     return out;
 }

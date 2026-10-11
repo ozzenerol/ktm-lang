@@ -34,7 +34,7 @@ bool writeSources() {
     for (i64 id = 0; id < CC_JOBS; id++) {
         u8 *path = cstr.format(CC_DIR "/p%d.ktm", id);
         u8 *src = programSource(id);
-        bool ok = fs.writeAll(path, src, cstr.len(src));
+        bool ok = fs.writeAll(cstr.view(path), cstr.view(src));
         mem.free(src);
         mem.free(path);
         if (!ok) { return false; }
@@ -84,10 +84,10 @@ bool compileAllAtOnce(u8 *flags) {
 
     for (id = 0; id < CC_JOBS; id++) {
         u8 *path = cstr.format(CC_DIR "/p%d.out", id);
-        u8 *out = fs.readAll(path);
+        u8 *out = fs.readAll(cstr.view(path)).take();
         u8 *want = cstr.format("prog %d %d\n", id, expectedSum(id));
         if (!out || cstr.cmp(out, want)) {
-            u8 *log = fs.readAll(cstr.format(CC_DIR "/p%d.log", id));
+            u8 *log = fs.readAll(cstr.view(cstr.format(CC_DIR "/p%d.log", id))).take();
             printf("program %d: got '%s', want '%s'\n%s\n", id, out, want, log);
             ok = false;
         }
@@ -119,7 +119,7 @@ i32 main() {
 
     /* ... and when linking fails (ktm exits through its panic path) */
     u8 *bad = "extern \"c\" void Ktm360NoSuchFn();\nvoid main() { Ktm360NoSuchFn(); }\n";
-    fs.writeAll(CC_DIR "/bad.ktm", bad, cstr.len(bad));
+    fs.writeAll(CC_DIR "/bad.ktm", cstr.view(bad));
     if (proc.shell("TMPDIR=\"$PWD/" CC_DIR "/tmp\" " CC_KTM CC_DIR "/bad.ktm -o " CC_DIR "/bad > /dev/null 2>&1") != 0) { correct++; }
     else { printf("Failed - linking an undefined function succeeded\n"); }
     if (leftoverTmpFiles(CC_DIR "/tmp") == 0) { correct++; }

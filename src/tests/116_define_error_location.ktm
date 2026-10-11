@@ -20,7 +20,7 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *excerpt, u8 *caret) {
 
     cleanupDefLocTest();
 
-    if (!fs.writeAll(DEF_LOC_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DEF_LOC_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -30,7 +30,7 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *excerpt, u8 *caret) {
         return false;
     }
 
-    out = fs.readAll(DEF_LOC_OUT);
+    out = fs.readAll(DEF_LOC_OUT).take();
     if (!out) {
         cleanupDefLocTest();
         return false;

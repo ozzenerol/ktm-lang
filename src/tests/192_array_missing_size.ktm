@@ -23,11 +23,11 @@ bool failsWith(u8 *source, u8 *e1, u8 *e2 = null) {
     bool ok;
 
     cleanupArrSizeTest();
-    fs.writeAll(ARRSZ_TEST_SRC, source, cstr.len(source),
+    fs.writeAll(ARRSZ_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(ARRSZ_KTM ARRSZ_TEST_SRC " -o " ARRSZ_TEST_BIN " > "
                              ARRSZ_TEST_OUT " 2>&1; test $? -eq 1");
-    out = fs.readAll(ARRSZ_TEST_OUT);
+    out = fs.readAll(ARRSZ_TEST_OUT).take();
     ok = res == 0 && out && libc.strstr(out, e1) && (!e2 || libc.strstr(out, e2));
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);

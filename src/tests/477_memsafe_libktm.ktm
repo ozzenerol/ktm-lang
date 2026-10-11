@@ -19,12 +19,12 @@ void check(bool ok, u8 *what, u8 *out) {
 }
 
 u8 *memsafe(u8 *src) {
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput(KTM "-Memsafe -jit " SRC_FILE " 2>&1");
 }
 
 u8 *repl(u8 *src) {
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("HOME=. " KTM "-repl < " SRC_FILE " 2>&1");
 }
 

@@ -12,11 +12,11 @@ import cstr, fs, libc, mem, proc, test;
 bool uncaught(u8 *body, u8 *wantErr, u8 *wantOut) {
     u8 *src = cstr.formatTo(null, "void main()\n{\n%s\n}\n", body);
     bool ok = false;
-    if (fs.writeAll(UT_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC) &&
+    if (fs.writeAll(UT_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC) &&
             proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                          UT_SRC " -o " UT_BIN) == 0) {
         i64 res = proc.shell(UT_BIN " > " UT_OUT " 2> " UT_ERR);
-        u8 *out = fs.readAll(UT_OUT), *err = fs.readAll(UT_ERR);
+        u8 *out = fs.readAll(UT_OUT).take(), *err = fs.readAll(UT_ERR).take();
         if (out && err) {
             ok = res == 1 && !cstr.cmp(err, wantErr) && !cstr.cmp(out, wantOut);
             if (!ok) { printf("\nexit %d, stdout [%s], stderr [%s]\n", res, out, err); }

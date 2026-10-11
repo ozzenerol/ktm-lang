@@ -43,17 +43,18 @@ void countWord(map.StrMap *counts, u8 *word) {
 }
 
 i32 main(i32 argc, u8 **argv) {
-    u8 *path = "sample.txt";
+    u8[] path = "sample.txt";
     if (argc > 1) {
-        path = argv[1];
+        path = cstr.view(argv[1]);
     }
 
-    i64 size;
-    u8 *text = fs.readAll(path, &size);
-    if (text == null) {
+    String text = fs.readAll(path);
+    defer text.free();
+    if (!text.ptr) {
         printf("cannot read %s\n", path);
         return 1;
     }
+    i64 size = text.len;
 
     map.StrMap *counts = map.strNew();
     u8 word[MAX_WORD];
@@ -89,6 +90,5 @@ i32 main(i32 argc, u8 **argv) {
         printf("%2d. %-10s %d\n", i + 1, top.word, top.count);
     }
 
-    mem.free(text);
     return 0;
 }

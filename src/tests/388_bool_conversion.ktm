@@ -140,7 +140,7 @@ void library() {
 
     /* RM_VERBOSE alone must not act like RM_RECURSE (2 as a bool is 1) */
     fs.makeDir("./ktm-388/sub", fs.MAKE_DIR_DEFAULT, true);
-    fs.writeAll("./ktm-388/sub/f", "x", 1);
+    fs.writeAll("./ktm-388/sub/f", "x");
     check(fs.removeDir("./ktm-388", 0) != 0 && exists("./ktm-388/sub/f"),
             "removeDir without REMOVE_RECURSE doesn't recurse");
     check(fs.removeDir("./ktm-388", fs.REMOVE_RECURSE) == 0 && !exists("./ktm-388"),

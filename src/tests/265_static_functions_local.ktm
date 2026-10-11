@@ -24,14 +24,14 @@ bool runs(bool jit, u8 *source, u8 *want) {
     u8 *out;
     i64 res;
     cleanup();
-    fs.writeAll(SL_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(SL_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (jit) {
         res = proc.shell(SL_KTM "-jit " SL_FILE " > " SL_OUT " 2>&1");
     } else {
         res = proc.shell(SL_KTM SL_FILE " -o " SL_EXE " > " SL_OUT " 2>&1 && "
                                  SL_TIMEOUT "./" SL_EXE " >> " SL_OUT " 2>&1");
     }
-    out = fs.readAll(SL_OUT);
+    out = fs.readAll(SL_OUT).take();
     bool ok = res == 0 && out && libc.strstr(out, want);
     if (!ok) { printf("jit=%d: exit status %d\n%s\n", jit, res, out); }
     mem.free(out);

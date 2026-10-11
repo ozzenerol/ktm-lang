@@ -17,7 +17,7 @@ i32 main() {
               "replHeap();\n"
               "replReloadRc();\n"
               "printf(\"end\\n\");\n";
-    fs.writeAll(IN_FILE, src, cstr.len(src));
+    fs.writeAll(IN_FILE, cstr.view(src));
     /* HOME here, so no ~/.ktm_rc.ktm is read */
     u8 *out = proc.shellOutput("HOME=. $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "

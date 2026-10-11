@@ -19,7 +19,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
     i64 res;
 
     cleanupPtrCmpTest();
-    if (!fs.writeAll(PTR_CMP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(PTR_CMP_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PTR_CMP_TEST_FILE " > " PTR_CMP_TEST_OUT " 2>&1");
@@ -27,7 +27,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         cleanupPtrCmpTest();
         return false;
     }
-    out = fs.readAll(PTR_CMP_TEST_OUT);
+    out = fs.readAll(PTR_CMP_TEST_OUT).take();
     if (!out) {
         cleanupPtrCmpTest();
         return false;

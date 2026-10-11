@@ -22,9 +22,9 @@ bool outputHas(u8 *src, u8 *expected) {
     u8 *out;
     bool ok = false;
     cleanupAtTest();
-    if (fs.writeAll(AT_TEST_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(AT_TEST_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " AT_TEST_FILE " > " AT_TEST_OUT " 2>&1");
-        out = fs.readAll(AT_TEST_OUT);
+        out = fs.readAll(AT_TEST_OUT).take();
         if (out) {
             ok = libc.strstr(out, expected) != null;
             if (!ok) { printf("%s\n", out); }

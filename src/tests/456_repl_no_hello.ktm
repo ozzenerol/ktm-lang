@@ -22,7 +22,7 @@ i32 main() {
              "  HOME=$d script -q /dev/null $k\n"
              "fi\n"
              "rm -rf $d\n";
-    fs.writeAll(SH_FILE, sh, cstr.len(sh));
+    fs.writeAll(SH_FILE, cstr.view(sh));
 
     /* without the define the greeting shows: the REPL did get a terminal */
     u8 *out = proc.shellOutput(RUN " loud 2>&1");

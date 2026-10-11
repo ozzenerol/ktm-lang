@@ -52,7 +52,7 @@ void cleanupFiles() {
  * and, when `expected` is given, the output contains it. */
 bool compile(u8 *source, bool shouldFail, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(DEFARGS_FILE, source, cstr.len(source),
+    if (!fs.writeAll(DEFARGS_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
@@ -61,7 +61,7 @@ bool compile(u8 *source, bool shouldFail, u8 *expected) {
                                      DEFARGS_FILE " -o " DEFARGS_BIN " > " DEFARGS_OUT " 2>&1");
     bool ok = (res != 0) == shouldFail;
     if (ok && expected) {
-        u8 *out = fs.readAll(DEFARGS_OUT);
+        u8 *out = fs.readAll(DEFARGS_OUT).take();
         ok = out && libc.strstr(out, expected) != null;
         if (!ok && out) { printf("%s\n", out); }
         mem.free(out);

@@ -57,7 +57,7 @@ void main() {
     i64 correct = 0, tests = 8;
 
     cleanupCrossTest();
-    fs.writeAll(CT_FILE, ctSource, cstr.len(ctSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CT_FILE, cstr.view(ctSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     if (hasGnuStack("x86_64-unknown-linux-gnu") == 1) { correct++; }
     if (hasGnuStack("aarch64-unknown-linux-gnu") == 1) { correct++; }

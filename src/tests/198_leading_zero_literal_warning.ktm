@@ -36,14 +36,14 @@ bool runLeadingZero(u8 *flags, u8 *source, i64 status, i64 nwarn,
     bool ok = true;
 
     cleanupLeadingZeroTest();
-    if (!fs.writeAll(LZ_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(LZ_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     cmd = cstr.format(LZ_KTM "%s -jit " LZ_FILE " > " LZ_OUT " 2>&1", flags);
     res = proc.shell(cmd);
     mem.free(cmd);
 
-    out = fs.readAll(LZ_OUT);
+    out = fs.readAll(LZ_OUT).take();
     if (!out) {
         cleanupLeadingZeroTest();
         return false;

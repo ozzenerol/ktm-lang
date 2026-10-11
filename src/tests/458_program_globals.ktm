@@ -18,7 +18,7 @@ void check(bool ok, u8 *what, u8 *out) {
 }
 
 void put(u8 *path, u8 *src) {
-    fs.writeAll(path, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(cstr.view(path), cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 /* ktm's output for DIR/<file>: -jit, or built and run */

@@ -28,13 +28,12 @@ i32 main() {
     tests++;
     if (cstr.firstOf(null, ".") == null && cstr.firstOf("a.b", null) == null &&
             cstr.lastOf(null, ".") == null && cstr.lastOf("a.b", null) == null &&
-            fs.ext(null) == null &&
+            fs.ext(cstr.view(null)).len == 0 &&
             cstr.toInt(null) == 0 && cstr.toInt("42") == 42) { correct++; }
 
     u8 dst[16];
-    cstr.copy(dst, "junk");
-    fs.cutExt(null, dst);
-    bool ok = dst[0] == '\0';
+    /* fs.cutExt takes a u8[]: an empty one gives an empty one */
+    bool ok = fs.cutExt(cstr.view(null)).len == 0;
     /* str.splitFirst/splitLast take a u8[] now: an empty one (null, 0) */
     u8[] none, before, after;
     ok = ok && !str.splitFirst(none, "/", &before, &after) && before.len == 0 && after.len == 0;

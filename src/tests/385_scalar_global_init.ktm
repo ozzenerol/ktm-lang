@@ -21,14 +21,14 @@ void check(bool ok, u8 *what) {
 u8 *slurp(u8 *cmd) {
     proc.shell("rm -f " GI_OUT);
     if (proc.shell(cmd) != 0) { return null; }
-    return fs.readAll(GI_OUT);
+    return fs.readAll(GI_OUT).take();
 }
 
 /* `src` built with -jit and as a binary, run with the arguments
  * "one two", prints `want` both ways */
 void runsAs(u8 *src, u8 *want, u8 *what) {
     u8 *out, label[128];
-    fs.writeAll(GI_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(GI_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " GI_SRC " one two > " GI_OUT " 2>&1");
     cstr.formatTo(label, "%s (JIT)", what);
     check(out && !cstr.cmp(out, want), label);

@@ -37,13 +37,13 @@ bool compileFailsTwice(u8 *source, u8 *m1, u8 *loc1, u8 *m2, u8 *loc2) {
 
     cleanupInitRecoveryTest();
 
-    if (!fs.writeAll(INIT_RECOVERY_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(INIT_RECOVERY_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " INIT_RECOVERY_FILE " > " INIT_RECOVERY_OUT " 2>&1");
 
-    out = fs.readAll(INIT_RECOVERY_OUT);
+    out = fs.readAll(INIT_RECOVERY_OUT).take();
     if (!out) {
         cleanupInitRecoveryTest();
         return false;

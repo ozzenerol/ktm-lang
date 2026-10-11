@@ -22,7 +22,7 @@ u8 *gWant = "9 5 4\n";
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " OUT " " BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(OUT);
+    u8 *out = fs.readAll(OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);

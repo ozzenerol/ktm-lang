@@ -382,6 +382,16 @@ pub i64 toInt(u8 *str)
         return libc.atol(str);
 }
 
+/* The bytes of a C string, before its NUL, as a u8[] (a view, nothing
+ * copied; empty for null): where a u8[] is wanted, `cstr.view(path)` */
+pub u8[] view(u8 *s) {
+        if (!s) {
+                u8[] none;
+                return none;
+        }
+        return s[0:libc.strlen(s)];
+}
+
 /* The length of `buf` before its '\0', 0 for null. libc's strlen, which
     * reads a word at a time: about 5x the old byte loop. */
 pub u64 len(u8 *buf) {

@@ -28,7 +28,7 @@ i64 sumY(Point[] ps) { i64 t = 0; for (i64 i = 0; i < ps.len; i++) { t += ps[i].
 u8 *errorOf(u8 *code) {
     u8 *src = cstr.format("i32 main() {\n    i64 x[2] = {1, 2};\n    i64[] a = x, b = x;\n"
                          "    %s\n    return 0;\n}\n", code);
-    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");

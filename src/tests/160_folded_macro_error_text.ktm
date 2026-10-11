@@ -20,13 +20,13 @@ bool jitOutputHas(u8 *source, bool ok, u8 *expected) {
     bool good = true;
 
     cleanupFoldedTest();
-    if (!fs.writeAll(FM_TEST_FILE, source, cstr.len(source),
+    if (!fs.writeAll(FM_TEST_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " FM_TEST_FILE " > " FM_TEST_OUT " 2>&1");
     if ((res == 0) != ok) { good = false; }
-    out = fs.readAll(FM_TEST_OUT);
+    out = fs.readAll(FM_TEST_OUT).take();
     if (!out) {
         cleanupFoldedTest();
         return false;

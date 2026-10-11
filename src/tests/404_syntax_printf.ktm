@@ -53,7 +53,7 @@ i32 main() {
     i64 correct = 0, tests = 0, i;
     printf("Test - printf: ");
 
-    fs.writeAll("__404_both.ktm", both, cstr.len(both));
+    fs.writeAll("__404_both.ktm", cstr.view(both));
     u8 *out = proc.shellOutput(KTM "-jit __404_both.ktm 2>&1");
     u8 *aot = proc.shellOutput(KTM "__404_both.ktm -o __404_both 2>&1 && ./__404_both");
 
@@ -85,7 +85,7 @@ i32 main() {
 
     tests++;   /* the arguments are checked against the format */
     u8 *bad = "void main()\n{\n  printf(\"%s %d\\n\", \"x\");\n}\n";
-    fs.writeAll("__404_bad.ktm", bad, cstr.len(bad));
+    fs.writeAll("__404_bad.ktm", cstr.view(bad));
     u8 *err = proc.shellOutput(KTM "-jit __404_bad.ktm 2>&1");
     if (err && libc.strstr(err, "printf format expects 2 arguments but 1 was supplied") &&
             libc.strstr(err, "__404_bad.ktm:3:")) { correct++; }

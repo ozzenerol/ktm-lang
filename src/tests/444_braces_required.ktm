@@ -9,11 +9,11 @@ import cstr, fs, libc, mem, proc, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " BR_SRC " " BR_OUT);
-    fs.writeAll(BR_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(BR_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                "-S " BR_SRC " -o /dev/null > " BR_OUT " 2>&1");
-    u8 *out = fs.readAll(BR_OUT);
+    u8 *out = fs.readAll(BR_OUT).take();
     proc.shell("rm -f " BR_SRC " " BR_OUT);
     return out;
 }

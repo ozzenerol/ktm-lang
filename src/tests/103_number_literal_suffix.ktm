@@ -23,7 +23,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupNumSuffixTest();
 
-    if (!fs.writeAll(NUM_SUFFIX_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NUM_SUFFIX_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -32,7 +32,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         printf("ktm exit status %d, expected a normal compile failure\n", res);
         ok = false;
     } else {
-        out = fs.readAll(NUM_SUFFIX_TEST_OUT);
+        out = fs.readAll(NUM_SUFFIX_TEST_OUT).take();
         if (!out || !libc.strstr(out, expected) || !libc.strstr(out, "malformed numeric literal")) {
             if (out) { printf("%s\n", out); }
             ok = false;

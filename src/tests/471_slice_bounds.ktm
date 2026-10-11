@@ -66,7 +66,7 @@ i32 main() {
 
     /* uncaught: the program's report names it */
     u8 *src = "i32 main() {\n    i64 a[2] = {1, 2};\n    i64[] s = a;\n    return s[2];\n}\n";
-    fs.writeAll("__471_src.ktm", src, cstr.len(src));
+    fs.writeAll("__471_src.ktm", cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit __471_src.ktm 2>&1");

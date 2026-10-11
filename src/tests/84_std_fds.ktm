@@ -19,7 +19,7 @@ void cleanupFdTest(void) {
 
 /* The file at `path` holds exactly `expected` */
 bool fileIs(u8 *path, u8 *expected) {
-    u8 *got = fs.readAll(path);
+    u8 *got = fs.readAll(cstr.view(path)).take();
     bool ok;
     if (!got) {
         printf("%s missing\n", path);
@@ -54,7 +54,7 @@ i32 main()
   return 0;
 }
 ";
-    fs.writeAll(FD_TEST_PROG, prog, cstr.len(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FD_TEST_PROG, cstr.view(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     /* stdin is /dev/null (read-only), stdout and stderr are files */
     if (proc.shell(FD_TEST_KTM " < /dev/null > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) { correct++; }

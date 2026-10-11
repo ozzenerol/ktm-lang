@@ -17,13 +17,13 @@ u8 *diagnose(u8 *source, bool jit) {
     i64 res;
     if (jit) { mode = "-jit"; }
     proc.shell("rm -f " RO_SRC " " RO_OUT);
-    fs.writeAll(RO_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(RO_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " RO_SRC " > " RO_OUT " 2>&1",
                                     mode);
     res = proc.shell(cmd);
-    if (res == 1) { out = fs.readAll(RO_OUT); }
+    if (res == 1) { out = fs.readAll(RO_OUT).take(); }
     else { printf("ktm exited with %d\n", res); }
     proc.shell("rm -f " RO_SRC " " RO_OUT);
     mem.free(cmd);

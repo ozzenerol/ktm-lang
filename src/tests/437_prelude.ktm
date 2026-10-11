@@ -21,7 +21,7 @@ u8 *gWant = "1 383 42\nError 5\n";
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(MOD_OUT);
+    u8 *out = fs.readAll(MOD_OUT).take();
     bool ok = out && libc.strstr(out, want) != null;
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
@@ -31,7 +31,7 @@ bool output(u8 *cmd, u8 *want) {
 
 /* the diagnostics for `source` have want in them */
 bool diagnose(u8 *source, u8 *want) {
-    fs.writeAll(AT_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     bool ok = output(KTM "-S " AT_SRC " -o /dev/null > " MOD_OUT " 2>&1", want);
     proc.shell("rm -f " AT_SRC);
     return ok;

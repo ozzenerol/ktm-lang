@@ -24,7 +24,7 @@ void cleanupPrintFmt(void) {
 u8 *runPrint(u8 *src, u8 *how, i64 *resArg) {
     u8 *cmd;
     cleanupPrintFmt();
-    if (!fs.writeAll(PF_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(PF_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return null;
     }
     if (!cstr.cmp(how, "-jit")) {
@@ -33,7 +33,7 @@ u8 *runPrint(u8 *src, u8 *how, i64 *resArg) {
         cmd = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PF_FILE " -o " PF_BIN " > " PF_OUT " 2>&1 && ./" PF_BIN " > " PF_OUT " 2>&1";
     }
     *resArg = proc.shell(cmd);
-    return fs.readAll(PF_OUT);
+    return fs.readAll(PF_OUT).take();
 }
 
 /* `src` runs (both ways) and prints exactly `want` */
