@@ -1,0 +1,15 @@
+// map: a container function is a method call only on a pointer of its type
+import list, vec;
+
+void main()
+{
+  list.List *l = list.new();
+  l.append(null);
+  void *p = l.first();
+  p = list.List.first(null);
+  void *raw = l;
+  list.List.count(raw);
+  vec.IntVec *v = vec.intNew();
+  v.push(3);
+  vec.IntVec.push(null, 4);
+}

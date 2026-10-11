@@ -2613,7 +2613,7 @@ static Ast *parsePrimary(Cctrl *cc) {
                              !strcmp(ast->lname->data, "self"))) {
             migrateNoteName(cc, &mig_name);
         }
-        if (cc->migrate) migrateNoteRef(cc, &mig_name);
+        if (cc->migrate) migrateNoteRef(cc, &mig_name, ast);
 #endif
 #ifdef KTM_CONVERT
         if (cc->migrate && ast && ast->kind == AST_LVAR &&

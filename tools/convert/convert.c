@@ -1371,7 +1371,31 @@ static void migSwapArgs(MigFile *f, s64 p, int a, int b) {
     migAddSegs(f, starts[b], ends[b], "swap", migRange(starts[a], ends[a]), NULL);
 }
 
-void migrateNoteRef(Cctrl *cc, Lexeme *name) {
+/* Whether the call's first argument is a pointer to the container type of
+ * decl's first parameter, so `Old(recv, ...)` can be `recv.method(...)`;
+ * true when the call isn't known (a call statement at file scope) */
+static int migReceiverFits(Ast *decl, Ast *call) {
+    if (!call || call->kind != AST_FUNCALL || !call->args || call->args->size == 0) return 1;
+    Ast *arg = call->args->entries[0];
+    Ast *p0 = decl->params->entries[0];
+    if (!arg || !arg->type || arg->type->kind != AST_TYPE_POINTER || !arg->type->ptr ||
+        !arg->type->ptr->clsname) return 0;
+    const char *a = arg->type->ptr->clsname->data, *b = p0->type->ptr->clsname->data;
+    const char *ad = strrchr(a, '.'), *bd = strrchr(b, '.');
+    return !strcmp(ad ? ad + 1 : a, bd ? bd + 1 : b);
+}
+
+/* `mod.Type.method`, the explicit form of a method call, for a receiver
+ * that isn't the container's pointer (null, a void *, ...) */
+static char *migExplicitMethod(MigFile *f, Ast *decl, const char *meth) {
+    Ast *p0 = decl->params->entries[0];
+    const char *cls = p0->type->ptr->clsname->data, *dot = strrchr(cls, '.');
+    MigName *t = mapGet(mig_map, (char *)(dot ? dot + 1 : cls));
+    if (!t || strcmp(t->kind, "type")) return NULL;
+    return mprintf("%s.%s", migQualified(f, t), meth);
+}
+
+void migrateNoteRef(Cctrl *cc, Lexeme *name, Ast *call) {
     if (!mig_map) return;
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;
@@ -1403,6 +1427,13 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name) {
         return;
     }
     char *meth = migMethodName(decl, m);
+    if (meth && !migReceiverFits(decl, call)) {
+        char *explicit_name = migExplicitMethod(f, decl, meth);
+        if (explicit_name) {
+            migAdd(f, s, s + name->len, explicit_name, "stdlib");
+            return;
+        }
+    }
     if (meth && migMethodCall(f, s, name->len, meth)) return;
     migAdd(f, s, s + name->len, migQualified(f, m), "stdlib");
     /* decision 11: QSortGeneric(arr, high, low, lt) is vec.qsort(arr, low, high, lt) */

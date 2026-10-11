@@ -5353,7 +5353,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 if (cc->migrate) {
                     Lexeme mig_call = *tok;
                     migrateNoteName(cc, &mig_call);
-                    migrateNoteRef(cc, &mig_call);
+                    migrateNoteRef(cc, &mig_call, NULL);
                 }
 #endif
                 cctrlTokenGet(cc);

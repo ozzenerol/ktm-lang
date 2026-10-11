@@ -37,7 +37,7 @@ void migrateNoteBody(Cctrl *cc, Lexeme *hdr, Lexeme *first, Lexeme *last);
  * renamed when it is a keyword or type name of the new syntax */
 void migrateNoteName(Cctrl *cc, Lexeme *name);
 /* An identifier used in an expression (with --map: a stdlib name) */
-void migrateNoteRef(Cctrl *cc, Lexeme *name);
+void migrateNoteRef(Cctrl *cc, Lexeme *name, Ast *call);
 /* A type name (with --map: a stdlib type) */
 void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type);
 void migrateNoteTypeDef(Cctrl *cc, Lexeme *name);

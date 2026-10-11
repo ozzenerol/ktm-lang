@@ -1,0 +1,312 @@
+diff --git a/src/std/coro/coroutines.ktm b/src/std/coro/coroutines.ktm
+index b36a093..050a720 100644
+--- a/src/std/coro/coroutines.ktm
++++ b/src/std/coro/coroutines.ktm
+@@ -256,7 +256,7 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
+     u64 *sp = top - 20;
+     mem.set(sp, 0, 20 * sizeof(u64));
+     sp[0] = (u64)c;              /* X19 */
+-    sp[11] = (u64)&CoroEntry;    /* X30 (lr); X29 (fp) stays 0 */
++    sp[11] = (u64)&coroEntry;    /* X30 (lr); X29 (fp) stays 0 */
+ #endif
+     c.sp = sp;
+     return c;
+diff --git a/src/std/map/hashtable.ktm b/src/std/map/hashtable.ktm
+index d5a150f..1fa37de 100644
+--- a/src/std/map/hashtable.ktm
++++ b/src/std/map/hashtable.ktm
+@@ -1,5 +1,5 @@
+ module map;
+-import mem, os, str, vec;
++import mem, str, vec;
+ 
+ const i64 HT_LOAD = 60;
+ 
+@@ -102,7 +102,7 @@ u64 intMapHashFunction(i64 key, u64 mask)
+         return htFmix64(key) & mask;
+ }
+ 
+-pub IntMap *intNew(u64 capacity)
++pub IntMap *intNew(u64 capacity = 32)
+ {// null when out of memory
+         IntMap *map = mem.alloc(sizeof(IntMap));
+         if (!map) {
+@@ -466,7 +466,7 @@ pub u8 *IntMap.keysToStr() {
+         return buffer;
+ }
+ 
+-pub StrMap *strNew(u64 capacity)
++pub StrMap *strNew(u64 capacity = 32)
+ {// null when out of memory
+         StrMap *map = mem.alloc(sizeof(StrMap));
+         if (!map) {
+@@ -910,129 +910,3 @@ pub u8 *StrMap.keysToStr() {
+         }
+         return buffer;
+ }
+-
+-#ifdef KTM_HT_TEST
+-void IntMapTests(void) {
+-        IntMap *map = intNew(8);
+-        IntMapNode *n;
+-        u8 *strs[] = {
+-                printf("hello",
+-                "world",
+-                "foo",
+-                "bar",
+-                "baz",
+-                "cat",
+-                "dog",
+-                "owl"
+-        });
+-        i64 len = sizeof(strs)/sizeof(strs[0]);
+-
+-        for (i64 i = 0; i < len; i++) {
+-                intSet(map,i,strs[i]);
+-        }
+-
+-
+-        for (i64 i = 0; i < len; i++) {
+-                u8 *value = intGet(map,i);
+-                if (value != strs[i]) {
+-                        printf("Failed IntMapTests -> IntMapGet: %d=>%s\n",i,value);
+-                        os.exit;
+-                }
+-        }
+-
+-        for (i64 i = 0; i < len; i++) {
+-                if (!intHas(map,i)) {
+-                        printf("Failed IntMapTests -> IntMapHas\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        /* Inorder iteration */
+-        for (i64 i = 0; intIter(map,&i,&n);) {
+-                if (strs[i-1] != n->value) {
+-                        printf("Failed IntMapTests -> IntMapIter i=%d key=%d => value=%s str = %s\n",
+-                                i,n->key,n->value,strs[i]);
+-                        os.exit;
+-                }
+-        }
+-
+-        for (i64 i = 0; i < len; i++) {
+-                if (!intDelete(map,i)) {
+-                        printf("Failed IntMapTests -> IntMapDelete\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        intRelease(map);
+-        printf("PASS IntMap\n");
+-}
+-
+-void StrMapTests(void) {
+-        StrMap *map = strNew(8);
+-        StrMapNode *n;
+-        u8 *keys[] = {
+-                printf("card",
+-                "can",
+-                "will",
+-                "shill",
+-                "cup",
+-                "mug",
+-                "glass",
+-                "tin"
+-        });
+-        u8 *strs[] = {
+-                printf("hello",
+-                "world",
+-                "foo",
+-                "bar",
+-                "baz",
+-                "cat",
+-                "dog",
+-                "owl"
+-        });
+-
+-        i64 len = sizeof(strs)/sizeof(strs[0]);
+-
+-
+-        for (i64 i = 0; i < len; i++) {
+-                strSet(map,keys[i],strs[i]);
+-        }
+-
+-        for (i64 i = 0; i < len; i++) {
+-                if (strGet(map,keys[i]) != strs[i]) {
+-                        printf("Failed StrMapTests -> StrMapGet\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        for (i64 i = 0; i < len; i++) {
+-                if (!strHas(map,keys[i])) {
+-                        printf("Failed StrMapTests -> StrMapHas\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        /* Inorder iteration */
+-        for (i64 i = 0; strIter(map,&i,&n);) {
+-                if (keys[i-1] != n->key || strs[i-1] != n->value) {
+-                        printf("Failed StrMapTests -> StrMapIter\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        for (i64 i = 0; i < len; i++) {
+-                if (!strDelete(map,keys[i])) {
+-                        printf("Failed StrMapTests -> StrMapDelete\n");
+-                        os.exit;
+-                }
+-        }
+-
+-        strRelease(map);
+-        printf("PASS StrMap\n");
+-}
+-
+-void main(void) {
+-        IntMapTests;
+-        StrMapTests;
+-}
+-#endif
+diff --git a/src/std/net/net.ktm b/src/std/net/net.ktm
+index b43de02..61c7112 100644
+--- a/src/std/net/net.ktm
++++ b/src/std/net/net.ktm
+@@ -43,7 +43,7 @@ static i32 netAcceptCloexec(i32 socket, libc.sockaddr *address, u32 *addressLen)
+ #ifdef IS_LINUX
+         return accept4(socket, address, addressLen, __NET_SOCK_CLOEXEC);
+ #else
+-        i32 fd = libc.accept(libc.socket, address, address_len);
++        i32 fd = libc.accept(socket, address, addressLen);
+         if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
+         return fd;
+ #endif
+@@ -167,7 +167,7 @@ static i32 netConnectBefore(i32 sockfd, libc.addrinfo *sa, i64 deadline) {
+                 pfd.fd = sockfd;
+                 pfd.events = __NET_POLLOUT;
+                 pfd.revents = 0;
+-                n = libc.poll(&pfd, 1, left);
++                n = libc.poll((libc.pollfd *)&pfd, 1, left);
+                 if (n > 0) {
+                         break;
+                 }
+diff --git a/src/std/os/system.ktm b/src/std/os/system.ktm
+index 047367c..5f9a1b8 100644
+--- a/src/std/os/system.ktm
++++ b/src/std/os/system.ktm
+@@ -1,28 +1,18 @@
+ module os;
+ import libc;
+ 
+-#ifdef IS_X86_64
+-asm {
+-_EXIT::
+-        CALL    exit
+-        RET
++/* End the program with exitCode (C's exit: atexit handlers run, stdio
++ * is flushed) */
++pub void exit(i64 exitCode=EXIT_FAIL) {
++    libc.exit(exitCode);
+ }
+ 
+-pub _extern _EXIT void exit(i64 exitCode=EXIT_FAIL);
+-#endif
+-
+-#ifdef IS_ARM_64
+-pub void exit(i64 exit_code=EXIT_FAIL) {
+-    libc.exit(exit_code);
+-}
+-#endif
+-
+ #ifdef IS_LINUX
+ extern "c" i32 *__errno_location();
+ static i32 *errnoPtr() { return __errno_location(); }
+ #else
+ /* errno is *__error(); the raw name, as ktm doesn't prefix names starting with _ */
+-_extern ___error i32 *ErrnoPtr();
++_extern ___error i32 *errnoPtr();
+ #endif
+ 
+ /* The calling thread's C errno: the reason the last failing libc call
+diff --git a/src/std/proc/process.ktm b/src/std/proc/process.ktm
+index a537c98..4048b5f 100644
+--- a/src/std/proc/process.ktm
++++ b/src/std/proc/process.ktm
+@@ -210,14 +210,17 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
+      * 0-2 included: name the ones the child inherits. Only open ones: a
+      * closed fd named here makes the spawn fail, where Linux just leaves it
+      * closed in the child. */
+-    if (!like_system) {
+-        if (opts->in == INHERIT && libc.fcntl(0, PROC_F_GETFD) != -1)
++    if (!likeSystem) {
++        if (opts.in == INHERIT && libc.fcntl(0, PROC_F_GETFD) != -1) {
+             posix_spawn_file_actions_addinherit_np(fa, 0);
+-        if ((opts->out == INHERIT || opts->err == STDOUT) &&
+-                libc.fcntl(1, PROC_F_GETFD) != -1)
++        }
++        if ((opts.out == INHERIT || opts.err == STDOUT) &&
++                libc.fcntl(1, PROC_F_GETFD) != -1) {
+             posix_spawn_file_actions_addinherit_np(fa, 1);
+-        if (opts->err == INHERIT && libc.fcntl(2, PROC_F_GETFD) != -1)
++        }
++        if (opts.err == INHERIT && libc.fcntl(2, PROC_F_GETFD) != -1) {
+             posix_spawn_file_actions_addinherit_np(fa, 2);
++        }
+     }
+ #endif
+     if (opts.in == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pin[0], 0); }
+@@ -282,7 +285,7 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
+     p.errFd = perr[0];
+     p.group = opts.newGroup;
+ #ifdef IS_MACOS
+-    if (p->in_fd != -1) libc.fcntl(p->in_fd, PROC_F_SETNOSIGPIPE, 1);
++    if (p.inFd != -1) { libc.fcntl(p.inFd, PROC_F_SETNOSIGPIPE, 1); }
+ #endif
+     return p;
+ }
+@@ -434,7 +437,7 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
+             fds[nfds++].events = PROC_POLLIN;
+         }
+         for (i = 0; i < nfds; i++) { fds[i].revents = 0; }
+-        if (libc.poll(fds, nfds, -1) < 0) {
++        if (libc.poll((libc.pollfd *)fds, nfds, -1) < 0) {
+             if (os.errno() == PROC_EINTR) { continue; }
+             break;
+         }
+@@ -538,7 +541,7 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
+         fd.fd = p.outFd;
+         fd.events = PROC_POLLIN;
+         fd.revents = 0;
+-        r = libc.poll(&fd, 1, 10);
++        r = libc.poll((libc.pollfd *)&fd, 1, 10);
+         if (r < 0 && os.errno() != PROC_EINTR) { break; }
+         if (r > 0 && !procDrain(p.outFd, &b)) {
+             procClose(&p.outFd);               /* EOF */
+diff --git a/src/std/rt/except.ktm b/src/std/rt/except.ktm
+index 335fd9a..ceae85a 100644
+--- a/src/std/rt/except.ktm
++++ b/src/std/rt/except.ktm
+@@ -38,7 +38,7 @@ static bool ErrOwns(u8 *message) {
+  * (PTHREAD_ONCE_INIT is {0x30B1BCBA, {0}}); pthread_key_t is 4 bytes on
+  * Linux and 8 on macOS, so 8 zeroed bytes hold either. */
+ #ifdef IS_MACOS
+-static i64 _fs_once[2] = {0x30B1BCBA, 0};
++static i64 fsOnce[2] = {0x30B1BCBA, 0};
+ #else
+ static i64 fsOnce[2] = {0, 0};
+ #endif
+diff --git a/src/std/sql/sqllite.ktm b/src/std/sql/sqllite.ktm
+index b17f250..8e911bc 100644
+--- a/src/std/sql/sqllite.ktm
++++ b/src/std/sql/sqllite.ktm
+@@ -1,7 +1,7 @@
+ module sql;
+-import mem, str;
+ 
+ #ifdef __KTM_LINK_SQLITE3__
++import mem, str;
+ 
+ pub const i64 SQLITE_OK = 0;   /* Successful result */
+ 
