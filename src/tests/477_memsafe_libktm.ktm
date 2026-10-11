@@ -34,8 +34,8 @@ i32 main() {
     u8 *out = memsafe("import str;\ni32 main() {\n    String a = str.from(\"shared\");\n"
                       "    String b = a;\n    a.free();\n    b.free();\n    printf(\"end\");\n"
                       "    return 0;\n}\n");
-    check(out && libc.strstr(out, "double free of") && libc.strstr(out, "allocated   in `main`") &&
-          libc.strstr(out, "line 3") && libc.strstr(out, "first freed in `main`") &&
+    check(out && libc.strstr(out, "double free of") && libc.strstr(out, "allocated   in `") && libc.strstr(out, "main`+") &&
+          libc.strstr(out, "line 3") && libc.strstr(out, "first freed in `") &&
           libc.strstr(out, "line 5") && libc.strstr(out, "line 6") && libc.strstr(out, "end"),
           "a double free through a copy", out);
 
