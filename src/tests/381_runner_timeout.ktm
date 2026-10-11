@@ -84,7 +84,11 @@ i32 main() {
     if (sleepPid > 0 && libc.kill(sleepPid, 0) != 0) { correct++; }
     else { printf("sleep %d still running ", sleepPid); }
 
-    if (correct != tests && out) { printf("\n%s", out); }
+    if (correct != tests) {
+        printf("\n  runner child: %s %d, output %s\n%s", (status & 0x7f) ? "signal" : "exit",
+               (status & 0x7f) ? (status & 0x7f) : (status >> 8) & 0xff,
+               out ? "below" : "missing", out ? out : "");
+    }
     mem.free(out);
     mem.free(pidText);
     names.release(&mem.free);
