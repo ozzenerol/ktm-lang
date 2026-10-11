@@ -882,6 +882,10 @@ Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
         }
     } else if ((decl = mapGetLen(cc->asm_funcs,fname,len)) != NULL) {
         /* Assembly function */
+        cctrlCheckModuleAccess(cc, fname, len);
+        return decl;
+    } else if (qual && (decl = mapGet(cc->asm_funcs, qual)) != NULL) {
+        /* a binding of the module itself (`_extern _x I32 stat(...)`) */
         return decl;
     }
     return NULL;
