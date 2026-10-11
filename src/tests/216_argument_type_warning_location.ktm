@@ -30,7 +30,7 @@ bool has(u8 *source, u8 *want1, u8 *want2, u8 *want3 = null) {
 }
 
 #define CLS "struct P { i64 x, y; };\nstruct S { fn(P *p) void f; };\n" \
-                        "void Take(P *p) { }\nU0 TakeV(P p) { }\nU0 Two(i64 a, P *p) { }\n"
+                        "void Take(P *p) { }\nvoid TakeV(P p) { }\nvoid Two(i64 a, P *p) { }\n"
 
 i32 main() {
     printf("Test - argument type warning location: ");

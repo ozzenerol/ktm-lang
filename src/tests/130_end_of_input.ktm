@@ -63,7 +63,7 @@ i32 main() {
         "i64 g[3] =",
         "extern",
         "struct B {i64 x;}; struct C1 :",
-        "class N { i64 (*",
+        "struct N { i64 (*",
         /* After a type */
         "i64",
         "static i64 *",
@@ -82,7 +82,7 @@ i32 main() {
         "i64 F(i64 a) { return a; } void main() { F(",
         "void Main() { \"%d\", 1,",
         /* Classes and initialisers */
-        "class U { union",
+        "struct U { union",
         "struct P { i64 a; i64 b; }; P p = {1, 2",
         "void Main() { i64 a[2] = {{1}, {2"
     };

@@ -98,7 +98,7 @@ i32 main() {
 
     /* the issue's repro: tabs before and inside the underlined span */
     if (excerptIs(
-            "#define N 3\n\t#define Z (N\t? 2.50)\nU0 Main() {}\n",
+            "#define N 3\n\t#define Z (N\t? 2.50)\nvoid main() {}\n",
             TAB_TEST_FILE ":2:12\n"
             "     |\n"
             "   2 |            #define Z (N    ? 2.50)\n"

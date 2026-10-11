@@ -36,7 +36,7 @@ i32 main() {
     i64 correct = 0;
 
     tests++;
-    if (has("i64 a, ;\nI64 b;\n", "Identifier expected", "221-cnm.ktm:1:8\n",
+    if (has("i64 a, ;\ni64 b;\n", "Identifier expected", "221-cnm.ktm:1:8\n",
                     "|           ^\n")) {
         correct++;
                     } else { printf("Failed - `;` after the comma\n"); }
@@ -52,13 +52,13 @@ i32 main() {
     } else { printf("Failed - a number after the comma\n"); }
 
     tests++;
-    if (has("i64 a,\n;\nI64 c;\n", "Identifier expected", "221-cnm.ktm:2:1\n")) {
+    if (has("i64 a,\n;\ni64 c;\n", "Identifier expected", "221-cnm.ktm:2:1\n")) {
         correct++;
     } else { printf("Failed - `;` on the next line\n"); }
 
     /* The next declaration is still checked, at its own token */
     tests++;
-    if (has("i64 a, ;\nI64 b, 7;\n", "221-cnm.ktm:1:8\n", "221-cnm.ktm:2:8\n")) {
+    if (has("i64 a, ;\ni64 b, 7;\n", "221-cnm.ktm:1:8\n", "221-cnm.ktm:2:8\n")) {
         correct++;
     } else { printf("Failed - two errors\n"); }
 

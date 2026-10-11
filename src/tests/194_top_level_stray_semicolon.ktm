@@ -96,7 +96,7 @@ i32 main() {
 
     /* A missing declarator after `,` is still an error */
     tests++;
-    if (runSemi("i64 a, ;\nI64 b;\n", SEMI_AOT, 1, "Identifier expected", true)) {
+    if (runSemi("i64 a, ;\ni64 b;\n", SEMI_AOT, 1, "Identifier expected", true)) {
         correct++;
     } else { printf("Failed - i64 a, ;\n"); }
 

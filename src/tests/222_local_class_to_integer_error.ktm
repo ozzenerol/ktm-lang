@@ -78,7 +78,7 @@ i32 main() {
     tests++;
     if (oneError(CLS "void main() {\n  P p;\n  i64 z;\n  z = p;\n}\n",
                              "`i64 = P` is invalid", "222-ci.ktm:6:5\n") &&
-            oneError(CLS "P gp;\nI64 gz = gp;\n",
+            oneError(CLS "P gp;\ni64 gz = gp;\n",
                              "`i64 = P` is invalid", "222-ci.ktm:4:8\n")) { correct++; }
     /* Still in a declaration list */
     tests++;
