@@ -100,7 +100,7 @@ static void ErrSet(HCFs *fs, u64 code, u8 *message, u8 *file, i64 line) {
 static void WriteErr(u8 *s) {
     i64 n = 0;
     while (s[n]) { n++; }
-    fdWrite(os.STDERR, s, n);
+    libc.write(os.STDERR, s, n);
 }
 
 /* Report an error no try catches on stderr and exit with 1:

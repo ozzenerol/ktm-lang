@@ -106,7 +106,7 @@ pub void IntSet.delete(i64 key) {
     self.tree.delete((void*)key);
 }
 
-pub IntSet *IntSet.union(IntSet *s2) {
+pub IntSet *IntSet.unionWith(IntSet *s2) {
     IntSet *unionSet = intNew();
     IntSetIter *i1 = self.iterNew();
     IntSetIter *i2 = s2.iterNew();

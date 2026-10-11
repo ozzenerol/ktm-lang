@@ -158,7 +158,7 @@ _extern _CORO_SWAP void *coroSwap(void **saveSp, void *newSp, void *value);
 _extern _CORO_ENTRY void coroEntry();
 
 static void coroDie(u8 *msg) {
-    fdWrite(os.STDERR, msg, str.len(msg));
+    libc.write(os.STDERR, msg, str.len(msg));
     os.exit(1);
 }
 

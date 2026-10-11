@@ -1,5 +1,5 @@
 module vec;
-import mem, os, str;
+import libc, mem, os, str;
 
 pub struct IntVec {
     i64 size;
@@ -21,7 +21,7 @@ pub struct FloatVec {
 static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
     u8 *msg = str.formatTo(null, "%s: index %d out of range (size %d)\n",
                                          fnName, idx, size);
-    fdWrite(os.STDERR, msg, str.len(msg));
+    libc.write(os.STDERR, msg, str.len(msg));
     os.exit(1);
 }
 

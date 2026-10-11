@@ -238,6 +238,21 @@ void cctrlAddBuiltinFunctions(Cctrl *cc) {
       mapAdd(cc->global_env,fn->fname->data,fn);
 }
 
+/* C's printf, built in (the stdlib map: no module, the compiler checks
+ * it), declared as the old std.ktmh did: an install that still has that
+ * header redeclares it the same */
+static void cctrlAddBuiltinPrintf(Cctrl *cc) {
+      Vec *pf_params = vecNew(&vec_ast_type);
+      vecPush(pf_params, astLVar(astMakePointerType(ast_i8_type), str_lit("fmt")));
+      vecPush(pf_params, astVarArgs());
+      AstType *pf_type = astMakeFunctionType(ast_int_type, pf_params);
+      pf_type->has_var_args = 1;
+      Ast *pf = astFunction(pf_type, str_lit("printf"), pf_params, NULL, NULL, 0);
+      pf->kind = AST_EXTERN_FUNC;
+      pf->flags |= AST_FLAG_BUILTIN;
+      mapAdd(cc->global_env, pf->fname->data, pf);
+}
+
 static void cctrlAddBuiltinTypes(Map *symbol_table) {
     for (int i = 0; i < (int)static_size(built_in_types); ++i) {
         AstType *type = (AstType *)malloc(sizeof(AstType));
@@ -375,6 +390,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cctrlAddBuiltinMacros(cc);
     /* We have no real mechanism of adding compiler builtins */
     // cctrlAddBuiltinFunctions(cc);
+    cctrlAddBuiltinPrintf(cc);
 
     Ast *cmd_args = astGlobalCmdArgs();
     listAppend(cc->ast_list,cmd_args->argc);
