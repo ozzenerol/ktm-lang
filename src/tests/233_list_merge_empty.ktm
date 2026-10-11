@@ -1,6 +1,4 @@
-import test;
-
-import list;
+import list, test;
 
 /* ListMergeAppend/ListMergePrepend with an empty l2 linked the freed l2
  * head into l1 (use after free, endless walks). ListPop, ListCount and

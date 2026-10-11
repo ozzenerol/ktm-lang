@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The compile-time check of a StrPrint-family format string against its
  * arguments only knew C's conversions: `StrPrint(null, "%Q %d", "a", 1)`

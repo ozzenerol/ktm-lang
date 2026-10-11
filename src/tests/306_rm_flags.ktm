@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Rm marked a directory with an internal flag 0x6, which is
  * RM_VERBOSE|RM_FORCE: Rm(file, RM_VERBOSE / RM_FORCE / RM_RECURSE)

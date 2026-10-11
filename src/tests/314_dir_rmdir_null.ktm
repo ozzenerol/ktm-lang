@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* Dir(null) and RmDir(null, RM_RECURSE) passed null to opendir() and
  * segfaulted. Both return -1 now; Dir also returns -1 (not 0, which is

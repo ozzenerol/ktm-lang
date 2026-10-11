@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 struct Example {
     i64 i1;

@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A float comparison used as a value (not a branch condition) was
  * typed as f64 by the parser, so `i64 x = b < 3.0;` converted the 0/1

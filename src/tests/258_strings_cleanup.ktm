@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, str;
+import libc, mem, str, test;
 
 /* strings.ktm cleanup: strlen was declared twice (once as i64, once as
  * u64), strncasecmp and atol were public in the library but missing from

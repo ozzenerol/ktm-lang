@@ -1,6 +1,4 @@
-import test;
-
-import list;
+import list, test;
 
 /* New list functions: ListClear (free the nodes, keep the head - also a
  * ListInit stack head), ListRemove (unlink + free one node, return its

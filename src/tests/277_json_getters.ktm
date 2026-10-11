@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* New getters: JsonObjectGet (exact key), JsonArrayGet (index) and
  * JsonLen (items of an array/object). Checked against JsonSelect on

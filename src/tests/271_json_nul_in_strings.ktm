@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* A \u0000 in a JSON string or key cut it short: the parser decoded it
  * into a '\0' and everything after it was lost, also in JsonToString.

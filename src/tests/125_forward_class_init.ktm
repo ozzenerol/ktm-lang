@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A brace initialiser for a class that was only forward declared
  * (`class Foo;`) is reported as an error. ktm used to read the missing

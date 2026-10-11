@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define DEF_AFTER_CLASS_FILE "__110_define_after_class.ktm"
 #define DEF_AFTER_CLASS_OUT  "__110_define_after_class.out"

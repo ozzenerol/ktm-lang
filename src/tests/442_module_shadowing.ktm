@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc;
+import fs, libc, mem, proc, test;
 
 /* Go's rule for an import prefix: a local or a parameter named like one
  * (`u8 *str`, `Box geo`) shadows the module for its scope: there `geo.x`

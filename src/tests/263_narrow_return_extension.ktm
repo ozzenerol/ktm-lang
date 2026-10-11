@@ -1,6 +1,4 @@
-import test;
-
-import libc;
+import libc, test;
 
 /* A call returning a narrow integer (i8/i16/i32, u8/u16/u32) used directly
  * in an expression read the whole 64-bit return register. SysV and AAPCS64

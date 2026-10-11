@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An error on a #define line echoed a rewritten line in its excerpt:
  * `#define T (N > 2 ? 1 : 2.5)` showed as `#define T (N > 2  1 :

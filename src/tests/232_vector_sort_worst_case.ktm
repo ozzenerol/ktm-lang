@@ -1,6 +1,4 @@
-import test;
-
-import mem, vec;
+import mem, test, vec;
 
 /* IntVecSort/PtrVecSort used a last-element-pivot Lomuto quicksort that
  * recursed on both sides: O(n^2) on sorted, reversed and all-equal input,

@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* The parser reads tokens from a 16-token ring that the lexer fills
  * ahead of it, and macros were expanded only as the parser took each

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str, vec;
+import fs, libc, mem, proc, str, test, vec;
 
 /* IntVecGet/FloatVecGet/PtrVecGet only checked the index under
  * `#ifdef DEBUG`, which the library is never built with: IntVecGet(v, -1)

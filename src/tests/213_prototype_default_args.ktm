@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str, vec;
+import fs, libc, mem, proc, str, test, vec;
 
 /* A definition (or a later prototype) dropped the default arguments of
  * the earlier prototype: `i64 F(i64 *v, i64 n=2);` then

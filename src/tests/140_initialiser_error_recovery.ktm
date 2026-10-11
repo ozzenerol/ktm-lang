@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An error inside a brace initialiser is reported once. The parser's
  * recovery used to stop at the `}` of the innermost list and report the

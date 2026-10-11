@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* Modules (M1): a precompiled module. `ktm -lib geo dir/geo` builds the
  * module into libgeo.a and its shared object in dir/geo and writes the

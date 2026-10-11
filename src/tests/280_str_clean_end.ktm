@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* StrCleanEnd(str, chars) removes every character in `chars` from the
  * end of str, in place, stops at the first one that isn't and returns the

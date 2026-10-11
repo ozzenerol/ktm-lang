@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `case 0x...3:` was accepted as `case 0...3:`: the lexer ended a number
  * at a `..` range operator by returning early, skipping the "hex literal

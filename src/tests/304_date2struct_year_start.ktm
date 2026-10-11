@@ -1,6 +1,4 @@
-import test;
-
-import date, mem, str;
+import date, mem, str, test;
 
 /* Date2Struct estimates the year from the day number and only corrected
  * an estimate that was too high. For 182 years in 1..10000 (1903,

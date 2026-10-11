@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* StrTrimEnd on an empty or all-blank string walked back past the start
  * and wrote the NUL before it; StrTrimStart ignored its str_len. Both now

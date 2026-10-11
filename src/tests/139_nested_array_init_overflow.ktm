@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An inner list (or string) in a multi-dimensional array initialiser
  * must fit its dimension. ktm used to accept `i64 m[2][2] = {{1,2,3},..}`

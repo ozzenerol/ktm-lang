@@ -1,7 +1,5 @@
-import test;
+import fs, libc, mem, proc, str, test, vec;
 #include "run_shared.ktm"
-
-import fs, libc, mem, proc, str, vec;
 
 /* The test runners had no time limit: one hanging test (a deadlock)
  * blocked the whole suite until someone killed it. RunTests now kills a

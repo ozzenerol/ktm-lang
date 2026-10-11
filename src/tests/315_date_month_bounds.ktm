@@ -1,6 +1,4 @@
-import test;
-
-import date, mem;
+import date, mem, test;
 
 /* Struct2Date indexed its month table with mon-1 unchecked: month 13
  * read past the table (January of the same year), 0 read before it.

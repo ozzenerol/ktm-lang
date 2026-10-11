@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Methods (Y10) and modules: the fixture src/tests/modules/methods has
  * module bank with `pub struct Account` and its methods over two files

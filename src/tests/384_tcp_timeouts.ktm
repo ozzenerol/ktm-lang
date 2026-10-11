@@ -1,6 +1,4 @@
-import test;
-
-import date, libc, net, os;
+import date, libc, net, os, test;
 
 /* NetConnect's timeout_ms, NetSetSendTimeout and NetSetRecvTimeout on TCP.
  * Loopback only. A connect that never completes is made with a listening

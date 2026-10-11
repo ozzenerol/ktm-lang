@@ -1,6 +1,4 @@
-import test;
-
-import mem, set, str, vec;
+import mem, set, str, test, vec;
 
 /* IntSet stored nothing: IntSetAdd is `return RBTreeInsert(...);` in a void
  * function and the compiler dropped the call (fixed in the compiler, test

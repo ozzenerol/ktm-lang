@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* Calling a ktm `...` function through a function pointer passed the
  * implicit argc and the extra arguments in registers, while the callee

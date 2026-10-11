@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* MemSet and MemCpy are declared to return void * but returned junk: the
  * x86_64 MemSet copied RAX into RDI instead of the other way round,

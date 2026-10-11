@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 i32 main() {
     printf("Test - comma separated declarators & types: ");

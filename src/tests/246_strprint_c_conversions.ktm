@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* StrPrint took only `-` and `0` as flags and none of C's length
  * modifiers, %i or %o, ignored an integer precision (`%.3d` gave 7, not

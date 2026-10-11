@@ -1,6 +1,4 @@
-import test;
-
-import json, libc, mem, str;
+import json, libc, mem, str, test;
 
 /* JsonToString found each float's text by trying %.1g, %.2g, ... up to
  * %.17g until one read back as the same value: up to 17 formats per

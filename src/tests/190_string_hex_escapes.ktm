@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* `\x` takes at most two hex digits and every string literal ends in a
  * NUL that sizeof counts. Compiled programs used to hand `"\x01b"` to

@@ -1,6 +1,4 @@
-import test;
-
-import libc, thread;
+import libc, test, thread;
 
 /* ThreadPoolRelease used to hang: the workers slept on a semaphore that
  * shutdown never signalled, and the detached workers were then joined.

@@ -1,6 +1,4 @@
-import test;
-
-import date, fs, libc, mem, proc, str;
+import date, fs, libc, mem, proc, str, test;
 
 /* A nested `{ ... }` in an array initialiser must initialise an element
  * that is an array, a class or a union. For a scalar element

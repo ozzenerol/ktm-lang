@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc;
+import fs, libc, mem, proc, test;
 
 /* rt, the runtime: a module in the install's modules/ that is in every
  * program, imported or not, but that no program imports: `import rt;`

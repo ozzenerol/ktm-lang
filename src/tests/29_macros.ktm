@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 #define _SOME_STRING      ("Hello World")
 #define _SOME_INT_MATHS   (10+(2*5+8-1))
@@ -18,14 +16,12 @@ const i64 FOO = 0;
 const i64 BAR = 4;
 #endif
 
-
 #if defined(__FOO__)
 const i64 _INTVAL = (420);
 #elif defined(_SOME_STRING) && 32 && 1 && \
     defined(_SOME_INT_MATHS)
 #define _INTVAL (42)
 #endif
-
 
 i32 main() {
     i64 correct = 0, tests = 6;

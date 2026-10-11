@@ -1,6 +1,4 @@
-import test;
-
-import libc, map;
+import libc, map, test;
 
 /* IntMap hashed a key as `key & mask`, so keys sharing their low bits
  * (`i << 20`, multiples of 1024, aligned pointers) all went to the same

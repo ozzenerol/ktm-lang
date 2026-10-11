@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `-transpile` wrote the classes first and the unions after them, so a
  * class holding a named union by value used it before its typedef, and

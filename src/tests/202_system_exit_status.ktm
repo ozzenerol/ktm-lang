@@ -1,6 +1,4 @@
-import test;
-
-import proc;
+import proc, test;
 
 /* System and Sh returned the raw wait status from C's system(), so
  * System("exit 3") gave 768. They must return the exit code (0-255),

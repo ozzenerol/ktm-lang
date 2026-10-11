@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm syntax v0.2: `const` marks a DECLARATION read-only, it is not a
  * type qualifier like C's. An initializer is required (except on

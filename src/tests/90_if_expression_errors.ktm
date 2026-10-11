@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define IF_TEST_FILE "__90_if_expr_fail.ktm"
 #define IF_TEST_OUT  "__90_if_expr_fail.out"

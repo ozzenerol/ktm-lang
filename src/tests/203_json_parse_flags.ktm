@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonParse ignored its flags argument: JSON_STRNUM_FLAG (numbers kept
  * as their text, JSON_STRNUM / ->strnum) behaved like flags 0. */

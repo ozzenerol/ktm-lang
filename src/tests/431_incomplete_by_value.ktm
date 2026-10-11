@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A class field can hold a class by value only once that class is
  * complete. Outside modules, `class B; class A { B b; i64 x; };` with B

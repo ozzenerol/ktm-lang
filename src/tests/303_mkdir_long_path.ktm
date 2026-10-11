@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* MkDir(path,,true) copied each prefix of path into a DIR_MAXPATHLEN
  * (256 on Linux, 1024 on macOS) stack buffer without a bound, so a

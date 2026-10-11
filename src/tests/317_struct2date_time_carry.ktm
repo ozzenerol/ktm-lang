@@ -1,6 +1,4 @@
-import test;
-
-import date, mem, str;
+import date, mem, str, test;
 
 /* Struct2Date did not carry the time past a day: the time of day wrapped
  * and the date stayed, so 2024-03-05 with hour 24, min 30 gave

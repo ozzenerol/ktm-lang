@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, os, proc, str;
+import fs, libc, mem, os, proc, str, test;
 
 /* std.ktmh (and the library's defs.ktmh) defined STDOUT as 0 and STDIN as
  * 2, so Write(STDOUT, ...) wrote to stdin: it only worked while fd 0

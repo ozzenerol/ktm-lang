@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem;
+import libc, mem, test;
 
 /* timeval.tv_usec was an i32 everywhere, but Linux's is a long: the upper
  * half of a stack timeval was whatever was in memory, so setsockopt

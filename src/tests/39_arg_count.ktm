@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define ARG_COUNT_TEST_FILE "__39_arg_count_fail.ktm"
 #define ARG_COUNT_TEST_OUT  "__39_arg_count_fail.out"

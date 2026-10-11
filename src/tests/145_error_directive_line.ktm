@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `#error 1.5 0x10 'a'` printed only "1.5": the message was the first
  * token after `#error`. As in C it must be the rest of the line as

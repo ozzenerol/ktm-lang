@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net, os;
+import libc, mem, net, os, test;
 
 /* The basics socket code needs had no stdlib support: byte order
  * (Htons/Ntohs/Htonl/Ntohl), the C errno (Errno/SetErrno) and its E*

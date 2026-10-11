@@ -1,6 +1,4 @@
-import test;
-
-import sql;
+import sql, test;
 
 /* SqlCtxNew leaked the sqlite handle when opening failed; SqlCtxRelease
  * used sqlite3_close, which fails with SQLITE_BUSY (and keeps the

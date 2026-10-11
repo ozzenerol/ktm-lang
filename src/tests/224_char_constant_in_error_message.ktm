@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A character constant in an error message was printed from its
  * decoded length: `'\n'` (one character) showed as `\`, `'\x41'` as

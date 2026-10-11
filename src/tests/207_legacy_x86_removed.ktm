@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The legacy AST-based x86 backend was removed: --use-legacy-x86 must
  * fail with a clear message, not compile with a broken code generator. */

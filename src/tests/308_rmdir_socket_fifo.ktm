@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* RmDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
  * number, not a bit mask: a socket (DT_SOCK 12) or block device (DT_BLK

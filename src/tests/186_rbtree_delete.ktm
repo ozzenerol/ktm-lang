@@ -1,6 +1,4 @@
-import test;
-
-import map, set;
+import map, set, test;
 
 /* RBTreeDelete (and so IntSetDelete) crashed: its search loop read `x->key`
  * with x null and never stopped on a match. It also tested for null where

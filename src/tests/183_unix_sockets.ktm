@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net, str;
+import libc, mem, net, str, test;
 
 /* The socket address classes had the BSD layout everywhere (a leading
  * length byte), so on Linux the family landed in the wrong byte: unix

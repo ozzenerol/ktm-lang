@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A syntax error inside a class/union body is reported where it is,
  * the rest of the body is still parsed, and the class keeps the fields

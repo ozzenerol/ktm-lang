@@ -1,6 +1,4 @@
-import test;
-
-import date;
+import date, test;
 
 /* Reading a whole intrinsic class value (`i64 class CDate`) through a
  * pointer - `pp[i]`, `*pp`, `*(pp+2)` - gave the address instead of the

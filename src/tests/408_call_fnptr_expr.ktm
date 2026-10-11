@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* As in C, `(` calls any expression whose type is a function pointer.
  * A cast to a function pointer type (`((i64 (*)(i64))fv)(5)`,

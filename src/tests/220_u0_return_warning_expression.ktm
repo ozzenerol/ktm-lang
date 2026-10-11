@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The warning for a value returned from a function that can't return it
  * printed the expression rebuilt from the AST: `return g++;` as `++g`,

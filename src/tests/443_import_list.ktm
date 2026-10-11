@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc;
+import fs, libc, mem, proc, test;
 
 /* `import a, b, h = net.http;`: one line imports several modules, each
  * with its own alias if it has one (the stdlib map's decision 3). Before,

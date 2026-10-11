@@ -1,6 +1,4 @@
-import test;
-
-import date, mem, str;
+import date, mem, str, test;
 
 /* CDate used the original calendar: no leap year in years divisible by
  * 4000, and none in year 0. From 4000-03-01 every date was a day off from

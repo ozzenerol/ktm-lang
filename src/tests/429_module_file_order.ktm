@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Modules (M5): the files of a module are read in name order, but every
  * name of every file is visible in any order, types included. The

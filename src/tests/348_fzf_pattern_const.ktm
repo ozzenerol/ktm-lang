@@ -1,6 +1,4 @@
-import test;
-
-import fzf, mem, str;
+import fzf, mem, str, test;
 
 /* FzF trimmed the pattern in place: the caller's string was changed, and
  * a string literal with leading or trailing spaces segfaulted under AOT

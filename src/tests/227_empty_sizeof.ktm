@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `sizeof()` (and `sizeof;`, `alignof()`) segfaulted under -jit, AOT and
  * -transpile: the missing operand parsed as null. It is now an error at

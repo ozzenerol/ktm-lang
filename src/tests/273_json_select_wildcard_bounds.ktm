@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonSelect: a '*' in an object path copied the wrong buffer, so ".*"
  * and ".price_*" never matched; a selector ending in '.' or '[' read past

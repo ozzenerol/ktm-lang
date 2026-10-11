@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm syntax v0.2: `_` may appear between two digits of a number
  * literal (its own base: decimal, or hex inside a hex literal) and is

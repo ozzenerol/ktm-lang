@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `fallthrough;` (ktm syntax v0.2) says a case goes on into the next
  * one. Cases fall through anyway today, so it does nothing; it is an

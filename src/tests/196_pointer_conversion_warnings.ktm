@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `i64 *q; q -= q;` (a pointer difference, an integer, stored back into
  * the pointer) and `f64 f; i64 *q = &f;` (incompatible pointer types)

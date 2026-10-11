@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Rm(link, RM_RECURSE) on a symlink to a directory stat()ed the target,
  * then emptied the directory the link points to. A symlink inside a

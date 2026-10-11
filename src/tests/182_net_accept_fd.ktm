@@ -1,6 +1,4 @@
-import test;
-
-import libc, net, str;
+import libc, net, str, test;
 
 /* NetAccept returned bool, so a socket number over 255 was truncated, and
  * NetCreateServer/NetConnect returned 0 (or a getaddrinfo error code) on

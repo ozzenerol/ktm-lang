@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm has no octal literals: `0644` is the decimal number 644 (C
  * reads octal 420). That meaning stays, but it was silent; ktm now

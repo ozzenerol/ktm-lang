@@ -1,7 +1,6 @@
 module http;
 
-import net;
-import mem, str;
+import mem, net, str;
 
 /* uses its parent module through an import, like any other */
 pub net.Conn *open(i64 fd) {

@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* Forms the converter emits that did not compile:
  * - a default on an fn-typed parameter, `fn(i64) i64 f = &D`: calling f

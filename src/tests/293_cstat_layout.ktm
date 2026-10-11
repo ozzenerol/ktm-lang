@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* On arm64 Linux cStat had x86_64's struct stat layout, so st_mode,
  * st_size and the times were read from the wrong offsets: a regular file

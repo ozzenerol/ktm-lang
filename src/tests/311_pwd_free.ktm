@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, str;
+import fs, libc, mem, str, test;
 
 /* Pwd() returned getcwd(null,0)'s libc malloc block, and Free of it
  * aborted ("free(): invalid pointer"): Free expects MAlloc's header. It

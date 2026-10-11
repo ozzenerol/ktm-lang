@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A nested `{ ... }` in a class initialiser initialises the next field,
  * which can be a class or an array: `Bar b = {1, {2}};`. ktm used to

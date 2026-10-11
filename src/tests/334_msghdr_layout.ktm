@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, str;
+import libc, mem, str, test;
 
 /* msghdr had msg_iovlen as i32 and msg_controllen as i64 everywhere. On
  * Linux both are size_t, so the upper half of msg_iovlen was whatever was

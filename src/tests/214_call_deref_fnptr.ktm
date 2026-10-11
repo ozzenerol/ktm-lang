@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `(*fp)()` was an error ("The `*` operator cannot be applied to a
  * function pointer"). As in C, `*fp` of a function pointer is now the

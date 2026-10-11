@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* Modules (M1): nested modules and aliases. `import net.http;` loads
  * the directory net/http (its files start with `module http;`) and its

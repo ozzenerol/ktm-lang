@@ -1,6 +1,4 @@
-import test;
-
-import libc, str, thread;
+import libc, str, test, thread;
 
 /* ThreadPoolNew ignored pthread_create failing: the handles of the
  * workers that never started were left as uninitialised MAlloc memory

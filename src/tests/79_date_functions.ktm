@@ -1,6 +1,4 @@
-import test;
-
-import date, mem, str;
+import date, mem, str, test;
 
 /* Date2Struct, MPrintDate and MPrintTime segfaulted. The optimiser
  * folded `iadd t, param, k` into a later store's addressing mode across

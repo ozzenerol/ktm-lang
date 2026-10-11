@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* Modules (M1): `import geo;` loads the directory geo/ next to the main
  * file; every file there starts with `module geo;`. Outside, the module's

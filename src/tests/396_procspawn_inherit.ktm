@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, proc, str;
+import libc, mem, proc, str, test;
 
 /* On macOS a ProcSpawn child had no stdin, stdout or stderr when they
  * were PROC_INHERIT (the default): POSIX_SPAWN_CLOEXEC_DEFAULT closes

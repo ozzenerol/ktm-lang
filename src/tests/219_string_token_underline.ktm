@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The underline under a string token in a diagnostic was the length of
  * its contents, starting at the opening quote, so it left out the end of

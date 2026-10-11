@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* Deeply nested JSON (80000 `[`) overflowed the stack: the parser,
  * JsonToString and JsonRelease recurse once per level. Arrays and

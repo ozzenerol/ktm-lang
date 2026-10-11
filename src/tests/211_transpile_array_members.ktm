@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `-transpile` wrote array sizes in bytes (`Leaf leaves[2];` became
  * `Leaf leaves[32];`), kept only one dimension of `i32 grid[2][3]`, and

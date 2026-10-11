@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* An empty main source file stepped past its terminator once the
  * stdlib header pushed in front of it was done, so ktm lexed whatever

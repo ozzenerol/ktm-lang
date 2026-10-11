@@ -1,6 +1,4 @@
-import test;
-
-import map;
+import map, test;
 
 /* RBTreeGet, RBTreeHas, RBTreeInsert, RBTreeDelete, RBTreeForEach and
  * RBIterNew dereferenced a null tree; only RBTreeRelease checked. Reads

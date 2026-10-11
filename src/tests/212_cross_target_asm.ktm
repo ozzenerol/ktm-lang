@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `--target=*-apple-darwin` on a Linux host still wrote the ELF-only
  * `.section .note.GNU-stack` (chosen by the host, not the target), which

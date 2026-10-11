@@ -1,6 +1,4 @@
-import test;
-
-import json, str;
+import json, str, test;
 
 /* JsonParse(text, len) read past `len`: the string scan, number scan
  * (and strtoll/strtod) and whitespace skip all went on to a NUL. So a

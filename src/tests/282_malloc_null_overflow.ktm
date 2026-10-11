@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* MAlloc wrote its size header through malloc's result without checking
  * it for null, so a failed allocation crashed, and size + 8 wrapped for

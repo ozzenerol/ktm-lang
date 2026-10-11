@@ -1,6 +1,4 @@
-import test;
-
-import os;
+import os, test;
 
 /* The suite compiles AOT, so #ifaot branches must be taken and #ifjit
  * branches skipped. The JIT side is covered by run_jit compiling the
@@ -40,7 +38,6 @@ if (modeFn() == 1) correct++;
 if (Mode2() == 1) correct++;
 if (aot_only == 0) correct++;
 #endif
-
 
 void main() {
     printf("Test - #ifjit / #ifaot: ");

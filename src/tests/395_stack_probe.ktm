@@ -1,6 +1,4 @@
-import test;
-
-import libc;
+import libc, test;
 
 /* A function with a frame larger than a page now reserves it a page at a
  * time, touching each page as the stack descends (stack-clash probing).

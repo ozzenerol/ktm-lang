@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, sql;
+import libc, mem, sql, test;
 
 /* SqlExecRaw's check was inverted: it returned sqlite's (null) message on
  * success and null on failure, and leaked the message. It returns an

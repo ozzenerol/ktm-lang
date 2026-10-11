@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem;
+import libc, mem, test;
 
 extern "c" i64 strcmp(u8 *p,u8*p2);
 

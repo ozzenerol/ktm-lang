@@ -1,6 +1,4 @@
-import test;
-
-import sql;
+import sql, test;
 
 /* SqlPrepare ignored sqlite3_prepare_v2's result and returned an object
  * with a null stmt, which SqlExecPrepared then crashed on. It returns null

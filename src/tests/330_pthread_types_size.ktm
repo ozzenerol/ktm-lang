@@ -1,6 +1,4 @@
-import test;
-
-import libc;
+import libc, test;
 
 /* The Linux pthread types had the x86_64 glibc sizes on every
  * architecture: on aarch64 pthread_attr_t is 64 bytes (not 56) and the

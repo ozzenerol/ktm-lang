@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 enum Err { compress };
 
@@ -27,7 +25,6 @@ const i64 ARC_BITS_MAX = 12;
 const i64 CT_NONE = 1;
 const i64 CT_7_BIT = 2;
 const i64 CT_8_BIT = 3;
-
 
 u64 memMappedSpace;
 

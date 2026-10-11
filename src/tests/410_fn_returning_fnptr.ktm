@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A function returning a function pointer, declared C's way,
  * `i64 (*GetH())(i64) { ... }`, was a syntax error. Now: definitions and

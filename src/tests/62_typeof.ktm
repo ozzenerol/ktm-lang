@@ -1,6 +1,4 @@
-import test;
-
-import os, str;
+import os, str, test;
 
 struct TypeofVec2 {
     f64 x;
@@ -27,7 +25,6 @@ void runMain() {
     /* The operand is type-checked, not evaluated. */
     if (!str.cmp(typeof(half(4.0)), "f64")) { correct++; }
 }
-
 
 void main() {
     printf("Test - typeof: ");

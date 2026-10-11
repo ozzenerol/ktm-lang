@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* By-value classes of every size from 1 to 16 bytes, and two with float
  * fields (12 bytes of f32; an f64 then 3 bytes), passed to and

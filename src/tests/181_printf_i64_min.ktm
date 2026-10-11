@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* "%d" of the smallest i64 printed punctuation: I64ToStr negated the number
  * (-I64_MIN overflows back to I64_MIN) and took `% 10` of a negative. */

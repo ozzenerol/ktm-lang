@@ -1,6 +1,4 @@
-import test;
-
-import date;
+import date, test;
 
 /* `p[i]` where both p and i arrive as parameters. On arm64 AOT the
  * pointer was reloaded into x1, which still held the index, so

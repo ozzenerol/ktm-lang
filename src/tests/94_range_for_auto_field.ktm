@@ -1,6 +1,4 @@
-import test;
-
-import mem, vec;
+import mem, test, vec;
 
 /* `auto` in a range-based for over a container reached through a class
  * field (`h.v`, `p->v`, `a.b->v`) was given the type of the container's

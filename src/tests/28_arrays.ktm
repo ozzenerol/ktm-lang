@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 bool stringArray() {
     i32 correct = 0, tests = 2;

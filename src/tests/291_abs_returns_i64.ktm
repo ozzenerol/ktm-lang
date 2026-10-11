@@ -1,6 +1,4 @@
-import test;
-
-import math, str;
+import math, str, test;
 
 /* Abs returned a u64, so everything done with its result was unsigned:
  * `Abs(x) > -1` was false and `f64 f = Abs(-3) - 5` was 1.8e19. It now

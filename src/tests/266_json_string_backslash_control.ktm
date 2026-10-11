@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* A JSON string ending in an escaped backslash ("C:\\") was rejected:
  * the end-of-string scan took `\"` for an escaped quote. Raw control

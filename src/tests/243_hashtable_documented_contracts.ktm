@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* What the library docs and std.ktmh now promise about IntMap and StrMap:
  * the capacity rule (slots, a power of two, grows at 60% full, never

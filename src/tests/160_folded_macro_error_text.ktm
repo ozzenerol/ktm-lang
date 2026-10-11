@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A #define whose value is folded from several tokens (`(N + 1)`) got
  * an empty spelling, so an error on a use of it read "Unexpected

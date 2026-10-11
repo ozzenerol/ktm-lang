@@ -1,6 +1,4 @@
-import test;
-
-import libc, map, mem, set;
+import libc, map, mem, set, test;
 
 /* All red-black trees shared one global sentinel node: RBTreeNew reset
  * it and RBTransplant / the delete fix-up wrote its parent, so trees used

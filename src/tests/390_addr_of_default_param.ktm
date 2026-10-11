@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* Taking the address of a parameter that has a default value stopped the
  * compiler (AOT and JIT) with "&AST_DEFAULT_PARAM not supported in

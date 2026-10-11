@@ -1,6 +1,4 @@
-import test;
-
-import date, mem;
+import date, mem, test;
 
 /* NowDateTimeStruct set sec10000 to usec/100 (0-9999), but Struct2Date
  * and Date2Struct use it as the ten-thousandths below sec100 (0-99), so

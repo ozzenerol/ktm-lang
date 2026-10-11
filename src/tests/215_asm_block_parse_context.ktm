@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An asm block failed to parse depending on what came before it
  * ("Identifier expected: got TK_PUNCT \n" on the declaration after the

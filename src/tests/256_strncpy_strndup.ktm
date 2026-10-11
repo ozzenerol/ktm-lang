@@ -1,6 +1,4 @@
-import test;
-
-import fzf, mem, str;
+import fzf, mem, str, test;
 
 /* StrNCpy(buf, len) copied exactly len bytes, past the end of a shorter
  * string, returned an uninitialised byte for len 0 (it returned before

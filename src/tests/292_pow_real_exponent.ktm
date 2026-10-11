@@ -1,6 +1,4 @@
-import test;
-
-import libc, math;
+import libc, math, test;
 
 /* Pow took an i64 exponent, so a real one was silently truncated:
  * Pow(4.0, 0.5) was 1.0 and Pow(2.0, 2.9) was 4.0. The exponent is now

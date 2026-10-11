@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* fn(...) types, three gaps:
  * - a `*` after the return type is part of it: `fn(u8 *) u8 *` returns

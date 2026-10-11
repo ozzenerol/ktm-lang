@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 struct Class1 {
     i64 val;

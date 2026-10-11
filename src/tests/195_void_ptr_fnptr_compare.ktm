@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `void *w = &F; if (w == &F)` was rejected with "The `==` operator
  * cannot be applied to a pointer type with a unary op of function".

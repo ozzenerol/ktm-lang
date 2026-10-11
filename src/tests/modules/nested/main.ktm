@@ -1,5 +1,4 @@
-import net;
-import net.http;
+import net, net.http;
 import h = net.http;
 import n = net;
 

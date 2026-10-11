@@ -1,6 +1,4 @@
-import test;
-
-import fs, str;
+import fs, str, test;
 
 /* String functions crashed on null. Now: StrCmp/StrNCmp/StrNICmp sort
  * null before every string (two NULLs are equal), StrFirstOcc/StrLastOcc/

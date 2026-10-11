@@ -1,6 +1,4 @@
-import test;
-
-import str, vec;
+import str, test, vec;
 
 /* IntVecPop/FloatVecPop/PtrVecPop wrote through `_ok` unconditionally, so
  * IntVecPop(v, null) crashed and the flag had to be passed. It now

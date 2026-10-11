@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The "perhaps a missing `;`" note went to the last token of the
  * nearest earlier line whatever the error was: `i64 x = 2 3;` after

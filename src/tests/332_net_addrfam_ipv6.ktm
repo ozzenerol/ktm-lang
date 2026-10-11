@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net;
+import libc, mem, net, test;
 
 /* NetCreateServer and NetConnect always asked getaddrinfo for AF_INET:
  * the addrfam argument was only looked at for "::*", so a server could

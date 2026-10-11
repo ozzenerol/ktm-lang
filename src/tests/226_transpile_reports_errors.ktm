@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* -transpile reported no errors: a bad statement was dropped from the C
  * without a word, and `i64 v = ;` segfaulted (so did -jit). The program

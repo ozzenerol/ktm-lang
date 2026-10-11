@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, net, proc, str;
+import fs, libc, mem, net, proc, str, test;
 
 /* The fds the library opens (sockets from the Net* helpers, accepted
  * connections, FileRead/FileWrite's file (also while FileRead reads a

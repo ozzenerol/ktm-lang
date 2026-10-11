@@ -1,6 +1,4 @@
-import test;
-
-import proc, str;
+import proc, str, test;
 
 /* `u8 buf[] = "abc";` inside a function used to store the literal's
  * address into the array's first 8 bytes instead of copying the

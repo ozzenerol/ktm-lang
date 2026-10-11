@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem;
+import fs, libc, mem, test;
 
 /* FileRead asked read() for the whole file length on every call, even
  * after the buffer was full, so the EOF probe claimed bytes past the end

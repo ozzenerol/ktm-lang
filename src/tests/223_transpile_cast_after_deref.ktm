@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `i64 v = **pp(i64 *);` with `Pt **pp`: a cast is postfix, so this is
  * `**(pp(i64 *))`, and the second `*` dereferences an i64. -jit and AOT

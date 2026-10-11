@@ -1,6 +1,4 @@
-import test;
-
-import os, proc;
+import os, proc, test;
 
 /* Two-stage test: build a small C shared library, then compile a
  * second ktm program whose only route to that library is a
@@ -12,10 +10,6 @@ i64 correct = 0;
 i64 tests = 3;
 
 /* No quotes or `%` in the C source keeps the shell printf simple. */
-
-
-
-
 
 void main() {
     printf("Test - #link directive (AOT): ");

@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, set;
+import map, mem, set, test;
 
 /* RBTreeRelease freed the nodes but not the tree, and never called the
  * key/value destructors. RBTreeDelete already called them; updating an

@@ -1,6 +1,4 @@
-import test;
-
-import coro, libc, mem;
+import coro, libc, mem, test;
 
 enum Err { main, boom };
 

@@ -1,6 +1,4 @@
-import test;
-
-import libc, map, mem, str;
+import libc, map, mem, str, test;
 
 /* CatPrint returned a brand new string and never freed the one passed
  * in, so the idiomatic `s = CatPrint(s, ...)` loop leaked every old s.

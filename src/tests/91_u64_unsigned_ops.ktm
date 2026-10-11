@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* `>>`, `/`, `%` and `<`/`>` on u64 behaved as signed (sarq/asr,
  * idiv/sdiv, signed compares): every integer binop was typed i64. An

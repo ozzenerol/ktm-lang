@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define NUM_MSG_TEST_FILE "__124_number_messages.ktm"
 #define NUM_MSG_TEST_OUT  "__124_number_messages.out"

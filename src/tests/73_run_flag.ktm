@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `ktm -run file.ktm` used to free its command string before handing it
  * to system(), so it ran nothing and exited 0. It must compile the

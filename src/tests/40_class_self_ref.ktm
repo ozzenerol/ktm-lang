@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* Self-referencing class without a forward declaration. 07 covers the
  * forward-decl form `class Node; class Node { Node *next; ... };`; this covers

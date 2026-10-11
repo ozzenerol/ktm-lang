@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The lexer silently dropped characters it has no use for (`?`, a
  * backtick, `$` and `@` outside an asm block, non-ASCII bytes), so

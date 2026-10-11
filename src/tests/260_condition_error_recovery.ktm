@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An error inside the parentheses of an if, while, do-while, for or
  * switch was recovered from by skipping to the next `;`: in

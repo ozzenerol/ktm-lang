@@ -1,6 +1,4 @@
-import test;
-
-import vec;
+import test, vec;
 
 /* FloatVecSort did nothing: its comparator took two f64 parameters but
  * QSortGeneric passes the entries as void * in integer registers, so it

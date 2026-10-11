@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem;
+import fs, libc, mem, test;
 
 extern "c" i32 dup(i32 fd);
 extern "c" i32 dup2(i32 fd, i32 fd2);

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `extern i64 (*fp)(i64);` didn't parse ("`extern <Type>` must be followed
  * by an identifier, got `(`"), so a program couldn't use a library's

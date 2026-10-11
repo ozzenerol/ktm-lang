@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The prelude (src/std/prelude, installed as modules/prelude): its pub
  * names, Error and the macros EXIT_OK/EXIT_FAIL and the integer limits

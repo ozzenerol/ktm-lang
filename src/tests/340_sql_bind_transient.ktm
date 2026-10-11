@@ -1,6 +1,4 @@
-import test;
-
-import mem, sql, str;
+import mem, sql, str, test;
 
 /* Text and blob parameters were bound with SQLITE_STATIC, so sqlite kept
  * reading the caller's buffer while the rows were stepped: reusing or

@@ -1,6 +1,4 @@
-import test;
-
-import mem, proc, str;
+import mem, proc, str, test;
 
 /* ShQuote(s) single-quotes s for sh, so text can go into Sh and Shlurp
  * commands as one word with nothing expanded. Each string goes through

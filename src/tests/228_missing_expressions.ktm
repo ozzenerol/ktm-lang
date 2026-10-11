@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Places that need an expression accepted none: `while ()` and
  * `do ... while ();` compiled to nothing, `if ()`, `switch ()` and a

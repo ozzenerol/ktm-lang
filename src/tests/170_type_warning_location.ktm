@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* "Incompatible types" warnings for assignments, compound assignments
  * and declarations were placed by rewinding to the nearest `=`, so with

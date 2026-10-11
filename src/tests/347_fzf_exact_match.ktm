@@ -1,6 +1,4 @@
-import test;
-
-import fzf, libc, mem, str;
+import fzf, libc, mem, str, test;
 
 /* The naive exact matcher (used for 'term, for every term when fuzzy is
  * false, and for !inverse terms) reset its state after the first matching

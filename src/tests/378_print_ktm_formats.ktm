@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Print statements ("%Q\n", s;) went straight to C's printf, so the ktm
  * conversions %Q %D %T %C %F printed garbage or the letter, and the

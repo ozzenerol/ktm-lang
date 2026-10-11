@@ -1,6 +1,4 @@
-import test;
-
-import date, fs, libc, mem, proc, str;
+import date, fs, libc, mem, proc, str, test;
 
 /* A compound assignment whose operands can't be combined, like
  * `y += p` with `p` a class, is the same type error as `y = y + p`.

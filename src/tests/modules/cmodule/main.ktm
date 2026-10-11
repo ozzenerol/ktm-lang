@@ -1,5 +1,4 @@
-import libc;
-import net.sock;
+import libc, net.sock;
 
 i32 main() {
     u8 *s = "hello\n";

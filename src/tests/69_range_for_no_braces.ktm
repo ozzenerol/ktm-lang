@@ -1,6 +1,4 @@
-import test;
-
-import mem, vec;
+import mem, test, vec;
 
 /* A range-based for loop whose body is a single statement without braces
  * crashed the compiler: the body was assumed to be a compound statement

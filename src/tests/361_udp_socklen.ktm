@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, net, proc, str;
+import fs, libc, mem, net, proc, str, test;
 
 /* accept, getpeername, getsockname, recvfrom and getsockopt took their
  * length as an i64* or u64*, but C's socklen_t is 32 bits on Linux and
@@ -152,7 +150,6 @@ i32 main() {
 
     check(compilesCleanly(
 "
-import libc;
 
 void main()
 {

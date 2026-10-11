@@ -1,6 +1,4 @@
-import test;
-
-import mem, proc, str;
+import mem, proc, str, test;
 
 /* Sh and Shlurp ran fmt as-is when no arguments followed, so
  * Sh("echo '100%%'") printed 100%% and the same command meant different

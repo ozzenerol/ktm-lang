@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonRelease on a node from JsonSelect freed it and every node after
  * it, leaving the document pointing at freed memory. It now only frees a

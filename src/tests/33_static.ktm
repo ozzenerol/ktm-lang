@@ -1,6 +1,4 @@
-import test;
-
-import libc, str;
+import libc, str, test;
 
 i64 globalInt;
 

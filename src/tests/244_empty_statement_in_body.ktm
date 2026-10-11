@@ -1,6 +1,4 @@
-import test;
-
-import proc;
+import proc, test;
 
 /* A lone `;` in a function body ended the body: the next statement was
  * "Syntax error ... perhaps you meant `}`?". `case 1: ;` and

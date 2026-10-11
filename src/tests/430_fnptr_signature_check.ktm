@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A function pointer only takes a function (or function pointer) with
  * the same signature. Before, `i64 (*op)(u8 *) = &t;` with a `t` taking

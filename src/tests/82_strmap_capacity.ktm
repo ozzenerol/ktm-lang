@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* StrMapNew and IntMapNew rounded the capacity up to a power of two but
  * built the mask, the threshold and the entries array from the unrounded

@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* StrMapDelete wrote HT_DELETED into the insertion-order vector at the
  * *slot* index (a heap overflow once the slot was past the vector's end),

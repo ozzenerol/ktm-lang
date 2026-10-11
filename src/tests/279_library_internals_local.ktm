@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Library functions that std.ktmh doesn't declare are internal helpers,
  * but libktm exported every non-static function as a weak symbol, so a

@@ -1,6 +1,4 @@
-import test;
-
-import date, fs, libc, mem, proc, str;
+import date, fs, libc, mem, proc, str, test;
 
 /* `-x`, `+x` and `~x` need a number. On a string, pointer, array, class
  * or function they compiled and gave the negated/complemented address;

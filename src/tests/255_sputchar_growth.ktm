@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* SPutChar grew a full buffer with MAlloc(i<<1+1), which ktm parses as
  * i<<(1+1): from an empty 1-byte buffer (i=0) it allocated 0 bytes and

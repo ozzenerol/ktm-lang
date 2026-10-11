@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net, str;
+import libc, mem, net, str, test;
 
 /* NetGetIpv4AddressFromAcceptedSocket read the peer address into a
  * 16-byte sockaddr, which cuts a sockaddr_in6 short, and NetGetInAddress

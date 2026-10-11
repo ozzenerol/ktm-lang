@@ -1,6 +1,4 @@
-import test;
-
-import libc, net;
+import libc, net, test;
 
 /* On macOS BSD's accept() copies O_NONBLOCK from the listening socket, so
  * NetAccept(srv) on a non-blocking listener returned a non-blocking socket

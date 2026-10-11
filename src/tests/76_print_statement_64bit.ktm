@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A print statement, `"%d\n", x;`, compiles to a call to C's printf
  * where `%d` is a 32-bit int, so 5000000000 printed as 705032704. In

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define DW_TEST_FILE "__141_do_while_fail.ktm"
 #define DW_TEST_OUT  "__141_do_while_fail.out"

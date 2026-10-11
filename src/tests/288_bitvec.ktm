@@ -1,6 +1,4 @@
-import test;
-
-import mem, vec;
+import mem, test, vec;
 
 /* bitvec.ktm was not part of the library and every operation was broken:
  * BitVecSet grew to sizeof(u32) * block_idx + 1 bytes and left the new

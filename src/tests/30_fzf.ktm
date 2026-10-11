@@ -1,6 +1,4 @@
-import test;
-
-import fzf;
+import fzf, test;
 
 const i64 STRINGS_LEN = 9;
 

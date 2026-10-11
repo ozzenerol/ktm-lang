@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define BINOP_NOISE_FILE "__131_binop_type_error_noise.ktm"
 #define BINOP_NOISE_OUT  "__131_binop_type_error_noise.out"

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Inside a function `P p; i64 z = p;` was only a warning and stored the
  * class's address, while `z = p` and a global `i64 gz = gp;` are errors.

@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* A ktm `...` function always gets the implicit argc/argv, but a call
  * that passed no extra arguments (`Count("a")`) didn't pass argc at all,

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The catch chain was one process-wide global, so a throw in one thread
  * could longjmp onto another thread's stack ("stack smashing detected").
@@ -72,7 +70,6 @@ void *worker(Work *w) {
 
 bool uncaughtInThreadExits() {
     u8 *src = "
-import libc;
 
 enum Err { thr };
 

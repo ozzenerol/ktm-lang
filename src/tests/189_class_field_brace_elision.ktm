@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Brace elision, as in C: an array or class element or field of an
  * initialiser list may be written without its braces, its items then

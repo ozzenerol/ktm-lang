@@ -1,6 +1,4 @@
-import test;
-
-import libc, os;
+import libc, os, test;
 
 /* While this is possible, it is quite difficult to read */
 
@@ -19,7 +17,6 @@ i64 x = 0;
 
 MyClass *c;
 
-
 i64 func(i64 y = 10) {
     return y;
 }
@@ -27,8 +24,6 @@ i64 func(i64 y = 10) {
 void assign() {
     c.i = 89;
 }
-
-
 
 i32 runMain() {
     if (x == 45) { correct++; }

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The `^` under an error was placed by counting bytes, so it drifted
  * right after non-ASCII text: `€` is 3 bytes but 1 column. A UTF-8

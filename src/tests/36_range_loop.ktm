@@ -1,6 +1,4 @@
-import test;
-
-import mem, vec;
+import mem, test, vec;
 
 const i64 TEST_CAPACITY = 32;
 

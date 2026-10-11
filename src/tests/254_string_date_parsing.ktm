@@ -1,6 +1,4 @@
-import test;
-
-import date;
+import date, test;
 
 /* Str2CDateStruct: %a/%b never matched (and read past short input), %b
  * stored a 0-based month, 12 PM became hour 24, a format without seconds

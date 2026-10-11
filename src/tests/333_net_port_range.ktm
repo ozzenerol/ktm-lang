@@ -1,6 +1,4 @@
-import test;
-
-import libc, net;
+import libc, net, test;
 
 /* NetCreateServer and NetConnect printed the port into a 6-byte buffer, so
  * a port above 65535 was cut to its first five digits (212345 listened on

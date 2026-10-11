@@ -1,6 +1,4 @@
-import test;
-
-import date, libc, mem, str;
+import date, libc, mem, str, test;
 
 /* StrPrint ignored the width of %s and used its precision as the width:
  * "[%5s][%-5s][%.2s]" gave "[ab][ab][abcd]". Right-justified padding was

@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, set, str;
+import map, mem, set, str, test;
 
 /* RBIterNew, IntSetIterNew and RBTreeForEach size their stack from the
  * tree's size when they start, so adding keys during the walk wrote past

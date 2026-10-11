@@ -1,6 +1,4 @@
-import test;
-
-import set;
+import set, test;
 
 /* `return <expr>;` in a void function dropped the expression: the
  * function has no return slot, and the value was only evaluated to be

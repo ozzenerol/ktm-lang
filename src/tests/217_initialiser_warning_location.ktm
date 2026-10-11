@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A class initialiser item of the wrong type for its field was reported
  * at the token after it (the `}` or `,`) instead of at the item. It is

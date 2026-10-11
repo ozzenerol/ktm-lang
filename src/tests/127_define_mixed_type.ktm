@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* `#define F (1.5 * N)` with `#define N 3` folded to the i64 3: the
  * define took the type of the last macro (or the first literal) in its

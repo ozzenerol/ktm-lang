@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A call argument of the wrong type was reported at the call's `)` (or
  * the token after it) instead of at the argument. It is now reported at

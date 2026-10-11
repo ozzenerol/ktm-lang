@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Array types were named with their size in bytes (`i64 arr[2]` was
  * `i64[16]`, `i64 g[2][3]` was `i64[24][48]`), and a string literal's type

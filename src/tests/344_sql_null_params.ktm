@@ -1,6 +1,4 @@
-import test;
-
-import sql, str;
+import sql, str, test;
 
 /* SqlQuery and SqlSelect rejected SQL_NULL parameters (they fell into the
  * default case, which returned SQLITE_OK as the error) while

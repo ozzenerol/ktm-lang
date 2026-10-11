@@ -1,6 +1,4 @@
-import test;
-
-import os;
+import os, test;
 
 const i64 MATHS_MUL = 0;
 const i64 MATHS_MOD = 1;

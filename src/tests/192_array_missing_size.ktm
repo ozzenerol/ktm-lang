@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `void Main() { i64 a[; }` crashed ktm: the array size expression was
  * empty (parseExpr returned null at the `;`) and was evaluated anyway.

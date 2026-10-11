@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A global array or class initialiser is written out as static data, which
  * only held literals and strings: any other item - `&gx`, `&Foo`, `gx`,

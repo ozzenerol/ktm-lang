@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* On a filesystem whose readdir() gives DT_UNKNOWN for every entry,
  * RmDir(path, RM_RECURSE) stat()ed each entry and, for a directory,

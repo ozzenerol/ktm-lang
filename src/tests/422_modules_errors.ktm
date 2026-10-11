@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Modules (M1): the errors, each a fixture under src/tests/modules/errors.
  * A name not marked pub is private to its module (functions, types); a

@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* `u8 buf[] = "abc"` at file scope was emitted with no section
  * directive by the AOT backends, so it landed in whatever section the

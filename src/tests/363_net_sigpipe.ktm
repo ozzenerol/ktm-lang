@@ -1,6 +1,4 @@
-import test;
-
-import libc, net, os;
+import libc, net, os, test;
 
 /* Writing to a socket whose peer had closed raised SIGPIPE, which ended
  * the program, and there was no way to avoid it: no Net* send helper,

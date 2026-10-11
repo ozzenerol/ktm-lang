@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A global class initialiser wrote its items back to back, ignoring the
  * field offsets: `P gp = {1,2,3,4}` with `i32 a; i64 b;` put `b` at

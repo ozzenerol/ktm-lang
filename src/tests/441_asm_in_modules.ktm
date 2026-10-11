@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc;
+import fs, libc, mem, proc, test;
 
 /* A module's asm blocks and `_extern` bindings: a module's file is read
  * once per pass (declarations, then in full), and an asm block was

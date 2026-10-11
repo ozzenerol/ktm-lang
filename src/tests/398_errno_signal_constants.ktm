@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, os, proc, str;
+import fs, libc, mem, os, proc, str, test;
 
 /* ENOENT, EACCES and ECHILD were missing although the ProcSpawn docs name
  * them; so were ENETUNREACH, EHOSTUNREACH, EADDRNOTAVAIL, EMFILE, ENFILE

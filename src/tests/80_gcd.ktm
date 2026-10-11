@@ -1,6 +1,4 @@
-import test;
-
-import math;
+import math, test;
 
 /* Gcd used to return the wrong answer on x86_64 (Gcd(12, 18) was 18):
  * its assembly loop copied the divisor the wrong way round. Gcd uses

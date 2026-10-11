@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /**
  * Type casting is a postfix cast of a functional style. */

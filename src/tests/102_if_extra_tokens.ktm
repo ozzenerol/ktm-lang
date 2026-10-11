@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define IF_EXTRA_TEST_FILE "__102_if_extra_tokens.ktm"
 #define IF_EXTRA_TEST_OUT  "__102_if_extra_tokens.out"

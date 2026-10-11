@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The block comment scan started on the opener's `*`, so `/` `*` `/`
  * opened and closed a comment in three characters and what followed

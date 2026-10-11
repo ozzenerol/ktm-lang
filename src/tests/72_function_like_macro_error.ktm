@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define FN_MACRO_TEST_FILE "__72_fn_macro_fail.ktm"
 #define FN_MACRO_TEST_OUT  "__72_fn_macro_fail.out"

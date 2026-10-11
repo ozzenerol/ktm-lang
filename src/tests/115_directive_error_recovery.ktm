@@ -1,4 +1,4 @@
-import test;
+import fs, libc, mem, proc, str, test;
 
 #define DIR_ERR_FILE "__115_directive_error.ktm"
 #define DIR_ERR_OUT  "__115_directive_error.out"
@@ -208,7 +208,6 @@ bool testSeveral(void) {
 union Bar { i64 a; u8 b; };
 #include 7
 
-import fs, libc, mem, proc, str;
 struct Baz { i64 b; };
 void main() { Foo f; Bar b; Baz z; f.a = 1; b.a = 2; z.b = 3; }
 ", 3, "Syntax is: #include");

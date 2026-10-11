@@ -1,6 +1,4 @@
-import test;
-
-import map, mem;
+import map, mem, test;
 
 /* IntMapNew/StrMapNew rounded the requested capacity up to a power of two
  * without a bound: above 2^63 (`IntMapNew(-1)`) it wrapped to 0, the mask

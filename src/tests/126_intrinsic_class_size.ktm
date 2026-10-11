@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An intrinsic class whose fields don't fit its base type, or whose base
  * type is not an integer, is reported once. ktm used to unwind before

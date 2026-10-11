@@ -1,6 +1,4 @@
-import test;
-
-import fzf, libc;
+import fzf, libc, test;
 
 /* FzF allocated (CAlloc) and freed a 200 KB slab on every call, which no
  * matcher ever used: slow, and on macOS the freed blocks stayed counted as

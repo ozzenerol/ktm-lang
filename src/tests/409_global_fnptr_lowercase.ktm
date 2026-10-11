@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A global function pointer (or array of them) whose return type is a
  * lowercase built-in type or a class name, `i64 (*g)(i64);`, was taken

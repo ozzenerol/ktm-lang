@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JSON errors gave a byte "position" that was often past the problem
  * (`{"a",1}` skipped to the end looking for ':'; `[trux]` reported an

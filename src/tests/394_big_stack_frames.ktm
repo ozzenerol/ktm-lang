@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* A function's frame size was kept in 16 bits (IrFunction.stack_space and
  * the prologues' total_stack were u16), so a function with more than about

@@ -1,6 +1,4 @@
-import test;
-
-import sql;
+import sql, test;
 
 /* SqlRowRelease on a row of a prepared statement finalized that
  * statement, so the next SqlExecPrepared or SqlFinalizePrepared used a

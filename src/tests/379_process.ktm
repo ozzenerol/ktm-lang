@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net, os, proc, str;
+import libc, mem, net, os, proc, str, test;
 
 /* Processes (process.ktm): ProcSpawn runs argv without a shell; exit codes
  * and signals from ProcWait; ENOENT for a missing program; PROC_NULL,
@@ -20,7 +18,6 @@ extern "c" u32 alarm(u32 seconds);
 extern "c" void _exit(i32 code);
 extern "c" i32 fflush(void *stream);
 extern "c" i32 setenv(u8 *name, u8 *value, i32 overwrite);
-
 
 proc.Opts *opts(i64 in, i64 out, i64 err) {
     proc.Opts *o = mem.allocZero(sizeof(proc.Opts));

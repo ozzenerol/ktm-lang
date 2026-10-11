@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `-transpile` dropped every file-scope global, so the C used undeclared
  * variables, and it dropped code at file scope (non-constant initialisers,

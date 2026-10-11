@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A file that ends in the middle of a construct is reported with an
  * "unexpected end of input" error and exit status 1. ktm used to loop

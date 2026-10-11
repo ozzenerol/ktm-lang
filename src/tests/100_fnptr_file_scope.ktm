@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A function pointer declared at file scope - `i64 (*g)(i64 a, i64 b)
  * = &Add;` - failed with "Identifier expected", with or without

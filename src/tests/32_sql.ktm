@@ -1,6 +1,4 @@
-import test;
-
-import libc, sql, str;
+import libc, sql, str, test;
 
 #define DB_NAME ("./_test.db")
 

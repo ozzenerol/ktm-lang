@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define HEX_NO_DIGITS_TEST_FILE "__117_hex_no_digits.ktm"
 #define HEX_NO_DIGITS_TEST_OUT  "__117_hex_no_digits.out"

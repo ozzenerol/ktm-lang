@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* RmDir(path, RM_RECURSE) without RM_VERBOSE printed "Error Rm: <file>"
  * for every file it deleted successfully: the else of

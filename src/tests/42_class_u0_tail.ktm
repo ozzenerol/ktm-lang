@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* The "flexible array" trick: a trailing `void body;` member is a
  * zero-size placeholder whose address points to the byte just past the

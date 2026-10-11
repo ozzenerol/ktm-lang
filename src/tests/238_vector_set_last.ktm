@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str, vec;
+import fs, libc, mem, proc, str, test, vec;
 
 /* New vector functions: IntVecSet/FloatVecSet/PtrVecSet (bounds checked
  * like Get: an index outside [0, size) prints an error and exits 1) and

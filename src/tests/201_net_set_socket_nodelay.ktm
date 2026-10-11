@@ -1,6 +1,4 @@
-import test;
-
-import libc, net;
+import libc, net, test;
 
 /* NetSetSocketNoDelay returned false when setsockopt succeeded and true
  * when it failed. It must return true on success (and really set

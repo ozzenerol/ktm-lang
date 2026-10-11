@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Shlurp read the command's output back from a temporary file in
  * $TMPDIR, so it returned null when $TMPDIR was missing or read-only and

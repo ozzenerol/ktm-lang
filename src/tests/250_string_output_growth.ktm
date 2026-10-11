@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* StrPrint's buffer grew to ten times its size plus the argument
  * whenever a %s didn't fit, and StrLen was a byte-at-a-time loop that

@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonToString printed an empty object or array as `{(nil)}` / `[(nil)]`
  * and wrote strings with %Q (DolDoc quoting: `$` doubled, `\v`, raw

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* "control may reach the end of non-void function" was reported for a
  * function whose last statement is a goto: the fall-through analysis

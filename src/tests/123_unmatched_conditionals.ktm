@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define COND_FILE "__123_unmatched_conditionals.ktm"
 #define COND_OUT  "__123_unmatched_conditionals.out"

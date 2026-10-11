@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, proc, str;
+import fs, libc, proc, str, test;
 
 /* `ktm -jit -Memsafe` crashed (SIGSEGV) as soon as a pthread MAlloc'd:
  * the allocation-site walk followed frame pointers past the end of the

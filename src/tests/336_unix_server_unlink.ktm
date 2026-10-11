@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net, str;
+import libc, mem, net, str, test;
 
 /* NetCreateUnixServerSocket unlink()ed whatever was at the path before
  * binding: a regular file there was deleted, and a second server on the

@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 i64 add(...args) {
     i64 acc = 0, arg;
@@ -109,7 +107,6 @@ i32 main() {
 
     res = wrap(wrap(add(2,2,2,4,4,4,4,3,3,5)));
     if (res == 33) { correct++; }
-
 
     test.printResult(correct,tests);
     printf("=====\n");

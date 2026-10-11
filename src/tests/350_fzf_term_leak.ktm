@@ -1,6 +1,4 @@
-import test;
-
-import fzf, mem, str;
+import fzf, mem, str, test;
 
 /* Every FzF call leaked its parsed terms: releasing a term set freed the
  * terms but not their text, and in case-sensitive mode the term's copy of

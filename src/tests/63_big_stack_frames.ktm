@@ -1,6 +1,4 @@
-import test;
-
-import os;
+import os, test;
 
 /* aarch64 add/sub immediates encode 12 bits (optionally lsl #12);
  * frames past 4095 bytes once emitted unencodable prologue/epilogue
@@ -83,7 +81,6 @@ void runMain() {
     if (h.x == 3.5) { correct++; }
     if (h.y == 2.5) { correct++; }
 }
-
 
 void main() {
     printf("Test - big stack frames: ");

@@ -1,6 +1,4 @@
-import test;
-
-import os, proc;
+import os, proc, test;
 
 /* `ktm -lib <name>` installs lib<name>.a plus the VERSIONED shared
  * object (lib<name>.so.0.0.1 / lib<name>.0.0.1.dylib) and deliberately
@@ -14,13 +12,6 @@ import os, proc;
 
 i64 correct = 0;
 i64 tests = 3;
-
-
-
-
-
-
-
 
 void main() {
     printf("Test - -lib library loadable via #link (JIT + AOT): ");

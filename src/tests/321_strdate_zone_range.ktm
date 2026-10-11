@@ -1,6 +1,4 @@
-import test;
-
-import date;
+import date, test;
 
 /* Str2CDateStruct's %z read any 4 digits, so "+0199" gave zone_diff 199
  * (99 minutes) and "+2500" 2500. An offset is +-hhmm with hh 00-23 and

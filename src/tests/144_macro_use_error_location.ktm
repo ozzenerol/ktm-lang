@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An error on a macro use pointed at the #define: `i64 x = 2 N;` with
  * `#define N 3` reported "Unexpected integer `3`" at the define's line

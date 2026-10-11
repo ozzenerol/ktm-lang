@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define DEF_LOC_FILE "__116_define_error_location.ktm"
 #define DEF_LOC_OUT  "__116_define_error_location.out"

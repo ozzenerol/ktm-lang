@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm syntax v0.2: scoped enums. `enum Name [: IntType] { member [=
  * constexpr], ... };` at file scope. Members are integer constants, only

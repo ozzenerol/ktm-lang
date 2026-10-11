@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 i32 main() {
     printf("Test - MemCpy, MemSet: ");

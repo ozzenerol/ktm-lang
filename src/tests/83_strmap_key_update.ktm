@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* StrMapSet stores the caller's key pointer (by design), but setting a key
  * that already existed replaced the stored pointer with the new one. Counting

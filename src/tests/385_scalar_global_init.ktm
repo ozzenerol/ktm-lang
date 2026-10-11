@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A scalar global's initialiser (`i32 g = 7;`) was a store in the
  * generated main(): on arm64 that code ran over x0/x1 before Main read

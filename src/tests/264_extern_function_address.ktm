@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, str;
+import libc, mem, str, test;
 
 /* Taking the address of a function this object doesn't define - a C
  * library function declared `extern "c"`, or a libktm function only

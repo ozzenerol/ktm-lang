@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* StrMapGetLen/StrMapHasLen compared `key_len` bytes but hashed the whole
  * NUL-terminated string, so a key given as the start of a longer buffer

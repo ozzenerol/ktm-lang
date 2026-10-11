@@ -1,6 +1,4 @@
-import test;
-
-import date, libc, mem, net, os, str;
+import date, libc, mem, net, os, str, test;
 
 /* NetCreateUdpSocket, NetSendTo, NetRecvFrom, NetSetRecvTimeout and
  * NetGetSocketPort: loopback only, ports picked by the kernel. Ends with a

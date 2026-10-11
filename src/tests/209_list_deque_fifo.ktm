@@ -1,6 +1,4 @@
-import test;
-
-import list, thread;
+import list, test, thread;
 
 /* ListDeque takes from the front (FIFO with ListAppend) and ListPop
  * from the back (LIFO with ListAppend); a single-worker ThreadPool runs

@@ -1,6 +1,4 @@
-import test;
-
-import math;
+import math, test;
 
 /* Pow(x, I64_MIN) returned 1.0: negating the exponent overflowed back
  * to I64_MIN, which is not > 0, so the loop never ran. */

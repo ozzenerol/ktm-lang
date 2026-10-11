@@ -1,6 +1,4 @@
-import test;
-
-import sql;
+import sql, test;
 
 /* SqlQuery, SqlSelect and SqlPrepare ran only the first statement of a
  * string holding several and silently dropped the rest. They fail now

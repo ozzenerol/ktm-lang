@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, proc, str;
+import fs, libc, proc, str, test;
 
 /* ktm sources are .ktm and headers .ktmh. The old .HC/.HH names (and any
  * other extension) are a clean break: as the input file they stop the

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Dir sorted names that start with a number by that number only: names
  * with the same number came out in any order, a number too big for an

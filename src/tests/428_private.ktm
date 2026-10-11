@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `private` (Y14): a struct field marked `private` can be used anywhere
  * in the module that defines the struct (any of its files, its methods)

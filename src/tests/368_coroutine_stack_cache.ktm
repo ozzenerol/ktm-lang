@@ -1,6 +1,4 @@
-import test;
-
-import coro, libc;
+import coro, libc, test;
 
 /* CoroutineRelease keeps the stack for the next CoroutineNew of the same
  * size on the same thread instead of unmapping it: at most 16 per

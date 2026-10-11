@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, proc, str;
+import fs, libc, proc, str, test;
 
 /* ktm syntax v0.2: the entry point can be `main` in lowercase: `i32 main()`,
  * `i32 main(i32 argc, u8 **argv)` or `void main()`, with the same behaviour

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm syntax v0.2: named variadic parameters. `T ...name` takes zero or
  * more extra arguments, each checked and converted like an argument of

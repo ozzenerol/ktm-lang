@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A binary op with only its right operand a pointer had its operands
  * swapped (meant to turn `1 + p` into `p + 1`), so `z < p` ran as

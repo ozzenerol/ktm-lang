@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* A postfix cast in a #define's value, `#define X (5(u64) % 3)`, crashed
  * ktm: the stub parser that folds a define had no type table to look `u64`

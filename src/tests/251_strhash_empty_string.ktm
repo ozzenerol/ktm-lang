@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* StrHash("") read the byte after the terminating NUL (the x86_64 asm
  * loaded 1[RDI] first, the arm64 version started at index 1). It also had

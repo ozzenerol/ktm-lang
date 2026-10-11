@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 void assignI64(i64 *ptr) {
     *ptr = 360;

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A wrong argument count was underlined from the first `(` to the first
  * `)` of the line, so `void Main() { i64 x = One(1); i64 y = Two(1); }`

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A string in a char-array slot of an initialiser - a row of
  * `u8 names[2][8]` or a `u8 name[8]` class field - is the string's

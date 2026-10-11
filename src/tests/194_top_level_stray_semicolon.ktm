@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A stray `;` at the top level, `i64 x = 1;;`, was taken as the type of
  * the next declaration, which then failed with "Identifier expected:

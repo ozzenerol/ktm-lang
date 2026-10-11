@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `i64 x = 1 2;` followed by `"ab" y;` in one function crashed ktm.
  * The error for `y` rewound up to 6 tokens looking for a punctuator

@@ -1,6 +1,4 @@
-import test;
-
-import coro, libc, mem, str;
+import coro, libc, mem, str, test;
 
 /* The coroutine stacks (src/std/coroutines.ktm). The old x86_64-only
  * demo crashed on first use: mmap got MAP_SHARED|MAP_PRIVATE instead of

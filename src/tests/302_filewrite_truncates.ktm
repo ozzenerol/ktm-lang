@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, str;
+import fs, libc, mem, str, test;
 
 /* FileWrite's default flags were O_CREAT|O_RDWR without O_TRUNC, so
  * writing a shorter buffer over a file kept the old tail. A negative

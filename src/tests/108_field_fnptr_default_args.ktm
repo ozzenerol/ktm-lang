@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Default arguments declared on a class field function pointer were
  * ignored: `c.f(1)` with `i64 (*f)(i64 a, i64 b=10)` passed whatever was

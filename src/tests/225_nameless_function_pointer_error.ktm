@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A function pointer declared without a name, `i64 (*)(i64 x);`, was
  * reported ("Expected function pointer name") and then, after the

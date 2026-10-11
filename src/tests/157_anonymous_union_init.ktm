@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A union takes one positional initialiser item, for its first member,
  * as in C. An anonymous union inside a class took one item per member:

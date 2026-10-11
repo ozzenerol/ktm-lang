@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* FileRead on a directory took lseek(SEEK_END) as the size, which is
  * LLONG_MAX on ext4: MAlloc(len+100) overflowed and it crashed. Only a

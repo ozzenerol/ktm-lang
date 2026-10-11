@@ -1,6 +1,4 @@
-import test;
-
-import os, proc;
+import os, proc, test;
 
 /* A >16-byte struct return crosses the C boundary via the hidden
  * out-pointer, and on AArch64 that pointer travels in x8 (AAPCS64's
@@ -20,12 +18,6 @@ import os, proc;
 
 i64 correct = 0;
 i64 tests = 3;
-
-
-
-
-
-
 
 void main() {
     printf("Test - indirect struct return C interop: ");

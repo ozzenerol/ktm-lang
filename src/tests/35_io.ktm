@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, str;
+import fs, libc, str, test;
 
 #define TEST_FILE "__file__.txt"
 #define TEST_DATA "hello\n"

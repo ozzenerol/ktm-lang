@@ -1,6 +1,4 @@
-import test;
-
-import libc, os, signal;
+import libc, os, signal, test;
 
 /* sigaction-based signals (signals.ktm): SigAction/SigHandle install a
  * handler, SIG_IGN or SIG_DFL and return the previous action; the mask

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An i8, u8 or bool value couldn't index an array or be added to a
  * pointer ("`u8[8] + u8` is invalid": they are char-kind types, and only

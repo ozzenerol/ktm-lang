@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define NUM_SUFFIX_TEST_FILE "__103_number_literal_suffix.ktm"
 #define NUM_SUFFIX_TEST_OUT  "__103_number_literal_suffix.out"

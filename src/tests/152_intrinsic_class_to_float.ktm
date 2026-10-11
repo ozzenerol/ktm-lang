@@ -1,6 +1,4 @@
-import test;
-
-import date, fs, libc, mem, proc, str;
+import date, fs, libc, mem, proc, str, test;
 
 /* An intrinsic class (`i64 class CDate`, `u16 class`, `i32 class`) is an
  * integer underneath, but converting one to a float was a raw bit copy:

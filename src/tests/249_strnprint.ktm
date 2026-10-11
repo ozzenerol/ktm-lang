@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* StrNPrint: StrPrint into a buffer of a known size, with C's snprintf
  * rules - at most size-1 characters, always a '\0' within size, nothing

@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonParse rejected every \u escape. They are decoded to UTF-8 now,
  * including surrogate pairs; malformed ones are still errors. */

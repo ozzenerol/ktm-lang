@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* WildMatch got simple globs wrong: ("banana","*a") was false,
  * ("abc","**") false, ("","*x") true, ("ab","ab*c") true - it checked the

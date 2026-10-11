@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 struct BaseClass {
     i64 base;
@@ -131,7 +129,6 @@ bool testComplexUnion() {
     mem.free(u);
     return correct == tests;
 }
-
 
 i32 main() {
     i64 correct = 0, tests = 4;

@@ -1,6 +1,4 @@
-import test;
-
-import vec;
+import test, vec;
 
 /* IntVecNew(0)/FloatVecNew(0) never grew (capacity * 2 of 0) and every
  * push wrote past the block; PtrVecNew ignored its size and always made

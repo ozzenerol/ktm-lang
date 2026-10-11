@@ -1,6 +1,4 @@
-import test;
-
-import fs, json;
+import fs, json, test;
 
 /* A value converted to bool kept only its low byte: 0x100, 0x800 and 0.5
  * became false, -1 stayed -1 and a pointer gave its low byte. As in C it

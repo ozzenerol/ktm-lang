@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A global declaration missing a name after a comma, `i64 a, ;`, was
  * reported at the token after the bad one: the start of the next line,

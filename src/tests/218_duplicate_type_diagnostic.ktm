@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `y = p` with an integer `y` and a class `p` printed a type warning
  * and then the error for the same statement. Only the error is printed

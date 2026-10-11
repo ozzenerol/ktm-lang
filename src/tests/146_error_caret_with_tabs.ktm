@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The `^` under an error drifted left on a line with tabs: the excerpt
  * echoed the tab, which the terminal shows several columns wide, but the

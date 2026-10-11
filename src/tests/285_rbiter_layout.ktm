@@ -1,6 +1,4 @@
-import test;
-
-import map, mem;
+import map, mem, test;
 
 /* std.ktmh declared RBIter with an extra `node` field that set.ktm's
  * RBIter doesn't have, so user code saw a 32-byte class while

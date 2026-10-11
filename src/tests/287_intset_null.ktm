@@ -1,6 +1,4 @@
-import test;
-
-import mem, set, str, vec;
+import mem, set, str, test, vec;
 
 /* IntSetRelease(null) and IntSetSize(null) crashed. The IntSet functions
  * that only read a set now treat null as the empty set, and the release

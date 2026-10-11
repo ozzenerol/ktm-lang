@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* The conditional operator `cond ? a : b`: right-associative, lower
  * precedence than ||, only the chosen branch evaluated, usual arithmetic

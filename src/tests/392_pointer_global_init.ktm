@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A global pointer initialised with an address (`u8 *p = &g;`, `&arr[2]`,
  * `&Fn`, null) was a store in the generated main(), so in a -lib library

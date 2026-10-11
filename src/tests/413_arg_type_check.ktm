@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Call arguments are checked against the parameter types like C does.
  * Before, any pointer passed as an 8-byte integer, any class as any other

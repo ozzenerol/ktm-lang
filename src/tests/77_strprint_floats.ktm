@@ -1,6 +1,4 @@
-import test;
-
-import json, libc, mem, str;
+import json, libc, mem, str, test;
 
 /* StrPrint and friends printed "Floats not supported" and exited on %f,
  * so JsonToString exited on any JSON containing a float. %f, %e and %g

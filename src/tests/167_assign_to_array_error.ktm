@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Assigning to an array (`arr = p`, `arr += 1`, `arr++`) was only an
  * "Incompatible types" warning, and `arr++` compiled silently. As in C

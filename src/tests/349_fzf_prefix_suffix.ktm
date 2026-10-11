@@ -1,6 +1,4 @@
-import test;
-
-import fzf, libc, mem, str;
+import fzf, libc, mem, str, test;
 
 /* `^prefix` skipped the text's leading whitespace only when the pattern
  * started with a space (the test was inverted), and `^exact$` compared

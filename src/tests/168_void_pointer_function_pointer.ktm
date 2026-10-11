@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Assigning a `void *` to a function pointer (or a function pointer to a
  * `void *`) warned "'void *' is not assignable to type '<fn> i64'". C

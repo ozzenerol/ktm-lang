@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Shlurp wrapped the command as "{ cmd\n}": an empty command made "{ }",
  * and a command ending in a backslash swallowed the "}", both shell

@@ -1,6 +1,4 @@
-import test;
-
-import date, mem;
+import date, mem, test;
 
 /* An assignment used as a value has the type of its left-hand side (as in
  * C). It used to be typed i64 for an i64-sized class, so `(c = Mk()).date`

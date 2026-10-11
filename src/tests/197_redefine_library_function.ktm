@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A program may define its own version of a standard-library function
  * (here `Now()`, `public CDate Now();` in std.ktmh). That worked in the

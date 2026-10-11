@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `p || T()` where p is a pointer and T() returns bool (or any other
  * char-kind operand: a bool/u8/i8 variable) failed to compile with

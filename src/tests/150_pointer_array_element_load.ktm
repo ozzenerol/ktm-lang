@@ -1,6 +1,4 @@
-import test;
-
-import mem;
+import mem, test;
 
 /* Reading an element of an array of `i64 *` / `i32 *` / `f64 *` (or any
  * pointer to a non-u8, non-class type), or dereferencing an `i64 **`,

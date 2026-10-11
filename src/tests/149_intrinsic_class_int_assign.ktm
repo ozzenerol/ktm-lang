@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An intrinsic class (`i64 class CDate`, `u16 class`, `i32 class`) is an
  * integer underneath: `i64 x = date;` or `x += date;` warned

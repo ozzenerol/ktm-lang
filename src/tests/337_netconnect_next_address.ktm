@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, net;
+import libc, mem, net, test;
 
 /* NetConnect gave up when connecting to the first address a name resolved
  * to failed, instead of trying the next one: "localhost" resolving to ::1

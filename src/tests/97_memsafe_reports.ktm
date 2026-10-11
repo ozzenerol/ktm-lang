@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `ktm -jit -Memsafe` reported leaks and double frees in correct code:
  * its pointer table (a containers.c Map) ended every lookup at the

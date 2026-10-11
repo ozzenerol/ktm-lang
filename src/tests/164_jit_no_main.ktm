@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `ktm -jit` on a file with no Main and no code at file scope looked
  * up a `main` that was never made and exited 255 with nothing printed.

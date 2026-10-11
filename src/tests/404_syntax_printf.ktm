@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, proc, str;
+import fs, libc, proc, str, test;
 
 /* ktm syntax v0.2: printf(fmt, ...) is ktm's print, the same as the print
  * statement "fmt", ...; : %d/%x/%u print the full 64-bit value (narrow

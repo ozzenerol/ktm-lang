@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* Methods (Y10): `T User.name(params) { ... }`, written outside the
  * struct, is a function with an implicit const `User *self` first

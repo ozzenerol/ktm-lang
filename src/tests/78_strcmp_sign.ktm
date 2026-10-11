@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, str;
+import libc, mem, str, test;
 
 /* StrCmp / StrNCmp / StrNICmp must order strings like C's strcmp /
  * strncmp / strncasecmp: negative if s1 < s2, 0 if equal, positive if

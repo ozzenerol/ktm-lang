@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Since library functions became weak definitions (so a program can
  * replace one, test 197), every function in libktm was a weak global

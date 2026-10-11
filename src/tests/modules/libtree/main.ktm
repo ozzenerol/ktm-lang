@@ -1,6 +1,5 @@
 /* At the top of the tree, so not part of any module: the program */
-import geo;
-import net.http;
+import geo, net.http;
 
 i32 main() {
     geo.Point p;

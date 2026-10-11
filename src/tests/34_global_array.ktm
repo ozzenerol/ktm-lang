@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 u8 *htmlAttrs[] = {
     "invalid",
@@ -17,7 +15,6 @@ u8 *htmlAttrs[] = {
     "strong",
     "italic"
 };
-
 
 bool testStaticArray() {
     i64 tests = 4, correct = 0;

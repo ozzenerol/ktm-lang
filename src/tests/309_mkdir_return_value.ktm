@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* MkDir's result could not tell success from failure: without recurse
  * it returned 0 on success and also for a missing parent or a read-only

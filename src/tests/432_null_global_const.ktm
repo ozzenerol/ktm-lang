@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, proc, str;
+import fs, libc, proc, str, test;
 
 /* A global initialised with `null` (or a cast of an integer constant) is
  * a constant: written as data, as `null` (0) was, not stored by code that

@@ -1,6 +1,4 @@
-import test;
-
-import date, mem;
+import date, mem, test;
 
 /* Reading a field straight off an intrinsic class value with no storage
  * of its own - `Now().date`, `MkDate(..).time`, `raw(CDate).date` - used

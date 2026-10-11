@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* ktm wrote its intermediate assembly to the fixed path /tmp/ktm-asm.s,
  * so compiles running at the same time assembled each other's code (or a

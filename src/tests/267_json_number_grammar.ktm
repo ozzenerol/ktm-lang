@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JSON numbers follow RFC 8259 now: -?(0|[1-9][0-9]*)(.[0-9]+)?
  * ([eE][+-]?[0-9]+)?. `-`, `+`, `.` gave -3, -5 and -2; `01 +1 .5 1. 0x1F

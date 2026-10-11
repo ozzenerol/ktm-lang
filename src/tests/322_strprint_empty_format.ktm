@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* StrPrintJoin wrote the NUL only after a character, so an empty result
  * (StrPrint(null, ""), or "%s" of "") was an unterminated MAlloc block:

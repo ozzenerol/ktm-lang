@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* With `#define M "mid"`, `u8 *s = "a" M "b";` was silently left out of
  * -transpile's C: the transpiler keeps #defines, so the parser met an

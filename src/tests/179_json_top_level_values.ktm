@@ -1,6 +1,4 @@
-import test;
-
-import json, str;
+import json, str, test;
 
 /* JsonParse only accepted a non-empty object or array at the top level:
  * `{}`, `[]`, `42`, `"text"`, `true` and `null` were errors (moving past the

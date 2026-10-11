@@ -1,6 +1,4 @@
-import test;
-
-import thread;
+import test, thread;
 
 /* ThreadPoolNew returns null for a bad count or when a thread can't be
  * created, but ThreadPoolEnqueue, ThreadPoolWait and ThreadPoolStop then

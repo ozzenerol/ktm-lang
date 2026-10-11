@@ -1,6 +1,4 @@
-import test;
-
-import map, mem, str;
+import map, mem, str, test;
 
 /* Hash table API additions and fixes:
  *  - IntMapGet/StrMapGet/StrMapGetLen take an optional `bool *_ok`, true

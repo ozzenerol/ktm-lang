@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Text in a skipped #if group reported errors: a malformed number
  * (`0b12`), a long or unterminated char const (an apostrophe in

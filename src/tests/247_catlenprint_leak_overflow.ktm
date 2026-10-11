@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* CatLenPrint never freed the string it formats into, so every call
  * leaked a block (JsonToString, built on it, leaked one per piece), and

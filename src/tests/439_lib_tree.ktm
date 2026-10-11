@@ -1,6 +1,4 @@
-import test;
-
-import fs, mem, proc, str;
+import fs, mem, proc, str, test;
 
 /* `ktm -lib name dir`, dir not module name's directory: every module
  * under dir (net/http is net.http) goes into one library, dir/libname.a

@@ -1,6 +1,4 @@
-import test;
-
-import date, mem, str;
+import date, mem, str, test;
 
 /* An intrinsic class (`i64 class CDate { u32 time; i32 date; };`) is a
  * value of its base integer type whose fields overlay its bytes.

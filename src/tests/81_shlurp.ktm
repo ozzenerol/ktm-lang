@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Shlurp("cmd") without format arguments used to run the command
  * through System(), so the output went to the terminal and the exit

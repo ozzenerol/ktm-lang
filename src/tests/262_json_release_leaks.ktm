@@ -1,6 +1,4 @@
-import test;
-
-import json;
+import json, test;
 
 /* JsonRelease never freed the parse state JsonParse hangs on the node it
  * returns (32 bytes per parse), and a parse error in an array or object

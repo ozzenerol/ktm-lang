@@ -1,6 +1,4 @@
-import test;
-
-import str;
+import str, test;
 
 /* `#define X (0.5 && 1)` folded to 0: the constant folder truncated the
  * float operands of &&, || and ! to integers, so 0.5 counted as false.

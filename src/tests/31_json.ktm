@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 i32 main() {
     printf("Test - JSON parsing: ");

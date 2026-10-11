@@ -1,6 +1,4 @@
-import test;
-
-import fs, json, libc, mem, proc, str;
+import fs, json, libc, mem, proc, str, test;
 
 #define EXP_TEST_FILE "__89_float_exp_fail.ktm"
 #define EXP_TEST_OUT  "__89_float_exp_fail.out"

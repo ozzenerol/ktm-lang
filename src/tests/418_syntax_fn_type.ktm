@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* ktm syntax v0.2: `fn ( [type {, type}] [, ...] ) RetType` is the new way
  * to write a function pointer type: `fn(i64) i64` is exactly the C

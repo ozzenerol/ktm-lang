@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `a[i % n]` crashed ktm with a SIGFPE: the subscript is constant
  * folded to check its bounds, and the folder divided the 0 it uses

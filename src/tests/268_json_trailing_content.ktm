@@ -1,6 +1,4 @@
-import test;
-
-import json, mem, str;
+import json, mem, str, test;
 
 /* JsonParse accepted text after the top-level value (`[1]x`, `1 2`,
  * `truex`, `{"a":1}}`), skipped anything between a key and its ':'

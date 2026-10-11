@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* Methods (Y10): the compile errors. A method and a field can't share a
  * name, a method is defined once, only on a struct or union, only by

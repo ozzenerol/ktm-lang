@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* MPrintQ (and %Q) wrote a control byte as `x01`, with no backslash: the
  * result could not be told from the text "x01" and did not read back as

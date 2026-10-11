@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `return` in top-level code (`if (x) return 0;` outside any function)
  * crashed ktm, AOT and JIT: parseReturnStatement used the current

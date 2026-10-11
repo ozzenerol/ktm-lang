@@ -1,6 +1,4 @@
-import test;
-
-import proc, str;
+import proc, str, test;
 
 /* ktm syntax v0.2: `struct` is the same as `class` and `pub` the same as
  * `public`. struct in every place class works: definitions, inheritance,

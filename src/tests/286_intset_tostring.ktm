@@ -1,6 +1,4 @@
-import test;
-
-import mem, set, str;
+import mem, set, str, test;
 
 /* IntSetToString appended every element with CatPrint, which measures
  * the whole string each time: O(n^2), about 24 s for 500k elements. */

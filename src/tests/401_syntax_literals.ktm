@@ -1,6 +1,4 @@
-import test;
-
-import mem, str;
+import mem, str, test;
 
 /* ktm syntax v0.2: true and false are bool literals (1 and 0) and null
  * is a null pointer (0 as a void *, so it converts to any pointer and to

@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* The `libc` module declares the C library: its files hold only extern "c"
  * functions, structs, unions, enums and constants, and `libc.write(...)`

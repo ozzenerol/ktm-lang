@@ -1,6 +1,4 @@
-import test;
-
-import libc, math;
+import libc, math, test;
 
 /* M_PI, M_E and the other maths constants were defined in math.ktm but
  * not exported in std.ktmh, so programs got "M_PI has not been defined". */

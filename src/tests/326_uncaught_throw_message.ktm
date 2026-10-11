@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* An uncaught throw printed `uncaught throw: 6574614C` on stdout. It is
  * now reported on stderr, a printable character constant as text, with

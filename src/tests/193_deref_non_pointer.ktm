@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* `i64 d = 1 +* 2;` crashed ktm. It parses as `1 + (*2)` and the
  * unary `*` on an integer gave the expression no type (the "Unary type

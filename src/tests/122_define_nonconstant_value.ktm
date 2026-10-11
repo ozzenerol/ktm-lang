@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 #define NONCONST_FILE "__122_define_nonconstant_value.ktm"
 #define NONCONST_OUT  "__122_define_nonconstant_value.out"

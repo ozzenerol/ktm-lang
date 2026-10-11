@@ -1,6 +1,4 @@
-import test;
-
-import fs, libc, mem, proc, str;
+import fs, libc, mem, proc, str, test;
 
 /* A definition or prototype that doesn't match the standard library's
  * declaration is an error ("conflicting types"), but the check didn't

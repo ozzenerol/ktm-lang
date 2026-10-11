@@ -1,6 +1,4 @@
-import test;
-
-import libc, mem, thread;
+import libc, mem, test, thread;
 
 const i64 THREAD_COUNT = 5;
 
