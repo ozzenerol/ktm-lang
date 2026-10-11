@@ -1,0 +1,70 @@
+diff --git a/src/std/str/strings.ktm b/src/std/str/strings.ktm
+index 58251e7..a1ec863 100644
+--- a/src/std/str/strings.ktm
++++ b/src/std/str/strings.ktm
+@@ -1,5 +1,5 @@
+ module str;
+-import date, fs, libc, mem, os;
++import libc, mem, os;
+ 
+ const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
+ 
+@@ -666,7 +666,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+         i64 ch, sp = 0, len, flags, tlen,dec_len;
+         u8 *ptr, *strarg, *tmp, *dst, *spec, buf[256];
+         u8 **grow;
+-        date.Date cdt;
+ 
+         /* Growth (SPutChar's and OutStr's MSize/Free dance) is only legal on a
+             * buffer WE MAlloc'd. A caller-provided dst may live on the stack or mid-array,
+@@ -743,20 +742,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+                                         mem.free(strarg);
+                                 }
+ 
+-                                case 'T': {
+-                                        cdt = (date.Date)argv[sp++];
+-                                        strarg = date.formatTime(cdt);
+-                                        outStr(strarg,grow,&ptr,tlen,flags);
+-                                        mem.free(strarg);
+-                                }
+-
+-                                case 'D': {
+-                                        cdt = (date.Date)argv[sp++];
+-                                        strarg = date.formatDate(cdt);
+-                                        outStr(strarg,grow,&ptr,tlen,flags);
+-                                        mem.free(strarg);
+-                                }
+-
+                                 /* Presently there is only f64, %f/%e/%g as C prints them */
+                                 case 'e':
+                                 case 'g':
+@@ -804,11 +789,24 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+                                         outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
+                                 }
+ 
+-                                case 'F': { // a file
+-                                        tmp = (u8 *)argv[sp++];
+-                                        strarg = fs.readAll(tmp,&len);
+-                                        outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
+-                                        mem.free(strarg);
++                                /* %D, %T and %F were dates, times and a file's contents:
++                                    * they need date and fs, which use str. Kept as written,
++                                    * with what to use instead on stderr (as for a conversion
++                                    * str doesn't know), the argument taken. */
++                                case 'D':
++                                case 'T':
++                                case 'F': {
++                                        sp++;
++                                        u8 conv = *(fmt-1);
++                                        u8 *instead = conv == 'D' ? "date.format(d, \"%m/%d/%Y\")"
++                                                    : conv == 'T' ? "date.format(d, \"%H:%M:%S\")"
++                                                    : "fs.readAll(path, &len) and %s";
++                                        len = libc.snprintf(buf,sizeof(buf),
++                                                "%%%c is not a conversion any more: use %s\n",conv,instead);
++                                        libc.write(os.STDERR,buf,len);
++                                        for (tmp = spec; tmp < fmt; ++tmp) {
++                                                strPutChar(&ptr,*tmp,grow);
++                                        }
+                                 }
+ 
+                                 case 'c': {

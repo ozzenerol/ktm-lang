@@ -20,14 +20,15 @@ defined = set(i['name'] for f in files for i in allit[f] if i['kind'] in ('func'
 # a ktm prototype of a function some file declares extern "c" (the header's
 # `public cDIR *opendir(...)` next to dir.ktm's extern) is the extern's
 defined |= set(i['name'] for f in files for i in allit[f] if i['kind'] == 'cfunc')
-DROP = {'Dir', 'IsDotZ', 'IsDotC', 'Write', 'CH_SPACE', 'CH_SHIFT_SPACE', 'RM_VERBOSE', 'TRUE', 'FALSE', 'NULL',
-        '__BUFSIZ__'}
+DROP = {'Dir', 'IsDotZ', 'IsDotC', 'Write', 'RM_VERBOSE', 'TRUE', 'FALSE', 'NULL', '__BUFSIZ__'}
 # names that leave the API (module `-` in the map) but the code still needs:
 # the runtime's, and the header's implementation details, private to the
 # module that uses them
 KEEP_IN = {'HCFs': 'rt', 'Fs': 'rt', 'HT_DELETED': 'map', 'STR_LEN': 'str',
            'PRTF_DECIMAL': 'str', 'PRTF_LEFT_JUSTIFY': 'str', 'PRTF_PAD_ZERO': 'str',
-           'PRTF_SLASH': 'str', 'PRTF_TRUNCATE': 'str', '_SS_PAD1SIZE': 'libc', '_SS_PAD2SIZE': 'libc'}
+           'PRTF_SLASH': 'str', 'PRTF_TRUNCATE': 'str', '_SS_PAD1SIZE': 'libc', '_SS_PAD2SIZE': 'libc',
+           # leave the API but str's formatter uses them
+           'CH_SPACE': 'str', 'CH_SHIFT_SPACE': 'str'}
 
 # placed by hand: coroutine stack caching is the runtime's thread state
 # (rt frees it when a thread ends; coro uses rt, so rt can't use coro)
