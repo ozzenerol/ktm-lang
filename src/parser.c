@@ -2911,7 +2911,8 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
         cctrlRaiseException(cc,"unexpected 'case' found");
     }
     cc->fallthrough_pending = 0;
-    Ast *case_, *prev, *case_expr = NULL;
+    Lexeme *case_tok = tok;
+    Ast *case_, *prev, *case_expr = NULL, *value_expr = NULL;
     Lexeme *peek;
     AoStr *label;
     int begining,end;
@@ -2929,6 +2930,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     } else {
         /* A bare `case:` (above) is the previous value plus one */
         case_expr = parseRequiredExpr(cc, "a `case` value or `:`");
+        value_expr = case_expr;
         begining = evalIntConstExprOrErr(case_expr, &ok);
         if (!ok) {
             parseRaiseCaseException(cc,case_expr);
@@ -2960,7 +2962,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     peek = cctrlTokenPeek(cc);
 
     case_ = astCase(label,begining,end,stmts);
-    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_);
+    assertUniqueSwitchCaseLabels(cc,cc->tmp_case_list,case_,value_expr,case_tok);
 
     vecPush(cc->tmp_case_list,case_);
     parseCaseArm(cc, case_);
