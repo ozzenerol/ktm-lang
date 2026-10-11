@@ -22,9 +22,9 @@ const i64 CORO_PROT_WRITE = 0x2;
 const i64 CORO_MAP_PRIVATE = 0x02;
 
 #ifdef IS_MACOS
-#define CORO_MAP_ANONYMOUS 0x1000
+const i64 CORO_MAP_ANONYMOUS = 0x1000;
 #else
-#define CORO_MAP_ANONYMOUS 0x20
+const i64 CORO_MAP_ANONYMOUS = 0x20;
 #endif
 
 pub struct Coroutine;

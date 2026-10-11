@@ -2,15 +2,15 @@ module signal;
 import libc, mem, os;
 
 #ifdef IS_MACOS
-#define SIG_SA_FLAGS_AT  12
-#define SIG_SA_RESTART   0x2
-#define SIG_SA_RESETHAND 0x4
-#define SIG_MAX          31
+const i64 SIG_SA_FLAGS_AT = 12;
+const i64 SIG_SA_RESTART = 0x2;
+const i64 SIG_SA_RESETHAND = 0x4;
+const i64 SIG_MAX = 31;
 #else
-#define SIG_SA_FLAGS_AT  136
-#define SIG_SA_RESTART   0x10000000
-#define SIG_SA_RESETHAND 0x80000000
-#define SIG_MAX          64
+const i64 SIG_SA_FLAGS_AT = 136;
+const i64 SIG_SA_RESTART = 0x10000000;
+const i64 SIG_SA_RESETHAND = 0x80000000;
+const i64 SIG_MAX = 64;
 #endif
 
 const i64 SIG_SA_BYTES = 160;   /* >= 152, the largest struct sigaction */
@@ -26,9 +26,9 @@ const i64 SIG_F_GETFL = 3;
 const i64 SIG_F_SETFL = 4;
 
 #ifdef IS_MACOS
-#define SIG_O_NONBLOCK   0x4
+const i64 SIG_O_NONBLOCK = 0x4;
 #else
-#define SIG_O_NONBLOCK   0x800
+const i64 SIG_O_NONBLOCK = 0x800;
 #endif
 
 /* A signal action, as SigAction takes and returns it. */

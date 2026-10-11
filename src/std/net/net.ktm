@@ -119,15 +119,15 @@ pub bool addrToStr(libc.sockaddr *sAddr, i32 ai_family, u8 *outbuf, i32 size) {
 }
 
 #ifdef IS_LINUX
-#define __NET_EINTR       4
-#define __NET_EINVAL      22
-#define __NET_ETIMEDOUT   110
-#define __NET_EINPROGRESS 115
+const i64 __NET_EINTR = 4;
+const i64 __NET_EINVAL = 22;
+const i64 __NET_ETIMEDOUT = 110;
+const i64 __NET_EINPROGRESS = 115;
 #else
-#define __NET_EINTR       4
-#define __NET_EINVAL      22
-#define __NET_ETIMEDOUT   60
-#define __NET_EINPROGRESS 36
+const i64 __NET_EINTR = 4;
+const i64 __NET_EINVAL = 22;
+const i64 __NET_ETIMEDOUT = 60;
+const i64 __NET_EINPROGRESS = 36;
 #endif
 
 const i64 __NET_POLLOUT = 0x4;
@@ -374,9 +374,9 @@ pub i32 accept(i32 socket, bool nonBlocking=false)
 }
 
 #ifdef IS_LINUX
-#define __NET_MSG_NOSIGNAL 0x4000
+const i64 __NET_MSG_NOSIGNAL = 0x4000;
 #else
-#define __NET_MSG_NOSIGNAL 0x80000
+const i64 __NET_MSG_NOSIGNAL = 0x80000;
 #endif
 
 pub i64 send(i32 sockfd, void *buf, i64 len, i32 flags=0)
@@ -418,9 +418,9 @@ static bool netUnixAddress(libc.sockaddr_un *addr, u8 *name) {
 }
 
 #ifdef IS_LINUX
-#define __NET_ECONNREFUSED 111
+const i64 __NET_ECONNREFUSED = 111;
 #else
-#define __NET_ECONNREFUSED 61
+const i64 __NET_ECONNREFUSED = 61;
 #endif
 
 /* true if `name` is a socket file left behind by a server that is gone:

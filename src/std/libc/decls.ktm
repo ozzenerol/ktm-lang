@@ -54,49 +54,49 @@ pub extern "c" i32 gettimeofday(timeval *tp, void *tzp);
 
 /* THREADS ==========*/
 #ifdef IS_MACOS
-#define __MUTEX_LOCK_PADDING__   56
-#define __MUTEX_LOCK_ATTR_SIZE__ 8
+pub const i64 __MUTEX_LOCK_PADDING__ = 56;
+pub const i64 __MUTEX_LOCK_ATTR_SIZE__ = 8;
 
-#define __THREAD_COND_SIZE__     40
-#define __THREAD_CONDATTR_SIZE__ 8
-#define __THREAD_SIZE__          8176
-#define __THREAD_ATTR_SIZE__     56
+pub const i64 __THREAD_COND_SIZE__ = 40;
+pub const i64 __THREAD_CONDATTR_SIZE__ = 8;
+pub const i64 __THREAD_SIZE__ = 8176;
+pub const i64 __THREAD_ATTR_SIZE__ = 56;
 
 /* MACOS definitions */
-struct pthread_mutex_t {
+pub struct pthread_mutex_t {
     i64 __sig;
     i8 __opaque[__MUTEX_LOCK_PADDING__];
 };
 
-struct pthread_mutexattr_t {
+pub struct pthread_mutexattr_t {
     i64 __sig;
     i8 __opaque[__MUTEX_LOCK_ATTR_SIZE__];
 };
 
-struct pthread_cond_t {
+pub struct pthread_cond_t {
     i64 __sig;
     i8 __opaque[__THREAD_COND_SIZE__];
 };
 
-struct pthread_condattr_t {
+pub struct pthread_condattr_t {
     i64 __sig;
     i8 __opaque[__THREAD_CONDATTR_SIZE__];
 };
 
-struct pthread_handler_rec;
-struct pthread_handler_rec {
+pub struct pthread_handler_rec;
+pub struct pthread_handler_rec {
     void (*__routine)(void *__arg); // Routine to call
     void *__arg;                  // Argument to pass
     pthread_handler_rec *__next;
 };
 
-struct pthread_attr_t
+pub struct pthread_attr_t
 {  
     i64 __sig;
     i8 __opaque[__THREAD_ATTR_SIZE__];
 };
 
-struct pthread_t {
+pub struct pthread_t {
     i64 __sig;
     pthread_handler_rec  *__cleanup_stack;
     i8 __opaque[__THREAD_SIZE__];
@@ -106,40 +106,40 @@ struct pthread_t {
 
 /* glibc's bits/pthreadtypes-arch.h: the sizes differ between x86_64 and aarch64 */
 #ifdef IS_X86_64
-#define __SIZEOF_PTHREAD_MUTEX_T   40
-#define __SIZEOF_PTHREAD_ATTR_T    56
-#define __SIZEOF_PTHREAD_RWLOCK_T  56
-#define __SIZEOF_PTHREAD_BARRIER_T 32
+pub const i64 __SIZEOF_PTHREAD_MUTEX_T = 40;
+pub const i64 __SIZEOF_PTHREAD_ATTR_T = 56;
+pub const i64 __SIZEOF_PTHREAD_RWLOCK_T = 56;
+pub const i64 __SIZEOF_PTHREAD_BARRIER_T = 32;
 
-#define __SIZEOF_PTHREAD_MUTEXATTR_T   4
-#define __SIZEOF_PTHREAD_COND_T        48
-#define __SIZEOF_PTHREAD_CONDATTR_T    4
-#define __SIZEOF_PTHREAD_RWLOCKATTR_T  8
-#define __SIZEOF_PTHREAD_BARRIERATTR_T 4
+pub const i64 __SIZEOF_PTHREAD_MUTEXATTR_T = 4;
+pub const i64 __SIZEOF_PTHREAD_COND_T = 48;
+pub const i64 __SIZEOF_PTHREAD_CONDATTR_T = 4;
+pub const i64 __SIZEOF_PTHREAD_RWLOCKATTR_T = 8;
+pub const i64 __SIZEOF_PTHREAD_BARRIERATTR_T = 4;
 #else /* aarch64 */
-#define __SIZEOF_PTHREAD_MUTEX_T   48
-#define __SIZEOF_PTHREAD_ATTR_T    64
-#define __SIZEOF_PTHREAD_RWLOCK_T  56
-#define __SIZEOF_PTHREAD_BARRIER_T 32
+pub const i64 __SIZEOF_PTHREAD_MUTEX_T = 48;
+pub const i64 __SIZEOF_PTHREAD_ATTR_T = 64;
+pub const i64 __SIZEOF_PTHREAD_RWLOCK_T = 56;
+pub const i64 __SIZEOF_PTHREAD_BARRIER_T = 32;
 
-#define __SIZEOF_PTHREAD_MUTEXATTR_T   8
-#define __SIZEOF_PTHREAD_COND_T        48
-#define __SIZEOF_PTHREAD_CONDATTR_T    8
-#define __SIZEOF_PTHREAD_RWLOCKATTR_T  8
-#define __SIZEOF_PTHREAD_BARRIERATTR_T 8
+pub const i64 __SIZEOF_PTHREAD_MUTEXATTR_T = 8;
+pub const i64 __SIZEOF_PTHREAD_COND_T = 48;
+pub const i64 __SIZEOF_PTHREAD_CONDATTR_T = 8;
+pub const i64 __SIZEOF_PTHREAD_RWLOCKATTR_T = 8;
+pub const i64 __SIZEOF_PTHREAD_BARRIERATTR_T = 8;
 #endif
 
-union pthread_mutexattr_t {
+pub union pthread_mutexattr_t {
     i8  __size[__SIZEOF_PTHREAD_MUTEXATTR_T];
     i32 __align;
 };
 
-union pthread_condattr_t {
+pub union pthread_condattr_t {
     i8  __size[__SIZEOF_PTHREAD_CONDATTR_T];
     i32 __align;
 };
 
-union pthread_attr_t {
+pub union pthread_attr_t {
     i8  __size[__SIZEOF_PTHREAD_ATTR_T];
     i64 __align;
 };
@@ -150,13 +150,13 @@ pub struct pthread_t {
     u64 __padding;
 };
 
-struct __pthread_list_t;
-struct __pthread_list_t {
+pub struct __pthread_list_t;
+pub struct __pthread_list_t {
     __pthread_list_t *__prev;
     __pthread_list_t *__next;
 };
 
-struct __pthread_mutex_s {
+pub struct __pthread_mutex_s {
     i32 __lock;
     u32 __count;
     i32 __owner;
@@ -167,13 +167,13 @@ struct __pthread_mutex_s {
     __pthread_list_t __list;
 };
 
-union pthread_mutex_t {
+pub union pthread_mutex_t {
     __pthread_mutex_s __data;
     i8  __size[__SIZEOF_PTHREAD_MUTEX_T];
     i64 __align;
 };
 
-union __atomic_wide_counter {
+pub union __atomic_wide_counter {
     u64 __value64;
     struct
     {
@@ -182,7 +182,7 @@ union __atomic_wide_counter {
     };
 };
 
-struct __pthread_cond_s {
+pub struct __pthread_cond_s {
     __atomic_wide_counter __wseg;
     __atomic_wide_counter __g1_start;
     u32 __g_regs[2];
@@ -192,7 +192,7 @@ struct __pthread_cond_s {
     u32 __g_signals[2];
 };
 
-union pthread_cond_t {
+pub union pthread_cond_t {
     __pthread_cond_s __data;
     i8 __size[__SIZEOF_PTHREAD_COND_T];
     i64 __align;
@@ -243,99 +243,99 @@ pub extern "c" i32 fork();
 
 /* errno values (the ones networking code checks most); they differ
  * between Linux and macOS, so compare Errno() with these names. */
-pub #define ENOENT          2               /* No such file or directory (or program) */
+pub const i64 ENOENT = 2;               /* No such file or directory (or program) */
 
-pub #define EINTR           4               /* Interrupted by a signal: retry */
+pub const i64 EINTR = 4;               /* Interrupted by a signal: retry */
 
-pub #define EBADF           9               /* Bad file descriptor */
+pub const i64 EBADF = 9;               /* Bad file descriptor */
 
-pub #define ECHILD          10              /* No child process to wait for */
+pub const i64 ECHILD = 10;              /* No child process to wait for */
 
-pub #define EACCES          13              /* Permission denied */
+pub const i64 EACCES = 13;              /* Permission denied */
 
-pub #define EINVAL          22              /* Invalid argument */
+pub const i64 EINVAL = 22;              /* Invalid argument */
 
-pub #define ENFILE          23              /* Too many open files in the system */
+pub const i64 ENFILE = 23;              /* Too many open files in the system */
 
-pub #define EMFILE          24              /* Too many open files in this process */
+pub const i64 EMFILE = 24;              /* Too many open files in this process */
 
-pub #define EPIPE           32              /* Write to a closed pipe or socket */
+pub const i64 EPIPE = 32;              /* Write to a closed pipe or socket */
 
 #ifdef IS_LINUX
-#define EAGAIN          11              /* Would block: try again later */
-#define EADDRINUSE      98              /* Address (port) already in use */
-#define EADDRNOTAVAIL   99              /* Address not available on this host */
-#define ENETUNREACH     101             /* Network unreachable */
-#define ECONNRESET      104             /* Connection reset by the peer */
-#define ETIMEDOUT       110             /* Timed out */
-#define ECONNREFUSED    111             /* Connection refused */
-#define EHOSTUNREACH    113             /* No route to host */
-#define EINPROGRESS     115             /* Non-blocking connect started */
+pub const i64 EAGAIN = 11;              /* Would block: try again later */
+pub const i64 EADDRINUSE = 98;              /* Address (port) already in use */
+pub const i64 EADDRNOTAVAIL = 99;              /* Address not available on this host */
+pub const i64 ENETUNREACH = 101;             /* Network unreachable */
+pub const i64 ECONNRESET = 104;             /* Connection reset by the peer */
+pub const i64 ETIMEDOUT = 110;             /* Timed out */
+pub const i64 ECONNREFUSED = 111;             /* Connection refused */
+pub const i64 EHOSTUNREACH = 113;             /* No route to host */
+pub const i64 EINPROGRESS = 115;             /* Non-blocking connect started */
 #else
-#define EAGAIN          35              /* Would block: try again later */
-#define EINPROGRESS     36              /* Non-blocking connect started */
-#define EADDRINUSE      48              /* Address (port) already in use */
-#define EADDRNOTAVAIL   49              /* Address not available on this host */
-#define ENETUNREACH     51              /* Network unreachable */
-#define ECONNRESET      54              /* Connection reset by the peer */
-#define ETIMEDOUT       60              /* Timed out */
-#define ECONNREFUSED    61              /* Connection refused */
-#define EHOSTUNREACH    65              /* No route to host */
+pub const i64 EAGAIN = 35;              /* Would block: try again later */
+pub const i64 EINPROGRESS = 36;              /* Non-blocking connect started */
+pub const i64 EADDRINUSE = 48;              /* Address (port) already in use */
+pub const i64 EADDRNOTAVAIL = 49;              /* Address not available on this host */
+pub const i64 ENETUNREACH = 51;              /* Network unreachable */
+pub const i64 ECONNRESET = 54;              /* Connection reset by the peer */
+pub const i64 ETIMEDOUT = 60;              /* Timed out */
+pub const i64 ECONNREFUSED = 61;              /* Connection refused */
+pub const i64 EHOSTUNREACH = 65;              /* No route to host */
 #endif
 
-pub #define EWOULDBLOCK     EAGAIN          /* Same value on Linux and macOS */
+pub const i64 EWOULDBLOCK = EAGAIN;          /* Same value on Linux and macOS */
 
 /* Signals (each platform's numbers) and signal(3). signal returns
  * the previous handler, or SIG_ERR. SIG_IGN on SIGPIPE makes a write to a
  * closed socket or pipe return -1 with Errno() EPIPE instead of ending
  * the program. */
-pub #define SIGHUP          1               /* Terminal hung up */
+pub const i64 SIGHUP = 1;               /* Terminal hung up */
 
-pub #define SIGINT          2               /* Ctrl-C */
+pub const i64 SIGINT = 2;               /* Ctrl-C */
 
-pub #define SIGKILL         9               /* Kill (can't be caught or ignored) */
+pub const i64 SIGKILL = 9;               /* Kill (can't be caught or ignored) */
 
-pub #define SIGPIPE         13              /* Write to a closed pipe or socket */
+pub const i64 SIGPIPE = 13;              /* Write to a closed pipe or socket */
 
-pub #define SIGTERM         15              /* Termination request */
+pub const i64 SIGTERM = 15;              /* Termination request */
 
-pub #define SIG_DFL         0               /* The default action */
+pub const i64 SIG_DFL = 0;               /* The default action */
 
-pub #define SIG_IGN         1               /* Ignore the signal */
+pub const i64 SIG_IGN = 1;               /* Ignore the signal */
 
-pub #define SIG_ERR         -1              /* signal() failed */
+pub const i64 SIG_ERR = -1;              /* signal() failed */
 
 /* handler is SIG_DFL, SIG_IGN or a void F(i32 sig) as (&F)(i64) */
 pub extern "c" i64 signal(i32 sig, i64 handler);
 
-pub #define SIGQUIT         3               /* Ctrl-\ */
+pub const i64 SIGQUIT = 3;               /* Ctrl-\ */
 
-pub #define SIGALRM         14              /* alarm() timer */
+pub const i64 SIGALRM = 14;              /* alarm() timer */
 
-pub #define SIGTTIN         21              /* Background read from the terminal */
+pub const i64 SIGTTIN = 21;              /* Background read from the terminal */
 
-pub #define SIGTTOU         22              /* Background write to the terminal */
+pub const i64 SIGTTOU = 22;              /* Background write to the terminal */
 
 #ifdef IS_MACOS
-#define SIGUSR1         30              /* For the program's own use */
-#define SIGUSR2         31
-#define SIGCHLD         20              /* A child process ended */
-#define SIGSTOP         17              /* Stop (can't be caught or ignored) */
-#define SIGTSTP         18              /* Ctrl-Z */
-#define SIGCONT         19              /* Continue a stopped process */
-#define SA_RESTART      0x2             /* Restart read/write/... after the handler */
-#define SA_RESETHAND    0x4             /* Back to SIG_DFL once the handler ran */
-#define SA_NODEFER      0x10            /* Don't block the signal in its handler */
+pub const i64 SIGUSR1 = 30;              /* For the program's own use */
+pub const i64 SIGUSR2 = 31;
+pub const i64 SIGCHLD = 20;              /* A child process ended */
+pub const i64 SIGSTOP = 17;              /* Stop (can't be caught or ignored) */
+pub const i64 SIGTSTP = 18;              /* Ctrl-Z */
+pub const i64 SIGCONT = 19;              /* Continue a stopped process */
+pub const i64 SA_RESTART = 0x2;             /* Restart read/write/... after the handler */
+pub const i64 SA_RESETHAND = 0x4;             /* Back to SIG_DFL once the handler ran */
+pub const i64 SA_NODEFER = 0x10;            /* Don't block the signal in its handler */
 #else
-#define SIGUSR1         10              /* For the program's own use */
-#define SIGUSR2         12
-#define SIGCHLD         17              /* A child process ended */
-#define SIGCONT         18              /* Continue a stopped process */
-#define SIGSTOP         19              /* Stop (can't be caught or ignored) */
-#define SIGTSTP         20              /* Ctrl-Z */
-#define SA_RESTART      0x10000000      /* Restart read/write/... after the handler */
-#define SA_RESETHAND    0x80000000      /* Back to SIG_DFL once the handler ran */
-#define SA_NODEFER      0x40000000      /* Don't block the signal in its handler */
+pub const i64 SIGUSR1 = 10;              /* For the program's own use */
+pub const i64 SIGUSR2 = 12;
+pub const i64 SIGCHLD = 17;              /* A child process ended */
+pub const i64 SIGCONT = 18;              /* Continue a stopped process */
+pub const i64 SIGSTOP = 19;              /* Stop (can't be caught or ignored) */
+pub const i64 SIGTSTP = 20;              /* Ctrl-Z */
+pub const i64 SA_RESTART = 0x10000000;      /* Restart read/write/... after the handler */
+pub const i64 SA_RESETHAND = 0x80000000;      /* Back to SIG_DFL once the handler ran */
+pub const i64 SA_NODEFER = 0x40000000;      /* Don't block the signal in its handler */
 #endif
 
 /* Send sig to the calling thread / to process pid (-pid: its group). */
@@ -519,85 +519,85 @@ pub extern "c" u8 *strtok(u8 *__str, u8 *__sep);
 
 pub extern "c" u64 strxfrm(u8 *__s1, u8 *__s2, u64 __n);
 
-pub #define F_DUPFD 0 /* Duplicate a file descriptor */
+pub const i64 F_DUPFD = 0; /* Duplicate a file descriptor */
 
-pub #define F_GETFD 1 /* Retrieve file descriptor flags */
+pub const i64 F_GETFD = 1; /* Retrieve file descriptor flags */
 
-pub #define F_SETFD 2 /* Assign flags to file descriptor */
+pub const i64 F_SETFD = 2; /* Assign flags to file descriptor */
 
-pub #define F_GETFL 3 /* Get file status flags */
+pub const i64 F_GETFL = 3; /* Get file status flags */
 
-pub #define F_SETFL 4 /* Assign file status flags */
+pub const i64 F_SETFL = 4; /* Assign file status flags */
 
-pub #define F_FLUSH_DATA  40 /* Commit data to disk */
+pub const i64 F_FLUSH_DATA = 40; /* Commit data to disk */
 
-pub #define F_CHKCLEAN    41 /* Verify file is not modified */
+pub const i64 F_CHKCLEAN = 41; /* Verify file is not modified */
 
-pub #define F_PREALLOCATE 42 /* Allocate space for file in advance */
+pub const i64 F_PREALLOCATE = 42; /* Allocate space for file in advance */
 
-pub #define F_SETSIZE     43 /* Adjust file size */
+pub const i64 F_SETSIZE = 43; /* Adjust file size */
 
-pub #define F_RDADVISE    44 /* Suggest read behavior */
+pub const i64 F_RDADVISE = 44; /* Suggest read behavior */
 
-pub #define F_RDAHEAD     45 /* Enable read ahead */
+pub const i64 F_RDAHEAD = 45; /* Enable read ahead */
 
-pub #define FD_CLOEXEC 1  /* Close file descriptor on exec */
+pub const i64 FD_CLOEXEC = 1;  /* Close file descriptor on exec */
 
 #ifdef IS_LINUX
-  #define F_GETOWN 0x9 /* Retrieve SIGIO/SIGURG process/group */
-  #define F_SETOWN 0x8 /* Set SIGIO/SIGURG process/group */
-  #define F_GETLK  0x5 /* Query record locking info */
-  #define F_SETLK  0x6 /* Set record locking info without waiting */
-  #define F_SETLKW 0x7 /* Set record locking info with waiting */
+    pub const i64 F_GETOWN = 0x9; /* Retrieve SIGIO/SIGURG process/group */
+    pub const i64 F_SETOWN = 0x8; /* Set SIGIO/SIGURG process/group */
+    pub const i64 F_GETLK = 0x5; /* Query record locking info */
+    pub const i64 F_SETLK = 0x6; /* Set record locking info without waiting */
+    pub const i64 F_SETLKW = 0x7; /* Set record locking info with waiting */
 #else
-  #define F_GETOWN 0x5
-  #define F_SETOWN 0x6
-  #define F_GETLK  0x7
-  #define F_SETLK  0x8
-  #define F_SETLKW 0x9
+    pub const i64 F_GETOWN = 0x5;
+    pub const i64 F_SETOWN = 0x6;
+    pub const i64 F_GETLK = 0x7;
+    pub const i64 F_SETLK = 0x8;
+    pub const i64 F_SETLKW = 0x9;
 #endif
 
 /* record locking flags */
 #ifdef IS_LINUX
-  #define F_RDLCK 0 /* Establish a read lock */
-  #define F_WRLCK 1 /* Establish a write lock */
-  #define F_UNLCK 2 /* Remove a lock */
+    pub const i64 F_RDLCK = 0; /* Establish a read lock */
+    pub const i64 F_WRLCK = 1; /* Establish a write lock */
+    pub const i64 F_UNLCK = 2; /* Remove a lock */
 #else
-  #define F_RDLCK 1
-  #define F_UNLCK 2
-  #define F_WRLCK 3
+    pub const i64 F_RDLCK = 1;
+    pub const i64 F_UNLCK = 2;
+    pub const i64 F_WRLCK = 3;
 #endif
 
-pub #define O_RDONLY  0x0000 /* Open exclusively for reading */
+pub const i64 O_RDONLY = 0x0000; /* Open exclusively for reading */
 
-pub #define O_WRONLY  0x0001 /* Open exclusively for writing */
+pub const i64 O_WRONLY = 0x0001; /* Open exclusively for writing */
 
-pub #define O_RDWR    0x0002 /* Open for reading and writing */
+pub const i64 O_RDWR = 0x0002; /* Open for reading and writing */
 
-pub #define O_ACCMODE 0x0003 /* Mask to extract access modes */
+pub const i64 O_ACCMODE = 0x0003; /* Mask to extract access modes */
 
 /* open() flags whose values differ between Linux and macOS */
 #ifdef IS_LINUX
-  #define O_CREAT    0x040 /* Create file if it doesn't exist */
-  #define O_TRUNC    0x200 /* Truncate existing file to zero length */
-  #define O_EXCL     0x080 /* Error if file already exists */
-  #define O_NONBLOCK 0x800 /* Non-blocking mode */
-  #define O_APPEND   0x400 /* Append data to the end of the file */
-  #define O_CLOEXEC  0x80000 /* Close the fd in programs started by exec */
+    pub const i64 O_CREAT = 0x040; /* Create file if it doesn't exist */
+    pub const i64 O_TRUNC = 0x200; /* Truncate existing file to zero length */
+    pub const i64 O_EXCL = 0x080; /* Error if file already exists */
+    pub const i64 O_NONBLOCK = 0x800; /* Non-blocking mode */
+    pub const i64 O_APPEND = 0x400; /* Append data to the end of the file */
+    pub const i64 O_CLOEXEC = 0x80000; /* Close the fd in programs started by exec */
 #else
-  #define O_CREAT    0x00000200
-  #define O_TRUNC    0x00000400
-  #define O_EXCL     0x00000800
-  #define O_NONBLOCK 0x00000004
-  #define O_APPEND   0x00000008
-  #define O_CLOEXEC  0x01000000
+    pub const i64 O_CREAT = 0x00000200;
+    pub const i64 O_TRUNC = 0x00000400;
+    pub const i64 O_EXCL = 0x00000800;
+    pub const i64 O_NONBLOCK = 0x00000004;
+    pub const i64 O_APPEND = 0x00000008;
+    pub const i64 O_CLOEXEC = 0x01000000;
 #endif
 
-pub #define SEEK_SET 0 /* Set offset to specified value */
+pub const i64 SEEK_SET = 0; /* Set offset to specified value */
 
-pub #define SEEK_CUR 1 /* Set offset to current position plus value */
+pub const i64 SEEK_CUR = 1; /* Set offset to current position plus value */
 
-pub #define SEEK_END 2 /* Set offset to size of file plus value */
+pub const i64 SEEK_END = 2; /* Set offset to size of file plus value */
 
 /*
  * The iovec class represents a buffer in memory, with a base address and a length.
@@ -608,29 +608,29 @@ pub struct iovec {
     u64 iov_len;   /* Length of the buffer */
 };
 
-pub #define DT_UNKNOWN 0  /* Type not determined */
+pub const i64 DT_UNKNOWN = 0;  /* Type not determined */
 
-pub #define DT_FIFO    1  /* FIFO/pipe */
+pub const i64 DT_FIFO = 1;  /* FIFO/pipe */
 
-pub #define DT_CHR     2  /* Character device */
+pub const i64 DT_CHR = 2;  /* Character device */
 
-pub #define DT_DIR     4  /* Directory */
+pub const i64 DT_DIR = 4;  /* Directory */
 
-pub #define DT_BLK     6  /* Block device */
+pub const i64 DT_BLK = 6;  /* Block device */
 
-pub #define DT_REG     8  /* Regular file */
+pub const i64 DT_REG = 8;  /* Regular file */
 
-pub #define DT_LNK    10  /* Symbolic link */
+pub const i64 DT_LNK = 10;  /* Symbolic link */
 
-pub #define DT_SOCK   12  /* Socket */
+pub const i64 DT_SOCK = 12;  /* Socket */
 
-pub #define DT_WHT    14  /* Whiteout */
+pub const i64 DT_WHT = 14;  /* Whiteout */
 
 pub struct DIR;
 
 #ifdef IS_MACOS
-#define DIR_MAXPATHLEN (1024)
-struct Dirent {
+pub const i64 DIR_MAXPATHLEN = (1024);
+pub struct Dirent {
     u64 ino;           /* file number of entry */
     u64 seekoff;       /* seek offset (optional, used by servers) */
     u16 reclen;        /* length of this record */
@@ -641,8 +641,8 @@ struct Dirent {
 #endif
 
 #ifdef IS_LINUX
-#define DIR_MAXPATHLEN (256)
-struct Dirent {
+pub const i64 DIR_MAXPATHLEN = (256);
+pub struct Dirent {
     u64 ino;           /* inode number (d_ino) */
     u64 seekoff;       /* position of the next entry, for seekdir (d_off) */
     u16 reclen;        /* length of this record */
@@ -697,7 +697,7 @@ pub struct cStat {
 #elifdef IS_LINUX
 #ifdef IS_ARM_64
 /* aarch64 uses the generic struct stat, not x86_64's */
-struct cStat {
+pub struct cStat {
     u64 st_dev;
     u64 st_ino;
     u32 st_mode;
@@ -716,7 +716,7 @@ struct cStat {
     i32 __unused[2];
 };
 #else
-struct cStat {
+pub struct cStat {
     u64 st_dev;
     u64 st_ino;
     u64 st_nlink;
@@ -735,13 +735,13 @@ struct cStat {
 };
 #endif
 
-struct statx_timestamp {
+pub struct statx_timestamp {
     i64  tv_sec;
     u32  tv_nsec;
     i32  __reserved;
 };
 
-struct Statx {
+pub struct Statx {
     u32 stx_mask;
     u32 stx_blksize;
     u64 stx_attributes;
@@ -787,7 +787,7 @@ pub const i64 STATX_INO = 0x00000100;
 pub const i64 STATX_SIZE = 0x00000200;
 pub const i64 STATX_BLOCKS = 0x00000400;
 pub const i64 STATX_BASIC_STATS = 0x000007ff;
-#define STATX_BTIME          0x00000800
+pub const i64 STATX_BTIME = 0x00000800;
 pub const i64 STATX_MNT_ID = 0x00001000;
 pub const i64 STATX_DIOALIGN = 0x00002000;
 pub const i64 STATX_MNT_ID_UNIQUE = 0x00004000;
@@ -809,7 +809,7 @@ pub const i64 STATX_ATTR_DAX = 0x00200000;
 pub const i64 STATX_ATTR_WRITE_ATOMIC = 0x00400000;
 pub const i64 STAT_X_AT_FDCWD = -100;
 pub const i64 AT_STATX_SYNC_AS_STAT = 0x0000;
-#define STATX_BTIME           0x00000800
+pub const i64 STATX_BTIME = 0x00000800;
 
 pub extern "c" i32 statx(i32 __dirfd,
                                                         i8 *__path,
@@ -841,219 +841,219 @@ pub extern "c" i32 unlink(u8 *pathname);
 
 pub extern "c" i32 rmdir(u8 *dirname);
 
-pub #define S_IFMT      0xF000  /* Bit mask for the file type bit fields */
+pub const i64 S_IFMT = 0xF000;  /* Bit mask for the file type bit fields */
 
-pub #define S_IFIFO     0x1000  /* FIFO or pipe */
+pub const i64 S_IFIFO = 0x1000;  /* FIFO or pipe */
 
-pub #define S_IFCHR     0x2000  /* Character device */
+pub const i64 S_IFCHR = 0x2000;  /* Character device */
 
-pub #define S_IFDIR     0x4000  /* Directory */
+pub const i64 S_IFDIR = 0x4000;  /* Directory */
 
-pub #define S_IFBLK     0x6000  /* Block device */
+pub const i64 S_IFBLK = 0x6000;  /* Block device */
 
-pub #define S_IFREG     0x8000  /* Regular file */
+pub const i64 S_IFREG = 0x8000;  /* Regular file */
 
-pub #define S_IFLNK     0xA000  /* Symbolic link */
+pub const i64 S_IFLNK = 0xA000;  /* Symbolic link */
 
-pub #define S_IFSOCK    0xC000  /* Socket */
+pub const i64 S_IFSOCK = 0xC000;  /* Socket */
 
-pub #define S_IRWXU 0x1C0  /* Permission: user (owner) can read, write, execute */
+pub const i64 S_IRWXU = 0x1C0;  /* Permission: user (owner) can read, write, execute */
 
-pub #define S_IRUSR 0x100  /* Permission: user (owner) can read */
+pub const i64 S_IRUSR = 0x100;  /* Permission: user (owner) can read */
 
-pub #define S_IWUSR 0x80   /* Permission: user (owner) can write */
+pub const i64 S_IWUSR = 0x80;   /* Permission: user (owner) can write */
 
-pub #define S_IXUSR 0x40   /* Permission: user (owner) can execute */
+pub const i64 S_IXUSR = 0x40;   /* Permission: user (owner) can execute */
 
 /* Permissions: group can read, write, execute */
-pub #define S_IRWXG 0x38
+pub const i64 S_IRWXG = 0x38;
 
-pub #define S_IRGRP 0x20   /* Permission: group can read */
+pub const i64 S_IRGRP = 0x20;   /* Permission: group can read */
 
-pub #define S_IWGRP 0x10   /* Permission: group can write */
+pub const i64 S_IWGRP = 0x10;   /* Permission: group can write */
 
-pub #define S_IXGRP 0x8    /* Permission: group can execute */
+pub const i64 S_IXGRP = 0x8;    /* Permission: group can execute */
 
 /* Permissions: others can read, write, execute */
-pub #define S_IRWXO 0x7
+pub const i64 S_IRWXO = 0x7;
 
-pub #define S_IROTH 0x4    /* Permission: others can read */
+pub const i64 S_IROTH = 0x4;    /* Permission: others can read */
 
-pub #define S_IWOTH 0x2    /* Permission: others can write */
+pub const i64 S_IWOTH = 0x2;    /* Permission: others can write */
 
-pub #define S_IXOTH 0x1    /* Permission: others can execute */
+pub const i64 S_IXOTH = 0x1;    /* Permission: others can execute */
 
-pub #define S_ISUID 0x800  /* Set user ID on execution */
+pub const i64 S_ISUID = 0x800;  /* Set user ID on execution */
 
-pub #define S_ISGID 0x400  /* Set group ID on execution */
+pub const i64 S_ISGID = 0x400;  /* Set group ID on execution */
 
-pub #define S_ISVTX 0x200  /* Save swapped text after use (sticky) */
+pub const i64 S_ISVTX = 0x200;  /* Save swapped text after use (sticky) */
 
 /* Socket options level */
 #ifdef IS_LINUX
-#define SOL_SOCKET      1               /* Socket-level options */
+pub const i64 SOL_SOCKET = 1;               /* Socket-level options */
 #else
-#define SOL_SOCKET      0xffff          /* Socket-level options */
+pub const i64 SOL_SOCKET = 0xffff;          /* Socket-level options */
 #endif
 
 /*
  * Address families.
  */
-pub #define AF_UNSPEC       0               /* Unspecified */
+pub const i64 AF_UNSPEC = 0;               /* Unspecified */
 
-pub #define AF_UNIX         1               /* Local communication (unix pipes) */
+pub const i64 AF_UNIX = 1;               /* Local communication (unix pipes) */
 
-pub #define AF_INET         2               /* Internet IPv4 */
+pub const i64 AF_INET = 2;               /* Internet IPv4 */
 
 #ifdef IS_LINUX
-#define AF_INET6        10              /* Internet IPv6 */
+pub const i64 AF_INET6 = 10;              /* Internet IPv6 */
 #else
-#define AF_INET6        30              /* Internet IPv6 */
+pub const i64 AF_INET6 = 30;              /* Internet IPv6 */
 #endif
 
 /* Socket types */
-pub #define SOCK_STREAM     1               /* Stream (connection-oriented) socket */
+pub const i64 SOCK_STREAM = 1;               /* Stream (connection-oriented) socket */
 
-pub #define SOCK_DGRAM      2               /* Datagram (connectionless) socket */
+pub const i64 SOCK_DGRAM = 2;               /* Datagram (connectionless) socket */
 
-pub #define SOCK_RAW        3               /* Raw protocol interface */
+pub const i64 SOCK_RAW = 3;               /* Raw protocol interface */
 
-pub #define SOCK_SEQPACKET  5               /* Sequenced packet stream */
+pub const i64 SOCK_SEQPACKET = 5;               /* Sequenced packet stream */
 
 #ifdef IS_LINUX
 pub const i64 SOCK_CLOEXEC = 0x80000;         /* Or into socket()'s type: close on exec */
 #endif
 
 /* Flags for send, recv, sendto, recvfrom, sendmsg and recvmsg */
-pub #define MSG_OOB         0x1             /* Out-of-band data */
+pub const i64 MSG_OOB = 0x1;             /* Out-of-band data */
 
-pub #define MSG_PEEK        0x2             /* Read without removing it from the queue */
+pub const i64 MSG_PEEK = 0x2;             /* Read without removing it from the queue */
 
-pub #define MSG_DONTROUTE   0x4             /* Don't use a gateway */
+pub const i64 MSG_DONTROUTE = 0x4;             /* Don't use a gateway */
 
 #ifdef IS_LINUX
-#define MSG_CTRUNC      0x8             /* recvmsg: control data was cut short */
-#define MSG_TRUNC       0x20            /* recvmsg: datagram was longer than the buffer */
-#define MSG_EOR         0x80            /* End of record */
-#define MSG_WAITALL     0x100           /* Wait for the full request */
-#define MSG_DONTWAIT    0x40            /* This call only: don't block */
-#define MSG_NOSIGNAL    0x4000          /* No SIGPIPE on a closed peer: EPIPE */
+pub const i64 MSG_CTRUNC = 0x8;             /* recvmsg: control data was cut short */
+pub const i64 MSG_TRUNC = 0x20;            /* recvmsg: datagram was longer than the buffer */
+pub const i64 MSG_EOR = 0x80;            /* End of record */
+pub const i64 MSG_WAITALL = 0x100;           /* Wait for the full request */
+pub const i64 MSG_DONTWAIT = 0x40;            /* This call only: don't block */
+pub const i64 MSG_NOSIGNAL = 0x4000;          /* No SIGPIPE on a closed peer: EPIPE */
 #else
-#define MSG_CTRUNC      0x20            /* recvmsg: control data was cut short */
-#define MSG_TRUNC       0x10            /* recvmsg: datagram was longer than the buffer */
-#define MSG_EOR         0x8             /* End of record */
-#define MSG_WAITALL     0x40            /* Wait for the full request */
-#define MSG_DONTWAIT    0x80            /* This call only: don't block */
-#define MSG_NOSIGNAL    0x80000         /* No SIGPIPE on a closed peer: EPIPE */
+pub const i64 MSG_CTRUNC = 0x20;            /* recvmsg: control data was cut short */
+pub const i64 MSG_TRUNC = 0x10;            /* recvmsg: datagram was longer than the buffer */
+pub const i64 MSG_EOR = 0x8;             /* End of record */
+pub const i64 MSG_WAITALL = 0x40;            /* Wait for the full request */
+pub const i64 MSG_DONTWAIT = 0x80;            /* This call only: don't block */
+pub const i64 MSG_NOSIGNAL = 0x80000;         /* No SIGPIPE on a closed peer: EPIPE */
 #endif
 
 /*
  * Per-socket option flags.
  */
 #ifdef IS_LINUX
-#define SO_DEBUG        1               /* Enable debugging information */
-#define SO_ACCEPTCONN   30              /* Socket has had listen() applied */
-#define SO_REUSEADDR    2               /* Allow reuse of local addresses */
-#define SO_KEEPALIVE    9               /* Keep connections active */
-#define SO_DONTROUTE    5               /* Route packets through local interfaces */
-#define SO_BROADCAST    6               /* Allow broadcast messages */
-#define SO_LINGER       13              /* Linger on close if data is present */
-#define SO_OOBINLINE    10              /* Leave out-of-band data inline */
-#define SO_REUSEPORT    15              /* Allow reuse of local ports */
-#define SO_TIMESTAMP    29              /* Timestamp incoming datagrams */
-#define SO_SNDBUF       7               /* Send buffer size */
-#define SO_RCVBUF       8               /* Receive buffer size */
-#define SO_ERROR        4               /* Get and clear the pending error */
-#define SO_RCVTIMEO     20              /* Read timeout (a timeval) */
-#define SO_SNDTIMEO     21              /* Write timeout (a timeval) */
+pub const i64 SO_DEBUG = 1;               /* Enable debugging information */
+pub const i64 SO_ACCEPTCONN = 30;              /* Socket has had listen() applied */
+pub const i64 SO_REUSEADDR = 2;               /* Allow reuse of local addresses */
+pub const i64 SO_KEEPALIVE = 9;               /* Keep connections active */
+pub const i64 SO_DONTROUTE = 5;               /* Route packets through local interfaces */
+pub const i64 SO_BROADCAST = 6;               /* Allow broadcast messages */
+pub const i64 SO_LINGER = 13;              /* Linger on close if data is present */
+pub const i64 SO_OOBINLINE = 10;              /* Leave out-of-band data inline */
+pub const i64 SO_REUSEPORT = 15;              /* Allow reuse of local ports */
+pub const i64 SO_TIMESTAMP = 29;              /* Timestamp incoming datagrams */
+pub const i64 SO_SNDBUF = 7;               /* Send buffer size */
+pub const i64 SO_RCVBUF = 8;               /* Receive buffer size */
+pub const i64 SO_ERROR = 4;               /* Get and clear the pending error */
+pub const i64 SO_RCVTIMEO = 20;              /* Read timeout (a timeval) */
+pub const i64 SO_SNDTIMEO = 21;              /* Write timeout (a timeval) */
 #else
-#define SO_DEBUG        0x0001          /* Enable debugging information */
-#define SO_ACCEPTCONN   0x0002          /* Socket has had listen() applied */
-#define SO_REUSEADDR    0x0004          /* Allow reuse of local addresses */
-#define SO_KEEPALIVE    0x0008          /* Keep connections active */
-#define SO_DONTROUTE    0x0010          /* Route packets through local interfaces */
-#define SO_BROADCAST    0x0020          /* Allow broadcast messages */
-#define SO_LINGER       0x1080          /* Linger on close if data is present */
-#define SO_OOBINLINE    0x0100          /* Leave out-of-band data inline */
-#define SO_REUSEPORT    0x0200          /* Allow reuse of local ports */
-#define SO_TIMESTAMP    0x0400          /* Timestamp incoming datagrams */
-#define SO_TIMESTAMP_MONOTONIC  0x0800  /* Use monotonic timestamps for datagrams */
-#define SO_SNDBUF       0x1001          /* Send buffer size */
-#define SO_RCVBUF       0x1002          /* Receive buffer size */
-#define SO_ERROR        0x1007          /* Get and clear the pending error */
-#define SO_RCVTIMEO     0x1006          /* Read timeout (a timeval) */
-#define SO_SNDTIMEO     0x1005          /* Write timeout (a timeval) */
+pub const i64 SO_DEBUG = 0x0001;          /* Enable debugging information */
+pub const i64 SO_ACCEPTCONN = 0x0002;          /* Socket has had listen() applied */
+pub const i64 SO_REUSEADDR = 0x0004;          /* Allow reuse of local addresses */
+pub const i64 SO_KEEPALIVE = 0x0008;          /* Keep connections active */
+pub const i64 SO_DONTROUTE = 0x0010;          /* Route packets through local interfaces */
+pub const i64 SO_BROADCAST = 0x0020;          /* Allow broadcast messages */
+pub const i64 SO_LINGER = 0x1080;          /* Linger on close if data is present */
+pub const i64 SO_OOBINLINE = 0x0100;          /* Leave out-of-band data inline */
+pub const i64 SO_REUSEPORT = 0x0200;          /* Allow reuse of local ports */
+pub const i64 SO_TIMESTAMP = 0x0400;          /* Timestamp incoming datagrams */
+pub const i64 SO_TIMESTAMP_MONOTONIC = 0x0800;  /* Use monotonic timestamps for datagrams */
+pub const i64 SO_SNDBUF = 0x1001;          /* Send buffer size */
+pub const i64 SO_RCVBUF = 0x1002;          /* Receive buffer size */
+pub const i64 SO_ERROR = 0x1007;          /* Get and clear the pending error */
+pub const i64 SO_RCVTIMEO = 0x1006;          /* Read timeout (a timeval) */
+pub const i64 SO_SNDTIMEO = 0x1005;          /* Write timeout (a timeval) */
 #endif
 
 /* Protocols */
-pub #define IPPROTO_IP              0               /* Placeholder for IP */
+pub const i64 IPPROTO_IP = 0;               /* Placeholder for IP */
 
-pub #define IPPROTO_ICMP            1               /* Internet Control Message Protocol */
+pub const i64 IPPROTO_ICMP = 1;               /* Internet Control Message Protocol */
 
-pub #define IPPROTO_IPV4            4               /* IPv4 encapsulation */
+pub const i64 IPPROTO_IPV4 = 4;               /* IPv4 encapsulation */
 
-pub #define IPPROTO_TCP             6               /* Transmission Control Protocol */
+pub const i64 IPPROTO_TCP = 6;               /* Transmission Control Protocol */
 
-pub #define IPPROTO_UDP             17              /* User Datagram Protocol */
+pub const i64 IPPROTO_UDP = 17;              /* User Datagram Protocol */
 
-pub #define IPPROTO_IPV6            41              /* IPv6 protocol */
+pub const i64 IPPROTO_IPV6 = 41;              /* IPv6 protocol */
 
-pub #define IPPROTO_ICMPV6          58              /* ICMP for IPv6 */
+pub const i64 IPPROTO_ICMPV6 = 58;              /* ICMP for IPv6 */
 
-pub #define IPPROTO_RAW             255             /* Raw IP packets */
+pub const i64 IPPROTO_RAW = 255;             /* Raw IP packets */
 
 /* IPPROTO_IPV6 level option: an AF_INET6 socket takes IPv6 only, no IPv4 */
 #ifdef IS_LINUX
-#define IPV6_V6ONLY             26
+pub const i64 IPV6_V6ONLY = 26;
 #else
-#define IPV6_V6ONLY             27
+pub const i64 IPV6_V6ONLY = 27;
 #endif
 
 /* TCP options */
 #ifdef IS_LINUX
-#define TCP_NODELAY             1       /* Disable Nagle's algorithm */
-#define TCP_MAXSEG              2       /* Set maximum segment size */
+pub const i64 TCP_NODELAY = 1;       /* Disable Nagle's algorithm */
+pub const i64 TCP_MAXSEG = 2;       /* Set maximum segment size */
 pub const i64 TCP_CORK = 3;       /* Don't send partial frames */
 pub const i64 TCP_KEEPIDLE = 4;       /* Set keepalive idle time */
-#define TCP_KEEPALIVE           4       /* The macOS name of TCP_KEEPIDLE */
-#define TCP_KEEPINTVL           5       /* Interval between keepalives */
-#define TCP_KEEPCNT             6       /* Number of keepalives before close */
+pub const i64 TCP_KEEPALIVE = 4;       /* The macOS name of TCP_KEEPIDLE */
+pub const i64 TCP_KEEPINTVL = 5;       /* Interval between keepalives */
+pub const i64 TCP_KEEPCNT = 6;       /* Number of keepalives before close */
 pub const i64 TCP_INFO = 11;      /* TCP connection state info */
 pub const i64 TCP_QUICKACK = 12;      /* Disable/enable delayed acks */
 pub const i64 TCP_USER_TIMEOUT = 18;      /* Timeout for unacknowledged data */
-#define TCP_FASTOPEN            23      /* TCP Fast Open */
+pub const i64 TCP_FASTOPEN = 23;      /* TCP Fast Open */
 #else
-#define TCP_NODELAY             0x01    /* Disable Nagle's algorithm */
-#define TCP_MAXSEG              0x02    /* Set maximum segment size */
-#define TCP_NOPUSH              0x04    /* Disable push on final write */
-#define TCP_NOOPT               0x08    /* Disable TCP options */
-#define TCP_KEEPALIVE           0x10    /* Set keepalive idle time */
-#define TCP_CONNECTIONTIMEOUT   0x20    /* Set connection timeout */
-#define PERSIST_TIMEOUT         0x40    /* Timeout for persist state */
-#define TCP_RXT_CONNDROPTIME    0x80    /* Connection drop time for retransmissions */
-#define TCP_RXT_FINDROP         0x100   /* Drop connection after retransmitting FIN */
-#define TCP_KEEPINTVL           0x101   /* Interval between keepalives */
-#define TCP_KEEPCNT             0x102   /* Number of keepalives before close */
-#define TCP_SENDMOREACKS        0x103   /* Acknowledge every other packet */
-#define TCP_ENABLE_ECN          0x104   /* Enable Explicit Congestion Notification */
-#define TCP_FASTOPEN            0x105   /* TCP Fast Open */
-#define TCP_CONNECTION_INFO     0x106   /* TCP connection state info */
+pub const i64 TCP_NODELAY = 0x01;    /* Disable Nagle's algorithm */
+pub const i64 TCP_MAXSEG = 0x02;    /* Set maximum segment size */
+pub const i64 TCP_NOPUSH = 0x04;    /* Disable push on final write */
+pub const i64 TCP_NOOPT = 0x08;    /* Disable TCP options */
+pub const i64 TCP_KEEPALIVE = 0x10;    /* Set keepalive idle time */
+pub const i64 TCP_CONNECTIONTIMEOUT = 0x20;    /* Set connection timeout */
+pub const i64 PERSIST_TIMEOUT = 0x40;    /* Timeout for persist state */
+pub const i64 TCP_RXT_CONNDROPTIME = 0x80;    /* Connection drop time for retransmissions */
+pub const i64 TCP_RXT_FINDROP = 0x100;   /* Drop connection after retransmitting FIN */
+pub const i64 TCP_KEEPINTVL = 0x101;   /* Interval between keepalives */
+pub const i64 TCP_KEEPCNT = 0x102;   /* Number of keepalives before close */
+pub const i64 TCP_SENDMOREACKS = 0x103;   /* Acknowledge every other packet */
+pub const i64 TCP_ENABLE_ECN = 0x104;   /* Enable Explicit Congestion Notification */
+pub const i64 TCP_FASTOPEN = 0x105;   /* TCP Fast Open */
+pub const i64 TCP_CONNECTION_INFO = 0x106;   /* TCP connection state info */
 #endif
 
-pub #define INET6_ADDRSTRLEN        46      /* Length of string form of IPv6 address */
+pub const i64 INET6_ADDRSTRLEN = 46;      /* Length of string form of IPv6 address */
 
 /* Address info flags */
-pub #define AI_PASSIVE     0x00000001 /* Suitable for bind() */
+pub const i64 AI_PASSIVE = 0x00000001; /* Suitable for bind() */
 
-pub #define AI_CANONNAME   0x00000002 /* Request canonical name */
+pub const i64 AI_CANONNAME = 0x00000002; /* Request canonical name */
 
-pub #define AI_NUMERICHOST 0x00000004 /* Numeric host address string */
+pub const i64 AI_NUMERICHOST = 0x00000004; /* Numeric host address string */
 
 #ifdef IS_LINUX
-#define AI_NUMERICSERV 0x00000400 /* Numeric service address string */
+pub const i64 AI_NUMERICSERV = 0x00000400; /* Numeric service address string */
 #else
-#define AI_NUMERICSERV 0x00001000 /* Numeric service address string */
-#define AI_UNUSABLE    0x10000000 /* Include unusable addresses */
+pub const i64 AI_NUMERICSERV = 0x00001000; /* Numeric service address string */
+pub const i64 AI_UNUSABLE = 0x10000000; /* Include unusable addresses */
 #endif
 
 /*
@@ -1349,11 +1349,11 @@ pub extern "c" i64 sendto(i32 socket, void *buffer, u64 length, i32 flags, socka
  * does that for every write in the program. */
 
 /* shutdown(2) `how` */
-pub #define SHUT_RD         0               /* No more receives */
+pub const i64 SHUT_RD = 0;               /* No more receives */
 
-pub #define SHUT_WR         1               /* No more sends (the peer reads EOF) */
+pub const i64 SHUT_WR = 1;               /* No more sends (the peer reads EOF) */
 
-pub #define SHUT_RDWR       2               /* Both */
+pub const i64 SHUT_RDWR = 2;               /* Both */
 
 /* poll(2): wait until one of nfds descriptors in fds is ready, at most
  * timeout milliseconds (-1: no limit, 0: just check). Returns how many
@@ -1364,16 +1364,16 @@ pub struct pollfd {
     i16 revents; /* POLL* events that happened, set by poll */
 };
 
-pub #define POLLIN          0x1             /* Data to read (or a connection to accept) */
+pub const i64 POLLIN = 0x1;             /* Data to read (or a connection to accept) */
 
-pub #define POLLPRI         0x2             /* Urgent data to read */
+pub const i64 POLLPRI = 0x2;             /* Urgent data to read */
 
-pub #define POLLOUT         0x4             /* Writing won't block */
+pub const i64 POLLOUT = 0x4;             /* Writing won't block */
 
-pub #define POLLERR         0x8             /* Error (revents only) */
+pub const i64 POLLERR = 0x8;             /* Error (revents only) */
 
-pub #define POLLHUP         0x10            /* Peer hung up (revents only) */
+pub const i64 POLLHUP = 0x10;            /* Peer hung up (revents only) */
 
-pub #define POLLNVAL        0x20            /* fd not open (revents only) */
+pub const i64 POLLNVAL = 0x20;            /* fd not open (revents only) */
 
 pub extern "c" i32 poll(pollfd *fds, u64 nfds, i32 timeout);

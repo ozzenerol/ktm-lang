@@ -24,18 +24,18 @@ const i64 PROC_SPAWN_SETSIGMASK = 0x08;
 const i64 PROC_SIGPIPE = 13;
 
 #ifdef IS_MACOS
-#define PROC_O_NONBLOCK     0x4
-#define PROC_F_DUPFD_CLOEXEC 67
-#define PROC_F_SETNOSIGPIPE 73
-#define PROC_SPAWN_CLOEXEC_DEFAULT 0x4000
-#define PROC_EPIPE          32
+const i64 PROC_O_NONBLOCK = 0x4;
+const i64 PROC_F_DUPFD_CLOEXEC = 67;
+const i64 PROC_F_SETNOSIGPIPE = 73;
+const i64 PROC_SPAWN_CLOEXEC_DEFAULT = 0x4000;
+const i64 PROC_EPIPE = 32;
 #else
-#define PROC_O_NONBLOCK     0x800
+const i64 PROC_O_NONBLOCK = 0x800;
 const i64 PROC_O_CLOEXEC = 0x80000;
-#define PROC_F_DUPFD_CLOEXEC 1030
+const i64 PROC_F_DUPFD_CLOEXEC = 1030;
 const i64 PROC_SIG_BLOCK = 0;
 const i64 PROC_SIG_SETMASK = 2;
-#define PROC_EPIPE          32
+const i64 PROC_EPIPE = 32;
 #endif
 
 const i64 PROC_EINTR = 4;
@@ -47,9 +47,9 @@ const i64 PROC_POLLOUT = 0x4;
 const i64 PROC_SIGTERM = 15;
 
 #ifdef IS_MACOS
-#define PROC_EAGAIN         35
+const i64 PROC_EAGAIN = 35;
 #else
-#define PROC_EAGAIN         11
+const i64 PROC_EAGAIN = 11;
 #endif
 
 /* posix_spawnattr_t / posix_spawn_file_actions_t are structs on glibc
