@@ -57,8 +57,8 @@ pub struct Fstat {
 
 /* Default MkDir mode, 04775 (rwxrwxr-x; the set-user-ID bit means nothing
  * on a directory), minus the umask: drwxr-xr-x with the usual 022. */
-pub const i64 MKDIR_DEFAULT = (S_ISUID|S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
+pub const i64 MAKE_DIR_DEFAULT = (S_ISUID|S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
 
-pub const i64 RM_RECURSE = 0x1;  /* Remove directories and their contents recursively */
+pub const i64 REMOVE_RECURSE = 0x1;  /* Remove directories and their contents recursively */
 
-pub const i64 RM_FORCE = 0x4;  /* A path that doesn't exist is not an error for Rm */
+pub const i64 REMOVE_FORCE = 0x4;  /* A path that doesn't exist is not an error for Rm */

@@ -42,11 +42,11 @@ const i64 SQLITE_NULL = 5;
 const i64 SQLITE_TEXT = 3;
 const i64 SQLITE3_TEXT = 3;
 
-pub const i64 SQL_INT = SQLITE_INTEGER;
-pub const i64 SQL_FLOAT = SQLITE_FLOAT;
-pub const i64 SQL_TEXT = SQLITE3_TEXT;
-pub const i64 SQL_BLOB = SQLITE_BLOB;
-pub const i64 SQL_NULL = SQLITE_NULL;
+pub const i64 INT = SQLITE_INTEGER;
+pub const i64 FLOAT = SQLITE_FLOAT;
+pub const i64 TEXT = SQLITE3_TEXT;
+pub const i64 BLOB = SQLITE_BLOB;
+pub const i64 NULL_TYPE = SQLITE_NULL;
 
 struct sqlite3_stmt {};
 struct sqlite3 {};

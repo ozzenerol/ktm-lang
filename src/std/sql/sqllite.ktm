@@ -1,15 +1,15 @@
 module sql;
 import libc, mem, str;
 
-pub const i64 SQL_INT = SQLITE_INTEGER;
+pub const i64 INT = SQLITE_INTEGER;
 
-pub const i64 SQL_FLOAT = SQLITE_FLOAT;
+pub const i64 FLOAT = SQLITE_FLOAT;
 
-pub const i64 SQL_TEXT = SQLITE3_TEXT;
+pub const i64 TEXT = SQLITE3_TEXT;
 
-pub const i64 SQL_BLOB = SQLITE_BLOB;
+pub const i64 BLOB = SQLITE_BLOB;
 
-pub const i64 SQL_NULL = SQLITE_NULL;
+pub const i64 NULL_TYPE = SQLITE_NULL;
 
 /* Destructor argument of sqlite3_bind_* ((void *)-1): sqlite copies the
  * value, so the caller may free or reuse it right after the call. */
