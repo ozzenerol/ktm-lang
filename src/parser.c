@@ -4218,6 +4218,19 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     return func;
 }
 
+/* A main-program global (not static, not a module's) gets its own
+ * symbol, as its functions do (AST_FLAG_PROGRAM, astProgramSymbol): a
+ * program's `environ` or `errno` can't replace the C library's. */
+static void parseProgramGlobal(Cctrl *cc, Ast *gvar) {
+    if (!cc->decl_from_main || cc->cur_module || gvar->is_static ||
+        memchr(gvar->gname->data, '.', gvar->gname->len)) {
+        return;
+    }
+    char *sym = astProgramSymbol(gvar->gname->data, gvar->gname->len);
+    gvar->glabel = aoStrDupRaw(sym, strlen(sym));
+    gvar->flags |= AST_FLAG_PROGRAM;
+}
+
 Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len) {
     Ast *func;
     int has_var_args = 0;
@@ -4972,7 +4985,6 @@ static int parseGotParenFnType(Cctrl *cc) {
     cctrlTokenGet(cc);
     return 0;
 }
-
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
@@ -5061,6 +5073,25 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                         /* extern "c" func(...) - C-ABI function decl. */
                         type = parseDeclSpec(cc);
                         name = cctrlTokenGet(cc);
+                        if (name && name->tk_type == TK_IDENT &&
+                            !tokenPunctIs(cctrlTokenPeek(cc),'('))
+                        {
+                            /* `extern "c" T name;`: C data (environ),
+                             * known by its C name everywhere */
+                            type = parseArrayDimensions(cc, type);
+                            cctrlTokenExpect(cc,';');
+                            Ast *gvar = astGVar(type, name->start, name->len, 0);
+                            /* Mach-O spells a C symbol with a leading `_` */
+                            if (cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                                cc->target == TARGET_X86_64_APPLE_DARWIN) {
+                                gvar->glabel = aoStrPrintf("_%.*s", name->len, name->start);
+                            }
+                            Ast *decl = astDecl(gvar, NULL);
+                            decl->flags |= AST_FLAG_EXTERN;
+                            gvar->flags |= AST_FLAG_EXTERN | AST_FLAG_EXTERN_C;
+                            mapAdd(cc->global_env, gvar->gname->data, gvar);
+                            return decl;
+                        }
                         cctrlTokenExpect(cc,'(');
                         extern_func = parseExternFunctionProto(cc,type,
                                 name->start,name->len);
@@ -5097,7 +5128,20 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     type = parseArrayDimensions(cc, type);
                     cctrlTokenExpect(cc,';');
                     cctrlNoteHeaderName(cc, name->start, name->len);
-                    Ast *gvar = astGVar(type, name->start, name->len, 0);
+                    /* a ktm global defined elsewhere: a module's is named
+                     * as its other globals are, a program's gets the
+                     * program's symbol; C data is `extern "c"` */
+                    char *ext_name = name->start;
+                    int ext_len = name->len;
+                    if (cc->cur_module) {
+                        char *qual = cctrlDeclName(cc, name->start, name->len);
+                        if (qual) {
+                            ext_name = qual;
+                            ext_len = strlen(qual);
+                        }
+                    }
+                    Ast *gvar = astGVar(type, ext_name, ext_len, 0);
+                    parseProgramGlobal(cc, gvar);
                     Ast *decl = astDecl(gvar, NULL);
                     decl->flags |= AST_FLAG_EXTERN;
                     gvar->flags |= AST_FLAG_EXTERN;
@@ -5521,6 +5565,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             tokenPunctIs(cctrlTokenPeekBy(cc,1),'{'))
         {
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
@@ -5532,6 +5577,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
         if (tokenPunctIs(tok,'=') && type->kind != AST_TYPE_ARRAY) {
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             Ast *ast_decl = astDecl(variable,NULL);
 
             listAppend(cc->ast_list,ast_decl);
@@ -5629,6 +5675,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                         name->len, name->start);
             }
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             if (is_const) variable->flags |= AST_FLAG_CONST;
             mapAdd(cc->global_env,variable->gname->data,variable);
             cc->tmp_gvar_decl = variable;
@@ -5666,6 +5713,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             }
             parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
             variable = astGVar(type,name->start,name->len,is_static);
+            parseProgramGlobal(cc, variable);
             mapAdd(cc->global_env,variable->gname->data,variable);
             return astDecl(variable,NULL);
         }
@@ -5674,7 +5722,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 }
 
 /* The module `libc` only declares the C library: `extern "c"` functions
- * (called by their C names, as an extern "c" of any module is), structs,
+ * and data (known by their C names, as an extern "c" of any module is), structs,
  * unions, enums and constants. Its code would be the program's, under
  * the name of C's. Checked in its full pass only. */
 static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
@@ -5684,7 +5732,7 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
     }
     if (ast->kind == AST_EXTERN_FUNC || ast->kind == AST_ASM_FUNC_BIND) return;
     if (ast->kind == AST_DECL && ast->declvar &&
-        (ast->declvar->flags & AST_FLAG_CONST)) {
+        (ast->declvar->flags & (AST_FLAG_CONST | AST_FLAG_EXTERN_C))) {
         return;
     }
     const char *what = "a statement";
@@ -5696,8 +5744,8 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         default: break;
     }
     cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1,
-        "module libc only declares C: extern \"c\" functions, structs, unions, "
-        "enums and constants, not %s", what);
+        "module libc only declares C: extern \"c\" functions and data, structs, "
+        "unions, enums and constants, not %s", what);
 }
 
 /* M2: each module whose globals have run-time initialisers gets a

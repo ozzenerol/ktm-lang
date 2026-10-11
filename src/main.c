@@ -144,6 +144,13 @@ static void noteUndefinedPrototypes(Cctrl *cc) {
                     "is declared with extern \"c\"\n",
                     astSymbolDisplayName(fn->fname->data));
         }
+        /* an `extern T x;` of the program is a ktm global too */
+        if (fn->kind == AST_GVAR && (fn->flags & AST_FLAG_PROGRAM) &&
+            (fn->flags & AST_FLAG_EXTERN) &&
+            (!link_messages || strstr(link_messages->data, fn->gname->data))) {
+            fprintf(stderr, "note: `%s` is declared but not defined; a C variable "
+                    "is declared with extern \"c\"\n", fn->gname->data);
+        }
     }
 }
 
