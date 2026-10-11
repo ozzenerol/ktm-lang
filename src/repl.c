@@ -371,7 +371,7 @@ static void replReportFault(void) {
     fflush(stderr);
 }
 
-/* `ReplHeap;` - live allocations, biggest first. The tracker itself
+/* `replHeap;` - live allocations, biggest first. The tracker itself
  * lives in memsafe.c; replRun installs it via memsafeInit. */
 static void replBuiltinReplHeap(void) {
     memsafeDumpLive(stdout);
@@ -494,7 +494,7 @@ static void replEvalString(char *code) {
     replExec(&b, INT_MAX);
 }
 
-/* --------- ReplReloadRc: Refresh the `~/.ktm_rc.ktm` ----------
+/* --------- replReloadRc: Refresh the `~/.ktm_rc.ktm` ----------
  * Reinclude the `~/.ktm_rc.ktm` this does not however delete the previous
  * function or `#define` definitions, so it won't delete stuff. But it will
  * re-define already existing symbols
@@ -515,7 +515,7 @@ static void replBuiltinReloadRc(void) {
     parseToAst(cc);
 
     if (cctrlDiagFlush(cc) > 0) {
-        fprintf(stderr, "ReplReloadRc: errors\n");
+        fprintf(stderr, "replReloadRc: errors\n");
     }
 
     cctrlDiagClear(cc);
@@ -575,7 +575,7 @@ static void replBuiltinFindFn(char *name) {
     vecRelease(vec);
 }
 
-/* --------- ReplListGlobal: List all defined global variables ---------- */
+/* --------- replListGVars: List all defined global variables ---------- */
 static void replBuiltinListGVars(void) {
     KtmJit *jit = repl_jit;
     if (jit == NULL) return;
@@ -598,7 +598,7 @@ static void replBuiltinListGVars(void) {
     }
 }
 
-/* ---------------- ReplClassRep: Print a class or union --------- */
+/* ---------------- replClassRep: Print a class or union --------- */
 static void replBuiltinPrintClass(char *name) {
     KtmJit *jit = repl_jit;
     if (name == NULL || *name == '\0' || jit == NULL) return;
@@ -668,14 +668,14 @@ static void replBuiltinReplDel(char *name) {
  * hints). The implementations are registered via ktmJitDefineSymbol. */
 static const char repl_builtin_protos[] =
     "extern \"c\" void replDisasm(u8 *fname);\n"
-    "extern \"c\" void ReplReloadRc();\n"
+    "extern \"c\" void replReloadRc();\n"
     "extern \"c\" void replListFn();\n"
     "extern \"c\" void replFindFn(u8 *name);\n"
-    "extern \"c\" void ReplListGVars();\n"
-    "extern \"c\" void ReplClassRep(u8 *name);\n"
-    "extern \"c\" void ReplEval(u8 *code);\n"
+    "extern \"c\" void replListGVars();\n"
+    "extern \"c\" void replClassRep(u8 *name);\n"
+    "extern \"c\" void replEval(u8 *code);\n"
     "extern \"c\" void replDel(u8 *name);\n"
-    "extern \"c\" void ReplHeap();\n";
+    "extern \"c\" void replHeap();\n";
 
 /* ---------------- tab completion ---------------- */
 
@@ -1475,7 +1475,7 @@ static void replExecInner(AoStr *input, int round) {
 }
 
 /* Fault-guard around an eval. Nested evals (JIT'd code calling the
- * ReplEval builtin re-enters here) stack: the outer jump point is
+ * replEval builtin re-enters here) stack: the outer jump point is
  * saved and restored either way, so a fault always unwinds to the
  * innermost live eval. sigsetjmp's savemask=1 restores the signal
  * mask on the jump - without it the delivered signal would stay
@@ -1487,7 +1487,7 @@ static void replExec(AoStr *input, int round) {
 
     if (sigsetjmp(repl_fault_env, 1) == 0) {
         repl_in_eval = 1;
-        /* Rounds tag memsafe reports; ReplEval's INT_MAX isn't a real
+        /* Rounds tag memsafe reports; replEval's INT_MAX isn't a real
          * round, so drop it to "untagged". */
         memsafeSetRound(round == INT_MAX ? 0 : round);
         replExecInner(input, round);
@@ -1518,12 +1518,12 @@ int replRun(Cctrl *cc, CliArgs *args) {
     /* Builtin helper functions */
     ktmJitDefineSymbol(jit, "replDisasm", (void *)(uintptr_t)replBuiltinUf);
     ktmJitDefineSymbol(jit, "replDel", (void *)(uintptr_t)replBuiltinReplDel);
-    ktmJitDefineSymbol(jit, "ReplReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
+    ktmJitDefineSymbol(jit, "replReloadRc", (void *)(uintptr_t)replBuiltinReloadRc);
     ktmJitDefineSymbol(jit, "replListFn", (void *)(uintptr_t)replBuiltinListFn);
-    ktmJitDefineSymbol(jit, "ReplListGVars", (void *)(uintptr_t)replBuiltinListGVars);
-    ktmJitDefineSymbol(jit, "ReplClassRep", (void *)(uintptr_t)replBuiltinPrintClass);
-    ktmJitDefineSymbol(jit, "ReplEval", (void *)(uintptr_t)replEvalString);
-    ktmJitDefineSymbol(jit, "ReplHeap", (void *)(uintptr_t)replBuiltinReplHeap);
+    ktmJitDefineSymbol(jit, "replListGVars", (void *)(uintptr_t)replBuiltinListGVars);
+    ktmJitDefineSymbol(jit, "replClassRep", (void *)(uintptr_t)replBuiltinPrintClass);
+    ktmJitDefineSymbol(jit, "replEval", (void *)(uintptr_t)replEvalString);
+    ktmJitDefineSymbol(jit, "replHeap", (void *)(uintptr_t)replBuiltinReplHeap);
     ktmJitDefineSymbol(jit, "replFindFn", (void *)(uintptr_t)replBuiltinFindFn);
 
     /* Tracking allocator (memsafe.c) - always on in the REPL, and
