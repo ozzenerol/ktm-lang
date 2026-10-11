@@ -1,0 +1,50 @@
+diff --git a/src/std/date/strings.ktm b/src/std/date/strings.ktm
+index 96e07de..b56b4ae 100644
+--- a/src/std/date/strings.ktm
++++ b/src/std/date/strings.ktm
+@@ -217,3 +217,45 @@ pub Date parse(u8 *_str, u8 *fmt)
+         }
+         return fromParts(&ds);
+ }
++
++/* like strftime: %Y year, %m month (01-12), %d day (01-31), %H hour
++    * (00-23), %M minutes, %S seconds, %a day name (Mon), %b month name
++    * (Jan), %p AM or PM, %% a `%`. Any other text is copied as written,
++    * an unknown conversion included. The result is from mem.alloc. */
++pub u8 *format(Date d, u8 *fmt) {
++        Parts ds;
++        toParts(&ds,d);
++        i64 len = 0;
++        u8 *out = mem.alloc(1);
++        out[0] = '\0';
++        if (!fmt) { return out; }
++        for (u8 *p = fmt; *p; ++p) {
++                if (*p != '%' || !p[1]) {
++                        out = str.appendFormatLen(out,&len,"%c",*p);
++                        continue;
++                }
++                ++p;
++                switch (*p) {
++                        case 'Y': out = str.appendFormatLen(out,&len,"%d",ds.year);
++                        case 'm': out = str.appendFormatLen(out,&len,"%02d",ds.mon);
++                        case 'd': out = str.appendFormatLen(out,&len,"%02d",ds.dayOfMon);
++                        case 'H': out = str.appendFormatLen(out,&len,"%02d",ds.hour);
++                        case 'M': out = str.appendFormatLen(out,&len,"%02d",ds.min);
++                        case 'S': out = str.appendFormatLen(out,&len,"%02d",ds.sec);
++                        case 'a': {
++                                u8 *n = strDateDays[ds.dayOfWeek % 7];
++                                out = str.appendFormatLen(out,&len,"%c%c%c",
++                                        str.toUpper(n[0]),n[1],n[2]);
++                        }
++                        case 'b': {
++                                u8 *n = strDateMonths[(ds.mon + 11) % 12];
++                                out = str.appendFormatLen(out,&len,"%c%c%c",
++                                        str.toUpper(n[0]),n[1],n[2]);
++                        }
++                        case 'p': out = str.appendFormatLen(out,&len,"%s",ds.hour < 12 ? "AM" : "PM");
++                        case '%': out = str.appendFormatLen(out,&len,"%%");
++                        default:  out = str.appendFormatLen(out,&len,"%%%c",*p);
++                }
++        }
++        return out;
++}

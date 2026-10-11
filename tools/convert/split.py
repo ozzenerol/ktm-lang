@@ -132,6 +132,12 @@ def repeats_header(body):
 
 def block_module(f, idx, body):
     defs = block_defs(body)
+    # a block that defines the API of a module (system.ktm's per-arch Exit)
+    # is that module's
+    api = collections.Counter(mp[d][1] for d in defs
+                              if d in mp and mp[d][1] not in ('-', 'prelude', 'libc') and mp[d][0] != 'c')
+    if api:
+        return api.most_common(1)[0][0]
     refs = collections.Counter()
     for g in files:
         for j, it in enumerate(allit[g]):
