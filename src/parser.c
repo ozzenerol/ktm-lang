@@ -1619,6 +1619,9 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
         init = astI64Type(evalIntConstExpr(init));
     }
 
+    /* `i64[] s = array;`: the array becomes a slice */
+    init = parseSliceFrom(cc, var->type, init);
+
     /* `auto`: the type is the initialiser's, nothing to check it against
      * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
     int from_auto = var->type->kind == AST_TYPE_AUTO;
@@ -2252,6 +2255,16 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
+    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1] */
+    if (container->type && astTypeIsSlice(container->type)) {
+        Map *fields = container->type->fields;
+        Ast *len_ref = astClassRef(mapGetLen(fields, str_lit("len")), container, "len");
+        Ast *ptr_ref = astClassRef(mapGetLen(fields, str_lit("ptr")), container, "ptr");
+        if (iteratee->type->kind == AST_TYPE_AUTO) {
+            iteratee->type = container->type->elem;
+        }
+        return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
+    }
     if (container->kind == AST_LVAR && (container->flags & AST_FLAG_VARARGS)) {
         /* `for (auto v : nums)` over a `T ...nums` parameter */
         AoStr *len_name = aoStrPrintf("%s#len", container->lname->data);
@@ -2684,6 +2697,7 @@ Ast *parseReturnStatement(Cctrl *cc) {
 
     Ast *maybe_fn = findFunctionDecl(cc,cc->tmp_fname->data,cc->tmp_fname->len);
 
+    if (retval) retval = parseSliceFrom(cc, cc->tmp_rettype, retval);
     if (retval) check = retval->type;
     else        check = ast_void_type;
 

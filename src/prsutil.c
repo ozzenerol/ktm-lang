@@ -645,6 +645,14 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    /* `s.len = n`: a slice's fields are set together, by assigning a
+     * whole slice */
+    if (ast->kind == AST_CLASS_REF && ast->cls && ast->cls->type &&
+        astTypeIsSlice(ast->cls->type)) {
+        cctrlRewindUntilStrMatch(cc, ast->field, strlen(ast->field), NULL);
+        cctrlRaiseException(cc, "a slice's `.%s` is read-only: assign the whole "
+                            "slice instead", ast->field);
+    }
     if (ast->kind == AST_LVAR && (ast->flags & AST_FLAG_VARARGS)) {
         cctrlRaiseException(cc,"cannot assign to the variadic parameter '%s'",
                             ast->lname->data);

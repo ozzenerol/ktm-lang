@@ -17,6 +17,7 @@ void parseAssignAuto(Cctrl *cc, Ast *ast);
 AstType *parseReturnAuto(Cctrl *cc, Ast *retval);
 AstType *parseArrayDimensions(Cctrl *cc, AstType *base_type);
 AstType *parsePointerType(Cctrl *cc, AstType *type);
+Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr);
 AstType *parseBaseDeclSpec(Cctrl *cc);
 AstType *parseDeclSpec(Cctrl *cc);
 AstType *parseFullType(Cctrl *cc);
