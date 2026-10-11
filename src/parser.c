@@ -5078,6 +5078,11 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                             type = parseArrayDimensions(cc, type);
                             cctrlTokenExpect(cc,';');
                             Ast *gvar = astGVar(type, name->start, name->len, 0);
+                            /* Mach-O spells a C symbol with a leading `_` */
+                            if (cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                                cc->target == TARGET_X86_64_APPLE_DARWIN) {
+                                gvar->glabel = aoStrPrintf("_%.*s", name->len, name->start);
+                            }
                             Ast *decl = astDecl(gvar, NULL);
                             decl->flags |= AST_FLAG_EXTERN;
                             gvar->flags |= AST_FLAG_EXTERN | AST_FLAG_EXTERN_C;
