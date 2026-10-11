@@ -2090,6 +2090,7 @@ Ast *parseIfStatement(Cctrl *cc) {
     } else {
         cond = cond_clause;
     }
+    parseCheckCondition(cc, cond);
 
     Lexeme *peek = cctrlTokenPeek(cc);
     if (peek == NULL) {
@@ -2506,6 +2507,7 @@ Ast *parseForStatement(Cctrl *cc) {
         }
 
         forcond = parseOptExpr(cc);
+        parseCheckCondition(cc, forcond);
         if (tokenPunctIs(cctrlTokenPeek(cc), ')')) {
             forstep = NULL;
         } else {
@@ -2567,6 +2569,7 @@ Ast *parseWhileStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         whilecond = parseRequiredExpr(cc, "the `while` condition");
+        parseCheckCondition(cc, whilecond);
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
     }
@@ -2637,6 +2640,7 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         whilecond = parseRequiredExpr(cc, "the `while` condition");
+        parseCheckCondition(cc, whilecond);
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
     }

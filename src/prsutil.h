@@ -31,6 +31,7 @@ int evalClassRef(Ast *ast, int offset);
 int assertLValue(Ast *ast);
 void parseRaiseNotLValue(Cctrl *cc, Ast *ast);
 void assertNotConstAssign(Cctrl *cc, Ast *ast);
+void parseCheckCondition(Cctrl *cc, Ast *ast);
 Ast *parseLiteralWriteBase(Ast *at);
 void parseCheckLiteralWrites(Cctrl *cc);
 void parseNoteSliceMoved(Ast *ast);

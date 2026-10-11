@@ -717,6 +717,25 @@ void parseNoteSliceMoved(Ast *ast) {
     }
 }
 
+/* `ast` used as a truth value (`if`, `while`, `for`, `?:`, `!`, `&&`,
+ * `||`): a struct has none (it was tested by its address, always true) */
+void parseCheckCondition(Cctrl *cc, Ast *ast) {
+    if (!ast || !ast->type) {
+        return;
+    }
+    AstType *t = ast->type;
+    if ((t->kind != AST_TYPE_CLASS && t->kind != AST_TYPE_UNION) || t->is_intrinsic) {
+        return;
+    }
+    char *hint = (astTypeIsString(t) || astTypeIsSlice(t))
+               ? ": test its .len (or .ptr)" : "";
+    if (ast->line > 0 && ast->col > 0) {
+        cctrlRaiseExceptionAt(cc, ast->line, ast->col, 1, "a %s can't be a condition%s",
+                              astTypeToString(t), hint);
+    }
+    cctrlRaiseException(cc, "a %s can't be a condition%s", astTypeToString(t), hint);
+}
+
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
