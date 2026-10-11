@@ -2879,6 +2879,8 @@ static int parseArmEnds(Lexeme *peek) {
             (peek->i64 == KW_CASE || peek->i64 == KW_DEFAULT));
 }
 
+static Ast *parseArmBlock(Cctrl *cc);
+
 /* The statements of a `case` or `default` (Y8): every one up to the next
  * label. The arm leaves the switch at its end, unless its last statement
  * is `fallthrough;`, which runs on into the next arm. An empty arm
@@ -2887,29 +2889,17 @@ static void parseCaseArm(Cctrl *cc, Ast *arm) {
     List *stmts = arm->case_asts;
     int ft = 0;
     s64 ft_line = 0, ft_col = 0;
-    while (!parseArmEnds(cctrlTokenPeek(cc))) {
-        if (ft) {
-            cctrlRaiseExceptionAt(cc, ft_line, ft_col, 11,
-                "`fallthrough` must be the last statement of its case");
-        }
+    if (!parseArmEnds(cctrlTokenPeek(cc))) {
+        /* a block of its own (F33): declarations, `defer` and a scope,
+         * and the block's checks place a `fallthrough` */
         cc->fallthrough_pending = 0;
-        Ast *stmt = parseStatement(cc);
+        Ast *block = parseArmBlock(cc);
         if (cc->fallthrough_pending) {
-            /* a `{...}` arm ending in it is fine (the block checked it) */
-            if (stmt && stmt->kind != AST_COMPOUND_STMT) {
-                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
-                cc->fallthrough_pending = 0;
-                cctrlRaiseExceptionAt(cc, line, col, 11,
-                    "`fallthrough` must be the last statement of its case, "
-                    "not inside a block or another statement");
-            }
-            if (stmt) listAppend(stmts, stmt);    /* `{ ...; fallthrough; }` */
             ft = 1;
             ft_line = cc->fallthrough_line;
             ft_col = cc->fallthrough_col;
-            continue;
         }
-        if (stmt) listAppend(stmts, stmt);
+        if (!listEmpty(block->stms)) listAppend(stmts, block);
     }
     arm->case_fallthrough = ft;
     arm->case_ft_line = ft_line;
@@ -3395,7 +3385,10 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     return parseStatement(cc);
 }
 
-void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
+/* The statements of a `{ ... }` block into `body`, or, with `arm` set, of
+ * a switch case's arm: up to the next `case`, `default` or the switch's
+ * `}` (left for the switch), in a scope of its own like a block's */
+static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
     Ast *stmt = NULL;
     Ast *var = NULL;
     AstType *base_type, *type, *next_type;
@@ -3419,7 +3412,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
 
     tok = cctrlTokenPeek(cc);
 
-    while (tok && !tokenPunctIs(tok, '}')) {
+    while (tok && !(arm ? parseArmEnds(tok) : tokenPunctIs(tok, '}'))) {
         /* Snapshot the tail of body->stms and cc->tmp_locals
          * *before* attempting the next statement. If the parse
          * longjmps mid-way, half-built nodes may already have
@@ -3584,7 +3577,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 }
                 if (stmt) listAppend(body->stms, stmt);
                 tok = cctrlTokenPeek(cc);
-                if (tok && !tokenPunctIs(tok, '}')) {
+                if (tok && !(arm ? parseArmEnds(tok) : tokenPunctIs(tok, '}'))) {
                     cc->fallthrough_pending = 0;
                     cctrlRaiseExceptionAt(cc, line, col, 11,
                         "`fallthrough` must be the last statement of its case");
@@ -3605,8 +3598,21 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
     }
     cc->current_recovery = outer_recovery;
     cc->localenv = cc->localenv->parent;
-    cctrlTokenExpect(cc,'}');
+    if (!arm) {
+        cctrlTokenExpect(cc,'}');
+    }
     cctrlTokenPeek(cc);
+}
+
+void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
+    parseBlockInternal(cc, body, 0);
+}
+
+/* A case's arm (parseCaseArm): its statements as one block */
+static Ast *parseArmBlock(Cctrl *cc) {
+    Ast *block = astCompountStatement(listNew());
+    parseBlockInternal(cc, block, 1);
+    return block;
 }
 
 Ast *parseCompoundStatement(Cctrl *cc) {
