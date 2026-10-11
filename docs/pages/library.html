@@ -627,7 +627,7 @@ stopping cleanly after signal 15
 <h2 id="lists">Lists</h2>
 <p><code>list.List</code> is a circular doubly linked list of <code>void *</code> values. The list
 is its head node, which links to itself when the list is empty, so iterate from
-<code>l->next</code> until you get back to <code>l</code>. The list never frees the values
+<code>l.next</code> until you get back to <code>l</code>. The list never frees the values
 it holds unless you hand it a free function.</p>
 <pre data-run><code>
 import list;
@@ -667,7 +667,7 @@ popped three, 2 left
   <code>list.pop</code> the last, so <code>list.append</code> with <code>list.shift</code> is a
   first-in first-out queue and <code>list.append</code> with <code>list.pop</code> a stack.
   <code>list.remove(node)</code> unlinks one node while you walk the list (take
-  <code>it->next</code> first) and returns its value; never pass it the head.</li>
+  <code>it.next</code> first) and returns its value; never pass it the head.</li>
   <li><strong>Looking.</strong> <code>list.first</code> and <code>list.last</code> return a value
   without removing it, <code>list.isEmpty</code> tells whether there are any, and
   <code>list.count</code> counts them by walking the list, so it is O(n).</li>
@@ -731,7 +731,7 @@ are the same for the three, with the type as prefix:</p>
   <li><code>vec.intGet(v, i)</code> and <code>vec.intSet(v, i, value)</code> read and replace an
   entry. The index is always checked: outside <code>0</code> to <code>size - 1</code> they
   print <code>vec.intGet: index 5 out of range (size 3)</code> on stderr and exit with
-  status 1. Reading <code>v->entries[i]</code> directly is not checked.</li>
+  status 1. Reading <code>v.entries[i]</code> directly is not checked.</li>
   <li><code>vec.intPop(v, &amp;ok)</code> removes and returns the last entry and
   <code>vec.intLast(v, &amp;ok)</code> returns it without removing it. On an empty vector they
   return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
@@ -990,7 +990,7 @@ after clear: 0 keys, 32 slots
 and the <code>map.IntMap</code> ones) follows insertion order. Start the cursor at 0 and call
 until it returns <code>false</code>; the cursor is opaque, so don't compute with it.
 Deleting entries while iterating is safe (the loop above could delete
-<code>node->key</code>); adding entries is not, as an added entry can be skipped or the
+<code>node.key</code>); adding entries is not, as an added entry can be skipped or the
 table rebuilt under the loop. A deleted key can be set again and then comes last.
 <code>map.strToStr</code>, <code>map.intToStr</code> and the <code>KeysToString</code>
 versions print a map, in insertion order, into a new string you free.</p>
@@ -1755,7 +1755,7 @@ error without running the statement. Such a row belongs to the statement, which
 <ul>
   <li><a href="stdlib.html#threads">Threads</a>: pthreads (<code>pthread_create</code>, mutexes, condition variables) and a thread pool:
   <code>thread.poolNew(n)</code> (NULL if <code>n</code> &lt;= 0 or a thread can't start), <code>thread.poolEnqueue(pool, argv, &amp;Fn)</code>
-  runs <code>Fn(pool-&gt;priv_data, argv)</code> on a worker, <code>thread.poolWait</code> waits until the queue is empty (never call it
+  runs <code>Fn(pool.priv_data, argv)</code> on a worker, <code>thread.poolWait</code> waits until the queue is empty (never call it
   from inside a job), <code>thread.poolRelease</code> runs what is left and frees the pool.</li>
   <li><a href="stdlib.html#net">Networking</a>: sockets, <code>getaddrinfo</code> and friends.
   <code>net.unixListen(path, backlog)</code> and <code>net.unixDial(path)</code>
