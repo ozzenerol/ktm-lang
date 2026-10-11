@@ -73,6 +73,20 @@ i32 main() {
         correct++;
                          }
 
+    /* a variadic C function through the module (libc.open's mode) is
+     * called as variadic: on arm64 macOS its variadic arguments go on the
+     * stack, so `mode` is stored at [sp] before the call */
+    tests++;
+    proc.shell("rm -rf " TMP_DIR " && mkdir -p " TMP_DIR);
+    u8 *openSrc = "import libc;\ni32 main() { return libc.open(\"x\", libc.O_CREAT | libc.O_WRONLY, 420); }\n";
+    fs.writeAll(TMP_DIR "/open.ktm", openSrc, str.len(openSrc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    if (output(KTM "--target=aarch64-apple-darwin -S " TMP_DIR "/open.ktm -o " MOD_BIN " && "
+               "awk '/str[[:space:]]+x9, \\[sp/ { s = 1 } /bl[[:space:]]+_open$/ { if (s) ok = 1; exit } "
+               "END { exit !ok }' " MOD_BIN " && echo variadic > " MOD_OUT, "variadic")) {
+        correct++;
+    }
+    proc.shell("rm -rf " TMP_DIR);
+
     /* constants, structs, unions, enums are fine */
     tests++;
     if (cModule("pub const i64 K = 3;\npub union U { i64 a; f64 b; };\n", "") ) { correct++; }
