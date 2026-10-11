@@ -1629,6 +1629,10 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
 
     /* `i64[] s = array;`: the array becomes a slice */
     init = parseSliceFrom(cc, var->type, init);
+    if (var->kind == AST_LVAR && init->kind == AST_SLICE_MAKE &&
+        init->slice_ptr && init->slice_ptr->kind == AST_STRING) {
+        var->flags |= AST_FLAG_LIT_SLICE;
+    }
 
     /* `auto`: the type is the initialiser's, nothing to check it against
      * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
@@ -4151,6 +4155,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
 
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cc->tmp_locals = locals;
+    cc->lit_writes = listNew();
 
     /* Upgrade a prototype to an actual function */
     func = mapGetLen(cc->global_env, fname, len);
@@ -4293,6 +4298,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             astModuleDemangle(fname, len));
     }
 
+    parseCheckLiteralWrites(cc);
     cc->localenv = NULL;
     cc->tmp_locals = NULL;
     cc->tmp_rettype = NULL;

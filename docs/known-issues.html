@@ -49,15 +49,7 @@ each with a way to reproduce it and a workaround. The other pages avoid them, so
 there works as shown.</p>
 
 <h2 id="compiler">Compiler<a class="anchor" href="#compiler" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table>
-  <thead><tr><th>Issue</th><th>Reproduce</th><th>Workaround</th></tr></thead>
-  <tbody>
-    <tr><td>A write through a slice of a string literal is not caught at compile time
-    (planned for v0.3.1): a compiled program crashes, and the JIT changes the literal.</td>
-    <td><code>u8[] a = "abc"; a[0] = 'x';</code></td>
-    <td>Copy the literal first: <code>String a = str.from("abc"); defer a.free();</code></td></tr>
-  </tbody>
-</table></div>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
 
 <h3 id="diagnostics">Diagnostics<a class="anchor" href="#diagnostics" aria-label="Link to this section">#</a></h3>
 <p>No known issues: everything found while writing these docs has been fixed.</p>

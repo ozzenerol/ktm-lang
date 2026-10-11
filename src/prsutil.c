@@ -642,9 +642,86 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
             astKindToHumanReadable(ast), ast_str);
 }
 
+/* What a write through `at` (an element's address) lands in when it is a
+ * byte of a string, through sub-slices and the slice a literal makes: the
+ * literal (AST_STRING), a local, or NULL when it is neither */
+Ast *parseLiteralWriteBase(Ast *at) {
+    Ast *base;
+    if (at->kind == AST_SLICE_ELEM) {
+        base = at->sub_base;
+    } else if (at->kind == AST_BINOP && at->binop == AST_BIN_OP_ADD) {
+        /* `"abc"[0]`: the literal is an array */
+        base = at->left->kind == AST_STRING ? at->left : at->right;
+        return base->kind == AST_STRING ? base : NULL;
+    } else {
+        return NULL;
+    }
+    while (base && base->kind == AST_SUBSLICE) {
+        base = base->sub_base;
+    }
+    if (base && base->kind == AST_SLICE_MAKE) {
+        base = base->slice_ptr;
+    }
+    if (base && (base->kind == AST_STRING || base->kind == AST_LVAR)) {
+        return base;
+    }
+    return NULL;
+}
+
+/* A write through `ast`: an error when it is a string literal's byte,
+ * (read-only data) and noted for the end of the function when it goes
+ * through a local that a literal initialised (an error there unless the
+ * local was given something else) */
+static void parseCheckLiteralWrite(Cctrl *cc, Ast *ast) {
+    if (ast->kind != AST_UNOP || ast->unop != AST_UN_OP_DEREF || !ast->operand) {
+        return;
+    }
+    Ast *at = ast->operand;
+    Ast *base = parseLiteralWriteBase(at);
+    if (!base) {
+        return;
+    }
+    if (base->kind == AST_STRING) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, 1,
+                "a string literal is read-only: copy it with str.from(...)");
+    }
+    if ((base->flags & AST_FLAG_LIT_SLICE) && cc->lit_writes) {
+        listAppend(cc->lit_writes, at);
+    }
+}
+
+/* The writes noted by parseCheckLiteralWrite through a local still
+ * holding its literal at the end of the function: errors */
+void parseCheckLiteralWrites(Cctrl *cc) {
+    if (!cc->lit_writes) {
+        return;
+    }
+    listForEach(cc->lit_writes) {
+        Ast *at = (Ast *)it->value;
+        Ast *var = parseLiteralWriteBase(at);
+        if (var && var->kind == AST_LVAR && !(var->flags & AST_FLAG_SLICE_MOVED)) {
+            cctrlErrorAt(cc, at->line, at->col, 1,
+                    "`%s` is a string literal, which is read-only: copy it "
+                    "with str.from(...)", var->lname->data);
+        }
+    }
+    listRelease(cc->lit_writes, NULL);
+    cc->lit_writes = NULL;
+}
+
+/* `&a` of a local a literal initialised: it may change through the
+ * pointer, so writes through it are left to run time */
+void parseNoteSliceMoved(Ast *ast) {
+    if (ast && ast->kind == AST_LVAR && (ast->flags & AST_FLAG_LIT_SLICE)) {
+        ast->flags |= AST_FLAG_SLICE_MOVED;
+    }
+}
+
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    parseNoteSliceMoved(ast);
+    parseCheckLiteralWrite(cc, ast);
     /* `s.len = n`: a slice's fields are set together, by assigning a
      * whole slice */
     /* a String's too, but to its own methods (module str's) */

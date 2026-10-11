@@ -166,6 +166,11 @@ typedef struct Cctrl {
     /* Function being parsed */
     Ast *tmp_func;
 
+    /* Writes through a local initialised from a string literal
+     * (AST_FLAG_LIT_SLICE), each an AST_SLICE_ELEM: errors at the end of
+     * the function unless the local was reassigned */
+    List *lit_writes;
+
     /* Global variable whose declaration is mid-parse. If the
      * initialiser errors, top-level recovery unregisters it from
      * global_env. Otherwise later code could name a variable whose

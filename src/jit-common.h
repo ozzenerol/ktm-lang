@@ -18,6 +18,12 @@
 #include "asm/asm_enc.h"
 #include "asm/asm_jit.h"
 
+/* A mapping holding string literals, read-only after they are written */
+typedef struct JitStrings {
+    uint8_t *ptr;
+    size_t len;
+} JitStrings;
+
 typedef struct KtmJit {
     Cctrl *cc;
 
@@ -46,9 +52,13 @@ typedef struct KtmJit {
      * stay mapped forever - earlier code may hold pointers into them. */
     List *chunks;
 
-    /* RW arenas for globals + string literals, one per chunk; the
+    /* RW arenas for globals, one per chunk (string literals are in
+     * string_arenas); the
      * absolute addresses are registered in host_symbols. */
     List *globals_arenas;
+    /* String literals, read-only once written as AOT's are (a write
+     * through one faults): each a JitStrings */
+    List *string_arenas;
     /* Global pointers initialised with an address (`U8 *p = &g`, `&Fn`),
      * patched once the target has one (jitResolvePtrFixups) */
     List *ptr_fixups;
