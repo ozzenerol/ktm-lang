@@ -876,18 +876,31 @@ void testDebounce() {
                 l.publishes - before == 1);
 
     /* ~1.5s of continuous typing, never quiet: the max-age cap must
-     * force diagnostics through mid-storm, and once more at the end. */
+     * force diagnostics through mid-storm, and the last edit must get
+     * its own. The last edit adds an undefined name, so the final
+     * publish is recognisable: on a slow host a cap-forced analysis can
+     * land just before or just after the storm ends, so how many
+     * publishes follow it (0 to 2) is timing, not behaviour. */
     before = l.publishes;
     for (i64 i = 0; i < 36; i++) {
-        lspDidChange(l, uri, mainPlusFn("C", i));
+        u8 *text = mainPlusFn("C", i);
+        if (i == 35) {
+            text = str.format("%si64 FinalEdit() { return notDefinedInFinalEdit; }\n", text);
+        }
+        lspDidChange(l, uri, text);
         lspSettle(l, 40);
     }
     i64 mid = l.publishes - before;
     before = l.publishes;
     lspSettle(l, 1000);
     i64 tail = l.publishes - before;
+    u8 *last = l.lastPublish ? json.toStr(l.lastPublish) : null;
+    bool finalSeen = last && libc.strstr(last, "notDefinedInFinalEdit") != null;
     check("continuous typing still publishes via the max-age cap",
-                mid >= 1 && tail == 1);
+                mid >= 1 && tail <= 2 && finalSeen);
+    if (!(mid >= 1 && tail <= 2 && finalSeen)) {
+        printf("    mid=%d tail=%d final edit published=%d\n", mid, tail, finalSeen);
+    }
     check("clean shutdown", lspClose(l) == 0);
 }
 
