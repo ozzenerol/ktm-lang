@@ -3038,8 +3038,43 @@ void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len) {
                                           : "its struct");
 }
 
+/* `x.name(...)` of a slice or a String with no such member or method,
+ * the `(` next:
+ *   - `parts.free()` of any slice: rt.__ktmSliceFree(parts.ptr)
+ *   - a byte slice or a String: str.name(x, ...) when str has a function
+ *     of that name taking a u8[] first (`s.find("x")`, `s.split(",")`)
+ * NULL when it is neither. */
+static Ast *parseSliceMethodCall(Cctrl *cc, Ast *cls, AstType *type, Lexeme *tok) {
+    if (astTypeIsSlice(type) && tok->len == 4 && !memcmp(tok->start, "free", 4)) {
+        cctrlTokenGet(cc);
+        cctrlTokenExpect(cc, ')');
+        Vec *args = astVecNew();
+        vecPush(args, astClassRef(mapGetLen(type->fields, str_lit("ptr")), cls, "ptr"));
+        char *sym = astRuntimeSymbol("__ktmSliceFree");
+        return astFunctionCall(ast_void_type, sym, strlen(sym), args);
+    }
+    if (!parseIsByteSlice(type)) return NULL;
+    char *qual = mprintf("str.%.*s", tok->len, tok->start);
+    Ast *fn = mapGet(cc->global_env, qual);
+    if (!fn || (fn->kind != AST_FUNC && fn->kind != AST_FUN_PROTO) ||
+        !fn->params || fn->params->size < 1) {
+        return NULL;
+    }
+    Ast *first = fn->params->entries[0];
+    AstType *first_t = first->kind == AST_DEFAULT_PARAM ? first->declvar->type : first->type;
+    if (!parseIsByteSlice(first_t) || astTypeIsString(first_t)) return NULL;
+    cctrlTokenGet(cc);
+    Ast *recv = parseSliceFrom(cc, first_t, cls);
+    AstType *owner = astTypeIsString(type) ? type : first_t;
+    return parseMethodCall(cc, fn, owner, recv, tok->start, tok->len);
+}
+
 Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     AstType *type;
+    /* `"abc".len`, `"a,b".split(",")`: a literal's u8[] view */
+    if (cls->kind == AST_STRING) {
+        cls = parseSliceFrom(cc, astMakeSliceType(ast_u8_type), cls);
+    }
     /* `p.x` on a pointer to a class is `p->x` (one level: not `pp.x`) */
     if (cls->type->kind == AST_TYPE_POINTER && cls->type->ptr &&
         parseIsClassOrUnion(cls->type->ptr->kind))
@@ -3111,6 +3146,10 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
                                     AST_UN_OP_ADDR_OF, cls);
         }
         return parseMethodCall(cc, method, owner, recv, tok->start, tok->len);
+    }
+    if (!field && tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        Ast *call = parseSliceMethodCall(cc, cls, type, tok);
+        if (call) return call;
     }
     if (!field) {
         cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);

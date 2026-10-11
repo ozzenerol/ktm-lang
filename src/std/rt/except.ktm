@@ -216,6 +216,12 @@ pub void __ktmBoundsSlice(i64 lo, i64 hi, i64 len, u8 *file, i64 line) {
     ErrJump(fs);
 }
 
+/* `parts.free()` of a slice: the buffer its ptr points at, for one a
+ * function allocated (str.split's list) */
+pub void __ktmSliceFree(void *ptr) {
+    mem.free(ptr);
+}
+
 pub void __ktmThrow(u64 v) {
     __ktmThrowAt(v, null, 0);
 }
