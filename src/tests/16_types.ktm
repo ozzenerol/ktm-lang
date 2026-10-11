@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 i32 main() {
     printf("Test - comma separated declarators & types: ");
@@ -7,8 +7,8 @@ i32 main() {
     ptr = "hello";
     ch = 'f';
 
-    if (!str.cmpLen(ptr,"hello",5)) { ++correct; }
-    if (!str.cmpLen(ptr2,"hey",3)) { ++correct; }
+    if (!cstr.cmpLen(ptr,"hello",5)) { ++correct; }
+    if (!cstr.cmpLen(ptr2,"hey",3)) { ++correct; }
     if (ch == 'f') { ++correct; }
 
     test.printResult(correct,tests);

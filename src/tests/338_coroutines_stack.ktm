@@ -1,4 +1,4 @@
-import coro, libc, mem, str, test;
+import coro, cstr, libc, mem, test;
 
 /* The coroutine stacks (src/std/coroutines.ktm). The old x86_64-only
  * demo crashed on first use: mmap got MAP_SHARED|MAP_PRIVATE instead of
@@ -46,8 +46,8 @@ void *floats(void *arg) {
     f64 x = 1.5;
     for (i64 i = 0; i < 3; i++) {
         x *= 2.0;
-        u8 *s = str.format("%.2f", x);
-        coro.yield((void *)str.cmp(s, ((u8 **)arg)[i]));
+        u8 *s = cstr.format("%.2f", x);
+        coro.yield((void *)cstr.cmp(s, ((u8 **)arg)[i]));
         mem.free(s);
     }
     return null;
@@ -171,7 +171,7 @@ i32 main() {
     libc.close(gPipe[0]);
     /* killed in the overflow: SIGSEGV (11) on Linux, SIGBUS (10) or
      * SIGSEGV on macOS */
-    if (!str.cmp(reached, "r") && (rc == 111 || rc == 110)) { correct++; }
+    if (!cstr.cmp(reached, "r") && (rc == 111 || rc == 110)) { correct++; }
     else { printf("\n  stack overflow not caught by the guard page (%d)\n", rc); }
     test.printResult(correct, tests);
     printf("====\n");

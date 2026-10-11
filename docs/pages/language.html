@@ -41,7 +41,7 @@ Ada is 36 years old
    42|42   |00042
 ff FF A 3.142
 </pre>
-<p>The conversions are the ones <code>str.format</code> knows (see the
+<p>The conversions are the ones <code>cstr.format</code> knows (see the
 <a href="library.html">library guide</a>), ktm's own included: <code>%Q</code> prints a
 string escaped as a C literal and <code>%C</code> a character in upper case. A date is
 formatted with <code>date.format(d, "%m/%d/%Y %H:%M:%S")</code> and printed with
@@ -94,6 +94,9 @@ void main()
 <code>null</code> is the null pointer: 0 as a <code>void *</code>, so it can be assigned to any
 pointer or function pointer. <code>true</code> and <code>false</code> are <code>bool</code>
 values, 1 and 0.</p>
+<p>Two more types are built in: slices <code>T[]</code> (a pointer and a length, 16 bytes;
+see <a href="#slices">Slices</a>) and <code>String</code> (an owned, growable string, 24 bytes;
+see <a href="#strings">Strings</a>).</p>
 <p>As in C, a value becomes a <code>bool</code> by comparing it with 0: an integer, float
 or pointer that isn't 0 (or <code>null</code>) is <code>true</code>, whether it is assigned,
 passed as an argument, returned, stored in a field or cast with <code>(bool)x</code>. Only the
@@ -522,7 +525,7 @@ w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
 <code>entries</code> field and a <code>size</code> field, such as the library's
 <code>vec.IntVec</code> and <code>vec.PtrVec</code>:</p>
 <pre data-run><code>
-import vec;
+import cstr, vec;
 
 void main()
 {
@@ -641,10 +644,11 @@ void main()
 <p>The last parameter can take any number of extra arguments, zero included:
 <code>T ...name</code> takes them as values of type <code>T</code>, each checked and
 converted like an argument to a <code>T</code> parameter (a wrong type is an error).
-Inside the function <code>name.len</code> is how many there are, <code>name[i]</code> is
-one of them (<code>&amp;name[i]</code> works too) and <code>for (auto v : name)</code> goes
-through them; <code>name</code> itself can't be assigned. Fixed and default parameters can
-come before it.</p>
+Inside the function <code>name</code> is a slice, a <code>T[]</code>: <code>name.len</code>
+is how many there are, <code>name[i]</code> is one of them (checked, as any slice's
+index), <code>for (auto v : name)</code> goes through them, and it can be sliced or passed
+on to a <code>T[]</code> parameter; <code>name</code> itself can't be assigned. Fixed and
+default parameters can come before it.</p>
 <pre data-run><code>
 i64 sum(i64 ...nums)
 {
@@ -679,14 +683,14 @@ void main()
 <p><code>...name</code> as the last argument of a call passes the extras of a variadic
 parameter on, to a function that takes the same kind (it must be the only extra
 argument). Without a type, <code>...name</code> takes the extras as 64-bit slots, the way
-format functions want them: a number as is, a float as its bits (read it back with
-<code>name[i](f64)</code>), a pointer as its address:</p>
+format functions want them, and is a <code>u64[]</code>: a number as is, a float as its bits
+(read it back with <code>*(f64 *)&amp;name[i]</code>), a pointer as its address:</p>
 <pre data-run><code>
-import mem, str;
+import cstr, mem, str;
 
 void Log(u8 *fmt, ...args)
 {
-  u8 *msg = str.formatArgs(null, fmt, args.len, args);   // format the extras
+  u8 *msg = cstr.formatArgs(null, fmt, args);   // format the extras
   printf("[log] %s\n", msg);
   mem.free(msg);
 }
@@ -734,14 +738,14 @@ type (<code>((fn(i64) i64)p)(5)</code>),
 the result of a call that returns one, or of an assignment (<code>(f = &amp;mul)(2, 3)</code>).
 The arguments are checked against the pointer's parameters, as for a named function:</p>
 <pre data-run><code>
-import str;
+import cstr, str;
 
 i64 add(i64 a, i64 b) { return a + b; }
 i64 mul(i64 a, i64 b) { return a * b; }
 
 void *lookup(u8 *name)
 {
-  if (!str.cmp(name, "add")) { return &add; }
+  if (!cstr.cmp(name, "add")) { return &add; }
   return &mul;
 }
 
@@ -1036,7 +1040,7 @@ square 49
 <p><code>mem.alloc</code> allocates, <code>mem.allocZero</code> allocates zeroed memory,
 <code>mem.realloc</code> resizes and <code>mem.free</code> releases. Nothing is garbage collected.</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 void main()
 {
@@ -1052,33 +1056,177 @@ void main()
 0 7
 </pre>
 
-<h3>Strings</h3>
-<p>Strings are NUL-terminated <code>u8</code> arrays, as in C. The library has the
-usual helpers (<a href="library.html#strings">more in the library guide</a>):</p>
+<h2 id="slices">Slices</h2>
+<p>A slice <code>T[]</code> is a view of some <code>T</code>s that knows how many there are: a
+pointer and a length, 16 bytes, passed and returned in two registers. <code>s.len</code> is the
+length and <code>s.ptr</code> the pointer; both are read-only (assign the whole slice instead).
+<code>s[i]</code> reads and writes an element, and <code>s[a:b]</code> is a view of elements
+<code>a</code> up to (not including) <code>b</code>, with <code>s[a:]</code> and <code>s[:b]</code>
+running to the end or from the start. Nothing is copied: a view writes into what it views.</p>
 <pre data-run><code>
-import mem, str;
+i64 sum(i64[] xs)
+{
+  i64 total = 0;
+  for (auto x : xs) {
+    total += x;
+  }
+  return total;
+}
 
 void main()
 {
-  u8 *copy = str.dup("hello");
-  printf("%s %d %d\n", copy, str.len(copy), str.cmp(copy, "hello"));
+  i64 nums[6] = {1, 2, 3, 4, 5, 6};
+  i64[] all = nums;               // an array converts: len 6
+  i64[] mid = all[1:4];           // a view of 2, 3, 4: nothing copied
+  mid[0] = 20;                    // writes nums[1]
+  printf("%d %d %d %d\n", all.len, mid.len, nums[1], sum(mid));
+  printf("%d %d\n", sum(all[:2]), sum(all[4:]));
 
-  u8 *msg = str.formatTo(null, "%s has %d letters", copy, str.len(copy));
-  printf("%s\n", msg);
+  u8[] word = "hello";            // a literal: len 5, no copy
+  printf("%s %d %c %s\n", word, word.len, word[1], typeof(mid));
+}
+</code></pre>
+<pre class="output">
+6 3 20 27
+21 11
+hello 5 e i64[]
+</pre>
+<p>An array converts to a slice of all its elements wherever one is expected, and a string
+literal to a <code>u8[]</code> of its bytes (without the NUL). A raw pointer becomes a slice with
+<code>p[0:n]</code>, which can't be checked: it is the one way in, and you vouch for the
+<code>n</code>. The other way, a slice gives its pointer only through <code>.ptr</code>. Slices
+of structs, slice fields in structs, slices in function types and slices of slices
+(<code>u8[][]</code>) all work, and an initialiser list takes a slice as one item.</p>
+<p>Every index and every sub-slice is checked, always (AOT and JIT): out of range throws
+<code>rt.ERR_BOUNDS</code> with the index, the length and where it happened, which a server can
+catch like any other error. A check is one compare and a branch. <code>s.ptr[i]</code> is the
+unchecked way, for a hot loop that has checked its range itself.</p>
+<pre data-run><code>
+void main()
+{
+  i64 nums[3] = {1, 2, 3};
+  i64[] s = nums;
+  try {
+    printf("%d\n", s[3]);
+  } catch (Error e) {
+    printf("caught: %s\n", e.message);
+  }
+  try {
+    i64[] t = s[2:5];
+  } catch (Error e) {
+    printf("caught: %s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+caught: index 3 out of range for length 3
+caught: slice 2:5 out of range for length 3
+</pre>
+<p><code>==</code> on two slices is an error: compare their contents with
+<code>a.equals(b)</code> (for <code>u8[]</code>) or their identity with
+<code>a.ptr == b.ptr</code>. A slice that a function allocated (like the parts
+<code>str.split</code> returns) is freed with <code>s.free()</code>, which is
+<code>mem.free(s.ptr)</code>; a slice of an array or of someone else's memory is not yours to
+free.</p>
+<div class="warn"><p>A <code>u8 buf[64]</code> passed where a <code>u8[]</code> is expected is all 64
+bytes, not the text in it. Use <code>cstr.view(buf)</code> for the text up to its NUL, or
+<code>buf[0:n]</code> when you know the length.</p></div>
+
+<h2 id="strings">Strings</h2>
+<p><code>String</code> is an owned, growable string: a pointer, a length and a capacity (24
+bytes), its bytes always followed by a NUL. Its length is in bytes, and the bytes are UTF-8 by
+convention (<code>str.decodeRune</code> and <code>str.runeCount</code> read them as characters).
+It converts to a <code>u8[]</code> view wherever one is expected, so every function that reads
+text takes a literal, a slice or a String alike, and <code>%s</code> prints any of them. A String
+you get is yours to free, and the idiom is always <code>defer</code>:</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  String s = str.from("Hello");
+  defer s.free();
+  s.append(", world");
+  s.appendFormat(" %d", 2026);
+  printf("%s (%d bytes)\n", s, s.len);
+
+  u8[] hello = s[0:5];             // a view into s
+  printf("%s %d %d\n", hello, s.startsWith("Hell"), s.find("world"));
+
+  String loud = s.clone();         // a copy of its own
+  defer loud.free();
+  loud.toUpper();
+  loud.replace("WORLD", "THERE");
+  printf("%s | %s\n", loud, s);
+
+  u8[][] parts = str.split("a,b,,c", ",");
+  defer parts.free();
+  for (auto p : parts) {
+    printf("[%s]", p);
+  }
+  printf(" %d parts\n", parts.len);
+
+  u8[] t = str.trim("  padded  ");
+  String num = str.format("%05d", 42);
+  defer num.free();
+  printf("(%s) %s %d\n", t, num, num.equals("00042"));
+}
+</code></pre>
+<pre class="output">
+Hello, world 2026 (17 bytes)
+Hello 1 7
+HELLO, THERE 2026 | Hello, world 2026
+[a][b][][c] 4 parts
+(padded) 00042 1
+</pre>
+<p><code>str.new()</code> allocates nothing until something is added, <code>str.withCap(n)</code>
+makes room ahead, <code>str.from(t)</code> copies a <code>u8[]</code> and <code>str.format</code>
+formats into a new String. The methods that change a String (<code>append</code>,
+<code>appendByte</code>, <code>appendFormat</code>, <code>insert</code>, <code>remove</code>,
+<code>replace</code>, <code>toLower</code>, <code>toUpper</code>, <code>reverse</code>,
+<code>clear</code>, <code>reserve</code>) are String methods; the ones that only read
+(<code>find</code>, <code>contains</code>, <code>startsWith</code>, <code>endsWith</code>,
+<code>equals</code>, <code>compare</code>, <code>trim</code>, <code>split</code> and the rest) take
+a <code>u8[]</code> and work on all three. A view of a String is valid until the String changes
+or is freed. The <a href="library.html#strings">library guide</a> lists them all.</p>
+<p>Assigning a String copies its three fields, as a struct, so both names share the same bytes:
+only one of them may free it, and a change through one can move the bytes under the other.
+Use <code>clone()</code> for a copy of its own. <code>free()</code> empties the String it is
+called on, so a second <code>free()</code> of the same variable does nothing; a double free
+through a copy is caught by <code>-Memsafe</code>, which reports the allocation and both frees.
+A String's fields are read-only outside the <code>str</code> module.</p>
+<p>In a literal format, <code>%s</code> takes a slice or a String as well as a C string, with a
+width (<code>%-10s</code>) but no precision (the length is the slice's). A format that isn't a
+literal can't take a slice: pass <code>s.cstr()</code>.</p>
+<div class="warn"><p>String literals are read-only data. Writing through a slice of one
+(<code>u8[] a = "abc"; a[0] = 'x';</code>) crashes a compiled program and, in the JIT, changes
+the literal. Copy it first: <code>String a = str.from("abc");</code>.</p></div>
+
+<h3>C strings</h3>
+<p>A NUL-terminated <code>u8 *</code> is still what C functions take and return, and string
+literals are <code>u8 *</code> too, converting to a <code>u8[]</code> where one is expected.
+<code>s.cstr()</code> gives a String's bytes as a C string, at no cost; <code>cstr.view(p)</code>
+gives a C string as a <code>u8[]</code> (its length measured once). The <code>cstr</code> module
+has the classic helpers for them, and what it allocates is freed with <code>mem.free</code>:</p>
+<pre data-run><code>
+import cstr, mem;
+
+void main()
+{
+  u8 *copy = cstr.dup("hello");
+  printf("%s %d %d\n", copy, cstr.len(copy), cstr.cmp(copy, "hello"));
 
   i64 vowels = 0;
   for (u8 *c = copy; *c; c++) {
     if (*c == 'e' || *c == 'o') { vowels++; }
   }
-  printf("%d vowels\n", vowels);
+  printf("%d vowels, %d as a slice\n", vowels, cstr.view(copy).len);
   mem.free(copy);
-  mem.free(msg);
 }
 </code></pre>
 <pre class="output">
 hello 5 0
-hello has 5 letters
-2 vowels
+2 vowels, 5 as a slice
 </pre>
 <p>A <code>u8</code> array initialised from a string gets its own writable copy. With an
 explicit size, the rest is zero-filled:</p>
@@ -1100,7 +1248,7 @@ Xbc 4 hi 8
 and its name is a type straight away, with no <code>typedef</code> needed. Several fields can
 share a line. <code>pub</code> (or <code>pub</code>) marks what a library exports.</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 struct Point
 {
@@ -1435,7 +1583,7 @@ module geo;
 i64 square(i64 n) { return n * n; }             // private to geo
 
 // main.ktm
-import geo;
+import cstr, geo;
 
 i32 main() {
   geo.Point p;
@@ -1478,7 +1626,7 @@ pub void Account.deposit(i64 x) { self.balance += x; self.audit(); }
 void Account.audit() { }                         // private to bank
 
 // main.ktm
-import bank;
+import bank, cstr;
 
 i32 main() {
   bank.Account *a = bank.open("ann");
@@ -1503,7 +1651,7 @@ pub struct Conn {
 pub u8 *peek(Conn *c) { return libc.buf; }
 
 // main.ktm
-import net;
+import cstr, net;
 
 i32 main() {
   net.Conn c;
@@ -1548,7 +1696,7 @@ file scope would hide the module). An import that is never used is a warning.</p
 module for its scope (<code>u8 *str</code> in a file that imports <code>str</code>). There
 <code>str.x</code> is the local's field or method, and a member the local doesn't have is the
 error "u8 * has no member `len` (note: the local `str` hides the module str)". The local's
-own initialiser still sees the module (<code>u8 *str = str.format(...)</code>), a type name
+own initialiser still sees the module (<code>u8 *str = cstr.format(...)</code>), a type name
 (<code>str.Thing</code>) is still the module's, and outside the scope the module is there
 again.</p>
 <p>A module can be built into a library once and used from there:
@@ -1727,7 +1875,7 @@ insufficient funds: need 500, have 100
 carrying on
 </pre>
 <p><code>e.message</code> is never <code>null</code> (it is <code>""</code> without a message)
-and is freed when the catch block is left: copy it (<code>str.dup(e.message)</code>) to keep
+and is freed when the catch block is left: copy it (<code>cstr.dup(e.message)</code>) to keep
 it. <code>throw(e)</code> throws the same error again, with its original message, file and
 line, so a handler can look at an error and pass it on. A <code>catch</code> that doesn't
 need the error can leave out the binding.</p>
@@ -1785,7 +1933,7 @@ block, through <code>return</code>, <code>break</code>, <code>continue</code> or
 way to a <code>catch</code> (after the deferred statements have run, the throw carries on
 to that catch). It keeps clean-up next to the code that needs it:</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 enum Err { neg };
 
@@ -1856,7 +2004,7 @@ like a <code>try</code> does); code without it compiles exactly as before.</p>
 <p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always
 linked:</p>
 <pre data-run><code>
-import libc;
+import cstr, libc;
 
 extern "c" i32 abs(i32 x);
 extern "c" u8 *getenv(u8 *name);

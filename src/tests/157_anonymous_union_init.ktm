@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A union takes one positional initialiser item, for its first member,
  * as in C. An anonymous union inside a class took one item per member:
@@ -110,18 +110,18 @@ bool compileFailsWith(u8 *source, u8 *msg, u8 *loc) {
     bool ok;
 
     cleanupUnionInitTest();
-    if (!fs.writeAll(UNION_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNION_INIT_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " UNION_INIT_FILE " > " UNION_INIT_OUT " 2>&1");
-    out = fs.readAll(UNION_INIT_OUT);
+    out = fs.readAll(UNION_INIT_OUT).take();
     if (!out) {
         cleanupUnionInitTest();
         return false;
     }
     ok = res == 1;
     first = libc.strstr(out, "error: ");
-    if (!first || str.cmpLen(first + 7, msg, str.len(msg))) { ok = false; }
+    if (!first || cstr.cmpLen(first + 7, msg, cstr.len(msg))) { ok = false; }
     else if (!libc.strstr(first, loc)) { ok = false; }
     if (!ok) { printf("status %d\n%s\n", res, out); }
     mem.free(out);

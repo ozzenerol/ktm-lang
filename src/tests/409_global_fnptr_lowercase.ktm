@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A global function pointer (or array of them) whose return type is a
  * lowercase built-in type or a class name, `i64 (*g)(i64);`, was taken
@@ -36,7 +36,7 @@ i32 main() {
     gInt = &twice;
     gFlt = &half;
     gStr = &nameFn;
-    if (gInt(21) == 42 && gFlt(5.0) == 2.5 && !str.cmp(gStr(), "ktm") && !gNone) { correct++; }
+    if (gInt(21) == 42 && gFlt(5.0) == 2.5 && !cstr.cmp(gStr(), "ktm") && !gNone) { correct++; }
     else { printf("\n  scalars\n"); }
 
     tests++;

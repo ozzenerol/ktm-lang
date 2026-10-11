@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Shlurp wrapped the command as "{ cmd\n}": an empty command made "{ }",
  * and a command ending in a backslash swallowed the "}", both shell
@@ -25,13 +25,13 @@ u8 *capturedErr() {
     libc.fflush(null);
     dup2(gSaved, 2);
     libc.close(gSaved);
-    return fs.readAll(gErr);
+    return fs.readAll(gErr).take();
 }
 
 bool quiet(u8 *cmd, u8 *want) {
     captureErr();
     u8 *got = proc.shellOutput(cmd), *err = capturedErr();
-    bool ok = got && !str.cmp(got, want) && err && !str.cmp(err, "");
+    bool ok = got && !cstr.cmp(got, want) && err && !cstr.cmp(err, "");
     if (!ok) { printf("Shlurp(\"%s\"): got '%s' want '%s', stderr '%s'\n",
                      cmd, got, want, err);
     }
@@ -45,13 +45,13 @@ i32 main() {
     u8 root[64], *cmd;
     printf("Test - Shlurp empty command: ");
 
-    str.copy(root, "./ktm-test-316-XXXXXX");
+    cstr.copy(root, "./ktm-test-316-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
         return 0;
     }
-    str.formatTo(gErr, "%s/err.txt", root);
+    cstr.formatTo(gErr, "%s/err.txt", root);
 
     if (quiet("", "")) { correct++; }
     if (quiet("   ", "")) { correct++; }
@@ -60,7 +60,7 @@ i32 main() {
     if (quiet("echo a; echo b", "a\nb")) { correct++; }
     if (quiet("echo x\necho y", "x\ny")) { correct++; }
 
-    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

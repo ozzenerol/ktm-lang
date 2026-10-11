@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.toStr printed an empty object or array as `{(nil)}` / `[(nil)]`
  * and wrote strings with %Q (DolDoc quoting: `$` doubled, `\v`, raw
@@ -7,22 +7,22 @@ import json, mem, str, test;
 i64 gCorrect = 0;
 
 void expect(u8 *got, u8 *want) {
-    if (!str.cmp(got, want)) { gCorrect++; }
+    if (!cstr.cmp(got, want)) { gCorrect++; }
     else { printf("\n  got  %s\n  want %s\n", got, want); }
 }
 
 /* Parse -> string -> parse -> string must give the same text both times */
 void roundTrip(u8 *text, u8 *want) {
-    json.Value *a = json.parse(text);
+    json.Value *a = json.parse(cstr.view(text));
     if (!json.ok(a)) {
         printf("\n  '%s' does not parse\n", text);
         return;
     }
-    u8 *s1 = json.toStr(a);
+    u8 *s1 = json.toStr(a).take();
     expect(s1, want);
-    json.Value *b = json.parse(s1);
+    json.Value *b = json.parse(cstr.view(s1));
     if (json.ok(b)) {
-        u8 *s2 = json.toStr(b);
+        u8 *s2 = json.toStr(b).take();
         expect(s2, s1);
         mem.free(s2);
     } else {
@@ -47,11 +47,10 @@ i32 main() {
 
     /* Other control characters become \u00XX; DEL and UTF-8 stay as they are */
     json.Value *j = json.parse("{\"s\": \"x\"}");
-    mem.free(j.object.str);
-    u8 *ctl = str.dup("a\x01b\x1Fc\x0B\x7F\xC3\xA9");
-    j.object.str = ctl;
-    j.object.strLen = str.len(ctl); /* the length json.toStr writes */
-    u8 *out = json.toStr(j);
+    mem.free(j.object.str.ptr);
+    u8 *ctl = cstr.dup("a\x01b\x1Fc\x0B\x7F\xC3\xA9");
+    j.object.str = cstr.view(ctl); /* json.toStr writes its len bytes */
+    u8 *out = json.toStr(j).take();
     expect(out, "{\"s\": \"a\\u0001b\\u001fc\\u000b\x7F\xC3\xA9\"}");
     mem.free(out);
     json.release(j);
@@ -60,14 +59,14 @@ i32 main() {
     j = json.parse("{\"a\": 1}");
     json.release(j.object);
     j.object = null;
-    out = json.toStr(j);
+    out = json.toStr(j).take();
     expect(out, "{}");
     mem.free(out);
     json.release(j);
     j = json.parse("[1]");
     json.release(j.array);
     j.array = null;
-    out = json.toStr(j);
+    out = json.toStr(j).take();
     expect(out, "[]");
     mem.free(out);
     json.release(j);

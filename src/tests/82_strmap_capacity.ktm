@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* map.strNew and map.intNew rounded the capacity up to a power of two but
  * built the mask, the threshold and the entries array from the unrounded
@@ -34,12 +34,12 @@ i64 checkStrMap(map.StrMap *m, u8 **keys, u64 startCapacity) {
     correct++;
 
     for (i = 0; i < N_KEYS; i++) {
-        m.set(keys[i], (void *)i);
+        m.set(cstr.view(keys[i]), (void *)i);
     }
 
     bad = 0;
     for (i = 0; i < N_KEYS; i++) {
-        if (!m.has(keys[i]) || (i64)m.get(keys[i]) != i) { bad++; }
+        if (!m.has(cstr.view(keys[i])) || (i64)m.get(cstr.view(keys[i])) != i) { bad++; }
     }
     if (bad == 0) { correct++; }
 
@@ -49,7 +49,7 @@ i64 checkStrMap(map.StrMap *m, u8 **keys, u64 startCapacity) {
     map.StrMapNode *node;
     bad = 0;
     while (m.iter(&idx, &node) && count <= N_KEYS) {
-        if (node.key != keys[count] || (i64)node.value != count) { bad++; }
+        if (!node.key.equals(cstr.view(keys[count])) || (i64)node.value != count) { bad++; }
         count++;
     }
     if (count == N_KEYS && bad == 0) { correct++; }
@@ -60,13 +60,13 @@ i64 checkStrMap(map.StrMap *m, u8 **keys, u64 startCapacity) {
     /* It grew, and the grown table is still consistent. */
     if (m.capacity > startCapacity && strMapShapeOk(m)) { correct++; }
 
-    /* Replace every value with the same key pointer. */
+    /* Replace every value under the same keys. */
     for (i = 0; i < N_KEYS; i++) {
-        m.set(keys[i], (void *)(i * 2));
+        m.set(cstr.view(keys[i]), (void *)(i * 2));
     }
     bad = 0;
     for (i = 0; i < N_KEYS; i++) {
-        if ((i64)m.get(keys[i]) != i * 2) { bad++; }
+        if ((i64)m.get(cstr.view(keys[i])) != i * 2) { bad++; }
     }
     if (bad == 0 && m.size == N_KEYS) { correct++; }
 
@@ -124,7 +124,7 @@ i32 main() {
 
     u8 **keys = mem.alloc(N_KEYS * sizeof(u8 *));
     for (i = 0; i < N_KEYS; i++) {
-        keys[i] = str.formatTo(null, "key-%d", i);
+        keys[i] = cstr.formatTo(null, "key-%d", i);
     }
 
     for (i = 0; i < 7; i++) {
@@ -158,10 +158,10 @@ i32 main() {
     if (id.capacity == 32 && id.mask == 31 && intMapShapeOk(id)) { correct++; }
     tests += 2;
 
-    /* A map that owns its keys frees them on release. */
-    sd.setFreeKey(&mem.free);
+    /* The map copies its keys (and frees them on release). */
+    u8 kbuf[32];
     for (i = 0; i < 500; i++) {
-        sd.set(str.formatTo(null, "owned-%d", i), (void *)i);
+        sd.set(cstr.view(cstr.formatTo(kbuf, "owned-%d", i)), (void *)i);
     }
     if (sd.size == 500 && (i64)sd.get("owned-499") == 499) { correct++; }
     tests++;

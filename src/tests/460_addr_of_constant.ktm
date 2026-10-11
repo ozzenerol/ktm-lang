@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `&5` / `&E.a` reached the code generator, which gave up with
  * "&AST_LITERAL not supported in slice" (and `&f()`, `&(x + 1)`,
@@ -9,16 +9,16 @@ import fs, libc, proc, str, test;
 i64 gCorrect = 0, gTests = 0;
 
 void expect(u8 *expr, u8 *want) {
-    u8 *src = str.format("enum E { a, b };\ni64 f() { return 1; }\n"
+    u8 *src = cstr.format("enum E { a, b };\ni64 f() { return 1; }\n"
                          "i32 main() {\n    i64 x = 1;\n    auto p = %s;\n    return 0;\n}\n", expr);
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit " SRC_FILE " 2>&1");
     gTests++;
     bool ok = want ? out && libc.strstr(out, want) && libc.strstr(out, " --> " SRC_FILE ":5:14") &&
                      !libc.strstr(out, "not supported")
-                   : out && !str.cmp(out, "");
+                   : out && !cstr.cmp(out, "");
     if (ok) { gCorrect++; }
     else { printf("\n  %s: [%s]\n", expr, out); }
 }

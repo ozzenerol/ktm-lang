@@ -43,7 +43,7 @@ bool acceptMode(bool listenerNb, bool non_blocking) {
         }
         if (!(libc.fcntl(acc, libc.F_GETFD, 0) & libc.FD_CLOEXEC)) { ok = false; }
         /* data goes through; a blocking socket waits for it */
-        net.send(cli, "ping", 4);
+        net.send(cli, "ping"[0:4]);
         if (non_blocking) {
             p.fd = acc;
             p.events = libc.POLLIN;

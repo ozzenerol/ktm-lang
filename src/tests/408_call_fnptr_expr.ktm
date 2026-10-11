@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* As in C, `(` calls any expression whose type is a function pointer.
  * A cast to a function pointer type (`((i64 (*)(i64))fv)(5)`,
@@ -37,11 +37,11 @@ bool failsWith(u8 *source, u8 *want) {
     u8 *out;
     bool ok;
     proc.shell("rm -f " CE_SRC " " CE_OUT);
-    fs.writeAll(CE_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CE_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     ok = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-S " CE_SRC " -o /dev/null > " CE_OUT " 2>&1") != 0;
-    out = fs.readAll(CE_OUT);
+    out = fs.readAll(CE_OUT).take();
     ok = ok && out && libc.strstr(out, want);
     if (!ok) { printf("got: '%s'\n", out); }
     mem.free(out);

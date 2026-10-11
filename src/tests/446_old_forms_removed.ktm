@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The old forms removed in ktm syntax v0.2 are errors naming what to
  * write: code at file scope, the `Main` entry point, the print statement
@@ -11,11 +11,11 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " OF_SRC " " OF_OUT);
-    fs.writeAll(OF_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(OF_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                "-S " OF_SRC " -o /dev/null > " OF_OUT " 2>&1");
-    u8 *out = fs.readAll(OF_OUT);
+    u8 *out = fs.readAll(OF_OUT).take();
     proc.shell("rm -f " OF_SRC " " OF_OUT);
     return out;
 }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Brace elision, as in C: an array or class element or field of an
  * initialiser list may be written without its braces, its items then
@@ -44,11 +44,11 @@ bool failsWith(u8 *source, u8 *expected) {
     bool ok;
 
     proc.shell("rm -f " ELIDE_TEST_SRC " " ELIDE_TEST_OUT);
-    fs.writeAll(ELIDE_TEST_SRC, source, str.len(source),
+    fs.writeAll(ELIDE_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(ELIDE_KTM ELIDE_TEST_SRC " > " ELIDE_TEST_OUT " 2>&1; "
                              "test $? -eq 1");
-    out = fs.readAll(ELIDE_TEST_OUT);
+    out = fs.readAll(ELIDE_TEST_OUT).take();
     ok = res == 0 && out && libc.strstr(out, expected);
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);
@@ -125,9 +125,9 @@ i32 main() {
             gm[1][1] == 5 && gm[1][2] == 0) { correct++; }
     else { printf("Failed - i64 m[2][3]\n"); }
     tests++;
-    if (!str.cmp(s[0].name, "ab") && s[0].n == 1 && s[1].name[0] == 'c' &&
+    if (!cstr.cmp(s[0].name, "ab") && s[0].n == 1 && s[1].name[0] == 'c' &&
             s[1].name[3] == 'f' && s[1].n == 2 &&
-            !str.cmp(gs[0].name, "ab") && gs[0].n == 1 && gs[1].name[0] == 'c' &&
+            !cstr.cmp(gs[0].name, "ab") && gs[0].n == 1 && gs[1].name[0] == 'c' &&
             gs[1].name[3] == 'f' && gs[1].n == 2) { correct++; }
     else { printf("Failed - char array field\n"); }
     tests++;

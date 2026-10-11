@@ -1,9 +1,10 @@
-import map, mem, str, test;
+import cstr, map, test;
 
 /* map.strGetLen/map.strHasLen compared `key_len` bytes but hashed the whole
  * NUL-terminated string, so a key given as the start of a longer buffer
  * (`("hello world", 5)`) was never found. map.StrMap now hashes exactly the
- * bytes it compares, with its own length-bounded hash and a final mix (the
+ * bytes it compares (keys are u8[] since v0.3.0: a view of the start of a
+ * buffer is `buf[0:5]`), with its own length-bounded hash and a final mix (the
  * old hash put similar keys like "key%d" in long runs of slots). Also
  * checks the empty key, keys with high bytes, and that iteration is still
  * in insertion order across resizes and deletes. */
@@ -19,16 +20,16 @@ i32 main() {
     m.set("caf\xc3\xa9", (void *)4);
 
     tests++;
-    if (m.hasLen("hello world", 5) &&
-            (i64)m.getLen("hello world", 5) == 1 &&
-            (i64)m.getLen("key=value", 3) == 2 &&
-            m.hasLen("key=value", 3)) {
+    if (m.has("hello world"[0:5]) &&
+            (i64)m.get("hello world"[0:5]) == 1 &&
+            (i64)m.get("key=value"[0:3]) == 2 &&
+            m.has("key=value"[0:3])) {
         correct++;
             } else { printf("Failed - prefix of a longer buffer\n"); }
 
     tests++;
-    if (!m.hasLen("hello world", 4) && !m.hasLen("hello world", 6) &&
-            m.getLen("keys", 4) == null && !m.has("hell")) {
+    if (!m.has("hello world"[0:4]) && !m.has("hello world"[0:6]) &&
+            m.get("keys"[0:4]) == null && !m.has("hell")) {
         correct++;
             } else { printf("Failed - near misses\n"); }
 
@@ -36,32 +37,32 @@ i32 main() {
     m.set("", (void *)5);
     tests++;
     if (m.has("") && (i64)m.get("") == 5 &&
-            (i64)m.getLen("xyz", 0) == 5 && m.size == 4) {
+            (i64)m.get("xyz"[0:0]) == 5 && m.size == 4) {
         correct++;
             } else { printf("Failed - empty key\n"); }
 
     tests++;
-    if ((i64)m.getLen("caf\xc3\xa9!", 5) == 4 &&
+    if ((i64)m.get("caf\xc3\xa9!"[0:5]) == 4 &&
             (i64)m.get("caf\xc3\xa9") == 4) {
         correct++;
             } else { printf("Failed - high bytes\n"); }
     m.release();
 
-    /* Every key is found by Get, Has, GetLen and HasLen alike, also when it
-     * is the start of a longer buffer; the map grows from 8 slots. */
+    /* Every key is found by get and has alike, also when it is the start
+     * of a longer buffer; the map grows from 8 slots. The map copies the
+     * keys, so one buffer serves for all of them. */
     m = map.strNew(8);
-    m.setFreeKey(&mem.free);
     i64 n = 20000, bad = 0;
     u8 buf[64];
     for (i64 i = 0; i < n; i++) {
-        m.set(str.formatTo(null, "key%d", i), (void *)i);
+        m.set(cstr.view(cstr.formatTo(buf, "key%d", i)), (void *)i);
     }
     for (i64 i = 0; i < n; i++) {
-        str.formatTo(buf, "key%d-and-more", i);
-        i64 len = str.len(buf) - 9;
-        if ((i64)m.getLen(buf, len) != i || !m.hasLen(buf, len)) { bad++; }
+        cstr.formatTo(buf, "key%d-and-more", i);
+        i64 len = cstr.len(buf) - 9;
+        if ((i64)m.get(buf[0:len]) != i || !m.has(buf[0:len])) { bad++; }
         buf[len] = 0;
-        if ((i64)m.get(buf) != i || !m.has(buf)) { bad++; }
+        if ((i64)m.get(cstr.view(buf)) != i || !m.has(cstr.view(buf))) { bad++; }
     }
     tests++;
     if (bad == 0 && m.size == n) { correct++; }
@@ -78,11 +79,10 @@ i32 main() {
 
     /* Insertion order, after deleting every third key and growing again */
     for (i64 i = 0; i < n; i += 3) {
-        str.formatTo(buf, "key%d", i);
-        m.delete(buf);
+        m.delete(cstr.view(cstr.formatTo(buf, "key%d", i)));
     }
     for (i64 i = n; i < n + 5000; i++) {
-        m.set(str.formatTo(null, "key%d", i), (void *)i);
+        m.set(cstr.view(cstr.formatTo(buf, "key%d", i)), (void *)i);
     }
     i64 prev = -1;
     bad = 0;

@@ -16,6 +16,10 @@
 
 void parseToAst(Cctrl *cc);
 Ast *parseStatement(Cctrl *cc);
+/* The current file's name as a string literal (for throw and bounds checks) */
+Ast *parseThrowFile(Cctrl *cc);
+/* An expression where one is required, reported when missing */
+Ast *parseRequiredExpr(Cctrl *cc, char *what);
 s64 evalIntConstExpr(Ast *ast);
 
 #endif // !PARSER_H

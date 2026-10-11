@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Default arguments declared on a class field function pointer were
  * ignored: `c.f(1)` with `fn(i64 a, i64 b=10) i64 f` passed whatever was
@@ -24,20 +24,20 @@ struct Outer {
 i64 add(i64 a, i64 b) { return a + b; }
 i64 sub(i64 a, i64 b) { return a - b; }
 f64 fAdd(f64 x, f64 y, f64 z) { return x + y + z; }
-u8 *join(u8 *a, u8 *b) { return str.format("%s %s", a, b); }
+u8 *join(u8 *a, u8 *b) { return cstr.format("%s %s", a, b); }
 
 bool compileFailsWith(u8 *source, u8 *expected) {
     u8 *out;
     i64 res;
     bool ok = false;
 
-    if (!fs.writeAll(FIELD_FNPTR_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FIELD_FNPTR_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " FIELD_FNPTR_TEST_FILE " > " FIELD_FNPTR_TEST_OUT " 2>&1");
     if (res != 0) {
-        out = fs.readAll(FIELD_FNPTR_TEST_OUT);
+        out = fs.readAll(FIELD_FNPTR_TEST_OUT).take();
         if (out) {
             if (libc.strstr(out, expected)) { ok = true; }
             else { printf("%s\n", out); }
@@ -77,7 +77,7 @@ i32 main() {
 
     /* string default */
     strVal = c.s("hello");
-    if (!str.cmp(strVal, "hello world")) { correct++; }
+    if (!cstr.cmp(strVal, "hello world")) { correct++; }
     mem.free(strVal);
 
     /* through a pointer to the class */

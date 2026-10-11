@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -48,11 +48,127 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-3-0-2026-10-11">v0.3.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-3-0-2026-10-11" aria-label="Link to this section">#</a></h2>
+<p>Safe strings and slices. ktm gets a slice type that knows its length, a native <code>String</code>,
+bounds checks that throw, and a standard library that works with both. The old <code>u8 *</code> buffer
+functions are gone or moved to a C-string module, so code written for v0.2 needs updating where it
+uses them.</p>
+
+<pre><code>import fs, str;
+
+i32 main() {
+    String text = fs.readAll("notes.txt");
+    defer text.free();
+
+    u8[][] lines = text.split("\n");
+    defer lines.free();
+    for (auto line : lines) {
+        u8[] t = line.trim();
+        if (t.startsWith("#")) {
+            continue;
+        }
+        printf("%s (%d bytes)\n", t, t.len);
+    }
+
+    String out = str.format("%d lines", lines.len);
+    defer out.free();
+    out.append("!");
+    printf("%s\n", out);
+    return 0;
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
+  <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
+  <code>s[a:]</code>, <code>s[:b]</code> with no copy, range-for, slices of structs, slice fields, nested
+  slices. An array converts to a slice, a string literal converts to a <code>u8[]</code> (no copy), and
+  <code>p[0:n]</code> makes a slice from a raw pointer. <code>==</code> on slices is an error: use
+  <code>a.equals(b)</code> or compare <code>.ptr</code>.</li>
+  <li>Bounds checks on every index and sub-slice, always on: a bad index throws <code>ERR_BOUNDS</code>
+  ("index 5 out of range for length 5", with the file and line in <code>e.file</code> and
+  <code>e.line</code>), which a server can catch. <code>s.ptr[i]</code> is
+  the unchecked way.</li>
+  <li><code>String</code>: an owned, growable, NUL-terminated UTF-8 string (<code>str.new()</code>,
+  <code>str.from(...)</code>, <code>str.format(...)</code>), freed with <code>defer s.free()</code>. Methods:
+  <code>append</code>, <code>appendFormat</code>, <code>insert</code>, <code>remove</code>,
+  <code>replace</code>, <code>clone</code>, <code>toLower</code>/<code>toUpper</code>, <code>cstr()</code>.
+  A String converts to a <code>u8[]</code> view wherever one is expected.</li>
+  <li>Text methods on any <code>u8[]</code>, literal or String: <code>find</code>, <code>contains</code>,
+  <code>startsWith</code>, <code>endsWith</code>, <code>equals</code>, <code>compare</code>,
+  <code>trim</code> (a view), <code>split</code> (views), <code>decodeRune</code>,
+  <code>runeCount</code>.</li>
+  <li><code>%s</code> takes a slice or a String directly in <code>printf</code>, <code>str.format</code> and
+  <code>throw</code>.</li>
+  <li>Named varargs are real slices (<code>i64 ...nums</code> is an <code>i64[]</code>), and
+  <code>...x</code> spreads any slice.</li>
+  <li><code>-Memsafe</code> and the REPL see every allocation, the library's own included: a double free
+  through a copied String is reported with all three lines.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
+  the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
+  <code>cstr.format</code>, ...), with <code>cstr.view(p)</code> to turn a C string into a
+  <code>u8[]</code>.</li>
+  <li><code>fs</code>: paths are <code>u8[]</code>, <code>fs.readAll(path)</code> returns a String,
+  <code>fs.writeAll(path, data)</code> takes a <code>u8[]</code>.</li>
+  <li><code>json</code>: <code>json.parse(u8[] text)</code> (parse part of a text by passing
+  <code>text[0:n]</code>), <code>toStr</code>/<code>errorStr</code> return Strings, a value's
+  <code>str</code> and <code>key</code> are <code>u8[]</code> views the document owns, and
+  <code>objectGet</code> matches the whole key.</li>
+  <li><code>net</code>: addresses and names are <code>u8[]</code> (empty means any),
+  <code>net.send</code>/<code>sendTo</code> take a <code>u8[]</code>, <code>net.recvFrom</code> reads
+  into a <code>u8[]</code> and gives the sender as a String, <code>net.peerAddr</code> and
+  <code>net.addrToStr</code> return Strings.</li>
+  <li><code>date</code>: <code>format</code>, <code>formatDate</code>, <code>formatTime</code>,
+  <code>timestampNow</code> and <code>isoFromTimespec</code> return Strings; <code>date.parse</code>
+  and <code>parseParts</code> take a <code>u8[]</code>.</li>
+  <li><code>map</code>: a <code>StrMap</code> key is a <code>u8[]</code> matched on all its bytes, and
+  the map copies and frees its keys itself (<code>setFreeKey</code>, <code>getLen</code> and
+  <code>hasLen</code> are gone: look up part of a buffer with <code>buf[0:n]</code>);
+  <code>node.key</code> and <code>keyIter</code> give views of the map's copy. <code>toStr</code> and
+  <code>keysToStr</code> of <code>StrMap</code>, <code>IntMap</code> and <code>set.IntSet</code>
+  return Strings.</li>
+  <li><code>proc</code>, <code>csv</code> and <code>sql</code> keep their <code>u8 *</code> functions
+  in this release; they move to <code>u8[]</code> and String in v0.3.1.</li>
+</ul>
+
+<h3 id="watch-out">Watch out<a class="anchor" href="#watch-out" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>An array becomes a slice of its full length: a <code>u8 buf[64]</code> passed where a
+  <code>u8[]</code> is expected is all 64 bytes, not the text up to its NUL. Pass
+  <code>cstr.view(buf)</code> for the C string in it.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The format engine never checked its argument count: a format asking for more arguments than it got
+  now throws instead of reading past them.</li>
+  <li>A module can call its own global function pointer by name.</li>
+  <li>A method can be called on a call's result (<code>fs.readAll(p).take()</code>).</li>
+  <li><code>return f();</code> of a function returning a struct crashed the compiler; <code>c ? a : b</code>
+  of structs works, and mixing a struct with a pointer in a conditional is an error (it compiled to
+  garbage); a field named like an imported module (<code>v.str</code>) is a field.</li>
+  <li>A vector's index error names the method: <code>IntVec.get: index 5 out of range (size 3)</code>
+  (it said <code>IntVecGet</code>).</li>
+  <li>A slice in an initialiser list takes one item (<code>Path p = {"name", points};</code>), in
+  locals, globals, structs and arrays.</li>
+</ul>
+
+<h3 id="known-issue">Known issue<a class="anchor" href="#known-issue" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A write through a slice of a string literal is not caught at compile time yet (planned for
+  v0.3.1): copy the literal with <code>str.from</code> before changing it.</li>
+</ul>
+
 <h2 id="v0-2-1-2026-10-11">v0.2.1 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-1-2026-10-11" aria-label="Link to this section">#</a></h2>
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -122,7 +238,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -155,14 +271,14 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
   <code>sql</code>, <code>date</code>, <code>coro</code>, <code>thread</code>, <code>map</code>,
   <code>set</code>, <code>vec</code>, <code>list</code>, <code>math</code>, <code>fzf</code>, plus
   <code>libc</code> for the C and POSIX functions under their C names. Names are camelCase:
-  <code>StrLen(s)</code> is now <code>str.len(s)</code>, <code>StrMapSet(m, k, v)</code> is
+  <code>StrLen(s)</code> is now <code>cstr.len(s)</code>, <code>StrMapSet(m, k, v)</code> is
   <code>m.set(k, v)</code>.</li>
   <li>A prelude every file sees without an import: <code>Error</code>, the integer limits
   (<code>I8_MIN</code> to <code>U64_MAX</code>), <code>EXIT_OK</code>/<code>EXIT_FAIL</code>.</li>
@@ -184,7 +300,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -197,7 +313,7 @@ i32 main(i32 argc, u8 **argv) {
   next line's first word; several test races on macOS and the LSP debounce test.</li>
 </ul>
 
-<h3 id="known-issue">Known issue<a class="anchor" href="#known-issue" aria-label="Link to this section">#</a></h3>
+<h3 id="known-issue-2">Known issue<a class="anchor" href="#known-issue-2" aria-label="Link to this section">#</a></h3>
 <p>On macOS, a child forked by a program run with <code>-jit</code> can crash right after
 <code>fork()</code>, rarely and under load. Compiled programs are fine; see
 <a href="known-issues.html">Known issues</a> for the workaround.</p>

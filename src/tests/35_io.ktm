@@ -1,4 +1,4 @@
-import fs, libc, str, test;
+import cstr, fs, libc, test;
 
 #define TEST_FILE "__file__.txt"
 #define TEST_DATA "hello\n"
@@ -15,13 +15,13 @@ bool successAndCleanup(void) {
 
 bool testWriteFile(void) {
     auto flags = libc.O_CREAT|libc.O_RDWR;
-    auto ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    auto ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
 
-    auto buffer = fs.readAll(TEST_FILE);
-    auto len = str.len(buffer);
+    auto buffer = fs.readAll(TEST_FILE).take();
+    auto len = cstr.len(buffer);
     if (len != 6) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
+    if (cstr.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
 
     return successAndCleanup();
 }
@@ -31,19 +31,19 @@ bool testTruncFile(void)
      * we should only have one copy of TEST_DATA */
     auto flags = libc.O_CREAT|libc.O_RDWR|libc.O_TRUNC;
 
-    auto ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    auto ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
 
-    auto buffer = fs.readAll(TEST_FILE);
-    auto len = str.len(buffer);
+    auto buffer = fs.readAll(TEST_FILE).take();
+    auto len = cstr.len(buffer);
     if (len != 6) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
+    if (cstr.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
 
     return successAndCleanup();
 }
@@ -51,20 +51,20 @@ bool testTruncFile(void)
 bool testAppendFile(void) {
     auto flags = libc.O_CREAT|libc.O_RDWR|libc.O_APPEND;
 
-    auto ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    auto ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
-    ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     if (ok == false) { return failAndCleanup(); }
 
-    auto buffer = fs.readAll(TEST_FILE);
+    auto buffer = fs.readAll(TEST_FILE).take();
 
-    auto len = str.len(buffer);
+    auto len = cstr.len(buffer);
     if (len != 6*4) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA TEST_DATA TEST_DATA TEST_DATA,6*4) != 0) { 
+    if (cstr.cmpLen(buffer,TEST_DATA TEST_DATA TEST_DATA TEST_DATA,6*4) != 0) { 
         return failAndCleanup();
     }
 
@@ -73,7 +73,7 @@ bool testAppendFile(void) {
 
 bool testReadOnlyFile(void) {
     auto flags = libc.O_CREAT|libc.O_RDONLY;
-    auto ok = fs.writeAll(TEST_FILE,TEST_DATA,6,flags);
+    auto ok = fs.writeAll(TEST_FILE, TEST_DATA[0:6],flags);
     /* We want the write to fail as the user should not have permissions to be 
      * able to write to the file as the write flag has not been set. */
     if (ok != false) { return failAndCleanup(); }

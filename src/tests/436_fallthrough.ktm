@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Y8: a case ends at the next label, with no `break` (one still leaves
  * early); stacked empty labels share the code after them. `fallthrough;`
@@ -13,11 +13,11 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-    u8 *out = fs.readAll(AT_OUT);
+    u8 *out = fs.readAll(AT_OUT).take();
     proc.shell("rm -f " AT_SRC " " AT_OUT);
     return out;
 }
@@ -33,7 +33,7 @@ i64 count(u8 *s, u8 *what) {
 
 /* ktm prints `errors` errors, no warnings, and want (if any) */
 bool prints(u8 *body, i64 errors, u8 *want=null) {
-    u8 *src = str.format("%s\ni32 main() { return 0; }\n", body);
+    u8 *src = cstr.format("%s\ni32 main() { return 0; }\n", body);
     u8 *out = diagnose(src);
     bool ok = out && count(out, "error:") == errors &&
                         count(out, "warning:") == 0 && (!want || libc.strstr(out, want));

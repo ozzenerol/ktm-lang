@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test, vec;
+import cstr, fs, libc, mem, proc, test, vec;
 
 /* New vector functions: vec.intSet/vec.floatSet/vec.ptrSet (bounds checked
  * like Get: an index outside [0, size) prints an error and exits 1) and
@@ -17,14 +17,14 @@ void cleanupFiles() {
 
 bool runExpectingExit(u8 *src, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(VS_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(VS_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                      VS_FILE " -o " VS_BIN " > " VS_OUT " 2>&1 && "
                                      "./" VS_BIN " 2> " VS_OUT " >/dev/null; exit $?");
-    u8 *out = fs.readAll(VS_OUT);
+    u8 *out = fs.readAll(VS_OUT).take();
     bool ok = out && res == 1 && libc.strstr(out, expected) != null &&
                         libc.strstr(out, "unreachable") == null;
     if (!ok) { printf("status %d, output: %s\n", res, out); }
@@ -98,17 +98,17 @@ i32 main() {
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.IntVec *v = vec.intNew(); v.push(1);\n"
 "  v.set(1, 5); printf(\"unreachable\\n\"); return 0; }\n",
-            "IntVecSet: index 1 out of range (size 1)")) { correct++; }
+            "IntVec.set: index 1 out of range (size 1)")) { correct++; }
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.FloatVec *v = vec.floatNew();\n"
 "  v.set(0, 1.0); printf(\"unreachable\\n\"); return 0; }\n",
-            "FloatVecSet: index 0 out of range (size 0)")) { correct++; }
+            "FloatVec.set: index 0 out of range (size 0)")) { correct++; }
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.PtrVec *v = vec.ptrNew(); v.push(null);\n"
 "  v.set(-3, null); printf(\"unreachable\\n\"); return 0; }\n",
-            "PtrVecSet: index -3 out of range (size 1)")) { correct++; }
+            "PtrVec.set: index -3 out of range (size 1)")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

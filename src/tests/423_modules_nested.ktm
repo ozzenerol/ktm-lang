@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* Modules (M1): nested modules and aliases. `import web.http;` loads
  * the directory web/http (its files start with `module http;`) and its
@@ -19,8 +19,8 @@ u8 *gWant = "3 80\n82 84 80\n84\n";
 bool output(u8 *cmd) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(MOD_OUT);
-    bool ok = out && !str.cmp(out, gWant);
+    u8 *out = fs.readAll(MOD_OUT).take();
+    bool ok = out && !cstr.cmp(out, gWant);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);

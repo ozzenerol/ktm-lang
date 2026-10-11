@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Inside a function `P p; i64 z = p;` was only a warning and stored the
  * class's address, while `z = p` and a global `i64 gz = gp;` are errors.
@@ -11,11 +11,11 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source`; `*_status` gets ktm's exit code; returns its output */
 u8 *diagnose(u8 *source, i64 *statusArg) {
     proc.shell("rm -f " CI_SRC " " CI_OUT);
-    fs.writeAll(CI_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CI_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     *statusArg = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " CI_SRC " -o /dev/null > " CI_OUT " 2>&1");
-    u8 *out = fs.readAll(CI_OUT);
+    u8 *out = fs.readAll(CI_OUT).take();
     proc.shell("rm -f " CI_SRC " " CI_OUT);
     return out;
 }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An asm block failed to parse depending on what came before it
  * ("Identifier expected: got TK_PUNCT \n" on the declaration after the
@@ -22,7 +22,7 @@ void cleanupFiles() {
 /* Write `src` and run it (JIT, or compile + run): true if it exits 0 */
 bool runSource(u8 *src, bool jit) {
     cleanupFiles();
-    if (!fs.writeAll(ASMCTX_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ASMCTX_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res;
@@ -37,7 +37,7 @@ bool runSource(u8 *src, bool jit) {
                                  "./" ASMCTX_BIN " >> " ASMCTX_OUT " 2>&1");
     }
     if (res != 0) {
-        u8 *out = fs.readAll(ASMCTX_OUT);
+        u8 *out = fs.readAll(ASMCTX_OUT).take();
         if (out) { printf("%s\n", out); }
         mem.free(out);
     }
@@ -50,9 +50,9 @@ bool runSource(u8 *src, bool jit) {
 u8 *makeSource(i64 terms, bool minus) {
     u8 *sign = "";
     if (minus) { sign = "-"; }
-    u8 *src = str.formatTo(null, "i64 g_pad = %s1", sign);
-    for (i64 i = 0; i < terms; ++i) { src = str.appendFormat(src, " + 1"); }
-    src = str.appendFormat(src, ";\n"
+    u8 *src = cstr.formatTo(null, "i64 g_pad = %s1", sign);
+    for (i64 i = 0; i < terms; ++i) { src = cstr.appendFormat(src, " + 1"); }
+    src = cstr.appendFormat(src, ";\n"
 "asm {\n"
 "_T215_FORTY_TWO::\n"
 "    MOV     RAX, 42\n"

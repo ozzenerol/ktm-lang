@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 enum Err { done };
 
@@ -102,11 +102,11 @@ bool compileFailsWith(u8 *src, u8 *expected) {
     bool ok;
 
     cleanupGotoTry();
-    if (!fs.writeAll(GOTO_TRY_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(GOTO_TRY_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " GOTO_TRY_FILE " > " GOTO_TRY_OUT " 2>&1");
-    out = fs.readAll(GOTO_TRY_OUT);
+    out = fs.readAll(GOTO_TRY_OUT).take();
     ok = res != 0 && out && libc.strstr(out, expected) != null;
     if (!ok && out) { printf("%s\n", out); }
     mem.free(out);

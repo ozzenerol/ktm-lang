@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Assigning to an array (`arr = p`, `arr += 1`, `arr++`) was only an
  * "Incompatible types" warning, and `arr++` compiled silently. As in C
@@ -21,11 +21,11 @@ bool compile(u8 *source, bool shouldFail, u8 *expected) {
     bool ok;
 
     cleanupArrTest();
-    if (!fs.writeAll(ARR_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ARR_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " ARR_TEST_FILE " > " ARR_TEST_OUT " 2>&1");
-    out = fs.readAll(ARR_TEST_OUT);
+    out = fs.readAll(ARR_TEST_OUT).take();
     if (!out) {
         cleanupArrTest();
         return false;
@@ -39,7 +39,7 @@ bool compile(u8 *source, bool shouldFail, u8 *expected) {
 }
 
 u8 *wrap(u8 *stmt) {
-    return str.format("struct S { i64 a[2]; };\ni64 g[2];\n"
+    return cstr.format("struct S { i64 a[2]; };\ni64 g[2];\n"
                                      "void main()\n{\n  i64 arr[2];\n  i64 *p = arr;\n  S s;\n"
                                      "  %s\n}\n", stmt);
 }

@@ -1,5 +1,5 @@
 module vec;
-import libc, mem, os, str;
+import cstr, libc, mem, os;
 
 pub struct IntVec {
     i64 size;
@@ -19,9 +19,9 @@ pub struct FloatVec {
 /* Get/Set with an index outside [0, size): report it on stderr and exit,
  * rather than read or write past the entries. */
 static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
-    u8 *msg = str.formatTo(null, "%s: index %d out of range (size %d)\n",
+    u8 *msg = cstr.formatTo(null, "%s: index %d out of range (size %d)\n",
                                          fnName, idx, size);
-    libc.write(os.STDERR, msg, str.len(msg));
+    libc.write(os.STDERR, msg, cstr.len(msg));
     os.exit(1);
 }
 
@@ -60,7 +60,7 @@ pub f64 FloatVec.pop(bool *_ok=null) {
 
 pub f64 FloatVec.get(i64 idx) {
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("FloatVecGet", idx, self.size);
+        vecIndexError("FloatVec.get", idx, self.size);
     }
     return self.entries[idx];
 }
@@ -68,7 +68,7 @@ pub f64 FloatVec.get(i64 idx) {
 pub void FloatVec.set(i64 idx, f64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("FloatVecSet", idx, self.size);
+        vecIndexError("FloatVec.set", idx, self.size);
     }
     self.entries[idx] = value;
 }
@@ -142,7 +142,7 @@ pub i64 IntVec.pop(bool *_ok=null) {
 
 pub i64 IntVec.get(i64 idx) {
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("IntVecGet", idx, self.size);
+        vecIndexError("IntVec.get", idx, self.size);
     }
     return self.entries[idx];
 }
@@ -150,7 +150,7 @@ pub i64 IntVec.get(i64 idx) {
 pub void IntVec.set(i64 idx, i64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("IntVecSet", idx, self.size);
+        vecIndexError("IntVec.set", idx, self.size);
     }
     self.entries[idx] = value;
 }
@@ -219,7 +219,7 @@ pub void *PtrVec.pop(bool *_ok=null) {
 
 pub void *PtrVec.get(i64 idx) {
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("PtrVecGet", idx, self.size);
+        vecIndexError("PtrVec.get", idx, self.size);
     }
     return self.entries[idx];
 }
@@ -227,7 +227,7 @@ pub void *PtrVec.get(i64 idx) {
 pub void PtrVec.set(i64 idx, void *value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
     if (idx < 0 || idx >= self.size) {
-        vecIndexError("PtrVecSet", idx, self.size);
+        vecIndexError("PtrVec.set", idx, self.size);
     }
     self.entries[idx] = value;
 }

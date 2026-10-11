@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Methods (Y10) and modules: the fixture src/tests/modules/methods has
  * module bank with `pub struct Account` and its methods over two files
@@ -20,8 +20,8 @@ u8 *gWant = "ann:115:6 bob:4:7\n";
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " M_OUT " " M_BIN);
     proc.shell(cmd);
-    u8 *out = fs.readAll(M_OUT);
-    bool ok = out && !str.cmp(out, want);
+    u8 *out = fs.readAll(M_OUT).take();
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " M_OUT " " M_BIN);
@@ -42,13 +42,13 @@ i64 count(u8 *s, u8 *what) {
 bool fails(u8 *main, u8 *shop, u8 *want) {
     proc.shell("rm -rf " M_DIR " && mkdir -p " M_DIR " && "
                  "cp -r ${KTM_TEST_SRC:-.}/modules/methods/bank " M_DIR "/");
-    fs.writeAll(M_DIR "/main.ktm", main, str.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(M_DIR "/main.ktm", cstr.view(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (shop) {
         proc.shell("mkdir -p " M_DIR "/shop");
-        fs.writeAll(M_DIR "/shop/shop.ktm", shop, str.len(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+        fs.writeAll(M_DIR "/shop/shop.ktm", cstr.view(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     }
     proc.shell(KTM "-S " M_DIR "/main.ktm -o /dev/null > " M_OUT " 2>&1");
-    u8 *out = fs.readAll(M_OUT);
+    u8 *out = fs.readAll(M_OUT).take();
     bool ok = out && count(out, "error:") == 1 && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", main, out); }
     mem.free(out);

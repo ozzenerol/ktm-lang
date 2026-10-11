@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `#define KTM_NO_REPL_HELLO` in ~/.ktm_rc.ktm hides the REPL's welcome
  * message, as the docs say (the REPL checked KTM_REPL_NO_HELLO). The
@@ -22,7 +22,7 @@ i32 main() {
              "  HOME=$d script -q /dev/null $k\n"
              "fi\n"
              "rm -rf $d\n";
-    fs.writeAll(SH_FILE, sh, str.len(sh));
+    fs.writeAll(SH_FILE, cstr.view(sh));
 
     /* without the define the greeting shows: the REPL did get a terminal */
     u8 *out = proc.shellOutput(RUN " loud 2>&1");

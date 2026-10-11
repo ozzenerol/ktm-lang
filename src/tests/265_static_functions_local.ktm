@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Library functions are weak definitions in libktm; `static` functions
  * and file-scope `static` variables are local symbols, in the library and
@@ -24,14 +24,14 @@ bool runs(bool jit, u8 *source, u8 *want) {
     u8 *out;
     i64 res;
     cleanup();
-    fs.writeAll(SL_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(SL_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (jit) {
         res = proc.shell(SL_KTM "-jit " SL_FILE " > " SL_OUT " 2>&1");
     } else {
         res = proc.shell(SL_KTM SL_FILE " -o " SL_EXE " > " SL_OUT " 2>&1 && "
                                  SL_TIMEOUT "./" SL_EXE " >> " SL_OUT " 2>&1");
     }
-    out = fs.readAll(SL_OUT);
+    out = fs.readAll(SL_OUT).take();
     bool ok = res == 0 && out && libc.strstr(out, want);
     if (!ok) { printf("jit=%d: exit status %d\n%s\n", jit, res, out); }
     mem.free(out);
@@ -47,7 +47,7 @@ i64 jsonNumberLen(void *p, bool *is_int) { return 0; }
 void main()
 {
   json.Value *j = json.parse(\"[12]\");
-  u8 *s = json.toStr(j);
+  u8 *s = json.toStr(j).take();
   printf(\"ok=%d %s\\n\", json.ok(j), s);
   mem.free(s);
   json.release(j);
@@ -67,16 +67,16 @@ void main()
 ";
 
 /* A program's static function named like a library function used inside
- * the library (str.format) */
+ * the library (cstr.format) */
 u8 *srcUserStatic =
-"import mem, str;
+"import cstr, mem;
 
 static u8 *dup(u8 *buf) { return \"mine\"; }
 static i64 gCount = 7;
 static i64 twice(i64 x) { return x * 2; }
 void main()
 {
-  u8 *s = str.format(\"%d\", 5);
+  u8 *s = cstr.format(\"%d\", 5);
   printf(\"lib=%s own=%s twice=%d count=%d\\n\", s, dup(\"x\"), twice(4), gCount);
   mem.free(s);
 }

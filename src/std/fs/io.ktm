@@ -1,11 +1,19 @@
 module fs;
-import libc, mem, str;
+import cstr, libc, mem, os, str;
+
+/* The longest path the functions here take (with its NUL) */
+const i64 FS_PATH_MAX = 4096;
+#ifdef IS_MACOS
+const i32 FS_ENAMETOOLONG = 63;
+#else
+const i32 FS_ENAMETOOLONG = 36;
+#endif
 
 /* Stantardise the stat function, though `std.ktmh` also allows 
  * calling the libc version. This is just much easier to use.
  * With the added benifit of including when a file was created 
  * for linux, which mac includes with `st_birthtimespec` */
-pub i32 stat(FileStat *fst, u8 *pathname) {
+static i32 statC(FileStat *fst, u8 *pathname) {
 #if IS_LINUX
     libc.Statx stx;
 
@@ -107,24 +115,41 @@ static u8 *fileReadToEof(i32 fd, i64 *_len) {
     return null;
 }
 
-pub u8 *readAll(u8 *path, i64 *_size=null) {
-    if (_size) { *_size = 0; }
-    if (!path) { return null; }
+/* `path` as a C string, in `buf` (FS_PATH_MAX bytes): false, with errno
+ * ENAMETOOLONG, when it doesn't fit */
+bool fsPath(u8[] path, u8 *buf)
+{
+    if (path.len >= FS_PATH_MAX) {
+        os.setErrno(FS_ENAMETOOLONG);
+        return false;
+    }
+    if (path.len) { mem.copy(buf, path.ptr, path.len); }
+    buf[path.len] = 0;
+    return true;
+}
+
+/* The whole file at path, a String that is yours (`defer s.free();`), with
+ * a NUL after it; its ptr is null when the file can't be read (os.errno()
+ * says why). An empty file gives an empty String that has a ptr. */
+pub String readAll(u8[] path) {
+    String out;
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return out; }
     i32 fd;
     i64 len, rbytes, size;
     u8 *s;
     libc.cStat st;
 
     /* The library's fds are close-on-exec: programs it starts don't get them */
-    if ((fd = libc.open(path,libc.O_RDONLY|libc.O_CLOEXEC,438)) == -1) {
-        return null;    
+    if ((fd = libc.open(cpath,libc.O_RDONLY|libc.O_CLOEXEC,438)) == -1) {
+        return out;
     }
 
     /* A directory has nothing to read (lseek on one gives a huge "size" on
      * some filesystems, LLONG_MAX on ext4) */
     if (libc.fstat(fd,&st) != 0 || (st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
         libc.close(fd);
-        return null;
+        return out;
     }
 
     /* Only a regular file with a size is read up to that size; anything
@@ -132,23 +157,21 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     if ((st.st_mode & libc.S_IFMT) != libc.S_IFREG || st.st_size == 0) {
         s = fileReadToEof(fd,&len);
         libc.close(fd);
-        if (s && _size) {
-            *_size = len;
-        }
-        return s;
+        if (s) { out = str.adopt(s, len); }
+        return out;
     }
 
     /* get the file size */
     if ((len = libc.lseek(fd,0,libc.SEEK_END)) < 0) {
         libc.close(fd);
-        return null;
+        return out;
     }
 
     libc.lseek(fd,0,libc.SEEK_SET);
 
-    if ((s = mem.alloc(len+100)) == null) {
+    if ((s = mem.alloc(len+1)) == null) {
         libc.close(fd);
-        return null;
+        return out;
     }
     size = 0;
 
@@ -162,29 +185,27 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     if (size != len) {
         libc.close(fd);
         mem.free(s);
-        return null;
-    }
-
-    if (_size) {
-        *_size = len;
+        return out;
     }
 
     s[len] = '\0';
     libc.close(fd);
-    return s;
+    out = str.adopt(s, len);
+    return out;
 }
 
-pub bool writeAll(u8 *filename, u8 *buf, i64 size,
+/* data into the file at path (made with 0644 when flags create it); false
+ * on an error */
+pub bool writeAll(u8[] path, u8[] data,
         i64 flags=libc.O_CREAT|libc.O_WRONLY|libc.O_TRUNC) {
-    i64 towrite = size, nwritten = 0;
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return false; }
+    i64 towrite = data.len, nwritten = 0;
+    u8 *buf = data.ptr;
     i32 fd;
     i32 perms = 420;
 
-    if (!filename || !buf || size < 0) {
-        return false;
-    }
-
-    if ((fd = libc.open(filename,flags|libc.O_CLOEXEC,perms)) == -1) {
+    if ((fd = libc.open(cpath,flags|libc.O_CLOEXEC,perms)) == -1) {
         return false;
     }
 
@@ -201,21 +222,21 @@ pub bool writeAll(u8 *filename, u8 *buf, i64 size,
     return true;
 }
 
-pub i32 changeDir(u8 *path) {
+static i32 changeDirC(u8 *path) {
     u8 *newPath = null;
-    u64 len = str.len(path);
+    u64 len = cstr.len(path);
     if ((len == 1 && path[0] == '~') ||
             (len == 2 && path[0] == '~' && path[1] == '/')) {
         u8 *home = libc.getenv("HOME");
-        home = str.dup(home);
+        home = cstr.dup(home);
         newPath = home;
     } else if (len >= 3 && path[0] == '~' && path[1] == '/') {
         u8 *home = libc.getenv("HOME");
         u8 *p = path;
         if (*(p + 2) != '\0') {
-            newPath = str.formatTo(,"%s/%s",home,p+2);
+            newPath = cstr.formatTo(,"%s/%s",home,p+2);
         } else {
-            newPath = str.formatTo(,"%s",home);
+            newPath = cstr.formatTo(,"%s",home);
         }
     } else {
         newPath = path;
@@ -227,16 +248,15 @@ pub i32 changeDir(u8 *path) {
     return retVal;
 }
 
-/* The working directory: written into buf if one is given, otherwise a
- * new string to Free (getcwd's own block is libc malloc'd, which Free
- * can't take). null on error. */
-pub u8 *currentDir(u8 *buf=null, u64 bufSize=0) {
-    u8 *cwd, *copy;
-    if (buf) { return libc.getcwd(buf, bufSize); }
-    if ((cwd = libc.getcwd(null, 0)) == null) { return null; }
-    copy = str.dup(cwd);
+/* The working directory, a String that is yours; its ptr is null on an
+ * error (getcwd's own block is libc malloc'd, which a String can't own) */
+pub String currentDir() {
+    String out;
+    u8 *cwd = libc.getcwd(null, 0);
+    if (!cwd) { return out; }
+    out = str.from(cwd[0:cstr.len(cwd)]);
     libc.free(cwd);
-    return copy;
+    return out;
 }
 
 /* `ls`-style entry colours. */
@@ -289,7 +309,7 @@ i64 cmpLeadingNumber(u8 *s1, u8 *s2) {
     while ('0'<=s1[n1]<='9') { n1++; }
     while ('0'<=s2[n2]<='9') { n2++; }
     if (n1 != n2) { return n1 - n2; }
-    return str.cmpLen(s1,s2,n1);
+    return cstr.cmpLen(s1,s2,n1);
 }
 
 /* true if dh1 is listed before dh2: names that both start with a number
@@ -302,5 +322,22 @@ i64 cmpDirHuman(void *_dh1, void *_dh2) {
     if ('0'<=*str1<='9' && '0'<=*str2<='9') {
         if ((cmp = cmpLeadingNumber(str1,str2)) != 0) { return cmp < 0; }
     }
-    return str.cmp(str1,str2) < 0;
+    return cstr.cmp(str1,str2) < 0;
+}
+
+/* What is at path (fst filled): 0, or -1 with errno set */
+pub i32 stat(FileStat *fst, u8[] path)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return statC(fst, cpath);
+}
+
+/* The working directory changed to path (`~` and `~/...` are under
+ * $HOME): 0, or -1 with errno set */
+pub i32 changeDir(u8[] path)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return changeDirC(cpath);
 }

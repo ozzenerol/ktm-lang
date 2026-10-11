@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* An empty main source file stepped past its terminator once the
  * stdlib header pushed in front of it was done, so ktm lexed whatever
@@ -21,7 +21,7 @@ void cleanupEmptyTest(void) {
 /* Write `printf_fmt` (a printf format, so "" makes an empty file) to
  * `file` through the shell */
 bool writeFile(u8 *file, u8 *printfFmt) {
-    u8 *cmd = str.format("printf '%s' > %s", printfFmt, file);
+    u8 *cmd = cstr.format("printf '%s' > %s", printfFmt, file);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
     return res == 0;
@@ -30,13 +30,13 @@ bool writeFile(u8 *file, u8 *printfFmt) {
 /* Run ktm with `flags` on EMPTY_FILE; returns the exit code and
  * leaves the output in `*_out` (null if it could not be read) */
 i64 runKtm(u8 *flags, u8 **outArg) {
-    u8 *cmd = str.format(
+    u8 *cmd = cstr.format(
             "T=; command -v timeout >/dev/null 2>&1 && T='timeout 10'; "
             "$T ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
             "%s " EMPTY_FILE " > " EMPTY_OUT " 2>&1", flags);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
-    *outArg = fs.readAll(EMPTY_OUT);
+    *outArg = fs.readAll(EMPTY_OUT).take();
     return res;
 }
 
@@ -71,7 +71,7 @@ bool testNoCode(u8 *name, u8 *content, i64 wantStatus) {
     for (i = 0; i < 3; i++) {
         res = runKtm("-jit", &out);
         if (!out || !gCommentOut || res != wantStatus ||
-                str.cmp(out, gCommentOut)) {
+                cstr.cmp(out, gCommentOut)) {
             printf("%s, -jit run %d: status %d (want %d)\n%s\n", name, i, res,
                 wantStatus, out);
             ok = false;
@@ -80,7 +80,7 @@ bool testNoCode(u8 *name, u8 *content, i64 wantStatus) {
     }
 
     res = runKtm("-tokens", &out);
-    if (!out || res != 0 || str.len(out) != 0) {
+    if (!out || res != 0 || cstr.len(out) != 0) {
         printf("%s, -tokens: status %d\n%s\n", name, res, out);
         ok = false;
     }
@@ -104,7 +104,7 @@ bool testEmptyInclude(void) {
         return false;
     }
     res = runKtm("-jit", &out);
-    if (!out || res != 0 || str.cmp(out, "ok\n")) {
+    if (!out || res != 0 || cstr.cmp(out, "ok\n")) {
         printf("empty include: status %d\n%s\n", res, out);
         ok = false;
     }

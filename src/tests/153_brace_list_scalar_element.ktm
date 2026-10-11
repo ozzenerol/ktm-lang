@@ -1,4 +1,4 @@
-import date, fs, libc, mem, proc, str, test;
+import cstr, date, fs, libc, mem, proc, test;
 
 /* A nested `{ ... }` in an array initialiser must initialise an element
  * that is an array, a class or a union. For a scalar element
@@ -42,13 +42,13 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where, i64 errors=1) {
 
     cleanupScalarBraceTest();
 
-    if (!fs.writeAll(SB_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SB_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " SB_TEST_FILE " > " SB_TEST_OUT " 2>&1");
 
-    out = fs.readAll(SB_TEST_OUT);
+    out = fs.readAll(SB_TEST_OUT).take();
     if (!out) {
         printf("status %d, no output\n", res);
         cleanupScalarBraceTest();
@@ -57,7 +57,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where, i64 errors=1) {
 
     ok = res == 1 && countErrors(out) == errors;
     err = libc.strstr(out, "error: ");
-    if (!err || str.cmpLen(err + 7, expected, str.len(expected))) { ok = false; }
+    if (!err || cstr.cmpLen(err + 7, expected, cstr.len(expected))) { ok = false; }
     if (!libc.strstr(out, where)) { ok = false; }
     if (!ok) { printf("status %d\n%s\n", res, out); }
 
@@ -240,7 +240,7 @@ bool testValid(void) {
     if (pairs[1].a != 3 || pairs[1].b != 4) { ok = false; }
     if (row.n != 9 || row.v[0] != 7 || row.v[1] != 8 || row.v[2] != 0) { ok = false; }
     if (nums[0].i != 11 || nums[1].i != 12) { ok = false; }
-    if (str.cmp(strs[1], "cd")) { ok = false; }
+    if (cstr.cmp(strs[1], "cd")) { ok = false; }
     if (fs[1] != 2.5 || ds[1] != 2) { ok = false; }
     if (gPairs[0].b != 2 || gPairs[1].a != 3 || gPairs[1].b != 0) { ok = false; }
     if (gGrid[0][1] != 6 || gGrid[1][0] != 7 || gGrid[1][1] != 0) { ok = false; }

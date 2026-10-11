@@ -1,0 +1,452 @@
+module str;
+import cstr, libc, mem;
+
+/* The String type is the prelude's (every file sees it); its constructors
+ * and methods are here. A String you get from one of these is yours:
+ * `String s = str.new(); defer s.free();`. */
+
+/* printf's format into a new String (yours: free it). `%s` takes a u8[]
+ * or a String as well as a C string. */
+pub String format(u8 *fmt, ...args)
+{
+    String s;
+    u8 *text = cstr.formatArgs(null, fmt, args);
+    if (text) {
+        /* the formatter's buffer becomes the String's (it is mem's, with
+         * the NUL after it), no copy */
+        s.ptr = text;
+        s.len = cstr.len(text);
+        s.cap = s.len;
+    }
+    return s;
+}
+
+/* A String owning `bytes`, a mem.alloc'd block of len bytes and a NUL
+ * after them (from C, or a reader): no copy, free it as any String */
+pub String adopt(u8 *bytes, i64 len)
+{
+    String s;
+    if (bytes) {
+        s.ptr = bytes;
+        s.len = len;
+        s.cap = len;
+    }
+    return s;
+}
+
+/* An empty String: nothing allocated until something is added */
+pub String new()
+{
+    String s;
+    return s;
+}
+
+/* An empty String with room for n bytes */
+pub String withCap(i64 n)
+{
+    String s;
+    s.reserve(n);
+    return s;
+}
+
+/* A String of t's bytes, a copy */
+pub String from(u8[] t)
+{
+    String s;
+    s.append(t);
+    return s;
+}
+
+/* Room for n more bytes (and the NUL after them) */
+pub void String.reserve(i64 n)
+{
+    if (n <= self.cap - self.len) { return; }
+    i64 cap = self.cap ? self.cap * 2 : 16;
+    if (cap < self.len + n) { cap = self.len + n; }
+    u8 *grown = mem.realloc(self.ptr, cap + 1);
+    if (!grown) { throw(1); }   /* out of memory */
+    self.ptr = grown;
+    self.cap = cap;
+    self.ptr[self.len] = 0;
+}
+
+/* Where t's bytes are in this String's buffer, -1 when they aren't (a
+ * view of the String itself moves when it grows) */
+static i64 stringOwnOffset(String *s, u8[] t)
+{
+    if (s.ptr && t.ptr >= s.ptr && t.ptr <= s.ptr + s.len) { return t.ptr - s.ptr; }
+    return -1;
+}
+
+/* t's bytes at the end (t may be a view of this String itself) */
+pub void String.append(u8[] t)
+{
+    if (!t.len) { return; }
+    i64 own = stringOwnOffset(self, t);
+    self.reserve(t.len);
+    u8 *from = own >= 0 ? self.ptr + own : t.ptr;
+    libc.memmove(self.ptr + self.len, from, t.len);
+    self.len += t.len;
+    self.ptr[self.len] = 0;
+}
+
+pub void String.appendByte(u8 b)
+{
+    self.reserve(1);
+    self.ptr[self.len++] = b;
+    self.ptr[self.len] = 0;
+}
+
+/* printf's format at the end */
+pub void String.appendFormat(u8 *fmt, ...args)
+{
+    u8 *text = cstr.formatArgs(null, fmt, args);
+    self.append(text[0:cstr.len(text)]);
+    mem.free(text);
+}
+
+/* t's bytes before byte `at` (0 to len) */
+pub void String.insert(i64 at, u8[] t)
+{
+    /* 0 <= at <= len, or ERR_BOUNDS as a sub-slice's check throws it */
+    u8[] whole = self.ptr[0:self.len];
+    whole[at:];
+    if (!t.len) { return; }
+    i64 own = stringOwnOffset(self, t);
+    self.reserve(t.len);
+    libc.memmove(self.ptr + at + t.len, self.ptr + at, self.len - at);
+    if (own < 0) {
+        libc.memmove(self.ptr + at, t.ptr, t.len);
+    } else {
+        /* a view of this String: the part of it after `at` moved along */
+        for (i64 i = 0; i < t.len; ++i) {
+            i64 src = own + i;
+            if (src >= at) { src += t.len; }
+            self.ptr[at + i] = self.ptr[src];
+        }
+    }
+    self.len += t.len;
+    self.ptr[self.len] = 0;
+}
+
+/* Bytes a (included) to b (excluded) out, 0 <= a <= b <= len */
+pub void String.remove(i64 a, i64 b)
+{
+    /* 0 <= a <= b <= len, or ERR_BOUNDS as a sub-slice's check throws it */
+    u8[] whole = self.ptr[0:self.len];
+    whole[a:b];
+    if (a == b) { return; }
+    libc.memmove(self.ptr + a, self.ptr + b, self.len - b);
+    self.len -= b - a;
+    self.ptr[self.len] = 0;
+}
+
+/* Empty, keeping its room */
+pub void String.clear()
+{
+    self.len = 0;
+    if (self.ptr) { self.ptr[0] = 0; }
+}
+
+/* A copy of it, its own */
+pub String String.clone()
+{
+    String copy;
+    copy.append(*self);
+    return copy;
+}
+
+/* Its bytes as a C string, NUL-terminated ("" when it has none) */
+pub u8 *String.cstr()
+{
+    return self.ptr ? self.ptr : "";
+}
+
+/* ASCII letters in place */
+pub void String.toLower()
+{
+    for (i64 i = 0; i < self.len; ++i) {
+        u8 c = self.ptr[i];
+        if (c >= 'A' && c <= 'Z') { self.ptr[i] = c + 32; }
+    }
+}
+
+pub void String.toUpper()
+{
+    for (i64 i = 0; i < self.len; ++i) {
+        u8 c = self.ptr[i];
+        if (c >= 'a' && c <= 'z') { self.ptr[i] = c - 32; }
+    }
+}
+
+/* Its bytes in reverse order (bytes: a multi-byte UTF-8 character is
+ * reversed too) */
+pub void String.reverse()
+{
+    for (i64 i = 0, j = self.len - 1; i < j; i++, j--) {
+        u8 c = self.ptr[i];
+        self.ptr[i] = self.ptr[j];
+        self.ptr[j] = c;
+    }
+}
+
+/* Its bytes as a C string that is now yours (mem.free it), null when it
+ * has none; it is empty after. For C: `u8 *text = fs.readAll(p).take();` */
+pub u8 *String.take()
+{
+    u8 *bytes = self.ptr;
+    self.ptr = null;
+    self.len = 0;
+    self.cap = 0;
+    return bytes;
+}
+
+/* Its bytes given back; it is empty after, so a second free() of the same
+ * String does nothing */
+pub void String.free()
+{
+    mem.free(self.ptr);
+    self.ptr = null;
+    self.len = 0;
+    self.cap = 0;
+}
+
+/* ---- Reading bytes: these take a u8[], so a literal, a slice or a
+ * String; called as methods too (`s.find("x")` is str.find(s, "x")) ---- */
+
+/* Where needle first is in s, -1 when it isn't (an empty needle is at 0) */
+pub i64 find(u8[] s, u8[] needle)
+{
+    if (needle.len > s.len) { return -1; }
+    if (!needle.len) { return 0; }
+    u8 first = needle.ptr[0];
+    for (i64 i = 0; i <= s.len - needle.len; ++i) {
+        if (s.ptr[i] == first && !libc.memcmp(s.ptr + i, needle.ptr, needle.len)) { return i; }
+    }
+    return -1;
+}
+
+/* Where needle last is in s, -1 when it isn't */
+pub i64 findLast(u8[] s, u8[] needle)
+{
+    if (needle.len > s.len) { return -1; }
+    for (i64 i = s.len - needle.len; i >= 0; --i) {
+        if (!libc.memcmp(s.ptr + i, needle.ptr, needle.len)) { return i; }
+    }
+    return -1;
+}
+
+pub bool contains(u8[] s, u8[] needle)
+{
+    return find(s, needle) >= 0;
+}
+
+pub bool startsWith(u8[] s, u8[] prefix)
+{
+    return prefix.len <= s.len && !libc.memcmp(s.ptr, prefix.ptr, prefix.len);
+}
+
+pub bool endsWith(u8[] s, u8[] suffix)
+{
+    return suffix.len <= s.len &&
+           !libc.memcmp(s.ptr + s.len - suffix.len, suffix.ptr, suffix.len);
+}
+
+/* <0, 0 or >0 as a sorts before, with or after b (bytes, then length) */
+pub i64 compare(u8[] a, u8[] b)
+{
+    i64 n = a.len < b.len ? a.len : b.len;
+    i32 c = n ? libc.memcmp(a.ptr, b.ptr, n) : 0;
+    if (c) { return c; }
+    return a.len - b.len;
+}
+
+/* The same bytes */
+pub bool equals(u8[] a, u8[] b)
+{
+    return a.len == b.len && (!a.len || !libc.memcmp(a.ptr, b.ptr, a.len));
+}
+
+static bool viewIsSpace(u8 c)
+{
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
+}
+
+/* s without the whitespace at its ends: a view of it, nothing copied */
+pub u8[] trim(u8[] s)
+{
+    i64 a = 0, b = s.len;
+    while (a < b && viewIsSpace(s.ptr[a])) { a++; }
+    while (b > a && viewIsSpace(s.ptr[b - 1])) { b--; }
+    return s[a:b];
+}
+
+/* The parts of s between the seps, views of it (an empty sep: s whole).
+ * The list is allocated: `u8[][] parts = s.split(","); defer parts.free();` */
+pub u8[][] split(u8[] s, u8[] sep)
+{
+    i64 n = 1;
+    if (sep.len) {
+        for (i64 at = find(s, sep); at >= 0; ) {
+            n++;
+            i64 next = find(s[at + sep.len:], sep);
+            at = next >= 0 ? at + sep.len + next : -1;
+        }
+    }
+    u8[] *parts = mem.alloc(n * sizeof(u8[]));
+    u8[][] out = parts[0:n];
+    u8[] rest = s;
+    for (i64 i = 0; i < n - 1; ++i) {
+        i64 at = find(rest, sep);
+        out[i] = rest[:at];
+        rest = rest[at + sep.len:];
+    }
+    out[n - 1] = rest;
+    return out;
+}
+
+/* Every old in it replaced by new (an empty old changes nothing) */
+pub void String.replace(u8[] old, u8[] new)
+{
+    if (!old.len || !self.len) { return; }
+    String out = withCap(self.len);
+    u8[] rest = *self;
+    for (i64 at = find(rest, old); at >= 0; at = find(rest, old)) {
+        out.append(rest[:at]);
+        out.append(new);
+        rest = rest[at + old.len:];
+    }
+    out.append(rest);
+    mem.free(self.ptr);
+    self.ptr = out.ptr;
+    self.len = out.len;
+    self.cap = out.cap;
+}
+
+/* ---- UTF-8: a String's or a u8[]'s bytes as characters (s.len and s[i]
+ * stay bytes) ---- */
+
+/* The code point at byte *at of s, *at moved past it; U+FFFD for bytes
+ * that aren't UTF-8 (then *at moves one byte), -1 at the end */
+pub i32 decodeRune(u8[] s, i64 *at)
+{
+    i64 i = *at;
+    if (i < 0 || i >= s.len) { return -1; }
+    u8 b0 = s.ptr[i];
+    if (b0 < 0x80) {
+        *at = i + 1;
+        return b0;
+    }
+    i64 n = 0;
+    i32 cp = 0;
+    u8 lo = 0x80, hi = 0xBF; /* the second byte's range (RFC 3629) */
+    if (0xC2 <= b0 <= 0xDF) { n = 2; cp = b0 & 0x1F; }
+    else if (b0 == 0xE0) { n = 3; cp = b0 & 0x0F; lo = 0xA0; }
+    else if (b0 == 0xED) { n = 3; cp = b0 & 0x0F; hi = 0x9F; }
+    else if (0xE1 <= b0 <= 0xEF) { n = 3; cp = b0 & 0x0F; }
+    else if (b0 == 0xF0) { n = 4; cp = b0 & 0x07; lo = 0x90; }
+    else if (0xF1 <= b0 <= 0xF3) { n = 4; cp = b0 & 0x07; }
+    else if (b0 == 0xF4) { n = 4; cp = b0 & 0x07; hi = 0x8F; }
+    if (!n || i + n > s.len) {
+        *at = i + 1;
+        return 0xFFFD;
+    }
+    for (i64 k = 1; k < n; ++k) {
+        u8 b = s.ptr[i + k];
+        u8 min = k == 1 ? lo : 0x80, max = k == 1 ? hi : 0xBF;
+        if (b < min || b > max) {
+            *at = i + 1;
+            return 0xFFFD;
+        }
+        cp = (cp << 6) | (b & 0x3F);
+    }
+    *at = i + n;
+    return cp;
+}
+
+/* How many characters s holds (each byte that isn't UTF-8 counts as one) */
+pub i64 runeCount(u8[] s)
+{
+    i64 n = 0, at = 0;
+    while (decodeRune(s, &at) >= 0) { n++; }
+    return n;
+}
+
+/* Whether all of s is UTF-8 */
+pub bool validUtf8(u8[] s)
+{
+    i64 at = 0;
+    while (at < s.len) {
+        i64 before = at;
+        i32 cp = decodeRune(s, &at);
+        if (cp == 0xFFFD && !(at - before == 3 && s.ptr[before] == 0xEF)) { return false; }
+    }
+    return true;
+}
+
+/* ---- Bytes ---- */
+
+/* An ASCII letter in the other case, any other byte as is */
+pub u8 toLower(u8 ch)
+{
+    if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
+    return ch;
+}
+
+pub u8 toUpper(u8 ch)
+{
+    if (ch >= 'a' && ch <= 'z') { return ch - 32; }
+    return ch;
+}
+
+/* ' ', '\t', '\n', '\v', '\f' or '\r' */
+pub bool isSpace(u8 ch)
+{
+    return viewIsSpace(ch);
+}
+
+/* s without the whitespace at its start, a view of it */
+pub u8[] trimStart(u8[] s)
+{
+    i64 a = 0;
+    while (a < s.len && viewIsSpace(s.ptr[a])) { a++; }
+    return s[a:];
+}
+
+/* s without what is at its end of the bytes in `chars` (whitespace when
+ * left out), a view of it */
+pub u8[] trimEnd(u8[] s, u8[] chars = " \t\n\v\f\r")
+{
+    i64 b = s.len;
+    while (b > 0 && find(chars, s[b - 1:b]) >= 0) { b--; }
+    return s[:b];
+}
+
+/* s around the first sep: *before and *after, views of it, and true; or
+ * false, with *before all of s and *after empty, when sep isn't in it */
+pub bool splitFirst(u8[] s, u8[] sep, u8[] *before, u8[] *after)
+{
+    i64 at = find(s, sep);
+    if (at < 0) {
+        *before = s;
+        *after = s[s.len:];
+        return false;
+    }
+    *before = s[:at];
+    *after = s[at + sep.len:];
+    return true;
+}
+
+/* As splitFirst, around the last sep */
+pub bool splitLast(u8[] s, u8[] sep, u8[] *before, u8[] *after)
+{
+    i64 at = findLast(s, sep);
+    if (at < 0) {
+        *before = s;
+        *after = s[s.len:];
+        return false;
+    }
+    *before = s[:at];
+    *after = s[at + sep.len:];
+    return true;
+}

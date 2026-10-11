@@ -35,7 +35,7 @@ void tcpClosedPeer() {
     /* The first write may still succeed (the peer answers it with a RST),
      * a later one fails */
     for (i = 0; i < 50 && rv != -1; i++) {
-        rv = net.send(cli, "x", 1);
+        rv = net.send(cli, "x"[0:1]);
         if (rv != -1) { libc.poll(null, 0, 10); }   // 10 ms
     }
     check(rv == -1, "NetSend to a closed peer returns -1");
@@ -48,12 +48,12 @@ void tcpClosedPeer() {
 void unixClosedPeer() {
     i32 sv[2];
     check(socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, sv) == 0, "socketpair");
-    check(net.send(sv[0], "ok", 2) == 2, "NetSend to an open peer");
+    check(net.send(sv[0], "ok"[0:2]) == 2, "NetSend to an open peer");
     libc.close(sv[1]);
-    check(net.send(sv[0], "x", 1) == -1 && os.errno() == libc.EPIPE,
+    check(net.send(sv[0], "x"[0:1]) == -1 && os.errno() == libc.EPIPE,
             "NetSend to a closed peer: EPIPE");
     /* Caller flags are kept */
-    check(net.send(sv[0], "x", 1, libc.MSG_DONTWAIT) == -1 && os.errno() == libc.EPIPE,
+    check(net.send(sv[0], "x"[0:1], libc.MSG_DONTWAIT) == -1 && os.errno() == libc.EPIPE,
             "NetSend with flags: EPIPE");
     libc.close(sv[0]);
 }

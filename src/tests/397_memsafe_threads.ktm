@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `ktm -jit -Memsafe` crashed (SIGSEGV) as soon as a pthread MAlloc'd:
  * the allocation-site walk followed frame pointers past the end of the
@@ -24,14 +24,14 @@ void check(bool ok, u8 *what) {
 
 /* Run `src` under -Memsafe: true if ktm exited 0 */
 bool runMt(u8 *src) {
-    fs.writeAll(MT_PROG, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(MT_PROG, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     return proc.shell(MT_RUN) == 0;
 }
 
 /* `what` (an extended regex) is on `times` lines of the report */
 bool errHas(u8 *what, i64 times = 1) {
     u8 cmd[512];
-    str.formatTo(cmd, "[ \"$(grep -E -c -- '%s' " MT_ERR ")\" = %d ]", what, times);
+    cstr.formatTo(cmd, "[ \"$(grep -E -c -- '%s' " MT_ERR ")\" = %d ]", what, times);
     return proc.shell(cmd) == 0;
 }
 

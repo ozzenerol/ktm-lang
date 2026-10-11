@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* A main-program global has its own symbol (_K0<len><name>), as its
  * functions do (F24): a program's `environ` no longer replaces the C
@@ -18,7 +18,7 @@ void check(bool ok, u8 *what, u8 *out) {
 }
 
 void put(u8 *path, u8 *src) {
-    fs.writeAll(path, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(cstr.view(path), cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 /* ktm's output for DIR/<file>: -jit, or built and run */
@@ -26,17 +26,17 @@ u8 *run(u8 *file, bool jit) {
     u8 *ktm = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
               "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} ";
     if (jit) {
-        return proc.shellOutput(str.format("%s-jit " DIR "/%s 2>&1", ktm, file));
+        return proc.shellOutput(cstr.format("%s-jit " DIR "/%s 2>&1", ktm, file));
     }
-    return proc.shellOutput(str.format("rm -f " DIR "/bin; %s" DIR "/%s -o " DIR "/bin 2>&1 && "
+    return proc.shellOutput(cstr.format("rm -f " DIR "/bin; %s" DIR "/%s -o " DIR "/bin 2>&1 && "
                                        DIR "/bin 2>&1", ktm, file));
 }
 
 void both(u8 *file, u8 *want, u8 *what) {
     u8 *out = run(file, true);
-    check(out && !str.cmp(out, want), str.format("%s (JIT)", what), out);
+    check(out && !cstr.cmp(out, want), cstr.format("%s (JIT)", what), out);
     out = run(file, false);
-    check(out && !str.cmp(out, want), str.format("%s (AOT)", what), out);
+    check(out && !cstr.cmp(out, want), cstr.format("%s (AOT)", what), out);
 }
 
 i32 main() {
@@ -58,7 +58,7 @@ i32 main() {
 }
 ");
     u8 *home = libc.getenv("HOME");
-    both("own.ktm", str.format("0 6 home=%s", home ? home : ""), "a program's environ");
+    both("own.ktm", cstr.format("0 6 home=%s", home ? home : ""), "a program's environ");
 
     /* C data by extern \"c\", a program global by plain extern */
     put(DIR "/ext.ktm",

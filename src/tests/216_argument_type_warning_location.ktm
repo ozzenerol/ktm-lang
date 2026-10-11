@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A call argument of the wrong type was reported at the call's `)` (or
  * the token after it) instead of at the argument. It is now reported at
@@ -10,11 +10,11 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
-    fs.writeAll(ARGLOC_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(ARGLOC_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " ARGLOC_SRC " -o /dev/null > " ARGLOC_OUT " 2>&1");
-    u8 *out = fs.readAll(ARGLOC_OUT);
+    u8 *out = fs.readAll(ARGLOC_OUT).take();
     proc.shell("rm -f " ARGLOC_SRC " " ARGLOC_OUT);
     return out;
 }

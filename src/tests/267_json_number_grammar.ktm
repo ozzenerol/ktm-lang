@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* JSON numbers follow RFC 8259 now: -?(0|[1-9][0-9]*)(.[0-9]+)?
  * ([eE][+-]?[0-9]+)?. `-`, `+`, `.` gave -3, -5 and -2; `01 +1 .5 1. 0x1F
@@ -9,7 +9,7 @@ import json, mem, str, test;
  * nan as null. */
 
 bool badFn(u8 *text, i64 flags=0) {
-    json.Value *j = json.parse(text, -1, flags);
+    json.Value *j = json.parse(cstr.view(text), flags);
     bool ok = !json.ok(j) && j.state.error == json.INVALID_NUMBER;
     if (!ok) { printf("[%s] flags %d: error %d\n", text, flags, j.state.error); }
     json.release(j);
@@ -18,11 +18,11 @@ bool badFn(u8 *text, i64 flags=0) {
 
 bool num(u8 *text, i64 type, u8 *out, i64 flags=0)
 { // parses as one value of `type`, written back as `out`
-    json.Value *j = json.parse(text, -1, flags);
+    json.Value *j = json.parse(cstr.view(text), flags);
     bool ok = json.ok(j) && j.type == type;
     if (ok) {
-        u8 *s = json.toStr(j);
-        ok = !str.cmp(s, out);
+        u8 *s = json.toStr(j).take();
+        ok = !cstr.cmp(s, out);
         if (!ok) { printf("[%s] gave [%s] want [%s]\n", text, s, out); }
         mem.free(s);
     } else {
@@ -82,16 +82,16 @@ i32 main() {
     json.Value *j = json.parse("[1e400,-1e400]");
     if (json.ok(j) && j.array.type == json.FLOAT && j.array.floatVal > 1e308 &&
             j.array.next.floatVal < -1e308) { correct++; }
-    u8 *s = json.toStr(j);
+    u8 *s = json.toStr(j).take();
     tests++;
-    if (!str.cmp(s, "[null,null]")) { correct++; }
+    if (!cstr.cmp(s, "[null,null]")) { correct++; }
     else { printf("[%s]\n", s); }
     mem.free(s);
     json.release(j);
 
     /* `len` ends the number even with more digits in the buffer */
     tests++;
-    j = json.parse("1234567", 3);
+    j = json.parse("1234567"[0:3]);
     if (json.ok(j) && j.type == json.INT && j.intVal == 123) { correct++; }
     json.release(j);
 

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The block comment scan started on the opener's `*`, so `/` `*` `/`
  * opened and closed a comment in three characters and what followed
@@ -35,13 +35,13 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupSlashTest();
 
-    if (!fs.writeAll(SLASH_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SLASH_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " SLASH_FILE " > " SLASH_OUT " 2>&1");
 
-    out = fs.readAll(SLASH_OUT);
+    out = fs.readAll(SLASH_OUT).take();
     if (!out) {
         cleanupSlashTest();
         return false;

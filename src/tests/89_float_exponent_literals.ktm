@@ -1,4 +1,4 @@
-import fs, json, libc, mem, proc, str, test;
+import cstr, fs, json, libc, mem, proc, test;
 
 #define EXP_TEST_FILE "__89_float_exp_fail.ktm"
 #define EXP_TEST_OUT  "__89_float_exp_fail.out"
@@ -86,7 +86,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupExpTest();
 
-    if (!fs.writeAll(EXP_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(EXP_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -97,7 +97,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(EXP_TEST_OUT);
+    out = fs.readAll(EXP_TEST_OUT).take();
     if (!out) {
         cleanupExpTest();
         return false;

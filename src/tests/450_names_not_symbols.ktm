@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* F14: messages printed some functions by their symbols (`_K06helper`,
  * `_K3geo7missing`) instead of their names: the JIT's unresolved symbol,
@@ -12,10 +12,10 @@ import fs, libc, mem, proc, str, test;
 
 /* the output of `cmd` run in D */
 u8 *run(u8 *cmd) {
-    u8 *full = str.format("cd " D " && %s > out 2>&1", cmd);
+    u8 *full = cstr.format("cd " D " && %s > out 2>&1", cmd);
     proc.shell(full);
     mem.free(full);
-    return fs.readAll(D "/out");
+    return fs.readAll(D "/out").take();
 }
 
 bool has(u8 *out, u8 *what) { return out && libc.strstr(out, what) != null; }
@@ -27,8 +27,8 @@ i32 main() {
     u8 *mod = "module geo;\npub i64 missing(i64 x);\npub i64 area(i64 w, i64 h) { return w * h; }\n";
     u8 *main = "import geo;\ni64 helper(i64 x);\n"
                "i32 main() { return helper(1) + geo.missing(2) + geo.area(1, 2); }\n";
-    fs.writeAll(D "/geo/geo.ktm", mod, str.len(mod), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    fs.writeAll(D "/main.ktm", main, str.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(D "/geo/geo.ktm", cstr.view(mod), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(D "/main.ktm", cstr.view(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     /* the JIT */
     u8 *out = run(KTM "-jit main.ktm");
@@ -48,7 +48,7 @@ i32 main() {
 
     /* the REPL */
     u8 *in = "import geo;\nreplFindFn(\"area\");\n";
-    fs.writeAll(D "/in", in, str.len(in), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(D "/in", cstr.view(in), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = run(KTM "-repl < in");
     tests++;
     if (has(out, "geo.area(i64 w, i64 h)") && !has(out, "_K")) { correct++; }

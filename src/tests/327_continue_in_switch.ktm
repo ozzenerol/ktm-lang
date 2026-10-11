@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 enum Err { two };
 
@@ -161,11 +161,11 @@ bool continueWithoutLoopFails() {
     bool ok;
 
     cleanupContinueSwitch();
-    if (!fs.writeAll(CONT_SWITCH_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(CONT_SWITCH_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CONT_SWITCH_FILE " > " CONT_SWITCH_OUT " 2>&1");
-    out = fs.readAll(CONT_SWITCH_OUT);
+    out = fs.readAll(CONT_SWITCH_OUT).take();
     ok = res != 0 && out && libc.strstr(out, "continue, not inside a loop") &&
              !libc.strstr(out, "NULL param");
     if (!ok && out) { printf("%s\n", out); }

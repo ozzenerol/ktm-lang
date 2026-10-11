@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* date.toParts, date.formatDate and date.formatTime segfaulted. The optimiser
  * folded `iadd t, param, k` into a later store's addressing mode across
@@ -49,7 +49,7 @@ bool sameHour(date.Parts *a, date.Parts *b) {
 }
 
 bool strIs(u8 *got, u8 *want) {
-    bool ok = !str.cmp(got, want);
+    bool ok = !cstr.cmp(got, want);
     if (!ok) { printf("Failed - got '%s' want '%s'\n", got, want); }
     mem.free(got);
     return ok;
@@ -78,9 +78,9 @@ i32 main() {
 
     /* formatting. */
     c = mkDate(2024, 2, 29, 12, 34, 56);
-    if (strIs(date.formatDate(c), "02/29/2024")) { correct++; }
-    if (strIs(date.formatTime(c), "12:34:56")) { correct++; }
-    if (strIs(date.format(c, "%m/%d/%Y %H:%M:%S"), "02/29/2024 12:34:56")) { correct++; }
+    if (strIs(date.formatDate(c).take(), "02/29/2024")) { correct++; }
+    if (strIs(date.formatTime(c).take(), "12:34:56")) { correct++; }
+    if (strIs(date.format(c, "%m/%d/%Y %H:%M:%S").take(), "02/29/2024 12:34:56")) { correct++; }
 
     /* Day helpers. */
     d = mkDay(2024, 2, 15);

@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `for (i64 i = 0, j = 1; ...)`: several declarations in a for loop's
  * init (j "has not been defined" before), each with its own `*`s as in
@@ -7,7 +7,7 @@ import fs, libc, proc, str, test;
 #define SRC_FILE "__459_src.ktm"
 
 u8 *runKtm(u8 *src) {
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");
@@ -34,9 +34,9 @@ i32 main() {
 
     u8 *types = null;
     for (auto a = 1, b = 2.5; a < 2; a++) {
-        types = str.format("%s %s %.1f", typeof(a), typeof(b), b + a);
+        types = cstr.format("%s %s %.1f", typeof(a), typeof(b), b + a);
     }
-    if (types && !str.cmp(types, "i64 f64 3.5")) { correct++; }
+    if (types && !cstr.cmp(types, "i64 f64 3.5")) { correct++; }
     else { printf("\n  auto: [%s]\n", types); }
 
     i64 later = 0;

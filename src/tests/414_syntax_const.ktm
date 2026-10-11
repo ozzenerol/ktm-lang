@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm syntax v0.2: `const` marks a DECLARATION read-only, it is not a
  * type qualifier like C's. An initializer is required (except on
@@ -52,11 +52,11 @@ i64 forConstSum() {
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " DIAG_SRC " " DIAG_OUT);
-    fs.writeAll(DIAG_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(DIAG_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " DIAG_SRC " -o /dev/null > " DIAG_OUT " 2>&1");
-    u8 *out = fs.readAll(DIAG_OUT);
+    u8 *out = fs.readAll(DIAG_OUT).take();
     proc.shell("rm -f " DIAG_SRC " " DIAG_OUT);
     return out;
 }
@@ -86,7 +86,7 @@ i32 main() {
 
     /* values: plain, pointer, pub, chain */
     tests++; if (MAX_USERS == 4) { correct++; }
-    tests++; if (!str.cmp(VERSION, "0.2.0")) { correct++; }
+    tests++; if (!cstr.cmp(VERSION, "0.2.0")) { correct++; }
     tests++; if (PI > 3.14 && PI < 3.15) { correct++; }
     tests++; if (B == 20) { correct++; }
 

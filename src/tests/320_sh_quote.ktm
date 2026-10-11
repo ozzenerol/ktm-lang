@@ -1,4 +1,4 @@
-import mem, proc, str, test;
+import cstr, mem, proc, test;
 
 /* proc.shellQuote(s) single-quotes s for sh, so text can go into Sh and Shlurp
  * commands as one word with nothing expanded. Each string goes through
@@ -11,8 +11,8 @@ extern "c" i32 access(u8 *path, i32 mode);
 bool roundTrip(u8 *s) {
     u8 *q = proc.shellQuote(s);
     u8 *got = proc.shellOutput("printf '%%s.' %s", q);
-    u8 *want = str.formatTo(null, "%s.", s);
-    bool ok = got && !str.cmp(got, want);
+    u8 *want = cstr.formatTo(null, "%s.", s);
+    bool ok = got && !cstr.cmp(got, want);
     if (!ok) { printf("round trip of [%s] via [%s]: got [%s]\n", s, q, got); }
     mem.free(q);
     mem.free(got);
@@ -22,7 +22,7 @@ bool roundTrip(u8 *s) {
 
 bool quoteIs(u8 *s, u8 *want) {
     u8 *q = proc.shellQuote(s);
-    bool ok = !str.cmp(q, want);
+    bool ok = !cstr.cmp(q, want);
     if (!ok) { printf("ShQuote: got [%s] want [%s]\n", q, want); }
     mem.free(q);
     return ok;
@@ -62,10 +62,10 @@ i32 main() {
     if (roundTrip(all)) { correct++; }
 
     /* A string that would run a command if it weren't quoted */
-    str.copy(dir, "./ktm-shquote-XXXXXX");
+    cstr.copy(dir, "./ktm-shquote-XXXXXX");
     if (mkdtemp(dir)) {
-        str.formatTo(path, "%s/pwned", dir);
-        u8 *evil = str.formatTo(null, "x'; touch %s; echo '$(touch %s)`touch %s`",
+        cstr.formatTo(path, "%s/pwned", dir);
+        u8 *evil = cstr.formatTo(null, "x'; touch %s; echo '$(touch %s)`touch %s`",
                                                 path, path, path);
         q = proc.shellQuote(evil);
         i64 st = proc.shellf("printf '%%s' %s > /dev/null", q);
@@ -80,7 +80,7 @@ i32 main() {
 
     /* One word to the shell, spaces and all */
     q = proc.shellQuote("a b  c");
-    cmd = str.formatTo(null, "test %s = 'a b  c'", q);
+    cmd = cstr.formatTo(null, "test %s = 'a b  c'", q);
     bad = proc.shellf(cmd);
     if (bad == 0 && proc.shellf("set -- %s; test $# -eq 1", q) == 0) { correct++; }
     else { printf("Sh with a quoted word: %d\n", bad); }

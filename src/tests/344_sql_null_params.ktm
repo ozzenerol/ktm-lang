@@ -1,4 +1,4 @@
-import sql, str, test;
+import cstr, sql, test;
 
 /* sql.exec and sql.select rejected SQL_NULL parameters (they fell into the
  * default case, which returned SQLITE_OK as the error) while
@@ -43,7 +43,7 @@ i32 main() {
     ok = sql.select(ctx, &row, "SELECT ? IS null, typeof(?1);", p, 1);
     tests++;
     if (ok && sql.next(&row) && row.col[0].intVal == 1 && row.col[1].type == sql.SQLITE_TEXT &&
-            !str.cmp(row.col[1].str, "null")) {
+            !cstr.cmp(row.col[1].str, "null")) {
         correct++;
     }
     if (ok) { sql.rowRelease(&row); }

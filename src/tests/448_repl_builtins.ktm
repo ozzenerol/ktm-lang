@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* The REPL's builtins replDisasm("name") and replDel("name") (were Uf and
  * ReplDel). replDisasm found nothing once a program's functions got their own
@@ -15,7 +15,7 @@ i32 main() {
               "replDisasm(\"fib\");\n"
               "replDel(\"fib\");\n"
               "replDel(\"fib\");\n";
-    fs.writeAll(IN_FILE, src, str.len(src));
+    fs.writeAll(IN_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-repl < " IN_FILE " 2>&1");

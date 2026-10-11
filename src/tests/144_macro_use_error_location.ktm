@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An error on a macro use pointed at the #define: `i64 x = 2 N;` with
  * `#define N 3` reported "Unexpected integer `3`" at the define's line
@@ -28,11 +28,11 @@ bool compileOutputHas(u8 *source, u8 *header, bool ok, u8 *expected,
 
     cleanupMacroTest();
 
-    if (header && !fs.writeAll(MACRO_TEST_HDR, header, str.len(header),
+    if (header && !fs.writeAll(MACRO_TEST_HDR, cstr.view(header),
                                                      libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
-    if (!fs.writeAll(MACRO_TEST_FILE, source, str.len(source),
+    if (!fs.writeAll(MACRO_TEST_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
@@ -40,7 +40,7 @@ bool compileOutputHas(u8 *source, u8 *header, bool ok, u8 *expected,
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " MACRO_TEST_FILE " > " MACRO_TEST_OUT " 2>&1");
     if ((res == 0) != ok) { good = false; }
 
-    out = fs.readAll(MACRO_TEST_OUT);
+    out = fs.readAll(MACRO_TEST_OUT).take();
     if (!out) {
         cleanupMacroTest();
         return false;

@@ -47,7 +47,7 @@
  * aarch64 backend cannot encode add/sub immediates over 4095, so a
  * huge frame miscompiles at the assembler stage. */
 
-import fs, json, libc, mem, os, proc, str;
+import cstr, fs, json, libc, mem, os, proc;
 
 extern "c" i32 pipe(i32 *fds);
 extern "c" i32 fork();
@@ -247,7 +247,7 @@ bool posOf(u8 *text, u8 *needle, i64 within, i64 *line, i64 *chr) {
 
 /* JSON string-escape `s` (quotes, backslashes, \n \r \t). */
 u8 *jsonEscapeText(u8 *s) {
-    i64 len = str.len(s);
+    i64 len = cstr.len(s);
     u8 *out = mem.alloc(len * 2 + 1);
     i64 o = 0;
     for (i64 i = 0; i < len; i++) {
@@ -282,8 +282,8 @@ u8 *jsonEscapeText(u8 *s) {
 }
 
 u8 *uriOf(u8 *rel) {
-    u8 *uri = mem.alloc(str.len(gDir) + str.len(rel) + 16);
-    libc.snprintf(uri, str.len(gDir) + str.len(rel) + 16, "file://%s/%s",
+    u8 *uri = mem.alloc(cstr.len(gDir) + cstr.len(rel) + 16);
+    libc.snprintf(uri, cstr.len(gDir) + cstr.len(rel) + 16, "file://%s/%s",
                      gDir, rel);
     return uri;
 }
@@ -304,14 +304,14 @@ struct LspClient {
 
 void lspSendBody(LspClient *l, u8 *body) {
     u8 hdr[64];
-    i64 blen = str.len(body);
+    i64 blen = cstr.len(body);
     i64 hlen = libc.snprintf(hdr, 64, "Content-Length: %lld\r\n\r\n", blen);
     libc.write(l.wfd, hdr, hlen);
     libc.write(l.wfd, body, blen);
 }
 
 void lspNotify(LspClient *l, u8 *method, u8 *params) {
-    i64 cap = str.len(method) + str.len(params) + 64;
+    i64 cap = cstr.len(method) + cstr.len(params) + 64;
     u8 *body = mem.alloc(cap);
     libc.snprintf(body, cap, "{\"jsonrpc\":\"2.0\",\"method\":\"%s\",\"params\":%s}",
                      method, params);
@@ -345,11 +345,11 @@ json.Value *lspNextMsg(LspClient *l) {
     if (sep == null) { return null; }
     u8 *cl = libc.strstr(l.buf, "Content-Length:");
     if (cl == null || cl > sep) { return null; }
-    i64 blen = str.toInt(cl + 15);
+    i64 blen = cstr.toInt(cl + 15);
     u8 *body = sep + 4;
     i64 have = l.len - (body - l.buf);
     if (have < blen) { return null; }
-    json.Value *msg = json.parse(body, blen);
+    json.Value *msg = json.parse(body[0:blen]);
     i64 consumed = body - l.buf + blen;
     i64 rest = l.len - consumed;
     for (i64 i = 0; i < rest; i++) { l.buf[i] = l.buf[consumed + i]; }
@@ -366,7 +366,7 @@ json.Value *lspTake(LspClient *l) {
         if (msg == null) { return null; }
         json.Value *method = json.select(msg, ".method:s");
         if (method != null &&
-                str.cmp(method.str, "textDocument/publishDiagnostics") == 0) {
+                cstr.cmp(method.str.ptr, "textDocument/publishDiagnostics") == 0) {
             l.publishes++;
             l.lastPublish = msg;
             continue;
@@ -395,7 +395,7 @@ json.Value *lspCollectId(LspClient *l, i64 id, i64 timeout_ms) {
 json.Value *lspRequest(LspClient *l, u8 *method, u8 *params,
                                  i64 timeout_ms=REQ_TIMEOUT_MS) {
     l.nextId++;
-    i64 cap = str.len(method) + str.len(params) + 96;
+    i64 cap = cstr.len(method) + cstr.len(params) + 96;
     u8 *body = mem.alloc(cap);
     libc.snprintf(body, cap,
                      "{\"jsonrpc\":\"2.0\",\"id\":%lld,\"method\":\"%s\",\"params\":%s}",
@@ -457,7 +457,7 @@ LspClient *lspStart() {
         args[2] = null;
         args[3] = null;
         u8 *prefix = libc.getenv("KTM_INSTALL_DIR");
-        if (prefix && prefix[0]) { args[2] = str.format("--install-dir=%s", prefix); }
+        if (prefix && prefix[0]) { args[2] = cstr.format("--install-dir=%s", prefix); }
         execv(gKtm, args);
         os.exit(127);
     }
@@ -497,7 +497,7 @@ i64 lspClose(LspClient *l) {
 
 void lspDidOpen(LspClient *l, u8 *uri, u8 *text) {
     u8 *esc = jsonEscapeText(text);
-    i64 cap = str.len(esc) + str.len(uri) + 128;
+    i64 cap = cstr.len(esc) + cstr.len(uri) + 128;
     u8 *params = mem.alloc(cap);
     libc.snprintf(params, cap,
                      "{\"textDocument\":{\"uri\":\"%s\",\"languageId\":\"ktm\","
@@ -510,7 +510,7 @@ void lspDidOpen(LspClient *l, u8 *uri, u8 *text) {
 
 void lspDidChange(LspClient *l, u8 *uri, u8 *text) {
     u8 *esc = jsonEscapeText(text);
-    i64 cap = str.len(esc) + str.len(uri) + 128;
+    i64 cap = cstr.len(esc) + cstr.len(uri) + 128;
     u8 *params = mem.alloc(cap);
     libc.snprintf(params, cap,
                      "{\"textDocument\":{\"uri\":\"%s\"},"
@@ -531,7 +531,7 @@ json.Value *lspPositionRequest(LspClient *l, u8 *method, u8 *uri,
 
 /* MAIN_HC plus one appended declaration - for keystroke storms. */
 u8 *mainPlusFn(u8 *name, i64 i) {
-    i64 cap = str.len(MAIN_HC) + 64;
+    i64 cap = cstr.len(MAIN_HC) + 64;
     u8 *text = mem.alloc(cap);
     libc.snprintf(text, cap, "%s\ni64 %s%lld() { return %lld; }\n",
                      MAIN_HC, name, i, i);
@@ -552,7 +552,7 @@ bool locEq(json.Value *resp, u8 *wantUri, i64 wantLine, i64 wantChr,
     json.Value *ln = json.select(resp, ".result.range.start.line:i");
     json.Value *ch = json.select(resp, ".result.range.start.character:i");
     if (u == null || ln == null || ch == null) { return false; }
-    if (str.cmp(u.str, wantUri) != 0) { return false; }
+    if (cstr.cmp(u.str.ptr, wantUri) != 0) { return false; }
     if (ln.intVal != wantLine) { return false; }
     if (checkChr && ch.intVal != wantChr) { return false; }
     return true;
@@ -562,7 +562,7 @@ bool hoverContains(json.Value *resp, u8 *needle) {
     if (resp == null) { return false; }
     json.Value *val = json.select(resp, ".result.contents.value:s");
     if (val == null) { return false; }
-    return libc.strstr(val.str, needle) != null;
+    return libc.strstr(val.str.ptr, needle) != null;
 }
 
 /* All labels start with `prefix`; `must1`/`must2` are present
@@ -577,9 +577,9 @@ bool labelsOk(json.Value *resp, u8 *prefix, u8 *must1, u8 *must2) {
     while (it != null) {
         json.Value *lab = json.select(it, ".label:s");
         if (lab == null) { return false; }
-        if (str.cmpLen(lab.str, prefix, str.len(prefix)) != 0) { return false; }
-        if (str.cmp(lab.str, must1) == 0) { has1 = true; }
-        if (must2 != null && str.cmp(lab.str, must2) == 0) { has2 = true; }
+        if (cstr.cmpLen(lab.str.ptr, prefix, cstr.len(prefix)) != 0) { return false; }
+        if (cstr.cmp(lab.str.ptr, must1) == 0) { has1 = true; }
+        if (must2 != null && cstr.cmp(lab.str.ptr, must2) == 0) { has2 = true; }
         it = it.next;
     }
     return has1 && has2;
@@ -593,7 +593,7 @@ json.Value *renameChangesFor(json.Value *resp, u8 *uri) {
     if (changes == null) { return null; }
     json.Value *it = changes.object;
     while (it != null) {
-        if (it.key != null && str.cmp(it.key, uri) == 0) { return it; }
+        if (it.key.ptr != null && cstr.cmp(it.key.ptr, uri) == 0) { return it; }
         it = it.next;
     }
     return null;
@@ -651,7 +651,7 @@ bool hasLocation(json.Value *arr, u8 *uri, i64 line, i64 chr) {
         json.Value *l = json.select(it, ".range.start.line:i");
         json.Value *c = json.select(it, ".range.start.character:i");
         if (u != null && l != null && c != null &&
-                str.cmp(u.str, uri) == 0 && l.intVal == line && c.intVal == chr) {
+                cstr.cmp(u.str.ptr, uri) == 0 && l.intVal == line && c.intVal == chr) {
             return true;
         }
         it = it.next;
@@ -675,7 +675,7 @@ void testHandshake() {
     json.Value *resp = lspRequest(l, "initialize", "{}");
     json.Value *enc = json.select(resp, ".result.capabilities.positionEncoding:s");
     check("utf-16 positions unless the client offers utf-8",
-                enc != null && str.cmp(enc.str, "utf-16") == 0);
+                enc != null && cstr.cmp(enc.str.ptr, "utf-16") == 0);
     bool ok = false;
     if (resp != null) {
         json.Value *df = json.select(resp, ".result.capabilities.definitionProvider:b");
@@ -808,7 +808,7 @@ void testHoverCompletion() {
 
     /* Flush-before-query: a symbol added by an edit must be visible to
      * an IMMEDIATE completion, no quiet period. */
-    i64 cap = str.len(MAIN_HC) + 64;
+    i64 cap = cstr.len(MAIN_HC) + 64;
     u8 *withMul = mem.alloc(cap);
     libc.snprintf(withMul, cap, "%s\ni64 LibMul(i64 a, i64 b) { return a * b; }\n",
                      MAIN_HC);
@@ -835,7 +835,7 @@ void testHoverCompletion() {
      * symbols an edit deletes (with their stale lines), and a stale
      * function whose line overlaps the new one derails the
      * enclosing-function heuristic. Supersets mirror real typing. */
-    i64 pcap = str.len(withMul) + 128;
+    i64 pcap = cstr.len(withMul) + 128;
     u8 *withPtr = mem.alloc(pcap);
     libc.snprintf(withPtr, pcap, "%sU0 UsePtr(LibPoint *lp) {\n  lp->x = 1;\n}\n",
                      withMul);
@@ -885,7 +885,7 @@ void testDebounce() {
     for (i64 i = 0; i < 36; i++) {
         u8 *text = mainPlusFn("C", i);
         if (i == 35) {
-            text = str.format("%si64 FinalEdit() { return notDefinedInFinalEdit; }\n", text);
+            text = cstr.format("%si64 FinalEdit() { return notDefinedInFinalEdit; }\n", text);
         }
         lspDidChange(l, uri, text);
         lspSettle(l, 40);
@@ -894,7 +894,7 @@ void testDebounce() {
     before = l.publishes;
     lspSettle(l, 1000);
     i64 tail = l.publishes - before;
-    u8 *last = l.lastPublish ? json.toStr(l.lastPublish) : null;
+    u8 *last = l.lastPublish ? json.toStr(l.lastPublish).take() : null;
     bool finalSeen = last && libc.strstr(last, "notDefinedInFinalEdit") != null;
     check("continuous typing still publishes via the max-age cap",
                 mid >= 1 && tail <= 2 && finalSeen);
@@ -919,7 +919,7 @@ void testSurvival() {
     /* A crash storm; the canary contains it and features keep serving
      * from the last good parse. */
     for (i64 i = 0; i < 10; i++) {
-        i64 cap = str.len(CRASHER_HC) + 32;
+        i64 cap = cstr.len(CRASHER_HC) + 32;
         u8 *text = mem.alloc(cap);
         libc.snprintf(text, cap, "%s\ni64 K%lld();\n", CRASHER_HC, i);
         lspDidChange(l, curi, text);
@@ -1011,7 +1011,7 @@ void testRename() {
     resp = lspPositionRequest(l, "textDocument/prepareRename", uri, line, chr);
     json.Value *ph = json.select(resp, ".result.placeholder:s");
     check("prepareRename yields the symbol's range",
-                ph != null && str.cmp(ph.str, "LibAdd") == 0);
+                ph != null && cstr.cmp(ph.str.ptr, "LibAdd") == 0);
     resp = lspPositionRequest(l, "textDocument/prepareRename", uri, 0, 0);
     check("prepareRename on a non-symbol is null", isNullResult(resp));
 
@@ -1071,7 +1071,7 @@ void testRegressions() {
 
     /* Rename Square to Cube but keep the call: the old name must not
      * linger in the compiler and hide the error. */
-    u8 *edited = str.formatTo(null, "%s", REG_HC);
+    u8 *edited = cstr.formatTo(null, "%s", REG_HC);
     u8 *at = libc.strstr(edited, "Square(i64");
     mem.copy(at, "Cube  ", 6);
     lspDidChange(l, uri, edited);
@@ -1290,8 +1290,8 @@ void runGroups() {
             runGroup(group);
             libc.fflush(null);
             libc.snprintf(path, 512, "%s/counts.%lld", gDir, group);
-            u8 *counts = str.format("%d %d", gPass, gFail);
-            fs.writeAll(path, counts, str.len(counts));
+            u8 *counts = cstr.format("%d %d", gPass, gFail);
+            fs.writeAll(path, cstr.view(counts));
             _exit(0);
         } else if (pids[group] == -1) {
             runGroup(group);
@@ -1302,10 +1302,10 @@ void runGroups() {
         if (pids[group] == -1) { continue; }
         libc.waitpid(pids[group], &status, 0);
         libc.snprintf(path, 512, "%s/report.%lld", gDir, group);
-        u8 *report = fs.readAll(path);
+        u8 *report = fs.readAll(path).take();
         if (report) { printf("%s", report); }
         libc.snprintf(path, 512, "%s/counts.%lld", gDir, group);
-        u8 *counts = fs.readAll(path);
+        u8 *counts = fs.readAll(path).take();
         u8 *end;
         if (counts) {
             pass = strtol(counts, &end, 10);
@@ -1343,25 +1343,25 @@ i32 main() {
 
     u8 path[512];
     libc.snprintf(path, 512, "%s/lib.ktm", gDir);
-    fs.writeAll(path, LIB_HC, str.len(LIB_HC));
+    fs.writeAll(path, cstr.view(LIB_HC));
     libc.snprintf(path, 512, "%s/sub/deep.ktm", gDir);
-    fs.writeAll(path, DEEP_HC, str.len(DEEP_HC));
+    fs.writeAll(path, cstr.view(DEEP_HC));
     libc.snprintf(path, 512, "%s/main.ktm", gDir);
-    fs.writeAll(path, MAIN_HC, str.len(MAIN_HC));
+    fs.writeAll(path, cstr.view(MAIN_HC));
     libc.snprintf(path, 512, "%s/bad.ktm", gDir);
-    fs.writeAll(path, BAD_INCLUDE_HC, str.len(BAD_INCLUDE_HC));
+    fs.writeAll(path, cstr.view(BAD_INCLUDE_HC));
     libc.snprintf(path, 512, "%s/broken.ktm", gDir);
-    fs.writeAll(path, BROKEN_HC, str.len(BROKEN_HC));
+    fs.writeAll(path, cstr.view(BROKEN_HC));
     libc.snprintf(path, 512, "%s/crash.ktm", gDir);
-    fs.writeAll(path, CRASHER_HC, str.len(CRASHER_HC));
+    fs.writeAll(path, cstr.view(CRASHER_HC));
     libc.snprintf(path, 512, "%s/rename.ktm", gDir);
-    fs.writeAll(path, RENAME_HC, str.len(RENAME_HC));
+    fs.writeAll(path, cstr.view(RENAME_HC));
     libc.snprintf(path, 512, "%s/std.ktm", gDir);
-    fs.writeAll(path, STD_HC, str.len(STD_HC));
+    fs.writeAll(path, cstr.view(STD_HC));
     libc.snprintf(path, 512, "%s/geo/geo.ktm", gDir);
-    fs.writeAll(path, MOD_GEO_HC, str.len(MOD_GEO_HC));
+    fs.writeAll(path, cstr.view(MOD_GEO_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
-    fs.writeAll(path, MOD_MAIN_HC, str.len(MOD_MAIN_HC));
+    fs.writeAll(path, cstr.view(MOD_MAIN_HC));
 
     printf("ktm -lsp tests (%s)\n", gKtm);
     runGroups();

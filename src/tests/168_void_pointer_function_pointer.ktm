@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Assigning a `void *` to a function pointer (or a function pointer to a
  * `void *`) warned "'void *' is not assignable to type '<fn> i64'". C
@@ -25,16 +25,16 @@ void cleanupVpTest() {
 
 /* Compiles `body` inside Main; returns the compiler output (or null) */
 u8 *compileOutput(u8 *body) {
-    u8 *src = str.format("i64 Inc(i64 x) { return x + 1; }\n"
+    u8 *src = cstr.format("i64 Inc(i64 x) { return x + 1; }\n"
                                             "struct C { fn(i64 x) i64 f; };\n"
                                             "i64 Call(fn(i64 x) i64 f, i64 v) { return f(v); }\n"
                                             "void main()\n{\n  void *v = &Inc;\n  fn(i64 x) i64 fp = &Inc;\n"
                                             "  C c;\n  i64 *ip = null;\n%s\n}\n", body);
     u8 *out = null;
     cleanupVpTest();
-    if (fs.writeAll(VP_TEST_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(VP_TEST_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " VP_TEST_FILE " > " VP_TEST_OUT " 2>&1");
-        out = fs.readAll(VP_TEST_OUT);
+        out = fs.readAll(VP_TEST_OUT).take();
     }
     mem.free(src);
     cleanupVpTest();

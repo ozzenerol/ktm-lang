@@ -942,6 +942,7 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
 }
 
 void lexPushFile(Lexer *l, AoStr *filename) {
+    l->after_member = 0;
     s64 file_len = 0;
     char *src = lexReadfile(filename->data, &file_len);
     lexPushFileSource(l, filename, src, file_len);
@@ -953,6 +954,7 @@ void lexPushFile(Lexer *l, AoStr *filename) {
  * (and `#include` save/restore) both need `l->cur_file` to be real.
  * `src` is borrowed; it must outlive the parse of this buffer. */
 void lexPushString(Lexer *l, char *name, char *src, s64 len) {
+    l->after_member = 0;
     LexFile *f = (LexFile *)malloc(sizeof(LexFile));
     AoStr *src_code = aoStrNew();
     src_code->data = src;
@@ -3623,9 +3625,10 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     }
     if (!m) {
         /* the prelude is the install's, whatever else is called that */
+        /* and the runtime's (rt, str): the install's too */
         char *dir = auto_prelude
                   ? mprintf("%s/prelude", lexInstallModules(l))
-                  : auto_rt ? mprintf("%s/rt", lexInstallModules(l))
+                  : auto_rt ? mprintf("%s/%s", lexInstallModules(l), path->data)
                   : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
@@ -3689,7 +3692,10 @@ void lexPushRuntime(Lexer *l) {
     if (!l->builtin_root || l->building_module || l->building_tree) return;
     char *dir = mprintf("%s/rt", lexInstallModules(l));
     if (!lexIsDir(dir)) return;
-    char *src = "import rt;\n";
+    /* and str, whose String methods every program may call (when the
+     * install has it) */
+    char *with_str = mprintf("%s/str", lexInstallModules(l));
+    char *src = lexIsDir(with_str) ? "import rt;\nimport str;\n" : "import rt;\n";
     lexPushString(l, LEX_RT_FILE, src, strlen(src));
 }
 
@@ -3725,6 +3731,9 @@ static void lexQualify(Lexer *l, Lexeme *tok) {
     if (!file || !file->imports || *l->ptr != '.') return;
     char c = l->ptr[1];
     if (!(isalpha((unsigned char)c) || c == '_')) return;
+    /* a member named like a prefix (`v.str.len` with `import str`): after
+     * `.` or `->` it is a field, not the module */
+    if (l->after_member) return;
     for (LexImport *imp = file->imports; imp; imp = imp->next) {
         if ((int)imp->prefix->len != tok->len ||
             memcmp(imp->prefix->data, tok->start, tok->len)) continue;
@@ -3777,9 +3786,15 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
             tok->mod_pass = file->mod_pass;
             tok->in_std = file->is_std;
             tok->file = file;
+            int member = l->after_member;
+            l->after_member = tok->tk_type == TK_PUNCT &&
+                              (tok->i64 == '.' || tok->i64 == TK_ARROW);
             if (tok->tk_type == TK_IDENT) {
                 char *before = tok->start;
+                int saved = l->after_member;
+                l->after_member = member;
                 lexQualify(l, tok);
+                l->after_member = saved;
                 if (tok->start == before) {
                     for (LexImport *imp = file->imports; imp; imp = imp->next) {
                         if ((int)imp->prefix->len == tok->len &&

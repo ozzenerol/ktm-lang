@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define DW_TEST_FILE "__141_do_while_fail.ktm"
 #define DW_TEST_OUT  "__141_do_while_fail.out"
@@ -21,7 +21,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
 
     cleanupDoWhileTest();
 
-    if (!fs.writeAll(DW_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DW_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -32,7 +32,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
         return false;
     }
 
-    out = fs.readAll(DW_TEST_OUT);
+    out = fs.readAll(DW_TEST_OUT).take();
     if (!out) {
         cleanupDoWhileTest();
         return false;

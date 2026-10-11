@@ -1,4 +1,4 @@
-import mem, sql, str, test;
+import cstr, mem, sql, test;
 
 /* Text and blob parameters were bound with SQLITE_STATIC, so sqlite kept
  * reading the caller's buffer while the rows were stepped: reusing or
@@ -14,7 +14,7 @@ bool allRows(sql.Row *row, u8 *want, i64 count, bool prepared) {
         } else if (!sql.next(row)) {
             break;
         }
-        if (row.col[0].type != sql.SQLITE_TEXT || str.cmp(row.col[0].str, want)) {
+        if (row.col[0].type != sql.SQLITE_TEXT || cstr.cmp(row.col[0].str, want)) {
             ok = false;
         }
         n++;
@@ -25,11 +25,11 @@ bool allRows(sql.Row *row, u8 *want, i64 count, bool prepared) {
 bool selectText(sql.Db *ctx) {
     sql.Row row;
     sql.Param q[1];
-    u8 *key = str.dup("original");
+    u8 *key = cstr.dup("original");
     q[0].type = sql.SQLITE_TEXT;
     q[0].str = key;
     if (!sql.select(ctx, &row, "SELECT ?, id FROM t;", q, 1)) { return false; }
-    str.copy(key, "CHANGED!");
+    cstr.copy(key, "CHANGED!");
     mem.free(key);
     return allRows(&row, "original", 3, false);
 }
@@ -61,11 +61,11 @@ bool selectBlob(sql.Db *ctx) {
 bool insertThenFree(sql.Db *ctx) {
     sql.Row row;
     sql.Param q[1];
-    u8 *name = str.dup("kept");
+    u8 *name = cstr.dup("kept");
     q[0].type = sql.SQLITE_TEXT;
     q[0].str = name;
     if (!sql.exec(ctx, "INSERT INTO names(name) VALUES(?);", q, 1)) { return false; }
-    str.copy(name, "gone");
+    cstr.copy(name, "gone");
     mem.free(name);
     if (!sql.select(ctx, &row, "SELECT name FROM names;")) { return false; }
     return allRows(&row, "kept", 1, false);
@@ -76,14 +76,14 @@ bool preparedText(sql.Db *ctx) {
     sql.Param q[1];
     bool ok;
     sql.Stmt *st = sql.prepare(ctx, "SELECT ?, id FROM t;");
-    u8 *key = str.dup("prepared");
+    u8 *key = cstr.dup("prepared");
     q[0].type = sql.SQLITE_TEXT;
     q[0].str = key;
     if (sql.execPrepared(st, &row, q) != sql.SQLITE_ROW) {
         sql.finalize(st);
         return false;
     }
-    str.copy(key, "XXXXXXXX");
+    cstr.copy(key, "XXXXXXXX");
     mem.free(key);
     ok = allRows(&row, "prepared", 3, true);
     sql.finalize(st);

@@ -1,12 +1,12 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.toStr on a node from json.select also printed the nodes after it
  * and its key ("b": 2,"c": 3 for .b). It now serialises only that node's
  * value; a whole document prints as before. */
 
 bool is(json.Value *n, u8 *want) {
-    u8 *s = json.toStr(n);
-    bool ok = !str.cmp(s, want);
+    u8 *s = json.toStr(n).take();
+    bool ok = !cstr.cmp(s, want);
     if (!ok) { printf("got %s, want %s\n", s, want); }
     mem.free(s);
     return ok;
@@ -29,10 +29,10 @@ i32 main() {
 
     /* the selected node is left as it was */
     json.Value *b = json.select(d, ".b");
-    u8 *again = json.toStr(d);
+    u8 *again = json.toStr(d).take();
     tests++;
-    if (b.next && !str.cmp(b.key, "b") &&
-            !str.cmp(again, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) {
+    if (b.next && !cstr.cmp(b.key.ptr, "b") &&
+            !cstr.cmp(again, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) {
         correct++;
             }
     mem.free(again);

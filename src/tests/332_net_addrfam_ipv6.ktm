@@ -1,4 +1,4 @@
-import libc, mem, net, test;
+import cstr, libc, mem, net, test;
 
 /* net.listen and net.dial always asked getaddrinfo for AF_INET:
  * the addrfam argument was only looked at for "::*", so a server could
@@ -42,7 +42,7 @@ bool ipv6Loopback() {
 bool roundTrip(i32 srv, u8 *addr)
 {// net.dial to the server's port at addr, send a byte through
     u8 b = 0;
-    i32 c = net.dial(addr, gPort);
+    i32 c = net.dial(cstr.view(addr), gPort);
     if (c == -1) { return false; }
     i32 a = net.accept(srv);
     bool ok = a != -1 && libc.write(c, "x", 1) == 1 && libc.read(a, &b, 1) == 1 && b == 'x';

@@ -1,30 +1,23 @@
-import map, mem, str, test;
+import cstr, map, mem, str, test;
 
 /* Hash table API additions and fixes:
- *  - map.intGet/map.strGet/map.strGetLen take an optional `bool *_ok`, true
- *    when the key is there, so a stored null or 0 can be told from a
- *    missing key (calls without it still work);
- *  - a pointer that is both the key and the value (`map.strSet(m,s,s)`)
- *    with both destructors registered was freed twice; it is now freed
- *    once, on release, delete, clear and update;
+ *  - map.intGet/map.strGet take an optional `bool *_ok`, true when the
+ *    key is there, so a stored null or 0 can be told from a missing key
+ *    (calls without it still work);
  *  - map.intClear/map.strClear remove every entry (running the
  *    destructors) and keep the capacity;
- *  - a null map or key no longer crashes: Get/Has give null/false,
- *    Set/Delete false.
- * Every allocation is counted against the frees (valgrind-clean). */
+ *  - a null map no longer crashes: Get/Has give null/false, Set/Delete
+ *    false.
+ * Since v0.3.0 a StrMap copies its u8[] keys and frees them itself (the
+ * key destructor is gone), so a key can be a String freed right after.
+ * Every value allocation is counted against the frees. */
 
 i64 gAllocs = 0;
-i64 gKeyFrees = 0;
 i64 gValueFrees = 0;
 
 u8 *new(u8 *s) {
     gAllocs++;
-    return str.dup(s);
-}
-
-void freeKey(void *p) {
-    gKeyFrees++;
-    mem.free(p);
+    return cstr.dup(s);
 }
 
 void freeValue(void *p) {
@@ -34,13 +27,12 @@ void freeValue(void *p) {
 
 map.StrMap *countingMap() {
     map.StrMap *m = map.strNew();
-    m.setFreeKey(&freeKey);
     m.setFreeValue(&freeValue);
     return m;
 }
 
 bool allFreed() {
-    return gKeyFrees + gValueFrees == gAllocs;
+    return gValueFrees == gAllocs;
 }
 
 i32 main() {
@@ -73,8 +65,8 @@ i32 main() {
     if (sm.get("null", &okn) == null && okn &&
             (i64)sm.get("one", &ok1) == 1 && ok1 &&
             sm.get("two", &okm) == null && !okm &&
-            (i64)sm.getLen("one", 3, &okl) == 1 && okl &&
-            sm.getLen("one", 2, &okml) == null && !okml &&
+            (i64)sm.get("one!"[0:3], &okl) == 1 && okl &&
+            sm.get("one"[0:2], &okml) == null && !okml &&
             (i64)sm.get("one") == 1) {
         correct++;
             } else { printf("Failed - StrMapGet _ok\n"); }
@@ -106,72 +98,64 @@ i32 main() {
     else { printf("Failed - IntMapClear destructors: %d\n", gValueFrees); }
     im.release();
 
-    /* map.strClear with destructors, shared and separate pointers */
+    /* map.strClear with a value destructor; the keys are the map's */
     sm = countingMap();
+    gValueFrees = 0;
+    gAllocs = 0;
     for (i64 i = 0; i < 40; i++) {
-        u8 *k = str.formatTo(null, "k%d", i);
-        gAllocs++;
-        if (i % 2) { sm.set(k, k); }
-        else       { sm.set(k, new("v")); }
+        String k = str.format("k%d", i);
+        sm.set(k, new("v"));
+        k.free();               /* the map has its own copy */
     }
     cap = sm.capacity;
     sm.delete("k1");
     sm.delete("k2");
+    tests++;
+    if (gValueFrees == 2 && sm.has("k3") && (i64)sm.size == 38) { correct++; }
+    else { printf("Failed - StrMap keys copied: %d %d\n", gValueFrees, sm.size); }
     sm.clear();
     tests++;
     if (allFreed() && sm.size == 0 && sm.capacity == cap && !sm.has("k3")) {
         correct++;
-    } else { printf("Failed - StrMapClear: allocs %d, freed %d + %d\n",
-                 gAllocs, gKeyFrees, gValueFrees);
+    } else { printf("Failed - StrMapClear: allocs %d, freed %d\n", gAllocs, gValueFrees);
     }
-    sm.set(new("again"), new("v"));
+    sm.set("again", new("v"));
     sm.release();
     tests++;
     if (allFreed()) { correct++; }
     else { printf("Failed - release after clear\n"); }
 
-    /* Shared key and value: release, delete, and every kind of update */
+    /* Updates free the replaced value once, never the same pointer set again */
     sm = countingMap();
-    i64 freedBefore = gKeyFrees + gValueFrees;
-    u8 *s = new("a");
-    sm.set(s, s);               /* insert shared */
-    sm.set(s, s);               /* same again: nothing freed */
-    u8 *s2 = new("a");
-    sm.set(s2, s2);             /* shared over shared: s freed once */
+    u8 *v1 = new("1");
+    sm.set("a", v1);
+    sm.set("a", v1);            /* same again: nothing freed */
+    i64 freedBefore = gValueFrees;
+    u8 *v2 = new("2");
+    sm.set("a", v2);            /* v1 freed */
     tests++;
-    if (gKeyFrees + gValueFrees == freedBefore + 1 &&
-            sm.get("a") == s2) {
+    if (gValueFrees == freedBefore + 1 && sm.get("a") == v2 && (i64)sm.size == 1) {
         correct++;
-            } else { printf("Failed - shared over shared: %d %d %d\n", gKeyFrees, gValueFrees,
-                 sm.get("a") == s2);
-    }
-    sm.set(new("a"), new("x")); /* separate over shared */
-    u8 *s3 = new("a");
-    sm.set(s3, s3);             /* shared over separate */
-    sm.set(new("b"), new("y"));
-    u8 *s4 = new("c");
-    sm.set(s4, s4);
-    sm.delete("c");             /* delete shared */
+    } else { printf("Failed - update: %d %d\n", gValueFrees, freedBefore); }
+    sm.set("b", new("y"));
+    sm.delete("a");
     sm.release();
     tests++;
     if (allFreed()) { correct++; }
-    else { printf("Failed - shared keys: allocs %d, freed %d + %d\n",
-                 gAllocs, gKeyFrees, gValueFrees);
-    }
+    else { printf("Failed - updates: allocs %d, freed %d\n", gAllocs, gValueFrees); }
 
-    /* null map and null key */
+    /* a null map, and the empty key */
     ok = true;
     bool ok2 = true, ok3 = true;
     i64 cursor = 0;
     map.StrMapNode *snode;
-    u8 *strVal;
     tests++;
     if (map.IntMap.get(null, 1, &ok) == null && !ok && !map.IntMap.has(null, 1) &&
             !map.IntMap.set(null, 1, null) && !map.IntMap.delete(null, 1) &&
             !map.IntMap.iter(null, &cursor, &inode) && !map.IntMap.resize(null) &&
             map.StrMap.get(null, "a", &ok2) == null && !ok2 && !map.StrMap.has(null, "a") &&
             !map.StrMap.set(null, "a", null) && !map.StrMap.delete(null, "a") &&
-            !map.StrMap.hasLen(null, "a", 1) && !map.StrMap.iter(null, &cursor, &snode) &&
+            !map.StrMap.iter(null, &cursor, &snode) &&
             !map.StrMap.resize(null)) {
         correct++;
             } else { printf("Failed - null map\n"); }
@@ -180,21 +164,21 @@ i32 main() {
     map.IntMap.release(null);
     map.StrMap.release(null);
     map.IntMap.setFreeValue(null, &freeValue);
-    map.StrMap.setFreeKey(null, &freeKey);
     map.StrMap.setFreeValue(null, &freeValue);
-    strVal = map.IntMap.keysToStr(null);
-    bool emptyStr = !str.cmp(strVal, "{}");
-    mem.free(strVal);
+    String strVal = map.IntMap.keysToStr(null);
+    bool emptyStr = strVal.equals("{}");
+    strVal.free();
 
     sm = map.strNew();
     sm.set("a", (void *)1);
     tests++;
-    if (emptyStr && sm.get(null, &ok3) == null && !ok3 &&
-            !sm.has(null) && !sm.set(null, (void *)2) &&
-            !sm.delete(null) && sm.getLen(null, 3) == null &&
-            !sm.hasLen(null, 0) && sm.size == 1) {
+    u8[] none;                  /* {null, 0}: the empty key, like "" */
+    bool before = sm.has(none) || sm.get(none, &ok3) != null || ok3;
+    sm.set(none, (void *)2);
+    if (emptyStr && !before && (i64)sm.get("") == 2 && sm.has(none) &&
+            sm.delete("") && !sm.has(none) && sm.size == 1) {
         correct++;
-            } else { printf("Failed - null key\n"); }
+            } else { printf("Failed - empty key\n"); }
     sm.release();
 
     test.printResult(correct, tests);

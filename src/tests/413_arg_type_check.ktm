@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Call arguments are checked against the parameter types like C does.
  * Before, any pointer passed as an 8-byte integer, any class as any other
@@ -16,11 +16,11 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-    u8 *out = fs.readAll(AT_OUT);
+    u8 *out = fs.readAll(AT_OUT).take();
     proc.shell("rm -f " AT_SRC " " AT_OUT);
     return out;
 }
@@ -36,7 +36,7 @@ i64 count(u8 *s, u8 *what) {
 
 /* ktm prints `warnings` warnings, `errors` errors and want (if any) */
 bool prints(u8 *body, i64 warnings, i64 errors, u8 *want=null) {
-    u8 *src = str.format(
+    u8 *src = cstr.format(
 "i64 Twice(i64 x) { return x * 2; }
 i64 TakeP(i64 *p) { return 0; }
 i64 TakeV(void *p) { return 0; }

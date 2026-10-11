@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 /* Calling a ktm `...` function through a function pointer passed the
  * implicit argc and the extra arguments in registers, while the callee
@@ -30,8 +30,8 @@ f64 scale(f64 k, ...args) {
 }
 
 u8 *format(u8 *fmt, ...args) {
-    if (args.len == 0) { return str.dup(fmt); }
-    return str.formatArgs(null, fmt, args.len, args);
+    if (args.len == 0) { return cstr.dup(fmt); }
+    return cstr.formatArgs(null, fmt, args);
 }
 
 struct H {
@@ -111,11 +111,11 @@ i32 main() {
     else { printf("Failed - global class field\n"); }
 
     s = fp("keep %s and 50%%");
-    if (!str.cmp(s, "keep %s and 50%%")) { correct++; }
+    if (!cstr.cmp(s, "keep %s and 50%%")) { correct++; }
     else { printf("Failed - format through a pointer, no arguments: '%s'\n", s); }
     mem.free(s);
     s = fp("%s=%d", "x", 42);
-    if (!str.cmp(s, "x=42")) { correct++; }
+    if (!cstr.cmp(s, "x=42")) { correct++; }
     else { printf("Failed - format through a pointer: '%s'\n", s); }
     mem.free(s);
 

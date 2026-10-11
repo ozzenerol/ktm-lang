@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define IF_TEST_FILE "__90_if_expr_fail.ktm"
 #define IF_TEST_OUT  "__90_if_expr_fail.out"
@@ -24,7 +24,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
 
     cleanupIfTest();
 
-    if (!fs.writeAll(IF_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(IF_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -35,7 +35,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where) {
         return false;
     }
 
-    out = fs.readAll(IF_TEST_OUT);
+    out = fs.readAll(IF_TEST_OUT).take();
     if (!out) {
         cleanupIfTest();
         return false;

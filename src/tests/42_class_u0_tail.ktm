@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 /* The "flexible array" trick: a trailing `void body;` member is a
  * zero-size placeholder whose address points to the byte just past the
@@ -33,7 +33,7 @@ bool roundTripPayload() {
     mem.copy(buf, &h.body, h.size);
     buf[h.size] = 0;
 
-    bool ok = h.size == 5 && !str.cmp(buf, "hello");
+    bool ok = h.size == 5 && !cstr.cmp(buf, "hello");
     mem.free(h);
     return ok;
 }

@@ -1,4 +1,4 @@
-import libc, net, str, test;
+import cstr, libc, net, test;
 
 /* net.accept returned bool, so a socket number over 255 was truncated, and
  * net.listen/net.dial returned 0 (or a getaddrinfo error code) on
@@ -55,7 +55,7 @@ i32 main() {
     if (acc > 255 && acc != cli && acc != srv) { correct++; }
 
     /* the accepted socket really is the other end of `cli` */
-    if (libc.write(cli, "hi", 2) == 2 && libc.read(acc, msg, 2) == 2 && !str.cmpLen(msg, "hi", 2)) { correct++; }
+    if (libc.write(cli, "hi", 2) == 2 && libc.read(acc, msg, 2) == 2 && !cstr.cmpLen(msg, "hi", 2)) { correct++; }
     libc.close(acc);
 
     /* non-blocking accept with nothing pending fails with -1 */

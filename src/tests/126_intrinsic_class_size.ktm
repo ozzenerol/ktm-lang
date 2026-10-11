@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An intrinsic class whose fields don't fit its base type, or whose base
  * type is not an integer, is reported once. ktm used to unwind before
@@ -48,13 +48,13 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
 
     cleanupIntrinsicTest();
 
-    if (!fs.writeAll(INTR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(INTR_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " INTR_FILE " > " INTR_OUT " 2>&1");
 
-    out = fs.readAll(INTR_OUT);
+    out = fs.readAll(INTR_OUT).take();
     if (!out) {
         cleanupIntrinsicTest();
         return false;

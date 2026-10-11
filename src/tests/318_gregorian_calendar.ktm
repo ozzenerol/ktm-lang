@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* CDate used the original calendar: no leap year in years divisible by
  * 4000, and none in year 0. From 4000-03-01 every date was a day off from
@@ -43,7 +43,7 @@ bool dayIs(i64 dateVal, i64 y, i64 mo, i64 d, i64 dow) {
 }
 
 bool strIs(u8 *s, u8 *want) {
-    bool ok = !str.cmp(s, want);
+    bool ok = !cstr.cmp(s, want);
     if (!ok) { printf("got %s want %s\n", s, want); }
     mem.free(s);
     return ok;
@@ -107,7 +107,7 @@ i32 main() {
 
     /* The parser, which always used Gregorian leap years, now agrees */
     c = date.parse("4000-02-29", "%Y-%m-%d");
-    if (c.date == 1461028 && strIs(date.formatDate(c), "02/29/4000")) { correct++; }
+    if (c.date == 1461028 && strIs(date.formatDate(c).take(), "02/29/4000")) { correct++; }
     if (date.parse("4000-03-01", "%Y-%m-%d").date == 1461029 &&
             date.parse("0000-02-29", "%Y-%m-%d").date == 58 &&
             date.parse("9999-12-31", "%Y-%m-%d").date == 3652423) { correct++; }
@@ -118,10 +118,10 @@ i32 main() {
             date.lastDayOfYear(0) == 364 && date.firstDayOfYear(364) == -1) { correct++; }
 
     /* Carrying across Feb 29 of 4000 */
-    if (strIs(date.formatDate(mkDay(4000, 2, 30)), "03/01/4000") &&
-            strIs(date.formatDate(mkDay(4000, 3, 0)), "02/29/4000")) { correct++; }
+    if (strIs(date.formatDate(mkDay(4000, 2, 30)).take(), "03/01/4000") &&
+            strIs(date.formatDate(mkDay(4000, 3, 0)).take(), "02/29/4000")) { correct++; }
 
-    if (strIs(date.formatDate(mkDay(4000, 12, 31)), "12/31/4000") &&
+    if (strIs(date.formatDate(mkDay(4000, 12, 31)).take(), "12/31/4000") &&
             mkDay(4001, 1, 1).date - mkDay(4000, 1, 1).date == 366) { correct++; }
 
     test.printResult(correct, tests);

@@ -1,17 +1,17 @@
-import str, test;
+import cstr, test;
 
 bool stringArray() {
     i32 correct = 0, tests = 2;
     u8 *arr[2] = {"hello", "how is the world?"};
-    if (!str.cmpLen(arr[0],"hello",5)) { correct++; }
-    if (!str.cmpLen(arr[1],"how is the world?",17)) { correct++; }
+    if (!cstr.cmpLen(arr[0],"hello",5)) { correct++; }
+    if (!cstr.cmpLen(arr[1],"how is the world?",17)) { correct++; }
     return correct == tests;
 }
 
 bool stringArray2()
 { /* https://github.com/Jamesbarford/holyc-lang/issues/158 */
     u8 s[][8] = {"hello", "world"};
-    return !str.cmpLen(s[0],"hello",5) && !str.cmpLen(s[1],"world",5);
+    return !cstr.cmpLen(s[0],"hello",5) && !cstr.cmpLen(s[1],"world",5);
 }
 
 bool vector3D() {

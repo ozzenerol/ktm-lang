@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A class initialiser item of the wrong type for its field was reported
  * at the token after it (the `}` or `,`) instead of at the item. It is
@@ -11,11 +11,11 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " IWL_SRC " " IWL_OUT);
-    fs.writeAll(IWL_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(IWL_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " IWL_SRC " -o /dev/null > " IWL_OUT " 2>&1");
-    u8 *out = fs.readAll(IWL_OUT);
+    u8 *out = fs.readAll(IWL_OUT).take();
     proc.shell("rm -f " IWL_SRC " " IWL_OUT);
     return out;
 }

@@ -1,4 +1,4 @@
-import fs, libc, mem, str, test;
+import cstr, fs, libc, mem, test;
 
 /* fs.readAll only read regular files, up to their size: a FIFO or a pipe
  * gave null, and so did /proc files, which report size 0. Now anything
@@ -23,7 +23,7 @@ u8 *bigText() {
 }
 
 bool isBigText(u8 *s, i64 len) {
-    if (!s || len != BIG_LEN || str.len(s) != BIG_LEN) { return false; }
+    if (!s || len != BIG_LEN || cstr.len(s) != BIG_LEN) { return false; }
     for (i64 i = 0; i < BIG_LEN; i++) {
         if (s[i] != 'a' + i % 26) { return false; }
     }
@@ -51,6 +51,7 @@ void cleanup() {
 }
 
 i32 main() {
+    String s_read;
     printf("Test - FileRead pipes and /proc: ");
     i64 correct = 0, tests = 0, len;
     u8 *s;
@@ -62,9 +63,11 @@ i32 main() {
     tests++; correct++;
 #else
     len = -1;
-    s = fs.readAll("/proc/self/status", &len);
+    s_read = fs.readAll("/proc/self/status");
+    len = s_read.len;
+    s = s_read.take();
     tests++;
-    if (s && len > 0 && len == str.len(s) && !str.cmpLen(s, "Name:", 5)) { correct++; }
+    if (s && len > 0 && len == cstr.len(s) && !cstr.cmpLen(s, "Name:", 5)) { correct++; }
     else { printf("/proc/self/status: %s, len %d ", s, len); }
     mem.free(s);
 #endif
@@ -74,7 +77,9 @@ i32 main() {
     if (mkfifo(FIFO_PATH, 420) == 0) {
         libc.pthread_create(&th, null, &writer, FIFO_PATH);
         len = -1;
-        s = fs.readAll(FIFO_PATH, &len);
+        s_read = fs.readAll(FIFO_PATH);
+        len = s_read.len;
+        s = s_read.take();
         libc.pthread_join(th);
         if (isBigText(s, len)) { correct++; } else { printf("fifo: len %d ", len); }
         mem.free(s);
@@ -84,11 +89,13 @@ i32 main() {
     i32 fds[2];
     tests++;
     if (libc.pipe(fds) == 0) {
-        u8 *path = str.formatTo(null, "/dev/fd/%d", fds[0]);
+        u8 *path = cstr.formatTo(null, "/dev/fd/%d", fds[0]);
         fifoFd = fds[1];
         libc.pthread_create(&th, null, &writer, null);
         len = -1;
-        s = fs.readAll(path, &len);
+        s_read = fs.readAll(cstr.view(path));
+        len = s_read.len;
+        s = s_read.take();
         libc.pthread_join(th);
         libc.close(fds[0]);
         if (isBigText(s, len)) { correct++; } else { printf("pipe: len %d ", len); }
@@ -98,24 +105,32 @@ i32 main() {
 
     /* regular files still read by size, an empty one as "" */
     u8 *text = bigText();
-    fs.writeAll(REG_PATH, text, BIG_LEN);
-    s = fs.readAll(REG_PATH, &len);
+    fs.writeAll(REG_PATH, text[0:BIG_LEN]);
+    s_read = fs.readAll(REG_PATH);
+    len = s_read.len;
+    s = s_read.take();
     tests++; if (isBigText(s, len)) { correct++; } else { printf("regular: len %d ", len); }
     mem.free(s);
     mem.free(text);
-    fs.writeAll(REG_PATH, "", 0);
+    fs.writeAll(REG_PATH, "");
     len = -1;
-    s = fs.readAll(REG_PATH, &len);
+    s_read = fs.readAll(REG_PATH);
+    len = s_read.len;
+    s = s_read.take();
     tests++; if (s && len == 0 && s[0] == '\0') { correct++; } else { printf("empty file "); }
     mem.free(s);
 
     /* a directory or a missing file: null and size 0 */
     libc.mkdir(DIR_PATH);
     len = -1;
-    s = fs.readAll(DIR_PATH, &len);
+    s_read = fs.readAll(DIR_PATH);
+    len = s_read.len;
+    s = s_read.take();
     tests++; if (!s && len == 0) { correct++; } else { printf("directory read "); }
     len = -1;
-    s = fs.readAll("__376_missing", &len);
+    s_read = fs.readAll("__376_missing");
+    len = s_read.len;
+    s = s_read.take();
     tests++; if (!s && len == 0) { correct++; } else { printf("missing file read "); }
 
     cleanup();

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Modules (M1): the errors, each a fixture under src/tests/modules/errors.
  * A name not marked pub is private to its module (functions, types); a
@@ -24,13 +24,13 @@ i64 count(u8 *s, u8 *what) {
 /* Compiling fixture `name` reports `errors` errors, `warnings` warnings,
  * and `want` */
 bool reports(u8 *name, u8 *env, i64 errors, i64 warnings, u8 *want) {
-    u8 *cmd = str.format("%s $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    u8 *cmd = cstr.format("%s $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                             "-S " FIXTURES "%s/main.ktm -o /dev/null > " ERR_OUT " 2>&1",
                                             env, name);
     proc.shell("rm -f " ERR_OUT);
     proc.shell(cmd);
-    u8 *out = fs.readAll(ERR_OUT);
+    u8 *out = fs.readAll(ERR_OUT).take();
     bool ok = out && count(out, "error:") == errors &&
                         count(out, "warning:") == warnings && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", name, out); }

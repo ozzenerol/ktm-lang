@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A definition (or a later prototype) dropped the default arguments of
  * the earlier prototype: `i64 F(i64 *v, i64 n=2);` then
@@ -52,7 +52,7 @@ void cleanupFiles() {
  * and, when `expected` is given, the output contains it. */
 bool compile(u8 *source, bool shouldFail, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(DEFARGS_FILE, source, str.len(source),
+    if (!fs.writeAll(DEFARGS_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
@@ -61,7 +61,7 @@ bool compile(u8 *source, bool shouldFail, u8 *expected) {
                                      DEFARGS_FILE " -o " DEFARGS_BIN " > " DEFARGS_OUT " 2>&1");
     bool ok = (res != 0) == shouldFail;
     if (ok && expected) {
-        u8 *out = fs.readAll(DEFARGS_OUT);
+        u8 *out = fs.readAll(DEFARGS_OUT).take();
         ok = out && libc.strstr(out, expected) != null;
         if (!ok && out) { printf("%s\n", out); }
         mem.free(out);
@@ -79,7 +79,7 @@ i32 main() {
     else { printf("int default lost\n"); }
     tests++; if (scale(2.0) == 5.0 && scale(2.0, 3.0) == 6.0) { correct++; }
     else { printf("float default lost\n"); }
-    tests++; if (!str.cmp(greet(), "world") && !str.cmp(greet("ktm"), "ktm")) { correct++; }
+    tests++; if (!cstr.cmp(greet(), "world") && !cstr.cmp(greet("ktm"), "ktm")) { correct++; }
     else { printf("string default lost\n"); }
     tests++; if (mid(1) == 205 && mid(1, 2) == 125 && mid(1, 2, 3) == 123) { correct++; }
     else { printf("second default lost\n"); }

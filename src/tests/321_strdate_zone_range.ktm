@@ -1,4 +1,4 @@
-import date, test;
+import cstr, date, test;
 
 /* date.parseParts's %z read any 4 digits, so "+0199" gave zone_diff 199
  * (99 minutes) and "+2500" 2500. An offset is +-hhmm with hh 00-23 and
@@ -6,7 +6,7 @@ import date, test;
 
 bool zone(u8 *in, bool wantOk, i64 wantZone) {
     date.Parts ds;
-    bool ok = date.parseParts(in, "%Y-%m-%d %z", &ds);
+    bool ok = date.parseParts(cstr.view(in), "%Y-%m-%d %z", &ds);
     if (ok != wantOk) {
         printf("\"%s\": ok %d\n", in, ok);
         return false;

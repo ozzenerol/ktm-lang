@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Rm(link, RM_RECURSE) on a symlink to a directory stat()ed the target,
  * then emptied the directory the link points to. A symlink inside a
@@ -12,7 +12,7 @@ u8 *gRoot;
 u8 gPath[512];
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -22,7 +22,7 @@ bool exists(u8 *name) {
 }
 
 void makeFile(u8 *name) {
-    fs.writeAll(P(name), "k\n", 2);
+    fs.writeAll(cstr.view(P(name)), "k\n");
 }
 
 i32 main() {
@@ -30,7 +30,7 @@ i32 main() {
     u8 root[64];
     printf("Test - Rm does not follow symlinks: ");
 
-    str.copy(root, "./ktm-test-300-XXXXXX");
+    cstr.copy(root, "./ktm-test-300-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
@@ -38,10 +38,10 @@ i32 main() {
     }
     gRoot = root;
 
-    fs.makeDir(P("target"));
+    fs.makeDir(cstr.view(P("target")));
     makeFile("target/keep1");
     makeFile("target/keep2");
-    fs.makeDir(P("tree"));
+    fs.makeDir(cstr.view(P("tree")));
     makeFile("tree/f");
     symlink("../target", P("tree/inner"));
     symlink("target", P("link"));
@@ -50,32 +50,32 @@ i32 main() {
     symlink("nowhere", P("dangling"));
 
     /* The link goes, the directory it points to stays full */
-    if (fs.remove(P("link"), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("link")), fs.REMOVE_RECURSE) == 0) { correct++; }
     if (!exists("link")) { correct++; }
     if (exists("target/keep1") && exists("target/keep2")) { correct++; }
 
     /* Without flags too */
-    if (fs.remove(P("link2")) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("link2"))) == 0) { correct++; }
     if (!exists("link2") && exists("target/keep1")) { correct++; }
 
     /* A dangling link can be removed */
-    if (fs.remove(P("dangling")) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("dangling"))) == 0) { correct++; }
     if (!exists("dangling")) { correct++; }
 
     /* A link inside a tree is removed, not followed */
-    if (fs.remove(P("tree"), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("tree")), fs.REMOVE_RECURSE) == 0) { correct++; }
     if (!exists("tree")) { correct++; }
     if (exists("target/keep1") && exists("target/keep2")) { correct++; }
 
     /* fs.removeDir refuses a symlink: it is not a directory */
-    if (fs.removeDir(P("link3"), fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (fs.removeDir(cstr.view(P("link3")), fs.REMOVE_RECURSE) == -1) { correct++; }
     if (exists("link3") && exists("target/keep1")) { correct++; }
 
     /* The real directory still goes */
-    fs.remove(P("link3"));
-    if (fs.remove(P("target"), fs.REMOVE_RECURSE) == 0 && !exists("target")) { correct++; }
+    fs.remove(cstr.view(P("link3")));
+    if (fs.remove(cstr.view(P("target")), fs.REMOVE_RECURSE) == 0 && !exists("target")) { correct++; }
 
-    u8 *cmd = str.formatTo(null, "rm -rf '%s'", root);
+    u8 *cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

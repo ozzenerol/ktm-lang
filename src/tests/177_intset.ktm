@@ -1,4 +1,4 @@
-import mem, set, str, test, vec;
+import cstr, mem, set, test, vec;
 
 /* set.IntSet stored nothing: set.intAdd is `return map.rbSet(...);` in a void
  * function and the compiler dropped the call (fixed in the compiler, test
@@ -18,13 +18,13 @@ set.IntSet *setOf(i64 *keys, i64 n) {
 
 /* The set's keys, in iteration order, as "a,b,c" */
 u8 *keysFn(set.IntSet *s) {
-    u8 *buf = str.dup("");
+    u8 *buf = cstr.dup("");
     set.IntSetIter *it = s.iterNew();
     set.IntSetEntry *e;
     bool first = true;
     while ((e = set.intIterNext(it))) {
-        if (!first) { buf = str.appendFormat(buf, ","); }
-        buf = str.appendFormat(buf, "%d", e.key);
+        if (!first) { buf = cstr.appendFormat(buf, ","); }
+        buf = cstr.appendFormat(buf, "%d", e.key);
         first = false;
     }
     set.intIterRelease(it);
@@ -33,7 +33,7 @@ u8 *keysFn(set.IntSet *s) {
 
 bool keysAre(set.IntSet *s, u8 *want) {
     u8 *got = keysFn(s);
-    bool ok = !str.cmp(got, want);
+    bool ok = !cstr.cmp(got, want);
     if (!ok) { printf("\n  keys '%s', want '%s'\n", got, want); }
     mem.free(got);
     return ok;
@@ -44,7 +44,7 @@ i32 main() {
     i64 aKeys[6] = {5, -3, 9, 0, 5, I64_MIN};
     i64 bKeys[4] = {9, 1, -3, I64_MAX};
     set.IntSet *empty = set.intNew(), *a, *b, *u, *d, *sd, *in, *big;
-    u8 *strVal;
+    String strVal;
     printf("Test - IntSet: ");
 
     check(empty.size() == 0 && !empty.has(0), "empty set");
@@ -83,18 +83,18 @@ i32 main() {
     check(v.size == 2 && v.entries[0] == -3 && v.entries[1] == 9, "IntSetToVec");
 
     strVal = in.toStr();
-    check(!str.cmp(strVal, "{-3, 9}"), "IntSetToString");
-    if (str.cmp(strVal, "{-3, 9}")) { printf("  got '%s'\n", strVal); }
-    mem.free(strVal);
+    check(strVal.equals("{-3, 9}"), "IntSetToString");
+    if (!strVal.equals("{-3, 9}")) { printf("  got '%s'\n", strVal); }
+    strVal.free();
     strVal = empty.toStr();
-    check(!str.cmp(strVal, "{}"), "IntSetToString of an empty set");
-    if (str.cmp(strVal, "{}")) { printf("  got '%s'\n", strVal); }
-    mem.free(strVal);
+    check(strVal.equals("{}"), "IntSetToString of an empty set");
+    if (!strVal.equals("{}")) { printf("  got '%s'\n", strVal); }
+    strVal.free();
     set.IntSet *one = set.intNew();
     one.add(7);
     strVal = one.toStr();
-    check(!str.cmp(strVal, "{7}"), "IntSetToString of one key");
-    mem.free(strVal);
+    check(strVal.equals("{7}"), "IntSetToString of one key");
+    strVal.free();
 
     /* a big set, keys added in a scrambled order, half negative */
     big = set.intNew();

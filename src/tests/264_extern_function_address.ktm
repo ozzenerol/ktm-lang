@@ -1,4 +1,4 @@
-import libc, mem, str, test;
+import cstr, libc, mem, test;
 
 /* Taking the address of a function this object doesn't define - a C
  * library function declared `extern "c"`, or a libktm function only
@@ -43,7 +43,7 @@ i32 main() {
     else { printf("Failed - strcmp/strlen\n"); }
 
     /* libktm functions, a ktm one and an asm-bound one */
-    fn(u8 *s) u64 hlen = &str.len;
+    fn(u8 *s) u64 hlen = &cstr.len;
     fn(u64 size) void *alloc = &mem.alloc;
     u8 *p = alloc(16);
     tests++;

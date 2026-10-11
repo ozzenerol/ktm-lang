@@ -1,4 +1,4 @@
-import date, fs, libc, mem, proc, str, test;
+import cstr, date, fs, libc, mem, proc, test;
 
 /* A compound assignment whose operands can't be combined, like
  * `y += p` with `p` a class, is the same type error as `y = y + p`.
@@ -40,13 +40,13 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where, i64 errors=1) {
 
     cleanupCompoundAssignTest();
 
-    if (!fs.writeAll(CA_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(CA_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell(CA_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CA_TEST_FILE " > " CA_TEST_OUT " 2>&1");
 
-    out = fs.readAll(CA_TEST_OUT);
+    out = fs.readAll(CA_TEST_OUT).take();
     if (!out) {
         printf("status %d, no output\n", res);
         cleanupCompoundAssignTest();
@@ -55,7 +55,7 @@ bool compileFailsWith(u8 *source, u8 *expected, u8 *where, i64 errors=1) {
 
     ok = res == 1 && countErrors(out) == errors;
     err = libc.strstr(out, "error: ");
-    if (!err || str.cmpLen(err + 7, expected, str.len(expected))) { ok = false; }
+    if (!err || cstr.cmpLen(err + 7, expected, cstr.len(expected))) { ok = false; }
     if (!libc.strstr(out, where)) { ok = false; }
     if (!ok) { printf("status %d\n%s\n", res, out); }
 

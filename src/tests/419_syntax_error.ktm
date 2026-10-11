@@ -1,4 +1,4 @@
-import coro, fs, libc, mem, proc, str, test;
+import coro, cstr, fs, libc, mem, proc, test;
 
 enum Err { old };
 
@@ -23,7 +23,7 @@ void logFn(u8 *s) {
 }
 
 bool got(u8 *want) {
-    bool ok = !str.cmp(gLog, want);
+    bool ok = !cstr.cmp(gLog, want);
     if (!ok) { printf("\n  want \"%s\" got \"%s\"\n", want, gLog); }
     gLen = 0;
     gLog[0] = 0;
@@ -54,7 +54,7 @@ bool formatted() {
     try {
         withdraw(100, 500);
     } catch (Error e) {
-        return e.code == BankError.funds && !str.cmp(e.message, "need 500, have 100") &&
+        return e.code == BankError.funds && !cstr.cmp(e.message, "need 500, have 100") &&
                      inThisFile(&e);
     }
     return false;
@@ -76,7 +76,7 @@ bool rethrow() {
     try {
         rethrower();
     } catch (Error e) {
-        return e.code == BankError.funds && !str.cmp(e.message, "need 2, have 1") &&
+        return e.code == BankError.funds && !cstr.cmp(e.message, "need 2, have 1") &&
                      inThisFile(&e) && e.line == gInnerLine;
     }
     return false;
@@ -100,7 +100,7 @@ bool throughDefers() {
     } catch (Error e) {
         logFn("c");
         return got("iotc") && e.code == BankError.locked &&
-                     !str.cmp(e.message, "locked account") && inThisFile(&e);
+                     !cstr.cmp(e.message, "locked account") && inThisFile(&e);
     }
     return false;
 }
@@ -118,7 +118,7 @@ bool deferKeepsError() {
     try {
         deferWithTry();
     } catch (Error e) {
-        return got("x") && e.code == BankError.locked && !str.cmp(e.message, "outer");
+        return got("x") && e.code == BankError.locked && !cstr.cmp(e.message, "outer");
     }
     return false;
 }
@@ -147,7 +147,7 @@ bool inCoroutine() {
     try {
         coro.next(c);
     } catch (Error e) {
-        ok = e.code == BankError.locked && !str.cmp(e.message, "from coroutine") &&
+        ok = e.code == BankError.locked && !cstr.cmp(e.message, "from coroutine") &&
                  inThisFile(&e);
     }
     coro.release(c);
@@ -161,8 +161,8 @@ void *worker(void *arg) {
         try {
             throw(BankError.funds, "worker %d", i);
         } catch (Error e) {
-            u8 *want = str.format("worker %d", i);
-            if (str.cmp(e.message, want)) { *ok = false; }
+            u8 *want = cstr.format("worker %d", i);
+            if (cstr.cmp(e.message, want)) { *ok = false; }
             mem.free(want);
         }
     }
@@ -178,7 +178,7 @@ bool perThread() {
         libc.pthread_t *t;
         libc.pthread_create(&t, null, &worker, &workerOk);
         libc.pthread_join(t);
-        ok = !str.cmp(e.message, "main") && e.code == BankError.locked;
+        ok = !cstr.cmp(e.message, "main") && e.code == BankError.locked;
     }
     return ok && workerOk;
 }
@@ -222,22 +222,22 @@ bool noLeak() {
  * the program printed; *status is the program's exit status. */
 u8 *compileRun(u8 *source, u8 *flags, bool run, i64 *status=null) {
     proc.shell("rm -f " ERR_SRC " " ERR_OUT " " ERR_BIN);
-    fs.writeAll(ERR_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(ERR_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     u8 *cmd;
     if (run) {
-        cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+        cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                         "%s " ERR_SRC " -o " ERR_BIN " > " ERR_OUT " 2>&1 && "
                                         ERR_BIN " >> " ERR_OUT " 2>&1", flags);
     } else {
-        cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+        cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                         "%s " ERR_SRC " > " ERR_OUT " 2>&1", flags);
     }
     i64 res = proc.shell(cmd);
     if (status) { *status = res; }
     mem.free(cmd);
-    u8 *out = fs.readAll(ERR_OUT);
+    u8 *out = fs.readAll(ERR_OUT).take();
     proc.shell("rm -f " ERR_SRC " " ERR_OUT " " ERR_BIN);
     return out;
 }
@@ -245,7 +245,7 @@ u8 *compileRun(u8 *source, u8 *flags, bool run, i64 *status=null) {
 bool prints(u8 *source, u8 *flags, bool run, i64 status, u8 *want) {
     i64 res = -1;
     u8 *out = compileRun(source, flags, run, &res);
-    bool ok = out && res == status && !str.cmp(out, want);
+    bool ok = out && res == status && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n---- exit %d\n%s\n", source, res, out); }
     mem.free(out);
     return ok;

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The lexer silently dropped characters it has no use for (`?`, a
  * backtick, `$` and `@` outside an asm block, non-ASCII bytes), so
@@ -37,13 +37,13 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupUnknownTest();
 
-    if (!fs.writeAll(UNKNOWN_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNKNOWN_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " UNKNOWN_FILE " > " UNKNOWN_OUT " 2>&1");
 
-    out = fs.readAll(UNKNOWN_OUT);
+    out = fs.readAll(UNKNOWN_OUT).take();
     if (!out) {
         cleanupUnknownTest();
         return false;

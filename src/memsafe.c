@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #include <malloc.h> /* malloc_usable_size */
 #endif
+#include <dlfcn.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -446,6 +447,20 @@ void memsafeReportLeaks(FILE *f) {
     memsafeUnlock();
 }
 
+/* libktm's hook `name` (a module global, by its symbol) set to `fn`; the
+ * JIT has loaded libktm by now. Nothing when it isn't there. */
+static void memsafeSetHook(const char *name, void *fn) {
+    char *sym = astModuleMangle((char *)name, (int)strlen(name));
+    void **slot = NULL;
+#if defined(__APPLE__)
+    /* Mach-O: dlsym adds the leading `_` itself, and ktm's own symbols
+     * are emitted without the extra one a C name gets */
+    slot = (void **)dlsym(RTLD_DEFAULT, sym + 1);
+#endif
+    if (!slot) slot = (void **)dlsym(RTLD_DEFAULT, sym);
+    if (slot) *slot = fn;
+}
+
 void memsafeInit(KtmJit *jit) {
     if (jit == NULL) return;
     memsafe_jit = jit;
@@ -478,4 +493,10 @@ void memsafeInit(KtmJit *jit) {
     ktmJitDefineSymbol(jit, "_K3mem4free",      (void *)(uintptr_t)memsafeFree);
     ktmJitDefineSymbol(jit, "_K3mem9allocZero", (void *)(uintptr_t)memsafeCAlloc);
     ktmJitDefineSymbol(jit, "_K3mem7realloc",   (void *)(uintptr_t)memsafeReAlloc);
+    /* and libktm's own allocations (a String growing, str.format's
+     * buffers): its mem functions call these hooks when they are set */
+    memsafeSetHook("mem.__allocHook", (void *)(uintptr_t)memsafeMAlloc);
+    memsafeSetHook("mem.__freeHook", (void *)(uintptr_t)memsafeFree);
+    memsafeSetHook("mem.__allocZeroHook", (void *)(uintptr_t)memsafeCAlloc);
+    memsafeSetHook("mem.__reallocHook", (void *)(uintptr_t)memsafeReAlloc);
 }

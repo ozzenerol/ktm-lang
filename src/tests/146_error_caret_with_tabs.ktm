@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The `^` under an error drifted left on a line with tabs: the excerpt
  * echoed the tab, which the terminal shows several columns wide, but the
@@ -23,7 +23,7 @@ bool excerptIs(u8 *source, u8 *expected) {
 
     cleanupTabTest();
 
-    if (!fs.writeAll(TAB_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(TAB_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -33,7 +33,7 @@ bool excerptIs(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(TAB_TEST_OUT);
+    out = fs.readAll(TAB_TEST_OUT).take();
     if (!out) {
         cleanupTabTest();
         return false;

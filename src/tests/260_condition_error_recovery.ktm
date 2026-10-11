@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An error inside the parentheses of an if, while, do-while, for or
  * switch was recovered from by skipping to the next `;`: in
@@ -15,11 +15,11 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " IFR_SRC " " IFR_OUT);
-    fs.writeAll(IFR_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(IFR_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " IFR_SRC " -o /dev/null > " IFR_OUT " 2>&1");
-    u8 *out = fs.readAll(IFR_OUT);
+    u8 *out = fs.readAll(IFR_OUT).take();
     proc.shell("rm -f " IFR_SRC " " IFR_OUT);
     return out;
 }

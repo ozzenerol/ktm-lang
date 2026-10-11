@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 void FN() {
     printf("FN()\n");
@@ -9,7 +9,7 @@ u8 *printMessage(u8 *msg,
                                  fn() void fn_ = null,
                                  i64 N) {
     if (fn_) { fn_(); }
-    u8 *buffer = str.format("%s i=%d N=%d\n",msg, i, N);
+    u8 *buffer = cstr.format("%s i=%d N=%d\n",msg, i, N);
     return buffer;
 }
 
@@ -20,7 +20,7 @@ i32 main() {
 
     u8 *msg = printMessage("hello!",24,,4);
 
-    if (!str.cmp(msg, "hello! i=24 N=4\n")) {
+    if (!cstr.cmp(msg, "hello! i=24 N=4\n")) {
         correct++;
     }
     test.printResult(correct,total);

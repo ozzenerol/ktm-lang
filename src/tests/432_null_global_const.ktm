@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* A global initialised with `null` (or a cast of an integer constant) is
  * a constant: written as data, as `null` (0) was, not stored by code that
@@ -19,11 +19,11 @@ i32 main() {
 
     u8 *src = "u8 *g_p = null;\nfn(i64) i64 g_fn = null;\ni32 main() { return 0; }\n";
     proc.shell("rm -f " N_SRC " " N_OUT);
-    fs.writeAll(N_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(N_SRC, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " N_SRC " -o " N_OUT " 2>&1");
-    u8 *s = fs.readAll(N_OUT);
+    u8 *s = fs.readAll(N_OUT).take();
     /* no run-time store into either global */
     tests++; if (s && !libc.strstr(s, "g_p(%rip)") && !libc.strstr(s, "g_fn(%rip)") &&
                              !libc.strstr(s, "g_p@PAGEOFF") && !libc.strstr(s, "g_fn@PAGEOFF") &&

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A #define whose value is folded from several tokens (`(N + 1)`) got
  * an empty spelling, so an error on a use of it read "Unexpected
@@ -20,13 +20,13 @@ bool jitOutputHas(u8 *source, bool ok, u8 *expected) {
     bool good = true;
 
     cleanupFoldedTest();
-    if (!fs.writeAll(FM_TEST_FILE, source, str.len(source),
+    if (!fs.writeAll(FM_TEST_FILE, cstr.view(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " FM_TEST_FILE " > " FM_TEST_OUT " 2>&1");
     if ((res == 0) != ok) { good = false; }
-    out = fs.readAll(FM_TEST_OUT);
+    out = fs.readAll(FM_TEST_OUT).take();
     if (!out) {
         cleanupFoldedTest();
         return false;
@@ -79,7 +79,7 @@ i32 main() {
     tests++;
     if ((u64)V_U == 0xFFFFFFFFFFFFFFFF) { correct++; }
     tests++;
-    if (!str.cmp(V_S, "abcd")) { correct++; }
+    if (!cstr.cmp(V_S, "abcd")) { correct++; }
 
     cleanupFoldedTest();
     test.printResult(correct, tests);

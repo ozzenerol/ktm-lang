@@ -288,6 +288,8 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                                 Lexeme *start)
 {
     if (type->ptr) {
+        /* an array or a string for a slice element: its view */
+        init = parseSliceFrom(cc, type->ptr, init);
         if (astFnPtrMismatch(type->ptr, init->type)) {
             parseRaiseFnConvert(cc, type->ptr, init->type);
         }
@@ -308,6 +310,7 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
         AstType *cls_field_type = entry->value;
         parseCheckPrivateField(cc, cls_field_type, (char *)entry->key,
                                strlen((char *)entry->key));
+        init = parseSliceFrom(cc, cls_field_type, init);
         if (init->kind == AST_STRING &&
             cls_field_type->kind == AST_TYPE_ARRAY &&
             cls_field_type->ptr->kind == AST_TYPE_CHAR)
@@ -326,9 +329,14 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
  * (brace elision, as in C: `L l = {1, 2, 3, 4}` is `{1, {2, 3}, 4}`)
  * when `init` is the first of them; 0 when `init` is a value for the
  * whole of `type` - a string for a char array, a class of its own
- * type - or `type` takes no list: a scalar, an intrinsic class, an
- * unsized array. */
+ * type - or `type` takes no list: a scalar, a slice, an intrinsic
+ * class, an unsized array. */
 static s64 parseDeclElidedCount(AstType *type, Ast *init) {
+    /* A slice takes one value (a slice, an array or a string, converted),
+     * never its pointer and length as two items */
+    if (astTypeIsSlice(type)) {
+        return 0;
+    }
     if (type->kind == AST_TYPE_ARRAY) {
         if (type->len <= 0 || !type->ptr ||
             (init->kind == AST_STRING && type->ptr->kind == AST_TYPE_CHAR)) {
@@ -1619,6 +1627,9 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
         init = astI64Type(evalIntConstExpr(init));
     }
 
+    /* `i64[] s = array;`: the array becomes a slice */
+    init = parseSliceFrom(cc, var->type, init);
+
     /* `auto`: the type is the initialiser's, nothing to check it against
      * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
     int from_auto = var->type->kind == AST_TYPE_AUTO;
@@ -1940,7 +1951,7 @@ static void parseCondGuardDone(Cctrl *cc, ParseCondGuard *g) {
 /* An expression where one is required: parseExpr gives NULL when the next
  * token can't start one (`while ()`), which compiled to nothing or
  * crashed later. Reported at that token. */
-static Ast *parseRequiredExpr(Cctrl *cc, char *what) {
+Ast *parseRequiredExpr(Cctrl *cc, char *what) {
     Ast *expr = parseExpr(cc,16);
     if (!expr) {
         Lexeme *bad = cctrlTokenGet(cc);
@@ -2252,14 +2263,15 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
-    if (container->kind == AST_LVAR && (container->flags & AST_FLAG_VARARGS)) {
-        /* `for (auto v : nums)` over a `T ...nums` parameter */
-        AoStr *len_name = aoStrPrintf("%s#len", container->lname->data);
-        Ast *count = cctrlGetVar(cc, len_name->data, len_name->len);
+    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1] */
+    if (container->type && astTypeIsSlice(container->type)) {
+        Map *fields = container->type->fields;
+        Ast *len_ref = astClassRef(mapGetLen(fields, str_lit("len")), container, "len");
+        Ast *ptr_ref = astClassRef(mapGetLen(fields, str_lit("ptr")), container, "ptr");
         if (iteratee->type->kind == AST_TYPE_AUTO) {
-            iteratee->type = container->type->ptr;
+            iteratee->type = container->type->elem;
         }
-        return parseCreateForRange(cc, iteratee, count, container);
+        return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
     }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
@@ -2684,6 +2696,7 @@ Ast *parseReturnStatement(Cctrl *cc) {
 
     Ast *maybe_fn = findFunctionDecl(cc,cc->tmp_fname->data,cc->tmp_fname->len);
 
+    if (retval) retval = parseSliceFrom(cc, cc->tmp_rettype, retval);
     if (retval) check = retval->type;
     else        check = ast_void_type;
 
@@ -2803,7 +2816,7 @@ Ast *parseTryStatement(Cctrl *cc) {
 
 /* The file a throw is in, as a string literal: the path it was compiled
  * from, as diagnostics show it. */
-static Ast *parseThrowFile(Cctrl *cc) {
+Ast *parseThrowFile(Cctrl *cc) {
     char *path = "";
     if (cc->lexer_ && cc->lexer_->cur_file && cc->lexer_->cur_file->filename) {
         path = cc->lexer_->cur_file->filename->data;
@@ -4202,6 +4215,22 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
         func->flags |= AST_FLAG_INLINE;
         func->inline_ret = astLVar(func->type->rettype, str_lit("retval"));
     }
+    /* `T ...name`: in the body, name is a `T[]` (u64[] untyped) of the
+     * hidden pointer and count parameters, made first thing */
+    if (params && params->size >= 2) {
+        Ast *data = params->entries[params->size - 1];
+        Ast *count = params->entries[params->size - 2];
+        if (data && data->kind == AST_LVAR && (data->flags & AST_FLAG_VARARGS)) {
+            Ast *slice = astLVar(astMakeSliceType(data->type->ptr),
+                                 data->lname->data, data->lname->len);
+            slice->flags |= AST_FLAG_VARARGS;
+            slice->line = data->line;
+            slice->col = data->col;
+            mapAdd(cc->localenv, slice->lname->data, slice);
+            listAppend(locals, slice);
+            listAppend(body, astSliceMake(slice, data, count));
+        }
+    }
     parseCompoundStatementInternal(cc, func_body);
     parseCheckGotoIntoTry(cc, func_body);
     fn_type->rettype = cc->tmp_rettype;
@@ -4782,7 +4811,14 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
         mine = mine && path && (int)path->len == mod_len &&
                !memcmp(path->data, cls->clsname->data, mod_len);
     } else {
-        mine = mine && !path;
+        /* a program's struct, or the prelude's (its names have no module
+         * part), from the prelude itself */
+        mine = mine && (!path || cctrlInPrelude(cc));
+    }
+    /* the prelude's String: its methods are module str's */
+    if (!dot && astTypeIsString(cls) && path && path->len == 3 &&
+        !memcmp(path->data, "str", 3)) {
+        mine = 1;
     }
     /* (reported once, by a module's full pass) */
     if (!mine && !cc->decls_only) {

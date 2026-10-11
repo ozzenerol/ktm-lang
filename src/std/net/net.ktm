@@ -1,5 +1,5 @@
 module net;
-import date, libc, mem, os, str;
+import str, cstr, date, libc, mem, os;
 
 /* Byte order: the network is big endian, every target ktm supports is
     * little endian, so these swap the bytes. */
@@ -103,7 +103,7 @@ static void *netGetInAddress(libc.sockaddr *sa)
 }
 
 /* Fills out buf with the IPV4 address */
-pub bool addrToStr(libc.sockaddr *sAddr, i32 ai_family, u8 *outbuf, i32 size) {
+static bool addrToStrC(libc.sockaddr *sAddr, i32 ai_family, u8 *outbuf, i32 size) {
         void *address;
         if (sAddr.sa_family != ai_family) {
                 return false;
@@ -186,7 +186,7 @@ static i32 netConnectBefore(i32 sockfd, libc.addrinfo *sa, i64 deadline) {
         return 0;
 }
 
-pub i32 dial(u8 *addr, i32 port, bool nonBlocking=false,
+static i32 dialC(u8 *addr, i32 port, bool nonBlocking=false,
                 i64 timeoutMs=0)
 {// Returns the connected socket, or -1 on failure
         u8 strport[6];
@@ -274,7 +274,7 @@ pub bool bindListen(i32 sockfd, libc.addrinfo *sa, i32 backlog) {
         return true;
 }
 
-pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
+static i32 listenC(i32 port, u8 *bindaddr, i32 backlog,
                 i32 addrfam=libc.AF_UNSPEC, bool nonBlocking=false)
 {// Returns the listening socket, or -1 on failure
         i32 sockfd = -1, rv;
@@ -294,13 +294,13 @@ pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
         /* "*" (or null) is any address of addrfam, IPv4 for AF_UNSPEC as it
             * always was; "::*" is any IPv6 address. Anything else must be a
             * numeric address: a host name would wait on DNS */
-        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
+        if (bindaddr != null && !cstr.cmp("::*", bindaddr)) {
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
                 addrfam = libc.AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
+        } else if (bindaddr != null && !cstr.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == libc.AF_UNSPEC) {
@@ -379,7 +379,7 @@ const i64 __NET_MSG_NOSIGNAL = 0x4000;
 const i64 __NET_MSG_NOSIGNAL = 0x80000;
 #endif
 
-pub i64 send(i32 sockfd, void *buf, i64 len, i32 flags=0)
+static i64 sendC(i32 sockfd, void *buf, i64 len, i32 flags=0)
 {// send() that never raises SIGPIPE: a closed peer gives -1 (EPIPE)
         return libc.send(sockfd, buf, len, flags | __NET_MSG_NOSIGNAL);
 }
@@ -389,7 +389,7 @@ pub i64 send(i32 sockfd, void *buf, i64 len, i32 flags=0)
     * could probably be made as this only accepts IPV4 which doesn't feel
     * right.
     */
-pub bool peerAddr(i32 sockfd, u8 *ipbuf, i32 outlen) {
+static bool peerAddrC(i32 sockfd, u8 *ipbuf, i32 outlen) {
         libc.sockaddr_storage sa; /* a sockaddr is too small for an IPv6 peer */
         u32 len;
         i32 retval;
@@ -399,12 +399,12 @@ pub bool peerAddr(i32 sockfd, u8 *ipbuf, i32 outlen) {
                 return false;
         }
 
-        return addrToStr((libc.sockaddr *)(&sa), sa.ss_family, ipbuf, outlen);
+        return addrToStrC((libc.sockaddr *)(&sa), sa.ss_family, ipbuf, outlen);
 }
 
 /* Fills `addr` for the socket file `name`; false if the path doesn't fit */
 static bool netUnixAddress(libc.sockaddr_un *addr, u8 *name) {
-        i64 len = str.len(name);
+        i64 len = cstr.len(name);
         if (len >= sizeof(addr.sun_path)) {
                 return false;
         }
@@ -443,7 +443,7 @@ static bool netUnixSocketIsStale(libc.sockaddr_un *addr, u8 *name) {
         return stale;
 }
 
-pub i32 unixListen(u8 *name, i32 backlog)
+static i32 unixListenC(u8 *name, i32 backlog)
 {// Listens on the socket file `name`; returns the socket or -1 on failure.
     // A stale socket file at `name` is replaced; any other file, or a socket
     // a server is listening on, makes it fail.
@@ -478,7 +478,7 @@ error:
         return -1;
 }
 
-pub i32 unixDial(u8 *name)
+static i32 unixDialC(u8 *name)
 {// Connects to the socket file `name`; returns the socket or -1 on failure
         i32 sockfd;
         libc.sockaddr_un srv;
@@ -515,7 +515,7 @@ pub i32 localPort(i32 sockfd)
         return -1;
 }
 
-pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
+static i32 udpSocketC(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
                 bool nonBlocking=false)
 {// Returns the bound UDP socket, or -1 on failure
         i32 sockfd = -1;
@@ -531,13 +531,13 @@ pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
         libc.snprintf(strport, sizeof(strport), "%d", port);
 
         /* The same bind addresses as NetCreateServer */
-        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
+        if (bindaddr != null && !cstr.cmp("::*", bindaddr)) {
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
                 addrfam = libc.AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
+        } else if (bindaddr != null && !cstr.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == libc.AF_UNSPEC) {
@@ -574,7 +574,7 @@ pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
         return sockfd;
 }
 
-pub i64 sendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
+static i64 sendToC(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
 {// Returns the bytes sent, or -1 on failure
         libc.sockaddr_storage me;
         u32 melen = sizeof(libc.sockaddr_storage);
@@ -604,7 +604,7 @@ pub i64 sendTo(i32 sockfd, void *buf, i64 len, u8 *addr, i32 port)
         return sent;
 }
 
-pub i64 recvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
+static i64 recvFromC(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
                 i64 fromSize=0, i32 *fromPort=null)
 {// Returns the bytes received, or -1
         libc.sockaddr_storage from;
@@ -621,7 +621,7 @@ pub i64 recvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
         }
 
         if (fromAddr != null && fromSize > 0) {
-                if (!addrToStr((libc.sockaddr *)(&from), from.ss_family, fromAddr, fromSize)) {
+                if (!addrToStrC((libc.sockaddr *)(&from), from.ss_family, fromAddr, fromSize)) {
                         fromAddr[0] = '\0';
                 }
         }
@@ -659,4 +659,106 @@ pub bool setRecvTimeout(i32 sockfd, i64 ms)
 pub bool setSendTimeout(i32 sockfd, i64 ms)
 {// true if SO_SNDTIMEO was set
         return netSetTimeout(sockfd, libc.SO_SNDTIMEO, ms);
+}
+
+/* ---- The API: text as u8[] (a literal, a slice, a String) ---- */
+
+/* `s` as a C string in buf (size bytes), null for an empty s (any address) */
+static u8 *netCStr(u8[] s, u8 *buf, i64 size)
+{
+        if (!s.len || s.len >= size) { return null; }
+        mem.copy(buf, s.ptr, s.len);
+        buf[s.len] = 0;
+        return buf;
+}
+
+/* The address of sAddr (of family ai_family) as text, a String; one without
+ * a ptr if it isn't one */
+pub String addrToStr(libc.sockaddr *sAddr, i32 ai_family)
+{
+        u8 buf[64];
+        String out;
+        if (addrToStrC(sAddr, ai_family, buf, sizeof(buf))) { out = str.from(cstr.view(buf)); }
+        return out;
+}
+
+/* The connected socket for addr (a host name or an address) and port, or -1 */
+pub i32 dial(u8[] addr, i32 port, bool nonBlocking=false, i64 timeoutMs=0)
+{
+        u8 buf[256];
+        u8 *c = netCStr(addr, buf, sizeof(buf));
+        if (!c) { return -1; }
+        return dialC(c, port, nonBlocking, timeoutMs);
+}
+
+/* A listening socket on port, on bindaddr (empty: every address), or -1 */
+pub i32 listen(i32 port, u8[] bindaddr, i32 backlog,
+                i32 addrfam=libc.AF_UNSPEC, bool nonBlocking=false)
+{
+        u8 buf[256];
+        return listenC(port, netCStr(bindaddr, buf, sizeof(buf)), backlog, addrfam, nonBlocking);
+}
+
+/* data sent on sockfd (never raising SIGPIPE): the bytes sent, or -1 */
+pub i64 send(i32 sockfd, u8[] data, i32 flags=0)
+{
+        return sendC(sockfd, data.ptr, data.len, flags);
+}
+
+/* The peer's address of an accepted socket, a String (no ptr on an error) */
+pub String peerAddr(i32 sockfd)
+{
+        u8 buf[64];
+        String out;
+        if (peerAddrC(sockfd, buf, sizeof(buf))) { out = str.from(cstr.view(buf)); }
+        return out;
+}
+
+pub i32 unixListen(u8[] name, i32 backlog)
+{
+        u8 buf[256];
+        u8 *c = netCStr(name, buf, sizeof(buf));
+        if (!c) { return -1; }
+        return unixListenC(c, backlog);
+}
+
+pub i32 unixDial(u8[] name)
+{
+        u8 buf[256];
+        u8 *c = netCStr(name, buf, sizeof(buf));
+        if (!c) { return -1; }
+        return unixDialC(c);
+}
+
+/* A bound UDP socket on port, on bindaddr (empty: every address), or -1 */
+pub i32 udpSocket(i32 port, u8[] bindaddr, i32 addrfam=libc.AF_UNSPEC,
+                bool nonBlocking=false)
+{
+        u8 buf[256];
+        return udpSocketC(port, netCStr(bindaddr, buf, sizeof(buf)), addrfam, nonBlocking);
+}
+
+/* data to addr:port from a UDP socket: the bytes sent, or -1 */
+pub i64 sendTo(i32 sockfd, u8[] data, u8[] addr, i32 port)
+{
+        u8 buf[256];
+        u8 *c = netCStr(addr, buf, sizeof(buf));
+        if (!c) { return -1; }
+        return sendToC(sockfd, data.ptr, data.len, c, port);
+}
+
+/* A datagram into buf: the bytes received, or -1; the sender's address
+ * into *fromAddr (a String, replaced) and its port into *fromPort when
+ * given */
+pub i64 recvFrom(i32 sockfd, u8[] buf, String *fromAddr=null, i32 *fromPort=null)
+{
+        u8 abuf[64];
+        abuf[0] = 0;
+        i64 got = recvFromC(sockfd, buf.ptr, buf.len, fromAddr ? abuf : null,
+                            fromAddr ? sizeof(abuf) : 0, fromPort);
+        if (fromAddr && got >= 0) {
+                fromAddr.clear();
+                fromAddr.append(cstr.view(abuf));
+        }
+        return got;
 }

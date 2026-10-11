@@ -27,7 +27,7 @@ so only pointers from these functions can go to <code>mem.free</code>, <code>mem
 <code>mem.realloc</code>. <code>mem.copy</code> copies front to back: for overlapping buffers
 use <code>memmove</code>.</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 struct Player
 {
@@ -53,69 +53,103 @@ ada 10, linus
 frees reported (and skipped) as they happen, and leaks reported at exit, each with the line
 that allocated or freed the block, in any thread. Only blocks your code gets from <code>mem.alloc</code>,
 <code>mem.allocZero</code> and <code>mem.realloc</code> are tracked: a string or container the standard
-library allocates for you (<code>str.dup</code>, <code>str.formatTo</code>, <code>vec.ptrNew</code>, ...)
+library allocates for you (<code>cstr.dup</code>, <code>cstr.formatTo</code>, <code>vec.ptrNew</code>, ...)
 is not, so leaking one goes unreported, and a block of yours that the library resizes
-(<code>str.appendFormat</code>, <code>str.appendFormatLen</code>) is reported as never freed.</p>
+(<code>cstr.appendFormat</code>, <code>cstr.appendFormatLen</code>) is reported as never freed.</p>
 
 <h2 id="strings">Strings</h2>
-<p>A string is a NUL-terminated <code>u8</code> array. Functions that make a string
-(<code>str.dup</code>, <code>str.formatTo(null, ...)</code>, <code>str.format</code>,
-<code>str.concat</code>, <code>str.dupLen</code>, <code>str.quote</code>, <code>date.formatDate</code>,
-<code>date.formatTime</code>, <code>date.timestampNow</code>) return a new block that you
-<code>mem.free</code>. The trimming and <code>...Rem</code> functions change the string you
-pass, in place, so give them a copy rather than a literal. Case conversion and the
-case-insensitive compares only know ASCII letters.</p>
+<p>Text is two modules. <code>str</code> is what code works with: <code>String</code>, a string
+you own that grows as you add to it, and the functions that read text given as a
+<code>u8[]</code>, so a literal, a slice or a String. <code>cstr</code> is C's strings: a
+NUL-terminated <code>u8 *</code>, for C functions and the data they give you. A String's bytes
+are always followed by a NUL, so <code>s.cstr()</code> passes one to C for free, and
+<code>cstr.view(p)</code> is a C string's bytes as a <code>u8[]</code>, so <code>str.from(cstr.view(p))</code>
+makes a String of them. Case conversion
+and the case-insensitive compares only know ASCII letters.</p>
 
-<h3>Building strings</h3>
-<p><code>str.formatTo(null, fmt, ...)</code> returns a newly allocated formatted string, and
-<code>str.appendFormat(s, fmt, ...)</code> appends the formatted text to the heap string <code>s</code>
-and returns it, so write <code>s = str.appendFormat(s, fmt, ...)</code>: when <code>s</code> is full it
-is grown, which may move it and frees the old block. <code>s</code> must come from
-<code>mem.alloc</code>, <code>str.dup</code>, <code>str.formatTo(null, ...)</code> or an earlier
-<code>str.appendFormat</code>, or be <code>null</code> to start a new string; never pass a string
-literal or a stack buffer. <code>str.appendFormat</code> measures <code>s</code> on every call, so
-appending in a long loop is quadratic; <code>str.appendFormatLen(s, &amp;len, fmt, ...)</code> keeps
-the length in <code>len</code> and doesn't. <code>str.concat("a", "b", ...)</code> joins strings and <code>str.format(fmt, ...)</code> is
-<code>str.formatTo</code> into an exactly sized block.</p>
+<h3>String</h3>
+<p>A String is yours: free it, and the way to do that is <code>defer</code> right where you make
+it. <code>str.new()</code> makes an empty one (nothing is allocated until something is added; a
+declared <code>String s;</code> is empty too), <code>str.from(t)</code> a copy of
+<code>t</code>, <code>str.withCap(n)</code> one with room for <code>n</code> bytes and
+<code>str.format(fmt, ...)</code> the formatted text. Its methods change it in place:
+<code>append</code>, <code>appendByte</code>, <code>appendFormat</code>, <code>insert</code>,
+<code>remove</code>, <code>replace</code>, <code>clear</code>, <code>reserve</code>,
+<code>toLower</code>, <code>toUpper</code>, <code>reverse</code>; <code>clone()</code> gives a
+copy of your own. <code>s.len</code> is its length in bytes and <code>s[i]</code>,
+<code>s[a:b]</code> its bytes (checked); its fields are read-only. Copying a String
+(<code>String b = a;</code>) shares its bytes, so free only one of them: <code>-Memsafe</code>
+reports a double free or a String never freed.</p>
 <pre data-run><code>
-import mem, str;
+import str;
 
 void main()
 {
-  u8 *s = str.formatTo(null, "%d|%05d|%s|%.2f", 5000000000, 42, "x", 3.14159);
-  printf("%s\n", s);
+  String s = str.format("%d files", 3);
+  defer s.free();
+  s.insert(0, "found ");
+  s.append(" in /tmp");
+  s.replace("files", "logs");
+  printf("%s (%d bytes)\n", s, s.len);
 
-  u8 *csv = str.dup("id");
-  for (i64 i = 1; i <= 3; i++) {
-    csv = str.appendFormat(csv, ",%d", i);
-  }
-  printf("%s\n", csv);
-
-  i64 len = 0;
-  u8 *log = null;
-  for (i64 i = 0; i < 3; i++) {
-    log = str.appendFormatLen(log, &len, "[%d]", i * i);
-  }
-  printf("%s (%d)\n", log, len);
-
-  u8 *joined = str.concat("con", "cat", "enate");
-  printf("%s\n", joined);
-  mem.free(s);
-  mem.free(csv);
-  mem.free(log);
-  mem.free(joined);
+  String path = str.from("/var/log");
+  defer path.free();
+  path.appendFormat("/%s.%d", "app", 2);
+  path.toUpper();
+  printf("%s %s %c\n", path, path[1:4], path[5]);
+  printf("%s\n", path.cstr());
 }
 </code></pre>
 <pre class="output">
-5000000000|00042|x|3.14
-id,1,2,3
-[0][1][4] (9)
-concatenate
+found 3 logs in /tmp (20 bytes)
+/VAR/LOG/APP.2 VAR L
+/VAR/LOG/APP.2
 </pre>
 
+<h3>Reading text</h3>
+<p>These take a <code>u8[]</code>, so any text, and are called as functions or as methods of it
+(<code>s.find("x")</code> is <code>str.find(s, "x")</code>). <code>find</code> and
+<code>findLast</code> give the index of a part or -1, <code>contains</code>,
+<code>startsWith</code>, <code>endsWith</code> and <code>equals</code> say whether it is there,
+<code>compare</code> orders two texts. The trims and splits return views, parts of what you
+gave them with nothing copied: <code>trim</code>, <code>trimStart</code>, <code>trimEnd</code>
+(of whitespace, or of the bytes you give it), <code>splitFirst</code> and
+<code>splitLast</code> (around a separator), and <code>split</code>, a list of views that is
+allocated: <code>defer parts.free();</code>.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] line = "  name = ktm, lang  \r\n";
+  u8[] t = line.trimEnd("\r\n").trim();
+  u8[] key, value;
+  if (str.splitFirst(t, " = ", &key, &value)) {
+    printf("[%s] [%s]\n", key, value);
+  }
+  u8[][] parts = value.split(", ");
+  defer parts.free();
+  for (auto p : parts) { printf("<%s>", p); }
+  printf("\n%d %d %d %d\n", t.find("ktm"), t.startsWith("name"), "abc".equals("abc"),
+         str.compare("a", "b") < 0);
+  printf("%c%c %d\n", str.toUpper('q'), str.toLower('Q'), str.isSpace('\t'));
+}
+</code></pre>
+<pre class="output">
+[name] [ktm, lang]
+<ktm><lang>
+7 1 1 1
+Qq 1
+</pre>
+<p><code>s.len</code> and <code>s[i]</code> count bytes. For characters, UTF-8:
+<code>str.decodeRune(s, &amp;at)</code> gives the code point at byte <code>at</code> and moves
+<code>at</code> past it (U+FFFD for bytes that aren't UTF-8, -1 at the end),
+<code>str.runeCount(s)</code> counts them and <code>str.validUtf8(s)</code> checks a text.</p>
+
 <h3>Format conversions</h3>
-<p><code>str.formatTo</code>, <code>str.appendFormat</code> and the other formatting functions share one
-format language with print statements. Integers are always 64-bit, and the C length
+<p><code>str.format</code>, a String's <code>appendFormat</code>, <code>cstr.format</code>,
+<code>cstr.formatTo</code> and the other formatting functions share one format language with
+print statements. Integers are always 64-bit, and the C length
 modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <code>z</code> and
 <code>j</code> are accepted and ignored, so C formats can be pasted in.</p>
 <table>
@@ -125,10 +159,10 @@ modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <cod
     <tr><td><code>%u</code></td><td>an unsigned integer</td></tr>
     <tr><td><code>%x</code> <code>%X</code> <code>%o</code></td><td>hexadecimal (lower / upper case), octal</td></tr>
     <tr><td><code>%f</code> <code>%e</code> <code>%g</code></td><td>an <code>f64</code>, as C's <code>printf</code> prints it</td></tr>
-    <tr><td><code>%s</code></td><td>a string</td></tr>
+    <tr><td><code>%s</code></td><td>a C string; in a literal format also a <code>u8[]</code> or a <code>String</code> (passed as its length and bytes)</td></tr>
     <tr><td><code>%c</code> <code>%C</code></td><td>a character, <code>%C</code> in upper case; a wider integer prints its bytes as characters, low byte first (up to 8); the value 0 prints nothing</td></tr>
     <tr><td><code>%p</code></td><td>a pointer as <code>0x</code> and 16 hex digits</td></tr>
-    <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>str.quote</code>)</td></tr>
+    <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>cstr.quote</code>)</td></tr>
     <tr><td><code>%%</code></td><td>a <code>%</code> (a width on it is ignored)</td></tr>
   </tbody>
 </table>
@@ -144,23 +178,23 @@ for integers (<code>%.3d</code> of 7 is <code>007</code>). Width and precision c
 <code>*</code>, taken from the arguments. An unknown conversion is printed as it was written,
 with a warning on stderr, and still uses up its argument, so the ones after it stay in
 place.</p>
-<p><code>str.formatTo(buf, fmt, ...)</code> writes into <code>buf</code> with no bound. For a
-fixed-size buffer use <code>str.formatToSize(buf, size, fmt, ...)</code>, which works like C's
+<p><code>cstr.formatTo(buf, fmt, ...)</code> writes into <code>buf</code> with no bound. For a
+fixed-size buffer use <code>cstr.formatToSize(buf, size, fmt, ...)</code>, which works like C's
 <code>snprintf</code>: it writes at most <code>size - 1</code> characters and always ends them
 with a <code>'\0'</code>, cutting longer output short. It returns <code>buf</code>.</p>
 <pre data-run><code>
-import mem, str;
+import cstr, mem;
 
 void main()
 {
-  u8 *s = str.formatTo(null, "%+d|% d|%#x|%#o|%.3d|%ld|%-4s|%5.1f", 7, 7, 255, 8, 7,
+  u8 *s = cstr.formatTo(null, "%+d|% d|%#x|%#o|%.3d|%ld|%-4s|%5.1f", 7, 7, 255, 8, 7,
                    5000000000, "ab", 2.25);
   printf("%s\n", s);
   mem.free(s);
 
   u8 small[8];
-  str.formatToSize(small, sizeof(small), "%s-%d", "overflow", 12345);
-  printf("[%s] %d\n", small, str.len(small));
+  cstr.formatToSize(small, sizeof(small), "%s-%d", "overflow", 12345);
+  printf("[%s] %d\n", small, cstr.len(small));
 }
 </code></pre>
 <pre class="output">
@@ -168,29 +202,82 @@ void main()
 [overflo] 7
 </pre>
 
-<h3>Inspecting strings</h3>
-<p><code>str.cmp</code>, <code>str.cmpLen</code> and <code>str.cmpLenNoCase</code> return a negative,
-zero or positive number like C's <code>strcmp</code>, comparing bytes as unsigned, and sort a
-<code>null</code> before every string. <code>str.firstOf</code> and <code>str.lastOf</code>
-find the first or last character of the first string that is any of the characters in the
-second. <code>str.globMatch</code> matches a whole string against a pattern where
-<code>*</code> is any run of characters and <code>?</code> any one character.
-<code>str.hash</code> gives a well mixed 64-bit hash of a string.</p>
+<h3>C strings</h3>
+<p><code>cstr</code> works on NUL-terminated strings, as C does. Functions that make one
+(<code>cstr.dup</code>, <code>cstr.format</code>, <code>cstr.formatTo(null, ...)</code>,
+<code>cstr.concat</code>, <code>cstr.dupLen</code>, <code>cstr.quote</code>) return a new block
+that you <code>mem.free</code>.</p>
+
+<h3>Building C strings</h3>
+<p><code>cstr.formatTo(null, fmt, ...)</code> returns a newly allocated formatted string, and
+<code>cstr.appendFormat(s, fmt, ...)</code> appends the formatted text to the heap string <code>s</code>
+and returns it, so write <code>s = cstr.appendFormat(s, fmt, ...)</code>: when <code>s</code> is full it
+is grown, which may move it and frees the old block. <code>s</code> must come from
+<code>mem.alloc</code>, <code>cstr.dup</code>, <code>cstr.formatTo(null, ...)</code> or an earlier
+<code>cstr.appendFormat</code>, or be <code>null</code> to start a new string; never pass a string
+literal or a stack buffer. <code>cstr.appendFormat</code> measures <code>s</code> on every call, so
+appending in a long loop is quadratic; <code>cstr.appendFormatLen(s, &amp;len, fmt, ...)</code> keeps
+the length in <code>len</code> and doesn't. <code>cstr.concat("a", "b", ...)</code> joins strings and <code>cstr.format(fmt, ...)</code> is
+<code>cstr.formatTo</code> into an exactly sized block.</p>
 <pre data-run><code>
-import fs, str;
+import cstr, mem;
 
 void main()
 {
-  printf("%d %d\n", str.len("hello"), str.cmp("abc", "abc") == 0);
-  printf("%d\n", str.cmpLen("prefix-rest", "prefix", 6) == 0);
-  printf("%d %d\n", str.cmp("abc", "abd") < 0, str.cmpLenNoCase("ABC", "abc", 3) == 0);
-  printf("%d\n", str.count("banana", 'a'));               // count a character
-  printf("%s\n", str.firstOf("key=value", "="));       // from the first match
-  printf("%s\n", str.lastOf("a/b/libc.ktm", "/"));         // from the last match
+  u8 *s = cstr.formatTo(null, "%d|%05d|%s|%.2f", 5000000000, 42, "x", 3.14159);
+  printf("%s\n", s);
+
+  u8 *csv = cstr.dup("id");
+  for (i64 i = 1; i <= 3; i++) {
+    csv = cstr.appendFormat(csv, ",%d", i);
+  }
+  printf("%s\n", csv);
+
+  i64 len = 0;
+  u8 *log = null;
+  for (i64 i = 0; i < 3; i++) {
+    log = cstr.appendFormatLen(log, &len, "[%d]", i * i);
+  }
+  printf("%s (%d)\n", log, len);
+
+  u8 *joined = cstr.concat("con", "cat", "enate");
+  printf("%s\n", joined);
+  mem.free(s);
+  mem.free(csv);
+  mem.free(log);
+  mem.free(joined);
+}
+</code></pre>
+<pre class="output">
+5000000000|00042|x|3.14
+id,1,2,3
+[0][1][4] (9)
+concatenate
+</pre>
+
+<h3>Inspecting C strings</h3>
+<p><code>cstr.cmp</code>, <code>cstr.cmpLen</code> and <code>cstr.cmpLenNoCase</code> return a negative,
+zero or positive number like C's <code>strcmp</code>, comparing bytes as unsigned, and sort a
+<code>null</code> before every string. <code>cstr.firstOf</code> and <code>cstr.lastOf</code>
+find the first or last character of the first string that is any of the characters in the
+second. <code>cstr.globMatch</code> matches a whole string against a pattern where
+<code>*</code> is any run of characters and <code>?</code> any one character.
+<code>cstr.hash</code> gives a well mixed 64-bit hash of a string.</p>
+<pre data-run><code>
+import cstr, fs, str;
+
+void main()
+{
+  printf("%d %d\n", cstr.len("hello"), cstr.cmp("abc", "abc") == 0);
+  printf("%d\n", cstr.cmpLen("prefix-rest", "prefix", 6) == 0);
+  printf("%d %d\n", cstr.cmp("abc", "abd") < 0, cstr.cmpLenNoCase("ABC", "abc", 3) == 0);
+  printf("%d\n", cstr.count("banana", 'a'));               // count a character
+  printf("%s\n", cstr.firstOf("key=value", "="));       // from the first match
+  printf("%s\n", cstr.lastOf("a/b/libc.ktm", "/"));         // from the last match
   printf("%s\n", fs.ext("archive.tar.gz"));
-  printf("%d %d %d\n", str.globMatch("main.ktm", "*.ktm"), str.globMatch("main.c", "*.ktm"),
-    str.globMatch("banana", "b?n*a"));
-  printf("%d\n", str.toInt("1234") + 1);
+  printf("%d %d %d\n", cstr.globMatch("main.ktm", "*.ktm"), cstr.globMatch("main.c", "*.ktm"),
+    cstr.globMatch("banana", "b?n*a"));
+  printf("%d\n", cstr.toInt("1234") + 1);
   printf("%c %c %d\n", str.toUpper('q'), str.toLower('Q'), str.isSpace(' '));
 }
 </code></pre>
@@ -207,119 +294,83 @@ void main()
 Q q 1
 </pre>
 <p><code>null</code> is safe in the inspecting functions: the compares sort it first,
-<code>str.firstOf</code>, <code>str.lastOf</code> and <code>fs.ext</code> return
-<code>null</code>, <code>str.globMatch</code>
-<code>false</code>, <code>str.count</code> and <code>str.toInt</code> 0.</p>
+<code>cstr.firstOf</code>, <code>cstr.lastOf</code> and <code>fs.ext</code> return
+<code>null</code>, <code>cstr.globMatch</code>
+<code>false</code>, <code>cstr.count</code> and <code>cstr.toInt</code> 0.</p>
 
-<h3>Copying and trimming</h3>
-<p><code>str.dup</code> copies a whole string and <code>str.dupLen(s, n)</code> at most the first
+<h3>Copying C strings</h3>
+<p><code>cstr.dup</code> copies a whole string and <code>cstr.dupLen(s, n)</code> at most the first
 <code>n</code> bytes of it, like C's <code>strndup</code> (a negative <code>n</code> is 0).
-<code>str.copy</code> copies into a buffer you provide. <code>str.trimStart</code> and
-<code>str.trimEnd</code> remove whitespace in place and return the same pointer; pass a length
-as the second argument to look only at that many bytes, or -1 for the whole string.</p>
+<code>cstr.copy</code> copies into a buffer you provide.</p>
 <pre data-run><code>
-import mem, str;
+import cstr, mem;
 
 void main()
 {
-  u8 *copy = str.dup("  padded  ");
-  i64 len;
-  str.trimStart(copy, -1, &len);
-  printf("[%s] %d\n", copy, len);
-  str.trimEnd(copy, -1, &len);
-  printf("[%s] %d\n", copy, len);
+  u8 *copy = cstr.dup("a copy");
+  printf("[%s]\n", copy);
 
-  u8 *part = str.dupLen("truncate me", 8);
+  u8 *part = cstr.dupLen("truncate me", 8);
   printf("[%s]\n", part);
 
   u8 buf[16];
-  str.copy(buf, "fixed");
+  cstr.copy(buf, "fixed");
   printf("%s\n", buf);
   mem.free(copy);
   mem.free(part);
 }
 </code></pre>
 <pre class="output">
-[padded  ] 8
-[padded] 6
+[a copy]
 [truncate]
 fixed
 </pre>
-<p><code>str.trimEndChars(s, chars)</code> removes any of the characters in <code>chars</code> from the end
-of <code>s</code>, in place, and returns the new length. Use it to drop the line ending from text
-you read, before comparing it.</p>
-<pre data-run><code>
-import str;
-
-void main()
-{
-  u8 buf[32];
-  str.copy(buf, "exit\r\n");
-  i64 len = str.trimEndChars(buf, "\r\n");
-  printf("[%s] %d %d\n", buf, len, str.cmp(buf, "exit") == 0);
-
-  str.copy(buf, "Hello!!!...");
-  len = str.trimEndChars(buf, ".!");
-  printf("[%s] %d\n", buf, len);
-}
-</code></pre>
-<pre class="output">
-[exit] 4 1
-[Hello] 5
-</pre>
-
 <h3>Splitting paths and names</h3>
-<p>These come from the original library. <code>str.splitFirst(s, markers, dst)</code> moves the part before
-the first marker character into <code>dst</code> and leaves the rest in <code>s</code>;
-<code>str.splitLast</code> does the same with the part after the last marker. Both change
-<code>s</code> in place, and <code>dst</code> may be <code>null</code>.
-<code>fs.cutExt(name, dst)</code> cuts the extension off <code>name</code> and puts it,
-without the dot, in <code>dst</code>. <code>fs.ext</code> finds the first <code>.</code>
-that isn't followed by <code>/</code> or <code>.</code>.</p>
+<p><code>fs.ext(name)</code> is a file name's extension, from its first <code>.</code> that
+isn't followed by <code>/</code> or <code>.</code>, and <code>fs.cutExt(name)</code> the name
+without it; both are views of the name. <code>str.splitLast</code> splits a path at its last
+<code>/</code>.</p>
 <pre data-run><code>
 import fs, str;
 
 void main()
 {
-  u8 path[32], first[16], last[16], ext[8];
-  str.copy(path, "usr/lib/libktm.a");
-  str.splitFirst(path, "/", first);
-  printf("%s + %s\n", first, path);
-  str.splitLast(path, "/", last);
-  printf("%s + %s\n", path, last);
-  fs.cutExt(last, ext);
-  printf("%s . %s\n", last, ext);
+  u8[] dir, file;
+  str.splitLast("usr/lib/libktm.tar.gz", "/", &dir, &file);
+  printf("%s + %s\n", dir, file);
+  printf("%s + %s\n", fs.cutExt(file), fs.ext(file));
 }
 </code></pre>
 <pre class="output">
-usr + lib/libktm.a
-lib + libktm.a
-libktm . a
+usr/lib + libktm.tar.gz
+libktm + .tar.gz
 </pre>
 
 <h2 id="files">Files</h2>
-<p><code>fs.writeAll</code> writes a buffer to a file and returns whether it worked.
-<code>fs.readAll</code> reads a whole file into a new NUL-terminated buffer, or returns
-<code>null</code> if it can't.</p>
+<p>Paths are a <code>u8[]</code> (a literal, a slice or a String; a C string through
+<code>cstr.view(p)</code>). <code>fs.writeAll(path, data)</code> writes <code>data</code>, a
+<code>u8[]</code>, to a file and returns whether it worked. <code>fs.readAll(path)</code> reads a
+whole file into a String that is yours, with a NUL after it; its <code>ptr</code> is
+<code>null</code> when the file can't be read (<code>os.errno()</code> says why), and an empty
+file gives an empty String that has one.</p>
 <pre data-run><code>
-import fs, mem, str;
+import fs;
 
 void main()
 {
-  u8 *path = "/tmp/ktm_docs_example.txt";
-  u8 *text = "first line\nsecond line\n";
-  if (!fs.writeAll(path, text, str.len(text))) {
+  u8[] path = "/tmp/ktm_docs_example.txt";
+  if (!fs.writeAll(path, "first line\nsecond line\n")) {
     printf("could not write %s\n", path);
     return;
   }
 
-  i64 size;
-  u8 *contents = fs.readAll(path, &size);
-  printf("%d bytes\n%s", size, contents);
-  mem.free(contents);
+  String contents = fs.readAll(path);
+  defer contents.free();
+  printf("%d bytes\n%s", contents.len, contents);
 
-  if (fs.readAll("/no/such/file", &size) == null) {
-    printf("missing files give NULL\n");
+  String missing = fs.readAll("/no/such/file");
+  if (!missing.ptr) {
+    printf("a missing file gives a String without a ptr\n");
   }
 }
 </code></pre>
@@ -327,17 +378,18 @@ void main()
 23 bytes
 first line
 second line
-missing files give NULL
+a missing file gives a String without a ptr
 </pre>
 <p><code>fs.writeAll</code> replaces the file's contents: by default it opens with
 <code>O_CREAT | O_WRONLY | O_TRUNC</code> (a new file gets mode 0644 minus the umask).
 Pass the flags yourself to do something else, <code>O_CREAT | O_WRONLY | O_APPEND</code>
-to add to the end. A <code>null</code> name or buffer or a negative size gives
-<code>false</code> and creates nothing. <code>fs.readAll</code> reads a regular file up to
-its size, and a FIFO, a pipe (<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a
-<code>/proc</code> file (which reports size 0) until end of file, so it waits for a
-FIFO's writer and never finishes on an endless device like <code>/dev/zero</code>. For a
-directory it returns <code>null</code>, and on any failure it sets <code>*_size</code> to 0.</p>
+to add to the end. A path that can't be opened gives <code>false</code> and creates nothing.
+<code>fs.readAll</code> reads a regular file up to its size, and a FIFO, a pipe
+(<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a <code>/proc</code> file (which
+reports size 0) until end of file, so it waits for a FIFO's writer and never finishes on an
+endless device like <code>/dev/zero</code>. For a directory it gives a String without a
+<code>ptr</code>. A path longer than 4095 bytes fails in every function here, with
+<code>ENAMETOOLONG</code>.</p>
 
 <p>Directories: <code>fs.makeDir(path)</code> makes one directory and
 <code>fs.makeDir(path,, true)</code> the missing parents too; both return 0 if the path is a
@@ -348,36 +400,39 @@ a directory and everything in it, with <code>fs.REMOVE_FORCE</code> a path that 
 is not an error. <code>fs.removeDir</code> is the directory half of it.
 <code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times),
 <code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
-<code>fs.currentDir()</code> returns the working directory as a new string to <code>mem.free</code>.</p>
+<code>fs.currentDir()</code> returns the working directory as a String.</p>
 <pre data-run><code>
-import fs, libc, mem, str;
+import cstr, fs, libc, mem, str;
 
 extern "c" u8 *mkdtemp(u8 *template);
 
 void main()
 {
-  u8 root[32], path[64];
-  mem.copy(root, "/tmp/ktm_docs_XXXXXX", 21);
-  if (!mkdtemp(root)) { return; }    // a fresh directory to work in
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(dir)) { return; }    // a fresh directory to work in
+  u8[] root = cstr.view(dir);
 
-  str.formatTo(path, "%s/a/b", root);
+  String path = str.format("%s/a/b", root);
+  defer path.free();
   printf("fs.makeDir: %d\n", fs.makeDir(path,, true));
 
-  str.formatTo(path, "%s/a/notes.txt", root);
-  fs.writeAll(path, "a long first version\n", 21);
-  fs.writeAll(path, "short\n", 6);                  // replaces it
-  fs.writeAll(path, "more\n", 5, libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
-  i64 size;
-  u8 *text = fs.readAll(path, &size);
-  printf("%d bytes:\n%s", size, text);
-  mem.free(text);
+  String notes = str.format("%s/a/notes.txt", root);
+  defer notes.free();
+  fs.writeAll(notes, "a long first version\n");
+  fs.writeAll(notes, "short\n");                  // replaces it
+  fs.writeAll(notes, "more\n", libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
+  String text = fs.readAll(notes);
+  defer text.free();
+  printf("%d bytes:\n%s", text.len, text);
 
-  str.formatTo(path, "%s/a", root);
-  printf("fs.readAll of a directory: %d\n", fs.readAll(path) == null);
+  String a = str.format("%s/a", root);
+  defer a.free();
+  String what = fs.readAll(a);
+  printf("fs.readAll of a directory: %d\n", what.ptr == null);
 
   fs.FileStat fst;
-  str.formatTo(path, "%s/a/notes.txt", root);
-  if (fs.stat(&fst, path) == 0) { printf("notes.txt: %d bytes\n", fst.st_size); }
+  if (fs.stat(&fst, notes) == 0) { printf("notes.txt: %d bytes\n", fst.st_size); }
 
   printf("fs.remove: %d\n", fs.remove(root, fs.REMOVE_RECURSE));
   printf("fs.remove again with fs.REMOVE_FORCE: %d\n", fs.remove(root, fs.REMOVE_FORCE));
@@ -407,7 +462,7 @@ its row or the row). The slices are the raw text: a quoted field keeps its quote
 its doubled <code>""</code>, commas and newlines inside quotes don't split, and a row's
 length includes its <code>\n</code> or <code>\r\n</code>. Unquoting is up to you.</p>
 <pre data-run><code>
-import csv, str;
+import cstr, csv, str;
 
 void main()
 {
@@ -415,7 +470,7 @@ void main()
   csv.Parser p;
   csv.Slice s;
   i64 kind;
-  csv.init(&p, text, str.len(text));
+  csv.init(&p, text, cstr.len(text));
   while ((kind = csv.next(&p, &s)) != csv.EOF) {
     if (kind == csv.FIELD) { printf("field %d: [%.*s]\n", s.idx, s.len, text + s.off); }
     else                   { printf("row %d: %d bytes\n", s.idx, s.len); }
@@ -436,7 +491,7 @@ row 2: 5 bytes
 
 <h2 id="system">Running commands</h2>
 <pre data-run><code>
-import mem, proc;
+import cstr, mem, proc;
 
 void main()
 {
@@ -480,7 +535,7 @@ not be pasted in as it is: a space splits it and <code>$</code>, <code>`</code>,
 <code>'</code> written as <code>'\''</code> (and <code>''</code> for <code>null</code>),
 so the shell gets it as one word, unchanged.</p>
 <pre data-run><code>
-import mem, proc;
+import cstr, mem, proc;
 
 void main()
 {
@@ -503,7 +558,7 @@ the program exactly as written, so nothing needs quoting. The program is looked 
 <code>$PATH</code>; NULL means it couldn't be started, and <code>os.errno()</code> says why
 (2, ENOENT, for a program that doesn't exist).</p>
 <pre data-run><code>
-import mem, proc;
+import cstr, mem, proc;
 
 void main()
 {
@@ -533,7 +588,7 @@ environment) are optional. <code>proc.communicate(p, input, len, &amp;out, &amp;
 <code>proc.release(p)</code> closes the pipes and frees it, waiting for a program that is still
 running.</p>
 <pre data-run><code>
-import mem, proc;
+import cstr, mem, proc;
 
 void main()
 {
@@ -573,7 +628,7 @@ and <code>old</code>, if given, receives the previous action, so it can be put b
 <code>signal.action(sig, &amp;old)</code>. <code>signal(sig, handler)</code> is the same as
 <code>signal.handle</code> with <code>SA_RESTART</code>, and the two can be mixed.</p>
 <pre data-run><code>
-import libc, signal;
+import cstr, libc, signal;
 
 i64 hits = 0;
 void onUsr1(i32 sig)
@@ -606,7 +661,7 @@ arrives, and from then on <code>signal.stopRequested()</code> is TRUE (<code>sig
 which one came). The loop finishes what it is doing and returns. A second Ctrl-C ends the program
 as usual, in case the loop never gets there.</p>
 <pre data-run><code>
-import libc, signal;
+import cstr, libc, signal;
 
 void main()
 {
@@ -630,7 +685,7 @@ is its head node, which links to itself when the list is empty, so iterate from
 <code>l.next</code> until you get back to <code>l</code>. The list never frees the values
 it holds unless you hand it a free function.</p>
 <pre data-run><code>
-import list;
+import cstr, list;
 
 void main()
 {
@@ -686,25 +741,25 @@ functions that remove, look or free accept a <code>null</code> list and do nothi
 (returning <code>null</code>, <code>0</code> from <code>list.count</code>, <code>true</code>
 from <code>list.isEmpty</code>); the ones that add need a real list.</p>
 <pre data-run><code>
-import list, mem, str;
+import cstr, list, mem, str;
 
 void main()
 {
   list.List todo;              // a head on the stack
   todo.init();
-  todo.append(str.dup("write"));
-  todo.append(str.dup("test"));
-  todo.append(str.dup("ship"));
+  todo.append(cstr.dup("write"));
+  todo.append(cstr.dup("test"));
+  todo.append(cstr.dup("ship"));
 
   list.List *it = todo.next;
   while (it != &todo) {   // drop "test" while walking
     list.List *next = it.next;
-    if (!str.cmp(it.value, "test")) { mem.free(it.remove()); }
+    if (!cstr.cmp(it.value, "test")) { mem.free(it.remove()); }
     it = next;
   }
 
   list.List *later = list.new();
-  later.append(str.dup("rest"));
+  later.append(cstr.dup("rest"));
   todo.mergeAppend(later);   // `later` is freed
 
   for (it = todo.next; it != &todo; it = it.next) { printf("%s ", it.value); }
@@ -721,37 +776,37 @@ empty: 1
 <h2 id="vectors">Vectors</h2>
 <p>Growable arrays: <code>vec.IntVec</code> of <code>i64</code>, <code>vec.FloatVec</code> of
 <code>f64</code> and <code>vec.PtrVec</code> of pointers. Each has <code>size</code> and
-<code>entries</code> fields, so a range-based <code>for</code> works on them. The functions
-are the same for the three, with the type as prefix:</p>
+<code>entries</code> fields, so a range-based <code>for</code> works on them. They have the
+same methods:</p>
 <ul>
   <li><code>vec.intNew(size = 32)</code> makes an empty vector with room for
   <code>size</code> values (its initial capacity); a size below 1 is taken as 1.
-  <code>vec.intCapacity</code> says how many values fit before the storage has to grow, and
-  <code>vec.intPush</code> appends, doubling the storage when it is full.</li>
-  <li><code>vec.intGet(v, i)</code> and <code>vec.intSet(v, i, value)</code> read and replace an
+  <code>v.capacity()</code> says how many values fit before the storage has to grow, and
+  <code>v.push(value)</code> appends, doubling the storage when it is full.</li>
+  <li><code>v.get(i)</code> and <code>v.set(i, value)</code> read and replace an
   entry. The index is always checked: outside <code>0</code> to <code>size - 1</code> they
-  print <code>vec.intGet: index 5 out of range (size 3)</code> on stderr and exit with
+  print <code>IntVec.get: index 5 out of range (size 3)</code> on stderr and exit with
   status 1. Reading <code>v.entries[i]</code> directly is not checked.</li>
-  <li><code>vec.intPop(v, &amp;ok)</code> removes and returns the last entry and
-  <code>vec.intLast(v, &amp;ok)</code> returns it without removing it. On an empty vector they
+  <li><code>v.pop(&amp;ok)</code> removes and returns the last entry and
+  <code>v.last(&amp;ok)</code> returns it without removing it. On an empty vector they
   return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
   <code>vec.PtrVec</code>) and set <code>ok</code> to <code>false</code>; the
   <code>ok</code> argument is optional.</li>
-  <li><code>vec.intClear</code> sets the size to 0 and keeps the storage for reuse;
-  <code>vec.intRelease</code> frees it. <code>vec.ptrRelease(v, free_value)</code> first calls
+  <li><code>v.clear()</code> sets the size to 0 and keeps the storage for reuse;
+  <code>v.release()</code> frees it. A <code>vec.PtrVec</code>'s <code>v.release(free_value)</code> first calls
   <code>free_value</code> (for example <code>&amp;mem.free</code>) on every value.</li>
-  <li><code>vec.intSort</code> and <code>vec.floatSort</code> sort ascending.
-  <code>vec.ptrSort</code> takes a comparison that returns <code>true</code> when its first
+  <li><code>sort()</code> of a <code>vec.IntVec</code> or <code>vec.FloatVec</code> sorts ascending.
+  A <code>vec.PtrVec</code>'s <code>sort</code> takes a comparison that returns <code>true</code> when its first
   argument should come first. That's a "less than" test, not a C-style negative, zero or
   positive result, which leaves the vector unsorted. The sorts are O(n log n), also for
   sorted or all-equal input, and not stable: equal values may change order.</li>
 </ul>
 <pre data-run><code>
-import mem, str, vec;
+import cstr, mem, str, vec;
 
 i64 shorterFirst(void *a, void *b)
 {
-  return str.len(a) < str.len(b);
+  return cstr.len(a) < cstr.len(b);
 }
 
 void main()
@@ -769,9 +824,9 @@ void main()
   nums.release();
 
   vec.PtrVec *words = vec.ptrNew();
-  words.push(str.dup("banana"));
-  words.push(str.dup("fig"));
-  words.push(str.dup("kiwi"));
+  words.push(cstr.dup("banana"));
+  words.push(cstr.dup("fig"));
+  words.push(cstr.dup("kiwi"));
   words.sort(&shorterFirst);
   for (u8 *w : words) {
     printf("%s\n", w);
@@ -789,7 +844,7 @@ kiwi
 banana
 </pre>
 <pre data-run><code>
-import vec;
+import cstr, vec;
 
 void main()
 {
@@ -814,18 +869,18 @@ after clear: size 0, last -1.0, ok 0
 </pre>
 
 <h2 id="sets">Sets and trees</h2>
-<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>set.intAdd</code>,
-<code>set.intDelete</code> and <code>set.intHas</code> are O(log n); adding a value that is
-there, or deleting one that isn't, changes nothing. <code>set.intUnionWith</code>,
-<code>set.intIntersection</code>, <code>set.intDiff</code> (in the first set, not the
-second) and <code>set.intSymDiff</code> (in exactly one) return a new set and leave their
-arguments alone; <code>set.intEq</code> compares two sets. An iterator, <code>set.intToVec</code>
-and <code>set.intToStr</code> give the values in ascending order. Don't add or delete
+<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>add</code>,
+<code>delete</code> and <code>has</code> are O(log n); adding a value that is
+there, or deleting one that isn't, changes nothing. <code>unionWith</code>,
+<code>intersection</code>, <code>diff</code> (in the first set, not the
+second) and <code>symDiff</code> (in exactly one) return a new set and leave their
+arguments alone; <code>eq</code> compares two sets. An iterator, <code>toVec</code>
+and <code>toStr</code> (a String) give the values in ascending order. Don't add or delete
 values while iterating: once one is added or deleted, <code>set.intIterNext</code> returns
 <code>null</code> and the loop ends early, so collect the changes and apply them after it. The functions that only read a set, and
-<code>set.intRelease</code>, treat <code>null</code> as the empty set.</p>
+<code>release</code>, treat <code>null</code> as the empty set.</p>
 <pre data-run><code>
-import mem, set;
+import cstr, mem, set;
 
 void main()
 {
@@ -840,9 +895,9 @@ void main()
     evens.has(4), evens.has(5), evens.size());
 
   set.IntSet *both = evens.intersection(threes);
-  u8 *str = both.toStr();
-  printf("both: %s\n", str);
-  mem.free(str);
+  String text = both.toStr();
+  printf("both: %s\n", text);
+  text.free();
 
   set.IntSet *either = evens.unionWith(threes);
   set.IntSetIter *it = either.iterNew();
@@ -868,18 +923,18 @@ both: {6, 12}
 less than 0 when <code>a</code> comes first, 0 when they are equal and more than 0
 otherwise. The two free functions may be <code>null</code>; when set, the tree frees keys
 and values with them on delete, release and when an insert replaces a value (an insert of
-an existing key keeps the stored key). <code>map.rbGet</code> returns <code>null</code> for
-a missing key, the same as a stored <code>null</code>, so ask <code>map.rbHas</code> to tell
-them apart. <code>map.rbIterNew</code> and <code>map.rbForEach</code> visit the entries in key
+an existing key keeps the stored key). <code>get</code> returns <code>null</code> for
+a missing key, the same as a stored <code>null</code>, so ask <code>has</code> to tell
+them apart. <code>iterNew</code> and <code>forEach</code> visit the entries in key
 order; don't insert or delete while they run. Once a new key is added or one is deleted,
-<code>map.rbIterNext</code> returns <code>null</code> and <code>map.rbForEach</code> returns after
+<code>map.rbIterNext</code> returns <code>null</code> and <code>forEach</code> returns after
 that callback; replacing the value of a key that is there is fine.</p>
 <pre data-run><code>
-import map, str;
+import cstr, map, str;
 
 i64 strKeyCmp(void *a, void *b)
 {
-  return str.cmp(a, b);
+  return cstr.cmp(a, b);
 }
 
 void main()
@@ -907,15 +962,22 @@ linus = 55
 </pre>
 
 <h2 id="hash-tables">Hash tables</h2>
-<p><code>map.StrMap</code> maps strings to <code>void *</code> values and <code>map.IntMap</code> maps
+<p><code>map.StrMap</code> maps text keys to <code>void *</code> values and <code>map.IntMap</code> maps
 <code>i64</code> keys. Values are pointers, so cast integers when storing them:
 <code>count(void *)</code>. Setting an existing key replaces its value.</p>
+<p>A <code>StrMap</code> key is a <code>u8[]</code>: a literal, a <code>String</code> or a view into a
+buffer, matched on all its bytes. The map stores its own copy of every new key and frees it
+itself, so the key you pass can be a reused buffer or a String you free right after.
+<code>node.key</code> and <code>keyIter</code> give views of the map's copy (with a NUL after it, so
+<code>key.ptr</code> is also a C string), valid until that key is deleted or the map is cleared or
+released.</p>
 <pre data-run><code>
 import map;
 
 void main()
 {
   map.StrMap *stock = map.strNew();
+  defer stock.release();
   stock.set("apples", (void *)3);
   stock.set("pears", (void *)5);
   stock.set("apples", (void *)4);
@@ -930,14 +992,13 @@ void main()
   while (stock.iter(&idx, &node)) {
     printf("%s = %d\n", node.key, node.value);
   }
-  stock.release();
 
   map.IntMap *names = map.intNew();
+  defer names.release();
   names.set(404, "not found");
   names.set(200, "ok");
   printf("%s\n", names.get(404));
   printf("deleted 200: %d, deleted 500: %d\n", names.delete(200), names.delete(500));
-  names.release();
 }
 </code></pre>
 <pre class="output">
@@ -947,20 +1008,18 @@ pears = 5
 not found
 deleted 200: 1, deleted 500: 0
 </pre>
-<p><code>map.strGet</code> and <code>map.intGet</code> return <code>null</code> for a missing
-key, which is also what a stored <code>null</code> or <code>0</code> gives. Pass a
-<code>bool</code> as the optional last argument to tell them apart: it is set to
-<code>true</code> when the key is there (<code>map.strHas</code> and <code>map.intHas</code> answer
-the same question). <code>map.strGetLen</code> and <code>map.strHasLen</code> look up the first
-<code>key_len</code> bytes at a pointer, so a word inside a larger buffer can be looked up
-without copying it out. <code>map.strClear</code> and <code>map.intClear</code> remove every
-entry and keep the capacity.</p>
+<p><code>get</code> returns <code>null</code> for a missing key, which is also what a stored
+<code>null</code> or <code>0</code> gives. Pass a <code>bool</code> as the optional last argument to
+tell them apart: it is set to <code>true</code> when the key is there (<code>has</code> answers the
+same question). A word inside a larger buffer is looked up with a sub-slice, without copying it out.
+<code>clear</code> removes every entry and keeps the capacity.</p>
 <pre data-run><code>
 import map;
 
 void main()
 {
   map.IntMap *seen = map.intNew();
+  defer seen.release();
   seen.set(7, (void *)0);
   bool ok;
   i64 v = seen.get(7, &ok);
@@ -969,15 +1028,14 @@ void main()
   printf("8: %d (there: %d)\n", v, ok);
 
   map.StrMap *words = map.strNew();
+  defer words.release();
   words.set("let", (void *)1);
   words.set("for", (void *)2);
-  u8 *line = "for x in xs";
-  printf("first word: %d\n", words.getLen(line, 3));
+  u8[] line = "for x in xs";
+  printf("first word: %d\n", words.get(line[0:3]));
 
   words.clear();
   printf("after clear: %d keys, %d slots\n", words.size, words.capacity);
-  words.release();
-  seen.release();
 }
 </code></pre>
 <pre class="output">
@@ -986,48 +1044,63 @@ void main()
 first word: 2
 after clear: 0 keys, 32 slots
 </pre>
-<p>Iteration (<code>map.strIter</code>, <code>map.strKeyIter</code>, <code>map.strValueIter</code>
-and the <code>map.IntMap</code> ones) follows insertion order. Start the cursor at 0 and call
-until it returns <code>false</code>; the cursor is opaque, so don't compute with it.
-Deleting entries while iterating is safe (the loop above could delete
-<code>node.key</code>); adding entries is not, as an added entry can be skipped or the
-table rebuilt under the loop. A deleted key can be set again and then comes last.
-<code>map.strToStr</code>, <code>map.intToStr</code> and the <code>KeysToString</code>
-versions print a map, in insertion order, into a new string you free.</p>
+<p>Iteration (<code>iter</code>, <code>keyIter</code> and <code>valueIter</code>, on both kinds of
+map) follows insertion order. Start the cursor at 0 and call until it returns <code>false</code>;
+the cursor is opaque, so don't compute with it. Deleting entries while iterating is safe (the
+loop above could delete <code>node.key</code>); adding entries is not, as an added entry can be
+skipped or the table rebuilt under the loop. A deleted key can be set again and then comes last.
+<code>toStr</code> and <code>keysToStr</code> print a map, in insertion order, into a new
+<code>String</code> (free it); <code>toStr</code> takes a function that turns a value into a
+<code>String</code>, which it frees after use.</p>
+<pre data-run><code>
+import map, str;
+
+String showCount(void *v)
+{
+  return str.format("%d", (i64)v);
+}
+
+void main()
+{
+  map.StrMap *m = map.strNew();
+  defer m.release();
+  m.set("a", (void *)1);
+  m.set("b", (void *)2);
+  String keys = m.keysToStr();
+  defer keys.free();
+  String all = m.toStr(&showCount);
+  defer all.free();
+  printf("%s %s\n", keys, all);
+}
+</code></pre>
+<pre class="output">
+{a, b} {[a] => 1, [b] => 2}
+</pre>
 <p><code>map.strNew</code> and <code>map.intNew</code> take an optional starting capacity
 (default 32): the number of slots, rounded up to a power of two, at least 8 (a negative
 request gets 8 and one above 2<sup>28</sup> gets 2<sup>28</sup>). The table is rebuilt,
 doubling, when its entries and deleted holes fill 60% of the slots, so a capacity of 1024
 holds about 600 entries before it grows. It never shrinks, not on delete and not on clear;
-release it and make a new one to give the memory back. <code>map.strResize</code> and
-<code>map.intResize</code> double it ahead of time. They and the <code>New</code> functions
-return <code>false</code> or <code>null</code> when out of memory, as does a
-<code>Set</code> that needed to grow the table.</p>
-<p><code>map.strSetFreeKey</code>, <code>map.strSetFreeValue</code> and
-<code>map.intSetFreeValue</code> register destructors. With them the map owns what you give
-it: they run on <code>Delete</code>, <code>Clear</code> and <code>Release</code>, and when
-<code>Set</code> replaces a value. Setting a key that is already there keeps the key the map
-stores and frees the old value and the key you passed (nothing is freed when you pass the
-stored pointers again). A pointer used as both the key and the value
-(<code>map.strSet(m, s, s)</code>) is freed once. <code>Set</code> returns <code>true</code>
-for a new key and an update alike; check <code>Has</code> first to know which. A
-<code>null</code> map or key is safe everywhere: <code>Get</code> and <code>Has</code> give
-<code>null</code> and <code>false</code>, <code>Set</code> and <code>Delete</code>
-<code>false</code>, and <code>Release</code> and <code>Clear</code> do nothing.</p>
-<div class="warn"><p>The map keeps the key pointer you pass the first time a key is set,
-instead of copying it. Use keys that live as long as the map, such as
-<code>str.dup</code> copies; updating an existing key from a reused buffer is fine. With a
-key destructor registered, an update frees the key you passed: don't use it after
-<code>map.strSet</code> returns.</p></div>
+release it and make a new one to give the memory back. <code>resize</code> doubles it ahead of
+time. It and the <code>New</code> functions return <code>false</code> or <code>null</code> when
+out of memory, as does a <code>set</code> that needed to grow the table or copy a key.</p>
+<p><code>setFreeValue</code> registers a value destructor. With it the map owns the values you
+give it: it runs on <code>delete</code>, <code>clear</code> and <code>release</code>, and when
+<code>set</code> replaces a value (not when you set the stored pointer again). <code>set</code>
+returns <code>true</code> for a new key and an update alike; check <code>has</code> first to know
+which. A <code>null</code> map is safe everywhere: <code>get</code> and <code>has</code> give
+<code>null</code> and <code>false</code>, <code>set</code> and <code>delete</code>
+<code>false</code>, and <code>release</code> and <code>clear</code> do nothing. An empty
+<code>u8[]</code> is the key <code>""</code>.</p>
 
 <h2 id="bit-vectors">Bit vectors</h2>
-<p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>vec.bitSet</code>
-grows it to fit any index (a <code>u64</code>), <code>vec.bitTest</code> and
-<code>vec.bitUnset</code> treat bits past the end as 0, and <code>vec.bitClear</code> zeroes
-every bit. <code>vec.bitSet</code> returns <code>false</code> when it runs out of memory
-growing. <code>vec.bitRelease(null)</code> does nothing.</p>
+<p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>set</code>
+grows it to fit any index (a <code>u64</code>), <code>test</code> and
+<code>unset</code> treat bits past the end as 0, and <code>clear</code> zeroes
+every bit. <code>set</code> returns <code>false</code> when it runs out of memory
+growing. <code>release</code> of a <code>null</code> BitVec does nothing.</p>
 <pre data-run><code>
-import vec;
+import cstr, vec;
 
 void main()
 {
@@ -1051,7 +1124,7 @@ void main()
 
 <h2 id="json">JSON</h2>
 <h3>Parsing and selecting</h3>
-<p><code>json.parse(text)</code> parses text into a tree of <code>json.Value</code> nodes and
+<p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
 returns its root; the text can be any one JSON value (an object, array, string, number,
 boolean or <code>null</code>). It always returns a root: check <code>json.ok</code> before
 using it, and free it with <code>json.release</code> either way. <code>json.select(node,
@@ -1062,11 +1135,11 @@ string, <code>:i</code> integer, <code>:f</code> float, <code>:b</code> boolean,
 <code>null</code> if the path doesn't match or is malformed (<code>[1x]</code>,
 <code>..a</code>, a trailing <code>.</code>).</p>
 <pre data-run><code>
-import json, mem;
+import json;
 
 void main()
 {
-  u8 *text = "{\"name\": \"ktm\", \"version\": 15, \"ratio\": 0.75, \"tags\": [\"jit\", \"repl\"], \"stable\": false, \"owner\": null}";
+  u8[] text = "{\"name\": \"ktm\", \"version\": 15, \"ratio\": 0.75, \"tags\": [\"jit\", \"repl\"], \"stable\": false, \"owner\": null}";
   json.Value *doc = json.parse(text);
   if (!json.ok(doc)) {
     json.printError(doc);
@@ -1086,9 +1159,9 @@ void main()
     printf("tag %s\n", t.str);
   }
 
-  u8 *out = json.toStr(doc);
+  String out = json.toStr(doc);
+  defer out.free();
   printf("%s\n", out);
-  mem.free(out);
   json.release(doc);
 }
 </code></pre>
@@ -1102,21 +1175,22 @@ tag repl
 {"name": "ktm","version": 15,"ratio": 0.75,"tags": ["jit","repl"],"stable": false,"owner": null}
 </pre>
 <p>Each node has a <code>type</code> and its value in the matching field:
-<code>json.STRING</code> in <code>str</code>, <code>json.INT</code> in <code>i64</code>,
-<code>json.FLOAT</code> in <code>f64</code>, <code>json.BOOL</code> in
+<code>json.STRING</code> in <code>str</code> (a <code>u8[]</code>), <code>json.INT</code> in <code>intVal</code>,
+<code>json.FLOAT</code> in <code>floatVal</code>, <code>json.BOOL</code> in
 <code>boolean</code>, <code>json.NULL</code>, <code>json.STRNUM</code> in
 <code>strnum</code> (see below), and <code>json.ARRAY</code> / <code>json.OBJECT</code>,
 whose <code>array</code> / <code>object</code> points at the first item or member - or is
 <code>null</code> when the array or object is empty. A member has its name in
-<code>key</code>, and <code>next</code> leads to the following item or member, so that is how
-you iterate.</p>
+<code>key</code> (a <code>u8[]</code>), and <code>next</code> leads to the following item or
+member, so that is how you iterate. <code>str</code> and <code>key</code> are views of bytes
+the document owns (each with a NUL after it, so <code>.ptr</code> is a C string).</p>
 
 <h3>Wildcards and getters</h3>
 <p>A <code>*</code> in a path takes the next argument: an <code>i64</code> inside
 <code>[]</code>, a string after <code>.</code>, and it can be part of a name
 (<code>.price_*</code>). Each part of a path is at most 256 bytes, and a key that contains
 <code>.</code> <code>[</code> <code>]</code> <code>:</code> or <code>*</code> can't be written
-in a path. <code>json.objectGet(obj, key)</code> and <code>json.arrayGet(arr, i)</code> take
+in a path. <code>json.objectGet(obj, key)</code> (any <code>u8[]</code>, all its bytes) and <code>json.arrayGet(arr, i)</code> take
 any key or index directly (<code>null</code> if it isn't there or the node has the wrong
 type), and <code>json.len</code> counts the items of an array or object (0 for anything
 else). If a key appears twice, both members are kept; selecting it finds the first.</p>
@@ -1155,8 +1229,8 @@ rows[1][0] = 3, rows[5]: 1
 </pre>
 
 <h3>Writing JSON and freeing</h3>
-<p><code>json.toStr(node)</code> returns the JSON text of that node's value as a new
-string to <code>mem.free</code>: for an inner node just its value, without its key or the nodes
+<p><code>json.toStr(node)</code> returns the JSON text of that node's value as a String
+that is yours: for an inner node just its value, without its key or the nodes
 after it. Members are written as <code>"key": value</code> and items are separated by
 <code>,</code> without a space. Floats get 15, 16 or 17 significant digits, the fewest that
 read back as the same value, always with a decimal point (<code>0.75</code>,
@@ -1169,19 +1243,19 @@ parses back to the same values.</p>
 released. <code>json.release</code> frees a whole document, and only does something when given
 a root; on <code>null</code> or an inner node it does nothing.</p>
 <pre data-run><code>
-import json, mem;
+import json;
 
 void main()
 {
   json.Value *doc = json.parse("{\"user\": {\"id\": 7, \"roles\": [\"admin\"]}, \"n\": 1e400}");
   json.Value *user = json.select(doc, ".user");
-  u8 *s = json.toStr(user);      // just this node's value
+  String s = json.toStr(user);      // just this node's value
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(user);               // a view: ignored
-  s = json.toStr(doc);           // 1e400 is too big for an f64: null
+  s = json.toStr(doc);              // 1e400 is too big for an f64: null
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);                // frees everything
 }
 </code></pre>
@@ -1197,27 +1271,27 @@ top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
 strings, whitespace other than space, tab, newline and carriage return, anything but whitespace
 between a key and its <code>:</code>, and arrays and objects nested more than
 <code>json.MAX_DEPTH</code> (512) deep. On an error <code>json.errorStr(root)</code>
-returns a message to <code>mem.free</code> (<code>null</code> if there was no error) and
+returns the message as a String (one without a <code>ptr</code> if there was no error) and
 <code>json.printError</code> prints it; both say where, as a line and a byte column, also
 found in <code>root-&gt;state</code> with the error code (<code>error</code>, <code>line</code>,
 <code>col</code>, <code>offset</code>).</p>
 <pre data-run><code>
-import json, mem;
+import cstr, json;
 
 void main()
 {
   json.Value *doc = json.parse("{\n  \"a\": [1, 2],\n  \"b\" 3\n}");
   if (!json.ok(doc)) {
-    u8 *msg = json.errorStr(doc);
+    String msg = json.errorStr(doc);
     printf("%s\n", msg);
     printf("code %d, line %d, column %d\n", doc.state.error, doc.state.line, doc.state.col);
-    mem.free(msg);
+    msg.free();
   }
   json.release(doc);
 
   u8 *bad[6] = {"[1, 2,]", "[1] x", "[01]", "{\"a\": tru}", "[\"tab\there\"]", ""};
   for (i64 i = 0; i < 6; i++) {
-    doc = json.parse(bad[i]);
+    doc = json.parse(cstr.view(bad[i]));
     printf("%d ", doc.state.error);
     json.release(doc);
   }
@@ -1256,11 +1330,10 @@ longer produced.</p>
 becomes a <code>json.FLOAT</code>, as in JavaScript, and a number with a fraction or exponent
 is a float (one too big for an <code>f64</code> is infinity). String escapes are decoded,
 <code>\uXXXX</code> and surrogate pairs to UTF-8. A string can contain <code>\u0000</code>,
-so <code>str_len</code> and <code>key_len</code> give the full byte length of
-<code>str</code> and <code>key</code>; C-style functions and paths see them only up to the
-first <code>'\0'</code>.</p>
-<p><code>json.parse</code>'s optional arguments are the length to parse (-1, the default,
-reads up to the terminating NUL) and flags: <code>json.NO_FLAGS</code> or
+which <code>str.len</code> and <code>key.len</code> count; C-style functions and paths see
+them only up to the first <code>'\0'</code>.</p>
+<p><code>json.parse</code>'s optional argument is the flags (to parse part of a text, give it
+the part: <code>json.parse(text[0:n])</code>): <code>json.NO_FLAGS</code> or
 <code>json.STRNUM_FLAG</code>. With <code>json.STRNUM_FLAG</code> numbers are not converted:
 each one is still checked against the JSON grammar and becomes a <code>json.STRNUM</code>
 node whose <code>strnum</code> is the number exactly as written, so large integers and
@@ -1268,25 +1341,25 @@ decimals keep every digit, and <code>json.toStr</code> writes it back unchanged.
 <code>:i</code> and <code>:f</code> checks don't match these nodes; select them without
 one.</p>
 <pre data-run><code>
-import json, mem;
+import json;
 
 void main()
 {
   json.Value *doc = json.parse("[9007199254740993, 99999999999999999999, 2.50, \"a\\u0000b\"]");
   json.Value *big = json.arrayGet(doc, 1);
-  printf("%d %d %d\n", json.isInt(json.arrayGet(doc, 0)), json.isFloat(big), json.arrayGet(doc, 3).strLen);
-  u8 *s = json.toStr(doc);
+  printf("%d %d %d\n", json.isInt(json.arrayGet(doc, 0)), json.isFloat(big), json.arrayGet(doc, 3).str.len);
+  String s = json.toStr(doc);
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);
 
   doc = json.parse("{\"id\": 123456789012345678901234567890, \"price\": 9.90}",
-                  -1, json.STRNUM_FLAG);
+                  json.STRNUM_FLAG);
   printf("id %s\n", json.select(doc, ".id").strnum);
   printf("price %s\n", json.select(doc, ".price").strnum);
   s = json.toStr(doc);
   printf("%s\n", s);
-  mem.free(s);
+  s.free();
   json.release(doc);
 }
 </code></pre>
@@ -1300,7 +1373,7 @@ price 9.90
 
 <h2 id="dates">Dates and time</h2>
 <pre data-run><code>
-import date, mem, str;
+import date, mem;
 
 void main()
 {
@@ -1310,9 +1383,9 @@ void main()
   date.nowParts(&ds);
   printf("year looks right: %d\n", ds.year >= 2024);
 
-  u8 *stamp = date.timestampNow();     // like 2026-10-08 19:01:37
-  printf("timestamp is %d characters\n", str.len(stamp));
-  mem.free(stamp);
+  String stamp = date.timestampNow();     // like 2026-10-08 19:01:37
+  printf("timestamp is %d characters\n", stamp.len);
+  stamp.free();
 
   printf("elapsed ms is never negative: %d\n", date.nowMs() >= start);
 
@@ -1323,10 +1396,10 @@ void main()
   ds.hour = 12;
   ds.min = 34;
   date.Date leap = date.fromParts(&ds);
-  u8 *day = date.formatDate(leap), *clock = date.formatTime(leap);
+  String day = date.formatDate(leap), clock = date.formatTime(leap);
   printf("%s %s\n", day, clock);
-  mem.free(day);
-  mem.free(clock);
+  day.free();
+  clock.free();
 
   date.Parts back;
   date.toParts(&back, leap);
@@ -1346,8 +1419,9 @@ elapsed ms is never negative: 1
 <code>date.Parts</code>, which has <code>year</code>, <code>mon</code>,
 <code>day_of_mon</code>, <code>hour</code>, <code>min</code>, <code>sec</code> and
 <code>day_of_week</code> (0 is Sunday). <code>date.formatDate</code> and
-<code>date.formatTime</code> return new strings as <code>MM/DD/YYYY</code> and
-<code>HH:MM:SS</code>. A <code>date.Date</code> is an <code>i64 struct</code>, an integer
+<code>date.formatTime</code> return Strings as <code>MM/DD/YYYY</code> and
+<code>HH:MM:SS</code>, and <code>date.timestampNow()</code> one as
+<code>YYYY-MM-DD HH:MM:SS</code>. A <code>date.Date</code> is an <code>i64 struct</code>, an integer
 underneath, so <code>date.Date d = 5;</code> and <code>i64 x = d;</code> need no cast,
 and <code>f64 f = d;</code> converts it to a float like any integer (a float assigned to a
 <code>date.Date</code> is truncated, as it would be for an <code>i64</code>).</p>
@@ -1371,9 +1445,9 @@ void main()
   ds.year = 2024;
   ds.mon = 13;
   ds.dayOfMon = 32;
-  u8 *day = date.formatDate(date.fromParts(&ds));
+  String day = date.formatDate(date.fromParts(&ds));
+  defer day.free();
   printf("%s\n", day);     // month 13 of 2024, day 32
-  mem.free(day);
 }
 </code></pre>
 <pre class="output">
@@ -1383,10 +1457,9 @@ void main()
 for year 0 (a leap year, as in ISO 8601) and the years before it. Day 0 is January 2 of
 year 0, so a <code>date.Date</code> of 0 prints as <code>01/02/0000</code>. Years 1 to 3999
 have the same day numbers whose calendar has no February 29 in years
-divisible by 4000 and is a day ahead from 4000-03-01. <code>date.isoFromTimespec(&amp;ts, buf)</code>,
+divisible by 4000 and is a day ahead from 4000-03-01. <code>date.isoFromTimespec(&amp;ts)</code>,
 which formats a <code>fs.stat</code> time as UTC ISO 8601
-(<code>2026-07-05T14:30:00.123456789Z</code>, 31 bytes with the NUL), uses the same
-calendar.</p>
+(<code>2026-07-05T14:30:00.123456789Z</code>) into a String, uses the same calendar.</p>
 
 <p><code>date.parse(text, format)</code> parses a date with a <code>strptime</code>-like
 format and <code>date.parseParts(text, format, &amp;ds)</code> fills a
@@ -1401,15 +1474,15 @@ Missing time fields are 0, and without <code>%z</code> <code>zone_diff</code> is
 conversion or an impossible value (month 13, February 30, hour 24, ...);
 <code>date.parse</code> also needs the year, month and day.</p>
 <pre data-run><code>
-import date, mem;
+import date;
 
 void main()
 {
   date.Date d = date.parse("Mar 5 2024 1:30 PM", "%b %d %Y %H:%M %p");
-  u8 *day = date.formatDate(d), *clock = date.formatTime(d);
+  String day = date.formatDate(d), clock = date.formatTime(d);
   printf("%s %s\n", day, clock);
-  mem.free(day);
-  mem.free(clock);
+  day.free();
+  clock.free();
 
   date.Parts ds;
   printf("%d %d\n", date.parseParts("2023-02-29", "%Y-%m-%d", &ds),
@@ -1434,7 +1507,7 @@ ones use exact repeated squaring (<code>math.power(2, 10)</code> is 1024.0) and 
 <code>i64</code>; like C's <code>labs</code>, <code>math.abs(I64_MIN)</code> is
 <code>I64_MIN</code>. Use <code>fabs</code> for floats.</p>
 <pre data-run><code>
-import libc, math;
+import cstr, libc, math;
 
 void main()
 {
@@ -1453,6 +1526,7 @@ void main()
 a connected socket. All three return the socket as an <code>i32</code>, or -1 on failure
 (0 is a valid socket number). Read and write them with <code>read</code>/<code>write</code>
 or <code>recv</code>/<code>send</code>, and <code>close</code> them when done.
+Addresses, like all text here, are a <code>u8[]</code> (a literal, a slice, a String).
 <code>net.dial</code> takes a host name or an IPv4 or IPv6 address and tries every address
 the name resolves to. The server's bind address must be numeric (<code>"127.0.0.1"</code>,
 <code>"::1"</code>), <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6
@@ -1465,8 +1539,9 @@ and <code>net.setSendTimeout(sock, ms)</code> make a read or a write on a connec
 give up after <code>ms</code> milliseconds with -1 and <code>os.errno()</code>
 <code>EAGAIN</code> (a write returns the bytes it got out first, if any).
 Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which ends the
-program, as in C. <code>net.send(sock, buf, len)</code> (a <code>send</code> that adds
-<code>MSG_NOSIGNAL</code> to its optional flags) returns -1 with <code>os.errno()</code>
+program, as in C. <code>net.send(sock, data)</code>, with <code>data</code> a
+<code>u8[]</code> (a literal, a String, <code>buf[0:n]</code>), is a <code>send</code> that adds
+<code>MSG_NOSIGNAL</code> to its optional flags: it returns -1 with <code>os.errno()</code>
 <code>EPIPE</code> (or <code>ECONNRESET</code>) instead; <code>signal(SIGPIPE, SIG_IGN)</code>
 does the same for every <code>write</code> and <code>send</code> in the program.
 <code>signal</code> takes <code>SIG_DFL</code>, <code>SIG_IGN</code> or a handler
@@ -1477,18 +1552,23 @@ one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIG
 <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
 <code>SIGTTOU</code> are defined, with each platform's numbers.</p>
 <pre><code>
-i32 srv = NetCreateServer(8080, "127.0.0.1", 16);
+i32 srv = net.listen(8080, "127.0.0.1", 16);
 if (srv == -1) {
   printf("can't listen on 8080\n");
   return;
 }
-i32 conn = NetAccept(srv);   // waits for a client
+i32 conn = net.accept(srv);   // waits for a client
 if (conn != -1) {
-  NetSend(conn, "hello\n", 6);   // -1 if the client already left
-  close(conn);
+  String peer = net.peerAddr(conn);
+  defer peer.free();
+  net.send(conn, "hello\n");   // -1 if the client already left
+  libc.close(conn);
 }
-close(srv);
+libc.close(srv);
 </code></pre>
+<p><code>net.peerAddr(sock)</code> is the address of an accepted connection's peer and
+<code>net.addrToStr(sockaddr, family)</code> the address in a <code>sockaddr</code>, both as a
+String (without a <code>ptr</code> if there is none).</p>
 <p>The raw calls are there too, for UDP and anything the helpers don't cover:
 <code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
 <code>sendmsg</code>, <code>recvmsg</code>, <code>getsockname</code>, <code>setsockopt</code>, ...
@@ -1498,7 +1578,7 @@ ones you pass by address (to <code>accept</code>, <code>recvfrom</code>, <code>g
 size first. The <code>MSG_*</code> flags (<code>MSG_PEEK</code>, <code>MSG_TRUNC</code>,
 <code>MSG_WAITALL</code>, ...) have the platform's values.</p>
 <pre><code>
-import libc;
+import cstr, libc;
 
 i32 fd;
 libc.sockaddr_storage from;
@@ -1514,10 +1594,10 @@ void main()
 </code></pre>
 <p>For UDP, <code>net.udpSocket(port, bindaddr)</code> returns a bound datagram
 socket (the same bind addresses as <code>net.listen</code>, port 0 picks one:
-<code>net.localPort</code> tells which), <code>net.sendTo(sock, buf, len, addr, port)</code>
-sends one datagram and <code>net.recvFrom(sock, buf, len, from, from_size, &amp;port)</code>
-receives one and says who sent it, so a server answers with
-<code>net.sendTo(sock, reply, n, from, port)</code>. Both work with IPv4 and IPv6 and return
+<code>net.localPort</code> tells which), <code>net.sendTo(sock, data, addr, port)</code>
+sends one datagram and <code>net.recvFrom(sock, buf, &amp;from, &amp;port)</code> receives one
+into <code>buf</code> (a <code>u8[]</code>) and says who sent it (<code>from</code> a String),
+so a server answers with <code>net.sendTo(sock, reply, from, port)</code>. Both work with IPv4 and IPv6 and return
 -1 on failure. A datagram longer than the buffer is cut. <code>net.setRecvTimeout(sock, ms)</code>
 makes reads give up with -1 after <code>ms</code> milliseconds.</p>
 <pre data-run><code>
@@ -1527,20 +1607,19 @@ void main()
 {
   i32 srv = net.udpSocket(0, "127.0.0.1");
   i32 cli = net.udpSocket(0, "127.0.0.1");
-  u8 buf[64], from[libc.INET6_ADDRSTRLEN];
+  u8 buf[64];
+  String from;
+  defer from.free();
   i32 port;
-  i64 n;
 
-  net.sendTo(cli, "ping", 4, "127.0.0.1", net.localPort(srv));
-  n = net.recvFrom(srv, buf, sizeof(buf) - 1, from, sizeof(from), &port);
-  buf[n] = '\0';
-  printf("server got %s from %s\n", buf, from);
-  net.sendTo(srv, "pong", 4, from, port);   // answer the sender
+  net.sendTo(cli, "ping", "127.0.0.1", net.localPort(srv));
+  i64 n = net.recvFrom(srv, buf, &from, &port);
+  printf("server got %s from %s\n", buf[0:n], from);
+  net.sendTo(srv, "pong", from, port);   // answer the sender
 
   net.setRecvTimeout(cli, 1000);
-  n = net.recvFrom(cli, buf, sizeof(buf) - 1);
-  buf[n] = '\0';
-  printf("client got %s\n", buf);
+  n = net.recvFrom(cli, buf);
+  printf("client got %s\n", buf[0:n]);
   libc.close(srv);
   libc.close(cli);
 }
@@ -1569,7 +1648,7 @@ have each platform's values. <code>poll(fds, n, timeout_ms)</code> waits on an a
 <code>POLLIN</code>, <code>POLLOUT</code>, <code>POLLERR</code>, <code>POLLHUP</code>,
 <code>POLLNVAL</code> and <code>POLLPRI</code> bits.</p>
 <pre data-run><code>
-import libc, net, os;
+import cstr, libc, net, os;
 
 void main()
 {
@@ -1607,7 +1686,7 @@ for the next <code>coro.spawn</code> of the same size, so short-lived coroutines
 don't map and unmap a stack each time; they are unmapped when the thread ends. <code>coro.yield</code> outside a coroutine, or resuming one that is
 running, prints a message and exits with 1.</p>
 <pre data-run><code>
-import coro;
+import coro, cstr;
 
 void *fib(void *max)
 {
@@ -1665,7 +1744,7 @@ a single term, and the matcher is fzf's greedy one: it finds a match, not always
 best-scoring placement. The pattern is not modified, so a string literal is fine.
 fzf.match keeps no shared state, so threads can call it at the same time.</p>
 <pre data-run><code>
-import fzf;
+import cstr, fzf;
 
 void show(u8 *text, u8 *pattern)
 {
@@ -1715,7 +1794,7 @@ steps through the rows of <code>sql.select</code> and frees the row after the la
 call <code>sql.rowRelease</code> if you stop early. A column's <code>str</code> and
 <code>blob</code> are only valid until the next row.</p>
 <pre><code>
-import mem, sql;
+import cstr, mem, sql;
 
 sql.Db *db;
 u8 *err;

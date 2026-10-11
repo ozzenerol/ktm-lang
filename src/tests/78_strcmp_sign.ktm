@@ -1,10 +1,10 @@
-import libc, mem, str, test;
+import cstr, libc, mem, test;
 
-/* str.cmp / str.cmpLen / str.cmpLenNoCase must order strings like C's strcmp /
+/* cstr.cmp / cstr.cmpLen / cstr.cmpLenNoCase must order strings like C's strcmp /
  * strncmp / strncasecmp: negative if s1 < s2, 0 if equal, positive if
- * s1 > s2, comparing bytes as unsigned. On x86_64 str.cmp had the sign
- * reversed, str.cmpLenNoCase returned the distance between the two pointers
- * (even for equal strings shorter than n) and str.cmpLen kept comparing
+ * s1 > s2, comparing bytes as unsigned. On x86_64 cstr.cmp had the sign
+ * reversed, cstr.cmpLenNoCase returned the distance between the two pointers
+ * (even for equal strings shorter than n) and cstr.cmpLen kept comparing
  * past the terminating NUL. */
 
 extern "c" i32 strncasecmp(u8 *s1, u8 *s2, u64 n);
@@ -17,17 +17,17 @@ i64 sign(i64 x) {
 
 bool cmpOk(u8 *a, u8 *b, i64 want) {
     i32 c = libc.strcmp(a, b);
-    return sign(str.cmp(a, b)) == want && sign(c) == want;
+    return sign(cstr.cmp(a, b)) == want && sign(c) == want;
 }
 
 bool nCmpOk(u8 *a, u8 *b, i64 n, i64 want) {
     i32 c = libc.strncmp(a, b, n);
-    return sign(str.cmpLen(a, b, n)) == want && sign(c) == want;
+    return sign(cstr.cmpLen(a, b, n)) == want && sign(c) == want;
 }
 
 bool niCmpOk(u8 *a, u8 *b, i64 n, i64 want) {
     i32 c = libc.strncasecmp(a, b, n);
-    return sign(str.cmpLenNoCase(a, b, n)) == want && sign(c) == want;
+    return sign(cstr.cmpLenNoCase(a, b, n)) == want && sign(c) == want;
 }
 
 i32 main() {
@@ -47,7 +47,7 @@ i32 main() {
     g1[0] = 'a'; g1[1] = 'b'; g1[3] = 'X';
     g2[0] = 'a'; g2[1] = 'b'; g2[3] = 'Y';
 
-    /* str.cmp */
+    /* cstr.cmp */
     if (cmpOk("abc", "abd", -1)) { correct++; }
     if (cmpOk("abd", "abc", 1)) { correct++; }
     if (cmpOk("abc", "abc", 0)) { correct++; }
@@ -58,7 +58,7 @@ i32 main() {
     if (cmpOk("a", "", 1)) { correct++; }
     if (cmpOk(hi, lo, 1) && cmpOk(lo, hi, -1)) { correct++; }
 
-    /* str.cmpLen */
+    /* cstr.cmpLen */
     if (nCmpOk("abc", "abd", 3, -1)) { correct++; }
     if (nCmpOk("abd", "abc", 3, 1)) { correct++; }
     if (nCmpOk("abc", "abd", 2, 0)) { correct++; }  /* n stops before the difference */
@@ -70,7 +70,7 @@ i32 main() {
     if (nCmpOk(hi, lo, 1, 1) && nCmpOk(lo, hi, 1, -1)) { correct++; }
     if (nCmpOk(g1, g2, 8, 0)) { correct++; }        /* stops at the NUL */
 
-    /* str.cmpLenNoCase */
+    /* cstr.cmpLenNoCase */
     if (niCmpOk("abc", "ABD", 3, -1)) { correct++; }
     if (niCmpOk("ABD", "abc", 3, 1)) { correct++; }
     if (niCmpOk("Hello", "hELLO", 5, 0)) { correct++; }

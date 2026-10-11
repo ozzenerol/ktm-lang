@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm syntax v0.2: scoped enums. `enum Name [: IntType] { member [=
  * constexpr], ... };` at file scope. Members are integer constants, only
@@ -22,11 +22,11 @@ Color gColors[2] = {Color.green, Color.blue};
 /* Compile `source`, which must FAIL to compile, and return ktm's output. */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-    u8 *out = fs.readAll(AT_OUT);
+    u8 *out = fs.readAll(AT_OUT).take();
     proc.shell("rm -f " AT_SRC " " AT_OUT);
     return out;
 }
@@ -34,7 +34,7 @@ u8 *diagnose(u8 *source) {
 /* `body`, wrapped as a whole program, must fail to compile with `want`
  * somewhere in ktm's output. */
 bool fails(u8 *body, u8 *want) {
-    u8 *src = str.format("%s\ni32 main() { return 0; }\n", body);
+    u8 *src = cstr.format("%s\ni32 main() { return 0; }\n", body);
     u8 *out = diagnose(src);
     bool ok = out && libc.strstr(out, "error:") && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", body, out); }
@@ -60,7 +60,7 @@ i32 main() {
     tests++;
     Color c = Color.green;
     if (sizeof(Color) == 4 && sizeof(Status) == 2 &&
-            alignof(Status) == 2 && !str.cmp(typeof(c), "Color")) {
+            alignof(Status) == 2 && !cstr.cmp(typeof(c), "Color")) {
         correct++;
             } else { printf("\n  sizeof/alignof/typeof\n"); }
 
@@ -125,7 +125,7 @@ i32 main() {
     tests++;
     Color t1 = nSizes > 0 ? Color.blue : Color.red;
     i64 t2 = nSizes > 0 ? Color.blue : 7;
-    if (t1 == Color.blue && !str.cmp(typeof(t1), "Color") && t2 == 2) {
+    if (t1 == Color.blue && !cstr.cmp(typeof(t1), "Color") && t2 == 2) {
         correct++;
     } else { printf("\n  ternary with enum branches\n"); }
 

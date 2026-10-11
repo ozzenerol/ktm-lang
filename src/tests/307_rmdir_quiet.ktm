@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* fs.removeDir(path, RM_RECURSE) without RM_VERBOSE printed "Error Rm: <file>"
  * for every file it deleted successfully: the else of
@@ -18,7 +18,7 @@ u8 gOut[256];
 i32 gSaved;
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -29,11 +29,11 @@ bool exists(u8 *name) {
 
 void makeTree(u8 *top) {
     u8 name[64];
-    fs.makeDir(P(top));
-    fs.writeAll(P(str.formatTo(name, "%s/f1", top)), "k\n", 2);
-    mkfifo(P(str.formatTo(name, "%s/fifo", top)), 0x1A4);
-    fs.makeDir(P(str.formatTo(name, "%s/sub", top)));
-    fs.writeAll(P(str.formatTo(name, "%s/sub/f2", top)), "k\n", 2);
+    fs.makeDir(cstr.view(P(top)));
+    fs.writeAll(cstr.view(P(cstr.formatTo(name, "%s/f1", top))), "k\n", 2);
+    mkfifo(P(cstr.formatTo(name, "%s/fifo", top)), 0x1A4);
+    fs.makeDir(cstr.view(P(cstr.formatTo(name, "%s/sub", top))));
+    fs.writeAll(cstr.view(P(cstr.formatTo(name, "%s/sub/f2", top))), "k\n", 2);
 }
 
 void capture() {
@@ -49,7 +49,7 @@ u8 *captured() {
     libc.fflush(null);
     dup2(gSaved, 1);
     libc.close(gSaved);
-    u8 *got = fs.readAll(gOut);
+    u8 *got = fs.readAll(gOut).take();
     fs.remove(gOut);
     return got;
 }
@@ -57,7 +57,7 @@ u8 *captured() {
 /* `out` has the line `fmt` (with %s = the path of `name`) */
 bool hasLine(u8 *out, u8 *fmt, u8 *name) {
     u8 line[512];
-    str.formatTo(line, fmt, P(name));
+    cstr.formatTo(line, fmt, P(name));
     return out && libc.strstr(out, line) != null;
 }
 
@@ -67,25 +67,25 @@ i32 main() {
     i32 r;
     printf("Test - removeDir is quiet: ");
 
-    str.copy(root, "./ktm-test-307-XXXXXX");
+    cstr.copy(root, "./ktm-test-307-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
         return 0;
     }
     gRoot = root;
-    str.formatTo(gOut, "%s/out.txt", root);
+    cstr.formatTo(gOut, "%s/out.txt", root);
 
     makeTree("q");
     capture();
-    r = fs.removeDir(P("q"), fs.REMOVE_RECURSE);
+    r = fs.removeDir(cstr.view(P("q")), fs.REMOVE_RECURSE);
     out = captured();
     if (r == 0 && !exists("q")) { correct++; }
-    if (out && !str.cmp(out, "")) { correct++; }
+    if (out && !cstr.cmp(out, "")) { correct++; }
     else { printf("printed '%s'\n", out); }
     mem.free(out);
 
-    out = str.formatTo(null, "rm -rf '%s'", root);
+    out = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(out);
     mem.free(out);
 

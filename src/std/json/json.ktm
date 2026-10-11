@@ -1,5 +1,5 @@
 module json;
-import libc, mem, str;
+import cstr, libc, mem, str;
 
 const i64 JSON_PARSER_STRING = 0;
 
@@ -37,23 +37,20 @@ pub struct Value {
         State *state;
         Value *next;
         i64 type;
-        u8 *key;
+        /* An object member's key; an item of an array has none (empty).
+         * It and `str` are the Value's own, views to read (each has a NUL
+         * after it too): a string can hold \u0000, so use their len. */
+        u8[] key;
         union
         {
                 Value *array;
                 Value *object;
-                u8 *str;
+                u8[] str;
                 u8 *strnum;
                 f64 floatVal;
                 i64 intVal;
                 bool boolean;
         };
-        /* Bytes in `str` (a JSON_STRING) and in `key`, before their '\0': a
-            * string can hold \u0000, which the '\0' termination would cut off.
-            * Set them when you change `str` or `key` (0 means "up to the '\0'").
-            * JsonSelect matches keys up to their first '\0'. */
-        i64 strLen;
-        i64 keyLen;
 };
 
 struct JsonParser {
@@ -77,11 +74,10 @@ struct JsonStringBuilder {
 static Value *jsonNew() {
         Value *J = mem.alloc(sizeof(Value));
         J.type = NULL;
-        J.key = null;
+        u8[] none;
+        J.key = none;
         J.next = null;
         J.state = null;
-        J.strLen = 0;
-        J.keyLen = 0;
         return J;
 }
 
@@ -193,7 +189,7 @@ static bool jsonIntFits(u8 *text, i64 len) {
                 len--;
         }
         if (len != 19) { return len < 19; }
-        return str.cmpLen(text, max, 19) <= 0;
+        return cstr.cmpLen(text, max, 19) <= 0;
 }
 
 static void jsonParseNumber(JsonParser *p) {
@@ -251,14 +247,14 @@ static i64 jsonParseBool(JsonParser *p) {
 
         /* Check if the next character in the buffer is 't' for true */
         if (peek == 't') {
-                if (jsonHasChars(p, 4) && !str.cmpLen(p.buffer+p.offset,"true",4)) {
+                if (jsonHasChars(p, 4) && !cstr.cmpLen(p.buffer+p.offset,"true",4)) {
                         retval = true;
                         jsonUnsafeAdvanceBy(p, 4);
                 }
         }
         /* Check if the next character in the buffer is 'f' for false */
         else if (peek == 'f') {
-                if (jsonHasChars(p, 5) && !str.cmpLen(p.buffer+p.offset,"false",5)) {
+                if (jsonHasChars(p, 5) && !cstr.cmpLen(p.buffer+p.offset,"false",5)) {
                         retval = false;
                         jsonUnsafeAdvanceBy(p, 5);
                 }
@@ -277,7 +273,7 @@ static i64 jsonParseBool(JsonParser *p) {
     * -1: error
     */
 static i32 jsonParseNull(JsonParser *p) {
-        if (!jsonHasChars(p, 4) || str.cmpLen(p.buffer + p.offset,"null",4)) {
+        if (!jsonHasChars(p, 4) || cstr.cmpLen(p.buffer + p.offset,"null",4)) {
                 p.error = INVALID_LITERAL; /* where the literal starts */
                 return -1;
         }
@@ -534,7 +530,7 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
         u64 bits;
         mem.copy(&bits, &f, sizeof(f64));
         if (((bits >> 52) & 0x7FF) == 0x7FF) { /* inf/nan: JSON has none, null as JavaScript */
-                str.copy(buf, "null");
+                cstr.copy(buf, "null");
                 return buf;
         }
         while (true) {
@@ -542,9 +538,9 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
                 if (prec >= 17 || libc.strtod(buf,null) == f) { break; }
                 prec++;
         }
-        if (!str.count(buf,'.') && !str.count(buf,'n')) { // not inf/nan
-                len = str.len(buf);
-                e = str.firstOf(buf,"e");
+        if (!cstr.count(buf,'.') && !cstr.count(buf,'n')) { // not inf/nan
+                len = cstr.len(buf);
+                e = cstr.firstOf(buf,"e");
                 if (!e) { e = buf + len; }
                 libc.memmove(e+2,e,len - (e-buf) + 1);
                 e[0] = '.';
@@ -560,7 +556,7 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *strVal, i64 len) {
                 strVal = "";
                 len = 0;
         } else if (!len) { /* a node made or changed by hand */
-                len = str.len(strVal);
+                len = cstr.len(strVal);
         }
         u8 *buf = mem.alloc(len * 6 + 3), *dst = buf, *hex = "0123456789abcdef";
         u8 *end = strVal + len;
@@ -588,7 +584,7 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *strVal, i64 len) {
         }
         *dst++ = '"';
         *dst = '\0';
-        js.buf = str.appendFormatLen(js.buf,&js.len,"%s",buf);
+        js.buf = cstr.appendFormatLen(js.buf,&js.len,"%s",buf);
         mem.free(buf);
 }
 
@@ -598,40 +594,40 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
                                                                                                                             bool siblings=true) {
         u8 fbuf[64];
         if (J == null) {
-                js.buf = str.appendFormatLen(js.buf,&js.len,"(nil)");
+                js.buf = cstr.appendFormatLen(js.buf,&js.len,"(nil)");
                 return;
         }
 
         while (J) {
-                if (J.key && siblings) {
-                        jsonCatQuoted(js,J.key,J.keyLen);
-                        js.buf = str.appendFormatLen(js.buf,&js.len,": ");
+                if (J.key.ptr && siblings) {
+                        jsonCatQuoted(js,J.key.ptr,J.key.len);
+                        js.buf = cstr.appendFormatLen(js.buf,&js.len,": ");
                 }
                 switch (J.type) {
                         case INT:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"%d",J.intVal);
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"%d",J.intVal);
                         case FLOAT:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"%s",jsonFloatToStr(fbuf,J.floatVal));
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"%s",jsonFloatToStr(fbuf,J.floatVal));
                         case STRNUM:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"%s",J.strnum);
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"%s",J.strnum);
                         case STRING:
-                                jsonCatQuoted(js,J.str,J.strLen);
+                                jsonCatQuoted(js,J.str.ptr,J.str.len);
                         case ARRAY:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"[");
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"[");
                                 if (J.array) { jsonToStringInternal(J.array,js); } /* null: empty */
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"]");
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"]");
                         case OBJECT:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"{");
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"{");
                                 if (J.object) { jsonToStringInternal(J.object,js); } /* null: empty */
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"}");
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"}");
                         case BOOL:
                                 if (J.boolean == true) {
-                                        js.buf = str.appendFormatLen(js.buf,&js.len,"true");
+                                        js.buf = cstr.appendFormatLen(js.buf,&js.len,"true");
                                 } else {
-                                        js.buf = str.appendFormatLen(js.buf,&js.len,"false");
+                                        js.buf = cstr.appendFormatLen(js.buf,&js.len,"false");
                                 }
                         case NULL:
-                                js.buf = str.appendFormatLen(js.buf,&js.len,"null");
+                                js.buf = cstr.appendFormatLen(js.buf,&js.len,"null");
                         default:
                                 break;
                 }
@@ -639,16 +635,16 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
                         break;
                 }
                 if (J.next) {
-                        js.buf = str.appendFormatLen(js.buf,&js.len,",");
+                        js.buf = cstr.appendFormatLen(js.buf,&js.len,",");
                 }
                 J = J.next;
         }
 }
 
-pub u8 *toStr(Value *json)
+pub String toStr(Value *json)
 {// The JSON text of json's value - only that node, not the nodes after
-    // it or its key, so a node from JsonSelect gives just its value. A new
-    // string to Free.
+    // it or its key, so a node from JsonSelect gives just its value. A
+    // String that is yours.
         u8 *buf = mem.alloc(sizeof(u8)*1<<10);
         i64 len = 0;
         JsonStringBuilder sb;
@@ -656,7 +652,7 @@ pub u8 *toStr(Value *json)
         sb.len = len;
         jsonToStringInternal(json,&sb,false);
         sb.buf[sb.len] = '\0';
-        return sb.buf;
+        return str.adopt(sb.buf, sb.len);
 }
 
 /* Free J, the nodes after it and everything below them */
@@ -666,8 +662,8 @@ static void jsonReleaseList(Value *J) {
 
         while (ptr) {
                 next = ptr.next;
-                if (ptr.key) {
-                        mem.free(ptr.key);
+                if (ptr.key.ptr) {
+                        mem.free(ptr.key.ptr);
                 }
 
                 switch (ptr.type) {
@@ -677,8 +673,8 @@ static void jsonReleaseList(Value *J) {
                                 }
 
                         case STRING:
-                                if (ptr.str) {
-                                        mem.free(ptr.str);
+                                if (ptr.str.ptr) {
+                                        mem.free(ptr.str.ptr);
                                 }
 
                         case ARRAY:
@@ -786,7 +782,9 @@ Value *jsonParseObject(JsonParser *p) {
                         return null;
                 }
 
-                J.key = jsonParseString(p, &J.keyLen);
+                i64 keyLen = 0;
+                u8 *keyBytes = jsonParseString(p, &keyLen);
+                J.key = keyBytes[0:keyBytes ? keyLen : 0];
                 if (p.error != OK) {
                         jsonReleaseList(val); /* the whole list parsed so far, keys and values */
                         return null;
@@ -842,9 +840,12 @@ static bool jsonParseValue(JsonParser *p) {
                         }
                 }
 
-                case JSON_PARSER_STRING:
+                case JSON_PARSER_STRING: {
                         J.type = STRING;
-                        J.str = jsonParseString(p, &J.strLen);
+                        i64 strLen = 0;
+                        u8 *strBytes = jsonParseString(p, &strLen);
+                        J.str = strBytes[0:strBytes ? strLen : 0];
+                }
 
                 case JSON_PARSER_NULL:
                         if (jsonParseNull(p) == 1) {
@@ -927,25 +928,24 @@ Value *jsonParseWithLenAndFlags(u8 *raw, i64 len, i32 flags) {
         return J;
 }
 
-/* Parse `len` bytes of `raw` (-1: up to the NUL) into a tree of Json
-    * nodes. `flags` is 0 or JSON_STRNUM_FLAG, which keeps numbers as the
-    * text they were written as (type JSON_STRNUM, in `strnum`) instead of
-    * converting them to JSON_INT / JSON_FLOAT. */
-pub Value *parse(u8 *raw, i64 len=-1, i64 flags=0) {
-        if (!raw) { return null; }
-        if (len == -1) { len = str.len(raw); }
-        return jsonParseWithLenAndFlags(raw,len,flags);
+/* Parse `text` into a tree of Json nodes. `flags` is 0 or
+    * JSON_STRNUM_FLAG, which keeps numbers as the text they were written
+    * as (type JSON_STRNUM, in `strnum`) instead of converting them to
+    * JSON_INT / JSON_FLOAT. */
+pub Value *parse(u8[] text, i64 flags=0) {
+        if (!text.ptr) { return null; }
+        return jsonParseWithLenAndFlags(text.ptr,text.len,flags);
 }
 
 /* The offending character for a message: 'x', '\0' at the end of the
     * input, '\xNN' for other control characters and bytes past ASCII */
 static u8 *jsonErrorChar(u8 *buf, u8 ch) {
         if (ch == '\0') {
-                str.copy(buf, "'\\0'");
+                cstr.copy(buf, "'\\0'");
         } else if (ch < 0x20 || ch >= 0x7F) {
-                str.formatTo(buf, "'\\x%02X'", ch);
+                cstr.formatTo(buf, "'\\x%02X'", ch);
         } else {
-                str.formatTo(buf, "'%c'", ch);
+                cstr.formatTo(buf, "'%c'", ch);
         }
         return buf;
 }
@@ -955,7 +955,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
         jsonErrorChar(c, ch);
         switch (error) {
                 case OK:
-                        return str.formatTo(null, "Success");
+                        return cstr.formatTo(null, "Success");
                 case INVALID_UTF16:
                         what = "Invalid UTF-16 code in a \\u escape";
                 case INVALID_UTF16_SURROGATE:
@@ -967,28 +967,28 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 case INVALID_NUMBER:
                 case INVALID_DECIMAL:
                 case INVALID_SIGN:
-                        return str.formatTo(null, "Invalid number at %s at line %d, column %d",
+                        return cstr.formatTo(null, "Invalid number at %s at line %d, column %d",
                                                                                         c, line, col);
                 case INVALID_KEY_TERMINATOR_CHARACTER:
-                        return str.formatTo(null, "Expected '\"' to start an object key, got %s at "
+                        return cstr.formatTo(null, "Expected '\"' to start an object key, got %s at "
                                                                                         "line %d, column %d", c, line, col);
                 case INVALID_KEY_VALUE_SEPARATOR:
-                        return str.formatTo(null, "Expected ':' after an object key, got %s at line "
+                        return cstr.formatTo(null, "Expected ':' after an object key, got %s at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_ARRAY_CHARACTER:
-                        return str.formatTo(null, "Expected ',' or ']' in an array, got %s at line "
+                        return cstr.formatTo(null, "Expected ',' or ']' in an array, got %s at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_ESCAPE_CHARACTER:
-                        return str.formatTo(null, "Invalid escape character %s after '\\' at line "
+                        return cstr.formatTo(null, "Invalid escape character %s after '\\' at line "
                                                                                         "%d, column %d", c, line, col);
                 case INVALID_CONTROL_CHARACTER:
-                        return str.formatTo(null, "Unescaped control character %s in a string (write "
+                        return cstr.formatTo(null, "Unescaped control character %s in a string (write "
                                                                                         "it as \\u%04x) at line %d, column %d", c, ch, line, col);
                 case INVALID_UTF8:
-                        return str.formatTo(null, "Invalid UTF-8 sequence starting with %s in a "
+                        return cstr.formatTo(null, "Invalid UTF-8 sequence starting with %s in a "
                                                                                         "string at line %d, column %d", c, line, col);
                 case NESTING_TOO_DEEP:
-                        return str.formatTo(null, "Arrays and objects nested more than %d deep at "
+                        return cstr.formatTo(null, "Arrays and objects nested more than %d deep at "
                                                                                         "line %d, column %d", MAX_DEPTH, line, col);
                 case INVALID_BOOL:
                 case INVALID_LITERAL:
@@ -998,7 +998,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                         if (ch == '\0') {
                                 what = "Unexpected end of the JSON text"; break;
                         }
-                        return str.formatTo(null, "Unexpected character %s where a value or ',' "
+                        return cstr.formatTo(null, "Unexpected character %s where a value or ',' "
                                                                                         "was expected at line %d, column %d", c, line, col);
                 case CANNOT_START_PARSE:
                         what = "Expected a JSON value (object, array, string, number, true, "
@@ -1009,22 +1009,23 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 default:
                         return null;
         }
-        return str.formatTo(null, "%s at line %d, column %d", what, line, col);
+        return cstr.formatTo(null, "%s at line %d, column %d", what, line, col);
 }
 
 /* If the json has state this will return the error as a human readable string
     * must be freed by the caller (allows it to be thread safe). It would be
     * advisable to use this for debugging purposes only as it calls malloc */
-pub u8 *errorStr(Value *json) {
+pub String errorStr(Value *json) {
+        String none;
         if (!json || !json.state) { /* null or not a root: nothing to report */
-                return null;
+                return none;
         }
         if (json.state.error != OK) {
-                u8 *str = jsonGetStrerrorInternal(json.state.error,json.state.ch,
+                u8 *text = jsonGetStrerrorInternal(json.state.error,json.state.ch,
                                 json.state.line,json.state.col);
-                return str;
+                return str.adopt(text, cstr.len(text));
         }
-        return null;
+        return none;
 }
 
 /* Print the error to stdout ("No errors" if there was none); nothing for
@@ -1033,10 +1034,10 @@ pub void printError(Value *json) {
         if (!json || !json.state) { /* null or not a root: prints nothing */
                 return;
         }
-        u8 *strError = errorStr(json);
-        if (strError) {
+        String strError = errorStr(json);
+        defer strError.free();
+        if (strError.ptr) {
                 printf("%s\n", strError);
-                mem.free(strError);
         } else {
                 printf("No errors\n");
         }
@@ -1147,27 +1148,24 @@ Value *jsonArrayAt(Value *j, i64 idx) {
         return node;
 }
 
-static Value *jsonObjectAt(Value *j, u8 *name) {
+static Value *jsonObjectAt(Value *j, u8[] name) {
         if (!isObject(j)) {
-                return null;
-        }
-        if (name == null) {
                 return null;
         }
 
         auto el = j.object;
-        while ((el != null) && (el.key != null) && str.cmp(name,el.key) != 0) {
+        while ((el != null) && (el.key.ptr != null) && !str.equals(name, el.key)) {
                 el = el.next;
         }
 
-        if ((el == null) || (el.key == null)) {
+        if ((el == null) || (el.key.ptr == null)) {
                 return null;
         }
 
         return el;
 }
 
-pub Value *objectGet(Value *obj, u8 *key)
+pub Value *objectGet(Value *obj, u8[] key)
 {// The value stored under exactly `key` (the first one if it is repeated),
     // or null if obj isn't an object or has no such key. Any key works, also
     // ones JsonSelect can't spell ('.', '[', ':' ...). A view, don't release.
@@ -1273,7 +1271,7 @@ pub Value *select(Value *j, u8 *fmt, ...args) {
                                 } else if (kind == JSON_SEL_OBJ) {
                                         s = (u8 *)args[arg++];
                                         if (!s) { return null; }
-                                        len = str.len(s);
+                                        len = cstr.len(s);
                                 } else {
                                         return null;
                                 }
@@ -1306,7 +1304,7 @@ pub Value *select(Value *j, u8 *fmt, ...args) {
                                 }
                                 j = jsonArrayAt(j, idx);
                         case JSON_SEL_OBJ:
-                                j = jsonObjectAt(j, path);
+                                j = jsonObjectAt(j, cstr.view(path));
                         case JSON_SEL_TYPECHECK:
                                 if (pathLen != 1 || !jsonTypeCheck(j, path[0])) { return null; }
                 }

@@ -57,7 +57,7 @@ i32 main() {
     cli = net.dial("127.0.0.1", port, false, 2000);
     check(cli != -1 && !isNonBlocking(cli), "connect with a timeout, blocking");
     acc = net.accept(srv);
-    check(acc != -1 && net.send(cli, "hi", 2) == 2 && libc.recv(acc, buf, 2, 0) == 2,
+    check(acc != -1 && net.send(cli, "hi"[0:2]) == 2 && libc.recv(acc, buf, 2, 0) == 2,
                 "data flows");
     libc.close(acc);
     libc.close(cli);
@@ -115,7 +115,7 @@ i32 main() {
     total = 0;
     n = 0;
     while (n != -1 && date.nowMs() - t < 10000) {
-        n = net.send(cli, buf, sizeof(buf));
+        n = net.send(cli, buf[0:sizeof(buf)]);
         if (n > 0) { total += n; }
     }
     check(n == -1 && os.errno() == libc.EAGAIN && total > 0, "send times out");

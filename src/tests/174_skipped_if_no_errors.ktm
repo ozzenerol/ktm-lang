@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Text in a skipped #if group reported errors: a malformed number
  * (`0b12`), a long or unterminated char const (an apostrophe in
@@ -43,11 +43,11 @@ bool liveCodeReports(u8 *source, u8 *expected) {
     bool good = true;
 
     fs.remove(SKIP_FILE);
-    if (!fs.writeAll(SKIP_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SKIP_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " SKIP_FILE " > " SKIP_OUT " 2>&1");
-    out = fs.readAll(SKIP_OUT);
+    out = fs.readAll(SKIP_OUT).take();
     if (res == 0 || !out || !libc.strstr(out, expected)) { good = false; }
     if (!good && out) { printf("%s\n", out); }
     if (out) { mem.free(out); }

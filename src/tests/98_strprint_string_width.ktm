@@ -1,6 +1,6 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
-/* str.formatTo ignored the width of %s and used its precision as the width:
+/* cstr.formatTo ignored the width of %s and used its precision as the width:
  * "[%5s][%-5s][%.2s]" gave "[ab][ab][abcd]". Right-justified padding was
  * also written through a copy of the destination pointer and then
  * overwritten by the string, and %-8d/%-8x padded on the left. Every case
@@ -11,7 +11,7 @@ extern "c" i64 snprintf(u8 *buf, u64 len, u8 *fmt, ...);
 i64 gBad = 0;
 
 void same(u8 *fmt, u8 *ours, u8 *want) {
-    if (str.cmp(ours, want)) {
+    if (cstr.cmp(ours, want)) {
         gBad++;
         printf("\n  %s: got '%s', C printf gives '%s'", fmt, ours, want);
     }
@@ -19,21 +19,21 @@ void same(u8 *fmt, u8 *ours, u8 *want) {
 
 void checkS(u8 *fmt, u8 *s) {
     u8 ours[512], want[512];
-    str.formatTo(ours, fmt, s);
+    cstr.formatTo(ours, fmt, s);
     snprintf(want, sizeof(want), fmt, s);
     same(fmt, ours, want);
 }
 
 void checkI(u8 *fmt, i64 v) {
     u8 ours[512], want[512];
-    str.formatTo(ours, fmt, v);
+    cstr.formatTo(ours, fmt, v);
     snprintf(want, sizeof(want), fmt, v);
     same(fmt, ours, want);
 }
 
 void checkStar(u8 *fmt, i64 a, i64 b, u8 *s) {
     u8 ours[512], want[512];
-    str.formatTo(ours, fmt, a, b, s);
+    cstr.formatTo(ours, fmt, a, b, s);
     snprintf(want, sizeof(want), fmt, a, b, s);
     same(fmt, ours, want);
 }
@@ -89,66 +89,66 @@ i32 main() {
     if (!gBad) { correct++; }
 
     /* 4: the bug report, into a caller's stack buffer */
-    if (!str.cmp(str.formatTo(buf, "[%5s][%-5s][%.2s]", "ab", "ab", "abcd"),
+    if (!cstr.cmp(cstr.formatTo(buf, "[%5s][%-5s][%.2s]", "ab", "ab", "abcd"),
                             "[   ab][ab   ][ab]")) { correct++; }
 
     /* 5: into a buffer in the middle of an allocation, which is never grown */
     u8 *mid = mem.allocZero(128);
-    if (!str.cmp(str.formatTo(mid + 16, "%8s|%-8s|%.1s|%-6d|%6d", "x", "y", "zz", 7, -7),
+    if (!cstr.cmp(cstr.formatTo(mid + 16, "%8s|%-8s|%.1s|%-6d|%6d", "x", "y", "zz", 7, -7),
                             "       x|y       |z|7     |    -7")) { correct++; }
     mem.free(mid);
 
-    /* 6: str.formatTo(null, ...) grows its buffer past STR_LEN while padding */
-    m = str.formatTo(null, "%300s|%-300s|%.3s", "right", "left", "truncated");
+    /* 6: cstr.formatTo(null, ...) grows its buffer past STR_LEN while padding */
+    m = cstr.formatTo(null, "%300s|%-300s|%.3s", "right", "left", "truncated");
     snprintf(want, sizeof(want), "%300s|%-300s|%.3s", "right", "left", "truncated");
-    if (!str.cmp(m, want)) { correct++; }
+    if (!cstr.cmp(m, want)) { correct++; }
     mem.free(m);
 
-    /* 7: str.format, several regrowths, padding straddles each one */
-    m = str.format("%255s%-257s%511s%d", "a", "b", "c", 42);
+    /* 7: cstr.format, several regrowths, padding straddles each one */
+    m = cstr.format("%255s%-257s%511s%d", "a", "b", "c", 42);
     snprintf(want, sizeof(want), "%255s%-257s%511s%d", "a", "b", "c", 42);
-    if (!str.cmp(m, want) && str.len(m) == 255 + 257 + 511 + 2) { correct++; }
+    if (!cstr.cmp(m, want) && cstr.len(m) == 255 + 257 + 511 + 2) { correct++; }
     mem.free(m);
 
-    /* 8: str.appendFormat */
-    c = str.format("[%3s]", "a");
-    m = str.appendFormat(c, "[%-4s][%4.2s]", "bc", "def"); /* takes over c */
-    if (!str.cmp(m, "[  a][bc  ][  de]")) { correct++; }
+    /* 8: cstr.appendFormat */
+    c = cstr.format("[%3s]", "a");
+    m = cstr.appendFormat(c, "[%-4s][%4.2s]", "bc", "def"); /* takes over c */
+    if (!cstr.cmp(m, "[  a][bc  ][  de]")) { correct++; }
     mem.free(m);
 
     /* 9: a null string prints nothing, but still takes its width */
-    if (!str.cmp(str.formatTo(buf, "[%s][%4s][%-4s][%.2s]", null, null, null, null),
+    if (!cstr.cmp(cstr.formatTo(buf, "[%s][%4s][%-4s][%.2s]", null, null, null, null),
                             "[][    ][    ][]")) { correct++; }
 
     /* 10: %c and %C take a width and '-' too */
-    str.formatTo(ours, "[%3c][%-3c][%c]", 'a', 'b', 'c');
+    cstr.formatTo(ours, "[%3c][%-3c][%c]", 'a', 'b', 'c');
     snprintf(want, sizeof(want), "[%3c][%-3c][%c]", 'a', 'b', 'c');
-    if (!str.cmp(ours, want) &&
-            !str.cmp(str.formatTo(buf, "[%4C][%-4C]", 'a', 'b'), "[   A][B   ]")) {
+    if (!cstr.cmp(ours, want) &&
+            !cstr.cmp(cstr.formatTo(buf, "[%4C][%-4C]", 'a', 'b'), "[   A][B   ]")) {
         correct++;
     }
 
     /* 11, 12: %Q and %p with widths */
-    if (!str.cmp(str.formatTo(buf, "[%6Q][%-6Q]", "a\"b", "a\nb"),
+    if (!cstr.cmp(cstr.formatTo(buf, "[%6Q][%-6Q]", "a\"b", "a\nb"),
                             "[  a\\\"b][a\\nb  ]")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "[%p]", 0x1234), "[0x0000000000001234]") &&
-            !str.cmp(str.formatTo(buf, "[%20p][%-20p]", 0xab, 0xab),
+    if (!cstr.cmp(cstr.formatTo(buf, "[%p]", 0x1234), "[0x0000000000001234]") &&
+            !cstr.cmp(cstr.formatTo(buf, "[%20p][%-20p]", 0xab, 0xab),
                             "[  0x00000000000000AB][0x00000000000000AB  ]")) { correct++; }
 
     /* 13: a date and a time (date.format) with widths */
     date.Date cdt = date.now();
-    u8 *d = date.formatDate(cdt), *t = date.format(cdt, "%H:%M:%S");
+    u8 *d = date.formatDate(cdt).take(), *t = date.format(cdt, "%H:%M:%S").take();
     snprintf(want, sizeof(want), "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
-    str.formatTo(ours, "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
-    if (!str.cmp(ours, want)) { correct++; }
+    cstr.formatTo(ours, "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
+    if (!cstr.cmp(ours, want)) { correct++; }
     mem.free(d);
     mem.free(t);
 
     /* 14: floats and mixed formats are unchanged */
-    str.formatTo(ours, "%-6s=%8.3f|%5s|%-3d|%%|%s", "pi", 3.14159, "ok", 9, "end");
+    cstr.formatTo(ours, "%-6s=%8.3f|%5s|%-3d|%%|%s", "pi", 3.14159, "ok", 9, "end");
     snprintf(want, sizeof(want), "%-6s=%8.3f|%5s|%-3d|%%|%s",
                      "pi", 3.14159, "ok", 9, "end");
-    if (!str.cmp(ours, want)) { correct++; }
+    if (!cstr.cmp(ours, want)) { correct++; }
     else { printf("\n  mixed: got '%s', C printf gives '%s'", ours, want); }
 
     test.printResult(correct, tests);

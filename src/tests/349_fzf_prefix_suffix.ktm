@@ -1,4 +1,4 @@
-import fzf, libc, mem, str, test;
+import cstr, fzf, libc, mem, test;
 
 /* `^prefix` skipped the text's leading whitespace only when the pattern
  * started with a space (the test was inverted), and `^exact$` compared
@@ -8,11 +8,11 @@ import fzf, libc, mem, str, test;
 /* fzf.match's result as "score: positions" or "null", compared with the output
  * of upstream telescope-fzf-native (V1 algorithm) for the same input. */
 bool check(u8 *text, u8 *pat, i32 case_mode, bool fuzzy, u8 *want) {
-    u8 got[256], *p = str.dup(pat);
+    u8 got[256], *p = cstr.dup(pat);
     i64 len;
     fzf.Position *pos = fzf.match(text, p, case_mode, fuzzy);
     if (!pos) {
-        str.copy(got, "null");
+        cstr.copy(got, "null");
     } else {
         len = libc.snprintf(got, sizeof(got), "%d:", pos.score);
         for (i64 i = 0; i < pos.size; i++) {
@@ -21,7 +21,7 @@ bool check(u8 *text, u8 *pat, i32 case_mode, bool fuzzy, u8 *want) {
         fzf.release(pos);
     }
     mem.free(p);
-    if (str.cmp(got, want)) {
+    if (cstr.cmp(got, want)) {
         printf("\n  FzF(\"%s\", \"%s\", %d, %d) = %s, want %s", text, pat, case_mode, fuzzy, got, want);
         return false;
     }

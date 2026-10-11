@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Y13: the body of an if, else, for, while or do is a `{ ... }` block;
  * `else if` stays. A lone statement is "braces required", at the
@@ -9,11 +9,11 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " BR_SRC " " BR_OUT);
-    fs.writeAll(BR_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(BR_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                "-S " BR_SRC " -o /dev/null > " BR_OUT " 2>&1");
-    u8 *out = fs.readAll(BR_OUT);
+    u8 *out = fs.readAll(BR_OUT).take();
     proc.shell("rm -f " BR_SRC " " BR_OUT);
     return out;
 }
@@ -29,7 +29,7 @@ i64 count(u8 *s, u8 *what) {
 
 /* `body` inside a function: ktm prints `errors` errors, each with want */
 bool prints(u8 *body, i64 errors, u8 *want = null) {
-    u8 *src = str.format("void f(i64 x) {\n%s\n}\ni32 main() { return 0; }\n", body);
+    u8 *src = cstr.format("void f(i64 x) {\n%s\n}\ni32 main() { return 0; }\n", body);
     u8 *out = diagnose(src);
     bool ok = out && count(out, "error:") == errors &&
               (!want || count(out, want) == errors);

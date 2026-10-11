@@ -1170,6 +1170,7 @@ static IrOp irCompoundAssignToIrOp(AstBinOp op, int issigned) {
     }
 }
 
+static IrValue *irMakeLocalSlot(IrCtx *ctx, IrValueType ir_type, int size, u32 var_id);
 static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
     IrAssignTarget out = { NULL, NULL, 0 };
 
@@ -1177,6 +1178,12 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
 
     if (lhs->kind == AST_LVAR) {
         IrValue *local = irFnGetVar(ctx->cur_func, lhs->lvar_id);
+        /* a hidden variable (`#slice3`) gets its slot where it is first
+         * assigned: it has no declaration */
+        if (!local && lhs->lname && lhs->lname->data[0] == '#') {
+            local = irMakeLocalSlot(ctx, irConvertType(lhs->type),
+                                    lhs->type->size, lhs->lvar_id);
+        }
         if (!local) loggerPanic("irLowerAssign: unknown local %s\n",
                                 astToString(lhs));
         out.target = local;
@@ -1274,11 +1281,56 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
     loggerPanic("irLowerAssign: unsupported LHS %s\n", astKindToString(lhs->kind));
 }
 
+static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast);
+
+/* The address of a struct value: a call's result in a temporary, anything
+ * else (a variable, a field, a made slice, `?:`) where it is */
+static IrValue *irAggregateAddr(IrCtx *ctx, Ast *ast) {
+    if ((ast->kind == AST_FUNCALL || ast->kind == AST_FUNPTR_CALL ||
+         ast->kind == AST_ASM_FUNCALL) && ast->type && irRetTypeIsAggregate(ast->type)) {
+        return irExpr(ctx, ast);
+    }
+    return irLValueAddr(ctx, ast);
+}
+
 /* Materialise the ADDRESS of an lvalue (lvar / global / class field / `*p`).
  * Reuses the assign-target machinery: an indirect target is already a
  * pointer, a direct one is a slot/alias we LEA. Used for by-value struct
  * copies, where both sides are addressed and the bytes memcpy'd. */
 static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast) {
+    /* a made slice is its hidden variable's address already */
+    if (ast->kind == AST_SLICE_MAKE || ast->kind == AST_SUBSLICE) return irExpr(ctx, ast);
+    /* `c ? a : b` of structs: the chosen one's address */
+    if (ast->kind == AST_TERNARY) {
+        IrBlock *then_block = irBlockNew();
+        IrBlock *else_block = irBlockNew();
+        IrBlock *end_block = irBlockNew();
+        IrValue *cond = irExpr(ctx, ast->cond);
+        IrValue *result = irTmp(IR_TYPE_PTR, 8);
+        irBranch(ctx->cur_func, ctx->cur_block, cond, then_block, else_block);
+
+        irFnAddBlock(ctx->cur_func, then_block);
+        ctx->cur_block = then_block;
+        Ast *then = ast->then->kind == AST_CAST ? ast->then->operand : ast->then;
+        IrValue *then_val = irAggregateAddr(ctx, then);
+        IrBlock *then_end = ctx->cur_block;
+        irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+        irFnAddBlock(ctx->cur_func, else_block);
+        ctx->cur_block = else_block;
+        Ast *els = ast->els->kind == AST_CAST ? ast->els->operand : ast->els;
+        IrValue *else_val = irAggregateAddr(ctx, els);
+        IrBlock *else_end = ctx->cur_block;
+        irBlockAddInstr(ctx, irJump(ctx->cur_func, ctx->cur_block, end_block));
+
+        irFnAddBlock(ctx->cur_func, end_block);
+        ctx->cur_block = end_block;
+        IrInstr *phi = irPhi(result);
+        irBlockAddInstr(ctx, phi);
+        irAddPhiIncoming(phi, then_val, then_end);
+        irAddPhiIncoming(phi, else_val, else_end);
+        return result;
+    }
     IrAssignTarget t = irLowerAssignTarget(ctx, ast);
     if (t.indirect) {
         return t.target;
@@ -1807,7 +1859,8 @@ IrValue *irLowerClassRef(IrCtx *ctx, Ast *ast) {
     }
 
     if (cls && (cls->kind == AST_FUNCALL || cls->kind == AST_FUNPTR_CALL ||
-                cls->kind == AST_ASM_FUNCALL ||
+                cls->kind == AST_ASM_FUNCALL || cls->kind == AST_SLICE_MAKE ||
+                cls->kind == AST_SUBSLICE ||
                 astIsBinOpKind(cls, AST_BIN_OP_ASSIGN)))
     {
         /* Field of a struct-returning call result, e.g. `MakeVec2(..).y`.
@@ -2049,6 +2102,10 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
 }
 
 static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast);
+static IrValue *irLowerSliceMake(IrCtx *ctx, Ast *ast);
+static IrValue *irLowerSliceElem(IrCtx *ctx, Ast *ast);
+static IrValue *irLowerSubSlice(IrCtx *ctx, Ast *ast);
+static IrValue *irLValueAddr(IrCtx *ctx, Ast *ast);
 
 IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     /* Variable references are SHARED Ast nodes stamped with their
@@ -2059,6 +2116,22 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
     switch (ast->kind) {
         case AST_VA_PACK:
             return irLowerVaPack(ctx, ast);
+
+        case AST_SLICE_MAKE:
+            return irLowerSliceMake(ctx, ast);
+
+        case AST_SLICE_ELEM:
+            return irLowerSliceElem(ctx, ast);
+
+        case AST_SUBSLICE:
+            return irLowerSubSlice(ctx, ast);
+
+        case AST_TEMP_ADDR: {
+            /* the value into its hidden variable, whose address it is */
+            IrValue *addr = irLValueAddr(ctx, ast->slice_var);
+            irCopyAggregateTo(ctx, addr, ast->slice_ptr, ast->slice_var->type->size);
+            return addr;
+        }
 
         case AST_TERNARY: {
             /* cond ? then : els. Only the chosen branch runs: evaluate
@@ -2176,7 +2249,12 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
          * out_ptr param's slot holds the destination address. */
         AstType *rt = ast->retval->type;
         if (rt && irRetTypeIsAggregate(rt)) {
-            IrValue *src_addr = irExpr(ctx, ast->retval);
+            /* `return f();` of a struct-returning call: it has no address
+             * of its own; it writes straight into the destination below */
+            Ast *rv_ast = ast->retval;
+            int is_call = (rv_ast->kind == AST_FUNCALL || rv_ast->kind == AST_FUNPTR_CALL ||
+                           rv_ast->kind == AST_ASM_FUNCALL);
+            IrValue *src_addr = is_call ? NULL : irExpr(ctx, ast->retval);
             IrValue *dst_addr = irTmp(IR_TYPE_PTR, 8);
             if (irRetIsIndirect(rt)) {
                 /* return_value holds the caller's hidden out-pointer: load
@@ -2190,7 +2268,11 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
                 irBlockAddInstr(ctx, irInstrNew(IR_LEA, dst_addr,
                                 ctx->cur_func->return_value, NULL));
             }
-            irEmitMemcpy(ctx, dst_addr, src_addr, rt->size);
+            if (is_call) {
+                irFnCallTo(ctx, rv_ast, dst_addr);
+            } else {
+                irEmitMemcpy(ctx, dst_addr, src_addr, rt->size);
+            }
         } else {
             IrValue *val = irExpr(ctx, ast->retval);
             IrValue *rv = ctx->cur_func->return_value;
@@ -2707,6 +2789,179 @@ static IrValue *irLowerVaPack(IrCtx *ctx, Ast *ast) {
     return is_global ? addr : irLowerLVar(ctx, array);
 }
 
+/* A `T[]` made from a pointer and a length: both stored into the hidden
+ * variable (ptr at 0, len at 8), whose address is the value, as any
+ * struct's is. Lowered again (a defer) it keeps its slot. */
+static IrValue *irLowerSliceMake(IrCtx *ctx, Ast *ast) {
+    Ast *var = ast->slice_var;
+    int is_global = var->kind == AST_GVAR;
+    IrValue *base = NULL, *addr = NULL;
+    if (is_global) {
+        addr = irLowerGlobal(ctx, var);
+    } else {
+        base = irFnGetVar(ctx->cur_func, var->lvar_id);
+        if (!base) {
+            base = irMakeLocalSlot(ctx, irConvertType(var->type),
+                                   var->type->size, var->lvar_id);
+        }
+    }
+    IrValue *ptr = irExpr(ctx, ast->slice_ptr);
+    IrValue *len = irExpr(ctx, ast->slice_len);
+    if (len && len->kind == IR_VAL_CONST_INT) {
+        len = irConstInt(IR_TYPE_I64, len->as._i64);
+    } else {
+        len = irWidenToTargetWidth(ctx, len, ast->slice_len->type, ast_int_type);
+    }
+    IrValue *vals[2] = { ptr, len };
+    for (int i = 0; i < 2; ++i) {
+        IrValue *off = irConstInt(IR_TYPE_I64, (s64)i * 8);
+        IrValue *slot = irTmp(IR_TYPE_PTR, 8);
+        if (is_global) {
+            irBlockAddInstr(ctx, irInstrNew(IR_IADD, slot, addr, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, slot, vals[i], NULL));
+        } else {
+            irBlockAddInstr(ctx, irInstrNew(IR_GEP, slot, base, off));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE, slot, vals[i], NULL));
+        }
+    }
+    return is_global ? addr : irLowerLVar(ctx, var);
+}
+
+/* `*(base + off)`, a word of a slice value whose address is `base` */
+static IrValue *irLoadWordAt(IrCtx *ctx, IrValue *base, int off,
+                             IrValueType type) {
+    IrValue *at = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_IADD, at, base, irConstInt(IR_TYPE_I64, off)));
+    IrValue *val = irTmp(type, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LOAD_DEREF, val, at, NULL));
+    return val;
+}
+
+/* An index or bound as an i64: a narrower or unsigned one widened */
+static IrValue *irSliceIndex(IrCtx *ctx, Ast *ast) {
+    IrValue *v = irExpr(ctx, ast);
+    if (v->kind == IR_VAL_CONST_INT) return irConstInt(IR_TYPE_I64, v->as._i64);
+    return irWidenToTargetWidth(ctx, v, ast->type, ast_int_type);
+}
+
+/* Branch to a block that calls the runtime's `fail` (which throws
+ * rt.ERR_BOUNDS and never returns) when `a <cmp> b`, unsigned; the code
+ * after it goes on in a new block. The failing block is the same for
+ * each test of one access when `*fail_block` is set already. */
+static void irBoundsTest(IrCtx *ctx, IrCmpKind cmp, IrValue *a, IrValue *b,
+                         IrBlock *fail_block) {
+    IrValue *bad = irTmp(IR_TYPE_I8, 1);
+    IrInstr *test = irInstrNew(IR_ICMP, bad, a, b);
+    test->extra.cmp_kind = cmp;
+    irBlockAddInstr(ctx, test);
+    IrBlock *ok_block = irBlockNew();
+    irBranch(ctx->cur_func, ctx->cur_block, bad, fail_block, ok_block);
+    irFnAddBlock(ctx->cur_func, ok_block);
+    ctx->cur_block = ok_block;
+}
+
+/* The failing block of a bounds check: rt.<fname>(args..., file, line) */
+static void irBoundsFail(IrCtx *ctx, IrBlock *fail_block, const char *fname,
+                         int argc, IrValue **argv, Ast *ast) {
+    IrBlock *resume = ctx->cur_block;
+    irFnAddBlock(ctx->cur_func, fail_block);
+    ctx->cur_block = fail_block;
+    IrValue *args[5];
+    for (int i = 0; i < argc; ++i) args[i] = argv[i];
+    args[argc] = irExpr(ctx, ast->sub_file);
+    args[argc + 1] = irConstInt(IR_TYPE_I64, ast->line);
+    irEmitRuntimeCallN(ctx, astRuntimeSymbol(fname), IR_TYPE_VOID, 8, argc + 2, args);
+    ctx->cur_block->sealed = 1;
+    ctx->cur_block = resume;
+}
+
+/* `&s[i]` of a slice: its ptr + i, once i is below its len (unsigned,
+ * so a negative i fails too) */
+static IrValue *irLowerSliceElem(IrCtx *ctx, Ast *ast) {
+    IrValue *base = irExpr(ctx, ast->sub_base);
+    IrValue *ptr = irLoadWordAt(ctx, base, 0, IR_TYPE_PTR);
+    IrValue *len = irLoadWordAt(ctx, base, 8, IR_TYPE_I64);
+    IrValue *idx = irSliceIndex(ctx, ast->sub_lo);
+    IrBlock *fail_block = irBlockNew();
+    irBoundsTest(ctx, IR_CMP_UGE, idx, len, fail_block);
+    IrValue *fail_args[2] = { idx, len };
+    irBoundsFail(ctx, fail_block, "__ktmBoundsIndex", 2, fail_args, ast);
+
+    int esize = ast->type->ptr->size;
+    IrValue *off = idx;
+    if (esize != 1) {
+        off = irTmp(IR_TYPE_I64, 8);
+        irBlockAddInstr(ctx, irInstrNew(IR_IMUL, off, idx, irConstInt(IR_TYPE_I64, esize)));
+    }
+    IrValue *addr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_IADD, addr, ptr, off));
+    return addr;
+}
+
+/* `s[a:b]` (a defaults to 0, b to the length) of a slice or an array,
+ * checked a <= b <= len; or of a pointer, `p[a:b]`, unchecked. The new
+ * ptr and len go into the hidden variable, whose address is the value. */
+static IrValue *irLowerSubSlice(IrCtx *ctx, Ast *ast) {
+    Ast *base_ast = ast->sub_base;
+    AstType *bt = base_ast->type;
+    IrValue *ptr, *len = NULL;
+    int esize;
+    if (astTypeIsSlice(bt)) {
+        IrValue *base = irExpr(ctx, base_ast);
+        ptr = irLoadWordAt(ctx, base, 0, IR_TYPE_PTR);
+        len = irLoadWordAt(ctx, base, 8, IR_TYPE_I64);
+        esize = bt->elem->size;
+    } else {
+        ptr = irExpr(ctx, base_ast);   /* an array's or a pointer's address */
+        if (bt->kind == AST_TYPE_ARRAY) len = irConstInt(IR_TYPE_I64, bt->len);
+        esize = bt->ptr->size;
+    }
+    IrValue *lo = ast->sub_lo ? irSliceIndex(ctx, ast->sub_lo) : irConstInt(IR_TYPE_I64, 0);
+    IrValue *hi = ast->sub_hi ? irSliceIndex(ctx, ast->sub_hi) : len;
+    if (len) {
+        IrBlock *fail_block = irBlockNew();
+        irBoundsTest(ctx, IR_CMP_UGT, hi, len, fail_block);
+        irBoundsTest(ctx, IR_CMP_UGT, lo, hi, fail_block);
+        IrValue *fail_args[3] = { lo, hi, len };
+        irBoundsFail(ctx, fail_block, "__ktmBoundsSlice", 3, fail_args, ast);
+    }
+    IrValue *off = lo;
+    if (esize != 1) {
+        off = irTmp(IR_TYPE_I64, 8);
+        irBlockAddInstr(ctx, irInstrNew(IR_IMUL, off, lo, irConstInt(IR_TYPE_I64, esize)));
+    }
+    IrValue *new_ptr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_IADD, new_ptr, ptr, off));
+    IrValue *new_len = irTmp(IR_TYPE_I64, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_ISUB, new_len, hi, lo));
+
+    Ast *var = ast->sub_var;
+    int is_global = var->kind == AST_GVAR;
+    IrValue *vbase = NULL, *vaddr = NULL;
+    if (is_global) {
+        vaddr = irLowerGlobal(ctx, var);
+    } else {
+        vbase = irFnGetVar(ctx->cur_func, var->lvar_id);
+        if (!vbase) {
+            vbase = irMakeLocalSlot(ctx, irConvertType(var->type),
+                                    var->type->size, var->lvar_id);
+        }
+    }
+    IrValue *vals[2] = { new_ptr, new_len };
+    for (int i = 0; i < 2; ++i) {
+        IrValue *off8 = irConstInt(IR_TYPE_I64, (s64)i * 8);
+        IrValue *slot = irTmp(IR_TYPE_PTR, 8);
+        if (is_global) {
+            irBlockAddInstr(ctx, irInstrNew(IR_IADD, slot, vaddr, off8));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, slot, vals[i], NULL));
+        } else {
+            irBlockAddInstr(ctx, irInstrNew(IR_GEP, slot, vbase, off8));
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE, slot, vals[i], NULL));
+        }
+    }
+    return is_global ? vaddr : irLowerLVar(ctx, var);
+}
+
 void irLowerDecl(IrCtx *ctx, Ast *ast) {
     Ast *var = ast->declvar;
     Ast *init = ast->declinit;
@@ -2746,6 +3001,20 @@ void irLowerDecl(IrCtx *ctx, Ast *ast) {
         var_id = var->lvar_id;
     }
     (void)var_id;
+
+    /* a slice without an initialiser is empty ({null, 0}), never
+     * whatever the slot held: its len guards its accesses. So is one in
+     * a struct or an array. */
+    if (!init && astTypeHasSlice(var->type)) {
+        int n = var->type->size;
+        if (n <= 64) {
+            irStoreConstBytes(ctx, local, 0, n, NULL, 0);
+        } else {
+            IrValue *dst_addr = irTmp(IR_TYPE_PTR, 8);
+            irBlockAddInstr(ctx, irInstrNew(IR_LEA, dst_addr, local, NULL));
+            irEmitMemset(ctx, dst_addr, n);
+        }
+    }
 
     if (init) {
         IrValue *ir_init = NULL;
@@ -3229,7 +3498,9 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
             break;
         }
 
-        case AST_STRING: {
+        case AST_STRING:
+        case AST_SLICE_MAKE:
+        case AST_SUBSLICE: {
             irExpr(ctx, ast);
             break;
         }
@@ -3390,6 +3661,22 @@ static void irEscapeWalk(Ast *ast, Set *escape) {
             }
             return;
         }
+
+        case AST_SLICE_MAKE:
+            irEscapeWalk(ast->slice_ptr, escape);
+            irEscapeWalk(ast->slice_len, escape);
+            return;
+
+        case AST_TEMP_ADDR:
+            irEscapeWalk(ast->slice_ptr, escape);
+            return;
+
+        case AST_SLICE_ELEM:
+        case AST_SUBSLICE:
+            irEscapeWalk(ast->sub_base, escape);
+            if (ast->sub_lo) irEscapeWalk(ast->sub_lo, escape);
+            if (ast->sub_hi) irEscapeWalk(ast->sub_hi, escape);
+            return;
 
         case AST_COMPOUND_STMT: {
             irEscapeWalkList(ast->stms, escape);

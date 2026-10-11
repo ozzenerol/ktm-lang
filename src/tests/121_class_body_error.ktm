@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A syntax error inside a class/union body is reported where it is,
  * the rest of the body is still parsed, and the class keeps the fields
@@ -36,13 +36,13 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
 
     cleanupClassErrTest();
 
-    if (!fs.writeAll(CLS_ERR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(CLS_ERR_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CLS_ERR_FILE " > " CLS_ERR_OUT " 2>&1");
 
-    out = fs.readAll(CLS_ERR_OUT);
+    out = fs.readAll(CLS_ERR_OUT).take();
     if (!out) {
         cleanupClassErrTest();
         return false;

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The `^` under an error was placed by counting bytes, so it drifted
  * right after non-ASCII text: `€` is 3 bytes but 1 column. A UTF-8
@@ -22,7 +22,7 @@ bool excerptIs(u8 *source, u8 *expected) {
 
     cleanupUtf8Test();
 
-    if (!fs.writeAll(U8_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(U8_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -32,7 +32,7 @@ bool excerptIs(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(U8_TEST_OUT);
+    out = fs.readAll(U8_TEST_OUT).take();
     if (!out) {
         cleanupUtf8Test();
         return false;

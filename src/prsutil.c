@@ -645,6 +645,24 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
 /* `ast` is about to be written to (`=`, a compound assignment, `++`,
  * `--`): error out if it is a `const` variable or parameter. */
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
+    /* `s.len = n`: a slice's fields are set together, by assigning a
+     * whole slice */
+    /* a String's too, but to its own methods (module str's) */
+    if (ast->kind == AST_CLASS_REF && ast->cls && ast->cls->type &&
+        astTypeIsString(ast->cls->type)) {
+        AoStr *path = cctrlModulePath(cc, cc->cur_module);
+        if (!path || path->len != 3 || memcmp(path->data, "str", 3)) {
+            cctrlRewindUntilStrMatch(cc, ast->field, strlen(ast->field), NULL);
+            cctrlRaiseException(cc, "a String's `.%s` is read-only: change it with "
+                                "its methods", ast->field);
+        }
+    }
+    if (ast->kind == AST_CLASS_REF && ast->cls && ast->cls->type &&
+        astTypeIsSlice(ast->cls->type)) {
+        cctrlRewindUntilStrMatch(cc, ast->field, strlen(ast->field), NULL);
+        cctrlRaiseException(cc, "a slice's `.%s` is read-only: assign the whole "
+                            "slice instead", ast->field);
+    }
     if (ast->kind == AST_LVAR && (ast->flags & AST_FLAG_VARARGS)) {
         cctrlRaiseException(cc,"cannot assign to the variadic parameter '%s'",
                             ast->lname->data);

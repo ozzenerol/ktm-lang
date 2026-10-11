@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* `>>`, `/`, `%` and `<`/`>` on u64 behaved as signed (sarq/asr,
  * idiv/sdiv, signed compares): every integer binop was typed i64. An
@@ -106,8 +106,8 @@ i32 main() {
     if (U64_MAX > 1 && U64_MAX / 2 == I64_MAX) { correct++; }
     if (I64_MIN < 0 && I64_MIN / 2 == -4611686018427387904 && I64_MIN >> 62 == -2) { correct++; }
     if (-1 >> 1 == -1 && 0x7FFFFFFFFFFFFFFF > -1 && 9223372036854775807 > -1) { correct++; }
-    if (!str.cmp(typeof(0xFFFFFFFFFFFFFFFF), "u64") &&
-            !str.cmp(typeof(0x7FFFFFFFFFFFFFFF), "i64")) { correct++; }
+    if (!cstr.cmp(typeof(0xFFFFFFFFFFFFFFFF), "u64") &&
+            !cstr.cmp(typeof(0x7FFFFFFFFFFFFFFF), "i64")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

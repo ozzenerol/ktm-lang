@@ -217,6 +217,9 @@ typedef struct Cctrl {
      * program (not a module, not a stdlib header) */
     int decl_pub;
     int decl_from_main;
+    /* the `%.*s` lengths parseLowerSliceFormat added to the call being
+     * parsed, which its format check doesn't count as written */
+    int fmt_lowered;
     /* `a.b.name`s declared pub; names the main program declares, which
      * a module must not see */
     Set *pub_names;

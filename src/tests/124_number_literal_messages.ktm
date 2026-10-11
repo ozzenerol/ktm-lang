@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define NUM_MSG_TEST_FILE "__124_number_messages.ktm"
 #define NUM_MSG_TEST_OUT  "__124_number_messages.out"
@@ -19,7 +19,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupNumMsgTest();
 
-    if (!fs.writeAll(NUM_MSG_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NUM_MSG_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -28,7 +28,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         printf("ktm exit status %d, expected a normal compile failure\n", res);
         ok = false;
     } else {
-        out = fs.readAll(NUM_MSG_TEST_OUT);
+        out = fs.readAll(NUM_MSG_TEST_OUT).take();
         reason = null;
         err = null;
         if (out) {

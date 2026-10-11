@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `--target=*-apple-darwin` on a Linux host still wrote the ELF-only
  * `.section .note.GNU-stack` (chosen by the host, not the target), which
@@ -27,7 +27,7 @@ void main()
 /* 1 if the assembly for `target` has the GNU-stack note, 0 if not, -1 if
  * ktm failed */
 i64 hasGnuStack(u8 *target) {
-    u8 *cmd = str.format(CT_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --target=%s -S -o " CT_ASM " " CT_FILE " > /dev/null 2>&1", target);
+    u8 *cmd = cstr.format(CT_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --target=%s -S -o " CT_ASM " " CT_FILE " > /dev/null 2>&1", target);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
     if (res != 0) { return -1; }
@@ -41,12 +41,12 @@ bool assemblesOrSkipped(u8 *target) {
     i64 res;
     if (proc.shell("command -v clang >/dev/null 2>&1") != 0) { return true; }
     proc.shell("printf '.text\\n' > " CT_PROBE);
-    cmd = str.format("clang --target=%s -c " CT_PROBE " -o " CT_OBJ " > /dev/null 2>&1", target);
+    cmd = cstr.format("clang --target=%s -c " CT_PROBE " -o " CT_OBJ " > /dev/null 2>&1", target);
     res = proc.shell(cmd);
     mem.free(cmd);
     if (res != 0) { return true; }
     if (hasGnuStack(target) < 0) { return false; }
-    cmd = str.format("clang --target=%s -c " CT_ASM " -o " CT_OBJ " > /dev/null 2>&1", target);
+    cmd = cstr.format("clang --target=%s -c " CT_ASM " -o " CT_OBJ " > /dev/null 2>&1", target);
     res = proc.shell(cmd);
     mem.free(cmd);
     return res == 0;
@@ -57,7 +57,7 @@ void main() {
     i64 correct = 0, tests = 8;
 
     cleanupCrossTest();
-    fs.writeAll(CT_FILE, ctSource, str.len(ctSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CT_FILE, cstr.view(ctSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     if (hasGnuStack("x86_64-unknown-linux-gnu") == 1) { correct++; }
     if (hasGnuStack("aarch64-unknown-linux-gnu") == 1) { correct++; }

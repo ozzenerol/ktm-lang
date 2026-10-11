@@ -1,4 +1,4 @@
-import json, str, test;
+import cstr, json, test;
 
 /* json.parse only accepted a non-empty object or array at the top level:
  * `{}`, `[]`, `42`, `"text"`, `true` and `null` were errors (moving past the
@@ -8,7 +8,7 @@ i64 gCorrect = 0;
 
 /* Parses `text`, checks it is ok and has type `type` */
 json.Value *ok(u8 *text, i64 type) {
-    json.Value *j = json.parse(text);
+    json.Value *j = json.parse(cstr.view(text));
     if (json.ok(j) && j.type == type) {
         gCorrect++;
     } else {
@@ -18,7 +18,7 @@ json.Value *ok(u8 *text, i64 type) {
 }
 
 void bad(u8 *text) {
-    json.Value *j = json.parse(text);
+    json.Value *j = json.parse(cstr.view(text));
     if (!json.ok(j)) { gCorrect++; }
     else { printf("\n  '%s' should be rejected\n", text); }
     json.release(j);
@@ -51,10 +51,10 @@ i32 main() {
     if (j.floatVal == 2.5) { gCorrect++; }
     json.release(j);
     j = ok("\"text\"", json.STRING);
-    if (!str.cmp(j.str, "text")) { gCorrect++; }
+    if (!cstr.cmp(j.str.ptr, "text")) { gCorrect++; }
     json.release(j);
     j = ok("\"\"", json.STRING);
-    if (!str.cmp(j.str, "")) { gCorrect++; }
+    if (!cstr.cmp(j.str.ptr, "")) { gCorrect++; }
     json.release(j);
     j = ok("true", json.BOOL);
     if (j.boolean == true) { gCorrect++; }
@@ -75,10 +75,10 @@ i32 main() {
     json.release(ok("[null]", json.ARRAY));
 
     /* The explicit length is respected */
-    j = json.parse("[1]trailing", 3);
+    j = json.parse("[1]trailing"[0:3]);
     if (json.ok(j) && j.array.intVal == 1) { gCorrect++; }
     json.release(j);
-    j = json.parse("truex", 4);
+    j = json.parse("truex"[0:4]);
     if (json.ok(j) && j.type == json.BOOL) { gCorrect++; }
     json.release(j);
 

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define HEX_NO_DIGITS_TEST_FILE "__117_hex_no_digits.ktm"
 #define HEX_NO_DIGITS_TEST_OUT  "__117_hex_no_digits.out"
@@ -19,7 +19,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupHexNoDigitsTest();
 
-    if (!fs.writeAll(HEX_NO_DIGITS_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(HEX_NO_DIGITS_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -28,7 +28,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
         printf("ktm exit status %d, expected a normal compile failure\n", res);
         ok = false;
     } else {
-        out = fs.readAll(HEX_NO_DIGITS_TEST_OUT);
+        out = fs.readAll(HEX_NO_DIGITS_TEST_OUT).take();
         if (!out || !libc.strstr(out, expected) || !libc.strstr(out, "malformed numeric literal")) {
             if (out) { printf("%s\n", out); }
             ok = false;

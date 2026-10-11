@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A stray `;` at the top level, `i64 x = 1;;`, was taken as the type of
  * the next declaration, which then failed with "Identifier expected:
@@ -35,15 +35,15 @@ bool runSemi(u8 *source, u8 *cmd, i64 status, u8 *expected,
     bool ok;
 
     cleanupSemiTest();
-    fs.writeAll(SEMI_TEST_SRC, source, str.len(source),
+    fs.writeAll(SEMI_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     libc.snprintf(buf, sizeof(buf), "(%s) > " SEMI_TEST_OUT " 2>&1; test $? -eq %d",
                      cmd, status);
     res = proc.shell(buf);
-    out = fs.readAll(SEMI_TEST_OUT);
+    out = fs.readAll(SEMI_TEST_OUT).take();
     ok = res == 0 && out &&
              (!expected || (contains && libc.strstr(out, expected)) ||
-                (!contains && !str.cmp(out, expected)));
+                (!contains && !cstr.cmp(out, expected)));
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);
     cleanupSemiTest();

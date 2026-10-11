@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.parse accepted text after the top-level value (`[1]x`, `1 2`,
  * `truex`, `{"a":1}}`), skipped anything between a key and its ':'
@@ -7,7 +7,7 @@ import json, mem, str, test;
  * between a key and ':'. */
 
 bool errFn(u8 *text, i64 len, i64 error) {
-    json.Value *j = json.parse(text, len);
+    json.Value *j = json.parse(len < 0 ? cstr.view(text) : text[0:len]);
     bool ok = !json.ok(j) && j.state.error == error;
     if (!ok) { printf("[%s]: error %d want %d\n", text, j.state.error, error); }
     json.release(j);
@@ -15,11 +15,11 @@ bool errFn(u8 *text, i64 len, i64 error) {
 }
 
 bool okFn(u8 *text, u8 *want, i64 len=-1) {
-    json.Value *j = json.parse(text, len);
+    json.Value *j = json.parse(len < 0 ? cstr.view(text) : text[0:len]);
     bool ok = json.ok(j);
     if (ok) {
-        u8 *s = json.toStr(j);
-        ok = !str.cmp(s, want);
+        u8 *s = json.toStr(j).take();
+        ok = !cstr.cmp(s, want);
         if (!ok) { printf("[%s] gave [%s]\n", text, s); }
         mem.free(s);
     } else {

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `ktm -jit` on a file with no Main and no code at file scope looked
  * up a `main` that was never made and exited 255 with nothing printed.
@@ -22,20 +22,20 @@ bool jitRuns(u8 *source, bool wantOk, u8 *expected) {
     bool ok = true;
 
     cleanupNoMainTest();
-    if (!fs.writeAll(NM_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NM_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("T=; command -v timeout >/dev/null 2>&1 && T='timeout 30'; "
                              "$T ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                              "-jit " NM_FILE " > " NM_OUT " 2>&1");
-    out = fs.readAll(NM_OUT);
+    out = fs.readAll(NM_OUT).take();
     if (!out) {
         cleanupNoMainTest();
         return false;
     }
     if ((res == 0) != wantOk) { ok = false; }
     if (*expected && !libc.strstr(out, expected)) { ok = false; }
-    if (!*expected && str.len(out) != 0) { ok = false; }
+    if (!*expected && cstr.len(out) != 0) { ok = false; }
     if (!ok) { printf("\nstatus %d, want ok %d, output:\n%s\n", res, wantOk, out); }
     mem.free(out);
     cleanupNoMainTest();
@@ -60,7 +60,7 @@ i32 main() {
     /* a constant initialiser is static data, like `i64 g;` (no code); one
      * that calls a function is code at file scope */
     tests++; if (jitRuns("i64 x = 3;\ni64 foo() { return x; }\n", false, NO_MAIN_MSG)) { correct++; }
-    tests++; if (jitRuns("import str;\n\ni64 x;\ni64 foo() { return x; }\n\nvoid main()\n{\n  x = str.len(\"ab\");\n}\n", true, "")) { correct++; }
+    tests++; if (jitRuns("import cstr;\n\ni64 x;\ni64 foo() { return x; }\n\nvoid main()\n{\n  x = cstr.len(\"ab\");\n}\n", true, "")) { correct++; }
     /* a main: runs */
     tests++; if (jitRuns("void main() { printf(\"main\\n\"); }\n", true, "main\n")) { correct++; }
     tests++; if (jitRuns("i32 main() { return 3; }\n", false, "")) { correct++; }

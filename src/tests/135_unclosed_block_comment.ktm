@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A block comment left open at the end of a file was silently taken
  * as running to the end of the file, so `void Main() { ... }` followed
@@ -37,17 +37,17 @@ bool compile(u8 *source, u8 *inc, i64 count, u8 *loc) {
 
     cleanupCommentTest();
 
-    if (!fs.writeAll(COMMENT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(COMMENT_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
-    if (inc && !fs.writeAll(COMMENT_INC, inc, str.len(inc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (inc && !fs.writeAll(COMMENT_INC, cstr.view(inc), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         cleanupCommentTest();
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " COMMENT_FILE " > " COMMENT_OUT " 2>&1");
 
-    out = fs.readAll(COMMENT_OUT);
+    out = fs.readAll(COMMENT_OUT).take();
     if (!out) {
         cleanupCommentTest();
         return false;
@@ -57,7 +57,7 @@ bool compile(u8 *source, u8 *inc, i64 count, u8 *loc) {
         if (res != 0) { ok = false; }
     } else {
         if (res != 1) { ok = false; }
-        want = str.format("error: unterminated comment\n --> %s\n", loc);
+        want = cstr.format("error: unterminated comment\n --> %s\n", loc);
         if (!libc.strstr(out, want)) { ok = false; }
         mem.free(want);
     }
@@ -139,7 +139,7 @@ i32 main() {
 
     /* The same edge cases in this file itself */
     tests++; /* /* */ correct++;
-    tests++; if (str.len("/*") == 2) { correct++; }
+    tests++; if (cstr.len("/*") == 2) { correct++; }
 
     cleanupCommentTest();
     test.printResult(correct, tests);

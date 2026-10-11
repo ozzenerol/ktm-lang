@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An inner list (or string) in a multi-dimensional array initialiser
  * must fit its dimension. ktm used to accept `i64 m[2][2] = {{1,2,3},..}`
@@ -39,13 +39,13 @@ bool compileFailsWith(u8 *source, u8 *msg, u8 *loc) {
 
     cleanupNestedInitTest();
 
-    if (!fs.writeAll(NESTED_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NESTED_INIT_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " NESTED_INIT_FILE " > " NESTED_INIT_OUT " 2>&1");
 
-    out = fs.readAll(NESTED_INIT_OUT);
+    out = fs.readAll(NESTED_INIT_OUT).take();
     if (!out) {
         cleanupNestedInitTest();
         return false;
@@ -53,7 +53,7 @@ bool compileFailsWith(u8 *source, u8 *msg, u8 *loc) {
 
     ok = res == 1 && countErrors(out) == 1;
     first = libc.strstr(out, "error: ");
-    if (!first || str.cmpLen(first + 7, msg, str.len(msg))) { ok = false; }
+    if (!first || cstr.cmpLen(first + 7, msg, cstr.len(msg))) { ok = false; }
     else if (!libc.strstr(first, loc)) { ok = false; }
     if (!ok) { printf("status %d\n%s\n", res, out); }
 
@@ -142,7 +142,7 @@ bool testValidInits(void) {
     if (m[0][2] != 3 || m[1][0] != 4 || m[1][2] != 6) { ok = false; }
     if (sizeof(u) != 48 || u[2][0] != 5 || u[2][1] != 6) { ok = false; }
     if (c[0][1][1] != 4 || c[1][0][0] != 5 || c[1][1][1] != 8) { ok = false; }
-    if (str.cmp(s[0], "abc") || str.cmp(s[1], "de")) { ok = false; }
+    if (cstr.cmp(s[0], "abc") || cstr.cmp(s[1], "de")) { ok = false; }
     if (g139M[0][2] != 3 || g139M[1][0] != 4) { ok = false; }
     if (sizeof(g139Unsized) != 48 || g139Unsized[2][1] != 6) { ok = false; }
     if (g139Cube[1][0][1] != 6 || g139Cube[1][1][1] != 8) { ok = false; }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm syntax v0.2: named variadic parameters. `T ...name` takes zero or
  * more extra arguments, each checked and converted like an argument of
@@ -23,7 +23,7 @@ f64 avg(f64 ...xs) {
 
 i64 totalLen(u8 *...strs) {
     i64 t = 0;
-    for (auto s : strs) { t += str.len(s); }
+    for (auto s : strs) { t += cstr.len(s); }
     return t;
 }
 
@@ -42,9 +42,9 @@ f64 floats(f32 ...v) {
 /* untyped: the slots of the old argv, read with a postfix cast */
 u8 gBuf[128];
 i64 untyped(u8 *tag, ...args) {
-    str.formatTo(gBuf, "%s:%d", tag, args.len);
+    cstr.formatTo(gBuf, "%s:%d", tag, args.len);
     if (args.len >= 3) {
-        str.formatTo(gBuf + str.len(gBuf), ":%d:%.2f:%s", args[0], (f64)args[1], (u8 *)args[2]);
+        cstr.formatTo(gBuf + cstr.len(gBuf), ":%d:%.2f:%s", args[0], (f64)args[1], (u8 *)args[2]);
     }
     return args.len;
 }
@@ -85,11 +85,11 @@ i64 argcParam(i64 argc, i64 ...rest) {
 /* `source` fails to compile with exactly one error, `want` */
 bool fails(u8 *source, u8 *want) {
     proc.shell("rm -f " VA_SRC " " VA_OUT);
-    fs.writeAll(VA_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(VA_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " VA_SRC " -o /dev/null > " VA_OUT " 2>&1");
-    u8 *out = fs.readAll(VA_OUT);
+    u8 *out = fs.readAll(VA_OUT).take();
     proc.shell("rm -f " VA_SRC " " VA_OUT);
     i64 errors = 0;
     u8 *p = out;
@@ -131,8 +131,8 @@ i32 main() {
     tests++; if (floats(1.5, 2, 0.25) == 3.75) { correct++; }
     /* untyped */
     tests++;
-    if (untyped("t") == 0 && !str.cmp(gBuf, "t:0") &&
-            untyped("u", 42, 2.5, "s") == 3 && !str.cmp(gBuf, "u:3:42:2.50:s")) {
+    if (untyped("t") == 0 && !cstr.cmp(gBuf, "t:0") &&
+            untyped("u", 42, 2.5, "s") == 3 && !cstr.cmp(gBuf, "u:3:42:2.50:s")) {
         correct++;
             }
     /* a default before the extras */
@@ -159,8 +159,8 @@ i32 main() {
         correct++;
             }
     tests++;
-    if (!str.cmp(typeof(ft), "fn(i64 ...) i64") && !str.cmp(typeof(fa), "fn(f64 ...) f64") &&
-            !str.cmp(typeof(fp), "fn(i64 ...) i64")) {
+    if (!cstr.cmp(typeof(ft), "fn(i64 ...) i64") && !cstr.cmp(typeof(fa), "fn(f64 ...) f64") &&
+            !cstr.cmp(typeof(fp), "fn(i64 ...) i64")) {
         correct++;
             } else { printf("\n  %s | %s | %s\n", typeof(ft), typeof(fa), typeof(fp)); }
     /* in a loop: the call site's array is reused each time */
@@ -173,7 +173,7 @@ i32 main() {
     if (slot(0, true) == 1 && slot(1, 'x', 'y') == 'y' && slot(0, (i8)-3) == -3 &&
             slot(0, b200) == 200 && slot(1, false, (u8)7) == 7) { correct++; }
     /* the old form is unchanged */
-    tests++; if (!str.cmp(str.format("%d-%s", 5, "x"), "5-x")) { correct++; }
+    tests++; if (!cstr.cmp(cstr.format("%d-%s", 5, "x"), "5-x")) { correct++; }
 
     /* compile errors */
     tests++;
@@ -187,7 +187,7 @@ i32 main() {
                         "argument 2 of `S`: expected i64, got u8[2]")) { correct++; }
     tests++;
     if (fails("i64 S(i64 ...n) { return 0; }\ni64 G(f64 ...m) { return S(...m); }\n",
-                        "cannot spread `...m` (f64) into `S`, whose extra arguments are i64")) { correct++; }
+                        "cannot spread a f64[] into `S`, whose extra arguments are i64")) { correct++; }
     tests++;
     if (fails("i64 S(i64 ...n) { n = null; return 0; }\n",
                         "cannot assign to the variadic parameter 'n'")) { correct++; }

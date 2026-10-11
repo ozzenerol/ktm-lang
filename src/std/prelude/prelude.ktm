@@ -34,3 +34,21 @@ pub struct Error
   u8 *file;
   i32 line;
 };
+
+/* The code of the Error a failed bounds check throws: an index, or a
+ * sub-slice, outside a slice or an array */
+#define ERR_BOUNDS 0x6B746D01
+
+/* A string you own: its bytes (UTF-8 by convention) at ptr, len of them,
+ * room for cap, and always a NUL after the last one, so s.cstr() is
+ * free. Made empty (nothing allocated) by str.new() or a declaration,
+ * grown by its methods (module str's), freed by s.free():
+ * `String s = str.new(); defer s.free();`. A String converts to a u8[]
+ * view of its bytes wherever one is expected. Its fields are read-only
+ * outside module str. */
+pub struct String
+{
+  u8 *ptr;
+  i64 len;
+  i64 cap;
+};

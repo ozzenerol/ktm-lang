@@ -1,4 +1,4 @@
-import math, str, test;
+import cstr, math, test;
 
 /* Abs returned a u64, so everything done with its result was unsigned:
  * `Abs(x) > -1` was false and `f64 f = Abs(-3) - 5` was 1.8e19. It now
@@ -45,8 +45,8 @@ i32 main() {
     tests++; if (f < 0.0) { correct++; }
 
     u8 buf[32];
-    str.formatTo(buf, "%d", math.abs(-42) - 50);
-    tests++; if (!str.cmp(buf, "-8")) { correct++; }
+    cstr.formatTo(buf, "%d", math.abs(-42) - 50);
+    tests++; if (!cstr.cmp(buf, "-8")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `#error 1.5 0x10 'a'` printed only "1.5": the message was the first
  * token after `#error`. As in C it must be the rest of the line as
@@ -35,13 +35,13 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupErrorDirTest();
 
-    if (!fs.writeAll(ERRDIR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ERRDIR_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " ERRDIR_FILE " > " ERRDIR_OUT " 2>&1");
 
-    out = fs.readAll(ERRDIR_OUT);
+    out = fs.readAll(ERRDIR_OUT).take();
     if (!out) {
         cleanupErrorDirTest();
         return false;

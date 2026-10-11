@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm syntax v0.2: `fn ( [type {, type}] [, ...] ) RetType` is the new way
  * to write a function pointer type: `fn(i64) i64` is exactly the C
@@ -78,11 +78,11 @@ i64 showColor(Color c) { return (i64)c; }
 /* Compile `source`, which must FAIL to compile, and return ktm's output. */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-    u8 *out = fs.readAll(AT_OUT);
+    u8 *out = fs.readAll(AT_OUT).take();
     proc.shell("rm -f " AT_SRC " " AT_OUT);
     return out;
 }
@@ -90,7 +90,7 @@ u8 *diagnose(u8 *source) {
 /* `body`, wrapped as a whole program, must fail to compile with `want`
  * somewhere in ktm's output. */
 bool fails(u8 *body, u8 *want) {
-    u8 *src = str.format("%s\ni32 main() { return 0; }\n", body);
+    u8 *src = cstr.format("%s\ni32 main() { return 0; }\n", body);
     u8 *out = diagnose(src);
     bool ok = out && libc.strstr(out, "error:") && libc.strstr(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", body, out); }
@@ -194,8 +194,8 @@ i32 main() {
 
     /* typeof prints the new form, for both the new and old declarator */
     tests++;
-    if (!str.cmp(typeof(gNewOp), "fn(i64) i64") &&
-            !str.cmp(typeof(gOldOp), "fn(i64) i64")) {
+    if (!cstr.cmp(typeof(gNewOp), "fn(i64) i64") &&
+            !cstr.cmp(typeof(gOldOp), "fn(i64) i64")) {
         correct++;
             } else { printf("\n  typeof prints the new form\n"); }
 
@@ -247,7 +247,7 @@ i32 main() {
      * form would, not a hard error */
     tests++;
     {
-        u8 *src = str.format(
+        u8 *src = cstr.format(
             "i32 Take(fn(i64) i64 f) { return 0; }\n"
             "i32 g() { return Take(2); }\n"
             "i32 main() { return g(); }\n");

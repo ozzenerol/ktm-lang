@@ -1,6 +1,6 @@
-import fzf, mem, str, test;
+import cstr, fzf, mem, test;
 
-/* str.dupLen(buf, len) copied exactly len bytes, past the end of a shorter
+/* cstr.dupLen(buf, len) copied exactly len bytes, past the end of a shorter
  * string, returned an uninitialised byte for len 0 (it returned before
  * writing the NUL) and crashed on a negative len. It is now strndup: at
  * most len bytes, stopping at the NUL, always terminated, len < 0 is 0.
@@ -21,15 +21,15 @@ i32 main() {
     i64 correct = 0, tests = 0;
     printf("Test - StrNCpy strndup semantics: ");
 
-    u8 *a = str.dupLen("hello", 3);
-    u8 *b = str.dupLen("hi", 10);
-    u8 *c = str.dupLen("hello", 0);
-    u8 *d = str.dupLen("hello", -1);
-    u8 *e = str.dupLen("hello", 5);
-    u8 *f = str.dupLen(null, 4);
+    u8 *a = cstr.dupLen("hello", 3);
+    u8 *b = cstr.dupLen("hi", 10);
+    u8 *c = cstr.dupLen("hello", 0);
+    u8 *d = cstr.dupLen("hello", -1);
+    u8 *e = cstr.dupLen("hello", 5);
+    u8 *f = cstr.dupLen(null, 4);
     tests++;
-    if (!str.cmp(a, "hel") && !str.cmp(b, "hi") && c[0] == '\0' && d[0] == '\0' &&
-            !str.cmp(e, "hello") && f[0] == '\0') { correct++; }
+    if (!cstr.cmp(a, "hel") && !cstr.cmp(b, "hi") && c[0] == '\0' && d[0] == '\0' &&
+            !cstr.cmp(e, "hello") && f[0] == '\0') { correct++; }
     /* only what is needed is allocated, so a short source can't be read past */
     tests++; if (mem.size(b) == 3 && mem.size(a) == 4) { correct++; }
     mem.free(a); mem.free(b); mem.free(c); mem.free(d); mem.free(e); mem.free(f);

@@ -1,4 +1,4 @@
-module str;
+module cstr;
 import libc, mem, os;
 
 const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
@@ -224,9 +224,9 @@ _STRHASH::
                 RET
 }
 
-pub _extern _TOLOWER u8 toLower(u8 ch);
-pub _extern _TOUPPER u8 toUpper(u8 ch);
-pub _extern _ISSPACE bool isSpace(u8 ch);
+_extern _TOLOWER u8 toLower(u8 ch);
+_extern _TOUPPER u8 toUpper(u8 ch);
+_extern _ISSPACE bool isSpace(u8 ch);
 pub _extern _STRHASH u64 hash(u8 *str);
 #endif
 
@@ -345,17 +345,17 @@ _STRCPY::
                 RET
 }
 
-pub u8 toLower(u8 ch) {
+u8 toLower(u8 ch) {
         if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
         return ch;
 }
 
-pub u8 toUpper(u8 ch) {
+u8 toUpper(u8 ch) {
         if (ch >= 'a' && ch <= 'z') { return ch - 32; }
         return ch;
 }
 
-pub bool isSpace(u8 ch) {
+bool isSpace(u8 ch) {
         return ch == ' ' || ch == '\t' || ch == '\n' ||
                                     ch == '\v' || ch == '\f' || ch == '\r';
 }
@@ -380,6 +380,16 @@ pub i64 toInt(u8 *str)
 {// The integer at the start of str (like atol); 0 for null
         if (!str) { return 0; }
         return libc.atol(str);
+}
+
+/* The bytes of a C string, before its NUL, as a u8[] (a view, nothing
+ * copied; empty for null): where a u8[] is wanted, `cstr.view(path)` */
+pub u8[] view(u8 *s) {
+        if (!s) {
+                u8[] none;
+                return none;
+        }
+        return s[0:libc.strlen(s)];
 }
 
 /* The length of `buf` before its '\0', 0 for null. libc's strlen, which
@@ -522,30 +532,6 @@ pub u8 *firstOf(u8 *src,u8 *marker)
         }
 }
 
-pub u8 *splitFirst(u8 *src,u8 *marker,u8 *dst=null)
-{// Remove first str segment and place in dst buf or null.
-        i64 ch;
-        u8 *ptr=src,*res=dst;
-        if (!src || !marker) {
-                if (dst) { *dst=0; }
-                return res;
-        }
-        if (dst) {
-                while ((ch=*ptr++) && !count(marker,ch)) {
-                        *dst++=ch;
-                }
-                *dst=0;
-        } else {
-                while ((ch=*ptr++) && !count(marker,ch)) {}
-        }
-        if (ch) {
-                copy(src,ptr);
-        } else {
-                *src=0;
-        }
-        return res;
-}
-
 pub u8 *lastOf(u8 *src,u8 *marker)
 {// Point to last occurrence of market set in str.
         i64 ch;
@@ -557,133 +543,6 @@ pub u8 *lastOf(u8 *src,u8 *marker)
                 }
         }
         return res;
-}
-
-pub u8 *splitLast(u8 *src,u8 *marker,u8 *dst=null)
-{// Remove last str segment and place in dst buf or null.
-        u8 *ptr;
-        if (!src || !marker) {
-                if (dst) { *dst=0; }
-                return dst;
-        }
-        if ((ptr=lastOf(src,marker)) != null) {
-                if (dst) {
-                        copy(dst,ptr+1);
-                }
-                *ptr=0;
-        } else {
-                if (dst) {
-                        copy(dst,src);
-                }
-                *src=0;
-        }
-        return dst;
-}
-
-pub u8 *trimStart(u8 *str, i64 strLen=-1, i64 *_new_len=null)
-{ // Mutates the string, removes whitespace at the start
-        // of the string, MSize calls are still safe. Only the first str_len
-        // bytes are looked at (the whole string if str_len < 0); when something
-        // is removed the result is NUL terminated at its new length. null
-        // returns null.
-        i64 newLen,len,j;
-
-        if (!str) {
-                if (_new_len) { *_new_len = 0; }
-                return null;
-        }
-        if (strLen < 0) {
-                len = len(str);
-        } else {
-                len = strLen;
-        }
-        j = 0;
-
-        while (j < len && isSpace(str[j])) {
-                ++j;
-        }
-
-        newLen = len-j;
-        if (_new_len) {
-                *_new_len = newLen;
-        }
-        if (j == 0) {
-                return str;
-        }
-        libc.memmove(str,str+j,newLen);
-        str[newLen] = '\0';
-        return str;
-}
-
-pub u8 *trimEnd(u8 *str, i64 strLen=-1, i64 *_new_len=null)
-{ // Mutates the string, removes whitespace at the end
-        // of the string, MSize calls are still safe. Only the first str_len
-        // bytes are looked at (the whole string if str_len < 0). null returns
-        // null.
-        i64 newLen,len,i;
-
-        if (!str) {
-                if (_new_len) { *_new_len = 0; }
-                return null;
-        }
-        if (strLen < 0) {
-                len = len(str);
-        } else {
-                len = strLen;
-        }
-        i = len-1;
-
-        while (i >= 0 && isSpace(str[i])) {
-                --i;
-        }
-        i++;
-
-        newLen = i;
-        if (_new_len) {
-                *_new_len = newLen;
-        }
-        if (newLen == len) {
-                return str;
-        }
-        str[newLen] = '\0';
-        return str;
-}
-
-pub i64 trimEndChars(u8 *str, u8 *chars)
-{ // Mutates the string, removes any of the characters in `chars` from
-        // the end of the string and returns its new length. null returns 0.
-        i64 len,j;
-
-        if (!str) {
-                return 0;
-        }
-        len = len(str);
-
-        if (chars) {
-                while (len > 0) {
-                        j = 0;
-                        while (chars[j] && chars[j] != str[len-1]) {
-                                ++j;
-                        }
-                        if (!chars[j]) {
-                                break;
-                        }
-                        str[--len] = '\0';
-                }
-        }
-        return len;
-}
-
-pub void reverse(u8 *buf, i64 length)
-{ // Reverse a string inplace
-        i64 start = 0, end = length - 1;
-        while (start < end) {
-                u8 temp = buf[start];
-                buf[start] = buf[end];
-                buf[end] = temp;
-                start++;
-                end--;
-        }
 }
 
 i64 i64ToStr(u8 *buf, i64 num, bool *_is_neg=null, i64 _len=5000)
@@ -739,7 +598,7 @@ u64 u64ToStr(u8 *dst, u64 num, i64 len=5000) {
         return i;
 }
 
-pub i64 hex(u8 *dst, i64 num) {
+static i64 hex(u8 *dst, i64 num) {
         u8 *hexStr="0123456789ABCDEF";
         i64 i = (sizeof(u64) * 2) + 1, len = 2; /* "0x" + 16 digits */
         dst[i+1] = '\0';
@@ -1028,7 +887,7 @@ static void strPrintInt(u8 **_ptr, u8 **grow, u64 val, i64 conv, i64 flags,
         }
 }
 
-pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
         if (!fmt) { return null; }
         u64 uintarg, curlen = 0;
         f64 farg;
@@ -1070,7 +929,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                         }
                         if (*fmt == '*') {
                                 fmt++;
-                                tlen = (u64)argv[sp++];
+                                tlen = (u64)args[sp++];
                                 if (tlen < 0) { /* as in C, a negative '*' width left-justifies */
                                         flags|=PRTF_LEFT_JUSTIFY;
                                         tlen = -tlen;
@@ -1085,7 +944,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
                                 if (*fmt == '*') {
                                         fmt++;
-                                        dec_len=argv[sp++];
+                                        dec_len=args[sp++];
                                         if (dec_len < 0) { /* as in C, a negative precision is none */
                                                 dec_len = -1;
                                         }
@@ -1105,7 +964,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'Q': {
-                                        strarg = (u8*)argv[sp++];
+                                        strarg = (u8*)args[sp++];
                                         strarg = quote(strarg,flags);
                                         outStr(strarg,grow,&ptr,tlen,flags);
                                         mem.free(strarg);
@@ -1115,7 +974,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 case 'e':
                                 case 'g':
                                 case 'f': {
-                                        uintarg = (u64)argv[sp++]; // the f64's bits
+                                        uintarg = (u64)args[sp++]; // the f64's bits
                                         strarg = f64ToFmtStr(uintarg,dec_len,*(fmt-1));
                                         len = len(strarg);
                                         u8 sign = 0; /* '-', or '+' / ' ' with those flags */
@@ -1154,7 +1013,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 's': {
-                                        strarg = (u8 *)argv[sp++];
+                                        strarg = (u8 *)args[sp++];
                                         outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
                                 }
 
@@ -1179,7 +1038,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'c': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         for (i64 i = 0; i < 8; ++i) {
                                                 buf[i] = uintarg >> ((i*8) & 0xFF);
                                         }
@@ -1188,7 +1047,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'C': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         for (i64 i = 0; i < 8; ++i) {
                                                 buf[i] = toUpper(uintarg >> ((i*8) & 0xFF));
                                         }
@@ -1202,12 +1061,12 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 case 'o':
                                 case 'x':
                                 case 'X': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         strPrintInt(&ptr,grow,uintarg,*(fmt-1),flags,tlen,dec_len);
                                 }
 
                                 case 'p': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         len = hex(buf,uintarg);
                                         outStr(buf,grow,&ptr,tlen,flags);
                                 }
@@ -1250,20 +1109,20 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
         return dst;
 }
 
-pub u8 *concatArgs(i64 argc, u64 *argv) {
+pub u8 *concatArgs(u64[] args) {
         u8 *buf = mem.alloc(256), *dst = buf;
-        for (i64 i = 0; i < argc; ++i) {
-                outStr((u8*)argv[i],&buf,&dst,0,0);
+        for (auto arg : args) {
+                outStr((u8*)arg,&buf,&dst,0,0);
         }
         return buf;
 }
 
 pub u8 *concat(...args) {
-        return concatArgs(args.len,args);
+        return concatArgs(args);
 }
 
 pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
-        return formatArgs(dst,fmt,args.len,args);
+        return formatArgs(dst,fmt,args);
 }
 
 /* Format into `dst`, which has room for `size` bytes, like C's snprintf:
@@ -1272,7 +1131,7 @@ pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
     * StrPrint(dst, ...) has no bound, so use this for a fixed buffer. */
 pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
         if (!dst || size <= 0) { return dst; }
-        u8 *full = formatArgs(null,fmt,args.len,args);
+        u8 *full = formatArgs(null,fmt,args);
         i64 len = 0;
         if (full) {
                 len = len(full);
@@ -1286,7 +1145,7 @@ pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
 
 pub u8 *format(u8 *fmt,...args)
 {// MAlloc StrPrint.
-        u8 *res,*buf=formatArgs(null,fmt,args.len,args);
+        u8 *res,*buf=formatArgs(null,fmt,args);
         res=dup(buf);
         mem.free(buf);
         return res;
@@ -1301,7 +1160,7 @@ pub u8 *format(u8 *fmt,...args)
     * string: in a loop keep the length yourself with CatLenPrint, or
     * collect the pieces and StrPrint them once. */
 pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
-        u8 *s2 = formatArgs(null,fmt,args.len,args);
+        u8 *s2 = formatArgs(null,fmt,args);
         if (!s2) { return _dst; }
         if (!_dst) { return s2; }
         i64 len = len(_dst);
@@ -1319,7 +1178,7 @@ pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
     * StrLen per call. `_dst` may be null (with *_len 0) to start one. */
 pub u8 *appendFormatLen(u8 *_dst, i64 *_len, u8 *fmt, ...args) {
         i64 len = *_len;
-        u8 *s2 = formatArgs(null,fmt,args.len,args);
+        u8 *s2 = formatArgs(null,fmt,args);
         if (!s2) { return _dst; }
         i64 s2len = len(s2);
         i64 size = mem.size(_dst);

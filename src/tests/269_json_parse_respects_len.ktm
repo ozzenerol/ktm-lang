@@ -1,6 +1,6 @@
-import json, str, test;
+import cstr, json, test;
 
-/* json.parse(text, len) read past `len`: the string scan, number scan
+/* json.parse(text[0:len]) read past `len`: the string scan, number scan
  * (and strtoll/strtod) and whitespace skip all went on to a NUL. So a
  * string the length cuts off was read to a quote after it, and a number
  * took the digits after it. Strings cut off are now
@@ -8,7 +8,7 @@ import json, str, test;
 
 /* Parse the first `len` bytes of `text`, which goes on past them */
 json.Value *cut(u8 *text, i64 len) {
-    return json.parse(text, len);
+    return json.parse(text[0:len]);
 }
 
 bool unterminated(u8 *text, i64 len) {
@@ -53,14 +53,14 @@ i32 main() {
     json.Value *k = cut("true!!", 4);
     json.Value *n = cut("\"ok\"tail", 4);
     if (json.ok(j) && json.ok(k) && k.boolean == true && json.ok(n) &&
-            !str.cmp(n.str, "ok")) { correct++; }
+            !cstr.cmp(n.str.ptr, "ok")) { correct++; }
     json.release(j);
     json.release(k);
     json.release(n);
 
     /* null */
     tests++;
-    if (json.parse(null) == null && json.parse(null, 5) == null) { correct++; }
+    if (json.parse(cstr.view(null)) == null) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

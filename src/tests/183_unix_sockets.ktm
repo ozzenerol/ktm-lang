@@ -1,4 +1,26 @@
-import libc, mem, net, str, test;
+import cstr, libc, mem, net, test;
+
+/* the String forms of net's address functions, into a C buffer here */
+bool copyOut(String *s, u8 *buf, i64 size) {
+    bool ok = s.ptr && s.len < size;
+    if (ok) { cstr.copy(buf, s.cstr()); }
+    s.free();
+    return ok;
+}
+bool peerInto(i32 fd, u8 *buf, i64 size) {
+    String s = net.peerAddr(fd);
+    return copyOut(&s, buf, size);
+}
+bool addrInto(libc.sockaddr *sa, i32 fam, u8 *buf, i64 size) {
+    String s = net.addrToStr(sa, fam);
+    return copyOut(&s, buf, size);
+}
+i64 recvInto(i32 fd, u8 *buf, i64 len, u8 *from, i64 fromSize, i32 *port) {
+    String f;
+    i64 n = net.recvFrom(fd, buf[0:len], &f, port);
+    if (!copyOut(&f, from, fromSize)) { from[0] = 0; }
+    return n;
+}
 
 /* The socket address classes had the BSD layout everywhere (a leading
  * length byte), so on Linux the family landed in the wrong byte: unix
@@ -42,40 +64,40 @@ i32 main() {
 #endif
 
     /* a real AF_UNIX server and client in one process */
-    str.formatTo(path, "./ktm183-%d.sock", getpid());
-    srv = net.unixListen(path, 4);
+    cstr.formatTo(path, "./ktm183-%d.sock", getpid());
+    srv = net.unixListen(cstr.view(path), 4);
     check(srv > 0, "unix server");
-    cli = net.unixDial(path);
+    cli = net.unixDial(cstr.view(path));
     check(cli > 0, "unix client");
     acc = libc.accept(srv, null, null);
     check(acc > 0, "accept");
-    check(libc.write(cli, "ping", 4) == 4 && libc.read(acc, msg, 4) == 4 && !str.cmpLen(msg, "ping", 4), "client -> server");
-    check(libc.write(acc, "pong", 4) == 4 && libc.read(cli, msg, 4) == 4 && !str.cmpLen(msg, "pong", 4), "server -> client");
+    check(libc.write(cli, "ping", 4) == 4 && libc.read(acc, msg, 4) == 4 && !cstr.cmpLen(msg, "ping", 4), "client -> server");
+    check(libc.write(acc, "pong", 4) == 4 && libc.read(cli, msg, 4) == 4 && !cstr.cmpLen(msg, "pong", 4), "server -> client");
     len = sizeof(libc.sockaddr_un);
     mem.set(&un, 0, sizeof(libc.sockaddr_un));
     check(libc.getsockname(srv, (libc.sockaddr *)(&un), &len) == 0 && un.sun_family == libc.AF_UNIX &&
-                !str.cmp(un.sun_path, path), "getsockname of the server");
+                !cstr.cmp(un.sun_path, path), "getsockname of the server");
     libc.close(acc); libc.close(cli); libc.close(srv);
     libc.unlink(path);
 
     /* the longest path that fits works, one more byte is refused, not copied */
     len = sizeof(libc.sockaddr_un) - 2 - 1;
-    str.formatTo(longpath, "./ktm183-%d-", getpid());
-    for (i = str.len(longpath); i < len; i++) { longpath[i] = 'x'; }
+    cstr.formatTo(longpath, "./ktm183-%d-", getpid());
+    for (i = cstr.len(longpath); i < len; i++) { longpath[i] = 'x'; }
     longpath[len] = '\0';
-    srv = net.unixListen(longpath, 4);
+    srv = net.unixListen(cstr.view(longpath), 4);
     check(srv > 0, "longest path server");
-    cli = net.unixDial(longpath);
+    cli = net.unixDial(cstr.view(longpath));
     check(cli > 0, "longest path client");
     libc.close(cli); libc.close(srv);
     libc.unlink(longpath);
     longpath[len] = 'x';
     longpath[len + 1] = '\0';
-    check(net.unixListen(longpath, 4) == -1, "path one byte too long");
+    check(net.unixListen(cstr.view(longpath), 4) == -1, "path one byte too long");
     for (i = len + 1; i < 200; i++) { longpath[i] = 'y'; }
     longpath[200] = '\0';
-    check(net.unixListen(longpath, 4) == -1 &&
-                net.unixDial(longpath) == -1, "200-byte path");
+    check(net.unixListen(cstr.view(longpath), 4) == -1 &&
+                net.unixDial(cstr.view(longpath)) == -1, "200-byte path");
     check(net.unixDial("./ktm183-nobody-listens") == -1, "no server");
 
     /* IPv4: the family of an accepted socket's peer address */
@@ -86,7 +108,7 @@ i32 main() {
     port = ((u8 *)(&sin.sin_port))[0] << 8 | ((u8 *)(&sin.sin_port))[1];
     cli = net.dial("127.0.0.1", port);
     acc = libc.accept(srv, null, null);
-    check(net.peerAddr(acc, ip, sizeof(ip)) && !str.cmp(ip, "127.0.0.1"),
+    check(peerInto(acc, ip, sizeof(ip)) && !cstr.cmp(ip, "127.0.0.1"),
                 "peer address of an accepted socket");
 
     /* std.ktmh constants and addrinfo field order */

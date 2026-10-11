@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A program with a function named like a library internal used to
  * replace the library's own when compiled: its `RoundUpToNextPowerOf2`
@@ -25,14 +25,14 @@ bool runs(bool jit, u8 *source, u8 *want) {
     u8 *out;
     i64 res;
     cleanup();
-    fs.writeAll(LP_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(LP_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (jit) {
         res = proc.shell(LP_KTM "-jit " LP_FILE " > " LP_OUT " 2>&1");
     } else {
         res = proc.shell(LP_KTM LP_FILE " -o " LP_EXE " > " LP_OUT " 2>&1 && "
                                  LP_TIMEOUT "./" LP_EXE " >> " LP_OUT " 2>&1");
     }
-    out = fs.readAll(LP_OUT);
+    out = fs.readAll(LP_OUT).take();
     bool ok = res == 0 && out && libc.strstr(out, want);
     if (!ok) { printf("jit=%d: exit status %d\n%s\n", jit, res, out); }
     mem.free(out);
@@ -55,15 +55,14 @@ void main()
   map.StrMap *sm = map.strNew();
   sm.set(\"k\", (void *)7);
   json.Value *j = json.parse(\"{\\\"a\\\": [3, 1, 2]}\");
-  u8 *js = json.toStr(j);
+  u8 *js = json.toStr(j).take();
   vec.IntVec *v = vec.intNew();
   v.push(3); v.push(1); v.push(2);
   v.sort();
   libc.timespec ts;
   ts.tv_sec = 86400 * 365;
   ts.tv_nsec = 0;
-  u8 iso[64];
-  date.isoFromTimespec(&ts, iso);
+  String iso = date.isoFromTimespec(&ts);
   printf(\"cap=%d get=%d str=%d json=%s sorted=%d%d%d iso=%s own=%d\\n\",
     im.capacity, im.get(49), sm.get(\"k\"), js,
     v.entries[0], v.entries[1], v.entries[2], iso,

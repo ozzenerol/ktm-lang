@@ -1,20 +1,13 @@
-import map, mem, str, test;
+import cstr, map, str, test;
 
 /* What the library docs and std.ktmh now promise about map.IntMap and map.StrMap:
  * the capacity rule (slots, a power of two, grows at 60% full, never
  * shrinks, not even on Clear), insertion-order iteration with deletes
  * allowed during it and a re-set key coming last, an update keeping the
- * stored key and freeing the key passed, and map.strToStr's format. */
+ * stored key (the map's own copy since v0.3.0), and map.strToStr's format. */
 
-i64 gKeyFrees = 0;
-
-void freeKey(void *p) {
-    gKeyFrees++;
-    mem.free(p);
-}
-
-u8 *strFn(void *v) {
-    return str.formatTo(null, "%d", v);
+String strFn(void *v) {
+    return str.format("%d", v);
 }
 
 i32 main() {
@@ -43,7 +36,7 @@ i32 main() {
     /* Deleting every entry while iterating visits each once */
     map.StrMap *m = map.strNew();
     u8 *names[5] = {"a", "b", "c", "d", "e"};
-    for (i64 i = 0; i < 5; i++) { m.set(names[i], (void *)i); }
+    for (i64 i = 0; i < 5; i++) { m.set(cstr.view(names[i]), (void *)i); }
     i64 idx = 0, visited = 0;
     map.StrMapNode *node;
     while (m.iter(&idx, &node)) {
@@ -56,37 +49,41 @@ i32 main() {
     else { printf("Failed - delete while iterating: %d\n", visited); }
 
     /* A deleted key set again comes last */
-    for (i64 i = 0; i < 5; i++) { m.set(names[i], (void *)i); }
+    for (i64 i = 0; i < 5; i++) { m.set(cstr.view(names[i]), (void *)i); }
     m.delete("b");
     m.set("b", (void *)9);
-    u8 *keys = m.keysToStr();
-    u8 *all = m.toStr(&strFn);
+    String keys = m.keysToStr();
+    String all = m.toStr(&strFn);
     tests++;
-    if (!str.cmp(keys, "{a, c, d, e, b}") &&
-            !str.cmp(all, "{[a] => 0, [c] => 2, [d] => 3, [e] => 4, [b] => 9}")) {
+    if (keys.equals("{a, c, d, e, b}") &&
+            all.equals("{[a] => 0, [c] => 2, [d] => 3, [e] => 4, [b] => 9}")) {
         correct++;
             } else { printf("Failed - order: %s %s\n", keys, all); }
-    mem.free(keys);
-    mem.free(all);
+    keys.free();
+    all.free();
     m.release();
 
-    /* An update keeps the stored key and frees the one passed */
+    /* The map stores its own copy of a key, NUL-terminated, and an update
+     * keeps it */
     m = map.strNew();
-    m.setFreeKey(&freeKey);
-    u8 *first = str.dup("k");
-    m.set(first, (void *)1);
-    m.set(str.dup("k"), (void *)2);
-    u8 *stored;
+    u8 buf[8];
+    cstr.copy(buf, "k");
+    m.set(cstr.view(buf), (void *)1);
+    u8[] stored;
+    idx = 0;
+    m.keyIter(&idx, &stored);
+    u8 *firstCopy = stored.ptr;
+    buf[0] = 'x';                       /* the caller's buffer changes */
+    m.set("k", (void *)2);
     idx = 0;
     m.keyIter(&idx, &stored);
     tests++;
-    if (gKeyFrees == 1 && stored == first && (i64)m.get("k") == 2) {
+    if (stored.ptr == firstCopy && stored.ptr != buf && stored.equals("k") &&
+            stored.ptr[1] == 0 && (i64)m.get("k") == 2 && !m.has("x") &&
+            (i64)m.size == 1) {
         correct++;
-    } else { printf("Failed - update\n"); }
+    } else { printf("Failed - key copy\n"); }
     m.release();
-    tests++;
-    if (gKeyFrees == 2) { correct++; }
-    else { printf("Failed - release\n"); }
 
     test.printResult(correct, tests);
     printf("====\n");

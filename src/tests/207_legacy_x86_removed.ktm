@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The legacy AST-based x86 backend was removed: --use-legacy-x86 must
  * fail with a clear message, not compile with a broken code generator. */
@@ -20,10 +20,10 @@ i32 main() {
     printf("Test - --use-legacy-x86 is rejected: ");
     u8 *out = null;
     cleanup();
-    if (fs.writeAll(RM_SRC, gProgram, str.len(gProgram), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(RM_SRC, cstr.view(gProgram), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --use-legacy-x86 "
                              RM_SRC " -o " RM_BIN " > " RM_OUT " 2>&1") != 0) { correct++; }
-        out = fs.readAll(RM_OUT);
+        out = fs.readAll(RM_OUT).take();
         if (out && libc.strstr(out, "--use-legacy-x86 was removed")) { correct++; }
         else if (out) { printf("\n%s", out); }
         /* the same program still builds with the default backend */

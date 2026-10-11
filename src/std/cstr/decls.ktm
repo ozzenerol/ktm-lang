@@ -1,4 +1,4 @@
-module str;
+module cstr;
 
 /* The size StrPrint and MPrintQ start a new buffer at (it grows). */
 const i64 STR_LEN = 256;

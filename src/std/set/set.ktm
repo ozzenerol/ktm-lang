@@ -227,20 +227,20 @@ pub IntSet *IntSet.symDiff(IntSet *s2) {
     return symDiffSet;
 }
 
-pub u8 *IntSet.toStr() {
-    i64 len = 1;
-    u8 *buf = str.dup("{");
+pub String IntSet.toStr() {
+    String out = str.from("{");
     IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     bool first = true;
 
     while ((entry = intIterNext(i1))) {
-        if (first) { buf = str.appendFormatLen(buf, &len, "%d", entry.key); }
-        else       { buf = str.appendFormatLen(buf, &len, ", %d", entry.key); }
+        if (!first) { out.append(", "); }
+        out.appendFormat("%d", entry.key);
         first = false;
     }
     intIterRelease(i1);
-    return str.appendFormatLen(buf, &len, "}");
+    out.append("}");
+    return out;
 }
 
 pub void IntSet.release() {

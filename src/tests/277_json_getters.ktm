@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* New getters: json.objectGet (exact key), json.arrayGet (index) and
  * json.len (items of an array/object). Checked against json.select on
@@ -15,29 +15,29 @@ u8 *randValue(u8 *s, i64 depth) {
     i64 r = nextRand() % 10;
     if (depth > 3 || r < 4) {
         switch (nextRand() % 5) {
-            case 0: return str.appendFormat(s, "%d", nextRand() % 1000 - 500);
-            case 1: return str.appendFormat(s, "\"v%d\"", nextRand() % 50);
-            case 2: return str.appendFormat(s, "true");
-            case 3: return str.appendFormat(s, "null");
-            default: return str.appendFormat(s, "%d.5", nextRand() % 100);
+            case 0: return cstr.appendFormat(s, "%d", nextRand() % 1000 - 500);
+            case 1: return cstr.appendFormat(s, "\"v%d\"", nextRand() % 50);
+            case 2: return cstr.appendFormat(s, "true");
+            case 3: return cstr.appendFormat(s, "null");
+            default: return cstr.appendFormat(s, "%d.5", nextRand() % 100);
         }
     }
     i64 n = nextRand() % 6;
     if (r < 7) {
-        s = str.appendFormat(s, "[");
+        s = cstr.appendFormat(s, "[");
         for (i64 i = 0; i < n; ++i) {
-            if (i) { s = str.appendFormat(s, ","); }
+            if (i) { s = cstr.appendFormat(s, ","); }
             s = randValue(s, depth + 1);
         }
-        return str.appendFormat(s, "]");
+        return cstr.appendFormat(s, "]");
     }
-    s = str.appendFormat(s, "{");
+    s = cstr.appendFormat(s, "{");
     for (i64 i = 0; i < n; ++i) {
-        if (i) { s = str.appendFormat(s, ","); }
-        s = str.appendFormat(s, "\"k%d\":", nextRand() % 4);
+        if (i) { s = cstr.appendFormat(s, ","); }
+        s = cstr.appendFormat(s, "\"k%d\":", nextRand() % 4);
         s = randValue(s, depth + 1);
     }
-    return str.appendFormat(s, "}");
+    return cstr.appendFormat(s, "}");
 }
 
 i64 gChecks = 0;
@@ -58,10 +58,10 @@ bool check(json.Value *node) {
         for (it = node.object; it; it = it.next) {
             /* json.select and json.objectGet both give the first node with a key */
             u8 sel[32];
-            str.formatTo(sel, ".%s", it.key);
+            cstr.formatTo(sel, ".%s", it.key);
             if (json.objectGet(node, it.key) != json.select(node, sel)) { return false; }
-            if (json.objectGet(node, it.key).key != it.key &&
-                    str.cmp(json.objectGet(node, it.key).key, it.key)) { return false; }
+            if (json.objectGet(node, it.key).key.ptr != it.key.ptr &&
+                    !json.objectGet(node, it.key).key.equals(it.key)) { return false; }
             if (!check(it)) { return false; }
             n++;
             gChecks++;
@@ -80,7 +80,7 @@ i32 main() {
     bool ok = true;
     for (i64 i = 0; i < 300 && ok; ++i) {
         u8 *text = randValue(null, 0);
-        json.Value *d = json.parse(text);
+        json.Value *d = json.parse(cstr.view(text));
         if (!json.ok(d) || !check(d)) {
             printf("mismatch in %s\n", text);
             ok = false;
@@ -107,10 +107,10 @@ i32 main() {
             !json.arrayGet(arr, 3) && !json.arrayGet(arr, -1) &&
             !json.arrayGet(arr, 0x7FFFFFFFFFFFFFFF)) { correct++; }
 
-    /* wrong node types and null */
+    /* wrong node types and null (an empty u8[] is the key "") */
     tests++;
     if (!json.objectGet(arr, "0") && !json.arrayGet(d, 0) && !json.objectGet(null, "a") &&
-            !json.objectGet(d, null) && !json.arrayGet(null, 0) && json.len(null) == 0 &&
+            json.objectGet(d, cstr.view(null)).intVal == 4 && !json.arrayGet(null, 0) && json.len(null) == 0 &&
             json.len(json.arrayGet(arr, 0)) == 0) { correct++; }
 
     json.release(d);

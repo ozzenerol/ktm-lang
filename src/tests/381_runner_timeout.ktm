@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test, vec;
+import cstr, fs, libc, mem, proc, test, vec;
 #include "run_shared.ktm"
 
 /* The test runners had no time limit: one hanging test (a deadlock)
@@ -14,9 +14,9 @@ u8 *gTestDir;   /* this test's working directory */
 
 /* RunTests' hook: what each of the two tests does */
 void runTest(u8 *name, i64 idx) {
-    if (!str.cmp(name, "hang")) {
+    if (!cstr.cmp(name, "hang")) {
         /* the shell writes its pid, then becomes the sleep */
-        u8 *cmd = str.format("echo $$ > '%s/__381_pid'; exec sleep %d",
+        u8 *cmd = cstr.format("echo $$ > '%s/__381_pid'; exec sleep %d",
                                                 gTestDir, HANG_SECS);
         proc.shell(cmd);
         mem.free(cmd);
@@ -42,8 +42,8 @@ i32 main() {
     setenv("KTM_TEST_TIMEOUT", "2", 1);
     setenv("JOBS", "2", 1);
     vec.PtrVec *names = vec.ptrNew();
-    names.push(str.dup("hang"));
-    names.push(str.dup("quick"));
+    names.push(cstr.dup("hang"));
+    names.push(cstr.dup("quick"));
 
     /* RunTests in a child, its output in __381_out */
     began = nowMs();
@@ -60,7 +60,9 @@ i32 main() {
     }
     libc.waitpid(pid, &status, 0);
     took = nowMs() - began;
-    u8 *out = fs.readAll("__381_out", &len);
+    String out_read = fs.readAll("__381_out");
+    len = out_read.len;
+    u8 *out = out_read.take();
 
     tests++;
     if (contains(out, "FAILED") && contains(out, "timed out after 2 s: hang")) {
@@ -75,8 +77,8 @@ i32 main() {
     else { printf("took %d ms ", took); }
 
     /* the sleep the hanging test started was killed too */
-    u8 *pidText = fs.readAll("__381_pid");
-    if (pidText) { sleepPid = str.toInt(pidText); }
+    u8 *pidText = fs.readAll("__381_pid").take();
+    if (pidText) { sleepPid = cstr.toInt(pidText); }
     for (i = 0; i < 300 && sleepPid > 0 && libc.kill(sleepPid, 0) == 0; i++) {
         usleep(10000);
     }

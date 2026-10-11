@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* The parser reads tokens from a 16-token ring that the lexer fills
  * ahead of it, and macros were expanded only as the parser took each
@@ -51,8 +51,8 @@ i32 main() {
 
     if (gA == 3) { correct++; }
     if (gB == 4) { correct++; }
-    if (!str.cmp(gS1, "one")) { correct++; }
-    if (!str.cmp(gS2, "two")) { correct++; }
+    if (!cstr.cmp(gS1, "one")) { correct++; }
+    if (!cstr.cmp(gS2, "two")) { correct++; }
     if (gC == 10) { correct++; }
     if (V == 7) { correct++; }
     if (gK1 == 6 && K == 40) { correct++; }

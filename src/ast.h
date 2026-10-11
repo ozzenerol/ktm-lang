@@ -142,6 +142,10 @@ typedef enum AstKind {
     AST_TERNARY       = 300,  /* cond ? then : els (the conditional operator) */
     AST_DEFER         = 301,  /* defer <stmt>; runs <stmt> when its block is left */
     AST_VA_PACK       = 302,  /* the extras of a `T ...name` call, see astVaPack */
+    AST_SLICE_MAKE    = 303,  /* a `T[]` built from a pointer and a length, see astSliceMake */
+    AST_SLICE_ELEM    = 304,  /* &s[i] of a slice, bounds-checked, see astSliceElem */
+    AST_SUBSLICE      = 305,  /* s[a:b] of a slice, array or pointer, see astSubSlice */
+    AST_TEMP_ADDR     = 306,  /* &tmp of a struct value put in a hidden variable, see astTempAddr */
 } AstKind;
 
 /* @Cleanup
@@ -203,6 +207,10 @@ typedef struct AstType {
      * it without a cast; every other integer type needs one. */
     u8 is_enum;
     Map *enum_members;
+    /* A slice `T[]` (astMakeSliceType): a class of two fields, `T *ptr`
+     * and `i64 len`, interned per element type, whose element is `elem` */
+    u8 is_slice;
+    struct AstType *elem;
     /* On a class field: a union member after the first one (directly or
      * through an anonymous class/union flattened into the class). A
      * union takes one initialiser item, for its first member, so
@@ -458,6 +466,28 @@ typedef struct Ast {
             int va_untyped;
         };
 
+        /* A `T[]` value made from `slice_ptr` and `slice_len`, written
+         * into the hidden `slice_var` (an AST_LVAR, or an AST_GVAR in
+         * file-scope code); evaluates to its address, as a struct does */
+        struct {
+            Ast *slice_var;
+            Ast *slice_ptr;
+            Ast *slice_len;
+        };
+
+        /* `&s[i]` (AST_SLICE_ELEM: sub_lo is i) and `s[a:b]`
+         * (AST_SUBSLICE, into the hidden sub_var; sub_lo/sub_hi NULL when
+         * left out) of `sub_base`, a slice, an array or (a sub-slice only,
+         * unchecked) a pointer. A failed check throws rt.ERR_BOUNDS at
+         * `sub_file`:line. */
+        struct {
+            Ast *sub_base;
+            Ast *sub_lo;
+            Ast *sub_hi;
+            Ast *sub_var;
+            Ast *sub_file;
+        };
+
         /* @Typeo
          * Compound statement */
         struct {
@@ -605,6 +635,14 @@ Ast *astTry(Ast *try_body, Ast *catch_body);
 Ast *astThrow(Ast *value);
 Ast *astDefer(Ast *stmt);
 Ast *astVaPack(Ast *array, Vec *items, int untyped);
+AstType *astMakeSliceType(AstType *elem);
+int astTypeIsSlice(AstType *type);
+int astTypeHasSlice(AstType *type);
+int astTypeIsString(AstType *type);
+Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len);
+Ast *astSliceElem(Ast *base, Ast *index, Ast *file, int line);
+Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line);
+Ast *astTempAddr(Ast *var, Ast *value);
 Ast *astFunctionPtr(AstType *type,
                     char *fname,
                     int fname_len, 

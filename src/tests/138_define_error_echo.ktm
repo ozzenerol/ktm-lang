@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An error on a #define line echoed a rewritten line in its excerpt:
  * `#define T (N > 2 ? 1 : 2.5)` showed as `#define T (N > 2  1 :
@@ -25,7 +25,7 @@ bool excerptIs(u8 *source, u8 *expected) {
 
     cleanupEchoTest();
 
-    if (!fs.writeAll(ECHO_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ECHO_TEST_FILE, cstr.view(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -35,7 +35,7 @@ bool excerptIs(u8 *source, u8 *expected) {
         return false;
     }
 
-    out = fs.readAll(ECHO_TEST_OUT);
+    out = fs.readAll(ECHO_TEST_OUT).take();
     if (!out) {
         cleanupEchoTest();
         return false;

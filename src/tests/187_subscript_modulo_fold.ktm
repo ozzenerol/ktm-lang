@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `a[i % n]` crashed ktm with a SIGFPE: the subscript is constant
  * folded to check its bounds, and the folder divided the 0 it uses
@@ -22,11 +22,11 @@ bool compileFailsWith(u8 *source, u8 *expected) {
     bool ok;
 
     cleanupDivZeroTest();
-    fs.writeAll(DIVZERO_TEST_SRC, source, str.len(source),
+    fs.writeAll(DIVZERO_TEST_SRC, cstr.view(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(DIVZERO_KTM DIVZERO_TEST_SRC " > " DIVZERO_TEST_OUT " 2>&1; "
                              "test $? -eq 1");
-    out = fs.readAll(DIVZERO_TEST_OUT);
+    out = fs.readAll(DIVZERO_TEST_OUT).take();
     ok = res == 0 && out && libc.strstr(out, expected);
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);

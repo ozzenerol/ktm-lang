@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `void *w = &F; if (w == &F)` was rejected with "The `==` operator
  * cannot be applied to a pointer type with a unary op of function".
@@ -31,26 +31,26 @@ bool compileFailsWith(u8 *expr, u8 *expected) {
     bool ok = false;
 
     cleanupFnCmpTest();
-    src = str.format(
+    src = cstr.format(
 "void F() {}
 void main() {
   void *w = &F; fn() void fp = &F; i64 *q = null; f64 d = 1.0;
   printf(\"%%d\\n\", %s);
 }
 ", expr);
-    if (!fs.writeAll(FNCMP_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FNCMP_FILE, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         mem.free(src);
         return false;
     }
     mem.free(src);
-    cmd = str.format(
+    cmd = cstr.format(
             "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
             FNCMP_FILE " > " FNCMP_OUT " 2>&1");
     res = proc.shell(cmd);
     mem.free(cmd);
     if (res != 0) {
-        out = fs.readAll(FNCMP_OUT);
+        out = fs.readAll(FNCMP_OUT).take();
         if (out) {
             if (libc.strstr(out, expected)) {
                 ok = true;
