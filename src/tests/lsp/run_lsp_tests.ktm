@@ -593,7 +593,7 @@ json.Value *renameChangesFor(json.Value *resp, u8 *uri) {
     if (changes == null) { return null; }
     json.Value *it = changes.object;
     while (it != null) {
-        if (it.key != null && cstr.cmp(it.key, uri) == 0) { return it; }
+        if (it.key.ptr != null && cstr.cmp(it.key.ptr, uri) == 0) { return it; }
         it = it.next;
     }
     return null;
@@ -894,7 +894,7 @@ void testDebounce() {
     before = l.publishes;
     lspSettle(l, 1000);
     i64 tail = l.publishes - before;
-    u8 *last = l.lastPublish ? json.toStr(l.lastPublish) : null;
+    u8 *last = l.lastPublish ? json.toStr(l.lastPublish).take() : null;
     bool finalSeen = last && libc.strstr(last, "notDefinedInFinalEdit") != null;
     check("continuous typing still publishes via the max-age cap",
                 mid >= 1 && tail <= 2 && finalSeen);
