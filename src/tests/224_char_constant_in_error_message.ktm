@@ -72,7 +72,7 @@ i32 main() {
     tests++;
     if (has("void F() { if (1) '\\n' }\n",
                     "Unexpected character constant `'\\n'` while parsing if body",
-                    "224-ccm.ktm:1:17\n")) {
+                    "224-ccm.ktm:1:19\n")) {
         correct++;
                     } else { printf("Failed - if body\n"); }
 

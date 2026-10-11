@@ -149,7 +149,7 @@ i32 main() {
     printf("Test - udp socklen: ");
 
     check(compilesCleanly(
-"
+"import libc;
 
 void main()
 {

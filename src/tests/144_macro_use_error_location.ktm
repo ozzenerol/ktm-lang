@@ -63,7 +63,7 @@ i32 main() {
 
     /* the issue's repro */
     if (compileOutputHas(
-            "const i64 N = 3;\nvoid main() {\n  i64 x = 2 N;\n}\n", null, false,
+            "#define N 3\nvoid main() {\n  i64 x = 2 N;\n}\n", null, false,
             MACRO_TEST_FILE ":3:13\n"
             "     |\n"
             "   3 |      i64 x = 2 N;\n"
@@ -80,7 +80,7 @@ i32 main() {
 
     /* a float macro */
     if (compileOutputHas(
-            "const f64 PI = 3.25;\nvoid main() {\n  f64 x = 2 PI;\n}\n", null, false,
+            "#define PI 3.25\nvoid main() {\n  f64 x = 2 PI;\n}\n", null, false,
             MACRO_TEST_FILE ":3:13\n"
             "     |\n"
             "   3 |      f64 x = 2 PI;\n"
@@ -88,7 +88,7 @@ i32 main() {
 
     /* a macro defined as another macro */
     if (compileOutputHas(
-            "const i64 N = 3;\n#define LONGNAME N\nvoid main() {\n  i64 x = 2 LONGNAME;\n}\n",
+            "#define N 3\n#define LONGNAME N\nvoid main() {\n  i64 x = 2 LONGNAME;\n}\n",
             null, false,
             MACRO_TEST_FILE ":4:13\n"
             "     |\n"
@@ -97,7 +97,7 @@ i32 main() {
 
     /* a folded expression macro */
     if (compileOutputHas(
-            "const i64 N = 3;\n#define T (N + 1)\nvoid main() {\n  i64 x = 2 T;\n}\n",
+            "#define N 3\n#define T (N + 1)\nvoid main() {\n  i64 x = 2 T;\n}\n",
             null, false,
             MACRO_TEST_FILE ":4:13\n"
             "     |\n"
@@ -106,7 +106,7 @@ i32 main() {
 
     /* the "missing `;`" note on a line ending in a macro */
     if (compileOutputHas(
-            "const i64 N = 3;\nvoid main() {\n  i64 x = N\n  i64 y = 2;\n}\n", null, false,
+            "#define N 3\nvoid main() {\n  i64 x = N\n  i64 y = 2;\n}\n", null, false,
             "info: perhaps a missing `;` at the end of this line?\n"
             " --> " MACRO_TEST_FILE ":3:11\n"
             "     |\n"
@@ -132,7 +132,7 @@ i32 main() {
 
     /* the same macro used twice on a line: each at its own column */
     if (compileOutputHas(
-            "const i64 N = 3;\nvoid main() {\n  i64 x = N + N N;\n}\n", null, false,
+            "#define N 3\nvoid main() {\n  i64 x = N + N N;\n}\n", null, false,
             MACRO_TEST_FILE ":3:17\n"
             "     |\n"
             "   3 |      i64 x = N + N N;\n"

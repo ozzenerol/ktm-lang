@@ -85,7 +85,7 @@ bool testFloatLetters(void) {
 
 bool testInMacro(void) {
     return compileFailsWith(
-"const i64 BAD = 12ab;
+"#define BAD 12ab
 void main() { i64 x = BAD; }
 ", "invalid character 'a' in number");
 }

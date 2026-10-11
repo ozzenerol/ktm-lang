@@ -22,9 +22,10 @@ extern "c" u8 *mkdtemp(u8 *template);
 "}\n"
 
 #define PROG_SRC \
-"i32 Main(i32 argc, u8 **argv)\n" \
+"import fs;\n" \
+"i32 main(i32 argc, u8 **argv)\n" \
 "{\n" \
-"  \"result=%d\\n\", RmDir(argv[1], RM_RECURSE);\n" \
+"  printf(\"result=%d\\n\", fs.removeDir(argv[1], fs.REMOVE_RECURSE));\n" \
 "  return 0;\n" \
 "}\n"
 

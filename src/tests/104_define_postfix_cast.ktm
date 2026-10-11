@@ -25,7 +25,7 @@ import str, test;
 #if (u64)7 % 4 == 3
 #define CAST_IF 1
 #else
-const i64 CAST_IF = 0;
+#define CAST_IF 0
 #endif
 
 i32 main() {

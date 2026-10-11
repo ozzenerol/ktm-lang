@@ -1,4 +1,4 @@
-import date, libc, mem, str, test;
+import date, mem, str, test;
 
 /* str.formatTo ignored the width of %s and used its precision as the width:
  * "[%5s][%-5s][%.2s]" gave "[ab][ab][abcd]". Right-justified padding was
@@ -20,21 +20,21 @@ void same(u8 *fmt, u8 *ours, u8 *want) {
 void checkS(u8 *fmt, u8 *s) {
     u8 ours[512], want[512];
     str.formatTo(ours, fmt, s);
-    libc.snprintf(want, sizeof(want), fmt, s);
+    snprintf(want, sizeof(want), fmt, s);
     same(fmt, ours, want);
 }
 
 void checkI(u8 *fmt, i64 v) {
     u8 ours[512], want[512];
     str.formatTo(ours, fmt, v);
-    libc.snprintf(want, sizeof(want), fmt, v);
+    snprintf(want, sizeof(want), fmt, v);
     same(fmt, ours, want);
 }
 
 void checkStar(u8 *fmt, i64 a, i64 b, u8 *s) {
     u8 ours[512], want[512];
     str.formatTo(ours, fmt, a, b, s);
-    libc.snprintf(want, sizeof(want), fmt, a, b, s);
+    snprintf(want, sizeof(want), fmt, a, b, s);
     same(fmt, ours, want);
 }
 
@@ -100,13 +100,13 @@ i32 main() {
 
     /* 6: str.formatTo(null, ...) grows its buffer past STR_LEN while padding */
     m = str.formatTo(null, "%300s|%-300s|%.3s", "right", "left", "truncated");
-    libc.snprintf(want, sizeof(want), "%300s|%-300s|%.3s", "right", "left", "truncated");
+    snprintf(want, sizeof(want), "%300s|%-300s|%.3s", "right", "left", "truncated");
     if (!str.cmp(m, want)) { correct++; }
     mem.free(m);
 
     /* 7: str.format, several regrowths, padding straddles each one */
     m = str.format("%255s%-257s%511s%d", "a", "b", "c", 42);
-    libc.snprintf(want, sizeof(want), "%255s%-257s%511s%d", "a", "b", "c", 42);
+    snprintf(want, sizeof(want), "%255s%-257s%511s%d", "a", "b", "c", 42);
     if (!str.cmp(m, want) && str.len(m) == 255 + 257 + 511 + 2) { correct++; }
     mem.free(m);
 
@@ -122,7 +122,7 @@ i32 main() {
 
     /* 10: %c and %C take a width and '-' too */
     str.formatTo(ours, "[%3c][%-3c][%c]", 'a', 'b', 'c');
-    libc.snprintf(want, sizeof(want), "[%3c][%-3c][%c]", 'a', 'b', 'c');
+    snprintf(want, sizeof(want), "[%3c][%-3c][%c]", 'a', 'b', 'c');
     if (!str.cmp(ours, want) &&
             !str.cmp(str.formatTo(buf, "[%4C][%-4C]", 'ab', 'cd'), "[  AB][CD  ]")) {
         correct++;
@@ -138,7 +138,7 @@ i32 main() {
     /* 13: a date and a time (date.format) with widths */
     date.Date cdt = date.now();
     u8 *d = date.formatDate(cdt), *t = date.format(cdt, "%H:%M:%S");
-    libc.snprintf(want, sizeof(want), "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
+    snprintf(want, sizeof(want), "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
     str.formatTo(ours, "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
     if (!str.cmp(ours, want)) { correct++; }
     mem.free(d);
@@ -146,7 +146,7 @@ i32 main() {
 
     /* 14: floats and mixed formats are unchanged */
     str.formatTo(ours, "%-6s=%8.3f|%5s|%-3d|%%|%s", "pi", 3.14159, "ok", 9, "end");
-    libc.snprintf(want, sizeof(want), "%-6s=%8.3f|%5s|%-3d|%%|%s",
+    snprintf(want, sizeof(want), "%-6s=%8.3f|%5s|%-3d|%%|%s",
                      "pi", 3.14159, "ok", 9, "end");
     if (!str.cmp(ours, want)) { correct++; }
     else { printf("\n  mixed: got '%s', C printf gives '%s'", ours, want); }

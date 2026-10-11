@@ -53,7 +53,7 @@ i32 main() {
     printf("Test - error text of a folded macro: ");
 
     tests++;
-    if (jitOutputHas("const i64 N = 3;\n#define T (N + 1)\nvoid main() { i64 x = 2 T; }\n",
+    if (jitOutputHas("#define N 3\n#define T (N + 1)\nvoid main() { i64 x = 2 T; }\n",
                                      false, "Unexpected integer `4`")) { correct++; }
     tests++;
     if (jitOutputHas("#define T (1.5 * 2)\nvoid main() { f64 x = 2 T; }\n",
@@ -62,14 +62,14 @@ i32 main() {
     if (jitOutputHas("#define T (1.0 / 4)\nvoid main() { f64 x = 2 T; }\n",
                                      false, "Unexpected float `0.25`")) { correct++; }
     tests++;
-    if (jitOutputHas("const i64 T = (0 - 5);\nvoid main() { i64 x = 2 T; }\n",
+    if (jitOutputHas("#define T (0 - 5)\nvoid main() { i64 x = 2 T; }\n",
                                      false, "Unexpected integer `-5`")) { correct++; }
     tests++;
-    if (jitOutputHas("const i64 T = (0xFFFFFFFFFFFFFFFF + 0);\nvoid main() { i64 x = 2 T; }\n",
+    if (jitOutputHas("#define T (0xFFFFFFFFFFFFFFFF + 0)\nvoid main() { i64 x = 2 T; }\n",
                                      false, "`18446744073709551615`")) { correct++; }
     /* the spelling stays where it was right already */
     tests++;
-    if (jitOutputHas("const i64 T = 7;\nvoid main() { i64 x = 2 T; }\n",
+    if (jitOutputHas("#define T 7\nvoid main() { i64 x = 2 T; }\n",
                                      false, "Unexpected integer `7`")) { correct++; }
 
     tests++;

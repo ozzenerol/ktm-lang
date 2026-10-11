@@ -13,7 +13,7 @@ i64 gBad = 0;
 void check(u8 *fmt, f64 v) {
     u8 ours[512], want[512];
     str.formatTo(ours, fmt, v);
-    libc.snprintf(want, sizeof(want), fmt, v);
+    snprintf(want, sizeof(want), fmt, v);
     gChecks++;
     if (str.cmp(ours, want)) {
         gBad++;

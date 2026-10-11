@@ -23,10 +23,10 @@ i32 main() {
 
     put("__399_ok.ktmh", "i64 seven() { return 7; }\n");
     put("__399_noext", "i64 eight() { return 8; }\n");
-    put("__399_main.ktm", "#include \"__399_ok.ktmh\"\n#include \"__399_noext\"\nvoid main() { printf(\"%d\\n\", Seven + Eight); }\n");
+    put("__399_main.ktm", "#include \"__399_ok.ktmh\"\n#include \"__399_noext\"\nvoid main() { printf(\"%d\\n\", seven() + eight()); }\n");
     put("__399_old.HC", "void main() { printf(\"old\\n\"); }\n");
-    put("__399_inc_old.ktm", "#include \"__399_old.HC\"\nU0 Main() {}\n");
-    put("__399_inc_c.ktm", "#include \"__399_x.c\"\nU0 Main() {}\n");
+    put("__399_inc_old.ktm", "#include \"__399_old.HC\"\nvoid main() {}\n");
+    put("__399_inc_c.ktm", "#include \"__399_x.c\"\nvoid main() {}\n");
     put("__399_x.c", "int x;\n");
 
     tests++;

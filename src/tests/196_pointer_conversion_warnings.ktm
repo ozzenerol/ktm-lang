@@ -86,7 +86,7 @@ void main() {
                              PTRCONV_FILE ":7:10")) { correct++; }
     if (has(out, "Incompatible types 'f64 *' is not assignable to type 'i64 *'\n --> "
                              PTRCONV_FILE ":8:5")) { correct++; }
-    if (has(out, "Incompatible function argument, expected 'i64 *' got 'f64 *' in function 'TakeI'\n --> "
+    if (has(out, "Incompatible function argument, expected 'i64 *' got 'f64 *' in function 'takeI'\n --> "
                              PTRCONV_FILE ":9:")) { correct++; }
     if (has(out, "unexpected return value 'f' of type 'f64 *' expected 'i64 *'")) { correct++; }
     if (has(out, "Incompatible types 'u64' is not assignable to type 'i64 *'\n --> "

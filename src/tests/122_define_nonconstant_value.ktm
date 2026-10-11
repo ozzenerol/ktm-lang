@@ -65,11 +65,11 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *useLoc) {
 /* The report: an int macro plus a string */
 bool testIntMacroPlusString(void) {
     return compileFailsAt(
-"const i64 Y = 2;
+"#define Y 2
 #define X (Y + \"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "2:11", "3:21");
+        "#define X: " NC_MSG, "2:11", "3:30");
 }
 
 bool testIntPlusNegString(void) {
@@ -77,7 +77,7 @@ bool testIntPlusNegString(void) {
 "#define X (1 + -\"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "1:11", "2:21");
+        "#define X: " NC_MSG, "1:11", "2:30");
 }
 
 bool testIntTimesCastString(void) {
@@ -85,7 +85,7 @@ bool testIntTimesCastString(void) {
 "#define X (3 * (i64)\"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "1:11", "2:21");
+        "#define X: " NC_MSG, "1:11", "2:30");
 }
 
 bool testFloatPlusString(void) {
@@ -93,17 +93,17 @@ bool testFloatPlusString(void) {
 "#define X (2.5 + \"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "1:11", "2:21");
+        "#define X: " NC_MSG, "1:11", "2:30");
 }
 
 bool testFloatMacroPlusStringMacro(void) {
     return compileFailsAt(
-"const f64 F = 1.5;
+"#define F 1.5
 #define S \"s\"
 #define X (F * S)
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "3:11", "4:21");
+        "#define X: " NC_MSG, "3:11", "4:30");
 }
 
 bool testStringMinusInt(void) {
@@ -111,7 +111,7 @@ bool testStringMinusInt(void) {
 "#define X (\"a\" - 1)
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X expected string but got: AST_BINOP", "1:11", "2:21");
+        "#define X expected string but got: AST_BINOP", "1:11", "2:30");
 }
 
 /* `-` on a string is a type error now (test 134), as in `1 + -"s"` */
@@ -120,7 +120,7 @@ bool testNegString(void) {
 "#define X (-\"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X: " NC_MSG, "1:11", "2:21");
+        "#define X: " NC_MSG, "1:11", "2:30");
 }
 
 bool testCastString(void) {
@@ -128,7 +128,7 @@ bool testCastString(void) {
 "#define X ((i64)\"s\")
 void main() { printf(\"%d\\n\", X); }
 ",
-        "#define X expected string but got: AST_CAST", "1:11", "2:21");
+        "#define X expected string but got: AST_CAST", "1:11", "2:30");
 }
 
 /* Both bad defines reported, lexing carried on after each */
@@ -136,7 +136,7 @@ bool testTwoBadDefines(void) {
     return compileFailsAt(
 "#define A (1 + \"s\")
 #define B (2 * -\"t\")
-const i64 X = (A + B);
+#define X (A + B)
 void main() { printf(\"%d\\n\", X); }
 ",
         "#define B: " NC_MSG, "2:11", null);

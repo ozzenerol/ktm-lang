@@ -41,20 +41,20 @@ i32 main() {
     tests++;
     if (has(PRE "void A() { return g++; }\n",
                     "unexpected return value 'g++' of type 'i64' expected 'void'",
-                    "220-ure.ktm:3:10\n", "|             ^^^^^^^^^^\n")) {
+                    "220-ure.ktm:3:12\n", "|               ^^^^^^^^^^\n")) {
         correct++;
                     } else { printf("Failed - g++\n"); }
 
     tests++;
-    if (has(PRE "void B() { return Twice(Twice(1)); }\n",
-                    "unexpected return value 'Twice(Twice(1))' of type",
-                    "220-ure.ktm:3:10\n")) {
+    if (has(PRE "void B() { return twice(twice(1)); }\n",
+                    "unexpected return value 'twice(twice(1))' of type",
+                    "220-ure.ktm:3:12\n")) {
         correct++;
                     } else { printf("Failed - nested call\n"); }
 
     tests++;
     if (has(PRE "void C() { return  \"a;b\" ; }\n",
-                    "unexpected return value '\"a;b\"' of type", "220-ure.ktm:3:10\n")) {
+                    "unexpected return value '\"a;b\"' of type", "220-ure.ktm:3:12\n")) {
         correct++;
                     } else { printf("Failed - string with a ;\n"); }
 
@@ -68,7 +68,7 @@ i32 main() {
     /* Over two lines: printed from the AST, at the `return` */
     tests++;
     if (has(PRE "void D() { return g +\n  1; }\n",
-                    "unexpected return value 'g + 1' of type", "220-ure.ktm:3:10\n")) {
+                    "unexpected return value 'g + 1' of type", "220-ure.ktm:3:12\n")) {
         correct++;
                     } else { printf("Failed - two lines\n"); }
 

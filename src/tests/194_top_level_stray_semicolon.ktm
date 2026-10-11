@@ -90,7 +90,7 @@ i32 main() {
 
     /* The REPL */
     tests++;
-    if (runSemi("i64 x = 1;;\ni64 y = 2;\n;\nvoid F() { printf(\"f\\n\"); };\n\nvoid main()\n{\n  x + y;\n  F();\n}\n",
+    if (runSemi("i64 x = 1;;\ni64 y = 2;\nx + y;\n;\nvoid f() { printf(\"f\\n\"); };\nf();\n",
                             SEMI_REPL, 0, "3\nf\n")) { correct++; }
     else { printf("Failed - repl\n"); }
 

@@ -58,9 +58,9 @@ void main() { printf(\"%d\\n\", fp(4)); }
 
     /* a -lib library's public function pointer, called from a program */
     proc.shell("rm -rf ./ktm-393-prefix ./ktm-393-work ./ktm-393-use.ktm ./ktm-393-use");
-    check(proc.shell("import libc;\n\nD=${KTM_INSTALL_DIR:-/usr/local} && H=$PWD/../../ktm && P=$PWD && "
-                     "libc.mkdir -p ./ktm-393-prefix/include ./ktm-393-prefix/lib ./ktm-393-work && "
-                     "cp $D/include/std.ktmh ./ktm-393-prefix/include/ && "
+    check(proc.shell("D=${KTM_INSTALL_DIR:-../../build/prefix} && H=$PWD/../../ktm && P=$PWD && "
+                     "mkdir -p ./ktm-393-prefix/lib ./ktm-393-work && "
+                     "cp -R $D/modules ./ktm-393-prefix/ && "
                      "cp -P $D/lib/libktm.* ./ktm-393-prefix/lib/ && "
                      "printf 'i64 LibTriple(i64 x) { return x * 3; }\\n"
                      "i64 LibSquare(i64 x) { return x * x; }\\n"

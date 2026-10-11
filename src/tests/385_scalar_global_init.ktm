@@ -74,39 +74,35 @@ i32 main(i32 argc, u8 **argv)
     /* initialisers that run at startup, in order, around constant ones */
     runsAs(
 "i64 calls;
-i64 Next() { return ++calls; }
-i64 first;
+i64 next() { return ++calls; }
+i64 first = next();
 i32 seven = 7;
-i64 second;
-i64 third;
+i64 second = next() * 10 + seven;
+i64 third = next();
 i32 main(i64 argc, u8 **argv)
 {
-  first = Next();
-  second = Next() * 10 + seven;
-  printf(\"top-level %d\\n\", calls);
-  third = Next();
+  printf(\"calls %d\\n\", calls);
   printf(\"%d %s|%d %d %d\\n\", argc, argv[2], first, second, third);
   return 0;
 }
 ",
-"top-level 2\n3 two|1 27 3\n",
+"calls 3\n3 two|1 27 3\n",
         "non-constant initialisers keep their order");
 
     /* Main without parameters still runs after the initialisers */
     runsAs(
 "import math;
 
-i64 n;
-void main() {
-  n = math.abs(-4); printf(\"%d\\n\", n); }
+i64 n = math.abs(-4);
+void main() { printf(\"%d\\n\", n); }
 ",
 "4\n", "Main without parameters");
 
     /* a -lib library's initialised globals have their values */
     proc.shell("rm -rf ./ktm-385-prefix ./ktm-385-work ./ktm-385-use.ktm ./ktm-385-use");
-    check(proc.shell("import libc;\n\nD=${KTM_INSTALL_DIR:-/usr/local} && H=$PWD/../../ktm && P=$PWD && "
-                     "libc.mkdir -p ./ktm-385-prefix/include ./ktm-385-prefix/lib ./ktm-385-work && "
-                     "cp $D/include/std.ktmh ./ktm-385-prefix/include/ && "
+    check(proc.shell("D=${KTM_INSTALL_DIR:-../../build/prefix} && H=$PWD/../../ktm && P=$PWD && "
+                     "mkdir -p ./ktm-385-prefix/lib ./ktm-385-work && "
+                     "cp -R $D/modules ./ktm-385-prefix/ && "
                      "cp -P $D/lib/libktm.* ./ktm-385-prefix/lib/ && "
                      "printf 'static i32 hidden = -1;\\npub i64 shown = 42;\\n"
                      "pub f64 ratio = 0.5;\\n"

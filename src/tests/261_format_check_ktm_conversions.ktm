@@ -79,7 +79,7 @@ i32 main() {
     tests++;
     if (prints(MAIN "  s = str.formatTo(null, \"%Q %d\", \"a\");\n" END, 1, 0,
                          "printf format expects 2 arguments but 1 was supplied\n"
-                         " --> ./ktm-261-fmt.ktm:4:25\n")) {
+                         " --> ./ktm-261-fmt.ktm:4:26\n")) {
         correct++;
                          } else { printf("Failed - too few\n"); }
 

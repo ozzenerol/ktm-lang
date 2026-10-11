@@ -317,7 +317,7 @@ i32 main() {
         correct++;
                      }
     tests++;
-    if (runs("i32 main() { defer printf(\"bye\\n\"); printf(\"hi\\n\"); Exit(0); return 1; }\n",
+    if (runs("import os;\ni32 main() { defer printf(\"bye\\n\"); printf(\"hi\\n\"); os.exit(0); return 1; }\n",
                      "hi\n")) {
         correct++;
                      }

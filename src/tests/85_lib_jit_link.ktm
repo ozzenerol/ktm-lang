@@ -16,9 +16,9 @@ i64 tests = 3;
 void main() {
     printf("Test - -lib library loadable via #link (JIT + AOT): ");
     proc.shell("rm -rf ./ktm-85-prefix ./ktm-85-work ./ktm-85-use.ktm ./ktm-85-use");
-    if (proc.shell("import libc;\n\nD=${KTM_INSTALL_DIR:-/usr/local} && H=$PWD/../../ktm && P=$PWD && "
-                         "libc.mkdir -p ./ktm-85-prefix/include ./ktm-85-prefix/lib ./ktm-85-work && "
-                         "cp $D/include/std.ktmh ./ktm-85-prefix/include/ && "
+    if (proc.shell("D=${KTM_INSTALL_DIR:-../../build/prefix} && H=$PWD/../../ktm && P=$PWD && "
+                         "mkdir -p ./ktm-85-prefix/lib ./ktm-85-work && "
+                         "cp -R $D/modules ./ktm-85-prefix/ && "
                          "cp -P $D/lib/libktm.* ./ktm-85-prefix/lib/ && "
                          "printf 'pub i64 Ktm85Triple(i64 x) { return x * 3; }\n'"
                          " > ./ktm-85-work/ktm85.ktm && "

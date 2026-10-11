@@ -60,28 +60,28 @@ i32 main() {
 
     /* the issue's repro: a macro, a `$` and a float */
     if (excerptIs(
-            "#define N 3\n#define T (N > 2 $ 1 : 2.5)\nU0 Main() {}\n",
+            "#define N 3\n#define T (N > 2 $ 1 : 2.5)\nvoid main() {}\n",
             "   2 |    #define T (N > 2 $ 1 : 2.5)\n     |              ^^^^^^^^^^^^^^^^^")) { correct++; }
 
     /* hex, exponent, char const and string macro in a #define */
     if (excerptIs(
-            "#define N 3\n#define S \"x\\ty\"\n#define T (N + 0x1F + 1e2 + 'a' + S)\nU0 Main() {}\n",
+            "#define N 3\n#define S \"x\\ty\"\n#define T (N + 0x1F + 1e2 + 'a' + S)\nvoid main() {}\n",
             "   3 |    #define T (N + 0x1F + 1e2 + 'a' + S)\n     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^")) { correct++; }
 
     /* comments kept in a #define */
     if (excerptIs(
-            "#define N 3\n#define X (N + 1.5 /* c */ + \"s\")   // tail\nU0 Main() {}\n",
+            "#define N 3\n#define X (N + 1.5 /* c */ + \"s\")   // tail\nvoid main() {}\n",
             "   2 |    #define X (N + 1.5 /* c */ + \"s\")   // tail\n     |              ^^^^^^^^^^^^^^^^^^^^^^^")) { correct++; }
 
     /* an #if with a float and a `$` */
     if (excerptIs(
-            "#define N 3\n#if N > 2.5 $ 1\n#endif\nU0 Main() {}\n",
+            "#define N 3\n#if N > 2.5 $ 1\n#endif\nvoid main() {}\n",
             "   2 |    #if N > 2.5 $ 1\n     |                  ^")) { correct++; }
 
     /* a statement using a macro next to number literals */
     if (excerptIs(
-            "const i64 N = 3;\nvoid main() { i64 x = N + 0x10 + 1e3 + 2.5 3; }\n",
-            "   2 |    void main() { i64 x = N + 0x10 + 1e3 + 2.5 3; }\n     |                                             ^")) { correct++; }
+            "#define N 3\nvoid main() { i64 x = N + 0x10 + 1e3 + 2.5 3; }\n",
+            "   2 |    void main() { i64 x = N + 0x10 + 1e3 + 2.5 3; }\n     |                                               ^")) { correct++; }
 
     /* a char const and an escaped string */
     if (excerptIs(

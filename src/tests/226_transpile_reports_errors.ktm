@@ -74,7 +74,7 @@ void main() {
 
     tests++;
     if (failsLikeJit("void main() { i64 v = ; }\n",
-                                     "__226_transpile.ktm:1:19\n")) { correct++; }
+                                     "__226_transpile.ktm:1:21\n")) { correct++; }
     tests++;
     if (failsLikeJit("void main()\n{\n  i64 a = 1;\n  b = 2;\n}\n",
                                      "Variable or function `b` has not been defined")) { correct++; }

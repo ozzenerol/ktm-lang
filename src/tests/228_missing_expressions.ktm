@@ -52,37 +52,37 @@ i32 main() {
 
     tests++;
     if (rejected("void Main() { while () {} }\n",
-                             "Expected the `while` condition, got `)`", "228-ee.ktm:1:22\n")) { correct++; }
+                             "Expected the `while` condition, got `)`", "228-ee.ktm:1:24\n")) { correct++; }
     tests++;
     if (rejected("void main() { do {} while (); }\n",
-                             "Expected the `while` condition, got `)`", "228-ee.ktm:1:27\n")) { correct++; }
+                             "Expected the `while` condition, got `)`", "228-ee.ktm:1:29\n")) { correct++; }
     tests++;
     if (rejected("void Main() { if () {} }\n",
-                             "Expected the `if` condition, got `)`", "228-ee.ktm:1:19\n")) { correct++; }
+                             "Expected the `if` condition, got `)`", "228-ee.ktm:1:21\n")) { correct++; }
     tests++;
     if (rejected("void main() { if (i64 a = 1; ) {} }\n",
-                             "Expected the `if` condition, got `)`", "228-ee.ktm:1:30\n")) { correct++; }
+                             "Expected the `if` condition, got `)`", "228-ee.ktm:1:32\n")) { correct++; }
     tests++;
     if (rejected("void Main() { if (i64 a = ) {} }\n",
-                             "Expected an initial value, got `)`", "228-ee.ktm:1:27\n")) { correct++; }
+                             "Expected an initial value, got `)`", "228-ee.ktm:1:29\n")) { correct++; }
     tests++;
     if (rejected("void main() { switch () { case 1: break; } }\n",
-                             "Expected the `switch` value, got `)`", "228-ee.ktm:1:23\n")) { correct++; }
+                             "Expected the `switch` value, got `)`", "228-ee.ktm:1:25\n")) { correct++; }
     tests++;
     if (rejected("void main() { switch [] { case 1: break; } }\n",
-                             "Expected the `switch` value, got `]`", "228-ee.ktm:1:23\n")) { correct++; }
+                             "Expected the `switch` value, got `]`", "228-ee.ktm:1:25\n")) { correct++; }
     tests++;
     if (rejected("void main() { switch (1) { case 1 ... : break; } }\n",
-                             "Expected the end of the `case` range, got `:`", "228-ee.ktm:1:39\n")) { correct++; }
+                             "Expected the end of the `case` range, got `:`", "228-ee.ktm:1:41\n")) { correct++; }
     tests++;
     if (rejected("void main() { switch (1) { case ... 3: break; } }\n",
-                             "Expected a `case` value or `:`, got `...`", "228-ee.ktm:1:35\n")) { correct++; }
+                             "Expected a `case` value or `:`, got `...`", "228-ee.ktm:1:37\n")) { correct++; }
     tests++;
     if (rejected("void main() { try { throw(); } catch { } }\n",
-                             "Expected the value to `throw`, got `)`", "228-ee.ktm:1:26\n")) { correct++; }
+                             "Expected the value to `throw`, got `)`", "228-ee.ktm:1:28\n")) { correct++; }
     tests++;
     if (rejected("void main() { (); }\n",
-                             "Expected an expression between `(` and `)`", "228-ee.ktm:1:15\n")) { correct++; }
+                             "Expected an expression between `(` and `)`", "228-ee.ktm:1:17\n")) { correct++; }
 
     /* `return;` where a value is expected: still a warning, now readable */
     tests++;

@@ -49,7 +49,7 @@ i32 main() {
      * and str.toLower (asm bindings on some architectures) are untouched */
     tests++;
     if (conflicts(
-"import mem, os, str;
+"import mem, str;
 
 i64 exit(i64 x) { return x * 2; }
 i64 alloc(i64 n) { return n + 1; }

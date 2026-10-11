@@ -77,9 +77,9 @@ i32 main() {
 
     tests++;   /* a library whose functions are pub is linked like one with public */
     i64 ok = 0;
-    if (proc.shell("import libc;\n\nD=${KTM_INSTALL_DIR:-/usr/local} && H=$PWD/../../ktm && P=$PWD && "
-                         "libc.mkdir -p ./ktm-402-prefix/include ./ktm-402-prefix/lib ./ktm-402-work && "
-                         "cp $D/include/std.ktmh ./ktm-402-prefix/include/ && "
+    if (proc.shell("D=${KTM_INSTALL_DIR:-../../build/prefix} && H=$PWD/../../ktm && P=$PWD && "
+                         "mkdir -p ./ktm-402-prefix/lib ./ktm-402-work && "
+                         "cp -R $D/modules ./ktm-402-prefix/ && "
                          "cp -P $D/lib/libktm.* ./ktm-402-prefix/lib/ && "
                          "printf 'pub struct Pair { i64 a, b; };\npub i64 Ktm402Sum(Pair *p) { return p->a + p->b; }\n'"
                          " > ./ktm-402-work/ktm402.ktm && "

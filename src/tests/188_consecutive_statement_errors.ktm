@@ -47,28 +47,28 @@ i32 main() {
 
     /* The repro: both errors, the second at `y` (line 4, column 8) */
     tests++;
-    if (failsWith("void main()\n{\n  i64 x = 1 2;\n  printf(\"ab\" y);\n}\nmain;\n",
+    if (failsWith("void main()\n{\n  i64 x = 1 2;\n  \"ab\" y;\n}\n",
                                 "Unexpected integer `2`", "stmterr.ktm:4:8",
                                 "Invalid identifier `y`")) { correct++; }
     else { printf("Failed - the repro\n"); }
 
     /* Alone, `"ab" y;` is reported at `y`, not at `Main` */
     tests++;
-    if (failsWith("void main()\n{\n  printf(\"ab\" y);\n}\nmain;\n",
+    if (failsWith("void main()\n{\n  \"ab\" y;\n}\n",
                                 "stmterr.ktm:3:8", "Invalid identifier `y`")) { correct++; }
     else { printf("Failed - \"ab\" y; alone\n"); }
 
     /* Short statements before it: the rewind reached two back */
     tests++;
-    if (failsWith("void main()\n{\n  i64 a;\n  a;\n  a;\n  printf(\"ab\" y);\n"
-                                "  printf(\"cd\" z);\n}\nmain;\n",
+    if (failsWith("void main()\n{\n  i64 a;\n  a;\n  a;\n  \"ab\" y;\n"
+                                "  \"cd\" z;\n}\n",
                                 "stmterr.ktm:6:8", "stmterr.ktm:7:8")) { correct++; }
     else { printf("Failed - after short statements\n"); }
 
     /* In a nested block, at the top level, and with a call */
     tests++;
     if (failsWith("void main(i64 v)\n{\n  if (v) {\n    i64 x = 1 2;\n"
-                                "    printf(\"ab\" y);\n  }\n}\nmain(1);\n",
+                                "    \"ab\" y;\n  }\n}\n",
                                 "stmterr.ktm:4:15", "stmterr.ktm:5:10")) { correct++; }
     else { printf("Failed - nested block\n"); }
     tests++;
@@ -77,7 +77,7 @@ i32 main() {
     else { printf("Failed - top level\n"); }
     tests++;
     if (failsWith("void F(i64 a, i64 b) {}\nvoid main()\n{\n  F(1 2);\n"
-                                "  F(3 4);\n  i64 q = 5 6;\n}\nmain;\n",
+                                "  F(3 4);\n  i64 q = 5 6;\n}\n",
                                 "stmterr.ktm:4:7", "stmterr.ktm:5:7", "stmterr.ktm:6:13")) { correct++; }
     else { printf("Failed - calls\n"); }
 

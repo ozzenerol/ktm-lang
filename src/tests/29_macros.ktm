@@ -7,17 +7,17 @@ import str, test;
 #ifdef _SOME_STRING
 #define FOO 24
 #else
-const i64 FOO = 0;
+#define FOO 0
 #endif
 
 #ifndef FOO_BAR
 #define BAR 32
 #else 
-const i64 BAR = 4;
+#define BAR 4
 #endif
 
 #if defined(__FOO__)
-const i64 _INTVAL = (420);
+#define _INTVAL (420)
 #elif defined(_SOME_STRING) && 32 && 1 && \
     defined(_SOME_INT_MATHS)
 #define _INTVAL (42)

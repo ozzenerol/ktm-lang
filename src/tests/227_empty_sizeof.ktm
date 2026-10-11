@@ -47,26 +47,26 @@ i32 main() {
 
     tests++;
     if (rejected("void main() { i64 x = sizeof(); }\n", NEED,
-                             "227-sz.ktm:1:29\n")) { correct++; }
+                             "227-sz.ktm:1:31\n")) { correct++; }
     tests++;
     if (rejected("void main() { i64 x = 1 + sizeof() * 2; }\n", NEED,
-                             "227-sz.ktm:1:34\n")) { correct++; }
+                             "227-sz.ktm:1:36\n")) { correct++; }
     tests++;
     if (rejected("void main() { i64 a[sizeof()]; }\n", NEED,
-                             "227-sz.ktm:1:27\n")) { correct++; }
+                             "227-sz.ktm:1:29\n")) { correct++; }
     tests++;
     if (rejected("i64 g = sizeof();\nvoid main() {}\n", NEED,
                              "227-sz.ktm:1:17\n")) { correct++; }
     tests++;
     if (rejected("void main() { i64 x = sizeof; }\n", NEED,
-                             "227-sz.ktm:1:27\n")) { correct++; }
+                             "227-sz.ktm:1:29\n")) { correct++; }
     tests++;
     if (rejected("void main() { i64 x = sizeof(()); }\n", NEED,
-                             "227-sz.ktm:1:31\n")) { correct++; }
+                             "227-sz.ktm:1:33\n")) { correct++; }
     tests++;
     if (rejected("void main() { i64 x = alignof(); }\n",
                              "`alignof` needs a type or an expression",
-                             "227-sz.ktm:1:30\n")) { correct++; }
+                             "227-sz.ktm:1:32\n")) { correct++; }
     tests++;
     if (rejected("void Main() { i64 x = sizeof(", "Unexpected end of input",
                              "227-sz.ktm:1")) { correct++; }

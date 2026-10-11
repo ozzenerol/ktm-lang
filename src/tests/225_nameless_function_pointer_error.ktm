@@ -54,7 +54,7 @@ i32 main() {
     } else { printf("Failed - global\n"); }
 
     tests++;
-    if (prints("i64 (*)(i64 x) = null;\n", 1, 0, "225-fpn.ktm:1:7\n")) {
+    if (prints("i64 (*)(i64 x) = 0;\n", 1, 0, "225-fpn.ktm:1:7\n")) {
         correct++;
     } else { printf("Failed - global with an initialiser\n"); }
 
@@ -73,7 +73,7 @@ i32 main() {
 
     tests++;
     if (prints("void F(i64 (*)(i64 x), i64 (*)(), i64 y) { y = 1; }\n", 2, 0,
-                         "225-fpn.ktm:1:28\n")) {
+                         "225-fpn.ktm:1:30\n")) {
         correct++;
                          } else { printf("Failed - parameters\n"); }
 

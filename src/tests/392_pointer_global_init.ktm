@@ -73,9 +73,9 @@ void main()
 
     /* a -lib library's pointer globals point at its own data and code */
     proc.shell("rm -rf ./ktm-392-prefix ./ktm-392-work ./ktm-392-use.ktm ./ktm-392-use");
-    check(proc.shell("import libc;\n\nD=${KTM_INSTALL_DIR:-/usr/local} && H=$PWD/../../ktm && P=$PWD && "
-                     "libc.mkdir -p ./ktm-392-prefix/include ./ktm-392-prefix/lib ./ktm-392-work && "
-                     "cp $D/include/std.ktmh ./ktm-392-prefix/include/ && "
+    check(proc.shell("D=${KTM_INSTALL_DIR:-../../build/prefix} && H=$PWD/../../ktm && P=$PWD && "
+                     "mkdir -p ./ktm-392-prefix/lib ./ktm-392-work && "
+                     "cp -R $D/modules ./ktm-392-prefix/ && "
                      "cp -P $D/lib/libktm.* ./ktm-392-prefix/lib/ && "
                      "printf 'static i64 table[4] = {5, 6, 7, 8};\\n"
                      "i64 LibTriple(i64 x) { return x * 3; }\\n"

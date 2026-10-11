@@ -60,10 +60,10 @@ i32 main() {
     /* An array right hand side */
     tests++;
     if (diagAt(DECLS "  y = 4; f = arr;\n}\n", "Incompatible types 'i64[", ":6:12")) { correct++; }
-    /* Top level statements */
+    /* Statements after globals (they used to be top-level code) */
     tests++;
     if (diagAt("i64 *gq = null;\nf64 gf;\ni64 gy;\n \nvoid main() {\n  gy = 1;\n  gf = gq; }\n",
-                         WARN, ":4:12", ":4:4")) { correct++; }
+                         WARN, ":7:6", ":7:3")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

@@ -1,4 +1,4 @@
-import libc, test;
+import test;
 
 /* A call returning a narrow integer (i8/i16/i32, u8/u16/u32) used directly
  * in an expression read the whole 64-bit return register. SysV and AAPCS64
@@ -50,19 +50,19 @@ i32 main() {
     i64 correct = 0;
 
     tests++;
-    if (libc.strcmp("a", "b") < 0 && libc.strcmp("b", "a") > 0 && libc.strcmp("a", "a") == 0 &&
-            idFn(libc.strcmp("a", "b")) < 0 && libc.strcmp("a", "b") + 0 < 0 && -libc.strcmp("a", "b") > 0) {
+    if (strcmp("a", "b") < 0 && strcmp("b", "a") > 0 && strcmp("a", "a") == 0 &&
+            idFn(strcmp("a", "b")) < 0 && strcmp("a", "b") + 0 < 0 && -strcmp("a", "b") > 0) {
         correct++;
-            } else { printf("Failed - strcmp: %d\n", libc.strcmp("a", "b") < 0); }
+            } else { printf("Failed - strcmp: %d\n", strcmp("a", "b") < 0); }
 
     /* C functions returning a long, declared narrower */
     tests++;
-    if (libc.atol("511") == -1 && libc.atol("511") < 0 && atoll("511") == 255 &&
+    if (atol("511") == -1 && atol("511") < 0 && atoll("511") == 255 &&
             strtol("1ffff", null, 16) == -1 && labs(0x7700000000010002) == 2 &&
             llabs(0x100000007) == 7 && llabs(0x1ffffffff) == 0xffffffff &&
-            idFn(libc.atol("383")) == 127) {
+            idFn(atol("383")) == 127) {
         correct++;
-            } else { printf("Failed - C: %d %d %d %d %d\n", libc.atol("511"), atoll("511"),
+            } else { printf("Failed - C: %d %d %d %d %d\n", atol("511"), atoll("511"),
                  strtol("1ffff", null, 16), labs(0x7700000000010002), llabs(0x100000007));
     }
 
@@ -115,7 +115,7 @@ i32 main() {
     }
 
     /* Stored first, as before */
-    i32 r = libc.strcmp("a", "b");
+    i32 r = strcmp("a", "b");
     u8 u = gU8(big | 0x1ff);
     tests++;
     if (r < 0 && u == 255) { correct++; }

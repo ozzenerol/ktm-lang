@@ -53,9 +53,7 @@ i32 main() {
     }
 
     transpilesTo(
-"import str;
-
-struct Pt { i64 x, y; };
+"struct Pt { i64 x, y; };
 i64 a;
 i64 b = 5;
 static i32 c = -1;
@@ -68,7 +66,7 @@ Pt *pp;
 i64 e;
 i32 main(i32 argc, u8 **argv)
 {
-  e = str.len(\"abcd\");
+  e = arr[2] + 1;
   printf(\"top %d\\n\", e);
   a = 7;
   printf(\"%d %d %d %.1f %s %s %d %d %d %d %d %s\\n\", a, b, c, d, s, buf, arr[2],

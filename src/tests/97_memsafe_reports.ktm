@@ -112,9 +112,9 @@ void main()
 }
 ") && check("grep -qx 'memsafe: 3 allocation(s) (60 bytes) never freed' " MS_ERR
                         " && test $(grep -c ' bytes  ' " MS_ERR ") -eq 3"
-                        " && grep -q ' 30 bytes  .*line 8$' " MS_ERR
-                        " && grep -q ' 20 bytes  .*line 7$' " MS_ERR
-                        " && grep -q ' 10 bytes  .*line 6$' " MS_ERR
+                        " && grep -q ' 30 bytes  .*line 10$' " MS_ERR
+                        " && grep -q ' 20 bytes  .*line 9$' " MS_ERR
+                        " && grep -q ' 10 bytes  .*line 8$' " MS_ERR
                         " && ! grep -q 'double free\\|never heap' " MS_ERR)) { correct++; }
     else { printf("Failed - leak of 3 blocks\n"); }
 

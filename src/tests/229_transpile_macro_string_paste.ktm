@@ -18,9 +18,7 @@ void cleanupTranspilePasteTest(void) {
 }
 
 u8 *tpSource =
-"import str;
-
-#define M \"mid\"
+"#define M \"mid\"
 #define N \"end\"
 #define TAB \"\\t\"
 #define K 3
@@ -38,11 +36,11 @@ void main()
   f64 h = HALF * k;
   printf(\"%s %s %s %s %s %d %.1f\\n\", s, t, u, v, w, k, h);
   printf(\"fmt \" M \" %d\\n\", k);
-  printf(\"%s|%s|%d\\n\", \"q\" M N, p, str.len(e));
+  printf(\"%s|%s|%c\\n\", \"q\" M N, p, e[0]);
 }
 ";
 
-u8 *tpExpected = "amidb midx xmid midend mid 7 3.5\nfmt mid 7\nqmidend|plain pair|4\n";
+u8 *tpExpected = "amidb midx xmid midend mid 7 3.5\nfmt mid 7\nqmidend|plain pair|[\n";
 
 void main() {
     printf("Test - transpile macro pasted into a string: ");

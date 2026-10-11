@@ -115,7 +115,7 @@ void main() { i64 y = X; }
 bool testFnLikeAfterClass(void) {
     return compileFailsExactly(
 "struct Foo { i64 a; };
-const i64 X = (1);
+#define X(1)
 void main() { i64 y = 1; }
 ", 1, DEF_MSG_FNLIKE, null);
 }

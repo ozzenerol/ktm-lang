@@ -48,17 +48,17 @@ i32 main() {
 
     /* `void Main() { ` is 12 columns */
     tests++;
-    if (errorAt("i64 x = One(1); i64 y = Two(1);", ":6:37", "|                                        ^^^^^^\n")) { correct++; }
+    if (errorAt("i64 x = One(1); i64 y = Two(1);", ":6:39", "|                                          ^^^^^^\n")) { correct++; }
     tests++;
-    if (errorAt("i64 y = Two (1, 2, 3);", ":6:21", "|                        ^^^^^^^^^^^^^\n")) { correct++; }
+    if (errorAt("i64 y = Two (1, 2, 3);", ":6:23", "|                          ^^^^^^^^^^^^^\n")) { correct++; }
     tests++;
-    if (errorAt("i64 (*fp)(i64 a, i64 b) = &Two; i64 y = fp(1);", ":6:53", "^^^^^\n")) { correct++; }
+    if (errorAt("i64 (*fp)(i64 a, i64 b) = &Two; i64 y = fp(1);", ":6:55", "^^^^^\n")) { correct++; }
     tests++;
-    if (errorAt("c.f = &One; i64 y = c.f();", ":6:35", "|                                      ^^^\n")) { correct++; }
+    if (errorAt("c.f = &One; i64 y = c.f();", ":6:37", "|                                        ^^^\n")) { correct++; }
     tests++;
-    if (errorAt("i64 y = 1 + Two;", ":6:25", "|                            ^^^\n")) { correct++; }
+    if (errorAt("i64 y = 1 + Two;", ":6:27", "|                              ^^^\n")) { correct++; }
     tests++;
-    if (errorAt("i64 x = One(1); i64 y = Va();", ":6:37", "^^^^\n")) { correct++; }
+    if (errorAt("i64 x = One(1); i64 y = Va();", ":6:39", "^^^^\n")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");
