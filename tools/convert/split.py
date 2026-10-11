@@ -115,6 +115,15 @@ hdr_text = text['std.ktmh'] + text['defs.ktmh']
 hdr_types = set(re.findall(r'\b(?:class|union|struct)\s+(\w+)', hdr_text))
 hdr_defines = set(re.findall(r'#\s*define\s+(\w+)', hdr_text))
 
+# what the header defines inside its #if blocks (sqlite's, the platform
+# layouts): a .ktm's own top-level copy of one is dropped, the header's kept
+hdr_block_names = set()
+for it in allit['std.ktmh']:
+    if it['kind'] == 'ifblock':
+        b = text['std.ktmh'][it['s']:it['e']]
+        hdr_block_names |= set(re.findall(r'\b(?:class|union|struct)\s+(\w+)', b))
+        hdr_block_names |= set(re.findall(r'#\s*define\s+(\w+)', b))
+
 def repeats_header(body):
     types = set(re.findall(r'\b(?:class|union|struct)\s+(\w+)', body))
     defines = set(re.findall(r'#\s*define\s+(\w+)', body))
@@ -170,9 +179,11 @@ for f in headers + files:
             if ckey in seen_c:
                 continue
             seen_c.add(ckey)
-            # sqlite's C functions are the sql module's (optional, like it)
-            target = 'sql' if name.startswith('sqlite3') else 'libc'
-            if target == 'libc' and k != 'define':
+            # the map's module for a C name (sql for SQLite's, optional like
+            # it), libc for the rest
+            target = row[1] if row and row[0] == 'c' and row[1] not in ('-', None) else \
+                     ('sql' if name.startswith('sqlite3') else 'libc')
+            if target in ('libc', 'sql') and k != 'define':
                 # everything in c is pub: it is the C library, for every module
                 # (a #define is made a pub const by the converter)
                 lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
@@ -187,6 +198,9 @@ for f in headers + files:
             continue          # a forward declaration: a module's names need none
         if f in headers and k == 'global' and name in defined:
             continue                                 # declared again by its definition
+        if f not in headers and k in ('define', 'type') and name in hdr_block_names:
+            dropped.append((f, it['start'], k, name + ' (the header block has it)'))
+            continue
         if k == 'define':
             if name in seen_defines:
                 continue      # defs.ktmh and std.ktmh both have it
@@ -244,6 +258,16 @@ for f in headers + files:
             body = re.sub(r'^(\s*)(?=(?:class|union|struct)\s+\w+\s*(?:\{|$|;))', r'\1public ',
                           body, flags=re.M)
             body = re.sub(r'\bpublic(\s+)public\b', r'public', body)
+        # inside a block, the module's API (its map names) is public too
+        if k == 'ifblock' and mod not in (None, 'libc'):
+            def pub_if_api(m):
+                row2 = mp.get(m.group(3))
+                if row2 and row2[1] == mod and not re.search(r'(public|static)\s*$', m.group(1)):
+                    return m.group(1) + 'public ' + m.group(2) + m.group(3)
+                return m.group(0)
+            body = re.sub(r'^(\s*)((?:class|union|struct)\s+)(\w+)(?=\s*\{)', pub_if_api, body, flags=re.M)
+            body = re.sub(r'^(\s*)((?:[A-Z]\w*|I\d+|U\d+)\s*\**\s*)(\w+)(?=\s*\([^;]*\)\s*\{)',
+                          pub_if_api, body, flags=re.M)
         # everything in libc is pub: it is the C library, for every module
         if mod == 'libc' and k in ('type', 'global', 'func', 'proto'):
             lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
@@ -264,13 +288,19 @@ for (mod, f), parts in sorted(outputs.items()):
     name = 'decls.ktm' if f in headers else os.path.splitext(f)[0] + '.ktm'
     path = os.path.join(d, name)
     fresh = not os.path.exists(path)
+    # sql is there only when ktm is built with SQLite (all.ktm's #ifdef)
+    guard = mod == 'sql' and f != 'std.ktmh'
     with open(path, 'a') as w:
         if fresh:
             w.write('module %s;\n\n' % mod)
         else:
             w.write('\n\n')
+        if guard:
+            w.write('#ifdef __KTM_LINK_SQLITE3__\n\n')
         w.write('\n\n'.join(p.strip('\n') for p in parts))
         w.write('\n')
+        if guard:
+            w.write('\n#endif\n')
 for d in dropped:
     print('dropped:', *d)
 for u in unplaced:
