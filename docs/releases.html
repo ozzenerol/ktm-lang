@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,52 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-2-1-2026-10-11">v0.2.1 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-1-2026-10-11" aria-label="Link to this section">#</a></h2>
+<p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
+names in every message, and a set of smaller fixes.</p>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
+  after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
+  issue is gone.</li>
+  <li>A library that reads or writes another prebuilt library's globals links (they are reached through
+  the GOT).</li>
+  <li>Messages name functions, not their symbols: the JIT's unresolved-symbol errors, the linker's errors
+  and notes, and the REPL say <code>geo.useHelper</code>, never <code>_K3geo9useHelper</code>.</li>
+  <li>A module global whose type doesn't exist is reported once, not twice.</li>
+  <li><code>#define KTM_NO_REPL_HELLO</code> in <code>~/.ktm_rc.ktm</code> hides the REPL greeting, as
+  documented.</li>
+  <li>A program's own global named like a C one (<code>environ</code>, <code>errno</code>) no longer
+  replaces it: program globals get their own symbols, as functions did in v0.2.0. A child started by
+  <code>proc.run</code> from a program that had its own <code>environ</code> got an empty environment.</li>
+  <li>In the JIT, a global declared with <code>extern</code> and never defined is an error instead of a
+  crash at address 0.</li>
+  <li><code>auto s = "x";</code> no longer warns "u8[2] is not assignable to u8[2]".</li>
+  <li><code>&amp;</code> of something without an address (<code>&amp;5</code>, <code>&amp;E.a</code>,
+  <code>&amp;f()</code>) is a parse error instead of a code generator failure.</li>
+  <li>Duplicate <code>case</code> values are reported by value (<code>duplicate case value Color.red</code>),
+  including a value inside an earlier range; integer duplicates were not reported at all.</li>
+  <li><code>argc</code>/<code>argv</code> outside <code>main</code>'s parameters are an error (they were
+  silently 0 and null).</li>
+  <li><code>json.parse</code> rejects invalid UTF-8 in strings (stray continuation bytes, cut-off and
+  overlong sequences, surrogates, values past U+10FFFF) with the new <code>json.INVALID_UTF8</code> and
+  the position of the bad byte.</li>
+</ul>
+
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
+  <code>extern T x;</code> is a ktm global defined elsewhere.</li>
+  <li>A <code>for</code> init can declare several variables (<code>for (i64 i = 0, j = 10; i &lt; j; i++, j--)</code>),
+  and its step can be several expressions.</li>
+  <li>A module built with <code>ktm -lib</code> can have globals with run-time initialisers: each module
+  gets an init function that runs once, its imports first, before the program's own initialisers.</li>
+  <li>All REPL builtins are camelCase: <code>replListFn</code>, <code>replFindFn</code>,
+  <code>replReloadRc</code>, <code>replListGVars</code>, <code>replClassRep</code>, <code>replEval</code>,
+  <code>replHeap</code> (and <code>replDisasm</code>/<code>replDel</code> from v0.2.0).</li>
+</ul>
 
 <h2 id="v0-2-0-2026-10-11">v0.2.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-0-2026-10-11" aria-label="Link to this section">#</a></h2>
 <p>A new language. ktm now has its own C-like syntax, modules, methods and a standard library organised
@@ -138,7 +184,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -160,7 +206,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
