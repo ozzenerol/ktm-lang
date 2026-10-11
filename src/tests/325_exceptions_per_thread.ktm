@@ -4,6 +4,8 @@ import fs, libc, mem, proc, str, test;
  * could longjmp onto another thread's stack ("stack smashing detected").
  * Each thread now has its own catch chain. */
 
+enum Err { again, main };
+
 const i64 WORKERS = 8;
 const i64 ROUNDS = 5000;
 
@@ -23,7 +25,7 @@ extern "c" i32 usleep(u32 usec);
 
 /* Workers wait here until all of them are running, so none has exited
  * (and the next thread reused its state) while the others throw. */
-pthread_mutex_t startedLock;
+libc.pthread_mutex_t startedLock;
 i64 started;
 
 void waitForAllWorkers() {
@@ -66,7 +68,9 @@ void *worker(Work *w) {
 
 bool uncaughtInThreadExits() {
     u8 *src = "
-enum Err { thr, again, main };
+import libc;
+
+enum Err { thr };
 
 void *T(void *a)
 {

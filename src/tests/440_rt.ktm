@@ -33,8 +33,7 @@ i32 main() {
     i64 correct = 0, tests = 0;
 
     proc.shell("rm -rf " PREFIX " && D=${KTM_INSTALL_DIR:-/usr/local} && "
-                 "mkdir -p " PREFIX "/include " PREFIX "/lib " PREFIX "/modules && "
-                 "cp $D/include/std.ktmh " PREFIX "/include/ && "
+                 "mkdir -p " PREFIX "/lib " PREFIX "/modules && "
                  "cp -P $D/lib/libktm.* " PREFIX "/lib/ && "
                  "cp -r $D/modules/prelude " PREFIX "/modules/ && "
                  "S=${KTM_TEST_SRC:-.}/modules/rtinstall && "

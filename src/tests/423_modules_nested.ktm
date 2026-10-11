@@ -1,8 +1,8 @@
 import fs, mem, proc, str, test;
 
-/* Modules (M1): nested modules and aliases. `import net.http;` loads
- * the directory net/http (its files start with `module http;`) and its
- * names are `http.name`; `import h = net.http;` makes them `h.name` as
+/* Modules (M1): nested modules and aliases. `import web.http;` loads
+ * the directory web/http (its files start with `module http;`) and its
+ * names are `http.name`; `import h = web.http;` makes them `h.name` as
  * well. A nested module imports its parent like any other module, and a
  * type of one module is used through another's functions. The symbols
  * stay apart: `_K3net4port`, `_K3net4http3get`. The fixture is

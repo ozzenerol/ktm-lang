@@ -30,7 +30,7 @@ date.Date mkDate(i64 y, i64 mo, i64 d, i64 h, i64 mi, i64 s) {
 
 i64 mkDay(i64 y, i64 mo, i64 d) {
     date.Date c = mkDate(y, mo, d, 0, 0, 0);
-    return libc.date;
+    return c.date;
 }
 
 /* Round trip through date.toParts and check every field. */

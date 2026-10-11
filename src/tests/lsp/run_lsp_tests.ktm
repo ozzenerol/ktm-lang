@@ -624,7 +624,7 @@ bool hasEditAt(json.Value *fileEdits, i64 line, i64 chr) {
     while (it != null) {
         json.Value *l = json.select(it, ".range.start.line:i");
         json.Value *c = json.select(it, ".range.start.character:i");
-        if (l != null && c != null && l.intVal == line && libc.intVal == chr) {
+        if (l != null && c != null && l.intVal == line && c.intVal == chr) {
             return true;
         }
         it = it.next;
@@ -646,7 +646,7 @@ bool hasLocation(json.Value *arr, u8 *uri, i64 line, i64 chr) {
         json.Value *l = json.select(it, ".range.start.line:i");
         json.Value *c = json.select(it, ".range.start.character:i");
         if (u != null && l != null && c != null &&
-                str.cmp(u.str, uri) == 0 && l.intVal == line && libc.intVal == chr) {
+                str.cmp(u.str, uri) == 0 && l.intVal == line && c.intVal == chr) {
             return true;
         }
         it = it.next;

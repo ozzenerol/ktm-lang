@@ -143,7 +143,7 @@ i32 main() {
             !str.cmp(typeof(fn(...args) i64), "fn(...args) i64") &&
             !str.cmp(typeof(fn(u8 *, ...args) i32), "fn(u8*, ...args) i32") &&
             !str.cmp(typeof(fn(i64 ...nums) i64), "fn(i64 ...) i64") &&
-            !str.cmp(typeof(fn(...args) i64), "fn(...) i64")) {
+            !str.cmp(typeof(fn(...) i64), "fn(...) i64")) {
         correct++;
             }
 

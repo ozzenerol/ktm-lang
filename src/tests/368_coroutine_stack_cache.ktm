@@ -23,7 +23,7 @@ bool mappedFn(void *addr) {
 
 /* The top page of a coroutine's stack, writable while it is mapped. */
 void *topPage(coro.Coroutine *c) {
-    return libc.stackBase + libc.stackLen - libc.getpagesize();
+    return c.stackBase + c.stackLen - libc.getpagesize();
 }
 
 void *fib(void *max) {
@@ -61,7 +61,7 @@ bool reuse() {
     coro.release(b);                               /* while paused */
 
     coro.Coroutine *c = coro.spawn(&fib, (void *)100);
-    if (libc.stackBase != base) { return false; }
+    if (c.stackBase != base) { return false; }
     if (runFib(c) != 232) { return false; }                /* dirty stack, clean start */
     coro.release(c);
     coro.Coroutine *d = coro.spawn(&fib, (void *)100);   /* back in the cache */

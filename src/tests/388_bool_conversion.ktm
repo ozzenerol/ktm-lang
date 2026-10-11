@@ -91,11 +91,11 @@ void fields(u8 *p) {
     bool arr[4] = {0x100, 0, -1, 0.5};
 
     check(sizeof(bool) == 1 && sizeof(C) == 3, "bool is one byte");
-    check((u8 *)(&libc.b) - (u8 *)(&c) == 1 && (u8 *)(&libc.c) - (u8 *)(&c) == 2,
+    check((u8 *)(&c.b) - (u8 *)(&c) == 1 && (u8 *)(&c.c) - (u8 *)(&c) == 2,
             "field offsets");
-    libc.a = 7; libc.c = 9;
-    libc.b = big; check(is(libc.b, 1) && libc.a == 7 && libc.c == 9, "field 0x800");
-    libc.b = p;   check(is(libc.b, 1) && libc.a == 7 && libc.c == 9, "field pointer");
+    c.a = 7; c.c = 9;
+    c.b = big; check(is(c.b, 1) && c.a == 7 && c.c == 9, "field 0x800");
+    c.b = p;   check(is(c.b, 1) && c.a == 7 && c.c == 9, "field pointer");
     check(is(d.b, 1) && d.a == 7 && d.c == 9, "class initialiser");
     check(is(arr[0], 1) && is(arr[1], 0) && is(arr[2], 1) && is(arr[3], 1),
             "array initialiser");

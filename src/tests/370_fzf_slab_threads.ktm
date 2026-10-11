@@ -7,18 +7,32 @@ import fzf, libc, test;
  * pattern was split with strtok, whose position is one global shared by
  * all threads: fzf.match from several threads at once gave wrong answers. */
 
+/* (the test module's heap helpers keep these C structs to themselves) */
 #ifdef IS_MACOS
-i64 HeapPeak() {
+struct CHeapZoneStats {
+    u32 blocks_in_use;
+    u32 pad;
+    u64 size_in_use;
+    u64 max_size_in_use;
+    u64 size_allocated;
+};
+extern "c" void malloc_zone_statistics(void *zone, CHeapZoneStats *stats);
+i64 heapPeak() {
     CHeapZoneStats st;
     malloc_zone_statistics(null, &st);
     return st.max_size_in_use;
 }
 #else
+struct CHeapMallInfo2 {
+    u64 arena, ordblks, smblks, hblks, hblkhd;
+    u64 usmblks, fsmblks, uordblks, fordblks, keepcost;
+};
+extern "c" CHeapMallInfo2 mallinfo2();
 extern "c" i32 mallopt(i32 param, i32 value);
 extern "c" i32 malloc_trim(u64 pad);
 /* glibc: no trimming, no top padding and no mmap for these sizes, so the
  * main arena only grows, by about what the largest live block needs:
- * HeapPeak() trims it first and reports its size, and calling it again
+ * heapPeak() trims it first and reports its size, and calling it again
  * after some work tells how far the heap reached in between. */
 void heapPeakInit() {
     mallopt(-1, 1 << 30); /* M_TRIM_THRESHOLD */

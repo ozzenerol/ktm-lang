@@ -1,4 +1,4 @@
-module net;
+module web;
 import mem;
 
 pub struct Conn {
@@ -7,7 +7,7 @@ pub struct Conn {
     private i64 used;
 };
 
-/* inherits Conn's private fields: still private to net */
+/* inherits Conn's private fields: still private to web */
 pub struct Tls : Conn {
     i64 level;
 };

@@ -28,8 +28,6 @@ const i64 CT_8_BIT = 3;
 
 u64 memMappedSpace;
 
-const i64 U32_MAX = 4294967295;
-
 pub struct CArcCompress {
   i64	compressedSize,expandedSize;
   u8	compressionType;

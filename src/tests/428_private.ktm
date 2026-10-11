@@ -41,10 +41,10 @@ i64 count(u8 *s, u8 *what) {
 }
 
 /* A program `main` (and the module `shop` when given) next to a copy of
- * net fails with exactly one error, `want` */
+ * web fails with exactly one error, `want` */
 bool fails(u8 *main, u8 *shop, u8 *want) {
     proc.shell("rm -rf " P_DIR " && mkdir -p " P_DIR " && "
-                 "cp -r ${KTM_TEST_SRC:-.}/modules/private/net " P_DIR "/");
+                 "cp -r ${KTM_TEST_SRC:-.}/modules/private/web " P_DIR "/");
     fs.writeAll(P_DIR "/main.ktm", main, str.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (shop) {
         proc.shell("mkdir -p " P_DIR "/shop");
@@ -77,7 +77,7 @@ i32 main() {
     tests++; if (!str.cmp(join("pub", "private", "public"), "pub|private|public")) { correct++; }
     tests++; if (!str.cmp(join("i64", "u8"), "i64|u8|")) { correct++; }
 
-    /* inside net every file uses them, outside the layout still works */
+    /* inside web every file uses them, outside the layout still works */
     tests++;
     if (output(KTM FIXTURE " -o " P_BIN " > " P_OUT " 2>&1 && " P_BIN " >> " P_OUT " 2>&1",
                          gWant)) {
@@ -87,46 +87,46 @@ i32 main() {
     if (output(KTM "-jit " FIXTURE " > " P_OUT " 2>&1", gWant)) { correct++; }
 
     tests++;
-    if (fails("import net;\ni32 main() { net.Conn *c = net.dial(1); u8 *b = c.buf; return 0; }\n",
-                        null, "`buf` is a private field of net.Conn")) {
+    if (fails("import web;\ni32 main() { web.Conn *c = web.dial(1); u8 *b = c.buf; return 0; }\n",
+                        null, "`buf` is a private field of web.Conn")) {
         correct++;
                         }
     tests++;
-    if (fails("import net;\ni32 main() { net.Conn *c = net.dial(1); c->buf = null; return 0; }\n",
-                        null, "`buf` is a private field of net.Conn")) {
+    if (fails("import web;\ni32 main() { web.Conn *c = web.dial(1); c->buf = null; return 0; }\n",
+                        null, "`buf` is a private field of web.Conn")) {
         correct++;
                         }
     tests++;
-    if (fails("import net;\ni32 main() { net.Conn c; i64 *p = &c.used; return 0; }\n",
-                        null, "`used` is a private field of net.Conn")) {
+    if (fails("import web;\ni32 main() { web.Conn c; i64 *p = &c.used; return 0; }\n",
+                        null, "`used` is a private field of web.Conn")) {
         correct++;
                         }
     tests++;
-    if (fails("import net;\ni32 main() { net.Conn c = {1, \"x\"}; return 0; }\n",
-                        null, "`buf` is a private field of net.Conn")) {
+    if (fails("import web;\ni32 main() { web.Conn c = {1, \"x\"}; return 0; }\n",
+                        null, "`buf` is a private field of web.Conn")) {
         correct++;
                         }
     tests++;
-    if (fails("import net;\ni32 main() { net.Tls t; t.used = 1; return 0; }\n",
-                        null, "`used` is a private field of net.Conn")) {
+    if (fails("import web;\ni32 main() { web.Tls t; t.used = 1; return 0; }\n",
+                        null, "`used` is a private field of web.Conn")) {
         correct++;
                         }
     tests++;
-    if (fails("import net;\ni64 F(net.Bytes *b) { for (auto x : b) {} return 0; }\n"
+    if (fails("import web;\ni64 F(web.Bytes *b) { for (auto x : b) {} return 0; }\n"
                         "i32 main() { return 0; }\n",
-                        null, "`size` is a private field of net.Bytes")) {
+                        null, "`size` is a private field of web.Bytes")) {
         correct++;
                         }
     tests++;
     if (fails("import shop;\ni32 main() { shop.go(); return 0; }\n",
-                        "module shop;\nimport net;\npub void go() { net.Conn *c = net.dial(1); c.used = 2; }\n",
-                        "`used` is a private field of net.Conn")) {
+                        "module shop;\nimport web;\npub void go() { web.Conn *c = web.dial(1); c.used = 2; }\n",
+                        "`used` is a private field of web.Conn")) {
         correct++;
                         }
     /* `private` on a function: the same as no `pub` */
     tests++;
-    if (fails("import net;\ni32 main() { return net.twice(1); }\n",
-                        null, "`twice` is private to module net")) {
+    if (fails("import web;\ni32 main() { return web.twice(1); }\n",
+                        null, "`twice` is private to module web")) {
         correct++;
                         }
     tests++;

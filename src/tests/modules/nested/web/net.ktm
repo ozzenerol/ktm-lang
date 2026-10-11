@@ -1,4 +1,4 @@
-module net;
+module web;
 
 pub struct Conn { i64 fd; i64 port; };
 

@@ -1,6 +1,6 @@
-module net;
+module web;
 
-/* another file of net uses the private fields too */
+/* another file of web uses the private fields too */
 pub u8 *peek(Conn *c) { return c.buf; }
 
 pub i64 sum(Bytes *b) {
