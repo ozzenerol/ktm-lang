@@ -5,7 +5,15 @@ each with a way to reproduce it and a workaround. The other pages avoid them, so
 there works as shown.</p>
 
 <h2>Compiler</h2>
-<p>No known issues: everything found while writing these docs has been fixed.</p>
+<table>
+  <thead><tr><th>Issue</th><th>Reproduce</th><th>Workaround</th></tr></thead>
+  <tbody>
+    <tr><td>A write through a slice of a string literal is not caught at compile time
+    (planned for v0.3.1): a compiled program crashes, and the JIT changes the literal.</td>
+    <td><code>u8[] a = "abc"; a[0] = 'x';</code></td>
+    <td>Copy the literal first: <code>String a = str.from("abc"); defer a.free();</code></td></tr>
+  </tbody>
+</table>
 
 <h3>Diagnostics</h3>
 <p>No known issues: everything found while writing these docs has been fixed.</p>
