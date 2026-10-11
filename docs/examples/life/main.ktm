@@ -62,7 +62,7 @@ i64 population() {
 }
 
 void show(i64 gen) {
-    printf("generation %d, %d alive\n", gen, population)();
+    printf("generation %d, %d alive\n", gen, population());
     u8 line[W + 1];
     line[W] = 0;
     for (i64 r = 0; r < H; r++) {
