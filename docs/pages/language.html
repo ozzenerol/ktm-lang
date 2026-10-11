@@ -1198,9 +1198,12 @@ A String's fields are read-only outside the <code>str</code> module.</p>
 <p>In a literal format, <code>%s</code> takes a slice or a String as well as a C string, with a
 width (<code>%-10s</code>) but no precision (the length is the slice's). A format that isn't a
 literal can't take a slice: pass <code>s.cstr()</code>.</p>
-<div class="warn"><p>String literals are read-only data. Writing through a slice of one
-(<code>u8[] a = "abc"; a[0] = 'x';</code>) crashes a compiled program and, in the JIT, changes
-the literal. Copy it first: <code>String a = str.from("abc");</code>.</p></div>
+<p>String literals are read-only data. A write the compiler can see is an error: through the
+literal itself, or through a local initialised from one and never given anything else
+(<code>u8[] a = "abc"; a[0] = 'x';</code>: "`a` is a string literal, which is read-only: copy it
+with str.from(...)"). A write it can't see, through a parameter or a pointer, faults at run
+time, compiled and in the JIT alike. Copy the literal first:
+<code>String a = str.from("abc");</code>.</p>
 
 <h3>C strings</h3>
 <p>A NUL-terminated <code>u8 *</code> is still what C functions take and return, and string

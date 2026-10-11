@@ -281,6 +281,11 @@ static int memsafeIsWild(void *p) {
             uintptr_t lo = (uintptr_t)it->value;
             if (a >= lo && a < lo + malloc_usable_size(it->value)) return 1;
         }
+        listForEach(memsafe_jit->string_arenas) {
+            JitStrings *s = (JitStrings *)it->value;
+            uintptr_t lo = (uintptr_t)s->ptr;
+            if (a >= lo && a < lo + s->len) return 1;
+        }
     }
     return 0;
 }

@@ -4197,6 +4197,7 @@ Ast *parseUnaryExpr(Cctrl *cc) {
         switch (unary_op) {
             case AST_UN_OP_ADDR_OF: {
                 parseCheckAddrOperand(cc, operand, op_line, op_col, op_len);
+                parseNoteSliceMoved(operand);
                 if (parseIsFunction(operand)) {
                     /* TODO;
                      * Making this a pointer type effects the return type of 

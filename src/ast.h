@@ -265,6 +265,11 @@ typedef struct AstType {
 #define AST_FLAG_PROGRAM (1<<9)
 /* `extern "c" T name;`: C data, its symbol the C name */
 #define AST_FLAG_EXTERN_C (1<<10)
+/* A local u8[] initialised from a string literal (`u8[] a = "abc";`):
+ * a write through it is a compile error unless the local is reassigned
+ * or its address taken (AST_FLAG_SLICE_MOVED) somewhere in the function */
+#define AST_FLAG_LIT_SLICE (1<<11)
+#define AST_FLAG_SLICE_MOVED (1<<12)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
