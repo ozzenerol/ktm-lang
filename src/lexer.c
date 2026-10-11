@@ -287,9 +287,13 @@ static void lexDiagVa(Lexer *l, int severity, s64 line, s64 col, s64 len,
         }
         if (len < 1) len = 1;
 
-        /* About where the lexer is, not the last token the parser took */
+        /* About where the lexer is, not the last token the parser took;
+         * the rest of an import list is a file of its own whose lines
+         * are its owner's, which has the text around them */
         LexFile *parser_file = l->cc->tok_file;
-        l->cc->tok_file = l->cur_file;
+        LexFile *at_file = l->cur_file;
+        while (at_file && at_file->import_owner) at_file = at_file->import_owner;
+        l->cc->tok_file = at_file;
         AoStr *buf = cctrlCreateErrorLineAt(l->cc, line, col, len,
                                             bold->data, severity, NULL);
         aoStrRelease(bold);
@@ -3428,15 +3432,18 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     /* the importing file (an import line's rest is read from a file of
      * its own, see below) */
     LexFile *file = l->cur_file;
+    Lexeme *here = kw;      /* the `import` lexed, in the file being read */
     if (file && file->import_owner) {
         if (file->import_kw) kw = file->import_kw;
         file = file->import_owner;
     }
     AoStr *aliases[64], *paths[64];
     Lexeme *firsts[64], *lasts[64];
+    char *item_starts[64];
     int n = 0, more = 1;
     while (more) {
         Lexeme *first = lexTokenRaw(macro_defs, l);
+        char *item_start = first ? first->start : NULL;
         AoStr *alias = NULL;
         if (first && first->tk_type == TK_IDENT) {
             Lexeme *eq = lexTokenRaw(macro_defs, l);
@@ -3456,6 +3463,7 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
             paths[n] = path;
             firsts[n] = first;
             lasts[n] = last;
+            item_starts[n] = item_start;
             n++;
         }
     }
@@ -3465,17 +3473,24 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
      * the list goes into a file read after the first module's files,
      * which are pushed on top of it. */
     if (n > 1) {
+        /* The statement's own lines, from the start of the `import` line
+         * to its `;`, with everything but `import` before the second
+         * module blanked: the rest of the list keeps its lines and
+         * columns, so its diagnostics point into the file as written */
         AoStr *rest = aoStrNew();
-        aoStrCat(rest, "import ");
-        for (int i = 1; i < n; ++i) {
-            if (i > 1) aoStrCat(rest, ", ");
-            if (aliases[i]) aoStrCatPrintf(rest, "%s = ", aliases[i]->data);
-            aoStrCatPrintf(rest, "%s", paths[i]->data);
+        char *line_start = here->start - (here->col - 1);
+        for (char *p = line_start; p < l->ptr; ++p) {
+            char c = *p;
+            int keep = (p >= here->start && p < here->start + here->len) ||
+                       p >= item_starts[1] || c == '\n';
+            aoStrPutChar(rest, keep ? c : ' ');
         }
-        aoStrCat(rest, ";\n");
+        aoStrCat(rest, "\n");
         LexFile *cur = l->cur_file;
         lexPushString(l, cur->filename->data, rest->data, rest->len);
         LexFile *more = l->cur_file;
+        more->lineno = here->line;
+        l->lineno = here->line;
         more->import_owner = file;
         more->import_kw = lexemeCopy(kw);
         more->module_id = cur->module_id;

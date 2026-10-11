@@ -47,6 +47,18 @@ I32 Main()
              "error: expected `;` or `,` after the module name"))
     correct++;
 
+  /* missing modules of a list are each reported where written, with
+   * their own source line (the rest of a list is read from a file of its
+   * own, which keeps the lines and columns) */
+  tests++;
+  if (Output(KTM "-S " FIX "/missing.ktm -o /dev/null > " OUT " 2>&1",
+             "missing.ktm:4:8\n     |\n   4 |           zz1,") &&
+      Output(KTM "-S " FIX "/missing.ktm -o /dev/null > " OUT " 2>&1",
+             "missing.ktm:5:9\n     |\n   5 |        h = zz2, zz3;") &&
+      Output(KTM "-S " FIX "/missing.ktm -o /dev/null > " OUT " 2>&1",
+             "missing.ktm:5:14\n"))
+    correct++;
+
   PrintResult(correct, tests);
   "====\n";
   return 0;
