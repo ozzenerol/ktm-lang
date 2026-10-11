@@ -1,13 +1,13 @@
 module fs;
-import c, mem, str;
+import libc, mem, str;
 
 /* 0 if `path` is a directory afterwards (made now or already there) */
 static i32 makeDirIfMissing(u8 *path, i32 mode=MAKE_DIR_DEFAULT) {
-    c.cStat st;
-    if (c.mkdir(path, mode) == 0) {
+    libc.cStat st;
+    if (libc.mkdir(path, mode) == 0) {
         return 0;
     }
-    if (c.stat(path, &st) == 0 && (st.st_mode & c.S_IFMT) == c.S_IFDIR) {
+    if (libc.stat(path, &st) == 0 && (st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
         return 0;
     }
     return -1;
@@ -18,14 +18,14 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     i64 pathlen,buflen;
     u8 *buf;
     cDIR *dir;
-    c.cStat st;
+    libc.cStat st;
     Dirent *ent;
     result = -1;
 
     if (!path) { return -1; }
 
     if (!(flags & REMOVE_RECURSE)) {
-        result = c.rmdir(path);
+        result = libc.rmdir(path);
         if (isVerbose) {
             if (result == 0) { printf("removed dir '%s'\n",path); }
             else             { printf("ERROR removing dir '%s', is it empty?\n",path); }
@@ -35,7 +35,7 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
 
     /* Never follow a symlink: opendir() would empty the directory it
      * points to. Rm removes the link itself. */
-    if (c.lstat(path,&st) != 0 || (st.st_mode & c.S_IFMT) == c.S_IFLNK) {
+    if (libc.lstat(path,&st) != 0 || (st.st_mode & libc.S_IFMT) == libc.S_IFLNK) {
         return result;
     }
 
@@ -52,21 +52,21 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
 
         buf = str.formatTo(null,"%s/%s",path,ent.name);
         if (buf) {
-            if (ent.type == c.DT_DIR) {
+            if (ent.type == libc.DT_DIR) {
                 r2 = removeDir(buf,flags);
-            } else if (ent.type != c.DT_UNKNOWN) {
+            } else if (ent.type != libc.DT_UNKNOWN) {
                 /* Anything but a directory, links included, is unlinked; the
                  * type is a number, not a bit mask (DT_SOCK & DT_DIR != 0) */
-                r2 = c.unlink(buf);
+                r2 = libc.unlink(buf);
                 if (isVerbose) {
                     if (r2 == 0) { printf("Rm: %s\n",buf); }
                     else         { printf("Error Rm: %s\n",buf); }
                 }
-            } else if (!c.lstat(buf,&st)) {
-                    if ((st.st_mode & c.S_IFMT) == c.S_IFDIR) {
+            } else if (!libc.lstat(buf,&st)) {
+                    if ((st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
                         r2 = removeDir(buf,flags);
                     } else {
-                        r2 = c.unlink(buf);
+                        r2 = libc.unlink(buf);
                         if (isVerbose) {
                             if (r2 == 0) { printf("Rm: %s\n",buf); }
                             else         { printf("Error Rm: %s\n",buf); }
@@ -83,10 +83,10 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
             mem.free(buf);
             result = r2;
     }
-    c.closedir(dir);
+    libc.closedir(dir);
 
     if (!result && path) {
-        result = c.rmdir(path);
+        result = libc.rmdir(path);
         if (flags & RM_VERBOSE) {
             if (result == 0) {
             printf("RmDir %s\n",path);
@@ -103,23 +103,23 @@ pub i32 remove(u8 *path, i64 flags=0)
 { /* DANGER Remove a file or directory, this is powerful but can cause a world 
      * of pain */
     i32 result;
-    c.cStat st;
+    libc.cStat st;
 
     if (!path) { return -1; }
 
     /* lstat: a symlink is removed itself, never what it points to */
-    if (c.lstat(path,&st) == -1) {
+    if (libc.lstat(path,&st) == -1) {
         /* RM_FORCE: like rm -f, a file that does not exist is not an error */
         if (flags & REMOVE_FORCE) { return 0; }
         return -1;
     }
 
     /* An empty directory, or with RM_RECURSE everything in it */
-    if ((st.st_mode & c.S_IFMT) == c.S_IFDIR) {
+    if ((st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
         return removeDir(path,flags);
     }
 
-    result = c.unlink(path);
+    result = libc.unlink(path);
     if (flags & RM_VERBOSE) {
         printf("Rm '%s'",path);
         if (result != 0) { printf(" failed\n"); }

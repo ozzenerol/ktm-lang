@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" void *calloc(u64 count, u64 size);
 

@@ -1,5 +1,5 @@
 module date;
-import c, math, str;
+import libc, math, str;
 
 pub i64 struct CDate {
   u32 time;
@@ -22,23 +22,23 @@ u64 monStartDays2[12]={
   0,31,60,91,121,152,182,213,244,274,305,335};
 
 pub u64 nowMs() {
-  c.timeval tm;
-  c.gettimeofday(&tm,null);
+  libc.timeval tm;
+  libc.gettimeofday(&tm,null);
   return (tm.tv_sec*1000) +
          (tm.tv_usec/1000);
 }
 
 pub void nowParts(CDateStruct *_ds) {
-  c.timeval _tv;
-  c.tm *ptm;
+  libc.timeval _tv;
+  libc.tm *ptm;
   u64 milliseconds,seconds;
   i64 gmtoff;
 
-  c.gettimeofday(&_tv,null);
+  libc.gettimeofday(&_tv,null);
   milliseconds = (_tv.tv_sec*1000) +
                  (_tv.tv_usec/1000);
   seconds = milliseconds / 1000;
-  ptm = c.localtime(&seconds);
+  ptm = libc.localtime(&seconds);
 
   /* sec100 is the hundredths, sec10000 the ten-thousandths below them
    * (0-99 each), as Struct2Date and Date2Struct use them */
@@ -245,7 +245,7 @@ void civilFromDays(i64 z, i64 *y, i64 *m, i64 *d) {
 }
 
 // Writes e.g. 2026-07-05T14:30:00.123456789Z  (UTC)
-pub void isoFromTimespec(c.timespec *ts, u8 *buf) {
+pub void isoFromTimespec(libc.timespec *ts, u8 *buf) {
   i64 sec = ts.tv_sec, nsec = ts.tv_nsec;
   i64 days = sec / 86400, rem = sec % 86400;
   if (rem < 0) {

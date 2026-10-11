@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" i8 *getcwd(u8 *buf, u64 size);
 

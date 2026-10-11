@@ -1,7 +1,5 @@
 module fs;
 
-struct cDIR;
-
 /* Mac libc has a $INODE64 suffix on opendir/readdir for x86 64-bit
  * builds (legacy of the i386 -> x86_64 transition). On Apple ARM the
  * suffix doesn't seem to exist. */

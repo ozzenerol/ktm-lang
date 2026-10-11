@@ -1,5 +1,5 @@
 module rt;
-import c;
+import libc;
 
 /* A released stack in its thread's cache (Fs()->coro_cache). It lives
  * in the top bytes of the stack itself, so caching allocates nothing. */
@@ -15,7 +15,7 @@ pub void coroStacksFree(HCFs *fs) {
     CoroCached *n = fs.coro_cache, *next;
     while (n) {
         next = n.next;
-        c.munmap((u8 *)n + sizeof(CoroCached) - n.len, n.len);
+        libc.munmap((u8 *)n + sizeof(CoroCached) - n.len, n.len);
         n = next;
     }
     fs.coro_cache = null;

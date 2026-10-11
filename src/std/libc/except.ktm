@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 /* The compiler's try and defer frames use _setjmp, which unlike setjmp
  * doesn't save the signal mask (a sigprocmask syscall per try or defer

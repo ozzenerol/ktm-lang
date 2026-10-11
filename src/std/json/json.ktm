@@ -1,5 +1,5 @@
 module json;
-import c, mem, str;
+import libc, mem, str;
 
 const i64 JSON_PARSER_STRING = 0;
 
@@ -213,10 +213,10 @@ static void jsonParseNumber(JsonParser *p) {
             * does; strtoll would saturate it silently. 1e400 is inf, which
             * JsonToString writes as null. */
         if (isInt && jsonIntFits(text, numLen)) {
-                current.intVal = c.strtoll(text, null, 10);
+                current.intVal = libc.strtoll(text, null, 10);
                 current.type = INT;
         } else {
-                current.floatVal = c.strtod(text, null);
+                current.floatVal = libc.strtod(text, null);
                 current.type = FLOAT;
         }
         if (text != small) { mem.free(text); }
@@ -481,15 +481,15 @@ static u8 *jsonFloatToStr(u8 *buf, f64 f)
                 return buf;
         }
         while (true) {
-                c.snprintf(buf,64,"%.*g",(i32)prec,f);
-                if (prec >= 17 || c.strtod(buf,null) == f) { break; }
+                libc.snprintf(buf,64,"%.*g",(i32)prec,f);
+                if (prec >= 17 || libc.strtod(buf,null) == f) { break; }
                 prec++;
         }
         if (!str.count(buf,'.') && !str.count(buf,'n')) { // not inf/nan
                 len = str.len(buf);
                 e = str.firstOf(buf,"e");
                 if (!e) { e = buf + len; }
-                c.memmove(e+2,e,len - (e-buf) + 1);
+                libc.memmove(e+2,e,len - (e-buf) + 1);
                 e[0] = '.';
                 e[1] = '0';
         }
@@ -1208,7 +1208,7 @@ pub Json *select(Json *j, u8 *fmt, ...args) {
                 while (*ptr && *ptr != '.' && *ptr != '[' && *ptr != ']' && *ptr != ':') {
                         if (*ptr == '*') {
                                 if (kind == JSON_SEL_ARRAY) {
-                                        len = c.snprintf(buf, sizeof(buf), "%ld", (i64)args[arg++]);
+                                        len = libc.snprintf(buf, sizeof(buf), "%ld", (i64)args[arg++]);
                                         s = buf;
                                 } else if (kind == JSON_SEL_OBJ) {
                                         s = (u8 *)args[arg++];

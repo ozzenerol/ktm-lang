@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" void exit(i32 status);
 

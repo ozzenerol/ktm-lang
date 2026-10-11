@@ -1,5 +1,5 @@
 module fs;
-import c, mem, str;
+import libc, mem, str;
 
 #ifdef IS_LINUX
   #define F_GETOWN 0x9
@@ -49,7 +49,7 @@ import c, mem, str;
  * for linux, which mac includes with `st_birthtimespec` */
 pub i32 stat(Fstat *fst, u8 *pathname) {
 #if IS_LINUX
-    c.Statx stx;
+    libc.Statx stx;
 
     const i64 AT_FDCWD = -100;
     const i64 AT_STATX_SYNC_AS_STAT = 0x0000;
@@ -58,7 +58,7 @@ pub i32 stat(Fstat *fst, u8 *pathname) {
     const i64 STATX_MTIME = 0x0040U;
     const i64 STATX_CTIME = 0x0080U;
 
-    if (i32 ret = c.statx(AT_FDCWD, pathname, AT_STATX_SYNC_AS_STAT,
+    if (i32 ret = libc.statx(AT_FDCWD, pathname, AT_STATX_SYNC_AS_STAT,
                 STATX_BTIME, &stx); ret != 0) {
         return ret;
     }
@@ -134,7 +134,7 @@ static u8 *fileReadToEof(i32 fd, i64 *_len) {
             s = bigger;
             cap *= 2;
         }
-        rbytes = c.read(fd,s+size,cap-size-1);
+        rbytes = libc.read(fd,s+size,cap-size-1);
         if (rbytes == 0) {
             s[size] = '\0';
             *_len = size;
@@ -155,25 +155,25 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     i32 fd;
     i64 len, rbytes, size;
     u8 *s;
-    c.cStat st;
+    libc.cStat st;
 
     /* The library's fds are close-on-exec: programs it starts don't get them */
-    if ((fd = c.open(path,c.O_RDONLY|O_CLOEXEC,438)) == -1) {
+    if ((fd = libc.open(path,libc.O_RDONLY|O_CLOEXEC,438)) == -1) {
         return null;    
     }
 
     /* A directory has nothing to read (lseek on one gives a huge "size" on
      * some filesystems, LLONG_MAX on ext4) */
-    if (c.fstat(fd,&st) != 0 || (st.st_mode & c.S_IFMT) == c.S_IFDIR) {
-        c.close(fd);
+    if (libc.fstat(fd,&st) != 0 || (st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
+        libc.close(fd);
         return null;
     }
 
     /* Only a regular file with a size is read up to that size; anything
      * else (a FIFO, a pipe, a device, a /proc file of size 0) to EOF. */
-    if ((st.st_mode & c.S_IFMT) != c.S_IFREG || st.st_size == 0) {
+    if ((st.st_mode & libc.S_IFMT) != libc.S_IFREG || st.st_size == 0) {
         s = fileReadToEof(fd,&len);
-        c.close(fd);
+        libc.close(fd);
         if (s && _size) {
             *_size = len;
         }
@@ -181,15 +181,15 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     }
 
     /* get the file size */
-    if ((len = c.lseek(fd,0,c.SEEK_END)) < 0) {
-        c.close(fd);
+    if ((len = libc.lseek(fd,0,libc.SEEK_END)) < 0) {
+        libc.close(fd);
         return null;
     }
 
-    c.lseek(fd,0,c.SEEK_SET);
+    libc.lseek(fd,0,libc.SEEK_SET);
 
     if ((s = mem.alloc(len+100)) == null) {
-        c.close(fd);
+        libc.close(fd);
         return null;
     }
     size = 0;
@@ -197,12 +197,12 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     /* Ask only for what is left: a `len`-byte read at `s+size` runs past
      * the buffer, which qemu-user rejects with EFAULT when that crosses
      * the end of the heap. Stop on an error rather than adding -1. */
-    while (size < len && (rbytes = c.read(fd,s+size,len-size)) > 0) {
+    while (size < len && (rbytes = libc.read(fd,s+size,len-size)) > 0) {
         size += rbytes;
     }
 
     if (size != len) {
-        c.close(fd);
+        libc.close(fd);
         mem.free(s);
         return null;
     }
@@ -212,12 +212,12 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     }
 
     s[len] = '\0';
-    c.close(fd);
+    libc.close(fd);
     return s;
 }
 
 pub bool writeAll(u8 *filename, u8 *buf, i64 size,
-        i64 flags=O_CREAT|c.O_WRONLY|O_TRUNC) {
+        i64 flags=O_CREAT|libc.O_WRONLY|O_TRUNC) {
     i64 towrite = size, nwritten = 0;
     i32 fd;
     i32 perms = 420;
@@ -226,20 +226,20 @@ pub bool writeAll(u8 *filename, u8 *buf, i64 size,
         return false;
     }
 
-    if ((fd = c.open(filename,flags|O_CLOEXEC,perms)) == -1) {
+    if ((fd = libc.open(filename,flags|O_CLOEXEC,perms)) == -1) {
         return false;
     }
 
     while (towrite > 0) {
-        nwritten = c.write(fd,buf,towrite);
+        nwritten = libc.write(fd,buf,towrite);
         if (nwritten < 0) {
-            c.close(fd);
+            libc.close(fd);
             return false;
         }
         buf += nwritten;
         towrite -= nwritten;
     }
-    c.close(fd);
+    libc.close(fd);
     return true;
 }
 
@@ -248,11 +248,11 @@ pub i32 changeDir(u8 *path) {
     u64 len = str.len(path);
     if ((len == 1 && path[0] == '~') ||
             (len == 2 && path[0] == '~' && path[1] == '/')) {
-        u8 *home = c.getenv("HOME");
+        u8 *home = libc.getenv("HOME");
         home = str.dup(home);
         newPath = home;
     } else if (len >= 3 && path[0] == '~' && path[1] == '/') {
-        u8 *home = c.getenv("HOME");
+        u8 *home = libc.getenv("HOME");
         u8 *p = path;
         if (*(p + 2) != '\0') {
             newPath = str.formatTo(,"%s/%s",home,p+2);
@@ -262,7 +262,7 @@ pub i32 changeDir(u8 *path) {
     } else {
         newPath = path;
     }
-    i32 retVal = c.chdir(newPath);
+    i32 retVal = libc.chdir(newPath);
     if (newPath != path) {
         mem.free(newPath);
     }
@@ -274,10 +274,10 @@ pub i32 changeDir(u8 *path) {
  * can't take). null on error. */
 pub u8 *currentDir(u8 *buf=null, u64 bufSize=0) {
     u8 *cwd, *copy;
-    if (buf) { return c.getcwd(buf, bufSize); }
-    if ((cwd = c.getcwd(null, 0)) == null) { return null; }
+    if (buf) { return libc.getcwd(buf, bufSize); }
+    if ((cwd = libc.getcwd(null, 0)) == null) { return null; }
     copy = str.dup(cwd);
-    c.free(cwd);
+    libc.free(cwd);
     return copy;
 }
 
@@ -314,11 +314,11 @@ void dirHumanRelease(void *_dh) {
 
 /* The colour `ls` would paint this entry, or null for plain. */
 u8 *dirHumanColor(DirHuman *dh) {
-    if (dh.type == c.DT_LNK) { return DIR_COL_LNK; }
-    if (dh.type == c.DT_DIR || (dh.mode & c.S_IFMT) == c.S_IFDIR) {
+    if (dh.type == libc.DT_LNK) { return DIR_COL_LNK; }
+    if (dh.type == libc.DT_DIR || (dh.mode & libc.S_IFMT) == libc.S_IFDIR) {
         return DIR_COL_DIR;
     }
-    if (dh.mode & (c.S_IXUSR|c.S_IXGRP|c.S_IXOTH)) { return DIR_COL_EXE; }
+    if (dh.mode & (libc.S_IXUSR|libc.S_IXGRP|libc.S_IXOTH)) { return DIR_COL_EXE; }
     return null;
 }
 

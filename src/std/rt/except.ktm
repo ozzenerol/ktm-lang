@@ -1,5 +1,5 @@
 module rt;
-import c, mem, os, str;
+import libc, mem, os, str;
 
 /* strings.ktm */
 
@@ -49,25 +49,25 @@ static void fsFree(void *p) {
     HCFs *fs = p;
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     coroStacksFree(fs);
-    c.free(fs.coro_root);
-    c.free(fs);
+    libc.free(fs.coro_root);
+    libc.free(fs);
 }
 
 static void fsKeyCreate() {
-    c.pthread_key_create(&fsKey, &fsFree);
+    libc.pthread_key_create(&fsKey, &fsFree);
 }
 
 /* The calling thread's HCFs, created on its first use. */
 pub HCFs *Fs() {
-    c.pthread_once(fsOnce, &fsKeyCreate);
-    HCFs *fs = c.pthread_getspecific(fsKey);
+    libc.pthread_once(fsOnce, &fsKeyCreate);
+    HCFs *fs = libc.pthread_getspecific(fsKey);
     if (!fs) {
-        fs = c.calloc(1, sizeof(HCFs));
+        fs = libc.calloc(1, sizeof(HCFs));
         if (!fs) {
             printf("out of memory for the exception state\n");
             os.exit(1);
         }
-        c.pthread_setspecific(fsKey, fs);
+        libc.pthread_setspecific(fsKey, fs);
     }
     return fs;
 }
@@ -135,7 +135,7 @@ static void __ktmUncaught(HCFs *fs) {
         for (i = n - 1; i >= 0; i--) { buf[len++] = digits[i]; }
     }
     buf[len] = 0;
-    c.fflush(null);  /* what the program printed comes first */
+    libc.fflush(null);  /* what the program printed comes first */
     WriteErr("uncaught error ");
     WriteErr(buf);
     if (fs.error.message && fs.error.message[0]) {
@@ -165,7 +165,7 @@ static void __ktmUncaught(HCFs *fs) {
 static void ErrJump(HCFs *fs) {
     auto t = fs.catch_top;
     if (!t) { __ktmUncaught(fs); }
-    c._longjmp(t.jb, 1);
+    libc._longjmp(t.jb, 1);
 }
 
 /* `throw(code)`: the compiler passes where the throw is. */

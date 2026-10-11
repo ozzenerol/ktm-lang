@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" i32 open(u8 *__name, i32 flags, ...);
 
@@ -736,40 +736,40 @@ struct Statx {
     u64 __spare3[8];
 };
 
-const i64 STATX_TYPE = 0x00000001;
-const i64 STATX_MODE = 0x00000002;
-const i64 STATX_NLINK = 0x00000004;
-const i64 STATX_UID = 0x00000008;
-const i64 STATX_GID = 0x00000010;
-const i64 STATX_ATIME = 0x00000020;
-const i64 STATX_MTIME = 0x00000040;
-const i64 STATX_CTIME = 0x00000080;
-const i64 STATX_INO = 0x00000100;
-const i64 STATX_SIZE = 0x00000200;
-const i64 STATX_BLOCKS = 0x00000400;
-const i64 STATX_BASIC_STATS = 0x000007ff;
+pub const i64 STATX_TYPE = 0x00000001;
+pub const i64 STATX_MODE = 0x00000002;
+pub const i64 STATX_NLINK = 0x00000004;
+pub const i64 STATX_UID = 0x00000008;
+pub const i64 STATX_GID = 0x00000010;
+pub const i64 STATX_ATIME = 0x00000020;
+pub const i64 STATX_MTIME = 0x00000040;
+pub const i64 STATX_CTIME = 0x00000080;
+pub const i64 STATX_INO = 0x00000100;
+pub const i64 STATX_SIZE = 0x00000200;
+pub const i64 STATX_BLOCKS = 0x00000400;
+pub const i64 STATX_BASIC_STATS = 0x000007ff;
 #define STATX_BTIME          0x00000800
-const i64 STATX_MNT_ID = 0x00001000;
-const i64 STATX_DIOALIGN = 0x00002000;
-const i64 STATX_MNT_ID_UNIQUE = 0x00004000;
-const i64 STATX_SUBVOL = 0x00008000;
-const i64 STATX_WRITE_ATOMIC = 0x00010000;
-const i64 STATX_DIO_READ_ALIGN = 0x00020000;
+pub const i64 STATX_MNT_ID = 0x00001000;
+pub const i64 STATX_DIOALIGN = 0x00002000;
+pub const i64 STATX_MNT_ID_UNIQUE = 0x00004000;
+pub const i64 STATX_SUBVOL = 0x00008000;
+pub const i64 STATX_WRITE_ATOMIC = 0x00010000;
+pub const i64 STATX_DIO_READ_ALIGN = 0x00020000;
 
-const i64 STATX__RESERVED = 0x80000000;
-const i64 STATX_ALL = 0x00000fff;
-const i64 STATX_ATTR_COMPRESSED = 0x00000004;
-const i64 STATX_ATTR_IMMUTABLE = 0x00000010;
-const i64 STATX_ATTR_APPEND = 0x00000020;
-const i64 STATX_ATTR_NODUMP = 0x00000040;
-const i64 STATX_ATTR_ENCRYPTED = 0x00000800;
-const i64 STATX_ATTR_AUTOMOUNT = 0x00001000;
-const i64 STATX_ATTR_MOUNT_ROOT = 0x00002000;
-const i64 STATX_ATTR_VERITY = 0x00100000;
-const i64 STATX_ATTR_DAX = 0x00200000;
-const i64 STATX_ATTR_WRITE_ATOMIC = 0x00400000;
-const i64 STAT_X_AT_FDCWD = -100;
-const i64 AT_STATX_SYNC_AS_STAT = 0x0000;
+pub const i64 STATX__RESERVED = 0x80000000;
+pub const i64 STATX_ALL = 0x00000fff;
+pub const i64 STATX_ATTR_COMPRESSED = 0x00000004;
+pub const i64 STATX_ATTR_IMMUTABLE = 0x00000010;
+pub const i64 STATX_ATTR_APPEND = 0x00000020;
+pub const i64 STATX_ATTR_NODUMP = 0x00000040;
+pub const i64 STATX_ATTR_ENCRYPTED = 0x00000800;
+pub const i64 STATX_ATTR_AUTOMOUNT = 0x00001000;
+pub const i64 STATX_ATTR_MOUNT_ROOT = 0x00002000;
+pub const i64 STATX_ATTR_VERITY = 0x00100000;
+pub const i64 STATX_ATTR_DAX = 0x00200000;
+pub const i64 STATX_ATTR_WRITE_ATOMIC = 0x00400000;
+pub const i64 STAT_X_AT_FDCWD = -100;
+pub const i64 AT_STATX_SYNC_AS_STAT = 0x0000;
 #define STATX_BTIME           0x00000800
 
 pub extern "c" i32 statx(i32 __dirfd,
@@ -882,7 +882,7 @@ pub #define SOCK_RAW        3               /* Raw protocol interface */
 pub #define SOCK_SEQPACKET  5               /* Sequenced packet stream */
 
 #ifdef IS_LINUX
-const i64 SOCK_CLOEXEC = 0x80000;         /* Or into socket()'s type: close on exec */
+pub const i64 SOCK_CLOEXEC = 0x80000;         /* Or into socket()'s type: close on exec */
 #endif
 
 /* Flags for send, recv, sendto, recvfrom, sendmsg and recvmsg */
@@ -974,14 +974,14 @@ pub #define IPPROTO_RAW             255             /* Raw IP packets */
 #ifdef IS_LINUX
 #define TCP_NODELAY             1       /* Disable Nagle's algorithm */
 #define TCP_MAXSEG              2       /* Set maximum segment size */
-const i64 TCP_CORK = 3;       /* Don't send partial frames */
-const i64 TCP_KEEPIDLE = 4;       /* Set keepalive idle time */
+pub const i64 TCP_CORK = 3;       /* Don't send partial frames */
+pub const i64 TCP_KEEPIDLE = 4;       /* Set keepalive idle time */
 #define TCP_KEEPALIVE           4       /* The macOS name of TCP_KEEPIDLE */
 #define TCP_KEEPINTVL           5       /* Interval between keepalives */
 #define TCP_KEEPCNT             6       /* Number of keepalives before close */
-const i64 TCP_INFO = 11;      /* TCP connection state info */
-const i64 TCP_QUICKACK = 12;      /* Disable/enable delayed acks */
-const i64 TCP_USER_TIMEOUT = 18;      /* Timeout for unacknowledged data */
+pub const i64 TCP_INFO = 11;      /* TCP connection state info */
+pub const i64 TCP_QUICKACK = 12;      /* Disable/enable delayed acks */
+pub const i64 TCP_USER_TIMEOUT = 18;      /* Timeout for unacknowledged data */
 #define TCP_FASTOPEN            23      /* TCP Fast Open */
 #else
 #define TCP_NODELAY             0x01    /* Disable Nagle's algorithm */
@@ -1137,6 +1137,10 @@ pub struct sockaddr_in6 {
  * canonical name, address, and pointer to the next in list.
  */
 pub struct addrinfo;
+
+pub const i64 _SS_PAD1SIZE = (6);
+
+pub const i64 _SS_PAD2SIZE = (112);
 
 /*
  * The sockaddr_storage class is designed to accommodate all supported address families,

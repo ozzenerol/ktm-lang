@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" void *mmap(void *addr, u64 len, i32 prot, i32 flags, i32 fd, i64 offset);
 

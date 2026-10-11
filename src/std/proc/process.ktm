@@ -1,5 +1,5 @@
 module proc;
-import c, mem, os;
+import libc, mem, os;
 
 const i64 PROC_WNOHANG = 1;
 
@@ -111,7 +111,7 @@ static u8 **procEnviron() {
 
 static void procClose(i32 *fd) {
     if (*fd != -1) {
-        c.close(*fd);
+        libc.close(*fd);
         *fd = -1;
     }
 }
@@ -133,21 +133,21 @@ static bool procPipe(i32 *fds) {
 #endif
     for (i = 0; i < 2; i++) {
         if (fds[i] <= 2) {
-            fd = c.fcntl(fds[i], PROC_F_DUPFD_CLOEXEC, 3);
-            c.close(fds[i]);
+            fd = libc.fcntl(fds[i], PROC_F_DUPFD_CLOEXEC, 3);
+            libc.close(fds[i]);
             fds[i] = fd;
         }
     }
     if (fds[0] == -1 || fds[1] == -1) {
-        if (fds[0] != -1) { c.close(fds[0]); }
-        if (fds[1] != -1) { c.close(fds[1]); }
+        if (fds[0] != -1) { libc.close(fds[0]); }
+        if (fds[1] != -1) { libc.close(fds[1]); }
         return false;
     }
     return true;
 }
 
 static void procNonBlocking(i32 fd) {
-    if (fd != -1) { c.fcntl(fd, PROC_F_SETFL, c.fcntl(fd, PROC_F_GETFL, 0) | PROC_O_NONBLOCK); }
+    if (fd != -1) { libc.fcntl(fd, PROC_F_SETFL, libc.fcntl(fd, PROC_F_GETFL, 0) | PROC_O_NONBLOCK); }
 }
 
 /* Record a wait status: exited with a code, or killed by a signal. */
@@ -204,7 +204,7 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
         return null;
     }
 
-    c.posix_spawn_file_actions_init(fa);
+    libc.posix_spawn_file_actions_init(fa);
 #ifdef IS_MACOS
     /* CLOEXEC_DEFAULT (below) closes every fd the file actions don't name,
      * 0-2 included: name the ones the child inherits. Only open ones: a
@@ -220,20 +220,20 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
             posix_spawn_file_actions_addinherit_np(fa, 2);
     }
 #endif
-    if (opts.in == PIPE) { c.posix_spawn_file_actions_adddup2(fa, pin[0], 0); }
+    if (opts.in == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pin[0], 0); }
     else if (opts.in == DEVNULL) {
-        c.posix_spawn_file_actions_addopen(fa, 0, "/dev/null", PROC_O_RDWR, 0);
+        libc.posix_spawn_file_actions_addopen(fa, 0, "/dev/null", PROC_O_RDWR, 0);
     }
-    if (opts.out == PIPE) { c.posix_spawn_file_actions_adddup2(fa, pout[1], 1); }
+    if (opts.out == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pout[1], 1); }
     else if (opts.out == DEVNULL) {
-        c.posix_spawn_file_actions_addopen(fa, 1, "/dev/null", PROC_O_RDWR, 0);
+        libc.posix_spawn_file_actions_addopen(fa, 1, "/dev/null", PROC_O_RDWR, 0);
     }
-    if (opts.err == PIPE) { c.posix_spawn_file_actions_adddup2(fa, perr[1], 2); }
+    if (opts.err == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, perr[1], 2); }
     else if (opts.err == DEVNULL) {
-        c.posix_spawn_file_actions_addopen(fa, 2, "/dev/null", PROC_O_RDWR, 0);
-    } else if (opts.err == STDOUT) { c.posix_spawn_file_actions_adddup2(fa, 1, 2); }
-    if (opts.cwd) { c.posix_spawn_file_actions_addchdir_np(fa, opts.cwd); }
-    c.posix_spawnattr_init(attr);
+        libc.posix_spawn_file_actions_addopen(fa, 2, "/dev/null", PROC_O_RDWR, 0);
+    } else if (opts.err == STDOUT) { libc.posix_spawn_file_actions_adddup2(fa, 1, 2); }
+    if (opts.cwd) { libc.posix_spawn_file_actions_addchdir_np(fa, opts.cwd); }
+    libc.posix_spawnattr_init(attr);
     if (!likeSystem) {
 #ifdef IS_LINUX
         posix_spawn_file_actions_addclosefrom_np(fa, 3);
@@ -241,23 +241,23 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
         flags |= PROC_SPAWN_CLOEXEC_DEFAULT;
 #endif
         flags |= PROC_SPAWN_SETSIGDEF | PROC_SPAWN_SETSIGMASK;
-        c.sigfillset(sigs);
-        c.sigemptyset(nosigs);
-        c.posix_spawnattr_setsigdefault(attr, sigs);
-        c.posix_spawnattr_setsigmask(attr, nosigs);
+        libc.sigfillset(sigs);
+        libc.sigemptyset(nosigs);
+        libc.posix_spawnattr_setsigdefault(attr, sigs);
+        libc.posix_spawnattr_setsigmask(attr, nosigs);
     }
     if (opts.new_group) {
         flags |= PROC_SPAWN_SETPGROUP;
-        c.posix_spawnattr_setpgroup(attr, 0);
+        libc.posix_spawnattr_setpgroup(attr, 0);
     }
-    c.posix_spawnattr_setflags(attr, flags);
+    libc.posix_spawnattr_setflags(attr, flags);
 
     env = opts.env;
     if (!env) { env = procEnviron(); }
-    if (opts.no_path) { err = c.posix_spawn(&pid, argv[0], fa, attr, argv, env); }
-    else               { err = c.posix_spawnp(&pid, argv[0], fa, attr, argv, env); }
-    c.posix_spawn_file_actions_destroy(fa);
-    c.posix_spawnattr_destroy(attr);
+    if (opts.no_path) { err = libc.posix_spawn(&pid, argv[0], fa, attr, argv, env); }
+    else               { err = libc.posix_spawnp(&pid, argv[0], fa, attr, argv, env); }
+    libc.posix_spawn_file_actions_destroy(fa);
+    libc.posix_spawnattr_destroy(attr);
 
     /* the child's ends are its own now */
     procClose(&pin[0]);
@@ -271,7 +271,7 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
         return null;
     }
 
-    Proc *p = c.calloc(1, sizeof(Proc));
+    Proc *p = libc.calloc(1, sizeof(Proc));
     if (!p) {
         printf("out of memory for a Proc\n");
         os.exit(1);
@@ -292,7 +292,7 @@ static bool procReap(Proc *p, i32 options) {
     i32 st = 0, r;
     if (p.done) { return true; }
     while (true) {
-        r = c.waitpid(p.pid, &st, options);
+        r = libc.waitpid(p.pid, &st, options);
         if (r == p.pid) {
             procSetStatus(p, st);
             return true;
@@ -325,8 +325,8 @@ pub bool done(Proc *p) {
  * new_group). false if p has already been reaped or kill fails. */
 pub bool kill(Proc *p, i32 sig=PROC_SIGTERM) {
     if (p.done) { return false; }
-    if (p.group) { return c.kill(-p.pid, sig) == 0; }
-    return c.kill(p.pid, sig) == 0;
+    if (p.group) { return libc.kill(-p.pid, sig) == 0; }
+    return libc.kill(p.pid, sig) == 0;
 }
 
 /* write() that gives -1 with Errno() EPIPE for a reader that has gone,
@@ -343,19 +343,19 @@ static i64 procWriteNoSigpipe(i32 fd, u8 *buf, i64 len) {
     bool wasPending;
     i64 n;
     i32 err;
-    c.sigemptyset(set);
-    c.sigaddset(set, PROC_SIGPIPE);
-    c.pthread_sigmask(PROC_SIG_BLOCK, set, old);
-    c.sigpending(pend);
-    wasPending = c.sigismember(pend, PROC_SIGPIPE) == 1;
-    n = c.write(fd, buf, len);
+    libc.sigemptyset(set);
+    libc.sigaddset(set, PROC_SIGPIPE);
+    libc.pthread_sigmask(PROC_SIG_BLOCK, set, old);
+    libc.sigpending(pend);
+    wasPending = libc.sigismember(pend, PROC_SIGPIPE) == 1;
+    n = libc.write(fd, buf, len);
     err = os.errno();
     if (n == -1 && err == PROC_EPIPE && !wasPending) {
         zero[0] = 0;
         zero[1] = 0;
         while (sigtimedwait(set, null, zero) == -1 && os.errno() == PROC_EINTR) {}
     }
-    c.pthread_sigmask(PROC_SIG_SETMASK, old, null);
+    libc.pthread_sigmask(PROC_SIG_SETMASK, old, null);
     os.setErrno(err);
     return n;
 #endif
@@ -373,7 +373,7 @@ static bool procDrain(i32 fd, ProcBuf *b) {
     u8 tmp[4096];
     i64 n;
     while (true) {
-        n = c.read(fd, tmp, sizeof(tmp));
+        n = libc.read(fd, tmp, sizeof(tmp));
         if (n > 0) {
             if (b) {
                 if (b.len + n + 1 > b.cap) {
@@ -434,7 +434,7 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
             fds[nfds++].events = PROC_POLLIN;
         }
         for (i = 0; i < nfds; i++) { fds[i].revents = 0; }
-        if (c.poll(fds, nfds, -1) < 0) {
+        if (libc.poll(fds, nfds, -1) < 0) {
             if (os.errno() == PROC_EINTR) { continue; }
             break;
         }
@@ -489,7 +489,7 @@ pub void release(Proc *p) {
     procClose(&p.out_fd);
     procClose(&p.err_fd);
     procReap(p, 0);
-    c.free(p);
+    libc.free(p);
 }
 
 /* Run argv (no shell; stdin /dev/null, stderr inherited) and return what
@@ -538,7 +538,7 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
         fd.fd = p.out_fd;
         fd.events = PROC_POLLIN;
         fd.revents = 0;
-        r = c.poll(&fd, 1, 10);
+        r = libc.poll(&fd, 1, 10);
         if (r < 0 && os.errno() != PROC_EINTR) { break; }
         if (r > 0 && !procDrain(p.out_fd, &b)) {
             procClose(&p.out_fd);               /* EOF */

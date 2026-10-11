@@ -1,5 +1,5 @@
 module proc;
-import c, mem, str;
+import libc, mem, str;
 
 /* Run `command` with the shell (`sh -c`). Returns the command's exit
  * code (0-255), or -1 if it was killed by a signal or the shell could
@@ -7,7 +7,7 @@ import c, mem, str;
  * a command it can't find. */
 pub i64 shell(u8 *command) {
     if (!command) { return -1; }
-    i32 status = c.system(command);
+    i32 status = libc.system(command);
     if (status == -1) { return -1; }
     /* `system` returns a wait status: the low 7 bits are the signal that
      * killed the child, the exit code is in bits 8-15 */

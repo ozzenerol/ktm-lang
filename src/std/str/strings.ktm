@@ -1,5 +1,5 @@
 module str;
-import c, date, fs, mem, os;
+import date, fs, libc, mem, os;
 
 const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
 
@@ -10,14 +10,14 @@ const i64 PRTF_ALT = 0x4000; /* `#`: 0x/0X before hex, a leading 0 in octal */
 pub i64 toInt(u8 *str)
 {// The integer at the start of str (like atol); 0 for null
         if (!str) { return 0; }
-        return c.atol(str);
+        return libc.atol(str);
 }
 
 /* The length of `buf` before its '\0', 0 for null. libc's strlen, which
     * reads a word at a time: about 5x the old byte loop. */
 pub u64 len(u8 *buf) {
         if (!buf) { return 0; }
-        return c.strlen(buf);
+        return libc.strlen(buf);
 }
 
 pub _extern _STRNCMP i64 cmpLen(u8 *s1, u8 *s2, i64 len);
@@ -241,7 +241,7 @@ pub u8 *trimStart(u8 *str, i64 str_len=-1, i64 *_new_len=null)
         if (j == 0) {
                 return str;
         }
-        c.memmove(str,str+j,newLen);
+        libc.memmove(str,str+j,newLen);
         str[newLen] = '\0';
         return str;
 }
@@ -855,7 +855,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                         u8 bad = *(fmt-1);
                                         if (!bad) {
                                                 fmt--;
-                                                len = c.snprintf(buf,sizeof(buf),
+                                                len = libc.snprintf(buf,sizeof(buf),
                                                                                                             "Invalid format: '%%' with no conversion at the end\n");
                                         } else {
                                                 u8 *end = null;
@@ -868,9 +868,9 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                                         sp++;
                                                         fmt = end+1;
                                                 }
-                                                len = c.snprintf(buf,sizeof(buf),"Invalid format char: '%c'\n",bad);
+                                                len = libc.snprintf(buf,sizeof(buf),"Invalid format char: '%c'\n",bad);
                                         }
-                                        c.write(os.STDERR,buf,len);
+                                        libc.write(os.STDERR,buf,len);
                                         for (tmp = spec; tmp < fmt; ++tmp) {
                                                 strPutChar(&ptr,*tmp,grow);
                                         }

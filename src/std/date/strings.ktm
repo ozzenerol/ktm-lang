@@ -1,5 +1,5 @@
 module date;
-import c, mem, str;
+import libc, mem, str;
 
 #define TIMESTAMP_FMT "%d-%02d-%02d %02d:%02d:%02d"
 
@@ -19,8 +19,8 @@ pub u8 *timestampNow()
 {// Get a timestamp
         i64 seconds = nowMs() / 1000; 
         u8 *timestamp = mem.alloc(sizeof(u8)*32);
-        auto ptm = c.localtime(&seconds);
-        auto len = c.snprintf(timestamp,sizeof(u8)*32,TIMESTAMP_FMT,
+        auto ptm = libc.localtime(&seconds);
+        auto len = libc.snprintf(timestamp,sizeof(u8)*32,TIMESTAMP_FMT,
                                         ptm.tm_year+1900,ptm.tm_mon+1,ptm.tm_mday,
                                         ptm.tm_hour,ptm.tm_min,ptm.tm_sec);
         timestamp[len] = '\0';

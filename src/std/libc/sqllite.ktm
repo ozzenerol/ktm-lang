@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub #define SQLITE_OK           0   /* Successful result */
 

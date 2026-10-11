@@ -1,5 +1,5 @@
 module math;
-import c;
+import libc;
 
 #ifdef IS_X86_64
 asm {
@@ -45,9 +45,9 @@ pub u64 gcd(i64 a, i64 b) {
  * repeated squaring, so Pow(2, 10) is exactly 1024.0; any other `b`
  * (fractional, NaN, infinite or beyond i64) goes to pow. */
 pub f64 power(f64 a, f64 b) {
-    if (b != c.trunc(b) || b < -9.223372036854775808e18 ||
+    if (b != libc.trunc(b) || b < -9.223372036854775808e18 ||
             b >= 9.223372036854775808e18) {
-        return c.pow(a, b);
+        return libc.pow(a, b);
     }
     if (b == 0) { return 1.0; }
     f64 result = 1.0;

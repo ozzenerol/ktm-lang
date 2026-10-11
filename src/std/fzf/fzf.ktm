@@ -1,5 +1,5 @@
 module fzf;
-import c, list, mem, str;
+import libc, list, mem, str;
 
 const i64 FZF_SCORE_MATCH = 16;
 
@@ -145,10 +145,10 @@ bool hasSuffix(u8 *str, i64 len, u8 *suffix, i64 suffixLen) {
 }
 
 u8 *strReplaceChar(u8 *str, u8 find, u8 replace) {
-    u8 *currentPos = c.strchr(str, find);
+    u8 *currentPos = libc.strchr(str, find);
     while (currentPos) {
         *currentPos = replace;
-        currentPos = c.strchr(currentPos, find);
+        currentPos = libc.strchr(currentPos, find);
     }
     return str;
 }
@@ -171,7 +171,7 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
     }
 
     ins = orig;
-    for (; (tmp = c.strstr(ins, rep)); ++count) {
+    for (; (tmp = libc.strstr(ins, rep)); ++count) {
         ins = tmp + lenRep;
     }
 
@@ -181,7 +181,7 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
     }
 
     while (count--) {
-        ins = c.strstr(orig, rep);
+        ins = libc.strstr(orig, rep);
         lenFront = ins - orig;
         mem.copy(tmp, orig, lenFront);  /* C's strncpy, not StrNCpy */
         tmp += lenFront;
@@ -673,7 +673,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     mem.free(patternDup);
     u8 *delim = " ";
     u8 *tokSave = null;
-    u8 *ptr = c.strtok_r(patternCopy, delim, &tokSave);
+    u8 *ptr = libc.strtok_r(patternCopy, delim, &tokSave);
 
     FzFTermSet *set = mem.allocZero(sizeof(FzFTermSet));
     set.entries = list.new();
@@ -715,7 +715,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
         if (set.size > 0 && !afterBar && str.cmp(text, "|") == 0) {
             switchSet = false;
             afterBar = true;
-            ptr = c.strtok_r(null, delim, &tokSave);
+            ptr = libc.strtok_r(null, delim, &tokSave);
             if (ogStr) {
                 mem.free(ogStr);
             }
@@ -782,7 +782,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
             }
         }
 
-        ptr = c.strtok_r(null, delim, &tokSave);
+        ptr = libc.strtok_r(null, delim, &tokSave);
     }
     if (set.size > 0) {
         patObj.entries.append(set);

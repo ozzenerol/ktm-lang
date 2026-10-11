@@ -1,5 +1,5 @@
 module coro;
-import c, mem, os, rt, str;
+import libc, mem, os, rt, str;
 
 const i64 CORO_STACK_DEFAULT = (256 * 1024);
 
@@ -166,7 +166,7 @@ static void coroDie(u8 *msg) {
 static Coroutine *coroRoot(rt.HCFs *fs) {
     Coroutine *r = fs.coroRoot;
     if (!r) {
-        r = c.calloc(1, sizeof(Coroutine));
+        r = libc.calloc(1, sizeof(Coroutine));
         if (!r) { coroDie("out of memory for the coroutine state\n"); }
         r.status = CORO_ACTIVE;
         r.is_root = true;
@@ -214,25 +214,25 @@ void coroMain(Coroutine *c) {
 pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
                                                              i64 stackSize=0) {
     if (!body) { coroDie("CoroutineNew: null function\n"); }
-    i64 page = c.getpagesize();
+    i64 page = libc.getpagesize();
     if (stackSize <= 0) { stackSize = CORO_STACK_DEFAULT; }
     if (stackSize < 4 * page) { stackSize = 4 * page; }
     stackSize = (stackSize + page - 1) & ~(page - 1);
 
-    Coroutine *c = c.calloc(1, sizeof(Coroutine));
+    Coroutine *c = libc.calloc(1, sizeof(Coroutine));
     if (!c) { return null; }
     c.stack_len = page + stackSize;
     c.stack_base = coroStackGet(rt.Fs(), c.stack_len);
     if (!c.stack_base) {
-        c.stack_base = c.mmap(null, c.stack_len, CORO_PROT_READ|CORO_PROT_WRITE,
+        c.stack_base = libc.mmap(null, c.stack_len, CORO_PROT_READ|CORO_PROT_WRITE,
                 CORO_MAP_PRIVATE|CORO_MAP_ANONYMOUS, -1, 0);
         if ((i64)c.stack_base == -1) { /* MAP_FAILED */
-            c.free(c);
+            libc.free(c);
             return null;
         }
-        if (c.mprotect(c.stack_base, page, CORO_PROT_NONE) != 0) {
-            c.munmap(c.stack_base, c.stack_len);
-            c.free(c);
+        if (libc.mprotect(c.stack_base, page, CORO_PROT_NONE) != 0) {
+            libc.munmap(c.stack_base, c.stack_len);
+            libc.free(c);
             return null;
         }
     }
@@ -321,7 +321,7 @@ pub void release(Coroutine *c) {
     }
     rt.__ktmErrorDrop(&c.error);
     if (!coroStackPut(rt.Fs(), c.stack_base, c.stack_len)) {
-        c.munmap(c.stack_base, c.stack_len);
+        libc.munmap(c.stack_base, c.stack_len);
     }
-    c.free(c);
+    libc.free(c);
 }

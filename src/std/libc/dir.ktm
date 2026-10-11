@@ -1,4 +1,6 @@
-module c;
+module libc;
+
+pub struct cDIR;
 
 #ifdef IS_MACOS
 #define DIR_MAXPATHLEN 1024

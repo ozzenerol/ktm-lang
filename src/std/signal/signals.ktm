@@ -1,5 +1,5 @@
 module signal;
-import c, mem, os;
+import libc, mem, os;
 
 #ifdef IS_MACOS
 #define SIG_SA_FLAGS_AT  12
@@ -55,20 +55,20 @@ pub bool action(i32 sig, SigAct *act, SigAct *old=null) {
     mem.set(cold, 0, sizeof(cold));
     if (act) {
         cact[0] = act.handler;
-        c.sigemptyset((u8 *)cact + 8);
+        libc.sigemptyset((u8 *)cact + 8);
         for (s = 1; s <= SIG_MAX; s++) {
-            if (act.mask & bit(s)) { c.sigaddset((u8 *)cact + 8, s); }
+            if (act.mask & bit(s)) { libc.sigaddset((u8 *)cact + 8, s); }
         }
         *(i32 *)((u8 *)cact + SIG_SA_FLAGS_AT) = act.flags;
         pact = cact;
     }
     if (old) { pold = cold; }
-    if (c.sigaction(sig, pact, pold) != 0) { return false; }
+    if (libc.sigaction(sig, pact, pold) != 0) { return false; }
     if (old) {
         old.handler = cold[0];
         old.mask = 0;
         for (s = 1; s <= SIG_MAX; s++) {
-            if (c.sigismember((u8 *)cold + 8, s) == 1) { old.mask |= bit(s); }
+            if (libc.sigismember((u8 *)cold + 8, s) == 1) { old.mask |= bit(s); }
         }
         old.flags = *(i32 *)((u8 *)cold + SIG_SA_FLAGS_AT);
     }
@@ -97,7 +97,7 @@ static void sigStopHandler(i32 sig) {
     i32 err = os.errno();
     u8 b = 1;
     sigStopSig = sig;
-    c.write(sigStopWfd, &b, 1);    /* non-blocking: a full pipe is fine */
+    libc.write(sigStopWfd, &b, 1);    /* non-blocking: a full pipe is fine */
     os.setErrno(err);
 }
 
@@ -112,11 +112,11 @@ static void sigStopHandler(i32 sig) {
 pub i32 stopInit() {
     i32 fds[2];
     if (sigStopRfd != -1) { return sigStopRfd; }
-    if (c.pipe(fds) != 0) { return -1; }
-    c.fcntl(fds[0], SIG_F_SETFD, 1);
-    c.fcntl(fds[1], SIG_F_SETFD, 1);
-    c.fcntl(fds[0], SIG_F_SETFL, c.fcntl(fds[0], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
-    c.fcntl(fds[1], SIG_F_SETFL, c.fcntl(fds[1], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
+    if (libc.pipe(fds) != 0) { return -1; }
+    libc.fcntl(fds[0], SIG_F_SETFD, 1);
+    libc.fcntl(fds[1], SIG_F_SETFD, 1);
+    libc.fcntl(fds[0], SIG_F_SETFL, libc.fcntl(fds[0], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
+    libc.fcntl(fds[1], SIG_F_SETFL, libc.fcntl(fds[1], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
     sigStopRfd = fds[0];
     sigStopWfd = fds[1];
     handle(SIG_SIGINT, (i64)(&sigStopHandler), SIG_SA_RESTART | SIG_SA_RESETHAND);

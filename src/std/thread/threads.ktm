@@ -1,5 +1,5 @@
 module thread;
-import c, list, mem;
+import libc, list, mem;
 
 #ifdef IS_MACOS
 #define __MUTEX_LOCK_PADDING__   56
@@ -179,20 +179,20 @@ pub void poolEnqueue(ThreadPool *pool, void *argv, fn(void *priv_data, void *arg
         job.callback = callback;
         job.argv = argv;
         job.next = null;
-        c.pthread_mutex_lock(&pool.lock);
+        libc.pthread_mutex_lock(&pool.lock);
         pool.jobs.append(job);
-        c.pthread_cond_signal(&pool.has_work);
-        c.pthread_mutex_unlock(&pool.lock);
+        libc.pthread_cond_signal(&pool.has_work);
+        libc.pthread_mutex_unlock(&pool.lock);
 }
 
 pub void poolWait(ThreadPool *pool)
 {//Wait for all jobs in the queue to be complete
         if (!pool) { return; }
-        c.pthread_mutex_lock(&pool.lock);
+        libc.pthread_mutex_lock(&pool.lock);
         while (!pool.jobs.isEmpty() || pool.active_threads != 0) {
-                c.pthread_cond_wait(&pool.no_work,&pool.lock);
+                libc.pthread_cond_wait(&pool.no_work,&pool.lock);
         }
-        c.pthread_mutex_unlock(&pool.lock);
+        libc.pthread_mutex_unlock(&pool.lock);
 }
 
 static void *threadPoolMain(void *argv)
@@ -201,30 +201,30 @@ static void *threadPoolMain(void *argv)
         ThreadPool *pool = (ThreadPool *)argv;
         ThreadWorkerJob *job;
 
-        c.pthread_mutex_lock(&pool.lock);
+        libc.pthread_mutex_lock(&pool.lock);
         pool.alive_threads++;
         while (true) {
                 while (pool.run && pool.jobs.isEmpty()) {
-                        c.pthread_cond_wait(&pool.has_work,&pool.lock);
+                        libc.pthread_cond_wait(&pool.has_work,&pool.lock);
                 }
                 job = pool.jobs.shift();
                 if (!job) {
                         break; /* stopped and the queue is drained */
                 }
                 pool.active_threads++;
-                c.pthread_mutex_unlock(&pool.lock);
+                libc.pthread_mutex_unlock(&pool.lock);
 
                 job.callback(pool.priv_data,job.argv);
                 mem.free(job);
 
-                c.pthread_mutex_lock(&pool.lock);
+                libc.pthread_mutex_lock(&pool.lock);
                 pool.active_threads--;
                 if (pool.active_threads == 0 && pool.jobs.isEmpty()) {
-                        c.pthread_cond_broadcast(&pool.no_work);
+                        libc.pthread_cond_broadcast(&pool.no_work);
                 }
         }
         pool.alive_threads--;
-        c.pthread_mutex_unlock(&pool.lock);
+        libc.pthread_mutex_unlock(&pool.lock);
         return null;
 }
 
@@ -246,15 +246,15 @@ pub ThreadPool *poolNew(i64 worker_count)
         pool.workers = workers;
         pool.priv_data = null;
 
-        c.pthread_cond_init(&pool.no_work);
-        c.pthread_cond_init(&pool.has_work);
-        c.pthread_mutex_init(&pool.lock);
+        libc.pthread_cond_init(&pool.no_work);
+        libc.pthread_cond_init(&pool.has_work);
+        libc.pthread_mutex_init(&pool.lock);
 
         /* The workers stay joinable so ThreadPoolStop can wait for them */
         for (i64 i = 0; i < worker_count; ++i) {
                 ThreadWorker *worker = workers + i;
                 worker.id = i;
-                err = c.pthread_create(&worker.th,null,&threadPoolMain,pool);
+                err = libc.pthread_create(&worker.th,null,&threadPoolMain,pool);
                 if (err != 0) {
                         poolRelease(pool);
                         return null;
@@ -267,13 +267,13 @@ pub ThreadPool *poolNew(i64 worker_count)
 pub void poolStop(ThreadPool *pool)
 {// Finish every queued job, then stop and join the workers
         if (!pool) { return; }
-        c.pthread_mutex_lock(&pool.lock);
+        libc.pthread_mutex_lock(&pool.lock);
         pool.run = false;
-        c.pthread_cond_broadcast(&pool.has_work);
-        c.pthread_mutex_unlock(&pool.lock);
+        libc.pthread_cond_broadcast(&pool.has_work);
+        libc.pthread_mutex_unlock(&pool.lock);
 
         for (i64 i = 0; i < pool.worker_count; ++i) {
-                c.pthread_join(pool.workers[i].th);
+                libc.pthread_join(pool.workers[i].th);
         }
         pool.worker_count = 0;
 }
@@ -284,9 +284,9 @@ pub void poolRelease(ThreadPool *pool)
         if (pool) {
                 poolStop(pool);
 
-                c.pthread_cond_destroy(&pool.has_work);
-                c.pthread_cond_destroy(&pool.no_work);
-                c.pthread_mutex_destroy(&pool.lock);
+                libc.pthread_cond_destroy(&pool.has_work);
+                libc.pthread_cond_destroy(&pool.no_work);
+                libc.pthread_mutex_destroy(&pool.lock);
                 /* Only jobs enqueued after ThreadPoolStop can be left */
                 pool.jobs.release(&mem.free);
 

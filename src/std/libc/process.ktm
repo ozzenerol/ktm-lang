@@ -1,4 +1,4 @@
-module c;
+module libc;
 
 pub extern "c" i32 posix_spawnp(i32 *pid, u8 *file, void *fileActions, void *attr,
                                                         u8 **argv, u8 **envp);
