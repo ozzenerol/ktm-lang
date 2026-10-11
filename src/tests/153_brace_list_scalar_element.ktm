@@ -124,8 +124,8 @@ void main()
 {
   date.Date d[2] = {1, {2}};
 }
-", "Cannot use an initialiser list for an element of type CDate",
-            SB_TEST_FILE ":3:20")) { ok = false; }
+", "Cannot use an initialiser list for an element of type date.Date",
+            SB_TEST_FILE ":5:24")) { ok = false; }
     return ok;
 }
 
@@ -157,8 +157,8 @@ void main()
   date.Date d = {1, {2}};
   i64 *p = {};
 }
-", "Cannot use an initialiser list for a variable of type CDate",
-            SB_TEST_FILE ":3:13", 2)) { ok = false; }
+", "Cannot use an initialiser list for a variable of type date.Date",
+            SB_TEST_FILE ":5:17", 2)) { ok = false; }
     /* At file scope it's read as an expression */
     if (!compileFailsWith(
 "i64 g = {1};

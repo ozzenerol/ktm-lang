@@ -133,7 +133,7 @@ bool testTooManyForClass(void) {
     return compileFailsWith(
 "struct W { u8 t; union { i32 i; f32 f; }; i64 z; };
 void main() { W w = {1,2,3,4}; }
-", "More initialisers than class fields for class: W", "2:27");
+", "More initialisers than class fields for class: W", "2:29");
 }
 
 bool testTooManyForUnion(void) {

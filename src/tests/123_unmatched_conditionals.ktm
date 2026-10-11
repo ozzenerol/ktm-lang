@@ -103,7 +103,7 @@ i64 b = 2;
 void main() { printf(\"%d\\n\", b); }
 ",
         2, "Syntax is: #ifdef <TK_IDENT>", "1:1",
-        "Variable or function `b` has not been defined", "4:21", null, null);
+        "Variable or function `b` has not been defined", "4:30", null, null);
 }
 
 bool testIfndefNoName(void) {

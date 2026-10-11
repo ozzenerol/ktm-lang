@@ -42,7 +42,7 @@ Pt pts[2] = {{1, gx}, {gy, 4}};
 Fn gfn = {&dbl, 4};
 Fn ftab[2] = {{&dbl, 1}, {&inc, 2}};
 Mixed gm = {7, gx, gf};
-i64 g2;
+i64 g2 = gx * 2;
 i64 dep[2] = {g2, g2 + 1};
 
 i64 staticGet(i64 i) {
@@ -52,7 +52,6 @@ i64 staticGet(i64 i) {
 }
 
 i32 main() {
-    g2 = gx * 2;
     i64 correct = 0, tests = 30;
 
     printf("Test - non-constant items in a global initialiser: ");

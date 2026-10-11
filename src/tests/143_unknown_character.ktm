@@ -68,7 +68,7 @@ bool compile(u8 *source, i64 count, u8 *want) {
 bool testDollarSign(void) {
     return compile(
 "void main() { i64 x = 2.5 $ 3; }
-", 2, "error: unexpected character '$'\n --> " UNKNOWN_FILE ":1:25\n");
+", 2, "error: unexpected character '$'\n --> " UNKNOWN_FILE ":1:27\n");
 }
 
 /* Stray characters between statements: one error each, nothing else */
@@ -77,7 +77,7 @@ bool testBacktick(void) {
 "void main() {
   printf(\"hi\\n\"); `
 }
-", 1, "error: unexpected character '`'\n --> " UNKNOWN_FILE ":2:11\n");
+", 1, "error: unexpected character '`'\n --> " UNKNOWN_FILE ":2:19\n");
 }
 
 bool testDollarAt(void) {
@@ -92,14 +92,14 @@ bool testDollarAt(void) {
 bool testControlChar(void) {
     return compile(
 "void main() { printf(\"hi\\n\"); \x01 }
-", 1, "error: unexpected character '\\x01'\n --> " UNKNOWN_FILE ":1:21\n");
+", 1, "error: unexpected character '\\x01'\n --> " UNKNOWN_FILE ":1:31\n");
 }
 
 /* A UTF-8 character outside a string is reported once, as itself */
 bool testUtf8(void) {
     return compile(
 "void main() { printf(\"hi\\n\"); \xe2\x82\xac }
-", 1, "error: unexpected character '\xe2\x82\xac'\n --> " UNKNOWN_FILE ":1:21\n");
+", 1, "error: unexpected character '\xe2\x82\xac'\n --> " UNKNOWN_FILE ":1:31\n");
 }
 
 bool testTwoUtf8(void) {

@@ -120,14 +120,14 @@ bool testStringTooLong(void) {
     /* "abc" needs 4 bytes with its NUL, like a top-level u8 buf[3]. */
     return compileFailsWith(
 "void main() {
-  u8 s[2][3] = {printf(\"ab\",\"abc\"});
+  u8 s[2][3] = {\"ab\",\"abc\"};
 }
 ", "Invalid array initializer: expected 3 items but got 4", "2:22");
 }
 
 bool testGlobalStringTooLong(void) {
     return compileFailsWith(
-"u8 s[2][3] = {printf(\"abcdef\",\"x\"});
+"u8 s[2][3] = {\"abcdef\",\"x\"};
 void main() {}
 ", "Invalid array initializer: expected 3 items but got 7", "1:15");
 }

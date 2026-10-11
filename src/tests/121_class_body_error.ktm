@@ -65,7 +65,7 @@ bool testFieldAccess(void) {
     return compileFailsExactly(
 "struct Foo { i64 a; i64 b c; };
 void main() { Foo f; f.a = 1; f.b = 2; }
-", 1, MSG_TOKEN_C, "1:26");
+", 1, MSG_TOKEN_C, "1:27");
 }
 
 /* Fields after the bad one are still parsed; the bad name is not a field */

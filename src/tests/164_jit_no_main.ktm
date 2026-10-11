@@ -56,7 +56,7 @@ i32 main() {
     tests++; if (jitRuns("struct C { i64 a; };\ni64 g;\n", false, NO_MAIN_MSG)) { correct++; }
     /* code at file scope: runs as before */
     tests++; if (jitRuns("\"top\\n\";\n", true, "top\n")) { correct++; }
-    tests++; if (jitRuns("i64 two() { return 2; }\n\nvoid main()\n{\n  printf(\"%d\\n\", two)();\n}\n", true, "2\n")) { correct++; }
+    tests++; if (jitRuns("i64 two() { return 2; }\n\nvoid main()\n{\n  printf(\"%d\\n\", two());\n}\n", true, "2\n")) { correct++; }
     /* a constant initialiser is static data, like `i64 g;` (no code); one
      * that calls a function is code at file scope */
     tests++; if (jitRuns("i64 x = 3;\ni64 foo() { return x; }\n", false, NO_MAIN_MSG)) { correct++; }

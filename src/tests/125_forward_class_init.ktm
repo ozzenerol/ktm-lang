@@ -81,7 +81,7 @@ bool testLocal(void) {
     return compileFailsExactly(
 "struct Foo;
 void main() { Foo f = {1, 2}; }
-", 1, MSG_INCOMPLETE, "2:21");
+", 1, MSG_INCOMPLETE, "2:23");
 }
 
 /* Reported once, at the outer `{`, not once per element */
@@ -89,7 +89,7 @@ bool testArray(void) {
     return compileFailsExactly(
 "struct Foo;
 void main() { Foo a[2] = {{1},{2}}; }
-", 1, MSG_INCOMPLETE, "2:24");
+", 1, MSG_INCOMPLETE, "2:26");
 }
 
 bool testArrayUnsized(void) {

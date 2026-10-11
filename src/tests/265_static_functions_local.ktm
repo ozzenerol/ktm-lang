@@ -1,17 +1,12 @@
 import fs, libc, mem, proc, str, test;
 
-/* Since library functions became weak definitions (so a program can
- * replace one, test 197), every function in libktm was a weak global
- * symbol, `static` ones included. A program defining a function with the
- * name of a library internal silently replaced it when compiled: its own
- * `CountNumberLen` (static in json.ktm; now JsonNumberLen, which the
- * test uses) broke json.toStr, its own
- * `GetNextNonWhitespaceIdx` (an internal helper of json.parse, now
- * static) broke json.parse. `static` functions and file-scope `static`
- * variables are now local symbols, in the library and in programs: a
- * program's static function neither replaces a library one of the same
- * name nor is replaced. Replacing a non-static library function still
- * works. Compiled and JIT. */
+/* Library functions are weak definitions in libktm; `static` functions
+ * and file-scope `static` variables are local symbols, in the library and
+ * in programs. With the stdlib in modules a library function's symbol is
+ * the module's (_K4json...), so a program's function or static function
+ * with the short name of a library internal (json's static jsonNumberLen,
+ * str's dup) or of a public function (date.now) lives next to it: neither
+ * replaces the other. Compiled and JIT. */
 
 #define SL_FILE "__265_static.ktm"
 #define SL_EXE  "__265_static.exe"
@@ -48,7 +43,7 @@ bool runs(bool jit, u8 *source, u8 *want) {
 u8 *srcCount =
 "import json, mem;
 
-i64 JsonNumberLen(void *p, bool *is_int) { return 0; }
+i64 jsonNumberLen(void *p, bool *is_int) { return 0; }
 void main()
 {
   json.Value *j = json.parse(\"[12]\");
@@ -62,37 +57,37 @@ void main()
 u8 *srcWs =
 "import json;
 
-i64 getNextNonWhitespaceIdx(u8 *p) { return 42; }
+i64 jsonAdvanceWhitespace(u8 *p) { return 42; }
 void main()
 {
   json.Value *j = json.parse(\"  [1]\");
-  printf(\"mine=%d ok=%d\\n\", getNextNonWhitespaceIdx(\"x\"), json.ok(j));
+  printf(\"mine=%d ok=%d\\n\", jsonAdvanceWhitespace(\"x\"), json.ok(j));
   json.release(j);
 }
 ";
 
 /* A program's static function named like a library function used inside
- * the library (str.format calls str.dup) */
+ * the library (str.format) */
 u8 *srcUserStatic =
 "import mem, str;
 
-static u8 *StrNew(u8 *buf) { return \"mine\"; }
+static u8 *dup(u8 *buf) { return \"mine\"; }
 static i64 gCount = 7;
 static i64 twice(i64 x) { return x * 2; }
 void main()
 {
   u8 *s = str.format(\"%d\", 5);
-  printf(\"lib=%s own=%s twice=%d count=%d\\n\", s, StrNew(\"x\"), twice(4), gCount);
+  printf(\"lib=%s own=%s twice=%d count=%d\\n\", s, dup(\"x\"), twice(4), gCount);
   mem.free(s);
 }
 ";
 
-/* Replacing a library function without `static` still works */
-u8 *srcReplace =
+/* A program's own now() next to date.now() */
+u8 *srcOwnNow =
 "import date;
 
-date.Date Now() { return 42; }
-void main() { printf(\"now=%d\\n\", Now)(); }
+i64 now() { return 42; }
+void main() { printf(\"now=%d lib=%d\\n\", now(), date.now() != 42); }
 ";
 
 i32 main() {
@@ -111,8 +106,8 @@ i32 main() {
         if (runs(jit, srcUserStatic, "lib=5 own=mine twice=8 count=7")) { correct++; }
         else { printf("Failed - program static (jit=%d)\n", jit); }
         tests++;
-        if (runs(jit, srcReplace, "now=42")) { correct++; }
-        else { printf("Failed - replacing a library function (jit=%d)\n", jit); }
+        if (runs(jit, srcOwnNow, "now=42 lib=1")) { correct++; }
+        else { printf("Failed - own now next to date.now (jit=%d)\n", jit); }
     }
 
     /* In the archive: a static function is a local (`t`) symbol, a public
@@ -121,9 +116,9 @@ i32 main() {
     i64 res = proc.shell("command -v nm >/dev/null 2>&1 || exit 0; "
             "lib=${KTM_INSTALL_DIR:-../../build/prefix}/lib/libktm.a; "
             "[ -f \"$lib\" ] || exit 0; "
-            "nm \"$lib\" | grep -E ' [Tt] _?JsonNumberLen$' | grep -q ' t ' && "
-            "nm \"$lib\" | grep -qE ' [WVT] _?JsonParse$' && "
-            "! nm \"$lib\" | grep -qE ' [TWV] _?JsonNumberLen$'");
+            "nm \"$lib\" | grep -E ' [Tt] _?_K4json13jsonNumberLen$' | grep -q ' t ' && "
+            "nm \"$lib\" | grep -qE ' [WVT] _?_K4json5parse$' && "
+            "! nm \"$lib\" | grep -qE ' [TWV] _?_K4json13jsonNumberLen$'");
     if (res == 0) { correct++; }
     else { printf("Failed - nm\n"); }
 

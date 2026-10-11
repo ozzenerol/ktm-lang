@@ -188,15 +188,15 @@ i32 main() {
 
     if (testFieldTooLong(
 "struct D { u8 n[4]; i64 z; };
-D g = {printf(\"abcd\",1});
+D g = {\"abcd\",1};
 void main() {}
 ", "2:8")) { correct++; }
     else { printf("Failed - TestFieldTooLong(global)\n"); }
 
     if (testFieldTooLong(
 "struct D { u8 n[4]; i64 z; };
-void main() { D d = {printf(\"abcd\",1}); }
-", "2:20")) { correct++; }
+void main() { D d = {\"abcd\",1}; }
+", "2:22")) { correct++; }
     else { printf("Failed - TestFieldTooLong(local)\n"); }
 
     test.printResult(correct, tests);

@@ -76,8 +76,8 @@ bool testClassTooManyThenString(void) {
 "struct Foo { i64 a; i64 b; };
 void main() { Foo f = {1, 2, 3}; printf(\"ok\\n\"); }
 void Other() { i64 z = 2.5 + \"t\"; }
-", "More initialisers than class fields for class: Foo", ":2:29",
-     MSG_FLOAT_STR, ":3:26");
+", "More initialisers than class fields for class: Foo", ":2:31",
+     MSG_FLOAT_STR, ":3:28");
 }
 
 bool testLocalLastElement(void) {
@@ -117,7 +117,7 @@ bool testGlobalNested(void) {
 "i64 g[2][2] = {{1, 2.5 + \"s\"}, {3, 4}};
 i64 h = 5;
 void main() { i64 z = 2.5 + \"t\"; }
-", MSG_FLOAT_STR, ":1:24", MSG_FLOAT_STR, ":3:25");
+", MSG_FLOAT_STR, ":1:24", MSG_FLOAT_STR, ":3:27");
 }
 
 bool testGlobalClass(void) {
@@ -179,11 +179,11 @@ bool testRowTooLong(void) {
 
 bool testStringTooLong(void) {
     return compileFailsTwice(
-"u8 s[2][3] = {printf(\"abcdef\", \"x\"});
+"u8 s[2][3] = {\"abcdef\", \"x\"};
 i64 h = 5;
 void main() { i64 z = 2.5 + \"t\"; }
 ", "Invalid array initializer: expected 3 items but got 7", ":1:15",
-     MSG_FLOAT_STR, ":3:25");
+     MSG_FLOAT_STR, ":3:27");
 }
 
 i32 main() {
