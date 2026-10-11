@@ -1,108 +1,104 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
-/* `U0 *w = &F; if (w == &F)` was rejected with "The `==` operator
+/* `void *w = &F; if (w == &F)` was rejected with "The `==` operator
  * cannot be applied to a pointer type with a unary op of function".
- * As in C, a `U0 *` holding a function address compares equal / not
+ * As in C, a `void *` holding a function address compares equal / not
  * equal with a function address or function pointer, in both orders.
- * Other mixes (an `I64 *`, an F64, `<`, `-`) are still errors. */
+ * Other mixes (an `i64 *`, an f64, `<`, `-`) are still errors. */
 
 #define FNCMP_FILE "__195_fncmp.ktm"
 #define FNCMP_OUT  "__195_fncmp.out"
 
-U0 F() {}
-U0 G() {}
+void F() {}
+void G() {}
 
-class Holder
-{
-  U0 *any;
+struct Holder {
+    void *any;
 };
 
-U0 *g_w = &F;
+void *gW = &F;
 
-U0 CleanupFnCmpTest(U0)
-{
-  Rm(FNCMP_FILE);
-  Rm(FNCMP_OUT);
-  Rm("./a.out");
+void cleanupFnCmpTest(void) {
+    fs.remove(FNCMP_FILE);
+    fs.remove(FNCMP_OUT);
+    fs.remove("./a.out");
 }
 
 /* `expr` must fail to compile with `expected` in the output */
-Bool CompileFailsWith(U8 *expr, U8 *expected)
-{
-  U8 *src, *cmd, *out;
-  I64 res;
-  Bool ok = FALSE;
+bool compileFailsWith(u8 *expr, u8 *expected) {
+    u8 *src, *cmd, *out;
+    i64 res;
+    bool ok = false;
 
-  CleanupFnCmpTest;
-  src = MStrPrint(
+    cleanupFnCmpTest();
+    src = str.format(
 "void F() {}
-void Main() {
-  void *w = &F; void (*fp)() = &F; i64 *q = NULL; f64 d = 1.0;
-  \"%%d\\n\", %s;
+void main() {
+  void *w = &F; void (*fp)() = &F; i64 *q = null; f64 d = 1.0;
+  printf(\"%%d\\n\", %s);
 }
 ", expr);
-  if (!FileWrite(FNCMP_FILE, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC)) {
-    Free(src);
-    return FALSE;
-  }
-  Free(src);
-  cmd = MStrPrint(
-      "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
-      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-      FNCMP_FILE " > " FNCMP_OUT " 2>&1");
-  res = System(cmd);
-  Free(cmd);
-  if (res != 0) {
-    out = FileRead(FNCMP_OUT);
-    if (out) {
-      if (strstr(out, expected)) {
-        ok = TRUE;
-      } else {
-        "%s\n", out;
-      }
-      Free(out);
+    if (!fs.writeAll(FNCMP_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        mem.free(src);
+        return false;
     }
-  }
-  CleanupFnCmpTest;
-  return ok;
+    mem.free(src);
+    cmd = str.format(
+            "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+            FNCMP_FILE " > " FNCMP_OUT " 2>&1");
+    res = proc.shell(cmd);
+    mem.free(cmd);
+    if (res != 0) {
+        out = fs.readAll(FNCMP_OUT);
+        if (out) {
+            if (libc.strstr(out, expected)) {
+                ok = true;
+            } else {
+                printf("%s\n", out);
+            }
+            mem.free(out);
+        }
+    }
+    cleanupFnCmpTest();
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 18;
-  U0 *w = &F;
-  U0 *n = NULL;
-  U0 (*fp)() = &F;
-  U0 (*gp)() = &G;
-  Holder h;
-  h.any = &G;
+i32 main() {
+    i64 correct = 0, tests = 18;
+    void *w = &F;
+    void *n = null;
+    fn() void fp = &F;
+    fn() void gp = &G;
+    Holder h;
+    h.any = &G;
 
-  "Test - compare a void pointer with a function pointer: ";
+    printf("Test - compare a void pointer with a function pointer: ");
 
-  if (w == &F) correct++;
-  if (!(w != &F)) correct++;
-  if (w != &G) correct++;
-  if (&F == w) correct++;
-  if (&G != w) correct++;
-  if (w == fp && fp == w) correct++;
-  if (w != gp && gp != w) correct++;
-  if (n != fp && fp != n) correct++;
-  if (fp != NULL && fp != 0 && !(fp == NULL)) correct++;
-  if (g_w == &F && g_w != gp) correct++;
-  if (h.any == &G && h.any != fp) correct++;
-  /* The result is a 0/1 value */
-  I64 eq = w == &F, ne = w == &G;
-  if (eq == 1 && ne == 0) correct++;
+    if (w == &F) { correct++; }
+    if (!(w != &F)) { correct++; }
+    if (w != &G) { correct++; }
+    if (&F == w) { correct++; }
+    if (&G != w) { correct++; }
+    if (w == fp && fp == w) { correct++; }
+    if (w != gp && gp != w) { correct++; }
+    if (n != fp && fp != n) { correct++; }
+    if (fp != null && fp != 0 && !(fp == null)) { correct++; }
+    if (gW == &F && gW != gp) { correct++; }
+    if (h.any == &G && h.any != fp) { correct++; }
+    /* The result is a 0/1 value */
+    i64 eq = w == &F, ne = w == &G;
+    if (eq == 1 && ne == 0) { correct++; }
 
-  /* Still errors */
-  if (CompileFailsWith("fp == 1.5", "cannot be applied to a function")) correct++;
-  if (CompileFailsWith("fp == d", "cannot be applied to a function")) correct++;
-  if (CompileFailsWith("q == &F", "`i64 * == fn() void` is invalid")) correct++;
-  if (CompileFailsWith("w < &F", "`void * < fn() void` is invalid")) correct++;
-  if (CompileFailsWith("w - &F", "`void * - fn() void` is invalid")) correct++;
-  if (CompileFailsWith("w * fp", "is invalid")) correct++;
+    /* Still errors */
+    if (compileFailsWith("fp == 1.5", "cannot be applied to a function")) { correct++; }
+    if (compileFailsWith("fp == d", "cannot be applied to a function")) { correct++; }
+    if (compileFailsWith("q == &F", "`i64 * == fn() void` is invalid")) { correct++; }
+    if (compileFailsWith("w < &F", "`void * < fn() void` is invalid")) { correct++; }
+    if (compileFailsWith("w - &F", "`void * - fn() void` is invalid")) { correct++; }
+    if (compileFailsWith("w * fp", "is invalid")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

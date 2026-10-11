@@ -851,6 +851,10 @@ Ast *findFunctionDecl(Cctrl *cc, char *fname, int len) {
         }
     } else if ((decl = mapGetLen(cc->asm_funcs,fname,len)) != NULL) {
         /* Assembly function */
+        cctrlCheckModuleAccess(cc, fname, len);
+        return decl;
+    } else if (qual && (decl = mapGet(cc->asm_funcs, qual)) != NULL) {
+        /* a binding of the module itself (`_extern _x I32 stat(...)`) */
         return decl;
     }
     return NULL;
@@ -1761,6 +1765,43 @@ next_spec: ;
     return n;
 }
 
+/* %D %T and %F left the format engine (dates and files are not str's):
+ * the first of them a format uses, raw source text (`raw`, with escapes)
+ * or the literal's value, and 0 if none */
+static char parseFormatRemovedConv(const char *s, int len, int raw) {
+    int i = 0;
+    while (i < len) {
+        if (raw && s[i] == '\\' && i + 1 < len) {
+            i += 2;
+            continue;
+        }
+        if (s[i] != '%') {
+            i++;
+            continue;
+        }
+        i++;
+        while (i < len && strchr("-0+ #", s[i])) i++;
+        while (i < len && (strchr("*.", s[i]) || (s[i] >= '0' && s[i] <= '9'))) i++;
+        while (i < len && strchr("lhzjtLq", s[i])) i++;
+        if (i < len && strchr("DTF", s[i])) return s[i];
+        i++; /* the conversion, `%` of `%%` included */
+    }
+    return 0;
+}
+
+/* The error for a removed conversion, naming what replaces it */
+static void parseFormatRemovedError(Cctrl *cc, char conv, int line, int col,
+                                    int len)
+{
+    char *msg = conv == 'F'
+        ? "`%%F` is no longer a format conversion: read the file with fs.readAll"
+        : "`%%%c` is no longer a format conversion: use date.format(...)";
+    if (line > 0) {
+        cctrlRaiseExceptionAt(cc, line, col, len, msg, conv);
+    }
+    cctrlRaiseException(cc, msg, conv);
+}
+
 /* The same for the ktm library's StrPrint (StrPrintJoin): a spec is `%`,
  * flags `-0+ #`, a width (digits or `*`), a precision (`.` then digits or
  * `*`), length modifiers (l ll h hh z j t L q, which change nothing) and
@@ -1804,7 +1845,7 @@ static int parseCountktmFormatSpecs(const char *fmt, int len,
         if (ch == '%') {
             continue;
         }
-        if (strchr("diuoxXcsfegpQDTCF", ch)) {
+        if (strchr("diuoxXcsfegpQC", ch)) {
             n++;
         } else if (!*_unknown) {
             *_unknown = ch;
@@ -1832,14 +1873,14 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 8 && !strncmp(fname, str_lit("snprintf"))) return 0;
     /* May as well type-check ktm's library too which is even more
      * prone to erroring. */
-    else if (len == 9 && !strncmp(fname, str_lit("MStrPrint"))) return 0;
-    else if (len == 5 && !strncmp(fname, str_lit("Print"))) return 0;
-    else if (len == 8 && !strncmp(fname, str_lit("StrPrint"))) return 1;
-    else if (len == 8 && !strncmp(fname, str_lit("CatPrint"))) return 1;
-    else if (len == 11 && !strncmp(fname, str_lit("CatLenPrint"))) return 2;
-    else if (len == 9 && !strncmp(fname, str_lit("StrNPrint"))) return 2;
+    else if (len == 10 && !strncmp(fname, str_lit("str.format"))) return 0;
+    else if (len == 14 && !strncmp(fname, str_lit("rt.__ktmPrintf"))) return 0;
+    else if (len == 12 && !strncmp(fname, str_lit("str.formatTo"))) return 1;
+    else if (len == 16 && !strncmp(fname, str_lit("str.appendFormat"))) return 1;
+    else if (len == 19 && !strncmp(fname, str_lit("str.appendFormatLen"))) return 2;
+    else if (len == 16 && !strncmp(fname, str_lit("str.formatToSize"))) return 2;
     /* `throw(code, fmt, ...)`, checked as a call to it */
-    else if (len == 12 && !strncmp(fname, str_lit("KTM_ThrowFmt"))) return 1;
+    else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
 }
 
@@ -1874,6 +1915,12 @@ static void parsePrintfFormatCheck(Cctrl *cc,
         expected = parseCountPrintfFormatSpecs(fmt_ast->sval->data,
                 fmt_ast->sval->len);
     } else {
+        char removed = parseFormatRemovedConv(fmt_ast->sval->data,
+                fmt_ast->sval->len, 0);
+        if (removed) {
+            parseFormatRemovedError(cc, removed, at ? at->line : 0,
+                                    at ? at->col : 0, at ? at->len : 0);
+        }
         char unknown = 0;
         expected = parseCountktmFormatSpecs(fmt_ast->sval->data,
                 fmt_ast->sval->len, &unknown);
@@ -1902,6 +1949,17 @@ static void parsePrintfFormatCheck(Cctrl *cc,
                        maybe_fn->type->has_var_args &&
                        maybe_fn->kind != AST_EXTERN_FUNC;
     if (ktm_vararg && supplied > 0) supplied -= 1;
+    /* `...name`: the extras are passed as their count and an array, a
+     * spread `...other` with a count only known at run time */
+    Vec *params = maybe_fn ? parseGetFunctionParams(maybe_fn) : NULL;
+    if (params && params->size >= 2 && argv->size == params->size) {
+        Ast *last = params->entries[params->size - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            Ast *count = argv->entries[argv->size - 2];
+            if (!count || count->kind != AST_LITERAL) return;
+            supplied = (int)count->i64;
+        }
+    }
     if (supplied == expected)
         return;
 
@@ -1939,8 +1997,8 @@ int parseIsErrorType(AstType *type) {
  *                          line, code, fmt, ...)
  *   throw(e)               e an Error: KTM_ThrowError(&e) */
 Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
-    char *fname = "KTM_ThrowFmt";
-    int len = 12;
+    char *fname = astRuntimeName("__ktmThrowFmt");
+    int len = strlen(fname);
     Ast *decl = findFunctionDecl(cc, fname, len);
     *_code = NULL;
 
@@ -1949,6 +2007,16 @@ Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
     Vec *argv = parseArgv(cc, decl, ')', fname, len, loc.args);
     parseCallLocEnd(cc, &loc);
 
+    /* rt.__ktmThrowFmt's `...args` pads the call to its fixed parameters
+     * and the (count, data) pair: `throw(code)` and `throw()` come back
+     * with placeholders after what was written */
+    for (u64 i = 0; i < argv->size; ++i) {
+        Ast *arg = argv->entries[i];
+        if (!arg || arg->kind == AST_PLACEHOLDER) {
+            if (i <= 1) argv->size = i;
+            break;
+        }
+    }
     if (argv->size == 0 || !argv->entries[0]) {
         parseCallLocFreeArgs(&loc);
         parseRaiseCallError(cc, &loc, "`throw` needs a code, or an Error to throw again");
@@ -1975,11 +2043,12 @@ Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
         Vec *args = astVecNew();
         vecPush(args, astUnaryOperator(astMakePointerType(arg->type),
                                        AST_UN_OP_ADDR_OF, arg));
-        return astFunctionCall(ast_void_type, "KTM_ThrowError", 14, args);
+        char *sym = astRuntimeSymbol("__ktmThrowError");
+        return astFunctionCall(ast_void_type, sym, strlen(sym), args);
     }
     if (!decl) {
         parseCallLocFreeArgs(&loc);
-        parseRaiseCallError(cc, &loc, "`throw` with a message needs the standard library (KTM_ThrowFmt)");
+        parseRaiseCallError(cc, &loc, "`throw` with a message needs the runtime (rt.__ktmThrowFmt)");
     }
     parseFunctionArgumentCheck(cc, decl, argv, "throw", 5, &loc);
     parseFlattenDefaultArgs(decl, argv);
@@ -1994,7 +2063,8 @@ Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
     for (u64 i = 0; i < argv->size; ++i) {
         vecPush(at, argv->entries[i]);
     }
-    return astFunctionCall(ast_void_type, "KTM_ThrowFmtAt", 14, at);
+    char *sym = astRuntimeSymbol("__ktmThrowFmtAt");
+    return astFunctionCall(ast_void_type, sym, strlen(sym), at);
 }
 
 /* Read function arguments for a function being called */
@@ -2219,7 +2289,7 @@ static AoStr *parsePrintFormatTo64(AoStr *fmt, int *added) {
 }
 
 /* Whether a print statement's format literal (raw source text) uses a
- * conversion C's printf doesn't have or reads differently: %Q %D %T %C %F */
+ * conversion C's printf doesn't have or reads differently: %Q %C */
 static int parsePrintFormatIsktm(char *s, int len) {
     int i = 0;
     while (i < len) {
@@ -2235,7 +2305,7 @@ static int parsePrintFormatIsktm(char *s, int len) {
         while (i < len && strchr("-0+ #", s[i])) i++;
         while (i < len && (strchr("*.", s[i]) || (s[i] >= '0' && s[i] <= '9'))) i++;
         while (i < len && strchr("lhzjtLq", s[i])) i++;
-        if (i < len && strchr("QDTCF", s[i])) return 1;
+        if (i < len && strchr("QC", s[i])) return 1;
         i++; /* the conversion, `%` of `%%` included */
     }
     return 0;
@@ -2246,19 +2316,26 @@ static int parsePrintFormatIsktm(char *s, int len) {
  * made 64-bit to match ktm's `%d` (see parsePrintFormatTo64) and the
  * call is flagged so the IR widens narrow integer arguments to match.
  * A non-literal format is passed through as written. A literal that uses
- * a ktm-only conversion (%Q %D %T %C %F) calls the library's Print
+ * a ktm-only conversion (%Q %C) calls the library's Print
  * instead, which formats like StrPrint; plain formats keep the direct
  * printf call. */
 /* A print: the arguments of `"fmt", args;` (terminator `;`) or of
  * `printf(fmt, args)` (terminator `)`), with the format still to come.
- * A literal format using ktm's conversions (%Q %D %T %C %F) calls Print;
+ * A literal format using ktm's conversions (%Q %C) calls Print;
  * any other calls C's printf with its integer conversions widened to 64
  * bits, and the arguments are checked against the format either way. */
 Ast *parsePrintCall(Cctrl *cc, s64 terminator) {
     Lexeme *tok = cctrlTokenPeek(cc);
+    if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR) {
+        char removed = parseFormatRemovedConv(tok->start, tok->len, 1);
+        if (removed) {
+            parseFormatRemovedError(cc, removed, tok->line, tok->col, tok->len);
+        }
+    }
     if (!(cc->flags & CCTRL_TRANSPILING) && tok && tok->tk_type == TK_STR &&
         parsePrintFormatIsktm(tok->start, tok->len)) {
-        return parseFunctionArguments(cc,"Print",5,terminator);
+        char *print = astRuntimeName("__ktmPrintf");
+        return parseFunctionArguments(cc,print,strlen(print),terminator);
     }
     Ast *call = parseFunctionArguments(cc,"printf",6,terminator);
     if (cc->flags & CCTRL_TRANSPILING) return call;

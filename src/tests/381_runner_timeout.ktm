@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test, vec;
 #include "run_shared.ktm"
 
 /* The test runners had no time limit: one hanging test (a deadlock)
@@ -8,92 +8,89 @@
  * tests with a 2 s limit: "hang" starts a shell that sleeps for 20 s,
  * "quick" just prints. */
 
-#define HANG_SECS 20
+const i64 HANG_SECS = 20;
 
-U8 *g_test_dir;   /* this test's working directory */
+u8 *gTestDir;   /* this test's working directory */
 
 /* RunTests' hook: what each of the two tests does */
-U0 RunTest(U8 *name, I64 idx)
-{
-  if (!StrCmp(name, "hang")) {
-    /* the shell writes its pid, then becomes the sleep */
-    U8 *cmd = MStrPrint("echo $$ > '%s/__381_pid'; exec sleep %d",
-                        g_test_dir, HANG_SECS);
-    System(cmd);
-    Free(cmd);
-    "hang finished\n";
-  } else {
-    "quick ran\n";
-  }
+void runTest(u8 *name, i64 idx) {
+    if (!str.cmp(name, "hang")) {
+        /* the shell writes its pid, then becomes the sleep */
+        u8 *cmd = str.format("echo $$ > '%s/__381_pid'; exec sleep %d",
+                                                gTestDir, HANG_SECS);
+        proc.shell(cmd);
+        mem.free(cmd);
+        printf("hang finished\n");
+    } else {
+        printf("quick ran\n");
+    }
 }
 
-Bool Contains(U8 *s, U8 *what)
-{
-  return s && strstr(s, what) != NULL;
+bool contains(u8 *s, u8 *what) {
+    return s && libc.strstr(s, what) != null;
 }
 
-I32 Main()
-{
-  "Test - runner timeout: ";
-  I64 correct = 0, tests = 0, len = 0, began, took, i;
-  I32 pid, status, sleep_pid = 0;
-  g_target = "";
-  g_test_dir = AbsPath(".");
-  unlink("__381_pid");
-  unlink("__381_out");
+i32 main() {
+    printf("Test - runner timeout: ");
+    i64 correct = 0, tests = 0, len = 0, began, took, i;
+    i32 pid, status, sleepPid = 0;
+    gTarget = "";
+    gTestDir = absPath(".");
+    libc.unlink("__381_pid");
+    libc.unlink("__381_out");
 
-  setenv("KTM_TEST_TIMEOUT", "2", 1);
-  setenv("JOBS", "2", 1);
-  PtrVec *names = PtrVecNew;
-  PtrVecPush(names, StrNew("hang"));
-  PtrVecPush(names, StrNew("quick"));
+    setenv("KTM_TEST_TIMEOUT", "2", 1);
+    setenv("JOBS", "2", 1);
+    vec.PtrVec *names = vec.ptrNew();
+    names.push(str.dup("hang"));
+    names.push(str.dup("quick"));
 
-  /* RunTests in a child, its output in __381_out */
-  began = NowMs();
-  fflush(NULL);
-  pid = fork();
-  if (pid == 0) {
-    I32 fd = creat("__381_out", 0x1A4);
-    dup2(fd, 1);
-    dup2(fd, 2);
-    close(fd);
-    RunTests(names);
-    fflush(NULL);
-    _exit(0);
-  }
-  waitpid(pid, &status, 0);
-  took = NowMs() - began;
-  U8 *out = FileRead("__381_out", &len);
+    /* RunTests in a child, its output in __381_out */
+    began = nowMs();
+    libc.fflush(null);
+    pid = libc.fork();
+    if (pid == 0) {
+        i32 fd = libc.creat("__381_out", 0x1A4);
+        dup2(fd, 1);
+        dup2(fd, 2);
+        libc.close(fd);
+        runTests(names);
+        libc.fflush(null);
+        _exit(0);
+    }
+    libc.waitpid(pid, &status, 0);
+    took = nowMs() - began;
+    u8 *out = fs.readAll("__381_out", &len);
 
-  tests++;
-  if (Contains(out, "FAILED") && Contains(out, "timed out after 2 s: hang"))
-    correct++;
-  else "no timeout reported ";
+    tests++;
+    if (contains(out, "FAILED") && contains(out, "timed out after 2 s: hang")) {
+        correct++;
+    } else { printf("no timeout reported "); }
 
-  tests++; if (Contains(out, "quick ran")) correct++; else "quick test missing ";
-  tests++; if (!Contains(out, "hang finished")) correct++; else "hang was not stopped ";
-  /* not before the limit, and not as long as the sleep */
-  tests++;
-  if (took >= 2000 && took < (HANG_SECS - 5) * 1000) correct++;
-  else "took %d ms ", took;
+    tests++; if (contains(out, "quick ran")) { correct++; } else { printf("quick test missing "); }
+    tests++; if (!contains(out, "hang finished")) { correct++; } else { printf("hang was not stopped "); }
+    /* not before the limit, and not as long as the sleep */
+    tests++;
+    if (took >= 2000 && took < (HANG_SECS - 5) * 1000) { correct++; }
+    else { printf("took %d ms ", took); }
 
-  /* the sleep the hanging test started was killed too */
-  U8 *pid_text = FileRead("__381_pid");
-  if (pid_text) sleep_pid = Atoi(pid_text);
-  for (i = 0; i < 300 && sleep_pid > 0 && kill(sleep_pid, 0) == 0; i++) {
-    usleep(10000);
-  }
-  tests++;
-  if (sleep_pid > 0 && kill(sleep_pid, 0) != 0) correct++;
-  else "sleep %d still running ", sleep_pid;
+    /* the sleep the hanging test started was killed too */
+    u8 *pidText = fs.readAll("__381_pid");
+    if (pidText) { sleepPid = str.toInt(pidText); }
+    for (i = 0; i < 300 && sleepPid > 0 && libc.kill(sleepPid, 0) == 0; i++) {
+        usleep(10000);
+    }
+    tests++;
+    if (sleepPid > 0 && libc.kill(sleepPid, 0) != 0) { correct++; }
+    else { printf("sleep %d still running ", sleepPid); }
 
-  if (correct != tests && out) "\n%s", out;
-  Free(out);
-  Free(pid_text);
-  PtrVecRelease(names, &Free);
-  unlink("__381_pid");
-  unlink("__381_out");
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    if (correct != tests && out) { printf("\n%s", out); }
+    mem.free(out);
+    mem.free(pidText);
+    names.release(&mem.free);
+    libc.unlink("__381_pid");
+    libc.unlink("__381_out");
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

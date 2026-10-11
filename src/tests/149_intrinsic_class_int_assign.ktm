@@ -1,8 +1,8 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
-/* An intrinsic class (`I64 class CDate`, `U16 class`, `I32 class`) is an
- * integer underneath: `I64 x = date;` or `x += date;` warned
- * "Incompatible types 'CDate' is not assignable to type 'I64'" (integer to
+/* An intrinsic class (`i64 class CDate`, `u16 class`, `i32 class`) is an
+ * integer underneath: `i64 x = date;` or `x += date;` warned
+ * "Incompatible types 'CDate' is not assignable to type 'i64'" (integer to
  * intrinsic class was already silent). A compound assignment
  * also put the warning on the previous `=` in the source - for `y += d;`
  * that was the `CDate d = 5;` line above it. */
@@ -10,50 +10,48 @@
 #define IC_TEST_FILE "__149_intrinsic_class.ktm"
 #define IC_TEST_OUT  "__149_intrinsic_class.out"
 
-U0 CleanupIcTest(U0)
-{
-  Rm(IC_TEST_FILE);
-  Rm(IC_TEST_OUT);
+void cleanupIcTest(void) {
+    fs.remove(IC_TEST_FILE);
+    fs.remove(IC_TEST_OUT);
 }
 
-/* Runs `source` with the JIT; the combined stdout and stderr, or NULL. */
-U8 *RunKtm(U8 *source)
-{
-  CleanupIcTest;
-  if (!FileWrite(IC_TEST_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return NULL;
-  }
-  System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " IC_TEST_FILE " > " IC_TEST_OUT " 2>&1");
-  U8 *out = FileRead(IC_TEST_OUT);
-  CleanupIcTest;
-  return out;
+/* Runs `source` with the JIT; the combined stdout and stderr, or null. */
+u8 *runKtm(u8 *source) {
+    cleanupIcTest();
+    if (!fs.writeAll(IC_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return null;
+    }
+    proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " IC_TEST_FILE " > " IC_TEST_OUT " 2>&1");
+    u8 *out = fs.readAll(IC_TEST_OUT);
+    cleanupIcTest();
+    return out;
 }
 
-Bool Contains(U8 *out, U8 *want)
-{
-  if (out && strstr(out, want)) return TRUE;
-  "\nexpected `%s` in:\n%s\n", want, out;
-  return FALSE;
+bool contains(u8 *out, u8 *want) {
+    if (out && libc.strstr(out, want)) { return true; }
+    printf("\nexpected `%s` in:\n%s\n", want, out);
+    return false;
 }
 
-Bool Lacks(U8 *out, U8 *unwanted)
-{
-  if (out && !strstr(out, unwanted)) return TRUE;
-  "\nunexpected `%s` in:\n%s\n", unwanted, out;
-  return FALSE;
+bool lacks(u8 *out, u8 *unwanted) {
+    if (out && !libc.strstr(out, unwanted)) { return true; }
+    printf("\nunexpected `%s` in:\n%s\n", unwanted, out);
+    return false;
 }
 
-U8 *intrinsic_src =
-"u16 class W { u8 lo, hi; };
-i32 class D { u16 a, b; };
-class S { CDate d; i64 x; };
+u8 *intrinsicSrc =
+"import date;
 
-CDate Ret() { return 5; }
-i64 Back(CDate d) { return d; }
-void Take(CDate d) { \"take %d\\n\", d; }
+u16 struct W { u8 lo, hi; };
+i32 struct D { u16 a, b; };
+struct S { date.Date d; i64 x; };
 
-void Main() {
-  CDate d = 5;
+date.Date ret() { return 5; }
+i64 back(date.Date d) { return d; }
+void take(date.Date d) { printf(\"take %d\\n\", d); }
+
+void main() {
+  date.Date d = 5;
   d = 6;
   d += 1;
   i64 y = d;
@@ -74,19 +72,21 @@ void Main() {
   dd = i + 1;
   d = w;
   w = d;
-  Take(3);
-  \"%d %d %d %d %x %x %x %x %x %d %d\\n\",
-    d, y, arr[1], s.x, u, wy, w, i, dd, Ret, Back(7);
+  take(3);
+  printf(\"%d %d %d %d %x %x %x %x %x %d %d\\n\",
+    d, y, arr[1], s.x, u, wy, w, i, dd, ret(), back(7));
 }
 ";
 
-U8 *where_src =
-"class P { i64 a, b; };
+u8 *whereSrc =
+"import date;
+
+struct P { i64 a, b; };
 P g;
 P *Mk(i64 a, i64 b, i64 c) { return &g; }
-void Main() {
+void main() {
   u8 *s = \"x\";
-  CDate d = 5;
+  date.Date d = 5;
   i64 y = 1;
   y += d;
   P p;
@@ -94,38 +94,37 @@ void Main() {
   f64 f = d;
   y = 2; s =
     Mk(4, 5, 6);
-  \"%d\\n\", y;
+  printf(\"%d\\n\", y);
 }
 ";
 
-I32 Main()
-{
-  I64 correct = 0, tests = 8;
+i32 main() {
+    i64 correct = 0, tests = 8;
 
-  "Test - integer <-> intrinsic class assignment: ";
+    printf("Test - integer <-> intrinsic class assignment: ");
 
-  U8 *out = RunKtm(intrinsic_src);
-  /* No diagnostic at all, and the values come through. */
-  if (Lacks(out, "warning") && Lacks(out, "Incompatible")) correct++;
-  if (Contains(out, "take 3\n4661 7 7 9 1234 1234 1235 10002 10003 5 7\n")) correct++;
-  Free(out);
+    u8 *out = runKtm(intrinsicSrc);
+    /* No diagnostic at all, and the values come through. */
+    if (lacks(out, "warning") && lacks(out, "Incompatible")) { correct++; }
+    if (contains(out, "take 3\n4661 7 7 9 1234 1234 1235 10002 10003 5 7\n")) { correct++; }
+    mem.free(out);
 
-  out = RunKtm(where_src);
-  /* `y += d` is fine and no longer reported against `CDate d = 5;`. */
-  if (Lacks(out, "'CDate' is not assignable to type 'i64'") &&
-      Lacks(out, "CDate d = 5;")) correct++;
-  /* A real class still can't become an integer (an error since test
-   * 222)... */
-  if (Contains(out, "`i64 = P` is invalid")) correct++;
-  if (Contains(out, "i64 z = p;")) correct++;
-  /* An intrinsic class converts to a float like an integer, silently. */
-  if (Lacks(out, "'CDate' is not assignable to type 'f64'")) correct++;
-  /* ...and the warning is on the line with the `=`, from the `=`. */
-  if (Contains(out, "Incompatible types 'P *' is not assignable to type 'u8 *'")) correct++;
-  if (Contains(out, "y = 2; s =\n") && Lacks(out, "Mk(4, 5, 6);\n")) correct++;
-  Free(out);
+    out = runKtm(whereSrc);
+    /* `y += d` is fine and no longer reported against `CDate d = 5;`. */
+    if (lacks(out, "'CDate' is not assignable to type 'i64'") &&
+            lacks(out, "CDate d = 5;")) { correct++; }
+    /* A real class still can't become an integer (an error since test
+     * 222)... */
+    if (contains(out, "`i64 = P` is invalid")) { correct++; }
+    if (contains(out, "i64 z = p;")) { correct++; }
+    /* An intrinsic class converts to a float like an integer, silently. */
+    if (lacks(out, "'CDate' is not assignable to type 'f64'")) { correct++; }
+    /* ...and the warning is on the line with the `=`, from the `=`. */
+    if (contains(out, "Incompatible types 'P *' is not assignable to type 'u8 *'")) { correct++; }
+    if (contains(out, "y = 2; s =\n") && lacks(out, "Mk(4, 5, 6);\n")) { correct++; }
+    mem.free(out);
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

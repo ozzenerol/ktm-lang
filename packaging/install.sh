@@ -1,11 +1,12 @@
 #!/bin/sh
 # Install ktm + libktm from a release archive.
 #
-# Mirrors what `ktm -lib ktm` does at the end of a source build
-# (ktmLibInit in src/main.c), namely:
+# Mirrors what a source build installs (build.sh --install), namely:
 #   <prefix>/bin/ktm
-#   <prefix>/include/std.ktmh
-#   <prefix>/modules/prelude/*.ktm  (read before std.ktmh)
+#   <prefix>/modules/<module>/       (the standard library's modules,
+#                                     prelude and rt among them, each
+#                                     with a .ktmlib marker pointing at
+#                                     ../../lib)
 #   <prefix>/lib/libktm.a
 #   <prefix>/lib/libktm.so.0.0.1   (Linux)
 #   <prefix>/lib/libktm.0.0.1.dylib (macOS)
@@ -75,15 +76,21 @@ if [ "$UNINSTALL" -eq 1 ]; then
             rm -f "$f" && echo "removed $f"
         fi
     done
-    if [ -d "$PREFIX/modules/prelude" ]; then
-        rm -rf "$PREFIX/modules/prelude" && echo "removed $PREFIX/modules/prelude"
-    fi
+    # the standard library's modules (the ones this archive has; other
+    # modules under $PREFIX/modules stay)
+    for d in "$SRC"/modules/*/; do
+        [ -d "$d" ] || continue
+        d=$(basename "$d")
+        if [ -d "$PREFIX/modules/$d" ]; then
+            rm -rf "$PREFIX/modules/$d" && echo "removed $PREFIX/modules/$d"
+        fi
+    done
     exit 0
 fi
 
 # Fail early with a useful message rather than part-way through with a
-# permission error on one of five copies.
-for d in bin include lib modules/prelude; do
+# permission error part-way through.
+for d in bin lib modules; do
     if ! mkdir -p "$PREFIX/$d" 2>/dev/null; then
         echo "install.sh: cannot create $PREFIX/$d - try: sudo ./install.sh --prefix=$PREFIX" >&2
         exit 1
@@ -102,9 +109,18 @@ install_file() {
 }
 
 install_file "$SRC/ktm"             "$PREFIX/bin/ktm"           755
-install_file "$SRC/include/std.ktmh"  "$PREFIX/include/std.ktmh"    644
-for f in "$SRC"/modules/prelude/*.ktm; do
-    install_file "$f" "$PREFIX/modules/prelude/$(basename "$f")" 644
+# the old header-based stdlib, which an earlier install left
+if [ -e "$PREFIX/include/std.ktmh" ]; then
+    rm -f "$PREFIX/include/std.ktmh" && echo "removed $PREFIX/include/std.ktmh"
+fi
+# the standard library's modules, each replaced whole (its .ktmlib
+# marker included)
+for d in "$SRC"/modules/*/; do
+    d=$(basename "$d")
+    rm -rf "$PREFIX/modules/$d"
+    cp -R "$SRC/modules/$d" "$PREFIX/modules/$d"
+    chmod -R u=rwX,go=rX "$PREFIX/modules/$d"
+    echo "installed $PREFIX/modules/$d"
 done
 install_file "$SRC/lib/libktm.a"    "$PREFIX/lib/libktm.a"      644
 install_file "$SRC/lib/$SHLIB"      "$PREFIX/lib/$SHLIB"        755
@@ -121,7 +137,7 @@ echo
 echo "ktm installed to $PREFIX"
 
 # The binary bakes INSTALL_PREFIX in at compile time (release builds
-# use /usr/local) and looks for <prefix>/include/std.ktmh there. A
+# use /usr/local) and looks for <prefix>/modules there. A
 # non-default prefix therefore needs --install-dir on every call.
 if [ "$PREFIX" != "/usr/local" ]; then
     echo

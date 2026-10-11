@@ -560,6 +560,8 @@ Ast *astUnaryOperator(AstType *type, AstUnOp operation, Ast *operand);
 
 /* Variable definitions */
 Ast *astLVar(AstType *type, char *name, int len);
+char *astRuntimeName(const char *name);
+char *astRuntimeSymbol(const char *name);
 char *astModuleMangle(char *qual, int len);
 char *astModuleDemangle(char *sym, int len);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);

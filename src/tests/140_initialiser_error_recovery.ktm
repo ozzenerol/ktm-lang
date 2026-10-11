@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* An error inside a brace initialiser is reported once. The parser's
  * recovery used to stop at the `}` of the innermost list and report the
@@ -12,234 +12,219 @@
 
 #define MSG_FLOAT_STR "The `+` operator cannot be applied to a float type with a string literal of array type"
 
-U0 CleanupInitRecoveryTest(U0)
-{
-  Rm(INIT_RECOVERY_FILE);
-  Rm(INIT_RECOVERY_OUT);
-  Rm("./a.out");
+void cleanupInitRecoveryTest(void) {
+    fs.remove(INIT_RECOVERY_FILE);
+    fs.remove(INIT_RECOVERY_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p += 7;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p += 7;
+    }
+    return n;
 }
 
 /* Compile `source`: ktm must exit with status 1 and print exactly two
  * errors, `m1` then `m2`, at `loc1` and `loc2`. */
-Bool CompileFailsTwice(U8 *source, U8 *m1, U8 *loc1, U8 *m2, U8 *loc2)
-{
-  U8 *out, *first, *second;
-  I64 res;
-  Bool ok;
+bool compileFailsTwice(u8 *source, u8 *m1, u8 *loc1, u8 *m2, u8 *loc2) {
+    u8 *out, *first, *second;
+    i64 res;
+    bool ok;
 
-  CleanupInitRecoveryTest;
+    cleanupInitRecoveryTest();
 
-  if (!FileWrite(INIT_RECOVERY_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(INIT_RECOVERY_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " INIT_RECOVERY_FILE " > " INIT_RECOVERY_OUT " 2>&1");
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " INIT_RECOVERY_FILE " > " INIT_RECOVERY_OUT " 2>&1");
 
-  out = FileRead(INIT_RECOVERY_OUT);
-  if (!out) {
-    CleanupInitRecoveryTest;
-    return FALSE;
-  }
+    out = fs.readAll(INIT_RECOVERY_OUT);
+    if (!out) {
+        cleanupInitRecoveryTest();
+        return false;
+    }
 
-  ok = res == 1 && CountErrors(out) == 2;
-  first = strstr(out, "error: ");
-  second = NULL;
-  if (first) second = strstr(first + 7, "error: ");
-  if (!first || !second) {
-    ok = FALSE;
-  } else {
-    if (StrNCmp(first + 7, m1, StrLen(m1))) ok = FALSE;
-    if (StrNCmp(second + 7, m2, StrLen(m2))) ok = FALSE;
-    /* Each location is in its own error's header. */
-    U8 *loc = strstr(first, loc1);
-    if (!loc || loc > second) ok = FALSE;
-    if (!strstr(second, loc2)) ok = FALSE;
-  }
-  if (!ok) "status %d\n%s\n", res, out;
+    ok = res == 1 && countErrors(out) == 2;
+    first = libc.strstr(out, "error: ");
+    second = null;
+    if (first) { second = libc.strstr(first + 7, "error: "); }
+    if (!first || !second) {
+        ok = false;
+    } else {
+        if (str.cmpLen(first + 7, m1, str.len(m1))) { ok = false; }
+        if (str.cmpLen(second + 7, m2, str.len(m2))) { ok = false; }
+        /* Each location is in its own error's header. */
+        u8 *loc = libc.strstr(first, loc1);
+        if (!loc || loc > second) { ok = false; }
+        if (!libc.strstr(second, loc2)) { ok = false; }
+    }
+    if (!ok) { printf("status %d\n%s\n", res, out); }
 
-  Free(out);
-  CleanupInitRecoveryTest;
-  return ok;
+    mem.free(out);
+    cleanupInitRecoveryTest();
+    return ok;
 }
 
-Bool TestClassTooManyThenString(U0)
-{
-  /* The reported repro: the next statement is a string. */
-  return CompileFailsTwice(
-"class Foo { I64 a; I64 b; };
-U0 Main() { Foo f = {1, 2, 3}; \"ok\\n\"; }
-U0 Other() { I64 z = 2.5 + \"t\"; }
-", "More initialisers than class fields for class: Foo", ":2:29",
-   MSG_FLOAT_STR, ":3:26");
+bool testClassTooManyThenString(void) {
+    /* The reported repro: the next statement is a string. */
+    return compileFailsTwice(
+"struct Foo { i64 a; i64 b; };
+void main() { Foo f = {1, 2, 3}; printf(\"ok\\n\"); }
+void Other() { i64 z = 2.5 + \"t\"; }
+", "More initialisers than class fields for class: Foo", ":2:31",
+     MSG_FLOAT_STR, ":3:28");
 }
 
-Bool TestLocalLastElement(U0)
-{
-  /* The reported repro: the next statement is a declaration. */
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 a[2] = {1, 2.5 + \"s\"};
-  I64 u = 3;
-  I64 z = 2.5 + \"t\";
+bool testLocalLastElement(void) {
+    /* The reported repro: the next statement is a declaration. */
+    return compileFailsTwice(
+"void main() {
+  i64 a[2] = {1, 2.5 + \"s\"};
+  i64 u = 3;
+  i64 z = 2.5 + \"t\";
 }
 ", MSG_FLOAT_STR, ":2:22", MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestLocalNested(U0)
-{
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 m[2][2] = {{1, 2}, {3, 2.5 + \"s\"}};
-  I64 k = 1;
-  I64 z = 2.5 + \"t\";
+bool testLocalNested(void) {
+    return compileFailsTwice(
+"void main() {
+  i64 m[2][2] = {{1, 2}, {3, 2.5 + \"s\"}};
+  i64 k = 1;
+  i64 z = 2.5 + \"t\";
 }
 ", MSG_FLOAT_STR, ":2:34", MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestLocalNestedFirstRow(U0)
-{
-  /* The error is in the first inner list; the rest is skipped. */
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 c[2][2][2] = {{{1, 2.5 + \"s\"}, {3, 4}}, {{5, 6}, {7, 8}}};
-  \"ok\\n\";
-  I64 z = 2.5 + \"t\";
+bool testLocalNestedFirstRow(void) {
+    /* The error is in the first inner list; the rest is skipped. */
+    return compileFailsTwice(
+"void main() {
+  i64 c[2][2][2] = {{{1, 2.5 + \"s\"}, {3, 4}}, {{5, 6}, {7, 8}}};
+  printf(\"ok\\n\");
+  i64 z = 2.5 + \"t\";
 }
 ", MSG_FLOAT_STR, ":2:30", MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestGlobalNested(U0)
-{
-  return CompileFailsTwice(
-"I64 g[2][2] = {{1, 2.5 + \"s\"}, {3, 4}};
-I64 h = 5;
-U0 Main() { I64 z = 2.5 + \"t\"; }
-", MSG_FLOAT_STR, ":1:24", MSG_FLOAT_STR, ":3:25");
+bool testGlobalNested(void) {
+    return compileFailsTwice(
+"i64 g[2][2] = {{1, 2.5 + \"s\"}, {3, 4}};
+i64 h = 5;
+void main() { i64 z = 2.5 + \"t\"; }
+", MSG_FLOAT_STR, ":1:24", MSG_FLOAT_STR, ":3:27");
 }
 
-Bool TestGlobalClass(U0)
-{
-  return CompileFailsTwice(
-"class Foo { I64 a; I64 b; };
+bool testGlobalClass(void) {
+    return compileFailsTwice(
+"struct Foo { i64 a; i64 b; };
 Foo f = {1, 2, 3};
-I64 h = 5;
-I64 z = 2.5 + \"t\";
+i64 h = 5;
+i64 z = 2.5 + \"t\";
 ", "More initialisers than class fields for class: Foo", ":2:17",
-   MSG_FLOAT_STR, ":4:13");
+     MSG_FLOAT_STR, ":4:13");
 }
 
-Bool TestClassArrayField(U0)
-{
-  /* Error inside the nested list of an array field. */
-  return CompileFailsTwice(
-"class Bar { I64 x; I64 y[2]; };
-U0 Main() {
+bool testClassArrayField(void) {
+    /* Error inside the nested list of an array field. */
+    return compileFailsTwice(
+"struct Bar { i64 x; i64 y[2]; };
+void main() {
   Bar b = {1, {2, .y}};
-  I64 k = 1;
-  I64 z = 2.5 + \"t\";
+  i64 k = 1;
+  i64 z = 2.5 + \"t\";
 }
 ", "Designated initialisers", ":3:20", MSG_FLOAT_STR, ":5:15");
 }
 
-Bool TestMissingOperand(U0)
-{
-  /* The bad expression runs into the closing `}`. */
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 a[3] = {1, 2 + };
-  I64 k = 1;
-  I64 z = 2.5 + \"t\";
+bool testMissingOperand(void) {
+    /* The bad expression runs into the closing `}`. */
+    return compileFailsTwice(
+"void main() {
+  i64 a[3] = {1, 2 + };
+  i64 k = 1;
+  i64 z = 2.5 + \"t\";
 }
 ", "Second operand missing", ":2:", MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestMoreDeclaratorsAfter(U0)
-{
-  /* The rest of the statement (`, b = 4`) is skipped with it. */
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 a[2] = {1, 2.5 + \"s\"}, b = 4;
-  I64 k = 1;
-  I64 z = 2.5 + \"t\";
+bool testMoreDeclaratorsAfter(void) {
+    /* The rest of the statement (`, b = 4`) is skipped with it. */
+    return compileFailsTwice(
+"void main() {
+  i64 a[2] = {1, 2.5 + \"s\"}, b = 4;
+  i64 k = 1;
+  i64 z = 2.5 + \"t\";
 }
 ", MSG_FLOAT_STR, ":2:22", MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestRowTooLong(U0)
-{
-  /* The overflow is found after the row's `}`; the rest of the
-   * initialiser (`, {4, 5}}`) is skipped too. */
-  return CompileFailsTwice(
-"U0 Main() {
-  I64 m[2][2] = {{1, 2, 3}, {4, 5}};
-  I64 k = 1;
-  I64 z = 2.5 + \"t\";
+bool testRowTooLong(void) {
+    /* The overflow is found after the row's `}`; the rest of the
+     * initialiser (`, {4, 5}}`) is skipped too. */
+    return compileFailsTwice(
+"void main() {
+  i64 m[2][2] = {{1, 2, 3}, {4, 5}};
+  i64 k = 1;
+  i64 z = 2.5 + \"t\";
 }
 ", "Invalid array initializer: expected 2 items but got 3", ":2:26",
-   MSG_FLOAT_STR, ":4:15");
+     MSG_FLOAT_STR, ":4:15");
 }
 
-Bool TestStringTooLong(U0)
-{
-  return CompileFailsTwice(
-"U8 s[2][3] = {\"abcdef\", \"x\"};
-I64 h = 5;
-U0 Main() { I64 z = 2.5 + \"t\"; }
+bool testStringTooLong(void) {
+    return compileFailsTwice(
+"u8 s[2][3] = {\"abcdef\", \"x\"};
+i64 h = 5;
+void main() { i64 z = 2.5 + \"t\"; }
 ", "Invalid array initializer: expected 3 items but got 7", ":1:15",
-   MSG_FLOAT_STR, ":3:25");
+     MSG_FLOAT_STR, ":3:27");
 }
 
-I32 Main()
-{
-  "Test - Initialiser error recovery: ";
-  I64 tests = 11;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - Initialiser error recovery: ");
+    i64 tests = 11;
+    i64 correct = 0;
 
-  if (TestClassTooManyThenString()) correct++;
-  else "Failed - TestClassTooManyThenString()\n";
+    if (testClassTooManyThenString()) { correct++; }
+    else { printf("Failed - TestClassTooManyThenString()\n"); }
 
-  if (TestLocalLastElement()) correct++;
-  else "Failed - TestLocalLastElement()\n";
+    if (testLocalLastElement()) { correct++; }
+    else { printf("Failed - TestLocalLastElement()\n"); }
 
-  if (TestLocalNested()) correct++;
-  else "Failed - TestLocalNested()\n";
+    if (testLocalNested()) { correct++; }
+    else { printf("Failed - TestLocalNested()\n"); }
 
-  if (TestLocalNestedFirstRow()) correct++;
-  else "Failed - TestLocalNestedFirstRow()\n";
+    if (testLocalNestedFirstRow()) { correct++; }
+    else { printf("Failed - TestLocalNestedFirstRow()\n"); }
 
-  if (TestGlobalNested()) correct++;
-  else "Failed - TestGlobalNested()\n";
+    if (testGlobalNested()) { correct++; }
+    else { printf("Failed - TestGlobalNested()\n"); }
 
-  if (TestGlobalClass()) correct++;
-  else "Failed - TestGlobalClass()\n";
+    if (testGlobalClass()) { correct++; }
+    else { printf("Failed - TestGlobalClass()\n"); }
 
-  if (TestClassArrayField()) correct++;
-  else "Failed - TestClassArrayField()\n";
+    if (testClassArrayField()) { correct++; }
+    else { printf("Failed - TestClassArrayField()\n"); }
 
-  if (TestMissingOperand()) correct++;
-  else "Failed - TestMissingOperand()\n";
+    if (testMissingOperand()) { correct++; }
+    else { printf("Failed - TestMissingOperand()\n"); }
 
-  if (TestMoreDeclaratorsAfter()) correct++;
-  else "Failed - TestMoreDeclaratorsAfter()\n";
+    if (testMoreDeclaratorsAfter()) { correct++; }
+    else { printf("Failed - TestMoreDeclaratorsAfter()\n"); }
 
-  if (TestRowTooLong()) correct++;
-  else "Failed - TestRowTooLong()\n";
+    if (testRowTooLong()) { correct++; }
+    else { printf("Failed - TestRowTooLong()\n"); }
 
-  if (TestStringTooLong()) correct++;
-  else "Failed - TestStringTooLong()\n";
+    if (testStringTooLong()) { correct++; }
+    else { printf("Failed - TestStringTooLong()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

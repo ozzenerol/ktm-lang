@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* A function pointer only takes a function (or function pointer) with
  * the same signature. Before, `i64 (*op)(u8 *) = &t;` with a `t` taking
@@ -13,34 +13,31 @@
 #define AT_SRC "./ktm-430-fnsig.ktm"
 #define AT_OUT "./ktm-430-fnsig.out"
 
-U8 *Diagnose(U8 *source)
-{
-  System("rm -f " AT_SRC " " AT_OUT);
-  FileWrite(AT_SRC, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC);
-  System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
-         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-         "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
-  U8 *out = FileRead(AT_OUT);
-  System("rm -f " AT_SRC " " AT_OUT);
-  return out;
+u8 *diagnose(u8 *source) {
+    proc.shell("rm -f " AT_SRC " " AT_OUT);
+    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+                 "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                 "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
+    u8 *out = fs.readAll(AT_OUT);
+    proc.shell("rm -f " AT_SRC " " AT_OUT);
+    return out;
 }
 
-I64 Count(U8 *s, U8 *what)
-{
-  I64 n = 0;
-  while (s && (s = strstr(s, what))) {
-    n++;
-    s++;
-  }
-  return n;
+i64 count(u8 *s, u8 *what) {
+    i64 n = 0;
+    while (s && (s = libc.strstr(s, what))) {
+        n++;
+        s++;
+    }
+    return n;
 }
 
 /* ktm prints `errors` errors and want (if any) for body, and no
  * warnings when there is no error (after a `return` that is an error,
  * the function is also said to maybe not return a value) */
-Bool Prints(U8 *body, I64 errors, U8 *want=NULL)
-{
-  U8 *src = MStrPrint(
+bool prints(u8 *body, i64 errors, u8 *want=null) {
+    u8 *src = str.format(
 "i64 t(i64 x) { return x; }
 i64 s(u8 *p) { return 0; }
 i64 v(i64 n, ...) { return n; }
@@ -49,34 +46,33 @@ u8 r8(i64 x) { return 0; }
 i64 take(fn(i64) i64 f) { return f(1); }
 i64 takeold(i64 (*f)(u8 *)) { return 0; }
 i64 takev(void *p) { return 0; }
-class S { fn(u8 *) i64 cb; };
+struct S { fn(u8 *) i64 cb; };
 %s
 ", body);
-  U8 *out = Diagnose(src);
-  Bool ok = out && (errors || Count(out, "warning:") == 0) &&
-            Count(out, "error:") == errors && (!want || strstr(out, want));
-  if (!ok) "\n%s\n----\n%s\n", body, out;
-  Free(out);
-  Free(src);
-  return ok;
+    u8 *out = diagnose(src);
+    bool ok = out && (errors || count(out, "warning:") == 0) &&
+                        count(out, "error:") == errors && (!want || libc.strstr(out, want));
+    if (!ok) { printf("\n%s\n----\n%s\n", body, out); }
+    mem.free(out);
+    mem.free(src);
+    return ok;
 }
 
 #define WRONG "cannot convert fn(i64) i64 to fn(u8*) i64"
 
 /* runtime: what is still allowed calls through correctly */
-i64 Add1(i64 x) { return x + 1; }
-i64 Apply(fn(i64) i64 f, i64 x) { return f(x); }
-fn(i64) i64 Pick() { return &Add1; }
-class Ops { fn(i64) i64 op; };
+i64 add1(i64 x) { return x + 1; }
+i64 apply(fn(i64) i64 f, i64 x) { return f(x); }
+fn(i64) i64 pick() { return &add1; }
+struct Ops { fn(i64) i64 op; };
 
-I32 Main()
-{
-  "Test - function pointer signatures are checked: ";
-  I64 correct = 0, tests = 0;
+i32 main() {
+    printf("Test - function pointer signatures are checked: ");
+    i64 correct = 0, tests = 0;
 
-  /* the same signature, void * both ways, null: no diagnostic */
-  tests++;
-  if (Prints(
+    /* the same signature, void * both ways, null: no diagnostic */
+    tests++;
+    if (prints(
 "i64 (*g1)(i64) = &t;
 fn(u8 *) i64 g2 = &s;
 fn(i64) i64 g3[2] = { &t, &t };
@@ -97,77 +93,85 @@ void f()
   fn(i64, i64 ...xs) i64 vn = &nv;
   (fn(i64) i64) *pa = &a;
   (fn(i64) i64) *pb = pa;
-}", 0)) correct++;
+}", 0)) { correct++; }
 
-  /* initialisers: global and local, old and fn form */
-  tests++; if (Prints("i64 (*op)(u8 *) = &t;", 1, WRONG)) correct++;
-  tests++; if (Prints("fn(u8 *) i64 op = &t;", 1, WRONG)) correct++;
-  tests++; if (Prints("void f() { i64 (*a)(u8 *) = &t; }", 1, WRONG)) correct++;
-  tests++; if (Prints("void f() { fn(u8 *) i64 a = &t; }", 1, WRONG)) correct++;
+    /* initialisers: global and local, old and fn form */
+    tests++; if (prints("i64 (*op)(u8 *) = &t;", 1, WRONG)) { correct++; }
+    tests++; if (prints("fn(u8 *) i64 op = &t;", 1, WRONG)) { correct++; }
+    tests++; if (prints("void f() { i64 (*a)(u8 *) = &t; }", 1, WRONG)) { correct++; }
+    tests++; if (prints("void f() { fn(u8 *) i64 a = &t; }", 1, WRONG)) { correct++; }
 
-  /* assignment, from a function and from a function pointer */
-  tests++; if (Prints("void f() { fn(u8 *) i64 a = &s; a = &t; }", 1, WRONG)) correct++;
-  tests++;
-  if (Prints("void f() { fn(u8 *) i64 a = &s; fn(i64) i64 b = &t; a = b; }", 1, WRONG))
-    correct++;
+    /* assignment, from a function and from a function pointer */
+    tests++; if (prints("void f() { fn(u8 *) i64 a = &s; a = &t; }", 1, WRONG)) { correct++; }
+    tests++;
+    if (prints("void f() { fn(u8 *) i64 a = &s; fn(i64) i64 b = &t; a = b; }", 1, WRONG)) {
+        correct++;
+    }
 
-  /* argument */
-  tests++;
-  if (Prints("void f() { take(&s); }", 1, "cannot convert fn(u8*) i64 to fn(i64) i64"))
-    correct++;
-  tests++; if (Prints("void f() { takeold(&t); }", 1, WRONG)) correct++;
+    /* argument */
+    tests++;
+    if (prints("void f() { take(&s); }", 1, "cannot convert fn(u8*) i64 to fn(i64) i64")) {
+        correct++;
+    }
+    tests++; if (prints("void f() { takeold(&t); }", 1, WRONG)) { correct++; }
 
-  /* return */
-  tests++; if (Prints("fn(u8 *) i64 r() { return &t; }", 1, WRONG)) correct++;
+    /* return */
+    tests++; if (prints("fn(u8 *) i64 r() { return &t; }", 1, WRONG)) { correct++; }
 
-  /* class field: initialiser and assignment */
-  tests++; if (Prints("void f() { S x = { &t }; }", 1, WRONG)) correct++;
-  tests++; if (Prints("void f() { S x; x.cb = &t; }", 1, WRONG)) correct++;
+    /* class field: initialiser and assignment */
+    tests++; if (prints("void f() { S x = { &t }; }", 1, WRONG)) { correct++; }
+    tests++; if (prints("void f() { S x; x.cb = &t; }", 1, WRONG)) { correct++; }
 
-  /* array initialiser, local and global */
-  tests++; if (Prints("void f() { fn(u8 *) i64 arr[2] = { &s, &t }; }", 1, WRONG)) correct++;
-  tests++; if (Prints("fn(u8 *) i64 garr[2] = { &s, &t };", 1, WRONG)) correct++;
+    /* array initialiser, local and global */
+    tests++; if (prints("void f() { fn(u8 *) i64 arr[2] = { &s, &t }; }", 1, WRONG)) { correct++; }
+    tests++; if (prints("fn(u8 *) i64 garr[2] = { &s, &t };", 1, WRONG)) { correct++; }
 
-  /* conditional: the branches must agree */
-  tests++;
-  if (Prints("void f() { fn(u8 *) i64 c = 1 ? &t : &s; }", 1,
-             "cannot convert fn(u8*) i64 to fn(i64) i64"))
-    correct++;
+    /* conditional: the branches must agree */
+    tests++;
+    if (prints("void f() { fn(u8 *) i64 c = 1 ? &t : &s; }", 1,
+                         "cannot convert fn(u8*) i64 to fn(i64) i64")) {
+        correct++;
+                         }
 
-  /* varargs, named varargs and the return type must match exactly */
-  tests++;
-  if (Prints("void f() { fn(i64, ...) i64 a = &t; }", 1,
-             "cannot convert fn(i64) i64 to fn(i64, ...) i64"))
-    correct++;
-  tests++;
-  if (Prints("void f() { fn(i64) i64 a = &v; }", 1,
-             "cannot convert fn(i64, ...) i64 to fn(i64) i64"))
-    correct++;
-  tests++;
-  if (Prints("void f() { fn(i64, ...) i64 a = &nv; }", 1,
-             "cannot convert fn(i64, i64 ...) i64 to fn(i64, ...) i64"))
-    correct++;
-  tests++;
-  if (Prints("void f() { fn(i64) i64 a = &r8; }", 1,
-             "cannot convert fn(i64) u8 to fn(i64) i64"))
-    correct++;
+    /* varargs, named varargs and the return type must match exactly */
+    tests++;
+    if (prints("void f() { fn(i64, ...) i64 a = &t; }", 1,
+                         "cannot convert fn(i64) i64 to fn(i64, ...) i64")) {
+        correct++;
+                         }
+    tests++;
+    if (prints("void f() { fn(i64) i64 a = &v; }", 1,
+                         "cannot convert fn(i64, ...) i64 to fn(i64) i64")) {
+        correct++;
+                         }
+    tests++;
+    if (prints("void f() { fn(i64, ...) i64 a = &nv; }", 1,
+                         "cannot convert fn(i64, i64 ...) i64 to fn(i64, ...) i64")) {
+        correct++;
+                         }
+    tests++;
+    if (prints("void f() { fn(i64) i64 a = &r8; }", 1,
+                         "cannot convert fn(i64) u8 to fn(i64) i64")) {
+        correct++;
+                         }
 
-  /* a pointer to a function pointer: the signatures still must agree */
-  tests++;
-  if (Prints("void f() { fn(i64) i64 a = &t; (fn(u8 *) i64) *pb = &a; }", 1,
-             "cannot convert (fn(i64) i64) * to (fn(u8*) i64) *"))
-    correct++;
+    /* a pointer to a function pointer: the signatures still must agree */
+    tests++;
+    if (prints("void f() { fn(i64) i64 a = &t; (fn(u8 *) i64) *pb = &a; }", 1,
+                         "cannot convert (fn(i64) i64) * to (fn(u8*) i64) *")) {
+        correct++;
+                         }
 
-  /* the allowed conversions call through correctly */
-  Ops o = { &Add1 };
-  void *vp = &Add1;
-  fn(i64) i64 back = vp;
-  tests++; if (Apply(&Add1, 1) == 2) correct++;
-  tests++; if (Pick()(2) == 3) correct++;
-  tests++; if (o.op(3) == 4) correct++;
-  tests++; if (back(4) == 5) correct++;
+    /* the allowed conversions call through correctly */
+    Ops o = { &add1 };
+    void *vp = &add1;
+    fn(i64) i64 back = vp;
+    tests++; if (apply(&add1, 1) == 2) { correct++; }
+    tests++; if (pick()(2) == 3) { correct++; }
+    tests++; if (o.op(3) == 4) { correct++; }
+    tests++; if (back(4) == 5) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

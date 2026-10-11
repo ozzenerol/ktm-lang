@@ -1,202 +1,195 @@
-#include "testhelper.ktm"
+import fs, libc, mem, net, proc, str, test;
 
 /* The fds the library opens (sockets from the Net* helpers, accepted
- * connections, FileRead/FileWrite's file (also while FileRead reads a
+ * connections, fs.readAll/fs.writeAll's file (also while fs.readAll reads a
  * FIFO to its end), Shlurp's temporary file) were
  * inherited by every program started with System, Sh, Shlurp or exec:
  * a child kept a listening socket or a client connection open. They are
  * close-on-exec now. Checked with F_GETFD, and by asking a shell started
  * with Shlurp which of the fds it has. */
 
-extern "c" I32 mkfifo(U8 *path, U32 mode);
-extern "c" U32 alarm(U32 seconds);
+extern "c" i32 mkfifo(u8 *path, u32 mode);
+extern "c" u32 alarm(u32 seconds);
 
 #define FIFO "./ktm-380.fifo"
 #define USOCK "./ktm-380.sock"
-#define BIG (256 * 1024)
+const i64 BIG = (256 * 1024);
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
-Bool CloseOnExec(I32 fd)
-{
-  I32 fl = fcntl(fd, F_GETFD);
-  return fl != -1 && (fl & FD_CLOEXEC) != 0;
+bool closeOnExec(i32 fd) {
+    i32 fl = libc.fcntl(fd, libc.F_GETFD);
+    return fl != -1 && (fl & libc.FD_CLOEXEC) != 0;
 }
 
 /* Does a shell started by Shlurp have fd open? (`[ -e /dev/fd/N ]` opens
  * nothing, so the child can't mistake one of its own fds for ours) */
-Bool ChildHas(I32 fd)
-{
-  U8 *out = Shlurp("[ -e /dev/fd/%d ] && echo yes", fd);
-  Bool has = out && !StrCmp(out, "yes");
-  Free(out);
-  return has;
+bool childHas(i32 fd) {
+    u8 *out = proc.shellOutput("[ -e /dev/fd/%d ] && echo yes", fd);
+    bool has = out && !str.cmp(out, "yes");
+    mem.free(out);
+    return has;
 }
 
-U0 Kind(I32 fd, U8 *what)
-{
-  U8 buf[128];
-  if (fd < 0) {
-    Check(FALSE, what);
-    return;
-  }
-  StrPrint(buf, "%s: FD_CLOEXEC", what);
-  Check(CloseOnExec(fd), buf);
-  StrPrint(buf, "%s: not inherited", what);
-  Check(!ChildHas(fd), buf);
+void kind(i32 fd, u8 *what) {
+    u8 buf[128];
+    if (fd < 0) {
+        check(false, what);
+        return;
+    }
+    str.formatTo(buf, "%s: FD_CLOEXEC", what);
+    check(closeOnExec(fd), buf);
+    str.formatTo(buf, "%s: not inherited", what);
+    check(!childHas(fd), buf);
 }
 
-U8 *g_big;
-U0 *WriteFifo(U0 *arg)
-{// Blocks in FileWrite until main drains the fifo
-  FileWrite(FIFO, g_big, BIG, O_WRONLY);
-  return NULL;
+u8 *gBig;
+void *writeFifo(void *arg)
+{// Blocks in fs.writeAll until main drains the fifo
+    fs.writeAll(FIFO, gBig, BIG, libc.O_WRONLY);
+    return null;
 }
 
-U0 FileWriteFd()
-{
-  I32 rd, probe, n, i;
-  pthread_t *th;
-  U8 buf[4096];
-  I64 got = 0;
+void fileWriteFd() {
+    i32 rd, probe, n, i;
+    libc.pthread_t *th;
+    u8 buf[4096];
+    i64 got = 0;
 
-  unlink(FIFO);
-  if (mkfifo(FIFO, 0x1A4) != 0) {
-    Check(FALSE, "mkfifo");
-    return;
-  }
-  /* Non-blocking so this open doesn't wait for a writer */
-  rd = open(FIFO, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-  Check(rd != -1, "open the fifo for reading");
-  /* The fd FileWrite will get: the lowest free one */
-  probe = open("/dev/null", O_RDONLY | O_CLOEXEC);
-  close(probe);
-  g_big = MAlloc(BIG);
-  MemSet(g_big, 'x', BIG);
-  pthread_create(&th, NULL, &WriteFifo);
+    libc.unlink(FIFO);
+    if (mkfifo(FIFO, 0x1A4) != 0) {
+        check(false, "mkfifo");
+        return;
+    }
+    /* Non-blocking so this open doesn't wait for a writer */
+    rd = libc.open(FIFO, libc.O_RDONLY | libc.O_NONBLOCK | libc.O_CLOEXEC);
+    check(rd != -1, "open the fifo for reading");
+    /* The fd fs.writeAll will get: the lowest free one */
+    probe = libc.open("/dev/null", libc.O_RDONLY | libc.O_CLOEXEC);
+    libc.close(probe);
+    gBig = mem.alloc(BIG);
+    mem.set(gBig, 'x', BIG);
+    libc.pthread_create(&th, null, &writeFifo);
 
-  /* FileWrite has the fifo open once that fd exists; the pipe then fills
-   * (it holds far less than BIG) and its write waits with the fd open.
-   * (poll can't tell: on macOS it misses data already in a fifo.) */
-  for (i = 0; i < 500 && fcntl(probe, F_GETFD) == -1; i++) poll(NULL, 0, 10);
-  Check(fcntl(probe, F_GETFD) != -1, "FileWrite opened the fifo");
-  Check(CloseOnExec(probe), "FileWrite: FD_CLOEXEC");
-  Check(!ChildHas(probe), "FileWrite: not inherited");
+    /* fs.writeAll has the fifo open once that fd exists; the pipe then fills
+     * (it holds far less than BIG) and its write waits with the fd open.
+     * (poll can't tell: on macOS it misses data already in a fifo.) */
+    for (i = 0; i < 500 && libc.fcntl(probe, libc.F_GETFD) == -1; i++) { libc.poll(null, 0, 10); }
+    check(libc.fcntl(probe, libc.F_GETFD) != -1, "FileWrite opened the fifo");
+    check(closeOnExec(probe), "FileWrite: FD_CLOEXEC");
+    check(!childHas(probe), "FileWrite: not inherited");
 
-  /* Drain to EOF before the join, with blocking reads: EOF comes when
-   * FileWrite has written everything and closed its end. (alarm in Main
-   * ends the test if this ever stalls.) */
-  fcntl(rd, F_SETFL, fcntl(rd, F_GETFL) & ~O_NONBLOCK);
-  while ((n = read(rd, buf, sizeof(buf))) > 0) got += n;
-  pthread_join(th);
-  Check(got == BIG, "the whole buffer arrived");
-  close(rd);
-  unlink(FIFO);
-  Free(g_big);
+    /* Drain to EOF before the join, with blocking reads: EOF comes when
+     * fs.writeAll has written everything and closed its end. (alarm in Main
+     * ends the test if this ever stalls.) */
+    libc.fcntl(rd, libc.F_SETFL, libc.fcntl(rd, libc.F_GETFL) & ~libc.O_NONBLOCK);
+    while ((n = libc.read(rd, buf, sizeof(buf))) > 0) { got += n; }
+    libc.pthread_join(th);
+    check(got == BIG, "the whole buffer arrived");
+    libc.close(rd);
+    libc.unlink(FIFO);
+    mem.free(gBig);
 }
 
-/* FileRead's fd: the FIFO fd that isn't `except` */
-I32 FifoFd(I32 except)
-{
-  cStat st;
-  I32 fd;
-  for (fd = 3; fd < 256; fd++) {
-    if (fd != except && fstat(fd, &st) == 0 && (st.st_mode & S_IFMT) == S_IFIFO)
-      return fd;
-  }
-  return -1;
+/* fs.readAll's fd: the FIFO fd that isn't `except` */
+i32 fifoFd(i32 except) {
+    libc.cStat st;
+    i32 fd;
+    for (fd = 3; fd < 256; fd++) {
+        if (fd != except && libc.fstat(fd, &st) == 0 && (st.st_mode & libc.S_IFMT) == libc.S_IFIFO) {
+            return fd;
+        }
+    }
+    return -1;
 }
 
-U8 *g_read;
-I64 g_read_len;
-U0 *ReadFifo(U0 *arg)
-{// Blocks in FileRead (reading to EOF) until main closes its end
-  g_read = FileRead(FIFO, &g_read_len);
-  return NULL;
+u8 *gRead;
+i64 gReadLen;
+void *readFifo(void *arg)
+{// Blocks in fs.readAll (reading to EOF) until main closes its end
+    gRead = fs.readAll(FIFO, &gReadLen);
+    return null;
 }
 
-U0 FileReadFd()
-{
-  I32 wr = -1, fd = -1, i;
-  pthread_t *th;
+void fileReadFd() {
+    i32 wr = -1, fd = -1, i;
+    libc.pthread_t *th;
 
-  unlink(FIFO);
-  if (mkfifo(FIFO, 0x1A4) != 0) {
-    Check(FALSE, "mkfifo 2");
-    return;
-  }
-  pthread_create(&th, NULL, &ReadFifo);
-  /* A non-blocking open for writing works once FileRead has it open */
-  for (i = 0; i < 500 && wr == -1; i++) {
-    wr = open(FIFO, O_WRONLY | O_NONBLOCK | O_CLOEXEC);
-    if (wr == -1) poll(NULL, 0, 10);
-  }
-  Check(wr != -1, "FileRead opened the fifo");
-  /* Never leave the thread waiting in open(): a blocking open for writing
-   * returns as soon as it has the fifo open */
-  if (wr == -1) wr = open(FIFO, O_WRONLY | O_CLOEXEC);
-  /* Nothing written yet: FileRead waits in its read with the fd open */
-  for (i = 0; i < 200 && fd == -1; i++) {
-    fd = FifoFd(wr);
-    if (fd == -1) poll(NULL, 0, 10);
-  }
-  Check(fd != -1 && CloseOnExec(fd), "FileRead: FD_CLOEXEC");
-  Check(fd != -1 && !ChildHas(fd), "FileRead: not inherited");
-  write(wr, "fifo data", 9);
-  close(wr);
-  pthread_join(th);
-  Check(g_read && g_read_len == 9 && !StrCmp(g_read, "fifo data"),
-      "FileRead got the data");
-  Free(g_read);
-  unlink(FIFO);
+    libc.unlink(FIFO);
+    if (mkfifo(FIFO, 0x1A4) != 0) {
+        check(false, "mkfifo 2");
+        return;
+    }
+    libc.pthread_create(&th, null, &readFifo);
+    /* A non-blocking open for writing works once fs.readAll has it open */
+    for (i = 0; i < 500 && wr == -1; i++) {
+        wr = libc.open(FIFO, libc.O_WRONLY | libc.O_NONBLOCK | libc.O_CLOEXEC);
+        if (wr == -1) { libc.poll(null, 0, 10); }
+    }
+    check(wr != -1, "FileRead opened the fifo");
+    /* Never leave the thread waiting in open(): a blocking open for writing
+     * returns as soon as it has the fifo open */
+    if (wr == -1) { wr = libc.open(FIFO, libc.O_WRONLY | libc.O_CLOEXEC); }
+    /* Nothing written yet: fs.readAll waits in its read with the fd open */
+    for (i = 0; i < 200 && fd == -1; i++) {
+        fd = fifoFd(wr);
+        if (fd == -1) { libc.poll(null, 0, 10); }
+    }
+    check(fd != -1 && closeOnExec(fd), "FileRead: FD_CLOEXEC");
+    check(fd != -1 && !childHas(fd), "FileRead: not inherited");
+    libc.write(wr, "fifo data", 9);
+    libc.close(wr);
+    libc.pthread_join(th);
+    check(gRead && gReadLen == 9 && !str.cmp(gRead, "fifo data"),
+            "FileRead got the data");
+    mem.free(gRead);
+    libc.unlink(FIFO);
 }
 
-I32 Main()
-{
-  I32 plain, srv, cli, acc, usrv, ucli, uacc, udp, port;
-  "Test - library fds are close-on-exec: ";
-  alarm(60);   /* a hang ends the test (SIGALRM) instead of the suite */
+i32 main() {
+    i32 plain, srv, cli, acc, usrv, ucli, uacc, udp, port;
+    printf("Test - library fds are close-on-exec: ");
+    alarm(60);   /* a hang ends the test (SIGALRM) instead of the suite */
 
-  /* The check works: an fd opened without O_CLOEXEC is inherited */
-  plain = open("/dev/null", O_RDONLY);
-  Check(plain != -1 && !CloseOnExec(plain), "plain open has no FD_CLOEXEC");
-  Check(ChildHas(plain), "the child sees an inheritable fd");
-  close(plain);
+    /* The check works: an fd opened without O_CLOEXEC is inherited */
+    plain = libc.open("/dev/null", libc.O_RDONLY);
+    check(plain != -1 && !closeOnExec(plain), "plain open has no FD_CLOEXEC");
+    check(childHas(plain), "the child sees an inheritable fd");
+    libc.close(plain);
 
-  srv = NetCreateServer(0, "127.0.0.1", 4);
-  Kind(srv, "NetCreateServer");
-  port = NetGetSocketPort(srv);
-  cli = NetConnect("127.0.0.1", port);
-  Kind(cli, "NetConnect");
-  acc = NetAccept(srv);
-  Kind(acc, "NetAccept");
+    srv = net.listen(0, "127.0.0.1", 4);
+    kind(srv, "NetCreateServer");
+    port = net.localPort(srv);
+    cli = net.dial("127.0.0.1", port);
+    kind(cli, "NetConnect");
+    acc = net.accept(srv);
+    kind(acc, "NetAccept");
 
-  unlink(USOCK);
-  usrv = NetCreateUnixServerSocket(USOCK, 4);
-  Kind(usrv, "NetCreateUnixServerSocket");
-  ucli = NetCreateUnixClientSocket(USOCK);
-  Kind(ucli, "NetCreateUnixClientSocket");
-  uacc = NetAccept(usrv);
-  Kind(uacc, "NetAccept on a unix socket");
+    libc.unlink(USOCK);
+    usrv = net.unixListen(USOCK, 4);
+    kind(usrv, "NetCreateUnixServerSocket");
+    ucli = net.unixDial(USOCK);
+    kind(ucli, "NetCreateUnixClientSocket");
+    uacc = net.accept(usrv);
+    kind(uacc, "NetAccept on a unix socket");
 
-  udp = NetCreateUdpSocket(0, "127.0.0.1");
-  Kind(udp, "NetCreateUdpSocket");
+    udp = net.udpSocket(0, "127.0.0.1");
+    kind(udp, "NetCreateUdpSocket");
 
-  close(udp);
-  close(uacc); close(ucli); close(usrv);
-  unlink(USOCK);
-  close(acc); close(cli); close(srv);
+    libc.close(udp);
+    libc.close(uacc); libc.close(ucli); libc.close(usrv);
+    libc.unlink(USOCK);
+    libc.close(acc); libc.close(cli); libc.close(srv);
 
-  FileWriteFd;
-  FileReadFd;
+    fileWriteFd();
+    fileReadFd();
 
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+    test.printResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

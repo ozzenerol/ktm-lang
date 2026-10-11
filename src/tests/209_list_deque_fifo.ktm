@@ -1,72 +1,71 @@
-#include "testhelper.ktm"
+import list, test, thread;
 
-/* ListDeque takes from the front (FIFO with ListAppend) and ListPop
- * from the back (LIFO with ListAppend); a single-worker ThreadPool runs
+/* list.shift takes from the front (FIFO with list.append) and list.pop
+ * from the back (LIFO with list.append); a single-worker thread.Pool runs
  * jobs in submission order. */
 
-I64 g_order[8];
-I64 g_n = 0;
+i64 gOrder[8];
+i64 gN = 0;
 
-U0 RecordJob(U0 *priv, U0 *argv)
-{
-  g_order[g_n++] = argv(I64);
+void recordJob(void *priv, void *argv) {
+    gOrder[gN++] = (i64)argv;
 }
 
-I32 Main()
-{
-  "Test - ListDeque FIFO order: ";
-  I64 correct = 0, tests = 7, i;
-  List *l = ListNew();
+i32 main() {
+    printf("Test - ListDeque FIFO order: ");
+    i64 correct = 0, tests = 7, i;
+    list.List *l = list.new();
 
-  /* Empty and NULL lists */
-  if (ListDeque(l) == NULL && ListPop(l) == NULL && ListDeque(NULL) == NULL)
-    correct++;
+    /* Empty and null lists */
+    if (l.shift() == null && l.pop() == null && list.List.shift(null) == null) {
+        correct++;
+    }
 
-  ListAppend(l, 1(U0 *));
-  ListAppend(l, 2(U0 *));
-  ListAppend(l, 3(U0 *));
-  if (ListDeque(l)(I64) == 1 && ListDeque(l)(I64) == 2 &&
-      ListDeque(l)(I64) == 3 && ListDeque(l) == NULL && ListEmpty(l)) correct++;
+    l.append((void *)1);
+    l.append((void *)2);
+    l.append((void *)3);
+    if ((i64)l.shift() == 1 && (i64)l.shift() == 2 &&
+            (i64)l.shift() == 3 && l.shift() == null && l.isEmpty()) { correct++; }
 
-  /* Interleaved append / deque keeps FIFO order */
-  Bool ok = TRUE;
-  I64 next_in = 0, next_out = 0;
-  for (i = 0; i < 50; i++) {
-    ListAppend(l, next_in++(U0 *));
-    ListAppend(l, next_in++(U0 *));
-    if (ListDeque(l)(I64) != next_out++) ok = FALSE;
-  }
-  while (!ListEmpty(l)) {
-    if (ListDeque(l)(I64) != next_out++) ok = FALSE;
-  }
-  if (ok && next_out == 100 && ListCount(l) == 0) correct++;
+    /* Interleaved append / deque keeps FIFO order */
+    bool ok = true;
+    i64 nextIn = 0, nextOut = 0;
+    for (i = 0; i < 50; i++) {
+        l.append((void *)nextIn++);
+        l.append((void *)nextIn++);
+        if ((i64)l.shift() != nextOut++) { ok = false; }
+    }
+    while (!l.isEmpty()) {
+        if ((i64)l.shift() != nextOut++) { ok = false; }
+    }
+    if (ok && nextOut == 100 && l.count() == 0) { correct++; }
 
-  /* ListPop takes from the back */
-  ListAppend(l, 1(U0 *));
-  ListAppend(l, 2(U0 *));
-  ListAppend(l, 3(U0 *));
-  if (ListPop(l)(I64) == 3 && ListCount(l) == 2) correct++;
-  /* ListPrepend puts at the front, where ListDeque takes from */
-  ListPrepend(l, 0(U0 *));
-  if (ListDeque(l)(I64) == 0 && ListDeque(l)(I64) == 1 &&
-      ListPop(l)(I64) == 2 && ListEmpty(l)) correct++;
-  ListRelease(l, NULL);
+    /* list.pop takes from the back */
+    l.append((void *)1);
+    l.append((void *)2);
+    l.append((void *)3);
+    if ((i64)l.pop() == 3 && l.count() == 2) { correct++; }
+    /* list.prepend puts at the front, where list.shift takes from */
+    l.prepend((void *)0);
+    if ((i64)l.shift() == 0 && (i64)l.shift() == 1 &&
+            (i64)l.pop() == 2 && l.isEmpty()) { correct++; }
+    l.release(null);
 
-  /* One worker: the jobs run in the order they were queued */
-  ThreadPool *pool = ThreadPoolNew(1);
-  for (i = 0; i < 8; i++) {
-    ThreadPoolEnqueue(pool, i(U0 *), &RecordJob);
-  }
-  ThreadPoolWait(pool);
-  if (g_n == 8) correct++;
-  ok = TRUE;
-  for (i = 0; i < 8; i++) {
-    if (g_order[i] != i) ok = FALSE;
-  }
-  if (ok) correct++;
-  ThreadPoolRelease(pool);
+    /* One worker: the jobs run in the order they were queued */
+    thread.Pool *pool = thread.poolNew(1);
+    for (i = 0; i < 8; i++) {
+        thread.poolEnqueue(pool, (void *)i, &recordJob);
+    }
+    thread.poolWait(pool);
+    if (gN == 8) { correct++; }
+    ok = true;
+    for (i = 0; i < 8; i++) {
+        if (gOrder[i] != i) { ok = false; }
+    }
+    if (ok) { correct++; }
+    thread.poolRelease(pool);
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

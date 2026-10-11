@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 #define IF_EXTRA_TEST_FILE "__102_if_extra_tokens.ktm"
 #define IF_EXTRA_TEST_OUT  "__102_if_extra_tokens.out"
@@ -7,115 +7,106 @@
 #define IF_EXTRA_X 3
 #define IF_EXTRA_Y 1
 
-U0 CleanupIfExtraTest(U0)
-{
-  Rm(IF_EXTRA_TEST_FILE);
-  Rm(IF_EXTRA_TEST_OUT);
-  Rm(IF_EXTRA_TEST_BIN);
+void cleanupIfExtraTest(void) {
+    fs.remove(IF_EXTRA_TEST_FILE);
+    fs.remove(IF_EXTRA_TEST_OUT);
+    fs.remove(IF_EXTRA_TEST_BIN);
 }
 
-/* Compile `source` with ktm; return TRUE if the result matches
+/* Compile `source` with ktm; return true if the result matches
  * `should_fail` and, when failing, the output contains `expected`. */
-Bool CompileCheck(U8 *source, Bool should_fail, U8 *expected)
-{
-  U8 *out;
-  I64 res;
-  Bool ok = TRUE;
+bool compileCheck(u8 *source, bool shouldFail, u8 *expected) {
+    u8 *out;
+    i64 res;
+    bool ok = true;
 
-  CleanupIfExtraTest;
+    cleanupIfExtraTest();
 
-  if (!FileWrite(IF_EXTRA_TEST_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " IF_EXTRA_TEST_FILE " -o " IF_EXTRA_TEST_BIN " > " IF_EXTRA_TEST_OUT " 2>&1");
-
-  if (should_fail) {
-    if (res == 0) {
-      ok = FALSE;
-    } else {
-      out = FileRead(IF_EXTRA_TEST_OUT);
-      if (!out || !strstr(out, expected)) {
-        if (out) "%s\n", out;
-        ok = FALSE;
-      }
-      Free(out);
+    if (!fs.writeAll(IF_EXTRA_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
     }
-  } else if (res != 0) {
-    out = FileRead(IF_EXTRA_TEST_OUT);
-    if (out) "%s\n", out;
-    Free(out);
-    ok = FALSE;
-  }
 
-  CleanupIfExtraTest;
-  return ok;
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " IF_EXTRA_TEST_FILE " -o " IF_EXTRA_TEST_BIN " > " IF_EXTRA_TEST_OUT " 2>&1");
+
+    if (shouldFail) {
+        if (res == 0) {
+            ok = false;
+        } else {
+            out = fs.readAll(IF_EXTRA_TEST_OUT);
+            if (!out || !libc.strstr(out, expected)) {
+                if (out) { printf("%s\n", out); }
+                ok = false;
+            }
+            mem.free(out);
+        }
+    } else if (res != 0) {
+        out = fs.readAll(IF_EXTRA_TEST_OUT);
+        if (out) { printf("%s\n", out); }
+        mem.free(out);
+        ok = false;
+    }
+
+    cleanupIfExtraTest();
+    return ok;
 }
 
-Bool TestTwoLiterals(U0)
-{
-  return CompileCheck(
+bool testTwoLiterals(void) {
+    return compileCheck(
 "#if 0 1
-I32 Main() { return 1; }
+i32 main() { return 1; }
 #else
-I32 Main() { return 0; }
+i32 main() { return 0; }
 #endif
-", TRUE, "#if: unexpected '1' after the condition");
+", true, "#if: unexpected '1' after the condition");
 }
 
-Bool TestLineNumber(U0)
-{
-  return CompileCheck(
-"I64 a = 1;
+bool testLineNumber(void) {
+    return compileCheck(
+"i64 a = 1;
 
 #if 1 2
 #endif
-I32 Main() { return 0; }
-", TRUE, ":3:");
+i32 main() { return 0; }
+", true, ":3:");
 }
 
-Bool TestAfterDefined(U0)
-{
-  return CompileCheck(
+bool testAfterDefined(void) {
+    return compileCheck(
 "#define FOO
 #if defined(FOO) 1
 #endif
-I32 Main() { return 0; }
-", TRUE, "#if: unexpected '1' after the condition");
+i32 main() { return 0; }
+", true, "#if: unexpected '1' after the condition");
 }
 
-Bool TestAfterExpression(U0)
-{
-  return CompileCheck(
+bool testAfterExpression(void) {
+    return compileCheck(
 "#define A 3
 #if A > 2 && A 7
 #endif
-I32 Main() { return 0; }
-", TRUE, "#if: unexpected '7' after the condition");
+i32 main() { return 0; }
+", true, "#if: unexpected '7' after the condition");
 }
 
-Bool TestElif(U0)
-{
-  return CompileCheck(
+bool testElif(void) {
+    return compileCheck(
 "#if 0
 #elif 1 1
 #endif
-I32 Main() { return 0; }
-", TRUE, "#elif: unexpected '1' after the condition");
+i32 main() { return 0; }
+", true, "#elif: unexpected '1' after the condition");
 }
 
-Bool TestStraySemicolon(U0)
-{
-  return CompileCheck(
+bool testStraySemicolon(void) {
+    return compileCheck(
 "#if 1;
 #endif
-I32 Main() { return 0; }
-", TRUE, "#if: unexpected ';' after the condition");
+i32 main() { return 0; }
+", true, "#if: unexpected ';' after the condition");
 }
 
-Bool TestValidConditionsCompile(U0)
-{
-  return CompileCheck(
+bool testValidConditionsCompile(void) {
+    return compileCheck(
 "#define A 3
 #define B 1
 #define FLAG
@@ -136,74 +127,72 @@ Bool TestValidConditionsCompile(U0)
 #if B
 #endif
 #endif
-I32 Main() { return 0; }
-", FALSE, NULL);
+i32 main() { return 0; }
+", false, null);
 }
 
 /* The same conditions in this file: the test only builds if they are
  * still accepted, and each must pick the right branch. */
-Bool TestValidConditionsInline(U0)
-{
-  I64 hits = 0;
+bool testValidConditionsInline(void) {
+    i64 hits = 0;
 #if 1 // note
-  hits++;
+    hits++;
 #endif
 #if 1 /* block */
-  hits++;
+    hits++;
 #endif
 #if IF_EXTRA_X > 2 && IF_EXTRA_Y
-  hits++;
+    hits++;
 #endif
 #if defined(IF_EXTRA_X) && !defined(IF_EXTRA_NOPE)
-  hits++;
+    hits++;
 #endif
 #if 0
-  hits += 100;
+    hits += 100;
 #elif (IF_EXTRA_X + 1) * 2 == 8 // trailing
-  hits++;
+    hits++;
 #endif
 #if 1
 #if IF_EXTRA_Y
-  hits++;
+    hits++;
 #endif
 #endif
 #if 0
-  hits += 100;
+    hits += 100;
 #endif
-  return hits == 6;
+    return hits == 6;
 }
 
-I32 Main()
-{
-  "Test - #if extra tokens: \n";
-  I64 tests = 8;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - #if extra tokens: \n");
+    i64 tests = 8;
+    i64 correct = 0;
 
-  if (TestTwoLiterals()) correct++;
-  else "Failed - TestTwoLiterals()\n";
+    if (testTwoLiterals()) { correct++; }
+    else { printf("Failed - TestTwoLiterals()\n"); }
 
-  if (TestLineNumber()) correct++;
-  else "Failed - TestLineNumber()\n";
+    if (testLineNumber()) { correct++; }
+    else { printf("Failed - TestLineNumber()\n"); }
 
-  if (TestAfterDefined()) correct++;
-  else "Failed - TestAfterDefined()\n";
+    if (testAfterDefined()) { correct++; }
+    else { printf("Failed - TestAfterDefined()\n"); }
 
-  if (TestAfterExpression()) correct++;
-  else "Failed - TestAfterExpression()\n";
+    if (testAfterExpression()) { correct++; }
+    else { printf("Failed - TestAfterExpression()\n"); }
 
-  if (TestElif()) correct++;
-  else "Failed - TestElif()\n";
+    if (testElif()) { correct++; }
+    else { printf("Failed - TestElif()\n"); }
 
-  if (TestStraySemicolon()) correct++;
-  else "Failed - TestStraySemicolon()\n";
+    if (testStraySemicolon()) { correct++; }
+    else { printf("Failed - TestStraySemicolon()\n"); }
 
-  if (TestValidConditionsCompile()) correct++;
-  else "Failed - TestValidConditionsCompile()\n";
+    if (testValidConditionsCompile()) { correct++; }
+    else { printf("Failed - TestValidConditionsCompile()\n"); }
 
-  if (TestValidConditionsInline()) correct++;
-  else "Failed - TestValidConditionsInline()\n";
+    if (testValidConditionsInline()) { correct++; }
+    else { printf("Failed - TestValidConditionsInline()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

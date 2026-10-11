@@ -2156,7 +2156,7 @@ static void x86_64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
 
             Ast *callee = NULL;
             if (!indirect) {
-                callee = (Ast *)mapGetLen(ctx->cc->global_env,
+                callee = (Ast *)cctrlCalleeDecl(ctx->cc,
                                           fname->data, fname->len);
             }
             int callee_va = 0;

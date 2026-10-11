@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 #define DEF_AFTER_CLASS_FILE "__110_define_after_class.ktm"
 #define DEF_AFTER_CLASS_OUT  "__110_define_after_class.out"
@@ -9,174 +9,162 @@
 #define DEF_MSG_UNDEF   "Variable or function `X` has not been defined"
 
 /* A successful #define right after a class must keep working */
-class DefAfterClassOk { I64 a; };
+struct DefAfterClassOk { i64 a; };
 #define DEF_AFTER_CLASS_OK (2+1)
 
-U0 CleanupDefAfterClassTest(U0)
-{
-  Rm(DEF_AFTER_CLASS_FILE);
-  Rm(DEF_AFTER_CLASS_OUT);
-  Rm("./a.out");
+void cleanupDefAfterClassTest(void) {
+    fs.remove(DEF_AFTER_CLASS_FILE);
+    fs.remove(DEF_AFTER_CLASS_OUT);
+    fs.remove("./a.out");
 }
 
-I64 CountErrors(U8 *out)
-{
-  I64 n = 0;
-  U8 *p = out;
-  while ((p = strstr(p, "error: "))) {
-    n++;
-    p += 7;
-  }
-  return n;
+i64 countErrors(u8 *out) {
+    i64 n = 0;
+    u8 *p = out;
+    while ((p = libc.strstr(p, "error: "))) {
+        n++;
+        p += 7;
+    }
+    return n;
 }
 
 /* Compile `source`, which must fail with exactly `n_expected` errors,
- * each of `m1`/`m2` (when not NULL) among them. */
-Bool CompileFailsExactly(U8 *source, I64 n_expected, U8 *m1, U8 *m2)
-{
-  U8 *out;
-  I64 res;
-  Bool ok;
+ * each of `m1`/`m2` (when not null) among them. */
+bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
+    u8 *out;
+    i64 res;
+    bool ok;
 
-  CleanupDefAfterClassTest;
+    cleanupDefAfterClassTest();
 
-  if (!FileWrite(DEF_AFTER_CLASS_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(DEF_AFTER_CLASS_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " DEF_AFTER_CLASS_FILE " > " DEF_AFTER_CLASS_OUT " 2>&1");
-  if (res == 0) {
-    CleanupDefAfterClassTest;
-    return FALSE;
-  }
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " DEF_AFTER_CLASS_FILE " > " DEF_AFTER_CLASS_OUT " 2>&1");
+    if (res == 0) {
+        cleanupDefAfterClassTest();
+        return false;
+    }
 
-  out = FileRead(DEF_AFTER_CLASS_OUT);
-  if (!out) {
-    CleanupDefAfterClassTest;
-    return FALSE;
-  }
+    out = fs.readAll(DEF_AFTER_CLASS_OUT);
+    if (!out) {
+        cleanupDefAfterClassTest();
+        return false;
+    }
 
-  ok = CountErrors(out) == n_expected;
-  if (m1 && !strstr(out, m1)) ok = FALSE;
-  if (m2 && !strstr(out, m2)) ok = FALSE;
-  if (!ok) "%s\n", out;
+    ok = countErrors(out) == nExpected;
+    if (m1 && !libc.strstr(out, m1)) { ok = false; }
+    if (m2 && !libc.strstr(out, m2)) { ok = false; }
+    if (!ok) { printf("%s\n", out); }
 
-  Free(out);
-  CleanupDefAfterClassTest;
-  return ok;
+    mem.free(out);
+    cleanupDefAfterClassTest();
+    return ok;
 }
 
-Bool TestNoPreceding(U0)
-{
-  return CompileFailsExactly(
+bool testNoPreceding(void) {
+    return compileFailsExactly(
 "#define X (zz+1)
-U0 Main() { I64 y = X; }
+void main() { i64 y = X; }
 ", 2, DEF_MSG_CONST, DEF_MSG_UNDEF);
 }
 
-Bool TestAfterClass(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; };
+bool testAfterClass(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; };
 #define X (zz+1)
-U0 Main() { I64 y = X; }
+void main() { i64 y = X; }
 ", 2, DEF_MSG_CONST, DEF_MSG_UNDEF);
 }
 
-Bool TestAfterUnion(U0)
-{
-  return CompileFailsExactly(
-"union Foo { I64 a; U8 b; };
+bool testAfterUnion(void) {
+    return compileFailsExactly(
+"union Foo { i64 a; u8 b; };
 #define X (zz+1)
-U0 Main() { I64 y = X; }
+void main() { i64 y = X; }
 ", 2, DEF_MSG_CONST, DEF_MSG_UNDEF);
 }
 
-Bool TestAfterGlobal(U0)
-{
-  return CompileFailsExactly(
-"I64 g = 5;
+bool testAfterGlobal(void) {
+    return compileFailsExactly(
+"i64 g = 5;
 #define X (zz+1)
-U0 Main() { I64 y = X; }
+void main() { i64 y = X; }
 ", 2, DEF_MSG_CONST, DEF_MSG_UNDEF);
 }
 
 /* The class must be complete: using it after the failing define used
  * to crash the compiler. */
-Bool TestClassStillUsable(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; };
+bool testClassStillUsable(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; };
 #define X (zz+1)
-U0 Main() { Foo f; f.a = 1; }
-", 1, DEF_MSG_CONST, NULL);
+void main() { Foo f; f.a = 1; }
+", 1, DEF_MSG_CONST, null);
 }
 
-Bool TestNonConstAfterClass(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; };
+bool testNonConstAfterClass(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; };
 #define X zz
-U0 Main() { I64 y = X; }
+void main() { i64 y = X; }
 ", 2, DEF_MSG_NUM, DEF_MSG_UNDEF);
 }
 
-Bool TestFnLikeAfterClass(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; };
+bool testFnLikeAfterClass(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; };
 #define X(1)
-U0 Main() { I64 y = 1; }
-", 1, DEF_MSG_FNLIKE, NULL);
+void main() { i64 y = 1; }
+", 1, DEF_MSG_FNLIKE, null);
 }
 
-Bool TestTwoBadDefines(U0)
-{
-  return CompileFailsExactly(
-"class Foo { I64 a; };
+bool testTwoBadDefines(void) {
+    return compileFailsExactly(
+"struct Foo { i64 a; };
 #define X (zz+1)
 #define Y (yy+1)
-class Bar { I64 b; };
-U0 Main() { Bar b; b.b = 1; }
+struct Bar { i64 b; };
+void main() { Bar b; b.b = 1; }
 ", 2, DEF_MSG_CONST, "#define Y: the value must be a constant expression");
 }
 
-I32 Main()
-{
-  "Test - #define error after a class: \n";
-  I64 tests = 9;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - #define error after a class: \n");
+    i64 tests = 9;
+    i64 correct = 0;
 
-  if (TestNoPreceding()) correct++;
-  else "Failed - TestNoPreceding()\n";
+    if (testNoPreceding()) { correct++; }
+    else { printf("Failed - TestNoPreceding()\n"); }
 
-  if (TestAfterClass()) correct++;
-  else "Failed - TestAfterClass()\n";
+    if (testAfterClass()) { correct++; }
+    else { printf("Failed - TestAfterClass()\n"); }
 
-  if (TestAfterUnion()) correct++;
-  else "Failed - TestAfterUnion()\n";
+    if (testAfterUnion()) { correct++; }
+    else { printf("Failed - TestAfterUnion()\n"); }
 
-  if (TestAfterGlobal()) correct++;
-  else "Failed - TestAfterGlobal()\n";
+    if (testAfterGlobal()) { correct++; }
+    else { printf("Failed - TestAfterGlobal()\n"); }
 
-  if (TestClassStillUsable()) correct++;
-  else "Failed - TestClassStillUsable()\n";
+    if (testClassStillUsable()) { correct++; }
+    else { printf("Failed - TestClassStillUsable()\n"); }
 
-  if (TestNonConstAfterClass()) correct++;
-  else "Failed - TestNonConstAfterClass()\n";
+    if (testNonConstAfterClass()) { correct++; }
+    else { printf("Failed - TestNonConstAfterClass()\n"); }
 
-  if (TestFnLikeAfterClass()) correct++;
-  else "Failed - TestFnLikeAfterClass()\n";
+    if (testFnLikeAfterClass()) { correct++; }
+    else { printf("Failed - TestFnLikeAfterClass()\n"); }
 
-  if (TestTwoBadDefines()) correct++;
-  else "Failed - TestTwoBadDefines()\n";
+    if (testTwoBadDefines()) { correct++; }
+    else { printf("Failed - TestTwoBadDefines()\n"); }
 
-  DefAfterClassOk ok;
-  ok.a = DEF_AFTER_CLASS_OK;
-  if (ok.a == 3) correct++;
-  else "Failed - successful #define after a class\n";
+    DefAfterClassOk ok;
+    ok.a = DEF_AFTER_CLASS_OK;
+    if (ok.a == 3) { correct++; }
+    else { printf("Failed - successful #define after a class\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

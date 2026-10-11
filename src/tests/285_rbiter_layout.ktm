@@ -1,39 +1,38 @@
-#include "testhelper.ktm"
+import map, mem, test;
 
 /* std.ktmh declared RBIter with an extra `node` field that set.ktm's
  * RBIter doesn't have, so user code saw a 32-byte class while
- * RBIterNew allocated 24 bytes. */
+ * map.rbIterNew allocated 24 bytes. */
 
-I64 Cmp(U0 *a, U0 *b) { return a(I64) - b(I64); }
+i64 cmp(void *a, void *b) { return (i64)a - (i64)b; }
 
-I32 Main()
-{
-  "Test - RBIter layout: ";
-  I64 correct = 0, tests = 0, i, prev, n, ok;
-  RBTree *t = RBTreeNew(NULL, NULL, &Cmp);
-  RBNode *node;
+i32 main() {
+    printf("Test - RBIter layout: ");
+    i64 correct = 0, tests = 0, i, prev, n, ok;
+    map.RBTree *t = map.rbNew(null, null, &cmp);
+    map.RBNode *node;
 
-  RBIter *it = RBIterNew(t);
-  tests++; if (MSize(it) == sizeof(RBIter)) correct++;
-  tests++; if (RBIterNext(it) == NULL) correct++;
-  RBIterRelease(it);
+    map.RBIter *it = t.iterNew();
+    tests++; if (mem.size(it) == sizeof(map.RBIter)) { correct++; }
+    tests++; if (map.rbIterNext(it) == null) { correct++; }
+    map.rbIterRelease(it);
 
-  for (i = 0; i < 100; i++) RBTreeInsert(t, ((i * 37) % 101)(U0 *), i(U0 *));
-  it = RBIterNew(t);
-  tests++; if (MSize(it) == sizeof(RBIter)) correct++;
-  ok = TRUE; n = 0; prev = -1;
-  while ((node = RBIterNext(it)) != NULL) {
-    if (node->key(I64) <= prev) ok = FALSE;
-    prev = node->key(I64);
-    n++;
-  }
-  tests++; if (ok && n == 100) correct++;
-  /* the fields user code can see are the ones RBIterNew filled in */
-  tests++; if (it->sp == 0 && it->stack != NULL) correct++;
-  RBIterRelease(it);
-  RBTreeRelease(t);
+    for (i = 0; i < 100; i++) { t.set((void *)((i * 37) % 101), (void *)i); }
+    it = t.iterNew();
+    tests++; if (mem.size(it) == sizeof(map.RBIter)) { correct++; }
+    ok = true; n = 0; prev = -1;
+    while ((node = map.rbIterNext(it)) != null) {
+        if ((i64)node.key <= prev) { ok = false; }
+        prev = (i64)node.key;
+        n++;
+    }
+    tests++; if (ok && n == 100) { correct++; }
+    /* the fields user code can see are the ones map.rbIterNew filled in */
+    tests++; if (it.sp == 0 && it.stack != null) { correct++; }
+    map.rbIterRelease(it);
+    t.release();
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

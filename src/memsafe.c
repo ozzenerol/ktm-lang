@@ -472,4 +472,9 @@ void memsafeInit(KtmJit *jit) {
     ktmJitDefineSymbol(jit, "Free",     (void *)(uintptr_t)memsafeFree);
     ktmJitDefineSymbol(jit, "CAlloc",   (void *)(uintptr_t)memsafeCAlloc);
     ktmJitDefineSymbol(jit, "ReAlloc",  (void *)(uintptr_t)memsafeReAlloc);
+    /* the stdlib as modules: mem's functions by their symbols */
+    ktmJitDefineSymbol(jit, "_K3mem5alloc",     (void *)(uintptr_t)memsafeMAlloc);
+    ktmJitDefineSymbol(jit, "_K3mem4free",      (void *)(uintptr_t)memsafeFree);
+    ktmJitDefineSymbol(jit, "_K3mem9allocZero", (void *)(uintptr_t)memsafeCAlloc);
+    ktmJitDefineSymbol(jit, "_K3mem7realloc",   (void *)(uintptr_t)memsafeReAlloc);
 }

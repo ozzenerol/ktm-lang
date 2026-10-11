@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Global symbols whose name begins with an uppercase `L` (e.g. `LIGHTGRAY`)
  * must still assemble + link. On macOS/Mach-O the assembler treats any symbol
@@ -8,55 +8,50 @@
  * definition and every reference. This test just has to compile, link and
  * read/write these globals correctly. */
 
-class Color { U8 r, g, b, a; };
+struct Color { u8 r, g, b, a; };
 
 Color LIGHTGRAY = {200, 200, 200, 255};   /* class global, array-init */
-I64   LArr[3]   = {10, 20, 30};            /* array global */
-I64   Lscalar   = 42;                      /* scalar global */
-U8   *Lstr      = "hello";                 /* string-pointer global */
+i64   lArr[3]   = {10, 20, 30};            /* array global */
+i64   lscalar   = 42;                      /* scalar global */
+u8   *lstr      = "hello";                 /* string-pointer global */
 
-Bool ClassGlobal()
-{
-  Bool ok = LIGHTGRAY.r == 200 && LIGHTGRAY.g == 200 &&
-            LIGHTGRAY.b == 200 && LIGHTGRAY.a == 255;
-  LIGHTGRAY.g = 99;                         /* write a field */
-  ok = ok && LIGHTGRAY.g == 99;
-  LIGHTGRAY.g = 200;                        /* restore */
-  return ok;
+bool classGlobal() {
+    bool ok = LIGHTGRAY.r == 200 && LIGHTGRAY.g == 200 &&
+                        LIGHTGRAY.b == 200 && LIGHTGRAY.a == 255;
+    LIGHTGRAY.g = 99;                         /* write a field */
+    ok = ok && LIGHTGRAY.g == 99;
+    LIGHTGRAY.g = 200;                        /* restore */
+    return ok;
 }
 
-Bool ArrayGlobal()
-{
-  Bool ok = LArr[0] == 10 && LArr[1] == 20 && LArr[2] == 30;
-  LArr[1] = 77;
-  ok = ok && LArr[1] == 77;
-  LArr[1] = 20;
-  return ok;
+bool arrayGlobal() {
+    bool ok = lArr[0] == 10 && lArr[1] == 20 && lArr[2] == 30;
+    lArr[1] = 77;
+    ok = ok && lArr[1] == 77;
+    lArr[1] = 20;
+    return ok;
 }
 
-Bool ScalarGlobal()
-{
-  Bool ok = Lscalar == 42;
-  Lscalar = 7;
-  ok = ok && Lscalar == 7;
-  Lscalar = 42;
-  return ok;
+bool scalarGlobal() {
+    bool ok = lscalar == 42;
+    lscalar = 7;
+    ok = ok && lscalar == 7;
+    lscalar = 42;
+    return ok;
 }
 
-Bool StringGlobal()
-{
-  return Lstr[0] == 'h' && Lstr[4] == 'o';
+bool stringGlobal() {
+    return lstr[0] == 'h' && lstr[4] == 'o';
 }
 
-I32 Main()
-{
-  "Test - uppercase-L global symbols (Mach-O local-label escape):\n";
-  I64 tests = 4, correct = 0;
-  if (ClassGlobal())  correct++;
-  if (ArrayGlobal())  correct++;
-  if (ScalarGlobal()) correct++;
-  if (StringGlobal()) correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - uppercase-L global symbols (Mach-O local-label escape):\n");
+    i64 tests = 4, correct = 0;
+    if (classGlobal())  { correct++; }
+    if (arrayGlobal())  { correct++; }
+    if (scalarGlobal()) { correct++; }
+    if (stringGlobal()) { correct++; }
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

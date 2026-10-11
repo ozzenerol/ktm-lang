@@ -81,20 +81,16 @@ jobs:
         run: |
           set -eux
           stage="$PWD/$PKG"
-          mkdir -p "$stage/include" "$stage/lib"
+          mkdir -p "$stage/lib" "$stage/modules"
 
-          # std.ktmh must be in the prefix before all.ktm is compiled -
-          # the lexer resolves builtins from <install-dir>/include.
-          cp ./src/std/std.ktmh "$stage/include/std.ktmh"
-          # and the prelude, read before it by every compile
-          mkdir -p "$stage/modules"
-          cp -R ./src/std/prelude "$stage/modules/prelude"
-
-          (cd ./src/std && \
-            "$GITHUB_WORKSPACE/ktm-native" \
-              --target=${{ matrix.triple }} \
-              --install-dir="$stage" \
-              -fPIC -S -o "$GITHUB_WORKSPACE/ktm.s" ./all.ktm)
+          # The standard library's modules (prelude and rt among them),
+          # compiled as one tree: what `ktm -lib ktm <prefix>/modules`
+          # does, through -S so the target is the triple's.
+          cp -R ./src/std/. "$stage/modules/"
+          "$GITHUB_WORKSPACE/ktm-native" \
+            --target=${{ matrix.triple }} \
+            --install-dir="$stage" \
+            -fPIC -S -o "$GITHUB_WORKSPACE/ktm.s" -lib ktm "$stage/modules"
 
           cc -fPIC -c ./ktm.s -o ./ktm.o
 
@@ -103,6 +99,7 @@ jobs:
           ar rcs "$stage/lib/libktm.a" ./ktm.o
 
           if [ "${{ matrix.os_name }}" = "linux" ]; then
+            shlib=libktm.so.0.0.1
             # -Bsymbolic binds libktm's internal global references
             # (e.g. the `Fs` exception object) to its own definitions,
             # which is what lets codegen use direct RIP-relative /
@@ -110,10 +107,17 @@ jobs:
             cc -fPIC -shared -Wl,-Bsymbolic -Wl,-soname,libktm.so.0.0.1 \
               ./ktm.o -o "$stage/lib/libktm.so.0.0.1" -lpthread -lc -lm
           else
+            shlib=libktm.0.0.1.dylib
             cc -dynamiclib \
               -install_name @rpath/libktm.0.0.1.dylib \
               ./ktm.o -o "$stage/lib/libktm.0.0.1.dylib" -lpthread -lc -lm
           fi
+
+          # Each module's .ktmlib marker, as `ktm -lib` writes them: an
+          # importer links the library instead of compiling the module
+          for d in "$stage"/modules/*/; do
+            printf 'static ../../lib/libktm.a\nshared ../../lib/%s\n' "$shlib" > "$d/.ktmlib"
+          done
 
       - name: Stage package
         env:
@@ -123,7 +127,7 @@ jobs:
           cp ./ktm "./$PKG/ktm"
           cp ./packaging/install.sh "./$PKG/install.sh"
           chmod +x "./$PKG/ktm" "./$PKG/install.sh"
-          ls -la "./$PKG" "./$PKG/lib" "./$PKG/include"
+          ls -la "./$PKG" "./$PKG/lib" "./$PKG/modules"
           file "./$PKG/ktm" "./$PKG/lib/"*
 
       # Installs into a scratch prefix and compiles + runs a program

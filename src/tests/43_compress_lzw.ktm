@@ -1,16 +1,18 @@
-#include "testhelper.ktm"
+import mem, str, test;
+
+enum Err { compress };
 
 /* Integration test: LZW compress/decompress lifted verbatim from
  * TempleOS (TempleOS/Kernel/Compress.HC). Exercises in one file:
  *   - class self-reference without forward decl (CArcEntry, CArcCtrl)
- *   - trailing U0 placeholder field (CArcCompress.body)
+ *   - trailing void placeholder field (CArcCompress.body)
  *   - pointer relational comparisons (src_ptr<src_limit etc.)
  *   - throw/try with a real handler around uncaught conditions
  *   - default function parameters (ArcCtrlNew)
  *   - switch[], goto labels, hash-chain pointer overlay
  * Only change: explicit casts where TempleOS converts pointers silently
  * (&c->hash[i] used as a CArcEntry whose next field is the slot, and the
- * archive as a U8 buffer), so it compiles without warnings.
+ * archive as a u8 buffer), so it compiles without warnings.
  * Regression on any one of these will scramble the round-tripped bytes.
  *
  * **NOTE ON WARNINGS:**
@@ -19,351 +21,342 @@
  * of the below to satisfy typechecking.
  */
 
-#define ARC_BITS_MAX	12
-#define CT_NONE 	1
-#define CT_7_BIT	2
-#define CT_8_BIT	3
+const i64 ARC_BITS_MAX = 12;
+const i64 CT_NONE = 1;
+const i64 CT_7_BIT = 2;
+const i64 CT_8_BIT = 3;
 
-#ifndef FALSE
-#define FALSE 0
-#endif
+u64 memMappedSpace;
 
-#ifndef TRUE
-#define TRUE 1
-#endif
-
-
-U64 mem_mapped_space;
-
-#define U32_MAX 4294967295
-
-public class CArcCompress
-{
-  I64	compressed_size,expanded_size;
-  U8	compression_type;
-  U0	body;
+pub struct CArcCompress {
+  i64	compressedSize,expandedSize;
+  u8	compressionType;
+  void	body;
 };
 
-class CArcEntry
-{
+struct CArcEntry {
   CArcEntry *next;
-  U16	basecode;
-  U8	ch,pad;
-  U32	pad;
+  u16	basecode;
+  u8	ch,pad;
+  u32	pad;
 };
 
-public class CArcCtrl
-{
-  I64	src_pos,src_size,
-	dst_pos,dst_size;
-  U8	*src_buf,*dst_buf;
-  I64	min_bits,min_table_entry;
-  CArcEntry *cur_entry,*next_entry;
-  I64	cur_bits_in_use,next_bits_in_use;
-  U8	*stk_ptr,*stk_base;
-  I64	free_idx,free_limit,
-	saved_basecode,
-	entry_used,
-	last_ch;
+pub struct CArcCtrl {
+  i64	srcPos,srcSize,
+    dstPos,dstSize;
+  u8	*srcBuf,*dstBuf;
+  i64	minBits,minTableEntry;
+  CArcEntry *curEntry,*nextEntry;
+  i64	curBitsInUse,nextBitsInUse;
+  u8	*stkPtr,*stkBase;
+  i64	freeIdx,freeLimit,
+    savedBasecode,
+    entryUsed,
+    lastCh;
   CArcEntry compress[1<<ARC_BITS_MAX],
-	        *hash[1<<ARC_BITS_MAX];
+            *hash[1<<ARC_BITS_MAX];
 };
 
-U0 BFieldOrU32(U8 *bit_field, I64 bit_num, U64 val)
-{
-  U64 *q = bit_field + (bit_num >> 3);
-  *q |= val << (bit_num & 7);
+void bFieldOrU32(u8 *bitField, i64 bitNum, u64 val) {
+  u64 *q = bitField + (bitNum >> 3);
+  *q |= val << (bitNum & 7);
 }
 
-U64 BFieldExtU32(U8 *bit_field, I64 bit_num, I64 width)
-{
-  /* Canonical TempleOS form: 8-byte load via U64 *. The version
+u64 bFieldExtU32(u8 *bitField, i64 bitNum, i64 width) {
+  /* Canonical TempleOS form: 8-byte load via u64 *. The version
    * originally pasted in scratch/compress.ktm reads via
-   * `*(bit_field + ...)`, which is a U8 deref (1 byte) - any code
+   * `*(bit_field + ...)`, which is a u8 deref (1 byte) - any code
    * wider than (8 - bit_num%8) bits is then masked out and the LZW
    * dictionary lookup goes off the rails. */
-  U64 *q = bit_field + (bit_num >> 3);
-  return *q >> (bit_num & 7) & ((1 << width) - 1);
+  u64 *q = bitField + (bitNum >> 3);
+  return *q >> (bitNum & 7) & ((1 << width) - 1);
 }
 
-I64 ArcDetermineCompressionType(U8 *src,I64 size)
-{
-  while (size--)
-    if (*src++ & 0x80)
+i64 arcDetermineCompressionType(u8 *src,i64 size) {
+  while (size--) {
+    if (*src++ & 0x80) {
       return CT_8_BIT;
+    }
+  }
   return CT_7_BIT;
 }
 
-Bool ArcFinishCompression(CArcCtrl *c)
+bool arcFinishCompression(CArcCtrl *c)
 {//Do closing touch on archivew ctrl struct.
-  if (c->dst_pos+c->cur_bits_in_use<=c->dst_size) {
-    BFieldOrU32(c->dst_buf,c->dst_pos,c->saved_basecode);
-    c->dst_pos+=c->next_bits_in_use;
-    return TRUE;
-  } else
-    return FALSE;
+  if (c.dstPos+c.curBitsInUse<=c.dstSize) {
+    bFieldOrU32(c.dstBuf,c.dstPos,c.savedBasecode);
+    c.dstPos+=c.nextBitsInUse;
+    return true;
+  } else {
+    return false;
+  }
 }
 
-U0 ArcEntryGet(CArcCtrl *c)
-{
-  I64 i;
+void arcEntryGet(CArcCtrl *c) {
+  i64 i;
   CArcEntry *tmp,*tmp1;
 
-  if (c->entry_used) {
-    i=c->free_idx;
+  if (c.entryUsed) {
+    i=c.freeIdx;
 
-    c->entry_used=FALSE;
-    c->cur_entry=c->next_entry;
-    c->cur_bits_in_use=c->next_bits_in_use;
-    if (c->next_bits_in_use<ARC_BITS_MAX) {
-      c->next_entry = &c->compress[i++];
-      if (i==c->free_limit) {
-	c->next_bits_in_use++;
-	c->free_limit=1<<c->next_bits_in_use;
+    c.entryUsed=false;
+    c.curEntry=c.nextEntry;
+    c.curBitsInUse=c.nextBitsInUse;
+    if (c.nextBitsInUse<ARC_BITS_MAX) {
+      c.nextEntry = &c.compress[i++];
+      if (i==c.freeLimit) {
+    c.nextBitsInUse++;
+    c.freeLimit=1<<c.nextBitsInUse;
       }
     } else {
-      do if (++i==c->free_limit)
-	  i=c->min_table_entry;
-      while (c->hash[i]);
-      tmp=&c->compress[i];
-      c->next_entry=tmp;
-      tmp1=(&c->hash[tmp->basecode])(CArcEntry *);
+      do { if (++i==c.freeLimit) {
+      i=c.minTableEntry;
+      }
+      } while (c.hash[i]);
+      tmp=&c.compress[i];
+      c.nextEntry=tmp;
+      tmp1=(CArcEntry *)(&c.hash[tmp.basecode]);
       while (tmp1) {
-	if (tmp1->next==tmp) {
-	  tmp1->next=tmp->next;
-	  break;
-	} else
-	  tmp1=tmp1->next;
+    if (tmp1.next==tmp) {
+      tmp1.next=tmp.next;
+      break;
+    } else {
+      tmp1=tmp1.next;
+    }
       }
     }
-    c->free_idx=i;
+    c.freeIdx=i;
   }
 }
 
-CArcCtrl *ArcCtrlNew(Bool expand,I64 compression_type=CT_8_BIT)
+CArcCtrl *arcCtrlNew(bool expand,i64 compressionType=CT_8_BIT)
 {//MAlloc archive ctrl struct.
   CArcCtrl *c;
-  c=CAlloc(sizeof(CArcCtrl));
+  c=mem.allocZero(sizeof(CArcCtrl));
   if (expand) {
-    c->stk_base=MAlloc(1<<ARC_BITS_MAX);
-    c->stk_ptr=c->stk_base;
+    c.stkBase=mem.alloc(1<<ARC_BITS_MAX);
+    c.stkPtr=c.stkBase;
   }
-  if (compression_type==CT_7_BIT)
-    c->min_bits=7;
-  else
-    c->min_bits=8;
-  c->min_table_entry=1<<c->min_bits;
-  c->free_idx=c->min_table_entry;
-  c->next_bits_in_use=c->min_bits+1;
-  c->free_limit=1<<c->next_bits_in_use;
-  c->saved_basecode=U32_MAX;
-  c->entry_used=TRUE;
-  ArcEntryGet(c);
-  c->entry_used=TRUE;
+  if (compressionType==CT_7_BIT) {
+    c.minBits=7;
+  } else {
+    c.minBits=8;
+  }
+  c.minTableEntry=1<<c.minBits;
+  c.freeIdx=c.minTableEntry;
+  c.nextBitsInUse=c.minBits+1;
+  c.freeLimit=1<<c.nextBitsInUse;
+  c.savedBasecode=U32_MAX;
+  c.entryUsed=true;
+  arcEntryGet(c);
+  c.entryUsed=true;
   return c;
 }
 
-U0 ArcCtrlDel(CArcCtrl *c)
+void arcCtrlDel(CArcCtrl *c)
 {//Free archive ctrl struct.
-  Free(c->stk_base);
-  Free(c);
+  mem.free(c.stkBase);
+  mem.free(c);
 }
 
-U0 ArcCompressBuf(CArcCtrl *c)
+void arcCompressBuf(CArcCtrl *c)
 {//Use $LK,"CompressBuf",A="MN:CompressBuf"$() unless doing more than one buf.
   CArcEntry *tmp,*tmp1;
-  I64 ch,basecode;
-  U8 *src_ptr,*src_limit;
+  i64 ch,basecode;
+  u8 *srcPtr,*srcLimit;
 
-  src_ptr=c->src_buf+c->src_pos;
-  src_limit=c->src_buf+c->src_size;
+  srcPtr=c.srcBuf+c.srcPos;
+  srcLimit=c.srcBuf+c.srcSize;
 
-  if (c->saved_basecode==U32_MAX)
-    basecode=*src_ptr++;
-  else
-    basecode=c->saved_basecode;
+  if (c.savedBasecode==U32_MAX) {
+    basecode=*srcPtr++;
+  } else {
+    basecode=c.savedBasecode;
+  }
 
-  while (src_ptr<src_limit && c->dst_pos+c->cur_bits_in_use<=c->dst_size) {
-    ArcEntryGet(c);
+  while (srcPtr<srcLimit && c.dstPos+c.curBitsInUse<=c.dstSize) {
+    arcEntryGet(c);
 ac_start:
-    if (src_ptr>=src_limit) goto ac_done;
-    ch=*src_ptr++;
-    if (tmp=c->hash[basecode])
+    if (srcPtr>=srcLimit) { goto ac_done; }
+    ch=*srcPtr++;
+    if (tmp=c.hash[basecode]) {
       do {
-	if (tmp->ch==ch) {
-	  basecode=tmp-&c->compress[0];
-	  goto ac_start;
-	}
-      } while (tmp=tmp->next);
+    if (tmp.ch==ch) {
+      basecode=tmp-&c.compress[0];
+      goto ac_start;
+    }
+      } while (tmp=tmp.next);
+    }
 
-    BFieldOrU32(c->dst_buf,c->dst_pos,basecode);
-    c->dst_pos+=c->cur_bits_in_use;
+    bFieldOrU32(c.dstBuf,c.dstPos,basecode);
+    c.dstPos+=c.curBitsInUse;
 
-    c->entry_used=TRUE;
-    tmp=c->cur_entry;
-    tmp->basecode=basecode;
-    tmp->ch=ch;
-    tmp1=(&c->hash[basecode])(CArcEntry *);
-    tmp->next=tmp1->next;
-    tmp1->next=tmp;
+    c.entryUsed=true;
+    tmp=c.curEntry;
+    tmp.basecode=basecode;
+    tmp.ch=ch;
+    tmp1=(CArcEntry *)(&c.hash[basecode]);
+    tmp.next=tmp1.next;
+    tmp1.next=tmp;
 
     basecode=ch;
   }
 ac_done:
-  c->saved_basecode=basecode;
-  c->src_pos=src_ptr-c->src_buf;
+  c.savedBasecode=basecode;
+  c.srcPos=srcPtr-c.srcBuf;
 }
 
-CArcCompress *CompressBuf(U8 *src,I64 size)
+CArcCompress *compressBuf(u8 *src,i64 size)
 {//See $LK,"::/Demo/Dsk/SerializeTree.ktm"$.
   CArcCompress *arc;
-  I64 size_out,compression_type=ArcDetermineCompressionType(src,size);
-  CArcCtrl *c=ArcCtrlNew(FALSE,compression_type);
-  c->src_size=size;
-  c->src_buf=src;
-  c->dst_size=(size+sizeof(CArcCompress))<<3;
-  c->dst_buf=CAlloc(c->dst_size>>3);
-  c->dst_pos=sizeof(CArcCompress)<<3;
-  ArcCompressBuf(c);
-  if (ArcFinishCompression(c) && c->src_pos==c->src_size) {
-    size_out=(c->dst_pos+7)>>3;
-    arc=MAlloc(size_out);
-    MemCpy(arc,c->dst_buf,size_out);
-    arc->compression_type=compression_type;
-    arc->compressed_size=size_out;
+  i64 sizeOut,compressionType=arcDetermineCompressionType(src,size);
+  CArcCtrl *c=arcCtrlNew(false,compressionType);
+  c.srcSize=size;
+  c.srcBuf=src;
+  c.dstSize=(size+sizeof(CArcCompress))<<3;
+  c.dstBuf=mem.allocZero(c.dstSize>>3);
+  c.dstPos=sizeof(CArcCompress)<<3;
+  arcCompressBuf(c);
+  if (arcFinishCompression(c) && c.srcPos==c.srcSize) {
+    sizeOut=(c.dstPos+7)>>3;
+    arc=mem.alloc(sizeOut);
+    mem.copy(arc,c.dstBuf,sizeOut);
+    arc.compressionType=compressionType;
+    arc.compressedSize=sizeOut;
   } else {
-    arc=MAlloc(size+sizeof(CArcCompress));
-    MemCpy(&arc->body,src,size);
-    arc->compression_type=CT_NONE;
-    arc->compressed_size=size+sizeof(CArcCompress);
+    arc=mem.alloc(size+sizeof(CArcCompress));
+    mem.copy(&arc.body,src,size);
+    arc.compressionType=CT_NONE;
+    arc.compressedSize=size+sizeof(CArcCompress);
   }
-  arc->expanded_size=size;
-  Free(c->dst_buf);
-  ArcCtrlDel(c);
+  arc.expandedSize=size;
+  mem.free(c.dstBuf);
+  arcCtrlDel(c);
   return arc;
 }
 
-U0 ArcExpandBuf(CArcCtrl *c)
+void arcExpandBuf(CArcCtrl *c)
 {//Use $LK,"ExpandBuf",A="MN:ExpandBuf"$() unless you know what you're doing.
-  U8 *dst_ptr,*dst_limit;
-  I64 basecode,lastcode,code;
+  u8 *dstPtr,*dstLimit;
+  i64 basecode,lastcode,code;
   CArcEntry *tmp,*tmp1;
 
-  dst_ptr=c->dst_buf+c->dst_pos;
-  dst_limit=c->dst_buf+c->dst_size;
+  dstPtr=c.dstBuf+c.dstPos;
+  dstLimit=c.dstBuf+c.dstSize;
 
-  while (dst_ptr<dst_limit && c->stk_ptr!=c->stk_base)
-    *dst_ptr++ = * -- c->stk_ptr;
+  while (dstPtr<dstLimit && c.stkPtr!=c.stkBase) {
+    *dstPtr++ = * -- c.stkPtr;
+  }
 
-  if (c->stk_ptr==c->stk_base && dst_ptr<dst_limit) {
-    if (c->saved_basecode==U32_MAX) {
-      lastcode=BFieldExtU32(c->src_buf,c->src_pos,
-	    c->next_bits_in_use);
-      c->src_pos+=c->next_bits_in_use;
-      *dst_ptr++=lastcode;
-      ArcEntryGet(c);
-      c->last_ch=lastcode;
-    } else
-      lastcode=c->saved_basecode;
-    while (dst_ptr<dst_limit && c->src_pos+c->next_bits_in_use<=c->src_size) {
-      basecode=BFieldExtU32(c->src_buf,c->src_pos,
-	    c->next_bits_in_use);
-      c->src_pos+=c->next_bits_in_use;
-      if (c->cur_entry==&c->compress[basecode]) {
-	*c->stk_ptr++=c->last_ch;
-	code=lastcode;
-      } else
-	code=basecode;
-      while (code>=c->min_table_entry) {
-	*c->stk_ptr++=c->compress[code].ch;
-	code=c->compress[code].basecode;
+  if (c.stkPtr==c.stkBase && dstPtr<dstLimit) {
+    if (c.savedBasecode==U32_MAX) {
+      lastcode=bFieldExtU32(c.srcBuf,c.srcPos,
+        c.nextBitsInUse);
+      c.srcPos+=c.nextBitsInUse;
+      *dstPtr++=lastcode;
+      arcEntryGet(c);
+      c.lastCh=lastcode;
+    } else {
+      lastcode=c.savedBasecode;
+    }
+    while (dstPtr<dstLimit && c.srcPos+c.nextBitsInUse<=c.srcSize) {
+      basecode=bFieldExtU32(c.srcBuf,c.srcPos,
+        c.nextBitsInUse);
+      c.srcPos+=c.nextBitsInUse;
+      if (c.curEntry==&c.compress[basecode]) {
+    *c.stkPtr++=c.lastCh;
+    code=lastcode;
+      } else {
+    code=basecode;
       }
-      *c->stk_ptr++=code;
-      c->last_ch=code;
+      while (code>=c.minTableEntry) {
+    *c.stkPtr++=c.compress[code].ch;
+    code=c.compress[code].basecode;
+      }
+      *c.stkPtr++=code;
+      c.lastCh=code;
 
-      c->entry_used=TRUE;
-      tmp=c->cur_entry;
-      tmp->basecode=lastcode;
-      tmp->ch=c->last_ch;
-      tmp1=(&c->hash[lastcode])(CArcEntry *);
-      tmp->next=tmp1->next;
-      tmp1->next=tmp;
+      c.entryUsed=true;
+      tmp=c.curEntry;
+      tmp.basecode=lastcode;
+      tmp.ch=c.lastCh;
+      tmp1=(CArcEntry *)(&c.hash[lastcode]);
+      tmp.next=tmp1.next;
+      tmp1.next=tmp;
 
-      ArcEntryGet(c);
-      while (dst_ptr<dst_limit && c->stk_ptr!=c->stk_base)
-	*dst_ptr++ = * -- c->stk_ptr;
+      arcEntryGet(c);
+      while (dstPtr<dstLimit && c.stkPtr!=c.stkBase) {
+    *dstPtr++ = * -- c.stkPtr;
+      }
       lastcode=basecode;
     }
-    c->saved_basecode=lastcode;
+    c.savedBasecode=lastcode;
   }
-  c->dst_pos=dst_ptr-c->dst_buf;
+  c.dstPos=dstPtr-c.dstBuf;
 }
 
-U8 *ExpandBuf(CArcCompress *arc)
+u8 *expandBuf(CArcCompress *arc)
 {//See $LK,"::/Demo/Dsk/SerializeTree.ktm"$.
   CArcCtrl *c;
-  U8 *res;
+  u8 *res;
 
-  if (!(CT_NONE<=arc->compression_type<=CT_8_BIT) || arc->expanded_size>mem_mapped_space)
-    throw('Compress');
+  if (!(CT_NONE<=arc.compressionType<=CT_8_BIT) || arc.expandedSize>memMappedSpace) {
+    throw(Err.compress);
+  }
 
-  res=MAlloc(arc->expanded_size+1);
-  res[arc->expanded_size]=0; //terminate
-  switch [arc->compression_type] {
+  res=mem.alloc(arc.expandedSize+1);
+  res[arc.expandedSize]=0; //terminate
+  switch [arc.compressionType] {
     case CT_NONE:
-      MemCpy(res,&arc->body,arc->expanded_size);
+      mem.copy(res,&arc.body,arc.expandedSize);
       break;
     case CT_7_BIT:
     case CT_8_BIT:
-      c=ArcCtrlNew(TRUE,arc->compression_type);
-      c->src_size=arc->compressed_size<<3;
-      c->src_pos=sizeof(CArcCompress)<<3;
-      c->src_buf=arc(U8 *);
-      c->dst_size=arc->expanded_size;
-      c->dst_buf=res;
-      c->dst_pos=0;
-      ArcExpandBuf(c);
-      ArcCtrlDel(c);
+      c=arcCtrlNew(true,arc.compressionType);
+      c.srcSize=arc.compressedSize<<3;
+      c.srcPos=sizeof(CArcCompress)<<3;
+      c.srcBuf=(u8 *)arc;
+      c.dstSize=arc.expandedSize;
+      c.dstBuf=res;
+      c.dstPos=0;
+      arcExpandBuf(c);
+      arcCtrlDel(c);
       break;
   }
   return res;
 }
 
-Bool RoundTrip(U8 *src, I64 n)
-{
-  CArcCompress *arc = CompressBuf(src, n);
-  U8 *out = ExpandBuf(arc);
-  Bool ok = arc->expanded_size == n && !StrNCmp(out, src, n);
-  Free(out);
-  Free(arc);
+bool roundTrip(u8 *src, i64 n) {
+  CArcCompress *arc = compressBuf(src, n);
+  u8 *out = expandBuf(arc);
+  bool ok = arc.expandedSize == n && !str.cmpLen(out, src, n);
+  mem.free(out);
+  mem.free(arc);
   return ok;
 }
 
-Bool ShortBufferRoundTrip()
-{
+bool shortBufferRoundTrip() {
   /* Short input falls through the CT_NONE path (compressed bits
    * wouldn't fit), exercising the &arc->body trailing-buffer trick. */
-  return RoundTrip("hello", 5);
+  return roundTrip("hello", 5);
 }
 
-Bool RepeatedBufferRoundTrip()
-{
+bool repeatedBufferRoundTrip() {
   /* Highly repetitive input exercises the CT_7_BIT/CT_8_BIT LZW path. */
-  U8 *src = "the quick brown fox jumps over the lazy dog. "
+  u8 *src = "the quick brown fox jumps over the lazy dog. "
             "the quick brown fox jumps over the lazy dog. "
             "the quick brown fox jumps over the lazy dog. "
             "the quick brown fox jumps over the lazy dog.";
-  return RoundTrip(src, StrLen(src));
+  return roundTrip(src, str.len(src));
 }
 
-I32 Main()
-{
-  "Test - TempleOS LZW compress/decompress: ";
-  mem_mapped_space = 1 << 20;
-  I64 correct = 0, tests = 2;
-  if (ShortBufferRoundTrip) correct++;
-  if (RepeatedBufferRoundTrip) correct++;
-  PrintResult(correct, tests);
-  "====\n";
+i32 main() {
+  printf("Test - TempleOS LZW compress/decompress: ");
+  memMappedSpace = 1 << 20;
+  i64 correct = 0, tests = 2;
+  if (shortBufferRoundTrip()) { correct++; }
+  if (repeatedBufferRoundTrip()) { correct++; }
+  test.printResult(correct, tests);
+  printf("====\n");
   return 0;
 }

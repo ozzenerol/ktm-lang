@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* An uncaught throw printed `uncaught throw: 6574614C` on stdout. It is
  * now reported on stderr, a printable character constant as text, with
@@ -9,50 +9,49 @@
 #define UT_OUT "__326_uncaught.stdout"
 #define UT_ERR "__326_uncaught.stderr"
 
-Bool Uncaught(U8 *body, U8 *want_err, U8 *want_out)
-{
-  U8 *src = StrPrint(NULL, "U0 Main()\n{\n%s\n}\n", body);
-  Bool ok = FALSE;
-  if (FileWrite(UT_SRC, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC) &&
-      System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-             UT_SRC " -o " UT_BIN) == 0) {
-    I64 res = System(UT_BIN " > " UT_OUT " 2> " UT_ERR);
-    U8 *out = FileRead(UT_OUT), *err = FileRead(UT_ERR);
-    if (out && err) {
-      ok = res == 1 && !StrCmp(err, want_err) && !StrCmp(out, want_out);
-      if (!ok) "\nexit %d, stdout [%s], stderr [%s]\n", res, out, err;
+bool uncaught(u8 *body, u8 *wantErr, u8 *wantOut) {
+    u8 *src = str.formatTo(null, "void Main()\n{\n%s\n}\n", body);
+    bool ok = false;
+    if (fs.writeAll(UT_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC) &&
+            proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                         UT_SRC " -o " UT_BIN) == 0) {
+        i64 res = proc.shell(UT_BIN " > " UT_OUT " 2> " UT_ERR);
+        u8 *out = fs.readAll(UT_OUT), *err = fs.readAll(UT_ERR);
+        if (out && err) {
+            ok = res == 1 && !str.cmp(err, wantErr) && !str.cmp(out, wantOut);
+            if (!ok) { printf("\nexit %d, stdout [%s], stderr [%s]\n", res, out, err); }
+        }
+        mem.free(out);
+        mem.free(err);
     }
-    Free(out);
-    Free(err);
-  }
-  Free(src);
-  Rm(UT_SRC);
-  Rm(UT_BIN);
-  Rm(UT_OUT);
-  Rm(UT_ERR);
-  return ok;
+    mem.free(src);
+    fs.remove(UT_SRC);
+    fs.remove(UT_BIN);
+    fs.remove(UT_OUT);
+    fs.remove(UT_ERR);
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - uncaught throw message: ";
-  I64 correct = 0, tests = 8;
+i32 main() {
+    printf("Test - uncaught throw message: ");
+    i64 correct = 0, tests = 8;
 
-  if (Uncaught("throw('Late');", "uncaught error 'Late' (" UT_SRC ":3)\n", "")) correct++;
-  if (Uncaught("\"before\\n\"; throw('A');",
-               "uncaught error 'A' (" UT_SRC ":3)\n", "before\n")) correct++;
-  if (Uncaught("throw('LongName');", "uncaught error 'LongName' (" UT_SRC ":3)\n", ""))
-    correct++;
-  if (Uncaught("throw(0x0A41);", "uncaught error 2625 (" UT_SRC ":3)\n", "")) correct++;
-  if (Uncaught("throw(0);", "uncaught error 0 (" UT_SRC ":3)\n", "")) correct++;
-  if (Uncaught("throw(-12);", "uncaught error -12 (" UT_SRC ":3)\n", "")) correct++;
-  if (Uncaught("throw(0x8000000000000000);",
-               "uncaught error -9223372036854775808 (" UT_SRC ":3)\n", "")) correct++;
-  /* After a try has been used and left, the chain is empty again. */
-  if (Uncaught("try { throw(1); } catch { \"c\\n\"; } throw('Bye');",
-               "uncaught error 'Bye' (" UT_SRC ":3)\n", "c\n")) correct++;
+    if (uncaught("throw('Late');", "uncaught error 'Late' (" UT_SRC ":3)\n", "")) { correct++; }
+    if (uncaught("\"before\\n\"; throw('A');",
+                             "uncaught error 'A' (" UT_SRC ":3)\n", "before\n")) { correct++; }
+    if (uncaught("throw('LongName');", "uncaught error 'LongName' (" UT_SRC ":3)\n", "")) {
+        correct++;
+    }
+    if (uncaught("throw(0x0A41);", "uncaught error 2625 (" UT_SRC ":3)\n", "")) { correct++; }
+    if (uncaught("throw(0);", "uncaught error 0 (" UT_SRC ":3)\n", "")) { correct++; }
+    if (uncaught("throw(-12);", "uncaught error -12 (" UT_SRC ":3)\n", "")) { correct++; }
+    if (uncaught("throw(0x8000000000000000);",
+                             "uncaught error -9223372036854775808 (" UT_SRC ":3)\n", "")) { correct++; }
+    /* After a try has been used and left, the chain is empty again. */
+    if (uncaught("try { throw(1); } catch { \"c\\n\"; } throw('Bye');",
+                             "uncaught error 'Bye' (" UT_SRC ":3)\n", "c\n")) { correct++; }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

@@ -53,7 +53,7 @@ docs/examples/run.sh life     # just one</code></pre>
 
 <h2 id="word-frequency">Word frequency<a class="anchor" href="#word-frequency" aria-label="Link to this section">#</a></h2>
 <p>Reads a text file and prints its most common words. It shows reading a file, scanning
-characters, counting with a <code>StrMap</code>, ranking with <code>PtrVecSort</code>, and
+characters, counting with a <code>map.StrMap</code>, ranking with <code>vec.ptrSort</code>, and
 reading command-line arguments.</p>
 <pre><code>cd docs/examples/wordfreq
 ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>
@@ -62,97 +62,94 @@ ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>
 //   ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt
 //   ktm -jit main.ktm sample.txt
 //
-// Shows: reading files, scanning strings, StrMap, PtrVec sorting,
-// classes and command-line arguments.
+// Shows: reading a file (fs), scanning strings, counting in a map.StrMap,
+// sorting a vec.PtrVec, structs and command-line arguments.
 
-#define TOP_N    8
-#define MAX_WORD 64
+import fs, map, mem, str, vec;
 
-class WordCount
-{
-  U8 *word;
-  I64 count;
+const i64 TOP_N = 8;
+const i64 MAX_WORD = 64;
+
+struct WordCount {
+    u8 *word;
+    i64 count;
 };
 
-// Sort predicate: TRUE when a ranks above b. Most frequent first, then
+// Sort predicate: true when a ranks above b. Most frequent first, then
 // alphabetical so ties have a stable order.
-I64 RanksHigher(U0 *_a, U0 *_b)
-{
-  WordCount *a = _a;
-  WordCount *b = _b;
-  if (a-&gt;count != b-&gt;count) {
-    return a-&gt;count &gt; b-&gt;count;
-  }
-  return StrCmp(a-&gt;word, b-&gt;word) &lt; 0;
-}
-
-Bool IsLetter(U8 c)
-{
-  return ('a' &lt;= c &lt;= 'z') || ('A' &lt;= c &lt;= 'Z');
-}
-
-U0 CountWord(StrMap *counts, U8 *word)
-{
-  WordCount *wc = StrMapGet(counts, word);
-  if (wc == NULL) {
-    wc = MAlloc(sizeof(WordCount));
-    wc-&gt;word = StrNew(word);       // the map keeps this pointer as its key
-    wc-&gt;count = 0;
-    StrMapSet(counts, wc-&gt;word, wc);
-  }
-  wc-&gt;count++;
-}
-
-I32 Main(I32 argc, U8 **argv)
-{
-  U8 *path = "sample.txt";
-  if (argc &gt; 1) {
-    path = argv[1];
-  }
-
-  I64 size;
-  U8 *text = FileRead(path, &amp;size);
-  if (text == NULL) {
-    "cannot read %s\n", path;
-    return 1;
-  }
-
-  StrMap *counts = StrMapNew();
-  U8 word[MAX_WORD];
-  I64 len = 0, total = 0;
-
-  // One pass over the text; i == size flushes the final word.
-  for (I64 i = 0; i &lt;= size; i++) {
-    U8 c = 0;
-    if (i &lt; size) c = text[i];
-    if (IsLetter(c)) {
-      if (len &lt; MAX_WORD - 1) {
-        word[len++] = ToLower(c);
-      }
-    } else if (len &gt; 0) {
-      word[len] = 0;
-      CountWord(counts, word);
-      total++;
-      len = 0;
+i64 ranksHigher(void *aArg, void *bArg) {
+    WordCount *a = aArg;
+    WordCount *b = bArg;
+    if (a.count != b.count) {
+        return a.count &gt; b.count;
     }
-  }
+    return str.cmp(a.word, b.word) &lt; 0;
+}
 
-  PtrVec *ranked = PtrVecNew();
-  I64 idx = 0;
-  WordCount *wc;
-  while (StrMapValueIter(counts, &amp;idx, &amp;wc)) {
-    PtrVecPush(ranked, wc);
-  }
-  PtrVecSort(ranked, &amp;RanksHigher);
+bool isLetter(u8 c) {
+    return ('a' &lt;= c &lt;= 'z') || ('A' &lt;= c &lt;= 'Z');
+}
 
-  "%d words, %d distinct\n", total, ranked-&gt;size;
-  for (I64 i = 0; i &lt; TOP_N &amp;&amp; i &lt; ranked-&gt;size; i++) {
-    WordCount *top = ranked-&gt;entries[i];
-    "%2d. %-10s %d\n", i + 1, top-&gt;word, top-&gt;count;
-  }
+void countWord(map.StrMap *counts, u8 *word) {
+    WordCount *wc = counts.get(word);
+    if (wc == null) {
+        wc = mem.alloc(sizeof(WordCount));
+        wc.word = str.dup(word);       // the map keeps this pointer as its key
+        wc.count = 0;
+        counts.set(wc.word, wc);
+    }
+    wc.count++;
+}
 
-  Free(text);
-  return 0;
+i32 main(i32 argc, u8 **argv) {
+    u8 *path = "sample.txt";
+    if (argc &gt; 1) {
+        path = argv[1];
+    }
+
+    i64 size;
+    u8 *text = fs.readAll(path, &amp;size);
+    if (text == null) {
+        printf("cannot read %s\n", path);
+        return 1;
+    }
+
+    map.StrMap *counts = map.strNew();
+    u8 word[MAX_WORD];
+    i64 len = 0, total = 0;
+
+    // One pass over the text; i == size flushes the final word.
+    for (i64 i = 0; i &lt;= size; i++) {
+        u8 c = 0;
+        if (i &lt; size) { c = text[i]; }
+        if (isLetter(c)) {
+            if (len &lt; MAX_WORD - 1) {
+                word[len++] = str.toLower(c);
+            }
+        } else if (len &gt; 0) {
+            word[len] = 0;
+            countWord(counts, word);
+            total++;
+            len = 0;
+        }
+    }
+
+    vec.PtrVec *ranked = vec.ptrNew();
+    i64 idx = 0;
+    WordCount *wc;
+    while (counts.valueIter(&amp;idx, &amp;wc)) {
+        ranked.push(wc);
+    }
+    ranked.sort(&amp;ranksHigher);
+
+    printf("%d words, %d distinct\n", total, ranked.size);
+    for (i64 i = 0; i &lt; TOP_N &amp;&amp; i &lt; ranked.size; i++) {
+        WordCount *top = ranked.entries[i];
+        printf("%2d. %-10s %d\n", i + 1, top.word, top.count);
+    }
+
+    mem.free(text);
+    return 0;
 }
 </code></pre>
 <pre class="output">66 words, 28 distinct
@@ -178,163 +175,151 @@ ktm main.ktm -o bank &amp;&amp; ./bank</code></pre>
 //   ktm main.ktm -o bank &amp;&amp; ./bank
 //   ktm -jit main.ktm
 //
-// Shows: classes and inheritance, function pointers as "methods",
-// exceptions for errors, linked lists, and integer money (cents).
+// Shows: structs and inheritance, function pointers in a struct,
+// exceptions with an error enum, the list module, and integer money (cents).
 
-#define ERR_FUNDS  'Funds'
-#define ERR_FROZEN 'Frozen'
+import list, mem;
 
-class Account
-{
-  U8 *owner;
-  I64 balance;          // in cents
-  Bool frozen;
-  // Per-kind behaviour: interest earned in a month.
-  I64 (*interest)(Account *a);
+enum BankError { funds = 1, frozen };
+
+struct Account {
+    u8 *owner;
+    i64 balance;          // in cents
+    bool frozen;
+    // Per-kind behaviour: interest earned in a month.
+    fn(Account *a) i64 interest;
 };
 
-class Savings : Account
-{
-  I64 rate_bp;          // annual rate in basis points (1/100 of a percent)
+struct Savings : Account {
+    i64 rateBp;          // annual rate in basis points (1/100 of a percent)
 };
 
-class Txn
-{
-  U8 *owner;
-  U8 *what;
-  I64 amount;
+struct Txn {
+    u8 *owner;
+    u8 *what;
+    i64 amount;
 };
 
-List *ledger;
+list.List *ledger;
 
-I64 NoInterest(Account *a)
-{
-  return 0;
+i64 noInterest(Account *a) {
+    return 0;
 }
 
-I64 SavingsInterest(Account *a)
-{
-  Savings *s = a;
-  return s-&gt;balance * s-&gt;rate_bp / 10000 / 12;
+i64 savingsInterest(Account *a) {
+    Savings *s = a;
+    return s.balance * s.rateBp / 10000 / 12;
 }
 
-U0 InitAccount(Account *a, U8 *owner, I64 cents)
-{
-  a-&gt;owner = owner;
-  a-&gt;balance = cents;
-  a-&gt;frozen = FALSE;
-  a-&gt;interest = &amp;NoInterest;
+void initAccount(Account *a, u8 *owner, i64 cents) {
+    a.owner = owner;
+    a.balance = cents;
+    a.frozen = false;
+    a.interest = &amp;noInterest;
 }
 
-U0 Record(Account *a, U8 *what, I64 amount)
-{
-  Txn *t = MAlloc(sizeof(Txn));
-  t-&gt;owner = a-&gt;owner;
-  t-&gt;what = what;
-  t-&gt;amount = amount;
-  ListAppend(ledger, t);
+void record(Account *a, u8 *what, i64 amount) {
+    Txn *t = mem.alloc(sizeof(Txn));
+    t.owner = a.owner;
+    t.what = what;
+    t.amount = amount;
+    ledger.append(t);
 }
 
-U0 Withdraw(Account *a, I64 cents)
-{
-  if (a-&gt;frozen) throw(ERR_FROZEN);
-  if (cents &gt; a-&gt;balance) throw(ERR_FUNDS);
-  a-&gt;balance -= cents;
-  Record(a, "withdraw", -cents);
+void withdraw(Account *a, i64 cents) {
+    if (a.frozen) { throw(BankError.frozen); }
+    if (cents &gt; a.balance) { throw(BankError.funds); }
+    a.balance -= cents;
+    record(a, "withdraw", -cents);
 }
 
-U0 Deposit(Account *a, I64 cents)
-{
-  if (a-&gt;frozen) throw(ERR_FROZEN);
-  a-&gt;balance += cents;
-  Record(a, "deposit", cents);
+void deposit(Account *a, i64 cents) {
+    if (a.frozen) { throw(BankError.frozen); }
+    a.balance += cents;
+    record(a, "deposit", cents);
 }
 
 // Moves money between accounts, or neither changes.
-Bool Transfer(Account *from, Account *to, I64 cents)
-{
-  Bool withdrawn = FALSE;
-  try {
-    Withdraw(from, cents);
-    withdrawn = TRUE;
-    Deposit(to, cents);
-  } catch {
-    if (withdrawn) {                 // the deposit failed: put it back
-      from-&gt;balance += cents;
-      Record(from, "refund", cents);
+bool transfer(Account *from, Account *to, i64 cents) {
+    bool withdrawn = false;
+    try {
+        withdraw(from, cents);
+        withdrawn = true;
+        deposit(to, cents);
+    } catch (Error e) {
+        if (withdrawn) {                 // the deposit failed: put it back
+            from.balance += cents;
+            record(from, "refund", cents);
+        }
+        u8 *why = "account frozen";
+        if (e.code == BankError.funds) { why = "insufficient funds"; }
+        printf("  transfer %s -&gt; %s refused: %s\n", from.owner, to.owner, why);
+        return false;
     }
-    U8 *why = "account frozen";
-    if (Fs-&gt;except_ch == ERR_FUNDS) why = "insufficient funds";
-    "  transfer %s -&gt; %s refused: %s\n", from-&gt;owner, to-&gt;owner, why;
-    return FALSE;
-  }
-  return TRUE;
+    return true;
 }
 
-U0 PrintMoney(I64 cents)
-{
-  if (cents &lt; 0) {
-    "-";
-    cents = -cents;
-  }
-  "%d.%02d", cents / 100, cents % 100;
-}
-
-U0 Statement(Account *a)
-{
-  "  %-6s ", a-&gt;owner;
-  PrintMoney(a-&gt;balance);
-  if (a-&gt;frozen) " (frozen)";
-  "\n";
-}
-
-U0 Main()
-{
-  ledger = ListNew();
-
-  Account alice;
-  InitAccount(&amp;alice, "alice", 120000);
-
-  Savings bob;
-  InitAccount(&amp;bob, "bob", 50000);
-  bob.rate_bp = 450;                 // 4.5% a year
-  bob.interest = &amp;SavingsInterest;
-
-  Account carol;
-  InitAccount(&amp;carol, "carol", 2500);
-
-  Account *all[3];
-  all[0] = &amp;alice;
-  all[1] = &amp;bob;
-  all[2] = &amp;carol;
-
-  "Opening balances\n";
-  for (I64 i = 0; i &lt; 3; i++) Statement(all[i]);
-
-  "Transfers\n";
-  Transfer(&amp;alice, &amp;bob, 30000);
-  Transfer(&amp;carol, &amp;alice, 9999);    // carol only has 25.00
-  carol.frozen = TRUE;
-  Transfer(&amp;bob, &amp;carol, 100);
-
-  "Month end\n";
-  for (I64 i = 0; i &lt; 3; i++) {
-    Account *a = all[i];
-    I64 earned = a-&gt;interest(a);
-    if (earned &gt; 0) {
-      a-&gt;balance += earned;
-      Record(a, "interest", earned);
+void printMoney(i64 cents) {
+    if (cents &lt; 0) {
+        printf("-");
+        cents = -cents;
     }
-    Statement(a);
-  }
+    printf("%d.%02d", cents / 100, cents % 100);
+}
 
-  "Ledger (%d entries)\n", ListCount(ledger);
-  for (List *it = ledger-&gt;next; it != ledger; it = it-&gt;next) {
-    Txn *t = it-&gt;value;
-    "  %-6s %-9s ", t-&gt;owner, t-&gt;what;
-    PrintMoney(t-&gt;amount);
-    "\n";
-  }
+void statement(Account *a) {
+    printf("  %-6s ", a.owner);
+    printMoney(a.balance);
+    if (a.frozen) { printf(" (frozen)"); }
+    printf("\n");
+}
+
+void main() {
+    ledger = list.new();
+
+    Account alice;
+    initAccount(&amp;alice, "alice", 120000);
+
+    Savings bob;
+    initAccount(&amp;bob, "bob", 50000);
+    bob.rateBp = 450;                 // 4.5% a year
+    bob.interest = &amp;savingsInterest;
+
+    Account carol;
+    initAccount(&amp;carol, "carol", 2500);
+
+    Account *all[3];
+    all[0] = &amp;alice;
+    all[1] = &amp;bob;
+    all[2] = &amp;carol;
+
+    printf("Opening balances\n");
+    for (i64 i = 0; i &lt; 3; i++) { statement(all[i]); }
+
+    printf("Transfers\n");
+    transfer(&amp;alice, &amp;bob, 30000);
+    transfer(&amp;carol, &amp;alice, 9999);    // carol only has 25.00
+    carol.frozen = true;
+    transfer(&amp;bob, &amp;carol, 100);
+
+    printf("Month end\n");
+    for (i64 i = 0; i &lt; 3; i++) {
+        Account *a = all[i];
+        i64 earned = a.interest(a);
+        if (earned &gt; 0) {
+            a.balance += earned;
+            record(a, "interest", earned);
+        }
+        statement(a);
+    }
+
+    printf("Ledger (%d entries)\n", ledger.count());
+    for (list.List *it = ledger.next; it != ledger; it = it.next) {
+        Txn *t = it.value;
+        printf("  %-6s %-9s ", t.owner, t.what);
+        printMoney(t.amount);
+        printf("\n");
+    }
 }
 </code></pre>
 <pre class="output">Opening balances
@@ -359,7 +344,7 @@ Ledger (5 entries)
 <h2 id="game-of-life">Game of Life<a class="anchor" href="#game-of-life" aria-label="Link to this section">#</a></h2>
 <p>Conway's Game of Life on a small board that wraps at the edges, with a glider and a
 blinker. It shows 2D arrays, nested loops, <code>%</code> for wrap-around and
-<code>MemCpy</code> on whole arrays.</p>
+<code>mem.copy</code> on whole arrays.</p>
 <pre><code>cd docs/examples/life
 ktm main.ktm -o life &amp;&amp; ./life</code></pre>
 <pre><code class="language-ktm">// Conway's Game of Life on a small wrapping board.
@@ -368,87 +353,83 @@ ktm main.ktm -o life &amp;&amp; ./life</code></pre>
 //   ktm -jit main.ktm
 //
 // Shows: 2D arrays, nested loops, the % operator for wrap-around,
-// #define constants and building output a line at a time.
+// constants and building output a line at a time.
 
-#define W     12
-#define H     8
-#define STEPS 4
+import mem;
 
-U8 board[H][W];
-U8 next[H][W];
+const i64 W = 12;
+const i64 H = 8;
+const i64 STEPS = 4;
 
-U0 Place(U8 *pattern, I64 top, I64 left)
-{
-  // `pattern` rows are separated by '/'; '#' is a live cell.
-  I64 r = top, c = left;
-  for (U8 *p = pattern; *p; p++) {
-    if (*p == '/') {
-      r++;
-      c = left;
-    } else {
-      board[r][c] = *p == '#';
-      c++;
+u8 board[H][W];
+u8 next[H][W];
+
+void place(u8 *pattern, i64 top, i64 left) {
+    // `pattern` rows are separated by '/'; '#' is a live cell.
+    i64 r = top, c = left;
+    for (u8 *p = pattern; *p; p++) {
+        if (*p == '/') {
+            r++;
+            c = left;
+        } else {
+            board[r][c] = *p == '#';
+            c++;
+        }
     }
-  }
 }
 
-I64 Neighbours(I64 r, I64 c)
-{
-  I64 n = 0;
-  for (I64 dr = -1; dr &lt;= 1; dr++) {
-    for (I64 dc = -1; dc &lt;= 1; dc++) {
-      if (dr == 0 &amp;&amp; dc == 0) continue;
-      n += board[(r + dr + H) % H][(c + dc + W) % W];
+i64 neighbours(i64 r, i64 c) {
+    i64 n = 0;
+    for (i64 dr = -1; dr &lt;= 1; dr++) {
+        for (i64 dc = -1; dc &lt;= 1; dc++) {
+            if (dr == 0 &amp;&amp; dc == 0) { continue; }
+            n += board[(r + dr + H) % H][(c + dc + W) % W];
+        }
     }
-  }
-  return n;
+    return n;
 }
 
-U0 Step()
-{
-  for (I64 r = 0; r &lt; H; r++) {
-    for (I64 c = 0; c &lt; W; c++) {
-      I64 n = Neighbours(r, c);
-      // Born with 3 neighbours, survives with 2 or 3.
-      next[r][c] = n == 3 || (board[r][c] &amp;&amp; n == 2);
+void step() {
+    for (i64 r = 0; r &lt; H; r++) {
+        for (i64 c = 0; c &lt; W; c++) {
+            i64 n = neighbours(r, c);
+            // Born with 3 neighbours, survives with 2 or 3.
+            next[r][c] = n == 3 || (board[r][c] &amp;&amp; n == 2);
+        }
     }
-  }
-  MemCpy(board, next, sizeof(board));
+    mem.copy(board, next, sizeof(board));
 }
 
-I64 Population()
-{
-  I64 alive = 0;
-  for (I64 r = 0; r &lt; H; r++) {
-    for (I64 c = 0; c &lt; W; c++) {
-      alive += board[r][c];
+i64 population() {
+    i64 alive = 0;
+    for (i64 r = 0; r &lt; H; r++) {
+        for (i64 c = 0; c &lt; W; c++) {
+            alive += board[r][c];
+        }
     }
-  }
-  return alive;
+    return alive;
 }
 
-U0 Show(I64 gen)
-{
-  "generation %d, %d alive\n", gen, Population;
-  U8 line[W + 1];
-  line[W] = 0;
-  for (I64 r = 0; r &lt; H; r++) {
-    for (I64 c = 0; c &lt; W; c++) {
-      line[c] = '.';
-      if (board[r][c]) line[c] = '#';
+void show(i64 gen) {
+    printf("generation %d, %d alive\n", gen, population());
+    u8 line[W + 1];
+    line[W] = 0;
+    for (i64 r = 0; r &lt; H; r++) {
+        for (i64 c = 0; c &lt; W; c++) {
+            line[c] = '.';
+            if (board[r][c]) { line[c] = '#'; }
+        }
+        printf("%s\n", line);
     }
-    "%s\n", line;
-  }
 }
 
-U0 Main()
-{
-  Place(".#./..#/###", 0, 0);   // a glider, top left
-  Place("###", 5, 7);           // a blinker, bottom right
-  for (I64 gen = 0; gen &lt;= STEPS; gen++) {
-    Show(gen);
-    Step;
-  }
+void main() {
+    place(".#./..#/###", 0, 0);   // a glider, top left
+    place("###", 5, 7);           // a blinker, bottom right
+    for (i64 gen = 0; gen &lt;= STEPS; gen++) {
+        show(gen);
+        step();
+    }
 }
 </code></pre>
 <pre class="output">generation 0, 8 alive

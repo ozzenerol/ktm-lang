@@ -1,10 +1,10 @@
-#include "testhelper.ktm"
+import fs, libc, mem, net, proc, str, test;
 
 /* accept, getpeername, getsockname, recvfrom and getsockopt took their
- * length as an I64* or U64*, but C's socklen_t is 32 bits on Linux and
+ * length as an i64* or u64*, but C's socklen_t is 32 bits on Linux and
  * macOS: the kernel writes 4 bytes and the upper half of an 8-byte length
- * keeps whatever was in it, while a U32 length (the right type) got an
- * "Incompatible function argument" warning. The lengths are U32 now. This
+ * keeps whatever was in it, while a u32 length (the right type) got an
+ * "Incompatible function argument" warning. The lengths are u32 now. This
  * also checks the UDP structures against C and does an IPv4 and an IPv6
  * sendto/recvfrom round trip. */
 
@@ -12,192 +12,186 @@
 #define SOCKLEN_OUT "__361_socklen.out"
 #define SOCKLEN_BIN "__361_socklen.bin"
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
-/* A program that passes U32 lengths everywhere compiles without warnings */
-Bool CompilesCleanly(U8 *source)
-{
-  U8 *out;
-  Bool ok;
-  System("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
-  if (!FileWrite(SOCKLEN_SRC, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
-         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-         SOCKLEN_SRC " -o " SOCKLEN_BIN " > " SOCKLEN_OUT " 2>&1");
-  out = FileRead(SOCKLEN_OUT);
-  ok = out != NULL && StrLen(out) == 0;
-  if (!ok && out) "\n%s", out;
-  Free(out);
-  System("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
-  return ok;
+/* A program that passes u32 lengths everywhere compiles without warnings */
+bool compilesCleanly(u8 *source) {
+    u8 *out;
+    bool ok;
+    proc.shell("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
+    if (!fs.writeAll(SOCKLEN_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+                 "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
+                 SOCKLEN_SRC " -o " SOCKLEN_BIN " > " SOCKLEN_OUT " 2>&1");
+    out = fs.readAll(SOCKLEN_OUT);
+    ok = out != null && str.len(out) == 0;
+    if (!ok && out) { printf("\n%s", out); }
+    mem.free(out);
+    proc.shell("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
+    return ok;
 }
 
-I64 Off(U0 *base, U0 *field)
-{
-  return field(U8 *) - base(U8 *);
+i64 offFn(void *base, void *field) {
+    return (u8 *)field - (u8 *)base;
 }
 
 /* Bind a UDP socket to `ip` on a port the kernel picks; fills `me` with the
  * bound address and returns the socket, or -1 */
-I32 UdpBind(I32 fam, U8 *ip, sockaddr_storage *me, U32 *len)
-{
-  I32 fd = socket(fam, SOCK_DGRAM, 0);
-  sockaddr_in *v4 = me;
-  sockaddr_in6 *v6 = me;
-  if (fd == -1) return -1;
-  MemSet(me, 0, sizeof(sockaddr_storage));
-  if (fam == AF_INET) {
-    *len = sizeof(sockaddr_in);
-    v4->sin_family = AF_INET;
-    inet_pton(AF_INET, ip, &v4->sin_addr);
-  } else {
-    *len = sizeof(sockaddr_in6);
-    v6->sin6_family = AF_INET6;
-    inet_pton(AF_INET6, ip, &v6->sin6_addr);
-  }
+i32 udpBind(i32 fam, u8 *ip, libc.sockaddr_storage *me, u32 *len) {
+    i32 fd = libc.socket(fam, libc.SOCK_DGRAM, 0);
+    libc.sockaddr_in *v4 = me;
+    libc.sockaddr_in6 *v6 = me;
+    if (fd == -1) { return -1; }
+    mem.set(me, 0, sizeof(libc.sockaddr_storage));
+    if (fam == libc.AF_INET) {
+        *len = sizeof(libc.sockaddr_in);
+        v4.sin_family = libc.AF_INET;
+        libc.inet_pton(libc.AF_INET, ip, &v4.sin_addr);
+    } else {
+        *len = sizeof(libc.sockaddr_in6);
+        v6.sin6_family = libc.AF_INET6;
+        libc.inet_pton(libc.AF_INET6, ip, &v6.sin6_addr);
+    }
 #ifndef IS_LINUX
-  me->ss_len = *len;
+    me->ss_len = *len;
 #endif
-  if (bind(fd, me(sockaddr *), *len) == -1 ||
-      getsockname(fd, me(sockaddr *), len) == -1) {
-    close(fd);
-    return -1;
-  }
-  return fd;
+    if (libc.bind(fd, (libc.sockaddr *)me, *len) == -1 ||
+            libc.getsockname(fd, (libc.sockaddr *)me, len) == -1) {
+        libc.close(fd);
+        return -1;
+    }
+    return fd;
 }
 
 /* Send "ping" from one socket to another and read it back with recvfrom;
  * the sender's address must come back with the right length and port */
-U0 RoundTrip(I32 fam, U8 *ip, U8 *name)
-{
-  sockaddr_storage a, b, from;
-  sockaddr_in *v4 = &from;
-  sockaddr_in6 *v6 = &from;
-  U32 alen, blen, flen;
-  U8 buf[16], what[64], txt[64];
-  I32 sa = UdpBind(fam, ip, &a, &alen), sb = UdpBind(fam, ip, &b, &blen);
-  I64 n;
+void roundTrip(i32 fam, u8 *ip, u8 *name) {
+    libc.sockaddr_storage a, b, from;
+    libc.sockaddr_in *v4 = &from;
+    libc.sockaddr_in6 *v6 = &from;
+    u32 alen, blen, flen;
+    u8 buf[16], what[64], txt[64];
+    i32 sa = udpBind(fam, ip, &a, &alen), sb = udpBind(fam, ip, &b, &blen);
+    i64 n;
 
-  if (sa == -1 || sb == -1) {
-    if (fam == AF_INET6) {
-      /* no ::1 on this machine (IPv6 disabled): nothing to test */
-      if (sa != -1) close(sa);
-      if (sb != -1) close(sb);
-      g_tests += 7;
-      g_correct += 7;
-      return;
+    if (sa == -1 || sb == -1) {
+        if (fam == libc.AF_INET6) {
+            /* no ::1 on this machine (IPv6 disabled): nothing to test */
+            if (sa != -1) { libc.close(sa); }
+            if (sb != -1) { libc.close(sb); }
+            gTests += 7;
+            gCorrect += 7;
+            return;
+        }
+        check(false, "udp bind");
+        return;
     }
-    Check(FALSE, "udp bind");
-    return;
-  }
-  if (fam == AF_INET) n = sizeof(sockaddr_in);
-  else n = sizeof(sockaddr_in6);
-  Check(alen == n && blen == n, "getsockname length");
+    if (fam == libc.AF_INET) { n = sizeof(libc.sockaddr_in); }
+    else { n = sizeof(libc.sockaddr_in6); }
+    check(alen == n && blen == n, "getsockname length");
 
-  StrPrint(what, "%s sendto", name);
-  Check(sendto(sa, "ping", 4, 0, (&b)(sockaddr *), blen) == 4, what);
+    str.formatTo(what, "%s sendto", name);
+    check(libc.sendto(sa, "ping", 4, 0, (libc.sockaddr *)(&b), blen) == 4, what);
 
-  /* MSG_PEEK leaves the datagram queued */
-  MemSet(buf, 0, sizeof(buf));
-  StrPrint(what, "%s recv MSG_PEEK", name);
-  Check(recv(sb, buf, sizeof(buf), MSG_PEEK) == 4 && !StrCmp(buf, "ping"), what);
+    /* MSG_PEEK leaves the datagram queued */
+    mem.set(buf, 0, sizeof(buf));
+    str.formatTo(what, "%s recv MSG_PEEK", name);
+    check(libc.recv(sb, buf, sizeof(buf), libc.MSG_PEEK) == 4 && !str.cmp(buf, "ping"), what);
 
-  MemSet(buf, 0, sizeof(buf));
-  MemSet(&from, 0xAB, sizeof(sockaddr_storage));
-  flen = sizeof(sockaddr_storage);
-  n = recvfrom(sb, buf, sizeof(buf), 0, (&from)(sockaddr *), &flen);
-  StrPrint(what, "%s recvfrom", name);
-  Check(n == 4 && !StrCmp(buf, "ping"), what);
-  StrPrint(what, "%s recvfrom address length", name);
-  Check(flen == alen, what);
-  StrPrint(what, "%s sender family and port", name);
-  if (fam == AF_INET) {
-    Check(v4->sin_family == AF_INET && v4->sin_port == (&a)(sockaddr_in *)->sin_port, what);
-  } else {
-    Check(v6->sin6_family == AF_INET6 && v6->sin6_port == (&a)(sockaddr_in6 *)->sin6_port, what);
-  }
-  StrPrint(what, "%s sender address", name);
-  Check(NetGetIpv4Address((&from)(sockaddr *), fam, txt, sizeof(txt)) && !StrCmp(txt, ip), what);
-  close(sa);
-  close(sb);
+    mem.set(buf, 0, sizeof(buf));
+    mem.set(&from, 0xAB, sizeof(libc.sockaddr_storage));
+    flen = sizeof(libc.sockaddr_storage);
+    n = libc.recvfrom(sb, buf, sizeof(buf), 0, (libc.sockaddr *)(&from), &flen);
+    str.formatTo(what, "%s recvfrom", name);
+    check(n == 4 && !str.cmp(buf, "ping"), what);
+    str.formatTo(what, "%s recvfrom address length", name);
+    check(flen == alen, what);
+    str.formatTo(what, "%s sender family and port", name);
+    if (fam == libc.AF_INET) {
+        check(v4.sin_family == libc.AF_INET && v4.sin_port == ((libc.sockaddr_in *)(&a)).sin_port, what);
+    } else {
+        check(v6.sin6_family == libc.AF_INET6 && v6.sin6_port == ((libc.sockaddr_in6 *)(&a)).sin6_port, what);
+    }
+    str.formatTo(what, "%s sender address", name);
+    check(net.addrToStr((libc.sockaddr *)(&from), fam, txt, sizeof(txt)) && !str.cmp(txt, ip), what);
+    libc.close(sa);
+    libc.close(sb);
 }
 
 /* A datagram longer than the buffer: recvmsg cuts it and sets MSG_TRUNC */
-U0 Truncated()
-{
-  sockaddr_storage a;
-  U32 alen;
-  U8 buf[4];
-  iovec io;
-  msghdr m;
-  I32 fd = UdpBind(AF_INET, "127.0.0.1", &a, &alen);
-  Check(fd != -1 && sendto(fd, "toolong", 7, 0, (&a)(sockaddr *), alen) == 7, "sendto self");
-  io.iov_base = buf;
-  io.iov_len = sizeof(buf);
-  MemSet(&m, 0, sizeof(msghdr));
-  m.msg_iov = &io;
-  m.msg_iovlen = 1;
-  Check(recvmsg(fd, &m, 0) == 4 && (m.msg_flags & MSG_TRUNC) && !StrNCmp(buf, "tool", 4),
-        "MSG_TRUNC on a cut datagram");
-  close(fd);
+void truncated() {
+    libc.sockaddr_storage a;
+    u32 alen;
+    u8 buf[4];
+    libc.iovec io;
+    libc.msghdr m;
+    i32 fd = udpBind(libc.AF_INET, "127.0.0.1", &a, &alen);
+    check(fd != -1 && libc.sendto(fd, "toolong", 7, 0, (libc.sockaddr *)(&a), alen) == 7, "sendto self");
+    io.iov_base = buf;
+    io.iov_len = sizeof(buf);
+    mem.set(&m, 0, sizeof(libc.msghdr));
+    m.msg_iov = &io;
+    m.msg_iovlen = 1;
+    check(libc.recvmsg(fd, &m, 0) == 4 && (m.msg_flags & libc.MSG_TRUNC) && !str.cmpLen(buf, "tool", 4),
+                "MSG_TRUNC on a cut datagram");
+    libc.close(fd);
 }
 
-I32 Main()
-{
-  sockaddr_in6 s6;
-  "Test - udp socklen: ";
+i32 main() {
+    libc.sockaddr_in6 s6;
+    printf("Test - udp socklen: ");
 
-  Check(CompilesCleanly(
-"
-U0 Main()
+    check(compilesCleanly(
+"import libc;
+
+void main()
 {
-  sockaddr_storage ss;
-  U32 len = sizeof(sockaddr_storage), olen = sizeof(I32);
-  I32 val, fd = socket(AF_INET, SOCK_DGRAM, 0);
-  U8 buf[8];
-  getsockname(fd, (&ss)(sockaddr *), &len);
-  getpeername(fd, (&ss)(sockaddr *), &len);
-  getsockopt(fd, SOL_SOCKET, SO_BROADCAST, &val, &olen);
-  setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &val, olen);
-  recvfrom(fd, buf, 0, MSG_DONTROUTE, (&ss)(sockaddr *), &len);
-  sendto(fd, buf, 0, 0, (&ss)(sockaddr *), len);
-  if (0) accept(fd, (&ss)(sockaddr *), &len);
-  close(fd);
+  libc.sockaddr_storage ss;
+  u32 len = sizeof(libc.sockaddr_storage), olen = sizeof(i32);
+  i32 val, fd = libc.socket(libc.AF_INET, libc.SOCK_DGRAM, 0);
+  u8 buf[8];
+  libc.getsockname(fd, (libc.sockaddr *)(&ss), &len);
+  libc.getpeername(fd, (libc.sockaddr *)(&ss), &len);
+  libc.getsockopt(fd, libc.SOL_SOCKET, libc.SO_BROADCAST, &val, &olen);
+  libc.setsockopt(fd, libc.SOL_SOCKET, libc.SO_BROADCAST, &val, olen);
+  libc.recvfrom(fd, buf, 0, libc.MSG_DONTROUTE, (libc.sockaddr *)(&ss), &len);
+  libc.sendto(fd, buf, 0, 0, (libc.sockaddr *)(&ss), len);
+  if (0) { libc.accept(fd, (libc.sockaddr *)(&ss), &len); }
+  libc.close(fd);
 }
-"), "U32 lengths compile without warnings");
+"), "u32 lengths compile without warnings");
 
-  /* Layouts, as C's sizeof/offsetof give them on Linux and macOS */
-  Check(sizeof(sockaddr) == 16, "sizeof(sockaddr)");
-  Check(sizeof(sockaddr_in) == 16, "sizeof(sockaddr_in)");
-  Check(sizeof(sockaddr_in6) == 28, "sizeof(sockaddr_in6)");
-  Check(sizeof(sockaddr_storage) == 128, "sizeof(sockaddr_storage)");
-  Check(Off(&s6, &s6.sin6_port) == 2 && Off(&s6, &s6.sin6_flowinfo) == 4 &&
-        Off(&s6, &s6.sin6_addr) == 8 && Off(&s6, &s6.sin6_scope_id) == 24,
-        "sockaddr_in6 offsets");
+    /* Layouts, as C's sizeof/offsetof give them on Linux and macOS */
+    check(sizeof(libc.sockaddr) == 16, "sizeof(sockaddr)");
+    check(sizeof(libc.sockaddr_in) == 16, "sizeof(sockaddr_in)");
+    check(sizeof(libc.sockaddr_in6) == 28, "sizeof(sockaddr_in6)");
+    check(sizeof(libc.sockaddr_storage) == 128, "sizeof(sockaddr_storage)");
+    check(offFn(&s6, &s6.sin6_port) == 2 && offFn(&s6, &s6.sin6_flowinfo) == 4 &&
+                offFn(&s6, &s6.sin6_addr) == 8 && offFn(&s6, &s6.sin6_scope_id) == 24,
+                "sockaddr_in6 offsets");
 
-  /* MSG_* flags differ between Linux and the BSDs */
-  Check(MSG_OOB == 1 && MSG_PEEK == 2 && MSG_DONTROUTE == 4, "MSG_OOB/PEEK/DONTROUTE");
+    /* MSG_* flags differ between Linux and the BSDs */
+    check(libc.MSG_OOB == 1 && libc.MSG_PEEK == 2 && libc.MSG_DONTROUTE == 4, "MSG_OOB/PEEK/DONTROUTE");
 #ifdef IS_LINUX
-  Check(MSG_CTRUNC == 0x8 && MSG_TRUNC == 0x20 && MSG_EOR == 0x80 && MSG_WAITALL == 0x100,
-        "MSG_* (Linux)");
+    check(libc.MSG_CTRUNC == 0x8 && libc.MSG_TRUNC == 0x20 && libc.MSG_EOR == 0x80 && libc.MSG_WAITALL == 0x100,
+                "MSG_* (Linux)");
 #else
-  Check(MSG_CTRUNC == 0x20 && MSG_TRUNC == 0x10 && MSG_EOR == 0x8 && MSG_WAITALL == 0x40,
-        "MSG_* (macOS)");
+    check(libc.MSG_CTRUNC == 0x20 && libc.MSG_TRUNC == 0x10 && libc.MSG_EOR == 0x8 && libc.MSG_WAITALL == 0x40,
+                "MSG_* (macOS)");
 #endif
 
-  RoundTrip(AF_INET, "127.0.0.1", "IPv4");
-  RoundTrip(AF_INET6, "::1", "IPv6");
-  Truncated();
+    roundTrip(libc.AF_INET, "127.0.0.1", "IPv4");
+    roundTrip(libc.AF_INET6, "::1", "IPv6");
+    truncated();
 
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+    test.printResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

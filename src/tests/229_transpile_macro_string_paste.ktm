@@ -1,6 +1,6 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
-/* With `#define M "mid"`, `U8 *s = "a" M "b";` was silently left out of
+/* With `#define M "mid"`, `u8 *s = "a" M "b";` was silently left out of
  * -transpile's C: the transpiler keeps #defines, so the parser met an
  * identifier between two strings and gave up on the statement. The
  * strings and string macros are now written as they are (`"a" M "b"`),
@@ -13,92 +13,90 @@
 #define TP_TIMEOUT "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
 #define TP_KTM TP_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
-U0 CleanupTranspilePasteTest(U0)
-{
-  System("rm -f " TP_FILE " " TP_C " " TP_EXE " " TP_OUT);
+void cleanupTranspilePasteTest(void) {
+    proc.shell("rm -f " TP_FILE " " TP_C " " TP_EXE " " TP_OUT);
 }
 
-U8 *tp_source =
+u8 *tpSource =
 "#define M \"mid\"
 #define N \"end\"
 #define TAB \"\\t\"
 #define K 3
 #define HALF 0.5
-U0 Main()
+void main()
 {
-  U8 *s = \"a\" M \"b\";
-  U8 *t = M \"x\";
-  U8 *u = \"x\" M;
-  U8 *v = M N;
-  U8 *w = M;
-  U8 *e = \"[\" TAB \"\\n]\";
-  U8 *p = \"plain\" \" pair\";
-  I64 k = K * 2 + 1;
-  F64 h = HALF * k;
-  \"%s %s %s %s %s %d %.1f\\n\", s, t, u, v, w, k, h;
-  \"fmt \" M \" %d\\n\", k;
-  \"%s|%s|%d\\n\", \"q\" M N, p, StrLen(e);
+  u8 *s = \"a\" M \"b\";
+  u8 *t = M \"x\";
+  u8 *u = \"x\" M;
+  u8 *v = M N;
+  u8 *w = M;
+  u8 *e = \"[\" TAB \"\\n]\";
+  u8 *p = \"plain\" \" pair\";
+  i64 k = K * 2 + 1;
+  f64 h = HALF * k;
+  printf(\"%s %s %s %s %s %d %.1f\\n\", s, t, u, v, w, k, h);
+  printf(\"fmt \" M \" %d\\n\", k);
+  printf(\"%s|%s|%c\\n\", \"q\" M N, p, e[0]);
 }
 ";
 
-U8 *tp_expected = "amidb midx xmid midend mid 7 3.5\nfmt mid 7\nqmidend|plain pair|4\n";
+u8 *tpExpected = "amidb midx xmid midend mid 7 3.5\nfmt mid 7\nqmidend|plain pair|[\n";
 
-U0 Main()
-{
-  "Test - transpile macro pasted into a string: ";
-  I64 correct = 0, tests = 0, res;
-  U8 *code, *out;
+void main() {
+    printf("Test - transpile macro pasted into a string: ");
+    i64 correct = 0, tests = 0, res;
+    u8 *code, *out;
 
-  CleanupTranspilePasteTest;
-  FileWrite(TP_FILE, tp_source, StrLen(tp_source), O_CREAT | O_RDWR | O_TRUNC);
+    cleanupTranspilePasteTest();
+    fs.writeAll(TP_FILE, tpSource, str.len(tpSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
-  /* What the JIT prints */
-  tests++;
-  res = System(TP_KTM "-jit " TP_FILE " > " TP_OUT " 2>&1");
-  out = FileRead(TP_OUT);
-  if (res == 0 && out && !StrCmp(out, tp_expected)) correct++;
-  else "jit: %s\n", out;
-  Free(out);
+    /* What the JIT prints */
+    tests++;
+    res = proc.shell(TP_KTM "-jit " TP_FILE " > " TP_OUT " 2>&1");
+    out = fs.readAll(TP_OUT);
+    if (res == 0 && out && !str.cmp(out, tpExpected)) { correct++; }
+    else { printf("jit: %s\n", out); }
+    mem.free(out);
 
-  tests++;
-  res = System(TP_KTM "-transpile " TP_FILE " > " TP_C " 2>/dev/null");
-  code = FileRead(TP_C);
-  if (res == 0 && code) correct++;
-  if (!code) code = StrNew("");
+    tests++;
+    res = proc.shell(TP_KTM "-transpile " TP_FILE " > " TP_C " 2>/dev/null");
+    code = fs.readAll(TP_C);
+    if (res == 0 && code) { correct++; }
+    if (!code) { code = str.dup(""); }
 
-  /* Every statement is there, the pastes as written */
-  tests++;
-  if (strstr(code, "unsigned char *s = \"a\" M \"b\";") &&
-      strstr(code, "unsigned char *t = M \"x\";") &&
-      strstr(code, "unsigned char *u = \"x\" M;") &&
-      strstr(code, "unsigned char *v = M N;") &&
-      strstr(code, "unsigned char *w = M;") &&
-      strstr(code, "unsigned char *e = \"[\" TAB \"\\n]\";") &&
-      strstr(code, "unsigned char *p = \"plain pair\";") &&
-      strstr(code, "printf(\"fmt \" M \" %d\\n\", k);") &&
-      strstr(code, "\"q\" M N")) correct++;
-  else "%s\n", code;
+    /* Every statement is there, the pastes as written */
+    tests++;
+    if (libc.strstr(code, "unsigned char *s = \"a\" M \"b\";") &&
+            libc.strstr(code, "unsigned char *t = M \"x\";") &&
+            libc.strstr(code, "unsigned char *u = \"x\" M;") &&
+            libc.strstr(code, "unsigned char *v = M N;") &&
+            libc.strstr(code, "unsigned char *w = M;") &&
+            libc.strstr(code, "unsigned char *e = \"[\" TAB \"\\n]\";") &&
+            libc.strstr(code, "unsigned char *p = \"plain pair\";") &&
+            libc.strstr(code, "printf(\"fmt \" M \" %d\\n\", k);") &&
+            libc.strstr(code, "\"q\" M N")) { correct++; }
+    else { printf("%s\n", code); }
 
-  /* ...and the macros they use are defined */
-  tests++;
-  if (strstr(code, "#define M \"mid\"") && strstr(code, "#define N \"end\"") &&
-      strstr(code, "#define TAB \"\\t\"") && strstr(code, "#define K 3")) correct++;
+    /* ...and the macros they use are defined */
+    tests++;
+    if (libc.strstr(code, "#define M \"mid\"") && libc.strstr(code, "#define N \"end\"") &&
+            libc.strstr(code, "#define TAB \"\\t\"") && libc.strstr(code, "#define K 3")) { correct++; }
 
-  /* The C compiles and prints what the JIT does (only with a C
-   * compiler on the PATH) */
-  tests++;
-  if (System("command -v cc >/dev/null 2>&1") != 0) {
-    correct++;
-  } else {
-    res = System("cc -w -o " TP_EXE " " TP_C " -lm > " TP_OUT " 2>&1 && " TP_TIMEOUT "./" TP_EXE " > " TP_OUT " 2>&1");
-    out = FileRead(TP_OUT);
-    if (res == 0 && out && !StrCmp(out, tp_expected)) correct++;
-    else "cc: %s\n", out;
-    Free(out);
-  }
+    /* The C compiles and prints what the JIT does (only with a C
+     * compiler on the PATH) */
+    tests++;
+    if (proc.shell("command -v cc >/dev/null 2>&1") != 0) {
+        correct++;
+    } else {
+        res = proc.shell("cc -w -o " TP_EXE " " TP_C " -lm > " TP_OUT " 2>&1 && " TP_TIMEOUT "./" TP_EXE " > " TP_OUT " 2>&1");
+        out = fs.readAll(TP_OUT);
+        if (res == 0 && out && !str.cmp(out, tpExpected)) { correct++; }
+        else { printf("cc: %s\n", out); }
+        mem.free(out);
+    }
 
-  Free(code);
-  CleanupTranspilePasteTest;
-  PrintResult(correct, tests);
-  "====\n";
+    mem.free(code);
+    cleanupTranspilePasteTest();
+    test.printResult(correct, tests);
+    printf("====\n");
 }

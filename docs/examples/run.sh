@@ -17,7 +17,7 @@ fi
 
 flags=()
 dir="${KTM_INSTALL_DIR:-}"
-[ -z "$dir" ] && [ -d "$ROOT/build/prefix/include" ] && dir="$ROOT/build/prefix"
+[ -z "$dir" ] && [ -d "$ROOT/build/prefix/modules" ] && dir="$ROOT/build/prefix"
 [ -n "$dir" ] && flags=(--install-dir="$dir")
 
 projects=("$@")

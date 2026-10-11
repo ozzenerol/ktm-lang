@@ -238,6 +238,21 @@ void cctrlAddBuiltinFunctions(Cctrl *cc) {
       mapAdd(cc->global_env,fn->fname->data,fn);
 }
 
+/* C's printf, built in (the stdlib map: no module, the compiler checks
+ * it), declared as the old std.ktmh did: an install that still has that
+ * header redeclares it the same */
+static void cctrlAddBuiltinPrintf(Cctrl *cc) {
+      Vec *pf_params = vecNew(&vec_ast_type);
+      vecPush(pf_params, astLVar(astMakePointerType(ast_i8_type), str_lit("fmt")));
+      vecPush(pf_params, astVarArgs());
+      AstType *pf_type = astMakeFunctionType(ast_int_type, pf_params);
+      pf_type->has_var_args = 1;
+      Ast *pf = astFunction(pf_type, str_lit("printf"), pf_params, NULL, NULL, 0);
+      pf->kind = AST_EXTERN_FUNC;
+      pf->flags |= AST_FLAG_BUILTIN;
+      mapAdd(cc->global_env, pf->fname->data, pf);
+}
+
 static void cctrlAddBuiltinTypes(Map *symbol_table) {
     for (int i = 0; i < (int)static_size(built_in_types); ++i) {
         AstType *type = (AstType *)malloc(sizeof(AstType));
@@ -267,6 +282,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
      * dereference a garbage map. */
     cc->global_env = mapNew(32, &map_ast_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     /* A postfix cast in a #define's value, `#define X (5(U64) % 3)`,
      * looks the type name up: give it the built-in types (classes and
      * unions are not known while lexing, so those stay empty). */
@@ -312,6 +328,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->uniondefs = mapNew(32, &map_asttype_type);
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
+    cc->c_externs = mapNew(32, &map_ast_type);
     cc->macro_defs = cctrlCreateLexemeMap();
     cc->x86_registers = setNew(32, &set_cstring_type);
     cc->libc_functions = setNew(32, &set_cstring_type);
@@ -375,6 +392,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cctrlAddBuiltinMacros(cc);
     /* We have no real mechanism of adding compiler builtins */
     // cctrlAddBuiltinFunctions(cc);
+    cctrlAddBuiltinPrintf(cc);
 
     Ast *cmd_args = astGlobalCmdArgs();
     listAppend(cc->ast_list,cmd_args->argc);
@@ -663,10 +681,21 @@ static const char *cctrl_libktm_extra_exports[] = {
  * one does in a program or a user library. libktm is one translation
  * unit, so in it only what std.ktmh declares is exported (and argc/argv);
  * everything else is local and a program can't replace it. */
+/* The declaration a direct call to the symbol `name` calls, for the
+ * backends' calling convention (variadic or not): a function by its name,
+ * or a module's extern "c" by its C name */
+Ast *cctrlCalleeDecl(Cctrl *cc, char *name, int len) {
+    Ast *decl = mapGetLen(cc->global_env, name, len);
+    if (!decl && cc->c_externs) decl = mapGetLen(cc->c_externs, name, len);
+    return decl;
+}
+
 int cctrlIsExported(Cctrl *cc, AoStr *name) {
     if (!cc->is_libktm || !name) return 1;
-    /* a module's name (`a.b.name`): libktm built from a tree of them */
-    if (memchr(name->data, '.', name->len)) return 1;
+    /* libktm built from the stdlib's modules, without a header: module
+     * symbols are mangled apart and the asm labels are what `_extern`
+     * bindings call, so all but `static` (local already) are exported */
+    if (!cc->header_src) return 1;
     if (setHasLen(cc->header_names, name->data, name->len)) return 1;
     for (int i = 0; cctrl_libktm_extra_exports[i]; ++i) {
         if (!strcmp(name->data, cctrl_libktm_extra_exports[i])) return 1;
@@ -1647,6 +1676,11 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     }
 
     if ((ast_var = mapGetLen(cc->asm_funcs, varname, len)) != NULL) {
+        cctrlCheckModuleAccess(cc, varname, len);
+        return ast_var;
+    }
+    /* a module's own asm binding (`_extern _x I32 stat(...)`) */
+    if (qual && (ast_var = mapGet(cc->asm_funcs, qual)) != NULL) {
         return ast_var;
     }
 

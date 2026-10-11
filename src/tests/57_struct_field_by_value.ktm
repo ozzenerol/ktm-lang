@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Passing a struct field read through a pointer (`p->field`) BY VALUE,
  * including alongside a struct copy into the same object.
@@ -13,50 +13,46 @@
  *    zeros. The fix returns a value private to the field read and keeps it
  *    out of the algebraic-identity fold while tagged. */
 
-class Color { I32 r, g, b, a; };
-class E     { Color color; };
+struct Color { i32 r, g, b, a; };
+struct E     { Color color; };
 
 Color DARKGRAY = {80, 80, 80, 255};
 
-I64 SumColor(Color c) { return c.r + c.g + c.b + c.a; }
+i64 sumColor(Color c) { return c.r + c.g + c.b + c.a; }
 
-Bool FieldByValueAfterCopy()
-{
-  E storage;
-  E *e = &storage;
-  e->color = DARKGRAY;                  /* struct copy: global -> p->field */
-  Bool ok = e->color.r == 80 && e->color.g == 80 &&
-            e->color.b == 80 && e->color.a == 255;
-  ok = ok && SumColor(e->color) == 495; /* pass p->field by value */
-  ok = ok && SumColor(DARKGRAY) == 495; /* global directly (control) */
-  return ok;
+bool fieldByValueAfterCopy() {
+    E storage;
+    E *e = &storage;
+    e.color = DARKGRAY;                  /* struct copy: global -> p->field */
+    bool ok = e.color.r == 80 && e.color.g == 80 &&
+                        e.color.b == 80 && e.color.a == 255;
+    ok = ok && sumColor(e.color) == 495; /* pass p->field by value */
+    ok = ok && sumColor(DARKGRAY) == 495; /* global directly (control) */
+    return ok;
 }
 
-Bool FieldByValueNoCopy()
-{
-  E storage;
-  E *e = &storage;
-  e->color.r = 1; e->color.g = 2; e->color.b = 3; e->color.a = 4;
-  return SumColor(e->color) == 10;
+bool fieldByValueNoCopy() {
+    E storage;
+    E *e = &storage;
+    e.color.r = 1; e.color.g = 2; e.color.b = 3; e.color.a = 4;
+    return sumColor(e.color) == 10;
 }
 
-Bool TwoFieldArgs()
-{
-  E s1, s2;
-  E *a = &s1, *b = &s2;
-  a->color = DARKGRAY;
-  b->color.r = 1; b->color.g = 1; b->color.b = 1; b->color.a = 1;
-  return SumColor(a->color) == 495 && SumColor(b->color) == 4;
+bool twoFieldArgs() {
+    E s1, s2;
+    E *a = &s1, *b = &s2;
+    a.color = DARKGRAY;
+    b.color.r = 1; b.color.g = 1; b.color.b = 1; b.color.a = 1;
+    return sumColor(a.color) == 495 && sumColor(b.color) == 4;
 }
 
-I32 Main()
-{
-  "Test - passing a struct field (p->field) by value:\n";
-  I64 tests = 3, correct = 0;
-  if (FieldByValueAfterCopy()) correct++;
-  if (FieldByValueNoCopy())    correct++;
-  if (TwoFieldArgs())          correct++;
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - passing a struct field (p->field) by value:\n");
+    i64 tests = 3, correct = 0;
+    if (fieldByValueAfterCopy()) { correct++; }
+    if (fieldByValueNoCopy())    { correct++; }
+    if (twoFieldArgs())          { correct++; }
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

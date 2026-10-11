@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 #define FN_MACRO_TEST_FILE "__72_fn_macro_fail.ktm"
 #define FN_MACRO_TEST_OUT  "__72_fn_macro_fail.out"
@@ -18,167 +18,156 @@
 #define CALC_GONE 1
 #undef CALC_GONE
 
-U0 CleanupFnMacroTest(U0)
-{
-  Rm(FN_MACRO_TEST_FILE);
-  Rm(FN_MACRO_TEST_OUT);
-  Rm("./a.out");
+void cleanupFnMacroTest(void) {
+    fs.remove(FN_MACRO_TEST_FILE);
+    fs.remove(FN_MACRO_TEST_OUT);
+    fs.remove("./a.out");
 }
 
 /* The compile must fail normally (exit status 1), not die on a signal,
  * and print `expected`. */
-Bool CompileFailsWith(U8 *source, U8 *expected)
-{
-  U8 *out;
-  I64 res;
+bool compileFailsWith(u8 *source, u8 *expected) {
+    u8 *out;
+    i64 res;
 
-  CleanupFnMacroTest;
+    cleanupFnMacroTest();
 
-  if (!FileWrite(FN_MACRO_TEST_FILE, source, StrLen(source), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
+    if (!fs.writeAll(FN_MACRO_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
 
-  res = System("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " FN_MACRO_TEST_FILE " > " FN_MACRO_TEST_OUT " 2>&1");
-  if (res != 1) {
-    "ktm exit status %d, expected a normal compile failure\n", res;
-    CleanupFnMacroTest;
-    return FALSE;
-  }
+    res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " FN_MACRO_TEST_FILE " > " FN_MACRO_TEST_OUT " 2>&1");
+    if (res != 1) {
+        printf("ktm exit status %d, expected a normal compile failure\n", res);
+        cleanupFnMacroTest();
+        return false;
+    }
 
-  out = FileRead(FN_MACRO_TEST_OUT);
-  if (!out) {
-    CleanupFnMacroTest;
-    return FALSE;
-  }
+    out = fs.readAll(FN_MACRO_TEST_OUT);
+    if (!out) {
+        cleanupFnMacroTest();
+        return false;
+    }
 
-  if (!strstr(out, expected)) {
-    "%s\n", out;
-    Free(out);
-    CleanupFnMacroTest;
-    return FALSE;
-  }
+    if (!libc.strstr(out, expected)) {
+        printf("%s\n", out);
+        mem.free(out);
+        cleanupFnMacroTest();
+        return false;
+    }
 
-  Free(out);
-  CleanupFnMacroTest;
-  return TRUE;
+    mem.free(out);
+    cleanupFnMacroTest();
+    return true;
 }
 
-Bool TestFunctionLikeMacro(U0)
-{
-  return CompileFailsWith(
+bool testFunctionLikeMacro(void) {
+    return compileFailsWith(
 "#define DOUBLE(x) ((x)*2)
-U0 Main() { \"%d\\n\", DOUBLE(21); }
+void main() { printf(\"%d\\n\", DOUBLE(21)); }
 ",
-    "function-like macros are not supported: #define DOUBLE(x) ((x)*2)");
+        "function-like macros are not supported: #define DOUBLE(x) ((x)*2)");
 }
 
-Bool TestEmptyParamMacro(U0)
-{
-  return CompileFailsWith(
+bool testEmptyParamMacro(void) {
+    return compileFailsWith(
 "#define X()
-U0 Main() { }
+void Main() { }
 ",
-    "function-like macros are not supported: #define X()");
+        "function-like macros are not supported: #define X()");
 }
 
-Bool TestUnclosedParamMacro(U0)
-{
-  return CompileFailsWith(
+bool testUnclosedParamMacro(void) {
+    return compileFailsWith(
 "#define X(
-U0 Main() { }
+void Main() { }
 ",
-    "function-like macros are not supported: #define X(");
+        "function-like macros are not supported: #define X(");
 }
 
-Bool TestDefineNoName(U0)
-{
-  return CompileFailsWith(
+bool testDefineNoName(void) {
+    return compileFailsWith(
 "#define
-U0 Main() { }
+void Main() { }
 ",
-    "Syntax is: #define <TK_IDENT> <value>");
+        "Syntax is: #define <TK_IDENT> <value>");
 }
 
-Bool TestDefineBadName(U0)
-{
-  /* `1 x`, not `1x`: that is now a malformed number literal. */
-  return CompileFailsWith(
+bool testDefineBadName(void) {
+    /* `1 x`, not `1x`: that is now a malformed number literal. */
+    return compileFailsWith(
 "#define 1 x
-U0 Main() { }
+void Main() { }
 ",
-    "Syntax is: #define <TK_IDENT> <value>");
+        "Syntax is: #define <TK_IDENT> <value>");
 }
 
 /* An unknown name inside a multi-token value used to crash the
  * macro evaluator. */
-Bool TestDefineUnknownName(U0)
-{
-  return CompileFailsWith(
+bool testDefineUnknownName(void) {
+    return compileFailsWith(
 "#define Y (a + 1)
-U0 Main() { }
+void Main() { }
 ",
-    "#define Y: the value must be a constant expression");
+        "#define Y: the value must be a constant expression");
 }
 
-Bool TestDefineUnclosedValue(U0)
-{
-  return CompileFailsWith(
+bool testDefineUnclosedValue(void) {
+    return compileFailsWith(
 "#define Y (1 + 2
-U0 Main() { }
+void Main() { }
 ",
-    "#define Y: the value must be a constant expression");
+        "#define Y: the value must be a constant expression");
 }
 
-Bool TestObjectLikeMacros(U0)
-{
-  Bool ok = TRUE;
-  if (CALC != 42) ok = FALSE;
-  if (CALC_REF != 42) ok = FALSE;
-  if (StrCmp(CALC_STR, "forty two")) ok = FALSE;
-  if (CALC_F64 != 42.0) ok = FALSE;
-  if (CALC_CHAR != 'A') ok = FALSE;
-  if (CALC_CHR != 'b') ok = FALSE;
-  if (CALC_SUFFIX != 2048) ok = FALSE;
+bool testObjectLikeMacros(void) {
+    bool ok = true;
+    if (CALC != 42) { ok = false; }
+    if (CALC_REF != 42) { ok = false; }
+    if (str.cmp(CALC_STR, "forty two")) { ok = false; }
+    if (CALC_F64 != 42.0) { ok = false; }
+    if (CALC_CHAR != 'A') { ok = false; }
+    if (CALC_CHR != 'b') { ok = false; }
+    if (CALC_SUFFIX != 2048) { ok = false; }
 #ifndef CALC_FLAG
-  ok = FALSE;
+    ok = false;
 #endif
 #ifdef CALC_GONE
-  ok = FALSE;
+    ok = false;
 #endif
-  return ok;
+    return ok;
 }
 
-I32 Main()
-{
-  "Test - Function-like macro errors: \n";
-  I64 tests = 8;
-  I64 correct = 0;
+i32 main() {
+    printf("Test - Function-like macro errors: \n");
+    i64 tests = 8;
+    i64 correct = 0;
 
-  if (TestFunctionLikeMacro()) correct++;
-  else "Failed - TestFunctionLikeMacro()\n";
+    if (testFunctionLikeMacro()) { correct++; }
+    else { printf("Failed - TestFunctionLikeMacro()\n"); }
 
-  if (TestEmptyParamMacro()) correct++;
-  else "Failed - TestEmptyParamMacro()\n";
+    if (testEmptyParamMacro()) { correct++; }
+    else { printf("Failed - TestEmptyParamMacro()\n"); }
 
-  if (TestUnclosedParamMacro()) correct++;
-  else "Failed - TestUnclosedParamMacro()\n";
+    if (testUnclosedParamMacro()) { correct++; }
+    else { printf("Failed - TestUnclosedParamMacro()\n"); }
 
-  if (TestDefineNoName()) correct++;
-  else "Failed - TestDefineNoName()\n";
+    if (testDefineNoName()) { correct++; }
+    else { printf("Failed - TestDefineNoName()\n"); }
 
-  if (TestDefineBadName()) correct++;
-  else "Failed - TestDefineBadName()\n";
+    if (testDefineBadName()) { correct++; }
+    else { printf("Failed - TestDefineBadName()\n"); }
 
-  if (TestDefineUnknownName()) correct++;
-  else "Failed - TestDefineUnknownName()\n";
+    if (testDefineUnknownName()) { correct++; }
+    else { printf("Failed - TestDefineUnknownName()\n"); }
 
-  if (TestDefineUnclosedValue()) correct++;
-  else "Failed - TestDefineUnclosedValue()\n";
+    if (testDefineUnclosedValue()) { correct++; }
+    else { printf("Failed - TestDefineUnclosedValue()\n"); }
 
-  if (TestObjectLikeMacros()) correct++;
-  else "Failed - TestObjectLikeMacros()\n";
+    if (testObjectLikeMacros()) { correct++; }
+    else { printf("Failed - TestObjectLikeMacros()\n"); }
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

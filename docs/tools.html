@@ -95,20 +95,20 @@ removed afterwards, so several compiles can run at once.</p>
 <h2 id="the-jit">The JIT<a class="anchor" href="#the-jit" aria-label="Link to this section">#</a></h2>
 <p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's built-in
 assembler and runs it. No C compiler, linker or files are involved, so it starts fast.
-Arguments after the file are passed to the program. A file with no <code>Main</code> and
-no code at file scope has nothing to run: <code>-jit</code> says so and exits with 1. Use
+Arguments after the file are passed to the program. A file with no <code>main</code> has nothing to
+run: <code>-jit</code> says so and exits with 1. Use
 <code>#ifjit</code> / <code>#ifaot</code> for code that should differ between the two modes.</p>
 <pre><code>ktm -jit server.ktm 8080</code></pre>
 
 <h2 id="the-repl">The REPL<a class="anchor" href="#the-repl" aria-label="Link to this section">#</a></h2>
 <pre><code>ktm -repl</code></pre>
-<p>ktm runs as you type it. Functions, classes, globals and
+<p>ktm runs as you type it. Functions, structs, globals and
 <code>#define</code>s accumulate across the session, and the value of a trailing expression
 is echoed:</p>
-<pre><code>&amp;gt; I64 Sq(I64 x) { return x * x; }
+<pre><code>&amp;gt; i64 Sq(i64 x) { return x * x; }
 &amp;gt; Sq(7);
 49
-&amp;gt; "hello %d\n", Sq(3);
+&amp;gt; printf("hello %d\n", Sq(3));
 hello 9</code></pre>
 <ul>
   <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
@@ -150,8 +150,8 @@ Syntax highlighting for Vim is in <code>src/syntax-highlighting/ktm.vim</code>.<
 <pre><code>ktm -lib mylib --install-dir=$HOME/.local mylib.ktm</code></pre>
 <p>This produces <code>libmylib.a</code> and a shared library in
 <code>$HOME/.local/lib</code>. Mark the functions and globals it exports
-<code>public</code>. To use the library, declare its functions, and its globals with
-<code>extern</code> (<code>extern I64 count;</code>, <code>extern I64 (*hook)(I64);</code>),
+<code>pub</code>. To use the library, declare its functions, and its globals with
+<code>extern</code> (<code>extern i64 count;</code>, <code>extern i64 (*hook)(i64);</code>),
 usually in a <code>.ktmh</code> header you <code>#include</code>, and add
 <code>#link &lt;mylib&gt;</code>.</p>
 

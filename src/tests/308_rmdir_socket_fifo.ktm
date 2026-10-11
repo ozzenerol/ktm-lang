@@ -1,90 +1,85 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
-/* RmDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
+/* fs.removeDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
  * number, not a bit mask: a socket (DT_SOCK 12) or block device (DT_BLK
  * 6) matched, was "recursed" into, failed, and stopped the removal. A
  * socket, a FIFO, a symlink and a file must all go. Everything happens
  * in a fresh mkdtemp directory. */
 
-extern "c" U8 *mkdtemp(U8 *template);
-extern "c" I32 mkfifo(U8 *path, U32 mode);
-extern "c" I32 symlink(U8 *target, U8 *linkpath);
-extern "c" I32 socket(I32 domain, I32 type, I32 protocol);
-extern "c" I32 bind(I32 fd, U0 *addr, U32 len);
+extern "c" u8 *mkdtemp(u8 *template);
+extern "c" i32 mkfifo(u8 *path, u32 mode);
+extern "c" i32 symlink(u8 *target, u8 *linkpath);
+extern "c" i32 socket(i32 domain, i32 type, i32 protocol);
+extern "c" i32 bind(i32 fd, void *addr, u32 len);
 
-U8 *g_root;
-U8 g_path[256];
+u8 *gRoot;
+u8 gPath[256];
 
-U8 *P(U8 *name)
-{
-  StrPrint(g_path, "%s/%s", g_root, name);
-  return g_path;
+u8 *P(u8 *name) {
+    str.formatTo(gPath, "%s/%s", gRoot, name);
+    return gPath;
 }
 
-Bool Exists(U8 *name)
-{
-  cStat st;
-  return lstat(P(name), &st) == 0;
+bool exists(u8 *name) {
+    libc.cStat st;
+    return libc.lstat(P(name), &st) == 0;
 }
 
-Bool IsSocket(U8 *name)
-{
-  cStat st;
-  return lstat(P(name), &st) == 0 && (st.st_mode & S_IFMT) == S_IFSOCK;
+bool isSocket(u8 *name) {
+    libc.cStat st;
+    return libc.lstat(P(name), &st) == 0 && (st.st_mode & libc.S_IFMT) == libc.S_IFSOCK;
 }
 
 /* A UNIX socket bound at `path`; sockaddr_un is the family then the
  * path (macOS puts a length byte before a one-byte family) */
-Bool MakeSocket(U8 *path)
-{
-  U8 addr[110];
-  I32 fd = socket(1, 1, 0); /* AF_UNIX, SOCK_STREAM */
-  if (fd < 0) return FALSE;
-  MemSet(addr, 0, sizeof(addr));
+bool makeSocket(u8 *path) {
+    u8 addr[110];
+    i32 fd = libc.socket(1, 1, 0); /* AF_UNIX, SOCK_STREAM */
+    if (fd < 0) { return false; }
+    mem.set(addr, 0, sizeof(addr));
 #ifdef IS_MACOS
-  addr[0] = 106;
-  addr[1] = 1;
+    addr[0] = 106;
+    addr[1] = 1;
 #else
-  addr[0] = 1;
-  addr[1] = 0;
+    addr[0] = 1;
+    addr[1] = 0;
 #endif
-  MemCpy(addr + 2, path, StrLen(path) + 1);
-  Bool ok = bind(fd, addr, 106) == 0;
-  close(fd);
-  return ok;
+    mem.copy(addr + 2, path, str.len(path) + 1);
+    bool ok = libc.bind(fd, addr, 106) == 0;
+    libc.close(fd);
+    return ok;
 }
 
-I32 Main()
-{
-  I64 correct = 0, tests = 3;
-  U8 root[64], *cmd;
-  "Test - RmDir removes sockets and FIFOs: ";
+i32 main() {
+    i64 correct = 0, tests = 3;
+    u8 root[64], *cmd;
+    printf("Test - RmDir removes sockets and FIFOs: ");
 
-  StrCpy(root, "./ktm-test-308-XXXXXX");
-  if (!mkdtemp(root)) {
-    PrintResult(0, tests);
-    "====\n";
+    str.copy(root, "./ktm-test-308-XXXXXX");
+    if (!mkdtemp(root)) {
+        test.printResult(0, tests);
+        printf("====\n");
+        return 0;
+    }
+    gRoot = root;
+
+    fs.makeDir(P("t"));
+    fs.makeDir(P("t/sub"));
+    fs.writeAll(P("t/f"), "k\n", 2);
+    mkfifo(P("t/fifo"), 0x1A4);
+    symlink("sub", P("t/link"));
+    makeSocket(P("t/s"));
+    makeSocket(P("t/sub/s2"));
+    if (isSocket("t/s") && isSocket("t/sub/s2")) { correct++; }
+
+    if (fs.removeDir(P("t"), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (!exists("t")) { correct++; }
+
+    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    proc.shell(cmd);
+    mem.free(cmd);
+
+    test.printResult(correct, tests);
+    printf("====\n");
     return 0;
-  }
-  g_root = root;
-
-  MkDir(P("t"));
-  MkDir(P("t/sub"));
-  FileWrite(P("t/f"), "k\n", 2);
-  mkfifo(P("t/fifo"), 0x1A4);
-  symlink("sub", P("t/link"));
-  MakeSocket(P("t/s"));
-  MakeSocket(P("t/sub/s2"));
-  if (IsSocket("t/s") && IsSocket("t/sub/s2")) correct++;
-
-  if (RmDir(P("t"), RM_RECURSE) == 0) correct++;
-  if (!Exists("t")) correct++;
-
-  cmd = StrPrint(NULL, "rm -rf '%s'", root);
-  System(cmd);
-  Free(cmd);
-
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
 }

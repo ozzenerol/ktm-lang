@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A goto to a label inside a block that follows a return crashed ktm
  * (AOT and JIT): IR lowering dropped every statement after the return
@@ -7,118 +7,109 @@
  * that hold a label are now lowered into a fresh block that nothing
  * falls into, as after a goto. */
 
-I64 g_correct = 0, g_tests = 0;
-U0 Check(Bool ok, U8 *what)
-{
-  g_tests++;
-  if (ok) g_correct++;
-  else "\n  failed: %s\n", what;
+i64 gCorrect = 0, gTests = 0;
+void check(bool ok, u8 *what) {
+    gTests++;
+    if (ok) { gCorrect++; }
+    else { printf("\n  failed: %s\n", what); }
 }
 
 /* the repro */
-I64 PlainBlock(I64 x)
-{
-  if (x) goto inner;
-  return 1;
-  {
+i64 plainBlock(i64 x) {
+    if (x) { goto inner; }
+    return 1;
+    {
 inner:
-    x--;
-  }
-  return x;
+        x--;
+    }
+    return x;
 }
 
 /* the label sits in an if whose condition is never tested */
-I64 IfBlock(I64 x)
-{
-  if (x) goto inner;
-  return 1;
-  if (x > 5) {
+i64 ifBlock(i64 x) {
+    if (x) { goto inner; }
+    return 1;
+    if (x > 5) {
 inner:
-    x--;
-  }
-  return x * 10;
+        x--;
+    }
+    return x * 10;
 }
 
 /* into the middle of a loop body: the loop goes on as usual */
-I64 IntoLoop(I64 x)
-{
-  I64 n = 0;
-  if (x) goto inner;
-  return -1;
-  while (x > 0) {
+i64 intoLoop(i64 x) {
+    i64 n = 0;
+    if (x) { goto inner; }
+    return -1;
+    while (x > 0) {
 inner:
-    n++;
-    x--;
-  }
-  return n;
+        n++;
+        x--;
+    }
+    return n;
 }
 
 /* two blocks deep */
-I64 Nested(I64 x)
-{
-  if (x) goto deep;
-  return 0;
-  {
-    if (x > 100) {
+i64 nested(i64 x) {
+    if (x) { goto deep; }
+    return 0;
+    {
+        if (x > 100) {
 deep:
-      x += 1;
+            x += 1;
+        }
     }
-  }
-  return x;
+    return x;
 }
 
 /* from inside a switch */
-I64 FromSwitch(I64 x)
-{
-  switch (x) {
-    case 1: return 10;
-    default: goto in;
-  }
-  return 0;
-  {
+i64 fromSwitch(i64 x) {
+    switch (x) {
+        case 1: return 10;
+        default: goto in;
+    }
+    return 0;
+    {
 in:
-    x *= 3;
-  }
-  return x;
+        x *= 3;
+    }
+    return x;
 }
 
 /* an empty labelled block after a return */
-I64 g_count = 0;
-U0 EmptyBlock(I64 x)
-{
-  if (x) goto end;
-  g_count++;
-  return;
-  {
+i64 gCount = 0;
+void emptyBlock(i64 x) {
+    if (x) { goto end; }
+    gCount++;
+    return;
+    {
 end:
-  }
+    }
 }
 
 /* a dead block without a label is still dropped */
-I64 NoLabel(I64 x)
-{
-  return 1;
-  {
-    x++;
-  }
-  return x;
+i64 noLabel(i64 x) {
+    return 1;
+    {
+        x++;
+    }
+    return x;
 }
 
-I32 Main()
-{
-  "Test - goto into dead block: ";
+i32 main() {
+    printf("Test - goto into dead block: ");
 
-  Check(PlainBlock(0) == 1 && PlainBlock(5) == 4, "plain block");
-  Check(IfBlock(0) == 1 && IfBlock(5) == 40 && IfBlock(9) == 80, "if block");
-  Check(IntoLoop(0) == -1 && IntoLoop(3) == 3, "into a loop body");
-  Check(Nested(0) == 0 && Nested(7) == 8, "two blocks deep");
-  Check(FromSwitch(1) == 10 && FromSwitch(4) == 12, "from a switch");
-  EmptyBlock(0);
-  EmptyBlock(1);
-  Check(g_count == 1, "empty labelled block");
-  Check(NoLabel(3) == 1, "dead block without a label");
+    check(plainBlock(0) == 1 && plainBlock(5) == 4, "plain block");
+    check(ifBlock(0) == 1 && ifBlock(5) == 40 && ifBlock(9) == 80, "if block");
+    check(intoLoop(0) == -1 && intoLoop(3) == 3, "into a loop body");
+    check(nested(0) == 0 && nested(7) == 8, "two blocks deep");
+    check(fromSwitch(1) == 10 && fromSwitch(4) == 12, "from a switch");
+    emptyBlock(0);
+    emptyBlock(1);
+    check(gCount == 1, "empty labelled block");
+    check(noLabel(3) == 1, "dead block without a label");
 
-  PrintResult(g_correct, g_tests);
-  "====\n";
-  return 0;
+    test.printResult(gCorrect, gTests);
+    printf("====\n");
+    return 0;
 }

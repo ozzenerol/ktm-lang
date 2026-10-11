@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
 /* `--target=*-apple-darwin` on a Linux host still wrote the ELF-only
  * `.section .note.GNU-stack` (chosen by the host, not the target), which
@@ -11,69 +11,65 @@
 #define CT_PROBE "__212_probe.s"
 #define CT_TIMEOUT "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
 
-U0 CleanupCrossTest(U0)
-{
-  System("rm -f " CT_FILE " " CT_ASM " " CT_OBJ " " CT_PROBE);
+void cleanupCrossTest(void) {
+    proc.shell("rm -f " CT_FILE " " CT_ASM " " CT_OBJ " " CT_PROBE);
 }
 
-U8 *ct_source =
-"I64 g = 3;
-F64 f = 1.5;
-U0 Main()
+u8 *ctSource =
+"i64 g = 3;
+f64 f = 1.5;
+void main()
 {
-  \"%d %f\\n\", g, f;
+  printf(\"%d %f\\n\", g, f);
 }
 ";
 
 /* 1 if the assembly for `target` has the GNU-stack note, 0 if not, -1 if
  * ktm failed */
-I64 HasGnuStack(U8 *target)
-{
-  U8 *cmd = MStrPrint(CT_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --target=%s -S -o " CT_ASM " " CT_FILE " > /dev/null 2>&1", target);
-  I64 res = System(cmd);
-  Free(cmd);
-  if (res != 0) return -1;
-  return System("grep -q 'note.GNU-stack' " CT_ASM) == 0;
+i64 hasGnuStack(u8 *target) {
+    u8 *cmd = str.format(CT_TIMEOUT "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} --target=%s -S -o " CT_ASM " " CT_FILE " > /dev/null 2>&1", target);
+    i64 res = proc.shell(cmd);
+    mem.free(cmd);
+    if (res != 0) { return -1; }
+    return proc.shell("grep -q 'note.GNU-stack' " CT_ASM) == 0;
 }
 
-/* TRUE if clang assembles the output for `target`, or if there is no
+/* true if clang assembles the output for `target`, or if there is no
  * clang that can assemble for it here (then the check is skipped) */
-Bool AssemblesOrSkipped(U8 *target)
-{
-  U8 *cmd;
-  I64 res;
-  if (System("command -v clang >/dev/null 2>&1") != 0) return TRUE;
-  System("printf '.text\\n' > " CT_PROBE);
-  cmd = MStrPrint("clang --target=%s -c " CT_PROBE " -o " CT_OBJ " > /dev/null 2>&1", target);
-  res = System(cmd);
-  Free(cmd);
-  if (res != 0) return TRUE;
-  if (HasGnuStack(target) < 0) return FALSE;
-  cmd = MStrPrint("clang --target=%s -c " CT_ASM " -o " CT_OBJ " > /dev/null 2>&1", target);
-  res = System(cmd);
-  Free(cmd);
-  return res == 0;
+bool assemblesOrSkipped(u8 *target) {
+    u8 *cmd;
+    i64 res;
+    if (proc.shell("command -v clang >/dev/null 2>&1") != 0) { return true; }
+    proc.shell("printf '.text\\n' > " CT_PROBE);
+    cmd = str.format("clang --target=%s -c " CT_PROBE " -o " CT_OBJ " > /dev/null 2>&1", target);
+    res = proc.shell(cmd);
+    mem.free(cmd);
+    if (res != 0) { return true; }
+    if (hasGnuStack(target) < 0) { return false; }
+    cmd = str.format("clang --target=%s -c " CT_ASM " -o " CT_OBJ " > /dev/null 2>&1", target);
+    res = proc.shell(cmd);
+    mem.free(cmd);
+    return res == 0;
 }
 
-U0 Main()
-{
-  "Test - cross target assembly: ";
-  I64 correct = 0, tests = 8;
+void main() {
+    printf("Test - cross target assembly: ");
+    i64 correct = 0, tests = 8;
 
-  CleanupCrossTest;
-  FileWrite(CT_FILE, ct_source, StrLen(ct_source), O_CREAT | O_RDWR | O_TRUNC);
+    cleanupCrossTest();
+    fs.writeAll(CT_FILE, ctSource, str.len(ctSource), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
-  if (HasGnuStack("x86_64-unknown-linux-gnu") == 1) correct++;
-  if (HasGnuStack("aarch64-unknown-linux-gnu") == 1) correct++;
-  if (HasGnuStack("x86_64-apple-darwin") == 0) correct++;
-  if (HasGnuStack("aarch64-apple-darwin") == 0) correct++;
+    if (hasGnuStack("x86_64-unknown-linux-gnu") == 1) { correct++; }
+    if (hasGnuStack("aarch64-unknown-linux-gnu") == 1) { correct++; }
+    if (hasGnuStack("x86_64-apple-darwin") == 0) { correct++; }
+    if (hasGnuStack("aarch64-apple-darwin") == 0) { correct++; }
 
-  if (AssemblesOrSkipped("x86_64-apple-darwin")) correct++;
-  if (AssemblesOrSkipped("aarch64-apple-darwin")) correct++;
-  if (AssemblesOrSkipped("x86_64-unknown-linux-gnu")) correct++;
-  if (AssemblesOrSkipped("aarch64-unknown-linux-gnu")) correct++;
+    if (assemblesOrSkipped("x86_64-apple-darwin")) { correct++; }
+    if (assemblesOrSkipped("aarch64-apple-darwin")) { correct++; }
+    if (assemblesOrSkipped("x86_64-unknown-linux-gnu")) { correct++; }
+    if (assemblesOrSkipped("aarch64-unknown-linux-gnu")) { correct++; }
 
-  CleanupCrossTest;
-  PrintResult(correct, tests);
-  "====\n";
+    cleanupCrossTest();
+    test.printResult(correct, tests);
+    printf("====\n");
 }

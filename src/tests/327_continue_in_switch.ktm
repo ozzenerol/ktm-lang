@@ -1,201 +1,207 @@
-#include "testhelper.ktm"
+import fs, libc, mem, proc, str, test;
 
-/* `continue` inside a switch crashed the compiler ("NULL param"): the
+enum Err { two };
+
+/* `continue` inside a switch crashed the compiler ("null param"): the
  * switch pushed a loop context with no continue target. It must go to
  * the enclosing loop. */
 
 #define CONT_SWITCH_FILE "__327_continue_switch.ktm"
 #define CONT_SWITCH_OUT  "__327_continue_switch.out"
 
-I64 CatchDepth()
-{
-  if (!Fs) return 0;
-  I64 n = 0;
-  CatchFrame *f = Fs->catch_top;
-  while (f) {
-    n++;
-    f = f->prev;
-  }
-  return n;
-}
-
-I64 ForSwitch()
-{
-  I64 i, n = 0;
-  for (i = 0; i < 4; i++) {
-    switch (i) {
-      case 1: continue;
-      default: n += 10;
-    }
-    n++;
-  }
-  return n;
-}
-
-I64 NestedSwitch()
-{
-  I64 i, n = 0;
-  for (i = 0; i < 6; i++) {
-    switch (i & 1) {
-      case 0:
-        switch (i) {
-          case 2: continue;
-          default: n += 100;
-        }
-        break;
-      case 1:
-        n += 1;
-        break;
-    }
-    n += 1000;
-  }
-  return n;
-}
-
-I64 WhileSwitch()
-{
-  I64 i = 0, n = 0;
-  while (i < 5) {
-    i++;
-    switch (i) {
-      case 2:
-      case 4:
-        continue;
-    }
-    n += i;
-  }
-  return n;
-}
-
-I64 DoWhileSwitch()
-{
-  I64 i = 0, n = 0;
-  do {
-    i++;
-    switch (i) {
-      case 3: continue;
-      default: break;
-    }
-    n += i;
-  } while (i < 5);
-  return n;
-}
-
-I64 BreakStaysInSwitch()
-{
-  I64 i, n = 0;
-  for (i = 0; i < 3; i++) {
-    switch (i) {
-      case 0: break;
-      case 1: continue;
-      default: break;
-    }
-    n++;
-  }
-  return n;
-}
-
-I64 TryAroundSwitch()
-{
-  I64 i, n = 0;
-  for (i = 0; i < 4; i++) {
+/* A throw now reaches the nearest live catch (a frame left behind by a
+ * jump would take it somewhere else) */
+bool throwLands() {
+    i64 got = 0;
     try {
-      switch (i) {
-        case 1: continue;
-        case 2: throw('Two');
-        default: n += 10;
-      }
-      n++;
-    } catch {
-      n += 100;
+        throw(77);
+    } catch (Error e) {
+        got = e.code;
     }
-  }
-  return n;
+    return got == 77;
 }
 
-I64 SwitchAroundTry()
-{
-  I64 i, n = 0;
-  for (i = 0; i < 4; i++) {
-    switch (i) {
-      case 1:
-        try {
-          try {
-            continue;
-          } catch {
-          }
-        } catch {
-        }
-      default: n += 10;
-    }
-    n++;
-  }
-  return n;
-}
-
-I64 LoopInsideTry()
-{
-  I64 i, n = 0;
-  try {
+i64 forSwitch() {
+    i64 i, n = 0;
     for (i = 0; i < 4; i++) {
-      switch (i) {
-        case 1: continue;
-        default: n += CatchDepth();
-      }
+        switch (i) {
+            case 1: continue;
+            fallthrough;
+            default: n += 10;
+        }
+        n++;
     }
-  } catch {
-    n = -1;
-  }
-  return n;
+    return n;
 }
 
-U0 CleanupContinueSwitch(U0)
-{
-  Rm(CONT_SWITCH_FILE);
-  Rm(CONT_SWITCH_OUT);
-  Rm("./a.out");
+i64 nestedSwitch() {
+    i64 i, n = 0;
+    for (i = 0; i < 6; i++) {
+        switch (i & 1) {
+            case 0:
+                switch (i) {
+                    case 2: continue;
+                    fallthrough;
+                    default: n += 100;
+                }
+                break;
+            case 1:
+                n += 1;
+                break;
+        }
+        n += 1000;
+    }
+    return n;
 }
 
-Bool ContinueWithoutLoopFails()
-{
-  U8 *src = "U0 Main()\n{\n  I64 i = 1;\n  switch (i) {\n    case 1: continue;\n  }\n}\n";
-  U8 *out;
-  I64 res;
-  Bool ok;
-
-  CleanupContinueSwitch;
-  if (!FileWrite(CONT_SWITCH_FILE, src, StrLen(src), O_CREAT | O_RDWR | O_TRUNC)) {
-    return FALSE;
-  }
-  res = System("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CONT_SWITCH_FILE " > " CONT_SWITCH_OUT " 2>&1");
-  out = FileRead(CONT_SWITCH_OUT);
-  ok = res != 0 && out && strstr(out, "continue, not inside a loop") &&
-       !strstr(out, "NULL param");
-  if (!ok && out) "%s\n", out;
-  Free(out);
-  CleanupContinueSwitch;
-  return ok;
+i64 whileSwitch() {
+    i64 i = 0, n = 0;
+    while (i < 5) {
+        i++;
+        switch (i) {
+            case 2:
+            case 4:
+                continue;
+        }
+        n += i;
+    }
+    return n;
 }
 
-I32 Main()
-{
-  "Test - continue in switch: ";
-  I64 correct = 0, tests = 0;
+i64 doWhileSwitch() {
+    i64 i = 0, n = 0;
+    do {
+        i++;
+        switch (i) {
+            case 3: continue;
+            fallthrough;
+            default: break;
+        }
+        n += i;
+    } while (i < 5);
+    return n;
+}
 
-  tests++; if (ForSwitch == 33) correct++;
-  tests++; if (NestedSwitch == 5203) correct++;
-  tests++; if (WhileSwitch == 9) correct++;
-  tests++; if (DoWhileSwitch == 12) correct++;
-  tests++; if (BreakStaysInSwitch == 2) correct++;
-  tests++; if (TryAroundSwitch == 122) correct++;
-  tests++; if (CatchDepth == 0) correct++;
-  tests++; if (SwitchAroundTry == 33) correct++;
-  tests++; if (CatchDepth == 0) correct++;
-  tests++; if (LoopInsideTry == 3) correct++;
-  tests++; if (CatchDepth == 0) correct++;
-  tests++; if (ContinueWithoutLoopFails) correct++;
+i64 breakStaysInSwitch() {
+    i64 i, n = 0;
+    for (i = 0; i < 3; i++) {
+        switch (i) {
+            case 0: break;
+            case 1: continue;
+            fallthrough;
+            default: break;
+        }
+        n++;
+    }
+    return n;
+}
 
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+i64 tryAroundSwitch() {
+    i64 i, n = 0;
+    for (i = 0; i < 4; i++) {
+        try {
+            switch (i) {
+                case 1: continue;
+                fallthrough;
+                case 2: throw(Err.two);
+                default: n += 10;
+            }
+            n++;
+        } catch {
+            n += 100;
+        }
+    }
+    return n;
+}
+
+i64 switchAroundTry() {
+    i64 i, n = 0;
+    for (i = 0; i < 4; i++) {
+        switch (i) {
+            case 1:
+                try {
+                    try {
+                        continue;
+                    } catch {
+                    }
+                } catch {
+                }
+                fallthrough;
+            default: n += 10;
+        }
+        n++;
+    }
+    return n;
+}
+
+i64 loopInsideTry() {
+    i64 i, n = 0;
+    try {
+        for (i = 0; i < 4; i++) {
+            switch (i) {
+                case 1: continue;
+                fallthrough;
+                default: n += 1;
+            }
+        }
+    } catch {
+        n = -1;
+    }
+    return n;
+}
+
+void cleanupContinueSwitch(void) {
+    fs.remove(CONT_SWITCH_FILE);
+    fs.remove(CONT_SWITCH_OUT);
+    fs.remove("./a.out");
+}
+
+bool continueWithoutLoopFails() {
+    u8 *src = "void main()\n{\n  i64 i = 1;\n  switch (i) {\n    case 1: continue;\n  }\n}\n";
+    u8 *out;
+    i64 res;
+    bool ok;
+
+    cleanupContinueSwitch();
+    if (!fs.writeAll(CONT_SWITCH_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+        return false;
+    }
+    res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " CONT_SWITCH_FILE " > " CONT_SWITCH_OUT " 2>&1");
+    out = fs.readAll(CONT_SWITCH_OUT);
+    ok = res != 0 && out && libc.strstr(out, "continue, not inside a loop") &&
+             !libc.strstr(out, "NULL param");
+    if (!ok && out) { printf("%s\n", out); }
+    mem.free(out);
+    cleanupContinueSwitch();
+    return ok;
+}
+
+i32 main() {
+    printf("Test - continue in switch: ");
+    i64 correct = 0, tests = 0;
+
+    tests++; if (forSwitch() == 33) { correct++; }
+    tests++; if (nestedSwitch() == 5203) { correct++; }
+    tests++; if (whileSwitch() == 9) { correct++; }
+    tests++; if (doWhileSwitch() == 12) { correct++; }
+    tests++; if (breakStaysInSwitch() == 2) { correct++; }
+    tests++; if (tryAroundSwitch() == 122) { correct++; }
+    tests++; if (throwLands()) { correct++; }
+    tests++; if (switchAroundTry() == 33) { correct++; }
+    tests++; if (throwLands()) { correct++; }
+    tests++; if (loopInsideTry() == 3) { correct++; }
+    tests++; if (throwLands()) { correct++; }
+    /* the same many times over: nothing is left behind on the heap */
+    i64 before = test.heapInUse();
+    for (i64 i = 0; i < 20000; i++) {
+        tryAroundSwitch();
+        switchAroundTry();
+        loopInsideTry();
+    }
+    tests++; if (test.heapInUse() - before < 64 * 1024) { correct++; }
+    tests++; if (continueWithoutLoopFails()) { correct++; }
+
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* File-scope variables with initialisers are run by a synthetic entry
  * point that must also call the user's Main. The fact that Main runs at
@@ -6,57 +6,53 @@
  * guard - before the fix the program initialised the globals and exited
  * without ever entering Main. */
 
-I64 g_int   = 42;
-I64 g_neg   = -7;
-I64 g_expr  = 3 + 4 * 2;     /* 11 */
-F64 g_f64   = 1.5;
-F32 g_f32   = 2.25;
-U8  g_char  = 'A';
-U8 *g_str   = "ktm";
-auto g_auto_i = 99;          /* inferred I64 */
-auto g_auto_f = 3.5;         /* inferred F64 */
+i64 gInt   = 42;
+i64 gNeg   = -7;
+i64 gExpr  = 3 + 4 * 2;     /* 11 */
+f64 gF64   = 1.5;
+f32 gF32   = 2.25;
+u8  gChar  = 'A';
+u8 *gStr   = "ktm";
+auto gAutoI = 99;          /* inferred i64 */
+auto gAutoF = 3.5;         /* inferred f64 */
 
-Bool GlobalScalars()
-{
-  I64 tests = 7, correct = 0;
-  if (g_int == 42) correct++;
-  if (g_neg == -7) correct++;
-  if (g_expr == 11) correct++;
-  if (g_char == 'A') correct++;
-  if (g_str[0] == 'k' && g_str[2] == 'm' && !g_str[3]) correct++;
-  if (g_auto_i == 99) correct++;
-  if (g_auto_f == 3.5) correct++;
-  return correct == tests;
+bool globalScalars() {
+    i64 tests = 7, correct = 0;
+    if (gInt == 42) { correct++; }
+    if (gNeg == -7) { correct++; }
+    if (gExpr == 11) { correct++; }
+    if (gChar == 'A') { correct++; }
+    if (gStr[0] == 'k' && gStr[2] == 'm' && !gStr[3]) { correct++; }
+    if (gAutoI == 99) { correct++; }
+    if (gAutoF == 3.5) { correct++; }
+    return correct == tests;
 }
 
-Bool GlobalFloats()
-{
-  I64 tests = 3, correct = 0;
-  if (g_f64 == 1.5) correct++;
-  if (g_f32 == 2.25) correct++;
-  if (g_f64 + g_f32 == 3.75) correct++;
-  return correct == tests;
+bool globalFloats() {
+    i64 tests = 3, correct = 0;
+    if (gF64 == 1.5) { correct++; }
+    if (gF32 == 2.25) { correct++; }
+    if (gF64 + gF32 == 3.75) { correct++; }
+    return correct == tests;
 }
 
-Bool GlobalMutation()
-{
-  I64 tests = 2, correct = 0;
-  /* Globals are writable after their initialiser runs. */
-  g_int = g_int + 8;
-  if (g_int == 50) correct++;
-  g_f32 = g_f32 * 2.0;
-  if (g_f32 == 4.5) correct++;
-  return correct == tests;
+bool globalMutation() {
+    i64 tests = 2, correct = 0;
+    /* Globals are writable after their initialiser runs. */
+    gInt = gInt + 8;
+    if (gInt == 50) { correct++; }
+    gF32 = gF32 * 2.0;
+    if (gF32 == 4.5) { correct++; }
+    return correct == tests;
 }
 
-I32 Main()
-{
-  "Test - Global initialisers:\n";
-  I64 tests = 3, correct = 0;
-  if (GlobalScalars()) correct++;
-  if (GlobalFloats()) correct++;
-  if (GlobalMutation()) correct++;
-  PrintResult(correct,tests);
-  "====\n";
-  return 0;
+i32 main() {
+    printf("Test - Global initialisers:\n");
+    i64 tests = 3, correct = 0;
+    if (globalScalars()) { correct++; }
+    if (globalFloats()) { correct++; }
+    if (globalMutation()) { correct++; }
+    test.printResult(correct,tests);
+    printf("====\n");
+    return 0;
 }

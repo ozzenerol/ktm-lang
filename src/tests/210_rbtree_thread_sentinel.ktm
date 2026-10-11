@@ -1,174 +1,168 @@
-#include "testhelper.ktm"
+import libc, map, mem, set, test;
 
-/* All red-black trees shared one global sentinel node: RBTreeNew reset
+/* All red-black trees shared one global sentinel node: map.rbNew reset
  * it and RBTransplant / the delete fix-up wrote its parent, so trees used
  * from different threads corrupted each other. Each tree now has its own
  * sentinel. */
 
-#define RBT_THREADS 6
-#define RBT_KEYS    300
-#define RBT_OPS     200000
+const i64 RBT_THREADS = 6;
+const i64 RBT_KEYS = 300;
+const i64 RBT_OPS = 200000;
 
-extern "c" U32 alarm(U32 seconds);
+extern "c" u32 alarm(u32 seconds);
 
-I64 RbtCmp(U0 *a, U0 *b)
-{
-  if (a(I64) < b(I64)) return -1;
-  if (a(I64) > b(I64)) return 1;
-  return 0;
+i64 rbtCmp(void *a, void *b) {
+    if ((i64)a < (i64)b) { return -1; }
+    if ((i64)a > (i64)b) { return 1; }
+    return 0;
 }
 
-/* A tree's sentinel is the only node whose `left` is NULL */
-Bool IsNil(RBNode *n) { return n->left == NULL; }
+/* A tree's sentinel is the only node whose `left` is null */
+bool isNil(map.RBNode *n) { return n.left == null; }
 
 /* Black height, or -1 if an invariant is broken */
-I64 Check(RBNode *n, RBNode *parent, I64 lo, I64 hi, I64 *count)
-{
-  if (IsNil(n)) return 1;
-  I64 k = n->key(I64);
-  if (k <= lo || k >= hi) return -1;
-  if (n->parent != parent) return -1;
-  if (n->color == 0 && (n->left->color == 0 || n->right->color == 0)) return -1;
-  I64 l = Check(n->left, n, lo, k, count);
-  I64 r = Check(n->right, n, k, hi, count);
-  if (l < 0 || r < 0 || l != r) return -1;
-  ++*count;
-  return l + (n->color == 1);
+i64 check(map.RBNode *n, map.RBNode *parent, i64 lo, i64 hi, i64 *count) {
+    if (isNil(n)) { return 1; }
+    i64 k = (i64)n.key;
+    if (k <= lo || k >= hi) { return -1; }
+    if (n.parent != parent) { return -1; }
+    if (n.color == 0 && (n.left.color == 0 || n.right.color == 0)) { return -1; }
+    i64 l = check(n.left, n, lo, k, count);
+    i64 r = check(n.right, n, k, hi, count);
+    if (l < 0 || r < 0 || l != r) { return -1; }
+    ++*count;
+    return l + (n.color == 1);
 }
 
-Bool Valid(RBTree *t)
-{
-  I64 count = 0;
-  if (IsNil(t->root)) return t->size == 0;
-  if (t->root->color != 1) return FALSE;
-  if (Check(t->root, NULL, I64_MIN, I64_MAX, &count) < 0) return FALSE;
-  return count == t->size;
+bool valid(map.RBTree *t) {
+    i64 count = 0;
+    if (isNil(t.root)) { return t.size == 0; }
+    if (t.root.color != 1) { return false; }
+    if (check(t.root, null, I64_MIN, I64_MAX, &count) < 0) { return false; }
+    return count == t.size;
 }
 
-class RbtArgs
-{
-  pthread_t *th;
-  I64 seed;
-  Bool ok;
+struct RbtArgs {
+    libc.pthread_t *th;
+    i64 seed;
+    bool ok;
 };
 
 /* Random inserts and deletes against a shadow array, checking the tree
  * every so often. Every few hundred operations the tree is released and
- * a new one made, so RBTreeNew runs while other threads use their trees. */
-U0 *RbtWorker(RbtArgs *args)
-{
-  Bool shadow[RBT_KEYS];
-  I64 i, k, n = 0, seed = args->seed;
-  RBTree *t = RBTreeNew(NULL, NULL, &RbtCmp);
-  MemSet(shadow, 0, sizeof(shadow));
-  args->ok = TRUE;
+ * a new one made, so map.rbNew runs while other threads use their trees. */
+void *rbtWorker(RbtArgs *args) {
+    bool shadow[RBT_KEYS];
+    i64 i, k, n = 0, seed = args.seed;
+    map.RBTree *t = map.rbNew(null, null, &rbtCmp);
+    mem.set(shadow, 0, sizeof(shadow));
+    args.ok = true;
 
-  for (i = 0; i < RBT_OPS && args->ok; i++) {
-    seed = seed * 6364136223846793005 + 1442695040888963407;
-    k = ((seed >> 33) & 0x7FFFFFFF) % RBT_KEYS + 1;
-    if ((seed >> 20) & 1) {
-      RBTreeInsert(t, k(U0 *), (k * 2)(U0 *));
-      if (!shadow[k - 1]) n++;
-      shadow[k - 1] = TRUE;
-    } else {
-      RBTreeDelete(t, k(U0 *));
-      if (shadow[k - 1]) n--;
-      shadow[k - 1] = FALSE;
+    for (i = 0; i < RBT_OPS && args.ok; i++) {
+        seed = seed * 6364136223846793005 + 1442695040888963407;
+        k = ((seed >> 33) & 0x7FFFFFFF) % RBT_KEYS + 1;
+        if ((seed >> 20) & 1) {
+            t.set((void *)k, (void *)(k * 2));
+            if (!shadow[k - 1]) { n++; }
+            shadow[k - 1] = true;
+        } else {
+            t.delete((void *)k);
+            if (shadow[k - 1]) { n--; }
+            shadow[k - 1] = false;
+        }
+        if (t.has((void *)k) != shadow[k - 1] || t.size != n) { args.ok = false; }
+        if (i % 97 == 0 && !valid(t)) { args.ok = false; }
+        if (i % 1500 == 1499) {
+            t.release();
+            t = map.rbNew(null, null, &rbtCmp);
+            mem.set(shadow, 0, sizeof(shadow));
+            n = 0;
+        }
     }
-    if (RBTreeHas(t, k(U0 *)) != shadow[k - 1] || t->size != n) args->ok = FALSE;
-    if (i % 97 == 0 && !Valid(t)) args->ok = FALSE;
-    if (i % 1500 == 1499) {
-      RBTreeRelease(t);
-      t = RBTreeNew(NULL, NULL, &RbtCmp);
-      MemSet(shadow, 0, sizeof(shadow));
-      n = 0;
+    if (!valid(t)) { args.ok = false; }
+    for (k = 1; k <= RBT_KEYS; k++) {
+        if (shadow[k - 1] && (i64)t.get((void *)k) != k * 2) { args.ok = false; }
     }
-  }
-  if (!Valid(t)) args->ok = FALSE;
-  for (k = 1; k <= RBT_KEYS; k++) {
-    if (shadow[k - 1] && RBTreeGet(t, k(U0 *))(I64) != k * 2) args->ok = FALSE;
-  }
-  RBTreeRelease(t);
-  return NULL;
+    t.release();
+    return null;
 }
 
-I32 Main()
-{
-  "Test - RBTree sentinel per tree: ";
-  I64 correct = 0, tests = 5, i, k, n;
-  RbtArgs args[RBT_THREADS];
+i32 main() {
+    printf("Test - RBTree sentinel per tree: ");
+    i64 correct = 0, tests = 5, i, k, n;
+    RbtArgs args[RBT_THREADS];
 
-  alarm(120); /* a corrupted tree can loop forever: fail instead of hanging */
+    alarm(120); /* a corrupted tree can loop forever: fail instead of hanging */
 
-  /* Several trees on several threads at once */
-  for (i = 0; i < RBT_THREADS; i++) {
-    args[i].seed = i * 7919 + 1;
-    args[i].ok = FALSE;
-    pthread_create(&args[i].th,, (&RbtWorker)(U0 *(*)(U0 *)), &args[i]);
-  }
-  for (i = 0; i < RBT_THREADS; i++) pthread_join(args[i].th);
-  Bool ok = TRUE;
-  for (i = 0; i < RBT_THREADS; i++) if (!args[i].ok) ok = FALSE;
-  if (ok) correct++;
-
-  /* Single thread, two trees interleaved: deleting from one doesn't
-   * disturb the other */
-  RBTree *a = RBTreeNew(NULL, NULL, &RbtCmp);
-  RBTree *b = RBTreeNew(NULL, NULL, &RbtCmp);
-  for (k = 1; k <= 200; k++) {
-    RBTreeInsert(a, k(U0 *), k(U0 *));
-    RBTreeInsert(b, (k * 3)(U0 *), k(U0 *));
-    if (k % 3 == 0) {
-      RBTreeDelete(a, (k / 3)(U0 *));
-      RBTreeDelete(b, k(U0 *));
+    /* Several trees on several threads at once */
+    for (i = 0; i < RBT_THREADS; i++) {
+        args[i].seed = i * 7919 + 1;
+        args[i].ok = false;
+        libc.pthread_create(&args[i].th,, (fn(void *) void *)(&rbtWorker), &args[i]);
     }
-  }
-  if (Valid(a) && Valid(b) && a->size == 134 && b->size == 134) correct++;
-  /* A new tree made while others hold nodes is empty and independent */
-  RBTree *c = RBTreeNew(NULL, NULL, &RbtCmp);
-  if (c->size == 0 && IsNil(c->root) && Valid(a) && Valid(b)) correct++;
-  RBTreeRelease(a);
-  RBTreeRelease(b);
-  RBTreeRelease(c);
+    for (i = 0; i < RBT_THREADS; i++) { libc.pthread_join(args[i].th); }
+    bool ok = true;
+    for (i = 0; i < RBT_THREADS; i++) { if (!args[i].ok) { ok = false; } }
+    if (ok) { correct++; }
 
-  /* IntSet unchanged */
-  IntSet *s = IntSetNew();
-  for (k = 10; k > 0; k--) IntSetAdd(s, k);
-  IntSetDelete(s, 4);
-  IntSetDelete(s, 99);
-  IntSetIter *it = IntSetIterNew(s);
-  IntSetEntry *e;
-  n = 0;
-  ok = TRUE;
-  I64 prev = 0;
-  while ((e = IntSetIterNext(it))) {
-    if (e->key <= prev || e->key == 4) ok = FALSE;
-    prev = e->key;
-    n++;
-  }
-  IntSetIterRelease(it);
-  if (ok && n == 9 && IntSetSize(s) == 9 && IntSetHas(s, 10) && !IntSetHas(s, 4)) correct++;
-  U8 *str = IntSetToString(s);
-  Free(str);
-  IntSetRelease(s);
+    /* Single thread, two trees interleaved: deleting from one doesn't
+     * disturb the other */
+    map.RBTree *a = map.rbNew(null, null, &rbtCmp);
+    map.RBTree *b = map.rbNew(null, null, &rbtCmp);
+    for (k = 1; k <= 200; k++) {
+        a.set((void *)k, (void *)k);
+        b.set((void *)(k * 3), (void *)k);
+        if (k % 3 == 0) {
+            a.delete((void *)(k / 3));
+            b.delete((void *)k);
+        }
+    }
+    if (valid(a) && valid(b) && a.size == 134 && b.size == 134) { correct++; }
+    /* A new tree made while others hold nodes is empty and independent */
+    map.RBTree *c = map.rbNew(null, null, &rbtCmp);
+    if (c.size == 0 && isNil(c.root) && valid(a) && valid(b)) { correct++; }
+    a.release();
+    b.release();
+    c.release();
 
-  /* RBIter walks in order */
-  RBTree *t = RBTreeNew(NULL, NULL, &RbtCmp);
-  for (k = 1; k <= 50; k++) RBTreeInsert(t, ((k * 37) % 101)(U0 *), NULL);
-  RBIter *ri = RBIterNew(t);
-  RBNode *node;
-  n = 0; prev = -1; ok = TRUE;
-  while ((node = RBIterNext(ri))) {
-    if (node->key(I64) <= prev) ok = FALSE;
-    prev = node->key(I64);
-    n++;
-  }
-  RBIterRelease(ri);
-  if (ok && n == 50) correct++;
-  RBTreeRelease(t);
+    /* set.IntSet unchanged */
+    set.IntSet *s = set.intNew();
+    for (k = 10; k > 0; k--) { s.add(k); }
+    s.delete(4);
+    s.delete(99);
+    set.IntSetIter *it = s.iterNew();
+    set.IntSetEntry *e;
+    n = 0;
+    ok = true;
+    i64 prev = 0;
+    while ((e = set.intIterNext(it))) {
+        if (e.key <= prev || e.key == 4) { ok = false; }
+        prev = e.key;
+        n++;
+    }
+    set.intIterRelease(it);
+    if (ok && n == 9 && s.size() == 9 && s.has(10) && !s.has(4)) { correct++; }
+    u8 *str = s.toStr();
+    mem.free(str);
+    s.release();
 
-  alarm(0);
-  PrintResult(correct, tests);
-  "====\n";
-  return 0;
+    /* RBIter walks in order */
+    map.RBTree *t = map.rbNew(null, null, &rbtCmp);
+    for (k = 1; k <= 50; k++) { t.set((void *)((k * 37) % 101), null); }
+    map.RBIter *ri = t.iterNew();
+    map.RBNode *node;
+    n = 0; prev = -1; ok = true;
+    while ((node = map.rbIterNext(ri))) {
+        if ((i64)node.key <= prev) { ok = false; }
+        prev = (i64)node.key;
+        n++;
+    }
+    map.rbIterRelease(ri);
+    if (ok && n == 50) { correct++; }
+    t.release();
+
+    alarm(0);
+    test.printResult(correct, tests);
+    printf("====\n");
+    return 0;
 }
