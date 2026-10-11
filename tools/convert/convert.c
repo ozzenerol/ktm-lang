@@ -2088,7 +2088,65 @@ static void migOwnTypeWord(MigFile *f, s64 at, s64 len, void *ctx) {
     migOwnType(f, at, len);
 }
 
+static int migPreprocUses(MigFile *f, const char *name, s64 nlen);
+
+/* `#define NAME <number>` in text an #if skipped: the const the
+ * compiled branch's gets (the parser never typed this one: a plain
+ * number is i64, one with a point or an exponent f64) */
+static void migSkippedDefines(MigFile *f, s64 s, s64 e) {
+    char *t = f->text;
+    for (s64 i = s; i < e; ) {
+        s64 le = i;
+        while (le < e && t[le] != '\n') le++;
+        s64 j = i;
+        while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+        s64 line_start = j;
+        if (le - j > 7 && !memcmp(t + j, "#define", 7) && (t[j + 7] == ' ' || t[j + 7] == '\t')) {
+            j += 7;
+            while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
+            s64 nw = j;
+            while (j < le && migIsIdent(t[j])) j++;
+            s64 nlen = j - nw;
+            s64 vs = j, ve = le;
+            for (s64 k = j; k < le; ++k) {
+                if (t[k] == '/' && k + 1 < le && (t[k + 1] == '/' || t[k + 1] == '*')) { ve = k; break; }
+            }
+            while (vs < ve && isspace((unsigned char)t[vs])) vs++;
+            while (ve > vs && isspace((unsigned char)t[ve - 1])) ve--;
+            int numeric = nlen > 0 && vs < ve;
+            int is_float = 0;
+            for (s64 k = vs; k < ve && numeric; ++k) {
+                char c = t[k];
+                if (isdigit((unsigned char)c) || c == 'x' || c == 'X' || c == '(' || c == ')' ||
+                    c == '-' || c == '+' || c == ' ' || c == '|' || c == '<' || c == '>' ||
+                    (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || c == 'U' || c == 'u' ||
+                    c == 'L' || c == 'l') continue;
+                if (c == '.') { is_float = 1; continue; }
+                numeric = 0;
+            }
+            if (numeric && vs < ve && (isdigit((unsigned char)t[vs]) || t[vs] == '(' || t[vs] == '-')) {
+                char *name = mprintf("%.*s", (int)nlen, t + nw);
+                if (!migPreprocUses(f, name, nlen)) {
+                    const char *mod = migFileModule(f);
+                    MigName *mn = mig_map ? mapGet(mig_map, name) : NULL;
+                    int own = *mod && mn && !strcmp(mn->module, mod);
+                    int pub = *mod && (!strcmp(mod, "libc") || own);
+                    const char *cname = own && strcmp(mn->kind, "c") ? mn->name : name;
+                    migAddSegs(f, line_start, ve, "const",
+                               migLit(mprintf("%sconst %s %s = ", pub ? "pub " : "",
+                                              is_float ? "f64" : "i64", cname)),
+                               migRange(vs, ve), migLit(";"), NULL);
+                }
+            }
+        }
+        i = le + 1;
+    }
+}
+
 static void migSkippedCasts(MigFile *f) {
+    for (u64 r = 0; r + 1 < f->skipped->size; r += 2)
+        migSkippedDefines(f, (s64)(intptr_t)f->skipped->entries[r],
+                          (s64)(intptr_t)f->skipped->entries[r + 1]);
     if (mig_map) {
         if (f->real && strstr(f->real, "/src/std/"))
             migScanWords(f, f->text, 0, f->len, migOwnTypeWord, NULL);
@@ -2947,7 +3005,9 @@ static int migPreprocUses(MigFile *f, const char *name, s64 nlen) {
         }
         i = le + 1;
     }
-    return defs != 1;
+    /* defined twice is fine: an #if's branches each have their own (only
+     * one is compiled), each becoming a const */
+    return defs == 0;
 }
 
 static void migDefines(MigFile *f) {

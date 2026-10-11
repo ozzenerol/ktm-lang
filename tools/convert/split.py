@@ -169,8 +169,9 @@ for f in headers + files:
             seen_c.add(name)
             # sqlite's C functions are the sql module's (optional, like it)
             target = 'sql' if name.startswith('sqlite3') else 'libc'
-            if target == 'libc':
+            if target == 'libc' and k != 'define':
                 # everything in c is pub: it is the C library, for every module
+                # (a #define is made a pub const by the converter)
                 lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
                 if not re.match(r'(public|static)\b', body[lead:]):
                     body = body[:lead] + 'public ' + body[lead:]
@@ -236,6 +237,10 @@ for f in headers + files:
         if mod == 'libc' and k == 'ifblock':
             body = re.sub(r'^(\s*)public\s+(?!extern\b|_extern\b|class\b|union\b|struct\b|enum\b)'
                           r'([^;{]*\([^;{]*\)\s*;)', r'\1public extern "c" \2', body, flags=re.M)
+            # its C structs too are pub, like everything in libc
+            body = re.sub(r'^(\s*)(?=(?:class|union|struct)\s+\w+\s*(?:\{|$|;))', r'\1public ',
+                          body, flags=re.M)
+            body = re.sub(r'\bpublic(\s+)public\b', r'public', body)
         # everything in libc is pub: it is the C library, for every module
         if mod == 'libc' and k in ('type', 'global', 'func', 'proto'):
             lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()
