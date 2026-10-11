@@ -34,4 +34,15 @@ Steps (plan approved by asuslab-33):
   right after the flip, over src/std, tests, docs and the builder projects.
 - Runs: a program using str.format, %Q, date.format and throw/catch gives the right output AOT and JIT
   against the tree-built libktm.
-- Left: A4 build scripts, A5 checks.
+- A4 done: the compiler reads no std.ktmh (a stale one in an old install is ignored; the transpiler
+  still uses one if present). `ktm -lib ktm <prefix>/modules` puts libktm.a and the versioned shared
+  object in <prefix>/lib, markers `../../lib/...`. build.sh, CMake install (relative destinations,
+  honours --prefix), packaging/install.sh (replaces/removes only the stdlib's module dirs, removes an
+  old include/std.ktmh), Makefile (lsp-test, lib-ktm), release.yml (-S over the tree, markers
+  written), docker/matrix.sh. The modules root no longer needs <prefix>/include to exist.
+- throw(code) with rt.__ktmThrowFmt's `...args` fixed.
+- A5 so far, conv-ae 9df1fb4's 420-440 against build/prefix: pass 420 421 424 425 427 429-432 435-437
+  439. Left for (b): 422 (base drift, hides), 423/428 (fixture module `net` is found twice with the
+  stdlib's net: rename it), 426 (StrMap is map.StrMap), 433 (`fn(...)` became `fn(...args)` in a
+  typeof expectation), 438 (libc, base drift), 440 (copies include/std.ktmh; a prefix is lib/ + modules/).
+- Left: unused-import warnings while building the stdlib; 441-443 once conv-ae is rebased.

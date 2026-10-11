@@ -60,7 +60,7 @@ step "clang release: compiler is clang"        grep -q '^CMAKE_C_COMPILER:.*clan
 step "clang release: hello AOT + JIT"          hello_works ./ktm --install-dir=build/prefix
 
 step "install: --install to \$HOME/prefix"    env INSTALL_PREFIX="$HOME/prefix" ./build.sh --install
-step "install: files in place"                 bash -c "[ -x $HOME/prefix/bin/ktm ] && [ -f $HOME/prefix/include/std.ktmh ] && ls $HOME/prefix/lib | grep -q libktm"
+step "install: files in place"                 bash -c "[ -x $HOME/prefix/bin/ktm ] && [ -f $HOME/prefix/modules/str/.ktmlib ] && ls $HOME/prefix/lib | grep -q libktm"
 step "install: installed ktm, no --install-dir" hello_works "$HOME/prefix/bin/ktm"
 
 printf '\n##### SUMMARY %s steps, %s failed\n' "$steps" "$failed"

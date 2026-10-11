@@ -322,7 +322,8 @@ static char *relativePath(const char *from, const char *to) {
 
 /* `ktm -lib a.b dir/a/b`: liba.b.a and the shared object next to the
  * module's sources; `ktm -lib name dir` over a tree: libname.a and the
- * shared object in dir, from every module under it. Each module's
+ * shared object in dir, from every module under it (libktm: in the
+ * install directory's lib/, see below). Each module's
  * directory gets a .ktmlib marker an importer finds the library by,
  * relative to the marker. The object file is a temporary one, nothing
  * is installed, and the commands are printed only with -v. */
@@ -338,14 +339,34 @@ static void emitModuleLibrary(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
     char *shared_flags = "-shared -Wl,-Bsymbolic";
 #endif
     char *archive = mprintf("%s/lib%s.a", dir, args->lib_name);
+    char *shared_libs = "";
+    if (cc->is_libktm && args->lib_tree_dirs) {
+        /* `ktm -lib ktm <prefix>/modules`: the stdlib, into <prefix>/lib
+         * as ktmLibInit names it: the archive `-lktm` finds, and only the
+         * versioned shared object the JIT loads (an unversioned one would
+         * make `-lktm` link dynamically) */
+        char *lib_dir = mprintf("%s/lib", args->install_dir);
+        safeSystem(mprintf("mkdir -p %s", lib_dir), args->verbose);
+        char *real = realpath(lib_dir, NULL);
+        if (real) lib_dir = real;
+        archive = mprintf("%s/libktm.a", lib_dir);
+#if IS_BSD
+        shared = mprintf("%s/libktm.0.0.1.dylib", lib_dir);
+        shared_flags = mprintf("-dynamiclib -Wl,-install_name,%s", shared);
+#else
+        shared = mprintf("%s/libktm.so.0.0.1", lib_dir);
+        shared_flags = "-shared -Wl,-Bsymbolic -Wl,-soname,libktm.so.0.0.1";
+#endif
+        shared_libs = mprintf(CLIBS" %s", linkLibFlags(cc)->data);
+    }
     close(makeTmpFile(run_tmp_file, "obj", ".o"));
     char *object = run_tmp_file;
     safeSystem(mprintf("%s -fPIC -c %s -o %s", cc->CC, asm_tmp_file, object),
                args->verbose);
     safeSystem(mprintf("rm -f %s && ar rcs %s %s", archive, archive, object),
                args->verbose);
-    safeSystem(mprintf("%s -fPIC %s %s -o %s", cc->CC, shared_flags, object,
-                       shared), args->verbose);
+    safeSystem(mprintf("%s -fPIC %s %s -o %s %s", cc->CC, shared_flags, object,
+                       shared, shared_libs), args->verbose);
 
     int count = args->lib_tree_dirs ? (int)args->lib_tree_dirs->size : 1;
     for (int i = 0; i < count; ++i) {

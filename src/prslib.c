@@ -2007,6 +2007,16 @@ Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
     Vec *argv = parseArgv(cc, decl, ')', fname, len, loc.args);
     parseCallLocEnd(cc, &loc);
 
+    /* rt.__ktmThrowFmt's `...args` pads the call to its fixed parameters
+     * and the (count, data) pair: `throw(code)` and `throw()` come back
+     * with placeholders after what was written */
+    for (u64 i = 0; i < argv->size; ++i) {
+        Ast *arg = argv->entries[i];
+        if (!arg || arg->kind == AST_PLACEHOLDER) {
+            if (i <= 1) argv->size = i;
+            break;
+        }
+    }
     if (argv->size == 0 || !argv->entries[0]) {
         parseCallLocFreeArgs(&loc);
         parseRaiseCallError(cc, &loc, "`throw` needs a code, or an Error to throw again");

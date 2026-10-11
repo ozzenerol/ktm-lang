@@ -1966,7 +1966,11 @@ AoStr *transpileToC(Cctrl *cc, CliArgs *args) {
     
     lexInit(l,NULL,(CCF_PRE_PROC));
     lexSetBuiltinRoot(l,root);
-    lexPushFile(l,builtin_path);
+    /* the old header, only if an install still has one: the stdlib is
+     * modules now */
+    if (access(builtin_path->data, R_OK) == 0) {
+        lexPushFile(l,builtin_path);
+    }
 
     cctrlInitParse(cc,l);
     // we are parsing the built in types

@@ -117,14 +117,12 @@ KTM="$ROOT/ktm"
 
 step "Building libktm into $PREFIX"
 rm -rf "$PREFIX"
-mkdir -p "$PREFIX/include" "$PREFIX/lib"
-cp "$ROOT/src/std/std.ktmh" "$PREFIX/include/std.ktmh"
-# the prelude, which every compile (all.ktm's too) reads before std.ktmh
-mkdir -p "$PREFIX/modules"
-cp -R "$ROOT/src/std/prelude" "$PREFIX/modules/prelude"
-lib_args=(-fPIC -lib ktm --install-dir="$PREFIX")
-[ "$SQLITE" = 1 ] && lib_args=(-DKTM_LINK_SQLITE3 "${lib_args[@]}")
-(cd "$ROOT/src/std" && "$KTM" "${lib_args[@]}" ./all.ktm)
+mkdir -p "$PREFIX/lib" "$PREFIX/modules"
+# the stdlib's modules (the prelude and the runtime among them), compiled
+# as one tree into lib/libktm.a and the shared object the JIT loads; each
+# module directory gets a .ktmlib marker pointing at them
+cp -R "$ROOT/src/std/." "$PREFIX/modules/"
+"$KTM" -fPIC -lib ktm --install-dir="$PREFIX" "$PREFIX/modules"
 
 if [ "$RUN_TESTS" = 1 ]; then
     # The test runners otherwise compile each test against /usr/local.
@@ -147,7 +145,7 @@ if [ "$DO_INSTALL" = 1 ]; then
     # Copy what was already built rather than `make install`, which re-runs
     # ktm (as root, under sudo) inside the source tree.
     as=()
-    for d in "$INSTALL_PREFIX" "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/include" "$INSTALL_PREFIX/lib"; do
+    for d in "$INSTALL_PREFIX" "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/lib" "$INSTALL_PREFIX/modules"; do
         while [ ! -e "$d" ]; do d="$(dirname "$d")"; done
         if [ ! -w "$d" ] && [ "$uid" != 0 ]; then
             as=(sudo)
@@ -155,12 +153,17 @@ if [ "$DO_INSTALL" = 1 ]; then
             break
         fi
     done
-    ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/include" "$INSTALL_PREFIX/lib"
+    ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/lib"
     ${as[@]+"${as[@]}"} cp -f "$KTM" "$INSTALL_PREFIX/bin/ktm"
-    ${as[@]+"${as[@]}"} cp -f "$PREFIX/include/std.ktmh" "$INSTALL_PREFIX/include/std.ktmh"
-    ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/modules/prelude"
+    # the old header-based stdlib, which an earlier install left
+    ${as[@]+"${as[@]}"} rm -f "$INSTALL_PREFIX/include/std.ktmh"
+    # the stdlib's modules, replaced whole (other modules there stay)
     ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/modules"
-    ${as[@]+"${as[@]}"} cp -R "$PREFIX/modules/prelude" "$INSTALL_PREFIX/modules/prelude"
+    for d in "$PREFIX"/modules/*/; do
+        d="$(basename "$d")"
+        ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/modules/$d"
+        ${as[@]+"${as[@]}"} cp -R "$PREFIX/modules/$d" "$INSTALL_PREFIX/modules/$d"
+    done
     for f in "$PREFIX"/lib/*; do
         ${as[@]+"${as[@]}"} cp -fPR "$f" "$INSTALL_PREFIX/lib/"
     done

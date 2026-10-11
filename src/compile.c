@@ -70,7 +70,6 @@ void compileToTokens(Cctrl *cc, CliArgs *args, int lexer_flags) {
 
 int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     Lexer *l = (Lexer *)globalArenaAllocate(sizeof(Lexer));
-    AoStr *builtin_path = aoStrPrintf("%s/include/std.ktmh", args->install_dir);
     char *root_dir = mprintf("%s/include/", args->install_dir);
 
     lexInit(l,NULL,CCF_PRE_PROC|lexer_flags);
@@ -103,17 +102,7 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     }
     /* the runtime, after the header and before the program */
     lexPushRuntime(l);
-    /* library files: the old header, when the install still has one
-     * (the stdlib is modules, read when imported) */
-    /* the structure is a so this will get popped first */
-    if (access(builtin_path->data, R_OK) == 0) {
-        lexPushFile(l,builtin_path);
-        if (l->cur_file && l->cur_file->src) {
-            cc->header_src = l->cur_file->src->data;
-            cc->header_len = l->cur_file->src->len;
-        }
-    }
-    /* before the header, which uses its Error */
+    /* the prelude, read first (the stdlib is modules, read when imported) */
     lexPushPrelude(l);
 
     cctrlInitParse(cc,l);

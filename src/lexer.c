@@ -3130,11 +3130,25 @@ static Lexeme *lexTokenRaw(Map *macro_defs, Lexer *l) {
 
 static int lexIsDir(const char *path);
 
+/* <install>/modules from the builtin root <install>/include/: by text, as
+ * an install without include/ (the stdlib is modules) can't resolve
+ * `include/..` */
+static char *lexInstallModules(Lexer *l) {
+    char *root = l->builtin_root;
+    size_t len = strlen(root);
+    while (len > 0 && root[len - 1] == '/') len--;
+    if (len >= 7 && !strncmp(root + len - 7, "include", 7) &&
+        (len == 7 || root[len - 8] == '/')) {
+        return mprintf("%.*smodules", (int)(len - 7), root);
+    }
+    return mprintf("%s../modules", root);
+}
+
 /* Is `file` part of one of the standard library's modules
  * (<install>/modules)? */
 static int lexFileInStdModules(Lexer *l, LexFile *file) {
     if (!file || !file->module_id || !l->builtin_root) return 0;
-    char *root = realpath(mprintf("%s../modules", l->builtin_root), NULL);
+    char *root = realpath(lexInstallModules(l), NULL);
     char *dir = realpath(l->modules[file->module_id - 1]->dir->data, NULL);
     size_t len = root ? strlen(root) : 0;
     int inside = root && dir && !strncmp(dir, root, len) && dir[len] == '/';
@@ -3165,8 +3179,7 @@ static char *lexModuleDir(Lexer *l, AoStr *path, Lexeme *at) {
     int nroots = 0;
     roots[nroots++] = l->program_root ? l->program_root : ".";
     if (l->builtin_root) {
-        /* <install>/include/ -> <install>/modules */
-        roots[nroots++] = mprintf("%s../modules", l->builtin_root);
+        roots[nroots++] = lexInstallModules(l);
     }
     char *ktm_path = getenv("KTM_PATH");
     if (ktm_path && *ktm_path) {
@@ -3555,8 +3568,8 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     if (!m) {
         /* the prelude is the install's, whatever else is called that */
         char *dir = auto_prelude
-                  ? mprintf("%s../modules/prelude", l->builtin_root)
-                  : auto_rt ? mprintf("%s../modules/rt", l->builtin_root)
+                  ? mprintf("%s/prelude", lexInstallModules(l))
+                  : auto_rt ? mprintf("%s/rt", lexInstallModules(l))
                   : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
@@ -3600,7 +3613,7 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
  * when the install has none. */
 void lexPushPrelude(Lexer *l) {
     if (!l->builtin_root) return;
-    char *dir = mprintf("%s../modules/prelude", l->builtin_root);
+    char *dir = mprintf("%s/prelude", lexInstallModules(l));
     if (!lexIsDir(dir)) return;
     char *src = "import prelude;\n";
     lexPushString(l, LEX_PRELUDE_FILE, src, strlen(src));
@@ -3612,7 +3625,7 @@ void lexPushPrelude(Lexer *l) {
  * it linked in) or an install without one. */
 void lexPushRuntime(Lexer *l) {
     if (!l->builtin_root || l->building_module || l->building_tree) return;
-    char *dir = mprintf("%s../modules/rt", l->builtin_root);
+    char *dir = mprintf("%s/rt", lexInstallModules(l));
     if (!lexIsDir(dir)) return;
     char *src = "import rt;\n";
     lexPushString(l, LEX_RT_FILE, src, strlen(src));

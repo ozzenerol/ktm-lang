@@ -1370,14 +1370,9 @@ static AoStr *replGetRcPath(void) {
  * compile whatever it defines as chunk 0. */
 static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
                           char *root_dir) {
-    /* the old header, when the install still has one (the stdlib is
-     * modules, read when imported); the prelude and the runtime always */
-    AoStr *builtin = aoStrPrintf("%s/include/std.ktmh", args->install_dir);
-    if (access(builtin->data, R_OK) != 0) {
-        aoStrRelease(builtin);
-        builtin = NULL;
-    }
-
+    /* the prelude and the runtime (the stdlib is modules, read when
+     * imported) */
+    (void)args;
     AoStr *ktm_rc = replGetRcPath();
 
     Lexer *l = (Lexer *)malloc(sizeof(Lexer));
@@ -1386,7 +1381,6 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
     lexPushRuntime(l);
-    if (builtin) lexPushFile(l, builtin);
     lexPushPrelude(l);
 
     cctrlDiagClear(cc);
@@ -1394,7 +1388,7 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
     cctrlInitParse(cc, l);
     parseToAst(cc);
     if (cctrlDiagFlush(cc) > 0) {
-        fprintf(stderr, "repl: warning: errors in %s\n", builtin ? builtin->data : "the prelude");
+        fprintf(stderr, "repl: warning: errors in %s\n", "the prelude or the runtime");
     }
     cctrlDiagClear(cc);
     replDropInitialisers(cc);

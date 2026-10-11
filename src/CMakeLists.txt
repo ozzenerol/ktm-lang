@@ -144,15 +144,11 @@ add_custom_target(unit-test
 target_link_libraries(ktm m)
 
 # Install the executable
-install(TARGETS ktm DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS ktm DESTINATION bin)
 
 
-# Install the header file
-install(FILES ${CMAKE_SOURCE_DIR}/std/std.ktmh DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-
-# Custom installation step to run `ktm` during install
-if (DEFINED KTM_LINK_SQLITE3)
-    install(CODE "execute_process(COMMAND \"${KTM_PATH}\" -DKTM_LINK_SQLITE3 -lib ktm ${CMAKE_SOURCE_DIR}/std/all.ktm WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/std)")
-else()
-  install(CODE "execute_process(COMMAND \"${KTM_PATH}\" -fPIC -lib ktm ${CMAKE_SOURCE_DIR}/std/all.ktm WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/std)")
-endif()
+# The standard library: its modules into <prefix>/modules, then compiled
+# as one tree into <prefix>/lib (libktm.a and the versioned shared object)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/std/ DESTINATION modules)
+# ${CMAKE_INSTALL_PREFIX} escaped: the prefix at install time (`cmake --install --prefix`)
+install(CODE "execute_process(COMMAND \"\${CMAKE_INSTALL_PREFIX}/bin/ktm\" -fPIC -lib ktm --install-dir=\${CMAKE_INSTALL_PREFIX} \${CMAKE_INSTALL_PREFIX}/modules)")
