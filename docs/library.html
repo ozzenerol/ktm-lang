@@ -166,7 +166,7 @@ modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <cod
     <tr><td><code>%x</code> <code>%X</code> <code>%o</code></td><td>hexadecimal (lower / upper case), octal</td></tr>
     <tr><td><code>%f</code> <code>%e</code> <code>%g</code></td><td>an <code>f64</code>, as C's <code>printf</code> prints it</td></tr>
     <tr><td><code>%s</code></td><td>a string</td></tr>
-    <tr><td><code>%c</code> <code>%C</code></td><td>a character; a multi-character constant like <code>'abc'</code> prints all its characters (up to 8), <code>%C</code> in upper case; the value 0 prints nothing</td></tr>
+    <tr><td><code>%c</code> <code>%C</code></td><td>a character, <code>%C</code> in upper case; a wider integer prints its bytes as characters, low byte first (up to 8); the value 0 prints nothing</td></tr>
     <tr><td><code>%p</code></td><td>a pointer as <code>0x</code> and 16 hex digits</td></tr>
     <tr><td><code>%Q</code></td><td>a string escaped for a C literal (<code>str.quote</code>)</td></tr>
     <tr><td><code>%%</code></td><td>a <code>%</code> (a width on it is ignored)</td></tr>

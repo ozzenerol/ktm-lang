@@ -72,7 +72,7 @@ i32 main() {
                                             "invalid preprocessor directive '#foo'")) { correct++; }
     tests++;
     if (liveCodeReports("i64 c = 'abcdefghij';\nvoid main() {}\n",
-                                            "Char const limited to 8 characters")) { correct++; }
+                                            "a character literal holds one character")) { correct++; }
     /* a skipped group still has to end */
     tests++;
     if (liveCodeReports("#if 0\ndon't\nU0 Main() {}\n", "Unterminated #if")) {

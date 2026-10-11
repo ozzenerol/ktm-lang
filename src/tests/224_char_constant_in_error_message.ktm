@@ -44,9 +44,11 @@ i32 main() {
         correct++;
                     } else { printf("Failed - '\\n'\n"); }
 
+    /* Y9b: one character, an escape counting as one */
     tests++;
-    if (has("i64 s = 2 'ab' 3;\n", "Unexpected character constant `'ab'`" UNX,
-                    "|              ^^^^\n")) {
+    if (has("i64 s = 'ab';\ni64 t = '\\x41B';\n",
+                    "a character literal holds one character; use a string or an enum",
+                    "224-ccm.ktm:1:", "224-ccm.ktm:2:")) {
         correct++;
                     } else { printf("Failed - 'ab'\n"); }
 
@@ -78,7 +80,7 @@ i32 main() {
 
     /* The value is unchanged */
     tests++;
-    if ('\n' == 10 && '\x41' == 'A' && '\'' == 39 && 'ab' == 0x6261) {
+    if ('\n' == 10 && '\x41' == 'A' && '\'' == 39) {
         correct++;
     } else { printf("Failed - values\n"); }
 
