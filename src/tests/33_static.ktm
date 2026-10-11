@@ -9,8 +9,8 @@ u8 *testStaticSetup(u8 *str) {
 }
 
 bool testStatic() {
-    u8 *str = testStaticSetup("hello");
-    if (!str.cmpLen(str,"hello",5)) {
+    u8 *strVal = testStaticSetup("hello");
+    if (!str.cmpLen(strVal,"hello",5)) {
         return true;
     }
     return false;

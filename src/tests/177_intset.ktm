@@ -44,7 +44,7 @@ i32 main() {
     i64 aKeys[6] = {5, -3, 9, 0, 5, I64_MIN};
     i64 bKeys[4] = {9, 1, -3, I64_MAX};
     set.IntSet *empty = set.intNew(), *a, *b, *u, *d, *sd, *in, *big;
-    u8 *str;
+    u8 *strVal;
     printf("Test - IntSet: ");
 
     check(empty.size() == 0 && !empty.has(0), "empty set");
@@ -82,19 +82,19 @@ i32 main() {
     vec.IntVec *v = in.toVec();
     check(v.size == 2 && v.entries[0] == -3 && v.entries[1] == 9, "IntSetToVec");
 
-    str = in.toStr();
-    check(!str.cmp(str, "{-3, 9}"), "IntSetToString");
-    if (str.cmp(str, "{-3, 9}")) { printf("  got '%s'\n", str); }
-    mem.free(str);
-    str = empty.toStr();
-    check(!str.cmp(str, "{}"), "IntSetToString of an empty set");
-    if (str.cmp(str, "{}")) { printf("  got '%s'\n", str); }
-    mem.free(str);
+    strVal = in.toStr();
+    check(!str.cmp(strVal, "{-3, 9}"), "IntSetToString");
+    if (str.cmp(strVal, "{-3, 9}")) { printf("  got '%s'\n", strVal); }
+    mem.free(strVal);
+    strVal = empty.toStr();
+    check(!str.cmp(strVal, "{}"), "IntSetToString of an empty set");
+    if (str.cmp(strVal, "{}")) { printf("  got '%s'\n", strVal); }
+    mem.free(strVal);
     set.IntSet *one = set.intNew();
     one.add(7);
-    str = one.toStr();
-    check(!str.cmp(str, "{7}"), "IntSetToString of one key");
-    mem.free(str);
+    strVal = one.toStr();
+    check(!str.cmp(strVal, "{7}"), "IntSetToString of one key");
+    mem.free(strVal);
 
     /* a big set, keys added in a scrambled order, half negative */
     big = set.intNew();

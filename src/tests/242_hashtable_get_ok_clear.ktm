@@ -164,7 +164,7 @@ i32 main() {
     bool ok2 = true, ok3 = true;
     i64 cursor = 0;
     map.StrMapNode *snode;
-    u8 *str;
+    u8 *strVal;
     tests++;
     if (map.IntMap.get(null, 1, &ok) == null && !ok && !map.IntMap.has(null, 1) &&
             !map.IntMap.set(null, 1, null) && !map.IntMap.delete(null, 1) &&
@@ -182,9 +182,9 @@ i32 main() {
     map.IntMap.setFreeValue(null, &freeValue);
     map.StrMap.setFreeKey(null, &freeKey);
     map.StrMap.setFreeValue(null, &freeValue);
-    str = map.IntMap.keysToStr(null);
-    bool emptyStr = !str.cmp(str, "{}");
-    mem.free(str);
+    strVal = map.IntMap.keysToStr(null);
+    bool emptyStr = !str.cmp(strVal, "{}");
+    mem.free(strVal);
 
     sm = map.strNew();
     sm.set("a", (void *)1);

@@ -9,10 +9,10 @@ import sql, str, test;
 extern "c" i32 sqlite3_limit(sql.sqlite3 *db, i32 id, i32 newVal);
 const i64 SQLITE_LIMIT_LENGTH = 0;
 
-i64 count(sql.Db *ctx, u8 *sql) {
+i64 count(sql.Db *ctx, u8 *sqlVal) {
     sql.Row row;
     i64 n = 0;
-    if (!sql.select(ctx, &row, sql)) { return -1; }
+    if (!sql.select(ctx, &row, sqlVal)) { return -1; }
     while (sql.next(&row)) { n++; }
     return n;
 }

@@ -16,9 +16,9 @@ struct Pt {
 date.Date gDate;
 i64 gIdx = 0;
 
-date.Date mkDate(i32 date, u32 time) {
+date.Date mkDate(i32 dateVal, u32 time) {
     date.Date d;
-    d.date = date;
+    d.date = dateVal;
     d.time = time;
     return d;
 }

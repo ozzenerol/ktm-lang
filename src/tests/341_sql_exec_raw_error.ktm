@@ -4,8 +4,8 @@ import libc, mem, sql, test;
  * success and null on failure, and leaked the message. It returns an
  * MAlloc'd copy of the error now (Free it), null on success. */
 
-bool fails(sql.Db *ctx, u8 *sql, u8 *want) {
-    u8 *err = sql.execRaw(ctx, sql);
+bool fails(sql.Db *ctx, u8 *sqlVal, u8 *want) {
+    u8 *err = sql.execRaw(ctx, sqlVal);
     bool ok = err && libc.strstr(err, want) != null;
     if (!ok && err) { printf("%s\n", err); }
     mem.free(err);

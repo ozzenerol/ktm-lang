@@ -52,7 +52,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
 i32 main() {
     i64 correct = 0, tests = 14;
-    u8 *str;
+    u8 *strVal;
 
     printf("Test - default arguments through class field function pointers: ");
 
@@ -76,9 +76,9 @@ i32 main() {
     if (c.fl(1.0, 0.5) == 2.5) { correct++; }
 
     /* string default */
-    str = c.s("hello");
-    if (!str.cmp(str, "hello world")) { correct++; }
-    mem.free(str);
+    strVal = c.s("hello");
+    if (!str.cmp(strVal, "hello world")) { correct++; }
+    mem.free(strVal);
 
     /* through a pointer to the class */
     C *cp = &c;

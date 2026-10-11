@@ -61,7 +61,7 @@ i32 main() {
     map.RBTree *t;
     map.RBIter *it;
     map.RBNode *node;
-    set.IntSet *set;
+    set.IntSet *setVal;
     set.IntSetIter *sit;
     set.IntSetEntry *e;
 
@@ -141,37 +141,37 @@ i32 main() {
     t.release();
 
     /* IntSet: adding many keys while iterating stops the iterator */
-    set = set.intNew();
-    for (i = 1; i <= 3; i++) { set.add(i); }
-    sit = set.iterNew();
+    setVal = set.intNew();
+    for (i = 1; i <= 3; i++) { setVal.add(i); }
+    sit = setVal.iterNew();
     n = 0;
     while ((e = set.intIterNext(sit))) {
         n++;
-        for (i = 100; i < 600; i++) { set.add(i); }
+        for (i = 100; i < 600; i++) { setVal.add(i); }
     }
-    tests++; if (n == 1 && set.size() == 503) { correct++; }
+    tests++; if (n == 1 && setVal.size() == 503) { correct++; }
     set.intIterRelease(sit);
 
     /* adding a key that is there changes nothing, so it doesn't stop it */
-    sit = set.iterNew();
+    sit = setVal.iterNew();
     n = 0;
     while ((e = set.intIterNext(sit))) {
         n++;
-        set.add(e.key);
+        setVal.add(e.key);
     }
     tests++; if (n == 503) { correct++; }
     set.intIterRelease(sit);
 
     /* IntSet: deleting the current key stops it too */
-    sit = set.iterNew();
+    sit = setVal.iterNew();
     n = 0;
     while ((e = set.intIterNext(sit))) {
         n++;
-        set.delete(e.key);
+        setVal.delete(e.key);
     }
-    tests++; if (n == 1 && set.size() == 502 && !set.has(1)) { correct++; }
+    tests++; if (n == 1 && setVal.size() == 502 && !setVal.has(1)) { correct++; }
     set.intIterRelease(sit);
-    set.release();
+    setVal.release();
 
     test.printResult(correct, tests);
     printf("====\n");

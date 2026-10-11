@@ -28,16 +28,16 @@ date.Date mkDay(i64 y, i64 mo, i64 d) {
     return date.fromParts(&ds);
 }
 
-bool dayIs(i64 date, i64 y, i64 mo, i64 d, i64 dow) {
+bool dayIs(i64 dateVal, i64 y, i64 mo, i64 d, i64 dow) {
     date.Parts ds;
     date.Date c = 0;
-    c.date = date;
+    c.date = dateVal;
     date.toParts(&ds, c);
     if (ds.year == y && ds.mon == mo && ds.dayOfMon == d &&
-            ds.dayOfWeek == dow && mkDay(y, mo, d).date == date) {
+            ds.dayOfWeek == dow && mkDay(y, mo, d).date == dateVal) {
         return true;
             }
-    printf("day %d: got %d-%d-%d (%d), want %d-%d-%d (%d)\n", date, ds.year,
+    printf("day %d: got %d-%d-%d (%d), want %d-%d-%d (%d)\n", dateVal, ds.year,
         ds.mon, ds.dayOfMon, ds.dayOfWeek, y, mo, d, dow);
     return false;
 }

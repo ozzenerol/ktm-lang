@@ -111,7 +111,7 @@ vec.PtrVec *collectTests() {
         printf("Failed to open directory\n");
         os.exit();
     }
-    auto vec = vec.ptrNew();
+    auto vecVal = vec.ptrNew();
     libc.Dirent *ent;
     while ((ent = libc.readdir(dir)) != null) {
         if (ent.type & libc.DT_REG) {
@@ -122,14 +122,14 @@ vec.PtrVec *collectTests() {
                 continue;
             }
             fzf.release(res);
-            auto str = str.dup(ent.name);
-            vec.push(str);
+            auto strVal = str.dup(ent.name);
+            vecVal.push(strVal);
         }
     }
 
-    qSortStrings((u8 **)vec.entries,vec.size-1);
+    qSortStrings((u8 **)vecVal.entries,vecVal.size-1);
     libc.closedir(dir);
-    return vec;
+    return vecVal;
 }
 
 /* Tests run in parallel, each in a forked child with its own working

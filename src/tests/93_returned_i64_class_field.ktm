@@ -7,9 +7,9 @@ import date, mem, test;
 
 u16 struct P16 { u8 lo; i8 hi; };
 
-date.Date mkDate(i32 date, u32 time) {
+date.Date mkDate(i32 dateVal, u32 time) {
     date.Date c;
-    c.date = date;
+    c.date = dateVal;
     c.time = time;
     return c;
 }
@@ -34,7 +34,7 @@ i32 main() {
     if (mkDate(1, 0xFFFFFFF0).time == 0xFFFFFFF0) { correct++; }
     if (mkDate(0x12345678, 5).date == 0x12345678) { correct++; }
 
-    fn(i32 date, u32 time) date.Date fp = &mkDate;
+    fn(i32 dateVal, u32 time) date.Date fp = &mkDate;
     if (fp(-8, 98).date == -8 && fp(-8, 98).time == 98) { correct++; }
 
     /* Cast results are values too. */

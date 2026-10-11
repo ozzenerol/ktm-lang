@@ -15,9 +15,9 @@ struct Holder { i32 a; date.Date d; i32 b; };
 struct Q { i32 a; i32 b; };
 struct Packed { u8 pre; P16 p; u8 mid; S32 s; u8 post; S16 n; i64 tail; };
 
-date.Date mkDate(i32 date, u32 time) {
+date.Date mkDate(i32 dateVal, u32 time) {
     date.Date c;
-    c.date = date;
+    c.date = dateVal;
     c.time = time;
     return c;
 }

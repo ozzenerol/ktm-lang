@@ -22,9 +22,9 @@ i32 main() {
         if (obj.intVal == 10) { correct++; }
     }
 
-    u8 *str = json.toStr(j);
-    printf("%s\n",str);
-    mem.free(str);
+    u8 *strVal = json.toStr(j);
+    printf("%s\n",strVal);
+    mem.free(strVal);
 
     if ((obj = json.select(j,".key:s"))) {
         if (!str.cmpLen(obj.str,"some string",11)) { correct++; }

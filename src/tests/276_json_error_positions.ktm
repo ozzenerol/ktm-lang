@@ -8,11 +8,11 @@ import json, mem, str, test;
 
 i64 gBad = 0;
 
-bool errFn(u8 *json, i64 code, u8 *want) {
-    json.Value *j = json.parse(json);
+bool errFn(u8 *jsonVal, i64 code, u8 *want) {
+    json.Value *j = json.parse(jsonVal);
     u8 *e = json.errorStr(j);
     bool ok = !json.ok(j) && j.state.error == code && e && !str.cmp(e, want);
-    if (!ok) { printf("\"%s\": %d \"%s\"\n", json, j.state.error, e); }
+    if (!ok) { printf("\"%s\": %d \"%s\"\n", jsonVal, j.state.error, e); }
     mem.free(e);
     json.release(j);
     return ok;

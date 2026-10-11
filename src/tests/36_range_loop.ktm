@@ -118,15 +118,15 @@ BoxInt *bInt(i64 i) {
 }
 
 bool testPtrVecLoop(void) {
-    vec.PtrVec *vec = vec.ptrNew();
-    vec.push(bInt(1));
-    vec.push(bInt(4));
-    vec.push(bInt(8));
-    vec.push(bInt(9));
+    vec.PtrVec *vecVal = vec.ptrNew();
+    vecVal.push(bInt(1));
+    vecVal.push(bInt(4));
+    vecVal.push(bInt(8));
+    vecVal.push(bInt(9));
     i64 cases[] = {1,4,8,9};
     i64 i = 0;
 
-    for (BoxInt *b : vec) {
+    for (BoxInt *b : vecVal) {
         if (cases[i] != b.i) {
             break;
         }

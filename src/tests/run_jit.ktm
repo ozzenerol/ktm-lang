@@ -37,16 +37,16 @@ i32 main(i32 argc, u8 **argv) {
         argIdx = 2;
     }
 
-    vec.PtrVec *vec;
+    vec.PtrVec *vecVal;
     if (argc > argIdx) {
-        vec = vec.ptrNew();
-        vec.push(str.dup(argv[argIdx]));
+        vecVal = vec.ptrNew();
+        vecVal.push(str.dup(argv[argIdx]));
     } else {
-        vec = collectTests();
+        vecVal = collectTests();
     }
 
-    runTests(vec);
+    runTests(vecVal);
 
-    vec.release(&mem.free);
+    vecVal.release(&mem.free);
     return 0;
 }

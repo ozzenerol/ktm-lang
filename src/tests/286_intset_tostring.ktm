@@ -23,7 +23,7 @@ i32 main() {
     printf("Test - IntSetToString: ");
     i64 correct = 0, tests = 0, i, n, len, t;
     set.IntSet *s = set.intNew();
-    u8 *str;
+    u8 *strVal;
 
     tests++; if (strIs(s.toStr(), "{}")) { correct++; }
     s.add(42);
@@ -48,15 +48,15 @@ i32 main() {
         len += digits(n / 2 - i);
     }
     t = clock();
-    str = s.toStr();
+    strVal = s.toStr();
     t = (clock() - t) / 1000; /* CLOCKS_PER_SEC is 1000000 on POSIX */
-    tests++; if (str.len(str) == len && mem.size(str) > len) { correct++; }
-    tests++; if (!str.cmpLen(str, "{-149999, -149998, ", 19)) { correct++; }
-    tests++; if (!str.cmp(str + len - 17, ", 149999, 150000}")) { correct++; }
+    tests++; if (str.len(strVal) == len && mem.size(strVal) > len) { correct++; }
+    tests++; if (!str.cmpLen(strVal, "{-149999, -149998, ", 19)) { correct++; }
+    tests++; if (!str.cmp(strVal + len - 17, ", 149999, 150000}")) { correct++; }
     tests++;
     if (t < 2000) { correct++; }
     else { printf("\n  IntSetToString of %d elements took %d ms\n", n, t); }
-    mem.free(str);
+    mem.free(strVal);
     s.release();
 
     test.printResult(correct, tests);

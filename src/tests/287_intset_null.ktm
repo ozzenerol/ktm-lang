@@ -10,7 +10,7 @@ i32 main() {
     set.IntSet *s = set.intNew(), *r;
     set.IntSetIter *it;
     vec.IntVec *v;
-    u8 *str;
+    u8 *strVal;
 
     set.IntSet.release(null);
     tests++; correct++;
@@ -53,9 +53,9 @@ i32 main() {
     tests++; if (v != null && v.size == 0) { correct++; }
     v.release();
 
-    str = set.IntSet.toStr(null);
-    tests++; if (str != null && !str.cmp(str, "{}")) { correct++; }
-    mem.free(str);
+    strVal = set.IntSet.toStr(null);
+    tests++; if (strVal != null && !str.cmp(strVal, "{}")) { correct++; }
+    mem.free(strVal);
 
     /* Non-null sets are unaffected. */
     tests++; if (s.size() == 2 && s.has(3) && !s.has(4)) { correct++; }

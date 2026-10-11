@@ -5,10 +5,10 @@ import sql, test;
  * now. SqlExecPrepared with null params on a statement with parameters
  * read params[0]; null now leaves every parameter unbound (SQL null). */
 
-i64 countRows(sql.Db *ctx, u8 *sql) {
+i64 countRows(sql.Db *ctx, u8 *sqlVal) {
     sql.Row row;
     i64 n = 0;
-    if (!sql.select(ctx, &row, sql)) { return -1; }
+    if (!sql.select(ctx, &row, sqlVal)) { return -1; }
     while (sql.next(&row)) { n++; }
     return n;
 }
