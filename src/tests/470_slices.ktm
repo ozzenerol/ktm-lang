@@ -31,7 +31,7 @@ u8 *errorOf(u8 *code) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                            "-jit " SRC_FILE " 2>&1");
+                            "-jit " SRC_FILE " 2>&1").take();
 }
 
 i64 gCorrect = 0, gTests = 0;
