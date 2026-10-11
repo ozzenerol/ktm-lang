@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* Taking the address of a parameter that has a default value stopped the
  * compiler (AOT and JIT) with "&AST_DEFAULT_PARAM not supported in
@@ -56,8 +56,8 @@ i32 main() {
             "f64 read/write");
     check(rwF32() == 1.5 && rwF32() == 1.5 && rwF32(2.0) == 3.0,
             "f32 read/write");
-    check(!str.cmp(rwPtr(), "flt") && !str.cmp(rwPtr(), "flt") &&
-            !str.cmp(rwPtr("xyz"), "yz"), "pointer read/write");
+    check(!cstr.cmp(rwPtr(), "flt") && !cstr.cmp(rwPtr(), "flt") &&
+            !cstr.cmp(rwPtr("xyz"), "yz"), "pointer read/write");
     check(rwClassPtr() == 7 && rwClassPtr() == 7 && rwClassPtr(&q) == 30,
             "class pointer read/write");
     check(viaHelper() == 50 && viaHelper() == 50 && viaHelper(3) == 30,

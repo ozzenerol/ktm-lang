@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define ARG_COUNT_TEST_FILE "__39_arg_count_fail.ktm"
 #define ARG_COUNT_TEST_OUT  "__39_arg_count_fail.out"
@@ -15,7 +15,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupArgCountTest();
 
-    if (!fs.writeAll(ARG_COUNT_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ARG_COUNT_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

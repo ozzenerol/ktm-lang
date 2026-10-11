@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* The ways to a slice (v0.3.0 step 2): an array where a slice is expected,
  * a string literal as a u8[] (its bytes without the NUL, not copied),
@@ -24,9 +24,9 @@ i64 count(u8[] s, u8 c) {
 u8[] greeting() { return "hi there"; }
 
 u8 *errorOf(u8 *code) {
-    u8 *src = str.format("i32 main() {\n    i64 a[3] = {1, 2, 3};\n    i64 *p = a;\n"
+    u8 *src = cstr.format("i32 main() {\n    i64 a[3] = {1, 2, 3};\n    i64 *p = a;\n"
                          "    i64[] s = a;\n    %s\n    return 0;\n}\n", code);
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");
@@ -49,7 +49,7 @@ i32 main() {
         i64[] bad = a[2:5];
         check(false, "a[2:5] past the array");
     } catch (Error e) {
-        check(e.code == ERR_BOUNDS && !str.cmp(e.message, "slice 2:5 out of range for length 4"),
+        check(e.code == ERR_BOUNDS && !cstr.cmp(e.message, "slice 2:5 out of range for length 4"),
               "a[2:5] past the array");
     }
 

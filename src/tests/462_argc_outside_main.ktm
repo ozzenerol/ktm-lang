@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `argc` (and `argv`) compiled in any function and was silently 0 (null):
  * the old implicit argc of every function. They are main's parameters
@@ -7,8 +7,8 @@ import fs, libc, proc, str, test;
 #define SRC_FILE "__462_src.ktm"
 
 u8 *runKtm(u8 *src, u8 *args) {
-    fs.writeAll(SRC_FILE, src, str.len(src));
-    return proc.shellOutput(str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    return proc.shellOutput(cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                        "-jit " SRC_FILE " %s 2>&1", args));
 }
@@ -26,7 +26,7 @@ i32 main() {
     else { printf("\n  argv: [%s]\n", out); }
     /* main's own */
     out = runKtm("i32 main(i32 argc, u8 **argv) { printf(\"%d %s\", argc, argv[1]); return 0; }\n", "hello");
-    if (out && !str.cmp(out, "2 hello")) { correct++; }
+    if (out && !cstr.cmp(out, "2 hello")) { correct++; }
     else { printf("\n  main: [%s]\n", out); }
     fs.remove(SRC_FILE);
 

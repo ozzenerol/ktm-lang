@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `sizeof()` (and `sizeof;`, `alignof()`) segfaulted under -jit and AOT:
  * the missing operand parsed as null. It is now an error at
@@ -10,8 +10,8 @@ import fs, libc, mem, proc, str, test;
 /* Run ktm with `flags` on `source`; `*_status` gets its exit status */
 u8 *diagnose(u8 *source, u8 *flags, i64 *statusArg) {
     proc.shell("rm -f " SZ_SRC " " SZ_OUT);
-    fs.writeAll(SZ_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    u8 *cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    fs.writeAll(SZ_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    u8 *cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "%s " SZ_SRC " > " SZ_OUT " 2>&1", flags);
     *statusArg = proc.shell(cmd);

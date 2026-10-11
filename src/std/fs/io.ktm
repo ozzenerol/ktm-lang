@@ -1,5 +1,5 @@
 module fs;
-import libc, mem, str;
+import cstr, libc, mem;
 
 /* Stantardise the stat function, though `std.ktmh` also allows 
  * calling the libc version. This is just much easier to use.
@@ -203,19 +203,19 @@ pub bool writeAll(u8 *filename, u8 *buf, i64 size,
 
 pub i32 changeDir(u8 *path) {
     u8 *newPath = null;
-    u64 len = str.len(path);
+    u64 len = cstr.len(path);
     if ((len == 1 && path[0] == '~') ||
             (len == 2 && path[0] == '~' && path[1] == '/')) {
         u8 *home = libc.getenv("HOME");
-        home = str.dup(home);
+        home = cstr.dup(home);
         newPath = home;
     } else if (len >= 3 && path[0] == '~' && path[1] == '/') {
         u8 *home = libc.getenv("HOME");
         u8 *p = path;
         if (*(p + 2) != '\0') {
-            newPath = str.formatTo(,"%s/%s",home,p+2);
+            newPath = cstr.formatTo(,"%s/%s",home,p+2);
         } else {
-            newPath = str.formatTo(,"%s",home);
+            newPath = cstr.formatTo(,"%s",home);
         }
     } else {
         newPath = path;
@@ -234,7 +234,7 @@ pub u8 *currentDir(u8 *buf=null, u64 bufSize=0) {
     u8 *cwd, *copy;
     if (buf) { return libc.getcwd(buf, bufSize); }
     if ((cwd = libc.getcwd(null, 0)) == null) { return null; }
-    copy = str.dup(cwd);
+    copy = cstr.dup(cwd);
     libc.free(cwd);
     return copy;
 }
@@ -289,7 +289,7 @@ i64 cmpLeadingNumber(u8 *s1, u8 *s2) {
     while ('0'<=s1[n1]<='9') { n1++; }
     while ('0'<=s2[n2]<='9') { n2++; }
     if (n1 != n2) { return n1 - n2; }
-    return str.cmpLen(s1,s2,n1);
+    return cstr.cmpLen(s1,s2,n1);
 }
 
 /* true if dh1 is listed before dh2: names that both start with a number
@@ -302,5 +302,5 @@ i64 cmpDirHuman(void *_dh1, void *_dh2) {
     if ('0'<=*str1<='9' && '0'<=*str2<='9') {
         if ((cmp = cmpLeadingNumber(str1,str2)) != 0) { return cmp < 0; }
     }
-    return str.cmp(str1,str2) < 0;
+    return cstr.cmp(str1,str2) < 0;
 }

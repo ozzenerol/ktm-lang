@@ -1,4 +1,4 @@
-import fs, libc, mem, os, proc, str, test;
+import cstr, fs, libc, mem, os, proc, test;
 
 /* std.ktmh (and the library's defs.ktmh) defined STDOUT as 0 and STDIN as
  * 2, so Write(STDOUT, ...) wrote to stdin: it only worked while fd 0
@@ -25,7 +25,7 @@ bool fileIs(u8 *path, u8 *expected) {
         printf("%s missing\n", path);
         return false;
     }
-    ok = str.cmp(got, expected) == 0;
+    ok = cstr.cmp(got, expected) == 0;
     if (!ok) { printf("%s: got '%s', want '%s'\n", path, got, expected); }
     mem.free(got);
     return ok;
@@ -54,7 +54,7 @@ i32 main()
   return 0;
 }
 ";
-    fs.writeAll(FD_TEST_PROG, prog, str.len(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FD_TEST_PROG, prog, cstr.len(prog), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 
     /* stdin is /dev/null (read-only), stdout and stderr are files */
     if (proc.shell(FD_TEST_KTM " < /dev/null > " FD_TEST_OUT " 2> " FD_TEST_ERR) == 0) { correct++; }

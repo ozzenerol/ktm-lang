@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Shlurp("cmd") without format arguments used to run the command
  * through System(), so the output went to the terminal and the exit
@@ -15,7 +15,7 @@ bool is(u8 *got, u8 *expected) {
         printf("got null, want '%s'\n", expected);
         return false;
     }
-    ok = str.cmp(got, expected) == 0;
+    ok = cstr.cmp(got, expected) == 0;
     if (!ok) { printf("got '%s', want '%s'\n", got, expected); }
     mem.free(got);
     return ok;
@@ -29,7 +29,7 @@ i64 tempFiles() {
     u8 *out = proc.shellOutput("ls \"${TMPDIR:-/tmp}\" | grep -c '^ktm-shlurp-'");
     i64 n = -1;
     if (out) {
-        n = str.toInt(out);
+        n = cstr.toInt(out);
         mem.free(out);
     }
     return n;
@@ -85,8 +85,8 @@ i32 main() {
 
     /* Larger output */
     out = proc.shellOutput("seq 1 %d", 5000);
-    if (out && str.len(out) == 23892 && str.cmpLen(out, "1\n2\n3\n", 6) == 0
-            && out[str.len(out) - 1] == '0') { correct++; }
+    if (out && cstr.len(out) == 23892 && cstr.cmpLen(out, "1\n2\n3\n", 6) == 0
+            && out[cstr.len(out) - 1] == '0') { correct++; }
     else { printf("Failed - Shlurp large output\n"); }
     mem.free(out);
 
@@ -105,7 +105,7 @@ i32 main() {
     /* A TMPDIR with a space in it changes nothing */
     u8 *tmpdir = libc.getenv("TMPDIR");
     if (!tmpdir) { tmpdir = "/tmp"; }
-    tmpdir = str.dup(tmpdir);
+    tmpdir = cstr.dup(tmpdir);
     fs.makeDir("./ktm-81 tmp");
     setenv("TMPDIR", "./ktm-81 tmp", 1);
     if (is(proc.shellOutput("echo spaced"), "spaced")) { correct++; }

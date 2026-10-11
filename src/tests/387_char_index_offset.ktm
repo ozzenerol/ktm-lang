@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An i8, u8 or bool value couldn't index an array or be added to a
  * pointer ("`u8[8] + u8` is invalid": they are char-kind types, and only
@@ -36,10 +36,10 @@ bool badSubscriptAt(u8 *src, i64 line) {
     i64 res;
     bool ok;
     fs.remove(BAD_FILE);
-    fs.writeAll(BAD_FILE, src, str.len(src));
+    fs.writeAll(BAD_FILE, src, cstr.len(src));
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " BAD_FILE " > " BAD_OUT " 2>&1");
     out = fs.readAll(BAD_OUT);
-    str.formatTo(want, BAD_FILE ":%d:", line);
+    cstr.formatTo(want, BAD_FILE ":%d:", line);
     ok = res != 0 && out && libc.strstr(out, want) &&
              libc.strstr(out, "Subscript expressions must evaluate to an integer type");
     if (!ok && out) { printf("\n%s", out); }

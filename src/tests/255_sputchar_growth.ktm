@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 /* The formatter's character writer (SPutChar, now private to str) grew a
  * full buffer with MAlloc(i<<1+1), which ktm parses as i<<(1+1): from an
@@ -12,21 +12,21 @@ i32 main() {
     printf("Test - formatted strings grow: ");
 
     /* from an empty string, one char at a time */
-    u8 *s = str.dup("");
+    u8 *s = cstr.dup("");
     bool ok = true;
     for (i64 i = 0; i < 1000; ++i) {
-        s = str.appendFormat(s, "%c", 'a' + i % 26);
-        if (str.len(s) != i + 1) { ok = false; }
+        s = cstr.appendFormat(s, "%c", 'a' + i % 26);
+        if (cstr.len(s) != i + 1) { ok = false; }
     }
     for (i64 i = 0; i < 1000; ++i) { if (s[i] != 'a' + i % 26) { ok = false; } }
-    tests++; if (ok && str.len(s) == 1000) { correct++; }
+    tests++; if (ok && cstr.len(s) == 1000) { correct++; }
     mem.free(s);
 
     /* results of every small size */
     ok = true;
     for (i64 size = 0; size < 24; ++size) {
-        u8 *r = str.format("%*s", size, "");
-        if (str.len(r) != size) { ok = false; }
+        u8 *r = cstr.format("%*s", size, "");
+        if (cstr.len(r) != size) { ok = false; }
         mem.free(r);
     }
     tests++; if (ok) { correct++; }

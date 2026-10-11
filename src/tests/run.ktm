@@ -1,6 +1,6 @@
 #include "run_shared.ktm"
 
-import fs, libc, mem, proc, str, vec;
+import cstr, fs, libc, mem, proc, vec;
 
 void runTest(u8 *filename, i64 idx) {
     /* Use the local build (../../ktm relative to src/tests/) so we
@@ -10,8 +10,8 @@ void runTest(u8 *filename, i64 idx) {
      * cross-test triage). It compiles from src/tests, so its messages
      * name the file as before; the binary runs in the test's own
      * directory (see RunTests). */
-    u8 *bin = str.format("%s/b/%d", gRoot, idx);
-    u8 *cmd = str.format("cd '%s' && '%s' %s '%s' -o '%s'",
+    u8 *bin = cstr.format("%s/b/%d", gRoot, idx);
+    u8 *cmd = cstr.format("cd '%s' && '%s' %s '%s' -o '%s'",
                                             gStartDir, gKtm, gKtmFlags, filename, bin);
     auto res = proc.shell(cmd);
 
@@ -40,7 +40,7 @@ i32 main(i32 argc, u8 **argv) {
      * single-file workflow keeps working unchanged. */
     gTarget = "";
     i64 argIdx = 1;
-    if (argc >= 2 && str.cmpLen(argv[1], "--target=", 9) == 0) {
+    if (argc >= 2 && cstr.cmpLen(argv[1], "--target=", 9) == 0) {
         gTarget = argv[1] + 9;
         argIdx = 2;
     }
@@ -48,7 +48,7 @@ i32 main(i32 argc, u8 **argv) {
     vec.PtrVec *vecVal;
     if (argc > argIdx) {
         vecVal = vec.ptrNew();
-        vecVal.push(str.dup(argv[argIdx]));
+        vecVal.push(cstr.dup(argv[argIdx]));
     } else {
         vecVal = collectTests();
     }

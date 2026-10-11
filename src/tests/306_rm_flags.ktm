@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Rm marked a directory with an internal flag 0x6, which is
  * RM_VERBOSE|RM_FORCE: Rm(file, RM_VERBOSE / RM_FORCE / RM_RECURSE)
@@ -18,7 +18,7 @@ u8 gOut[256];
 i32 gSaved;
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -45,8 +45,8 @@ bool captured(u8 *want, u8 *path=null) {
     libc.fflush(null);
     dup2(gSaved, 1);
     libc.close(gSaved);
-    u8 *got = fs.readAll(gOut), *exp = str.formatTo(null, want, path);
-    bool ok = got && !str.cmp(got, exp);
+    u8 *got = fs.readAll(gOut), *exp = cstr.formatTo(null, want, path);
+    bool ok = got && !cstr.cmp(got, exp);
     if (!ok) { printf("printed '%s' want '%s'\n", got, exp); }
     mem.free(got);
     mem.free(exp);
@@ -59,14 +59,14 @@ i32 main() {
     i32 r;
     printf("Test - Rm flags: ");
 
-    str.copy(root, "./ktm-test-306-XXXXXX");
+    cstr.copy(root, "./ktm-test-306-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, 1);
         printf("====\n");
         return 0;
     }
     gRoot = root;
-    str.formatTo(gOut, "%s/out.txt", root);
+    cstr.formatTo(gOut, "%s/out.txt", root);
     fs.makeDir(P("w"));
     makeFile("w/a");
     makeFile("w/b");
@@ -89,7 +89,7 @@ i32 main() {
     capture();
     r = fs.remove(P("w/c"), fs.REMOVE_RECURSE);
     tests++; if (captured("") && r == 0 && !exists("w/c")) { correct++; }
-    full = str.dup(P("w/d"));
+    full = cstr.dup(P("w/d"));
     capture();
     r = fs.remove(full);
     tests++; if (captured("") && r == 0 && !exists("w/d")) { correct++; }
@@ -107,7 +107,7 @@ i32 main() {
     capture();
     r = fs.remove(P("w/empty"));
     tests++; if (captured("") && r == 0 && !exists("w/empty")) { correct++; }
-    full = str.dup(P("w/empty2"));
+    full = cstr.dup(P("w/empty2"));
     capture();
     r = fs.remove(full);
     tests++; if (captured("") && r == 0 &&
@@ -123,7 +123,7 @@ i32 main() {
 
     fs.remove(gOut);
     tests++; if (fs.remove(P("w"), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
-    full = str.formatTo(null, "rm -rf '%s'", root);
+    full = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(full);
     mem.free(full);
 

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `i64 x = 1 2;` followed by `"ab" y;` in one function crashed ktm.
  * The error for `y` rewound up to 6 tokens looking for a punctuator
@@ -27,7 +27,7 @@ bool failsWith(u8 *source, u8 *e1, u8 *e2 = null, u8 *e3 = null) {
     bool ok;
 
     cleanupStmtErrTest();
-    fs.writeAll(STMTERR_TEST_SRC, source, str.len(source),
+    fs.writeAll(STMTERR_TEST_SRC, source, cstr.len(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(STMTERR_KTM STMTERR_TEST_SRC " > " STMTERR_TEST_OUT " 2>&1; "
                              "test $? -eq 1");

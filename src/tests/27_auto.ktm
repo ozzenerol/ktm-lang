@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 struct Person {
     u8 name[10];
@@ -36,14 +36,14 @@ bool variableAutos() {
     p.age = 42;
     mem.copy(p.name,"PersonB",7);
     if (p.age == 42) { correct++; }
-    if (!str.cmpLen(p.name,"PersonB",7)) { correct++; }
+    if (!cstr.cmpLen(p.name,"PersonB",7)) { correct++; }
     return correct == tests;
 }
 
 bool functionCalls() {
     i64 correct = 0, tests = 3;
     auto p = createRandom();
-    if (p.age == 42 && !str.cmpLen(p.name,"PersonA",7)) { correct++; }
+    if (p.age == 42 && !cstr.cmpLen(p.name,"PersonA",7)) { correct++; }
     if (identity(10) == 10) { correct++; }
     if (add(420,36) == 456) { correct++; }
     return correct == tests;

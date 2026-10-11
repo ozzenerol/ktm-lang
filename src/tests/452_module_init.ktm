@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* M2: a module's globals may have run-time initialisers in a module built
  * with -lib too (before, that was "needs a constant initialiser"). They
@@ -14,18 +14,18 @@ import fs, libc, mem, proc, str, test;
 #define WANT "base init\ntop init\n20 21 42 top\n"
 
 u8 *run(u8 *cmd) {
-    u8 *full = str.format("cd " D " && %s > out 2>&1", cmd);
+    u8 *full = cstr.format("cd " D " && %s > out 2>&1", cmd);
     proc.shell(full);
     mem.free(full);
     return fs.readAll(D "/out");
 }
 
 void put(u8 *path, u8 *text) {
-    fs.writeAll(path, text, str.len(text), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(path, text, cstr.len(text), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 bool is(u8 *what, u8 *out, u8 *want) {
-    bool ok = out && !str.cmp(out, want);
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s: [%s]\n", what, out); }
     mem.free(out);
     return ok;

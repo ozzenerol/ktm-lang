@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `#include "."` (a directory) hung forever: open() succeeds on a
  * directory and lexReadfile looped while read() kept failing with
@@ -37,7 +37,7 @@ bool runKtm(u8 *args, i64 count, u8 *want) {
     i64 res;
     bool ok = true;
 
-    cmd = str.format(INCDIR_KTM "%s > " INCDIR_OUT " 2>&1", args);
+    cmd = cstr.format(INCDIR_KTM "%s > " INCDIR_OUT " 2>&1", args);
     res = proc.shell(cmd);
     mem.free(cmd);
 
@@ -60,7 +60,7 @@ bool runKtm(u8 *args, i64 count, u8 *want) {
 
 bool compile(u8 *source, i64 count, u8 *want) {
     bool ok;
-    if (!fs.writeAll(INCDIR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(INCDIR_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     ok = runKtm(INCDIR_FILE, count, want);

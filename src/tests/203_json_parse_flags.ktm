@@ -1,15 +1,15 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.parse ignored its flags argument: JSON_STRNUM_FLAG (numbers kept
  * as their text, JSON_STRNUM / ->strnum) behaved like flags 0. */
 
 bool strNumIs(json.Value *j, u8 *want) {
-    return j && j.type == json.STRNUM && !str.cmp(j.strnum, want);
+    return j && j.type == json.STRNUM && !cstr.cmp(j.strnum, want);
 }
 
 bool toStringIs(json.Value *j, u8 *want) {
     u8 *s = json.toStr(j);
-    bool ok = s && !str.cmp(s, want);
+    bool ok = s && !cstr.cmp(s, want);
     if (!ok) { printf("got `%s`, want `%s`\n", s, want); }
     mem.free(s);
     return ok;
@@ -46,7 +46,7 @@ i32 main() {
     if (!json.select(j, ".one:i") && !json.select(j, ".f:f")) { correct++; }
     /* Other values are unchanged; a quoted "5" is still a string */
     e = json.select(j, ".s");
-    if (e && e.type == json.STRING && !str.cmp(e.str, "5") &&
+    if (e && e.type == json.STRING && !cstr.cmp(e.str, "5") &&
             json.select(j, ".b:b").boolean == true && json.select(j, ".n:!")) { correct++; }
     e = json.select(j, ".arr:a");
     if (e && strNumIs(e.array, "1") && strNumIs(e.array.next, "2.5") &&

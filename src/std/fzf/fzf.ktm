@@ -1,5 +1,5 @@
 module fzf;
-import libc, list, mem, str;
+import cstr, libc, list, mem, str;
 
 const i64 FZF_SCORE_MATCH = 16;
 
@@ -141,7 +141,7 @@ i64 trailingWhitespaces(FzFString *strVal)
 bool hasSuffix(u8 *strVal, i64 len, u8 *suffix, i64 suffixLen) {
     FzFStrSlice s;
     sliceStr(&s, strVal, len - suffixLen, len);
-    return len >= suffixLen && !str.cmpLen(s.data, suffix, suffixLen);
+    return len >= suffixLen && !cstr.cmpLen(s.data, suffix, suffixLen);
 }
 
 u8 *strReplaceChar(u8 *str, u8 find, u8 replace) {
@@ -160,10 +160,10 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
 
     u8 *result,*ins,*tmp;
 
-    i64 lenRep = str.len(rep);
+    i64 lenRep = cstr.len(rep);
     i64 lenFront = 0;
-    i64 lenOrig = str.len(orig);
-    i64 lenWith = str.len(with);
+    i64 lenOrig = cstr.len(orig);
+    i64 lenWith = cstr.len(with);
     i64 count = 0;
 
     if (lenRep == 0) {
@@ -185,7 +185,7 @@ u8 *strReplace(u8 *orig, u8 *rep, u8 *with) {
         lenFront = ins - orig;
         mem.copy(tmp, orig, lenFront);  /* C's strncpy, not StrNCpy */
         tmp += lenFront;
-        str.copy(tmp,with);
+        cstr.copy(tmp,with);
         tmp += lenWith;
         orig += lenFront + lenRep;
         lenOrig -= lenFront + lenRep;
@@ -655,14 +655,16 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     patObj.entries = list.new();
     FzFTerm term;
 
-    i64 patLen = str.len(pattern);
+    i64 patLen = cstr.len(pattern);
     if (patLen == 0) {
         return patObj;
     }
 
     /* Trimmed in a copy: the caller's string may be a literal. */
-    u8 *patternDup = str.dup(pattern);
-    pattern = str.trimStart(patternDup,patLen,&patLen);
+    u8 *patternDup = cstr.dup(pattern);
+    u8[] trimmed = str.trimStart(patternDup[0:patLen]);
+    pattern = trimmed.ptr;
+    patLen = trimmed.len;
     while (hasSuffix(pattern, patLen, " ", 1) &&
             !hasSuffix(pattern, patLen, "\\ ", 2)) {
         pattern[patLen - 1] = 0;
@@ -687,15 +689,15 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
 
         bool inv = false;
 
-        auto len = str.len(ptr);
+        auto len = cstr.len(ptr);
         strReplaceChar(ptr, '\t', ' ');
-        u8 *text = str.dup(ptr);
+        u8 *text = cstr.dup(ptr);
 
         u8 *ogStr = text;
         u8 *lowerText = strTolower(text, len);
         bool caseSensitive = caseMode == CASE_RESPECT ||
                                                  (caseMode == CASE_SMART && 
-                                                    str.cmp(text, lowerText) != 0);
+                                                    cstr.cmp(text, lowerText) != 0);
 
         if (!caseSensitive) {
             if (text) {
@@ -712,7 +714,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
         if (!fuzzy) {
             cb = &fzfEqNaiveMatch;
         }
-        if (set.size > 0 && !afterBar && str.cmp(text, "|") == 0) {
+        if (set.size > 0 && !afterBar && cstr.cmp(text, "|") == 0) {
             switchSet = false;
             afterBar = true;
             ptr = libc.strtok_r(null, delim, &tokSave);
@@ -722,20 +724,20 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
             continue;
         }
         afterBar = false;
-        if (!str.cmpLen(text, "!", 1)) {
+        if (!cstr.cmpLen(text, "!", 1)) {
             inv = true;
             cb = &fzfEqNaiveMatch;
             text++;
             len--;
         }
 
-        if (str.cmp(text, "$") != 0 && hasSuffix(text, len, "$", 1)) {
+        if (cstr.cmp(text, "$") != 0 && hasSuffix(text, len, "$", 1)) {
             cb = &fzfSuffixMatch;
             text[len - 1] = '\0';
             len--;
         }
 
-        if (!str.cmpLen(text, "'", 1)) {
+        if (!cstr.cmpLen(text, "'", 1)) {
             if (fuzzy && !inv) {
                 cb = &fzfEqNaiveMatch;
                 text++;
@@ -745,7 +747,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
                 text++;
                 len--;
             }
-        } else if (!str.cmpLen(text, "^", 1)) {
+        } else if (!cstr.cmpLen(text, "^", 1)) {
             if (cb == &fzfSuffixMatch) {
                 cb = &fzfEqMatch;
             } else {
@@ -853,7 +855,7 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     auto entries = pattern.entries;
     FzFString input;
     input.data = text;
-    input.size = str.len(text);
+    input.size = cstr.len(text);
 
     if (pattern.onlyInv) {
         i64 final = 0;
@@ -929,7 +931,7 @@ Position *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     if (text == null || pattern.entries.isEmpty()) { return null; }
 
     input.data = text;
-    input.size = str.len(text);
+    input.size = cstr.len(text);
     allPos = fzfPosArray(0);
     auto entries = pattern.entries;
 

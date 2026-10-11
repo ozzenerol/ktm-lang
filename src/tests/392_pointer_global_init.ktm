@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A global pointer initialised with an address (`u8 *p = &g;`, `&arr[2]`,
  * `&Fn`, null) was a store in the generated main(), so in a -lib library
@@ -26,16 +26,16 @@ u8 *slurp(u8 *cmd) {
 /* `src` with -jit and as a binary prints `want` */
 void runsAs(u8 *src, u8 *want, u8 *what) {
     u8 *out, label[128];
-    fs.writeAll(PG_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(PG_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " PG_SRC " > " PG_OUT " 2>/dev/null");
-    str.formatTo(label, "%s (JIT)", what);
-    check(out && !str.cmp(out, want), label);
-    if (out && str.cmp(out, want)) { printf("  got: %s", out); }
+    cstr.formatTo(label, "%s (JIT)", what);
+    check(out && !cstr.cmp(out, want), label);
+    if (out && cstr.cmp(out, want)) { printf("  got: %s", out); }
     mem.free(out);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PG_SRC " -o " PG_BIN " 2>/dev/null && ./" PG_BIN " > " PG_OUT " 2>&1");
-    str.formatTo(label, "%s (AOT)", what);
-    check(out && !str.cmp(out, want), label);
-    if (out && str.cmp(out, want)) { printf("  got: %s", out); }
+    cstr.formatTo(label, "%s (AOT)", what);
+    check(out && !cstr.cmp(out, want), label);
+    if (out && cstr.cmp(out, want)) { printf("  got: %s", out); }
     mem.free(out);
     proc.shell("rm -f " PG_SRC " " PG_OUT " " PG_BIN);
 }

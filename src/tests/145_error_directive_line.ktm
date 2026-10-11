@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `#error 1.5 0x10 'a'` printed only "1.5": the message was the first
  * token after `#error`. As in C it must be the rest of the line as
@@ -35,7 +35,7 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupErrorDirTest();
 
-    if (!fs.writeAll(ERRDIR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(ERRDIR_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

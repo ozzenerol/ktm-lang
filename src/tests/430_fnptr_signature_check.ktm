@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A function pointer only takes a function (or function pointer) with
  * the same signature. Before, `i64 (*op)(u8 *) = &t;` with a `t` taking
@@ -15,7 +15,7 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
@@ -37,7 +37,7 @@ i64 count(u8 *s, u8 *what) {
  * warnings when there is no error (after a `return` that is an error,
  * the function is also said to maybe not return a value) */
 bool prints(u8 *body, i64 errors, u8 *want=null) {
-    u8 *src = str.format(
+    u8 *src = cstr.format(
 "i64 t(i64 x) { return x; }
 i64 s(u8 *p) { return 0; }
 extern \"c\" i64 v(i64 n, ...);

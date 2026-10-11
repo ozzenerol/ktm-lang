@@ -1,10 +1,10 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Print statements ("%Q\n", s;) went straight to C's printf, so the ktm
  * conversions %Q %C printed garbage or the letter, and the
  * compile-time argument check counted the format the C way. A literal
  * format that uses one of them now calls the library's Print, which
- * formats like str.formatTo; other print statements still call printf. */
+ * formats like cstr.formatTo; other print statements still call printf. */
 
 #define PF_FILE "__378_print.ktm"
 #define PF_OUT  "__378_print.out"
@@ -24,10 +24,10 @@ void cleanupPrintFmt(void) {
 u8 *runPrint(u8 *src, u8 *how, i64 *resArg) {
     u8 *cmd;
     cleanupPrintFmt();
-    if (!fs.writeAll(PF_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(PF_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return null;
     }
-    if (!str.cmp(how, "-jit")) {
+    if (!cstr.cmp(how, "-jit")) {
         cmd = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " PF_FILE " > " PF_OUT " 2>&1";
     } else {
         cmd = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PF_FILE " -o " PF_BIN " > " PF_OUT " 2>&1 && ./" PF_BIN " > " PF_OUT " 2>&1";
@@ -43,7 +43,7 @@ bool prints(u8 *src, u8 *want) {
     bool ok = true;
     for (i = 0; i < 2; i++) {
         out = runPrint(src, how[i], &res);
-        if (res != 0 || !out || str.cmp(out, want)) {
+        if (res != 0 || !out || cstr.cmp(out, want)) {
             ok = false;
             printf("\n  %s printed:\n%s\n  wanted:\n%s", how[i], out, want);
         }
@@ -91,9 +91,9 @@ xY|B   |  Z|
     tests++;
     if (prints("void main() { printf(\"100%%Q %d\\n\", 1); }\n", "100%Q 1\n")) { correct++; }
 
-    /* str.format with a format that isn't a literal */
+    /* cstr.format with a format that isn't a literal */
     tests++;
-    if (prints("import str;\nvoid main() { u8 *f = \"%Q|%d\\n\"; printf(\"%s\", str.format(f, \"t\\tab\", 5)); }\n",
+    if (prints("import cstr;\nvoid main() { u8 *f = \"%Q|%d\\n\"; printf(\"%s\", cstr.format(f, \"t\\tab\", 5)); }\n",
                          "t\\tab|5\n")) { correct++; }
 
     /* the argument check counts ktm conversions */

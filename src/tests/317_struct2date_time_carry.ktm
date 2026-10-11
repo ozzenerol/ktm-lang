@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* date.fromParts did not carry the time past a day: the time of day wrapped
  * and the date stayed, so 2024-03-05 with hour 24, min 30 gave
@@ -26,7 +26,7 @@ i64 gCorrect = 0, gTests = 0;
 void expect(date.Date c, u8 *want) {
     gTests++;
     u8 *got = date.format(c, "%m/%d/%Y %H:%M:%S");
-    if (!str.cmp(got, want)) { gCorrect++; }
+    if (!cstr.cmp(got, want)) { gCorrect++; }
     else { printf("Failed - got '%s' want '%s'\n", got, want); }
     mem.free(got);
 }

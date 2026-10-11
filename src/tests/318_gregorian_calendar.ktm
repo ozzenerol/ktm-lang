@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* CDate used the original calendar: no leap year in years divisible by
  * 4000, and none in year 0. From 4000-03-01 every date was a day off from
@@ -43,7 +43,7 @@ bool dayIs(i64 dateVal, i64 y, i64 mo, i64 d, i64 dow) {
 }
 
 bool strIs(u8 *s, u8 *want) {
-    bool ok = !str.cmp(s, want);
+    bool ok = !cstr.cmp(s, want);
     if (!ok) { printf("got %s want %s\n", s, want); }
     mem.free(s);
     return ok;

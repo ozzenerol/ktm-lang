@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 /* A ktm `...` function always gets the implicit argc/argv, but a call
  * that passed no extra arguments (`Count("a")`) didn't pass argc at all,
@@ -26,8 +26,8 @@ i64 allDefault(i64 a = 1, ...args) {
 
 /* As Shlurp and Sh do: use fmt as-is when there is nothing to format */
 u8 *format(u8 *fmt, ...args) {
-    if (args.len == 0) { return str.dup(fmt); }
-    return str.formatArgs(null, fmt, args);
+    if (args.len == 0) { return cstr.dup(fmt); }
+    return cstr.formatArgs(null, fmt, args);
 }
 
 /* Leaves a non-zero value where a following call's argc would go */
@@ -65,11 +65,11 @@ i32 main() {
 
     junk("x", 77, 88, 99);
     s = format("keep %s and 50%%");
-    if (!str.cmp(s, "keep %s and 50%%")) { correct++; }
+    if (!cstr.cmp(s, "keep %s and 50%%")) { correct++; }
     else { printf("Failed - format string used as-is: '%s'\n", s); }
     mem.free(s);
     s = format("got %s", "it");
-    if (!str.cmp(s, "got it")) { correct++; }
+    if (!cstr.cmp(s, "got it")) { correct++; }
     else { printf("Failed - format string with an argument: '%s'\n", s); }
     mem.free(s);
 

@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* Slices `T[]` (v0.3.0 step 1): a pointer and a length, 16 bytes, passed
  * and returned by value like a two-field struct. An array converts to one
@@ -26,9 +26,9 @@ void twice(i64[] s) { for (i64 i = 0; i < s.len; i++) { s[i] *= 2; } }
 i64 sumY(Point[] ps) { i64 t = 0; for (i64 i = 0; i < ps.len; i++) { t += ps[i].y; } return t; }
 
 u8 *errorOf(u8 *code) {
-    u8 *src = str.format("i32 main() {\n    i64 x[2] = {1, 2};\n    i64[] a = x, b = x;\n"
+    u8 *src = cstr.format("i32 main() {\n    i64 x[2] = {1, 2};\n    i64[] a = x, b = x;\n"
                          "    %s\n    return 0;\n}\n", code);
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");
@@ -47,7 +47,7 @@ i32 main() {
     i64 a[4] = {1, 2, 3, 4};
     i64[] s = a;
     check(s.len == 4 && s.ptr == a && sum(s) == 10, "from an array");
-    check(!str.cmp(typeof(s), "i64[]") && sizeof(i64[]) == 16 && sizeof(s) == 16, "typeof, sizeof");
+    check(!cstr.cmp(typeof(s), "i64[]") && sizeof(i64[]) == 16 && sizeof(s) == 16, "typeof, sizeof");
     twice(a);
     check(a[3] == 8 && sum(same(s)) == 20, "an array argument, written through");
     i64 t = 0;
@@ -71,7 +71,7 @@ i32 main() {
     i64[][] nested = rows;
     t = 0;
     for (auto r : nested) { for (auto v : r) { t += v; } }
-    check(nested.len == 2 && t == 15 && !str.cmp(typeof(nested), "i64[][]"), "nested");
+    check(nested.len == 2 && t == 15 && !cstr.cmp(typeof(nested), "i64[][]"), "nested");
 
     Point pts[2] = {{1, 2}, {3, 4}};
     Point[] ps = pts;

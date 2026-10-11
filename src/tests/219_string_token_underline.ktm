@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The underline under a string token in a diagnostic was the length of
  * its contents, starting at the opening quote, so it left out the end of
@@ -12,7 +12,7 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " STRU_SRC " " STRU_OUT);
-    fs.writeAll(STRU_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(STRU_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " STRU_SRC " -o /dev/null > " STRU_OUT " 2>&1");

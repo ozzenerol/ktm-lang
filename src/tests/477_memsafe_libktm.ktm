@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, str, test;
 
 /* -Memsafe and the REPL see the library's own allocations (v0.3.0 step
  * 4b): mem.alloc/free/allocZero/realloc call the checker's hooks when it
@@ -19,12 +19,12 @@ void check(bool ok, u8 *what, u8 *out) {
 }
 
 u8 *memsafe(u8 *src) {
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     return proc.shellOutput(KTM "-Memsafe -jit " SRC_FILE " 2>&1");
 }
 
 u8 *repl(u8 *src) {
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     return proc.shellOutput("HOME=. " KTM "-repl < " SRC_FILE " 2>&1");
 }
 
@@ -45,10 +45,10 @@ i32 main() {
           libc.strstr(out, "memsafe: 1 allocation(s)") && libc.strstr(out, "never freed"),
           "a String never freed", out);
 
-    out = memsafe("import mem, str;\ni32 main() {\n    String s = str.from(\"ok\");\n"
-                  "    defer s.free();\n    s.append(\"!\");\n    u8 *t = str.format(\"%d\", 5);\n"
+    out = memsafe("import cstr, mem, str;\ni32 main() {\n    String s = str.from(\"ok\");\n"
+                  "    defer s.free();\n    s.append(\"!\");\n    u8 *t = cstr.format(\"%d\", 5);\n"
                   "    mem.free(t);\n    printf(\"%s\", s);\n    return 0;\n}\n");
-    check(out && !str.cmp(out, "ok!"), "everything freed: no report", out);
+    check(out && !cstr.cmp(out, "ok!"), "everything freed: no report", out);
 
     out = repl("import str;\nString s = str.from(\"abc\");\nString c = s;\ns.free();\nc.free();\n");
     check(out && libc.strstr(out, "double free of"), "the REPL", out);

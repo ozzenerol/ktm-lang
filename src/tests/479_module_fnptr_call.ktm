@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* Inside a module, calling one of its global function pointers by name
  * (`op(x)` of `pub fn(i64) i64 op`) gave "Function: op() not defined":
@@ -10,7 +10,7 @@ import fs, libc, proc, str, test;
             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
 void put(u8 *path, u8 *src) {
-    fs.writeAll(path, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(path, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 i32 main() {
@@ -36,10 +36,10 @@ i32 main() {
 }
 ");
     u8 *out = proc.shellOutput(KTM "-jit " DIR "/main.ktm 2>&1");
-    if (out && !str.cmp(out, "8 10 6 12")) { correct++; }
+    if (out && !cstr.cmp(out, "8 10 6 12")) { correct++; }
     else { printf("\n  JIT: [%s]\n", out); }
     out = proc.shellOutput(KTM DIR "/main.ktm -o " DIR "/bin 2>&1 && " DIR "/bin");
-    if (out && !str.cmp(out, "8 10 6 12")) { correct++; }
+    if (out && !cstr.cmp(out, "8 10 6 12")) { correct++; }
     else { printf("\n  AOT: [%s]\n", out); }
     proc.shell("rm -rf " DIR);
 

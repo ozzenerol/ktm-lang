@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* `\x` takes at most two hex digits and every string literal ends in a
  * NUL that sizeof counts. Compiled programs used to hand `"\x01b"` to
@@ -29,7 +29,7 @@ i32 main() {
     tests++;
     u8 *s = "\x01b";
     want[0] = 1; want[1] = 'b'; want[2] = 0;
-    if (bytes(s, want, 3) && str.len(s) == 2) { correct++; }
+    if (bytes(s, want, 3) && cstr.len(s) == 2) { correct++; }
 
     tests++;
     if (sizeof("\x01b") == 3 && sizeof("\x42") == 2 && sizeof("") == 1) { correct++; }
@@ -107,7 +107,7 @@ i32 main() {
     /* Quotes and backticks inside a string */
     tests++;
     s = "it\'s `q` \`r\`";
-    if (!str.cmp(s, "it's `q` `r`") && sizeof("it\'s") == 5) { correct++; }
+    if (!cstr.cmp(s, "it's `q` `r`") && sizeof("it\'s") == 5) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test, vec;
+import cstr, fs, libc, mem, proc, test, vec;
 
 /* New vector functions: vec.intSet/vec.floatSet/vec.ptrSet (bounds checked
  * like Get: an index outside [0, size) prints an error and exits 1) and
@@ -17,7 +17,7 @@ void cleanupFiles() {
 
 bool runExpectingExit(u8 *src, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(VS_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(VS_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "

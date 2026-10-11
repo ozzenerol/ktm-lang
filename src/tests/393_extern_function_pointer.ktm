@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `extern i64 (*fp)(i64);` didn't parse ("`extern <Type>` must be followed
  * by an identifier, got `(`"), so a program couldn't use a library's
@@ -20,8 +20,8 @@ void check(bool ok, u8 *what) {
  * exit status */
 u8 *ktm(u8 *src, u8 *flags, i64 *resArg) {
     u8 *cmd;
-    fs.writeAll(XF_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    fs.writeAll(XF_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " XF_SRC " > " XF_OUT " 2>&1", flags);
     *resArg = proc.shell(cmd);
@@ -41,7 +41,7 @@ extern fn(i64) i64 fp;
 fn(i64) i64 fp = &twice;
 void main() { printf(\"%d\\n\", fp(4)); }
 ", "-jit", &res);
-    check(res == 0 && out && !str.cmp(out, "8\n"), "extern then definition (JIT)");
+    check(res == 0 && out && !cstr.cmp(out, "8\n"), "extern then definition (JIT)");
     mem.free(out);
 
     /* a malformed extern still says what is wrong */

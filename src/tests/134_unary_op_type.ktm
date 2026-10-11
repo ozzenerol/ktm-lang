@@ -1,4 +1,4 @@
-import date, fs, libc, mem, proc, str, test;
+import cstr, date, fs, libc, mem, proc, test;
 
 /* `-x`, `+x` and `~x` need a number. On a string, pointer, array, class
  * or function they compiled and gave the negated/complemented address;
@@ -26,7 +26,7 @@ bool compileFailsWith(u8 *name, u8 *source, u8 *expected) {
     i64 res;
 
     cleanupUnopTest();
-    if (!fs.writeAll(UNOP_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNOP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         printf("Failed - %s: could not write the source\n", name);
         return false;
     }
@@ -133,8 +133,8 @@ i32 main() {
     if (NEG_DEFINE == -5 && NEG_EXPR_DEFINE == -7) { correct++; }
     if (-twice(3) == -6) { correct++; }
     /* Passed straight to a vararg, not through a typed variable. */
-    u8 *buf = str.format("%d %d", -c, -sc);
-    if (!str.cmp(buf, "-5 128")) { correct++; }
+    u8 *buf = cstr.format("%d %d", -c, -sc);
+    if (!cstr.cmp(buf, "-5 128")) { correct++; }
     mem.free(buf);
 
     test.printResult(correct, tests);

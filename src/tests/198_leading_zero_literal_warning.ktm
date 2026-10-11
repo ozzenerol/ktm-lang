@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm has no octal literals: `0644` is the decimal number 644 (C
  * reads octal 420). That meaning stays, but it was silent; ktm now
@@ -36,10 +36,10 @@ bool runLeadingZero(u8 *flags, u8 *source, i64 status, i64 nwarn,
     bool ok = true;
 
     cleanupLeadingZeroTest();
-    if (!fs.writeAll(LZ_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(LZ_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
-    cmd = str.format(LZ_KTM "%s -jit " LZ_FILE " > " LZ_OUT " 2>&1", flags);
+    cmd = cstr.format(LZ_KTM "%s -jit " LZ_FILE " > " LZ_OUT " 2>&1", flags);
     res = proc.shell(cmd);
     mem.free(cmd);
 

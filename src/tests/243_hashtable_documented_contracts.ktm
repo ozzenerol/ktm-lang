@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* What the library docs and std.ktmh now promise about map.IntMap and map.StrMap:
  * the capacity rule (slots, a power of two, grows at 60% full, never
@@ -14,7 +14,7 @@ void freeKey(void *p) {
 }
 
 u8 *strFn(void *v) {
-    return str.formatTo(null, "%d", v);
+    return cstr.formatTo(null, "%d", v);
 }
 
 i32 main() {
@@ -62,8 +62,8 @@ i32 main() {
     u8 *keys = m.keysToStr();
     u8 *all = m.toStr(&strFn);
     tests++;
-    if (!str.cmp(keys, "{a, c, d, e, b}") &&
-            !str.cmp(all, "{[a] => 0, [c] => 2, [d] => 3, [e] => 4, [b] => 9}")) {
+    if (!cstr.cmp(keys, "{a, c, d, e, b}") &&
+            !cstr.cmp(all, "{[a] => 0, [c] => 2, [d] => 3, [e] => 4, [b] => 9}")) {
         correct++;
             } else { printf("Failed - order: %s %s\n", keys, all); }
     mem.free(keys);
@@ -73,9 +73,9 @@ i32 main() {
     /* An update keeps the stored key and frees the one passed */
     m = map.strNew();
     m.setFreeKey(&freeKey);
-    u8 *first = str.dup("k");
+    u8 *first = cstr.dup("k");
     m.set(first, (void *)1);
-    m.set(str.dup("k"), (void *)2);
+    m.set(cstr.dup("k"), (void *)2);
     u8 *stored;
     idx = 0;
     m.keyIter(&idx, &stored);

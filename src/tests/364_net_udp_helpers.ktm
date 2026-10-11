@@ -1,4 +1,4 @@
-import date, libc, mem, net, os, str, test;
+import cstr, date, libc, mem, net, os, test;
 
 /* net.udpSocket, net.sendTo, net.recvFrom, net.setRecvTimeout and
  * net.localPort: loopback only, ports picked by the kernel. Ends with a
@@ -28,28 +28,28 @@ void echo(u8 *ip, i32 fam, u8 *name) {
         gCorrect += 6;
         return;
     }
-    str.formatTo(what, "%s sockets", name);
+    cstr.formatTo(what, "%s sockets", name);
     check(srv != -1 && cli != -1, what);
     sport = net.localPort(srv);
     cport = net.localPort(cli);
-    str.formatTo(what, "%s ports", name);
+    cstr.formatTo(what, "%s ports", name);
     check(sport > 0 && cport > 0 && sport != cport, what);
 
-    str.formatTo(what, "%s NetSendTo", name);
+    cstr.formatTo(what, "%s NetSendTo", name);
     check(net.sendTo(cli, "hello", 5, ip, sport) == 5, what);
     mem.set(buf, 0, sizeof(buf));
     n = net.recvFrom(srv, buf, sizeof(buf), from, sizeof(from), &from_port);
-    str.formatTo(what, "%s NetRecvFrom", name);
-    check(n == 5 && !str.cmp(buf, "hello"), what);
-    str.formatTo(what, "%s sender address and port", name);
-    check(!str.cmp(from, ip) && from_port == cport, what);
+    cstr.formatTo(what, "%s NetRecvFrom", name);
+    check(n == 5 && !cstr.cmp(buf, "hello"), what);
+    cstr.formatTo(what, "%s sender address and port", name);
+    check(!cstr.cmp(from, ip) && from_port == cport, what);
 
     /* answer the sender */
     net.sendTo(srv, "world", 5, from, from_port);
     mem.set(buf, 0, sizeof(buf));
     n = net.recvFrom(cli, buf, sizeof(buf));
-    str.formatTo(what, "%s reply", name);
-    check(n == 5 && !str.cmp(buf, "world"), what);
+    cstr.formatTo(what, "%s reply", name);
+    check(n == 5 && !cstr.cmp(buf, "world"), what);
     libc.close(srv);
     libc.close(cli);
 }
@@ -102,7 +102,7 @@ bool dnsServe(i32 srv) {
         q += pkt[q] + 1;
     }
     name[len] = '\0';
-    if (str.cmp(name, "example.ktm")) { return false; }
+    if (cstr.cmp(name, "example.ktm")) { return false; }
     q += 5;  /* the root label, type and class */
 
     put16(pkt + 2, 0x8180);  /* response, recursion desired + available */
@@ -166,8 +166,8 @@ i32 main() {
     net.sendTo(fd, "toolong", 7, "127.0.0.1", net.localPort(fd));
     net.sendTo(fd, "next", 4, "127.0.0.1", net.localPort(fd));
     mem.set(buf, 0, sizeof(buf));
-    check(net.recvFrom(fd, buf, 4) == 4 && !str.cmpLen(buf, "tool", 4), "long datagram cut");
-    check(net.recvFrom(fd, buf, 4) == 4 && !str.cmpLen(buf, "next", 4), "next datagram whole");
+    check(net.recvFrom(fd, buf, 4) == 4 && !cstr.cmpLen(buf, "tool", 4), "long datagram cut");
+    check(net.recvFrom(fd, buf, 4) == 4 && !cstr.cmpLen(buf, "next", 4), "next datagram whole");
 
     /* timeout: -1 after about 150 ms instead of waiting forever */
     check(net.setRecvTimeout(fd, 150), "NetSetRecvTimeout");

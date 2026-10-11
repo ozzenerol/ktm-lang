@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A function returning a function pointer, declared C's way,
  * `i64 (*GetH())(i64) { ... }`, was a syntax error. Now: definitions and
@@ -9,7 +9,7 @@ import str, test;
 i64 twice(i64 x) { return x * 2; }
 i64 thrice(i64 x) { return x * 3; }
 u8 gLast[16];
-void hello(u8 *who) { str.copy(gLast, who); }
+void hello(u8 *who) { cstr.copy(gLast, who); }
 u8 *echo(u8 *s) { return s; }
 
 fn(i64) i64 getH() { return &twice; }
@@ -47,7 +47,7 @@ i32 main() {
     fn(u8 *) void gr = greeter();
     gr("ktm");
     fn(u8 *) u8 *ec = echoer();
-    if (!str.cmp(gLast, "ktm") && !str.cmp(ec("x"), "x")) { correct++; }
+    if (!cstr.cmp(gLast, "ktm") && !cstr.cmp(ec("x"), "x")) { correct++; }
     else { printf("\n  void and pointer returns\n"); }
 
     tests++;   /* a pointer to a function pointer, written through */

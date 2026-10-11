@@ -1,4 +1,4 @@
-import fs, libc, mem, os, proc, str, test;
+import cstr, fs, libc, mem, os, proc, test;
 
 /* ENOENT, EACCES and ECHILD were missing although the proc.spawn docs name
  * them; so were ENETUNREACH, EHOSTUNREACH, EADDRNOTAVAIL, EMFILE, ENFILE
@@ -49,13 +49,13 @@ void fill() {
 i64 compareWithC() {
     u8 *src = null, *out, *line, *sp;
     i64 i, bad = 0, n = 0;
-    src = str.appendFormat(src, "#include <errno.h>\n#include <signal.h>\n#include <stdio.h>\n"
+    src = cstr.appendFormat(src, "#include <errno.h>\n#include <signal.h>\n#include <stdio.h>\n"
                                             "int main(void) {\n");
     for (i = 0; i < gN; i++) {
-        src = str.appendFormat(src, "  printf(\"%s %%ld\\n\", (long)%s);\n", gNames[i], gNames[i]);
+        src = cstr.appendFormat(src, "  printf(\"%s %%ld\\n\", (long)%s);\n", gNames[i], gNames[i]);
     }
-    src = str.appendFormat(src, "  return 0;\n}\n");
-    fs.writeAll(EC_C, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    src = cstr.appendFormat(src, "  return 0;\n}\n");
+    fs.writeAll(EC_C, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     mem.free(src);
     if (proc.shell("cc -w -o " EC_EXE " " EC_C " > " EC_OUT " 2>&1 && ./" EC_EXE " > " EC_OUT) != 0) {
         printf("could not build the C program\n");
@@ -65,13 +65,13 @@ i64 compareWithC() {
     if (!out) { return -1; }
     line = out;
     for (i = 0; i < gN && line && *line; i++) {
-        sp = str.firstOf(line, " ");
-        if (!sp || str.toInt(sp + 1) != gValues[i]) {
-            printf("%s: std.ktmh %d, C %d\n", gNames[i], gValues[i], str.toInt(sp + 1));
+        sp = cstr.firstOf(line, " ");
+        if (!sp || cstr.toInt(sp + 1) != gValues[i]) {
+            printf("%s: std.ktmh %d, C %d\n", gNames[i], gValues[i], cstr.toInt(sp + 1));
             bad++;
         }
         n++;
-        line = str.firstOf(line, "\n");
+        line = cstr.firstOf(line, "\n");
         if (line) { line++; }
     }
     mem.free(out);

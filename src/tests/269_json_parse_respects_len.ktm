@@ -1,4 +1,4 @@
-import json, str, test;
+import cstr, json, test;
 
 /* json.parse(text, len) read past `len`: the string scan, number scan
  * (and strtoll/strtod) and whitespace skip all went on to a NUL. So a
@@ -53,7 +53,7 @@ i32 main() {
     json.Value *k = cut("true!!", 4);
     json.Value *n = cut("\"ok\"tail", 4);
     if (json.ok(j) && json.ok(k) && k.boolean == true && json.ok(n) &&
-            !str.cmp(n.str, "ok")) { correct++; }
+            !cstr.cmp(n.str, "ok")) { correct++; }
     json.release(j);
     json.release(k);
     json.release(n);

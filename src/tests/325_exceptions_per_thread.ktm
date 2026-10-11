@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The catch chain was one process-wide global, so a throw in one thread
  * could longjmp onto another thread's stack ("stack smashing detected").
@@ -68,7 +68,7 @@ void *worker(Work *w) {
 
 bool uncaughtInThreadExits() {
     u8 *src = "
-import libc;
+import cstr, libc;
 
 enum Err { thr };
 
@@ -91,7 +91,7 @@ void main()
 }
 ";
     bool ok = false;
-    if (!fs.writeAll(UNCAUGHT_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNCAUGHT_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "

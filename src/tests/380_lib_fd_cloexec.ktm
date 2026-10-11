@@ -1,4 +1,4 @@
-import fs, libc, mem, net, proc, str, test;
+import cstr, fs, libc, mem, net, proc, test;
 
 /* The fds the library opens (sockets from the Net* helpers, accepted
  * connections, fs.readAll/fs.writeAll's file (also while fs.readAll reads a
@@ -31,7 +31,7 @@ bool closeOnExec(i32 fd) {
  * nothing, so the child can't mistake one of its own fds for ours) */
 bool childHas(i32 fd) {
     u8 *out = proc.shellOutput("[ -e /dev/fd/%d ] && echo yes", fd);
-    bool has = out && !str.cmp(out, "yes");
+    bool has = out && !cstr.cmp(out, "yes");
     mem.free(out);
     return has;
 }
@@ -42,9 +42,9 @@ void kind(i32 fd, u8 *what) {
         check(false, what);
         return;
     }
-    str.formatTo(buf, "%s: FD_CLOEXEC", what);
+    cstr.formatTo(buf, "%s: FD_CLOEXEC", what);
     check(closeOnExec(fd), buf);
-    str.formatTo(buf, "%s: not inherited", what);
+    cstr.formatTo(buf, "%s: not inherited", what);
     check(!childHas(fd), buf);
 }
 
@@ -145,7 +145,7 @@ void fileReadFd() {
     libc.write(wr, "fifo data", 9);
     libc.close(wr);
     libc.pthread_join(th);
-    check(gRead && gReadLen == 9 && !str.cmp(gRead, "fifo data"),
+    check(gRead && gReadLen == 9 && !cstr.cmp(gRead, "fifo data"),
             "FileRead got the data");
     mem.free(gRead);
     libc.unlink(FIFO);

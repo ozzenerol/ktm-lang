@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, str, test;
 
 /* String (v0.3.0 step 4): the prelude's {ptr, len, cap}, owning its bytes
  * and always NUL-terminated after them. str.new(), str.withCap(n) and
@@ -30,9 +30,9 @@ String greeting(u8[] who) {
 }
 
 u8 *errorOf(u8 *code) {
-    u8 *src = str.format("import str;\ni32 main() {\n    String s = str.from(\"x\");\n"
+    u8 *src = cstr.format("import str;\ni32 main() {\n    String s = str.from(\"x\");\n"
                          "    %s\n    return 0;\n}\n", code);
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     return proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                             "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                             "-jit " SRC_FILE " 2>&1");
@@ -43,27 +43,27 @@ i32 main() {
 
     String s = str.new();
     defer s.free();
-    check(s.len == 0 && s.ptr == null && !str.cmp(s.cstr(), ""), "str.new() allocates nothing");
+    check(s.len == 0 && s.ptr == null && !cstr.cmp(s.cstr(), ""), "str.new() allocates nothing");
     s.append("banana");
-    check(s.len == 6 && s.cap >= 6 && s.ptr[6] == 0 && !str.cmp(s.cstr(), "banana"), "append, NUL after");
-    check(countOf(s, 'a') == 3 && !str.cmp(typeof(s), "String"), "a u8[] view, typeof");
-    check(!str.cmp(str.format("<%s|%8s>", s, s), "<banana|  banana>"), "%s prints it");
+    check(s.len == 6 && s.cap >= 6 && s.ptr[6] == 0 && !cstr.cmp(s.cstr(), "banana"), "append, NUL after");
+    check(countOf(s, 'a') == 3 && !cstr.cmp(typeof(s), "String"), "a u8[] view, typeof");
+    check(!cstr.cmp(cstr.format("<%s|%8s>", s, s), "<banana|  banana>"), "%s prints it");
 
     String g = greeting("ann");
     defer g.free();
-    check(!str.cmp(g.cstr(), "hello, ann"), "returned from a function");
+    check(!cstr.cmp(g.cstr(), "hello, ann"), "returned from a function");
 
     String w = str.withCap(100);
     defer w.free();
     check(w.cap == 100 && w.len == 0 && w.ptr != null, "str.withCap");
     String f = str.from(s[1:4]);
     defer f.free();
-    check(!str.cmp(f.cstr(), "ana") && f.ptr != s.ptr, "str.from copies");
+    check(!cstr.cmp(f.cstr(), "ana") && f.ptr != s.ptr, "str.from copies");
 
     String c = s.clone();
     defer c.free();
     c.toUpper();
-    check(!str.cmp(c.cstr(), "BANANA") && !str.cmp(s.cstr(), "banana"), "clone() is its own");
+    check(!cstr.cmp(c.cstr(), "BANANA") && !cstr.cmp(s.cstr(), "banana"), "clone() is its own");
     String shared = s;
     check(shared.ptr == s.ptr, "a copy shares the bytes");
 

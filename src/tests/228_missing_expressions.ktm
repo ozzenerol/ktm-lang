@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Places that need an expression accepted none: `while ()` and
  * `do ... while ();` compiled to nothing, `if ()`, `switch ()` and a
@@ -13,7 +13,7 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source, i64 *statusArg) {
     proc.shell("rm -f " EE_SRC " " EE_OUT);
-    fs.writeAll(EE_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(EE_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     *statusArg = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-jit " EE_SRC " > " EE_OUT " 2>&1");
@@ -96,7 +96,7 @@ i32 main() {
     /* The legal empty forms */
     tests++;
     out = diagnose(legalSrc, &status);
-    if (status == 0 && out && !str.cmp(out, "if two 5 32\n")) { correct++; }
+    if (status == 0 && out && !cstr.cmp(out, "if two 5 32\n")) { correct++; }
     else { printf("got (status %d): '%s'\n", status, out); }
     mem.free(out);
 

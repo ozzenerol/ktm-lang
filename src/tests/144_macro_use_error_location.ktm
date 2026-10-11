@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An error on a macro use pointed at the #define: `i64 x = 2 N;` with
  * `#define N 3` reported "Unexpected integer `3`" at the define's line
@@ -28,11 +28,11 @@ bool compileOutputHas(u8 *source, u8 *header, bool ok, u8 *expected,
 
     cleanupMacroTest();
 
-    if (header && !fs.writeAll(MACRO_TEST_HDR, header, str.len(header),
+    if (header && !fs.writeAll(MACRO_TEST_HDR, header, cstr.len(header),
                                                      libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
-    if (!fs.writeAll(MACRO_TEST_FILE, source, str.len(source),
+    if (!fs.writeAll(MACRO_TEST_FILE, source, cstr.len(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }

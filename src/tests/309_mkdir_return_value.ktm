@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* fs.makeDir's result could not tell success from failure: without recurse
  * it returned 0 on success and also for a missing parent or a read-only
@@ -15,7 +15,7 @@ u8 *gRoot;
 u8 gPath[256];
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -37,7 +37,7 @@ i32 main() {
     u8 root[64], *cmd;
     printf("Test - MkDir return value: ");
 
-    str.copy(root, "./ktm-test-309-XXXXXX");
+    cstr.copy(root, "./ktm-test-309-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, 1);
         printf("====\n");
@@ -71,7 +71,7 @@ i32 main() {
     gTests++; if (fs.makeDir(null) == -1) { gCorrect++; }
     gTests++; if (fs.makeDir("") == -1 && fs.makeDir("",, true) == -1) { gCorrect++; }
 
-    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

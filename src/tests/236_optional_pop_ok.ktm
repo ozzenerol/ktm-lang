@@ -1,4 +1,4 @@
-import str, test, vec;
+import cstr, test, vec;
 
 /* vec.intPop/vec.floatPop/vec.ptrPop wrote through `_ok` unconditionally, so
  * vec.intPop(v, null) crashed and the flag had to be passed. It now
@@ -37,7 +37,7 @@ i32 main() {
     ok = false;
     /* a stored null is told apart from empty only through `_ok` */
     tests++; if (pv.pop(&ok) == null && ok) { correct++; }
-    tests++; if (!str.cmp(pv.pop(), "x") && pv.pop() == null) { correct++; }
+    tests++; if (!cstr.cmp(pv.pop(), "x") && pv.pop() == null) { correct++; }
     ok = true;
     tests++; if (pv.pop(&ok) == null && !ok && pv.size == 0) { correct++; }
     pv.release();

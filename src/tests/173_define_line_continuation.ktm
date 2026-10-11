@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A `\` at the end of a line did not continue it, so a #define
  * written over several lines ended at the first and the rest was
@@ -40,7 +40,7 @@ bool failsWith(u8 *source, u8 *expected) {
     bool good = true;
 
     fs.remove(CL_FILE);
-    if (!fs.writeAll(CL_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(CL_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " CL_FILE " > " CL_OUT " 2>&1");
@@ -59,7 +59,7 @@ i32 main() {
     printf("Test - line continuation in #define: ");
 
     tests++; if (SUM == 6) { correct++; }
-    tests++; if (!str.cmp(GREETING, "hello")) { correct++; }
+    tests++; if (!cstr.cmp(GREETING, "hello")) { correct++; }
     tests++; if (HALF == 0.5) { correct++; }
     tests++; if (gIf == 1) { correct++; }
     tests++; if (gAfter == 7) { correct++; }

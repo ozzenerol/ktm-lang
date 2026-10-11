@@ -1,4 +1,4 @@
-import libc, mem, net, str, test;
+import cstr, libc, mem, net, test;
 
 /* net.peerAddr read the peer address into a
  * 16-byte sockaddr, which cuts a sockaddr_in6 short, and NetGetInAddress
@@ -65,13 +65,13 @@ i32 main() {
     check(pair(libc.AF_INET), "IPv4 pair");
     mem.set(buf, 0, sizeof(buf));
     check(net.peerAddr(gAcc, buf, sizeof(buf)) &&
-                !str.cmp(buf, "127.0.0.1"), "IPv4 peer");
+                !cstr.cmp(buf, "127.0.0.1"), "IPv4 peer");
     closePair();
 
     if (pair(libc.AF_INET6)) {
         mem.set(buf, 0, sizeof(buf));
         check(net.peerAddr(gAcc, buf, sizeof(buf)) &&
-                    !str.cmp(buf, "::1"), "IPv6 peer");
+                    !cstr.cmp(buf, "::1"), "IPv6 peer");
         mem.set(buf, 0, sizeof(buf));
         check(!net.peerAddr(gAcc, buf, 3), "buffer too small");
     }
@@ -79,14 +79,14 @@ i32 main() {
 
     /* a unix domain peer has no IP address */
     u8 dir[64], path[128];
-    str.copy(dir, "./ktm335-XXXXXX");
+    cstr.copy(dir, "./ktm335-XXXXXX");
     check(mkdtemp(dir) != null, "mkdtemp");
-    str.formatTo(path, "%s/s.sock", dir);
+    cstr.formatTo(path, "%s/s.sock", dir);
     i32 us = net.unixListen(path, 4);
     i32 uc = net.unixDial(path);
     i32 ua = net.accept(us);
     check(us != -1 && uc != -1 && ua != -1, "unix pair");
-    str.copy(buf, "untouched");
+    cstr.copy(buf, "untouched");
     check(!net.peerAddr(ua, buf, sizeof(buf)), "unix peer is false");
     check(!net.peerAddr(-1, buf, sizeof(buf)), "bad socket is false");
     libc.close(ua); libc.close(uc); libc.close(us);
@@ -102,7 +102,7 @@ i32 main() {
     ss.ss_family = libc.AF_INET;
     libc.inet_pton(libc.AF_INET, "10.1.2.3", &((libc.sockaddr_in *)(&ss)).sin_addr);
     check(net.addrToStr((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)) &&
-                !str.cmp(buf, "10.1.2.3"), "AF_INET address");
+                !cstr.cmp(buf, "10.1.2.3"), "AF_INET address");
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

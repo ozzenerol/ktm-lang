@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.parse accepted text after the top-level value (`[1]x`, `1 2`,
  * `truex`, `{"a":1}}`), skipped anything between a key and its ':'
@@ -19,7 +19,7 @@ bool okFn(u8 *text, u8 *want, i64 len=-1) {
     bool ok = json.ok(j);
     if (ok) {
         u8 *s = json.toStr(j);
-        ok = !str.cmp(s, want);
+        ok = !cstr.cmp(s, want);
         if (!ok) { printf("[%s] gave [%s]\n", text, s); }
         mem.free(s);
     } else {

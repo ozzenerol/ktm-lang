@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Shlurp read the command's output back from a temporary file in
  * $TMPDIR, so it returned null when $TMPDIR was missing or read-only and
@@ -27,7 +27,7 @@ void check(bool ok, u8 *what) {
 
 /* The result is `want`; frees it */
 bool is(u8 *got, u8 *want) {
-    bool ok = got && !str.cmp(got, want);
+    bool ok = got && !cstr.cmp(got, want);
     mem.free(got);
     return ok;
 }
@@ -36,7 +36,7 @@ void *worker(void *arg) {
     i64 id = (i64)arg, j, *bad = mem.alloc(sizeof(i64));
     *bad = 0;
     for (j = 0; j < 25; j++) {
-        u8 *want = str.format("w%d-%d", id, j);
+        u8 *want = cstr.format("w%d-%d", id, j);
         if (!is(proc.shellOutput("echo %s", want), want)) { *bad += 1; }
         mem.free(want);
     }
@@ -49,7 +49,7 @@ i32 main() {
     u8 *out;
 
     u8 *tmpdir = libc.getenv("TMPDIR");
-    if (tmpdir) { tmpdir = str.dup(tmpdir); }
+    if (tmpdir) { tmpdir = cstr.dup(tmpdir); }
 
     /* $TMPDIR doesn't exist: Shlurp doesn't need it */
     setenv("TMPDIR", "./ktm-382-does-not-exist", 1);
@@ -68,7 +68,7 @@ i32 main() {
 
     /* more than a pipe buffer, with one trailing newline removed */
     out = proc.shellOutput("yes | head -c 1048576");
-    check(out && str.len(out) == 1048575 && out[0] == 'y' && out[1] == '\n',
+    check(out && cstr.len(out) == 1048575 && out[0] == 'y' && out[1] == '\n',
                 "1 MiB of output");
     mem.free(out);
 
@@ -76,7 +76,7 @@ i32 main() {
      * shell exits */
     t0 = time(null);
     out = proc.shellOutput("echo first; sleep 5 > /dev/null 2>&1 & sleep 5 &");
-    check(out && !str.cmp(out, "first") && time(null) - t0 < 4,
+    check(out && !cstr.cmp(out, "first") && time(null) - t0 < 4,
                 "background job not waited for");
     mem.free(out);
 

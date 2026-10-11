@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.select: a '*' in an object path copied the wrong buffer, so ".*"
  * and ".price_*" never matched; a selector ending in '.' or '[' read past
@@ -17,7 +17,7 @@ i32 main() {
     json.Value *deep = json.select(d, ".*[*].*[*]:b", "items", 2, "k", 0);
     json.Value *p9 = json.select(d, ".nested.price_*:f", "9");
     tests++;
-    if (n && json.isString(n) && !str.cmp(n.str, "ktm") && p3 && p3.intVal == 2 &&
+    if (n && json.isString(n) && !cstr.cmp(n.str, "ktm") && p3 && p3.intVal == 2 &&
             it && it.intVal == 20 && deep && deep.boolean && p9 && p9.floatVal == 9.5) { correct++; }
     else { printf("wildcards: %p %p %p %p %p\n", n, p3, it, deep, p9); }
 

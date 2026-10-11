@@ -1,5 +1,5 @@
 module date;
-import libc, math, str;
+import cstr, libc, math;
 
 pub i64 struct Date {
   u32 time;
@@ -255,5 +255,5 @@ pub void isoFromTimespec(libc.timespec *ts, u8 *buf) {
   i64 hh = rem/3600, mm = rem%3600/60, ss = rem%60;
   i64 y, mo, d;
   civilFromDays(days, &y, &mo, &d);
-  str.formatTo(buf, "%04d-%02d-%02dT%02d:%02d:%02d.%09dZ", y, mo, d, hh, mm, ss, nsec);
+  cstr.formatTo(buf, "%04d-%02d-%02dT%02d:%02d:%02d.%09dZ", y, mo, d, hh, mm, ss, nsec);
 }

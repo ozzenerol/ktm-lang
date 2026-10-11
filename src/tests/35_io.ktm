@@ -1,4 +1,4 @@
-import fs, libc, str, test;
+import cstr, fs, libc, test;
 
 #define TEST_FILE "__file__.txt"
 #define TEST_DATA "hello\n"
@@ -19,9 +19,9 @@ bool testWriteFile(void) {
     if (ok == false) { return failAndCleanup(); }
 
     auto buffer = fs.readAll(TEST_FILE);
-    auto len = str.len(buffer);
+    auto len = cstr.len(buffer);
     if (len != 6) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
+    if (cstr.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
 
     return successAndCleanup();
 }
@@ -41,9 +41,9 @@ bool testTruncFile(void)
     if (ok == false) { return failAndCleanup(); }
 
     auto buffer = fs.readAll(TEST_FILE);
-    auto len = str.len(buffer);
+    auto len = cstr.len(buffer);
     if (len != 6) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
+    if (cstr.cmpLen(buffer,TEST_DATA,len) != 0) { return failAndCleanup(); }
 
     return successAndCleanup();
 }
@@ -62,9 +62,9 @@ bool testAppendFile(void) {
 
     auto buffer = fs.readAll(TEST_FILE);
 
-    auto len = str.len(buffer);
+    auto len = cstr.len(buffer);
     if (len != 6*4) { return failAndCleanup(); }
-    if (str.cmpLen(buffer,TEST_DATA TEST_DATA TEST_DATA TEST_DATA,6*4) != 0) { 
+    if (cstr.cmpLen(buffer,TEST_DATA TEST_DATA TEST_DATA TEST_DATA,6*4) != 0) { 
         return failAndCleanup();
     }
 

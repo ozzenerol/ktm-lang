@@ -1,6 +1,6 @@
-import mem, set, str, test;
+import cstr, mem, set, test;
 
-/* set.intToStr appended every element with str.appendFormat, which measures
+/* set.intToStr appended every element with cstr.appendFormat, which measures
  * the whole string each time: O(n^2), about 24 s for 500k elements. */
 
 extern "c" i64 clock();
@@ -13,7 +13,7 @@ i64 digits(i64 v) {
 }
 
 bool strIs(u8 *got, u8 *want) {
-    bool ok = got != null && !str.cmp(got, want);
+    bool ok = got != null && !cstr.cmp(got, want);
     if (!ok) { printf("\n  got \"%s\" want \"%s\"\n", got, want); }
     mem.free(got);
     return ok;
@@ -50,9 +50,9 @@ i32 main() {
     t = clock();
     strVal = s.toStr();
     t = (clock() - t) / 1000; /* CLOCKS_PER_SEC is 1000000 on POSIX */
-    tests++; if (str.len(strVal) == len && mem.size(strVal) > len) { correct++; }
-    tests++; if (!str.cmpLen(strVal, "{-149999, -149998, ", 19)) { correct++; }
-    tests++; if (!str.cmp(strVal + len - 17, ", 149999, 150000}")) { correct++; }
+    tests++; if (cstr.len(strVal) == len && mem.size(strVal) > len) { correct++; }
+    tests++; if (!cstr.cmpLen(strVal, "{-149999, -149998, ", 19)) { correct++; }
+    tests++; if (!cstr.cmp(strVal + len - 17, ", 149999, 150000}")) { correct++; }
     tests++;
     if (t < 2000) { correct++; }
     else { printf("\n  IntSetToString of %d elements took %d ms\n", n, t); }

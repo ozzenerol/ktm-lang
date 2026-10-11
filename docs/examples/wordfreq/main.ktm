@@ -6,7 +6,7 @@
 // Shows: reading a file (fs), scanning strings, counting in a map.StrMap,
 // sorting a vec.PtrVec, structs and command-line arguments.
 
-import fs, map, mem, str, vec;
+import cstr, fs, map, mem, str, vec;
 
 const i64 TOP_N = 8;
 const i64 MAX_WORD = 64;
@@ -24,7 +24,7 @@ i64 ranksHigher(void *aArg, void *bArg) {
     if (a.count != b.count) {
         return a.count > b.count;
     }
-    return str.cmp(a.word, b.word) < 0;
+    return cstr.cmp(a.word, b.word) < 0;
 }
 
 bool isLetter(u8 c) {
@@ -35,7 +35,7 @@ void countWord(map.StrMap *counts, u8 *word) {
     WordCount *wc = counts.get(word);
     if (wc == null) {
         wc = mem.alloc(sizeof(WordCount));
-        wc.word = str.dup(word);       // the map keeps this pointer as its key
+        wc.word = cstr.dup(word);       // the map keeps this pointer as its key
         wc.count = 0;
         counts.set(wc.word, wc);
     }

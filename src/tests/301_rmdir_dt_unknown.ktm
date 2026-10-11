@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* On a filesystem whose readdir() gives DT_UNKNOWN for every entry,
  * fs.removeDir(path, RM_RECURSE) stat()ed each entry and, for a directory,
@@ -35,7 +35,7 @@ bool exists(u8 *path) {
 }
 
 i64 runFn(u8 *fmt, u8 *root) {
-    u8 *cmd = str.formatTo(null, fmt, root, root, root, root, root, root);
+    u8 *cmd = cstr.formatTo(null, fmt, root, root, root, root, root, root);
     i64 res = proc.shell(cmd);
     mem.free(cmd);
     return res;
@@ -53,27 +53,27 @@ i32 main() {
         return 0;
     }
 
-    fs.writeAll(str.formatTo(tree, "%s/dtunk.c", root), SHIM_SRC, str.len(SHIM_SRC));
+    fs.writeAll(cstr.formatTo(tree, "%s/dtunk.c", root), SHIM_SRC, cstr.len(SHIM_SRC));
     if (runFn("[ \"$(uname)\" = Linux ] && command -v cc >/dev/null 2>&1 && "
                     "cd '%s' && cc -shared -fPIC -o dtunk.so dtunk.c -ldl", root) != 0) {
         /* No shim possible here: nothing to test */
         correct = tests;
     } else {
-        fs.writeAll(str.formatTo(tree, "%s/p.ktm", root), PROG_SRC, str.len(PROG_SRC));
+        fs.writeAll(cstr.formatTo(tree, "%s/p.ktm", root), PROG_SRC, cstr.len(PROG_SRC));
         runFn("mkdir -p '%s/t/a/b/c' '%s/t/d' && echo x > '%s/t/a/f' && "
                 "echo y > '%s/t/a/b/c/g' && echo z > '%s/t/top'", root);
-        str.formatTo(tree, "%s/t", root);
+        cstr.formatTo(tree, "%s/t", root);
         if (runFn("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                         "'%s/p.ktm' -o '%s/p' && cd '%s' && "
                         "LD_PRELOAD='%s/dtunk.so' ./p '%s/t' > '%s/out' 2>&1",
                         root) == 0) {
             correct++;
         }
-        out = fs.readAll(str.formatTo(tree, "%s/out", root));
+        out = fs.readAll(cstr.formatTo(tree, "%s/out", root));
         if (out && libc.strstr(out, "result=0\n")) { correct++; }
         else if (out) { printf("%s\n", out); }
         if (out) { mem.free(out); }
-        if (!exists(str.formatTo(tree, "%s/t", root))) { correct++; }
+        if (!exists(cstr.formatTo(tree, "%s/t", root))) { correct++; }
     }
 
     runFn("rm -rf '%s'", root);

@@ -1,5 +1,5 @@
 module set;
-import map, mem, str, vec;
+import cstr, map, mem, vec;
 
 static bool rbIsNil(map.RBNode *n) {
     return n == null || n.left == null;
@@ -229,18 +229,18 @@ pub IntSet *IntSet.symDiff(IntSet *s2) {
 
 pub u8 *IntSet.toStr() {
     i64 len = 1;
-    u8 *buf = str.dup("{");
+    u8 *buf = cstr.dup("{");
     IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     bool first = true;
 
     while ((entry = intIterNext(i1))) {
-        if (first) { buf = str.appendFormatLen(buf, &len, "%d", entry.key); }
-        else       { buf = str.appendFormatLen(buf, &len, ", %d", entry.key); }
+        if (first) { buf = cstr.appendFormatLen(buf, &len, "%d", entry.key); }
+        else       { buf = cstr.appendFormatLen(buf, &len, ", %d", entry.key); }
         first = false;
     }
     intIterRelease(i1);
-    return str.appendFormatLen(buf, &len, "}");
+    return cstr.appendFormatLen(buf, &len, "}");
 }
 
 pub void IntSet.release() {

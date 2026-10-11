@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The lexer silently dropped characters it has no use for (`?`, a
  * backtick, `$` and `@` outside an asm block, non-ASCII bytes), so
@@ -37,7 +37,7 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupUnknownTest();
 
-    if (!fs.writeAll(UNKNOWN_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(UNKNOWN_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* An intrinsic class (`i64 class CDate { u32 time; i32 date; };`) is a
  * value of its base integer type whose fields overlay its bytes.
@@ -133,8 +133,8 @@ i32 main() {
     date.toParts(&out, d);
     if (out.year == 2024 && out.mon == 2 && out.dayOfMon == 29 &&
             out.hour == 13 && out.min == 14 && out.sec == 15 &&
-            !str.cmp(date.formatDate(d), "02/29/2024") &&
-            !str.cmp(date.formatTime(d), "13:14:15")) { correct++; }
+            !cstr.cmp(date.formatDate(d), "02/29/2024") &&
+            !cstr.cmp(date.formatTime(d), "13:14:15")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

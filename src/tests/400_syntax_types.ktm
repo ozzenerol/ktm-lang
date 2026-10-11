@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* ktm syntax v0.2: void i8 u8 i16 u16 i32 u32 i64 u64 f32 f64 bool are
  * the built-in types. They are type names, not keywords: a struct field
@@ -62,7 +62,7 @@ i32 main() {
     i64 n = 1;
     bump(&n);
     if (add(1) == 11 && add(1, 2) == 3 && half(5) == 2.5 && n == 2 &&
-            gCount == 3 && !str.cmp(nameFn(), "ktm")) { correct++; }
+            gCount == 3 && !cstr.cmp(nameFn(), "ktm")) { correct++; }
     else { printf("\n  functions\n"); }
 
     tests++;   /* struct fields, including fields named like types */
@@ -88,21 +88,21 @@ i32 main() {
     else { printf("\n  old names\n"); }
 
     tests++;   /* typeof prints the new names */
-    if (!str.cmp(typeof(oldI), "i64") && !str.cmp(typeof(half(1.0)), "f64") &&
-            !str.cmp(typeof(t), "bool") && !str.cmp(typeof(ps), "u8 *") &&
-            !str.cmp(typeof(arr), "i32[4]") && !str.cmp(typeof(sc), "i8")) { correct++; }
+    if (!cstr.cmp(typeof(oldI), "i64") && !cstr.cmp(typeof(half(1.0)), "f64") &&
+            !cstr.cmp(typeof(t), "bool") && !cstr.cmp(typeof(ps), "u8 *") &&
+            !cstr.cmp(typeof(arr), "i32[4]") && !cstr.cmp(typeof(sc), "i8")) { correct++; }
     else { printf("\n  typeof: %s %s %s %s %s\n", typeof(oldI), typeof(half(1.0)), typeof(t), typeof(ps), typeof(arr)); }
 
     tests++;   /* and so do diagnostics */
     u8 *src = "i64 g;\nvoid A() { return g; }\nvoid main() { A(); }\n";
-    fs.writeAll("__400_warn.ktm", src, str.len(src));
+    fs.writeAll("__400_warn.ktm", src, cstr.len(src));
     u8 *out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit __400_warn.ktm 2>&1");
     if (out && libc.strstr(out, "of type 'i64' expected 'void'")) { correct++; }
     else { printf("\n  diagnostic names: [%s]\n", out); }
 
     tests++;   /* the old spellings, one error each */
     src = "class P { I64 x; };\npublic U0 F(Bool b) { }\nvoid main() { }\n";
-    fs.writeAll("__400_warn.ktm", src, str.len(src));
+    fs.writeAll("__400_warn.ktm", src, cstr.len(src));
     out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -S -o /dev/null __400_warn.ktm 2>&1");
     if (out && libc.strstr(out, "`class` is the old spelling: write `struct`") &&
         libc.strstr(out, "`I64` is the old spelling: write `i64`") &&

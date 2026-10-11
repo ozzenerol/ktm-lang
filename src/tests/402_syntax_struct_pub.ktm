@@ -1,4 +1,4 @@
-import proc, str, test;
+import cstr, proc, test;
 
 /* ktm syntax v0.2: `struct` is the same as `class` and `pub` the same as
  * `public`. struct in every place class works: definitions, inheritance,
@@ -47,7 +47,7 @@ i32 main() {
     b.size.w = 3;
     b.size.h = 4;
     if (b.x + b.y == 3 && area(&b.size) == 12 && sizeof(Box) == 32 &&
-            !str.cmp(typeof(b), "Box")) { correct++; }
+            !cstr.cmp(typeof(b), "Box")) { correct++; }
     else { printf("\n  struct with inheritance\n"); }
 
     tests++;

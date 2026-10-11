@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* map.strNew and map.intNew rounded the capacity up to a power of two but
  * built the mask, the threshold and the entries array from the unrounded
@@ -124,7 +124,7 @@ i32 main() {
 
     u8 **keys = mem.alloc(N_KEYS * sizeof(u8 *));
     for (i = 0; i < N_KEYS; i++) {
-        keys[i] = str.formatTo(null, "key-%d", i);
+        keys[i] = cstr.formatTo(null, "key-%d", i);
     }
 
     for (i = 0; i < 7; i++) {
@@ -161,7 +161,7 @@ i32 main() {
     /* A map that owns its keys frees them on release. */
     sd.setFreeKey(&mem.free);
     for (i = 0; i < 500; i++) {
-        sd.set(str.formatTo(null, "owned-%d", i), (void *)i);
+        sd.set(cstr.formatTo(null, "owned-%d", i), (void *)i);
     }
     if (sd.size == 500 && (i64)sd.get("owned-499") == 499) { correct++; }
     tests++;

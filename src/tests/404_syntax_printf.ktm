@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* ktm syntax v0.2: printf(fmt, ...) is ktm's print, the same as the print
  * statement "fmt", ...; : %d/%x/%u print the full 64-bit value (narrow
@@ -53,18 +53,18 @@ i32 main() {
     i64 correct = 0, tests = 0, i;
     printf("Test - printf: ");
 
-    fs.writeAll("__404_both.ktm", both, str.len(both));
+    fs.writeAll("__404_both.ktm", both, cstr.len(both));
     u8 *out = proc.shellOutput(KTM "-jit __404_both.ktm 2>&1");
     u8 *aot = proc.shellOutput(KTM "__404_both.ktm -o __404_both 2>&1 && ./__404_both");
 
     tests++;   /* each printf line equals the print statement after it */
     i64 pairsOk = 1;
-    u8 *copy = str.dup(out), *lines[32];
+    u8 *copy = cstr.dup(out), *lines[32];
     i64 count = linesFn(copy, lines, 32);
     if (count == 17) {
         /* 7 pairs, then the 42 whose length printf returns, then 2 counts */
-        for (i = 0; i < 14; i += 2) { if (str.cmp(lines[i], lines[i + 1])) { pairsOk = 0; } }
-        if (str.cmp(lines[14], "42") || str.cmp(lines[15], "count 3") || str.cmp(lines[16], "count 3")) {
+        for (i = 0; i < 14; i += 2) { if (cstr.cmp(lines[i], lines[i + 1])) { pairsOk = 0; } }
+        if (cstr.cmp(lines[14], "42") || cstr.cmp(lines[15], "count 3") || cstr.cmp(lines[16], "count 3")) {
             pairsOk = 0;
         }
     } else {
@@ -74,18 +74,18 @@ i32 main() {
     else { printf("\n  printf and the print statement differ (jit):\n%s\n", out); }
 
     tests++;   /* the 64-bit, narrow and Q lines have the right text */
-    if (count == 17 && !str.cmp(lines[0], "top level 1") &&
-            !str.cmp(lines[2], "5000000000 -3 200 -2") && !str.cmp(lines[4], "12a05f200 FF 10") &&
-            !str.cmp(lines[6], "str| 3.14|A|%") && !str.cmp(lines[8], "a\\\"b")) { correct++; }
+    if (count == 17 && !cstr.cmp(lines[0], "top level 1") &&
+            !cstr.cmp(lines[2], "5000000000 -3 200 -2") && !cstr.cmp(lines[4], "12a05f200 FF 10") &&
+            !cstr.cmp(lines[6], "str| 3.14|A|%") && !cstr.cmp(lines[8], "a\\\"b")) { correct++; }
     else { printf("\n  printf output: [%s]\n", out); }
 
     tests++;   /* compiled, the same output */
-    if (out && aot && !str.cmp(out, aot)) { correct++; }
+    if (out && aot && !cstr.cmp(out, aot)) { correct++; }
     else { printf("\n  aot differs:\n%s\n", aot); }
 
     tests++;   /* the arguments are checked against the format */
     u8 *bad = "void main()\n{\n  printf(\"%s %d\\n\", \"x\");\n}\n";
-    fs.writeAll("__404_bad.ktm", bad, str.len(bad));
+    fs.writeAll("__404_bad.ktm", bad, cstr.len(bad));
     u8 *err = proc.shellOutput(KTM "-jit __404_bad.ktm 2>&1");
     if (err && libc.strstr(err, "printf format expects 2 arguments but 1 was supplied") &&
             libc.strstr(err, "__404_bad.ktm:3:")) { correct++; }

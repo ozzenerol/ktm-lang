@@ -1,4 +1,4 @@
-import libc, mem, net, os, proc, str, test;
+import cstr, libc, mem, net, os, proc, test;
 
 /* Processes (process.ktm): proc.spawn runs argv without a shell; exit codes
  * and signals from proc.wait; ENOENT for a missing program; PROC_NULL,
@@ -76,11 +76,11 @@ bool noShell()
     u8 *a[] = {"printf", "%s|", "a b", "it's", "$HOME", ";", "*", "", "\"q\"", null};
     i64 code = -2;
     u8 *s = outFn(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
-    bool ok = s && !str.cmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
+    bool ok = s && !cstr.cmp(s, "a b|it's|$HOME|;|*||\"q\"|") && code == 0;
     mem.free(s);
     u8 *e[] = {"echo", "hello", null};
     s = proc.run(e, &code);
-    ok = ok && s && !str.cmp(s, "hello") && code == 0; /* newline removed */
+    ok = ok && s && !cstr.cmp(s, "hello") && code == 0; /* newline removed */
     mem.free(s);
     return ok;
 }
@@ -89,22 +89,22 @@ bool redirects() {
     i64 code;
     u8 *cat[] = {"cat", null};
     u8 *s = outFn(cat, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
-    bool ok = s && !str.cmp(s, "") && code == 0;     /* stdin /dev/null: EOF */
+    bool ok = s && !cstr.cmp(s, "") && code == 0;     /* stdin /dev/null: EOF */
     mem.free(s);
 
     u8 *both[] = {"sh", "-c", "echo out; echo err >&2", null};
     s = outFn(both, opts(proc.DEVNULL, proc.PIPE, proc.STDOUT), &code);
-    ok = ok && s && !str.cmp(s, "out\nerr\n");
+    ok = ok && s && !cstr.cmp(s, "out\nerr\n");
     mem.free(s);
     s = outFn(both, opts(proc.DEVNULL, proc.PIPE, proc.DEVNULL), &code);
-    ok = ok && s && !str.cmp(s, "out\n");
+    ok = ok && s && !cstr.cmp(s, "out\n");
     mem.free(s);
 
     u8 *out = null, *err = null;
     i64 olen = -1, elen = -1;
     proc.Proc *p = proc.spawn(both, opts(proc.DEVNULL, proc.PIPE, proc.PIPE));
     proc.communicate(p, null, 0, &out, &olen, &err, &elen);
-    ok = ok && !str.cmp(out, "out\n") && olen == 4 && !str.cmp(err, "err\n") && elen == 4;
+    ok = ok && !cstr.cmp(out, "out\n") && olen == 4 && !cstr.cmp(err, "err\n") && elen == 4;
     proc.release(p);
     mem.free(out);
     mem.free(err);
@@ -125,7 +125,7 @@ bool cwdEnv() {
     proc.Opts *o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
     o.cwd = "/";
     u8 *s = outFn(pwd, o, &code);
-    bool ok = s && !str.cmp(s, "/\n");
+    bool ok = s && !cstr.cmp(s, "/\n");
     mem.free(s);
 
     u8 *show[] = {"sh", "-c", "echo \"$KTM_379|$HOME\"", null};
@@ -133,12 +133,12 @@ bool cwdEnv() {
     o = opts(proc.DEVNULL, proc.PIPE, proc.INHERIT);
     o.env = env;
     s = outFn(show, o, &code);
-    ok = ok && s && !str.cmp(s, "replaced|\n");      /* HOME is gone */
+    ok = ok && s && !cstr.cmp(s, "replaced|\n");      /* HOME is gone */
     mem.free(s);
 
     setenv("KTM_379", "inherited", 1);              /* set at run time */
     s = outFn(show, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
-    ok = ok && s && str.len(s) > 10 && !str.cmpLen(s, "inherited|", 10);
+    ok = ok && s && cstr.len(s) > 10 && !cstr.cmpLen(s, "inherited|", 10);
     mem.free(s);
     return ok;
 }
@@ -161,7 +161,7 @@ bool doneAndKill() {
     ok = ok && proc.kill(p, libc.SIGKILL);
     u8 *out;
     i64 rc = proc.communicate(p, null, 0, &out);     /* returns at EOF */
-    ok = ok && rc == -1 && p.termSignal == libc.SIGKILL && !str.cmp(out, "");
+    ok = ok && rc == -1 && p.termSignal == libc.SIGKILL && !cstr.cmp(out, "");
     mem.free(out);
     proc.release(p);
     return ok;
@@ -210,12 +210,12 @@ bool noLeak() {
     /* our pipe ends are close-on-exec */
     bool ok = (libc.fcntl(keep.inFd, libc.F_GETFD) & libc.FD_CLOEXEC) &&
                         (libc.fcntl(keep.outFd, libc.F_GETFD) & libc.FD_CLOEXEC);
-    u8 *script = str.format("for fd in %d %d %d; do (: <&$fd) 2>/dev/null && echo open || echo closed; done",
+    u8 *script = cstr.format("for fd in %d %d %d; do (: <&$fd) 2>/dev/null && echo open || echo closed; done",
                                                  srv, keep.inFd, keep.outFd);
     u8 *a[] = {"sh", "-c", script, null};
     i64 code;
     u8 *s = outFn(a, opts(proc.DEVNULL, proc.PIPE, proc.INHERIT), &code);
-    ok = ok && s && !str.cmp(s, "closed\nclosed\nclosed\n");
+    ok = ok && s && !cstr.cmp(s, "closed\nclosed\nclosed\n");
     mem.free(s);
     mem.free(script);
     proc.release(keep);              /* cat sees EOF and ends */
@@ -227,10 +227,10 @@ void *spawner(void *arg) {
     i64 id = (i64)arg, j, code, *bad = mem.alloc(sizeof(i64));
     *bad = 0;
     for (j = 0; j < 25; j++) {
-        u8 *want = str.format("t%d-%d", id, j);
+        u8 *want = cstr.format("t%d-%d", id, j);
         u8 *a[] = {"echo", want, null};
         u8 *s = proc.run(a, &code);
-        if (!s || str.cmp(s, want) || code != 0) { *bad += 1; }
+        if (!s || cstr.cmp(s, want) || code != 0) { *bad += 1; }
         mem.free(s);
         mem.free(want);
     }

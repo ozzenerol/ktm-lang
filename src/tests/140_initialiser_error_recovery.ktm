@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* An error inside a brace initialiser is reported once. The parser's
  * recovery used to stop at the `}` of the innermost list and report the
@@ -37,7 +37,7 @@ bool compileFailsTwice(u8 *source, u8 *m1, u8 *loc1, u8 *m2, u8 *loc2) {
 
     cleanupInitRecoveryTest();
 
-    if (!fs.writeAll(INIT_RECOVERY_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(INIT_RECOVERY_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -56,8 +56,8 @@ bool compileFailsTwice(u8 *source, u8 *m1, u8 *loc1, u8 *m2, u8 *loc2) {
     if (!first || !second) {
         ok = false;
     } else {
-        if (str.cmpLen(first + 7, m1, str.len(m1))) { ok = false; }
-        if (str.cmpLen(second + 7, m2, str.len(m2))) { ok = false; }
+        if (cstr.cmpLen(first + 7, m1, cstr.len(m1))) { ok = false; }
+        if (cstr.cmpLen(second + 7, m2, cstr.len(m2))) { ok = false; }
         /* Each location is in its own error's header. */
         u8 *loc = libc.strstr(first, loc1);
         if (!loc || loc > second) { ok = false; }

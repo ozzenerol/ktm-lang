@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* "Incompatible types" warnings for assignments, compound assignments
  * and declarations were placed by rewinding to the nearest `=`, so with
@@ -21,7 +21,7 @@ bool diagAt(u8 *src, u8 *what, u8 *where, u8 *notWhere = null) {
     u8 *out, *at;
     bool ok = false;
     cleanupTwTest();
-    if (!fs.writeAll(TW_TEST_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(TW_TEST_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " TW_TEST_FILE " > " TW_TEST_OUT " 2>&1");

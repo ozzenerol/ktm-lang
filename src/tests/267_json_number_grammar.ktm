@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* JSON numbers follow RFC 8259 now: -?(0|[1-9][0-9]*)(.[0-9]+)?
  * ([eE][+-]?[0-9]+)?. `-`, `+`, `.` gave -3, -5 and -2; `01 +1 .5 1. 0x1F
@@ -22,7 +22,7 @@ bool num(u8 *text, i64 type, u8 *out, i64 flags=0)
     bool ok = json.ok(j) && j.type == type;
     if (ok) {
         u8 *s = json.toStr(j);
-        ok = !str.cmp(s, out);
+        ok = !cstr.cmp(s, out);
         if (!ok) { printf("[%s] gave [%s] want [%s]\n", text, s, out); }
         mem.free(s);
     } else {
@@ -84,7 +84,7 @@ i32 main() {
             j.array.next.floatVal < -1e308) { correct++; }
     u8 *s = json.toStr(j);
     tests++;
-    if (!str.cmp(s, "[null,null]")) { correct++; }
+    if (!cstr.cmp(s, "[null,null]")) { correct++; }
     else { printf("[%s]\n", s); }
     mem.free(s);
     json.release(j);

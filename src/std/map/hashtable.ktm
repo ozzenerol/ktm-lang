@@ -1,5 +1,5 @@
 module map;
-import mem, str, vec;
+import cstr, mem, vec;
 
 const i64 HT_LOAD = 60;
 
@@ -422,22 +422,22 @@ pub bool IntMap.keyIter(i64 *_idx, i64 *_key) {
 
 pub u8 *IntMap.toStr(fn(void *) u8 *stringifyValue) {
         if (!self) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
         auto mapSize = self.size;
         if (mapSize == 0) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
 
         IntMapNode *entry = null;
-        auto buffer = str.formatTo(null,"{");
+        auto buffer = cstr.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
         for (i64 i = 0; self.iter(&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
-                        buffer = str.appendFormat(buffer, "[%d] => %s}",entry.key,strVal);
+                        buffer = cstr.appendFormat(buffer, "[%d] => %s}",entry.key,strVal);
                 } else {
-                        buffer = str.appendFormat(buffer, "[%d] => %s, ",entry.key,strVal);
+                        buffer = cstr.appendFormat(buffer, "[%d] => %s, ",entry.key,strVal);
                 }
                 mem.free(strVal);
         }
@@ -446,21 +446,21 @@ pub u8 *IntMap.toStr(fn(void *) u8 *stringifyValue) {
 
 pub u8 *IntMap.keysToStr() {
         if (!self) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
         auto mapSize = self.size;
         if (mapSize == 0) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
 
         IntMapNode *entry = null;
-        auto buffer = str.formatTo(null,"{");
+        auto buffer = cstr.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
         for (i64 i = 0; self.iter(&i,&entry);) {
                 if (++printed == mapSize) {
-                        buffer = str.appendFormat(buffer, "%d}",entry.key);
+                        buffer = cstr.appendFormat(buffer, "%d}",entry.key);
                 } else {
-                        buffer = str.appendFormat(buffer, "%d, ",entry.key);
+                        buffer = cstr.appendFormat(buffer, "%d, ",entry.key);
                 }
         }
         return buffer;
@@ -549,7 +549,7 @@ static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 keyLen, bool *_is_free)
                         if (tombstone == HT_DELETED) {
                                 tombstone = idx;
                         }
-                } else if (keyLen == cur.keyLen && !str.cmpLen(cur.key,key,keyLen)) {
+                } else if (keyLen == cur.keyLen && !cstr.cmpLen(cur.key,key,keyLen)) {
                         *_is_free = false;
                         return idx;
                 }
@@ -571,7 +571,7 @@ static i64 strMapGetIdx(StrMap *map, u8 *key, i64 keyLen)
 
         while ((cur = entries[idx]) != null) {
                 if (cur.order != HT_DELETED && cur.keyLen == keyLen &&
-                                !str.cmpLen(cur.key, key, keyLen)) {
+                                !cstr.cmpLen(cur.key, key, keyLen)) {
                         return idx;
                 }
                 idx = (idx + 1) & mask;
@@ -690,7 +690,7 @@ pub bool StrMap.set(u8 *key, void *value) {
                 }
         }
 
-        i64 keyLen = str.len(key);
+        i64 keyLen = cstr.len(key);
         u64 idx = strMapGetNextIdx(self,key,keyLen,&isFree);
 
         if (isFree) {
@@ -746,7 +746,7 @@ pub bool StrMap.delete(u8 *key)
         if (!self || !key) {
                 return false;
         }
-        i64 idx = strMapGetIdx(self,key,str.len(key));
+        i64 idx = strMapGetIdx(self,key,cstr.len(key));
         if (idx == HT_DELETED) {
                 return false;
         }
@@ -781,7 +781,7 @@ pub void *StrMap.get(u8 *key, bool *_ok=null)
                 if (_ok) { *_ok = false; }
                 return null;
         }
-        i64 keyLen = str.len(key);
+        i64 keyLen = cstr.len(key);
         return self.getLen(key,keyLen,_ok);
 }
 
@@ -821,7 +821,7 @@ pub bool StrMap.has(u8 *key) {
         if (!self || !key) {
                 return false;
         }
-        i64 keyLen = str.len(key);
+        i64 keyLen = cstr.len(key);
         return self.hasLen(key,keyLen);
 }
 
@@ -865,23 +865,23 @@ pub bool StrMap.keyIter(i64 *_idx, u8 **_key) {
 
 pub u8 *StrMap.toStr(fn(void *) u8 *stringifyValue) {
         if (!self) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
         auto mapSize = self.size;
 
         if (mapSize == 0) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
 
         StrMapNode *entry = null;
-        auto buffer = str.formatTo(null,"{");
+        auto buffer = cstr.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
         for (i64 i = 0; self.iter(&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
-                        buffer = str.appendFormat(buffer, "[%s] => %s}",entry.key,strVal);
+                        buffer = cstr.appendFormat(buffer, "[%s] => %s}",entry.key,strVal);
                 } else {
-                        buffer = str.appendFormat(buffer, "[%s] => %s, ",entry.key,strVal);
+                        buffer = cstr.appendFormat(buffer, "[%s] => %s, ",entry.key,strVal);
                 }
                 mem.free(strVal);
         }
@@ -891,21 +891,21 @@ pub u8 *StrMap.toStr(fn(void *) u8 *stringifyValue) {
 
 pub u8 *StrMap.keysToStr() {
         if (!self) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
         auto mapSize = self.size;
         if (mapSize == 0) {
-                return str.formatTo(null,"{}");
+                return cstr.formatTo(null,"{}");
         }
 
         StrMapNode *entry = null;
-        auto buffer = str.formatTo(null,"{");
+        auto buffer = cstr.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
         for (i64 i = 0; self.iter(&i,&entry);) {
                 if (++printed == mapSize) {
-                        buffer = str.appendFormat(buffer, "%s}",entry.key);
+                        buffer = cstr.appendFormat(buffer, "%s}",entry.key);
                 } else {
-                        buffer = str.appendFormat(buffer, "%s, ",entry.key);
+                        buffer = cstr.appendFormat(buffer, "%s, ",entry.key);
                 }
         }
         return buffer;

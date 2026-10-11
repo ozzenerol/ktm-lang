@@ -1,4 +1,4 @@
-import json, libc, mem, str, test;
+import cstr, json, libc, mem, test;
 
 /* json.parse let bytes that aren't UTF-8 through inside strings. They are
  * json.INVALID_UTF8 now, at the sequence's first byte; valid UTF-8 (2, 3
@@ -11,7 +11,7 @@ void parses(u8 *text, u8 *want) {
     json.Value *j = json.parse(text);
     if (json.ok(j)) {
         u8 *s = json.toStr(j);
-        if (!str.cmp(s, want)) { gCorrect++; }
+        if (!cstr.cmp(s, want)) { gCorrect++; }
         else { printf("\n  [%s] gave [%s]\n", text, s); }
         mem.free(s);
     } else {

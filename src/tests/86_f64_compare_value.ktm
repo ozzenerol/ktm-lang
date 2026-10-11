@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A float comparison used as a value (not a branch condition) was
  * typed as f64 by the parser, so `i64 x = b < 3.0;` converted the 0/1
@@ -106,8 +106,8 @@ i32 main() {
 
     /* Printed directly. */
     u8 buf[32];
-    str.formatTo(buf, "%d%d%d", b == 2.0, b < 1.0, nan != nan);
-    expect(str.cmp(buf, "101"), 0);
+    cstr.formatTo(buf, "%d%d%d", b == 2.0, b < 1.0, nan != nan);
+    expect(cstr.cmp(buf, "101"), 0);
 
     test.printResult(gCorrect, tests);
     printf("====\n");

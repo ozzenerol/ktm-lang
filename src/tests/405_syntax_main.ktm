@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* ktm syntax v0.2: the entry point can be `main` in lowercase: `i32 main()`,
  * `i32 main(i32 argc, u8 **argv)` or `void main()`, with the same behaviour
@@ -10,7 +10,7 @@ import fs, libc, proc, str, test;
 #define KTM "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
 void put(u8 *name, u8 *text) {
-    fs.writeAll(name, text, str.len(text));
+    fs.writeAll(name, text, cstr.len(text));
 }
 
 /* Output and exit code of the program in file, run with args, both ways:
@@ -18,8 +18,8 @@ void put(u8 *name, u8 *text) {
 bool runs(u8 *file, u8 *want, i64 code) {
     u8 *jit = proc.shellOutput(KTM "-jit %s one two; echo \"rc=$?\"", file);
     u8 *aot = proc.shellOutput(KTM "%s -o __405_bin && ./__405_bin one two; echo \"rc=$?\"", file);
-    u8 *expect = str.format("%s\nrc=%d", want, code);
-    bool ok = jit && aot && !str.cmp(jit, expect) && !str.cmp(aot, expect);
+    u8 *expect = cstr.format("%s\nrc=%d", want, code);
+    bool ok = jit && aot && !cstr.cmp(jit, expect) && !cstr.cmp(aot, expect);
     if (!ok) { printf("\n  %s: want [%s]\n    jit [%s]\n    aot [%s]\n", file, expect, jit, aot); }
     return ok;
 }

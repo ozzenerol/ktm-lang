@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* date.toParts, date.formatDate and date.formatTime segfaulted. The optimiser
  * folded `iadd t, param, k` into a later store's addressing mode across
@@ -49,7 +49,7 @@ bool sameHour(date.Parts *a, date.Parts *b) {
 }
 
 bool strIs(u8 *got, u8 *want) {
-    bool ok = !str.cmp(got, want);
+    bool ok = !cstr.cmp(got, want);
     if (!ok) { printf("Failed - got '%s' want '%s'\n", got, want); }
     mem.free(got);
     return ok;

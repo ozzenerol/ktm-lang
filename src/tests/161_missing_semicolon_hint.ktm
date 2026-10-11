@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The "perhaps a missing `;`" note went to the last token of the
  * nearest earlier line whatever the error was: `i64 x = 2 3;` after
@@ -23,7 +23,7 @@ bool failsWith(u8 *source, u8 *expected, u8 *unwanted) {
     bool good = true;
 
     cleanupHintTest();
-    if (!fs.writeAll(SH_TEST_FILE, source, str.len(source),
+    if (!fs.writeAll(SH_TEST_FILE, source, cstr.len(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }

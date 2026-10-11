@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* fs.readAll on a directory took lseek(SEEK_END) as the size, which is
  * LLONG_MAX on ext4: MAlloc(len+100) overflowed and it crashed. Only a
@@ -19,7 +19,7 @@ i32 main() {
         printf("====\n");
         return 0;
     }
-    f = str.formatTo(null, "%s/f.txt", root);
+    f = cstr.formatTo(null, "%s/f.txt", root);
 
     n = 77;
     s = fs.readAll(root, &n);
@@ -43,11 +43,11 @@ i32 main() {
     mem.free(s);
     fs.writeAll(f, "hello\n", 6);
     s = fs.readAll(f, &n);
-    if (s && n == 6 && !str.cmp(s, "hello\n")) { correct++; }
+    if (s && n == 6 && !cstr.cmp(s, "hello\n")) { correct++; }
     mem.free(s);
 
     mem.free(f);
-    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

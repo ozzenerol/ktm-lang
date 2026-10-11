@@ -1,4 +1,4 @@
-import fzf, mem, str, test;
+import cstr, fzf, mem, test;
 
 /* fzf.match trimmed the pattern in place: the caller's string was changed, and
  * a string literal with leading or trailing spaces segfaulted under AOT
@@ -14,9 +14,9 @@ bool literal(u8 *text, i64 wantScore, i64 wantFirst) {
 }
 
 bool unchanged(u8 *pat, u8 *text) {
-    u8 *copy = str.dup(pat);
+    u8 *copy = cstr.dup(pat);
     fzf.Position *pos = fzf.match(text, copy);
-    bool ok = !str.cmp(copy, pat);
+    bool ok = !cstr.cmp(copy, pat);
     if (!ok) { printf("\n  [%s] became [%s]", pat, copy); }
     if (pos) { fzf.release(pos); }
     mem.free(copy);

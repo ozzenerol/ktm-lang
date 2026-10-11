@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* Bounds checks (v0.3.0 step 2): `s[i]` (read, write, `+=`, `++`, `&`)
  * with i outside 0 .. len-1, and `s[a:b]` outside 0 <= a <= b <= len,
@@ -29,7 +29,7 @@ u8 *thrown(i64[] s, i64 what) {
         }
     } catch (Error e) {
         if (e.code != ERR_BOUNDS) { return "wrong code"; }
-        return str.format("%s @%d", e.message, e.line);
+        return cstr.format("%s @%d", e.message, e.line);
     }
     return "";
 }
@@ -39,15 +39,15 @@ i32 main() {
     i64 a[5] = {1, 2, 3, 4, 5};
     i64[] s = a;
 
-    check(!str.cmp(thrown(s, 0), "index 5 out of range for length 5 @20"), "read past the end");
-    check(!str.cmp(thrown(s, 1), "index -1 out of range for length 5 @21"), "negative write");
-    check(!str.cmp(thrown(s, 2), "index 9 out of range for length 5 @22"), "+=");
-    check(!str.cmp(thrown(s, 3), "index 5 out of range for length 5 @23"), "++");
-    check(!str.cmp(thrown(s, 4), "index 5 out of range for length 5 @24"), "&s[i]");
-    check(!str.cmp(thrown(s, 5), "slice 2:9 out of range for length 5 @25"), "end past the length");
-    check(!str.cmp(thrown(s, 6), "slice 3:1 out of range for length 5 @26"), "start after the end");
-    check(!str.cmp(thrown(s, 7), "slice -1:5 out of range for length 5 @27"), "negative start");
-    check(!str.cmp(thrown(s, 8), "slice 0:9 out of range for length 5 @28"), "open start, end past");
+    check(!cstr.cmp(thrown(s, 0), "index 5 out of range for length 5 @20"), "read past the end");
+    check(!cstr.cmp(thrown(s, 1), "index -1 out of range for length 5 @21"), "negative write");
+    check(!cstr.cmp(thrown(s, 2), "index 9 out of range for length 5 @22"), "+=");
+    check(!cstr.cmp(thrown(s, 3), "index 5 out of range for length 5 @23"), "++");
+    check(!cstr.cmp(thrown(s, 4), "index 5 out of range for length 5 @24"), "&s[i]");
+    check(!cstr.cmp(thrown(s, 5), "slice 2:9 out of range for length 5 @25"), "end past the length");
+    check(!cstr.cmp(thrown(s, 6), "slice 3:1 out of range for length 5 @26"), "start after the end");
+    check(!cstr.cmp(thrown(s, 7), "slice -1:5 out of range for length 5 @27"), "negative start");
+    check(!cstr.cmp(thrown(s, 8), "slice 0:9 out of range for length 5 @28"), "open start, end past");
     check(a[0] == 1 && a[4] == 5, "nothing written by a failed access");
 
     /* in range */
@@ -66,7 +66,7 @@ i32 main() {
 
     /* uncaught: the program's report names it */
     u8 *src = "i32 main() {\n    i64 a[2] = {1, 2};\n    i64[] s = a;\n    return s[2];\n}\n";
-    fs.writeAll("__471_src.ktm", src, str.len(src));
+    fs.writeAll("__471_src.ktm", src, cstr.len(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit __471_src.ktm 2>&1");

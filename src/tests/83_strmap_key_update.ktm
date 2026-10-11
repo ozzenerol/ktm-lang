@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* map.strSet stores the caller's key pointer (by design), but setting a key
  * that already existed replaced the stored pointer with the new one. Counting
@@ -21,7 +21,7 @@ void countingFreeValue(void *value) {
 }
 
 u8 *dup(u8 *s) {
-    i64 len = str.len(s);
+    i64 len = cstr.len(s);
     u8 *d = mem.alloc(len + 1);
     mem.copy(d, s, len + 1);
     return d;
@@ -30,7 +30,7 @@ u8 *dup(u8 *s) {
 /* Allocate test strings in this file so -Memsafe tracks every one. */
 u8 *fmtFn(u8 *fmt, i64 i) {
     u8 tmp[64];
-    str.formatTo(tmp, fmt, i);
+    cstr.formatTo(tmp, fmt, i);
     return dup(tmp);
 }
 
@@ -60,14 +60,14 @@ i32 main() {
     map.StrMap *counts = map.strNew();
     u8 buf[32];
     for (i = 0; i < 8; i++) {
-        str.copy(buf, words[i]);
+        cstr.copy(buf, words[i]);
         if (counts.has(buf)) {
             counts.set(buf, (void *)((i64)counts.get(buf) + 1));
         } else {
             counts.set(dup(buf), (void *)1);
         }
     }
-    str.copy(buf, "zzzzzz");
+    cstr.copy(buf, "zzzzzz");
 
     tests++;
     if (counts.size == 5) { correct++; }
@@ -89,7 +89,7 @@ i32 main() {
     map.StrMapNode *node;
     bad = 0;
     while (counts.iter(&idx, &node) && n < 10) {
-        if (n >= 5 || node.key == buf || str.cmp(node.key, order[n])) { bad++; }
+        if (n >= 5 || node.key == buf || cstr.cmp(node.key, order[n])) { bad++; }
         n++;
     }
     tests++;
@@ -103,16 +103,16 @@ i32 main() {
     /* Many updates through one buffer, across resizes. */
     map.StrMap *big = map.strNew(8);
     for (i = 0; i < 2000; i++) {
-        str.formatTo(buf, "word-%d", i);
+        cstr.formatTo(buf, "word-%d", i);
         big.set(dup(buf), (void *)0);
     }
     for (i64 round = 1; round <= 3; round++) {
         for (i = 0; i < 2000; i++) {
-            str.formatTo(buf, "word-%d", i);
+            cstr.formatTo(buf, "word-%d", i);
             big.set(buf, (void *)round);
         }
     }
-    str.copy(buf, "gone");
+    cstr.copy(buf, "gone");
     bad = 0;
     for (i = 0; i < 2000; i++) {
         u8 *k = fmtFn("word-%d", i);

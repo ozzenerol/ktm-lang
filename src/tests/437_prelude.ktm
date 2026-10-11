@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The prelude (src/std/prelude, installed as modules/prelude): its pub
  * names, Error and the macros EXIT_OK/EXIT_FAIL and the integer limits
@@ -31,7 +31,7 @@ bool output(u8 *cmd, u8 *want) {
 
 /* the diagnostics for `source` have want in them */
 bool diagnose(u8 *source, u8 *want) {
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     bool ok = output(KTM "-S " AT_SRC " -o /dev/null > " MOD_OUT " 2>&1", want);
     proc.shell("rm -f " AT_SRC);
     return ok;
@@ -54,7 +54,7 @@ i32 main() {
     Error e;
     e.code = I64_MIN;
     tests++;
-    if (e.code == I64_MIN && U64_MAX == -1 && EXIT_OK == 0 && !str.cmp(typeof(e), "Error")) {
+    if (e.code == I64_MIN && U64_MAX == -1 && EXIT_OK == 0 && !cstr.cmp(typeof(e), "Error")) {
         correct++;
     }
 

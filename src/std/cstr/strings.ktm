@@ -1,4 +1,4 @@
-module str;
+module cstr;
 import libc, mem, os;
 
 const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
@@ -224,9 +224,9 @@ _STRHASH::
                 RET
 }
 
-pub _extern _TOLOWER u8 toLower(u8 ch);
-pub _extern _TOUPPER u8 toUpper(u8 ch);
-pub _extern _ISSPACE bool isSpace(u8 ch);
+_extern _TOLOWER u8 toLower(u8 ch);
+_extern _TOUPPER u8 toUpper(u8 ch);
+_extern _ISSPACE bool isSpace(u8 ch);
 pub _extern _STRHASH u64 hash(u8 *str);
 #endif
 
@@ -345,17 +345,17 @@ _STRCPY::
                 RET
 }
 
-pub u8 toLower(u8 ch) {
+u8 toLower(u8 ch) {
         if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
         return ch;
 }
 
-pub u8 toUpper(u8 ch) {
+u8 toUpper(u8 ch) {
         if (ch >= 'a' && ch <= 'z') { return ch - 32; }
         return ch;
 }
 
-pub bool isSpace(u8 ch) {
+bool isSpace(u8 ch) {
         return ch == ' ' || ch == '\t' || ch == '\n' ||
                                     ch == '\v' || ch == '\f' || ch == '\r';
 }
@@ -522,30 +522,6 @@ pub u8 *firstOf(u8 *src,u8 *marker)
         }
 }
 
-pub u8 *splitFirst(u8 *src,u8 *marker,u8 *dst=null)
-{// Remove first str segment and place in dst buf or null.
-        i64 ch;
-        u8 *ptr=src,*res=dst;
-        if (!src || !marker) {
-                if (dst) { *dst=0; }
-                return res;
-        }
-        if (dst) {
-                while ((ch=*ptr++) && !count(marker,ch)) {
-                        *dst++=ch;
-                }
-                *dst=0;
-        } else {
-                while ((ch=*ptr++) && !count(marker,ch)) {}
-        }
-        if (ch) {
-                copy(src,ptr);
-        } else {
-                *src=0;
-        }
-        return res;
-}
-
 pub u8 *lastOf(u8 *src,u8 *marker)
 {// Point to last occurrence of market set in str.
         i64 ch;
@@ -557,133 +533,6 @@ pub u8 *lastOf(u8 *src,u8 *marker)
                 }
         }
         return res;
-}
-
-pub u8 *splitLast(u8 *src,u8 *marker,u8 *dst=null)
-{// Remove last str segment and place in dst buf or null.
-        u8 *ptr;
-        if (!src || !marker) {
-                if (dst) { *dst=0; }
-                return dst;
-        }
-        if ((ptr=lastOf(src,marker)) != null) {
-                if (dst) {
-                        copy(dst,ptr+1);
-                }
-                *ptr=0;
-        } else {
-                if (dst) {
-                        copy(dst,src);
-                }
-                *src=0;
-        }
-        return dst;
-}
-
-pub u8 *trimStart(u8 *str, i64 strLen=-1, i64 *_new_len=null)
-{ // Mutates the string, removes whitespace at the start
-        // of the string, MSize calls are still safe. Only the first str_len
-        // bytes are looked at (the whole string if str_len < 0); when something
-        // is removed the result is NUL terminated at its new length. null
-        // returns null.
-        i64 newLen,len,j;
-
-        if (!str) {
-                if (_new_len) { *_new_len = 0; }
-                return null;
-        }
-        if (strLen < 0) {
-                len = len(str);
-        } else {
-                len = strLen;
-        }
-        j = 0;
-
-        while (j < len && isSpace(str[j])) {
-                ++j;
-        }
-
-        newLen = len-j;
-        if (_new_len) {
-                *_new_len = newLen;
-        }
-        if (j == 0) {
-                return str;
-        }
-        libc.memmove(str,str+j,newLen);
-        str[newLen] = '\0';
-        return str;
-}
-
-pub u8 *trimEnd(u8 *str, i64 strLen=-1, i64 *_new_len=null)
-{ // Mutates the string, removes whitespace at the end
-        // of the string, MSize calls are still safe. Only the first str_len
-        // bytes are looked at (the whole string if str_len < 0). null returns
-        // null.
-        i64 newLen,len,i;
-
-        if (!str) {
-                if (_new_len) { *_new_len = 0; }
-                return null;
-        }
-        if (strLen < 0) {
-                len = len(str);
-        } else {
-                len = strLen;
-        }
-        i = len-1;
-
-        while (i >= 0 && isSpace(str[i])) {
-                --i;
-        }
-        i++;
-
-        newLen = i;
-        if (_new_len) {
-                *_new_len = newLen;
-        }
-        if (newLen == len) {
-                return str;
-        }
-        str[newLen] = '\0';
-        return str;
-}
-
-pub i64 trimEndChars(u8 *str, u8 *chars)
-{ // Mutates the string, removes any of the characters in `chars` from
-        // the end of the string and returns its new length. null returns 0.
-        i64 len,j;
-
-        if (!str) {
-                return 0;
-        }
-        len = len(str);
-
-        if (chars) {
-                while (len > 0) {
-                        j = 0;
-                        while (chars[j] && chars[j] != str[len-1]) {
-                                ++j;
-                        }
-                        if (!chars[j]) {
-                                break;
-                        }
-                        str[--len] = '\0';
-                }
-        }
-        return len;
-}
-
-pub void reverse(u8 *buf, i64 length)
-{ // Reverse a string inplace
-        i64 start = 0, end = length - 1;
-        while (start < end) {
-                u8 temp = buf[start];
-                buf[start] = buf[end];
-                buf[end] = temp;
-                start++;
-                end--;
-        }
 }
 
 i64 i64ToStr(u8 *buf, i64 num, bool *_is_neg=null, i64 _len=5000)
@@ -739,7 +588,7 @@ u64 u64ToStr(u8 *dst, u64 num, i64 len=5000) {
         return i;
 }
 
-pub i64 hex(u8 *dst, i64 num) {
+static i64 hex(u8 *dst, i64 num) {
         u8 *hexStr="0123456789ABCDEF";
         i64 i = (sizeof(u64) * 2) + 1, len = 2; /* "0x" + 16 digits */
         dst[i+1] = '\0';

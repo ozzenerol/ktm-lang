@@ -41,7 +41,7 @@ Ada is 36 years old
    42|42   |00042
 ff FF A 3.142
 </pre>
-<p>The conversions are the ones <code>str.format</code> knows (see the
+<p>The conversions are the ones <code>cstr.format</code> knows (see the
 <a href="library.html">library guide</a>), ktm's own included: <code>%Q</code> prints a
 string escaped as a C literal and <code>%C</code> a character in upper case. A date is
 formatted with <code>date.format(d, "%m/%d/%Y %H:%M:%S")</code> and printed with
@@ -522,7 +522,7 @@ w0 w1 w2 d3 d2 d1 f0 f1 f3 f4 end
 <code>entries</code> field and a <code>size</code> field, such as the library's
 <code>vec.IntVec</code> and <code>vec.PtrVec</code>:</p>
 <pre data-run><code>
-import vec;
+import cstr, vec;
 
 void main()
 {
@@ -683,11 +683,11 @@ argument). Without a type, <code>...name</code> takes the extras as 64-bit slots
 format functions want them, and is a <code>u64[]</code>: a number as is, a float as its bits
 (read it back with <code>*(f64 *)&amp;name[i]</code>), a pointer as its address:</p>
 <pre data-run><code>
-import mem, str;
+import cstr, mem, str;
 
 void Log(u8 *fmt, ...args)
 {
-  u8 *msg = str.formatArgs(null, fmt, args);   // format the extras
+  u8 *msg = cstr.formatArgs(null, fmt, args);   // format the extras
   printf("[log] %s\n", msg);
   mem.free(msg);
 }
@@ -735,14 +735,14 @@ type (<code>((fn(i64) i64)p)(5)</code>),
 the result of a call that returns one, or of an assignment (<code>(f = &amp;mul)(2, 3)</code>).
 The arguments are checked against the pointer's parameters, as for a named function:</p>
 <pre data-run><code>
-import str;
+import cstr, str;
 
 i64 add(i64 a, i64 b) { return a + b; }
 i64 mul(i64 a, i64 b) { return a * b; }
 
 void *lookup(u8 *name)
 {
-  if (!str.cmp(name, "add")) { return &add; }
+  if (!cstr.cmp(name, "add")) { return &add; }
   return &mul;
 }
 
@@ -1037,7 +1037,7 @@ square 49
 <p><code>mem.alloc</code> allocates, <code>mem.allocZero</code> allocates zeroed memory,
 <code>mem.realloc</code> resizes and <code>mem.free</code> releases. Nothing is garbage collected.</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 void main()
 {
@@ -1057,14 +1057,14 @@ void main()
 <p>Strings are NUL-terminated <code>u8</code> arrays, as in C. The library has the
 usual helpers (<a href="library.html#strings">more in the library guide</a>):</p>
 <pre data-run><code>
-import mem, str;
+import cstr, mem, str;
 
 void main()
 {
-  u8 *copy = str.dup("hello");
-  printf("%s %d %d\n", copy, str.len(copy), str.cmp(copy, "hello"));
+  u8 *copy = cstr.dup("hello");
+  printf("%s %d %d\n", copy, cstr.len(copy), cstr.cmp(copy, "hello"));
 
-  u8 *msg = str.formatTo(null, "%s has %d letters", copy, str.len(copy));
+  u8 *msg = cstr.formatTo(null, "%s has %d letters", copy, cstr.len(copy));
   printf("%s\n", msg);
 
   i64 vowels = 0;
@@ -1101,7 +1101,7 @@ Xbc 4 hi 8
 and its name is a type straight away, with no <code>typedef</code> needed. Several fields can
 share a line. <code>pub</code> (or <code>pub</code>) marks what a library exports.</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 struct Point
 {
@@ -1436,7 +1436,7 @@ module geo;
 i64 square(i64 n) { return n * n; }             // private to geo
 
 // main.ktm
-import geo;
+import cstr, geo;
 
 i32 main() {
   geo.Point p;
@@ -1479,7 +1479,7 @@ pub void Account.deposit(i64 x) { self.balance += x; self.audit(); }
 void Account.audit() { }                         // private to bank
 
 // main.ktm
-import bank;
+import bank, cstr;
 
 i32 main() {
   bank.Account *a = bank.open("ann");
@@ -1504,7 +1504,7 @@ pub struct Conn {
 pub u8 *peek(Conn *c) { return libc.buf; }
 
 // main.ktm
-import net;
+import cstr, net;
 
 i32 main() {
   net.Conn c;
@@ -1549,7 +1549,7 @@ file scope would hide the module). An import that is never used is a warning.</p
 module for its scope (<code>u8 *str</code> in a file that imports <code>str</code>). There
 <code>str.x</code> is the local's field or method, and a member the local doesn't have is the
 error "u8 * has no member `len` (note: the local `str` hides the module str)". The local's
-own initialiser still sees the module (<code>u8 *str = str.format(...)</code>), a type name
+own initialiser still sees the module (<code>u8 *str = cstr.format(...)</code>), a type name
 (<code>str.Thing</code>) is still the module's, and outside the scope the module is there
 again.</p>
 <p>A module can be built into a library once and used from there:
@@ -1728,7 +1728,7 @@ insufficient funds: need 500, have 100
 carrying on
 </pre>
 <p><code>e.message</code> is never <code>null</code> (it is <code>""</code> without a message)
-and is freed when the catch block is left: copy it (<code>str.dup(e.message)</code>) to keep
+and is freed when the catch block is left: copy it (<code>cstr.dup(e.message)</code>) to keep
 it. <code>throw(e)</code> throws the same error again, with its original message, file and
 line, so a handler can look at an error and pass it on. A <code>catch</code> that doesn't
 need the error can leave out the binding.</p>
@@ -1786,7 +1786,7 @@ block, through <code>return</code>, <code>break</code>, <code>continue</code> or
 way to a <code>catch</code> (after the deferred statements have run, the throw carries on
 to that catch). It keeps clean-up next to the code that needs it:</p>
 <pre data-run><code>
-import mem;
+import cstr, mem;
 
 enum Err { neg };
 
@@ -1857,7 +1857,7 @@ like a <code>try</code> does); code without it compiles exactly as before.</p>
 <p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always
 linked:</p>
 <pre data-run><code>
-import libc;
+import cstr, libc;
 
 extern "c" i32 abs(i32 x);
 extern "c" u8 *getenv(u8 *name);

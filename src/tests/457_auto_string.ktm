@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* `auto s = "x";` warned "Incompatible types 'u8[2]' is not assignable to
  * type 'u8[2]'": the variable takes the string's type, then was checked
@@ -7,8 +7,8 @@ import fs, libc, proc, str, test;
 #define SRC_FILE "__457_src.ktm"
 
 u8 *runKtm(u8 *src, u8 *flags) {
-    fs.writeAll(SRC_FILE, src, str.len(src));
-    return proc.shellOutput(str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
+    return proc.shellOutput(cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                        "%s " SRC_FILE " 2>&1", flags));
 }
@@ -26,10 +26,10 @@ i32 main() {
               "    return 0;\n"
               "}\n";
     u8 *out = runKtm(src, "-jit");
-    if (out && !str.cmp(out, "in if x hello glob 6")) { correct++; }
+    if (out && !cstr.cmp(out, "in if x hello glob 6")) { correct++; }
     else { printf("\n  JIT: [%s]\n", out); }
     out = runKtm(src, "-o __457_bin");
-    if (out && !str.cmp(out, "")) { correct++; }
+    if (out && !cstr.cmp(out, "")) { correct++; }
     else { printf("\n  AOT: [%s]\n", out); }
 
     /* a real mismatch still warns */

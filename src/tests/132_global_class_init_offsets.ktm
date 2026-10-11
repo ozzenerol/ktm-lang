@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A global class initialiser wrote its items back to back, ignoring the
  * field offsets: `P gp = {1,2,3,4}` with `i32 a; i64 b;` put `b` at
@@ -65,7 +65,7 @@ bool pEq(P132 *p, i64 a, i64 b, i64 c, i64 d) {
 }
 
 bool mixEq(Mix132 *m, i64 x, f64 f, u8 *s, f64 g, i64 h, i64 last) {
-    return m.x == x && m.f == f && !str.cmp(m.s, s) && m.g == g &&
+    return m.x == x && m.f == f && !cstr.cmp(m.s, s) && m.g == g &&
                  m.h == h && m.last == last;
 }
 
@@ -110,7 +110,7 @@ i32 main() {
     if (gI16[0] == -1 && gI16[1] == 2 && gI16[2] == -3) { correct++; }
     if (gF32[0] == 1.5 && gF32[1] == -2.25) { correct++; }
     if (gF64[0] == 0.125 && gF64[1] == 8.5) { correct++; }
-    if (!str.cmp(gStrs[0], "one") && !str.cmp(gStrs[1], "two")) { correct++; }
+    if (!cstr.cmp(gStrs[0], "one") && !cstr.cmp(gStrs[1], "two")) { correct++; }
     if (gAfter == 0x1122334455667788) { correct++; }
 
     /* Function statics take the same path. */

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define BINOP_NOISE_FILE "__131_binop_type_error_noise.ktm"
 #define BINOP_NOISE_OUT  "__131_binop_type_error_noise.out"
@@ -14,7 +14,7 @@ i64 countOccurrences(u8 *haystack, u8 *needle) {
     u8 *p = haystack;
     while ((p = libc.strstr(p, needle)) != null) {
         count++;
-        p += str.len(needle);
+        p += cstr.len(needle);
     }
     return count;
 }
@@ -32,7 +32,7 @@ bool compileCheck(u8 *source, i64 wantStatus, i64 nerrors, u8 **want, i64 nwant)
 
     cleanupBinopNoiseTest();
 
-    if (!fs.writeAll(BINOP_NOISE_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(BINOP_NOISE_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

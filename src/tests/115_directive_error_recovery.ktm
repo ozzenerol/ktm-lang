@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define DIR_ERR_FILE "__115_directive_error.ktm"
 #define DIR_ERR_OUT  "__115_directive_error.out"
@@ -36,7 +36,7 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *msg) {
 
     cleanupDirErrTest();
 
-    if (!fs.writeAll(DIR_ERR_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DIR_ERR_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -69,21 +69,21 @@ bool errorOnlyEverywhere(u8 *name, u8 *bad, u8 *msg) {
     u8 *src;
     bool ok = true;
 
-    src = str.format("struct Foo { i64 a; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
+    src = cstr.format("struct Foo { i64 a; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s after a class\n", name);
         ok = false;
     }
     mem.free(src);
 
-    src = str.format("union Foo { i64 a; u8 b; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
+    src = cstr.format("union Foo { i64 a; u8 b; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s after a union\n", name);
         ok = false;
     }
     mem.free(src);
 
-    src = str.format("%sstruct Foo { i64 a; };\nvoid main() { Foo f; f.a = 1; }\n", bad);
+    src = cstr.format("%sstruct Foo { i64 a; };\nvoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s with nothing before it\n", name);
         ok = false;

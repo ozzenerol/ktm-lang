@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Rm(link, RM_RECURSE) on a symlink to a directory stat()ed the target,
  * then emptied the directory the link points to. A symlink inside a
@@ -12,7 +12,7 @@ u8 *gRoot;
 u8 gPath[512];
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -30,7 +30,7 @@ i32 main() {
     u8 root[64];
     printf("Test - Rm does not follow symlinks: ");
 
-    str.copy(root, "./ktm-test-300-XXXXXX");
+    cstr.copy(root, "./ktm-test-300-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
@@ -75,7 +75,7 @@ i32 main() {
     fs.remove(P("link3"));
     if (fs.remove(P("target"), fs.REMOVE_RECURSE) == 0 && !exists("target")) { correct++; }
 
-    u8 *cmd = str.formatTo(null, "rm -rf '%s'", root);
+    u8 *cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

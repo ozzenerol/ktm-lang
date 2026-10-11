@@ -1,6 +1,6 @@
 module http;
 
-import mem, web, str;
+import cstr, mem, web;
 
 /* uses its parent module through an import, like any other */
 pub web.Conn *open(i64 fd) {
@@ -10,4 +10,4 @@ pub web.Conn *open(i64 fd) {
     return c;
 }
 
-pub i64 get(u8 *path) { return web.port() + str.len(path); }
+pub i64 get(u8 *path) { return web.port() + cstr.len(path); }

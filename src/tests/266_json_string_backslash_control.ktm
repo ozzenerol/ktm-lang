@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* A JSON string ending in an escaped backslash ("C:\\") was rejected:
  * the end-of-string scan took `\"` for an escaped quote. Raw control
@@ -11,7 +11,7 @@ bool parses(u8 *text, u8 *want)
     bool ok = json.ok(j);
     if (ok) {
         u8 *s = json.toStr(j);
-        ok = !str.cmp(s, want);
+        ok = !cstr.cmp(s, want);
         if (!ok) { printf("[%s] gave [%s] want [%s]\n", text, s, want); }
         mem.free(s);
     } else {
@@ -46,8 +46,8 @@ i32 main() {
     /* The value is right too */
     tests++;
     json.Value *j = json.parse("{\"p\":\"C:\\\\\",\"q\":\"\\\"x\\\"\"}");
-    if (json.ok(j) && !str.cmp(json.select(j, ".p:s").str, "C:\\") &&
-            !str.cmp(json.select(j, ".q:s").str, "\"x\"")) { correct++; }
+    if (json.ok(j) && !cstr.cmp(json.select(j, ".p:s").str, "C:\\") &&
+            !cstr.cmp(json.select(j, ".q:s").str, "\"x\"")) { correct++; }
     json.release(j);
 
     /* Every raw control character is rejected, in values and keys */
@@ -55,10 +55,10 @@ i32 main() {
     u8 buf[16];
     bool ok = true;
     for (i = 1; i < 0x20; i++) {
-        str.copy(buf, "[\"a?b\"]");
+        cstr.copy(buf, "[\"a?b\"]");
         buf[3] = i;
         if (!rejected(buf, 7, json.INVALID_CONTROL_CHARACTER)) { ok = false; }
-        str.copy(buf, "{\"k?\":1}");
+        cstr.copy(buf, "{\"k?\":1}");
         buf[3] = i;
         if (!rejected(buf, 8, json.INVALID_CONTROL_CHARACTER)) { ok = false; }
     }
@@ -75,7 +75,7 @@ i32 main() {
     tests++;
     j = json.parse("[\"a\tb\"]");
     u8 *e = json.errorStr(j);
-    if (e && !str.cmp(e, "Unescaped control character '\\x09' in a string "
+    if (e && !cstr.cmp(e, "Unescaped control character '\\x09' in a string "
                                          "(write it as \\u0009) at line 1, column 4")) { correct++; }
     else { printf("message: %s\n", e); }
     mem.free(e);

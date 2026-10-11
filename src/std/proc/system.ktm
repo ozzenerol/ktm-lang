@@ -1,5 +1,5 @@
 module proc;
-import libc, mem, str;
+import cstr, libc, mem;
 
 /* Run `command` with the shell (`sh -c`). Returns the command's exit
  * code (0-255), or -1 if it was killed by a signal or the shell could
@@ -21,7 +21,7 @@ pub i64 shell(u8 *command) {
 pub i32 shellf(u8 *fmt, ...args) {
     if (!fmt) { return -1; }
     /* Formatted even without arguments, so "%%" is always a single % */
-    u8 *cmd = str.formatArgs(null, fmt, args);
+    u8 *cmd = cstr.formatArgs(null, fmt, args);
     i32 retval = shell(cmd);
     mem.free(cmd);
     return retval;
@@ -62,10 +62,10 @@ pub u8 *shellQuote(u8 *s) {
 pub u8 *shellOutput(u8 *fmt, ...args) {
     if (!fmt) { return null; }
     i64 len = 0;
-    u8 *userCmd = str.formatArgs(null, fmt, args);
+    u8 *userCmd = cstr.formatArgs(null, fmt, args);
     /* The newline completes a command that ends in a backslash (a line
      * continuation) or in a here-doc delimiter */
-    u8 *cmd = str.formatTo(null,"%s\n",userCmd);
+    u8 *cmd = cstr.formatTo(null,"%s\n",userCmd);
     mem.free(userCmd);
     u8 *output = procShellOutput(cmd,&len);
     mem.free(cmd);

@@ -1,6 +1,6 @@
-import mem, str, test;
+import cstr, mem, test;
 
-/* str.globMatch got simple globs wrong: ("banana","*a") was false,
+/* cstr.globMatch got simple globs wrong: ("banana","*a") was false,
  * ("abc","**") false, ("","*x") true, ("ab","ab*c") true - it checked the
  * end of the text too early, never backtracked properly and searched for
  * '?' / '*' literally after a '*'. It is now a standard glob match ('*'
@@ -28,7 +28,7 @@ i64 nextRand() {
 }
 
 void randStr(u8 *buf, u8 *alphabet, i64 maxLen) {
-    i64 n = nextRand() % (maxLen + 1), k = str.len(alphabet);
+    i64 n = nextRand() % (maxLen + 1), k = cstr.len(alphabet);
     for (i64 i = 0; i < n; ++i) { buf[i] = alphabet[nextRand() % k]; }
     buf[n] = '\0';
 }
@@ -39,13 +39,13 @@ i32 main() {
 
     /* the audit's cases and the usual ones */
     tests++;
-    if (str.globMatch("banana", "*a") && str.globMatch("abc", "**") && !str.globMatch("", "*x") &&
-            !str.globMatch("ab", "ab*c") && str.globMatch("", "") && str.globMatch("", "*") &&
-            !str.globMatch("a", "") && str.globMatch("main.ktm", "*.ktm") &&
-            !str.globMatch("main.c", "*.ktm") && str.globMatch("abc", "a?c") &&
-            !str.globMatch("ac", "a?c") && str.globMatch("mississippi", "m*iss*ppi") &&
-            str.globMatch("aaaab", "*a*b") && !str.globMatch("aaaa", "*a*b") &&
-            str.globMatch("x?y", "x?y") && str.globMatch("a*b", "a*b")) { correct++; }
+    if (cstr.globMatch("banana", "*a") && cstr.globMatch("abc", "**") && !cstr.globMatch("", "*x") &&
+            !cstr.globMatch("ab", "ab*c") && cstr.globMatch("", "") && cstr.globMatch("", "*") &&
+            !cstr.globMatch("a", "") && cstr.globMatch("main.ktm", "*.ktm") &&
+            !cstr.globMatch("main.c", "*.ktm") && cstr.globMatch("abc", "a?c") &&
+            !cstr.globMatch("ac", "a?c") && cstr.globMatch("mississippi", "m*iss*ppi") &&
+            cstr.globMatch("aaaab", "*a*b") && !cstr.globMatch("aaaa", "*a*b") &&
+            cstr.globMatch("x?y", "x?y") && cstr.globMatch("a*b", "a*b")) { correct++; }
 
     /* random cases against the reference */
     u8 s[16], p[16];
@@ -53,7 +53,7 @@ i32 main() {
     for (i64 i = 0; i < 20000; ++i) {
         randStr(s, "abc", 8);
         randStr(p, "ab*?c", 6);
-        if (str.globMatch(s, p) != refMatch(s, p)) {
+        if (cstr.globMatch(s, p) != refMatch(s, p)) {
             if (bad < 10) { printf("mismatch (\"%s\", \"%s\")\n", s, p); }
             bad++;
         }
@@ -65,10 +65,10 @@ i32 main() {
     mem.set(longS, 'a', 20000);
     longS[20000] = '\0';
     tests++;
-    if (!str.globMatch(longS, "*a*a*a*a*a*b") && str.globMatch(longS, "*a*a*a*a*a")) { correct++; }
+    if (!cstr.globMatch(longS, "*a*a*a*a*a*b") && cstr.globMatch(longS, "*a*a*a*a*a")) { correct++; }
     mem.free(longS);
 
-    tests++; if (!str.globMatch(null, "*") && !str.globMatch("a", null)) { correct++; }
+    tests++; if (!cstr.globMatch(null, "*") && !cstr.globMatch("a", null)) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

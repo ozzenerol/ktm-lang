@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* map.strGetLen/map.strHasLen compared `key_len` bytes but hashed the whole
  * NUL-terminated string, so a key given as the start of a longer buffer
@@ -54,11 +54,11 @@ i32 main() {
     i64 n = 20000, bad = 0;
     u8 buf[64];
     for (i64 i = 0; i < n; i++) {
-        m.set(str.formatTo(null, "key%d", i), (void *)i);
+        m.set(cstr.formatTo(null, "key%d", i), (void *)i);
     }
     for (i64 i = 0; i < n; i++) {
-        str.formatTo(buf, "key%d-and-more", i);
-        i64 len = str.len(buf) - 9;
+        cstr.formatTo(buf, "key%d-and-more", i);
+        i64 len = cstr.len(buf) - 9;
         if ((i64)m.getLen(buf, len) != i || !m.hasLen(buf, len)) { bad++; }
         buf[len] = 0;
         if ((i64)m.get(buf) != i || !m.has(buf)) { bad++; }
@@ -78,11 +78,11 @@ i32 main() {
 
     /* Insertion order, after deleting every third key and growing again */
     for (i64 i = 0; i < n; i += 3) {
-        str.formatTo(buf, "key%d", i);
+        cstr.formatTo(buf, "key%d", i);
         m.delete(buf);
     }
     for (i64 i = n; i < n + 5000; i++) {
-        m.set(str.formatTo(null, "key%d", i), (void *)i);
+        m.set(cstr.formatTo(null, "key%d", i), (void *)i);
     }
     i64 prev = -1;
     bad = 0;

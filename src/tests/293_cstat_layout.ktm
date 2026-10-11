@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* On arm64 Linux libc.cStat had x86_64's struct stat layout, so st_mode,
  * st_size and the times were read from the wrong offsets: a regular file
@@ -12,14 +12,14 @@ i32 main() {
     libc.cStat st;
     printf("Test - cStat layout: ");
 
-    str.copy(root, "./ktm-test-293-XXXXXX");
+    cstr.copy(root, "./ktm-test-293-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, 1);
         printf("====\n");
         return 0;
     }
-    f = str.formatTo(null, "%s/file", root);
-    d = str.formatTo(null, "%s/dir", root);
+    f = cstr.formatTo(null, "%s/file", root);
+    d = cstr.formatTo(null, "%s/dir", root);
     fs.writeAll(f, "hello world\n", 12);
     fs.makeDir(d);
 
@@ -42,7 +42,7 @@ i32 main() {
     tests++;
     i64 len = -1;
     u8 *buf = fs.readAll(f, &len);
-    if (buf && len == 12 && !str.cmpLen(buf, "hello world\n", 12)) { correct++; }
+    if (buf && len == 12 && !cstr.cmpLen(buf, "hello world\n", 12)) { correct++; }
     mem.free(buf);
 
 #ifdef IS_LINUX
@@ -54,7 +54,7 @@ i32 main() {
 #endif
 #endif
 
-    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
     mem.free(f);

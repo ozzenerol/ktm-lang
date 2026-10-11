@@ -1,4 +1,4 @@
-import fs, libc, mem, str, test;
+import cstr, fs, libc, mem, test;
 
 /* Pwd() returned getcwd(null,0)'s libc malloc block, and Free of it
  * aborted ("free(): invalid pointer"): Free expects MAlloc's header. It
@@ -13,8 +13,8 @@ i32 main() {
 
     libc.getcwd(buf, sizeof(buf));
     p = fs.currentDir();
-    if (p && !str.cmp(p, buf)) { correct++; }
-    if (p && mem.size(p) >= str.len(p) + 1) { correct++; }
+    if (p && !cstr.cmp(p, buf)) { correct++; }
+    if (p && mem.size(p) >= cstr.len(p) + 1) { correct++; }
     mem.free(p);
 
     for (i = 0; i < 100; i++) { mem.free(fs.currentDir()); }

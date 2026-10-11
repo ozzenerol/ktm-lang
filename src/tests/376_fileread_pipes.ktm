@@ -1,4 +1,4 @@
-import fs, libc, mem, str, test;
+import cstr, fs, libc, mem, test;
 
 /* fs.readAll only read regular files, up to their size: a FIFO or a pipe
  * gave null, and so did /proc files, which report size 0. Now anything
@@ -23,7 +23,7 @@ u8 *bigText() {
 }
 
 bool isBigText(u8 *s, i64 len) {
-    if (!s || len != BIG_LEN || str.len(s) != BIG_LEN) { return false; }
+    if (!s || len != BIG_LEN || cstr.len(s) != BIG_LEN) { return false; }
     for (i64 i = 0; i < BIG_LEN; i++) {
         if (s[i] != 'a' + i % 26) { return false; }
     }
@@ -64,7 +64,7 @@ i32 main() {
     len = -1;
     s = fs.readAll("/proc/self/status", &len);
     tests++;
-    if (s && len > 0 && len == str.len(s) && !str.cmpLen(s, "Name:", 5)) { correct++; }
+    if (s && len > 0 && len == cstr.len(s) && !cstr.cmpLen(s, "Name:", 5)) { correct++; }
     else { printf("/proc/self/status: %s, len %d ", s, len); }
     mem.free(s);
 #endif
@@ -84,7 +84,7 @@ i32 main() {
     i32 fds[2];
     tests++;
     if (libc.pipe(fds) == 0) {
-        u8 *path = str.formatTo(null, "/dev/fd/%d", fds[0]);
+        u8 *path = cstr.formatTo(null, "/dev/fd/%d", fds[0]);
         fifoFd = fds[1];
         libc.pthread_create(&th, null, &writer, null);
         len = -1;

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A character constant in an error message was printed from its
  * decoded length: `'\n'` (one character) showed as `\`, `'\x41'` as
@@ -11,7 +11,7 @@ import fs, libc, mem, proc, str, test;
 /* Compile `source` and return what ktm printed */
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " CCM_SRC " " CCM_OUT);
-    fs.writeAll(CCM_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(CCM_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " CCM_SRC " -o /dev/null > " CCM_OUT " 2>&1");

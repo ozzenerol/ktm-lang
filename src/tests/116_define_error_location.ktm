@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define DEF_LOC_FILE "__116_define_error_location.ktm"
 #define DEF_LOC_OUT  "__116_define_error_location.out"
@@ -20,7 +20,7 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *excerpt, u8 *caret) {
 
     cleanupDefLocTest();
 
-    if (!fs.writeAll(DEF_LOC_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DEF_LOC_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -36,9 +36,9 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *excerpt, u8 *caret) {
         return false;
     }
 
-    wantLoc = str.format("error: %s\n --> " DEF_LOC_FILE ":%s\n", msg, loc);
-    wantExcerpt = str.format(" |    %s\n", excerpt);
-    if (caret) { wantCaret = str.format("\n     |%s", caret); }
+    wantLoc = cstr.format("error: %s\n --> " DEF_LOC_FILE ":%s\n", msg, loc);
+    wantExcerpt = cstr.format(" |    %s\n", excerpt);
+    if (caret) { wantCaret = cstr.format("\n     |%s", caret); }
 
     if (!libc.strstr(out, wantLoc)) { ok = false; }
     if (!libc.strstr(out, wantExcerpt)) { ok = false; }

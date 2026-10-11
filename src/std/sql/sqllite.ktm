@@ -1,7 +1,7 @@
 module sql;
 
 #ifdef __KTM_LINK_SQLITE3__
-import mem, str;
+import cstr, mem;
 
 pub const i64 SQLITE_OK = 0;   /* Successful result */
 
@@ -250,10 +250,10 @@ pub u8 *execRaw(Db *ctx, u8 *sql) {
         return null;
     }
     if (errmsg) {
-        copy = str.dup(errmsg);
+        copy = cstr.dup(errmsg);
         sqlite3_free(errmsg);
     } else {
-        copy = str.dup(sqlite3_errmsg(ctx.conn));
+        copy = cstr.dup(sqlite3_errmsg(ctx.conn));
     }
     return copy;
 }
