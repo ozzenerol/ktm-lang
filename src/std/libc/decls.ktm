@@ -1177,6 +1177,22 @@ pub struct sockaddr_in6 {
  */
 pub struct addrinfo;
 
+pub struct addrinfo {
+    i32 ai_flags;	     /* Input flags */
+    i32 ai_family;     /* Address family */
+    i32 ai_socktype;   /* Socket type */
+    i32 ai_protocol;   /* Protocol for the socket */
+    u32 ai_addrlen;    /* Length of the address */
+#ifdef IS_LINUX
+    sockaddr *ai_addr; /* Binary address */
+    u8  *ai_canonname; /* Canonical name for the host */
+#else
+    u8  *ai_canonname; /* Canonical name for the host */
+    sockaddr *ai_addr; /* Binary address */
+#endif
+    addrinfo *ai_next; /* Next structure in the linked list */
+};
+
 pub const i64 _SS_PAD1SIZE = (6);
 
 pub const i64 _SS_PAD2SIZE = (112);
