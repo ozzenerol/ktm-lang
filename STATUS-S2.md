@@ -1,54 +1,14 @@
-# S2 (a): src/std into module directories, and the build
+# conv-ae: S2 (b) tests and (c) docs/examples (ktm-lang-6e)
 
-Branch feat/conversion, area (a) by ktm-lang-ef. (b)/(c) (tests, docs) by ktm-lang-6e on conv-ae.
+Rebuild the branch after a converter change (from feat/conversion d3d514e originals, REF=d3d514e):
+  ~/opensource/ktm-scratch/s2/regen-raw.sh /tmp/raw && ~/opensource/ktm-scratch/s2/replay.sh /tmp/raw
+Commits: the raw converter output, the scripted fixes (s2/fix-*.py: test module, name clashes,
+one import line, old names in comments), then the manual patches s2/manual/*.patch (dropped
+stdlib names; codes and runtime-internal tests; docs prose; fixtures; example comments; no %D/%T/%F;
+own names next to the stdlib; tests after a build; libc rules on the stdlib libc; no stdlib redeclaration;
+error-text tests; embedded programs; library guide, reference and LSP; example runner), then
+docs/tools/build.py regenerates the pages.
+Verified on d3d514e (--sqlite build): all 417 numbered tests pass JIT and AOT (420-443
+included), LSP 68/68, docs check-examples 106/106, docs/examples/run.sh 3/3.
+Left: nothing for S2 (b)/(c); the converter is no longer needed by this branch after the merge.
 Deleted before the final merge.
-
-Steps (plan approved by asuslab-33):
-- A1 split (done): tools/convert/split.py (feat/convert) put every item of the old src/std/*.ktm,
-  std.ktmh and defs.ktmh into src/std/<module>/ per stdlib-modules.tsv: extern "c" declarations,
-  C structs and constants to c/, the runtime (KTM_*, Fs, HCFs, CatchFrame) to rt/, helpers that
-  leave the API private to their module, the dropped names removed (Dir, IsDotC/Z, Write, CH_*,
-  RM_VERBOSE, TRUE/FALSE/NULL, __BUFSIZ__), the prelude's names left to src/std/prelude.
-  The files are still in the OLD syntax: the tree does not build from here until A2-A4.
-- A2 (raw done): tools/convert/convert-std.sh OLD_STD src/std (feat/convert 918ad88): split + one ktm-convert run through a
-  root importing all of them (`#define __KTM_LINK_SQLITE3__` + `import <m>;`), --map --names --renames
-  --layout, 0 errors; notes in ~/opensource/ktm-scratch/conv-notes/std.err. To regenerate: split.py
-  from the old src/std (3585f56), then the same run. Hand fixes next (Write -> c.write, the #if
-  branches converted from text only, public -> pub check, ...).
-- A2 (plan) convert each module with ktm-convert (--map --names --renames --layout), through a root
-  that imports every module; hand fixes (Write -> c.write, Fs in coro, ...).
-- A3 compiler: std.ktmh optional; runtime calls to rt.__ktm*; -Memsafe and the printf check on
-  the module names.
-- A4 build: build.sh, install, packaging, release.yml: `ktm -lib ktm <prefix>/modules`.
-- A5 check: stdlib builds, no import cycles, 421-440, then (b)'s tests compile.
-
-## 2026-10-11 WIP (feat/convert aee6f9e)
-- A3 done in the compiler: the runtime is called as rt.__ktm* (astRuntimeName/astRuntimeSymbol), the
-  format check knows str.format & co. and counts `...args` (count + array), %D/%T/%F are compile
-  errors naming the replacement, -Memsafe also overrides mem's symbols, libktm without a header
-  exports every non-static symbol (weak).
-- std-fixes 03 (coro's asm calls coroMain by its mangled symbol) and 04 (date.format(d, fmt)).
-- The whole tree builds into one libktm: `ktm -fPIC -lib ktm <prefix>/modules`, 0 errors, and programs
-  link against it.
-- Y8 (decided by asuslab-33): S2 keeps every break (feat/convert 52663b8), --drop-breaks removes them in S3
-  right after the flip, over src/std, tests, docs and the builder projects.
-- Runs: a program using str.format, %Q, date.format and throw/catch gives the right output AOT and JIT
-  against the tree-built libktm.
-- A4 done: the compiler reads no std.ktmh (a stale one in an old install is ignored; the transpiler
-  still uses one if present). `ktm -lib ktm <prefix>/modules` puts libktm.a and the versioned shared
-  object in <prefix>/lib, markers `../../lib/...`. build.sh, CMake install (relative destinations,
-  honours --prefix), packaging/install.sh (replaces/removes only the stdlib's module dirs, removes an
-  old include/std.ktmh), Makefile (lsp-test, lib-ktm), release.yml (-S over the tree, markers
-  written), docker/matrix.sh. The modules root no longer needs <prefix>/include to exist.
-- throw(code) with rt.__ktmThrowFmt's `...args` fixed.
-- A5 so far, conv-ae 9df1fb4's 420-440 against build/prefix: pass 420 421 424 425 427 429-432 435-437
-  439. Left for (b): 422 (base drift, hides), 423/428 (fixture module `net` is found twice with the
-  stdlib's net: rename it), 426 (StrMap is map.StrMap), 433 (`fn(...)` became `fn(...args)` in a
-  typeof expectation), 438 (libc, base drift), 440 (copies include/std.ktmh; a prefix is lib/ + modules/).
-- feat/convert 88a603c: std-fixes 05 (the non-host #if branches the converter left in old names:
-  macOS errno/fsOnce/net/proc, aarch64 coroEntry; os.exit is one function; map.intNew/strNew get
-  std.ktmh's defaults; the dead KTM_HT_TEST block dropped; sql's imports inside its #ifdef; poll casts).
-  The stdlib compiles for x86_64/aarch64 Linux and macOS (-S) with 0 errors and 0 warnings.
-- fix/while-true (aca04d6, from the rc tip, cherry-picked here): while (true) ends the flow.
-- Converter: a container call on a receiver that isn't the container's pointer becomes
-  mod.Type.method(...) (corpus method_receiver).
