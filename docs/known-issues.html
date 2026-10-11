@@ -55,7 +55,15 @@ there works as shown.</p>
 <p>No known issues: everything found while writing these docs has been fixed.</p>
 
 <h2 id="jit-and-code-generation">JIT and code generation<a class="anchor" href="#jit-and-code-generation" aria-label="Link to this section">#</a></h2>
-<p>No known issues: everything found while writing these docs has been fixed.</p>
+<h3 id="a-child-forked-by-a-jit-run-program-on-macos-can-crash">A child forked by a JIT-run program on macOS can crash<a class="anchor" href="#a-child-forked-by-a-jit-run-program-on-macos-can-crash" aria-label="Link to this section">#</a></h3>
+<p>On macOS (Apple Silicon), a program run with <code>ktm -jit</code> that calls
+<code>libc.fork()</code> sometimes gets a child that is killed by SIGBUS right after the fork,
+before it runs any of its own code: about once in a hundred runs, under heavy load. Compiled
+programs are not affected, and neither is Linux. <code>proc.spawn</code> uses
+<code>posix_spawn</code>, not <code>fork</code>.</p>
+<p><strong>Workaround:</strong> on macOS, compile a program that forks
+(<code>ktm main.ktm -o main &amp;&amp; ./main</code>) instead of running it with
+<code>-jit</code>, or start processes with <code>proc.spawn</code>.</p>
 
 <h2 id="standard-library">Standard library<a class="anchor" href="#standard-library" aria-label="Link to this section">#</a></h2>
 <p>No known issues: everything found while writing these docs has been fixed.</p>
