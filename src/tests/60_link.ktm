@@ -20,7 +20,7 @@ void main() {
     }
     proc.shell("printf '#link \"'\"$PWD\"'/ktm-60-link.so\"\n"
                  "extern \"c\" i64 KtmLinkTestValue();\n"
-                 "i32 main() { if (KtmLinkTestValue() == 42) return 0; return 1; }\n'"
+                 "i32 main() { if (KtmLinkTestValue() == 42) { return 0; } return 1; }\n'"
                  " > ./ktm-60-link-path.ktm");
     if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} ./ktm-60-link-path.ktm -o ./ktm-60-link-path && "
                          "./ktm-60-link-path") == 0) {
@@ -28,7 +28,7 @@ void main() {
     }
     proc.shell("printf '#link <m>\n"
                  "extern \"c\" f64 cos(f64 x);\n"
-                 "i32 main() { if (cos(0.0) == 1.0) return 0; return 1; }\n'"
+                 "i32 main() { if (cos(0.0) == 1.0) { return 0; } return 1; }\n'"
                  " > ./ktm-60-link-name.ktm");
     if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} ./ktm-60-link-name.ktm -o ./ktm-60-link-name && "
                          "./ktm-60-link-name") == 0) {

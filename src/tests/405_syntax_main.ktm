@@ -45,7 +45,7 @@ i32 main() {
     if (runs("__405_d.ktm", "40 two", 7)) { correct++; }
 
     tests++;   /* a prototype first, and main called by that name from elsewhere */
-    put("__405_e.ktm", "i32 main();\ni64 calls = 0;\nvoid Again() { if (calls < 2) main(); }\ni32 main()\n{\n  calls++;\n  Again();\n  if (calls == 2) {\n    printf(\"calls %d\\n\", calls);\n    calls = 99;\n  }\n  return 0;\n}\n");
+    put("__405_e.ktm", "i32 main();\ni64 calls = 0;\nvoid Again() { if (calls < 2) { main(); } }\ni32 main()\n{\n  calls++;\n  Again();\n  if (calls == 2) {\n    printf(\"calls %d\\n\", calls);\n    calls = 99;\n  }\n  return 0;\n}\n");
     if (runs("__405_e.ktm", "calls 2", 0)) { correct++; }
 
     tests++;   /* one entry point only */

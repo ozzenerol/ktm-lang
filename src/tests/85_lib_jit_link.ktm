@@ -28,7 +28,7 @@ void main() {
     }
     proc.shell("printf '#link <ktm85>\n"
                  "i64 Ktm85Triple(i64 x);\n"
-                 "i32 main() { if (Ktm85Triple(14) == 42) return 0; return 1; }\n'"
+                 "i32 main() { if (Ktm85Triple(14) == 42) { return 0; } return 1; }\n'"
                  " > ./ktm-85-use.ktm");
     if (proc.shell("../../ktm -jit --install-dir=./ktm-85-prefix ./ktm-85-use.ktm") == 0) {
         correct++;

@@ -332,7 +332,7 @@ i32 main() {
         correct++;
                         }
     tests++;
-    if (fails("  for (i64 i = 0; i < 3; i++) { defer { if (i) continue; } }",
+    if (fails("  for (i64 i = 0; i < 3; i++) { defer { if (i) { continue; } } }",
                         "`continue` can't leave a deferred statement")) {
         correct++;
                         }
@@ -347,7 +347,7 @@ i32 main() {
     }
     /* a goto past a defer into its scope */
     tests++;
-    if (fails("  if (Get()) goto inside;\n  defer n++;\ninside:\n  n++;",
+    if (fails("  if (Get()) { goto inside; }\n  defer n++;\ninside:\n  n++;",
                         "`goto inside` jumps past a `defer` into its scope")) {
         correct++;
                         }
@@ -357,7 +357,8 @@ i32 main() {
         correct++;
     }
     tests++;
-    if (fails("  if (n) defer n++;", "`defer` must be a statement of a { } block")) {
+    /* (an `if` body is a { } block anyway: Y13) */
+    if (fails("  if (n) defer n++;", "braces required: the body of `if` goes in `{ ... }`")) {
         correct++;
     }
     /* a loop inside a deferred statement keeps its break and continue */
@@ -365,7 +366,7 @@ i32 main() {
     if (runs(
 "i32 main() {
   {
-    defer for (i64 i = 0; i < 5; i++) { if (i == 1) continue; if (i == 3) break; printf(\"%d\", i); }
+    defer for (i64 i = 0; i < 5; i++) { if (i == 1) { continue; } if (i == 3) { break; } printf(\"%d\", i); }
     printf(\"x\");
   }
   printf(\"\\n\");

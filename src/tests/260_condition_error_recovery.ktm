@@ -51,19 +51,19 @@ i32 main() {
     i64 correct = 0;
 
     tests++;
-    if (prints(PRE "  if (F(1, 2)) y = 1;\n  else y = 2;\n}\n", 1, 0,
+    if (prints(PRE "  if (F(1, 2)) { y = 1; }\n  else { y = 2; }\n}\n", 1, 0,
                          "Unexpected number of arguments 2 in call to F()")) {
         correct++;
                          } else { printf("Failed - the report\n"); }
 
     tests++;
-    if (prints(PRE "  if (zz > 1) y = 1;\n  else if (y) y = 2;\n  else y = 3;\n}\n",
+    if (prints(PRE "  if (zz > 1) { y = 1; }\n  else if (y) { y = 2; }\n  else { y = 3; }\n}\n",
                          1, 0, "260-ifr.ktm:5:7\n")) {
         correct++;
                          } else { printf("Failed - undefined name, else-if chain\n"); }
 
     tests++;
-    if (prints(PRE "  if (y) y = 1;\n  else if (p + 1) y = 2;\n  else y = 3;\n}\n",
+    if (prints(PRE "  if (y) { y = 1; }\n  else if (p + 1) { y = 2; }\n  else { y = 3; }\n}\n",
                          1, 0, "260-ifr.ktm:6:14\n")) {
         correct++;
                          } else { printf("Failed - type error in an else-if\n"); }
@@ -81,7 +81,7 @@ i32 main() {
                          } else { printf("Failed - missing ) and an error in the else body\n"); }
 
     tests++;
-    if (prints(PRE "  if (F((1, 2)) y = 1;\n  else y = 2;\n}\n", 1, 0, "260-ifr.ktm:5:11\n")) {
+    if (prints(PRE "  if (F((1, 2)) { y = 1; }\n  else { y = 2; }\n}\n", 1, 0, "260-ifr.ktm:5:11\n")) {
         correct++;
     } else { printf("Failed - unbalanced parentheses\n"); }
 
@@ -91,7 +91,7 @@ i32 main() {
     } else { printf("Failed - while, and its body still checked\n"); }
 
     tests++;
-    if (prints(PRE "  while () y++;\n  y = 4;\n}\n", 1, 0,
+    if (prints(PRE "  while () { y++; }\n  y = 4;\n}\n", 1, 0,
                          "Expected the `while` condition, got `)`")) {
         correct++;
                          } else { printf("Failed - empty while\n"); }
@@ -119,7 +119,7 @@ i32 main() {
     } else { printf("Failed - switch []\n"); }
 
     tests++;
-    if (prints(PRE "  if (i64 k = qq; k > 1) y = k;\n  else y = 3;\n}\n", 1, 0, "260-ifr.ktm:5:15\n")) {
+    if (prints(PRE "  if (i64 k = qq; k > 1) { y = k; }\n  else { y = 3; }\n}\n", 1, 0, "260-ifr.ktm:5:15\n")) {
         correct++;
     } else { printf("Failed - if with an init statement\n"); }
 

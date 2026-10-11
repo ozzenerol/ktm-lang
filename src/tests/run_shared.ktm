@@ -50,7 +50,7 @@ bool shouldExclude(u8 *filename, i64 namelen) {
 
 #ifndef __KTM_LINK_SQLITE3__
     /* The NN_sql*.ktm tests need libktm built with --sqlite. */
-    if (libc.strstr(filename, "_sql")) return true;
+    if (libc.strstr(filename, "_sql")) { return true; }
 #endif
 
     for (u8 *name : exclude) {

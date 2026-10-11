@@ -39,8 +39,8 @@ void main() {
                  "B HcMakeBig(i64 n) { B b; b.a = n; b.b = n * 2; b.c = n * 3; return b; }\n"
                  "i32 main() {\n"
                  "  T t = CMakeTex(8);\n"
-                 "  if (t.id != 8 || t.w != 640 || t.h != 480 || t.mip != 1 || t.fmt != 7) return 1;\n"
-                 "  if (CCallsBack((void *)(&HcMakeBig)) != 60) return 2;\n"
+                 "  if (t.id != 8 || t.w != 640 || t.h != 480 || t.mip != 1 || t.fmt != 7) { return 1; }\n"
+                 "  if (CCallsBack((void *)(&HcMakeBig)) != 60) { return 2; }\n"
                  "  return 0;\n"
                  "}\n"
                  "' > ./ktm-64-sret.ktm");

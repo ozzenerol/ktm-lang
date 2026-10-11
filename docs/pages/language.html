@@ -392,6 +392,9 @@ h
 <h2>Control flow</h2>
 
 <h3>if and else</h3>
+<p>The body of an <code>if</code>, <code>else</code>, <code>for</code>, <code>while</code> or
+<code>do</code> is always a <code>{ ... }</code> block (<code>else if</code> aside):
+<code>if (x) y = 1;</code> is an error, "braces required".</p>
 <pre data-run><code>
 void main()
 {
@@ -1823,8 +1826,8 @@ caught
 <ul>
 <li>The scope is the block the <code>defer</code> is written in (not the whole function):
 in a loop body it runs at the end of every iteration. It must be a statement of a
-<code>{ }</code> block, so <code>if (x) defer f();</code> or a <code>defer</code> directly
-after a <code>case</code> label needs braces.</li>
+<code>{ }</code> block, so a <code>defer</code> directly after a <code>case</code> label
+needs braces.</li>
 <li>Several defers in a block run in reverse order, the last one first; inner blocks
 finish before outer ones.</li>
 <li>A defer only runs if it was reached: one written after an early <code>return</code> does

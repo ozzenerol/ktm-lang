@@ -88,7 +88,7 @@ i32 main() {
     proc.shell("printf '#link <ktm402>\n"
                  "struct Pair { i64 a, b; };\n"
                  "i64 Ktm402Sum(Pair *p);\n"
-                 "i32 main() { Pair p; p.a = 40; p.b = 2; if (Ktm402Sum(&p) == 42) return 0; return 1; }\n'"
+                 "i32 main() { Pair p; p.a = 40; p.b = 2; if (Ktm402Sum(&p) == 42) { return 0; } return 1; }\n'"
                  " > ./ktm-402-use.ktm");
     if (proc.shell("../../ktm -jit --install-dir=./ktm-402-prefix ./ktm-402-use.ktm") == 0) { ok++; }
     if (proc.shell("../../ktm --install-dir=./ktm-402-prefix ./ktm-402-use.ktm -o ./ktm-402-use && "

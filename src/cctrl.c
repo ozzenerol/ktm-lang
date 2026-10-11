@@ -1134,8 +1134,8 @@ void cctrlWarning(Cctrl *cc, char *fmt, ...) {
     }
 }
 
-static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
-                          s64 len, char *fmt, va_list ap)
+static void cctrlDiagAtVaRaise(Cctrl *cc, int severity, s64 lineno, s64 col,
+                               s64 len, int raise, char *fmt, va_list ap)
 {
     char *msg = mprintVa(fmt, ap, NULL);
     AoStr *bold_msg = aoStrNew();
@@ -1154,9 +1154,24 @@ static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
     d->end_line = (int)lineno;
     d->end_col = (int)(col + (len > 0 ? len : 1));
     cctrlDiagPush(cc, d);
-    if (severity == CCTRL_ERROR) {
+    if (severity == CCTRL_ERROR && raise) {
         cctrlTerminate(cc);
     }
+}
+
+static void cctrlDiagAtVa(Cctrl *cc, int severity, s64 lineno, s64 col,
+                          s64 len, char *fmt, va_list ap)
+{
+    cctrlDiagAtVaRaise(cc, severity, lineno, col, len, 1, fmt, ap);
+}
+
+/* An error at (line, col) the parser can step over: reported, and
+ * parsing goes on where it is (no unwinding to the recovery point) */
+void cctrlErrorAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
+    va_list ap;
+    va_start(ap,fmt);
+    cctrlDiagAtVaRaise(cc, CCTRL_ERROR, lineno, col, len, 0, fmt, ap);
+    va_end(ap);
 }
 
 /* Like cctrlWarning, but anchored at an explicit (line, col) instead of

@@ -350,6 +350,7 @@ void cctrlInfo(Cctrl *cc, char *fmt, ...);
 void cctrlWarning(Cctrl *cc, char *fmt, ...);
 void cctrlWarningAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlRaiseExceptionAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
+void cctrlErrorAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseExceptionFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseException(Cctrl *cc, char *fmt, ...);

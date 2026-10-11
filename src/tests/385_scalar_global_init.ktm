@@ -113,7 +113,7 @@ void main() { printf(\"%d\\n\", n); }
                 "build the -lib library");
     proc.shell("printf '#link <ktm385>\\n"
                  "extern i64 shown;\\nextern f64 ratio;\\ni64 Ktm385Sum();\\n"
-                 "i32 main() { if (Ktm385Sum() == 41 && shown == 42 && ratio == 0.5) return 0; return 1; }\\n'"
+                 "i32 main() { if (Ktm385Sum() == 41 && shown == 42 && ratio == 0.5) { return 0; } return 1; }\\n'"
                  " > ./ktm-385-use.ktm");
     check(proc.shell("../../ktm -jit --install-dir=./ktm-385-prefix ./ktm-385-use.ktm") == 0,
                 "-lib globals (JIT)");

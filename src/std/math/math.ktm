@@ -17,7 +17,7 @@ pub _extern _ABS i64 abs(i64 num);
 
 #ifdef IS_ARM_64
 pub i64 abs(i64 num) {
-    if (num < 0) return -num;
+    if (num < 0) { return -num; }
     return num;
 }
 
