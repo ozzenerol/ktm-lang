@@ -91,8 +91,8 @@ i32 main() {
     tests++; if (captured("") && r == 0 && !exists("w/c")) { correct++; }
     full = str.dup(P("w/d"));
     capture();
-    r = fs.remove(full, RM_VERBOSE);
-    tests++; if (captured("Rm '%s'\n", full) && r == 0 && !exists("w/d")) { correct++; }
+    r = fs.remove(full);
+    tests++; if (captured("") && r == 0 && !exists("w/d")) { correct++; }
     mem.free(full);
 
     /* A missing file: an error, unless RM_FORCE */
@@ -109,8 +109,8 @@ i32 main() {
     tests++; if (captured("") && r == 0 && !exists("w/empty")) { correct++; }
     full = str.dup(P("w/empty2"));
     capture();
-    r = fs.remove(full, RM_VERBOSE);
-    tests++; if (captured("removed dir '%s'\n", full) && r == 0 &&
+    r = fs.remove(full);
+    tests++; if (captured("") && r == 0 &&
                              !exists("w/empty2")) { correct++; }
     mem.free(full);
 

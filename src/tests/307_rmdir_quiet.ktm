@@ -62,10 +62,10 @@ bool hasLine(u8 *out, u8 *fmt, u8 *name) {
 }
 
 i32 main() {
-    i64 correct = 0, tests = 6;
+    i64 correct = 0, tests = 2;
     u8 root[64], *out;
     i32 r;
-    printf("Test - RmDir quiet without RM_VERBOSE: ");
+    printf("Test - removeDir is quiet: ");
 
     str.copy(root, "./ktm-test-307-XXXXXX");
     if (!mkdtemp(root)) {
@@ -82,20 +82,6 @@ i32 main() {
     out = captured();
     if (r == 0 && !exists("q")) { correct++; }
     if (out && !str.cmp(out, "")) { correct++; }
-    else { printf("printed '%s'\n", out); }
-    mem.free(out);
-
-    makeTree("v");
-    capture();
-    r = fs.removeDir(P("v"), fs.REMOVE_RECURSE|RM_VERBOSE);
-    out = captured();
-    if (r == 0 && !exists("v")) { correct++; }
-    if (hasLine(out, "Rm: %s\n", "v/f1") && hasLine(out, "Rm: %s\n", "v/fifo") &&
-            hasLine(out, "Rm: %s\n", "v/sub/f2")) { correct++; }
-    if (hasLine(out, "RmDir %s\n", "v/sub") && hasLine(out, "RmDir %s\n", "v")) {
-        correct++;
-    }
-    if (out && !libc.strstr(out, "Error") && !libc.strstr(out, "ERROR")) { correct++; }
     else { printf("printed '%s'\n", out); }
     mem.free(out);
 

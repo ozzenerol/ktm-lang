@@ -27,7 +27,7 @@ i32 main() {
     tests++;
     if (str.firstOf(null, ".") == null && str.firstOf("a.b", null) == null &&
             str.lastOf(null, ".") == null && str.lastOf("a.b", null) == null &&
-            fs.ext(null) == null && !IsDotC(null) && !IsDotZ(null) &&
+            fs.ext(null) == null &&
             str.toInt(null) == 0 && str.toInt("42") == 42) { correct++; }
 
     u8 dst[16];

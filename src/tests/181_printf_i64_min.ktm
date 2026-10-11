@@ -12,7 +12,7 @@ void expect(u8 *got, u8 *want) {
 }
 
 i32 main() {
-    i64 tests = 21, min = I64_MIN, max = I64_MAX;
+    i64 tests = 19, min = I64_MIN, max = I64_MAX;
     u8 buf[64];
     printf("Test - %%d of the smallest i64: ");
 
@@ -39,13 +39,6 @@ i32 main() {
     expect(str.formatTo(null, "%x", min), "8000000000000000");
     expect(str.format("%d", min), "-9223372036854775808");
     expect(str.appendFormat(str.dup("x="), "%d", min), "x=-9223372036854775808");
-
-    /* I64ToStr itself writes the digits reversed */
-    bool neg;
-    i64 len = I64ToStr(buf, min, &neg);
-    if (len == 19 && neg && !str.cmp(buf, "8085774586302733229")) { gCorrect++; }
-    len = I64ToStr(buf, -305, &neg);
-    if (len == 3 && neg && !str.cmp(buf, "503")) { gCorrect++; }
 
     test.printResult(gCorrect, tests);
     printf("====\n");

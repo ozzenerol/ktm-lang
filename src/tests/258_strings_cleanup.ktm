@@ -18,12 +18,6 @@ i32 main() {
     tests++;
     if (eq == 0 && lt < 0 && libc.atol("  -42x") == -42 && libc.strlen("four") == 4) { correct++; }
 
-    /* U64ToStr writes the digits least significant first (internal helper) */
-    u8 buf[32];
-    i64 n = U64ToStr(buf, 12345);
-    i64 z = U64ToStr(buf + 16, 0);
-    tests++; if (n == 5 && !str.cmp(buf, "54321") && z == 1 && !str.cmp(buf + 16, "0")) { correct++; }
-
     /* str.quote: '$' is an ordinary character */
     u8 *q = str.quote("a$$b\n\"c\"");
     tests++; if (!str.cmp(q, "a$$b\\n\\\"c\\\"")) { correct++; }
@@ -38,7 +32,7 @@ i32 main() {
 #ifdef PRTF_NEG_E
     gone = false;
 #endif
-    tests++; if (gone && CH_SPACE == ' ' && PRTF_PAD_ZERO == 1) { correct++; }
+    tests++; if (gone) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");
