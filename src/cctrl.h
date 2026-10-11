@@ -161,6 +161,8 @@ typedef struct Cctrl {
 
     /* For parsing a switch */
     Ast *tmp_default_case;
+    /* how many cases came before the switch's `default` */
+    int tmp_default_at;
 
     /* Function being parsed */
     Ast *tmp_func;

@@ -44,10 +44,8 @@ i64 nestedSwitch() {
                     fallthrough;
                     default: n += 100;
                 }
-                break;
             case 1:
                 n += 1;
-                break;
         }
         n += 1000;
     }

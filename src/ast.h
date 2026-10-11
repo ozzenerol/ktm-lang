@@ -487,6 +487,11 @@ typedef struct Ast {
              * feasible... or degrade into a series of 'ifs' if the range is 
              * sparse */
             List *case_asts;
+            /* the arm ends in `fallthrough;` (at case_ft_line:col) and
+             * runs on into the next one; every other arm leaves the
+             * switch at its end */
+            int case_fallthrough;
+            s64 case_ft_line, case_ft_col;
         };
 
         /* For a switch */

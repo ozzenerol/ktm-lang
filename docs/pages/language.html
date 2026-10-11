@@ -415,15 +415,17 @@ half is 7
 </pre>
 
 <h3>switch</h3>
-<p><code>case</code> takes a value or a range <code>lo ... hi</code>. Cases fall through
-without <code>break</code>, as in C.</p>
+<p><code>case</code> takes a value or a range <code>lo ... hi</code>. A case ends at the
+next one: unlike C it doesn't fall through, so no <code>break</code> is needed (one still
+leaves the switch early). Labels stacked with nothing between them share the code
+that follows.</p>
 <pre data-run><code>
 void grade(i64 score)
 {
   switch (score) {
-    case 90 ... 100: printf("A\n"); break;
-    case 80 ... 89:  printf("B\n"); break;
-    case 0:          printf("no score\n"); break;
+    case 90 ... 100: printf("A\n");
+    case 80 ... 89:  printf("B\n");
+    case 0:          printf("no score\n");
     default:         printf("C or below\n");
   }
 }
@@ -450,11 +452,11 @@ void main()
 {
   for (i64 i = 0; i < 6; i++) {
     switch [i] {
-      case 0: printf("zero "); break;
-      case:   printf("one "); break;      // 1
-      case:   printf("two "); break;      // 2
-      case 4...5: printf("four-five "); break;
-      default: printf("other "); break;
+      case 0: printf("zero ");
+      case:   printf("one ");      // 1
+      case:   printf("two ");      // 2
+      case 4...5: printf("four-five ");
+      default: printf("other ");
     }
   }
   printf("\n");
@@ -463,17 +465,19 @@ void main()
 <pre class="output">
 zero one two other four-five four-five 
 </pre>
-<p><code>fallthrough;</code> (ktm syntax v0.2) marks a case that goes on into the next one.
-Cases fall through anyway for now, so it changes nothing yet; it is an error outside a
-switch and as the last statement of the last case, where there is no next case. A
-variable called <code>fallthrough</code> still works.</p>
+<p><code>fallthrough;</code> as the last statement of a case (or of its <code>{ ... }</code>)
+runs on into the next case. It is an error anywhere else: outside a switch, before other
+statements of its case, under an <code>if</code> or a loop, in the last case where there
+is no next one, and into or out of a <code>default</code> that isn't the last label
+(<code>default</code> runs after the cases). A variable called <code>fallthrough</code>
+still works.</p>
 <pre data-run><code>
 void main()
 {
   for (i64 i = 1; i <= 3; i++) {
     switch (i) {
       case 1: printf("one, "); fallthrough;
-      case 2: printf("two or after one\n"); break;
+      case 2: printf("two or after one\n");
       default: printf("three\n");
     }
   }

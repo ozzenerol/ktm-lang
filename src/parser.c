@@ -2785,6 +2785,58 @@ void parseRaiseCaseException(Cctrl *cc, Ast *case_expr) {
     cctrlRaiseExceptionFromTo(cc, suggestion, 'c', ':', "`case` must be followed by an integer constant got - %s", exp);
 }
 
+/* Does `peek` end a case's arm: the next `case`, `default` or the
+ * switch's `}`? */
+static int parseArmEnds(Lexeme *peek) {
+    return !peek || tokenPunctIs(peek, '}') ||
+           (peek->tk_type == TK_KEYWORD &&
+            (peek->i64 == KW_CASE || peek->i64 == KW_DEFAULT));
+}
+
+/* The statements of a `case` or `default` (Y8): every one up to the next
+ * label. The arm leaves the switch at its end, unless its last statement
+ * is `fallthrough;`, which runs on into the next arm. An empty arm
+ * (`case 1: case 2: ...`) shares the next one's statements. */
+static void parseCaseArm(Cctrl *cc, Ast *arm) {
+    List *stmts = arm->case_asts;
+    int ft = 0;
+    s64 ft_line = 0, ft_col = 0;
+    while (!parseArmEnds(cctrlTokenPeek(cc))) {
+        if (ft) {
+            cctrlRaiseExceptionAt(cc, ft_line, ft_col, 11,
+                "`fallthrough` must be the last statement of its case");
+        }
+        cc->fallthrough_pending = 0;
+        Ast *stmt = parseStatement(cc);
+        if (cc->fallthrough_pending) {
+            /* a `{...}` arm ending in it is fine (the block checked it) */
+            if (stmt && stmt->kind != AST_COMPOUND_STMT) {
+                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
+                cc->fallthrough_pending = 0;
+                cctrlRaiseExceptionAt(cc, line, col, 11,
+                    "`fallthrough` must be the last statement of its case, "
+                    "not inside a block or another statement");
+            }
+            if (stmt) listAppend(stmts, stmt);    /* `{ ...; fallthrough; }` */
+            ft = 1;
+            ft_line = cc->fallthrough_line;
+            ft_col = cc->fallthrough_col;
+            continue;
+        }
+        if (stmt) listAppend(stmts, stmt);
+    }
+    arm->case_fallthrough = ft;
+    arm->case_ft_line = ft_line;
+    arm->case_ft_col = ft_col;
+    if (!ft && !listEmpty(stmts)) {
+        listAppend(stmts, astBreak(cc->tmp_loop_end));
+    }
+    /* the switch reports a `fallthrough` with no next case */
+    cc->fallthrough_pending = ft;
+    cc->fallthrough_line = ft_line;
+    cc->fallthrough_col = ft_col;
+}
+
 Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
@@ -2852,30 +2904,7 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     }
 
     vecPush(cc->tmp_case_list,case_);
-
-    do {
-        Ast *stmt = parseStatement(cc);
-        if (!stmt) {
-            /* `case 1: ;` - the empty statement */
-            peek = cctrlTokenPeek(cc);
-            if (!peek || tokenPunctIs(peek,'}')) break;
-            continue;
-        }
-        if (stmt->kind != AST_CASE && stmt->kind != AST_DEFAULT) {
-            listAppend(stmts,stmt);
-        }
-        if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE ||
-                stmt->kind == AST_DEFAULT || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
-                || stmt->kind == AST_GOTO) break;
-        peek = cctrlTokenPeek(cc);
-   
-        /* @Bug - Something is afoot, this ensures we don't go on forever
-         * parsing if there isn't a break and the case is a fall through...
-         * feels as though we could go on and just ommit the case. Which would
-         * avoid the call to `astCasesCompress()`? */
-        if (tokenPunctIs(peek,'}')) break;
-    } while (1);
-
+    parseCaseArm(cc, case_);
     return case_;
 }
 
@@ -2885,29 +2914,12 @@ Ast *parseDefaultStatement(Cctrl *cc) {
     if (cc->tmp_default_case) {
         cctrlRaiseException(cc,"Duplicate default case");
     }
-    Lexeme *peek;
     List *stmts = listNew();
     AoStr *default_label = astMakeLabel();
     /* set here so this is non-null for the next call to parseStatement */
     cc->tmp_default_case = astDefault(default_label,stmts);
-
-    do {
-        Ast *stmt = parseStatement(cc);
-        if (!stmt) {
-            /* `default: ;` - the empty statement */
-            peek = cctrlTokenPeek(cc);
-            if (!peek || tokenPunctIs(peek,'}')) break;
-            continue;
-        }
-        if (stmt->kind != AST_CASE) {
-            listAppend(stmts,stmt);
-        }
-        if (stmt->kind == AST_COMPOUND_STMT || stmt->kind == AST_CASE || stmt->kind == AST_BREAK || stmt->kind == AST_RETURN
-                || stmt->kind == AST_GOTO) break;
-        peek = cctrlTokenPeek(cc);
-        if (tokenPunctIs(peek,'}')) break;
-    } while (1);
-
+    cc->tmp_default_at = (int)cc->tmp_case_list->size;
+    parseCaseArm(cc, cc->tmp_default_case);
     return cc->tmp_default_case;
 }
 
@@ -2954,6 +2966,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     original_break = cc->tmp_loop_end;
     original_default_label = cc->tmp_default_case;
     original_cases = cc->tmp_case_list;
+    int original_default_at = cc->tmp_default_at;
 
     cc->tmp_case_list = astVecNew();
     cc->tmp_default_case = NULL;
@@ -2987,12 +3000,28 @@ Ast *parseSwitchStatement(Cctrl *cc) {
         switch_bounds_checked
     );
 
+    Ast *dflt = cc->tmp_default_case;
+    Vec *cases = cc->tmp_case_list;
+    int default_at = cc->tmp_default_at;
     cc->tmp_loop_end = original_break;
     cc->tmp_case_list = original_cases;
     cc->tmp_default_case = original_default_label;
+    cc->tmp_default_at = original_default_at;
     if (last_fallthrough) {
         cctrlRaiseExceptionAt(cc, last_ft_line, last_ft_col, 11,
                 "`fallthrough` in the last case of a switch: there is no next case");
+    }
+    /* `default` runs after every case (its code is placed last), so it
+     * can't be fallen into or out of from the middle of the cases */
+    if (dflt && default_at < (int)cases->size) {
+        Ast *before = default_at > 0 ? vecGet(Ast *, cases, default_at - 1) : NULL;
+        Ast *ft = dflt->case_fallthrough ? dflt
+                : before && before->case_fallthrough ? before : NULL;
+        if (ft) {
+            cctrlRaiseExceptionAt(cc, ft->case_ft_line, ft->case_ft_col, 11,
+                "`fallthrough` into or out of a `default` that isn't the "
+                "switch's last label: put `default` last");
+        }
     }
     return switch_ast;
 }
@@ -3012,9 +3041,9 @@ static int parseIsFallthrough(Cctrl *cc, Lexeme *tok, Lexeme *peek) {
     return 1;
 }
 
-/* A case of a switch says it goes on into the next one. A no-op while
- * cases fall through anyway; only inside a switch, and not after its
- * last case (parseSwitchStatement checks that once the body ends). */
+/* A case of a switch says it goes on into the next one (Y8: otherwise it
+ * leaves the switch); only inside a switch, as the last statement of a
+ * case (parseCaseArm) and not of its last one (parseSwitchStatement). */
 static Ast *parseFallthrough(Cctrl *cc, Lexeme *tok) {
     s64 line = tok->line, col = tok->col;
     cctrlTokenExpect(cc, ';');
@@ -3063,7 +3092,14 @@ Ast *parseStatement(Cctrl *cc) {
             case KW_SWITCH:   return parseSwitchStatement(cc);
             case KW_CASE:     return parseCaseLabel(cc,tok);
             case KW_DEFAULT:  return parseDefaultStatement(cc);
-            case KW_BREAK:    return parseBreakStatement(cc);
+            case KW_BREAK: {
+                /* at the `break`, not the token after it */
+                s64 line = tok->line, col = tok->col;
+                Ast *brk = parseBreakStatement(cc);
+                brk->line = line;
+                brk->col = col;
+                return brk;
+            }
             case KW_CONTINUE: return parseContinueStatement(cc);
             case KW_ASM: {
                 /* Inline `asm { ... }` block as a statement:
@@ -3458,7 +3494,32 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
              * statement a "perhaps you meant `}`" error */
             cctrlTokenGet(cc);
         } else { 
-            if ((stmt = parseStatement(cc)) != NULL) {
+            int ft_before = cc->fallthrough_pending;
+            stmt = parseStatement(cc);
+            /* (a `case` of the switch's own block carries its arm's
+             * `fallthrough` out to parseSwitchStatement) */
+            if (!ft_before && cc->fallthrough_pending &&
+                !(stmt && (stmt->kind == AST_CASE || stmt->kind == AST_DEFAULT))) {
+                /* `fallthrough;` here, or a block ending in it: only as
+                 * the block's last statement, and not under an `if`, a
+                 * loop or the like */
+                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
+                if (stmt && stmt->kind != AST_COMPOUND_STMT) {
+                    cc->fallthrough_pending = 0;
+                    cctrlRaiseExceptionAt(cc, line, col, 11,
+                        "`fallthrough` must be the last statement of its case, "
+                        "not inside a block or another statement");
+                }
+                if (stmt) listAppend(body->stms, stmt);
+                tok = cctrlTokenPeek(cc);
+                if (tok && !tokenPunctIs(tok, '}')) {
+                    cc->fallthrough_pending = 0;
+                    cctrlRaiseExceptionAt(cc, line, col, 11,
+                        "`fallthrough` must be the last statement of its case");
+                }
+                continue;
+            }
+            if (stmt != NULL) {
                 if (stmt->kind == AST_DECL && stmt->declvar->kind == AST_GVAR) {
                     tok = cctrlTokenPeek(cc);
                     continue;

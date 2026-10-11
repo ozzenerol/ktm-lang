@@ -1241,17 +1241,17 @@ void testMethods() {
 
 void runGroup(i64 group) {
     switch (group) {
-        case 0: testHandshake(); break;
-        case 1: testSync(); break;
-        case 2: testDefinition(); break;
-        case 3: testHoverCompletion(); break;
-        case 4: testDebounce(); break;
-        case 5: testSurvival(); break;
-        case 6: testRename(); break;
-        case 7: testReferences(); break;
-        case 8: testRegressions(); break;
-        case 9: testModules(); break;
-        case 10: testMethods(); break;
+        case 0: testHandshake();
+        case 1: testSync();
+        case 2: testDefinition();
+        case 3: testHoverCompletion();
+        case 4: testDebounce();
+        case 5: testSurvival();
+        case 6: testRename();
+        case 7: testReferences();
+        case 8: testRegressions();
+        case 9: testModules();
+        case 10: testMethods();
     }
 }
 

@@ -24,10 +24,10 @@ bool sortCase(i64 n, i64 kind) {
     for (i64 i = 0; i < n; ++i) {
         f64 x;
         switch (kind) {
-            case 0: x = (f64)(nextRand() % 2001 - 1000) / 8.0; break; /* +/-, dups */
-            case 1: x = (f64)(n - i) * -0.25; break;                  /* negative, sorted desc */
-            case 2: x = 1.5; break;                                   /* all equal */
-            case 3: x = (f64)(i % 7) - 3.0 + (f64)(i % 3) / 4.0; break;
+            case 0: x = (f64)(nextRand() % 2001 - 1000) / 8.0; /* +/-, dups */
+            case 1: x = (f64)(n - i) * -0.25; /* negative, sorted desc */
+            case 2: x = 1.5; /* all equal */
+            case 3: x = (f64)(i % 7) - 3.0 + (f64)(i % 3) / 4.0;
         }
         sum += x;
         v.push(x);

@@ -46,7 +46,7 @@ bool testNeighbours(void) {
     if (t != 200.0) { printf("2e2f32 = %f\n", t); ok = false; }
     if (u != 2.5) { printf("2.5f64 = %f\n", u); ok = false; }
     switch (2) {
-        case 1...3: hit = 1; break;
+        case 1...3: hit = 1;
     }
     if (!hit) { printf("case 1...3 missed\n"); ok = false; }
     return ok;

@@ -116,7 +116,6 @@ i64 switchBreak(i64 x) {
             } catch {
             }
             r = 99;
-            break;
         default:
             r = 2;
     }
@@ -132,7 +131,6 @@ i64 breakInsideTry() {
         switch (i) {
             case 2:
                 r = 1;
-                break;
             default:
                 r = 0;
         }

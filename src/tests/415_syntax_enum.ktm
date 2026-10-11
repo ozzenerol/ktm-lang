@@ -68,9 +68,9 @@ i32 main() {
     tests++;
     i64 hit = -1;
     switch (c) {
-        case Color.red:   hit = 0; break;
-        case Color.green: hit = 1; break;
-        case Color.blue:  hit = 2; break;
+        case Color.red:   hit = 0;
+        case Color.green: hit = 1;
+        case Color.blue:  hit = 2;
     }
     if (hit == 1) { correct++; }
     else { printf("\n  switch on an enum\n"); }
