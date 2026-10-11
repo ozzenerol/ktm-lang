@@ -71,6 +71,20 @@ I32 Main()
 U0 Main() { F(1); }
 ", FALSE)) correct++;
 
+  /* `true` is a bool literal: `while (true)` loops for ever like
+   * `while (1)`; `while (false)` doesn't */
+  tests++;
+  if (WarnsIf(
+"I64 F(I64 x){ while (true) { if (x) return 1; } }
+I64 G(I64 x){ for (;true;) { if (x) return 1; } }
+U0 Main() { F(1); G(1); }
+", FALSE)) correct++;
+  tests++;
+  if (WarnsIf(
+"I64 F(I64 x){ while (false) { if (x) return 1; } }
+U0 Main() { F(1); }
+", TRUE)) correct++;
+
   /* goto forward to a label that returns */
   tests++;
   if (WarnsIf(
