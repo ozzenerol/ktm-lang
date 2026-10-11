@@ -1,4 +1,4 @@
-import str, test;
+import cstr, str, test;
 
 /* String's methods (v0.3.0 step 4): append (also of a view of itself),
  * appendByte, appendFormat (`%s` takes a u8[] or a String), insert and
@@ -13,7 +13,7 @@ void check(bool ok, u8 *what) {
 }
 
 bool is(String *s, u8 *want) {
-    return s.len == str.len(want) && !str.cmp(s.cstr(), want) && s.ptr[s.len] == 0;
+    return s.len == cstr.len(want) && !cstr.cmp(s.cstr(), want) && s.ptr[s.len] == 0;
 }
 
 i32 main() {
@@ -61,14 +61,14 @@ i32 main() {
         s.insert(9, "x");
         check(false, "insert past the end");
     } catch (Error e) {
-        check(e.code == ERR_BOUNDS && !str.cmp(e.message, "slice 9:5 out of range for length 5"),
+        check(e.code == ERR_BOUNDS && !cstr.cmp(e.message, "slice 9:5 out of range for length 5"),
               "insert past the end");
     }
     try {
         s.remove(3, 2);
         check(false, "remove backwards");
     } catch (Error e) {
-        check(e.code == ERR_BOUNDS && !str.cmp(e.message, "slice 3:2 out of range for length 5"),
+        check(e.code == ERR_BOUNDS && !cstr.cmp(e.message, "slice 3:2 out of range for length 5"),
               "remove backwards");
     }
     check(is(&s, "abcde"), "unchanged by a failed call");

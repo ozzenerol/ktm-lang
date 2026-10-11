@@ -1,9 +1,25 @@
 module str;
-import libc, mem;
+import cstr, libc, mem;
 
 /* The String type is the prelude's (every file sees it); its constructors
  * and methods are here. A String you get from one of these is yours:
  * `String s = str.new(); defer s.free();`. */
+
+/* printf's format into a new String (yours: free it). `%s` takes a u8[]
+ * or a String as well as a C string. */
+pub String format(u8 *fmt, ...args)
+{
+    String s;
+    u8 *text = cstr.formatArgs(null, fmt, args);
+    if (text) {
+        /* the formatter's buffer becomes the String's (it is mem's, with
+         * the NUL after it), no copy */
+        s.ptr = text;
+        s.len = cstr.len(text);
+        s.cap = s.len;
+    }
+    return s;
+}
 
 /* An empty String: nothing allocated until something is added */
 pub String new()
@@ -71,8 +87,8 @@ pub void String.appendByte(u8 b)
 /* printf's format at the end */
 pub void String.appendFormat(u8 *fmt, ...args)
 {
-    u8 *text = formatArgs(null, fmt, args);
-    self.append(text[0:len(text)]);
+    u8 *text = cstr.formatArgs(null, fmt, args);
+    self.append(text[0:cstr.len(text)]);
     mem.free(text);
 }
 
@@ -341,5 +357,72 @@ pub bool validUtf8(u8[] s)
         i32 cp = decodeRune(s, &at);
         if (cp == 0xFFFD && !(at - before == 3 && s.ptr[before] == 0xEF)) { return false; }
     }
+    return true;
+}
+
+/* ---- Bytes ---- */
+
+/* An ASCII letter in the other case, any other byte as is */
+pub u8 toLower(u8 ch)
+{
+    if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
+    return ch;
+}
+
+pub u8 toUpper(u8 ch)
+{
+    if (ch >= 'a' && ch <= 'z') { return ch - 32; }
+    return ch;
+}
+
+/* ' ', '\t', '\n', '\v', '\f' or '\r' */
+pub bool isSpace(u8 ch)
+{
+    return viewIsSpace(ch);
+}
+
+/* s without the whitespace at its start, a view of it */
+pub u8[] trimStart(u8[] s)
+{
+    i64 a = 0;
+    while (a < s.len && viewIsSpace(s.ptr[a])) { a++; }
+    return s[a:];
+}
+
+/* s without what is at its end of the bytes in `chars` (whitespace when
+ * left out), a view of it */
+pub u8[] trimEnd(u8[] s, u8[] chars = " \t\n\v\f\r")
+{
+    i64 b = s.len;
+    while (b > 0 && find(chars, s[b - 1:b]) >= 0) { b--; }
+    return s[:b];
+}
+
+/* s around the first sep: *before and *after, views of it, and true; or
+ * false, with *before all of s and *after empty, when sep isn't in it */
+pub bool splitFirst(u8[] s, u8[] sep, u8[] *before, u8[] *after)
+{
+    i64 at = find(s, sep);
+    if (at < 0) {
+        *before = s;
+        *after = s[s.len:];
+        return false;
+    }
+    *before = s[:at];
+    *after = s[at + sep.len:];
+    return true;
+}
+
+/* As splitFirst, around the last sep */
+pub bool splitLast(u8[] s, u8[] sep, u8[] *before, u8[] *after)
+{
+    i64 at = findLast(s, sep);
+    if (at < 0) {
+        *before = s;
+        *after = s[s.len:];
+        return false;
+    }
+    *before = s[:at];
+    *after = s[at + sep.len:];
     return true;
 }

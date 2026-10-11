@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A function pointer declared at file scope - `i64 (*g)(i64 a, i64 b)
  * = &Add;` - failed with "Identifier expected", with or without
@@ -44,7 +44,7 @@ i32 main() {
     p2 = &dbl;
     if (p1(4) == 8 && p2(5) == 10) { correct++; }
     if (ap(&dbl, 21) == 42 && ap(p1, 3) == 6) { correct++; }
-    if (!str.cmp(nm(1), "one") && !str.cmp(nm(0), "zero")) { correct++; }
+    if (!cstr.cmp(nm(1), "one") && !cstr.cmp(nm(0), "zero")) { correct++; }
     cb(); cb();
     if (gHits == 2) { correct++; }
     if (va(1, 2, 3) == 3) { correct++; }

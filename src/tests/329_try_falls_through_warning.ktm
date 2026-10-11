@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 enum Err { x, in, out };
 
@@ -48,7 +48,7 @@ bool warnsIf(u8 *src, bool warn) {
     bool ok;
 
     cleanupTryFall();
-    if (!fs.writeAll(TRY_FALL_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(TRY_FALL_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " TRY_FALL_FILE " > " TRY_FALL_OUT " 2>&1");

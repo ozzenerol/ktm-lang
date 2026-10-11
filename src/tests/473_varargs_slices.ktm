@@ -1,9 +1,9 @@
-import str, test;
+import cstr, test;
 
 /* Variadic parameters are slices (v0.3.0 step 3): in the body `T ...name`
  * is a `T[]` and `...name` a `u64[]` (64-bit slots), so name[i] is checked,
  * name can be sliced, ranged over and passed to a slice parameter, and
- * `...name` still passes them on. str.formatArgs takes the slots as a
+ * `...name` still passes them on. cstr.formatArgs takes the slots as a
  * slice: a format wanting more arguments than it got throws ERR_BOUNDS
  * instead of reading past them. `...x` spreads any slice of the extras'
  * type (an array too), evaluated once. */
@@ -31,7 +31,7 @@ f64 avg(f64 ...xs) {
     for (i64 i = 0; i < xs.len; i++) { t += xs[i]; }
     return t / xs.len;
 }
-u8 *wrap(u8 *fmt, ...args) { return str.format("<%s>", str.formatArgs(null, fmt, args)); }
+u8 *wrap(u8 *fmt, ...args) { return cstr.format("<%s>", cstr.formatArgs(null, fmt, args)); }
 f64 secondAsFloat(...args) { return *(f64 *)&args[1]; }
 
 i32 main() {
@@ -44,24 +44,24 @@ i32 main() {
           sum(...arr) == 10, "spread a sub-slice, a slice, an array");
     check(sum(...counted(sl)) == 10 && gCalls == 1, "a spread evaluated once");
     u64 slots[2] = {7, 8};
-    check(!str.cmp(wrap("%d+%d", ...slots), "<7+8>"), "spread u64 slots into untyped");
-    check(!str.cmp(types(1), "i64[]") && !str.cmp(untypedType(1), "u64[]"), "typeof");
+    check(!cstr.cmp(wrap("%d+%d", ...slots), "<7+8>"), "spread u64 slots into untyped");
+    check(!cstr.cmp(types(1), "i64[]") && !cstr.cmp(untypedType(1), "u64[]"), "typeof");
     check(avg(1, 2, 4) > 2.33 && avg(1, 2, 4) < 2.34 && avg() == 0, "f64 ...xs");
-    check(!str.cmp(wrap("%d-%s-%.1f", 3, "x", 2.5), "<3-x-2.5>"), "formatArgs(null, fmt, args)");
+    check(!cstr.cmp(wrap("%d-%s-%.1f", 3, "x", 2.5), "<3-x-2.5>"), "formatArgs(null, fmt, args)");
     check(secondAsFloat(1, 2.5) == 2.5, "an untyped float slot");
-    check(!str.cmp(str.concat("a", "b", "c"), "abc"), "str.concat");
+    check(!cstr.cmp(cstr.concat("a", "b", "c"), "abc"), "cstr.concat");
     try {
         head(1);
         check(false, "a sub-slice past the extras");
     } catch (Error e) {
-        check(e.code == ERR_BOUNDS && !str.cmp(e.message, "slice 0:2 out of range for length 1"),
+        check(e.code == ERR_BOUNDS && !cstr.cmp(e.message, "slice 0:2 out of range for length 1"),
               "a sub-slice past the extras");
     }
     try {
         last();
         check(false, "an index past the extras");
     } catch (Error e) {
-        check(!str.cmp(e.message, "index -1 out of range for length 0"), "an index past the extras");
+        check(!cstr.cmp(e.message, "index -1 out of range for length 0"), "an index past the extras");
     }
     try {
         wrap("%d %d", 1);

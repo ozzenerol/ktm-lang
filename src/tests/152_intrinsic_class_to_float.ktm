@@ -1,4 +1,4 @@
-import date, fs, libc, mem, proc, str, test;
+import cstr, date, fs, libc, mem, proc, test;
 
 /* An intrinsic class (`i64 class CDate`, `u16 class`, `i32 class`) is an
  * integer underneath, but converting one to a float was a raw bit copy:
@@ -47,7 +47,7 @@ void main() {
 u8 *runKtm(u8 *source) {
     fs.remove(IF_TEST_FILE);
     fs.remove(IF_TEST_OUT);
-    if (!fs.writeAll(IF_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(IF_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return null;
     }
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " IF_TEST_FILE " > " IF_TEST_OUT " 2>&1");

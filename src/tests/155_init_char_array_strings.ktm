@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A string in a char-array slot of an initialiser - a row of
  * `u8 names[2][8]` or a `u8 name[8]` class field - is the string's
@@ -87,7 +87,7 @@ bool testGlobalFields(void) {
     if (g155O.c.id != 8 || g155O.c.z != 9) { ok = false; }
     if (!slotIs(g155O.c.name, 8, "in", 2)) { ok = false; }
     /* A pointer field still points at the literal. */
-    if (str.cmp(g155O.p, "ptr")) { ok = false; }
+    if (cstr.cmp(g155O.p, "ptr")) { ok = false; }
     return ok;
 }
 
@@ -111,7 +111,7 @@ bool testLocalFields(void) {
     if (!slotIs(o.tag, 4, "tg", 2)) { ok = false; }
     if (o.c.id != 8 || o.c.z != 9) { ok = false; }
     if (!slotIs(o.c.name, 8, "in", 2)) { ok = false; }
-    if (str.cmp(o.p, "ptr")) { ok = false; }
+    if (cstr.cmp(o.p, "ptr")) { ok = false; }
     return ok;
 }
 
@@ -126,7 +126,7 @@ i64 compileSource(u8 *source, u8 **out) {
     i64 res;
     cleanupStrInitTest();
     *out = null;
-    if (!fs.writeAll(STR_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(STR_INIT_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return -1;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " STR_INIT_FILE " > " STR_INIT_OUT " 2>&1");
@@ -157,7 +157,7 @@ bool testFieldTooLong(u8 *source, u8 *loc) {
     bool ok = res == 1 && out;
     if (ok) {
         first = libc.strstr(out, "error: ");
-        if (!first || str.cmpLen(first + 7, msg, str.len(msg))) { ok = false; }
+        if (!first || cstr.cmpLen(first + 7, msg, cstr.len(msg))) { ok = false; }
         else if (!libc.strstr(first, loc)) { ok = false; }
         else if (libc.strstr(first + 7, "error: ")) { ok = false; }
     }

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A file that ends in the middle of a construct is reported with an
  * "unexpected end of input" error and exit status 1. ktm used to loop
@@ -27,7 +27,7 @@ bool compileFailsAtEnd(u8 *source, u8 *expected) {
 
     cleanupEofTest();
 
-    if (!fs.writeAll(EOF_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(EOF_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

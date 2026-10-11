@@ -1,8 +1,8 @@
-import mem, str, test;
+import cstr, mem, test;
 
-/* str.formatTo's buffer grew to ten times its size plus the argument
- * whenever a %s didn't fit, and str.len was a byte-at-a-time loop that
- * crashed on null. The buffer now doubles, and str.len is libc's strlen,
+/* cstr.formatTo's buffer grew to ten times its size plus the argument
+ * whenever a %s didn't fit, and cstr.len was a byte-at-a-time loop that
+ * crashed on null. The buffer now doubles, and cstr.len is libc's strlen,
  * with null giving 0. */
 
 i32 main() {
@@ -11,7 +11,7 @@ i32 main() {
 
     /* null is 0 */
     tests++;
-    if (str.len(null) == 0 && str.len("") == 0 && str.len("abc") == 3) { correct++; }
+    if (cstr.len(null) == 0 && cstr.len("") == 0 && cstr.len("abc") == 3) { correct++; }
 
     /* Every length, at every alignment */
     tests++;
@@ -21,7 +21,7 @@ i32 main() {
         for (j = 0; j < 260; j++) {
             mem.set(buf + i, 'a', j);
             buf[i + j] = '\0';
-            if (str.len(buf + i) != j) { ok = false; }
+            if (cstr.len(buf + i) != j) { ok = false; }
         }
     }
     if (ok) { correct++; }
@@ -33,17 +33,17 @@ i32 main() {
     u8 *big = mem.alloc(n + 1);
     mem.set(big, 'a', n);
     big[n] = '\0';
-    u8 *s = str.formatTo(null, "%s%s%s%s", big, big, big, big);
-    if (str.len(s) == 4 * n && mem.size(s) <= 2 * str.len(s) + 4096) { correct++; }
-    else { printf("StrLen %d MSize %d\n", str.len(s), mem.size(s)); }
+    u8 *s = cstr.formatTo(null, "%s%s%s%s", big, big, big, big);
+    if (cstr.len(s) == 4 * n && mem.size(s) <= 2 * cstr.len(s) + 4096) { correct++; }
+    else { printf("StrLen %d MSize %d\n", cstr.len(s), mem.size(s)); }
     mem.free(s);
 
     /* Many short pieces still build the right string */
     tests++;
-    s = str.formatTo(null, "%s|%s", big + n - 5, "end");
+    s = cstr.formatTo(null, "%s|%s", big + n - 5, "end");
     u8 *c = null;
-    for (i = 0; i < 1000; i++) { c = str.appendFormat(c, "%d,", i % 10); }
-    if (!str.cmp(s, "aaaaa|end") && str.len(c) == 2000 && c[1998] == '9') { correct++; }
+    for (i = 0; i < 1000; i++) { c = cstr.appendFormat(c, "%d,", i % 10); }
+    if (!cstr.cmp(s, "aaaaa|end") && cstr.len(c) == 2000 && c[1998] == '9') { correct++; }
     mem.free(s);
     mem.free(c);
     mem.free(big);

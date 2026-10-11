@@ -1,5 +1,5 @@
 module fs;
-import str;
+import cstr;
 
 pub u8 *ext(u8 *src)
 {// Find dot char in name.
@@ -22,7 +22,7 @@ pub u8 *cutExt(u8 *src,u8 *dst=null)
     }
     if (ptr=ext(src)) {
         if (dst) {
-            str.copy(dst,ptr+1);
+            cstr.copy(dst,ptr+1);
         }
         *ptr=0;
     } else if (dst) {

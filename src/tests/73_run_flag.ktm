@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `ktm -run file.ktm` used to free its command string before handing it
  * to system(), so it ran nothing and exited 0. It must compile the
@@ -19,7 +19,7 @@ void cleanupRunTest(void) {
 }
 
 bool writeSource(u8 *path, u8 *source) {
-    return fs.writeAll(path, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    return fs.writeAll(path, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
 }
 
 /* The captured output of the last run must be exactly `expected` */
@@ -27,7 +27,7 @@ bool outputIs(u8 *expected) {
     u8 *out = fs.readAll(RUN_TEST_OUT);
     bool ok;
     if (!out) { return false; }
-    ok = str.cmp(out, expected) == 0;
+    ok = cstr.cmp(out, expected) == 0;
     if (!ok) { printf("got: '%s'\n", out); }
     mem.free(out);
     return ok;

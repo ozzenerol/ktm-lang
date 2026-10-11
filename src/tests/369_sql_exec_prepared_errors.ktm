@@ -1,4 +1,4 @@
-import sql, str, test;
+import cstr, sql, test;
 
 /* sql.execPrepared ignored the return codes of sqlite3_bind_* and skipped
  * parameters of an unknown type, so the statement ran anyway with null in
@@ -67,7 +67,7 @@ i32 main() {
     rc = sql.execPrepared(sel, &row, p + 1);
     tests++;
     if (rc == sql.SQLITE_ROW && sql.nextPrepared(&row) && row.col[0].type == sql.TEXT &&
-            !str.cmp(row.col[0].str, "ok")) {
+            !cstr.cmp(row.col[0].str, "ok")) {
         correct++;
     }
     sql.rowRelease(&row);

@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 #define _SOME_STRING      ("Hello World")
 #define _SOME_INT_MATHS   (10+(2*5+8-1))
@@ -27,7 +27,7 @@ i32 main() {
     i64 correct = 0, tests = 6;
     printf("Test - Preprocessor: ");
 
-    if (!str.cmp(_SOME_STRING,"Hello World")) { correct++; }
+    if (!cstr.cmp(_SOME_STRING,"Hello World")) { correct++; }
     if (_SOME_INT_MATHS == 27) { correct++; }
     if (_SOME_FLOAT_MATHS == 18.64) { correct++; }
     if (FOO == 24) { correct++; }

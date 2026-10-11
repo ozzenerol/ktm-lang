@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* map.strDelete wrote HT_DELETED into the insertion-order vector at the
  * *slot* index (a heap overflow once the slot was past the vector's end),
@@ -24,7 +24,7 @@ void countingFreeValue(void *value) {
 }
 
 u8 *dup(u8 *s) {
-    i64 len = str.len(s);
+    i64 len = cstr.len(s);
     u8 *d = mem.alloc(len + 1);
     mem.copy(d, s, len + 1);
     return d;
@@ -32,7 +32,7 @@ u8 *dup(u8 *s) {
 
 u8 *fmtFn(u8 *fmt, i64 i) {
     u8 tmp[64];
-    str.formatTo(tmp, fmt, i);
+    cstr.formatTo(tmp, fmt, i);
     return dup(tmp);
 }
 
@@ -43,12 +43,12 @@ i64 *box(i64 v) {
 }
 
 u8 *intStr(void *v) {
-    return str.formatTo(null, "%d", (i64)v);
+    return cstr.formatTo(null, "%d", (i64)v);
 }
 
 i64 keyNum(u8 *key)
 {/* "key-123" -> 123 */
-    return str.toInt(key + 4);
+    return cstr.toInt(key + 4);
 }
 
 i32 main() {
@@ -77,16 +77,16 @@ i32 main() {
             s.size == 2) { correct++; }
     u8 *keys = s.keysToStr();
     tests++;
-    if (!str.cmp(keys, "{a, c}")) { correct++; }
+    if (!cstr.cmp(keys, "{a, c}")) { correct++; }
     mem.free(keys);
     keys = s.toStr(&intStr);
     tests++;
-    if (!str.cmp(keys, "{[a] => 1, [c] => 3}")) { correct++; }
+    if (!cstr.cmp(keys, "{[a] => 1, [c] => 3}")) { correct++; }
     mem.free(keys);
     s.set("b", (void *)5);
     keys = s.keysToStr();
     tests++;
-    if (!str.cmp(keys, "{a, c, b}") && (i64)s.get("b") == 5 &&
+    if (!cstr.cmp(keys, "{a, c, b}") && (i64)s.get("b") == 5 &&
             s.size == 3) { correct++; }
     mem.free(keys);
     s.release();
@@ -100,7 +100,7 @@ i32 main() {
     }
     bad = 0;
     for (i = 0; i < 10000; i += 2) {
-        str.formatTo(buf, "key-%d", i);
+        cstr.formatTo(buf, "key-%d", i);
         if (!big.delete(buf)) { bad++; }
     }
     tests++;
@@ -110,9 +110,9 @@ i32 main() {
     /* Deleting again or deleting keys that never existed is false. */
     bad = 0;
     for (i = 0; i < 10000; i += 2) {
-        str.formatTo(buf, "key-%d", i);
+        cstr.formatTo(buf, "key-%d", i);
         if (big.delete(buf)) { bad++; }
-        str.formatTo(buf, "missing-%d", i);
+        cstr.formatTo(buf, "missing-%d", i);
         if (big.delete(buf) || big.has(buf)) { bad++; }
     }
     tests++;
@@ -120,7 +120,7 @@ i32 main() {
 
     bad = 0;
     for (i = 0; i < 10000; i++) {
-        str.formatTo(buf, "key-%d", i);
+        cstr.formatTo(buf, "key-%d", i);
         i64 *v = big.get(buf);
         if (i & 1) {
             if (!v || *v != i) { bad++; }
@@ -174,7 +174,7 @@ i32 main() {
 
     bad = 0;
     for (i = 0; i < 10000; i++) {
-        str.formatTo(buf, "key-%d", i);
+        cstr.formatTo(buf, "key-%d", i);
         i64 *v = big.get(buf);
         if (!v) { bad++; }
         else if ((i & 1) && *v != i + 100000) { bad++; }
@@ -200,11 +200,11 @@ i32 main() {
     bad = 0;
     for (i = 0; i < 20000; i++) {
         cyc.set(fmtFn("key-%d", i), box(i));
-        str.formatTo(buf, "key-%d", i);
+        cstr.formatTo(buf, "key-%d", i);
         if (!cyc.has(buf)) { bad++; }
         if (!cyc.delete(buf)) { bad++; }
         if (cyc.has(buf)) { bad++; }
-        str.formatTo(buf, "never-%d", i);
+        cstr.formatTo(buf, "never-%d", i);
         if (cyc.has(buf)) { bad++; }
     }
     tests++;
@@ -213,7 +213,7 @@ i32 main() {
     idx = 0;
     n = 0;
     while (cyc.iter(&idx, &node) && n < 10) {
-        if (str.cmp(node.key, "keep")) { bad++; }
+        if (cstr.cmp(node.key, "keep")) { bad++; }
         n++;
     }
     tests++;
@@ -292,7 +292,7 @@ i32 main() {
     tests++;
     if (n == 3 && col.size == 3 && (i64)col.get(65) == 31 &&
             !col.has(1) && (i64)col.get(0x7fffffffffffffff) == 40 &&
-            !str.cmp(keys, "{33, 65, 9223372036854775807}")) { correct++; }
+            !cstr.cmp(keys, "{33, 65, 9223372036854775807}")) { correct++; }
     mem.free(keys);
     col.set(1, (void *)11);
     tests++;

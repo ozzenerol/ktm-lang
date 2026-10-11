@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* A \u0000 in a JSON string or key cut it short: the parser decoded it
  * into a '\0' and everything after it was lost, also in json.toStr.
@@ -31,13 +31,13 @@ i32 main() {
             }
     tests++;
     u8 *s = json.toStr(j);
-    if (!str.cmp(s, "[\"a\\u0000b\",\"\\u0000\",\"plain\",\"\"]")) { correct++; }
+    if (!cstr.cmp(s, "[\"a\\u0000b\",\"\\u0000\",\"plain\",\"\"]")) { correct++; }
     else { printf("[%s]\n", s); }
     /* ...which parses back the same */
     tests++;
     json.Value *k = json.parse(s);
     u8 *s2 = json.toStr(k);
-    if (json.ok(k) && !str.cmp(s, s2)) { correct++; }
+    if (json.ok(k) && !cstr.cmp(s, s2)) { correct++; }
     mem.free(s);
     mem.free(s2);
     json.release(k);
@@ -53,7 +53,7 @@ i32 main() {
             }
     tests++;
     s = json.toStr(j);
-    if (!str.cmp(s, "{\"a\\u0000b\": 1,\"c\": \"x\\u0000\"}")) { correct++; }
+    if (!cstr.cmp(s, "{\"a\\u0000b\": 1,\"c\": \"x\\u0000\"}")) { correct++; }
     else { printf("[%s]\n", s); }
     mem.free(s);
     /* A key with a '\0' is selected by what comes before it */

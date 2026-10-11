@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 /* ktm syntax v0.2: true and false are bool literals (1 and 0) and null
  * is a null pointer (0 as a void *, so it converts to any pointer and to
@@ -67,7 +67,7 @@ i32 main() {
 
     tests++;   /* null is a pointer: it can be passed where one is expected */
     mem.free(null);
-    if (str.len(str.formatTo(null, "%d", true)) == 1) { correct++; }
+    if (cstr.len(cstr.formatTo(null, "%d", true)) == 1) { correct++; }
     else { printf("\n  as an argument\n"); }
 
     test.printResult(correct, tests);

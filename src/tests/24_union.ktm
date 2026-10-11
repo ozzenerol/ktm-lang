@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 struct BaseClass {
     i64 base;
@@ -19,9 +19,9 @@ bool testInheritanceOneLevel() {
     s.super = 69;
     s.superName = "super_name";
 
-    if (!str.cmp(s.baseName,"base_class")) { correct++; }
+    if (!cstr.cmp(s.baseName,"base_class")) { correct++; }
     if (s.base == 420) { correct++; }
-    if (!str.cmp(s.superName,"super_name")) { correct++; }
+    if (!cstr.cmp(s.superName,"super_name")) { correct++; }
     if (s.super == 69) { correct++; }
 
     mem.free(s);
@@ -45,13 +45,13 @@ bool testInheritanceTwoLevels() {
     a.anotherName = "another_name";
 
     if (a.base == 420) { correct++; }
-    if (!str.cmp(a.baseName,"base_class")) { correct++; }
+    if (!cstr.cmp(a.baseName,"base_class")) { correct++; }
 
     if (a.super == 69) { correct++; }
-    if (!str.cmp(a.superName,"super_name")) { correct++; }
+    if (!cstr.cmp(a.superName,"super_name")) { correct++; }
 
     if (a.another == 42) { correct++; }
-    if (!str.cmp(a.anotherName,"another_name")) { correct++; }
+    if (!cstr.cmp(a.anotherName,"another_name")) { correct++; }
 
     mem.free(a);
     return correct == tests;
@@ -78,11 +78,11 @@ bool testSimpleUnion() {
     u.name = "Foo";
 
     cat.fish = "food";
-    if (!str.cmp(cat.fish,"food")) {
+    if (!cstr.cmp(cat.fish,"food")) {
         correct++;
     }
 
-    if (!str.cmp(u.name,"Foo")) {
+    if (!cstr.cmp(u.name,"Foo")) {
         correct++;
     }
     mem.free(u);
@@ -116,15 +116,15 @@ bool testComplexUnion() {
     u.name = "Brian";
     u.age = 46;
 
-    if (!str.cmp(u.name,"Brian") && u.age == 46) { correct++; }
+    if (!cstr.cmp(u.name,"Brian") && u.age == 46) { correct++; }
     /* This is how unions work, despite it looking weird*/
-    if (!str.cmp(u.car,"Brian") && u.milage == 46) { correct++; }
+    if (!cstr.cmp(u.car,"Brian") && u.milage == 46) { correct++; }
 
     u.car = "Suzuki";
     u.milage = 17;
 
-    if (!str.cmp(u.car,"Suzuki") && u.milage == 17) { correct++; }
-    if (!str.cmp(u.name,"Suzuki") && u.age == 17) { correct++; }
+    if (!cstr.cmp(u.car,"Suzuki") && u.milage == 17) { correct++; }
+    if (!cstr.cmp(u.name,"Suzuki") && u.age == 17) { correct++; }
 
     mem.free(u);
     return correct == tests;

@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* Deeply nested JSON (80000 `[`) overflowed the stack: the parser,
  * json.toStr and json.release recurse once per level. Arrays and
@@ -28,7 +28,7 @@ i64 parseErr(i64 n, bool obj)
     i64 err = j.state.error;
     if (json.ok(j)) {
         u8 *o = json.toStr(j);
-        if (str.len(o) < n) { err = -1; }
+        if (cstr.len(o) < n) { err = -1; }
         mem.free(o);
     }
     json.release(j);
@@ -75,7 +75,7 @@ i32 main() {
     u8 *s = nest(600, false);
     j = json.parse(s);
     u8 *e = json.errorStr(j);
-    if (e && !str.cmpLen(e, "Arrays and objects nested more than 512 deep", 44)) { correct++; }
+    if (e && !cstr.cmpLen(e, "Arrays and objects nested more than 512 deep", 44)) { correct++; }
     else { printf("message: %s\n", e); }
     mem.free(e);
     json.release(j);

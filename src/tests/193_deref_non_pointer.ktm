@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `i64 d = 1 +* 2;` crashed ktm. It parses as `1 + (*2)` and the
  * unary `*` on an integer gave the expression no type (the "Unary type
@@ -24,7 +24,7 @@ bool failsWith(u8 *source, u8 *e1, u8 *e2 = null) {
     bool ok;
 
     cleanupDerefTest();
-    fs.writeAll(DEREF_TEST_SRC, source, str.len(source),
+    fs.writeAll(DEREF_TEST_SRC, source, cstr.len(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(DEREF_KTM DEREF_TEST_SRC " -o " DEREF_TEST_BIN " > "
                              DEREF_TEST_OUT " 2>&1; test $? -eq 1");
@@ -43,12 +43,12 @@ bool prints(u8 *source, u8 *expected) {
     bool ok;
 
     cleanupDerefTest();
-    fs.writeAll(DEREF_TEST_SRC, source, str.len(source),
+    fs.writeAll(DEREF_TEST_SRC, source, cstr.len(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(DEREF_KTM DEREF_TEST_SRC " -o " DEREF_TEST_BIN " && "
                              DEREF_TEST_BIN " > " DEREF_TEST_OUT " 2>&1");
     out = fs.readAll(DEREF_TEST_OUT);
-    ok = res == 0 && out && !str.cmp(out, expected);
+    ok = res == 0 && out && !cstr.cmp(out, expected);
     if (!ok) { printf("got (%d): '%s'\n", res, out); }
     mem.free(out);
     cleanupDerefTest();

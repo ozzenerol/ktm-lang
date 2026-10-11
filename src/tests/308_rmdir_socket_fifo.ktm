@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* fs.removeDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
  * number, not a bit mask: a socket (DT_SOCK 12) or block device (DT_BLK
@@ -16,7 +16,7 @@ u8 *gRoot;
 u8 gPath[256];
 
 u8 *P(u8 *name) {
-    str.formatTo(gPath, "%s/%s", gRoot, name);
+    cstr.formatTo(gPath, "%s/%s", gRoot, name);
     return gPath;
 }
 
@@ -44,7 +44,7 @@ bool makeSocket(u8 *path) {
     addr[0] = 1;
     addr[1] = 0;
 #endif
-    mem.copy(addr + 2, path, str.len(path) + 1);
+    mem.copy(addr + 2, path, cstr.len(path) + 1);
     bool ok = libc.bind(fd, addr, 106) == 0;
     libc.close(fd);
     return ok;
@@ -55,7 +55,7 @@ i32 main() {
     u8 root[64], *cmd;
     printf("Test - RmDir removes sockets and FIFOs: ");
 
-    str.copy(root, "./ktm-test-308-XXXXXX");
+    cstr.copy(root, "./ktm-test-308-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
@@ -75,7 +75,7 @@ i32 main() {
     if (fs.removeDir(P("t"), fs.REMOVE_RECURSE) == 0) { correct++; }
     if (!exists("t")) { correct++; }
 
-    cmd = str.formatTo(null, "rm -rf '%s'", root);
+    cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cmd);
     mem.free(cmd);
 

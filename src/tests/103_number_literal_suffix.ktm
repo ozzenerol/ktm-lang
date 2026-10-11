@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define NUM_SUFFIX_TEST_FILE "__103_number_literal_suffix.ktm"
 #define NUM_SUFFIX_TEST_OUT  "__103_number_literal_suffix.out"
@@ -23,7 +23,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupNumSuffixTest();
 
-    if (!fs.writeAll(NUM_SUFFIX_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NUM_SUFFIX_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

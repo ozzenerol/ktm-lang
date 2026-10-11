@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define FN_MACRO_TEST_FILE "__72_fn_macro_fail.ktm"
 #define FN_MACRO_TEST_OUT  "__72_fn_macro_fail.out"
@@ -32,7 +32,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupFnMacroTest();
 
-    if (!fs.writeAll(FN_MACRO_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FN_MACRO_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -124,7 +124,7 @@ bool testObjectLikeMacros(void) {
     bool ok = true;
     if (CALC != 42) { ok = false; }
     if (CALC_REF != 42) { ok = false; }
-    if (str.cmp(CALC_STR, "forty two")) { ok = false; }
+    if (cstr.cmp(CALC_STR, "forty two")) { ok = false; }
     if (CALC_F64 != 42.0) { ok = false; }
     if (CALC_CHAR != 'A') { ok = false; }
     if (CALC_CHR != 'b') { ok = false; }

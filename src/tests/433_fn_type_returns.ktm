@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* fn(...) types, three gaps:
  * - a `*` after the return type is part of it: `fn(u8 *) u8 *` returns
@@ -18,7 +18,7 @@ import fs, libc, mem, proc, str, test;
 
 u8 *diagnose(u8 *source) {
     proc.shell("rm -f " AT_SRC " " AT_OUT);
-    fs.writeAll(AT_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(AT_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "-S " AT_SRC " -o /dev/null > " AT_OUT " 2>&1");
@@ -29,7 +29,7 @@ u8 *diagnose(u8 *source) {
 
 /* ktm's output for body has want in it */
 bool prints(u8 *body, u8 *want) {
-    u8 *src = str.format(
+    u8 *src = cstr.format(
 "i64 t(i64 x) { return x; }
 fn(i64) i64 op = &t;
 %s
@@ -82,7 +82,7 @@ i32 main() {
     /* a `*` after the return type is part of it */
     fn(u8 *) u8 * d = &dup;
     fn(void *) void * w = &work;
-    tests++; if (!str.cmp(d("xab"), "ab") && !str.cmp(gDup("xy"), "y")) { correct++; }
+    tests++; if (!cstr.cmp(d("xab"), "ab") && !cstr.cmp(gDup("xy"), "y")) { correct++; }
     tests++; if ((i64)w((void *)7) == 7 && pickDup()("zq")[0] == 'q') { correct++; }
 
     /* (fn(...) R) * is a pointer to a function pointer */
@@ -108,8 +108,8 @@ i32 main() {
 
     /* typeof prints them as written */
     tests++;
-    if (!str.cmp(typeof(d), "fn(u8*) u8 *") && !str.cmp(typeof(slot), "(fn(i64) i64) *") &&
-            !str.cmp(typeof(b.slot), "(fn(i64) i64) *") && !str.cmp(typeof(gOp), "fn(i64) i64")) {
+    if (!cstr.cmp(typeof(d), "fn(u8*) u8 *") && !cstr.cmp(typeof(slot), "(fn(i64) i64) *") &&
+            !cstr.cmp(typeof(b.slot), "(fn(i64) i64) *") && !cstr.cmp(typeof(gOp), "fn(i64) i64")) {
         correct++;
             } else { printf("\n  %s | %s | %s\n", typeof(d), typeof(slot), typeof(b.slot)); }
 
@@ -120,7 +120,7 @@ i32 main() {
         correct++;
     }
     tests++;
-    if (!str.cmp(typeof(k), "fn(i64, i64) i64")) { correct++; }
+    if (!cstr.cmp(typeof(k), "fn(i64, i64) i64")) { correct++; }
     else { printf("\n  %s\n", typeof(k)); }
 
     /* varargs, named or not, typed or not, first or not */
@@ -140,10 +140,10 @@ i32 main() {
     tests++; if (seen == 2) { correct++; }
     tests++;
     if (sizeof(fn(...args) i64) == 8 && sizeof(fn(u8 *, ...args) i32) == 8 &&
-            !str.cmp(typeof(fn(...args) i64), "fn(...args) i64") &&
-            !str.cmp(typeof(fn(u8 *, ...args) i32), "fn(u8*, ...args) i32") &&
-            !str.cmp(typeof(fn(i64 ...nums) i64), "fn(i64 ...) i64") &&
-            !str.cmp(typeof(fn(...) i64), "fn(...) i64")) {
+            !cstr.cmp(typeof(fn(...args) i64), "fn(...args) i64") &&
+            !cstr.cmp(typeof(fn(u8 *, ...args) i32), "fn(u8*, ...args) i32") &&
+            !cstr.cmp(typeof(fn(i64 ...nums) i64), "fn(i64 ...) i64") &&
+            !cstr.cmp(typeof(fn(...) i64), "fn(...) i64")) {
         correct++;
             }
 

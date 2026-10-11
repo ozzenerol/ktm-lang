@@ -1,4 +1,4 @@
-import libc, str, test, thread;
+import cstr, libc, test, thread;
 
 /* thread.poolNew ignored pthread_create failing: the handles of the
  * workers that never started were left as uninitialised MAlloc memory
@@ -37,7 +37,7 @@ i64 threadsInProcess()
     if (!s) { return -1; }
     u8 *t = libc.strstr(s, "Threads:");
     if (!t) { return -1; }
-    return str.toInt(t + 8);
+    return cstr.toInt(t + 8);
 }
 
 bool onlyMainThread()
@@ -53,7 +53,7 @@ i64 vmSize()
 {// Bytes of address space in use
     u8 *s = readProc("/proc/self/statm");
     if (!s) { return -1; }
-    return str.toInt(s) * 4096;
+    return cstr.toInt(s) * 4096;
 }
 
 i32 childBadCounts() {

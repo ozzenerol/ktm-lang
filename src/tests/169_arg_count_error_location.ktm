@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A wrong argument count was underlined from the first `(` to the first
  * `)` of the line, so `void Main() { i64 x = One(1); i64 y = Two(1); }`
@@ -17,7 +17,7 @@ void cleanupAcTest() {
 /* Compiles `body` (line 6 of the file) and checks the output has both
  * `where` (file:line:col) and `underline` (the caret line's carets). */
 bool errorAt(u8 *body, u8 *where, u8 *underline) {
-    u8 *src = str.format("i64 One(i64 a) { return a; }\n"
+    u8 *src = cstr.format("i64 One(i64 a) { return a; }\n"
                                             "i64 Two(i64 a, i64 b) { return a + b; }\n"
                                             "i64 Va(i64 a, ...) { return a; }\n"
                                             "struct C { fn(i64 a) i64 f; };\n"
@@ -26,7 +26,7 @@ bool errorAt(u8 *body, u8 *where, u8 *underline) {
     u8 *out;
     bool ok = false;
     cleanupAcTest();
-    if (fs.writeAll(AC_TEST_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (fs.writeAll(AC_TEST_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " AC_TEST_FILE " > " AC_TEST_OUT " 2>&1") != 0) {
             out = fs.readAll(AC_TEST_OUT);
             if (out) {

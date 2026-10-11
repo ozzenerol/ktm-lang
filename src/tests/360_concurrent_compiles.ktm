@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* ktm wrote its intermediate assembly to the fixed path /tmp/ktm-asm.s,
  * so compiles running at the same time assembled each other's code (or a
@@ -15,14 +15,14 @@ u8 *programSource(i64 id) {
     i64 len = 0, i;
     u8 *src = null;
     for (i = 0; i < CC_FUNCS; i++) {
-        src = str.appendFormatLen(src, &len, "i64 Fn%d(i64 x) { return x * 3 + %d; }\n",
+        src = cstr.appendFormatLen(src, &len, "i64 Fn%d(i64 x) { return x * 3 + %d; }\n",
                                             i, i + id * 1000);
     }
-    src = str.appendFormatLen(src, &len, "void main()\n{\n  i64 s = 0;\n");
+    src = cstr.appendFormatLen(src, &len, "void main()\n{\n  i64 s = 0;\n");
     for (i = 0; i < CC_FUNCS; i++) {
-        src = str.appendFormatLen(src, &len, "  s += Fn%d(1);\n", i);
+        src = cstr.appendFormatLen(src, &len, "  s += Fn%d(1);\n", i);
     }
-    src = str.appendFormatLen(src, &len, "  printf(\"prog %d %%d\\n\", s);\n}\n", id);
+    src = cstr.appendFormatLen(src, &len, "  printf(\"prog %d %%d\\n\", s);\n}\n", id);
     return src;
 }
 
@@ -32,9 +32,9 @@ i64 expectedSum(i64 id) {
 
 bool writeSources() {
     for (i64 id = 0; id < CC_JOBS; id++) {
-        u8 *path = str.format(CC_DIR "/p%d.ktm", id);
+        u8 *path = cstr.format(CC_DIR "/p%d.ktm", id);
         u8 *src = programSource(id);
-        bool ok = fs.writeAll(path, src, str.len(src));
+        bool ok = fs.writeAll(path, src, cstr.len(src));
         mem.free(src);
         mem.free(path);
         if (!ok) { return false; }
@@ -47,7 +47,7 @@ i64 leftoverTmpFiles(u8 *dir) {
     u8 *out = proc.shellOutput("ls -A '%s' | grep -c '^ktm-'", dir);
     i64 n = -1;
     if (out) {
-        n = str.toInt(out);
+        n = cstr.toInt(out);
         mem.free(out);
     }
     return n;
@@ -61,11 +61,11 @@ bool compileAllAtOnce(u8 *flags) {
     bool ok = true;
 
     for (id = 0; id < CC_JOBS; id++) {
-        cmd = str.appendFormatLen(cmd, &len,
+        cmd = cstr.appendFormatLen(cmd, &len,
                 "TMPDIR=\"$PWD/" CC_DIR "/tmp\" " CC_KTM "%s " CC_DIR "/p%d.ktm -o "
                 CC_DIR "/p%d > " CC_DIR "/p%d.log 2>&1 &\n", flags, id, id, id);
     }
-    cmd = str.appendFormatLen(cmd, &len, "wait\n");
+    cmd = cstr.appendFormatLen(cmd, &len, "wait\n");
     proc.shell("rm -f " CC_DIR "/p? " CC_DIR "/p?.log " CC_DIR "/p?.out");
     proc.shell(cmd);
     mem.free(cmd);
@@ -75,19 +75,19 @@ bool compileAllAtOnce(u8 *flags) {
     cmd = null;
     len = 0;
     for (id = 0; id < CC_JOBS; id++) {
-        cmd = str.appendFormatLen(cmd, &len, "./" CC_DIR "/p%d > " CC_DIR "/p%d.out 2>&1 &\n",
+        cmd = cstr.appendFormatLen(cmd, &len, "./" CC_DIR "/p%d > " CC_DIR "/p%d.out 2>&1 &\n",
                                             id, id);
     }
-    cmd = str.appendFormatLen(cmd, &len, "wait\n");
+    cmd = cstr.appendFormatLen(cmd, &len, "wait\n");
     proc.shell(cmd);
     mem.free(cmd);
 
     for (id = 0; id < CC_JOBS; id++) {
-        u8 *path = str.format(CC_DIR "/p%d.out", id);
+        u8 *path = cstr.format(CC_DIR "/p%d.out", id);
         u8 *out = fs.readAll(path);
-        u8 *want = str.format("prog %d %d\n", id, expectedSum(id));
-        if (!out || str.cmp(out, want)) {
-            u8 *log = fs.readAll(str.format(CC_DIR "/p%d.log", id));
+        u8 *want = cstr.format("prog %d %d\n", id, expectedSum(id));
+        if (!out || cstr.cmp(out, want)) {
+            u8 *log = fs.readAll(cstr.format(CC_DIR "/p%d.log", id));
             printf("program %d: got '%s', want '%s'\n%s\n", id, out, want, log);
             ok = false;
         }
@@ -119,7 +119,7 @@ i32 main() {
 
     /* ... and when linking fails (ktm exits through its panic path) */
     u8 *bad = "extern \"c\" void Ktm360NoSuchFn();\nvoid main() { Ktm360NoSuchFn(); }\n";
-    fs.writeAll(CC_DIR "/bad.ktm", bad, str.len(bad));
+    fs.writeAll(CC_DIR "/bad.ktm", bad, cstr.len(bad));
     if (proc.shell("TMPDIR=\"$PWD/" CC_DIR "/tmp\" " CC_KTM CC_DIR "/bad.ktm -o " CC_DIR "/bad > /dev/null 2>&1") != 0) { correct++; }
     else { printf("Failed - linking an undefined function succeeded\n"); }
     if (leftoverTmpFiles(CC_DIR "/tmp") == 0) { correct++; }

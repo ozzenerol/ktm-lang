@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* `#define X (0.5 && 1)` folded to 0: the constant folder truncated the
  * float operands of &&, || and ! to integers, so 0.5 counted as false.
@@ -32,17 +32,17 @@ i32 main() {
 
     printf("Test - #define with float operands of &&, || and !: ");
 
-    if (AND_F == 1 && !str.cmp(typeof(AND_F), "i64")) { correct++; }
+    if (AND_F == 1 && !cstr.cmp(typeof(AND_F), "i64")) { correct++; }
     if (AND_F2 == 1 && AND_FF == 1) { correct++; }
     if (AND_ZERO == 0 && AND_NEG == 1) { correct++; }
     if (AND_MACRO == 1) { correct++; }
-    if (OR_F == 1 && !str.cmp(typeof(OR_F), "i64")) { correct++; }
+    if (OR_F == 1 && !cstr.cmp(typeof(OR_F), "i64")) { correct++; }
     if (OR_ZERO == 0 && OR_ZEROF == 0) { correct++; }
-    if (NOT_F == 0 && !str.cmp(typeof(NOT_F), "i64")) { correct++; }
+    if (NOT_F == 0 && !cstr.cmp(typeof(NOT_F), "i64")) { correct++; }
     if (NOT_ZERO == 1 && NOT_NOT == 1) { correct++; }
     if (CMP_AND == 1) { correct++; }
-    if (F_AND == 1.5 && !str.cmp(typeof(F_AND), "f64")) { correct++; }
-    if (F_NOT == 1.5 && !str.cmp(typeof(F_NOT), "f64")) { correct++; }
+    if (F_AND == 1.5 && !cstr.cmp(typeof(F_AND), "f64")) { correct++; }
+    if (F_NOT == 1.5 && !cstr.cmp(typeof(F_NOT), "f64")) { correct++; }
 
     /* The folded value equals the run-time one. */
     if (AND_F == (h && 1) && AND_NEG == (-h && 1)) { correct++; }

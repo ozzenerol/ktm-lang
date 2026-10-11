@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `p || T()` where p is a pointer and T() returns bool (or any other
  * char-kind operand: a bool/u8/i8 variable) failed to compile with
@@ -32,7 +32,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
     i64 res;
 
     cleanupLogPtrTest();
-    if (!fs.writeAll(LOGPTR_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(LOGPTR_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " LOGPTR_TEST_FILE " > " LOGPTR_TEST_OUT " 2>&1");

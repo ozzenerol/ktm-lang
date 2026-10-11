@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* The conditional operator `cond ? a : b`: right-associative, lower
  * precedence than ||, only the chosen branch evaluated, usual arithmetic
@@ -78,8 +78,8 @@ void conversions() {
 void pointers() {
     i64 a = 1;
     u8 *s = a ? "yes" : "no";
-    check(!str.cmp(s, "yes"), "string branches");
-    check(!str.cmp(a > 1 ? "yes" : "no", "no"), "string false branch");
+    check(!cstr.cmp(s, "yes"), "string branches");
+    check(!cstr.cmp(a > 1 ? "yes" : "no", "no"), "string false branch");
     /* pointer and null. */
     u8 *p = a ? s : null;
     check(p != null, "pointer / null, pointer chosen");

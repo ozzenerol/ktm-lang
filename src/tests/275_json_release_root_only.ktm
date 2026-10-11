@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.release on a node from json.select freed it and every node after
  * it, leaving the document pointing at freed memory. It now only frees a
@@ -20,8 +20,8 @@ i32 main() {
     json.release(null);
     u8 *s = json.toStr(d);
     tests++;
-    if (!str.cmp(s, "{\"a\": [1,{\"x\": \"y\"}],\"b\": \"str\",\"c\": {\"k\": null}}") &&
-            !str.cmp(json.select(d, ".a[1].x").str, "y")) { correct++; }
+    if (!cstr.cmp(s, "{\"a\": [1,{\"x\": \"y\"}],\"b\": \"str\",\"c\": {\"k\": null}}") &&
+            !cstr.cmp(json.select(d, ".a[1].x").str, "y")) { correct++; }
     else { printf("document changed: %s\n", s); }
     mem.free(s);
 

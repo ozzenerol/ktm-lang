@@ -1,4 +1,4 @@
-import proc, str, test;
+import cstr, proc, test;
 
 /* `u8 buf[] = "abc";` inside a function used to store the literal's
  * address into the array's first 8 bytes instead of copying the
@@ -20,7 +20,7 @@ i64 gWritesOk = 0;
 void bumpFirst() {
     u8 b[] = "abc";
     b[0]++;
-    if (!str.cmp(b, "bbc")) { gWritesOk++; }
+    if (!cstr.cmp(b, "bbc")) { gWritesOk++; }
 }
 
 i64 gRecOk = 0;
@@ -39,18 +39,18 @@ i32 main() {
     printf("Test - local u8 array initialised from a string: ");
 
     u8 buf[] = "abc";
-    if (!str.cmp(buf, "abc")) { correct++; }
+    if (!cstr.cmp(buf, "abc")) { correct++; }
     if (sizeof(buf) == 4) { correct++; }
 
     u8 exact[4] = "abc";
-    if (!str.cmp(exact, "abc") && sizeof(exact) == 4) { correct++; }
+    if (!cstr.cmp(exact, "abc") && sizeof(exact) == 4) { correct++; }
 
     u8 big[8] = "abc";
     zeros = 0;
     for (i = 3; i < 8; i++) {
         if (big[i] == 0) { zeros++; }
     }
-    if (!str.cmp(big, "abc") && sizeof(big) == 8) { correct++; }
+    if (!cstr.cmp(big, "abc") && sizeof(big) == 8) { correct++; }
     if (zeros == 5) { correct++; }
 
     /* Escapes are decoded: 'a', '\t', 'b', NUL. */
@@ -59,9 +59,9 @@ i32 main() {
 
     /* Writable, and only the local copy changes. */
     buf[0] = 'X';
-    if (!str.cmp(buf, "Xbc")) { correct++; }
+    if (!cstr.cmp(buf, "Xbc")) { correct++; }
     u8 *lit = "abc";
-    if (!str.cmp(lit, "abc")) { correct++; }
+    if (!cstr.cmp(lit, "abc")) { correct++; }
 
     bumpFirst();
     bumpFirst();
@@ -85,8 +85,8 @@ i32 main() {
     if (p.x == 1 && p.y == 2) { correct++; }
 
     /* Globals: inline bytes, zero-filled tail, neighbour untouched. */
-    if (!str.cmp(gBuf, "abc") && sizeof(gBuf) == 4) { correct++; }
-    if (!str.cmp(gBig, "ab") && sizeof(gBig) == 8 && gBig[7] == 0 &&
+    if (!cstr.cmp(gBuf, "abc") && sizeof(gBuf) == 4) { correct++; }
+    if (!cstr.cmp(gBig, "ab") && sizeof(gBig) == 8 && gBig[7] == 0 &&
             gAfter == 77) {
         correct++;
     }

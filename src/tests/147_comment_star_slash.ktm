@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* The block comment scan started on the opener's `*`, so `/` `*` `/`
  * opened and closed a comment in three characters and what followed
@@ -35,7 +35,7 @@ bool compile(u8 *source, i64 count, u8 *want) {
 
     cleanupSlashTest();
 
-    if (!fs.writeAll(SLASH_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SLASH_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

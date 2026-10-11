@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.toStr printed an empty object or array as `{(nil)}` / `[(nil)]`
  * and wrote strings with %Q (DolDoc quoting: `$` doubled, `\v`, raw
@@ -7,7 +7,7 @@ import json, mem, str, test;
 i64 gCorrect = 0;
 
 void expect(u8 *got, u8 *want) {
-    if (!str.cmp(got, want)) { gCorrect++; }
+    if (!cstr.cmp(got, want)) { gCorrect++; }
     else { printf("\n  got  %s\n  want %s\n", got, want); }
 }
 
@@ -48,9 +48,9 @@ i32 main() {
     /* Other control characters become \u00XX; DEL and UTF-8 stay as they are */
     json.Value *j = json.parse("{\"s\": \"x\"}");
     mem.free(j.object.str);
-    u8 *ctl = str.dup("a\x01b\x1Fc\x0B\x7F\xC3\xA9");
+    u8 *ctl = cstr.dup("a\x01b\x1Fc\x0B\x7F\xC3\xA9");
     j.object.str = ctl;
-    j.object.strLen = str.len(ctl); /* the length json.toStr writes */
+    j.object.strLen = cstr.len(ctl); /* the length json.toStr writes */
     u8 *out = json.toStr(j);
     expect(out, "{\"s\": \"a\\u0001b\\u001fc\\u000b\x7F\xC3\xA9\"}");
     mem.free(out);

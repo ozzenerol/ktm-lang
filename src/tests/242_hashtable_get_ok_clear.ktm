@@ -1,4 +1,4 @@
-import map, mem, str, test;
+import cstr, map, mem, test;
 
 /* Hash table API additions and fixes:
  *  - map.intGet/map.strGet/map.strGetLen take an optional `bool *_ok`, true
@@ -19,7 +19,7 @@ i64 gValueFrees = 0;
 
 u8 *new(u8 *s) {
     gAllocs++;
-    return str.dup(s);
+    return cstr.dup(s);
 }
 
 void freeKey(void *p) {
@@ -109,7 +109,7 @@ i32 main() {
     /* map.strClear with destructors, shared and separate pointers */
     sm = countingMap();
     for (i64 i = 0; i < 40; i++) {
-        u8 *k = str.formatTo(null, "k%d", i);
+        u8 *k = cstr.formatTo(null, "k%d", i);
         gAllocs++;
         if (i % 2) { sm.set(k, k); }
         else       { sm.set(k, new("v")); }
@@ -183,7 +183,7 @@ i32 main() {
     map.StrMap.setFreeKey(null, &freeKey);
     map.StrMap.setFreeValue(null, &freeValue);
     strVal = map.IntMap.keysToStr(null);
-    bool emptyStr = !str.cmp(strVal, "{}");
+    bool emptyStr = !cstr.cmp(strVal, "{}");
     mem.free(strVal);
 
     sm = map.strNew();

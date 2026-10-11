@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* `ktm -lib name dir`, dir not module name's directory: every module
  * under dir (net/http is net.http) goes into one library, dir/libname.a
@@ -23,7 +23,7 @@ bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " OUT " " BIN);
     proc.shell(cmd);
     u8 *out = fs.readAll(OUT);
-    bool ok = out && !str.cmp(out, want);
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " OUT " " BIN);

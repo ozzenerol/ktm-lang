@@ -81,7 +81,7 @@ ktm -jit hello.ktm                    # or compile in memory and run straight aw
 <h3 id="a-request-and-a-reply">A request and a reply<a class="anchor" href="#a-request-and-a-reply" aria-label="Link to this section">#</a></h3>
 <p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
 Unix sockets, IPv4 and IPv6.</p>
-<pre data-run><code>import libc, mem, net, str;
+<pre data-run><code>import cstr, libc, mem, net;
 
 void main()
 {
@@ -96,9 +96,9 @@ void main()
   n = libc.recv(conn, req, sizeof(req) - 1, 0);   // the server side
   req[n] = '\0';
   u8 *path = req + 4;                          // after "GET "
-  *str.firstOf(path, " ") = '\0';
-  u8 *reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
-  net.send(conn, reply, str.len(reply));
+  *cstr.firstOf(path, " ") = '\0';
+  u8 *reply = cstr.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  net.send(conn, reply, cstr.len(reply));
   libc.close(conn);
 
   n = libc.recv(cli, resp, sizeof(resp) - 1, libc.MSG_WAITALL);  // the client side
@@ -116,7 +116,7 @@ void main()
 <h3 id="running-a-program">Running a program<a class="anchor" href="#running-a-program" aria-label="Link to this section">#</a></h3>
 <p><code>proc.run</code> runs a command and returns what it printed; <code>proc.spawn</code> gives
 you its pipes.</p>
-<pre data-run><code>import mem, proc;
+<pre data-run><code>import cstr, mem, proc;
 
 void main()
 {
@@ -135,7 +135,7 @@ exit code 0
 <div class="sample">
 <h3 id="threads">Threads<a class="anchor" href="#threads" aria-label="Link to this section">#</a></h3>
 <p>POSIX threads directly, or a thread pool from the library.</p>
-<pre data-run><code>import libc;
+<pre data-run><code>import cstr, libc;
 
 i64 sums[4];
 

@@ -1,5 +1,5 @@
 module vec;
-import libc, mem, os, str;
+import cstr, libc, mem, os;
 
 pub struct IntVec {
     i64 size;
@@ -19,9 +19,9 @@ pub struct FloatVec {
 /* Get/Set with an index outside [0, size): report it on stderr and exit,
  * rather than read or write past the entries. */
 static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
-    u8 *msg = str.formatTo(null, "%s: index %d out of range (size %d)\n",
+    u8 *msg = cstr.formatTo(null, "%s: index %d out of range (size %d)\n",
                                          fnName, idx, size);
-    libc.write(os.STDERR, msg, str.len(msg));
+    libc.write(os.STDERR, msg, cstr.len(msg));
     os.exit(1);
 }
 

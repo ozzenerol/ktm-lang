@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `void Main() { i64 a[; }` crashed ktm: the array size expression was
  * empty (parseExpr returned null at the `;`) and was evaluated anyway.
@@ -23,7 +23,7 @@ bool failsWith(u8 *source, u8 *e1, u8 *e2 = null) {
     bool ok;
 
     cleanupArrSizeTest();
-    fs.writeAll(ARRSZ_TEST_SRC, source, str.len(source),
+    fs.writeAll(ARRSZ_TEST_SRC, source, cstr.len(source),
                         libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     res = proc.shell(ARRSZ_KTM ARRSZ_TEST_SRC " -o " ARRSZ_TEST_BIN " > "
                              ARRSZ_TEST_OUT " 2>&1; test $? -eq 1");

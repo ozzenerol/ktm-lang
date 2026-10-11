@@ -428,6 +428,28 @@ Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var) {
         cctrlRaiseException(cc,"Cannot have a default value of type array");
     }
     Ast *init = parseExpr(cc,16);
+    /* `u8[] chars = " \t"`: the default is evaluated at each call, in the
+     * caller, so its slice goes into a hidden static, not a local */
+    if (init && astTypeIsSlice(var->type) && init->type &&
+        init->type->kind == AST_TYPE_ARRAY) {
+        AstType *want = var->type;
+        Ast *converted = parseSliceFrom(cc, want, init);
+        if (converted != init && converted->kind == AST_SLICE_MAKE &&
+            converted->slice_var->kind == AST_LVAR) {
+            static int default_id = 0;
+            AoStr *name = aoStrPrintf("#slicedefault%d", default_id++);
+            Ast *gvar = astGVar(want, name->data, name->len, 1);
+            listAppend(cc->ast_list, astDecl(gvar, NULL));
+            /* the local parseSliceFrom made isn't one: drop it */
+            if (cc->tmp_locals && cc->tmp_locals->prev->value == converted->slice_var) {
+                List *last = cc->tmp_locals->prev;
+                last->prev->next = cc->tmp_locals;
+                cc->tmp_locals->prev = last->prev;
+            }
+            converted->slice_var = gvar;
+        }
+        init = converted;
+    }
     return astFunctionDefaultParam(var,init);
 }
 
@@ -2040,11 +2062,12 @@ static int parseFormatArgIdx(char *fname, int len) {
     /* May as well type-check ktm's library too which is even more
      * prone to erroring. */
     else if (len == 10 && !strncmp(fname, str_lit("str.format"))) return 0;
+    else if (len == 11 && !strncmp(fname, str_lit("cstr.format"))) return 0;
     else if (len == 14 && !strncmp(fname, str_lit("rt.__ktmPrintf"))) return 0;
-    else if (len == 12 && !strncmp(fname, str_lit("str.formatTo"))) return 1;
-    else if (len == 16 && !strncmp(fname, str_lit("str.appendFormat"))) return 1;
-    else if (len == 19 && !strncmp(fname, str_lit("str.appendFormatLen"))) return 2;
-    else if (len == 16 && !strncmp(fname, str_lit("str.formatToSize"))) return 2;
+    else if (len == 13 && !strncmp(fname, str_lit("cstr.formatTo"))) return 1;
+    else if (len == 17 && !strncmp(fname, str_lit("cstr.appendFormat"))) return 1;
+    else if (len == 20 && !strncmp(fname, str_lit("cstr.appendFormatLen"))) return 2;
+    else if (len == 17 && !strncmp(fname, str_lit("cstr.formatToSize"))) return 2;
     /* s.appendFormat(fmt, ...) of a String (its arguments without self) */
     else if (len == 19 && !strncmp(fname, str_lit("String.appendFormat"))) return 0;
     /* `throw(code, fmt, ...)`, checked as a call to it */

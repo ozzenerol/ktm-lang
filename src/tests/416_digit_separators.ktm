@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* ktm syntax v0.2: `_` may appear between two digits of a number
  * literal (its own base: decimal, or hex inside a hex literal) and is
@@ -27,7 +27,7 @@ bool compileFailsWithMisplaced(u8 *source) {
 
     cleanupSepTest();
 
-    if (!fs.writeAll(SEP_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SEP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

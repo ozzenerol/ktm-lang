@@ -1,4 +1,4 @@
-import fs, libc, mem, str, test;
+import cstr, fs, libc, mem, test;
 
 /* fs.writeAll's default flags were O_CREAT|O_RDWR without O_TRUNC, so
  * writing a shorter buffer over a file kept the old tail. A negative
@@ -17,7 +17,7 @@ bool exists(u8 *path) {
 bool holds(u8 *path, u8 *want) {
     i64 size = -1;
     u8 *got = fs.readAll(path, &size);
-    bool ok = got && size == str.len(want) && !str.cmp(got, want);
+    bool ok = got && size == cstr.len(want) && !cstr.cmp(got, want);
     if (!ok && got) { printf("got %d bytes '%s'\n", size, got); }
     if (got) { mem.free(got); }
     return ok;
@@ -28,14 +28,14 @@ i32 main() {
     u8 root[64], *f, *g;
     printf("Test - FileWrite truncates: ");
 
-    str.copy(root, "./ktm-test-302-XXXXXX");
+    cstr.copy(root, "./ktm-test-302-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
         return 0;
     }
-    f = str.formatTo(null, "%s/f.txt", root);
-    g = str.formatTo(null, "%s/g.txt", root);
+    f = cstr.formatTo(null, "%s/f.txt", root);
+    g = cstr.formatTo(null, "%s/g.txt", root);
 
     if (fs.writeAll(f, "a long first version\n", 21)) { correct++; }
     if (fs.writeAll(f, "short\n", 6) && holds(f, "short\n")) { correct++; }

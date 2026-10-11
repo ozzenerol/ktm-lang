@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, str, test;
 
 /* `i64 Exit(i64 x)` in a program silently replaced the library's
  * `_extern` bound Exit on x86_64 and was rejected on arm64. With the
@@ -24,16 +24,16 @@ bool conflicts(u8 *src, u8 *name) {
     bool ok;
 
     cleanupRedecl();
-    if (!fs.writeAll(REDECL_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(REDECL_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " REDECL_FILE " > " REDECL_OUT " 2>&1");
     out = fs.readAll(REDECL_OUT);
     if (name) {
-        str.formatTo(want, REDECL_MSG "%s`", name);
+        cstr.formatTo(want, REDECL_MSG "%s`", name);
         ok = res != 0 && out && libc.strstr(out, want) != null;
     } else {
-        ok = res == 0 && out && !str.cmp(out, "ok\n");
+        ok = res == 0 && out && !cstr.cmp(out, "ok\n");
     }
     if (!ok && out) { printf("%s\n", out); }
     mem.free(out);

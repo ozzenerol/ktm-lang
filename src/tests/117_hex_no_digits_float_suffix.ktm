@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define HEX_NO_DIGITS_TEST_FILE "__117_hex_no_digits.ktm"
 #define HEX_NO_DIGITS_TEST_OUT  "__117_hex_no_digits.out"
@@ -19,7 +19,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupHexNoDigitsTest();
 
-    if (!fs.writeAll(HEX_NO_DIGITS_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(HEX_NO_DIGITS_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* The rest of the REPL's builtins in camelCase like replDisasm (were
  * ReplListGVars, ReplClassRep, ReplEval, ReplHeap and ReplReloadRc). */
@@ -17,7 +17,7 @@ i32 main() {
               "replHeap();\n"
               "replReloadRc();\n"
               "printf(\"end\\n\");\n";
-    fs.writeAll(IN_FILE, src, str.len(src));
+    fs.writeAll(IN_FILE, src, cstr.len(src));
     /* HOME here, so no ~/.ktm_rc.ktm is read */
     u8 *out = proc.shellOutput("HOME=. $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "

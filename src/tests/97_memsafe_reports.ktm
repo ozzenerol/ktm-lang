@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `ktm -jit -Memsafe` reported leaks and double frees in correct code:
  * its pointer table (a containers.c Map) ended every lookup at the
@@ -23,7 +23,7 @@ void cleanupMemsafeTest(void) {
 
 /* Write `source` and run it under -Memsafe; true if ktm exited 0 */
 bool runMemsafe(u8 *source, u8 *cmd = MS_RUN) {
-    fs.writeAll(MS_PROG, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(MS_PROG, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     return proc.shell(cmd) == 0;
 }
 
@@ -32,7 +32,7 @@ bool stdoutIs(u8 *expected) {
     u8 *out = fs.readAll(MS_OUT);
     bool ok;
     if (!out) { return false; }
-    ok = str.cmp(out, expected) == 0;
+    ok = cstr.cmp(out, expected) == 0;
     if (!ok) { printf("got: '%s'\n", out); }
     mem.free(out);
     return ok;
@@ -56,7 +56,7 @@ i32 main() {
      * allocator entry point, stdlib strings and containers with
      * destructors. Nothing may be reported. */
     if (runMemsafe(
-"import map, mem, str, vec;
+"import cstr, map, mem, vec;
 
 void freeIt(void *p) { mem.free(p); }
 void main()
@@ -75,10 +75,10 @@ void main()
   p = mem.alloc(0); mem.free(p);
   p = mem.alloc(40); if (mem.size(p) != 40) { printf(\"bad MSize\\n\"); } mem.free(p);
   mem.free(null);
-  s = str.dup(\"hello\"); mem.free(s);
-  s = str.formatTo(null, \"%d\", 42); mem.free(s);
-  s = str.format(\"%d\", 7); mem.free(s);
-  s = str.dup(\"a\"); s = str.appendFormat(s, \"%d\", 123); mem.free(s);
+  s = cstr.dup(\"hello\"); mem.free(s);
+  s = cstr.formatTo(null, \"%d\", 42); mem.free(s);
+  s = cstr.format(\"%d\", 7); mem.free(s);
+  s = cstr.dup(\"a\"); s = cstr.appendFormat(s, \"%d\", 123); mem.free(s);
   vec.PtrVec *v = vec.ptrNew();
   for (i = 0; i < 1000; i++) { v.push(mem.alloc(24)); }
   v.release(&freeIt);
@@ -87,7 +87,7 @@ void main()
   m.setFreeKey(&mem.free);
   for (i = 0; i < 2000; i++) {
     s = mem.alloc(16);
-    str.formatTo(s, \"k%d\", i);
+    cstr.formatTo(s, \"k%d\", i);
     m.set(s, mem.allocZero(8));
   }
   m.release();

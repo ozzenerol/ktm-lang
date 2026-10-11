@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define NONCONST_FILE "__122_define_nonconstant_value.ktm"
 #define NONCONST_OUT  "__122_define_nonconstant_value.out"
@@ -31,7 +31,7 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *useLoc) {
 
     cleanupNonConstTest();
 
-    if (!fs.writeAll(NONCONST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NONCONST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -44,9 +44,9 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *useLoc) {
         return false;
     }
 
-    want = str.format("error: %s\n --> " NONCONST_FILE ":%s\n", msg, loc);
+    want = cstr.format("error: %s\n --> " NONCONST_FILE ":%s\n", msg, loc);
     if (useLoc) {
-        wantUse = str.format("error: Variable or function `X` has not been defined\n --> "
+        wantUse = cstr.format("error: Variable or function `X` has not been defined\n --> "
                                                  NONCONST_FILE ":%s\n", useLoc);
     }
     if (!libc.strstr(out, want)) { ok = false; }
@@ -180,7 +180,7 @@ i32 main() {
     if (NC_FLT == 3.0) { correct++; }
     else { printf("Failed - float define: %f\n", NC_FLT); }
 
-    if (!str.cmp(NC_STR, "hello") && !str.cmp(NC_PSTR, "abc")) { correct++; }
+    if (!cstr.cmp(NC_STR, "hello") && !cstr.cmp(NC_PSTR, "abc")) { correct++; }
     else { printf("Failed - string defines: %s %s\n", NC_STR, NC_PSTR); }
 
     test.printResult(correct, tests);

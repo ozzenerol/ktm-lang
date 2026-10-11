@@ -1,4 +1,4 @@
-import libc, mem, str, test;
+import cstr, libc, mem, test;
 
 /* msghdr had msg_iovlen as i32 and msg_controllen as i64 everywhere. On
  * Linux both are size_t, so the upper half of msg_iovlen was whatever was
@@ -68,7 +68,7 @@ i32 main() {
     m.msg_iov = io; m.msg_iovlen = 2;
     m.msg_control = null; m.msg_controllen = 0; m.msg_flags = 0;
     n = libc.recvmsg(sv[1], &m, 0);
-    check(n == 5 && !str.cmp(buf, "hello"), "recvmsg fills both buffers");
+    check(n == 5 && !cstr.cmp(buf, "hello"), "recvmsg fills both buffers");
     check(m.msg_flags == 0, "msg_flags after recvmsg");
     libc.close(sv[0]);
     libc.close(sv[1]);
@@ -94,7 +94,7 @@ i32 main() {
     m.msg_iov = io; m.msg_iovlen = 1;
     m.msg_control = null; m.msg_controllen = 0; m.msg_flags = 0;
     n = libc.recvmsg(u, &m, 0);
-    check(n == 4 && !str.cmp(buf, "ping"), "recvmsg udp");
+    check(n == 4 && !cstr.cmp(buf, "ping"), "recvmsg udp");
     check(m.msg_namelen == sizeof(libc.sockaddr_in), "msg_namelen after recvmsg");
     check(from.sin_port == me.sin_port, "sender address");
     libc.close(u);

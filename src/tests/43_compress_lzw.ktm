@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 enum Err { compress };
 
@@ -327,7 +327,7 @@ u8 *expandBuf(CArcCompress *arc)
 bool roundTrip(u8 *src, i64 n) {
   CArcCompress *arc = compressBuf(src, n);
   u8 *out = expandBuf(arc);
-  bool ok = arc.expandedSize == n && !str.cmpLen(out, src, n);
+  bool ok = arc.expandedSize == n && !cstr.cmpLen(out, src, n);
   mem.free(out);
   mem.free(arc);
   return ok;
@@ -345,7 +345,7 @@ bool repeatedBufferRoundTrip() {
             "the quick brown fox jumps over the lazy dog. "
             "the quick brown fox jumps over the lazy dog. "
             "the quick brown fox jumps over the lazy dog.";
-  return roundTrip(src, str.len(src));
+  return roundTrip(src, cstr.len(src));
 }
 
 i32 main() {

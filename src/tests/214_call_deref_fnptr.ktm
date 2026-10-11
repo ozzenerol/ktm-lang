@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `(*fp)()` was an error ("The `*` operator cannot be applied to a
  * function pointer"). As in C, `*fp` of a function pointer is now the
@@ -37,7 +37,7 @@ void cleanupFiles() {
 
 bool compileFailsWith(u8 *source, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(FNDEREF_FILE, source, str.len(source),
+    if (!fs.writeAll(FNDEREF_FILE, source, cstr.len(source),
                                  libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
@@ -74,8 +74,8 @@ i32 main() {
 
     fn(f64 x) f64 half = &halfFn;
     fn(i64 i) u8 *name = &nameFn;
-    tests++; if ((*half)(5.0) == 2.5 && !str.cmp((*name)(1), "one") &&
-                             !str.cmp((*name)(0), "zero")) { correct++; }
+    tests++; if ((*half)(5.0) == 2.5 && !cstr.cmp((*name)(1), "one") &&
+                             !cstr.cmp((*name)(0), "zero")) { correct++; }
     else { printf("float/pointer return wrong\n"); }
 
     Ops ops;

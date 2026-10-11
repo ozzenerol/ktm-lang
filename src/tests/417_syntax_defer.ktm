@@ -1,4 +1,4 @@
-import coro, fs, libc, mem, proc, str, test;
+import coro, cstr, fs, libc, mem, proc, test;
 
 enum Err { oops, in, def, co };
 
@@ -23,7 +23,7 @@ void logFn(u8 *s) {
 
 void logNum(i64 n) {
     u8 buf[24];
-    str.formatTo(buf, "%d", n);
+    cstr.formatTo(buf, "%d", n);
     logFn(buf);
 }
 
@@ -34,7 +34,7 @@ void reset() {
 
 /* The log since the last check is `want`, then start a new one. */
 bool got(u8 *want) {
-    bool ok = !str.cmp(gLog, want);
+    bool ok = !cstr.cmp(gLog, want);
     if (!ok) { printf("\n  want \"%s\" got \"%s\"\n", want, gLog); }
     reset();
     return ok;
@@ -237,7 +237,7 @@ bool throwInCoroutine() {
  * printed. */
 u8 *compileRun(u8 *source, bool run) {
     proc.shell("rm -f " DEFER_SRC " " DEFER_OUT " " DEFER_BIN);
-    fs.writeAll(DEFER_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(DEFER_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (run) {
         proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                      "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
@@ -264,7 +264,7 @@ i64 count(u8 *s, u8 *what) {
 
 /* `body` in a function fails to compile with exactly one error, `want` */
 bool fails(u8 *body, u8 *want) {
-    u8 *src = str.format(
+    u8 *src = cstr.format(
 "i64 Get() { return 1; }
 i32 main()
 {
@@ -284,7 +284,7 @@ i32 main()
 /* `source` compiles and runs, printing exactly `want` */
 bool runs(u8 *source, u8 *want) {
     u8 *out = compileRun(source, true);
-    bool ok = out && !str.cmp(out, want);
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", source, out); }
     mem.free(out);
     return ok;

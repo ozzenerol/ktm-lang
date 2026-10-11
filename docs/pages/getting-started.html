@@ -75,7 +75,7 @@ up in order before <code>main</code>.</p>
 
 <h2>The standard library</h2>
 <p>The standard library is a set of modules: import the ones a file uses and call their
-names with the module in front (<code>import str, mem;</code> then <code>str.len(s)</code>,
+names with the module in front (<code>import str, mem;</code> then <code>cstr.len(s)</code>,
 <code>mem.alloc(n)</code>). C's own functions are in <code>libc</code>. The compiler links
 <code>libktm</code> automatically. See the <a href="library.html">library guide</a>.</p>
 
@@ -90,7 +90,7 @@ pub i64 area(i64 w, i64 h)
     return w * h;
 }</code></pre>
 <pre><code>// main.ktm
-import geometry;
+import cstr, geometry;
 
 void main()
 {

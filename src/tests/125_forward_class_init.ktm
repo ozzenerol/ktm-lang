@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A brace initialiser for a class that was only forward declared
  * (`class Foo;`) is reported as an error. ktm used to read the missing
@@ -44,7 +44,7 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
 
     cleanupFwdInitTest();
 
-    if (!fs.writeAll(FWD_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(FWD_INIT_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

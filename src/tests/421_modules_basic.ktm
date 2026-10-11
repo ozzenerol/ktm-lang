@@ -1,4 +1,4 @@
-import fs, mem, proc, str, test;
+import cstr, fs, mem, proc, test;
 
 /* Modules (M1): `import geo;` loads the directory geo/ next to the main
  * file; every file there starts with `module geo;`. Outside, the module's
@@ -21,7 +21,7 @@ bool output(u8 *cmd) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
     proc.shell(cmd);
     u8 *out = fs.readAll(MOD_OUT);
-    bool ok = out && !str.cmp(out, gWant);
+    bool ok = out && !cstr.cmp(out, gWant);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);

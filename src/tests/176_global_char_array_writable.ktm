@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* `u8 buf[] = "abc"` at file scope was emitted with no section
  * directive by the AOT backends, so it landed in whatever section the
@@ -19,18 +19,18 @@ i32 main() {
     printf("Test - file-scope char arrays initialised from a string are writable: ");
 
     gFirst[0] = 'X';
-    tests++; if (!str.cmp(gFirst, "Xbc")) { correct++; }
+    tests++; if (!cstr.cmp(gFirst, "Xbc")) { correct++; }
     gPadded[2] = 'f';
     gPadded[6] = 'Y';
-    tests++; if (!str.cmp(gPadded, "def") && gPadded[6] == 'Y' && !gPadded[7]) { correct++; }
+    tests++; if (!cstr.cmp(gPadded, "def") && gPadded[6] == 'Y' && !gPadded[7]) { correct++; }
     gStatic[2] = 'Z';
-    tests++; if (!str.cmp(gStatic, "xyZ")) { correct++; }
-    tests++; if (!str.cmp(gPtr, "lit")) { correct++; }
+    tests++; if (!cstr.cmp(gStatic, "xyZ")) { correct++; }
+    tests++; if (!cstr.cmp(gPtr, "lit")) { correct++; }
     gAfterPtr[1] = 'N';
-    tests++; if (!str.cmp(gAfterPtr, "mNo")) { correct++; }
+    tests++; if (!cstr.cmp(gAfterPtr, "mNo")) { correct++; }
     tests++; if (sizeof(gFirst) == 4 && sizeof(gPadded) == 8) { correct++; }
     gEsc[0] = 'A';
-    tests++; if (!str.cmp(gEsc, "A\tb")) { correct++; }
+    tests++; if (!cstr.cmp(gEsc, "A\tb")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

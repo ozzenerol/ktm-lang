@@ -1,4 +1,4 @@
-import fs, libc, mem, net, proc, str, test;
+import cstr, fs, libc, mem, net, proc, test;
 
 /* accept, getpeername, getsockname, recvfrom and getsockopt took their
  * length as an i64* or u64*, but C's socklen_t is 32 bits on Linux and
@@ -24,14 +24,14 @@ bool compilesCleanly(u8 *source) {
     u8 *out;
     bool ok;
     proc.shell("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
-    if (!fs.writeAll(SOCKLEN_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(SOCKLEN_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  SOCKLEN_SRC " -o " SOCKLEN_BIN " > " SOCKLEN_OUT " 2>&1");
     out = fs.readAll(SOCKLEN_OUT);
-    ok = out != null && str.len(out) == 0;
+    ok = out != null && cstr.len(out) == 0;
     if (!ok && out) { printf("\n%s", out); }
     mem.free(out);
     proc.shell("rm -f " SOCKLEN_SRC " " SOCKLEN_OUT " " SOCKLEN_BIN);
@@ -97,30 +97,30 @@ void roundTrip(i32 fam, u8 *ip, u8 *name) {
     else { n = sizeof(libc.sockaddr_in6); }
     check(alen == n && blen == n, "getsockname length");
 
-    str.formatTo(what, "%s sendto", name);
+    cstr.formatTo(what, "%s sendto", name);
     check(libc.sendto(sa, "ping", 4, 0, (libc.sockaddr *)(&b), blen) == 4, what);
 
     /* MSG_PEEK leaves the datagram queued */
     mem.set(buf, 0, sizeof(buf));
-    str.formatTo(what, "%s recv MSG_PEEK", name);
-    check(libc.recv(sb, buf, sizeof(buf), libc.MSG_PEEK) == 4 && !str.cmp(buf, "ping"), what);
+    cstr.formatTo(what, "%s recv MSG_PEEK", name);
+    check(libc.recv(sb, buf, sizeof(buf), libc.MSG_PEEK) == 4 && !cstr.cmp(buf, "ping"), what);
 
     mem.set(buf, 0, sizeof(buf));
     mem.set(&from, 0xAB, sizeof(libc.sockaddr_storage));
     flen = sizeof(libc.sockaddr_storage);
     n = libc.recvfrom(sb, buf, sizeof(buf), 0, (libc.sockaddr *)(&from), &flen);
-    str.formatTo(what, "%s recvfrom", name);
-    check(n == 4 && !str.cmp(buf, "ping"), what);
-    str.formatTo(what, "%s recvfrom address length", name);
+    cstr.formatTo(what, "%s recvfrom", name);
+    check(n == 4 && !cstr.cmp(buf, "ping"), what);
+    cstr.formatTo(what, "%s recvfrom address length", name);
     check(flen == alen, what);
-    str.formatTo(what, "%s sender family and port", name);
+    cstr.formatTo(what, "%s sender family and port", name);
     if (fam == libc.AF_INET) {
         check(v4.sin_family == libc.AF_INET && v4.sin_port == ((libc.sockaddr_in *)(&a)).sin_port, what);
     } else {
         check(v6.sin6_family == libc.AF_INET6 && v6.sin6_port == ((libc.sockaddr_in6 *)(&a)).sin6_port, what);
     }
-    str.formatTo(what, "%s sender address", name);
-    check(net.addrToStr((libc.sockaddr *)(&from), fam, txt, sizeof(txt)) && !str.cmp(txt, ip), what);
+    cstr.formatTo(what, "%s sender address", name);
+    check(net.addrToStr((libc.sockaddr *)(&from), fam, txt, sizeof(txt)) && !cstr.cmp(txt, ip), what);
     libc.close(sa);
     libc.close(sb);
 }
@@ -139,7 +139,7 @@ void truncated() {
     mem.set(&m, 0, sizeof(libc.msghdr));
     m.msg_iov = &io;
     m.msg_iovlen = 1;
-    check(libc.recvmsg(fd, &m, 0) == 4 && (m.msg_flags & libc.MSG_TRUNC) && !str.cmpLen(buf, "tool", 4),
+    check(libc.recvmsg(fd, &m, 0) == 4 && (m.msg_flags & libc.MSG_TRUNC) && !cstr.cmpLen(buf, "tool", 4),
                 "MSG_TRUNC on a cut datagram");
     libc.close(fd);
 }

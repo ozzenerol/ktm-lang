@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 u8 *htmlAttrs[] = {
     "invalid",
@@ -27,9 +27,9 @@ bool testStaticArray() {
     i64 len = sizeof(arr)/sizeof(arr[0]);
 
     if (len == 3) { correct++; }
-    if (!str.cmp(arr[0],"f1")) { correct++; }
-    if (!str.cmp(arr[1],"f2")) { correct++; }
-    if (!str.cmp(arr[2],"dogs and cats are fun")) { correct++; }
+    if (!cstr.cmp(arr[0],"f1")) { correct++; }
+    if (!cstr.cmp(arr[1],"f2")) { correct++; }
+    if (!cstr.cmp(arr[2],"dogs and cats are fun")) { correct++; }
 
     return tests == correct;
 }
@@ -39,19 +39,19 @@ bool testGlobalArray() {
     i64 len = sizeof(htmlAttrs)/sizeof(htmlAttrs[0]);
 
     if (len == 12) { correct++; }
-    if (!str.cmp(htmlAttrs[0], "invalid")) { correct++; }
-    if (!str.cmp(htmlAttrs[1], "html")) { correct++; }
-    if (!str.cmp(htmlAttrs[2], "div")) { correct++; }
-    if (!str.cmp(htmlAttrs[3], "span")) { correct++; }
-    if (!str.cmp(htmlAttrs[4], "h1")) { correct++; }
-    if (!str.cmp(htmlAttrs[5], "h2")) { correct++; }
-    if (!str.cmp(htmlAttrs[6], "h3")) { correct++; }
-    if (!str.cmp(htmlAttrs[7], "h4")) { correct++; }
-    if (!str.cmp(htmlAttrs[8], "h5")) { correct++; }
-    if (!str.cmp(htmlAttrs[9], "h6")) { correct++; }
-    if (!str.cmp(htmlAttrs[10], "nav")) { correct++; }
-    if (!str.cmp(htmlAttrs[11], "strong")) { correct++; }
-    if (!str.cmp(htmlAttrs[12], "italic")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[0], "invalid")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[1], "html")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[2], "div")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[3], "span")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[4], "h1")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[5], "h2")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[6], "h3")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[7], "h4")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[8], "h5")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[9], "h6")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[10], "nav")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[11], "strong")) { correct++; }
+    if (!cstr.cmp(htmlAttrs[12], "italic")) { correct++; }
     return correct == tests;
 }
 

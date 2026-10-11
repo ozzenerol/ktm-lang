@@ -1,7 +1,7 @@
-import mem, str, test;
+import cstr, mem, test;
 
-/* str.formatArgs wrote the NUL only after a character, so an empty result
- * (str.formatTo(null, ""), or "%s" of "") was an unterminated MAlloc block:
+/* cstr.formatArgs wrote the NUL only after a character, so an empty result
+ * (cstr.formatTo(null, ""), or "%s" of "") was an unterminated MAlloc block:
  * whatever was in it came out (garbage on arm64 Linux, where Shlurp("")
  * ran it as a command; test 316 covers Shlurp). */
 
@@ -18,28 +18,28 @@ i32 main() {
     }
 
     tests++;
-    s = str.formatTo(null, "");
-    if (s && str.len(s) == 0) { correct++; }
+    s = cstr.formatTo(null, "");
+    if (s && cstr.len(s) == 0) { correct++; }
     mem.free(s);
 
     tests++;
-    s = str.formatTo(null, "%s", "");
-    if (s && str.len(s) == 0) { correct++; }
+    s = cstr.formatTo(null, "%s", "");
+    if (s && cstr.len(s) == 0) { correct++; }
     mem.free(s);
 
     tests++;
-    s = str.format("");
-    if (s && str.len(s) == 0) { correct++; }
+    s = cstr.format("");
+    if (s && cstr.len(s) == 0) { correct++; }
     mem.free(s);
 
     tests++;
     mem.set(buf, 'y', 16);
-    str.formatTo(buf, "");
+    cstr.formatTo(buf, "");
     if (buf[0] == '\0') { correct++; }
 
     tests++;
-    s = str.formatTo(null, "%s%s", "", "");
-    if (s && str.len(s) == 0) { correct++; }
+    s = cstr.formatTo(null, "%s%s", "", "");
+    if (s && cstr.len(s) == 0) { correct++; }
     mem.free(s);
 
     test.printResult(correct, tests);

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A scalar global's initialiser (`i32 g = 7;`) was a store in the
  * generated main(): on arm64 that code ran over x0/x1 before Main read
@@ -28,16 +28,16 @@ u8 *slurp(u8 *cmd) {
  * "one two", prints `want` both ways */
 void runsAs(u8 *src, u8 *want, u8 *what) {
     u8 *out, label[128];
-    fs.writeAll(GI_SRC, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(GI_SRC, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " GI_SRC " one two > " GI_OUT " 2>&1");
-    str.formatTo(label, "%s (JIT)", what);
-    check(out && !str.cmp(out, want), label);
-    if (out && str.cmp(out, want)) { printf("  got: %s", out); }
+    cstr.formatTo(label, "%s (JIT)", what);
+    check(out && !cstr.cmp(out, want), label);
+    if (out && cstr.cmp(out, want)) { printf("  got: %s", out); }
     mem.free(out);
     out = slurp("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " GI_SRC " -o " GI_BIN " && ./" GI_BIN " one two > " GI_OUT " 2>&1");
-    str.formatTo(label, "%s (AOT)", what);
-    check(out && !str.cmp(out, want), label);
-    if (out && str.cmp(out, want)) { printf("  got: %s", out); }
+    cstr.formatTo(label, "%s (AOT)", what);
+    check(out && !cstr.cmp(out, want), label);
+    if (out && cstr.cmp(out, want)) { printf("  got: %s", out); }
     mem.free(out);
     proc.shell("rm -f " GI_SRC " " GI_OUT " " GI_BIN);
 }

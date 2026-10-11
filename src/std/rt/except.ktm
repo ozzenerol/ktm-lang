@@ -1,5 +1,5 @@
 module rt;
-import libc, mem, os, str;
+import cstr, libc, mem, os;
 
 /* strings.ktm */
 
@@ -178,14 +178,14 @@ pub void __ktmThrowAt(u64 code, u8 *file, i64 line) {
 /* `throw(code, fmt, ...)`: the compiler checks the call as one to
  * KTM_ThrowFmt, then calls this with where the throw is in front. */
 pub void __ktmThrowFmtAt(u8 *file, i64 line, u64 code, u8 *fmt, ...args) {
-    u8 *message = str.formatArgs(null, fmt, args);
+    u8 *message = cstr.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, file, line);
     ErrJump(fs);
 }
 
 pub void __ktmThrowFmt(u64 code, u8 *fmt, ...args) {
-    u8 *message = str.formatArgs(null, fmt, args);
+    u8 *message = cstr.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, null, 0);
     ErrJump(fs);
@@ -194,7 +194,7 @@ pub void __ktmThrowFmt(u64 code, u8 *fmt, ...args) {
 /* `throw(e)`: the same error again, with a copy of its message (the
  * catch that holds e frees its own when it is left). */
 pub void __ktmThrowError(Error *e) {
-    u8 *message = ErrOwns(e.message) ? str.dup(e.message) : null;
+    u8 *message = ErrOwns(e.message) ? cstr.dup(e.message) : null;
     HCFs *fs = Fs();
     ErrSet(fs, e.code, message, e.file, e.line);
     ErrJump(fs);
@@ -204,14 +204,14 @@ pub void __ktmThrowError(Error *e) {
  * below the length, `s[a:b]` not within 0 <= a <= b <= length */
 pub void __ktmBoundsIndex(i64 index, i64 len, u8 *file, i64 line) {
     HCFs *fs = Fs();
-    ErrSet(fs, ERR_BOUNDS, str.format("index %d out of range for length %d", index, len),
+    ErrSet(fs, ERR_BOUNDS, cstr.format("index %d out of range for length %d", index, len),
            file, line);
     ErrJump(fs);
 }
 
 pub void __ktmBoundsSlice(i64 lo, i64 hi, i64 len, u8 *file, i64 line) {
     HCFs *fs = Fs();
-    ErrSet(fs, ERR_BOUNDS, str.format("slice %d:%d out of range for length %d", lo, hi, len),
+    ErrSet(fs, ERR_BOUNDS, cstr.format("slice %d:%d out of range for length %d", lo, hi, len),
            file, line);
     ErrJump(fs);
 }
@@ -245,7 +245,7 @@ pub void __ktmErrorDrop(Error *e) {
 /* dst = src, with its own copy of the message. */
 pub void __ktmErrorCopy(Error *dst, Error *src) {
     dst.code = src.code;
-    dst.message = ErrOwns(src.message) ? str.dup(src.message) : _err_none;
+    dst.message = ErrOwns(src.message) ? cstr.dup(src.message) : _err_none;
     dst.file = src.file ? src.file : _err_none;
     dst.line = src.line;
 }

@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A global array or class initialiser is written out as static data, which
  * only held literals and strings: any other item - `&gx`, `&Foo`, `gx`,
@@ -79,7 +79,7 @@ i32 main() {
     if (fns[0] == (void *)(&dbl)) { correct++; }
     if (ftab[0].f(4) == 8 && ftab[1].f(4) == 5) { correct++; }
 
-    if (!str.cmp(strs[0], "ab") && !str.cmp(strs[1], "cd")) { correct++; }
+    if (!cstr.cmp(strs[0], "ab") && !cstr.cmp(strs[1], "cd")) { correct++; }
 
     if (gq.x == 9 && gq.y == 3) { correct++; }
     if (pts[0].x == 1 && pts[0].y == 5) { correct++; }

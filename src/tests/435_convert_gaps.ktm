@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* Forms the converter emits that did not compile:
  * - a default on an fn-typed parameter, `fn(i64) i64 f = &D`: calling f
@@ -64,7 +64,7 @@ i32 main() {
     Cb c;
     c.cb = &D;
     tests++;
-    if (((fn(i64) i64)raw)(6) == 12 && !str.cmp(((fn(u8 *) u8 *)sp)("xy"), "y") &&
+    if (((fn(i64) i64)raw)(6) == 12 && !cstr.cmp(((fn(u8 *) u8 *)sp)("xy"), "y") &&
             ((fn(...args) i64)cp)(1, 2, 3) == 3) {
         correct++;
             }

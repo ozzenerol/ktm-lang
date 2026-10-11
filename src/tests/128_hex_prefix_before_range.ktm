@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `case 0x...3:` was accepted as `case 0...3:`: the lexer ended a number
  * at a `..` range operator by returning early, skipping the "hex literal
@@ -24,7 +24,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupHexRangeTest();
 
-    if (!fs.writeAll(HEX_RANGE_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(HEX_RANGE_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -84,13 +84,13 @@ i32 main() {
     if (compileFailsWith("void main() { i64 i = 0x; }\n",
                 "hex literal has no digits")) { correct++; }
 
-    if (!str.cmp(classify(2), "dec") && !str.cmp(classify(0), "none")) { correct++; }
-    if (!str.cmp(classify(4), "hex") && !str.cmp(classify(6), "hex")) { correct++; }
-    if (!str.cmp(classify(7), "bin") && !str.cmp(classify(9), "bin")) { correct++; }
-    if (!str.cmp(classify(10), "hexletters") && !str.cmp(classify(15), "hexletters")) { correct++; }
-    if (!str.cmp(classify(30), "hexe") && !str.cmp(classify(32), "hexe")) { correct++; }
-    if (!str.cmp(classify(33), "mixed") && !str.cmp(classify(40), "mixed")) { correct++; }
-    if (!str.cmp(classify(16), "none") && !str.cmp(classify(41), "none")) { correct++; }
+    if (!cstr.cmp(classify(2), "dec") && !cstr.cmp(classify(0), "none")) { correct++; }
+    if (!cstr.cmp(classify(4), "hex") && !cstr.cmp(classify(6), "hex")) { correct++; }
+    if (!cstr.cmp(classify(7), "bin") && !cstr.cmp(classify(9), "bin")) { correct++; }
+    if (!cstr.cmp(classify(10), "hexletters") && !cstr.cmp(classify(15), "hexletters")) { correct++; }
+    if (!cstr.cmp(classify(30), "hexe") && !cstr.cmp(classify(32), "hexe")) { correct++; }
+    if (!cstr.cmp(classify(33), "mixed") && !cstr.cmp(classify(40), "mixed")) { correct++; }
+    if (!cstr.cmp(classify(16), "none") && !cstr.cmp(classify(41), "none")) { correct++; }
     /* Ranges stop at the `...`, not at a float: `1.5` still lexes. */
     if (1.5 + 0x4 == 5.5) { correct++; }
 

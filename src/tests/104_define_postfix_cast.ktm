@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* A postfix cast in a #define's value, `#define X (5(u64) % 3)`, crashed
  * ktm: the stub parser that folds a define had no type table to look `u64`
@@ -34,17 +34,17 @@ i32 main() {
     printf("Test - postfix cast inside a #define: ");
 
     if (CAST_MOD == 2) { correct++; }
-    if (CAST_ONLY == 5 && !str.cmp(typeof(CAST_ONLY), "u64")) { correct++; }
-    if (!str.cmp(typeof(CAST_MOD), "u64")) { correct++; }
+    if (CAST_ONLY == 5 && !cstr.cmp(typeof(CAST_ONLY), "u64")) { correct++; }
+    if (!cstr.cmp(typeof(CAST_MOD), "u64")) { correct++; }
     if (CAST_END == 3) { correct++; }
     if (CAST_U8 == 44 && CAST_U8 == (u8)300) { correct++; }
     if (CAST_I8 == -56) { correct++; }
     if (CAST_U32 == 4294967295) { correct++; }
     if (CAST_PTR == 4096) { correct++; }
     if (CAST_PTR_OP == 3) { correct++; }
-    if (CAST_F64 == 5.0 && !str.cmp(typeof(CAST_F64), "f64")) { correct++; }
+    if (CAST_F64 == 5.0 && !cstr.cmp(typeof(CAST_F64), "f64")) { correct++; }
     if (CAST_F64_OP == 2.5) { correct++; }
-    if (CAST_TO_INT == 2 && !str.cmp(typeof(CAST_TO_INT), "i64")) { correct++; }
+    if (CAST_TO_INT == 2 && !cstr.cmp(typeof(CAST_TO_INT), "i64")) { correct++; }
     if (CAST_INT_OP == 4) { correct++; }
     if (CAST_NESTED == 2) { correct++; }
     if (CAST_TWICE == 3) { correct++; }
@@ -56,8 +56,8 @@ i32 main() {
 
     /* Without a cast a define has the type of its value: any float
      * operand makes it an f64 (test 127). */
-    if (PLAIN_INT == 3 && !str.cmp(typeof(PLAIN_INT), "i64")) { correct++; }
-    if (PLAIN_MIX == 3.5 && !str.cmp(typeof(PLAIN_MIX), "f64")) { correct++; }
+    if (PLAIN_INT == 3 && !cstr.cmp(typeof(PLAIN_INT), "i64")) { correct++; }
+    if (PLAIN_MIX == 3.5 && !cstr.cmp(typeof(PLAIN_MIX), "f64")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

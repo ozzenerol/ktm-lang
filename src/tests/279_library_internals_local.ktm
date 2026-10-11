@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A program with a function named like a library internal used to
  * replace the library's own when compiled: its `RoundUpToNextPowerOf2`
@@ -25,7 +25,7 @@ bool runs(bool jit, u8 *source, u8 *want) {
     u8 *out;
     i64 res;
     cleanup();
-    fs.writeAll(LP_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(LP_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (jit) {
         res = proc.shell(LP_KTM "-jit " LP_FILE " > " LP_OUT " 2>&1");
     } else {

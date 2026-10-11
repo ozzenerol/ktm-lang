@@ -1,5 +1,5 @@
 module coro;
-import libc, mem, os, rt, str;
+import cstr, libc, mem, os, rt;
 
 const i64 CORO_STACK_DEFAULT = (256 * 1024);
 
@@ -159,7 +159,7 @@ _extern _CORO_SWAP void *coroSwap(void **saveSp, void *newSp, void *value);
 _extern _CORO_ENTRY void coroEntry();
 
 static void coroDie(u8 *msg) {
-    libc.write(os.STDERR, msg, str.len(msg));
+    libc.write(os.STDERR, msg, cstr.len(msg));
     os.exit(1);
 }
 

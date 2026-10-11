@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 i32 main() {
     printf("Test - JSON parsing: ");
@@ -27,7 +27,7 @@ i32 main() {
     mem.free(strVal);
 
     if ((obj = json.select(j,".key:s"))) {
-        if (!str.cmpLen(obj.str,"some string",11)) { correct++; }
+        if (!cstr.cmpLen(obj.str,"some string",11)) { correct++; }
     }
 
     if ((obj = json.select(j,".id"))) {

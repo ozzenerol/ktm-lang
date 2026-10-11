@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 struct Class1 {
     i64 val;
@@ -43,7 +43,7 @@ i32 main() {
 
     if (s.id == 420) { ++correct; }
     if (s.age == 31) { ++correct; }
-    if (!str.cmpLen(s.name,"James",5)) { ++correct; }
+    if (!cstr.cmpLen(s.name,"James",5)) { ++correct; }
 
     spr.s = mem.alloc(sizeof(Student));
     spr.id = 420;
@@ -55,7 +55,7 @@ i32 main() {
     spr.s.name[3] = '\0';
     ++spr.s.age;
 
-    if (!str.cmpLen(spr.s.name,"Wil",3)) { ++correct; }
+    if (!cstr.cmpLen(spr.s.name,"Wil",3)) { ++correct; }
     if (spr.s.age == 41) { ++correct; }
 
     test.printResult(correct,tests);

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define COND_FILE "__123_unmatched_conditionals.ktm"
 #define COND_OUT  "__123_unmatched_conditionals.out"
@@ -36,7 +36,7 @@ bool compileReports(u8 *source, i64 count, u8 *msg1, u8 *loc1,
 
     cleanupCondTest();
 
-    if (!fs.writeAll(COND_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(COND_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -51,7 +51,7 @@ bool compileReports(u8 *source, i64 count, u8 *msg1, u8 *loc1,
 
     for (i = 0; i < 3; i++) {
         if (!msgs[i]) { break; }
-        want = str.format("error: %s\n --> " COND_FILE ":%s\n", msgs[i], locs[i]);
+        want = cstr.format("error: %s\n --> " COND_FILE ":%s\n", msgs[i], locs[i]);
         if (!libc.strstr(out, want)) { ok = false; }
         mem.free(want);
     }

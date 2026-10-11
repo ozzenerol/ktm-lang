@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A binary op with only its right operand a pointer had its operands
  * swapped (meant to turn `1 + p` into `p + 1`), so `z < p` ran as
@@ -19,7 +19,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
     i64 res;
 
     cleanupPtrCmpTest();
-    if (!fs.writeAll(PTR_CMP_TEST_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(PTR_CMP_TEST_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PTR_CMP_TEST_FILE " > " PTR_CMP_TEST_OUT " 2>&1");

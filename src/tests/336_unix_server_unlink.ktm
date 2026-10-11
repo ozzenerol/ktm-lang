@@ -1,4 +1,4 @@
-import libc, mem, net, str, test;
+import cstr, libc, mem, net, test;
 
 /* net.unixListen unlink()ed whatever was at the path before
  * binding: a regular file there was deleted, and a second server on the
@@ -26,7 +26,7 @@ bool hasData(u8 *path) {
     mem.set(b, 0, sizeof(b));
     i64 n = libc.read(fd, b, 5);
     libc.close(fd);
-    return n == 5 && !str.cmpLen(b, "data\n", 5);
+    return n == 5 && !cstr.cmpLen(b, "data\n", 5);
 }
 
 bool isMode(u8 *path, i64 kind) {
@@ -52,12 +52,12 @@ i32 main() {
     printf("Test - unix server socket keeps other files: ");
     alarm(30);
 
-    str.copy(dir, "./ktm336-XXXXXX");
+    cstr.copy(dir, "./ktm336-XXXXXX");
     check(mkdtemp(dir) != null, "mkdtemp");
-    str.formatTo(file, "%s/file", dir);
-    str.formatTo(sock, "%s/s.sock", dir);
-    str.formatTo(sub, "%s/sub", dir);
-    str.formatTo(link, "%s/link", dir);
+    cstr.formatTo(file, "%s/file", dir);
+    cstr.formatTo(sock, "%s/s.sock", dir);
+    cstr.formatTo(sub, "%s/sub", dir);
+    cstr.formatTo(link, "%s/link", dir);
 
     /* a regular file is left alone */
     fd = libc.open(file, libc.O_CREAT | libc.O_WRONLY | libc.O_TRUNC, 0x1A4);

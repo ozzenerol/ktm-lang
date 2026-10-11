@@ -1,4 +1,4 @@
-import fs, fzf, libc, mem, os, str, vec;
+import cstr, fs, fzf, libc, mem, os, vec;
 
 i64 cmpFileNames(u8 *str1, u8 *str2) {
     if ('0'<=*str1<='9' && '0'<=*str2<='9') {
@@ -54,7 +54,7 @@ bool shouldExclude(u8 *filename, i64 namelen) {
 #endif
 
     for (u8 *name : exclude) {
-        if (!str.cmpLen(name,filename,namelen)) { return true; }
+        if (!cstr.cmpLen(name,filename,namelen)) { return true; }
     }
     return false;
 }
@@ -115,14 +115,14 @@ vec.PtrVec *collectTests() {
     libc.Dirent *ent;
     while ((ent = libc.readdir(dir)) != null) {
         if (ent.type & libc.DT_REG) {
-            auto len = str.len(ent.name);
+            auto len = cstr.len(ent.name);
             auto res = fzf.match(ent.name,"ktm$");
 
             if (shouldExclude(ent.name,len) || res == null) {
                 continue;
             }
             fzf.release(res);
-            auto strVal = str.dup(ent.name);
+            auto strVal = cstr.dup(ent.name);
             vecVal.push(strVal);
         }
     }
@@ -161,14 +161,14 @@ const i64 SC_NPROCESSORS_ONLN = 84;
 u8 *absPath(u8 *path) {
     u8 *abs = realpath(path, null);
     if (abs) { return abs; }
-    if (path[0] == '/') { return str.dup(path); }
-    return str.format("%s/%s", gStartDir, path);
+    if (path[0] == '/') { return cstr.dup(path); }
+    return cstr.format("%s/%s", gStartDir, path);
 }
 
 i64 jobCount() {
     u8 *env = libc.getenv("JOBS");
     i64 jobs = 0;
-    if (env) { jobs = str.toInt(env); }
+    if (env) { jobs = cstr.toInt(env); }
     if (jobs < 1) { jobs = sysconf(SC_NPROCESSORS_ONLN); }
     if (jobs < 1) { jobs = 1; }
     return jobs;
@@ -177,7 +177,7 @@ i64 jobCount() {
 i64 testTimeout() {
     u8 *env = libc.getenv("KTM_TEST_TIMEOUT");
     if (env && env[0]) {
-        i64 secs = str.toInt(env);
+        i64 secs = cstr.toInt(env);
         if (secs >= 0) { return secs; }
     }
     return 60;
@@ -202,33 +202,33 @@ void runnerInit() {
     setenv("KTM_TEST_SRC", gStartDir, 1);
 
     if (gTarget[0] != '\0') {
-        gKtmFlags = str.format("--target=%s --install-dir=%s", gTarget,
-                                                        absPath(str.format("../../build/%s", gTarget)));
+        gKtmFlags = cstr.format("--target=%s --install-dir=%s", gTarget,
+                                                        absPath(cstr.format("../../build/%s", gTarget)));
     } else if (installDir) {
         /* The tests run ktm themselves from their own directories */
         installDir = absPath(installDir);
         setenv("KTM_INSTALL_DIR", installDir, 1);
-        gKtmFlags = str.format("--install-dir=%s", installDir);
+        gKtmFlags = cstr.format("--install-dir=%s", installDir);
     } else {
         gKtmFlags = "";
     }
 
     if (!tmpdir || !tmpdir[0]) { tmpdir = "/tmp"; }
-    gRoot = mkdtemp(str.format("%s/ktm-tests-XXXXXX", tmpdir));
+    gRoot = mkdtemp(cstr.format("%s/ktm-tests-XXXXXX", tmpdir));
     if (!gRoot) {
         printf("Failed to create a temporary directory in %s\n", tmpdir);
         os.exit(1);
     }
     gRoot = absPath(gRoot);
-    symlink(gKtm, str.format("%s/ktm", gRoot));
-    fs.makeDir(str.format("%s/w", gRoot));
-    fs.makeDir(str.format("%s/t", gRoot));
-    fs.makeDir(str.format("%s/b", gRoot));
-    fs.makeDir(str.format("%s/o", gRoot));
+    symlink(gKtm, cstr.format("%s/ktm", gRoot));
+    fs.makeDir(cstr.format("%s/w", gRoot));
+    fs.makeDir(cstr.format("%s/t", gRoot));
+    fs.makeDir(cstr.format("%s/b", gRoot));
+    fs.makeDir(cstr.format("%s/o", gRoot));
 }
 
 void runnerCleanup() {
-    libc.unlink(str.format("%s/ktm", gRoot));
+    libc.unlink(cstr.format("%s/ktm", gRoot));
     fs.removeDir(gRoot, fs.REMOVE_RECURSE);
 }
 
@@ -242,13 +242,13 @@ void runTestChild(u8 *name, i64 idx) {
     setpgid(0, 0);
     libc.signal(libc.SIGINT, libc.SIG_DFL);
     libc.signal(libc.SIGTERM, libc.SIG_DFL);
-    u8 *work = str.format("%s/w/%d", gRoot, idx);
-    u8 *tmp = str.format("%s/t/%d", gRoot, idx);
+    u8 *work = cstr.format("%s/w/%d", gRoot, idx);
+    u8 *tmp = cstr.format("%s/t/%d", gRoot, idx);
     fs.makeDir(work);
     fs.makeDir(tmp);
     setenv("TMPDIR", tmp, 1);
 
-    i32 fd = libc.creat(str.format("%s/o/%d", gRoot, idx), 0x1A4);
+    i32 fd = libc.creat(cstr.format("%s/o/%d", gRoot, idx), 0x1A4);
     if (fd == -1 || libc.chdir(work) != 0) {
         printf("\033[0;31mFAILED\033[0;0m to run: %s (no test directory)\n", name);
         libc.fflush(null);
@@ -265,7 +265,7 @@ void runTestChild(u8 *name, i64 idx) {
 
 void printTestOutput(i64 idx) {
     i64 len = 0;
-    u8 *path = str.format("%s/o/%d", gRoot, idx);
+    u8 *path = cstr.format("%s/o/%d", gRoot, idx);
     u8 *out = fs.readAll(path, &len);
     libc.fflush(null);
     if (out) {
@@ -282,10 +282,10 @@ void timeOutTest(u8 *name, i64 idx, i32 pid, i64 timeout) {
     libc.kill(-pid, libc.SIGKILL);
     libc.kill(pid, libc.SIGKILL);
     libc.waitpid(pid, &status, 0);
-    u8 *path = str.format("%s/o/%d", gRoot, idx);
-    u8 *msg = str.format("\033[0;31mFAILED\033[0;0m timed out after %d s: %s\n",
+    u8 *path = cstr.format("%s/o/%d", gRoot, idx);
+    u8 *msg = cstr.format("\033[0;31mFAILED\033[0;0m timed out after %d s: %s\n",
                                             timeout, name);
-    fs.writeAll(path, msg, str.len(msg), libc.O_CREAT|libc.O_WRONLY|libc.O_APPEND);
+    fs.writeAll(path, msg, cstr.len(msg), libc.O_CREAT|libc.O_WRONLY|libc.O_APPEND);
     mem.free(msg);
     mem.free(path);
 }
@@ -326,9 +326,9 @@ void runTests(vec.PtrVec *names) {
             } else if (pid == -1) {
                 /* Out of processes: wait for one of ours to finish and retry */
                 if (running > 0) { break; }
-                u8 *msg = str.format("\033[0;31mFAILED\033[0;0m to run: %s (fork failed)\n",
+                u8 *msg = cstr.format("\033[0;31mFAILED\033[0;0m to run: %s (fork failed)\n",
                                                         entries[next]);
-                fs.writeAll(str.format("%s/o/%d", gRoot, next), msg, str.len(msg));
+                fs.writeAll(cstr.format("%s/o/%d", gRoot, next), msg, cstr.len(msg));
                 done[next] = true;
             } else {
                 /* also here, so the group exists before any kill below */

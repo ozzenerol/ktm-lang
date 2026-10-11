@@ -1,5 +1,5 @@
 module fs;
-import libc, mem, str;
+import cstr, libc, mem;
 
 /* 0 if `path` is a directory afterwards (made now or already there) */
 static i32 makeDirIfMissing(u8 *path, i32 mode=MAKE_DIR_DEFAULT) {
@@ -42,11 +42,11 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     result = 0;
     while (!result && (ent = libc.readdir(dir))) {
         r2 = -1;
-        if (!str.cmp(ent.name,".") || !str.cmp(ent.name,"..")) {
+        if (!cstr.cmp(ent.name,".") || !cstr.cmp(ent.name,"..")) {
             continue;
         }
 
-        buf = str.formatTo(null,"%s/%s",path,ent.name);
+        buf = cstr.formatTo(null,"%s/%s",path,ent.name);
         if (buf) {
             if (ent.type == libc.DT_DIR) {
                 r2 = removeDir(buf,flags);
@@ -118,7 +118,7 @@ pub i32 makeDir(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
         return makeDirIfMissing(path,mode);
     } else {
         /* Each prefix of `path` is copied here, so it needs path's length */
-        if ((tmp = mem.alloc(str.len(path)+1)) == null) {
+        if ((tmp = mem.alloc(cstr.len(path)+1)) == null) {
             return -1;
         }
         ptr = path;

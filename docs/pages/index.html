@@ -40,7 +40,7 @@ ktm -jit hello.ktm                    # or compile in memory and run straight aw
 <p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
 Unix sockets, IPv4 and IPv6.</p>
 <pre data-run><code>
-import libc, mem, net, str;
+import cstr, libc, mem, net;
 
 void main()
 {
@@ -55,9 +55,9 @@ void main()
   n = libc.recv(conn, req, sizeof(req) - 1, 0);   // the server side
   req[n] = '\0';
   u8 *path = req + 4;                          // after "GET "
-  *str.firstOf(path, " ") = '\0';
-  u8 *reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
-  net.send(conn, reply, str.len(reply));
+  *cstr.firstOf(path, " ") = '\0';
+  u8 *reply = cstr.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  net.send(conn, reply, cstr.len(reply));
   libc.close(conn);
 
   n = libc.recv(cli, resp, sizeof(resp) - 1, libc.MSG_WAITALL);  // the client side
@@ -77,7 +77,7 @@ you asked for /hello
 <p><code>proc.run</code> runs a command and returns what it printed; <code>proc.spawn</code> gives
 you its pipes.</p>
 <pre data-run><code>
-import mem, proc;
+import cstr, mem, proc;
 
 void main()
 {
@@ -98,7 +98,7 @@ exit code 0
 <h3>Threads</h3>
 <p>POSIX threads directly, or a thread pool from the library.</p>
 <pre data-run><code>
-import libc;
+import cstr, libc;
 
 i64 sums[4];
 

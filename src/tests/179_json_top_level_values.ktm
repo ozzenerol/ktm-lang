@@ -1,4 +1,4 @@
-import json, str, test;
+import cstr, json, test;
 
 /* json.parse only accepted a non-empty object or array at the top level:
  * `{}`, `[]`, `42`, `"text"`, `true` and `null` were errors (moving past the
@@ -51,10 +51,10 @@ i32 main() {
     if (j.floatVal == 2.5) { gCorrect++; }
     json.release(j);
     j = ok("\"text\"", json.STRING);
-    if (!str.cmp(j.str, "text")) { gCorrect++; }
+    if (!cstr.cmp(j.str, "text")) { gCorrect++; }
     json.release(j);
     j = ok("\"\"", json.STRING);
-    if (!str.cmp(j.str, "")) { gCorrect++; }
+    if (!cstr.cmp(j.str, "")) { gCorrect++; }
     json.release(j);
     j = ok("true", json.BOOL);
     if (j.boolean == true) { gCorrect++; }

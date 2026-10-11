@@ -1,4 +1,4 @@
-import date, mem, str, test;
+import cstr, date, mem, test;
 
 /* date.toParts estimates the year from the day number and only corrected
  * an estimate that was too high. For 182 years in 1..10000 (1903,
@@ -79,7 +79,7 @@ i32 main() {
 
     /* date.formatDate goes through date.toParts */
     u8 *s = date.formatDate(mkDay(1904, 1, 1));
-    if (!str.cmp(s, "01/01/1904")) { correct++; }
+    if (!cstr.cmp(s, "01/01/1904")) { correct++; }
     else { printf("MPrintDate: %s\n", s); }
     mem.free(s);
 

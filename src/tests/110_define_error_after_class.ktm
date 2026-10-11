@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 #define DEF_AFTER_CLASS_FILE "__110_define_after_class.ktm"
 #define DEF_AFTER_CLASS_OUT  "__110_define_after_class.out"
@@ -37,7 +37,7 @@ bool compileFailsExactly(u8 *source, i64 nExpected, u8 *m1, u8 *m2) {
 
     cleanupDefAfterClassTest();
 
-    if (!fs.writeAll(DEF_AFTER_CLASS_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(DEF_AFTER_CLASS_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 

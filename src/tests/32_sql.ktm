@@ -1,4 +1,4 @@
-import libc, sql, str, test;
+import cstr, libc, sql, test;
 
 #define DB_NAME ("./_test.db")
 
@@ -63,31 +63,31 @@ bool testSelect(sql.Db *ctx) {
             count++;
             switch (count) {
                 case 1: {
-                    if (id != 1 && str.cmpLen(name,"Foo",3) != 0) {
+                    if (id != 1 && cstr.cmpLen(name,"Foo",3) != 0) {
                         goto error;
                     }
                     break;
                 }
                 case: {
-                    if (id != 2 && str.cmpLen(name,"Bar",3) != 0) {
+                    if (id != 2 && cstr.cmpLen(name,"Bar",3) != 0) {
                         goto error;
                     }
                     break;
                 }
                 case: {
-                    if (id != 3 && str.cmpLen(name,"Baz",3) != 0) {
+                    if (id != 3 && cstr.cmpLen(name,"Baz",3) != 0) {
                         goto error;
                     }
                     break;
                 }
                 case: {
-                    if (id != 4 && str.cmpLen(name,"Dog",3) != 0) {
+                    if (id != 4 && cstr.cmpLen(name,"Dog",3) != 0) {
                         goto error;
                     }
                     break;
                 }
                 case: {
-                    if (id != 5 && str.cmpLen(name,"Cat",3) != 0) {
+                    if (id != 5 && cstr.cmpLen(name,"Cat",3) != 0) {
                         goto error;
                     }
                     break;

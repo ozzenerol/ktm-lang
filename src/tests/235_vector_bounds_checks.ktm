@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test, vec;
+import cstr, fs, libc, mem, proc, test, vec;
 
 /* vec.intGet/vec.floatGet/vec.ptrGet only checked the index under
  * `#ifdef DEBUG`, which the library is never built with: vec.intGet(v, -1)
@@ -19,7 +19,7 @@ void cleanupFiles() {
  * stderr and not "unreachable" */
 bool runExpectingExit(u8 *src, u8 *expected) {
     cleanupFiles();
-    if (!fs.writeAll(VB_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(VB_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     i64 res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "

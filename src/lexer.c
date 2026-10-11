@@ -3623,9 +3623,10 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     }
     if (!m) {
         /* the prelude is the install's, whatever else is called that */
+        /* and the runtime's (rt, str): the install's too */
         char *dir = auto_prelude
                   ? mprintf("%s/prelude", lexInstallModules(l))
-                  : auto_rt ? mprintf("%s/rt", lexInstallModules(l))
+                  : auto_rt ? mprintf("%s/%s", lexInstallModules(l), path->data)
                   : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
@@ -3689,7 +3690,10 @@ void lexPushRuntime(Lexer *l) {
     if (!l->builtin_root || l->building_module || l->building_tree) return;
     char *dir = mprintf("%s/rt", lexInstallModules(l));
     if (!lexIsDir(dir)) return;
-    char *src = "import rt;\n";
+    /* and str, whose String methods every program may call (when the
+     * install has it) */
+    char *with_str = mprintf("%s/str", lexInstallModules(l));
+    char *src = lexIsDir(with_str) ? "import rt;\nimport str;\n" : "import rt;\n";
     lexPushString(l, LEX_RT_FILE, src, strlen(src));
 }
 

@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* ktm sources are .ktm and headers .ktmh. The old .HC/.HH names (and any
  * other extension) are a clean break: as the input file they stop the
@@ -8,7 +8,7 @@ import fs, libc, proc, str, test;
 #define KTM "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
 
 void put(u8 *name, u8 *text) {
-    fs.writeAll(name, text, str.len(text));
+    fs.writeAll(name, text, cstr.len(text));
 }
 
 /* The output of the shell command, or null on a failed exit. */
@@ -31,7 +31,7 @@ i32 main() {
 
     tests++;
     out = proc.shellOutput(KTM "-jit __399_main.ktm 2>&1");
-    if (out && !str.cmp(out, "15")) { correct++; }
+    if (out && !cstr.cmp(out, "15")) { correct++; }
     else { printf("\n  .ktm with .ktmh and extensionless includes: [%s]\n", out); }
 
     tests++;
@@ -57,7 +57,7 @@ i32 main() {
     tests++;   /* after the input, a .HC word is just an argument for the program */
     put("__399_args.ktm", "i32 main(i32 argc, u8 **argv) { printf(\"%s\\n\", argv[1]); return 0; }\n");
     out = proc.shellOutput(KTM "-jit __399_args.ktm notes.HC 2>&1");
-    if (out && !str.cmp(out, "notes.HC")) { correct++; }
+    if (out && !cstr.cmp(out, "notes.HC")) { correct++; }
     else { printf("\n  a .HC program argument after the input: [%s]\n", out); }
 
     proc.shell("rm -rf __399_*");   /* the files this test wrote */

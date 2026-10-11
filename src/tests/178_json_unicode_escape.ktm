@@ -1,4 +1,4 @@
-import json, mem, str, test;
+import cstr, json, mem, test;
 
 /* json.parse rejected every \u escape. They are decoded to UTF-8 now,
  * including surrogate pairs; malformed ones are still errors. */
@@ -12,14 +12,14 @@ u8 *parseE(u8 *text) {
     }
     json.Value *e = json.select(j, ".e:s");
     u8 *res = null;
-    if (e) { res = str.dup(e.str); }
+    if (e) { res = cstr.dup(e.str); }
     json.release(j);
     return res;
 }
 
 bool is(u8 *text, u8 *want) {
     u8 *got = parseE(text);
-    bool ok = got != null && !str.cmp(got, want);
+    bool ok = got != null && !cstr.cmp(got, want);
     if (!ok) { printf("\n  %s -> '%s', want '%s'\n", text, got, want); }
     if (got) { mem.free(got); }
     return ok;
@@ -51,7 +51,7 @@ i32 main() {
 
     /* In an array, and as an object key */
     json.Value *j = json.parse("[\"\\u0041\\u0042\", 1]");
-    if (json.ok(j) && !str.cmp(j.array.str, "AB")) { correct++; }
+    if (json.ok(j) && !cstr.cmp(j.array.str, "AB")) { correct++; }
     json.release(j);
     j = json.parse("{\"\\u006By\": 7}");
     if (json.ok(j) && json.select(j, ".ky:i") && json.select(j, ".ky:i").intVal == 7) { correct++; }

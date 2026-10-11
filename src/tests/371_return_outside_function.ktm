@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `return` in top-level code (`if (x) return 0;` outside any function)
  * crashed ktm, AOT and JIT: parseReturnStatement used the current
@@ -17,8 +17,8 @@ u8 *diagnose(u8 *source, bool jit) {
     i64 res;
     if (jit) { mode = "-jit"; }
     proc.shell("rm -f " RO_SRC " " RO_OUT);
-    fs.writeAll(RO_SRC, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    cmd = str.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    fs.writeAll(RO_SRC, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " RO_SRC " > " RO_OUT " 2>&1",
                                     mode);

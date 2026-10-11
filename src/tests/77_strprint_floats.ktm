@@ -1,6 +1,6 @@
-import json, libc, mem, str, test;
+import cstr, json, libc, mem, test;
 
-/* str.formatTo and friends printed "Floats not supported" and exited on %f,
+/* cstr.formatTo and friends printed "Floats not supported" and exited on %f,
  * so json.toStr exited on any JSON containing a float. %f, %e and %g
  * must now print exactly what C's printf prints for the same double. */
 
@@ -12,10 +12,10 @@ i64 gBad = 0;
 
 void check(u8 *fmt, f64 v) {
     u8 ours[512], want[512];
-    str.formatTo(ours, fmt, v);
+    cstr.formatTo(ours, fmt, v);
     snprintf(want, sizeof(want), fmt, v);
     gChecks++;
-    if (str.cmp(ours, want)) {
+    if (cstr.cmp(ours, want)) {
         gBad++;
         printf("\n  %s: got '%s', C printf gives '%s'", fmt, ours, want);
     }
@@ -77,35 +77,35 @@ i32 main() {
 
     /* the exact strings, not just "same as C" */
     u8 buf[64];
-    if (!str.cmp(str.formatTo(buf, "%f", 1.5), "1.500000")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "%.2f", 2.675), "2.67")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "[%8.2f][%-8.2f][%08.2f]", -1.5, 1.5, -1.5),
+    if (!cstr.cmp(cstr.formatTo(buf, "%f", 1.5), "1.500000")) { correct++; }
+    if (!cstr.cmp(cstr.formatTo(buf, "%.2f", 2.675), "2.67")) { correct++; }
+    if (!cstr.cmp(cstr.formatTo(buf, "[%8.2f][%-8.2f][%08.2f]", -1.5, 1.5, -1.5),
                             "[   -1.50][1.50    ][-0001.50]")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "%f %f", vals[11], negZero),
+    if (!cstr.cmp(cstr.formatTo(buf, "%f %f", vals[11], negZero),
                             "0.000000 -0.000000")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "%f|%f|%5f", inf, -inf, nan),
+    if (!cstr.cmp(cstr.formatTo(buf, "%f|%f|%5f", inf, -inf, nan),
                             "inf|-inf|  nan")) { correct++; }
-    if (!str.cmp(str.formatTo(buf, "%d %.3f %s", 7, 0.0005, "x"), "7 0.001 x")) {
+    if (!cstr.cmp(cstr.formatTo(buf, "%d %.3f %s", 7, 0.0005, "x"), "7 0.001 x")) {
         correct++; /* 0.0005 is just above the tie, so it rounds up */
     }
 
     /* %s into a caller's buffer must not MSize/mem.realloc it: mid-array the
      * size header OutStr read is 0, so it "grew" and freed a bad pointer */
     u8 *mid = mem.allocZero(64);
-    if (!str.cmp(str.formatTo(mid + 16, "%s|%c", "ab", 'z'), "ab|z")) {
+    if (!cstr.cmp(cstr.formatTo(mid + 16, "%s|%c", "ab", 'z'), "ab|z")) {
         correct++;
     }
     mem.free(mid);
 
-    /* str.format and str.appendFormat go through the same formatter */
-    u8 *m = str.format("pi=%.4f e=%.3e", 3.14159265358979, 2.718281828);
-    if (!str.cmp(m, "pi=3.1416 e=2.718e+00")) { correct++; }
+    /* cstr.format and cstr.appendFormat go through the same formatter */
+    u8 *m = cstr.format("pi=%.4f e=%.3e", 3.14159265358979, 2.718281828);
+    if (!cstr.cmp(m, "pi=3.1416 e=2.718e+00")) { correct++; }
     mem.free(m);
 
     /* json.parse -> json.toStr with floats no longer exits */
     json.Value *js = json.parse("{\"pi\": 3.5, \"neg\": -0.25, \"arr\": [1.5, 2, 0.1]}");
     u8 *s = json.toStr(js);
-    if (!str.cmp(s, "{\"pi\": 3.5,\"neg\": -0.25,\"arr\": [1.5,2,0.1]}")) {
+    if (!cstr.cmp(s, "{\"pi\": 3.5,\"neg\": -0.25,\"arr\": [1.5,2,0.1]}")) {
         correct++;
     } else {
         printf("\n  JsonToString gave: %s", s);
@@ -117,7 +117,7 @@ i32 main() {
      * digits, so the smallest denormal is not the shortest -5e-324) */
     js = json.parse("[2.0, 1.0e21, 0.30000000000000004, 1.0e-7, -4.9406564584124654e-324]");
     s = json.toStr(js);
-    if (!str.cmp(s, "[2.0,1.0e+21,0.30000000000000004,1.0e-07,-4.94065645841247e-324]")) {
+    if (!cstr.cmp(s, "[2.0,1.0e+21,0.30000000000000004,1.0e-07,-4.94065645841247e-324]")) {
         correct++;
     } else {
         printf("\n  JsonToString gave: %s", s);

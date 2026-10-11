@@ -1,4 +1,4 @@
-import fs, libc, proc, str, test;
+import cstr, fs, libc, proc, test;
 
 /* Duplicate case labels: `case 1: case 1:` on an integer wasn't reported
  * (and printed a debug dump of the switch), an enum's said "Duplicate case
@@ -31,7 +31,7 @@ i32 main() {
               "    }\n"
               "    return 0;\n"
               "}\n";
-    fs.writeAll(SRC_FILE, src, str.len(src));
+    fs.writeAll(SRC_FILE, src, cstr.len(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                "-jit " SRC_FILE " 2>&1");
@@ -47,11 +47,11 @@ i32 main() {
     /* distinct values are fine */
     u8 *ok = "i32 main() {\n    i64 x = 6;\n    switch (x) {\n        case 1 ... 5: break;\n"
              "        case 6: printf(\"six\"); break;\n        case 7: break;\n    }\n    return 0;\n}\n";
-    fs.writeAll(SRC_FILE, ok, str.len(ok));
+    fs.writeAll(SRC_FILE, ok, cstr.len(ok));
     out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                            "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                            "-jit " SRC_FILE " 2>&1");
-    if (out && !str.cmp(out, "six")) { correct++; }
+    if (out && !cstr.cmp(out, "six")) { correct++; }
     else { printf("\n  distinct: [%s]\n", out); }
     fs.remove(SRC_FILE);
 

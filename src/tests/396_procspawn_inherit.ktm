@@ -1,4 +1,4 @@
-import libc, mem, proc, str, test;
+import cstr, libc, mem, proc, test;
 
 /* On macOS a proc.spawn child had no stdin, stdout or stderr when they
  * were PROC_INHERIT (the default): POSIX_SPAWN_CLOEXEC_DEFAULT closes
@@ -41,8 +41,8 @@ i32 spawn(u8 *script, i64 in, i64 out, i64 err, u8 *wantOut=null, u8 *wantErr=nu
     u8 *gout = null, *gerr = null;
     i64 rc = proc.communicate(p, null, 0, &gout, null, &gerr);
     proc.release(p);
-    if (wantOut && (!gout || str.cmp(gout, wantOut))) { return 101; }
-    if (wantErr && (!gerr || str.cmp(gerr, wantErr))) { return 102; }
+    if (wantOut && (!gout || cstr.cmp(gout, wantOut))) { return 101; }
+    if (wantErr && (!gerr || cstr.cmp(gerr, wantErr))) { return 102; }
     return rc;
 }
 
@@ -73,7 +73,7 @@ i32 runErr() {
     i64 code;
     u8 *out = proc.run(argv, &code);
     i32 rc = 0;
-    if (!out || str.cmp(out, "o") || code != 3) { rc = 1; }
+    if (!out || cstr.cmp(out, "o") || code != 3) { rc = 1; }
     mem.free(out);
     return rc;
 }
@@ -94,7 +94,7 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
      * holds it): written after it, a child that doesn't read its stdin
      * could be gone already under load, and the write's SIGPIPE ended
      * the whole test (exit 141). */
-    libc.write(pi[1], input, str.len(input));
+    libc.write(pi[1], input, cstr.len(input));
     libc.close(pi[1]);
     libc.fflush(null);
     i32 pid = libc.fork();
@@ -127,7 +127,7 @@ i32 inChild(fn() i32 fn_, u8 *input, u8 *out, u8 *err) {
 void caseFn(u8 *what, fn() i32 fn_, u8 *input, u8 *wantOut, u8 *wantErr) {
     u8 out[256], err[256];
     i32 rc = inChild(fn_, input, out, err);
-    bool ok = rc == 0 && !str.cmp(out, wantOut) && !str.cmp(err, wantErr);
+    bool ok = rc == 0 && !cstr.cmp(out, wantOut) && !cstr.cmp(err, wantErr);
     check(ok, what);
     if (!ok) { printf("    exit %d, stdout [%s], stderr [%s]\n", rc, out, err); }
 }

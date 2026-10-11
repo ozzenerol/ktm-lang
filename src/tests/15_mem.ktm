@@ -1,4 +1,4 @@
-import mem, str, test;
+import cstr, mem, test;
 
 i32 main() {
     printf("Test - MemCpy, MemSet: ");
@@ -11,15 +11,15 @@ i32 main() {
     mem.copy(str2,"zooo",4);
     str2[5]='\0';
 
-    if (!str.cmpLen(str1,"hello",5)) { ++correct; }
-    if (!str.cmpLen(str2,"zooo",4)) { ++correct; }
-    if (str.cmpLen(str1, str2, 4) != 0) { ++correct; }
+    if (!cstr.cmpLen(str1,"hello",5)) { ++correct; }
+    if (!cstr.cmpLen(str2,"zooo",4)) { ++correct; }
+    if (cstr.cmpLen(str1, str2, 4) != 0) { ++correct; }
 
     mem.set(str1,'z',8);
     mem.copy(str2,str1,8);
 
     str1[9] = str2[9] = '\0';
-    if (!str.cmpLen(str1, str2, 4) != 0) { ++correct; }
+    if (!cstr.cmpLen(str1, str2, 4) != 0) { ++correct; }
 
     mem.free(str1);
     mem.free(str2);

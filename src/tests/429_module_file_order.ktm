@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* Modules (M5): the files of a module are read in name order, but every
  * name of every file is visible in any order, types included. The
@@ -25,7 +25,7 @@ bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " FO_OUT " " FO_BIN);
     proc.shell(cmd);
     u8 *out = fs.readAll(FO_OUT);
-    bool ok = out && !str.cmp(out, want);
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " FO_OUT " " FO_BIN);
@@ -47,9 +47,9 @@ i64 count(u8 *s, u8 *what) {
 bool compiles(u8 *a, u8 *b, i64 errors, u8 *want) {
     proc.shell("rm -rf " FO_DIR " && mkdir -p " FO_DIR "/m");
     u8 *main = "import m;\ni32 main() { return 0; }\n";
-    fs.writeAll(FO_DIR "/main.ktm", main, str.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    fs.writeAll(FO_DIR "/m/a.ktm", a, str.len(a), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    fs.writeAll(FO_DIR "/m/b.ktm", b, str.len(b), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FO_DIR "/main.ktm", main, cstr.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FO_DIR "/m/a.ktm", a, cstr.len(a), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(FO_DIR "/m/b.ktm", b, cstr.len(b), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     proc.shell(KTM "-S " FO_DIR "/main.ktm -o /dev/null > " FO_OUT " 2>&1");
     u8 *out = fs.readAll(FO_OUT);
     bool ok = out && count(out, "error:") == errors && (!want || libc.strstr(out, want));

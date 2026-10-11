@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* "control may reach the end of non-void function" was reported for a
  * function whose last statement is a goto: the fall-through analysis
@@ -39,7 +39,7 @@ bool warnsIf(u8 *src, bool warn, u8 *where=null) {
     bool ok;
 
     cleanupGotoFall();
-    if (!fs.writeAll(GOTO_FALL_FILE, src, str.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(GOTO_FALL_FILE, src, cstr.len(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     res = proc.shell("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit " GOTO_FALL_FILE " > " GOTO_FALL_OUT " 2>&1");

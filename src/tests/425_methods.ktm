@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 /* Methods (Y10): `T User.name(params) { ... }`, written outside the
  * struct, is a function with an implicit const `User *self` first
@@ -26,7 +26,7 @@ union Num {
 u8 gOut[256];
 
 void User.describe() {
-    str.formatTo(gOut + str.len(gOut), "%s:%d;", self.name, self.age);
+    cstr.formatTo(gOut + cstr.len(gOut), "%s:%d;", self.name, self.age);
 }
 
 i64 User.older(i64 years = 1) {
@@ -38,7 +38,7 @@ i64 User.older(i64 years = 1) {
 i64 User.twice();
 
 void Admin.describe() {
-    str.formatTo(gOut + str.len(gOut), "admin%d:", self.level);
+    cstr.formatTo(gOut + cstr.len(gOut), "admin%d:", self.level);
     User.describe(self);
 }
 
@@ -91,7 +91,7 @@ i32 main() {
     u.describe();
     p.describe();
     p.describe();
-    tests++; if (!str.cmp(gOut, "ann:30;ann:30;ann:30;")) { correct++; }
+    tests++; if (!cstr.cmp(gOut, "ann:30;ann:30;ann:30;")) { correct++; }
 
     /* default argument, arguments, `self` writes through */
     tests++; if (u.older() == 31 && p.older(5) == 36 && u.age == 36) { correct++; }
@@ -112,13 +112,13 @@ i32 main() {
     Admin *ap = &a;
     gOut[0] = 0;
     a.describe();
-    tests++; if (!str.cmp(gOut, "admin2:bob:40;")) { correct++; }
+    tests++; if (!cstr.cmp(gOut, "admin2:bob:40;")) { correct++; }
     tests++; if (ap.older() == 41 && a.age == 41) { correct++; }
     /* no virtual dispatch: through a User * it is User's */
     gOut[0] = 0;
     User *asUser = ap;
     asUser.describe();
-    tests++; if (!str.cmp(gOut, "bob:41;")) { correct++; }
+    tests++; if (!cstr.cmp(gOut, "bob:41;")) { correct++; }
 
     /* function pointers */
     fn(User *, i64) i64 f = &User.older;
@@ -127,7 +127,7 @@ i32 main() {
     gOut[0] = 0;
     d(p);
     User.describe(p);
-    tests++; if (!str.cmp(gOut, "ann:40;ann:40;")) { correct++; }
+    tests++; if (!cstr.cmp(gOut, "ann:40;ann:40;")) { correct++; }
 
     /* a union, an array element, a call's result */
     Num n;

@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A nested `{ ... }` in a class initialiser initialises the next field,
  * which can be a class or an array: `Bar b = {1, {2}};`. ktm used to
@@ -67,7 +67,7 @@ bool compileFailsWith(u8 *source, u8 *expected) {
 
     cleanupNestedInitTest();
 
-    if (!fs.writeAll(NESTED_INIT_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(NESTED_INIT_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
 
@@ -124,7 +124,7 @@ bool testLocalArrayOfClasses(void) {
 /* Fields of different widths, a string and a float in the nested class */
 bool testLocalMixed(void) {
     Mixed129 m = {-1, {"name", 2.5}, 200, -3};
-    return m.a == -1 && !str.cmp(m.n.name, "name") && m.n.weight == 2.5 &&
+    return m.a == -1 && !cstr.cmp(m.n.name, "name") && m.n.weight == 2.5 &&
                  m.c == 200 && m.s == -3;
 }
 

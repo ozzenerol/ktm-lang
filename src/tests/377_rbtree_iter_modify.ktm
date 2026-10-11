@@ -1,4 +1,4 @@
-import map, mem, set, str, test;
+import cstr, map, mem, set, test;
 
 /* map.rbIterNew, set.intIterNew and map.rbForEach size their stack from the
  * tree's size when they start, so adding keys during the walk wrote past
@@ -14,7 +14,7 @@ i64 cmp(void *a, void *b) {
 }
 
 i64 strKeyCmp(void *a, void *b) {
-    return str.cmp(a, b);
+    return cstr.cmp(a, b);
 }
 
 map.RBTree *treeFn(i64 n) {
@@ -96,9 +96,9 @@ i32 main() {
 
     /* RBIter: deleting the current key, whose key the tree frees */
     t = map.rbNew(&mem.free, null, &strKeyCmp);
-    t.set(str.dup("a"), null);
-    t.set(str.dup("b"), null);
-    t.set(str.dup("c"), null);
+    t.set(cstr.dup("a"), null);
+    t.set(cstr.dup("b"), null);
+    t.set(cstr.dup("c"), null);
     it = t.iterNew();
     n = 0;
     while ((node = map.rbIterNext(it))) {

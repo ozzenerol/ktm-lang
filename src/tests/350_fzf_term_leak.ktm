@@ -1,4 +1,4 @@
-import fzf, mem, str, test;
+import cstr, fzf, mem, test;
 
 /* Every fzf.match call leaked its parsed terms: releasing a term set freed the
  * terms but not their text, and in case-sensitive mode the term's copy of
@@ -14,7 +14,7 @@ i64 runAll(u8 *text) {
     modes[0] = fzf.CASE_SMART; modes[1] = fzf.CASE_IGNORE; modes[2] = fzf.CASE_RESPECT;
     for (i = 0; i < 7; i++) {
         for (j = 0; j < 3; j++) {
-            u8 *p = str.dup(pats[i]);
+            u8 *p = cstr.dup(pats[i]);
             pos = fzf.match(text, p, modes[j]);
             if (pos) { hits++; }
             fzf.release(pos);

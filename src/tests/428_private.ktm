@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* `private` (Y14): a struct field marked `private` can be used anywhere
  * in the module that defines the struct (any of its files, its methods)
@@ -24,7 +24,7 @@ bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " P_OUT " " P_BIN);
     proc.shell(cmd);
     u8 *out = fs.readAll(P_OUT);
-    bool ok = out && !str.cmp(out, want);
+    bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }
     mem.free(out);
     proc.shell("rm -f " P_OUT " " P_BIN);
@@ -45,10 +45,10 @@ i64 count(u8 *s, u8 *what) {
 bool fails(u8 *main, u8 *shop, u8 *want) {
     proc.shell("rm -rf " P_DIR " && mkdir -p " P_DIR " && "
                  "cp -r ${KTM_TEST_SRC:-.}/modules/private/web " P_DIR "/");
-    fs.writeAll(P_DIR "/main.ktm", main, str.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(P_DIR "/main.ktm", main, cstr.len(main), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     if (shop) {
         proc.shell("mkdir -p " P_DIR "/shop");
-        fs.writeAll(P_DIR "/shop/shop.ktm", shop, str.len(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+        fs.writeAll(P_DIR "/shop/shop.ktm", shop, cstr.len(shop), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     }
     proc.shell(KTM "-S " P_DIR "/main.ktm -o /dev/null > " P_OUT " 2>&1");
     u8 *out = fs.readAll(P_OUT);
@@ -61,7 +61,7 @@ bool fails(u8 *main, u8 *shop, u8 *want) {
 
 u8 gBuf[64];
 u8 *join(u8 *a, u8 *b = "", u8 *c = "") {
-    str.formatTo(gBuf, "%s|%s|%s", a, b, c);
+    cstr.formatTo(gBuf, "%s|%s|%s", a, b, c);
     return gBuf;
 }
 
@@ -72,10 +72,10 @@ i32 main() {
     i64 correct = 0, tests = 0;
 
     /* F13 */
-    tests++; if (!str.cmp(join("private", ""), "private||")) { correct++; }
-    tests++; if (!str.cmp(join("public"), "public||")) { correct++; }
-    tests++; if (!str.cmp(join("pub", "private", "public"), "pub|private|public")) { correct++; }
-    tests++; if (!str.cmp(join("i64", "u8"), "i64|u8|")) { correct++; }
+    tests++; if (!cstr.cmp(join("private", ""), "private||")) { correct++; }
+    tests++; if (!cstr.cmp(join("public"), "public||")) { correct++; }
+    tests++; if (!cstr.cmp(join("pub", "private", "public"), "pub|private|public")) { correct++; }
+    tests++; if (!cstr.cmp(join("i64", "u8"), "i64|u8|")) { correct++; }
 
     /* inside web every file uses them, outside the layout still works */
     tests++;

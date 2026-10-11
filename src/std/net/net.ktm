@@ -1,5 +1,5 @@
 module net;
-import date, libc, mem, os, str;
+import cstr, date, libc, mem, os;
 
 /* Byte order: the network is big endian, every target ktm supports is
     * little endian, so these swap the bytes. */
@@ -294,13 +294,13 @@ pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
         /* "*" (or null) is any address of addrfam, IPv4 for AF_UNSPEC as it
             * always was; "::*" is any IPv6 address. Anything else must be a
             * numeric address: a host name would wait on DNS */
-        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
+        if (bindaddr != null && !cstr.cmp("::*", bindaddr)) {
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
                 addrfam = libc.AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
+        } else if (bindaddr != null && !cstr.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == libc.AF_UNSPEC) {
@@ -404,7 +404,7 @@ pub bool peerAddr(i32 sockfd, u8 *ipbuf, i32 outlen) {
 
 /* Fills `addr` for the socket file `name`; false if the path doesn't fit */
 static bool netUnixAddress(libc.sockaddr_un *addr, u8 *name) {
-        i64 len = str.len(name);
+        i64 len = cstr.len(name);
         if (len >= sizeof(addr.sun_path)) {
                 return false;
         }
@@ -531,13 +531,13 @@ pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
         libc.snprintf(strport, sizeof(strport), "%d", port);
 
         /* The same bind addresses as NetCreateServer */
-        if (bindaddr != null && !str.cmp("::*", bindaddr)) {
+        if (bindaddr != null && !cstr.cmp("::*", bindaddr)) {
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
                 addrfam = libc.AF_INET6;
                 bindaddr = null;
-        } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
+        } else if (bindaddr != null && !cstr.cmp("*", bindaddr)) {
                 bindaddr = null;
         }
         if (bindaddr == null && addrfam == libc.AF_UNSPEC) {

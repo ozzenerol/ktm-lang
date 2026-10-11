@@ -1,4 +1,4 @@
-import libc, str, test;
+import cstr, libc, test;
 
 i64 globalInt;
 
@@ -10,7 +10,7 @@ u8 *testStaticSetup(u8 *str) {
 
 bool testStatic() {
     u8 *strVal = testStaticSetup("hello");
-    if (!str.cmpLen(strVal,"hello",5)) {
+    if (!cstr.cmpLen(strVal,"hello",5)) {
         return true;
     }
     return false;

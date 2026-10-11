@@ -1,4 +1,4 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* fs.makeDir(path,,true) copied each prefix of path into a DIR_MAXPATHLEN
  * (256 on Linux, 1024 on macOS) stack buffer without a bound, so a
@@ -17,7 +17,7 @@ i32 main() {
     u8 root[64], *p, *q;
     printf("Test - MkDir recursive on a long path: ");
 
-    str.copy(root, "./ktm-test-303-XXXXXX");
+    cstr.copy(root, "./ktm-test-303-XXXXXX");
     if (!mkdtemp(root)) {
         test.printResult(0, tests);
         printf("====\n");
@@ -25,28 +25,28 @@ i32 main() {
     }
 
     /* 18 levels of 48 characters: ~900 bytes */
-    p = str.dup(root);
+    p = cstr.dup(root);
     for (i = 0; i < 18; i++) {
-        p = str.appendFormat(p, "/%s", "dddddddddddddddddddddddddddddddddddddddddddddddd");
+        p = cstr.appendFormat(p, "/%s", "dddddddddddddddddddddddddddddddddddddddddddddddd");
     }
-    if (str.len(p) > 800 && str.len(p) < 1000) { correct++; }
+    if (cstr.len(p) > 800 && cstr.len(p) < 1000) { correct++; }
     fs.makeDir(p,, true);
     if (isDir(p)) { correct++; }
 
     /* Again with a trailing '/', over the existing directories */
-    q = str.formatTo(null, "%s/e/", p);
+    q = cstr.formatTo(null, "%s/e/", p);
     fs.makeDir(q,, true);
     if (isDir(q)) { correct++; }
 
     /* A short one still works */
     mem.free(q);
-    q = str.formatTo(null, "%s/x/y/z", root);
+    q = cstr.formatTo(null, "%s/x/y/z", root);
     fs.makeDir(q,, true);
     if (isDir(q)) { correct++; }
 
     mem.free(q);
     mem.free(p);
-    q = str.formatTo(null, "rm -rf '%s'", root);
+    q = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(q);
     mem.free(q);
 

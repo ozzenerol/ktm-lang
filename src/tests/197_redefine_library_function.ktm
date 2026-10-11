@@ -1,8 +1,8 @@
-import fs, libc, mem, proc, str, test;
+import cstr, fs, libc, mem, proc, test;
 
 /* A program may define functions named like the standard library's (an
  * AOT build once failed to link with "multiple definition of `Now'"):
- * with the library in modules its names are date.now, str.len, so the
+ * with the library in modules its names are date.now, cstr.len, so the
  * program's own now() and len() are separate functions, in both modes.
  * A definition or prototype whose signature differs from an earlier one
  * in the program is an error at its name. */
@@ -27,7 +27,7 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     bool ok = true;
 
     cleanupRedefineTest();
-    if (!fs.writeAll(RD_FILE, source, str.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
+    if (!fs.writeAll(RD_FILE, source, cstr.len(source), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC)) {
         return false;
     }
     if (jit) {
@@ -49,9 +49,9 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     return ok;
 }
 
-/* The program's own now() and len() next to date.now() and str.len() */
+/* The program's own now() and len() next to date.now() and cstr.len() */
 u8 *rdOwnNames =
-"import date, str;
+"import cstr, date;
 
 i64 now() { return 42; }
 i64 len(u8 *s) { return 7; }
@@ -59,7 +59,7 @@ i64 len(u8 *s) { return 7; }
 void main()
 {
   date.Date d = date.now();
-  printf(\"now=%d len=%d str.len=%d real=%d\\n\", now(), len(\"abc\"), str.len(\"abc\"), d > 0);
+  printf(\"now=%d len=%d cstr.len=%d real=%d\\n\", now(), len(\"abc\"), cstr.len(\"abc\"), d > 0);
 }
 ";
 
@@ -70,9 +70,9 @@ void main() {
     /* Its own functions named like library ones: both are there, AOT
      * (they link: a module's names have symbols of their own) and JIT */
     tests++;
-    if (runRedefine(false, rdOwnNames, 0, "now=42 len=7 str.len=3 real=1", null)) { correct++; }
+    if (runRedefine(false, rdOwnNames, 0, "now=42 len=7 cstr.len=3 real=1", null)) { correct++; }
     tests++;
-    if (runRedefine(true, rdOwnNames, 0, "now=42 len=7 str.len=3 real=1", null)) { correct++; }
+    if (runRedefine(true, rdOwnNames, 0, "now=42 len=7 cstr.len=3 real=1", null)) { correct++; }
 
     /* Two prototypes in the program that disagree */
     tests++;

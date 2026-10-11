@@ -1,4 +1,4 @@
-import str, test;
+import cstr, test;
 
 i64 add(...args) {
     i64 acc = 0, arg;
@@ -66,7 +66,7 @@ i64 wrap(i64 i)
 i32 main() {
     printf("Test - Variable arguments: ");
     i64 res, correct=0, tests = 15;
-    if (!str.cmpLen("foo bar baz", concat("foo", "bar", "baz"), 11)) {
+    if (!cstr.cmpLen("foo bar baz", concat("foo", "bar", "baz"), 11)) {
         correct++;
     }
 
