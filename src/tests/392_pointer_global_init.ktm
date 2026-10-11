@@ -91,7 +91,7 @@ void main()
      * doesn't parse) */
     proc.shell("printf '#link <ktm392>\\n"
                  "extern i64 *third;\\ni64 Ktm392Check();\\n"
-                 "i32 main() { if (Ktm392Check() == 14 && *third == 7) return 0; return 1; }\\n'"
+                 "i32 main() { if (Ktm392Check() == 14 && *third == 7) { return 0; } return 1; }\\n'"
                  " > ./ktm-392-use.ktm");
     check(proc.shell("../../ktm -jit --install-dir=./ktm-392-prefix ./ktm-392-use.ktm") == 0,
                 "-lib pointer globals (JIT)");

@@ -57,8 +57,8 @@ i32 main() {
     else { printf("Failed - return in an unclosed top-level block\n"); }
 
     tests++;
-    if (prints("i64 x = 1;\nif (x) return 0;\n", "`return` outside a function",
-                         RO_SRC ":2:8\n")) { correct++; }
+    if (prints("i64 x = 1;\nif (x) { return 0; }\n", "`return` outside a function",
+                         RO_SRC ":2:10\n")) { correct++; }
     else { printf("Failed - return in a top-level if\n"); }
 
     tests++;

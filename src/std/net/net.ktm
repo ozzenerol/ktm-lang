@@ -34,7 +34,7 @@ static i32 netSocket(i32 domain, i32 type, i32 protocol) {
         return libc.socket(domain, type | __NET_SOCK_CLOEXEC, protocol);
 #else
         i32 fd = libc.socket(domain, type, protocol);
-        if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
+        if (fd != -1) { libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC); }
         return fd;
 #endif
 }
@@ -44,7 +44,7 @@ static i32 netAcceptCloexec(i32 socket, libc.sockaddr *address, u32 *addressLen)
         return accept4(socket, address, addressLen, __NET_SOCK_CLOEXEC);
 #else
         i32 fd = libc.accept(socket, address, addressLen);
-        if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
+        if (fd != -1) { libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC); }
         return fd;
 #endif
 }

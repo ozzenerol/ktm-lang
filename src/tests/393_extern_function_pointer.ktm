@@ -73,8 +73,8 @@ void main() { printf(\"%d\\n\", fp(4)); }
     /* calls it, then sees the library repoint it */
     proc.shell("printf '#link <ktm393>\\n"
                  "extern i64 (*triple)(i64);\\nvoid Ktm393UseSquare();\\n"
-                 "i32 main() { if (triple(4) != 12) return 1; Ktm393UseSquare();"
-                 " if (triple(5) != 25) return 2; return 0; }\\n'"
+                 "i32 main() { if (triple(4) != 12) { return 1; } Ktm393UseSquare();"
+                 " if (triple(5) != 25) { return 2; } return 0; }\\n'"
                  " > ./ktm-393-use.ktm");
     check(proc.shell("../../ktm -jit --install-dir=./ktm-393-prefix ./ktm-393-use.ktm") == 0,
                 "library function pointer (JIT)");

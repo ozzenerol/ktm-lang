@@ -138,7 +138,7 @@ i32 main() {
 "void main()
 {
   i64 x = 1;
-  if (x) goto inside;
+  if (x) { goto inside; }
   try {
 inside:
     printf(\"in\\n\");
@@ -172,7 +172,7 @@ back:
     i++;
   } catch {
   }
-  if (i < 3) goto back;
+  if (i < 3) { goto back; }
 }
 ", "`goto back` jumps into a try body")) { correct++; }
 

@@ -48,7 +48,7 @@ i32 main() {
 #ifdef IS_LINUX
     tests++;
 #ifdef IS_ARM_64
-    if (sizeof(libc.cStat) == 128) correct++;
+    if (sizeof(libc.cStat) == 128) { correct++; }
 #else
     if (sizeof(libc.cStat) == 144) { correct++; }
 #endif

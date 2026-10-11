@@ -127,7 +127,7 @@ static bool procPipe(i32 *fds) {
 #else
     /* No pipe2: a spawn in another thread between pipe and fcntl is
      * harmless, as every child closes what it didn't ask for. */
-    if (libc.pipe(fds) != 0) return false;
+    if (libc.pipe(fds) != 0) { return false; }
     libc.fcntl(fds[0], PROC_F_SETFD, PROC_FD_CLOEXEC);
     libc.fcntl(fds[1], PROC_F_SETFD, PROC_FD_CLOEXEC);
 #endif

@@ -2005,6 +2005,24 @@ static Ast *parseIfClause(Cctrl *cc, char *term_out) {
     return clause;
 }
 
+/* Y13: the body of an if, else, for, while or do is a `{ ... }` block
+ * (`else if` aside): a lone statement there reads as guarded when the
+ * next one isn't, or the other way round */
+static Ast *parseBracedBody(Cctrl *cc, const char *what) {
+    Lexeme *peek = cctrlTokenPeek(cc);
+    if (peek && !tokenPunctIs(peek, '{')) {
+        /* reported, and the statement parsed on as the body */
+        cctrlErrorAt(cc, peek->line, peek->col, peek->len,
+            "braces required: the body of `%s` goes in `{ ... }`", what);
+        if (peek->tk_type == TK_KEYWORD && peek->i64 == KW_DEFER) {
+            /* (not "`defer` must be in a block" too): skip it */
+            cctrlSyncStatement(cc);
+            return NULL;
+        }
+    }
+    return parseStatement(cc);
+}
+
 Ast *parseIfStatement(Cctrl *cc) {
     cctrlTokenExpect(cc,'(');
     Lexeme open = parseConsumedToken(cc);
@@ -2061,7 +2079,7 @@ Ast *parseIfStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    Ast *then = parseStatement(cc);
+    Ast *then = parseBracedBody(cc, "if");
     Lexeme *tok = cctrlTokenGet(cc);
     Ast *els = NULL;
 
@@ -2076,7 +2094,9 @@ Ast *parseIfStatement(Cctrl *cc) {
             cctrlRaiseException(cc,"Unexpected %s `%s` while parsing else body",
                     lexemeTypeToString(epeek->tk_type), lexemeAsWritten(epeek));
         }
-        els = parseStatement(cc);
+        els = epeek->tk_type == TK_KEYWORD && epeek->i64 == KW_IF
+            ? parseStatement(cc)        /* else if */
+            : parseBracedBody(cc, "else");
     } else {
         cctrlTokenRewind(cc);
     }
@@ -2116,7 +2136,7 @@ Ast *parseOptExpr(Cctrl *cc) {
  * variable. A body without braces is a single statement, so it is wrapped
  * in a compound statement to have a statement list to prepend to. */
 static Ast *parseRangeLoopBody(Cctrl *cc, Ast *iterator) {
-    Ast *forbody = parseStatement(cc);
+    Ast *forbody = parseBracedBody(cc, "for");
     if (forbody == NULL || forbody->kind != AST_COMPOUND_STMT) {
         List *stmts = listNew();
         if (forbody) listAppend(stmts,forbody); /* NULL: an empty `;` body */
@@ -2438,7 +2458,7 @@ Ast *parseForStatement(Cctrl *cc) {
         cctrlRaiseException(cc,"Unexpected %s `%s` while parsing for loop body", 
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
-    forbody = parseStatement(cc);
+    forbody = parseBracedBody(cc, "for");
     /* Go back up */
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
@@ -2485,7 +2505,7 @@ Ast *parseWhileStatement(Cctrl *cc) {
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBracedBody(cc, "while");
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
     cc->tmp_loop_end = prev_end;
@@ -2521,7 +2541,7 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
     }
 
 
-    whilebody = parseStatement(cc);
+    whilebody = parseBracedBody(cc, "do");
     
     tok = cctrlTokenGetRequired(cc);
 

@@ -279,7 +279,7 @@ i32 main() {
     if (prints(
 "enum E { funds };
 void W(i64 have, i64 want) {
-  if (want > have) throw(E.funds, \"need %d, have %d\", want, have);
+  if (want > have) { throw(E.funds, \"need %d, have %d\", want, have); }
 }
 i32 main() {
   try { W(100, 500); }

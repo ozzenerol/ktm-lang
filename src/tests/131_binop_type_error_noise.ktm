@@ -106,7 +106,7 @@ void main() {
   Pt p;
   f64 z = 1.5;
   z = z + \"q\";
-  if (z < \"s\") printf(\"no\\n\");
+  if (z < \"s\") { printf(\"no\\n\"); }
   i64 k = p * 2;
 }
 ", 1, 3, want, 6);

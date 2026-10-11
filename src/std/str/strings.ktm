@@ -346,12 +346,12 @@ _STRCPY::
 }
 
 pub u8 toLower(u8 ch) {
-        if (ch >= 'A' && ch <= 'Z') return ch + 32;
+        if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
         return ch;
 }
 
 pub u8 toUpper(u8 ch) {
-        if (ch >= 'a' && ch <= 'z') return ch - 32;
+        if (ch >= 'a' && ch <= 'z') { return ch - 32; }
         return ch;
 }
 
