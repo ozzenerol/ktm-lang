@@ -792,6 +792,29 @@ int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
     return 1;
 }
 
+/* `f++` / `--f` on a function pointer: it points at code, so there is
+ * nothing to step over (like `f + 1`, a type error). Reported at the
+ * operator without unwinding. Returns 1 if `lhs` is a function. */
+int assertNotFnIncDec(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                      int op_len)
+{
+    if (!lhs || !lhs->type || lhs->type->kind != AST_TYPE_FUNC) return 0;
+    char *name = astLValueToString(lhs,0);
+    char *msg = mprintf("Cannot increment or decrement function pointer `%s`",
+                        name);
+    AoStr *bold = aoStrNew();
+    aoStrCatColoured(bold, ESC_BOLD, msg);
+    AoStr *buf = cctrlCreateErrorLineAt(cc, op_line, op_col, op_len, bold->data,
+                                        CCTRL_ERROR, NULL);
+    aoStrRelease(bold);
+    CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+    d->line = d->end_line = op_line;
+    d->col = op_col;
+    d->end_col = op_col + op_len;
+    cctrlDiagPush(cc, d);
+    return 1;
+}
+
 /* A scoped enum is like C++'s `enum class`: `++`, `--` and a compound
  * assignment (`+=`, `|=`, ...) are all errors, not just an integer
  * assigned to it without a cast. Plain `c = Color.green` and
