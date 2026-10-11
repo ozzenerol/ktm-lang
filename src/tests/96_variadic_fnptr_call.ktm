@@ -31,7 +31,7 @@ f64 scale(f64 k, ...args) {
 
 u8 *format(u8 *fmt, ...args) {
     if (args.len == 0) { return str.dup(fmt); }
-    return str.formatArgs(null, fmt, args.len, args);
+    return str.formatArgs(null, fmt, args);
 }
 
 struct H {

@@ -631,10 +631,11 @@ void main()
 <p>The last parameter can take any number of extra arguments, zero included:
 <code>T ...name</code> takes them as values of type <code>T</code>, each checked and
 converted like an argument to a <code>T</code> parameter (a wrong type is an error).
-Inside the function <code>name.len</code> is how many there are, <code>name[i]</code> is
-one of them (<code>&amp;name[i]</code> works too) and <code>for (auto v : name)</code> goes
-through them; <code>name</code> itself can't be assigned. Fixed and default parameters can
-come before it.</p>
+Inside the function <code>name</code> is a slice, a <code>T[]</code>: <code>name.len</code>
+is how many there are, <code>name[i]</code> is one of them (checked, as any slice's
+index), <code>for (auto v : name)</code> goes through them, and it can be sliced or passed
+on to a <code>T[]</code> parameter; <code>name</code> itself can't be assigned. Fixed and
+default parameters can come before it.</p>
 <pre data-run><code>i64 sum(i64 ...nums)
 {
   i64 total = 0;
@@ -667,13 +668,13 @@ void main()
 <p><code>...name</code> as the last argument of a call passes the extras of a variadic
 parameter on, to a function that takes the same kind (it must be the only extra
 argument). Without a type, <code>...name</code> takes the extras as 64-bit slots, the way
-format functions want them: a number as is, a float as its bits (read it back with
-<code>name[i](f64)</code>), a pointer as its address:</p>
+format functions want them, and is a <code>u64[]</code>: a number as is, a float as its bits
+(read it back with <code>*(f64 *)&amp;name[i]</code>), a pointer as its address:</p>
 <pre data-run><code>import mem, str;
 
 void Log(u8 *fmt, ...args)
 {
-  u8 *msg = str.formatArgs(null, fmt, args.len, args);   // format the extras
+  u8 *msg = str.formatArgs(null, fmt, args);   // format the extras
   printf("[log] %s\n", msg);
   mem.free(msg);
 }

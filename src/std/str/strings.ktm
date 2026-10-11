@@ -1028,7 +1028,7 @@ static void strPrintInt(u8 **_ptr, u8 **grow, u64 val, i64 conv, i64 flags,
         }
 }
 
-pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
         if (!fmt) { return null; }
         u64 uintarg, curlen = 0;
         f64 farg;
@@ -1070,7 +1070,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                         }
                         if (*fmt == '*') {
                                 fmt++;
-                                tlen = (u64)argv[sp++];
+                                tlen = (u64)args[sp++];
                                 if (tlen < 0) { /* as in C, a negative '*' width left-justifies */
                                         flags|=PRTF_LEFT_JUSTIFY;
                                         tlen = -tlen;
@@ -1085,7 +1085,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
                                 if (*fmt == '*') {
                                         fmt++;
-                                        dec_len=argv[sp++];
+                                        dec_len=args[sp++];
                                         if (dec_len < 0) { /* as in C, a negative precision is none */
                                                 dec_len = -1;
                                         }
@@ -1105,7 +1105,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'Q': {
-                                        strarg = (u8*)argv[sp++];
+                                        strarg = (u8*)args[sp++];
                                         strarg = quote(strarg,flags);
                                         outStr(strarg,grow,&ptr,tlen,flags);
                                         mem.free(strarg);
@@ -1115,7 +1115,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 case 'e':
                                 case 'g':
                                 case 'f': {
-                                        uintarg = (u64)argv[sp++]; // the f64's bits
+                                        uintarg = (u64)args[sp++]; // the f64's bits
                                         strarg = f64ToFmtStr(uintarg,dec_len,*(fmt-1));
                                         len = len(strarg);
                                         u8 sign = 0; /* '-', or '+' / ' ' with those flags */
@@ -1154,7 +1154,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 's': {
-                                        strarg = (u8 *)argv[sp++];
+                                        strarg = (u8 *)args[sp++];
                                         outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
                                 }
 
@@ -1179,7 +1179,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'c': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         for (i64 i = 0; i < 8; ++i) {
                                                 buf[i] = uintarg >> ((i*8) & 0xFF);
                                         }
@@ -1188,7 +1188,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 }
 
                                 case 'C': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         for (i64 i = 0; i < 8; ++i) {
                                                 buf[i] = toUpper(uintarg >> ((i*8) & 0xFF));
                                         }
@@ -1202,12 +1202,12 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
                                 case 'o':
                                 case 'x':
                                 case 'X': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         strPrintInt(&ptr,grow,uintarg,*(fmt-1),flags,tlen,dec_len);
                                 }
 
                                 case 'p': {
-                                        uintarg = (u64)argv[sp++];
+                                        uintarg = (u64)args[sp++];
                                         len = hex(buf,uintarg);
                                         outStr(buf,grow,&ptr,tlen,flags);
                                 }
@@ -1250,20 +1250,20 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
         return dst;
 }
 
-pub u8 *concatArgs(i64 argc, u64 *argv) {
+pub u8 *concatArgs(u64[] args) {
         u8 *buf = mem.alloc(256), *dst = buf;
-        for (i64 i = 0; i < argc; ++i) {
-                outStr((u8*)argv[i],&buf,&dst,0,0);
+        for (auto arg : args) {
+                outStr((u8*)arg,&buf,&dst,0,0);
         }
         return buf;
 }
 
 pub u8 *concat(...args) {
-        return concatArgs(args.len,args);
+        return concatArgs(args);
 }
 
 pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
-        return formatArgs(dst,fmt,args.len,args);
+        return formatArgs(dst,fmt,args);
 }
 
 /* Format into `dst`, which has room for `size` bytes, like C's snprintf:
@@ -1272,7 +1272,7 @@ pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
     * StrPrint(dst, ...) has no bound, so use this for a fixed buffer. */
 pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
         if (!dst || size <= 0) { return dst; }
-        u8 *full = formatArgs(null,fmt,args.len,args);
+        u8 *full = formatArgs(null,fmt,args);
         i64 len = 0;
         if (full) {
                 len = len(full);
@@ -1286,7 +1286,7 @@ pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
 
 pub u8 *format(u8 *fmt,...args)
 {// MAlloc StrPrint.
-        u8 *res,*buf=formatArgs(null,fmt,args.len,args);
+        u8 *res,*buf=formatArgs(null,fmt,args);
         res=dup(buf);
         mem.free(buf);
         return res;
@@ -1301,7 +1301,7 @@ pub u8 *format(u8 *fmt,...args)
     * string: in a loop keep the length yourself with CatLenPrint, or
     * collect the pieces and StrPrint them once. */
 pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
-        u8 *s2 = formatArgs(null,fmt,args.len,args);
+        u8 *s2 = formatArgs(null,fmt,args);
         if (!s2) { return _dst; }
         if (!_dst) { return s2; }
         i64 len = len(_dst);
@@ -1319,7 +1319,7 @@ pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
     * StrLen per call. `_dst` may be null (with *_len 0) to start one. */
 pub u8 *appendFormatLen(u8 *_dst, i64 *_len, u8 *fmt, ...args) {
         i64 len = *_len;
-        u8 *s2 = formatArgs(null,fmt,args.len,args);
+        u8 *s2 = formatArgs(null,fmt,args);
         if (!s2) { return _dst; }
         i64 s2len = len(s2);
         i64 size = mem.size(_dst);

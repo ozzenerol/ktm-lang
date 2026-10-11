@@ -21,7 +21,7 @@ pub i64 shell(u8 *command) {
 pub i32 shellf(u8 *fmt, ...args) {
     if (!fmt) { return -1; }
     /* Formatted even without arguments, so "%%" is always a single % */
-    u8 *cmd = str.formatArgs(null,fmt,args.len,args);
+    u8 *cmd = str.formatArgs(null, fmt, args);
     i32 retval = shell(cmd);
     mem.free(cmd);
     return retval;
@@ -62,7 +62,7 @@ pub u8 *shellQuote(u8 *s) {
 pub u8 *shellOutput(u8 *fmt, ...args) {
     if (!fmt) { return null; }
     i64 len = 0;
-    u8 *userCmd = str.formatArgs(null,fmt,args.len,args);
+    u8 *userCmd = str.formatArgs(null, fmt, args);
     /* The newline completes a command that ends in a backslash (a line
      * continuation) or in a here-doc delimiter */
     u8 *cmd = str.formatTo(null,"%s\n",userCmd);
