@@ -2566,7 +2566,9 @@ void lexUndef(Map *macro_defs, Lexer *l) {
                     "Syntax is: #undef <TK_IDENT>");
         return;
     }
-    if (next.tk_type != TK_IDENT) {
+    /* the name is on the directive's line: a word on the next one (now
+     * `void`, an identifier) starts the code after it */
+    if (next.tk_type != TK_IDENT || next.line != dir.line) {
         at = lexDropDirective(l, &dir, &next);
         lexReportAt(l, at.line, at.col, at.len,
                     "Syntax is: #undef <TK_IDENT>");
