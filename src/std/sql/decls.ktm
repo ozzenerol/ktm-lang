@@ -1,63 +1,62 @@
 module sql;
-import libc;
 
 #ifdef __KTM_LINK_SQLITE3__ 
 
-const i64 SQLITE_OK = 0;   /* Successful result */
+pub const i64 SQLITE_OK = 0;   /* Successful result */
 /* beginning-of-error-codes */
-const i64 SQLITE_ERROR = 1;   /* Generic error */
-const i64 SQLITE_INTERNAL = 2;   /* Internal logic error in SQLite */
-const i64 SQLITE_PERM = 3;   /* Access permission denied */
-const i64 SQLITE_ABORT = 4;   /* Callback routine requested an abort */
-const i64 SQLITE_BUSY = 5;   /* The database file is locked */
-const i64 SQLITE_LOCKED = 6;   /* A table in the database is locked */
-const i64 SQLITE_NOMEM = 7;   /* A malloc() failed */
-const i64 SQLITE_READONLY = 8;   /* Attempt to write a readonly database */
-const i64 SQLITE_INTERRUPT = 9;   /* Operation terminated by sqlite3_interrupt()*/
-const i64 SQLITE_IOERR = 10;   /* Some kind of disk I/O error occurred */
-const i64 SQLITE_CORRUPT = 11;   /* The database disk image is malformed */
-const i64 SQLITE_NOTFOUND = 12;   /* Unknown opcode in sqlite3_file_control() */
-const i64 SQLITE_FULL = 13;   /* Insertion failed because database is full */
-const i64 SQLITE_CANTOPEN = 14;   /* Unable to open the database file */
-const i64 SQLITE_PROTOCOL = 15;   /* Database lock protocol error */
-const i64 SQLITE_EMPTY = 16;   /* Internal use only */
-const i64 SQLITE_SCHEMA = 17;   /* The database schema changed */
-const i64 SQLITE_TOOBIG = 18;   /* String or BLOB exceeds size limit */
-const i64 SQLITE_CONSTRAINT = 19;   /* Abort due to constraint violation */
-const i64 SQLITE_MISMATCH = 20;   /* Data type mismatch */
-const i64 SQLITE_MISUSE = 21;   /* Library used incorrectly */
-const i64 SQLITE_NOLFS = 22;   /* Uses OS features not supported on host */
-const i64 SQLITE_AUTH = 23;   /* Authorization denied */
-const i64 SQLITE_FORMAT = 24;   /* Not used */
-const i64 SQLITE_RANGE = 25;   /* 2nd parameter to sqlite3_bind out of range */
-const i64 SQLITE_NOTADB = 26;   /* File opened that is not a database file */
-const i64 SQLITE_NOTICE = 27;   /* Notifications from sqlite3_log() */
-const i64 SQLITE_WARNING = 28;   /* Warnings from sqlite3_log() */
-const i64 SQLITE_ROW = 100;  /* sqlite3_step() has another row ready */
-const i64 SQLITE_DONE = 101;  /* sqlite3_step() has finished executing */
+pub const i64 SQLITE_ERROR = 1;   /* Generic error */
+pub const i64 SQLITE_INTERNAL = 2;   /* Internal logic error in SQLite */
+pub const i64 SQLITE_PERM = 3;   /* Access permission denied */
+pub const i64 SQLITE_ABORT = 4;   /* Callback routine requested an abort */
+pub const i64 SQLITE_BUSY = 5;   /* The database file is locked */
+pub const i64 SQLITE_LOCKED = 6;   /* A table in the database is locked */
+pub const i64 SQLITE_NOMEM = 7;   /* A malloc() failed */
+pub const i64 SQLITE_READONLY = 8;   /* Attempt to write a readonly database */
+pub const i64 SQLITE_INTERRUPT = 9;   /* Operation terminated by sqlite3_interrupt()*/
+pub const i64 SQLITE_IOERR = 10;   /* Some kind of disk I/O error occurred */
+pub const i64 SQLITE_CORRUPT = 11;   /* The database disk image is malformed */
+pub const i64 SQLITE_NOTFOUND = 12;   /* Unknown opcode in sqlite3_file_control() */
+pub const i64 SQLITE_FULL = 13;   /* Insertion failed because database is full */
+pub const i64 SQLITE_CANTOPEN = 14;   /* Unable to open the database file */
+pub const i64 SQLITE_PROTOCOL = 15;   /* Database lock protocol error */
+pub const i64 SQLITE_EMPTY = 16;   /* Internal use only */
+pub const i64 SQLITE_SCHEMA = 17;   /* The database schema changed */
+pub const i64 SQLITE_TOOBIG = 18;   /* String or BLOB exceeds size limit */
+pub const i64 SQLITE_CONSTRAINT = 19;   /* Abort due to constraint violation */
+pub const i64 SQLITE_MISMATCH = 20;   /* Data type mismatch */
+pub const i64 SQLITE_MISUSE = 21;   /* Library used incorrectly */
+pub const i64 SQLITE_NOLFS = 22;   /* Uses OS features not supported on host */
+pub const i64 SQLITE_AUTH = 23;   /* Authorization denied */
+pub const i64 SQLITE_FORMAT = 24;   /* Not used */
+pub const i64 SQLITE_RANGE = 25;   /* 2nd parameter to sqlite3_bind out of range */
+pub const i64 SQLITE_NOTADB = 26;   /* File opened that is not a database file */
+pub const i64 SQLITE_NOTICE = 27;   /* Notifications from sqlite3_log() */
+pub const i64 SQLITE_WARNING = 28;   /* Warnings from sqlite3_log() */
+pub const i64 SQLITE_ROW = 100;  /* sqlite3_step() has another row ready */
+pub const i64 SQLITE_DONE = 101;  /* sqlite3_step() has finished executing */
 
-const i64 SQLITE_INTEGER = 1;
-const i64 SQLITE_FLOAT = 2;
-const i64 SQLITE_BLOB = 4;
-const i64 SQLITE_NULL = 5;
-const i64 SQLITE_TEXT = 3;
-const i64 SQLITE3_TEXT = 3;
+pub const i64 SQLITE_INTEGER = 1;
+pub const i64 SQLITE_FLOAT = 2;
+pub const i64 SQLITE_BLOB = 4;
+pub const i64 SQLITE_NULL = 5;
+pub const i64 SQLITE_TEXT = 3;
+pub const i64 SQLITE3_TEXT = 3;
 
-pub const i64 INT = libc.SQLITE_INTEGER;
-pub const i64 FLOAT = libc.SQLITE_FLOAT;
-pub const i64 TEXT = libc.SQLITE3_TEXT;
-pub const i64 BLOB = libc.SQLITE_BLOB;
-pub const i64 NULL_TYPE = libc.SQLITE_NULL;
+pub const i64 INT = SQLITE_INTEGER;
+pub const i64 FLOAT = SQLITE_FLOAT;
+pub const i64 TEXT = SQLITE3_TEXT;
+pub const i64 BLOB = SQLITE_BLOB;
+pub const i64 NULL_TYPE = SQLITE_NULL;
 
-struct sqlite3_stmt {};
-struct sqlite3 {};
-struct sqlite3_value {};
+pub struct sqlite3_stmt {};
+pub struct sqlite3 {};
+pub struct sqlite3_value {};
 
 /* A value for a `?` parameter: type is SQL_INT (i64), SQL_FLOAT (f64),
  * SQL_TEXT (str, NUL-terminated), SQL_BLOB (blob, blob_len bytes) or
  * SQL_NULL. Text and blobs are copied when bound, so the caller may free
  * or reuse them right after the call. */
-struct Param {
+pub struct Param {
     i64 type;
     union {
         i64 intVal;
@@ -70,7 +69,7 @@ struct Param {
     };
 };
 
-struct Stmt {
+pub struct Stmt {
     sqlite3_stmt *stmt;
     i64  paramsCount;
 };
@@ -79,7 +78,7 @@ struct Stmt {
  * SQL_BLOB or SQL_NULL. str and blob point into sqlite's memory and are
  * only valid until the next SqlIter/SqlIterPrepared or SqlRowRelease;
  * len is their size in bytes, 0 for the other types. */
-struct Column {
+pub struct Column {
     i64 len;
     i64 type;
     union
@@ -92,7 +91,7 @@ struct Column {
 };
 
 /* The current row of a statement: col[0] .. col[cols - 1]. */
-struct Row {
+pub struct Row {
     sqlite3_stmt *stmt;
     i64 cols;
     Column *col;
@@ -101,7 +100,7 @@ struct Row {
     bool ownsStmt;
 };
 
-struct Db {
+pub struct Db {
     sqlite3 *conn;
     u8 *dbname;
 };

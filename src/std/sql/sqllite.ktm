@@ -1,68 +1,92 @@
 module sql;
-import libc, mem, str;
+import mem, str;
 
-pub const i64 INT = libc.SQLITE_INTEGER;
+#ifdef __KTM_LINK_SQLITE3__
 
-pub const i64 FLOAT = libc.SQLITE_FLOAT;
+pub const i64 SQLITE_OK = 0;   /* Successful result */
 
-pub const i64 TEXT = libc.SQLITE3_TEXT;
+/* beginning-of-error-codes */
+pub const i64 SQLITE_ERROR = 1;   /* Generic error */
 
-pub const i64 BLOB = libc.SQLITE_BLOB;
+pub const i64 SQLITE_INTERNAL = 2;   /* Internal logic error in SQLite */
 
-pub const i64 NULL_TYPE = libc.SQLITE_NULL;
+pub const i64 SQLITE_PERM = 3;   /* Access permission denied */
+
+pub const i64 SQLITE_ABORT = 4;   /* Callback routine requested an abort */
+
+pub const i64 SQLITE_BUSY = 5;   /* The database file is locked */
+
+pub const i64 SQLITE_LOCKED = 6;   /* A table in the database is locked */
+
+pub const i64 SQLITE_NOMEM = 7;   /* A malloc() failed */
+
+pub const i64 SQLITE_READONLY = 8;   /* Attempt to write a readonly database */
+
+pub const i64 SQLITE_INTERRUPT = 9;   /* Operation terminated by sqlite3_interrupt()*/
+
+pub const i64 SQLITE_IOERR = 10;   /* Some kind of disk I/O error occurred */
+
+pub const i64 SQLITE_CORRUPT = 11;   /* The database disk image is malformed */
+
+pub const i64 SQLITE_NOTFOUND = 12;   /* Unknown opcode in sqlite3_file_control() */
+
+pub const i64 SQLITE_FULL = 13;   /* Insertion failed because database is full */
+
+pub const i64 SQLITE_CANTOPEN = 14;   /* Unable to open the database file */
+
+pub const i64 SQLITE_PROTOCOL = 15;   /* Database lock protocol error */
+
+pub const i64 SQLITE_EMPTY = 16;   /* Internal use only */
+
+pub const i64 SQLITE_SCHEMA = 17;   /* The database schema changed */
+
+pub const i64 SQLITE_TOOBIG = 18;   /* String or BLOB exceeds size limit */
+
+pub const i64 SQLITE_CONSTRAINT = 19;   /* Abort due to constraint violation */
+
+pub const i64 SQLITE_MISMATCH = 20;   /* Data type mismatch */
+
+pub const i64 SQLITE_MISUSE = 21;   /* Library used incorrectly */
+
+pub const i64 SQLITE_NOLFS = 22;   /* Uses OS features not supported on host */
+
+pub const i64 SQLITE_AUTH = 23;   /* Authorization denied */
+
+pub const i64 SQLITE_FORMAT = 24;   /* Not used */
+
+pub const i64 SQLITE_RANGE = 25;   /* 2nd parameter to sqlite3_bind out of range */
+
+pub const i64 SQLITE_NOTADB = 26;   /* File opened that is not a database file */
+
+pub const i64 SQLITE_NOTICE = 27;   /* Notifications from sqlite3_log() */
+
+pub const i64 SQLITE_WARNING = 28;   /* Warnings from sqlite3_log() */
+
+pub const i64 SQLITE_ROW = 100;  /* sqlite3_step() has another row ready */
+
+pub const i64 SQLITE_DONE = 101;  /* sqlite3_step() has finished executing */
+
+pub const i64 SQLITE_INTEGER = 1;
+
+pub const i64 SQLITE_FLOAT = 2;
+
+pub const i64 SQLITE_BLOB = 4;
+
+pub const i64 SQLITE_NULL = 5;
+
+pub const i64 SQLITE_TEXT = 3;
+
+pub const i64 SQLITE3_TEXT = 3;
 
 /* Destructor argument of sqlite3_bind_* ((void *)-1): sqlite copies the
  * value, so the caller may free or reuse it right after the call. */
 const i64 SQLITE_TRANSIENT = (-1);
 
-struct sqlite3_stmt {};
+pub struct sqlite3_stmt {};
 
-struct sqlite3 {};
+pub struct sqlite3 {};
 
-struct sqlite3_value {};
-
-pub struct Param {
-    i64 type;
-    union {
-        i64 intVal;
-        f64 floatVal;
-        u8 *str;
-        struct {
-            void *blob;
-            i64 blobLen;
-        };
-    };
-};
-
-pub struct Stmt {
-    sqlite3_stmt *stmt;
-    i64  paramsCount;
-};
-
-pub struct Column {
-    i64 len;
-    i64 type;
-    union {
-        i64 intVal;
-        u8 *str;
-        void *blob;
-        f64 floatVal;
-    };
-};
-
-pub struct Row {
-    sqlite3_stmt *stmt;
-    i64 cols;
-    Column *col;
-    /* false for a row of a prepared statement, which SqlFinalizePrepared
-     * finalizes. */
-    bool ownsStmt;
-};
-
-pub struct Db {
-    sqlite3 *conn;
-    u8 *dbname;
-};
+pub struct sqlite3_value {};
 
 pub extern "c" i32 sqlite3_prepare_v2(
     sqlite3 *db,            /* Database handle */
@@ -148,15 +172,15 @@ pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 pub Db *open(u8 *dbname, bool printerror=false) {
     sqlite3 *db = null;
     Db *ctx;
-    i32 rc = libc.sqlite3_open(dbname, &db);
+    i32 rc = sqlite3_open(dbname, &db);
 
-    if (rc != libc.SQLITE_OK) {
+    if (rc != SQLITE_OK) {
         if (printerror) {
-            u8 *s = libc.sqlite3_errmsg(db);
+            u8 *s = sqlite3_errmsg(db);
             printf("NOT OK: %s\n", s);
         }
         /* The handle is allocated even when opening fails. */
-        libc.sqlite3_close(db);
+        sqlite3_close(db);
         return null;
     }
 
@@ -170,7 +194,7 @@ pub void close(Db *ctx) {
     if (!ctx) { return; }
     /* Unlike sqlite3_close, closes once the last statement is finalized
      * instead of failing with SQLITE_BUSY and leaking the connection. */
-    libc.sqlite3_close_v2(ctx.conn);
+    sqlite3_close_v2(ctx.conn);
     mem.free(ctx);
 }
 
@@ -182,22 +206,22 @@ static bool sqlTailIsEmpty(Db *ctx, u8 *tail) {
     if (!tail || !*tail) {
         return true;
     }
-    i32 rc = libc.sqlite3_prepare_v2(ctx.conn, tail, -1, &extra, null);
+    i32 rc = sqlite3_prepare_v2(ctx.conn, tail, -1, &extra, null);
     if (extra) {
-        libc.sqlite3_finalize(extra);
+        sqlite3_finalize(extra);
         return false;
     }
-    return rc == libc.SQLITE_OK;
+    return rc == SQLITE_OK;
 }
 
 pub Stmt *prepare(Db *ctx, u8 *sql) {
     Stmt *pstmt = mem.alloc(sizeof(Stmt));
     u8 *tail = null;
     pstmt.stmt = null;
-    if (libc.sqlite3_prepare_v2(ctx.conn, sql, -1, &(pstmt.stmt), &tail) != libc.SQLITE_OK ||
+    if (sqlite3_prepare_v2(ctx.conn, sql, -1, &(pstmt.stmt), &tail) != SQLITE_OK ||
             pstmt.stmt == null || !sqlTailIsEmpty(ctx, tail)) {
         /* A failed prepare leaves stmt null; so does an empty string. */
-        libc.sqlite3_finalize(pstmt.stmt);
+        sqlite3_finalize(pstmt.stmt);
         mem.free(pstmt);
         return null;
     }
@@ -206,30 +230,30 @@ pub Stmt *prepare(Db *ctx, u8 *sql) {
 }
 
 static void sqlReset(Stmt *pstmt) {
-    libc.sqlite3_clear_bindings(pstmt.stmt);
-    libc.sqlite3_reset(pstmt.stmt);
+    sqlite3_clear_bindings(pstmt.stmt);
+    sqlite3_reset(pstmt.stmt);
 }
 
 pub void finalize(Stmt *pstmt) {
     if (!pstmt) { return; }
-    libc.sqlite3_finalize(pstmt.stmt);
+    sqlite3_finalize(pstmt.stmt);
     mem.free(pstmt);
 }
 
-extern "c" void sqlite3_free(void *ptr);
+pub extern "c" void sqlite3_free(void *ptr);
 
 /* Unsafe */ 
 pub u8 *execRaw(Db *ctx, u8 *sql) {
     u8 *errmsg = null, *copy;
-    i32 rc = libc.sqlite3_exec(ctx.conn, sql, 0, 0, &errmsg);
-    if (rc == libc.SQLITE_OK) {
+    i32 rc = sqlite3_exec(ctx.conn, sql, 0, 0, &errmsg);
+    if (rc == SQLITE_OK) {
         return null;
     }
     if (errmsg) {
         copy = str.dup(errmsg);
         sqlite3_free(errmsg);
     } else {
-        copy = str.dup(libc.sqlite3_errmsg(ctx.conn));
+        copy = str.dup(sqlite3_errmsg(ctx.conn));
     }
     return copy;
 }
@@ -241,7 +265,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
         row.stmt = null;
     }
     if (!pstmt) {
-        return libc.SQLITE_MISUSE;
+        return SQLITE_MISUSE;
     }
     sqlReset(pstmt);
 
@@ -249,21 +273,21 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
     for (auto i = 0; params && i < pstmt.paramsCount; ++i) {
         Param *param = &params[i];
         switch (param.type) {
-            case SQL_INT:
+            case INT:
                 rc = sqlite3_bind_int64(pstmt.stmt, i + 1, param.intVal);
-            case SQL_FLOAT:
+            case FLOAT:
                 rc = sqlite3_bind_double(pstmt.stmt, i + 1, param.floatVal);
-            case SQL_TEXT:
+            case TEXT:
                 rc = sqlite3_bind_text(pstmt.stmt, i + 1, param.str, -1, (void *)SQLITE_TRANSIENT);
-            case SQL_BLOB:
+            case BLOB:
                 rc = sqlite3_bind_blob(pstmt.stmt, i + 1, param.blob, param.blobLen,
                         (void *)SQLITE_TRANSIENT);
-            case SQL_NULL:
+            case NULL_TYPE:
                 rc = sqlite3_bind_null(pstmt.stmt, i + 1);
             default:
-                rc = libc.SQLITE_MISMATCH;
+                rc = SQLITE_MISMATCH;
         }
-        if (rc != libc.SQLITE_OK) {
+        if (rc != SQLITE_OK) {
             /* Don't run the statement with a parameter missing; the next
              * SqlExecPrepared clears what was bound so far. */
             return rc;
@@ -271,8 +295,8 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
     }
 
     /* Execute. */
-    rc = libc.sqlite3_step(pstmt.stmt);
-    if (rc == libc.SQLITE_ROW && row) {
+    rc = sqlite3_step(pstmt.stmt);
+    if (rc == SQLITE_ROW && row) {
         row.stmt = pstmt.stmt;
         row.cols = 0;
         row.col = null;
@@ -284,7 +308,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
 
 static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
                                                 i32 paramCount) {
-    i32 rc = libc.SQLITE_ERROR;
+    i32 rc = SQLITE_ERROR;
     sqlite3_stmt *stmt = null;
     u8 *tail = null;
 
@@ -292,43 +316,43 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
         row.stmt = null;
     }
 
-    rc = libc.sqlite3_prepare_v2(ctx.conn, sql, -1, &stmt, &tail);
+    rc = sqlite3_prepare_v2(ctx.conn, sql, -1, &stmt, &tail);
 
-    if (rc != libc.SQLITE_OK) {
+    if (rc != SQLITE_OK) {
         goto err;
     }
     if (!sqlTailIsEmpty(ctx, tail)) {
-        rc = libc.SQLITE_ERROR;
+        rc = SQLITE_ERROR;
         goto err;
     }
 
     for (auto i = 0; i < paramCount; ++i) {
         switch (params[i].type) {
-            case SQL_INT:
+            case INT:
                 /* The leftmost SQL parameter has an index of 1 ref:
                  * https://www.sqlite.org/c3ref/bind_blob.html */
                 rc = sqlite3_bind_int64(stmt, i + 1, params[i].intVal);
-            case SQL_FLOAT:
+            case FLOAT:
                 rc = sqlite3_bind_double(stmt, i + 1, params[i].floatVal);
-            case SQL_TEXT:
+            case TEXT:
                 rc = sqlite3_bind_text(stmt, i + 1, params[i].str, -1, (void *)SQLITE_TRANSIENT);
-            case SQL_BLOB:
+            case BLOB:
                 rc = sqlite3_bind_blob(stmt, i + 1, params[i].blob,
                         params[i].blobLen, (void *)SQLITE_TRANSIENT);
-            case SQL_NULL:
+            case NULL_TYPE:
                 rc = sqlite3_bind_null(stmt, i + 1);
             default:
-                rc = libc.SQLITE_MISMATCH;
+                rc = SQLITE_MISMATCH;
                 goto err;
         }
-        if (rc != libc.SQLITE_OK) {
+        if (rc != SQLITE_OK) {
             goto err;
         }
     }
 
     /* Execute. */
-    rc = libc.sqlite3_step(stmt);
-    if (rc == libc.SQLITE_ROW && row) {
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW && row) {
         row.stmt = stmt;
         row.cols = 0;
         row.col = null;
@@ -338,7 +362,7 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
 
 err:
     if (stmt) {
-        libc.sqlite3_finalize(stmt);
+        sqlite3_finalize(stmt);
     }
     return rc;
 }
@@ -349,7 +373,7 @@ pub void rowRelease(Row *row) {
     }
     mem.free(row.col);
     if (row.ownsStmt) {
-        libc.sqlite3_finalize(row.stmt);
+        sqlite3_finalize(row.stmt);
     }
     row.col = null;
     row.stmt = null;
@@ -358,12 +382,12 @@ pub void rowRelease(Row *row) {
 pub bool select(Db *ctx, Row *row, u8 *sql, Param *params=null,
         i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,row,sql,params,paramCount);
-    return result == libc.SQLITE_DONE || result == libc.SQLITE_ROW;
+    return result == SQLITE_DONE || result == SQLITE_ROW;
 }
 
 pub bool exec(Db *ctx, u8 *sql, Param *params=null, i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,null,sql,params,paramCount);
-    return result == libc.SQLITE_DONE || result == libc.SQLITE_ROW;
+    return result == SQLITE_DONE || result == SQLITE_ROW;
 }
 
 static bool sqlIterGeneric(Row *row) {
@@ -372,7 +396,7 @@ static bool sqlIterGeneric(Row *row) {
     }
 
     if (row.col != null) {
-        if (libc.sqlite3_step(row.stmt) != libc.SQLITE_ROW) {
+        if (sqlite3_step(row.stmt) != SQLITE_ROW) {
             rowRelease(row);
             return false;
         }
@@ -381,20 +405,20 @@ static bool sqlIterGeneric(Row *row) {
     /* XXX: MAlloc's and Free's on each call which is a bit expensive seeing 
      * as this function will be called in a loop */
     mem.free(row.col);
-    row.cols = libc.sqlite3_data_count(row.stmt);
+    row.cols = sqlite3_data_count(row.stmt);
     row.col = mem.allocZero(row.cols * sizeof(Column));
 
     for (auto i = 0; i < row.cols; i++) {
         row.col[i].type = sqlite3_column_type(row.stmt,i);
         switch (row.col[i].type) {
-            case libc.SQLITE_INTEGER:
+            case SQLITE_INTEGER:
                 row.col[i].intVal = sqlite3_column_int64(row.stmt,i);
-            case libc.SQLITE_FLOAT:
+            case SQLITE_FLOAT:
                 row.col[i].floatVal = sqlite3_column_double(row.stmt,i);
-            case libc.SQLITE3_TEXT:
+            case SQLITE3_TEXT:
                 row.col[i].str = (u8 *)sqlite3_column_text(row.stmt,i);
                 row.col[i].len = sqlite3_column_bytes(row.stmt,i);
-            case libc.SQLITE_BLOB:
+            case SQLITE_BLOB:
                 row.col[i].blob = (void *)sqlite3_column_blob(row.stmt,i);
                 row.col[i].len = sqlite3_column_bytes(row.stmt,i);
             default:
@@ -414,3 +438,5 @@ pub i32 next(Row *row) {
 pub i64 nextPrepared(Row *row) {
     return sqlIterGeneric(row);
 }
+
+#endif
