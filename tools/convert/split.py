@@ -164,9 +164,12 @@ for f in headers + files:
             dropped.append((f, it['start'], k, name))
             continue
         if k == 'cfunc' or mod == 'libc' or (row and row[0] == 'c'):
-            if name in seen_c:
+            # once each; a type's forward declaration and its definition
+            # are two things (the header has `class addrinfo;` first)
+            ckey = name + ('{' if k == 'type' and '{' in body else '')
+            if ckey in seen_c:
                 continue
-            seen_c.add(name)
+            seen_c.add(ckey)
             # sqlite's C functions are the sql module's (optional, like it)
             target = 'sql' if name.startswith('sqlite3') else 'libc'
             if target == 'libc' and k != 'define':
