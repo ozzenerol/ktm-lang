@@ -890,6 +890,27 @@ static Set *mig_std_names = NULL;    /* every name the stdlib declares */
 static Map *mig_scoped_renames = NULL; /* "file:name" -> new, locals */
 static Map *mig_field_renames = NULL;
 
+/* --keep-defines LIST: files (by base name, one a line) whose #defines
+ * stay macros, in their code and in the programs in their strings (the
+ * tests of #define itself); set while such a file is converted */
+static Set *mig_keep_defines = NULL;
+static int mig_keep_now = 0;
+
+static int migLoadKeepDefines(const char *path) {
+    FILE *fp = fopen(path, "r");
+    if (!fp) return 0;
+    if (!mig_keep_defines) mig_keep_defines = setNew(32, &set_cstring_type);
+    char line[1024];
+    while (fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\r\n")] = '\0';
+        char *b = strrchr(line, '/');
+        b = b ? b + 1 : line;
+        if (*b && *b != '#') setAdd(mig_keep_defines, strdup(b));
+    }
+    fclose(fp);
+    return 1;
+}
+
 static int migLoadRenames(const char *path) {
     s64 len;
     char *text = migReadFile((char *)path, &len);
@@ -3091,6 +3112,7 @@ static int migPreprocUses(MigFile *f, const char *name, s64 nlen) {
 }
 
 static void migDefines(MigFile *f) {
+    if (mig_keep_now) return;
     s64 plen = strlen(f->path);
     if (plen > 5 && !strcmp(f->path + plen - 5, ".ktmh")) return;
     char *t = f->text;
@@ -3157,6 +3179,11 @@ static void migImports(MigFile *f) {
 
 /* Every pass but writing: the edits of f, sorted */
 static int migConvert(MigFile *f, char *install_dir, int outer) {
+    if (outer) {
+        const char *b = strrchr(f->path, '/');
+        b = b ? b + 1 : f->path;
+        mig_keep_now = mig_keep_defines && setHas(mig_keep_defines, (void *)b);
+    }
     /* Code at file scope that calls Main: Main stays a function and a new
      * main runs that code */
     for (u64 c = 0; c < f->main_calls->size; ++c) {
@@ -3202,6 +3229,7 @@ static void migUsage(void) {
         "  --names     rename to the naming rule (camelCase functions/variables)\n"
         "  --layout    `->` to `.`, braces on the header's line, 4-space indents (last)\n"
         "  --drop-breaks  Y8 for S3: drop each switch arm's last `break;` (S2 keeps them)\n"
+        "  --keep-defines LIST  files (base names) whose #defines stay macros (tests of #define)\n"
         "  --renames TSV  the stdlib's own renames (renames.tsv, renames-locals.tsv)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
@@ -3282,6 +3310,12 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--names")) mig_names = 1;
         else if (!strcmp(argv[i], "--layout")) mig_layout = 1;
         else if (!strcmp(argv[i], "--drop-breaks")) mig_drop_breaks = 1;
+        else if (!strcmp(argv[i], "--keep-defines") && i + 1 < argc) {
+            if (!migLoadKeepDefines(argv[++i])) {
+                fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);
+                return 2;
+            }
+        }
         else if (!strcmp(argv[i], "--renames") && i + 1 < argc) {
             if (!migLoadRenames(argv[++i])) {
                 fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);

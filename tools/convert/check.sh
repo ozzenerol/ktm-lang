@@ -26,6 +26,10 @@ for src in "$HERE"/corpus/*.ktm; do
   head -1 "$src" | grep -q '^// map' && MAP="--map $HERE/stdlib-modules.tsv"
   # `// drop-breaks` in the first lines: with S3's --drop-breaks (Y8)
   head -3 "$src" | grep -q '^// drop-breaks' && MAP="$MAP --drop-breaks"
+  # `// keep-defines`: the file's #defines stay macros (--keep-defines)
+  if head -3 "$src" | grep -q '^// keep-defines'; then
+    echo "$name.ktm" > "$TMP/$name.keep"; MAP="$MAP --keep-defines $TMP/$name.keep"
+  fi
   if $TO "$CONV" --install-dir="$DIR" $MAP --stdout "$src" > "$TMP/$name.got" 2> "$TMP/$name.err" &&
      cmp -s "$TMP/$name.got" "$HERE/corpus/$name.expected"; then
     ok
