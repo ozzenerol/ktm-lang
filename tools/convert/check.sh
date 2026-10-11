@@ -28,7 +28,8 @@ for src in "$HERE"/corpus/*.ktm; do
   head -3 "$src" | grep -q '^// drop-breaks' && MAP="$MAP --drop-breaks"
   # `// keep-defines`: the file's #defines stay macros (--keep-defines)
   if head -3 "$src" | grep -q '^// keep-defines'; then
-    echo "$name.ktm" > "$TMP/$name.keep"; MAP="$MAP --keep-defines $TMP/$name.keep"
+    printf '%s\n' "$name.ktm" "$name.new.ktm" > "$TMP/$name.keep"
+    MAP="$MAP --keep-defines $TMP/$name.keep"
   fi
   if $TO "$CONV" --install-dir="$DIR" $MAP --stdout "$src" > "$TMP/$name.got" 2> "$TMP/$name.err" &&
      cmp -s "$TMP/$name.got" "$HERE/corpus/$name.expected"; then
@@ -78,7 +79,9 @@ else
         diff "$TMP/$name.old.$mode" "$TMP/$name.new.$mode" | head -6
       fi
     done
-    if $TO "$CONV" --install-dir="$DIR" --check "$TMP/$name.new.ktm" > /dev/null 2>&1; then ok
+    KEEP=""
+    [ -f "$TMP/$name.keep" ] && KEEP="--keep-defines $TMP/$name.keep"
+    if $TO "$CONV" --install-dir="$DIR" $KEEP --check "$TMP/$name.new.ktm" > /dev/null 2>&1; then ok
     else bad "$name: converting the converted program changes it"
     fi
   done
