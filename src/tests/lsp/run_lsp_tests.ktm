@@ -96,6 +96,7 @@ u8 *REG_HC;
 u8 *UTF_HC;
 u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
+u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 
 void initFixtures() {
@@ -115,6 +116,10 @@ void initFixtures() {
         "pub const i64 ORIGIN = 0;\n"
         "i64 square(i64 n) { return n * n; }\n"
         "pub i64 area(i64 side) { return square(side); }\n";
+    /* geo's second file: uses geo.ktm's square bare */
+    MOD_GEO2_HC =
+        "module geo;\n"
+        "i64 cube(i64 n) { return square(n) * n; }\n";
     MOD_MAIN_HC =
         "import geo;\n"
         "i32 main() {\n"
@@ -1211,6 +1216,19 @@ void testModules() {
     posOf(MOD_GEO_HC, "area(i64", 0, &wantLine, &wantChr);
     check("definition of geo.area is in geo/geo.ktm",
                 locEq(resp, geoUri, wantLine, wantChr, false));
+
+    /* Inside geo's files its names are bare: `square(n)` in more.ktm
+     * is geo.ktm's square */
+    u8 *moreUri = uriOf("geo/more.ktm");
+    lspDidOpen(l, moreUri, MOD_GEO2_HC);
+    posOf(MOD_GEO2_HC, "square(n)", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", moreUri, line, chr);
+    check("hover on a module's own bare name from its other file",
+                hoverContains(resp, "i64 square(i64 n)"));
+    resp = lspPositionRequest(l, "textDocument/definition", moreUri, line, chr);
+    posOf(MOD_GEO_HC, "square(i64", 0, &wantLine, &wantChr);
+    check("definition of a module's own bare name from its other file",
+                locEq(resp, geoUri, wantLine, wantChr, false));
     check("clean shutdown", lspClose(l) == 0);
 }
 
@@ -1360,6 +1378,8 @@ i32 main() {
     fs.writeAll(path, cstr.view(STD_HC));
     libc.snprintf(path, 512, "%s/geo/geo.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_GEO_HC));
+    libc.snprintf(path, 512, "%s/geo/more.ktm", gDir);
+    fs.writeAll(path, cstr.view(MOD_GEO2_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_MAIN_HC));
 
