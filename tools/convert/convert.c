@@ -2167,6 +2167,7 @@ static void migSkippedDefines(MigFile *f, s64 s, s64 e) {
                     int own = *mod && mn && !strcmp(mn->module, mod);
                     int pub = *mod && (!strcmp(mod, "libc") || own);
                     const char *cname = own && strcmp(mn->kind, "c") ? mn->name : name;
+                    if (mig_map) migScanWords(f, t, vs, ve, migSkippedMapWord, NULL);
                     migAddSegs(f, line_start, ve, "const",
                                migLit(mprintf("%sconst %s %s = ", pub ? "pub " : "",
                                               is_float ? "f64" : "i64", cname)),
@@ -3083,6 +3084,9 @@ static void migDefines(MigFile *f) {
         MigName *mn = mig_map ? mapGet(mig_map, name) : NULL;
         int own = *mod && mn && !strcmp(mn->module, mod);
         int pub = *mod && (!strcmp(mod, "libc") || own);
+        /* the value's stdlib names, which the parser saw only as a macro's
+         * tokens: `(S_ISUID|S_IRWXU)` is `(libc.S_ISUID|libc.S_IRWXU)` */
+        if (mig_map) migScanWords(f, t, vs, ve, migSkippedMapWord, NULL);
         /* the map's name in its module (CSV_FIELD is csv's FIELD) */
         const char *cname = own && strcmp(mn->kind, "c") ? mn->name : name;
         migAddSegs(f, line_start, ve, "const", migLit(mprintf("%sconst %s %s = ", pub ? "pub " : "",

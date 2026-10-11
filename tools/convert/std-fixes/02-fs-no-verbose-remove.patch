@@ -1,0 +1,77 @@
+diff --git a/src/std/fs/stat.ktm b/src/std/fs/stat.ktm
+index 781325c..4655295 100644
+--- a/src/std/fs/stat.ktm
++++ b/src/std/fs/stat.ktm
+@@ -14,7 +14,7 @@ static i32 makeDirIfMissing(u8 *path, i32 mode=MAKE_DIR_DEFAULT) {
+ }
+ 
+ pub i32 removeDir(u8 *path, i64 flags=0) {
+-    i32 isVerbose = flags & RM_VERBOSE, result,r2;
++    i32 result,r2;
+     i64 pathlen,buflen;
+     u8 *buf;
+     libc.DIR *dir;
+@@ -26,10 +26,6 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
+ 
+     if (!(flags & REMOVE_RECURSE)) {
+         result = libc.rmdir(path);
+-        if (isVerbose) {
+-            if (result == 0) { printf("removed dir '%s'\n",path); }
+-            else             { printf("ERROR removing dir '%s', is it empty?\n",path); }
+-        }
+         return result;
+     }
+ 
+@@ -58,26 +54,15 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
+                 /* Anything but a directory, links included, is unlinked; the
+                  * type is a number, not a bit mask (DT_SOCK & DT_DIR != 0) */
+                 r2 = libc.unlink(buf);
+-                if (isVerbose) {
+-                    if (r2 == 0) { printf("Rm: %s\n",buf); }
+-                    else         { printf("Error Rm: %s\n",buf); }
+-                }
+             } else if (!libc.lstat(buf,&st)) {
+                     if ((st.st_mode & libc.S_IFMT) == libc.S_IFDIR) {
+                         r2 = removeDir(buf,flags);
+                     } else {
+                         r2 = libc.unlink(buf);
+-                        if (isVerbose) {
+-                            if (r2 == 0) { printf("Rm: %s\n",buf); }
+-                            else         { printf("Error Rm: %s\n",buf); }
+-                        }
+                     }
+                 }
+             } else {
+                 r2 = -1;
+-                if (isVerbose) {
+-                    printf("Unknown file type to delete: 0x%X\n",ent.type);
+-                }
+ 
+             }
+             mem.free(buf);
+@@ -87,13 +72,6 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
+ 
+     if (!result && path) {
+         result = libc.rmdir(path);
+-        if (flags & RM_VERBOSE) {
+-            if (result == 0) {
+-            printf("RmDir %s\n",path);
+-            } else {
+-                printf("ERROR: RmDir %s\n",path);
+-            }
+-        }
+     }
+ 
+     return result;
+@@ -120,11 +98,6 @@ pub i32 remove(u8 *path, i64 flags=0)
+     }
+ 
+     result = libc.unlink(path);
+-    if (flags & RM_VERBOSE) {
+-        printf("Rm '%s'",path);
+-        if (result != 0) { printf(" failed\n"); }
+-        else             { printf("\n"); }
+-    }
+     return result;
+ }
+ 
