@@ -36,7 +36,7 @@ macro	CDATE_BASE_DAY_OF_WEEK	date	BASE_DAY_OF_WEEK	renames.tsv: DATE_*; std.ktmh
 macro	CDATE_NO_ZONE	date	NO_ZONE	renames.tsv: DATE_*; std.ktmh
 macro	CDATE_YEAR_DAYS	date	YEAR_DAYS	renames.tsv: DATE_*; std.ktmh
 macro	CDATE_YEAR_DAYS_INT	date	YEAR_DAYS_INT	renames.tsv: DATE_*; std.ktmh
-type	Dirent	fs	Dirent	dir.ktm
+type	Dirent	libc	Dirent	the C struct dirent's (S2: libc's, which declares readdir); dir.ktm
 type	Fstat	fs	FileStat	ktm's portable stat; std.ktmh
 function	Cd	fs	changeDir	io.ktm
 function	Pwd	fs	currentDir	io.ktm
@@ -49,7 +49,7 @@ function	RmDir	fs	removeDir	stat.ktm
 function	Stat	fs	stat	ktm's portable stat; C stat is c.stat; io.ktm
 function	FileWrite	fs	writeAll	renames.tsv: fileWrite; io.ktm
 macro	MKDIR_DEFAULT	fs	MAKE_DIR_DEFAULT	follows MkDir -> makeDir; std.ktmh
-macro	DIR_MAXPATHLEN	fs	MAX_NAME	the size of Dirent.name (256 Linux, 1024 macOS); std.ktmh
+macro	DIR_MAXPATHLEN	libc	DIR_MAXPATHLEN	the C struct dirent's (S2: libc's, which declares readdir); the size of Dirent.name (256 Linux, 1024 macOS); std.ktmh
 macro	RM_FORCE	fs	REMOVE_FORCE	follows Rm -> remove; std.ktmh
 macro	RM_RECURSE	fs	REMOVE_RECURSE	follows Rm -> remove; std.ktmh
 type	FzFPosition	fzf	Position	fzf.ktm
@@ -179,9 +179,9 @@ function	Abs	math	abs	math.ktm
 function	ModU64	math	divModU64	returns *k % m and divides *k by m; name says both; renames.tsv: modU64; date.ktm,math.ktm
 function	Gcd	math	gcd	math.ktm
 function	Pow	math	power	not `pow`: math re-exports C pow (renames.tsv's reason too); math.ktm
-macro	M_1_PI	math	1_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
-macro	M_2_PI	math	2_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
-macro	M_2_SQRTPI	math	2_SQRTPI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_1_PI	math	INV_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_2_PI	math	TWO_INV_PI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
+macro	M_2_SQRTPI	math	TWO_INV_SQRTPI	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
 macro	M_E	math	E	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
 macro	M_LN10	math	LN10	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
 macro	M_LN2	math	LN2	ktm defines it (C's math.h spelling); math.PI, not math.M_PI; std.ktmh
@@ -466,3 +466,4 @@ type	cTimespec	libc	timespec	C struct timespec (the header called it cTimespec);
 cfunctions	(the other C functions the stdlib declared privately; S2)	libc	_longjmp calloc exit fflush getcwd getenv getpagesize isatty memcpy memset mmap mprotect munmap opendir pipe posix_spawn posix_spawn_file_actions_addchdir_np posix_spawn_file_actions_adddup2 posix_spawn_file_actions_addopen posix_spawn_file_actions_destroy posix_spawn_file_actions_init posix_spawnattr_destroy posix_spawnattr_init posix_spawnattr_setflags posix_spawnattr_setpgroup posix_spawnattr_setsigdefault posix_spawnattr_setsigmask posix_spawnp pthread_getspecific pthread_key_create pthread_once pthread_setspecific pthread_sigmask readdir realloc sigaction sigaddset sigemptyset sigfillset sigismember sigpending strtok_r system	C names, unchanged, as libc.<name>
 type	CoroCached	rt	CoroCached	runtime: a coroutine stack cached in its thread's HCFs (S2); coroutines.ktm
 function	CoroStacksFree	rt	coroStacksFree	runtime: frees a thread's cached coroutine stacks (S2); coroutines.ktm
+type	cDIR	libc	DIR	C's DIR (the ctypes row's `was cDIR`; S2); std.ktmh,dir.ktm

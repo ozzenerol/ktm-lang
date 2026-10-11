@@ -40,6 +40,8 @@ void migrateNoteName(Cctrl *cc, Lexeme *name);
 void migrateNoteRef(Cctrl *cc, Lexeme *name);
 /* A type name (with --map: a stdlib type) */
 void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type);
+void migrateNoteTypeDef(Cctrl *cc, Lexeme *name);
+void migrateNoteFuncDef(Cctrl *cc, Lexeme *body, char *fname, int len, Vec *params);
 /* A macro used (with --map: a stdlib macro) */
 void migrateNoteMacro(Cctrl *cc, Lexeme *use);
 /* A use of a stdlib struct's field (with --names: renames.tsv) */

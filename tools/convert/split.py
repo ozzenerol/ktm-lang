@@ -17,6 +17,9 @@ headers = ['std.ktmh', 'defs.ktmh']
 allit = {f: items(os.path.join(src, f)) for f in files + headers}
 text = {f: open(os.path.join(src, f)).read() for f in files + headers}
 defined = set(i['name'] for f in files for i in allit[f] if i['kind'] in ('func', 'type', 'global'))
+# a ktm prototype of a function some file declares extern "c" (the header's
+# `public cDIR *opendir(...)` next to dir.ktm's extern) is the extern's
+defined |= set(i['name'] for f in files for i in allit[f] if i['kind'] == 'cfunc')
 DROP = {'Dir', 'IsDotZ', 'IsDotC', 'Write', 'CH_SPACE', 'CH_SHIFT_SPACE', 'RM_VERBOSE', 'TRUE', 'FALSE', 'NULL',
         '__BUFSIZ__'}
 # names that leave the API (module `-` in the map) but the code still needs:
@@ -104,6 +107,18 @@ for it in allit['std.ktmh']:
 def block_defs(body):
     return set(re.findall(r'^\s*(?:static\s+|public\s+)?(?:_extern\s+\S+\s+)?[A-Za-z_]\w*[\s\*]+(\w+)\s*\(',
                           body, re.M)) - {'if', 'while', 'for', 'switch', 'return'}
+
+# a .ktm's platform block that only repeats the header's C types and
+# constants (threads.ktm's pthread_* layouts): the header's are kept
+hdr_text = text['std.ktmh'] + text['defs.ktmh']
+hdr_types = set(re.findall(r'\b(?:class|union|struct)\s+(\w+)', hdr_text))
+hdr_defines = set(re.findall(r'#\s*define\s+(\w+)', hdr_text))
+
+def repeats_header(body):
+    types = set(re.findall(r'\b(?:class|union|struct)\s+(\w+)', body))
+    defines = set(re.findall(r'#\s*define\s+(\w+)', body))
+    return (types or defines) and types <= hdr_types and defines <= hdr_defines and \
+        not block_defs(body) - types
 
 def block_module(f, idx, body):
     defs = block_defs(body)
@@ -205,6 +220,9 @@ for f in headers + files:
                     unplaced.append((f, it['start'], k, name + ' (several modules: %s, put in c)' % ','.join(sorted(mods))))
                 mod = 'libc'
         if mod is None and k == 'ifblock' and f not in headers:
+            if repeats_header(body):
+                dropped.append((f, it['start'], k, name + ' (repeats the header)'))
+                continue
             mod = block_module(f, idx, body)
         if mod is None:
             if f in headers:
@@ -212,6 +230,11 @@ for f in headers + files:
                 mod = 'rt'
             else:
                 mod = helper_mod.get(name) or home
+        # a header block's ktm prototypes of C functions (`public cDIR
+        # *opendir(...)`, with the extern in dir.ktm) are C declarations
+        if mod == 'libc' and k == 'ifblock':
+            body = re.sub(r'^(\s*)public\s+(?!extern\b|_extern\b|class\b|union\b|struct\b|enum\b)'
+                          r'([^;{]*\([^;{]*\)\s*;)', r'\1public extern "c" \2', body, flags=re.M)
         # everything in libc is pub: it is the C library, for every module
         if mod == 'libc' and k in ('type', 'global', 'func', 'proto'):
             lead = re.match(r'(\s*(?:/\*.*?\*/|//[^\n]*)\s*)*', body, re.S).end()

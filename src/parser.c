@@ -1100,6 +1100,9 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     u32 tag_file = 0;
     if (tok->tk_type == TK_IDENT) {
         /* A module's type is named `a.b.Name` */
+#ifdef KTM_CONVERT
+        if (cc->migrate) migrateNoteTypeDef(cc, tok);
+#endif
         char *qual = cctrlDeclName(cc, tok->start, tok->len);
         tag = qual ? aoStrDupRaw(qual, strlen(qual))
                    : aoStrDupRaw(tok->start,tok->len);
@@ -1268,6 +1271,9 @@ AstType *parseEnumDef(Cctrl *cc) {
                 lexemeAsWritten(tok));
     }
     /* A module's enum is named `a.b.Name` */
+#ifdef KTM_CONVERT
+    if (cc->migrate) migrateNoteTypeDef(cc, tok);
+#endif
     char *qual = cctrlDeclName(cc, tok->start, tok->len);
     AoStr *tag = qual ? aoStrDupRaw(qual, strlen(qual))
                       : aoStrDupRaw(tok->start, tok->len);
@@ -3989,6 +3995,9 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     s64 fn_line = next ? next->line : cc->lineno;
     s64 fn_col  = next ? next->col  : 0;
     s64 fn_len  = next ? next->len  : 1;
+#ifdef KTM_CONVERT
+    if (cc->migrate && next) migrateNoteFuncDef(cc, next, fname, len, params);
+#endif
     if (next == NULL) {
         cctrlRaiseException(cc,
                 "Unexpected end of input in function definition");

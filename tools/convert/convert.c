@@ -81,6 +81,10 @@ typedef struct MigFile {
     char *path;
     char *real;          /* realpath, to recognise it when it's #included */
     char *base;          /* the lexer's buffer for this file, while parsing */
+    /* a module's file is read once per pass (names, declarations, full):
+     * the other passes' buffers, the same text */
+    char *alt_base[4];
+    int n_alt;
     char *text;          /* our own copy of the original text */
     s64 len;
     Vec *edits;          /* MigEdit * */
@@ -133,14 +137,19 @@ static MigFile *migFileOf(Cctrl *cc, char *p) {
     for (int i = 0; i < m->n_files; ++i) {
         MigFile *f = m->files[i];
         if (f->base && p >= f->base && p < f->base + f->len) return f;
+        for (int k = 0; k < f->n_alt; ++k)
+            if (p >= f->alt_base[k] && p < f->alt_base[k] + f->len) return f;
     }
     return NULL;
 }
 
 static s64 migOff(MigFile *f, Lexeme *t) {
     if (!t || !t->src || !f->base) return -1;
-    if (t->src < f->base || t->src >= f->base + f->len) return -1;
-    return t->src - f->base;
+    if (t->src >= f->base && t->src < f->base + f->len) return t->src - f->base;
+    for (int k = 0; k < f->n_alt; ++k)
+        if (t->src >= f->alt_base[k] && t->src < f->alt_base[k] + f->len)
+            return t->src - f->alt_base[k];
+    return -1;
 }
 
 static int migLine(MigFile *f, s64 off) {
@@ -1186,7 +1195,9 @@ static char *migMethodName(Ast *decl, MigName *m) {
     Ast *p0 = decl->params->entries[0];
     if (!p0 || !p0->type || p0->type->kind != AST_TYPE_POINTER || !p0->type->ptr ||
         !p0->type->ptr->clsname) return NULL;
-    const char *prefix = migContainerPrefix(p0->type->ptr->clsname->data);
+    /* `List`, or `list.List` seen from inside its module */
+    const char *cls = p0->type->ptr->clsname->data, *dot = strrchr(cls, '.');
+    const char *prefix = migContainerPrefix(dot ? dot + 1 : cls);
     if (!prefix) return NULL;
     size_t pl = strlen(prefix);
     if (strncmp(m->name, prefix, pl)) return NULL;
@@ -1195,6 +1206,87 @@ static char *migMethodName(Ast *decl, MigName *m) {
     meth[0] = tolower((unsigned char)meth[0]);
     if (!strcmp(meth, "new")) return NULL;
     return meth;
+}
+
+/* In a container function's body, its first parameter is the method's
+ * `self` */
+static void migSelfWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    const char *pname = ctx;
+    char *t = f->text;
+    if ((s64)strlen(pname) != len || memcmp(t + at, pname, len)) return;
+    if (at > 0 && t[at - 1] == '.') return;                       /* a field */
+    if (at > 1 && t[at - 1] == '>' && t[at - 2] == '-') return;
+    migAdd(f, at, at + len, "self", "method");
+}
+
+/* A container function of src/std defined in its module becomes the
+ * method its calls become: `pub void append(List *ll, void *v) {` is
+ * `pub void List.append(void *v) {`, `ll` being `self` in the body */
+void migrateNoteFuncDef(Cctrl *cc, Lexeme *body, char *fname, int len, Vec *params) {
+    if (!mig_map || !params || params->size == 0) return;
+    MigFile *f = migFileOf(cc, body->src);
+    if (!f || !f->real || !strstr(f->real, "/src/std/")) return;
+    /* `body` is the body's first token: its `{` is the last one before */
+    s64 b = migOff(f, body);
+    if (b < 0) return;
+    while (b > 0 && f->text[b] != '{') b--;
+    if (f->text[b] != '{') return;
+    /* a module's function name is its symbol: `_K4list10ListAppend` */
+    if (len > 2 && fname[0] == '_' && fname[1] == 'K') {
+        fname = astModuleDemangle(fname, len);
+        len = strlen(fname);
+    }
+    const char *nm = fname;
+    for (int i = len - 1; i >= 0; --i) if (fname[i] == '.') { nm = fname + i + 1; break; }
+    char *key = mprintf("%.*s", (int)(fname + len - nm), nm);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || strcmp(m->kind, "function") || strcmp(m->module, migFileModule(f))) return;
+    Ast decl = {0};
+    decl.params = params;
+    Ast *p0 = params->entries[0];
+    if (p0 && p0->kind == AST_DEFAULT_PARAM) return;
+    char *meth = migMethodName(&decl, m);
+    if (!meth || !p0 || p0->kind != AST_LVAR || !p0->lname) return;
+    const char *cls = p0->type->ptr->clsname->data, *dot = strrchr(cls, '.');
+    cls = dot ? dot + 1 : cls;
+    MigName *tm = mapGet(mig_map, cls);
+    const char *tname = tm && !strcmp(tm->kind, "type") ? tm->name : cls;
+    char *t = f->text;
+    /* the parameter list: the `)` before the body and its `(` */
+    s64 close = b - 1;
+    while (close > 0 && isspace((unsigned char)t[close])) close--;
+    if (t[close] != ')') return;
+    s64 open = close, depth = 0;
+    for (; open >= 0; --open) {
+        if (t[open] == ')') depth++;
+        else if (t[open] == '(' && --depth == 0) break;
+    }
+    if (open < 0) return;
+    s64 ne = open;
+    while (ne > 0 && isspace((unsigned char)t[ne - 1])) ne--;
+    s64 ns = ne;
+    while (ns > 0 && migIsIdent(t[ns - 1])) ns--;
+    /* the first parameter, up to its `,` (or the `)`) */
+    s64 c = open + 1;
+    for (depth = 0; c < close; ++c) {
+        if (t[c] == '(' || t[c] == '[') depth++;
+        else if (t[c] == ')' || t[c] == ']') depth--;
+        else if (t[c] == ',' && depth == 0) break;
+    }
+    s64 after = c;
+    if (c < close) {
+        after = c + 1;
+        while (after < close && isspace((unsigned char)t[after])) after++;
+    }
+    migAdd(f, ns, after, mprintf("%s.%s(", tname, meth), "method");
+    /* the body: up to its matching `}` */
+    s64 e = b;
+    for (depth = 0; e < f->len; ++e) {
+        if (t[e] == '"' || t[e] == '\'') { e = migQuoteEnd(t, e, f->len); continue; }
+        if (t[e] == '{') depth++;
+        else if (t[e] == '}' && --depth == 0) break;
+    }
+    migScanWords(f, t, b, e, migSelfWord, (void *)p0->lname->data);
 }
 
 /* `Old(recv, args)` -> `recv.method(args)`, the name at s */
@@ -1305,8 +1397,33 @@ void migrateNoteRef(Cctrl *cc, Lexeme *name) {
     if (!strcmp(key, "QSortGeneric")) migSwapArgs(f, s + name->len, 1, 2);
 }
 
+/* The map's name for the type at `name`, in a module of src/std that
+ * defines (or uses) its own type: `struct CDate` in date is `Date` */
+static void migOwnType(MigFile *f, s64 s, s64 len) {
+    if (!mig_map || !f->real || !strstr(f->real, "/src/std/")) return;
+    char *key = mprintf("%.*s", (int)len, f->text + s);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || strcmp(m->kind, "type") || strcmp(m->module, migFileModule(f))) return;
+    if (strcmp(m->name, key)) migAdd(f, s, s + len, (char *)m->name, "name");
+}
+
+void migrateNoteTypeDef(Cctrl *cc, Lexeme *name) {
+    MigFile *f = migFileOf(cc, name ? name->src : NULL);
+    if (!f) return;
+    s64 s = migOff(f, name);
+    if (s < 0) return;
+    migOwnType(f, s, name->len);
+}
+
 void migrateNoteType(Cctrl *cc, Lexeme *name, AstType *type) {
-    if (!mig_map || !type || !type->in_std) return;
+    if (!mig_map || !type) return;
+    if (!type->in_std) {
+        /* a module's own type, used in its own files */
+        MigFile *f = migFileOf(cc, name ? name->src : NULL);
+        s64 s = f ? migOff(f, name) : -1;
+        if (s >= 0) migOwnType(f, s, name->len);
+        return;
+    }
     MigFile *f = migFileOf(cc, name ? name->src : NULL);
     if (!f) return;
     s64 s = migOff(f, name);
@@ -1605,7 +1722,11 @@ static int migCmp(const void *a, const void *b) {
     int xi = x->start == x->end, yi = y->start == y->end;
     if (xi != yi) return xi ? -1 : 1;            /* inserts first */
     if (xi) return x->seq > y->seq ? -1 : 1;     /* the newest insert first */
-    return x->end > y->end ? -1 : 1;
+    if (x->end != y->end) return x->end > y->end ? -1 : 1;
+    /* the same span: a method's (`self`) over a rename of the name */
+    int xmeth = !strcmp(x->kind, "method"), ymeth = !strcmp(y->kind, "method");
+    if (xmeth != ymeth) return xmeth ? -1 : 1;
+    return x->seq > y->seq ? -1 : 1;             /* else the newest first */
 }
 
 static void migSort(MigFile *f) {
@@ -1942,7 +2063,38 @@ static void migSkippedPrints(MigFile *f, s64 s, s64 e) {
     }
 }
 
+/* A stdlib name in text an #if skipped (the parser never saw it): the
+ * map's name, as the parser's notes would have made it */
+static void migSkippedMapWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    (void)ctx;
+    if (!mig_map) return;
+    char *key = mprintf("%.*s", (int)len, f->text + at);
+    MigName *m = mapGet(mig_map, key);
+    if (!m || !strcmp(m->module, "-") || !strcmp(m->module, "prelude")) return;
+    if (at > 0 && f->text[at - 1] == '.') return;           /* a field */
+    int in_std = f->real && strstr(f->real, "/src/std/");
+    if (!strcmp(m->module, "rt") && !in_std) return;
+    migAdd(f, at, at + len, migQualified(f, m), "stdlib");
+}
+
+/* In src/std, a module's own types by the map's name everywhere (class
+ * fields, platform branches): `cTimespec` in libc is `timespec` */
+static void migOwnTypeWord(MigFile *f, s64 at, s64 len, void *ctx) {
+    (void)ctx;
+    if (at > 0 && f->text[at - 1] == '.') return;
+    migOwnType(f, at, len);
+}
+
 static void migSkippedCasts(MigFile *f) {
+    if (mig_map) {
+        if (f->real && strstr(f->real, "/src/std/"))
+            migScanWords(f, f->text, 0, f->len, migOwnTypeWord, NULL);
+        for (u64 r = 0; r + 1 < f->skipped->size; r += 2) {
+            s64 s = (s64)(intptr_t)f->skipped->entries[r];
+            s64 e = (s64)(intptr_t)f->skipped->entries[r + 1];
+            migScanWords(f, f->text, s, e, migSkippedMapWord, NULL);
+        }
+    }
     char *t = f->text;
     int branches = 0;
     s64 first = -1;
@@ -2355,11 +2507,13 @@ static void migFilePushed(LexFile *lf) {
     if (!realpath(lf->filename->data, real)) return;
     for (int i = 0; i < mig_active->n_files; ++i) {
         MigFile *f = mig_active->files[i];
-        if (!f->base && f->real && !strcmp(f->real, real)) {
-            f->base = lf->src->data;
-            if ((s64)lf->src->len != f->len || memcmp(f->base, f->text, f->len)) {
-                f->base = NULL;  /* not what we read: leave it alone */
-            }
+        if (!f->real || strcmp(f->real, real)) continue;
+        int same = (s64)lf->src->len == f->len && !memcmp(lf->src->data, f->text, f->len);
+        if (!f->base) {
+            /* not what we read: leave it alone */
+            if (same) f->base = lf->src->data;
+        } else if (same && lf->src->data != f->base && f->n_alt < 4) {
+            f->alt_base[f->n_alt++] = lf->src->data;
         }
     }
 }
@@ -2825,9 +2979,12 @@ static void migDefines(MigFile *f) {
          * constant the map puts in this file's module */
         const char *mod = migFileModule(f);
         MigName *mn = mig_map ? mapGet(mig_map, name) : NULL;
-        int pub = *mod && (!strcmp(mod, "libc") || (mn && !strcmp(mn->module, mod)));
+        int own = *mod && mn && !strcmp(mn->module, mod);
+        int pub = *mod && (!strcmp(mod, "libc") || own);
+        /* the map's name in its module (CSV_FIELD is csv's FIELD) */
+        const char *cname = own && strcmp(mn->kind, "c") ? mn->name : name;
         migAddSegs(f, line_start, ve, "const", migLit(mprintf("%sconst %s %s = ", pub ? "pub " : "",
-                                                              d->type, name)),
+                                                              d->type, cname)),
                    migRange(vs, ve), migLit(";"), NULL);
     }
 }
@@ -2871,13 +3028,14 @@ static int migConvert(MigFile *f, char *install_dir, int outer) {
         vecPush(f->edits, c);
     }
     migScanWords(f, f->text, 0, f->len, migWordEdit, NULL);
-    migImports(f);
     migExceptions(f);
     migDefines(f);
     migDropLiteralDefines(f);
     migCommentsAndStrings(f, install_dir, outer);
     migDefineCasts(f);
     migSkippedCasts(f);
+    /* after every rewrite that can use a module (skipped #if text too) */
+    migImports(f);
     migSort(f);
     migMoveItems(f);
     migMainType(f);
