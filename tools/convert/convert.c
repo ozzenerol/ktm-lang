@@ -103,6 +103,7 @@ typedef struct MigFile {
     Vec *closers;        /* MigEdit *: `}`s of bodies, innermost first */
     Set *imports;        /* modules the file uses (--map) */
     Set *code_words;     /* identifiers in its code (--names clashes) */
+    const char *module;  /* the module it says it is in (migFileModule) */
 } MigFile;
 
 typedef struct MigDefine {
@@ -1110,9 +1111,37 @@ static int migIsStdFile(Cctrl *cc, u32 file_id) {
     return where && (strstr(where->data, "/src/std/") || strstr(where->data, "/include/"));
 }
 
-/* `module.name` as code: `c.write`, `map.strNew`, `EXIT_OK` (prelude) */
+/* The module a file says it is in (`module str;`), "" for none */
+static const char *migFileModule(MigFile *f) {
+    if (f->module) return f->module;
+    f->module = "";
+    char *t = f->text;
+    for (s64 i = 0; i < f->len; ) {
+        while (i < f->len && isspace((unsigned char)t[i])) i++;
+        if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '/') { while (i < f->len && t[i] != '\n') i++; continue; }
+        if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < f->len && !(t[i] == '*' && t[i + 1] == '/')) i++;
+            i += 2;
+            continue;
+        }
+        if (!strncmp(t + i, "module", 6) && isspace((unsigned char)t[i + 6])) {
+            s64 j = i + 6;
+            while (j < f->len && isspace((unsigned char)t[j])) j++;
+            s64 k = j;
+            while (k < f->len && (migIsIdent(t[k]) || t[k] == '.')) k++;
+            f->module = mprintf("%.*s", (int)(k - j), t + j);
+        }
+        break;
+    }
+    return f->module;
+}
+
+/* `module.name` as code: `c.write`, `map.strNew`, `EXIT_OK` (prelude);
+ * in the name's own module just the name */
 static char *migQualified(MigFile *f, MigName *m) {
     if (!strcmp(m->module, "prelude")) return (char *)m->name;
+    if (!strcmp(migFileModule(f), m->module)) return (char *)m->name;
     setAdd(f->imports, (char *)m->module);
     return mprintf("%s.%s", m->module, m->name);
 }
@@ -1298,8 +1327,7 @@ void migrateNoteMacro(Cctrl *cc, Lexeme *use) {
                 !strcmp(m->module, "rt") ? "runtime-only" : "dropped", m->note);
         return;
     }
-    migAdd(f, s, s + use->len, !strcmp(m->kind, "c") ? (setAdd(f->imports, "c"), mprintf("c.%s", key))
-                                                     : migQualified(f, m), "stdlib");
+    migAdd(f, s, s + use->len, migQualified(f, m), "stdlib");
 }
 
 /* ------------------------------------------------------------------ */
@@ -2537,16 +2565,48 @@ static void migThrowWord(MigFile *f, s64 at, s64 len, void *ctx) {
     vecPush(x->names, migErrMember(code, strlen(code)));
 }
 
-/* Where `enum Err` goes: after the #include lines at the top */
+/* The end of the file's header: its comments, then its `module` and
+ * `import` lines (and #includes) at the top; 0 when it has none */
+static s64 migHeaderEnd(MigFile *f) {
+    char *t = f->text;
+    s64 i = 0, at = 0;
+    while (i < f->len) {
+        while (i < f->len && isspace((unsigned char)t[i])) i++;
+        if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '/') {
+            while (i < f->len && t[i] != '\n') i++;
+            continue;
+        }
+        if (i + 1 < f->len && t[i] == '/' && t[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < f->len && !(t[i] == '*' && t[i + 1] == '/')) i++;
+            i += 2;
+            continue;
+        }
+        if ((!strncmp(t + i, "module", 6) || !strncmp(t + i, "import", 6)) &&
+            i + 6 < f->len && isspace((unsigned char)t[i + 6])) {
+            while (i < f->len && t[i] != '\n') i++;
+            at = i < f->len ? i + 1 : i;
+            continue;
+        }
+        break;
+    }
+    return at;
+}
+
+/* Where `enum Err` and `import` lines go: after the #include lines, and
+ * after the `module`/`import` lines at the top */
 static s64 migEnumAt(MigFile *f) {
     char *t = f->text;
-    s64 at = 0;
+    s64 at = migHeaderEnd(f);
     for (s64 i = 0; i < f->len; ) {
         s64 le = i;
         while (le < f->len && t[le] != '\n') le++;
         s64 j = i;
         while (j < le && (t[j] == ' ' || t[j] == '\t')) j++;
-        if (le - j >= 8 && !memcmp(t + j, "#include", 8)) at = le < f->len ? le + 1 : le;
+        if (le - j >= 8 && !memcmp(t + j, "#include", 8)) {
+            s64 after = le < f->len ? le + 1 : le;
+            if (after > at) at = after;
+        }
         i = le + 1;
     }
     if (at > 0) return at;
@@ -2573,7 +2633,12 @@ static s64 migEnumAt(MigFile *f) {
  * lines, or before the first code after the file's opening comment */
 static void migTopInsert(MigFile *f, const char *line, const char *kind) {
     s64 at = migEnumAt(f);
-    if (at > 0) {
+    if (at > 0 && at == migHeaderEnd(f)) {
+        /* under `module x;` / the imports: right after them, then a
+         * blank line before the code if there was none */
+        int blank = at < f->len && f->text[at] == '\n';
+        migAdd(f, at, at, mprintf("%s%s", line, blank ? "" : "\n"), kind);
+    } else if (at > 0) {
         migAdd(f, at, at, mprintf("\n%s", line), kind);
     } else {
         at = -at - 1;

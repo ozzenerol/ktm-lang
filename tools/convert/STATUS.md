@@ -18,4 +18,7 @@ result line): the differences are tests that compile programs from strings and c
 error text/columns, the switch tests (behave after S3), 156/385 (old file-scope order).
 
 Dry run: ~/opensource/ktm-scratch/dry-run-s1.txt (tools/convert/dry-run.sh . ~/opensource/hcc-builds).
-Open: --map/--names on src/std itself is S2.
+- module files (S2): in a file that says `module x;`, x's own stdlib names stay bare (no `x.` and
+  no self-import); `import`/`enum Err` lines go after the file's `module`/`import`/#include header.
+  Convert a module's files through a root that imports it: `--root main.ktm dir/x/*.ktm`.
+Open: --map/--names on src/std itself is S2 (ktm-lang-ef, area a).
