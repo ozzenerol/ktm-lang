@@ -313,7 +313,7 @@ static void replReportFault(void) {
 
     if (sym) {
         int line = ktmJitFindLineForAddr(jit, pc);
-        fprintf(stderr, " in `%s`+%zu", sym, off);
+        fprintf(stderr, " in `%s`+%zu", astSymbolDisplayName(sym), off);
         if (line) fprintf(stderr, ", line %d", line);
         fprintf(stderr, "\n");
     } else if (chunk) {

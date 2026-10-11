@@ -394,6 +394,23 @@ char *astModuleMangle(char *qual, int len) {
     return aoStrMove(out);
 }
 
+/* The symbol of a main-program function or global `name`: the module
+ * scheme with an empty module, `_K0` and the name with its length
+ * (`read` -> `_K04read`). A module part never has a leading 0, so it
+ * can't be a module's symbol, and astModuleDemangle reads it back as
+ * `read`. */
+char *astProgramSymbol(char *name, int len) {
+    return mprintf("_K0%d%.*s", len, len, name);
+}
+
+/* A symbol as a report shows it: `_K04read` or Mach-O's `__K3net4dial`
+ * as `read` / `net.dial`, anything else as is */
+const char *astSymbolDisplayName(const char *sym) {
+    if (sym[0] == '_' && sym[1] == '_' && sym[2] == 'K') sym++;
+    if (sym[0] != '_' || sym[1] != 'K') return sym;
+    return astModuleDemangle((char *)sym, strlen(sym));
+}
+
 /* `_K3net4dial` back to `net.dial`, for messages; any other name as is */
 char *astModuleDemangle(char *sym, int len) {
     if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||

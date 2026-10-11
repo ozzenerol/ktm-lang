@@ -79,6 +79,21 @@ typedef struct ktmLib {
  * its own (Homebrew on Apple Silicon most notably) - but only ones
  * that exist, so ld doesn't warn, and only when a `#link <name>` is
  * actually in play. */
+/* After a failed link: the program's functions that are declared but
+ * never defined. Their symbols are the program's own (`_K06strlen`), so
+ * one meant as a C function needs `extern "c"`. */
+static void noteUndefinedPrototypes(Cctrl *cc) {
+    MapIter it;
+    mapIterInit(cc->global_env, &it);
+    while (mapIterNext(&it)) {
+        Ast *fn = (Ast *)it.node->value;
+        if (fn && fn->kind == AST_FUN_PROTO && (fn->flags & AST_FLAG_PROGRAM)) {
+            fprintf(stderr, "note: `%s` is declared but not defined; a C function "
+                    "is declared with extern \"c\"\n", fn->fname->data);
+        }
+    }
+}
+
 static AoStr *linkLibFlags(Cctrl *cc) {
     AoStr *flags = aoStrNew();
     flags->data[0] = '\0';
@@ -476,6 +491,7 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
             unlink(asm_tmp_file);
             asm_tmp_file[0] = '\0';
             if (link_ok != 0) {
+                noteUndefinedPrototypes(cc);
                 loggerPanic("Failed to execute command: '%s'\n", cmd->data);
             }
 
@@ -529,7 +545,10 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
                 clibs,
                 args->output_filename);
 
-        safeSystem(cmd->data, 0);
+        if (system(cmd->data) != 0) {
+            noteUndefinedPrototypes(cc);
+            loggerPanic("Failed to execute command: '%s'\n", cmd->data);
+        }
     }
     removeTmpFiles();
     aoStrRelease(cmd);

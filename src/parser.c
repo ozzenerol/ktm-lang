@@ -4488,6 +4488,10 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         }
         fname = "Main";
     }
+    /* A main-program function (not a module's, not the entry point) gets
+     * its own symbol (AST_FLAG_PROGRAM, astProgramSymbol) */
+    int is_program_fn = cc->decl_from_main && !cc->cur_module &&
+                        !module_name && !(len == 4 && !memcmp(fname, "Main", 4));
     int has_var_args = 0;
     cctrlTokenExpect(cc,'(');
     cc->localenv = cctrlCreateAstMap(cc->localenv);
@@ -4554,6 +4558,7 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
             fn->line = name_line;
             fn->col = name_col;
             fn->file_id = name_file;
+            if (is_program_fn) fn->flags |= AST_FLAG_PROGRAM;
             if (is_lower_main) mapAdd(cc->global_env, "main", fn);
             if (module_name) mapAdd(cc->global_env, module_name, fn);
         }
@@ -4566,6 +4571,7 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         AstType *type = astMakeFunctionType(rettype, params);
         Ast *fn = astFunction(type,fname,len,params,NULL,NULL,has_var_args);
         fn->kind = AST_FUN_PROTO;
+        if (is_program_fn) fn->flags |= AST_FLAG_PROGRAM;
         mapAdd(cc->global_env,fn->fname->data,fn);
         if (is_lower_main) mapAdd(cc->global_env, "main", fn);
         if (module_name) mapAdd(cc->global_env, module_name, fn);

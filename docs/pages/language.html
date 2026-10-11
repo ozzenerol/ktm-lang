@@ -584,7 +584,11 @@ written <code>i64 later(i64 x) { ... }</code> and <code>later()</code> still pas
 Repeating a default is allowed if it is the same value; a different value is an error.</p>
 <p>The standard library lives in modules, so a function of your own may have the same name
 as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
-<code>date.now()</code> and <code>os.exit()</code> stay the library's.</p>
+<code>date.now()</code> and <code>os.exit()</code> stay the library's. The same holds for
+the C library: a program's functions have symbols of their own, so your <code>read()</code>
+or <code>free()</code> doesn't replace C's, which the standard library keeps calling. A C
+function you call is declared with <code>extern "c"</code>; a prototype without a body
+and without <code>extern "c"</code> is a ktm function that must be defined somewhere.</p>
 <p>A returned value is converted to the function's return type, as in C: an integer returned
 from an <code>f64</code> function becomes a float. In a
 <code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
