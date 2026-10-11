@@ -62,25 +62,25 @@ i32 main() {
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.IntVec *v = vec.intNew(); v.push(1);\n"
 "  v.get(-1); printf(\"unreachable\\n\"); return 0; }\n",
-            "IntVecGet: index -1 out of range (size 1)")) { correct++; }
+            "IntVec.get: index -1 out of range (size 1)")) { correct++; }
 
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.IntVec *v = vec.intNew(); v.push(1); v.push(2);\n"
 "  v.get(2); printf(\"unreachable\\n\"); return 0; }\n",
-            "IntVecGet: index 2 out of range (size 2)")) { correct++; }
+            "IntVec.get: index 2 out of range (size 2)")) { correct++; }
 
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.FloatVec *v = vec.floatNew();\n"
 "  v.get(0); printf(\"unreachable\\n\"); return 0; }\n",
-            "FloatVecGet: index 0 out of range (size 0)")) { correct++; }
+            "FloatVec.get: index 0 out of range (size 0)")) { correct++; }
 
     tests++;
     if (runExpectingExit(
 "import vec;\n\ni32 main() { vec.PtrVec *v = vec.ptrNew(); v.push(null);\n"
 "  v.get(40); printf(\"unreachable\\n\"); return 0; }\n",
-            "PtrVecGet: index 40 out of range (size 1)")) { correct++; }
+            "PtrVec.get: index 40 out of range (size 1)")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

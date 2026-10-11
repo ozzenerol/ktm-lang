@@ -782,27 +782,27 @@ empty: 1
 <h2 id="vectors">Vectors<a class="anchor" href="#vectors" aria-label="Link to this section">#</a></h2>
 <p>Growable arrays: <code>vec.IntVec</code> of <code>i64</code>, <code>vec.FloatVec</code> of
 <code>f64</code> and <code>vec.PtrVec</code> of pointers. Each has <code>size</code> and
-<code>entries</code> fields, so a range-based <code>for</code> works on them. The functions
-are the same for the three, with the type as prefix:</p>
+<code>entries</code> fields, so a range-based <code>for</code> works on them. They have the
+same methods:</p>
 <ul>
   <li><code>vec.intNew(size = 32)</code> makes an empty vector with room for
   <code>size</code> values (its initial capacity); a size below 1 is taken as 1.
-  <code>vec.intCapacity</code> says how many values fit before the storage has to grow, and
-  <code>vec.intPush</code> appends, doubling the storage when it is full.</li>
-  <li><code>vec.intGet(v, i)</code> and <code>vec.intSet(v, i, value)</code> read and replace an
+  <code>v.capacity()</code> says how many values fit before the storage has to grow, and
+  <code>v.push(value)</code> appends, doubling the storage when it is full.</li>
+  <li><code>v.get(i)</code> and <code>v.set(i, value)</code> read and replace an
   entry. The index is always checked: outside <code>0</code> to <code>size - 1</code> they
-  print <code>vec.intGet: index 5 out of range (size 3)</code> on stderr and exit with
+  print <code>IntVec.get: index 5 out of range (size 3)</code> on stderr and exit with
   status 1. Reading <code>v.entries[i]</code> directly is not checked.</li>
-  <li><code>vec.intPop(v, &amp;ok)</code> removes and returns the last entry and
-  <code>vec.intLast(v, &amp;ok)</code> returns it without removing it. On an empty vector they
+  <li><code>v.pop(&amp;ok)</code> removes and returns the last entry and
+  <code>v.last(&amp;ok)</code> returns it without removing it. On an empty vector they
   return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
   <code>vec.PtrVec</code>) and set <code>ok</code> to <code>false</code>; the
   <code>ok</code> argument is optional.</li>
-  <li><code>vec.intClear</code> sets the size to 0 and keeps the storage for reuse;
-  <code>vec.intRelease</code> frees it. <code>vec.ptrRelease(v, free_value)</code> first calls
+  <li><code>v.clear()</code> sets the size to 0 and keeps the storage for reuse;
+  <code>v.release()</code> frees it. A <code>vec.PtrVec</code>'s <code>v.release(free_value)</code> first calls
   <code>free_value</code> (for example <code>&amp;mem.free</code>) on every value.</li>
-  <li><code>vec.intSort</code> and <code>vec.floatSort</code> sort ascending.
-  <code>vec.ptrSort</code> takes a comparison that returns <code>true</code> when its first
+  <li><code>sort()</code> of a <code>vec.IntVec</code> or <code>vec.FloatVec</code> sorts ascending.
+  A <code>vec.PtrVec</code>'s <code>sort</code> takes a comparison that returns <code>true</code> when its first
   argument should come first. That's a "less than" test, not a C-style negative, zero or
   positive result, which leaves the vector unsorted. The sorts are O(n log n), also for
   sorted or all-equal input, and not stable: equal values may change order.</li>
@@ -871,16 +871,16 @@ after clear: size 0, last -1.0, ok 0
 </pre>
 
 <h2 id="sets">Sets and trees<a class="anchor" href="#sets" aria-label="Link to this section">#</a></h2>
-<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>set.intAdd</code>,
-<code>set.intDelete</code> and <code>set.intHas</code> are O(log n); adding a value that is
-there, or deleting one that isn't, changes nothing. <code>set.intUnionWith</code>,
-<code>set.intIntersection</code>, <code>set.intDiff</code> (in the first set, not the
-second) and <code>set.intSymDiff</code> (in exactly one) return a new set and leave their
-arguments alone; <code>set.intEq</code> compares two sets. An iterator, <code>set.intToVec</code>
-and <code>set.intToStr</code> give the values in ascending order. Don't add or delete
+<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>add</code>,
+<code>delete</code> and <code>has</code> are O(log n); adding a value that is
+there, or deleting one that isn't, changes nothing. <code>unionWith</code>,
+<code>intersection</code>, <code>diff</code> (in the first set, not the
+second) and <code>symDiff</code> (in exactly one) return a new set and leave their
+arguments alone; <code>eq</code> compares two sets. An iterator, <code>toVec</code>
+and <code>toStr</code> (a String) give the values in ascending order. Don't add or delete
 values while iterating: once one is added or deleted, <code>set.intIterNext</code> returns
 <code>null</code> and the loop ends early, so collect the changes and apply them after it. The functions that only read a set, and
-<code>set.intRelease</code>, treat <code>null</code> as the empty set.</p>
+<code>release</code>, treat <code>null</code> as the empty set.</p>
 <pre data-run><code>import cstr, mem, set;
 
 void main()
@@ -923,11 +923,11 @@ both: {6, 12}
 less than 0 when <code>a</code> comes first, 0 when they are equal and more than 0
 otherwise. The two free functions may be <code>null</code>; when set, the tree frees keys
 and values with them on delete, release and when an insert replaces a value (an insert of
-an existing key keeps the stored key). <code>map.rbGet</code> returns <code>null</code> for
-a missing key, the same as a stored <code>null</code>, so ask <code>map.rbHas</code> to tell
-them apart. <code>map.rbIterNew</code> and <code>map.rbForEach</code> visit the entries in key
+an existing key keeps the stored key). <code>get</code> returns <code>null</code> for
+a missing key, the same as a stored <code>null</code>, so ask <code>has</code> to tell
+them apart. <code>iterNew</code> and <code>forEach</code> visit the entries in key
 order; don't insert or delete while they run. Once a new key is added or one is deleted,
-<code>map.rbIterNext</code> returns <code>null</code> and <code>map.rbForEach</code> returns after
+<code>map.rbIterNext</code> returns <code>null</code> and <code>forEach</code> returns after
 that callback; replacing the value of a key that is there is fine.</p>
 <pre data-run><code>import cstr, map, str;
 
@@ -1086,11 +1086,11 @@ which. A <code>null</code> map is safe everywhere: <code>get</code> and <code>ha
 <code>u8[]</code> is the key <code>""</code>.</p>
 
 <h2 id="bit-vectors">Bit vectors<a class="anchor" href="#bit-vectors" aria-label="Link to this section">#</a></h2>
-<p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>vec.bitSet</code>
-grows it to fit any index (a <code>u64</code>), <code>vec.bitTest</code> and
-<code>vec.bitUnset</code> treat bits past the end as 0, and <code>vec.bitClear</code> zeroes
-every bit. <code>vec.bitSet</code> returns <code>false</code> when it runs out of memory
-growing. <code>vec.bitRelease(null)</code> does nothing.</p>
+<p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>set</code>
+grows it to fit any index (a <code>u64</code>), <code>test</code> and
+<code>unset</code> treat bits past the end as 0, and <code>clear</code> zeroes
+every bit. <code>set</code> returns <code>false</code> when it runs out of memory
+growing. <code>release</code> of a <code>null</code> BitVec does nothing.</p>
 <pre data-run><code>import cstr, vec;
 
 void main()
