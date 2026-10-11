@@ -171,6 +171,12 @@ typedef struct Cctrl {
      * the function unless the local was reassigned */
     List *lit_writes;
 
+    /* `for (i64 i = 0; i < s.len; i++)` loops whose `s[i]` may need no
+     * bounds check (ElideLoop *): the open ones, innermost last, and the
+     * finished ones, settled at the end of the function */
+    List *elide_open;
+    List *elide_done;
+
     /* Global variable whose declaration is mid-parse. If the
      * initialiser errors, top-level recovery unregisters it from
      * global_env. Otherwise later code could name a variable whose

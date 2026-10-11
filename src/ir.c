@@ -2880,12 +2880,15 @@ static void irBoundsFail(IrCtx *ctx, IrBlock *fail_block, const char *fname,
 static IrValue *irLowerSliceElem(IrCtx *ctx, Ast *ast) {
     IrValue *base = irExpr(ctx, ast->sub_base);
     IrValue *ptr = irLoadWordAt(ctx, base, 0, IR_TYPE_PTR);
-    IrValue *len = irLoadWordAt(ctx, base, 8, IR_TYPE_I64);
     IrValue *idx = irSliceIndex(ctx, ast->sub_lo);
-    IrBlock *fail_block = irBlockNew();
-    irBoundsTest(ctx, IR_CMP_UGE, idx, len, fail_block);
-    IrValue *fail_args[2] = { idx, len };
-    irBoundsFail(ctx, fail_block, "__ktmBoundsIndex", 2, fail_args, ast);
+    /* unchecked when the parser proved it in range (AST_FLAG_NOCHECK) */
+    if (!(ast->flags & AST_FLAG_NOCHECK)) {
+        IrValue *len = irLoadWordAt(ctx, base, 8, IR_TYPE_I64);
+        IrBlock *fail_block = irBlockNew();
+        irBoundsTest(ctx, IR_CMP_UGE, idx, len, fail_block);
+        IrValue *fail_args[2] = { idx, len };
+        irBoundsFail(ctx, fail_block, "__ktmBoundsIndex", 2, fail_args, ast);
+    }
 
     int esize = ast->type->ptr->size;
     IrValue *off = idx;

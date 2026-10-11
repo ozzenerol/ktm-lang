@@ -1059,8 +1059,11 @@ of structs, slice fields in structs, slices in function types and slices of slic
 (<code>u8[][]</code>) all work, and an initialiser list takes a slice as one item.</p>
 <p>Every index and every sub-slice is checked, always (AOT and JIT): out of range throws
 <code>rt.ERR_BOUNDS</code> with the index, the length and where it happened, which a server can
-catch like any other error. A check is one compare and a branch. <code>s.ptr[i]</code> is the
-unchecked way, for a hot loop that has checked its range itself.</p>
+catch like any other error. A check is one compare and a branch, and the compiler leaves it out
+where it can't fail: an <code>s[i]</code> in <code>for (i64 i = 0; i &lt; s.len; i++)</code> (or
+<code>++i</code>, <code>i += 1</code>) whose body doesn't change <code>i</code> or <code>s</code>,
+when neither has its address taken. <code>s.ptr[i]</code> is the unchecked way for other
+loops that have checked their range themselves.</p>
 <pre data-run><code>void main()
 {
   i64 nums[3] = {1, 2, 3};

@@ -3039,6 +3039,7 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     /* `s[i]` of a slice: its element, once i is checked against its len */
     if (astTypeIsSlice(ast->type)) {
         Ast *elem = astSliceElem(ast, subscript, parseThrowFile(cc), line);
+        parseElideNoteElem(cc, ast, subscript, elem);
         return astUnaryOperator(ast->type->elem, AST_UN_OP_DEREF, elem);
     }
 
