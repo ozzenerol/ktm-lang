@@ -3965,15 +3965,17 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             Ast *asm_function = astAsmFunctionDef(asm_fname, asm_block->asm_stmt);
 
             listAppend(asm_block->funcs, asm_function);
-            listAppend(cc->asm_blocks, asm_block);
+            /* a module's declarations pass: the full pass emits it */
+            if (!cc->decls_only) listAppend(cc->asm_blocks, asm_block);
 
             Ast *asm_func = astAsmFunctionBind(
                     astMakeFunctionType(rettype, params),
                     asm_fname,asm_fname,params);
 
-            /* REPL/LSP: a reparse redefines; shadow rather than abort. */
+            /* REPL/LSP: a reparse redefines; shadow rather than abort.
+             * So does a module's next pass over the same file. */
             if (!mapAddOrErr(cc->asm_functions, asm_fname->data, asm_func)) {
-                if (cc->flags & CCTRL_REPL) {
+                if ((cc->flags & CCTRL_REPL) || cc->cur_module) {
                     mapRemove(cc->asm_functions, asm_fname->data);
                     mapAdd(cc->asm_functions, asm_fname->data, asm_func);
                 } else {
@@ -3982,7 +3984,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             }
 
             if (!mapAddOrErr(cc->global_env, fname_duped->data, asm_func)) {
-                if (cc->flags & CCTRL_REPL) {
+                if ((cc->flags & CCTRL_REPL) || cc->cur_module) {
                     mapRemove(cc->global_env, fname_duped->data);
                     mapAdd(cc->global_env, fname_duped->data, asm_func);
                 } else {
@@ -4565,8 +4567,11 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
     }
 
     cc->localenv = NULL;
-    /* Map a c function to an ASM function */
-    mapAdd(cc->asm_funcs,c_fname->data,asm_func);
+    /* Map a c function to an ASM function; in a module, under the
+     * module's name (`c.stat`), pub or private like any declaration */
+    char *qual = cctrlDeclName(cc, c_fname->data, c_fname->len);
+    mapAdd(cc->asm_funcs, qual ? qual : c_fname->data, asm_func);
+    if (qual && cc->decl_pub) setAdd(cc->pub_names, qual);
     cctrlTokenExpect(cc,';');
     if (is_inline) {
         asm_func->flags |= AST_FLAG_INLINE;
@@ -4962,6 +4967,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     peek = cctrlTokenPeek(cc);
                     if (tokenPunctIs(peek,'{')) {
                         asm_block = prsAsm(cc, 0);
+                        /* a module's declarations pass only learns its
+                         * functions; the full pass emits the block */
+                        if (cc->decls_only) continue;
                         listAppend(cc->asm_blocks,asm_block);
                         return asm_block;
                     }
@@ -5600,7 +5608,7 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         !cctrlInCModule(cc)) {
         return;
     }
-    if (ast->kind == AST_EXTERN_FUNC) return;
+    if (ast->kind == AST_EXTERN_FUNC || ast->kind == AST_ASM_FUNC_BIND) return;
     if (ast->kind == AST_DECL && ast->declvar &&
         (ast->declvar->flags & AST_FLAG_CONST)) {
         return;

@@ -180,8 +180,9 @@ static void prsAsmFlushFunc(Cctrl *cc, List *funcs, AoStr *curfunc,
     if (!mapAddOrErr(cc->asm_functions, curfunc->data, fn)) {
         /* REPL/LSP reparse the same buffer against a persistent Cctrl,
          * so the asm block is genuinely redefined - shadow it like a
-         * function redefinition rather than aborting. */
-        if (cc->flags & CCTRL_REPL) {
+         * function redefinition rather than aborting. A module's file is
+         * parsed once per pass (declarations, then in full): the same. */
+        if ((cc->flags & CCTRL_REPL) || cc->cur_module) {
             mapRemove(cc->asm_functions, curfunc->data);
             mapAdd(cc->asm_functions, curfunc->data, fn);
         } else {

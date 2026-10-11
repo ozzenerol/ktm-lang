@@ -1647,6 +1647,11 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
     }
 
     if ((ast_var = mapGetLen(cc->asm_funcs, varname, len)) != NULL) {
+        cctrlCheckModuleAccess(cc, varname, len);
+        return ast_var;
+    }
+    /* a module's own asm binding (`_extern _x I32 stat(...)`) */
+    if (qual && (ast_var = mapGet(cc->asm_funcs, qual)) != NULL) {
         return ast_var;
     }
 
