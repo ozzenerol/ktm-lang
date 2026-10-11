@@ -93,7 +93,7 @@ i64 floatCmp(void *a, void *b) {
 }
 
 pub void FloatVec.sort() {
-    qsort((void**)self.entries,self.size-1,0,&floatCmp);
+    qsort((void**)self.entries,0,self.size-1,&floatCmp);
 }
 
 pub void FloatVec.clear() {
@@ -120,7 +120,7 @@ pub u64 IntVec.capacity() {
 }
 
 pub void IntVec.push(i64 value) {
-    auto capacity = intCapacity(self);
+    auto capacity = self.capacity();
     if (self.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
@@ -170,7 +170,7 @@ i64 intCmp(void *i1, void *i2) {
 }
 
 pub void IntVec.sort() {
-    qsort((void**)self.entries,self.size-1,0,&intCmp);
+    qsort((void**)self.entries,0,self.size-1,&intCmp);
 }
 
 pub void IntVec.clear() {
@@ -293,10 +293,10 @@ pub void qsort(void **arr, i64 high, i64 low,
         }
 
         if (lt - low < high - gt) {
-            qsort(arr, lt - 1, low, _compare_fn);
+            qsort(arr, low, lt - 1, _compare_fn);
             low = gt + 1;
         } else {
-            qsort(arr, high, gt + 1, _compare_fn);
+            qsort(arr, gt + 1, high, _compare_fn);
             high = lt - 1;
         }
     }
@@ -313,7 +313,7 @@ pub void qsort(void **arr, i64 high, i64 low,
 }
 
 pub void PtrVec.sort(fn(void *_arg1, void *_arg2) i64 _compare_fn) {
-    qsort(self.entries,self.size-1,0,_compare_fn);
+    qsort(self.entries,0,self.size-1,_compare_fn);
 }
 
 pub void PtrVec.clear() {

@@ -404,7 +404,7 @@ pub bool IntMap.iter(i64 *_idx, IntMapNode **_node) {
 
 pub bool IntMap.valueIter(i64 *_idx, void **_value) {
         IntMapNode *node;
-        if (intIter(self,_idx,&node)) {
+        if (self.iter(_idx,&node)) {
                 *_value = node.value;
                 return true;
         }
@@ -413,7 +413,7 @@ pub bool IntMap.valueIter(i64 *_idx, void **_value) {
 
 pub bool IntMap.keyIter(i64 *_idx, i64 *_key) {
         IntMapNode *node;
-        if (intIter(self,_idx,&node)) {
+        if (self.iter(_idx,&node)) {
                 *_key = node.key;
                 return true;
         }
@@ -432,7 +432,7 @@ pub u8 *IntMap.toStr(fn(void *) u8 *stringifyValue) {
         IntMapNode *entry = null;
         auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; intIter(self,&i,&entry);) {
+        for (i64 i = 0; self.iter(&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
                         buffer = str.appendFormat(buffer, "[%d] => %s}",entry.key,strVal);
@@ -456,7 +456,7 @@ pub u8 *IntMap.keysToStr() {
         IntMapNode *entry = null;
         auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; intIter(self,&i,&entry);) {
+        for (i64 i = 0; self.iter(&i,&entry);) {
                 if (++printed == mapSize) {
                         buffer = str.appendFormat(buffer, "%d}",entry.key);
                 } else {
@@ -782,7 +782,7 @@ pub void *StrMap.get(u8 *key, bool *_ok=null)
                 return null;
         }
         i64 key_len = str.len(key);
-        return strGetLen(self,key,key_len,_ok);
+        return self.getLen(key,key_len,_ok);
 }
 
 pub void StrMap.clear()
@@ -822,7 +822,7 @@ pub bool StrMap.has(u8 *key) {
                 return false;
         }
         i64 key_len = str.len(key);
-        return strHasLen(self,key,key_len);
+        return self.hasLen(key,key_len);
 }
 
 pub bool StrMap.iter(i64 *_idx, StrMapNode **_node) {
@@ -847,7 +847,7 @@ pub bool StrMap.iter(i64 *_idx, StrMapNode **_node) {
 
 pub bool StrMap.valueIter(i64 *_idx, void **_value) {
         StrMapNode *node;
-        if (strIter(self,_idx,&node)) {
+        if (self.iter(_idx,&node)) {
                 *_value = node.value;
                 return true;
         }
@@ -856,7 +856,7 @@ pub bool StrMap.valueIter(i64 *_idx, void **_value) {
 
 pub bool StrMap.keyIter(i64 *_idx, u8 **_key) {
         StrMapNode *node;
-        if (strIter(self,_idx,&node)) {
+        if (self.iter(_idx,&node)) {
                 *_key = node.key;
                 return true;
         }
@@ -876,7 +876,7 @@ pub u8 *StrMap.toStr(fn(void *) u8 *stringifyValue) {
         StrMapNode *entry = null;
         auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; strIter(self,&i,&entry);) {
+        for (i64 i = 0; self.iter(&i,&entry);) {
                 auto strVal = stringifyValue(entry.value);
                 if (++printed == mapSize) {
                         buffer = str.appendFormat(buffer, "[%s] => %s}",entry.key,strVal);
@@ -901,7 +901,7 @@ pub u8 *StrMap.keysToStr() {
         StrMapNode *entry = null;
         auto buffer = str.formatTo(null,"{");
         i64 printed = 0; /* `i` skips the holes deletes leave, so count */
-        for (i64 i = 0; strIter(self,&i,&entry);) {
+        for (i64 i = 0; self.iter(&i,&entry);) {
                 if (++printed == mapSize) {
                         buffer = str.appendFormat(buffer, "%s}",entry.key);
                 } else {

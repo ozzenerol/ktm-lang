@@ -443,7 +443,7 @@ pub void RBTree.release()
 {// Free every node, its key and value (with the tree's destructors, if
     // set) and the tree itself
         if (!self) { return; }
-        RBIter *it = rbIterNew(self);
+        RBIter *it = self.iterNew();
         RBNode *node = null;
         /* RBIterNext has already pushed the node's right subtree, so the node
             * can be freed straight away */

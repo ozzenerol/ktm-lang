@@ -51,7 +51,7 @@ pub IntSetIter *IntSet.iterNew() {
     IntSetIter *it = mem.alloc(sizeof(IntSetIter));
     it.sp = 0;
     it.entry = mem.alloc(sizeof(IntSetEntry));
-    it.stack = mem.alloc(sizeof(map.RBNode *) * intSize(self));
+    it.stack = mem.alloc(sizeof(map.RBNode *) * self.size());
     it.tree = null;
     it.version = 0;
     if (!self) { return it; } /* yields nothing */
@@ -108,16 +108,16 @@ pub void IntSet.delete(i64 key) {
 
 pub IntSet *IntSet.union(IntSet *s2) {
     IntSet *unionSet = intNew();
-    IntSetIter *i1 = intIterNew(self);
-    IntSetIter *i2 = intIterNew(s2);
+    IntSetIter *i1 = self.iterNew();
+    IntSetIter *i2 = s2.iterNew();
     IntSetEntry *entry = null;
 
     while ((entry = intIterNext(i1))) {
-        intAdd(unionSet,entry.key);
+        unionSet.add(entry.key);
     }
 
     while ((entry = intIterNext(i2))) {
-        intAdd(unionSet,entry.key);
+        unionSet.add(entry.key);
     }
 
     intIterRelease(i1);
@@ -127,12 +127,12 @@ pub IntSet *IntSet.union(IntSet *s2) {
 
 pub IntSet *IntSet.diff(IntSet *s2) {
     IntSet *diffSet = intNew();
-    IntSetIter *i1 = intIterNew(self);
+    IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
 
     while ((entry = intIterNext(i1))) {
-        if (!intHas(s2, (i64)entry.key)) {
-            intAdd(diffSet,(i64)entry.key);
+        if (!s2.has((i64)entry.key)) {
+            diffSet.add((i64)entry.key);
         }
     }
 
@@ -142,19 +142,19 @@ pub IntSet *IntSet.diff(IntSet *s2) {
 
 pub IntSet *IntSet.intersection(IntSet *s2) {
     IntSet *intersectionSet = intNew();
-    IntSetIter *i1 = intIterNew(self);
-    IntSetIter *i2 = intIterNew(s2);
+    IntSetIter *i1 = self.iterNew();
+    IntSetIter *i2 = s2.iterNew();
     IntSetEntry *entry = null;
 
     while ((entry = intIterNext(i1))) {
-        if (intHas(s2,entry.key)) {
-            intAdd(intersectionSet,entry.key);
+        if (s2.has(entry.key)) {
+            intersectionSet.add(entry.key);
         }
     }
 
     while ((entry = intIterNext(i2))) {
-        if (intHas(self,entry.key)) {
-            intAdd(intersectionSet,entry.key);
+        if (self.has(entry.key)) {
+            intersectionSet.add(entry.key);
         }
     }
 
@@ -164,22 +164,22 @@ pub IntSet *IntSet.intersection(IntSet *s2) {
 }
 
 pub bool IntSet.eq(IntSet *s2) {
-    if (intSize(self) != intSize(s2)) { return false; }
+    if (self.size() != s2.size()) { return false; }
 
-    IntSetIter *i1 = intIterNew(self);
-    IntSetIter *i2 = intIterNew(s2);
+    IntSetIter *i1 = self.iterNew();
+    IntSetIter *i2 = s2.iterNew();
     IntSetEntry *entry = null;
     bool retval = true;
 
     while ((entry = intIterNext(i1))) {
-        if (!intHas(s2,entry.key)) {
+        if (!s2.has(entry.key)) {
             retval = false;
             goto out;
         }
     }
 
     while ((entry = intIterNext(i2))) {
-        if (!intHas(self,entry.key)) {
+        if (!self.has(entry.key)) {
             retval = false;
             goto out;
         }
@@ -193,7 +193,7 @@ out:
 
 pub vec.IntVec *IntSet.toVec() {
     vec.IntVec *vec = vec.intNew();
-    IntSetIter *i1 = intIterNew(self);
+    IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     while ((entry = intIterNext(i1))) {
         vec.push(entry.key);
@@ -204,21 +204,21 @@ pub vec.IntVec *IntSet.toVec() {
 
 pub IntSet *IntSet.symDiff(IntSet *s2) {
     IntSet *symDiffSet = intNew();
-    IntSetIter *i1 = intIterNew(self);
-    IntSetIter *i2 = intIterNew(s2);
+    IntSetIter *i1 = self.iterNew();
+    IntSetIter *i2 = s2.iterNew();
     IntSetEntry *entry = null;
 
     /* Add elements from s1 that are not in s2 */
     while ((entry = intIterNext(i1))) {
-        if (!intHas(s2,entry.key)) {
-            intAdd(symDiffSet,entry.key);
+        if (!s2.has(entry.key)) {
+            symDiffSet.add(entry.key);
         }
     }
 
     /* Add elements from s2 that are not in s1 */
     while ((entry = intIterNext(i2))) {
-        if (!intHas(self,entry.key)) {
-            intAdd(symDiffSet,entry.key);
+        if (!self.has(entry.key)) {
+            symDiffSet.add(entry.key);
         }
     }
 
@@ -230,7 +230,7 @@ pub IntSet *IntSet.symDiff(IntSet *s2) {
 pub u8 *IntSet.toStr() {
     i64 len = 1;
     u8 *buf = str.dup("{");
-    IntSetIter *i1 = intIterNew(self);
+    IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     bool first = true;
 

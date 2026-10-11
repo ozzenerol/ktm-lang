@@ -65,7 +65,7 @@ pub void List.insertNodeBefore(List *newNode) {
 pub void List.insertBefore(void *value) {
         List *prev = new();
         prev.value = value;
-        insertNodeBefore(self,prev);
+        self.insertNodeBefore(prev);
 }
 
 pub void *List.pop() {
