@@ -91,6 +91,7 @@ i32 main() {
             libc.strstr(err, "__404_bad.ktm:3:")) { correct++; }
     else { printf("\n  format check: [%s]\n", err); }
 
+    proc.shell("rm -rf __404_*");   /* the files this test wrote */
     test.printResult(correct, tests);
     printf("====\n");
     return 0;
