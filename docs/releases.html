@@ -87,7 +87,8 @@ i32 main() {
   <code>p[0:n]</code> makes a slice from a raw pointer. <code>==</code> on slices is an error: use
   <code>a.equals(b)</code> or compare <code>.ptr</code>.</li>
   <li>Bounds checks on every index and sub-slice, always on: a bad index throws <code>ERR_BOUNDS</code>
-  ("index 5 out of range for length 5 at f.ktm:12"), which a server can catch. <code>s.ptr[i]</code> is
+  ("index 5 out of range for length 5", with the file and line in <code>e.file</code> and
+  <code>e.line</code>), which a server can catch. <code>s.ptr[i]</code> is
   the unchecked way.</li>
   <li><code>String</code>: an owned, growable, NUL-terminated UTF-8 string (<code>str.new()</code>,
   <code>str.from(...)</code>, <code>str.format(...)</code>), freed with <code>defer s.free()</code>. Methods:
