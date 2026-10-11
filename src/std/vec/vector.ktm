@@ -320,14 +320,14 @@ pub void PtrVec.clear() {
     self.size = 0;
 }
 
-pub void PtrVec.release(fn(void *_val) void _free_value = null)
+pub void PtrVec.release(fn(void *_val) void freeValue = null)
 { // Optionally pass a callback to free each item in the vector 
     if (self) {
-        if (_free_value) {
+        if (freeValue) {
             void **entries = self.entries;
             i64 size = self.size;
             for (i64 i = 0; i < size; ++i) {
-                _free_value(entries[i]);
+                freeValue(entries[i]);
             }
         }
         mem.free(self.entries);

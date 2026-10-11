@@ -10,9 +10,9 @@ pub i64 struct Date {
 
 pub struct Parts {
   u64 sec10000,sec100,sec,min,hour,
-    day_of_week,day_of_mon,mon;
+    dayOfWeek,dayOfMon,mon;
   i32 year;
-  i64 zone_diff;
+  i64 zoneDiff;
 };
 
 u64 monStartDays1[12]={
@@ -50,13 +50,13 @@ pub void nowParts(Parts *_ds) {
   _ds.year = (u64)ptm.tm_year;
   _ds.mon  = (u64)ptm.tm_mon;
   _ds.mon += 1;
-  _ds.day_of_week = (u64)ptm.tm_wday;
-  _ds.day_of_mon = (u64)ptm.tm_mday;
+  _ds.dayOfWeek = (u64)ptm.tm_wday;
+  _ds.dayOfMon = (u64)ptm.tm_mday;
   _ds.year += 1900;
   /* Offset from UTC as +-hhmm, like Str2CDateStruct's %z */
   gmtoff = ptm.tm_gmtoff/60;
-  if (gmtoff < 0) { _ds.zone_diff = -((-gmtoff)/60*100 + (-gmtoff)%60); }
-  else            { _ds.zone_diff = gmtoff/60*100 + gmtoff%60; }
+  if (gmtoff < 0) { _ds.zoneDiff = -((-gmtoff)/60*100 + (-gmtoff)%60); }
+  else            { _ds.zoneDiff = gmtoff/60*100 + gmtoff%60; }
 }
 
 pub i64 yearStart(i64 year)
@@ -86,7 +86,7 @@ pub i64 dayOfWeek(i64 i)
 pub void toParts(Parts *_ds,Date cdt)
 {//Cvt CDate to CDateStruct.
   i64 i,k,date=cdt.date;
-  _ds.day_of_week=dayOfWeek(date);
+  _ds.dayOfWeek=dayOfWeek(date);
   /* An estimate, can be a year off either way */
   _ds.year=(date+1)*100000/YEAR_DAYS_INT;
   i=yearStart(_ds.year);
@@ -113,7 +113,7 @@ pub void toParts(Parts *_ds,Date cdt)
     date-=monStartDays2[k];
   }
   _ds.mon=k+1;
-  _ds.day_of_mon=date+1;
+  _ds.dayOfMon=date+1;
   k=((625*15*15*3*cdt.time)>>21)+1;
   _ds.sec10000=math.divModU64(&k,100);
   _ds.sec100=math.divModU64(&k,100);
@@ -153,7 +153,7 @@ pub Date fromParts(Parts *_ds)
     t+=864000000;
     days--;
   }
-  cdt.date=i1+_ds.day_of_mon-1+days;
+  cdt.date=i1+_ds.dayOfMon-1+days;
   cdt.time=(t<<21)/(15*15*3*625);
   return cdt;
 }
@@ -164,7 +164,7 @@ pub i32 firstDayOfMonth(i64 i)
   Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
-  ds.day_of_mon=1;
+  ds.dayOfMon=1;
   cdt=fromParts(&ds);
   return cdt.date;
 }
@@ -180,7 +180,7 @@ pub i64 lastDayOfMonth(i64 i)
     ds.mon=1;
     ds.year++;
   }
-  ds.day_of_mon=1;
+  ds.dayOfMon=1;
   cdt=fromParts(&ds);
   return cdt.date-1;
 }
@@ -191,7 +191,7 @@ pub i32 firstDayOfYear(i64 i)
   Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
-  ds.day_of_mon=1;
+  ds.dayOfMon=1;
   ds.mon=1;
   cdt=fromParts(&ds);
   return cdt.date;
@@ -203,7 +203,7 @@ pub i64 lastDayOfYear(i64 i)
   Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
-  ds.day_of_mon=1;
+  ds.dayOfMon=1;
   ds.mon=1;
   ds.year++;
   cdt=fromParts(&ds);

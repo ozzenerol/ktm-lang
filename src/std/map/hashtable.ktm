@@ -22,7 +22,7 @@ pub struct IntMapNode {
 
 pub struct StrMapNode {
         u8 *key;
-        i64 key_len;
+        i64 keyLen;
         void *value;
         i64 order;
 };
@@ -35,8 +35,8 @@ pub struct IntMap {
         vec.IntVec *indexes; /* Where all of the values are in the entries array, in 
                                                                                 * insertion order. Means we can iterate over the HashTable 
                                                                                 * quickly at the cost of memory */
-        u64 threashold; /* rebuild threashold */
-        fn(void *value) void _free_value; /* User defined callback for freeing values */
+        u64 threshold; /* rebuild threashold */
+        fn(void *value) void freeValue; /* User defined callback for freeing values */
         IntMapNode **entries; /* The slots */
 };
 
@@ -48,9 +48,9 @@ pub struct StrMap {
         vec.IntVec *indexes; /* Where all of the values are in the entries array, in 
                                                                     * insertion order. Means we can iterate over the HashTable 
                                                                     * quickly at the cost of memory */
-        u64 threashold; /* rebuild threashold */
-        fn(void *_value) void _free_value; /* User defined callback for freeing values */
-        fn(void *_key) void _free_key; /* User defined callback for freeing keys */
+        u64 threshold; /* rebuild threashold */
+        fn(void *_value) void freeValue; /* User defined callback for freeing values */
+        fn(void *_key) void freeKey; /* User defined callback for freeing keys */
         StrMapNode **entries; /* The slots */
 };
 
@@ -113,8 +113,8 @@ pub IntMap *intNew(u64 capacity)
         map.mask = capacity-1;
         map.size = 0;
         map.indexes = vec.intNew();
-        map.threashold = (capacity * HT_LOAD)/100;
-        map._free_value = null;
+        map.threshold = (capacity * HT_LOAD)/100;
+        map.freeValue = null;
         map.entries = mem.allocZero(capacity * sizeof(IntMapNode *));
         if (!map.entries) {
                 map.indexes.release();
@@ -124,9 +124,9 @@ pub IntMap *intNew(u64 capacity)
         return map;
 }
 
-pub void IntMap.setFreeValue(fn(void *value) void _free_value) {
+pub void IntMap.setFreeValue(fn(void *value) void freeValue) {
         if (self) {
-                self._free_value = _free_value;
+                self.freeValue = freeValue;
         }
 }
 
@@ -185,13 +185,13 @@ pub void IntMap.release()
 {// free the entire hashtable
         if (self) {
                 auto indexes = self.indexes;
-                fn(void *value) void free_value = self._free_value;
+                fn(void *value) void freeValue = self.freeValue;
                 for (auto i = 0; i < self.capacity; ++i) {
                         auto n = self.entries[i];
                         if (n) {
                                 /* A tombstone's value was freed by IntMapDelete. */
-                                if (free_value && n.order != HT_DELETED) {
-                                        free_value(n.value);
+                                if (freeValue && n.order != HT_DELETED) {
+                                        freeValue(n.value);
                                 }
                                 mem.free(n);
                         }
@@ -258,7 +258,7 @@ static bool intMapRehash(IntMap *map, u64 newCapacity)
         map.indexes.size = newSize;
         map.indexes.entries = newIndexes;
 
-        map.threashold = (newCapacity * HT_LOAD)/100;
+        map.threshold = (newCapacity * HT_LOAD)/100;
         map.entries = newEntries;
         map.size = newSize;
         return true;
@@ -282,9 +282,9 @@ pub bool IntMap.set(i64 key, void *value) {
         /* `indexes->size` is the live entries plus the holes deletes left, so this
             * also bounds the tombstones. A table that is mostly tombstones is rebuilt
             * at the same size rather than doubled. */
-        if (self.indexes.size >= self.threashold) {
+        if (self.indexes.size >= self.threshold) {
                 u64 newCapacity = self.capacity;
-                if (self.size >= self.threashold / 2) {
+                if (self.size >= self.threshold / 2) {
                         newCapacity <<= 1;
                 }
                 if (!intMapRehash(self,newCapacity)) {
@@ -310,9 +310,9 @@ pub bool IntMap.set(i64 key, void *value) {
                 return true;
         } else {
                 auto n = self.entries[idx];
-                if (self._free_value && n.value != value) {
+                if (self.freeValue && n.value != value) {
                         /* Replacing a live value: the map owned the old one. */
-                        self._free_value(n.value);
+                        self.freeValue(n.value);
                 }
                 n.value = value;
                 return true;
@@ -328,8 +328,8 @@ pub bool IntMap.delete(i64 key)
         auto idx = intMapGetIdx(self,key);
         if (idx != HT_DELETED) {
                 auto n = self.entries[idx];
-                if (self._free_value) {
-                        self._free_value(n.value);
+                if (self.freeValue) {
+                        self.freeValue(n.value);
                 }
                 self.indexes.entries[n.order] = HT_DELETED;
                 n.order = HT_DELETED;
@@ -372,8 +372,8 @@ pub void IntMap.clear()
                 auto n = self.entries[i];
                 if (n) {
                         /* A tombstone's value was freed by IntMapDelete. */
-                        if (self._free_value && n.order != HT_DELETED) {
-                                self._free_value(n.value);
+                        if (self.freeValue && n.order != HT_DELETED) {
+                                self.freeValue(n.value);
                         }
                         mem.free(n);
                         self.entries[i] = null;
@@ -477,9 +477,9 @@ pub StrMap *strNew(u64 capacity)
         map.mask = capacity-1;
         map.size = 0;
         map.indexes = vec.intNew();
-        map.threashold = (capacity * HT_LOAD)/100;
-        map._free_value = null;
-        map._free_key = null;
+        map.threshold = (capacity * HT_LOAD)/100;
+        map.freeValue = null;
+        map.freeKey = null;
         map.entries = mem.allocZero(capacity * sizeof(StrMapNode *));
         if (!map.entries) {
                 map.indexes.release();
@@ -489,15 +489,15 @@ pub StrMap *strNew(u64 capacity)
         return map;
 }
 
-pub void StrMap.setFreeValue(fn(void *value) void _free_value) {
+pub void StrMap.setFreeValue(fn(void *value) void freeValue) {
         if (self) {
-                self._free_value = _free_value;
+                self.freeValue = freeValue;
         }
 }
 
-pub void StrMap.setFreeKey(fn(void *key) void _free_key) {
+pub void StrMap.setFreeKey(fn(void *key) void freeKey) {
         if (self) {
-                self._free_key = _free_key;
+                self.freeKey = freeKey;
         }
 }
 
@@ -505,42 +505,42 @@ static void strMapFreeEntry(StrMap *map, StrMapNode *n)
 {/* Free a live entry's value and key with the registered destructors. A
         * key that is also the value (`StrMapSet(m,s,s)`) is freed once, as the
         * value. */
-        if (map._free_value) {
-                map._free_value(n.value);
+        if (map.freeValue) {
+                map.freeValue(n.value);
         }
-        if (map._free_key && !(n.key == n.value && map._free_value)) {
-                map._free_key(n.key);
+        if (map.freeKey && !(n.key == n.value && map.freeValue)) {
+                map.freeKey(n.key);
         }
 }
 
-static u64 strMapHash(u8 *key, i64 key_len)
+static u64 strMapHash(u8 *key, i64 keyLen)
 {/* FNV-1a over exactly the `key_len` bytes the lookup compares, then
         * mixed. Set, Get, Has and Delete hash a NUL-terminated key's StrLen bytes
         * and GetLen/HasLen their `key_len`, so `("hello world", 5)` finds
         * "hello". */
         u64 h = 0xcbf29ce484222325;
-        for (i64 i = 0; i < key_len; i++) {
+        for (i64 i = 0; i < keyLen; i++) {
                 h ^= key[i];
                 h *= 0x100000001b3;
         }
         return htFmix64(h);
 }
 
-StrMapNode *strMapNodeNew(u8 *key, i64 key_len, void *value) {
+StrMapNode *strMapNodeNew(u8 *key, i64 keyLen, void *value) {
         StrMapNode *n = mem.alloc(sizeof(StrMapNode));
         n.key = key;
-        n.key_len = key_len;
+        n.keyLen = keyLen;
         n.value = value;
         n.order = HT_DELETED;
         return n;
 }
 
-static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 key_len, bool *_is_free)
+static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 keyLen, bool *_is_free)
 {// The slot holding `key` (*_is_free = false), else the slot to insert it
     // into (*_is_free = true): the first tombstone on the probe chain, or the
     // empty slot that ends it.
         u64 mask = map.mask;
-        u64 idx = strMapHash(key, key_len) & mask;
+        u64 idx = strMapHash(key, keyLen) & mask;
         u64 tombstone = HT_DELETED;
         StrMapNode *cur;
 
@@ -549,7 +549,7 @@ static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 key_len, bool *_is_free)
                         if (tombstone == HT_DELETED) {
                                 tombstone = idx;
                         }
-                } else if (key_len == cur.key_len && !str.cmpLen(cur.key,key,key_len)) {
+                } else if (keyLen == cur.keyLen && !str.cmpLen(cur.key,key,keyLen)) {
                         *_is_free = false;
                         return idx;
                 }
@@ -562,16 +562,16 @@ static u64 strMapGetNextIdx(StrMap *map, u8 *key, i64 key_len, bool *_is_free)
         return idx;
 }
 
-static i64 strMapGetIdx(StrMap *map, u8 *key, i64 key_len)
+static i64 strMapGetIdx(StrMap *map, u8 *key, i64 keyLen)
 {// Slot holding `key`, or HT_DELETED. Tombstones are skipped, not stopped at.
         u64 mask = map.mask;
-        u64 idx = strMapHash(key, key_len) & mask;
+        u64 idx = strMapHash(key, keyLen) & mask;
         StrMapNode **entries = map.entries;
         StrMapNode *cur;
 
         while ((cur = entries[idx]) != null) {
-                if (cur.order != HT_DELETED && cur.key_len == key_len &&
-                                !str.cmpLen(cur.key, key, key_len)) {
+                if (cur.order != HT_DELETED && cur.keyLen == keyLen &&
+                                !str.cmpLen(cur.key, key, keyLen)) {
                         return idx;
                 }
                 idx = (idx + 1) & mask;
@@ -635,7 +635,7 @@ static bool strMapRehash(StrMap *map, u64 newCapacity)
                 i64 idx = oldIndexes[i];
                 if (idx != HT_DELETED) {
                         auto old = oldEntries[idx];
-                        i64 newIdx = strMapGetNextIdx(map,old.key,old.key_len,&isFree);
+                        i64 newIdx = strMapGetNextIdx(map,old.key,old.keyLen,&isFree);
                         old.order = newSize;
                         newIndexes[newSize] = newIdx;
                         newEntries[newIdx] = old;
@@ -657,7 +657,7 @@ static bool strMapRehash(StrMap *map, u64 newCapacity)
 
         map.size = newSize;
         map.entries = newEntries;
-        map.threashold = (newCapacity * HT_LOAD)/100;
+        map.threshold = (newCapacity * HT_LOAD)/100;
         return true;
 }
 
@@ -679,9 +679,9 @@ pub bool StrMap.set(u8 *key, void *value) {
         /* `indexes->size` is the live entries plus the holes deletes left, so this
             * also bounds the tombstones. A table that is mostly tombstones is rebuilt
             * at the same size rather than doubled. */
-        if (self.indexes.size >= self.threashold) {
+        if (self.indexes.size >= self.threshold) {
                 u64 newCapacity = self.capacity;
-                if (self.size >= self.threashold / 2) {
+                if (self.size >= self.threshold / 2) {
                         newCapacity <<= 1;
                 }
                 if (!strMapRehash(self,newCapacity)) {
@@ -690,18 +690,18 @@ pub bool StrMap.set(u8 *key, void *value) {
                 }
         }
 
-        i64 key_len = str.len(key);
-        u64 idx = strMapGetNextIdx(self,key,key_len,&isFree);
+        i64 keyLen = str.len(key);
+        u64 idx = strMapGetNextIdx(self,key,keyLen,&isFree);
 
         if (isFree) {
                 auto n = self.entries[idx];
                 if (n) {
                         /* Reuse a tombstone */
                         n.key = key;
-                        n.key_len = key_len;
+                        n.keyLen = keyLen;
                         n.value = value;
                 } else {
-                        n = strMapNodeNew(key,key_len,value);
+                        n = strMapNodeNew(key,keyLen,value);
                         self.entries[idx] = n;
                 }
                 n.order = self.indexes.size;
@@ -722,18 +722,18 @@ pub bool StrMap.set(u8 *key, void *value) {
                     *   - the passed key is also the new value: it is kept, not freed. */
                 u8 *oldKey = n.key;
                 void *oldValue = n.value;
-                bool freeOldValue = self._free_value && oldValue != value;
+                bool freeOldValue = self.freeValue && oldValue != value;
                 u8 *dropped = key;
                 if (freeOldValue && oldKey == oldValue) {
                         n.key = key;
                         dropped = oldKey;
                 }
                 if (freeOldValue) {
-                        self._free_value(oldValue);
+                        self.freeValue(oldValue);
                 }
-                if (self._free_key && dropped != n.key && dropped != value &&
+                if (self.freeKey && dropped != n.key && dropped != value &&
                                 dropped != oldValue) {
-                        self._free_key(dropped);
+                        self.freeKey(dropped);
                 }
                 n.value = value;
                 return true;
@@ -755,17 +755,17 @@ pub bool StrMap.delete(u8 *key)
         self.indexes.entries[n.order] = HT_DELETED;
         n.order = HT_DELETED;
         n.key = null;
-        n.key_len = 0;
+        n.keyLen = 0;
         n.value = null;
         self.size--;
         return true;
 }
 
-pub void *StrMap.getLen(u8 *key, i64 key_len, bool *_ok=null)
+pub void *StrMap.getLen(u8 *key, i64 keyLen, bool *_ok=null)
 {// The value stored for the `key_len` bytes at `key`, or null. `*_ok`
     // (when given) tells a missing key (false) from a stored null (true).
         if (self && key) {
-                auto idx = strMapGetIdx(self,key,key_len);
+                auto idx = strMapGetIdx(self,key,keyLen);
                 if (idx != HT_DELETED) {
                         if (_ok) { *_ok = true; }
                         return self.entries[idx].value;
@@ -781,8 +781,8 @@ pub void *StrMap.get(u8 *key, bool *_ok=null)
                 if (_ok) { *_ok = false; }
                 return null;
         }
-        i64 key_len = str.len(key);
-        return self.getLen(key,key_len,_ok);
+        i64 keyLen = str.len(key);
+        return self.getLen(key,keyLen,_ok);
 }
 
 pub void StrMap.clear()
@@ -806,11 +806,11 @@ pub void StrMap.clear()
         self.size = 0;
 }
 
-pub bool StrMap.hasLen(u8 *key, i64 key_len) {
+pub bool StrMap.hasLen(u8 *key, i64 keyLen) {
         if (!self || !key) {
                 return false;
         }
-        i64 idx = strMapGetIdx(self,key,key_len);
+        i64 idx = strMapGetIdx(self,key,keyLen);
         if (idx != HT_DELETED) {
                 return true;
         }
@@ -821,8 +821,8 @@ pub bool StrMap.has(u8 *key) {
         if (!self || !key) {
                 return false;
         }
-        i64 key_len = str.len(key);
-        return self.hasLen(key,key_len);
+        i64 keyLen = str.len(key);
+        return self.hasLen(key,keyLen);
 }
 
 pub bool StrMap.iter(i64 *_idx, StrMapNode **_node) {

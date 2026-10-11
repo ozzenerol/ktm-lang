@@ -29,14 +29,14 @@ pub struct Param {
         u8 *str;
         struct {
             void *blob;
-            i64 blob_len;
+            i64 blobLen;
         };
     };
 };
 
 pub struct Stmt {
     sqlite3_stmt *stmt;
-    i64  params_count;
+    i64  paramsCount;
 };
 
 pub struct Column {
@@ -56,7 +56,7 @@ pub struct Row {
     Column *col;
     /* false for a row of a prepared statement, which SqlFinalizePrepared
      * finalizes. */
-    bool owns_stmt;
+    bool ownsStmt;
 };
 
 pub struct Db {
@@ -201,7 +201,7 @@ pub Stmt *prepare(Db *ctx, u8 *sql) {
         mem.free(pstmt);
         return null;
     }
-    pstmt.params_count = sqlite3_bind_parameter_count(pstmt.stmt);
+    pstmt.paramsCount = sqlite3_bind_parameter_count(pstmt.stmt);
     return pstmt;
 }
 
@@ -246,7 +246,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
     sqlReset(pstmt);
 
     /* null params: every parameter is left unbound, which is SQL null. */
-    for (auto i = 0; params && i < pstmt.params_count; ++i) {
+    for (auto i = 0; params && i < pstmt.paramsCount; ++i) {
         Param *param = &params[i];
         switch (param.type) {
             case SQL_INT:
@@ -256,7 +256,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
             case SQL_TEXT:
                 rc = sqlite3_bind_text(pstmt.stmt, i + 1, param.str, -1, (void *)SQLITE_TRANSIENT);
             case SQL_BLOB:
-                rc = sqlite3_bind_blob(pstmt.stmt, i + 1, param.blob, param.blob_len,
+                rc = sqlite3_bind_blob(pstmt.stmt, i + 1, param.blob, param.blobLen,
                         (void *)SQLITE_TRANSIENT);
             case SQL_NULL:
                 rc = sqlite3_bind_null(pstmt.stmt, i + 1);
@@ -276,7 +276,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
         row.stmt = pstmt.stmt;
         row.cols = 0;
         row.col = null;
-        row.owns_stmt = false;
+        row.ownsStmt = false;
     }
 
     return rc;
@@ -314,7 +314,7 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
                 rc = sqlite3_bind_text(stmt, i + 1, params[i].str, -1, (void *)SQLITE_TRANSIENT);
             case SQL_BLOB:
                 rc = sqlite3_bind_blob(stmt, i + 1, params[i].blob,
-                        params[i].blob_len, (void *)SQLITE_TRANSIENT);
+                        params[i].blobLen, (void *)SQLITE_TRANSIENT);
             case SQL_NULL:
                 rc = sqlite3_bind_null(stmt, i + 1);
             default:
@@ -332,7 +332,7 @@ static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
         row.stmt = stmt;
         row.cols = 0;
         row.col = null;
-        row.owns_stmt = true;
+        row.ownsStmt = true;
         stmt = null;
     }
 
@@ -348,7 +348,7 @@ pub void rowRelease(Row *row) {
         return;
     }
     mem.free(row.col);
-    if (row.owns_stmt) {
+    if (row.ownsStmt) {
         libc.sqlite3_finalize(row.stmt);
     }
     row.col = null;

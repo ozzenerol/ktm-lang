@@ -211,7 +211,7 @@ pub u8 *splitLast(u8 *src,u8 *marker,u8 *dst=null)
         return dst;
 }
 
-pub u8 *trimStart(u8 *str, i64 str_len=-1, i64 *_new_len=null)
+pub u8 *trimStart(u8 *str, i64 strLen=-1, i64 *_new_len=null)
 { // Mutates the string, removes whitespace at the start
         // of the string, MSize calls are still safe. Only the first str_len
         // bytes are looked at (the whole string if str_len < 0); when something
@@ -223,10 +223,10 @@ pub u8 *trimStart(u8 *str, i64 str_len=-1, i64 *_new_len=null)
                 if (_new_len) { *_new_len = 0; }
                 return null;
         }
-        if (str_len < 0) {
+        if (strLen < 0) {
                 len = len(str);
         } else {
-                len = str_len;
+                len = strLen;
         }
         j = 0;
 
@@ -246,7 +246,7 @@ pub u8 *trimStart(u8 *str, i64 str_len=-1, i64 *_new_len=null)
         return str;
 }
 
-pub u8 *trimEnd(u8 *str, i64 str_len=-1, i64 *_new_len=null)
+pub u8 *trimEnd(u8 *str, i64 strLen=-1, i64 *_new_len=null)
 { // Mutates the string, removes whitespace at the end
         // of the string, MSize calls are still safe. Only the first str_len
         // bytes are looked at (the whole string if str_len < 0). null returns
@@ -257,10 +257,10 @@ pub u8 *trimEnd(u8 *str, i64 str_len=-1, i64 *_new_len=null)
                 if (_new_len) { *_new_len = 0; }
                 return null;
         }
-        if (str_len < 0) {
+        if (strLen < 0) {
                 len = len(str);
         } else {
-                len = str_len;
+                len = strLen;
         }
         i = len-1;
 

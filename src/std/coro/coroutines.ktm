@@ -31,18 +31,18 @@ pub struct Coroutine;
 
 pub struct Coroutine {
     void *sp;               /* saved stack pointer while not running */
-    void *stack_base;       /* the mapping: guard page, then the stack */
-    i64 stack_len;        /* bytes mapped, guard included */
+    void *stackBase;       /* the mapping: guard page, then the stack */
+    i64 stackLen;        /* bytes mapped, guard included */
     Coroutine *resumer;   /* who to go back to on Yield/return */
     fn(void *arg) void *body;
     void *arg;
-    rt.CatchFrame *catch_top;/* this coroutine's catch chain while it is switched out */
-    u64 except_ch;
+    rt.CatchFrame *catchTop;/* this coroutine's catch chain while it is switched out */
+    u64 exceptCh;
     Error error;          /* its error in flight while it is switched out */
     Error thrown;         /* an uncaught error, rethrown by Next */
     i64 status;
     bool failed;          /* fn threw; Next rethrows `thrown` */
-    bool is_root;         /* the save slot of a thread's own stack */
+    bool isRoot;         /* the save slot of a thread's own stack */
 };
 
 #ifdef IS_X86_64
@@ -169,7 +169,7 @@ static Coroutine *coroRoot(rt.HCFs *fs) {
         r = libc.calloc(1, sizeof(Coroutine));
         if (!r) { coroDie("out of memory for the coroutine state\n"); }
         r.status = CORO_ACTIVE;
-        r.is_root = true;
+        r.isRoot = true;
         fs.coroRoot = r;
     }
     return r;
@@ -178,13 +178,13 @@ static Coroutine *coroRoot(rt.HCFs *fs) {
 /* Switch the thread from `from` to `to`, handing over `value`; returns
  * what is handed to `from` when something switches back to it. */
 static void *coroSwitch(rt.HCFs *fs, Coroutine *from, Coroutine *to, void *value) {
-    from.catch_top = fs.catchTop;
-    from.except_ch = fs.exceptCh;
+    from.catchTop = fs.catchTop;
+    from.exceptCh = fs.exceptCh;
     from.error = fs.error;
-    fs.catchTop = to.catch_top;
-    fs.exceptCh = to.except_ch;
+    fs.catchTop = to.catchTop;
+    fs.exceptCh = to.exceptCh;
     fs.error = to.error;
-    if (to.is_root) { fs.coroCur = null; }
+    if (to.isRoot) { fs.coroCur = null; }
     else             { fs.coroCur = to; }
     return coroSwap(&from.sp, to.sp, value);
 }
@@ -221,17 +221,17 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
 
     Coroutine *c = libc.calloc(1, sizeof(Coroutine));
     if (!c) { return null; }
-    c.stack_len = page + stackSize;
-    c.stack_base = coroStackGet(rt.Fs(), c.stack_len);
-    if (!c.stack_base) {
-        c.stack_base = libc.mmap(null, c.stack_len, CORO_PROT_READ|CORO_PROT_WRITE,
+    c.stackLen = page + stackSize;
+    c.stackBase = coroStackGet(rt.Fs(), c.stackLen);
+    if (!c.stackBase) {
+        c.stackBase = libc.mmap(null, c.stackLen, CORO_PROT_READ|CORO_PROT_WRITE,
                 CORO_MAP_PRIVATE|CORO_MAP_ANONYMOUS, -1, 0);
-        if ((i64)c.stack_base == -1) { /* MAP_FAILED */
+        if ((i64)c.stackBase == -1) { /* MAP_FAILED */
             libc.free(c);
             return null;
         }
-        if (libc.mprotect(c.stack_base, page, CORO_PROT_NONE) != 0) {
-            libc.munmap(c.stack_base, c.stack_len);
+        if (libc.mprotect(c.stackBase, page, CORO_PROT_NONE) != 0) {
+            libc.munmap(c.stackBase, c.stackLen);
             libc.free(c);
             return null;
         }
@@ -243,7 +243,7 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
     /* A frame as CoroSwap leaves it, so the first switch "returns" into
      * CoroEntry with the coroutine in a callee-saved register. A reused
      * stack holds old data, so the frame is zeroed first. */
-    u64 *top = (u64 *)(c.stack_base + c.stack_len);
+    u64 *top = (u64 *)(c.stackBase + c.stackLen);
 #ifdef IS_X86_64
     u64 *sp = top - 8;
     mem.set(sp, 0, 8 * sizeof(u64));
@@ -320,8 +320,8 @@ pub void release(Coroutine *c) {
         coroDie("CoroutineRelease: the coroutine is running\n");
     }
     rt.__ktmErrorDrop(&c.error);
-    if (!coroStackPut(rt.Fs(), c.stack_base, c.stack_len)) {
-        libc.munmap(c.stack_base, c.stack_len);
+    if (!coroStackPut(rt.Fs(), c.stackBase, c.stackLen)) {
+        libc.munmap(c.stackBase, c.stackLen);
     }
     libc.free(c);
 }

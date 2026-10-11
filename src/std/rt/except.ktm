@@ -16,12 +16,12 @@ pub struct CatchFrame {
 };
 
 pub struct HCFs {
-    CatchFrame *catch_top;  /* head of the active-try-frames chain */
-    u64 except_ch;          /* code of the most recent throw */
-    void *coro_cur;           /* running Coroutine, null on the thread's own stack */
-    void *coro_root;          /* save slot for the thread's own stack (coroutines.ktm) */
-    void *coro_cache;         /* released coroutine stacks kept for reuse */
-    i64 coro_cached;        /* how many */
+    CatchFrame *catchTop;  /* head of the active-try-frames chain */
+    u64 exceptCh;          /* code of the most recent throw */
+    void *coroCur;           /* running Coroutine, null on the thread's own stack */
+    void *coroRoot;          /* save slot for the thread's own stack (coroutines.ktm) */
+    void *coroCache;         /* released coroutine stacks kept for reuse */
+    i64 coroCached;        /* how many */
     Error error;            /* the error being thrown, until a catch takes it */
 };
 
@@ -49,7 +49,7 @@ static void fsFree(void *p) {
     HCFs *fs = p;
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     coroStacksFree(fs);
-    libc.free(fs.coro_root);
+    libc.free(fs.coroRoot);
     libc.free(fs);
 }
 
@@ -78,12 +78,12 @@ pub HCFs *Fs() {
  * mutation is the only thing we delegate to a helper. */
 pub void __ktmPushFrame(CatchFrame *f) {
     HCFs *fs = Fs();
-    f.prev = fs.catch_top;
-    fs.catch_top = f;
+    f.prev = fs.catchTop;
+    fs.catchTop = f;
 }
 
 pub void __ktmTryLeave(CatchFrame *f) {
-    Fs().catch_top = f.prev;
+    Fs().catchTop = f.prev;
 }
 
 /* Make e (a struct copy) the thread's current error; the message moves
@@ -94,7 +94,7 @@ static void ErrSet(HCFs *fs, u64 code, u8 *message, u8 *file, i64 line) {
     fs.error.message = message ? message : _err_none;
     fs.error.file = file ? file : _err_none;
     fs.error.line = line;
-    fs.except_ch = code;
+    fs.exceptCh = code;
 }
 
 static void WriteErr(u8 *s) {
@@ -163,7 +163,7 @@ static void __ktmUncaught(HCFs *fs) {
 }
 
 static void ErrJump(HCFs *fs) {
-    auto t = fs.catch_top;
+    auto t = fs.catchTop;
     if (!t) { __ktmUncaught(fs); }
     libc._longjmp(t.jb, 1);
 }
@@ -240,7 +240,7 @@ pub void __ktmErrorForget() {
  * way of throws caught inside the deferred statement. */
 pub void __ktmDeferCaught(CatchFrame *f, Error *saved) {
     HCFs *fs = Fs();
-    fs.catch_top = f.prev;
+    fs.catchTop = f.prev;
     __ktmErrorTake(saved);
 }
 

@@ -85,16 +85,16 @@ pub struct Opts {
     i64 in, out, err;
     u8 *cwd;
     u8 **env;
-    bool no_path;
-    bool new_group;
+    bool noPath;
+    bool newGroup;
 };
 
 pub struct Proc {
     i32 pid;
-    i32 in_fd, out_fd, err_fd;
+    i32 inFd, outFd, errFd;
     bool done;
-    i64 exit_code;
-    i32 term_signal;
+    i64 exitCode;
+    i32 termSignal;
     bool group;
 };
 
@@ -154,11 +154,11 @@ static void procNonBlocking(i32 fd) {
 static void procSetStatus(Proc *p, i32 st) {
     p.done = true;
     if ((st & 0x7F) == 0) {
-        p.exit_code = (st >> 8) & 0xFF;
-        p.term_signal = 0;
+        p.exitCode = (st >> 8) & 0xFF;
+        p.termSignal = 0;
     } else {
-        p.exit_code = -1;
-        p.term_signal = st & 0x7F;
+        p.exitCode = -1;
+        p.termSignal = st & 0x7F;
     }
 }
 
@@ -246,7 +246,7 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
         libc.posix_spawnattr_setsigdefault(attr, sigs);
         libc.posix_spawnattr_setsigmask(attr, nosigs);
     }
-    if (opts.new_group) {
+    if (opts.newGroup) {
         flags |= PROC_SPAWN_SETPGROUP;
         libc.posix_spawnattr_setpgroup(attr, 0);
     }
@@ -254,7 +254,7 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
 
     env = opts.env;
     if (!env) { env = procEnviron(); }
-    if (opts.no_path) { err = libc.posix_spawn(&pid, argv[0], fa, attr, argv, env); }
+    if (opts.noPath) { err = libc.posix_spawn(&pid, argv[0], fa, attr, argv, env); }
     else               { err = libc.posix_spawnp(&pid, argv[0], fa, attr, argv, env); }
     libc.posix_spawn_file_actions_destroy(fa);
     libc.posix_spawnattr_destroy(attr);
@@ -277,10 +277,10 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
         os.exit(1);
     }
     p.pid = pid;
-    p.in_fd = pin[1];
-    p.out_fd = pout[0];
-    p.err_fd = perr[0];
-    p.group = opts.new_group;
+    p.inFd = pin[1];
+    p.outFd = pout[0];
+    p.errFd = perr[0];
+    p.group = opts.newGroup;
 #ifdef IS_MACOS
     if (p->in_fd != -1) libc.fcntl(p->in_fd, PROC_F_SETNOSIGPIPE, 1);
 #endif
@@ -302,8 +302,8 @@ static bool procReap(Proc *p, i32 options) {
         /* ECHILD: someone else reaped it (SIGCHLD set to SIG_IGN, or a
          * wait(-1) elsewhere): the status is lost */
         p.done = true;
-        p.exit_code = -1;
-        p.term_signal = 0;
+        p.exitCode = -1;
+        p.termSignal = 0;
         return true;
     }
 }
@@ -312,7 +312,7 @@ static bool procReap(Proc *p, i32 options) {
  * killed it (the signal is in p->term_signal). */
 pub i64 wait(Proc *p) {
     procReap(p, 0);
-    return p.exit_code;
+    return p.exitCode;
 }
 
 /* Without waiting: true once p has ended (then reaped: p->exit_code and
@@ -405,32 +405,32 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
     ProcPollFd fds[3];
     i64 nfds, i, n, sent = 0;
     i32 inSlot, outSlot, errSlot;
-    bool pipedOut = p.out_fd != -1, pipedErr = p.err_fd != -1;
+    bool pipedOut = p.outFd != -1, pipedErr = p.errFd != -1;
 
     mem.set(&ob, 0, sizeof(ProcBuf));
     mem.set(&eb, 0, sizeof(ProcBuf));
     if (!input) { inputLen = 0; }
-    if (p.in_fd != -1 && inputLen == 0) { procClose(&p.in_fd); }
-    procNonBlocking(p.in_fd);
-    procNonBlocking(p.out_fd);
-    procNonBlocking(p.err_fd);
+    if (p.inFd != -1 && inputLen == 0) { procClose(&p.inFd); }
+    procNonBlocking(p.inFd);
+    procNonBlocking(p.outFd);
+    procNonBlocking(p.errFd);
 
-    while (p.in_fd != -1 || p.out_fd != -1 || p.err_fd != -1) {
+    while (p.inFd != -1 || p.outFd != -1 || p.errFd != -1) {
         nfds = 0;
         inSlot = outSlot = errSlot = -1;
-        if (p.in_fd != -1) {
+        if (p.inFd != -1) {
             inSlot = nfds;
-            fds[nfds].fd = p.in_fd;
+            fds[nfds].fd = p.inFd;
             fds[nfds++].events = PROC_POLLOUT;
         }
-        if (p.out_fd != -1) {
+        if (p.outFd != -1) {
             outSlot = nfds;
-            fds[nfds].fd = p.out_fd;
+            fds[nfds].fd = p.outFd;
             fds[nfds++].events = PROC_POLLIN;
         }
-        if (p.err_fd != -1) {
+        if (p.errFd != -1) {
             errSlot = nfds;
-            fds[nfds].fd = p.err_fd;
+            fds[nfds].fd = p.errFd;
             fds[nfds++].events = PROC_POLLIN;
         }
         for (i = 0; i < nfds; i++) { fds[i].revents = 0; }
@@ -439,25 +439,25 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
             break;
         }
         if (inSlot != -1 && fds[inSlot].revents) {
-            n = procWriteNoSigpipe(p.in_fd, input + sent, inputLen - sent);
+            n = procWriteNoSigpipe(p.inFd, input + sent, inputLen - sent);
             if (n > 0) { sent += n; }
             if (sent >= inputLen ||
                     (n == -1 && os.errno() != PROC_EAGAIN && os.errno() != PROC_EINTR)) {
-                procClose(&p.in_fd);
+                procClose(&p.inFd);
                     }              /* done, or the child is gone */
         }
         if (outSlot != -1 && fds[outSlot].revents) {
             if (out) {
-                if (!procDrain(p.out_fd, &ob)) { procClose(&p.out_fd); }
-            } else if (!procDrain(p.out_fd, null)) {
-                procClose(&p.out_fd);
+                if (!procDrain(p.outFd, &ob)) { procClose(&p.outFd); }
+            } else if (!procDrain(p.outFd, null)) {
+                procClose(&p.outFd);
             }
         }
         if (errSlot != -1 && fds[errSlot].revents) {
             if (err) {
-                if (!procDrain(p.err_fd, &eb)) { procClose(&p.err_fd); }
-            } else if (!procDrain(p.err_fd, null)) {
-                procClose(&p.err_fd);
+                if (!procDrain(p.errFd, &eb)) { procClose(&p.errFd); }
+            } else if (!procDrain(p.errFd, null)) {
+                procClose(&p.errFd);
             }
         }
     }
@@ -485,9 +485,9 @@ pub i64 communicate(Proc *p, u8 *input, i64 inputLen,
  * still running is waited for: ProcKill it first to stop it. */
 pub void release(Proc *p) {
     if (!p) { return; }
-    procClose(&p.in_fd);
-    procClose(&p.out_fd);
-    procClose(&p.err_fd);
+    procClose(&p.inFd);
+    procClose(&p.outFd);
+    procClose(&p.errFd);
     procReap(p, 0);
     libc.free(p);
 }
@@ -533,18 +533,18 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
     Proc *p = procSpawnEx(argv, &o, true);
     if (!p) { return null; }
     mem.set(&b, 0, sizeof(ProcBuf));
-    procNonBlocking(p.out_fd);
-    while (p.out_fd != -1) {
-        fd.fd = p.out_fd;
+    procNonBlocking(p.outFd);
+    while (p.outFd != -1) {
+        fd.fd = p.outFd;
         fd.events = PROC_POLLIN;
         fd.revents = 0;
         r = libc.poll(&fd, 1, 10);
         if (r < 0 && os.errno() != PROC_EINTR) { break; }
-        if (r > 0 && !procDrain(p.out_fd, &b)) {
-            procClose(&p.out_fd);               /* EOF */
+        if (r > 0 && !procDrain(p.outFd, &b)) {
+            procClose(&p.outFd);               /* EOF */
         } else if (done(p)) {
-            procDrain(p.out_fd, &b);            /* what is already there */
-            procClose(&p.out_fd);
+            procDrain(p.outFd, &b);            /* what is already there */
+            procClose(&p.outFd);
         }
     }
     release(p);

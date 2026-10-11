@@ -97,7 +97,7 @@ pub void List.release(fn(void *arg) void FreeValue) {
         mem.free(self);
 }
 
-pub void List.clear(fn(void *value) void free_value=null)
+pub void List.clear(fn(void *value) void freeValue=null)
 {// Free every node (calling free_value on each value, if given) and keep
     // the head, empty: works on a ListInit head too. null is ignored.
         if (!self) { return; }
@@ -105,8 +105,8 @@ pub void List.clear(fn(void *value) void free_value=null)
         List *next;
         while (node != self) {
                 next = node.next;
-                if (free_value) {
-                        free_value(node.value);
+                if (freeValue) {
+                        freeValue(node.value);
                 }
                 mem.free(node);
                 node = next;

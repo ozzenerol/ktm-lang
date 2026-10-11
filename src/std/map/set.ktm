@@ -26,9 +26,9 @@ pub struct RBNode {
 pub struct RBTree {
         RBNode *root;
         i64 size;
-        fn(void *) void free_key;
-        fn(void *) void free_value;
-        fn(void *, void *) i64 key_cmp;
+        fn(void *) void freeKey;
+        fn(void *) void freeValue;
+        fn(void *, void *) i64 keyCmp;
         RBNode *nil;
         /* Bumped by every insert of a new key and every delete, so iterators
             * can tell the tree changed under them (their stack may then point at
@@ -40,8 +40,8 @@ static bool rbIsNil(RBNode *n) {
         return n == null || n.left == null;
 }
 
-pub RBTree *rbNew(fn(void *) void free_key, fn(void *) void free_value, 
-                                                                        fn(void *, void *) i64 key_cmp) {
+pub RBTree *rbNew(fn(void *) void freeKey, fn(void *) void freeValue, 
+                                                                        fn(void *, void *) i64 keyCmp) {
         RBTree *tree = mem.alloc(sizeof(RBTree));
         RBNode *nil = mem.alloc(sizeof(RBNode));
         nil.color = __RB_BLACK__;
@@ -50,9 +50,9 @@ pub RBTree *rbNew(fn(void *) void free_key, fn(void *) void free_value,
         nil.parent = null;
         nil.key = null;
         nil.value = null;
-        tree.free_key = free_key;
-        tree.free_value = free_value;
-        tree.key_cmp = key_cmp;
+        tree.freeKey = freeKey;
+        tree.freeValue = freeValue;
+        tree.keyCmp = keyCmp;
         tree.nil = nil;
         tree.root = nil;
         tree.size = 0;
@@ -73,8 +73,8 @@ static RBNode *rbNodeNew(RBTree *tree, void *key, void *value) {
 
 static void rbNodeRelease(RBTree *tree, RBNode *n) {
         if (n && n != tree.nil) {
-                if (tree.free_key) { tree.free_key(n.key); }
-                if (tree.free_value) { tree.free_value(n.value); }
+                if (tree.freeKey) { tree.freeKey(n.key); }
+                if (tree.freeValue) { tree.freeValue(n.value); }
                 mem.free(n);
         }
 }
@@ -167,7 +167,7 @@ pub void RBTree.set(void *key, void *value) {
 
         while (x != self.nil) {
                 y = x;
-                cmp = self.key_cmp(key, x.key);
+                cmp = self.keyCmp(key, x.key);
 
                 if (cmp < 0) {
                         x = x.left;
@@ -178,8 +178,8 @@ pub void RBTree.set(void *key, void *value) {
                             * a key destructor the duplicate key is freed, and with a value
                             * destructor the replaced value is freed (unless it is the same
                             * pointer). */
-                        if (self.free_key && x.key != key) { self.free_key(key); }
-                        if (self.free_value && x.value != value) { self.free_value(x.value); }
+                        if (self.freeKey && x.key != key) { self.freeKey(key); }
+                        if (self.freeValue && x.value != value) { self.freeValue(x.value); }
                         x.value = value;
                         return;
                 }
@@ -190,7 +190,7 @@ pub void RBTree.set(void *key, void *value) {
 
         if (y == null) {
                 self.root = z;
-        } else if (self.key_cmp(z.key, y.key) < 0) {
+        } else if (self.keyCmp(z.key, y.key) < 0) {
                 y.left = z;
         } else {
                 y.right = z;
@@ -215,7 +215,7 @@ static RBNode *rbNodeFind(RBTree *tree, RBNode *n, void *key) {
         i64 cmp = 0;
 
         while (cur && cur != tree.nil) {
-                cmp = tree.key_cmp(key, cur.key);
+                cmp = tree.keyCmp(key, cur.key);
                 if (cmp == 0) {
                         return cur;
                 } else if (cmp < 0) {

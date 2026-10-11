@@ -52,8 +52,8 @@ pub struct Value {
             * string can hold \u0000, which the '\0' termination would cut off.
             * Set them when you change `str` or `key` (0 means "up to the '\0'").
             * JsonSelect matches keys up to their first '\0'. */
-        i64 str_len;
-        i64 key_len;
+        i64 strLen;
+        i64 keyLen;
 };
 
 struct JsonParser {
@@ -80,8 +80,8 @@ static Value *jsonNew() {
         J.key = null;
         J.next = null;
         J.state = null;
-        J.str_len = 0;
-        J.key_len = 0;
+        J.strLen = 0;
+        J.keyLen = 0;
         return J;
 }
 
@@ -547,7 +547,7 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
 
         while (J) {
                 if (J.key && siblings) {
-                        jsonCatQuoted(js,J.key,J.key_len);
+                        jsonCatQuoted(js,J.key,J.keyLen);
                         js.buf = str.appendFormatLen(js.buf,&js.len,": ");
                 }
                 switch (J.type) {
@@ -558,7 +558,7 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
                         case STRNUM:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"%s",J.strnum);
                         case STRING:
-                                jsonCatQuoted(js,J.str,J.str_len);
+                                jsonCatQuoted(js,J.str,J.strLen);
                         case ARRAY:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"[");
                                 if (J.array) { jsonToStringInternal(J.array,js); } /* null: empty */
@@ -729,7 +729,7 @@ Value *jsonParseObject(JsonParser *p) {
                         return null;
                 }
 
-                J.key = jsonParseString(p, &J.key_len);
+                J.key = jsonParseString(p, &J.keyLen);
                 if (p.error != OK) {
                         jsonReleaseList(val); /* the whole list parsed so far, keys and values */
                         return null;
@@ -787,7 +787,7 @@ static bool jsonParseValue(JsonParser *p) {
 
                 case JSON_PARSER_STRING:
                         J.type = STRING;
-                        J.str = jsonParseString(p, &J.str_len);
+                        J.str = jsonParseString(p, &J.strLen);
 
                 case JSON_PARSER_NULL:
                         if (jsonParseNull(p) == 1) {

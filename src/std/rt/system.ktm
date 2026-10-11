@@ -8,7 +8,7 @@ _EXIT::
         RET
 }
 
-pub _extern _EXIT void Exit(i64 exit_code=EXIT_FAIL);
+pub _extern _EXIT void Exit(i64 exitCode=EXIT_FAIL);
 #endif
 
 #ifdef IS_ARM_64

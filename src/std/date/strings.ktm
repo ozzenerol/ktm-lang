@@ -12,7 +12,7 @@ pub u8 *formatTime(Date cdt) {
 pub u8 *formatDate(Date cdt) {
         Parts ds;
         toParts(&ds,cdt);
-        return str.format("%02d/%02d/%04d",ds.mon,ds.day_of_mon,ds.year);
+        return str.format("%02d/%02d/%04d",ds.mon,ds.dayOfMon,ds.year);
 }
 
 pub u8 *timestampNow()
@@ -93,7 +93,7 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
         t.sec = 0;
         t.min = 0;
         t.hour = 0;
-        t.zone_diff = NO_ZONE;
+        t.zoneDiff = NO_ZONE;
 
         if (!strdate || !format || !*strdate) {
                 return false;
@@ -196,12 +196,12 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
 
         t.year = year;
         t.mon = mon;
-        t.day_of_mon = day;
-        t.day_of_week = dow;
+        t.dayOfMon = day;
+        t.dayOfWeek = dow;
         t.hour = hour;
         t.min = min;
         t.sec = sec;
-        t.zone_diff = zone;
+        t.zoneDiff = zone;
         return true;
 }
 
@@ -212,7 +212,7 @@ pub Date parse(u8 *_str, u8 *fmt)
         if (!parseParts(_str,fmt,&ds)) {
                 return 0;
         }
-        if ((i64)ds.year == -1 || (i64)ds.mon == -1 || (i64)ds.day_of_mon == -1) {
+        if ((i64)ds.year == -1 || (i64)ds.mon == -1 || (i64)ds.dayOfMon == -1) {
                 return 0;
         }
         return fromParts(&ds);

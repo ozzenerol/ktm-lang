@@ -65,14 +65,14 @@ struct Param {
         u8 *str;
         struct {
             void *blob;
-            i64 blob_len;
+            i64 blobLen;
         };
     };
 };
 
 struct Stmt {
     sqlite3_stmt *stmt;
-    i64  params_count;
+    i64  paramsCount;
 };
 
 /* One column of the current row: type is SQL_INT, SQL_FLOAT, SQL_TEXT,
@@ -98,7 +98,7 @@ struct Row {
     Column *col;
     /* false for a row of a prepared statement, which SqlFinalizePrepared
      * finalizes. */
-    bool owns_stmt;
+    bool ownsStmt;
 };
 
 struct Db {

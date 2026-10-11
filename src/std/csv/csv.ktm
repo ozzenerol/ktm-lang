@@ -2,7 +2,7 @@ module csv;
 
 pub struct Parser {
     u8 *csv;
-    u64 len,off,row_off,nrows,nfields;
+    u64 len,off,rowOff,nrows,nfields;
     i64 state;
 };
 
@@ -13,7 +13,7 @@ pub struct Slice {
 pub void init(Parser *p, u8 *csv, u64 len) {
     p.csv = csv;
     p.len = len;
-    p.off = p.row_off = p.nrows = p.nfields = p.state = 0;
+    p.off = p.rowOff = p.nrows = p.nfields = p.state = 0;
 }
 
 pub i64 next(Parser *p, Slice *s) {
@@ -42,10 +42,10 @@ pub i64 next(Parser *p, Slice *s) {
 
         case 1:
             s.idx = p.nrows++;
-            s.off = p.row_off;
-            s.len = p.off - p.row_off;
+            s.off = p.rowOff;
+            s.len = p.off - p.rowOff;
             p.nfields = 0;
-            p.row_off = p.off;
+            p.rowOff = p.off;
             if (p.off < p.len) { p.state = 0; }
             else                 { p.state = 2; }
             return ROW;

@@ -12,12 +12,12 @@ pub struct CoroCached {
 
 /* Unmap a thread's cached stacks: FsFree calls it when the thread ends. */
 pub void coroStacksFree(HCFs *fs) {
-    CoroCached *n = fs.coro_cache, *next;
+    CoroCached *n = fs.coroCache, *next;
     while (n) {
         next = n.next;
         libc.munmap((u8 *)n + sizeof(CoroCached) - n.len, n.len);
         n = next;
     }
-    fs.coro_cache = null;
-    fs.coro_cached = 0;
+    fs.coroCache = null;
+    fs.coroCached = 0;
 }

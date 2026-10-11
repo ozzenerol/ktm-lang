@@ -60,8 +60,8 @@ struct FzFSlab {
 };
 
 struct FzFSlabConfig {
-    i64 size_16;
-    i64 size_32;
+    i64 size16;
+    i64 size32;
 };
 
 struct FzFString {
@@ -70,12 +70,12 @@ struct FzFString {
 };
 
 struct FzFTerm {
-    fn(FzFResult *res, bool case_sensitive,
+    fn(FzFResult *res, bool caseSensitive,
             FzFString *text, FzFString *pattern, Position *pos, FzFSlab *slab) void cb;
     bool inv;
     u8 *ptr;
     void *text;
-    bool case_sensitive;
+    bool caseSensitive;
 };
 
 struct FzFTermSet {
@@ -88,7 +88,7 @@ struct FzFPattern {
     list.List *entries;
     i64 size;
     i64 cap;
-    bool only_inv;
+    bool onlyInv;
 };
 
 struct FzFStrSlice {
@@ -293,7 +293,7 @@ i16 bonusAt(FzFString *input, i64 idx) {
             charClsOf(input.data[idx]));
 }
 
-i32 trySkip(FzFString *input, bool case_sensitive, u8 b, i32 from) {
+i32 trySkip(FzFString *input, bool caseSensitive, u8 b, i32 from) {
     FzFStrSlice slice;
     sliceStr(&slice, input.data, (i64)from, input.size);
     FzFString byteArray;
@@ -304,7 +304,7 @@ i32 trySkip(FzFString *input, bool case_sensitive, u8 b, i32 from) {
         return from;
     }
 
-    if (!case_sensitive && ('a' <= b <= 'z')) {
+    if (!caseSensitive && ('a' <= b <= 'z')) {
         if (idx > 0) {
             FzFStrSlice tmp;
             sliceStrRight(&tmp, byteArray.data, (i64)idx);
@@ -324,10 +324,10 @@ i32 trySkip(FzFString *input, bool case_sensitive, u8 b, i32 from) {
 }
 
 i32 asciiFuzzyIndex(FzFString *input, u8 *pattern,
-        i64 size, bool case_sensitive) {
+        i64 size, bool caseSensitive) {
     i32 firstIdx = 0, idx = 0;
     for (i64 pidx = 0; pidx < size; pidx++) {
-        idx = trySkip(input, case_sensitive, pattern[pidx], idx);
+        idx = trySkip(input, caseSensitive, pattern[pidx], idx);
         if (idx < 0) {
             return -1;
         }
@@ -340,7 +340,7 @@ i32 asciiFuzzyIndex(FzFString *input, u8 *pattern,
     return firstIdx;
 }
 
-i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
+i32 fzfCalculateScore(bool caseSensitive, FzFString *text, FzFString *pattern,
         i64 sidx, i64 eidx, Position *pos) {
     auto M = pattern.size;
 
@@ -357,7 +357,7 @@ i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
     for (i64 idx = sidx; idx < eidx; idx++) {
         u8 c = text.data[idx];
         i32 cls = charClsOf(c);
-        if (!case_sensitive) {
+        if (!caseSensitive) {
             c = str.toLower(c);
         }
         if (c == pattern.data[pidx]) {
@@ -395,7 +395,7 @@ i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
     return score;
 }
 
-void fzfPrefixMatch(FzFResult *res, bool case_sensitive, FzFString *text,
+void fzfPrefixMatch(FzFResult *res, bool caseSensitive, FzFString *text,
         FzFString *pattern, Position *pos, FzFSlab *slab) {
     i64 M,trimmedLen,start,end;
     i32 score;
@@ -413,13 +413,13 @@ void fzfPrefixMatch(FzFResult *res, bool case_sensitive, FzFString *text,
 
     for (i64 i = 0; i < M; ++i) {
         c = text.data[trimmedLen + i];
-        if (!case_sensitive) { c = str.toLower(c); }
+        if (!caseSensitive) { c = str.toLower(c); }
         if (c != pattern.data[i]) { goto no_match; }
     }
 
     res.end = trimmedLen + M;
     res.start = trimmedLen;
-    res.score = fzfCalculateScore(case_sensitive,text,pattern,res.start,
+    res.score = fzfCalculateScore(caseSensitive,text,pattern,res.start,
                                                                  res.end,null);
     insertRange(pos,res.start,res.end);
     return;
@@ -430,7 +430,7 @@ no_match:
     res.score = 0;
 }
 
-void fzfSuffixMatch(FzFResult *res, bool case_sensitive,
+void fzfSuffixMatch(FzFResult *res, bool caseSensitive,
         FzFString *text, FzFString *pattern,
         Position *pos, FzFSlab *slab) {
     i64 trimmedLen = text.size, M = pattern.size,diff,start,end;
@@ -447,13 +447,13 @@ void fzfSuffixMatch(FzFResult *res, bool case_sensitive,
 
     for (i64 i = 0; i < M; ++i) {
         u8 c = text.data[i+diff];
-        if (!case_sensitive) { c = str.toLower(c); }
+        if (!caseSensitive) { c = str.toLower(c); }
         if (c != pattern.data[i]) { goto no_match; }
     }
 
     res.start = trimmedLen - M;
     res.end = trimmedLen;
-    res.score = fzfCalculateScore(case_sensitive,text,pattern,res.start,
+    res.score = fzfCalculateScore(caseSensitive,text,pattern,res.start,
             res.end,null);
 
     insertRange(pos,res.start,res.end);
@@ -466,7 +466,7 @@ no_match:
     return;
 }
 
-void fzfEqNaiveMatch(FzFResult *res, bool case_sensitive, FzFString *text,
+void fzfEqNaiveMatch(FzFResult *res, bool caseSensitive, FzFString *text,
         FzFString *pattern, Position *pos, FzFSlab *slab) {
     i64 M,N;
     i64 start,end,bestBonus,bonus,pidx;
@@ -485,13 +485,13 @@ void fzfEqNaiveMatch(FzFResult *res, bool case_sensitive, FzFString *text,
     if (N<M) {
         goto no_match;
     }
-    if (asciiFuzzyIndex(text,pattern.data,M,case_sensitive) < 0) {
+    if (asciiFuzzyIndex(text,pattern.data,M,caseSensitive) < 0) {
         goto no_match;
     }
 
     for (i64 i = 0; i < N; ++i) {
         c = text.data[i];
-        if (!case_sensitive) { c = str.toLower(c); }
+        if (!caseSensitive) { c = str.toLower(c); }
 
         if (c == pattern.data[pidx]) {
             if (pidx == 0) {
@@ -521,7 +521,7 @@ void fzfEqNaiveMatch(FzFResult *res, bool case_sensitive, FzFString *text,
         auto bp = bestPos;
         res.start = bp - M + 1;
         res.end = bp + 1;
-        res.score = fzfCalculateScore(case_sensitive,text,pattern,
+        res.score = fzfCalculateScore(caseSensitive,text,pattern,
                 res.start,res.end,null);
         insertRange(pos,res.start,res.end);
         return;
@@ -533,7 +533,7 @@ no_match:
     res.score = 0;
 }
 
-void fzfEqMatch(FzFResult *res, bool case_sensitive, FzFString *text,
+void fzfEqMatch(FzFResult *res, bool caseSensitive, FzFString *text,
         FzFString *pattern, Position *pos, FzFSlab *slab) {
     auto M = pattern.size;
     i64 trimmedLen,trimmedEndLen,start,end;
@@ -560,7 +560,7 @@ void fzfEqMatch(FzFResult *res, bool case_sensitive, FzFString *text,
     for (i64 i = 0; i < M; ++i) {
         pchar = pattern.data[i];
         c = text.data[trimmedLen+i];
-        if (!case_sensitive) { c = str.toLower(c); }
+        if (!caseSensitive) { c = str.toLower(c); }
         if (c != pchar) {
             match = false;
             break;
@@ -584,7 +584,7 @@ out:
     res.score = score;
 }
 
-void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
+void fzfFuzzyMatchV1(FzFResult *res, bool caseSensitive, FzFString *text,
         FzFString *pattern, Position *pos, FzFSlab *slab) {
     auto M = pattern.size;
     auto N = text.size;
@@ -593,7 +593,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
     if (M == 0) {
         return;
     }
-    if (asciiFuzzyIndex(text, pattern.data, M, case_sensitive) < 0) {
+    if (asciiFuzzyIndex(text, pattern.data, M, caseSensitive) < 0) {
         res.start = -1;
         res.end = -1;
         res.score = 0;
@@ -604,7 +604,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
 
     for (i64 idx = 0; idx < N; idx++) {
         u8 c = text.data[idx];
-        if (!case_sensitive) {
+        if (!caseSensitive) {
             c = str.toLower(c);
         }
         if (c == pattern.data[pidx]) {
@@ -625,7 +625,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
         pidx--;
         for (i64 idx = end - 1; idx >= start; idx--) {
             u8 c = text.data[idx];
-            if (!case_sensitive) {
+            if (!caseSensitive) {
                 c = str.toLower(c);
             }
             if (c == pattern.data[pidx]) {
@@ -637,7 +637,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
             }
         }
 
-        auto score = fzfCalculateScore(case_sensitive, text,
+        auto score = fzfCalculateScore(caseSensitive, text,
                 pattern, start, end, pos);
         res.start = start;
         res.end = end;
@@ -693,11 +693,11 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
 
         u8 *ogStr = text;
         u8 *lowerText = strTolower(text, len);
-        bool case_sensitive = caseMode == CASE_RESPECT ||
+        bool caseSensitive = caseMode == CASE_RESPECT ||
                                                  (caseMode == CASE_SMART && 
                                                     str.cmp(text, lowerText) != 0);
 
-        if (!case_sensitive) {
+        if (!caseSensitive) {
             if (text) {
                 mem.free(text);
             }
@@ -770,7 +770,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
             t.cb = cb;
             t.inv = inv;
             t.ptr = ogStr;
-            t.case_sensitive = case_sensitive;
+            t.caseSensitive = caseSensitive;
             t.text = textPtr;
 
             set.entries.append(t);
@@ -811,7 +811,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
         }
     }
 
-    patObj.only_inv = only;
+    patObj.onlyInv = only;
     if (patternCopy) {
         mem.free(patternCopy);
     }
@@ -855,13 +855,13 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     input.data = text;
     input.size = str.len(text);
 
-    if (pattern.only_inv) {
+    if (pattern.onlyInv) {
         i64 final = 0;
         for (auto it = entries.next; it != entries; it = it.next) {
             FzFTermSet *termSet = it.value;
             FzFTerm *term = termSet.entries.next.value;
             FzFResult res;
-            term.cb(&res,term.case_sensitive,&input,(FzFString *)term.text,null,slab);
+            term.cb(&res,term.caseSensitive,&input,(FzFString *)term.text,null,slab);
             final += res.score;
         }
         if (final > 0) {
@@ -881,7 +881,7 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
             auto fzfStr = (FzFString *)term.text;
 
             FzFResult res;
-            term.cb(&res,term.case_sensitive,&input,fzfStr,null,slab);
+            term.cb(&res,term.caseSensitive,&input,fzfStr,null,slab);
 
             if (res.start >= 0) {
                 if (term.inv) {
@@ -943,14 +943,14 @@ Position *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
             fzfStr = (FzFString *)term.text;
 
             if (term.inv) {
-                term.cb(&res,term.case_sensitive,&input,fzfStr,null,slab);
+                term.cb(&res,term.caseSensitive,&input,fzfStr,null,slab);
                 if (res.start < 0) {
                     matched = true;
                 }
                 continue;
             }
 
-            term.cb(&res,term.case_sensitive,&input,fzfStr,allPos,slab);
+            term.cb(&res,term.caseSensitive,&input,fzfStr,allPos,slab);
             if (res.start >= 0) {
                 matched = true;
                 break;
@@ -967,14 +967,14 @@ Position *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
 FzFSlab *fzfSlabNew(FzFSlabConfig *config) {
     FzFSlab *slab = mem.allocZero(sizeof(FzFSlab));
 
-    slab.v16.data = mem.allocZero(config.size_16 * sizeof(i16));
+    slab.v16.data = mem.allocZero(config.size16 * sizeof(i16));
 
-    slab.v16.cap = config.size_16;
+    slab.v16.cap = config.size16;
     slab.v16.size = 0;
     slab.v16.allocated = true;
 
-    slab.v32.data = mem.allocZero(config.size_32 * sizeof(i32));
-    slab.v32.cap = config.size_32;
+    slab.v32.data = mem.allocZero(config.size32 * sizeof(i32));
+    slab.v32.cap = config.size32;
     slab.v32.size = 0;
     slab.v32.allocated = true;
 
@@ -983,8 +983,8 @@ FzFSlab *fzfSlabNew(FzFSlabConfig *config) {
 
 FzFSlab *fzfDefaultSlab() {
     FzFSlabConfig config;
-    config.size_16 = (1<<10) * 100;
-    config.size_32 = 1<<11;
+    config.size16 = (1<<10) * 100;
+    config.size32 = 1<<11;
     return fzfSlabNew(&config);
 }
 
