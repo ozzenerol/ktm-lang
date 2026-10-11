@@ -69,21 +69,21 @@ bool errorOnlyEverywhere(u8 *name, u8 *bad, u8 *msg) {
     u8 *src;
     bool ok = true;
 
-    src = str.format("struct Foo { i64 a; };\n%sU0 main() { Foo f; f.a = 1; }\n", bad);
+    src = str.format("struct Foo { i64 a; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s after a class\n", name);
         ok = false;
     }
     mem.free(src);
 
-    src = str.format("union Foo { i64 a; u8 b; };\n%sU0 main() { Foo f; f.a = 1; }\n", bad);
+    src = str.format("union Foo { i64 a; u8 b; };\n%svoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s after a union\n", name);
         ok = false;
     }
     mem.free(src);
 
-    src = str.format("%sclass Foo { i64 a; };\nvoid main() { Foo f; f.a = 1; }\n", bad);
+    src = str.format("%sstruct Foo { i64 a; };\nvoid main() { Foo f; f.a = 1; }\n", bad);
     if (!compileFailsExactly(src, 1, msg)) {
         printf("Failed - %s with nothing before it\n", name);
         ok = false;
@@ -103,17 +103,17 @@ bool testElifBadCondition(void) {
 }
 
 bool testIfEmpty(void) {
-    return errorOnlyEverywhere("#if", "#if\nI64 y;\n#endif\n",
+    return errorOnlyEverywhere("#if", "#if\ni64 y;\n#endif\n",
                                                          "a #if must evaluate some expression");
 }
 
 bool testIfExtraToken(void) {
-    return errorOnlyEverywhere("#if 1 2", "#if 1 2\nI64 y;\n#endif\n",
+    return errorOnlyEverywhere("#if 1 2", "#if 1 2\ni64 y;\n#endif\n",
                                                          "#if: unexpected '2' after the condition");
 }
 
 bool testIfBadBackslash(void) {
-    return errorOnlyEverywhere("#if 1 \\ 2", "#if 1 \\ 2\nI64 y;\n#endif\n",
+    return errorOnlyEverywhere("#if 1 \\ 2", "#if 1 \\ 2\ni64 y;\n#endif\n",
                                                          "Invalid use of '\\' should be");
 }
 
@@ -140,7 +140,7 @@ bool testUndefBadSyntax(void) {
 
 /* `#undef` with nothing after it must not swallow the next line */
 bool testUndefNothing(void) {
-    return errorOnlyEverywhere("#undef", "#undef\nI64 y;\n",
+    return errorOnlyEverywhere("#undef", "#undef\ni64 y;\n",
                                                          "Syntax is: #undef <TK_IDENT>");
 }
 

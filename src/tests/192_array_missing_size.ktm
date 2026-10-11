@@ -50,7 +50,7 @@ i32 main() {
 
     /* A global, a class field and a parameter */
     tests++;
-    if (failsWith("i64 g[;\nI64 h;\n", WANT_BRACKET, "arrsize.ktm:1:7")) {
+    if (failsWith("i64 g[;\ni64 h;\n", WANT_BRACKET, "arrsize.ktm:1:7")) {
         correct++;
     } else { printf("Failed - global\n"); }
     tests++;

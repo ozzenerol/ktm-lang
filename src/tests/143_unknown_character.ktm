@@ -82,7 +82,7 @@ bool testBacktick(void) {
 
 bool testDollarAt(void) {
     return compile(
-"void Main() {
+"void main() {
   $
     @
 }

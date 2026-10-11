@@ -104,7 +104,7 @@ void main() { printf(\"hi\\n\"); }
 bool testQuotedCommentMarkers(void) {
     return compile(
 "#error \"// not\" '/*' a comment
-void Main() { \"hi\\n\"; }
+void main() { printf(\"hi\\n\"); }
 ", 1, "error: \"// not\" '/*' a comment\n");
 }
 

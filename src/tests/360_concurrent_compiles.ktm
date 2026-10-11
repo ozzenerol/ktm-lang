@@ -22,7 +22,7 @@ u8 *programSource(i64 id) {
     for (i = 0; i < CC_FUNCS; i++) {
         src = str.appendFormatLen(src, &len, "  s += Fn%d(1);\n", i);
     }
-    src = str.appendFormatLen(src, &len, "  \"prog %d %%d\\n\", s;\n}\n", id);
+    src = str.appendFormatLen(src, &len, "  printf(\"prog %d %%d\\n\", s);\n}\n", id);
     return src;
 }
 

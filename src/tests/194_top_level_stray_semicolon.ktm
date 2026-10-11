@@ -82,9 +82,9 @@ i32 main() {
         correct++;
                             } else { printf("Failed - leading ; and };;\n"); }
 
-    /* Top level statements (scripting) after stray `;`s */
+    /* Statements after stray `;`s */
     tests++;
-    if (runSemi("i64 x = 3;;\n;\n\"%d\\n\", x;;\n", SEMI_JIT, 0, "3\n")) {
+    if (runSemi("i64 x = 3;;\n;\nvoid main() { printf(\"%d\\n\", x);; }\n", SEMI_JIT, 0, "3\n")) {
         correct++;
     } else { printf("Failed - top level statements\n"); }
 
@@ -96,7 +96,7 @@ i32 main() {
 
     /* A missing declarator after `,` is still an error */
     tests++;
-    if (runSemi("i64 a, ;\nI64 b;\n", SEMI_AOT, 1, "Identifier expected", true)) {
+    if (runSemi("i64 a, ;\ni64 b;\n", SEMI_AOT, 1, "Identifier expected", true)) {
         correct++;
     } else { printf("Failed - i64 a, ;\n"); }
 

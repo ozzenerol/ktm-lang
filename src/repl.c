@@ -656,15 +656,15 @@ static void replBuiltinReplDel(char *name) {
  * type-check like any other function (and show up in completion and
  * hints). The implementations are registered via ktmJitDefineSymbol. */
 static const char repl_builtin_protos[] =
-    "extern \"c\" U0 Uf(U8 *fname);\n"
-    "extern \"c\" U0 ReplReloadRc();\n"
-    "extern \"c\" U0 ReplListFn();\n"
-    "extern \"c\" U0 ReplFindFn(U8 *name);\n"
-    "extern \"c\" U0 ReplListGVars();\n"
-    "extern \"c\" U0 ReplClassRep(U8 *name);\n"
-    "extern \"c\" U0 ReplEval(U8 *code);\n"
-    "extern \"c\" U0 ReplDel(U8 *name);\n"
-    "extern \"c\" U0 ReplHeap();\n";
+    "extern \"c\" void Uf(u8 *fname);\n"
+    "extern \"c\" void ReplReloadRc();\n"
+    "extern \"c\" void ReplListFn();\n"
+    "extern \"c\" void ReplFindFn(u8 *name);\n"
+    "extern \"c\" void ReplListGVars();\n"
+    "extern \"c\" void ReplClassRep(u8 *name);\n"
+    "extern \"c\" void ReplEval(u8 *code);\n"
+    "extern \"c\" void ReplDel(u8 *name);\n"
+    "extern \"c\" void ReplHeap();\n";
 
 /* ---------------- tab completion ---------------- */
 

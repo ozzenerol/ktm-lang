@@ -56,7 +56,7 @@ bool compileFailsAt(u8 *source, u8 *msg, u8 *loc, u8 *excerpt, u8 *caret) {
 bool testDefineAlone(void) {
     return compileFailsAt(
 "#define X (zz+1)
-void Main() {}
+void main() {}
 ",
         "#define X: the value must be a constant expression or a string, made of literals and other macros",
         "1:11", "#define X (zz+1)", "              ^^^^^^\n");
@@ -76,7 +76,7 @@ void main() {}
 bool testDefineNotNumeric(void) {
     return compileFailsAt(
 "#define X zz
-void Main() {}
+void main() {}
 ",
         "Error while parsing #define X; #define must be a numerical expression or a string",
         "1:11", "#define X zz", "              ^^\n");
@@ -85,7 +85,7 @@ void Main() {}
 bool testDefineNothing(void) {
     return compileFailsAt(
 "#define
-void Main() {}
+void main() {}
 ",
         "Syntax is: #define <TK_IDENT> <value> got nothing",
         "1:1", "#define", "    ^^^^^^^\n");
@@ -107,7 +107,7 @@ bool testElifCondition(void) {
 "#if 0
 #elif (1+
 #endif
-void Main() {}
+void main() {}
 ",
         "#elif: the condition must be a constant expression made of literals, macros and defined()",
         "2:7", "#elif (1+", "          ^^^\n");
@@ -117,7 +117,7 @@ bool testIfExtraToken(void) {
     return compileFailsAt(
 "#if 1 2
 #endif
-void Main() {}
+void main() {}
 ",
         "#if: unexpected '2' after the condition",
         "1:7", "#if 1 2", "          ^\n");
@@ -127,7 +127,7 @@ bool testIfEmpty(void) {
     return compileFailsAt(
 "#if
 #endif
-void Main() {}
+void main() {}
 ",
         "a #if must evaluate some expression",
         "1:1", "#if", "    ^^^\n");
@@ -148,7 +148,7 @@ i64 y;
 bool testUnknownDirective(void) {
     return compileFailsAt(
 "#foo bar
-void Main() {}
+void main() {}
 ",
         "invalid preprocessor directive '#foo'", "1:1", "#foo bar", "    ^^^^\n");
 }
@@ -156,7 +156,7 @@ void Main() {}
 bool testIncludeSyntax(void) {
     return compileFailsAt(
 "#include 42
-void Main() {}
+void main() {}
 ",
         "Syntax is: #include \"<value>\" got: TK_I64        42",
         "1:10", "#include 42", null);
@@ -166,7 +166,7 @@ void Main() {}
 bool testUndefNothing(void) {
     return compileFailsAt(
 "#undef
-void Main() {}
+void main() {}
 ",
         "Syntax is: #undef <TK_IDENT>", "1:1", "#undef", "    ^^^^^^\n");
 }

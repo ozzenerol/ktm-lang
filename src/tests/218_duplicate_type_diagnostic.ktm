@@ -64,7 +64,7 @@ i32 main() {
                          } else { printf("Failed - y += p\n"); }
 
     tests++;
-    if (prints(CLS "P gp;\nI64 gz = gp;\n", 1, 0, "`i64 = P` is invalid")) {
+    if (prints(CLS "P gp;\ni64 gz = gp;\n", 1, 0, "`i64 = P` is invalid")) {
         correct++;
     } else { printf("Failed - global initialiser\n"); }
 

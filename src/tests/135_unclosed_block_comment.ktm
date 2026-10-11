@@ -121,7 +121,7 @@ bool testUnclosedInIfZero(void) {
 "#if 0
 /* never closed
 #endif
-void Main() { \"hi\\n\"; }
+void main() { printf(\"hi\\n\"); }
 ", null, 2, COMMENT_FILE ":2:1");
 }
 

@@ -88,7 +88,7 @@ i32 main() {
                                 "in `if (...)`")) { correct++; }
     else { printf("Failed - stray } before class\n"); }
     tests++;
-    if (failsWith("}\nclass Z;\n", "Identifier expected")) { correct++; }
+    if (failsWith("}\nstruct Z;\n", "Identifier expected")) { correct++; }
     else { printf("Failed - } class\n"); }
 
     test.printResult(correct, tests);

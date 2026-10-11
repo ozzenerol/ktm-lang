@@ -4480,6 +4480,10 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
      * initialiser driver treat it as the entry, and `main` is kept as
      * a second name for calls. */
     int is_lower_main = len == 4 && !memcmp(fname, "main", 4);
+    if (len == 4 && !memcmp(fname, "Main", 4) && !(cc->flags & CCTRL_REPL)) {
+        cctrlErrorAt(cc, name_tok_line, name_tok_col, 4,
+                     "`Main` is the old entry point: write `main`");
+    }
     if (is_lower_main) {
         Ast *other = mapGetLen(cc->global_env, "Main", 4);
         if (other && other->kind == AST_FUNC) {
@@ -5781,6 +5785,9 @@ void parseToAst(Cctrl *cc) {
             continue;
         }
 
+        Lexeme *item_first = cctrlTokenPeek(cc);
+        s64 item_line = item_first ? item_first->line : 0;
+        s64 item_col = item_first ? item_first->col : 0;
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
         if (ast == NULL) break;
@@ -5802,6 +5809,15 @@ void parseToAst(Cctrl *cc) {
                     "a statement at the top of a module built with -lib would never run "
                     "(its library has no code that runs before main)");
             }
+        }
+        /* The old file-scope code (ktm syntax v0.2 has none): a statement
+         * there, not a global's initialiser; the REPL's input is that */
+        if (is_global && !(cc->flags & CCTRL_REPL) &&
+            !(ast->kind == AST_BINOP && ast->left && ast->left->kind == AST_GVAR) &&
+            ast->kind != AST_DECL) {
+            cctrlErrorAt(cc, item_line ? item_line : ast->line,
+                item_line ? item_col : ast->col, 1,
+                "code at file scope: put it in `main` (only declarations go there)");
         }
         if (is_global) {
             listAppend(cc->initalisers,ast);

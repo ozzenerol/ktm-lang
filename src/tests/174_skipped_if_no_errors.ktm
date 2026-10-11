@@ -68,19 +68,19 @@ i32 main() {
     if (liveCodeReports("i64 x = 0b12;\nvoid main() {}\n",
                                             "malformed numeric literal")) { correct++; }
     tests++;
-    if (liveCodeReports("#foo\nU0 Main() {}\n",
+    if (liveCodeReports("#foo\nvoid main() {}\n",
                                             "invalid preprocessor directive '#foo'")) { correct++; }
     tests++;
     if (liveCodeReports("i64 c = 'abcdefghij';\nvoid main() {}\n",
                                             "a character literal holds one character")) { correct++; }
     /* a skipped group still has to end */
     tests++;
-    if (liveCodeReports("#if 0\ndon't\nU0 Main() {}\n", "Unterminated #if")) {
+    if (liveCodeReports("#if 0\ndon't\nvoid main() {}\n", "Unterminated #if")) {
         correct++;
     }
     /* and #elif conditions read after skipped text are still checked */
     tests++;
-    if (liveCodeReports("#if 0\n0b2\n#elif (1 +\n#endif\nU0 Main() {}\n",
+    if (liveCodeReports("#if 0\n0b2\n#elif (1 +\n#endif\nvoid main() {}\n",
                                             "#elif")) { correct++; }
 
     test.printResult(correct, tests);

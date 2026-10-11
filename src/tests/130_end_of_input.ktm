@@ -63,28 +63,28 @@ i32 main() {
         "i64 g[3] =",
         "extern",
         "struct B {i64 x;}; struct C1 :",
-        "class N { i64 (*",
+        "struct N { i64 (*",
         /* After a type */
         "i64",
         "static i64 *",
-        "void Main() { i64",
-        "void Main() { i64 *",
+        "void main() { i64",
+        "void main() { i64 *",
         /* Statements */
-        "void Main() { for (i64",
+        "void main() { for (i64",
         "void main() { i64 i; for (i = 0; i",
-        "void Main() { if (1) {} else",
-        "void Main() { do {}",
-        "void Main() { \"%s\", typeof",
+        "void main() { if (1) {} else",
+        "void main() { do {}",
+        "void main() { printf(\"%s\", typeof",
         "void F() { static u8",
         "inline",
         "inline i64",
         /* Calls */
         "i64 F(i64 a) { return a; } void main() { F(",
-        "void Main() { \"%d\", 1,",
+        "void main() { \"%d\", 1,",
         /* Classes and initialisers */
-        "class U { union",
+        "struct U { union",
         "struct P { i64 a; i64 b; }; P p = {1, 2",
-        "void Main() { i64 a[2] = {{1}, {2"
+        "void main() { i64 a[2] = {{1}, {2"
     };
     i64 i, n = sizeof(cases) / sizeof(cases[0]);
 
@@ -96,7 +96,7 @@ i32 main() {
 
     /* A string literal or #include path cut off by the end of input */
     tests++;
-    if (compileFailsAtEnd("void Main() { \"abc", "Unterminated string")) { correct++; }
+    if (compileFailsAtEnd("void main() { \"abc", "Unterminated string")) { correct++; }
     else { printf("Failed - unterminated string\n"); }
 
     tests++;

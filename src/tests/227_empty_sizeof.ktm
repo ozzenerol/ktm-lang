@@ -68,7 +68,7 @@ i32 main() {
                              "`alignof` needs a type or an expression",
                              "227-sz.ktm:1:32\n")) { correct++; }
     tests++;
-    if (rejected("void Main() { i64 x = sizeof(", "Unexpected end of input",
+    if (rejected("void main() { i64 x = sizeof(", "Unexpected end of input",
                              "227-sz.ktm:1")) { correct++; }
     /* Recovery goes on to the next error */
     tests++;

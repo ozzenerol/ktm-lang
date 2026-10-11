@@ -832,11 +832,10 @@ int ktmJitRunMain(KtmJit *jit, int argc, char **argv) {
     union JitMainFunction entry;
     entry.obj = ktmJitLookup(jit, "main");
     if (!entry.obj) entry.obj = ktmJitLookup(jit, "_main");
-    /* No Main and no statements at file scope for a synthetic main:
-     * say so, rather than exiting 255 with nothing printed. */
+    /* No main: say so, rather than exiting 255 with nothing printed. */
     if (!entry.obj) {
-        fprintf(stderr, "ktm: %s: nothing to run: no Main function and "
-                "no code at file scope\n", argc > 0 ? argv[0] : "-jit");
+        fprintf(stderr, "ktm: %s: nothing to run: no main function\n",
+                argc > 0 ? argv[0] : "-jit");
         return 1;
     }
     return entry.main_fn(argc, argv);

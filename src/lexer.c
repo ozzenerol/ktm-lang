@@ -1666,6 +1666,30 @@ static void lexUnknownChar(Lexer *l, char *start, char ch) {
     }
 }
 
+/* The old syntax's spellings (ktm syntax v0.2 replaced them): each use
+ * is an error naming the new one, and the token is lexed as before so
+ * the parse goes on (one error per use, no cascade). Quiet where the
+ * lexer only re-reads: the diagnostic renderer, skipped #if text and a
+ * module's names and declarations passes. */
+static void lexOldSpelling(Lexer *l, Lexeme *le) {
+    static const char *old_new[][2] = {
+        {"U0", "void"}, {"Bool", "bool"}, {"I8", "i8"}, {"U8", "u8"},
+        {"I16", "i16"}, {"U16", "u16"}, {"I32", "i32"}, {"U32", "u32"},
+        {"I64", "i64"}, {"U64", "u64"}, {"F32", "f32"}, {"F64", "f64"},
+        {"class", "struct"}, {"public", "pub"},
+    };
+    if (l->flags & (CCF_PERMISSIVE|CCF_COND_SKIP)) return;
+    if (l->cur_file && LEX_PASS_QUIET(l->cur_file->mod_pass)) return;
+    for (u64 i = 0; i < sizeof(old_new) / sizeof(old_new[0]); ++i) {
+        if ((int)strlen(old_new[i][0]) == le->len &&
+            !memcmp(old_new[i][0], le->start, le->len)) {
+            lexReport(l, "`%s` is the old spelling: write `%s`",
+                      old_new[i][0], old_new[i][1]);
+            return;
+        }
+    }
+}
+
 static int lexCore(Lexer *l, Lexeme *le) {
     char ch, *start;
     int tk_type;
@@ -2058,6 +2082,7 @@ static int lexCore(Lexer *l, Lexeme *le) {
                         le->i64 = type->kind;
                         type = NULL;
                     }
+                    lexOldSpelling(l, le);
                     return 1;
                 }
                 lexUnknownChar(l, start, ch);

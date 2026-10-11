@@ -1,9 +1,10 @@
 import fs, libc, proc, str, test;
 
 /* ktm syntax v0.2: void i8 u8 i16 u16 i32 u32 i64 u64 f32 f64 bool are
- * the built-in types (the old names void i8 ... f64 bool still work and are
- * the same types). They are type names, not keywords: a struct field can
- * still be called i64. typeof and diagnostics print the new names. */
+ * the built-in types. They are type names, not keywords: a struct field
+ * can still be called i64. typeof and diagnostics print them. The old
+ * spellings (U0 I8 ... F64 Bool, class, public) are errors that name the
+ * new one. */
 
 struct Mix {
     i8 a;
@@ -98,6 +99,19 @@ i32 main() {
     u8 *out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -jit __400_warn.ktm 2>&1");
     if (out && libc.strstr(out, "of type 'i64' expected 'void'")) { correct++; }
     else { printf("\n  diagnostic names: [%s]\n", out); }
+
+    tests++;   /* the old spellings, one error each */
+    src = "class P { I64 x; };\npublic U0 F(Bool b) { }\nvoid main() { }\n";
+    fs.writeAll("__400_warn.ktm", src, str.len(src));
+    out = proc.shellOutput("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} -S -o /dev/null __400_warn.ktm 2>&1");
+    if (out && libc.strstr(out, "`class` is the old spelling: write `struct`") &&
+        libc.strstr(out, "`I64` is the old spelling: write `i64`") &&
+        libc.strstr(out, "`public` is the old spelling: write `pub`") &&
+        libc.strstr(out, "`U0` is the old spelling: write `void`") &&
+        libc.strstr(out, "`Bool` is the old spelling: write `bool`") &&
+        !libc.strstr(out, "has not been")) { correct++; }
+    else { printf("\n  old spellings: [%s]\n", out); }
+    fs.remove("__400_warn.ktm");
 
     proc.shell("rm -rf __400_*");   /* the files this test wrote */
     test.printResult(correct, tests);
