@@ -2546,6 +2546,7 @@ Lexeme *lexDefine(Map *macro_defs, Lexer *l) {
             if (!ast && start->tk_type == TK_STR) {
                 expanded->start = strndup(start->start,start->len);
                 expanded->len = start->len;
+                expanded->i64 = start->i64;     /* its decoded length */
             } else if (ast && ast->kind != TK_STR && ast->kind != AST_STRING) {
                 lexReportAt(l, def_line, err_col, err_len,
                             "#define %s expected string but got: %s",
@@ -2556,6 +2557,10 @@ Lexeme *lexDefine(Map *macro_defs, Lexer *l) {
                 /* Copy as we will free the AST which will free the string*/
                 expanded->start = strndup(ast->sval->data,ast->sval->len);
                 expanded->len = ast->sval->len;
+                /* the decoded length (NUL included) a string token carries,
+                 * which `u8[]` conversions use: it was left 0, so
+                 * `#define APP PREFIX "/app"` made a slice too short */
+                expanded->i64 = ast->real_len;
             } else {
                 lexReportAt(l, def_line, err_col, err_len,
                             "failed to parse #define %s", ident->data);
