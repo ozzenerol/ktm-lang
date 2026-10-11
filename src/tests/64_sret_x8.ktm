@@ -35,7 +35,7 @@ void main() {
                  "struct T { u32 id; i32 w, h, mip, fmt; };\n"
                  "struct B { i64 a, b, c; };\n"
                  "extern \"c\" T CMakeTex(i32 seed);\n"
-                 "extern \"c\" i64 CCallsBack(void *fn);\n"
+                 "extern \"c\" i64 CCallsBack(void *f);\n"
                  "B HcMakeBig(i64 n) { B b; b.a = n; b.b = n * 2; b.c = n * 3; return b; }\n"
                  "i32 main() {\n"
                  "  T t = CMakeTex(8);\n"

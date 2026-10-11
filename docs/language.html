@@ -477,8 +477,7 @@ one (starting from 0), and <code>switch [x]</code> skips the range check on
 runs on into the next case. It is an error anywhere else: outside a switch, before other
 statements of its case, under an <code>if</code> or a loop, in the last case where there
 is no next one, and into or out of a <code>default</code> that isn't the last label
-(<code>default</code> runs after the cases). A variable called <code>fallthrough</code>
-still works.</p>
+(<code>default</code> runs after the cases). <code>fallthrough</code> is a keyword.</p>
 <pre data-run><code>void main()
 {
   for (i64 i = 1; i &lt;= 3; i++) {
@@ -867,10 +866,9 @@ i32 main()
 </code></pre>
 <pre class="output">yz 11 3 3 b
 </pre>
-<p><code>fn</code> is a contextual keyword: old code that uses it as a plain identifier
-(<code>fn(x)</code>, <code>fn = &amp;f</code>) keeps working, since a bare <code>fn</code> only
-starts a type where a type can start and only when a real parameter list and a return type
-follow it. The old C declarator form (<code>i64 (*)(i64)</code>, an array of them, a function
+<p><code>fn</code> is a keyword, like <code>self</code>, <code>module</code>,
+<code>import</code> and <code>fallthrough</code>: none of them can name a variable, a
+parameter or a declaration. The old C declarator form (<code>i64 (*)(i64)</code>, an array of them, a function
 returning one, a pointer to one) is documented above and keeps working; it is converted to
 <code>fn(...)</code> everywhere in a later pass.</p>
 

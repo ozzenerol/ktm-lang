@@ -69,9 +69,29 @@ AstType *parsePointerType(Cctrl *cc, AstType *type) {
     return type;
 }
 
-/* `fn` is a contextual keyword (ktm syntax v0.2): used as a plain
- * identifier in old code (`U0 (*fn)(...)`, `fn(x)`, `fn = &f`), so it
- * is never registered as a type name. Is `tok` the identifier `fn`? */
+/* Words that are keywords though the lexer gives them as identifiers
+ * (they mean something only where the parser looks for them): none of
+ * them can name a variable, parameter or declaration */
+int parseIsReservedName(char *s, int len) {
+    static const char *words[] = {"fn", "self", "module", "import", "fallthrough"};
+    for (u64 i = 0; i < sizeof(words) / sizeof(words[0]); ++i) {
+        if ((int)strlen(words[i]) == len && !memcmp(words[i], s, len)) return 1;
+    }
+    return 0;
+}
+
+/* `tok`, about to name something, isn't one of those keywords: 1 (and
+ * reported) when it is */
+int parseCheckNotReserved(Cctrl *cc, Lexeme *tok) {
+    if (tok && tok->tk_type == TK_IDENT && parseIsReservedName(tok->start, tok->len)) {
+        cctrlErrorAt(cc, tok->line, tok->col, tok->len,
+                     "`%.*s` is a keyword: it can't be a name", tok->len, tok->start);
+        return 1;
+    }
+    return 0;
+}
+
+/* `fn`, a keyword the lexer gives as an identifier: is `tok` it? */
 int tokenIsFnIdent(Lexeme *tok) {
     return tok && tok->tk_type == TK_IDENT && tok->len == 2 &&
            tok->start[0] == 'f' && tok->start[1] == 'n';
@@ -83,78 +103,23 @@ int tokenMayStartFnType(Lexeme *tok) {
     return tokenIsFnIdent(tok) || tokenPunctIs(tok,'(');
 }
 
-/* Does the current, unconsumed `fn` (just peeked, not gotten) start a
- * type here? So does a `(` directly followed by such an `fn`. Only
- * when followed by `(` and a parameter list that is empty, `...` or
- * `...name` only, or starts with a type name, and (when the list is
- * empty or `...`/`...name` only, where the closing `)` is right there
- * to check) a type follows the `)`. A non-empty list starting with a
- * real type is never ambiguous with a call (`fn(x)` with a plain
- * argument `x` is not a type name), so that case does not need to
- * look past its `)`. Gets a handful of tokens and rewinds them all;
- * never consumes. */
+/* Does the current, unconsumed token start an fn type: `fn`, or the `(`
+ * of `(fn(...) R)`? `fn` is a keyword, so it always does. Never
+ * consumes. */
 int parseFnStartsType(Cctrl *cc) {
-    int n = 0, result = 0;
-    Lexeme *tok;
-
-    tok = cctrlTokenGet(cc); n++; /* `fn`, or the `(` of `(fn(...) R)` */
-    if (tokenPunctIs(tok,'(')) {
-        tok = cctrlTokenGet(cc); n++;
-        if (!tokenIsFnIdent(tok)) {
-            while (n-- > 0) cctrlTokenRewind(cc);
-            return 0;
-        }
-    }
-    tok = cctrlTokenGet(cc); n++; /* expect `(` */
-    if (tokenPunctIs(tok,'(')) {
-        Lexeme *first = cctrlTokenGet(cc); n++;
-        if (tokenPunctIs(first,')')) {
-            Lexeme *after = cctrlTokenPeek(cc);
-            result = after && (cctrlTokIsKeyword(cc, after) ||
-                                tokenIsFnIdent(after));
-        } else if (tokenPunctIs(first,TK_ELLIPSIS)) {
-            Lexeme *close = cctrlTokenGet(cc); n++;
-            /* `...name`, the named untyped form */
-            if (close && close->tk_type == TK_IDENT) {
-                close = cctrlTokenGet(cc); n++;
-            }
-            if (tokenPunctIs(close,')')) {
-                Lexeme *after = cctrlTokenPeek(cc);
-                result = after && (cctrlTokIsKeyword(cc, after) ||
-                                    tokenIsFnIdent(after));
-            }
-        } else if (first && (cctrlTokIsKeyword(cc, first) ||
-                              tokenIsFnIdent(first))) {
-            /* `Name.member` (an enum member, ktm syntax v0.2's Y6) is an
-             * expression, not a type: `fn(Color.blue)` is a call through
-             * a variable named `fn`, not a one-parameter type. */
-            Lexeme *after_first = cctrlTokenPeek(cc);
-            result = !tokenPunctIs(after_first,'.');
-        }
-    }
-    while (n-- > 0) cctrlTokenRewind(cc);
+    Lexeme *tok = cctrlTokenPeek(cc);
+    if (tokenIsFnIdent(tok)) return 1;
+    if (!tokenPunctIs(tok, '(')) return 0;
+    cctrlTokenGet(cc);
+    int result = tokenIsFnIdent(cctrlTokenPeek(cc));
+    cctrlTokenRewind(cc);
     return result;
 }
 
-/* At a declaration/expression-statement fork, should `fn` here be routed
- * to the declaration side at all, so a malformed one (`fn i64 x;`, a
- * missing `(`) gets parseBaseDeclSpec's precise error instead of being
- * read as the expression `fn` followed by a stray `i64`? True for a
- * real `fn(...)` type, or for `fn` directly followed by a type name
- * (whichever it is, that can never continue a valid expression). */
+/* At a declaration/expression-statement fork, `fn` goes to the
+ * declaration side (a malformed one gets parseBaseDeclSpec's error) */
 int parseFnLooksLikeType(Cctrl *cc) {
-    if (parseFnStartsType(cc)) {
-        return 1;
-    }
-    if (!tokenIsFnIdent(cctrlTokenPeek(cc))) {
-        return 0;
-    }
-    cctrlTokenGet(cc); /* `fn` */
-    Lexeme *after = cctrlTokenPeek(cc);
-    int looks_like_type = after && (cctrlTokIsKeyword(cc, after) ||
-                                     tokenIsFnIdent(after));
-    cctrlTokenRewind(cc);
-    return looks_like_type;
+    return parseFnStartsType(cc);
 }
 
 static int parseIsVarArgElemType(AstType *t);
@@ -595,7 +560,11 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         if (type->kind == AST_TYPE_ARRAY) {
             type = astMakePointerType(type->ptr);
         }
-        var = astLVar(type,pname->start,pname->len);
+        /* (a keyword as the name: reported, and the parameter nameless,
+         * so a method's `self` isn't "declared twice" as well) */
+        var = parseCheckNotReserved(cc, pname)
+            ? astLVar(type,"_unknown",7)
+            : astLVar(type,pname->start,pname->len);
         /* Anchor the param to its name token (astNew stamped whatever
          * token the parser had just consumed). */
         var->line = pname->line;

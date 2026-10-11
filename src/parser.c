@@ -3046,19 +3046,13 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     return switch_ast;
 }
 
-/* `fallthrough;` (ktm syntax v0.2), a contextual keyword: a variable
- * of that name in scope, or no `;` after it, keeps it an identifier */
+/* `fallthrough`, a keyword the lexer gives as an identifier (no
+ * variable can have its name, see parseCheckNotReserved) */
 static int parseIsFallthrough(Cctrl *cc, Lexeme *tok, Lexeme *peek) {
-    if (tok->tk_type != TK_IDENT || tok->len != 11 ||
-        memcmp(tok->start, "fallthrough", 11) != 0 ||
-        !tokenPunctIs(peek, ';')) {
-        return 0;
-    }
-    if ((cc->localenv && mapGetLen(cc->localenv, tok->start, tok->len)) ||
-        mapGetLen(cc->global_env, tok->start, tok->len)) {
-        return 0;
-    }
-    return 1;
+    (void)cc;
+    (void)peek;
+    return tok->tk_type == TK_IDENT && tok->len == 11 &&
+           memcmp(tok->start, "fallthrough", 11) == 0;
 }
 
 /* A case of a switch says it goes on into the next one (Y8: otherwise it
@@ -3448,6 +3442,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                                 peek->len, peek->start, astTypeToString(next_type));
                         break;
                     }
+                    parseCheckNotReserved(cc, varname);
                     type = parseArrayDimensions(cc,next_type);
                     var = astLVar(type,varname->start,varname->len);
                     var->line = varname->line;
@@ -5345,6 +5340,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         /* End of input after the type, `I64` or `static I64 *`. */
         name = cctrlTokenGetRequired(cc);
         cctrlCheckPrefixHidden(cc, name);
+        parseCheckNotReserved(cc, name);
         /* `T User.name(...)`: a method */
         if (type && name->tk_type == TK_IDENT &&
             tokenPunctIs(cctrlTokenPeek(cc), '.'))
