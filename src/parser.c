@@ -4803,7 +4803,14 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
         mine = mine && path && (int)path->len == mod_len &&
                !memcmp(path->data, cls->clsname->data, mod_len);
     } else {
-        mine = mine && !path;
+        /* a program's struct, or the prelude's (its names have no module
+         * part), from the prelude itself */
+        mine = mine && (!path || cctrlInPrelude(cc));
+    }
+    /* the prelude's String: its methods are module str's */
+    if (!dot && astTypeIsString(cls) && path && path->len == 3 &&
+        !memcmp(path->data, "str", 3)) {
+        mine = 1;
     }
     /* (reported once, by a module's full pass) */
     if (!mine && !cc->decls_only) {

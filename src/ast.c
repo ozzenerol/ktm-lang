@@ -826,10 +826,20 @@ int astTypeIsSlice(AstType *type) {
     return type && type->kind == AST_TYPE_CLASS && type->is_slice;
 }
 
-/* A slice, or a struct, union or array with one in it */
+/* The prelude's String: {u8 *ptr; i64 len; i64 cap;}, owning ptr */
+int astTypeIsString(AstType *type) {
+    return type && type->kind == AST_TYPE_CLASS && !type->is_intrinsic &&
+           type->clsname && type->clsname->len == 6 &&
+           !memcmp(type->clsname->data, "String", 6) && type->fields &&
+           mapGetLen(type->fields, str_lit("cap"));
+}
+
+/* A slice or a String, or a struct, union or array with one in it: what
+ * a local starts empty without an initialiser (zeroed), since its len
+ * (and a String's ptr) guard its use */
 int astTypeHasSlice(AstType *type) {
     if (!type) return 0;
-    if (astTypeIsSlice(type)) return 1;
+    if (astTypeIsSlice(type) || astTypeIsString(type)) return 1;
     if (type->kind == AST_TYPE_ARRAY) return astTypeHasSlice(type->ptr);
     if ((type->kind == AST_TYPE_CLASS || type->kind == AST_TYPE_UNION) &&
         !type->is_intrinsic && type->fields) {

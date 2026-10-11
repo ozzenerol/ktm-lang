@@ -187,7 +187,7 @@ i32 main() {
                         "argument 2 of `S`: expected i64, got u8[2]")) { correct++; }
     tests++;
     if (fails("i64 S(i64 ...n) { return 0; }\ni64 G(f64 ...m) { return S(...m); }\n",
-                        "cannot spread `...m` (f64) into `S`, whose extra arguments are i64")) { correct++; }
+                        "cannot spread a f64[] into `S`, whose extra arguments are i64")) { correct++; }
     tests++;
     if (fails("i64 S(i64 ...n) { n = null; return 0; }\n",
                         "cannot assign to the variadic parameter 'n'")) { correct++; }

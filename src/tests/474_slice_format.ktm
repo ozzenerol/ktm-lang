@@ -52,10 +52,10 @@ i32 main() {
     u8 *out = run("printf(\"[%s|%4s]\", s, s[1:]);");
     check(out && !str.cmp(out, "[abc|  bc]"), "printf");
     out = run("u8 *f = \"%s\";\n    printf(f, s);");
-    check(out && libc.strstr(out, "error: a slice passed to `printf` needs a literal format"),
+    check(out && libc.strstr(out, "error: a slice or a String passed to `printf` needs a literal format"),
           "a computed format");
     out = run("printf(\"%d\", s);");
-    check(out && libc.strstr(out, "error: a u8[] passed to `printf` is printed by a `%s`"),
+    check(out && libc.strstr(out, "error: a u8[] passed to `printf` is printed by a `%s` (a u8[] or a String only)"),
           "another conversion");
     out = run("printf(\"%.2s\", s);");
     check(out && libc.strstr(out, "can't have a precision"), "a precision");

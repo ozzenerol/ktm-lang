@@ -637,6 +637,7 @@ Ast *astVaPack(Ast *array, Vec *items, int untyped);
 AstType *astMakeSliceType(AstType *elem);
 int astTypeIsSlice(AstType *type);
 int astTypeHasSlice(AstType *type);
+int astTypeIsString(AstType *type);
 Ast *astSliceMake(Ast *var, Ast *ptr, Ast *len);
 Ast *astSliceElem(Ast *base, Ast *index, Ast *file, int line);
 Ast *astSubSlice(Ast *var, Ast *base, Ast *lo, Ast *hi, Ast *file, int line);

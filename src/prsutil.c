@@ -647,6 +647,16 @@ void parseRaiseNotLValue(Cctrl *cc, Ast *ast) {
 void assertNotConstAssign(Cctrl *cc, Ast *ast) {
     /* `s.len = n`: a slice's fields are set together, by assigning a
      * whole slice */
+    /* a String's too, but to its own methods (module str's) */
+    if (ast->kind == AST_CLASS_REF && ast->cls && ast->cls->type &&
+        astTypeIsString(ast->cls->type)) {
+        AoStr *path = cctrlModulePath(cc, cc->cur_module);
+        if (!path || path->len != 3 || memcmp(path->data, "str", 3)) {
+            cctrlRewindUntilStrMatch(cc, ast->field, strlen(ast->field), NULL);
+            cctrlRaiseException(cc, "a String's `.%s` is read-only: change it with "
+                                "its methods", ast->field);
+        }
+    }
     if (ast->kind == AST_CLASS_REF && ast->cls && ast->cls->type &&
         astTypeIsSlice(ast->cls->type)) {
         cctrlRewindUntilStrMatch(cc, ast->field, strlen(ast->field), NULL);
