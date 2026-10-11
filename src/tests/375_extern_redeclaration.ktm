@@ -1,11 +1,10 @@
 import fs, libc, mem, proc, str, test;
 
-/* A definition or prototype that doesn't match the standard library's
- * declaration is an error ("conflicting types"), but the check didn't
- * see `_extern _LABEL T Name(...)` bindings: on x86_64 `i64 Exit(i64 x)`
- * silently replaced the library's `void Exit(i64)`, while on arm64 (where
- * Exit is a plain prototype) the same file was rejected. Now both give
- * the same error. */
+/* `i64 Exit(i64 x)` in a program silently replaced the library's
+ * `_extern` bound Exit on x86_64 and was rejected on arm64. With the
+ * library in modules a program's exit, alloc and toLower are its own
+ * functions on every architecture, next to os.exit, mem.alloc and
+ * str.toLower (asm bindings included). */
 
 #define REDECL_FILE "__375_redecl.ktm"
 #define REDECL_OUT  "__375_redecl.out"
@@ -46,33 +45,21 @@ i32 main() {
     printf("Test - extern redeclaration: ");
     i64 correct = 0, tests = 0;
 
-    /* the repro: _extern on x86_64, a prototype on arm64 */
+    /* a program's exit, alloc and toLower are its own: os.exit, mem.alloc
+     * and str.toLower (asm bindings on some architectures) are untouched */
     tests++;
     if (conflicts(
-"i64 Exit(i64 x) { return x * 2; }
-void main() { printf(\"%d\\n\", Exit(21)); }
-", "Exit")) { correct++; }
+"import mem, os, str;
 
-    /* _extern on every architecture */
-    tests++;
-    if (conflicts(
-"i64 MAlloc(i64 n) { return n; }
-void main() { MAlloc(3); }
-", "MAlloc")) { correct++; }
-
-    /* a prototype alone conflicts too */
-    tests++;
-    if (conflicts(
-"i64 ToLower(i64 ch);
-void main() { }
-", "ToLower")) { correct++; }
-
-    /* the same signature again is fine */
-    tests++;
-    if (conflicts(
-"void *MAlloc(u64 size);
-u8 ToUpper(u8 ch);
-void main() { printf(\"ok\\n\"); }
+i64 exit(i64 x) { return x * 2; }
+i64 alloc(i64 n) { return n + 1; }
+i64 toLower(i64 ch) { return 0; }
+void main()
+{
+  u8 *p = mem.alloc(4);
+  if (exit(21) == 42 && alloc(3) == 4 && toLower('A') == 0 && str.toLower('A') == 'a') { printf(\"ok\\n\"); }
+  mem.free(p);
+}
 ", null)) { correct++; }
 
     /* and the library's own functions work as before */

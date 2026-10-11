@@ -1,13 +1,11 @@
 import fs, libc, mem, proc, str, test;
 
-/* A program may define its own version of a standard-library function
- * (here `Now()`, `public CDate Now();` in std.ktmh). That worked in the
- * JIT, but an AOT build failed to link with "multiple definition of
- * `Now'" as soon as anything else from libktm was used: libktm is one
- * object. Library functions are now weak definitions, so the program's
- * own one wins, as in the JIT. A definition or prototype whose
- * signature differs from an earlier one (the library's included) is an
- * error at its name, in both modes. */
+/* A program may define functions named like the standard library's (an
+ * AOT build once failed to link with "multiple definition of `Now'"):
+ * with the library in modules its names are date.now, str.len, so the
+ * program's own now() and len() are separate functions, in both modes.
+ * A definition or prototype whose signature differs from an earlier one
+ * in the program is an error at its name. */
 
 #define RD_FILE "__197_redefine.ktm"
 #define RD_EXE  "__197_redefine.exe"
@@ -51,35 +49,17 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     return ok;
 }
 
-/* Own Now() plus other library functions (str.len, date.formatDate) */
-u8 *rdSameSig =
-"import date, mem, str;
+/* The program's own now() and len() next to date.now() and str.len() */
+u8 *rdOwnNames =
+"import date, str;
 
-date.Date Now()
-{
-  return 42;
-}
+i64 now() { return 42; }
+i64 len(u8 *s) { return 7; }
 
 void main()
 {
-  printf(\"now=%d len=%d\\n\", Now(), str.len(\"abc\"));
-  u8 *date = date.formatDate(Now());
-  printf(\"date=%s\\n\", date);
-  mem.free(date);
-}
-";
-
-u8 *rdLibConflict =
-"import str;
-
-u8 *Now()
-{
-  return \"x\";
-}
-
-void main()
-{
-  printf(\"%s %d\\n\", Now, str.len(\"abc\"));
+  date.Date d = date.now();
+  printf(\"now=%d len=%d str.len=%d real=%d\\n\", now(), len(\"abc\"), str.len(\"abc\"), d > 0);
 }
 ";
 
@@ -87,38 +67,12 @@ void main() {
     printf("Test - redefine a library function: ");
     i64 correct = 0, tests = 0;
 
-    /* Same signature: links in AOT, and both modes call the program's */
+    /* Its own functions named like library ones: both are there, AOT
+     * (they link: a module's names have symbols of their own) and JIT */
     tests++;
-    if (runRedefine(false, rdSameSig, 0, "now=42 len=3", "date=01/02/0000")) { correct++; }
+    if (runRedefine(false, rdOwnNames, 0, "now=42 len=7 str.len=3 real=1", null)) { correct++; }
     tests++;
-    if (runRedefine(true, rdSameSig, 0, "now=42 len=3", "date=01/02/0000")) { correct++; }
-
-    /* An integer return type spelt as the plain integer the intrinsic
-     * class is (`i64 class CDate`) is the same signature */
-    tests++;
-    if (runRedefine(false,
-"import str;
-
-i64 Now() { return 7; }
-void main() { printf(\"now=%d %d\\n\", Now(), str.len(\"ab\")); }
-", 0, "now=7 2", null)) { correct++; }
-
-    /* A different signature from the library's prototype is an error at
-     * the definition's name, not a link failure */
-    tests++;
-    if (runRedefine(false, rdLibConflict, 1,
-            "error: conflicting types for `Now`: `u8 *Now(void);` does not match the earlier declaration `CDate Now(void);` at ",
-            "std.ktmh:")) { correct++; }
-    tests++;
-    if (runRedefine(true, rdLibConflict, 1, "conflicting types for `Now`",
-                                    RD_FILE ":1:5")) { correct++; }
-
-    /* i64 vs u64 return differ (std.ktmh: `public u64 date.nowMs();`) */
-    tests++;
-    if (runRedefine(true,
-"i64 NowMilliseconds() { return 0; }
-void main() { }
-", 1, "conflicting types for `NowMilliseconds`", null)) { correct++; }
+    if (runRedefine(true, rdOwnNames, 0, "now=42 len=7 str.len=3 real=1", null)) { correct++; }
 
     /* Two prototypes in the program that disagree */
     tests++;
