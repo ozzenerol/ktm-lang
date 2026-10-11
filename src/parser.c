@@ -3493,9 +3493,10 @@ Ast *parseCompoundStatement(Cctrl *cc) {
  * safe assumption, so we under-warn rather than cry wolf. */
 
 static int astIsConstTrueCond(Ast *c) {
-    /* `while(1)` / `for(;1;)` / `for(;;)` style infinite loops. */
+    /* `while(1)` / `while (true)` / `for(;1;)` / `for(;;)` style infinite
+     * loops (`true` is a literal of type bool) */
     return c && c->kind == AST_LITERAL && c->type &&
-           c->type->kind == AST_TYPE_INT && c->i64 != 0;
+           (c->type->kind == AST_TYPE_INT || c->type->is_bool) && c->i64 != 0;
 }
 
 /* Does `s` contain a `break` that targets the *enclosing* loop/switch
