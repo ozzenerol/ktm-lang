@@ -294,7 +294,7 @@ function	IntSetSize	set	intSize	set.ktm
 function	IntSetSymDiff	set	intSymDiff	set.ktm
 function	IntSetToString	set	intToStr	set.ktm
 function	IntSetToVec	set	intToVec	set.ktm
-function	IntSetUnion	set	intUnion	set.ktm
+function	IntSetUnion	set	intUnionWith	S2: `union` is a keyword, the method is unionWith; set.ktm
 type	SigAct	signal	Action	module name dropped from the type; signals.ktm
 function	SigAction	signal	action	signals.ktm
 function	SigBit	signal	bit	signals.ktm
@@ -412,7 +412,7 @@ function	Dir	-	drop	TempleOS `Dir` command, prints an ls-style listing (decision
 function	Fs	rt	Fs	HolyC `Fs->except_ch`, leaves the public API: `catch (Error e)` replaces it (decision 6); stays a runtime internal; except.ktm
 function	IsDotC	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
 function	IsDotZ	-	drop	TempleOS leftover (.Z compressed / .HC source names); only library.html's example and test 257 use it; strings.ktm
-function	Write	-	drop	duplicate of C write(2), which os re-exports (would collide as os.write); its users (coroutines, except, vector, test 84) call write; system.ktm
+function	Write	libc	write	S2: its users call C's write (libc.write); duplicate of C write(2), which os re-exports (would collide as os.write); its users (coroutines, except, vector, test 84) call write; system.ktm
 function	I64ToStr	-	private in str	documented as an internal helper of StrPrint; strings.ktm
 function	OutStr	-	private in str	documented as an internal helper of StrPrint; strings.ktm
 function	SPutChar	-	private in str	documented as an internal helper of StrPrint; strings.ktm
