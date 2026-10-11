@@ -450,6 +450,33 @@ static void replBuiltinUf(char *name) {
     fflush(stdout);
 }
 
+/* The modules loaded and the imports made so far: a round's lexer starts
+ * with them (an import in one round serves the next ones, and a module is
+ * loaded once) and leaves them for the next */
+static LexModule **repl_modules = NULL;
+static int repl_modules_len = 0, repl_modules_cap = 0;
+static LexImport *repl_imports = NULL;
+
+static Lexer *replLexerNew(char *root_dir) {
+    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
+    lexInit(l, NULL, CCF_PRE_PROC);
+    lexSetBuiltinRoot(l, root_dir);
+    l->repl = 1;
+    l->modules = repl_modules;
+    l->modules_len = repl_modules_len;
+    l->modules_cap = repl_modules_cap;
+    l->repl_imports = repl_imports;
+    return l;
+}
+
+static void replLexerRelease(Lexer *l) {
+    repl_modules = l->modules;
+    repl_modules_len = l->modules_len;
+    repl_modules_cap = l->modules_cap;
+    repl_imports = l->repl_imports;
+    lexerRelease(l);
+}
+
 static void replEvalString(char *code) {
     if (!code) return;
     u64 len = strlen(code);
@@ -474,9 +501,7 @@ static void replBuiltinReloadRc(void) {
     AoStr *ktm_rc = replGetRcPath();
     if (!ktm_rc) return;
 
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, repl_root_dir);
+    Lexer *l = replLexerNew(repl_root_dir);
     lexPushFile(l, ktm_rc);
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
@@ -494,7 +519,7 @@ static void replBuiltinReloadRc(void) {
         fprintf(stderr, "repl: warning: failed to compile rc file\n");
     }
 
-    lexerRelease(l);
+    replLexerRelease(l);
 }
 
 /* --------- ReplListFn: List all defined functions ---------- */
@@ -1324,9 +1349,7 @@ static void replDropInitialisers(Cctrl *cc) {
 /* Parse one buffer into the shared Cctrl. Returns the number of
  * errors (diagnostics already printed). */
 static int replParse(Cctrl *cc, char *root_dir, char *name, AoStr *src) {
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, root_dir);
+    Lexer *l = replLexerNew(root_dir);
     lexPushString(l, name, src->data, src->len);
 
     cctrlDiagClear(cc);
@@ -1348,7 +1371,7 @@ static int replParse(Cctrl *cc, char *root_dir, char *name, AoStr *src) {
 
     int errors = cctrlDiagFlush(cc);
     cctrlDiagClear(cc);
-    lexerRelease(l);
+    replLexerRelease(l);
     return errors;
 }
 
@@ -1375,9 +1398,7 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
     (void)args;
     AoStr *ktm_rc = replGetRcPath();
 
-    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
-    lexInit(l, NULL, CCF_PRE_PROC);
-    lexSetBuiltinRoot(l, root_dir);
+    Lexer *l = replLexerNew(root_dir);
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
     lexPushRuntime(l);
@@ -1394,10 +1415,10 @@ static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
     replDropInitialisers(cc);
 
     if (ktmJitCompileChunk(jit, NULL) != 0) {
-        fprintf(stderr, "repl: warning: failed to compile the standard "
-                "library header\n");
+        fprintf(stderr, "repl: warning: failed to compile the prelude "
+                "and the runtime\n");
     }
-    lexerRelease(l);
+    replLexerRelease(l);
 }
 
 static void replExecInner(AoStr *input, int round) {

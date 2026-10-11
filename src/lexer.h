@@ -338,6 +338,11 @@ typedef struct Lexer {
      * module directory */
     LexModule **modules;
     int modules_len, modules_cap;
+    /* The REPL: each round has a lexer of its own; the modules loaded and
+     * the imports made in earlier rounds carry over (repl.c), and an
+     * import isn't "unused" for being alone in its round */
+    int repl;
+    LexImport *repl_imports;
     u32 mod_stack[64];
     int mod_depth;
     char *program_root;

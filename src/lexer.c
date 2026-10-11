@@ -403,6 +403,8 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->modules = NULL;
     l->modules_len = 0;
     l->modules_cap = 0;
+    l->repl = 0;
+    l->repl_imports = NULL;
     l->mod_depth = 0;
     l->program_root = NULL;
     l->building_module = NULL;
@@ -964,6 +966,14 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->ended = 0;
     f->is_std = 0;
     f->imports = NULL;
+    /* the REPL's earlier rounds' imports */
+    for (LexImport *imp = l->repl_imports; imp; imp = imp->next) {
+        LexImport *copy = (LexImport *)malloc(sizeof(LexImport));
+        *copy = *imp;
+        copy->used = 1;
+        copy->next = f->imports;
+        f->imports = copy;
+    }
     f->import_owner = NULL;
     f->import_kw = NULL;
     if (l->cur_file) {
@@ -3595,12 +3605,18 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     imp->module = m;
     /* the `import` of `ktm -lib`'s generated program */
     imp->used = ((l->building_module || l->building_tree) && !file->module_id) ||
-                auto_prelude || auto_rt;
+                auto_prelude || auto_rt || (l->repl && !file->module_id);
     imp->line = kw->line;
     imp->col = kw->col;
     imp->len = kw->len;
     imp->next = file->imports;
     file->imports = imp;
+    if (l->repl && !file->module_id) {
+        LexImport *keep = (LexImport *)malloc(sizeof(LexImport));
+        *keep = *imp;
+        keep->next = l->repl_imports;
+        l->repl_imports = keep;
+    }
 
     if (!m->loaded && l->mod_depth < 64) {
         lexModuleLoad(l, m, first);

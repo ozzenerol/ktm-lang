@@ -248,7 +248,7 @@ pub void *PtrVec.last(bool *_ok=null)
  * partition, so sorted, reversed and all-equal input stay O(n log n); it
  * recurses into the smaller part and loops on the larger one, so the
  * recursion depth is O(log n). Short ranges use an insertion sort. */
-pub void qsort(void **arr, i64 high, i64 low,
+pub void qsort(void **arr, i64 low, i64 high,
         fn(void *_arg1, void *_arg2) i64 _compare_fn) {
     void *tmp;
     while (high - low >= 16) {
