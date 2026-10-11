@@ -8,10 +8,10 @@ module mem;
 
 /* `size` uninitialised bytes; null when out of memory or when `size` is
  * too large (such as a negative number passed as a u64). */
-pub _extern _MALLOC void *alloc(u64 size);
+pub void *alloc(u64 size);
 
 /* Free a block from MAlloc, CAlloc or ReAlloc. null is ignored. */
-pub _extern _FREE void free(void *ptr);
+pub void free(void *ptr);
 
 /* The size the block was asked for (not the capacity malloc rounded it up
  * to); 0 for null. */
@@ -26,10 +26,10 @@ pub _extern _MEMCPY void *copy(void *dst, void *src, u64 len);
 
 /* `new_size` zeroed bytes. One argument, the total size, unlike C's
  * calloc(count, size). null when out of memory. */
-pub _extern _CALLOC void *allocZero(u64 newSize);
+pub void *allocZero(u64 newSize);
 
 /* A new block of `new_size` bytes holding the start of `ptr` (as much as
  * fits); `ptr` is freed and the result is always a different pointer.
  * ReAlloc(null, n) is MAlloc(n). When out of memory it returns null and
  * leaves `ptr` as it was, still yours to free. */
-pub _extern _REALLOC void *realloc(void *ptr, u64 newSize);
+pub void *realloc(void *ptr, u64 newSize);
