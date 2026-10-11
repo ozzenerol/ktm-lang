@@ -386,8 +386,8 @@ Cctrl *cctrlNew(enum CliTarget target) {
     Ast *cmd_args = astGlobalCmdArgs();
     listAppend(cc->ast_list,cmd_args->argc);
     listAppend(cc->ast_list,cmd_args->argv);
-    mapAdd(cc->global_env,"argc",cmd_args->argc->declvar);
-    mapAdd(cc->global_env,"argv",cmd_args->argv->declvar);
+    /* not in scope: a function's `argc` used to find these, always 0
+     * and null (main's parameters are the real ones) */
     return cc;
 }
 

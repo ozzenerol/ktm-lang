@@ -657,20 +657,48 @@ void assertNotConstAssign(Cctrl *cc, Ast *ast) {
     }
 }
 
-void assertUniqueSwitchCaseLabels(Cctrl *cc, Vec *case_vector, Ast *case_) {
+/* `case_` (at `case_tok`, its value written as `value_expr`) takes a
+ * value an earlier case of the switch has: reported by the value, or an
+ * enum's member, without unwinding */
+void assertUniqueSwitchCaseLabels(Cctrl *cc, Vec *case_vector, Ast *case_,
+                                  Ast *value_expr, Lexeme *case_tok)
+{
     for (u64 i = 0; i < case_vector->size; ++i) {
         Ast *cur = case_vector->entries[i];
         if (case_->case_end < cur->case_begin ||
-            cur->case_begin < case_->case_begin) {
+            cur->case_end < case_->case_begin) {
             continue;
         }
-        if (case_->case_begin == cur->case_end) {
-            for (u64 j = 0; j < case_vector->size; ++j) {
-                astPrint(case_vector->entries[i]);
+        s64 value = case_->case_begin > cur->case_begin ? case_->case_begin
+                                                        : cur->case_begin;
+        char *shown = mprintf("%lld", (long long)value);
+        AstType *ty = value_expr ? value_expr->type : NULL;
+        if (ty && ty->is_enum && ty->enum_members) {
+            MapIter it;
+            mapIterInit(ty->enum_members, &it);
+            while (mapIterNext(&it)) {
+                Ast *member = it.node->value;
+                if (member && member->kind == AST_LITERAL && member->i64 == value) {
+                    shown = mprintf("%s.%s", ty->clsname ? ty->clsname->data
+                                                         : "<anonymous>",
+                                    (char *)it.node->key);
+                    break;
+                }
             }
-            cctrlRaiseException(cc,"Duplicate case value: %s\n",case_->case_label->data);
         }
-        cctrlRaiseException(cc, "Duplicate case value: %s\n",case_->case_label->data);
+        char *msg = mprintf("duplicate case value %s", shown);
+        AoStr *bold = aoStrNew();
+        aoStrCatColoured(bold, ESC_BOLD, msg);
+        AoStr *buf = cctrlCreateErrorLineAt(cc, case_tok->line, case_tok->col,
+                                            case_tok->len, bold->data,
+                                            CCTRL_ERROR, NULL);
+        aoStrRelease(bold);
+        CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+        d->line = d->end_line = case_tok->line;
+        d->col = case_tok->col;
+        d->end_col = case_tok->col + case_tok->len;
+        cctrlDiagPush(cc, d);
+        return;
     }
 }
 
