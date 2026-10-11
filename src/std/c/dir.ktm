@@ -3,40 +3,25 @@ module c;
 #ifdef IS_MACOS
 #define DIR_MAXPATHLEN 1024
 
-public class Dirent
-{
-  U64  ino;      /* file number of entry */
-  U64  seekoff;  /* seek offset (optional, used by servers) */
-  U16  reclen;   /* length of this record */
-  U16  namlen;   /* length of string in d_name */
-  U8   type;     /* file type, see below */
-  I8   name[DIR_MAXPATHLEN]; /* entry name (up to MAXPATHLEN bytes) */
+pub struct Dirent {
+    u64  ino;      /* file number of entry */
+    u64  seekoff;  /* seek offset (optional, used by servers) */
+    u16  reclen;   /* length of this record */
+    u16  namlen;   /* length of string in d_name */
+    u8   type;     /* file type, see below */
+    i8   name[DIR_MAXPATHLEN]; /* entry name (up to MAXPATHLEN bytes) */
 };
 #endif
 
 #ifdef IS_LINUX
 #define DIR_MAXPATHLEN 256
-public class Dirent
-{
-  U64  ino;      /* file number of entry */
-  U64  seekoff;  /* seek offset (optional, used by servers) */
-  U16  reclen;   /* length of this record */
-  U8   type;     /* file type, see below */
-  I8   name[DIR_MAXPATHLEN]; /* entry name (up to MAXPATHLEN bytes) */
+pub struct Dirent {
+    u64  ino;      /* file number of entry */
+    u64  seekoff;  /* seek offset (optional, used by servers) */
+    u16  reclen;   /* length of this record */
+    u8   type;     /* file type, see below */
+    i8   name[DIR_MAXPATHLEN]; /* entry name (up to MAXPATHLEN bytes) */
 };
-public extern "c" cDIR *opendir(U8 *dirname);
-public extern "c" Dirent *readdir(cDIR *dir);
-#endif
-
-/* Mac libc has a $INODE64 suffix on opendir/readdir for x86 64-bit
- * builds (legacy of the i386 -> x86_64 transition). On Apple ARM the
- * suffix doesn't seem to exist. */
-#ifdef IS_X86_64
-public _extern _opendir$INODE64 cDIR *opendir(U8 *dirname);
-public _extern _readdir$INODE64 Dirent *readdir(cDIR *dir);
-#endif
-
-#ifdef IS_ARM_64
-public _extern _opendir cDIR *opendir(U8 *dirname);
-public _extern _readdir Dirent *readdir(cDIR *dir);
+pub extern "c" cDIR *opendir(u8 *dirname);
+pub extern "c" Dirent *readdir(cDIR *dir);
 #endif

@@ -1,7 +1,7 @@
 module mem;
 
 /* Yup we can mix #define's and assembly */
-#define ALIGN_16 0xFFFFFFFFFFFFFFF0
+const u64 ALIGN_16 = 0xFFFFFFFFFFFFFFF0;
 
 #ifdef IS_X86_64
 asm {
@@ -46,9 +46,9 @@ _CALLOC::
     LEAVE
     RET
 
-// RDI = U0 *ptr
-// RSI = U64 size
-_REALLOC:: // U0 *ReAlloc(U0 *ptr, I64 size);
+// RDI = void *ptr
+// RSI = u64 size
+_REALLOC:: // void *ReAlloc(void *ptr, i64 size);
     PUSHQ  RBP
     MOVQ   RBP, RSP
     SUB    RSP, 32
@@ -60,7 +60,7 @@ _REALLOC:: // U0 *ReAlloc(U0 *ptr, I64 size);
     CALL   _MALLOC
     MOV    -16[RBP], RAX // new memory saved
     TEST   RAX, RAX
-    JZ     @@2           // out of memory: keep the old block, return NULL
+    JZ     @@2           // out of memory: keep the old block, return null
     MOV    RDI, -8[RBP]  // find out the old size
     CALL   _MSIZE
     MOV    RDX, RAX      // old size
@@ -74,7 +74,7 @@ _REALLOC:: // U0 *ReAlloc(U0 *ptr, I64 size);
     CALL   _FREE
     MOV    RAX, -16[RBP]
     JMP    @@2
-@@1: // If pointer is NULL
+@@1: // If pointer is null
     MOV    RDI, RSI
     CALL   _MALLOC
 @@2:
@@ -86,7 +86,7 @@ _MSIZE::
     PUSHQ  RBP
     MOVQ   RBP, RSP
     TEST   RDI, RDI
-    JZ     @@2/* NULL CHECK */
+    JZ     @@2/* null CHECK */
     SUB    RDI, 8
     MOV    RAX, [RDI]
 @@1:
@@ -140,14 +140,14 @@ asm {
 _MALLOC::
     STP    X29, X30, [SP, -16]! // save FP/LR - we make a call
     STR    X0, [SP, -16]!       // save size across the call (X1 is caller-saved)
-    ADD    X0, X0, 8            // add 8, big enough for a U64 header
+    ADD    X0, X0, 8            // add 8, big enough for a u64 header
     LDR    X1, [SP]
     CMP    X0, X1
     B.LO   @@1                  // size + 8 wrapped: fail
     BL     malloc               // X0 = malloc(size + 8)
     CBZ    X0, @@1
     LDR    X1, [SP]             // reload size
-    STR    X1, [X0]             // store the U64 size header at [ptr]
+    STR    X1, [X0]             // store the u64 size header at [ptr]
     ADD    X0, X0, 8            // step the pointer past the header
     B      @@2
 @@1:
@@ -173,7 +173,7 @@ _MSIZE::
 @@1:
     RET
 
-/* Assumes the X0 pointer is not NULL */
+/* Assumes the X0 pointer is not null */
 _MEMSET::
     MOV   X3, X0     // return dst
     CBZ	  X2, @@2
@@ -219,7 +219,7 @@ _REALLOC::
     STR    X1, [SP, 32] // store size
     MOV    X0, X1       // Move the size
     BL     _MALLOC
-    CBZ    X0, @@2      // out of memory: keep the old block, return NULL
+    CBZ    X0, @@2      // out of memory: keep the old block, return null
     STR    X0, [SP, 24] // store new pointer
     LDR    X0, [SP, 16] // Load old pointer
     BL     _MSIZE       // find size of old pointer
@@ -244,16 +244,16 @@ _REALLOC::
 
 #endif
 
-public _extern _MALLOC U0 *MAlloc(U64 size);
+pub _extern _MALLOC void *memAlloc(u64 size);
 
-public _extern _FREE U0 Free(U0 *ptr);
+pub _extern _FREE void memFree(void *ptr);
 
-public _extern _MSIZE U64 MSize(U0 *ptr);
+pub _extern _MSIZE u64 memSize(void *ptr);
 
-public _extern _MEMSET U0 *MemSet(U0 *dst, I32 ch, U64 len);
+pub _extern _MEMSET void *memSet(void *dst, i32 ch, u64 len);
 
-public _extern _MEMCPY U0 *MemCpy(U0 *dst, U0 *src, U64 len);
+pub _extern _MEMCPY void *memCpy(void *dst, void *src, u64 len);
 
-public _extern _CALLOC U0 *CAlloc(U64 new_size);
+pub _extern _CALLOC void *memAllocZero(u64 newSize);
 
-public _extern _REALLOC U0 *ReAlloc(U0 *ptr, U64 new_size);
+pub _extern _REALLOC void *memRealloc(void *ptr, u64 newSize);

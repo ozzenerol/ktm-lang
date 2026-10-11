@@ -1,9 +1,10 @@
 module rt;
+import mem, str;
 
-public U0 Print(U8 *fmt,...)
-{// @TempleOS - StrPrint to stdout, through C's stdio so it stays in
- // order with printf and the print statements that use it
-  U8 *buf=StrPrintJoin(NULL,fmt,argc,argv);
-  printf("%s",buf);
-  Free(buf);
+pub void __ktmPrintf(u8 *fmt,...args)
+{// StrPrint to stdout, through C's stdio so it stays in
+    // order with printf and the print statements that use it
+        u8 *buf=strPrintJoin(null,fmt,args.len,args);
+        printf("%s",buf);
+        memFree(buf);
 }

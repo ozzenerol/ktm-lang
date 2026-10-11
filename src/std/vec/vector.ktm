@@ -1,382 +1,352 @@
 module vec;
+import mem, os, str;
 
-public class IntVec
-{
-  I64 size;
-  I64 *entries;
+pub struct IntVec {
+    i64 size;
+    i64 *entries;
 };
 
-public class PtrVec
-{
-  I64 size;
-  U0 **entries;
+pub struct PtrVec {
+    i64 size;
+    void **entries;
 };
 
-public class FloatVec 
-{
-  I64 size;
-  F64 *entries;
+pub struct FloatVec {
+    i64 size;
+    f64 *entries;
 };
 
 /* Get/Set with an index outside [0, size): report it on stderr and exit,
  * rather than read or write past the entries. */
-static U0 _VecIndexError(U8 *fn_name, I64 idx, I64 size)
-{
-  U8 *msg = StrPrint(NULL, "%s: index %d out of range (size %d)\n",
-                     fn_name, idx, size);
-  Write(STDERR, msg, StrLen(msg));
-  Exit(1);
+static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
+    u8 *msg = strPrint(null, "%s: index %d out of range (size %d)\n",
+                                         fnName, idx, size);
+    fdWrite(os.STDERR, msg, strLen(msg));
+    exitProgram(1);
 }
 
-public FloatVec *FloatVecNew(I64 size = 32)
-{
-  FloatVec *vec = MAlloc(sizeof(FloatVec));
-  vec->size = 0;
-  if (size < 1) size = 1; /* 0 or negative: start with room for one */
-  vec->entries = MAlloc(sizeof(F64) * size);
-  return vec;
+pub FloatVec *floatVecNew(i64 size = 32) {
+    FloatVec *vec = memAlloc(sizeof(FloatVec));
+    vec.size = 0;
+    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
+    vec.entries = memAlloc(sizeof(f64) * size);
+    return vec;
 }
 
-public U64 FloatVecCapacity(FloatVec *vec)
-{
-  return MSize(vec->entries)/sizeof(F64);
+pub u64 floatVecCapacity(FloatVec *vec) {
+    return memSize(vec.entries)/sizeof(f64);
 }
 
-public U0 FloatVecPush(FloatVec *vec, F64 value)
-{
-  auto capacity = MSize(vec->entries)/sizeof(F64);
-  if (vec->size + 1 >= capacity) {
-    auto new_capacity = capacity * 2;
-    if (new_capacity < 8) new_capacity = 8;
-    auto new_entries = ReAlloc(vec->entries, (new_capacity * sizeof(F64))(U64));
-    vec->entries = new_entries;
-  }
-  vec->entries[vec->size++] = value;
+pub void floatVecPush(FloatVec *vec, f64 value) {
+    auto capacity = memSize(vec.entries)/sizeof(f64);
+    if (vec.size + 1 >= capacity) {
+        auto newCapacity = capacity * 2;
+        if (newCapacity < 8) { newCapacity = 8; }
+        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(f64)));
+        vec.entries = newEntries;
+    }
+    vec.entries[vec.size++] = value;
 }
 
-public F64 FloatVecPop(FloatVec *vec, Bool *_ok=NULL)
-{
-  if (vec->size > 0) {
-    auto value = vec->entries[--vec->size];
-    if (_ok) *_ok = TRUE;
-    return value;
-  }
-  if (_ok) *_ok = FALSE;
-  return -1.0;
+pub f64 floatVecPop(FloatVec *vec, bool *_ok=null) {
+    if (vec.size > 0) {
+        auto value = vec.entries[--vec.size];
+        if (_ok) { *_ok = true; }
+        return value;
+    }
+    if (_ok) { *_ok = false; }
+    return -1.0;
 }
 
-public F64 FloatVecGet(FloatVec *vec, I64 idx)
-{
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("FloatVecGet", idx, vec->size);
-  }
-  return vec->entries[idx];
+pub f64 floatVecGet(FloatVec *vec, i64 idx) {
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("FloatVecGet", idx, vec.size);
+    }
+    return vec.entries[idx];
 }
 
-public U0 FloatVecSet(FloatVec *vec, I64 idx, F64 value)
+pub void floatVecSet(FloatVec *vec, i64 idx, f64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("FloatVecSet", idx, vec->size);
-  }
-  vec->entries[idx] = value;
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("FloatVecSet", idx, vec.size);
+    }
+    vec.entries[idx] = value;
 }
 
-public F64 FloatVecLast(FloatVec *vec, Bool *_ok=NULL)
-{// The last entry without removing it; -1.0 and *_ok = FALSE when empty
-  if (vec->size > 0) {
-    if (_ok) *_ok = TRUE;
-    return vec->entries[vec->size - 1];
-  }
-  if (_ok) *_ok = FALSE;
-  return -1.0;
+pub f64 floatVecLast(FloatVec *vec, bool *_ok=null)
+{// The last entry without removing it; -1.0 and *_ok = false when empty
+    if (vec.size > 0) {
+        if (_ok) { *_ok = true; }
+        return vec.entries[vec.size - 1];
+    }
+    if (_ok) { *_ok = false; }
+    return -1.0;
 }
 
-/* QSortGeneric hands the comparator two 64-bit slots as U0 *, in integer
- * registers: an F64 parameter would read the float registers instead, so
+/* QSortGeneric hands the comparator two 64-bit slots as void *, in integer
+ * registers: an f64 parameter would read the float registers instead, so
  * take the bits and reinterpret them. */
-I64 _FloatCmp(U0 *a, U0 *b)
-{
-  F64 f1 = *(&a)(F64 *);
-  F64 f2 = *(&b)(F64 *);
-  return f1 < f2;
+i64 floatCmp(void *a, void *b) {
+    f64 f1 = *(f64 *)(&a);
+    f64 f2 = *(f64 *)(&b);
+    return f1 < f2;
 }
 
-public U0 FloatVecSort(FloatVec *vec)
-{
-  QSortGeneric(vec->entries(U0**),vec->size-1,0,&_FloatCmp);
+pub void floatVecSort(FloatVec *vec) {
+    qsortGeneric((void**)vec.entries,vec.size-1,0,&floatCmp);
 }
 
-public U0 FloatVecClear(FloatVec *vec)
-{
-  vec->size = 0;
+pub void floatVecClear(FloatVec *vec) {
+    vec.size = 0;
 }
 
-public U0 FloatVecRelease(FloatVec *vec)
-{
-  if (vec) {
-    Free(vec->entries);
-    Free(vec);
-  }
+pub void floatVecRelease(FloatVec *vec) {
+    if (vec) {
+        memFree(vec.entries);
+        memFree(vec);
+    }
 }
 
-public IntVec *IntVecNew(I64 size = 32)
-{
-  IntVec *vec = MAlloc(sizeof(IntVec));
-  vec->size = 0;
-  if (size < 1) size = 1; /* 0 or negative: start with room for one */
-  vec->entries = MAlloc(sizeof(I64) * size);
-  return vec;
+pub IntVec *intVecNew(i64 size = 32) {
+    IntVec *vec = memAlloc(sizeof(IntVec));
+    vec.size = 0;
+    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
+    vec.entries = memAlloc(sizeof(i64) * size);
+    return vec;
 }
 
-public U64 IntVecCapacity(IntVec *vec)
-{
-  return MSize(vec->entries)/sizeof(I64);
+pub u64 intVecCapacity(IntVec *vec) {
+    return memSize(vec.entries)/sizeof(i64);
 }
 
-public U0 IntVecPush(IntVec *vec, I64 value)
-{
-  auto capacity = IntVecCapacity(vec);
-  if (vec->size + 1 >= capacity) {
-    auto new_capacity = capacity * 2;
-    if (new_capacity < 8) new_capacity = 8;
-    auto new_entries = ReAlloc(vec->entries, (new_capacity * sizeof(I64))(U64));
-    vec->entries = new_entries;
-  }
-  vec->entries[vec->size++] = value;
+pub void intVecPush(IntVec *vec, i64 value) {
+    auto capacity = intVecCapacity(vec);
+    if (vec.size + 1 >= capacity) {
+        auto newCapacity = capacity * 2;
+        if (newCapacity < 8) { newCapacity = 8; }
+        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(i64)));
+        vec.entries = newEntries;
+    }
+    vec.entries[vec.size++] = value;
 }
 
-public I64 IntVecPop(IntVec *vec, Bool *_ok=NULL)
-{
-  if (vec->size > 0) {
-    auto value = vec->entries[--vec->size];
-    if (_ok) *_ok = TRUE;
-    return value;
-  }
-  if (_ok) *_ok = FALSE;
-  return -1;
+pub i64 intVecPop(IntVec *vec, bool *_ok=null) {
+    if (vec.size > 0) {
+        auto value = vec.entries[--vec.size];
+        if (_ok) { *_ok = true; }
+        return value;
+    }
+    if (_ok) { *_ok = false; }
+    return -1;
 }
 
-public I64 IntVecGet(IntVec *vec, I64 idx)
-{
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("IntVecGet", idx, vec->size);
-  }
-  return vec->entries[idx];
+pub i64 intVecGet(IntVec *vec, i64 idx) {
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("IntVecGet", idx, vec.size);
+    }
+    return vec.entries[idx];
 }
 
-public U0 IntVecSet(IntVec *vec, I64 idx, I64 value)
+pub void intVecSet(IntVec *vec, i64 idx, i64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("IntVecSet", idx, vec->size);
-  }
-  vec->entries[idx] = value;
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("IntVecSet", idx, vec.size);
+    }
+    vec.entries[idx] = value;
 }
 
-public I64 IntVecLast(IntVec *vec, Bool *_ok=NULL)
-{// The last entry without removing it; -1 and *_ok = FALSE when empty
-  if (vec->size > 0) {
-    if (_ok) *_ok = TRUE;
-    return vec->entries[vec->size - 1];
-  }
-  if (_ok) *_ok = FALSE;
-  return -1;
+pub i64 intVecLast(IntVec *vec, bool *_ok=null)
+{// The last entry without removing it; -1 and *_ok = false when empty
+    if (vec.size > 0) {
+        if (_ok) { *_ok = true; }
+        return vec.entries[vec.size - 1];
+    }
+    if (_ok) { *_ok = false; }
+    return -1;
 }
 
-I64 _IntCmp(U0 *i1, U0 *i2)
-{
-  return i1(I64) < i2(I64);
+i64 intCmp(void *i1, void *i2) {
+    return (i64)i1 < (i64)i2;
 }
 
-public U0 IntVecSort(IntVec *vec)
-{
-  QSortGeneric(vec->entries(U0**),vec->size-1,0,&_IntCmp);
+pub void intVecSort(IntVec *vec) {
+    qsortGeneric((void**)vec.entries,vec.size-1,0,&intCmp);
 }
 
-public U0 IntVecClear(IntVec *vec)
-{
-  vec->size = 0;
+pub void intVecClear(IntVec *vec) {
+    vec.size = 0;
 }
 
-public U0 IntVecRelease(IntVec *vec)
-{
-  if (vec) {
-    Free(vec->entries);
-    Free(vec);
-  }
+pub void intVecRelease(IntVec *vec) {
+    if (vec) {
+        memFree(vec.entries);
+        memFree(vec);
+    }
 }
 
-public PtrVec *PtrVecNew(I64 size = 32)
-{
-  PtrVec *vec = MAlloc(sizeof(PtrVec));
-  vec->size = 0;
-  if (size < 1) size = 1; /* 0 or negative: start with room for one */
-  vec->entries = MAlloc(sizeof(U0*) * size);
-  return vec;
+pub PtrVec *ptrVecNew(i64 size = 32) {
+    PtrVec *vec = memAlloc(sizeof(PtrVec));
+    vec.size = 0;
+    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
+    vec.entries = memAlloc(sizeof(void*) * size);
+    return vec;
 }
 
-public U64 PtrVecCapacity(PtrVec *vec)
-{
-  return MSize(vec->entries)/sizeof(U0*);
+pub u64 ptrVecCapacity(PtrVec *vec) {
+    return memSize(vec.entries)/sizeof(void*);
 }
 
-public U0 PtrVecPush(PtrVec *vec, U0 *value)
-{
-  auto capacity = MSize(vec->entries)/sizeof(U0*);
-  if (vec->size + 1 >= capacity) {
-    auto new_capacity = capacity * 2;
-    if (new_capacity < 8) new_capacity = 8;
-    auto new_entries = ReAlloc(vec->entries, (new_capacity * sizeof(U0*))(U64));
-    vec->entries = new_entries;
-  }
-  vec->entries[vec->size++] = value;
+pub void ptrVecPush(PtrVec *vec, void *value) {
+    auto capacity = memSize(vec.entries)/sizeof(void*);
+    if (vec.size + 1 >= capacity) {
+        auto newCapacity = capacity * 2;
+        if (newCapacity < 8) { newCapacity = 8; }
+        auto newEntries = memRealloc(vec.entries, (u64)(newCapacity * sizeof(void*)));
+        vec.entries = newEntries;
+    }
+    vec.entries[vec.size++] = value;
 }
 
-public U0 *PtrVecPop(PtrVec *vec, Bool *_ok=NULL)
-{
-  if (vec->size > 0) {
-    auto value = vec->entries[--vec->size];
-    if (_ok) *_ok = TRUE;
-    return value;
-  }
-  if (_ok) *_ok = FALSE;
-  return NULL;
+pub void *ptrVecPop(PtrVec *vec, bool *_ok=null) {
+    if (vec.size > 0) {
+        auto value = vec.entries[--vec.size];
+        if (_ok) { *_ok = true; }
+        return value;
+    }
+    if (_ok) { *_ok = false; }
+    return null;
 }
 
-public U0 *PtrVecGet(PtrVec *vec, I64 idx)
-{
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("PtrVecGet", idx, vec->size);
-  }
-  return vec->entries[idx];
+pub void *ptrVecGet(PtrVec *vec, i64 idx) {
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("PtrVecGet", idx, vec.size);
+    }
+    return vec.entries[idx];
 }
 
-public U0 PtrVecSet(PtrVec *vec, I64 idx, U0 *value)
+pub void ptrVecSet(PtrVec *vec, i64 idx, void *value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-  if (idx < 0 || idx >= vec->size) {
-    _VecIndexError("PtrVecSet", idx, vec->size);
-  }
-  vec->entries[idx] = value;
+    if (idx < 0 || idx >= vec.size) {
+        vecIndexError("PtrVecSet", idx, vec.size);
+    }
+    vec.entries[idx] = value;
 }
 
-public U0 *PtrVecLast(PtrVec *vec, Bool *_ok=NULL)
-{// The last entry without removing it; NULL and *_ok = FALSE when empty
-  if (vec->size > 0) {
-    if (_ok) *_ok = TRUE;
-    return vec->entries[vec->size - 1];
-  }
-  if (_ok) *_ok = FALSE;
-  return NULL;
+pub void *ptrVecLast(PtrVec *vec, bool *_ok=null)
+{// The last entry without removing it; null and *_ok = false when empty
+    if (vec.size > 0) {
+        if (_ok) { *_ok = true; }
+        return vec.entries[vec.size - 1];
+    }
+    if (_ok) { *_ok = false; }
+    return null;
 }
 
-/* Sort arr[low..high] in place; `_compare_fn(a, b)` is TRUE when `a` must
+/* Sort arr[low..high] in place; `_compare_fn(a, b)` is true when `a` must
  * come before `b` (a "less than", not a C-style -1/0/1 comparator). Not
  * stable. Quicksort with a median-of-three pivot and a three-way
  * partition, so sorted, reversed and all-equal input stay O(n log n); it
  * recurses into the smaller part and loops on the larger one, so the
  * recursion depth is O(log n). Short ranges use an insertion sort. */
-public U0 QSortGeneric(U0 **arr, I64 high, I64 low,
-    I64 (*_compare_fn)(U0 *_arg1, U0 *_arg2))
-{
-  U0 *tmp;
-  while (high - low >= 16) {
-    /* Pivot: the median of three entries, one from each third of the
-     * range, at offsets scrambled by a hash of the bounds. Fixed spots
-     * (first/middle/last) are defeated by the order the partition leaves
-     * sorted input in and degrade towards O(n^2). */
-    U64 third = ((high - low + 1) / 3)(U64);
-    U64 h = low(U64) * 0x9E3779B97F4A7C15 + high(U64) * 0xC2B2AE3D27D4EB4F;
-    h ^= h >> 31;
-    I64 a = low + (h % third)(I64);
-    I64 c = low + third(I64) + ((h >> 20) % third)(I64);
-    I64 b = high - ((h >> 40) % third)(I64);
-    I64 m;
-    if (_compare_fn(arr[c], arr[a])) {
-      if (_compare_fn(arr[b], arr[c]))      m = c;
-      else if (_compare_fn(arr[b], arr[a])) m = b;
-      else                                  m = a;
-    } else {
-      if (_compare_fn(arr[b], arr[a]))      m = a;
-      else if (_compare_fn(arr[b], arr[c])) m = b;
-      else                                  m = c;
-    }
-    tmp = arr[low]; arr[low] = arr[m]; arr[m] = tmp;
+pub void qsortGeneric(void **arr, i64 high, i64 low,
+        fn(void *_arg1, void *_arg2) i64 _compare_fn) {
+    void *tmp;
+    while (high - low >= 16) {
+        /* Pivot: the median of three entries, one from each third of the
+         * range, at offsets scrambled by a hash of the bounds. Fixed spots
+         * (first/middle/last) are defeated by the order the partition leaves
+         * sorted input in and degrade towards O(n^2). */
+        u64 third = (u64)((high - low + 1) / 3);
+        u64 h = (u64)low * 0x9E3779B97F4A7C15 + (u64)high * 0xC2B2AE3D27D4EB4F;
+        h ^= h >> 31;
+        i64 a = low + (i64)(h % third);
+        i64 c = low + (i64)third + (i64)((h >> 20) % third);
+        i64 b = high - (i64)((h >> 40) % third);
+        i64 m;
+        if (_compare_fn(arr[c], arr[a])) {
+            if (_compare_fn(arr[b], arr[c]))      { m = c; }
+            else if (_compare_fn(arr[b], arr[a])) { m = b; }
+            else                                  { m = a; }
+        } else {
+            if (_compare_fn(arr[b], arr[a]))      { m = a; }
+            else if (_compare_fn(arr[b], arr[c])) { m = b; }
+            else                                  { m = c; }
+        }
+        tmp = arr[low]; arr[low] = arr[m]; arr[m] = tmp;
 
-    /* Three-way partition: [low, lt) < pivot, [lt, gt] == pivot,
-     * (gt, high] > pivot. The pivot element itself is never compared,
-     * so the middle part is never empty and both sides shrink. */
-    U0 *pivot = arr[low];
-    I64 lt = low, i = low + 1, gt = high;
-    while (i <= gt) {
-      if (_compare_fn(arr[i], pivot)) {
-        tmp = arr[lt]; arr[lt] = arr[i]; arr[i] = tmp;
-        lt++;
-        i++;
-      } else if (_compare_fn(pivot, arr[i])) {
-        tmp = arr[gt]; arr[gt] = arr[i]; arr[i] = tmp;
-        gt--;
-      } else {
-        i++;
-      }
+        /* Three-way partition: [low, lt) < pivot, [lt, gt] == pivot,
+         * (gt, high] > pivot. The pivot element itself is never compared,
+         * so the middle part is never empty and both sides shrink. */
+        void *pivot = arr[low];
+        i64 lt = low, i = low + 1, gt = high;
+        while (i <= gt) {
+            if (_compare_fn(arr[i], pivot)) {
+                tmp = arr[lt]; arr[lt] = arr[i]; arr[i] = tmp;
+                lt++;
+                i++;
+            } else if (_compare_fn(pivot, arr[i])) {
+                tmp = arr[gt]; arr[gt] = arr[i]; arr[i] = tmp;
+                gt--;
+            } else {
+                i++;
+            }
+        }
+
+        if (lt - low < high - gt) {
+            qsortGeneric(arr, lt - 1, low, _compare_fn);
+            low = gt + 1;
+        } else {
+            qsortGeneric(arr, high, gt + 1, _compare_fn);
+            high = lt - 1;
+        }
     }
 
-    if (lt - low < high - gt) {
-      QSortGeneric(arr, lt - 1, low, _compare_fn);
-      low = gt + 1;
-    } else {
-      QSortGeneric(arr, high, gt + 1, _compare_fn);
-      high = lt - 1;
+    for (i64 j = low + 1; j <= high; ++j) {
+        void *x = arr[j];
+        i64 k = j - 1;
+        while (k >= low && _compare_fn(x, arr[k])) {
+            arr[k + 1] = arr[k];
+            k--;
+        }
+        arr[k + 1] = x;
     }
-  }
-
-  for (I64 j = low + 1; j <= high; ++j) {
-    U0 *x = arr[j];
-    I64 k = j - 1;
-    while (k >= low && _compare_fn(x, arr[k])) {
-      arr[k + 1] = arr[k];
-      k--;
-    }
-    arr[k + 1] = x;
-  }
 }
 
-public U0 PtrVecSort(PtrVec *vec, I64 (*_compare_fn)(U0 *_arg1, U0 *_arg2))
-{
-  QSortGeneric(vec->entries,vec->size-1,0,_compare_fn);
+pub void ptrVecSort(PtrVec *vec, fn(void *_arg1, void *_arg2) i64 _compare_fn) {
+    qsortGeneric(vec.entries,vec.size-1,0,_compare_fn);
 }
 
-public U0 PtrVecClear(PtrVec *vec)
-{
-  vec->size = 0;
+pub void ptrVecClear(PtrVec *vec) {
+    vec.size = 0;
 }
 
-public U0 PtrVecRelease(PtrVec *vec, U0 (*_free_value)(U0 *_val) = NULL)
+pub void ptrVecRelease(PtrVec *vec, fn(void *_val) void _free_value = null)
 { // Optionally pass a callback to free each item in the vector 
-  if (vec) {
-    if (_free_value) {
-      U0 **entries = vec->entries;
-      I64 size = vec->size;
-      for (I64 i = 0; i < size; ++i) {
-        _free_value(entries[i]);
-      }
+    if (vec) {
+        if (_free_value) {
+            void **entries = vec.entries;
+            i64 size = vec.size;
+            for (i64 i = 0; i < size; ++i) {
+                _free_value(entries[i]);
+            }
+        }
+        memFree(vec.entries);
+        memFree(vec);
     }
-    Free(vec->entries);
-    Free(vec);
-  }
 }
 
 #ifdef VEC_TEST
-U0 Main()
-{
-  auto vec = FloatVecNew();
-  FloatVecPush(vec,32.32);
-  FloatVecPush(vec,30.33);
-  FloatVecPush(vec,42.65);
-  FloatVecPush(vec,52.99);
+void main() {
+    auto vec = FloatVecNew();
+    FloatVecPush(vec,32.32);
+    FloatVecPush(vec,30.33);
+    FloatVecPush(vec,42.65);
+    FloatVecPush(vec,52.99);
 
-  for (I64 i = 0; i < vec->size; ++i) {
-    auto val = vec->entries[i];// FloatVecGet(vec,i);
-    "[%d] => %f\n",i,val(F64);
-  }
-  FloatVecRelease(vec);
+    for (i64 i = 0; i < vec->size; ++i) {
+        auto val = vec->entries[i];// FloatVecGet(vec,i);
+        printf("[%d] => %f\n",i,(f64)val);
+    }
+    FloatVecRelease(vec);
 }
 #endif

@@ -1,5 +1,5 @@
 module c;
 
-public extern "c" U0 exit(I32 status);
+pub extern "c" void exit(i32 status);
 
-public extern "c" I32 system(U8 *command);
+pub extern "c" i32 system(u8 *command);

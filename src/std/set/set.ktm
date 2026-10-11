@@ -1,266 +1,250 @@
 module set;
+import map, mem, str, vec;
 
-static RBNode *RBGrandParent(RBNode *n)
-{
-  if (n == NULL || n->parent == NULL) {
-    return NULL;
-  }
-  return n->parent->parent;
+static bool rbIsNil(map.RBNode *n) {
+    return n == null || n.left == null;
 }
 
-public class IntSet
-{
-  RBTree *tree; 
+static map.RBNode *rbGrandParent(map.RBNode *n) {
+    if (n == null || n.parent == null) {
+        return null;
+    }
+    return n.parent.parent;
+}
+
+pub struct IntSet {
+    RBTree *tree; 
 };
 
-I64 IntSetCmp(U0 *k1, U0 *k2)
-{
-  I64 _k1 = k1(I64);
-  I64 _k2 = k2(I64);
-  if (_k1 < _k2) return -1;
-  if (_k1 > _k2) return 1;
-  return 0;
+i64 intSetCmp(void *k1, void *k2) {
+    i64 _k1 = (i64)k1;
+    i64 _k2 = (i64)k2;
+    if (_k1 < _k2) { return -1; }
+    if (_k1 > _k2) { return 1; }
+    return 0;
 }
 
-public IntSet *IntSetNew()
-{
-  IntSet *set = MAlloc(sizeof(IntSet));
-  set->tree = RBTreeNew(NULL,NULL,&IntSetCmp);
-  return set;
+pub IntSet *intSetNew() {
+    IntSet *set = memAlloc(sizeof(IntSet));
+    set.tree = rbTreeNew(null,null,&intSetCmp);
+    return set;
 }
 
-public I64 IntSetSize(IntSet *set)
-{
-  if (!set) return 0;
-  return set->tree->size;
+pub i64 intSetSize(IntSet *set) {
+    if (!set) { return 0; }
+    return set.tree.size;
 }
 
-public class IntSetEntry
-{
-  I64 key;
+pub struct IntSetEntry {
+    i64 key;
 };
 
-public class IntSetIter
-{
-  I64 sp;
-  RBNode **stack;
-  IntSetEntry *entry; 
-  RBTree *tree;
-  I64 version; /* tree->version when the iterator was made */
+pub struct IntSetIter {
+    i64 sp;
+    RBNode **stack;
+    IntSetEntry *entry; 
+    RBTree *tree;
+    i64 version; /* tree->version when the iterator was made */
 };
 
-public IntSetIter *IntSetIterNew(IntSet *set)
-{
-  IntSetIter *it = MAlloc(sizeof(IntSetIter));
-  it->sp = 0;
-  it->entry = MAlloc(sizeof(IntSetEntry));
-  it->stack = MAlloc(sizeof(RBNode *) * IntSetSize(set));
-  it->tree = NULL;
-  it->version = 0;
-  if (!set) return it; /* yields nothing */
-  it->tree = set->tree;
-  it->version = set->tree->version;
-  RBNode *node = set->tree->root;
-  while (!RBIsNil(node)) {
-    it->stack[it->sp++] = node;
-    node = node->left;
-  }
-  return it;
-}
-
-public IntSetEntry *IntSetIterNext(IntSetIter *it)
-{
-  if (!it || it->sp == 0) {
-    return NULL;
-  }
-  if (it->tree->version != it->version) {
-    it->sp = 0; /* the set changed: stop for good */
-    return NULL;
-  }
-
-  RBNode *node = it->stack[--it->sp];
-  it->entry->key = node->key(I64);
-  auto right_tree = node->right;
-
-  while (!RBIsNil(right_tree)) {
-    it->stack[it->sp++] = right_tree;
-    right_tree = right_tree->left;
-  }
-
-  return it->entry;
-}
-
-public U0 IntSetIterRelease(IntSetIter *iter)
-{
-  if (!iter) return;
-  Free(iter->entry);
-  Free(iter->stack);
-  Free(iter);
-}
-
-public Bool IntSetHas(IntSet *set, I64 key)
-{
-  if (!set) return FALSE;
-  return RBTreeHas(set->tree,key(U0*));
-}
-
-public U0 IntSetAdd(IntSet *set, I64 key)
-{
-  return RBTreeInsert(set->tree,key(U0*),NULL);
-}
-
-public U0 IntSetDelete(IntSet *set, I64 key)
-{
-  RBTreeDelete(set->tree,key(U0*));
-}
-
-public IntSet *IntSetUnion(IntSet *s1, IntSet *s2)
-{
-  IntSet *union_set = IntSetNew;
-  IntSetIter *i1 = IntSetIterNew(s1);
-  IntSetIter *i2 = IntSetIterNew(s2);
-  IntSetEntry *entry = NULL;
-
-  while ((entry = IntSetIterNext(i1))) {
-    IntSetAdd(union_set,entry->key);
-  }
-  
-  while ((entry = IntSetIterNext(i2))) {
-    IntSetAdd(union_set,entry->key);
-  }
-
-  IntSetIterRelease(i1);
-  IntSetIterRelease(i2);
-  return union_set;
-}
-
-public IntSet *IntSetDiff(IntSet *s1, IntSet *s2)
-{
-  IntSet *diff_set = IntSetNew;
-  IntSetIter *i1 = IntSetIterNew(s1);
-  IntSetEntry *entry = NULL;
-
-  while ((entry = IntSetIterNext(i1))) {
-    if (!IntSetHas(s2, entry->key(I64))) {
-      IntSetAdd(diff_set,entry->key(I64));
+pub IntSetIter *intSetIterNew(IntSet *set) {
+    IntSetIter *it = memAlloc(sizeof(IntSetIter));
+    it.sp = 0;
+    it.entry = memAlloc(sizeof(IntSetEntry));
+    it.stack = memAlloc(sizeof(map.RBNode *) * intSetSize(set));
+    it.tree = null;
+    it.version = 0;
+    if (!set) { return it; } /* yields nothing */
+    it.tree = set.tree;
+    it.version = set.tree.version;
+    map.RBNode *node = set.tree.root;
+    while (!rbIsNil(node)) {
+        it.stack[it.sp++] = node;
+        node = node.left;
     }
-  }
-  
-  IntSetIterRelease(i1);
-  return diff_set;
+    return it;
 }
 
-public IntSet *IntSetIntersection(IntSet *s1, IntSet *s2)
-{
-  IntSet *intersection_set = IntSetNew;
-  IntSetIter *i1 = IntSetIterNew(s1);
-  IntSetIter *i2 = IntSetIterNew(s2);
-  IntSetEntry *entry = NULL;
-
-  while ((entry = IntSetIterNext(i1))) {
-    if (IntSetHas(s2,entry->key)) {
-      IntSetAdd(intersection_set,entry->key);
+pub IntSetEntry *intSetIterNext(IntSetIter *it) {
+    if (!it || it.sp == 0) {
+        return null;
     }
-  }
-
-  while ((entry = IntSetIterNext(i2))) {
-    if (IntSetHas(s1,entry->key)) {
-      IntSetAdd(intersection_set,entry->key);
+    if (it.tree.version != it.version) {
+        it.sp = 0; /* the set changed: stop for good */
+        return null;
     }
-  }
 
-  IntSetIterRelease(i1);
-  IntSetIterRelease(i2);
-  return intersection_set;
+    map.RBNode *node = it.stack[--it.sp];
+    it.entry.key = (i64)node.key;
+    auto rightTree = node.right;
+
+    while (!rbIsNil(rightTree)) {
+        it.stack[it.sp++] = rightTree;
+        rightTree = rightTree.left;
+    }
+
+    return it.entry;
 }
 
-public Bool IntSetEq(IntSet *s1, IntSet *s2)
-{
-  if (IntSetSize(s1) != IntSetSize(s2)) return FALSE;
+pub void intSetIterRelease(IntSetIter *iter) {
+    if (!iter) { return; }
+    memFree(iter.entry);
+    memFree(iter.stack);
+    memFree(iter);
+}
 
-  IntSetIter *i1 = IntSetIterNew(s1);
-  IntSetIter *i2 = IntSetIterNew(s2);
-  IntSetEntry *entry = NULL;
-  Bool retval = TRUE;
+pub bool intSetHas(IntSet *set, i64 key) {
+    if (!set) { return false; }
+    return set.tree.has((void*)key);
+}
 
-  while ((entry = IntSetIterNext(i1))) {
-    if (!IntSetHas(s2,entry->key)) {
-      retval = FALSE;
-      goto out;
+pub void intSetAdd(IntSet *set, i64 key) {
+    return set.tree.set((void*)key,null);
+}
+
+pub void intSetDelete(IntSet *set, i64 key) {
+    set.tree.delete((void*)key);
+}
+
+pub IntSet *intSetUnion(IntSet *s1, IntSet *s2) {
+    IntSet *unionSet = intSetNew();
+    IntSetIter *i1 = intSetIterNew(s1);
+    IntSetIter *i2 = intSetIterNew(s2);
+    IntSetEntry *entry = null;
+
+    while ((entry = intSetIterNext(i1))) {
+        intSetAdd(unionSet,entry.key);
     }
-  }
 
-  while ((entry = IntSetIterNext(i2))) {
-    if (!IntSetHas(s1,entry->key)) {
-      retval = FALSE;
-      goto out;
+    while ((entry = intSetIterNext(i2))) {
+        intSetAdd(unionSet,entry.key);
     }
-  }
+
+    intSetIterRelease(i1);
+    intSetIterRelease(i2);
+    return unionSet;
+}
+
+pub IntSet *intSetDiff(IntSet *s1, IntSet *s2) {
+    IntSet *diffSet = intSetNew();
+    IntSetIter *i1 = intSetIterNew(s1);
+    IntSetEntry *entry = null;
+
+    while ((entry = intSetIterNext(i1))) {
+        if (!intSetHas(s2, (i64)entry.key)) {
+            intSetAdd(diffSet,(i64)entry.key);
+        }
+    }
+
+    intSetIterRelease(i1);
+    return diffSet;
+}
+
+pub IntSet *intSetIntersection(IntSet *s1, IntSet *s2) {
+    IntSet *intersectionSet = intSetNew();
+    IntSetIter *i1 = intSetIterNew(s1);
+    IntSetIter *i2 = intSetIterNew(s2);
+    IntSetEntry *entry = null;
+
+    while ((entry = intSetIterNext(i1))) {
+        if (intSetHas(s2,entry.key)) {
+            intSetAdd(intersectionSet,entry.key);
+        }
+    }
+
+    while ((entry = intSetIterNext(i2))) {
+        if (intSetHas(s1,entry.key)) {
+            intSetAdd(intersectionSet,entry.key);
+        }
+    }
+
+    intSetIterRelease(i1);
+    intSetIterRelease(i2);
+    return intersectionSet;
+}
+
+pub bool intSetEq(IntSet *s1, IntSet *s2) {
+    if (intSetSize(s1) != intSetSize(s2)) { return false; }
+
+    IntSetIter *i1 = intSetIterNew(s1);
+    IntSetIter *i2 = intSetIterNew(s2);
+    IntSetEntry *entry = null;
+    bool retval = true;
+
+    while ((entry = intSetIterNext(i1))) {
+        if (!intSetHas(s2,entry.key)) {
+            retval = false;
+            goto out;
+        }
+    }
+
+    while ((entry = intSetIterNext(i2))) {
+        if (!intSetHas(s1,entry.key)) {
+            retval = false;
+            goto out;
+        }
+    }
 
 out:
-  IntSetIterRelease(i1);
-  IntSetIterRelease(i2);
-  return retval;
+    intSetIterRelease(i1);
+    intSetIterRelease(i2);
+    return retval;
 }
 
-public IntVec *IntSetToVec(IntSet *set)
-{
-  IntVec *vec = IntVecNew;
-  IntSetIter *i1 = IntSetIterNew(set);
-  IntSetEntry *entry = NULL;
-  while ((entry = IntSetIterNext(i1))) {
-    IntVecPush(vec,entry->key);
-  }
-  IntSetIterRelease(i1);
-  return vec;
-}
-
-public IntSet *IntSetSymDiff(IntSet *s1, IntSet *s2)
-{
-  IntSet *sym_diff_set = IntSetNew();
-  IntSetIter *i1 = IntSetIterNew(s1);
-  IntSetIter *i2 = IntSetIterNew(s2);
-  IntSetEntry *entry = NULL;
-
-  /* Add elements from s1 that are not in s2 */
-  while ((entry = IntSetIterNext(i1))) {
-    if (!IntSetHas(s2,entry->key)) {
-      IntSetAdd(sym_diff_set,entry->key);
+pub vec.IntVec *intSetToVec(IntSet *set) {
+    vec.IntVec *vec = intVecNew();
+    IntSetIter *i1 = intSetIterNew(set);
+    IntSetEntry *entry = null;
+    while ((entry = intSetIterNext(i1))) {
+        vec.push(entry.key);
     }
-  }
+    intSetIterRelease(i1);
+    return vec;
+}
 
-  /* Add elements from s2 that are not in s1 */
-  while ((entry = IntSetIterNext(i2))) {
-    if (!IntSetHas(s1,entry->key)) {
-      IntSetAdd(sym_diff_set,entry->key);
+pub IntSet *intSetSymDiff(IntSet *s1, IntSet *s2) {
+    IntSet *symDiffSet = intSetNew();
+    IntSetIter *i1 = intSetIterNew(s1);
+    IntSetIter *i2 = intSetIterNew(s2);
+    IntSetEntry *entry = null;
+
+    /* Add elements from s1 that are not in s2 */
+    while ((entry = intSetIterNext(i1))) {
+        if (!intSetHas(s2,entry.key)) {
+            intSetAdd(symDiffSet,entry.key);
+        }
     }
-  }
 
-  IntSetIterRelease(i1);
-  IntSetIterRelease(i2);
-  return sym_diff_set;
+    /* Add elements from s2 that are not in s1 */
+    while ((entry = intSetIterNext(i2))) {
+        if (!intSetHas(s1,entry.key)) {
+            intSetAdd(symDiffSet,entry.key);
+        }
+    }
+
+    intSetIterRelease(i1);
+    intSetIterRelease(i2);
+    return symDiffSet;
 }
 
-public U8 *IntSetToString(IntSet *set)
-{
-  I64 len = 1;
-  U8 *buf = StrNew("{");
-  IntSetIter *i1 = IntSetIterNew(set);
-  IntSetEntry *entry = NULL;
-  Bool first = TRUE;
+pub u8 *intSetToString(IntSet *set) {
+    i64 len = 1;
+    u8 *buf = strNew("{");
+    IntSetIter *i1 = intSetIterNew(set);
+    IntSetEntry *entry = null;
+    bool first = true;
 
-  while ((entry = IntSetIterNext(i1))) {
-    if (first) buf = CatLenPrint(buf, &len, "%d", entry->key);
-    else       buf = CatLenPrint(buf, &len, ", %d", entry->key);
-    first = FALSE;
-  }
-  IntSetIterRelease(i1);
-  return CatLenPrint(buf, &len, "}");
+    while ((entry = intSetIterNext(i1))) {
+        if (first) { buf = strAppendFormatLen(buf, &len, "%d", entry.key); }
+        else       { buf = strAppendFormatLen(buf, &len, ", %d", entry.key); }
+        first = false;
+    }
+    intSetIterRelease(i1);
+    return strAppendFormatLen(buf, &len, "}");
 }
 
-public U0 IntSetRelease(IntSet *set)
-{
-  if (!set) return;
-  RBTreeRelease(set->tree);
-  Free(set);
+pub void intSetRelease(IntSet *set) {
+    if (!set) { return; }
+    set.tree.release();
+    memFree(set);
 }

@@ -1,3 +1,3 @@
 module c;
 
-public extern "c" I32 sigaction(I32 sig, U0 *act, U0 *oldact);
+pub extern "c" i32 sigaction(i32 sig, void *act, void *oldact);

@@ -1,4 +1,5 @@
 module signal;
+import c, mem, os;
 
 #ifdef IS_MACOS
 #define SIG_SA_FLAGS_AT  12
@@ -12,17 +13,17 @@ module signal;
 #define SIG_MAX          64
 #endif
 
-#define SIG_SA_BYTES     160   /* >= 152, the largest struct sigaction */
+const i64 SIG_SA_BYTES = 160;   /* >= 152, the largest struct sigaction */
 
-#define SIG_SIGINT       2
+const i64 SIG_SIGINT = 2;
 
-#define SIG_SIGTERM      15
+const i64 SIG_SIGTERM = 15;
 
-#define SIG_F_SETFD      2
+const i64 SIG_F_SETFD = 2;
 
-#define SIG_F_GETFL      3
+const i64 SIG_F_GETFL = 3;
 
-#define SIG_F_SETFL      4
+const i64 SIG_F_SETFL = 4;
 
 #ifdef IS_MACOS
 #define SIG_O_NONBLOCK   0x4
@@ -31,76 +32,73 @@ module signal;
 #endif
 
 /* A signal action, as SigAction takes and returns it. */
-public class SigAct
-{
-  I64 handler;  /* SIG_DFL, SIG_IGN, or a U0 F(I32 sig) as (&F)(I64) */
-  U64 mask;     /* signals blocked while it runs: SigBit(s) | ... */
-  I32 flags;    /* SA_RESTART, SA_RESETHAND, SA_NODEFER, ... */
+pub struct SigAct {
+    i64 handler;  /* SIG_DFL, SIG_IGN, or a void F(i32 sig) as (&F)(i64) */
+    u64 mask;     /* signals blocked while it runs: SigBit(s) | ... */
+    i32 flags;    /* SA_RESTART, SA_RESETHAND, SA_NODEFER, ... */
 };
 
 /* The bit for sig in SigAct.mask. */
-public U64 SigBit(I32 sig)
-{
-  if (sig < 1 || sig > 64) return 0;
-  return 1(U64) << (sig - 1);
+pub u64 sigBit(i32 sig) {
+    if (sig < 1 || sig > 64) { return 0; }
+    return (u64)1 << (sig - 1);
 }
 
-/* Set the action for sig to *act (unless act is NULL) and store the
- * previous one in *old (unless old is NULL). FALSE on failure, Errno()
+/* Set the action for sig to *act (unless act is null) and store the
+ * previous one in *old (unless old is null). false on failure, Errno()
  * says why (EINVAL: a bad signal number, or SIGKILL/SIGSTOP). */
-public Bool SigAction(I32 sig, SigAct *act, SigAct *old=NULL)
-{
-  I64 cact[SIG_SA_BYTES / 8], cold[SIG_SA_BYTES / 8];
-  I32 s;
-  U0 *pact = NULL, *pold = NULL;
-  MemSet(cact, 0, sizeof(cact));
-  MemSet(cold, 0, sizeof(cold));
-  if (act) {
-    cact[0] = act->handler;
-    sigemptyset(cact(U8 *) + 8);
-    for (s = 1; s <= SIG_MAX; s++)
-      if (act->mask & SigBit(s)) sigaddset(cact(U8 *) + 8, s);
-    *(cact(U8 *) + SIG_SA_FLAGS_AT)(I32 *) = act->flags;
-    pact = cact;
-  }
-  if (old) pold = cold;
-  if (sigaction(sig, pact, pold) != 0) return FALSE;
-  if (old) {
-    old->handler = cold[0];
-    old->mask = 0;
-    for (s = 1; s <= SIG_MAX; s++)
-      if (sigismember(cold(U8 *) + 8, s) == 1) old->mask |= SigBit(s);
-    old->flags = *(cold(U8 *) + SIG_SA_FLAGS_AT)(I32 *);
-  }
-  return TRUE;
+pub bool sigAction(i32 sig, SigAct *act, SigAct *old=null) {
+    i64 cact[SIG_SA_BYTES / 8], cold[SIG_SA_BYTES / 8];
+    i32 s;
+    void *pact = null, *pold = null;
+    memSet(cact, 0, sizeof(cact));
+    memSet(cold, 0, sizeof(cold));
+    if (act) {
+        cact[0] = act.handler;
+        c.sigemptyset((u8 *)cact + 8);
+        for (s = 1; s <= SIG_MAX; s++) {
+            if (act.mask & sigBit(s)) { c.sigaddset((u8 *)cact + 8, s); }
+        }
+        *(i32 *)((u8 *)cact + SIG_SA_FLAGS_AT) = act.flags;
+        pact = cact;
+    }
+    if (old) { pold = cold; }
+    if (c.sigaction(sig, pact, pold) != 0) { return false; }
+    if (old) {
+        old.handler = cold[0];
+        old.mask = 0;
+        for (s = 1; s <= SIG_MAX; s++) {
+            if (c.sigismember((u8 *)cold + 8, s) == 1) { old.mask |= sigBit(s); }
+        }
+        old.flags = *(i32 *)((u8 *)cold + SIG_SA_FLAGS_AT);
+    }
+    return true;
 }
 
-/* SigAction in one call: handler (SIG_DFL, SIG_IGN or (&F)(I64)) for
+/* SigAction in one call: handler (SIG_DFL, SIG_IGN or (&F)(i64)) for
  * sig, with flags and mask; the previous action in *old if given. */
-public Bool SigHandle(I32 sig, I64 handler, I32 flags=SIG_SA_RESTART,
-                      U64 mask=0, SigAct *old=NULL)
-{
-  SigAct a;
-  a.handler = handler;
-  a.mask = mask;
-  a.flags = flags;
-  return SigAction(sig, &a, old);
+pub bool sigHandle(i32 sig, i64 handler, i32 flags=SIG_SA_RESTART,
+                                            u64 mask=0, SigAct *old=null) {
+    SigAct a;
+    a.handler = handler;
+    a.mask = mask;
+    a.flags = flags;
+    return sigAction(sig, &a, old);
 }
 
 /* The pipe SigStopInit made, -1 before; the signal that asked to stop */
-static I32 sig_stop_rfd = -1, sig_stop_wfd = -1;
+static i32 sigStopRfd = -1, sigStopWfd = -1;
 
-static I64 sig_stop_sig = 0;
+static i64 sigStopSig = 0;
 
 /* Runs in the signal: only a store and write(2), and errno is left as
  * the interrupted code had it. */
-static U0 SigStopHandler(I32 sig)
-{
-  I32 err = Errno();
-  U8 b = 1;
-  sig_stop_sig = sig;
-  write(sig_stop_wfd, &b, 1);    /* non-blocking: a full pipe is fine */
-  SetErrno(err);
+static void sigStopHandler(i32 sig) {
+    i32 err = errno();
+    u8 b = 1;
+    sigStopSig = sig;
+    c.write(sigStopWfd, &b, 1);    /* non-blocking: a full pipe is fine */
+    setErrno(err);
 }
 
 /* Make SIGINT and SIGTERM request a clean stop instead of ending the
@@ -111,30 +109,27 @@ static U0 SigStopHandler(I32 sig)
  * close-on-exec; reading it is optional. Returns the same fd on later
  * calls, -1 if the pipe can't be made. Call it once, before starting
  * threads. */
-public I32 SigStopInit()
-{
-  I32 fds[2];
-  if (sig_stop_rfd != -1) return sig_stop_rfd;
-  if (pipe(fds) != 0) return -1;
-  fcntl(fds[0], SIG_F_SETFD, 1);
-  fcntl(fds[1], SIG_F_SETFD, 1);
-  fcntl(fds[0], SIG_F_SETFL, fcntl(fds[0], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
-  fcntl(fds[1], SIG_F_SETFL, fcntl(fds[1], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
-  sig_stop_rfd = fds[0];
-  sig_stop_wfd = fds[1];
-  SigHandle(SIG_SIGINT, (&SigStopHandler)(I64), SIG_SA_RESTART | SIG_SA_RESETHAND);
-  SigHandle(SIG_SIGTERM, (&SigStopHandler)(I64), SIG_SA_RESTART | SIG_SA_RESETHAND);
-  return sig_stop_rfd;
+pub i32 sigStopInit() {
+    i32 fds[2];
+    if (sigStopRfd != -1) { return sigStopRfd; }
+    if (c.pipe(fds) != 0) { return -1; }
+    c.fcntl(fds[0], SIG_F_SETFD, 1);
+    c.fcntl(fds[1], SIG_F_SETFD, 1);
+    c.fcntl(fds[0], SIG_F_SETFL, c.fcntl(fds[0], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
+    c.fcntl(fds[1], SIG_F_SETFL, c.fcntl(fds[1], SIG_F_GETFL, 0) | SIG_O_NONBLOCK);
+    sigStopRfd = fds[0];
+    sigStopWfd = fds[1];
+    sigHandle(SIG_SIGINT, (i64)(&sigStopHandler), SIG_SA_RESTART | SIG_SA_RESETHAND);
+    sigHandle(SIG_SIGTERM, (i64)(&sigStopHandler), SIG_SA_RESTART | SIG_SA_RESETHAND);
+    return sigStopRfd;
 }
 
-/* TRUE once SIGINT or SIGTERM arrived after SigStopInit. */
-public Bool SigStopRequested()
-{
-  return sig_stop_sig != 0;
+/* true once SIGINT or SIGTERM arrived after SigStopInit. */
+pub bool sigStopRequested() {
+    return sigStopSig != 0;
 }
 
 /* The signal that requested the stop (SIGINT or SIGTERM), 0 if none. */
-public I32 SigStopSignal()
-{
-  return sig_stop_sig;
+pub i32 sigStopSignal() {
+    return sigStopSig;
 }

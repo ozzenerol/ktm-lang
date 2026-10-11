@@ -1,9 +1,9 @@
 module c;
 
-public extern "c" U0 *mmap(U0 *addr, U64 len, I32 prot, I32 flags, I32 fd, I64 offset);
+pub extern "c" void *mmap(void *addr, u64 len, i32 prot, i32 flags, i32 fd, i64 offset);
 
-public extern "c" I32 munmap(U0 *addr, U64 len);
+pub extern "c" i32 munmap(void *addr, u64 len);
 
-public extern "c" I32 mprotect(U0 *addr, U64 len, I32 prot);
+pub extern "c" i32 mprotect(void *addr, u64 len, i32 prot);
 
-public extern "c" I32 getpagesize();
+pub extern "c" i32 getpagesize();

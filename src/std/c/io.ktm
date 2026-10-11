@@ -1,7 +1,7 @@
 module c;
 
-public extern "c" I8 *getcwd(U8 *buf, U64 size);
+pub extern "c" i8 *getcwd(u8 *buf, u64 size);
 
-public extern "c" I8 *getenv(U8 *buf);
+pub extern "c" i8 *getenv(u8 *buf);
 
-public extern "c" I32 isatty(I32 fd);
+pub extern "c" i32 isatty(i32 fd);

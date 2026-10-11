@@ -3,14 +3,14 @@ module c;
 /* The compiler's try and defer frames use _setjmp, which unlike setjmp
  * doesn't save the signal mask (a sigprocmask syscall per try or defer
  * reached); so a throw is a _longjmp, which doesn't restore it. */
-public extern "c" U0 _longjmp(U0 *env, I32 val);
+pub extern "c" void _longjmp(void *env, i32 val);
 
-public extern "c" I32 fflush(U0 *stream);
+pub extern "c" i32 fflush(void *stream);
 
-public extern "c" I32 pthread_once(U0 *once, U0 (*init)());
+pub extern "c" i32 pthread_once(void *once, fn() void init);
 
-public extern "c" I32 pthread_key_create(U64 *key, U0 (*destructor)(U0 *));
+pub extern "c" i32 pthread_key_create(u64 *key, fn(void *) void destructor);
 
-public extern "c" U0 *pthread_getspecific(U64 key);
+pub extern "c" void *pthread_getspecific(u64 key);
 
-public extern "c" I32 pthread_setspecific(U64 key, U0 *value);
+pub extern "c" i32 pthread_setspecific(u64 key, void *value);

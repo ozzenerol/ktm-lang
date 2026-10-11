@@ -1,4 +1,4 @@
 module map;
 
 /* The `order` of a deleted hash table node (a tombstone) */
-#define HT_DELETED 0x7fffffffffffffff
+const i64 HT_DELETED = 0x7fffffffffffffff;

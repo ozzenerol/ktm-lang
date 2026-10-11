@@ -1,52 +1,52 @@
 module str;
 
 /* The size StrPrint and MPrintQ start a new buffer at (it grows). */
-#define STR_LEN 256
+const i64 STR_LEN = 256;
 
 /* StrPrint's internal format flags; MPrintQ's `flags` takes PRTF_SLASH,
  * which doubles each '%'. */
-#define PRTF_PAD_ZERO        0x001
+const i64 PRTF_PAD_ZERO = 0x001;
 
-#define PRTF_LEFT_JUSTIFY    0x002
+const i64 PRTF_LEFT_JUSTIFY = 0x002;
 
-#define PRTF_TRUNCATE        0x004
+const i64 PRTF_TRUNCATE = 0x004;
 
-#define PRTF_SLASH           0x020
+const i64 PRTF_SLASH = 0x020;
 
-#define PRTF_DECIMAL         0x100
+const i64 PRTF_DECIMAL = 0x100;
 
 /* Compare at most len bytes like C's strncmp: < 0, 0 or > 0, bytes compared
- * as unsigned, stopping at a NUL. NULL sorts before every string (two NULLs
+ * as unsigned, stopping at a NUL. null sorts before every string (two NULLs
  * are equal), whatever len is. */
-public _extern _STRNCMP I64 StrNCmp(U8 *s1, U8 *s2, I64 len);
+pub _extern _STRNCMP i64 strNCmp(u8 *s1, u8 *s2, i64 len);
 
 /* StrNCmp ignoring ASCII case, like C's strncasecmp. */
-public _extern _STRNICMP I64 StrNICmp(U8 *s1, U8 *s2, I64 len);
+pub _extern _STRNICMP i64 strNICmp(u8 *s1, u8 *s2, i64 len);
 
-/* Copy src and its NUL into dst, which must be big enough. A NULL src
- * copies "" and a NULL dst does nothing. */
-public _extern _STRCPY U0 StrCpy(U8 *dst, U8 *src);
+/* Copy src and its NUL into dst, which must be big enough. A null src
+ * copies "" and a null dst does nothing. */
+pub _extern _STRCPY void strCpy(u8 *dst, u8 *src);
 
 /* Compare like C's strcmp: < 0, 0 or > 0, bytes compared as unsigned.
- * NULL sorts before every string; two NULLs are equal. */
-public _extern _STRCMP I64 StrCmp(U8 *s1, U8 *s2);
+ * null sorts before every string; two NULLs are equal. */
+pub _extern _STRCMP i64 strCmp(u8 *s1, u8 *s2);
 
 #ifdef IS_X86_64
 /* ch in lower case: only 'A'-'Z' change (ASCII). */
-public _extern _TOLOWER U8 ToLower(U8 ch);
+pub _extern _TOLOWER u8 toLower(u8 ch);
 /* ch in upper case: only 'a'-'z' change (ASCII). */
-public _extern _TOUPPER U8 ToUpper(U8 ch);
-/* TRUE for ' ', '\t', '\n', '\v', '\f' and '\r'. */
-public _extern _ISSPACE Bool IsSpace(U8 ch);
+pub _extern _TOUPPER u8 toUpper(u8 ch);
+/* true for ' ', '\t', '\n', '\v', '\f' and '\r'. */
+pub _extern _ISSPACE bool isSpace(u8 ch);
 /* A 64-bit hash of str's bytes: h = h * 31 + c from 0, then a final mix
  * (murmur3's), so similar keys spread over the low bits; "" hashes to 0.
  * The same value on every target. */
-public _extern _STRHASH U64 StrHash(U8 *str);
+pub _extern _STRHASH u64 strHash(u8 *str);
 #endif
 
 #ifdef IS_ARM_64
-public U8 ToLower(U8 ch);
-public U8 ToUpper(U8 ch);
-public Bool IsSpace(U8 ch);
-public U64 StrHash(U8 *str);
+pub u8 ToLower(u8 ch);
+pub u8 ToUpper(u8 ch);
+pub bool IsSpace(u8 ch);
+pub u64 StrHash(u8 *str);
 #endif

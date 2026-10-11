@@ -10,7 +10,12 @@ Steps (plan approved by asuslab-33):
   leave the API private to their module, the dropped names removed (Dir, IsDotC/Z, Write, CH_*,
   RM_VERBOSE, TRUE/FALSE/NULL, __BUFSIZ__), the prelude's names left to src/std/prelude.
   The files are still in the OLD syntax: the tree does not build from here until A2-A4.
-- A2 convert each module with ktm-convert (--map --names --renames --layout), through a root
+- A2 (raw done): every module converted in one run of ktm-convert (feat/convert 4ad24c4) through a
+  root importing all of them (`#define __KTM_LINK_SQLITE3__` + `import <m>;`), --map --names --renames
+  --layout, 0 errors; notes in ~/opensource/ktm-scratch/conv-notes/std.err. To regenerate: split.py
+  from the old src/std (3585f56), then the same run. Hand fixes next (Write -> c.write, the #if
+  branches converted from text only, public -> pub check, ...).
+- A2 (plan) convert each module with ktm-convert (--map --names --renames --layout), through a root
   that imports every module; hand fixes (Write -> c.write, Fs in coro, ...).
 - A3 compiler: std.ktmh optional; runtime calls to rt.__ktm*; -Memsafe and the printf check on
   the module names.
