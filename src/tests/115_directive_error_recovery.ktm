@@ -171,7 +171,7 @@ bool testBadNumber(void) {
 
 bool testLongCharConst(void) {
     return errorOnlyEverywhere("'abcdefghij'", "i64 c = 'abcdefghij';\n",
-                                                         "Char const limited to 8 characters");
+                                                         "a character literal holds one character");
 }
 
 bool testBadEscape(void) {

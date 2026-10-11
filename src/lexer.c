@@ -1391,9 +1391,10 @@ done:
     return buffer;
 }
 
-/* Length of the char const is returned, it OR's in at max 8 characters. 
- * A s64 being 64 bits and 64/8 = 8. l->cur_strlen is set to its length in
- * the source, between the quotes (`'\n'` is 2), as for a string. */
+/* A character literal: exactly one character, an escape counting as one
+ * (Y9b); more is an error, though up to 8 are still read into the value
+ * so the error recovers. l->cur_strlen is set to its length in the
+ * source, between the quotes (`'\n'` is 2), as for a string. */
 u64 lexCharConst(Lexer *l) {
     u64 char_const = 0, idx;
     s64 hex_num = 0;
@@ -1491,12 +1492,12 @@ u64 lexCharConst(Lexer *l) {
     if (!(l->flags & CCF_PERMISSIVE)) {
         /* Both leave the lexer past the constant (at its closing quote
          * or the end of input); the truncated value is handed back. */
-        if (overflowed) {
-            lexReport(l, "Char const limited to %d characters",
-                      LEX_CHAR_CONST_LEN);
-        }
         if (!ch) {
             lexReport(l, "Unterminated char const");
+        } else if (len != 1 || overflowed) {
+            /* Y9b: one character, an escape counting as one */
+            lexReport(l, "a character literal holds one character; use a "
+                         "string or an enum");
         }
     }
 

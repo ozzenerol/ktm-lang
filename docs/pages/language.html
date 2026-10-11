@@ -132,23 +132,24 @@ void main()
   f64 f = 1.5e3, g = 2e-3;
   printf("%d %d %d %.1f %.3f\n", dec, hex, bin, f, g);
 
-  // Character constants hold up to 8 characters, packed into an integer
-  // (the first in the low byte), and take the same escapes as strings.
-  i64 one = 'A', many = 'Hi';
-  printf("%d %d %c\n", one, many, one);
+  // A character constant is one character (an escape counts as one),
+  // an integer, and takes the same escapes as strings.
+  i64 one = 'A', nl = '\n';
+  printf("%d %d %c\n", one, nl, one);
 
   printf("tab:[\t] quote:[\"] backslash:[\\]\n");
 }
 </code></pre>
 <pre class="output">
 42 255 10 1500.0 0.002
-65 26952 A
+65 10 A
 tab:[	] quote:["] backslash:[\]
 </pre>
 <p>Integers can be written in decimal, hex (<code>0x</code>) or binary
 (<code>0b</code>). A number with a <code>.</code> or an exponent (<code>1e3</code>,
-<code>2e-3</code>) is an <code>f64</code>. Multi-character constants are a ktm idiom for short tags, such as the values thrown by
-<a href="#exceptions">exceptions</a>. String literals are <code>u8 *</code>.</p>
+<code>2e-3</code>) is an <code>f64</code>. A character constant holds exactly one character:
+<code>'ab'</code> is an error (use a string, or an enum for a set of tags). String literals
+are <code>u8 *</code>.</p>
 <p>Strings take the C escapes <code>\n \t \r \b \f \v \a
 \\ \' \"</code>, and <code>\d</code> for <code>$</code>. <code>\x</code> takes at most two hex digits, so <code>"\x01b"</code> is the
 bytes 1 and <code>'b'</code>, and <code>\0</code> to <code>\7</code> start an octal escape of

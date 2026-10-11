@@ -76,15 +76,15 @@ i32 main() {
 {
   u8 *s = \"a\\\"b\\n\";
   printf(\"plain %d %s\\n\", 42, \"x\");
-  printf(\"%Q|%C|%5s|%d\\n\", s, 'abc', \"hi\", -7);
+  printf(\"%Q|%C|%5s|%d\\n\", s, 'a', \"hi\", -7);
   printf(\"plain %05.1f\\n\", 3.14159);
-  printf(\"%c%C|%-4C|%3C|\\n\", 'x', 'y', 'ab', 'z');
+  printf(\"%c%C|%-4C|%3C|\\n\", 'x', 'y', 'b', 'z');
 }
 ",
 "plain 42 x
-a\\\"b\\n|ABC|   hi|-7
+a\\\"b\\n|A|   hi|-7
 plain 003.1
-xY|AB  |  Z|
+xY|B   |  Z|
 ")) { correct++; }
 
     /* %%Q is a literal, not a conversion */

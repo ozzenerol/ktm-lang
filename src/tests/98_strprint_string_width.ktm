@@ -124,7 +124,7 @@ i32 main() {
     str.formatTo(ours, "[%3c][%-3c][%c]", 'a', 'b', 'c');
     snprintf(want, sizeof(want), "[%3c][%-3c][%c]", 'a', 'b', 'c');
     if (!str.cmp(ours, want) &&
-            !str.cmp(str.formatTo(buf, "[%4C][%-4C]", 'ab', 'cd'), "[  AB][CD  ]")) {
+            !str.cmp(str.formatTo(buf, "[%4C][%-4C]", 'a', 'b'), "[   A][B   ]")) {
         correct++;
     }
 

@@ -25,20 +25,13 @@ i32 main() {
         correct++;
     }
 
-    /* Hex takes at most two digits, octal at most three */
+    /* Hex takes at most two digits, octal at most three (more would be
+     * a second character: an error, see 224) */
     tests++;
-    if ('\x41' == 65 && '\x7' == 7 && '\X4a' == 0x4A && '\x41B' == 0x4241 &&
-            '\033' == 27 && '\0' == 0 && '\101' == 'A' && '\08' == 0x3800 &&
-            '\1234' == 0x3453) {
+    if ('\x41' == 65 && '\x7' == 7 && '\X4a' == 0x4A && '\033' == 27 &&
+            '\0' == 0 && '\101' == 'A') {
         correct++;
-            }
-
-    /* Multi-character constants, first character in the low byte */
-    tests++;
-    if ('AB' == 0x4241 && 'A\bB' == 0x420841 && '\b\b' == 0x0808 &&
-            'a\'b' == 0x622761 && '\x01\x02' == 0x0201 && '\\\n' == 0x0A5C) {
-        correct++;
-            }
+    }
 
     /* The same bytes as the string forms */
     tests++;

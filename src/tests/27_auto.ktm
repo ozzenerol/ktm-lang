@@ -28,11 +28,11 @@ bool variableAutos() {
     auto correct = 0, tests = 5;
     auto x = 1<<2,
              f = 4.5,
-             ch = 'hello', 
+             ch = 'h', 
              p = (Person *)mem.alloc(sizeof(Person));
     if (x + 4 == 8)    { correct++; }
     if (f + 4.5 == 9)  { correct++; }
-    if (ch == 'hello') { correct++; }
+    if (ch == 'h') { correct++; }
     p.age = 42;
     mem.copy(p.name,"PersonB",7);
     if (p.age == 42) { correct++; }
