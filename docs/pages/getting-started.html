@@ -75,9 +75,30 @@ up in order before <code>main</code>.</p>
 
 <h2>The standard library</h2>
 <p>The standard library is a set of modules: import the ones a file uses and call their
-names with the module in front (<code>import str, mem;</code> then <code>cstr.len(s)</code>,
-<code>mem.alloc(n)</code>). C's own functions are in <code>libc</code>. The compiler links
+names with the module in front (<code>import str, fs;</code> then <code>str.format(...)</code>,
+<code>fs.readAll(path)</code>). C's own functions are in <code>libc</code>. The compiler links
 <code>libktm</code> automatically. See the <a href="library.html">library guide</a>.</p>
+
+<h2>Text</h2>
+<p>A <code>String</code> is text you own: make it, free it where you made it with
+<code>defer</code>, and change it with its methods. Text you only read is a <code>u8[]</code>,
+a slice: a literal, part of a String or of a buffer, with its length, so nothing is
+copied.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  String greeting = str.format("Hello, %s", "world");
+  defer greeting.free();
+  greeting.append("!");
+  u8[] word = greeting[7:12];
+  printf("%s (%d bytes), the word is %s\n", greeting, greeting.len, word);
+}
+</code></pre>
+<pre class="output">
+Hello, world! (13 bytes), the word is world
+</pre>
 
 <h2>Several files</h2>
 <p>Put related code in a module: a directory whose files start with <code>module</code> and
@@ -90,7 +111,7 @@ pub i64 area(i64 w, i64 h)
     return w * h;
 }</code></pre>
 <pre><code>// main.ktm
-import cstr, geometry;
+import geometry;
 
 void main()
 {

@@ -40,30 +40,30 @@ ktm -jit hello.ktm                    # or compile in memory and run straight aw
 <p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
 Unix sockets, IPv4 and IPv6.</p>
 <pre data-run><code>
-import cstr, libc, mem, net;
+import libc, net, str;
 
 void main()
 {
   i32 srv = net.listen(0, "127.0.0.1", 4);
   i32 cli = net.dial("127.0.0.1", net.localPort(srv));
   i32 conn = net.accept(srv);
-  u8 req[256], resp[256];
-  i64 n;
+  u8 buf[256];
 
-  net.send(cli, "GET /hello HTTP/1.0\r\n\r\n", 23);
+  net.send(cli, "GET /hello HTTP/1.0\r\n\r\n");
 
-  n = libc.recv(conn, req, sizeof(req) - 1, 0);   // the server side
-  req[n] = '\0';
-  u8 *path = req + 4;                          // after "GET "
-  *cstr.firstOf(path, " ") = '\0';
-  u8 *reply = cstr.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
-  net.send(conn, reply, cstr.len(reply));
+  i64 n = libc.recv(conn, buf, sizeof(buf), 0);      // the server side
+  u8[] line, rest, path, version;
+  str.splitFirst(buf[0:n], "\r\n", &line, &rest);
+  str.splitFirst(line[4:], " ", &path, &version);     // after "GET "
+  String reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  defer reply.free();
+  net.send(conn, reply);
   libc.close(conn);
 
-  n = libc.recv(cli, resp, sizeof(resp) - 1, libc.MSG_WAITALL);  // the client side
-  resp[n] = '\0';
-  printf("%s", libc.strstr(resp, "\r\n\r\n") + 4);
-  mem.free(reply);
+  n = libc.recv(cli, buf, sizeof(buf), libc.MSG_WAITALL);  // the client side
+  u8[] head, body;
+  str.splitFirst(buf[0:n], "\r\n\r\n", &head, &body);
+  printf("%s", body);
   libc.close(cli);
   libc.close(srv);
 }

@@ -37,7 +37,7 @@ bool isMode(u8 *path, i64 kind) {
 bool talk(i32 srv, u8 *path)
 {// A client on path reaches srv
     u8 b = 0;
-    i32 c = net.unixDial(path);
+    i32 c = net.unixDial(cstr.view(path));
     if (c == -1) { return false; }
     i32 a = net.accept(srv);
     bool ok = a != -1 && libc.write(c, "x", 1) == 1 && libc.read(a, &b, 1) == 1 && b == 'x';

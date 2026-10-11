@@ -78,9 +78,9 @@ i32 main() {
 
     /* formatting. */
     c = mkDate(2024, 2, 29, 12, 34, 56);
-    if (strIs(date.formatDate(c), "02/29/2024")) { correct++; }
-    if (strIs(date.formatTime(c), "12:34:56")) { correct++; }
-    if (strIs(date.format(c, "%m/%d/%Y %H:%M:%S"), "02/29/2024 12:34:56")) { correct++; }
+    if (strIs(date.formatDate(c).take(), "02/29/2024")) { correct++; }
+    if (strIs(date.formatTime(c).take(), "12:34:56")) { correct++; }
+    if (strIs(date.format(c, "%m/%d/%Y %H:%M:%S").take(), "02/29/2024 12:34:56")) { correct++; }
 
     /* Day helpers. */
     d = mkDay(2024, 2, 15);

@@ -62,8 +62,7 @@ void main()
   libc.timespec ts;
   ts.tv_sec = 86400 * 365;
   ts.tv_nsec = 0;
-  u8 iso[64];
-  date.isoFromTimespec(&ts, iso);
+  String iso = date.isoFromTimespec(&ts);
   printf(\"cap=%d get=%d str=%d json=%s sorted=%d%d%d iso=%s own=%d\\n\",
     im.capacity, im.get(49), sm.get(\"k\"), js,
     v.entries[0], v.entries[1], v.entries[2], iso,

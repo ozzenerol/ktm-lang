@@ -1,5 +1,27 @@
 import cstr, libc, mem, net, test;
 
+/* the String forms of net's address functions, into a C buffer here */
+bool copyOut(String *s, u8 *buf, i64 size) {
+    bool ok = s.ptr && s.len < size;
+    if (ok) { cstr.copy(buf, s.cstr()); }
+    s.free();
+    return ok;
+}
+bool peerInto(i32 fd, u8 *buf, i64 size) {
+    String s = net.peerAddr(fd);
+    return copyOut(&s, buf, size);
+}
+bool addrInto(libc.sockaddr *sa, i32 fam, u8 *buf, i64 size) {
+    String s = net.addrToStr(sa, fam);
+    return copyOut(&s, buf, size);
+}
+i64 recvInto(i32 fd, u8 *buf, i64 len, u8 *from, i64 fromSize, i32 *port) {
+    String f;
+    i64 n = net.recvFrom(fd, buf[0:len], &f, port);
+    if (!copyOut(&f, from, fromSize)) { from[0] = 0; }
+    return n;
+}
+
 /* net.peerAddr read the peer address into a
  * 16-byte sockaddr, which cuts a sockaddr_in6 short, and NetGetInAddress
  * then read sin6_addr past the end of it: an IPv6 peer came out as
@@ -64,16 +86,16 @@ i32 main() {
 
     check(pair(libc.AF_INET), "IPv4 pair");
     mem.set(buf, 0, sizeof(buf));
-    check(net.peerAddr(gAcc, buf, sizeof(buf)) &&
+    check(peerInto(gAcc, buf, sizeof(buf)) &&
                 !cstr.cmp(buf, "127.0.0.1"), "IPv4 peer");
     closePair();
 
     if (pair(libc.AF_INET6)) {
         mem.set(buf, 0, sizeof(buf));
-        check(net.peerAddr(gAcc, buf, sizeof(buf)) &&
+        check(peerInto(gAcc, buf, sizeof(buf)) &&
                     !cstr.cmp(buf, "::1"), "IPv6 peer");
         mem.set(buf, 0, sizeof(buf));
-        check(!net.peerAddr(gAcc, buf, 3), "buffer too small");
+        check(!peerInto(gAcc, buf, 3), "buffer too small");
     }
     closePair();
 
@@ -87,8 +109,8 @@ i32 main() {
     i32 ua = net.accept(us);
     check(us != -1 && uc != -1 && ua != -1, "unix pair");
     cstr.copy(buf, "untouched");
-    check(!net.peerAddr(ua, buf, sizeof(buf)), "unix peer is false");
-    check(!net.peerAddr(-1, buf, sizeof(buf)), "bad socket is false");
+    check(!peerInto(ua, buf, sizeof(buf)), "unix peer is false");
+    check(!peerInto(-1, buf, sizeof(buf)), "bad socket is false");
     libc.close(ua); libc.close(uc); libc.close(us);
     libc.unlink(path);
     libc.rmdir(dir);
@@ -97,11 +119,11 @@ i32 main() {
     libc.sockaddr_storage ss;
     mem.set(&ss, 0x7f, sizeof(libc.sockaddr_storage));
     ss.ss_family = libc.AF_UNIX;
-    check(!net.addrToStr((libc.sockaddr *)(&ss), libc.AF_INET6, buf, sizeof(buf)), "AF_UNIX address");
-    check(!net.addrToStr((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)), "family mismatch");
+    check(!addrInto((libc.sockaddr *)(&ss), libc.AF_INET6, buf, sizeof(buf)), "AF_UNIX address");
+    check(!addrInto((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)), "family mismatch");
     ss.ss_family = libc.AF_INET;
     libc.inet_pton(libc.AF_INET, "10.1.2.3", &((libc.sockaddr_in *)(&ss)).sin_addr);
-    check(net.addrToStr((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)) &&
+    check(addrInto((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)) &&
                 !cstr.cmp(buf, "10.1.2.3"), "AF_INET address");
 
     test.printResult(gCorrect, gTests);

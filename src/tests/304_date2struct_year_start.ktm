@@ -78,7 +78,7 @@ i32 main() {
     else { printf("%d bad days\n", bad); }
 
     /* date.formatDate goes through date.toParts */
-    u8 *s = date.formatDate(mkDay(1904, 1, 1));
+    u8 *s = date.formatDate(mkDay(1904, 1, 1)).take();
     if (!cstr.cmp(s, "01/01/1904")) { correct++; }
     else { printf("MPrintDate: %s\n", s); }
     mem.free(s);

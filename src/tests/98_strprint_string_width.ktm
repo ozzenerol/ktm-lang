@@ -137,7 +137,7 @@ i32 main() {
 
     /* 13: a date and a time (date.format) with widths */
     date.Date cdt = date.now();
-    u8 *d = date.formatDate(cdt), *t = date.format(cdt, "%H:%M:%S");
+    u8 *d = date.formatDate(cdt).take(), *t = date.format(cdt, "%H:%M:%S").take();
     snprintf(want, sizeof(want), "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
     cstr.formatTo(ours, "[%12s][%-12s][%10s][%-10s]", d, d, t, t);
     if (!cstr.cmp(ours, want)) { correct++; }

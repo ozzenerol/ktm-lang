@@ -1355,7 +1355,7 @@ price 9.90
 
 <h2 id="dates">Dates and time</h2>
 <pre data-run><code>
-import cstr, date, mem, str;
+import date, mem;
 
 void main()
 {
@@ -1365,9 +1365,9 @@ void main()
   date.nowParts(&ds);
   printf("year looks right: %d\n", ds.year >= 2024);
 
-  u8 *stamp = date.timestampNow();     // like 2026-10-08 19:01:37
-  printf("timestamp is %d characters\n", cstr.len(stamp));
-  mem.free(stamp);
+  String stamp = date.timestampNow();     // like 2026-10-08 19:01:37
+  printf("timestamp is %d characters\n", stamp.len);
+  stamp.free();
 
   printf("elapsed ms is never negative: %d\n", date.nowMs() >= start);
 
@@ -1378,10 +1378,10 @@ void main()
   ds.hour = 12;
   ds.min = 34;
   date.Date leap = date.fromParts(&ds);
-  u8 *day = date.formatDate(leap), *clock = date.formatTime(leap);
+  String day = date.formatDate(leap), clock = date.formatTime(leap);
   printf("%s %s\n", day, clock);
-  mem.free(day);
-  mem.free(clock);
+  day.free();
+  clock.free();
 
   date.Parts back;
   date.toParts(&back, leap);
@@ -1401,8 +1401,9 @@ elapsed ms is never negative: 1
 <code>date.Parts</code>, which has <code>year</code>, <code>mon</code>,
 <code>day_of_mon</code>, <code>hour</code>, <code>min</code>, <code>sec</code> and
 <code>day_of_week</code> (0 is Sunday). <code>date.formatDate</code> and
-<code>date.formatTime</code> return new strings as <code>MM/DD/YYYY</code> and
-<code>HH:MM:SS</code>. A <code>date.Date</code> is an <code>i64 struct</code>, an integer
+<code>date.formatTime</code> return Strings as <code>MM/DD/YYYY</code> and
+<code>HH:MM:SS</code>, and <code>date.timestampNow()</code> one as
+<code>YYYY-MM-DD HH:MM:SS</code>. A <code>date.Date</code> is an <code>i64 struct</code>, an integer
 underneath, so <code>date.Date d = 5;</code> and <code>i64 x = d;</code> need no cast,
 and <code>f64 f = d;</code> converts it to a float like any integer (a float assigned to a
 <code>date.Date</code> is truncated, as it would be for an <code>i64</code>).</p>
@@ -1417,7 +1418,7 @@ carries fields that are out of range: day 32 of January is February 1, month 13 
 January of the next year and month 0 December of the year before; the time carries the same
 way, so hour 24 is midnight of the next day.</p>
 <pre data-run><code>
-import cstr, date, mem;
+import date, mem;
 
 void main()
 {
@@ -1426,9 +1427,9 @@ void main()
   ds.year = 2024;
   ds.mon = 13;
   ds.dayOfMon = 32;
-  u8 *day = date.formatDate(date.fromParts(&ds));
+  String day = date.formatDate(date.fromParts(&ds));
+  defer day.free();
   printf("%s\n", day);     // month 13 of 2024, day 32
-  mem.free(day);
 }
 </code></pre>
 <pre class="output">
@@ -1438,10 +1439,9 @@ void main()
 for year 0 (a leap year, as in ISO 8601) and the years before it. Day 0 is January 2 of
 year 0, so a <code>date.Date</code> of 0 prints as <code>01/02/0000</code>. Years 1 to 3999
 have the same day numbers whose calendar has no February 29 in years
-divisible by 4000 and is a day ahead from 4000-03-01. <code>date.isoFromTimespec(&amp;ts, buf)</code>,
+divisible by 4000 and is a day ahead from 4000-03-01. <code>date.isoFromTimespec(&amp;ts)</code>,
 which formats a <code>fs.stat</code> time as UTC ISO 8601
-(<code>2026-07-05T14:30:00.123456789Z</code>, 31 bytes with the NUL), uses the same
-calendar.</p>
+(<code>2026-07-05T14:30:00.123456789Z</code>) into a String, uses the same calendar.</p>
 
 <p><code>date.parse(text, format)</code> parses a date with a <code>strptime</code>-like
 format and <code>date.parseParts(text, format, &amp;ds)</code> fills a
@@ -1456,15 +1456,15 @@ Missing time fields are 0, and without <code>%z</code> <code>zone_diff</code> is
 conversion or an impossible value (month 13, February 30, hour 24, ...);
 <code>date.parse</code> also needs the year, month and day.</p>
 <pre data-run><code>
-import cstr, date, mem;
+import date;
 
 void main()
 {
   date.Date d = date.parse("Mar 5 2024 1:30 PM", "%b %d %Y %H:%M %p");
-  u8 *day = date.formatDate(d), *clock = date.formatTime(d);
+  String day = date.formatDate(d), clock = date.formatTime(d);
   printf("%s %s\n", day, clock);
-  mem.free(day);
-  mem.free(clock);
+  day.free();
+  clock.free();
 
   date.Parts ds;
   printf("%d %d\n", date.parseParts("2023-02-29", "%Y-%m-%d", &ds),
@@ -1508,6 +1508,7 @@ void main()
 a connected socket. All three return the socket as an <code>i32</code>, or -1 on failure
 (0 is a valid socket number). Read and write them with <code>read</code>/<code>write</code>
 or <code>recv</code>/<code>send</code>, and <code>close</code> them when done.
+Addresses, like all text here, are a <code>u8[]</code> (a literal, a slice, a String).
 <code>net.dial</code> takes a host name or an IPv4 or IPv6 address and tries every address
 the name resolves to. The server's bind address must be numeric (<code>"127.0.0.1"</code>,
 <code>"::1"</code>), <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6
@@ -1520,8 +1521,9 @@ and <code>net.setSendTimeout(sock, ms)</code> make a read or a write on a connec
 give up after <code>ms</code> milliseconds with -1 and <code>os.errno()</code>
 <code>EAGAIN</code> (a write returns the bytes it got out first, if any).
 Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which ends the
-program, as in C. <code>net.send(sock, buf, len)</code> (a <code>send</code> that adds
-<code>MSG_NOSIGNAL</code> to its optional flags) returns -1 with <code>os.errno()</code>
+program, as in C. <code>net.send(sock, data)</code>, with <code>data</code> a
+<code>u8[]</code> (a literal, a String, <code>buf[0:n]</code>), is a <code>send</code> that adds
+<code>MSG_NOSIGNAL</code> to its optional flags: it returns -1 with <code>os.errno()</code>
 <code>EPIPE</code> (or <code>ECONNRESET</code>) instead; <code>signal(SIGPIPE, SIG_IGN)</code>
 does the same for every <code>write</code> and <code>send</code> in the program.
 <code>signal</code> takes <code>SIG_DFL</code>, <code>SIG_IGN</code> or a handler
@@ -1532,18 +1534,23 @@ one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIG
 <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
 <code>SIGTTOU</code> are defined, with each platform's numbers.</p>
 <pre><code>
-i32 srv = NetCreateServer(8080, "127.0.0.1", 16);
+i32 srv = net.listen(8080, "127.0.0.1", 16);
 if (srv == -1) {
   printf("can't listen on 8080\n");
   return;
 }
-i32 conn = NetAccept(srv);   // waits for a client
+i32 conn = net.accept(srv);   // waits for a client
 if (conn != -1) {
-  NetSend(conn, "hello\n", 6);   // -1 if the client already left
-  close(conn);
+  String peer = net.peerAddr(conn);
+  defer peer.free();
+  net.send(conn, "hello\n");   // -1 if the client already left
+  libc.close(conn);
 }
-close(srv);
+libc.close(srv);
 </code></pre>
+<p><code>net.peerAddr(sock)</code> is the address of an accepted connection's peer and
+<code>net.addrToStr(sockaddr, family)</code> the address in a <code>sockaddr</code>, both as a
+String (without a <code>ptr</code> if there is none).</p>
 <p>The raw calls are there too, for UDP and anything the helpers don't cover:
 <code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
 <code>sendmsg</code>, <code>recvmsg</code>, <code>getsockname</code>, <code>setsockopt</code>, ...
@@ -1569,33 +1576,32 @@ void main()
 </code></pre>
 <p>For UDP, <code>net.udpSocket(port, bindaddr)</code> returns a bound datagram
 socket (the same bind addresses as <code>net.listen</code>, port 0 picks one:
-<code>net.localPort</code> tells which), <code>net.sendTo(sock, buf, len, addr, port)</code>
-sends one datagram and <code>net.recvFrom(sock, buf, len, from, from_size, &amp;port)</code>
-receives one and says who sent it, so a server answers with
-<code>net.sendTo(sock, reply, n, from, port)</code>. Both work with IPv4 and IPv6 and return
+<code>net.localPort</code> tells which), <code>net.sendTo(sock, data, addr, port)</code>
+sends one datagram and <code>net.recvFrom(sock, buf, &amp;from, &amp;port)</code> receives one
+into <code>buf</code> (a <code>u8[]</code>) and says who sent it (<code>from</code> a String),
+so a server answers with <code>net.sendTo(sock, reply, from, port)</code>. Both work with IPv4 and IPv6 and return
 -1 on failure. A datagram longer than the buffer is cut. <code>net.setRecvTimeout(sock, ms)</code>
 makes reads give up with -1 after <code>ms</code> milliseconds.</p>
 <pre data-run><code>
-import cstr, libc, net;
+import libc, net;
 
 void main()
 {
   i32 srv = net.udpSocket(0, "127.0.0.1");
   i32 cli = net.udpSocket(0, "127.0.0.1");
-  u8 buf[64], from[libc.INET6_ADDRSTRLEN];
+  u8 buf[64];
+  String from;
+  defer from.free();
   i32 port;
-  i64 n;
 
-  net.sendTo(cli, "ping", 4, "127.0.0.1", net.localPort(srv));
-  n = net.recvFrom(srv, buf, sizeof(buf) - 1, from, sizeof(from), &port);
-  buf[n] = '\0';
-  printf("server got %s from %s\n", buf, from);
-  net.sendTo(srv, "pong", 4, from, port);   // answer the sender
+  net.sendTo(cli, "ping", "127.0.0.1", net.localPort(srv));
+  i64 n = net.recvFrom(srv, buf, &from, &port);
+  printf("server got %s from %s\n", buf[0:n], from);
+  net.sendTo(srv, "pong", from, port);   // answer the sender
 
   net.setRecvTimeout(cli, 1000);
-  n = net.recvFrom(cli, buf, sizeof(buf) - 1);
-  buf[n] = '\0';
-  printf("client got %s\n", buf);
+  n = net.recvFrom(cli, buf);
+  printf("client got %s\n", buf[0:n]);
   libc.close(srv);
   libc.close(cli);
 }
