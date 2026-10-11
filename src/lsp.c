@@ -182,19 +182,19 @@ static void lspInstallCrashHandlers(void) {
  * squiggle, and hover/completion have nothing to serve. Mirrors
  * replBootstrap; stdlib diagnostics are discarded. */
 static void lspBootstrap(LspCtx *ctx, Cctrl *cc) {
+    /* the old header, when the install still has one; the prelude and
+     * the runtime always */
     AoStr *builtin = aoStrPrintf("%sstd.ktmh", ctx->root_dir);
     if (access(builtin->data, R_OK) != 0) {
-        lspLog(ctx, "lsp: %s not found; stdlib symbols unavailable",
-               builtin->data);
         aoStrRelease(builtin);
-        return;
+        builtin = NULL;
     }
     Lexer *l = (Lexer *)malloc(sizeof(Lexer));
     lexInit(l, NULL, CCF_PRE_PROC);
     l->cc = cc; /* lex-time raises route through diagnostics, not exit */
     lexSetBuiltinRoot(l, ctx->root_dir);
     lexPushRuntime(l);
-    lexPushFile(l, builtin);
+    if (builtin) lexPushFile(l, builtin);
     lexPushPrelude(l);
 
     cctrlDiagClear(cc);

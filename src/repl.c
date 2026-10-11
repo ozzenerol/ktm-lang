@@ -1370,36 +1370,31 @@ static AoStr *replGetRcPath(void) {
  * compile whatever it defines as chunk 0. */
 static void replBootstrap(Cctrl *cc, KtmJit *jit, CliArgs *args,
                           char *root_dir) {
+    /* the old header, when the install still has one (the stdlib is
+     * modules, read when imported); the prelude and the runtime always */
     AoStr *builtin = aoStrPrintf("%s/include/std.ktmh", args->install_dir);
     if (access(builtin->data, R_OK) != 0) {
-        fprintf(stderr,
-                "repl: warning: %s not found; the ktm standard library "
-                "will be unavailable\n", builtin->data);
         aoStrRelease(builtin);
         builtin = NULL;
     }
-    
-    AoStr *ktm_rc = replGetRcPath();
 
-    /* We have nothing to preload */
-    if (!builtin && !ktm_rc)
-        return;
+    AoStr *ktm_rc = replGetRcPath();
 
     Lexer *l = (Lexer *)malloc(sizeof(Lexer));
     lexInit(l, NULL, CCF_PRE_PROC);
     lexSetBuiltinRoot(l, root_dir);
 
     if (ktm_rc)  lexPushFile(l, ktm_rc);
-    if (builtin) lexPushRuntime(l);
+    lexPushRuntime(l);
     if (builtin) lexPushFile(l, builtin);
-    if (builtin) lexPushPrelude(l);
+    lexPushPrelude(l);
 
     cctrlDiagClear(cc);
     cctrlResetTokenBuffer(cc);
     cctrlInitParse(cc, l);
     parseToAst(cc);
     if (cctrlDiagFlush(cc) > 0) {
-        fprintf(stderr, "repl: warning: errors in %s\n", builtin->data);
+        fprintf(stderr, "repl: warning: errors in %s\n", builtin ? builtin->data : "the prelude");
     }
     cctrlDiagClear(cc);
     replDropInitialisers(cc);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "aostr.h"
 #include "ast.h"
@@ -102,12 +103,15 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     }
     /* the runtime, after the header and before the program */
     lexPushRuntime(l);
-    /* library files */
+    /* library files: the old header, when the install still has one
+     * (the stdlib is modules, read when imported) */
     /* the structure is a so this will get popped first */
-    lexPushFile(l,builtin_path);
-    if (l->cur_file && l->cur_file->src) {
-        cc->header_src = l->cur_file->src->data;
-        cc->header_len = l->cur_file->src->len;
+    if (access(builtin_path->data, R_OK) == 0) {
+        lexPushFile(l,builtin_path);
+        if (l->cur_file && l->cur_file->src) {
+            cc->header_src = l->cur_file->src->data;
+            cc->header_len = l->cur_file->src->len;
+        }
     }
     /* before the header, which uses its Error */
     lexPushPrelude(l);
