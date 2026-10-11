@@ -187,6 +187,8 @@ static void jitGlobalAddr(KtmJit *jit, X86Reg reg, const char *sym) {
     void *addr = mapGet(jit->host_symbols, (void *)sym);
     if (!addr) addr = asm_jit_dlsym_resolver(NULL, sym);
     if (!addr) {
+        /* nothing defines it: the chunk fails (it was a null address) */
+        asm_jit_unresolved(&jit->enc, sym);
         jitEmitMovImm(&jit->enc, reg, 0);
         return;
     }

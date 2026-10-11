@@ -46,7 +46,7 @@ bool cModule(u8 *extra, u8 *want) {
     return ok;
 }
 
-#define ONLY "error: module libc only declares C: extern \"c\" functions, structs, unions, enums and constants, not "
+#define ONLY "error: module libc only declares C: extern \"c\" functions and data, structs, unions, enums and constants, not "
 
 i32 main() {
     printf("Test - the libc module: ");

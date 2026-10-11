@@ -16,6 +16,8 @@ typedef void *(*asm_jit_resolver_fn)(void *ud, const char *sym);
  * Useful for JIT'd code that calls libc or any function the host process
  * has already loaded. `ud` is ignored; pass NULL. */
 void *asm_jit_dlsym_resolver(void *ud, const char *sym);
+/* Reports `sym` as unresolved (counted in enc->errors). */
+void asm_jit_unresolved(AsmEnc *enc, const char *sym);
 
 /* Result of asm_jit_finalize. `code` is the executable entry; cast it to a
  * function pointer of the appropriate signature and call. The other fields

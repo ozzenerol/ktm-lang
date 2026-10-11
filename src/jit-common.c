@@ -641,6 +641,8 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
         }
     }
 
+    /* an unresolved global reported while emitting */
+    if (jit->enc.errors) return -1;
     AsmJitCode *code = calloc(1, sizeof *code);
     if (asm_jit_finalize(&jit->enc, jitResolveSymbol, jit, code) != 0) {
         free(code);

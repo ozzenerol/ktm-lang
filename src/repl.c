@@ -653,13 +653,15 @@ static void replBuiltinReplDel(char *name) {
      * chunks may still reference it. */
     char mangled[256];
     snprintf(mangled, sizeof(mangled), "_%s", name);
-    if (jit->host_symbols) {
-        mapRemove(jit->host_symbols, name);
-        mapRemove(jit->host_symbols, mangled);
-    }
-    if (jit->symbols) {
-        mapRemove(jit->symbols, name);
-        mapRemove(jit->symbols, mangled);
+    /* and as the program's symbol (`_K01x`), the one a session's own
+     * functions and globals are bound by */
+    char *prog = astProgramSymbol(name, (int)len);
+    char prog_mangled[256];
+    snprintf(prog_mangled, sizeof(prog_mangled), "_%s", prog);
+    const char *spellings[] = { name, mangled, prog, prog_mangled };
+    for (size_t i = 0; i < sizeof(spellings)/sizeof(spellings[0]); ++i) {
+        if (jit->host_symbols) mapRemove(jit->host_symbols, (char *)spellings[i]);
+        if (jit->symbols) mapRemove(jit->symbols, (char *)spellings[i]);
     }
 }
 
