@@ -1532,7 +1532,8 @@ or a type, <code>private</code> just says what leaving out <code>pub</code> alre
 private fields outside their module.</p>
 <p><code>import net.http;</code> loads the directory <code>net/http</code> (its files
 start with <code>module http;</code>) and its names are <code>http.get</code>;
-<code>import h = net.http;</code> names it <code>h</code> instead. The imports come first in
+<code>import h = net.http;</code> names it <code>h</code> instead. One line can import several:
+<code>import fs, str, h = net.http;</code>. The imports come first in
 a file, before any declaration. A module is looked for under the main file's directory,
 then in the standard library's module directory, then in each directory of
 <code>KTM_PATH</code> (separated by <code>:</code>); found in two places is an error.
