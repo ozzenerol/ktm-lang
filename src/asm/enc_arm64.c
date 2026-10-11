@@ -242,20 +242,16 @@ aarch64_enc_mov_reg_w(AsmEnc *e, A64Reg rd, A64Reg rm)
  *
  * Values up to 4095 use sh=0. Values that are a multiple of 4096 and
  * fit in the upper 12-bit field (i.e. value <= 4095 * 4096) use sh=1.
- * Anything else truncates - callers expecting larger values must split
- * with MOVZ/MOVK + register form themselves. */
+ * One instruction reaches no further: aarch64_enc_add_imm/sub_imm split
+ * a bigger value into several. */
 static uint32_t
 aarch64_add_sub_imm(int sf, uint32_t op, A64Reg rd, A64Reg rn, uint32_t imm)
 {
     uint32_t sh = 0;
-    uint32_t imm12;
-    if (imm <= 0xFFFu) {
-        imm12 = imm;
-    } else if ((imm & 0xFFFu) == 0 && (imm >> 12) <= 0xFFFu) {
+    uint32_t imm12 = imm;
+    if (imm > 0xFFFu) {
         sh = 1;
         imm12 = imm >> 12;
-    } else {
-        imm12 = imm & 0xFFFu;  /* legacy fallback, caller's problem */
     }
     return (((uint32_t)sf & 1u) << 31)  |
            (op << 30)                   |
@@ -266,16 +262,45 @@ aarch64_add_sub_imm(int sf, uint32_t op, A64Reg rd, A64Reg rn, uint32_t imm)
            ((uint32_t)rd & 0x1F);
 }
 
+/* rd = rn +/- imm for any imm: one instruction when imm fits (12 bits,
+ * or 12 bits shifted by 12), else a run of them, the first from rn and
+ * the rest from rd. No scratch register, and reg 31 stays SP in every
+ * one, so `sub sp, sp, #big` works. Returns the first instruction's
+ * offset. */
+static size_t
+aarch64_enc_add_sub_imm_any(AsmEnc *e, int sf, uint32_t op, A64Reg rd,
+                            A64Reg rn, uint32_t imm)
+{
+    const uint32_t chunk = 0xFFFu << 12;
+    size_t first = e->len;
+    A64Reg src = rn;
+    int emitted = 0;
+    while (imm > chunk) {
+        put_word(e, aarch64_add_sub_imm(sf, op, rd, src, chunk));
+        imm -= chunk;
+        src = rd;
+        emitted = 1;
+    }
+    uint32_t hi = imm & ~0xFFFu, lo = imm & 0xFFFu;
+    if (hi) {
+        put_word(e, aarch64_add_sub_imm(sf, op, rd, src, hi));
+        src = rd;
+        emitted = 1;
+    }
+    if (lo || !emitted) put_word(e, aarch64_add_sub_imm(sf, op, rd, src, lo));
+    return first;
+}
+
 size_t
 aarch64_enc_add_imm(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, uint32_t imm12)
 {
-    return put_word(e, aarch64_add_sub_imm(is_64, 0, rd, rn, imm12));
+    return aarch64_enc_add_sub_imm_any(e, is_64, 0, rd, rn, imm12);
 }
 
 size_t
 aarch64_enc_sub_imm(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, uint32_t imm12)
 {
-    return put_word(e, aarch64_add_sub_imm(is_64, 1, rd, rn, imm12));
+    return aarch64_enc_add_sub_imm_any(e, is_64, 1, rd, rn, imm12);
 }
 
 /* ADD/SUB (shifted register), generalised:
@@ -315,6 +340,26 @@ size_t
 aarch64_enc_sub_reg(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, A64Reg rm)
 {
     return put_word(e, aarch64_add_sub_reg_shifted(is_64, 1, 0, 0, 0, rd, rn, rm));
+}
+
+/* ADD/SUB (extended register) with UXTX, the form that reads reg 31 as
+ * SP in Rd and Rn (the shifted-register form reads it as XZR, so
+ * `add x0, sp, x1` there adds x1 to zero):
+ *   sf | op | 0 | 0 1 0 1 1 0 0 1 | Rm:5 | option:3 | imm3:3 | Rn:5 | Rd:5
+ * option 011 = UXTX (X), 010 = UXTW (W); imm3 a left shift of 0..4. */
+size_t
+aarch64_enc_add_sub_sp_reg(AsmEnc *e, int is_64, int is_sub, A64Reg rd,
+                           A64Reg rn, A64Reg rm, int shift_amount)
+{
+    uint32_t w = (((uint32_t)is_64 & 1u) << 31)         |
+                 (((uint32_t)is_sub & 1u) << 30)        |
+                 (0x59u << 21)                          |
+                 (((uint32_t)rm & 0x1F) << 16)          |
+                 ((is_64 ? 3u : 2u) << 13)              |
+                 (((uint32_t)shift_amount & 0x7u) << 10) |
+                 (((uint32_t)rn & 0x1F) << 5)           |
+                 ((uint32_t)rd & 0x1F);
+    return put_word(e, w);
 }
 
 /* Shifted-register variants exposed for the dispatcher. */
@@ -2087,8 +2132,10 @@ aarch64_enc_add_sub(AsmEnc *e, AsmLine *ln, int is_sub)
             asm_err_at(e, ln, "ADD/SUB: shift suffix not valid with immediate");
             return;
         }
-        if (m->imm < 0 || m->imm > 0xFFF) {
-            asm_err_at(e, ln, "ADD/SUB imm out of 12-bit range");
+        if (m->imm < 0 || (m->imm > 0xFFF &&
+                           ((m->imm & 0xFFF) || m->imm > 0xFFF000))) {
+            asm_err_at(e, ln, "ADD/SUB imm out of range (0..4095, or a "
+                              "multiple of 4096 up to 4095 << 12)");
             return;
         }
         if (is_sub) aarch64_enc_sub_imm(e, is_64, rd, rn, (uint32_t)m->imm);
@@ -2130,6 +2177,18 @@ aarch64_enc_add_sub(AsmEnc *e, AsmLine *ln, int is_sub)
         if (rc < 0) return;
         if (st == ASHIFT_ROR) {
             asm_err_at(e, ln, "ADD/SUB: ROR shift not valid");
+            return;
+        }
+        if (m->reg.cls == AR_A64_SP) {
+            asm_err_at(e, ln, "ADD/SUB: sp can't be the third operand");
+            return;
+        }
+        if (d->reg.cls == AR_A64_SP || n->reg.cls == AR_A64_SP) {
+            if (sa > 4 || (rc > 0 && st != ASHIFT_LSL)) {
+                asm_err_at(e, ln, "ADD/SUB with sp: only LSL #0..4");
+                return;
+            }
+            aarch64_enc_add_sub_sp_reg(e, is_64, is_sub, rd, rn, rm, sa);
             return;
         }
         if (is_sub) aarch64_enc_sub_reg_shifted(e, is_64, rd, rn, rm, st, sa);
