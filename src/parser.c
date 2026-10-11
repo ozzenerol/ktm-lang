@@ -288,6 +288,8 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
                                 Lexeme *start)
 {
     if (type->ptr) {
+        /* an array or a string for a slice element: its view */
+        init = parseSliceFrom(cc, type->ptr, init);
         if (astFnPtrMismatch(type->ptr, init->type)) {
             parseRaiseFnConvert(cc, type->ptr, init->type);
         }
@@ -308,6 +310,7 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
         AstType *cls_field_type = entry->value;
         parseCheckPrivateField(cc, cls_field_type, (char *)entry->key,
                                strlen((char *)entry->key));
+        init = parseSliceFrom(cc, cls_field_type, init);
         if (init->kind == AST_STRING &&
             cls_field_type->kind == AST_TYPE_ARRAY &&
             cls_field_type->ptr->kind == AST_TYPE_CHAR)
@@ -326,9 +329,14 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
  * (brace elision, as in C: `L l = {1, 2, 3, 4}` is `{1, {2, 3}, 4}`)
  * when `init` is the first of them; 0 when `init` is a value for the
  * whole of `type` - a string for a char array, a class of its own
- * type - or `type` takes no list: a scalar, an intrinsic class, an
- * unsized array. */
+ * type - or `type` takes no list: a scalar, a slice, an intrinsic
+ * class, an unsized array. */
 static s64 parseDeclElidedCount(AstType *type, Ast *init) {
+    /* A slice takes one value (a slice, an array or a string, converted),
+     * never its pointer and length as two items */
+    if (astTypeIsSlice(type)) {
+        return 0;
+    }
     if (type->kind == AST_TYPE_ARRAY) {
         if (type->len <= 0 || !type->ptr ||
             (init->kind == AST_STRING && type->ptr->kind == AST_TYPE_CHAR)) {
