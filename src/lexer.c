@@ -897,6 +897,8 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
     f->is_std = l->builtin_root &&
         !strncmp(filename->data, l->builtin_root, strlen(l->builtin_root));
     f->imports = NULL;
+    f->import_owner = NULL;
+    f->import_kw = NULL;
     /* The program's modules are found from its main file's directory */
     if (!l->program_root) {
         char *slash = strrchr(filename->data, '/');
@@ -958,6 +960,8 @@ void lexPushString(Lexer *l, char *name, char *src, s64 len) {
     f->ended = 0;
     f->is_std = 0;
     f->imports = NULL;
+    f->import_owner = NULL;
+    f->import_kw = NULL;
     if (l->cur_file) {
         l->cur_file->ptr = l->ptr;
         l->cur_file->lineno = l->lineno;
@@ -3419,8 +3423,13 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
  * whole list is read first: importing a module pushes its files, which
  * are read next. They are pushed last first, so read in the list's order. */
 static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
-    /* the importing file: each import pushes its module's files */
+    /* the importing file (an import line's rest is read from a file of
+     * its own, see below) */
     LexFile *file = l->cur_file;
+    if (file && file->import_owner) {
+        if (file->import_kw) kw = file->import_kw;
+        file = file->import_owner;
+    }
     AoStr *aliases[64], *paths[64];
     Lexeme *firsts[64], *lasts[64];
     int n = 0, more = 1;
@@ -3448,9 +3457,31 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
             n++;
         }
     }
-    for (int i = n - 1; i >= 0; --i) {
-        lexImportOne(l, file, kw, aliases[i], paths[i], firsts[i], lasts[i]);
+    if (n == 0) return;
+    /* One module at a time: a module's files are read before the next
+     * import, so the next one's own imports see it loaded. The rest of
+     * the list goes into a file read after the first module's files,
+     * which are pushed on top of it. */
+    if (n > 1) {
+        AoStr *rest = aoStrNew();
+        aoStrCat(rest, "import ");
+        for (int i = 1; i < n; ++i) {
+            if (i > 1) aoStrCat(rest, ", ");
+            if (aliases[i]) aoStrCatPrintf(rest, "%s = ", aliases[i]->data);
+            aoStrCatPrintf(rest, "%s", paths[i]->data);
+        }
+        aoStrCat(rest, ";\n");
+        LexFile *cur = l->cur_file;
+        lexPushString(l, cur->filename->data, rest->data, rest->len);
+        LexFile *more = l->cur_file;
+        more->import_owner = file;
+        more->import_kw = lexemeCopy(kw);
+        more->module_id = cur->module_id;
+        more->mod_pass = cur->mod_pass;
+        more->is_std = cur->is_std;
+        more->file_id = cur->file_id;
     }
+    lexImportOne(l, file, kw, aliases[0], paths[0], firsts[0], lasts[0]);
 }
 
 /* One module of an `import` line of `file` */
