@@ -4,7 +4,8 @@
  * (`u8 *str`, `i64 geo`) shadows the module for its scope instead of
  * being an error, and `geo.name` inside that scope is the error "`geo`
  * is a local i64, it hides the module geo". Outside the scope the module
- * is there again. A file-scope name like a prefix is still an error
+ * is there again, and in the local's own initialiser (its scope starts
+ * after its declaration). A file-scope name like a prefix is still an error
  * (test 422). The fixture is src/tests/modules/shadow; AOT and JIT. */
 
 #define OUT "./ktm-442-shadow.out"
@@ -35,6 +36,13 @@ I32 Main()
     correct++;
   tests++;
   if (Output(KTM "-jit " FIX "/main.ktm > " OUT " 2>&1", "2 8 4\n")) correct++;
+  /* the local's scope starts after its declaration: its initialiser
+   * still sees the module (`i64 geo = geo.one() + 1;`) */
+  tests++;
+  if (Output(KTM FIX "/init.ktm -o " BIN " > " OUT " 2>&1 && " BIN " >> " OUT, "2\n"))
+    correct++;
+  tests++;
+  if (Output(KTM "-jit " FIX "/init.ktm > " OUT " 2>&1", "2\n")) correct++;
   tests++;
   if (Output(KTM "-S " FIX "/local.ktm -o /dev/null > " OUT " 2>&1",
              "error: `geo` is a local u8 *, it hides the module geo"))

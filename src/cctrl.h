@@ -180,6 +180,9 @@ typedef struct Cctrl {
     /* A `fallthrough;` not yet followed by a case or default label of
      * its switch: where it is, for the error if the switch ends first */
     int fallthrough_pending;
+    /* The local whose initialiser is being parsed (it doesn't hide an
+     * import prefix there yet) */
+    struct Ast *decl_in_init;
     s64 fallthrough_line, fallthrough_col;
     /* Deferred statements (`defer <stmt>`) being parsed around the
      * current token: a return, or a break/continue with no loop inside

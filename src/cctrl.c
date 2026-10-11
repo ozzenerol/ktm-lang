@@ -700,7 +700,7 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
         if (token->qual_prefix && cc->localenv) {
             Ast *local = mapGetLen(cc->localenv, token->qual_prefix,
                                    token->qual_prefix_len);
-            if (local) {
+            if (local && local != cc->decl_in_init) {
                 const char *dot = strrchr(token->start, '.');
                 int mod_len = dot ? (int)(dot - token->start) : token->len;
                 AstType *type = local->kind == AST_DEFAULT_PARAM && local->declvar
