@@ -1,10 +1,10 @@
 import libc, mem, str, test;
 
-/* StrCmp / StrNCmp / StrNICmp must order strings like C's strcmp /
+/* str.cmp / str.cmpLen / str.cmpLenNoCase must order strings like C's strcmp /
  * strncmp / strncasecmp: negative if s1 < s2, 0 if equal, positive if
- * s1 > s2, comparing bytes as unsigned. On x86_64 StrCmp had the sign
- * reversed, StrNICmp returned the distance between the two pointers
- * (even for equal strings shorter than n) and StrNCmp kept comparing
+ * s1 > s2, comparing bytes as unsigned. On x86_64 str.cmp had the sign
+ * reversed, str.cmpLenNoCase returned the distance between the two pointers
+ * (even for equal strings shorter than n) and str.cmpLen kept comparing
  * past the terminating NUL. */
 
 extern "c" i32 strncasecmp(u8 *s1, u8 *s2, u64 n);
@@ -47,7 +47,7 @@ i32 main() {
     g1[0] = 'a'; g1[1] = 'b'; g1[3] = 'X';
     g2[0] = 'a'; g2[1] = 'b'; g2[3] = 'Y';
 
-    /* StrCmp */
+    /* str.cmp */
     if (cmpOk("abc", "abd", -1)) { correct++; }
     if (cmpOk("abd", "abc", 1)) { correct++; }
     if (cmpOk("abc", "abc", 0)) { correct++; }
@@ -58,7 +58,7 @@ i32 main() {
     if (cmpOk("a", "", 1)) { correct++; }
     if (cmpOk(hi, lo, 1) && cmpOk(lo, hi, -1)) { correct++; }
 
-    /* StrNCmp */
+    /* str.cmpLen */
     if (nCmpOk("abc", "abd", 3, -1)) { correct++; }
     if (nCmpOk("abd", "abc", 3, 1)) { correct++; }
     if (nCmpOk("abc", "abd", 2, 0)) { correct++; }  /* n stops before the difference */
@@ -70,7 +70,7 @@ i32 main() {
     if (nCmpOk(hi, lo, 1, 1) && nCmpOk(lo, hi, 1, -1)) { correct++; }
     if (nCmpOk(g1, g2, 8, 0)) { correct++; }        /* stops at the NUL */
 
-    /* StrNICmp */
+    /* str.cmpLenNoCase */
     if (niCmpOk("abc", "ABD", 3, -1)) { correct++; }
     if (niCmpOk("ABD", "abc", 3, 1)) { correct++; }
     if (niCmpOk("Hello", "hELLO", 5, 0)) { correct++; }

@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* RmDir(path, RM_RECURSE) without RM_VERBOSE printed "Error Rm: <file>"
+/* fs.removeDir(path, RM_RECURSE) without RM_VERBOSE printed "Error Rm: <file>"
  * for every file it deleted successfully: the else of
  * `if (unlink(..) == 0 && verbose)` caught the quiet successes too. It
  * now prints nothing without RM_VERBOSE and the right line with it.

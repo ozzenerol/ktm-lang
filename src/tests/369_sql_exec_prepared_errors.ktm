@@ -1,6 +1,6 @@
 import sql, str, test;
 
-/* SqlExecPrepared ignored the return codes of sqlite3_bind_* and skipped
+/* sql.execPrepared ignored the return codes of sqlite3_bind_* and skipped
  * parameters of an unknown type, so the statement ran anyway with null in
  * their place and returned SQLITE_DONE. Now a failed bind or an unknown
  * type is returned as the error and the statement does not run. */

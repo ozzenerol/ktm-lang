@@ -1,8 +1,8 @@
 import map, mem, str, test;
 
-/* StrMapGetLen/StrMapHasLen compared `key_len` bytes but hashed the whole
+/* map.strGetLen/map.strHasLen compared `key_len` bytes but hashed the whole
  * NUL-terminated string, so a key given as the start of a longer buffer
- * (`("hello world", 5)`) was never found. StrMap now hashes exactly the
+ * (`("hello world", 5)`) was never found. map.StrMap now hashes exactly the
  * bytes it compares, with its own length-bounded hash and a final mix (the
  * old hash put similar keys like "key%d" in long runs of slots). Also
  * checks the empty key, keys with high bytes, and that iteration is still

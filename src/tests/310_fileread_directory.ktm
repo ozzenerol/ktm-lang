@@ -1,6 +1,6 @@
 import fs, mem, proc, str, test;
 
-/* FileRead on a directory took lseek(SEEK_END) as the size, which is
+/* fs.readAll on a directory took lseek(SEEK_END) as the size, which is
  * LLONG_MAX on ext4: MAlloc(len+100) overflowed and it crashed. Only a
  * regular file is read now; anything else gives null. *_size is set on
  * every return, 0 on failure. Everything happens in a fresh mkdtemp

@@ -1,10 +1,10 @@
 import json, str, test;
 
-/* JsonParse(text, len) read past `len`: the string scan, number scan
+/* json.parse(text, len) read past `len`: the string scan, number scan
  * (and strtoll/strtod) and whitespace skip all went on to a NUL. So a
  * string the length cuts off was read to a quote after it, and a number
  * took the digits after it. Strings cut off are now
- * JSON_INVALID_STRING_NOT_TERMINATED. JsonParse(null) returns null. */
+ * JSON_INVALID_STRING_NOT_TERMINATED. json.parse(null) returns null. */
 
 /* Parse the first `len` bytes of `text`, which goes on past them */
 json.Value *cut(u8 *text, i64 len) {

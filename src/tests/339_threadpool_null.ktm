@@ -1,8 +1,8 @@
 import test, thread;
 
-/* ThreadPoolNew returns null for a bad count or when a thread can't be
- * created, but ThreadPoolEnqueue, ThreadPoolWait and ThreadPoolStop then
- * crashed on it; only ThreadPoolRelease checked. All four ignore null. */
+/* thread.poolNew returns null for a bad count or when a thread can't be
+ * created, but thread.poolEnqueue, thread.poolWait and thread.poolStop then
+ * crashed on it; only thread.poolRelease checked. All four ignore null. */
 
 i64 ran = 0;
 

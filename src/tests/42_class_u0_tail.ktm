@@ -23,7 +23,7 @@ bool layoutMatchesSizeof() {
 bool roundTripPayload() {
     u8 *src = "hello";
     i64 n = 5;
-    /* Creating the flexible Array, all be it dynamically. You can only `MemCpy`
+    /* Creating the flexible Array, all be it dynamically. You can only `mem.copy`
      * in and out of it*/
     Hdr *h = mem.alloc(sizeof(Hdr) + n);
     h.size = n;

@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonToString printed an empty object or array as `{(nil)}` / `[(nil)]`
+/* json.toStr printed an empty object or array as `{(nil)}` / `[(nil)]`
  * and wrote strings with %Q (DolDoc quoting: `$` doubled, `\v`, raw
  * control characters), so its output couldn't always be parsed back. */
 
@@ -50,7 +50,7 @@ i32 main() {
     mem.free(j.object.str);
     u8 *ctl = str.dup("a\x01b\x1Fc\x0B\x7F\xC3\xA9");
     j.object.str = ctl;
-    j.object.strLen = str.len(ctl); /* the length JsonToString writes */
+    j.object.strLen = str.len(ctl); /* the length json.toStr writes */
     u8 *out = json.toStr(j);
     expect(out, "{\"s\": \"a\\u0001b\\u001fc\\u000b\x7F\xC3\xA9\"}");
     mem.free(out);

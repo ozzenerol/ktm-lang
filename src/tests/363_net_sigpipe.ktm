@@ -2,7 +2,7 @@ import libc, net, os, test;
 
 /* Writing to a socket whose peer had closed raised SIGPIPE, which ended
  * the program, and there was no way to avoid it: no Net* send helper,
- * no MSG_NOSIGNAL and no signal(). NetSend now passes MSG_NOSIGNAL, and
+ * no MSG_NOSIGNAL and no signal(). net.send now passes MSG_NOSIGNAL, and
  * signal(SIGPIPE, SIG_IGN) is available for plain write(). Reaching the
  * end of this test at all is the main check. */
 

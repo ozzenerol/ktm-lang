@@ -1,6 +1,6 @@
 import mem, str, test;
 
-/* StrHash("") read the byte after the terminating NUL (the x86_64 asm
+/* str.hash("") read the byte after the terminating NUL (the x86_64 asm
  * loaded 1[RDI] first, the arm64 version started at index 1). It also had
  * no final mixing: h*31+c keeps similar keys ("key1", "key2", ...) in
  * neighbouring slots of a power-of-two table. It is now h*31+c from 0
@@ -48,7 +48,7 @@ i32 main() {
     }
     tests++; if (ok) { correct++; }
 
-    /* Spread: 100000 "key%d" in 262144 slots, linear probing like StrMap.
+    /* Spread: 100000 "key%d" in 262144 slots, linear probing like map.StrMap.
      * Without the finaliser this averaged 9.6 probes (max 288). */
     i64 cap = 262144, n = 100000, total = 0, worst = 0;
     bool *taken = mem.allocZero(cap);

@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonParse accepted text after the top-level value (`[1]x`, `1 2`,
+/* json.parse accepted text after the top-level value (`[1]x`, `1 2`,
  * `truex`, `{"a":1}}`), skipped anything between a key and its ':'
  * (`{"a" , "b": 1}` was {"a": 1}), and took \v and \f for whitespace.
  * Only JSON's whitespace (space, tab, LF, CR) may follow the value or sit

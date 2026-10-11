@@ -1,7 +1,7 @@
 import mem, str, test;
 
-/* StrPrintJoin wrote the NUL only after a character, so an empty result
- * (StrPrint(null, ""), or "%s" of "") was an unterminated MAlloc block:
+/* str.formatArgs wrote the NUL only after a character, so an empty result
+ * (str.formatTo(null, ""), or "%s" of "") was an unterminated MAlloc block:
  * whatever was in it came out (garbage on arm64 Linux, where Shlurp("")
  * ran it as a command; test 316 covers Shlurp). */
 

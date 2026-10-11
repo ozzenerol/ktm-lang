@@ -1,9 +1,9 @@
 import sql, test;
 
-/* SqlQuery, SqlSelect and SqlPrepare ran only the first statement of a
+/* sql.exec, sql.select and sql.prepare ran only the first statement of a
  * string holding several and silently dropped the rest. They fail now
  * when anything but whitespace or comments follows the first statement;
- * SqlExecRaw still runs them all. */
+ * sql.execRaw still runs them all. */
 
 bool hasTable(sql.Db *ctx, u8 *name) {
     sql.Row row;
@@ -55,7 +55,7 @@ i32 main() {
     }
     tests++; if (n == 2) { correct++; }
 
-    /* SqlExecRaw runs every statement */
+    /* sql.execRaw runs every statement */
     tests++; if (sql.execRaw(ctx, "CREATE TABLE d(x); CREATE TABLE e(y);") == null) { correct++; }
     tests++; if (hasTable(ctx, "d") && hasTable(ctx, "e")) { correct++; }
 

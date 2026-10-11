@@ -1,8 +1,8 @@
 import mem, str, test;
 
-/* StrPrint's buffer grew to ten times its size plus the argument
- * whenever a %s didn't fit, and StrLen was a byte-at-a-time loop that
- * crashed on null. The buffer now doubles, and StrLen is libc's strlen,
+/* str.formatTo's buffer grew to ten times its size plus the argument
+ * whenever a %s didn't fit, and str.len was a byte-at-a-time loop that
+ * crashed on null. The buffer now doubles, and str.len is libc's strlen,
  * with null giving 0. */
 
 i32 main() {

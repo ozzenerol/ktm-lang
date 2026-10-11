@@ -1,6 +1,6 @@
 import fzf, mem, str, test;
 
-/* FzF trimmed the pattern in place: the caller's string was changed, and
+/* fzf.match trimmed the pattern in place: the caller's string was changed, and
  * a string literal with leading or trailing spaces segfaulted under AOT
  * (literals are read-only). It works on a copy now. */
 

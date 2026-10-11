@@ -2,7 +2,7 @@ import map, mem, test;
 
 /* std.ktmh declared RBIter with an extra `node` field that set.ktm's
  * RBIter doesn't have, so user code saw a 32-byte class while
- * RBIterNew allocated 24 bytes. */
+ * map.rbIterNew allocated 24 bytes. */
 
 i64 cmp(void *a, void *b) { return (i64)a - (i64)b; }
 
@@ -27,7 +27,7 @@ i32 main() {
         n++;
     }
     tests++; if (ok && n == 100) { correct++; }
-    /* the fields user code can see are the ones RBIterNew filled in */
+    /* the fields user code can see are the ones map.rbIterNew filled in */
     tests++; if (it.sp == 0 && it.stack != null) { correct++; }
     map.rbIterRelease(it);
     t.release();

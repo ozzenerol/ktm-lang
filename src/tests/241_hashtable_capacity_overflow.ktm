@@ -1,7 +1,7 @@
 import map, mem, test;
 
-/* IntMapNew/StrMapNew rounded the requested capacity up to a power of two
- * without a bound: above 2^63 (`IntMapNew(-1)`) it wrapped to 0, the mask
+/* map.intNew/map.strNew rounded the requested capacity up to a power of two
+ * without a bound: above 2^63 (`map.intNew(-1)`) it wrapped to 0, the mask
  * became all ones and the first Set wrote far outside the table. A
  * negative request now gets the minimum capacity (8) and a huge one is
  * clamped to 2^28 slots; the map still grows past that as needed. */

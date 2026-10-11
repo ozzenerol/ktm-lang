@@ -1,7 +1,7 @@
 import date, mem, test;
 
-/* NowDateTimeStruct set sec10000 to usec/100 (0-9999), but Struct2Date
- * and Date2Struct use it as the ten-thousandths below sec100 (0-99), so
+/* date.nowParts set sec10000 to usec/100 (0-9999), but date.fromParts
+ * and date.toParts use it as the ten-thousandths below sec100 (0-99), so
  * the fraction of a second was counted twice: Now() ran up to a second
  * fast and, just before midnight, wrapped to 00:00 of the same day.
  * zone_diff was left uninitialised; it is now the UTC offset as +-hhmm. */

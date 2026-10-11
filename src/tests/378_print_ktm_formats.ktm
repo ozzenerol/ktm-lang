@@ -4,7 +4,7 @@ import fs, libc, mem, proc, str, test;
  * conversions %Q %D %T %C %F printed garbage or the letter, and the
  * compile-time argument check counted the format the C way. A literal
  * format that uses one of them now calls the library's Print, which
- * formats like StrPrint; other print statements still call printf. */
+ * formats like str.formatTo; other print statements still call printf. */
 
 #define PF_FILE "__378_print.ktm"
 #define PF_OUT  "__378_print.out"
@@ -87,7 +87,7 @@ plain 003.1
 xY|AB  |  Z|
 ")) { correct++; }
 
-    /* %D %T print what StrPrint prints (the time changes from run to run,
+    /* %D %T print what str.formatTo prints (the time changes from run to run,
      * so the two lines are compared with each other), %F a file's contents */
     tests++;
     {

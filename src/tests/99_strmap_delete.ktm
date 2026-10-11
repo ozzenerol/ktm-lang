@@ -1,13 +1,13 @@
 import map, mem, str, test;
 
-/* StrMapDelete wrote HT_DELETED into the insertion-order vector at the
+/* map.strDelete wrote HT_DELETED into the insertion-order vector at the
  * *slot* index (a heap overflow once the slot was past the vector's end),
  * returned true for keys that were not there, and inserting after a delete
  * could reuse a deleted slot while the key still existed further along the
  * probe chain (duplicate keys). Deleted slots were never cleared, so enough
  * delete/insert cycles left no empty slot and a lookup for a missing key
- * never terminated. IntMapDelete left the node visible to iteration and its
- * freed value was freed again by IntMapRelease. Every loop here is bounded so
+ * never terminated. map.intDelete left the node visible to iteration and its
+ * freed value was freed again by map.intRelease. Every loop here is bounded so
  * a regression fails instead of hanging. */
 
 i64 gKeyFrees = 0;
@@ -222,7 +222,7 @@ i32 main() {
     tests++;
     if (gKeyFrees == 20001 && gValueFrees == 20001) { correct++; }
 
-    /* IntMap: 10,000 keys, delete half, re-insert, iterate, release. */
+    /* map.IntMap: 10,000 keys, delete half, re-insert, iterate, release. */
     gValueFrees = 0;
     map.IntMap *im = map.intNew();
     im.setFreeValue(&countingFreeValue);
@@ -274,7 +274,7 @@ i32 main() {
     tests++;
     if (gValueFrees == 20000) { correct++; }
 
-    /* IntMap collisions: keys 1, 33 and 65 share a probe chain in a 32-slot
+    /* map.IntMap collisions: keys 1, 33 and 65 share a probe chain in a 32-slot
      * map. Setting 65 after deleting 1 updates 65 instead of duplicating it. */
     map.IntMap *col = map.intNew(32);
     col.set(1, (void *)10);
@@ -300,7 +300,7 @@ i32 main() {
             col.delete(0x7fffffffffffffff) &&
             !col.has(0x7fffffffffffffff)) { correct++; }
 
-    /* IntMap delete/insert cycles terminate and do not grow the table. */
+    /* map.IntMap delete/insert cycles terminate and do not grow the table. */
     bad = 0;
     for (i = 0; i < 20000; i++) {
         col.set(1000 + i, null);

@@ -1,6 +1,6 @@
 import fs, libc, mem, str, test;
 
-/* FileRead only read regular files, up to their size: a FIFO or a pipe
+/* fs.readAll only read regular files, up to their size: a FIFO or a pipe
  * gave null, and so did /proc files, which report size 0. Now anything
  * but a directory is read until end of file, and *_size is its length. */
 

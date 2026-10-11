@@ -1,7 +1,7 @@
 import libc, net, str, test;
 
-/* NetAccept returned bool, so a socket number over 255 was truncated, and
- * NetCreateServer/NetConnect returned 0 (or a getaddrinfo error code) on
+/* net.accept returned bool, so a socket number over 255 was truncated, and
+ * net.listen/net.dial returned 0 (or a getaddrinfo error code) on
  * failure, which looks like a valid socket. They return the i32 socket,
  * or -1 on failure, now. */
 

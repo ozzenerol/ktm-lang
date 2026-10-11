@@ -1,8 +1,8 @@
 import map, mem, str, test;
 
-/* StrMapNew and IntMapNew rounded the capacity up to a power of two but
+/* map.strNew and map.intNew rounded the capacity up to a power of two but
  * built the mask, the threshold and the entries array from the unrounded
- * value. Any other capacity - StrMapNew(100), StrMapNew(0) - gave a mask
+ * value. Any other capacity - map.strNew(100), map.strNew(0) - gave a mask
  * whose probe sequence can't reach every slot, so inserting a few hundred
  * keys hung forever (and Release read past the entries array). Each map is
  * checked for a consistent mask before anything is inserted, so a

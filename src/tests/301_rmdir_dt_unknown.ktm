@@ -1,7 +1,7 @@
 import fs, libc, mem, proc, str, test;
 
 /* On a filesystem whose readdir() gives DT_UNKNOWN for every entry,
- * RmDir(path, RM_RECURSE) stat()ed each entry and, for a directory,
+ * fs.removeDir(path, RM_RECURSE) stat()ed each entry and, for a directory,
  * recursed on `path` instead of the entry: endless recursion and a
  * segfault. A DT_UNKNOWN filesystem is simulated with an LD_PRELOAD
  * readdir() shim, so this needs Linux and a C compiler; elsewhere the

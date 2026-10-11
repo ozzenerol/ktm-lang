@@ -1,6 +1,6 @@
 import mem, proc, str, test;
 
-/* ShQuote(s) single-quotes s for sh, so text can go into Sh and Shlurp
+/* proc.shellQuote(s) single-quotes s for sh, so text can go into Sh and Shlurp
  * commands as one word with nothing expanded. Each string goes through
  * Shlurp("printf '%%s.' %s", q) and must come back unchanged (the "."
  * keeps Shlurp from dropping a trailing newline). */

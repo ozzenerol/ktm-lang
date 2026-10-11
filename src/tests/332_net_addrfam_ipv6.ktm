@@ -1,8 +1,8 @@
 import libc, mem, net, test;
 
-/* NetCreateServer and NetConnect always asked getaddrinfo for AF_INET:
+/* net.listen and net.dial always asked getaddrinfo for AF_INET:
  * the addrfam argument was only looked at for "::*", so a server could
- * not listen on ::1 and NetConnect could not reach an IPv6 address. A
+ * not listen on ::1 and net.dial could not reach an IPv6 address. A
  * numeric bind address that isn't valid ("256.1.1.1") went to DNS.
  * Only loopback addresses and kernel-chosen ports are used; the IPv6
  * checks are skipped when ::1 can't be bound. */
@@ -40,7 +40,7 @@ bool ipv6Loopback() {
 }
 
 bool roundTrip(i32 srv, u8 *addr)
-{// NetConnect to the server's port at addr, send a byte through
+{// net.dial to the server's port at addr, send a byte through
     u8 b = 0;
     i32 c = net.dial(addr, gPort);
     if (c == -1) { return false; }

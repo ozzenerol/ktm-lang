@@ -1,11 +1,11 @@
 import fs, libc, mem, proc, str, test;
 
-/* MkDir's result could not tell success from failure: without recurse
+/* fs.makeDir's result could not tell success from failure: without recurse
  * it returned 0 on success and also for a missing parent or a read-only
  * directory, -1 only when the path was a file; with recurse it returned
  * true/false and ignored whether the last directory was made. It now
  * returns 0 if the path is a directory afterwards and -1 if not, like
- * Rm and RmDir. Everything happens in a fresh mkdtemp directory. */
+ * Rm and fs.removeDir. Everything happens in a fresh mkdtemp directory. */
 
 extern "c" u8 *mkdtemp(u8 *template);
 extern "c" i32 chmod(u8 *path, u32 mode);

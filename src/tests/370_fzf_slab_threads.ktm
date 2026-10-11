@@ -1,11 +1,11 @@
 import fzf, libc, test;
 
-/* FzF allocated (CAlloc) and freed a 200 KB slab on every call, which no
+/* fzf.match allocated (CAlloc) and freed a 200 KB slab on every call, which no
  * matcher ever used: slow, and on macOS the freed blocks stayed counted as
- * in use. The heap's high-water mark must not move when FzF is called, a
+ * in use. The heap's high-water mark must not move when fzf.match is called, a
  * loop of calls must leave the heap where it was (on macOS too). And the
  * pattern was split with strtok, whose position is one global shared by
- * all threads: FzF from several threads at once gave wrong answers. */
+ * all threads: fzf.match from several threads at once gave wrong answers. */
 
 #ifdef IS_MACOS
 i64 HeapPeak() {

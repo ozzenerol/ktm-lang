@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonParse rejected every \u escape. They are decoded to UTF-8 now,
+/* json.parse rejected every \u escape. They are decoded to UTF-8 now,
  * including surrogate pairs; malformed ones are still errors. */
 
 /* Parses `text` and returns the string at .e, or null if it didn't parse */

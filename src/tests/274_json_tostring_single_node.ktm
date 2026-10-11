@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonToString on a node from JsonSelect also printed the nodes after it
+/* json.toStr on a node from json.select also printed the nodes after it
  * and its key ("b": 2,"c": 3 for .b). It now serialises only that node's
  * value; a whole document prints as before. */
 

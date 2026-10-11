@@ -1,8 +1,8 @@
 import fs, libc, mem, proc, str, test, vec;
 
-/* New vector functions: IntVecSet/FloatVecSet/PtrVecSet (bounds checked
+/* New vector functions: vec.intSet/vec.floatSet/vec.ptrSet (bounds checked
  * like Get: an index outside [0, size) prints an error and exits 1) and
- * IntVecLast/FloatVecLast/PtrVecLast (peek; sentinel -1 / -1.0 / null and
+ * vec.intLast/vec.floatLast/vec.ptrLast (peek; sentinel -1 / -1.0 / null and
  * *_ok = false when empty). */
 
 #define VS_FILE "__238_vecset.ktm"

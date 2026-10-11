@@ -6,7 +6,7 @@ import json, mem, str, test;
  * requires them escaped, so they are now JSON_INVALID_CONTROL_CHARACTER. */
 
 bool parses(u8 *text, u8 *want)
-{ // parses, and JsonToString gives `want`
+{ // parses, and json.toStr gives `want`
     json.Value *j = json.parse(text);
     bool ok = json.ok(j);
     if (ok) {

@@ -1,8 +1,8 @@
 import map, test;
 
-/* RBTreeGet, RBTreeHas, RBTreeInsert, RBTreeDelete, RBTreeForEach and
- * RBIterNew dereferenced a null tree; only RBTreeRelease checked. Reads
- * now give null/false, writes do nothing and RBIterNew(null) gives an
+/* map.rbGet, map.rbHas, map.rbSet, map.rbDelete, map.rbForEach and
+ * map.rbIterNew dereferenced a null tree; only map.rbRelease checked. Reads
+ * now give null/false, writes do nothing and map.rbIterNew(null) gives an
  * iterator that yields nothing. */
 
 i64 gCalls;

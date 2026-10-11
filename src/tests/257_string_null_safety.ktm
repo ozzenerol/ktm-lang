@@ -1,10 +1,10 @@
 import fs, str, test;
 
-/* String functions crashed on null. Now: StrCmp/StrNCmp/StrNICmp sort
- * null before every string (two NULLs are equal), StrFirstOcc/StrLastOcc/
- * FileExtDot return null, IsDotC/IsDotZ false, Atoi 0, the *Rem functions
- * leave dst empty, and StrCpy with a null src copies "" (on arm64 too).
- * (StrTrimStart/End and WildMatch got the same in their own fixes.) */
+/* String functions crashed on null. Now: str.cmp/str.cmpLen/str.cmpLenNoCase sort
+ * null before every string (two NULLs are equal), str.firstOf/str.lastOf/
+ * fs.ext return null, IsDotC/IsDotZ false, Atoi 0, the *Rem functions
+ * leave dst empty, and str.copy with a null src copies "" (on arm64 too).
+ * (str.trimStart/End and str.globMatch got the same in their own fixes.) */
 
 i32 main() {
     i64 correct = 0, tests = 0;

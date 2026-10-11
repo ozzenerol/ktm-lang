@@ -1,7 +1,7 @@
 import list, test, thread;
 
-/* ListDeque takes from the front (FIFO with ListAppend) and ListPop
- * from the back (LIFO with ListAppend); a single-worker ThreadPool runs
+/* list.shift takes from the front (FIFO with list.append) and list.pop
+ * from the back (LIFO with list.append); a single-worker thread.Pool runs
  * jobs in submission order. */
 
 i64 gOrder[8];
@@ -40,12 +40,12 @@ i32 main() {
     }
     if (ok && nextOut == 100 && l.count() == 0) { correct++; }
 
-    /* ListPop takes from the back */
+    /* list.pop takes from the back */
     l.append((void *)1);
     l.append((void *)2);
     l.append((void *)3);
     if ((i64)l.pop() == 3 && l.count() == 2) { correct++; }
-    /* ListPrepend puts at the front, where ListDeque takes from */
+    /* list.prepend puts at the front, where list.shift takes from */
     l.prepend((void *)0);
     if ((i64)l.shift() == 0 && (i64)l.shift() == 1 &&
             (i64)l.pop() == 2 && l.isEmpty()) { correct++; }

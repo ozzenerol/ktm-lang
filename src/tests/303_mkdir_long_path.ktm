@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* MkDir(path,,true) copied each prefix of path into a DIR_MAXPATHLEN
+/* fs.makeDir(path,,true) copied each prefix of path into a DIR_MAXPATHLEN
  * (256 on Linux, 1024 on macOS) stack buffer without a bound, so a
  * longer path smashed the stack. Everything happens in a fresh mkdtemp
  * directory. The path stays under macOS's PATH_MAX of 1024. */

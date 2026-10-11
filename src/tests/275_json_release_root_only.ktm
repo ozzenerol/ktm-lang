@@ -1,9 +1,9 @@
 import json, mem, str, test;
 
-/* JsonRelease on a node from JsonSelect freed it and every node after
+/* json.release on a node from json.select freed it and every node after
  * it, leaving the document pointing at freed memory. It now only frees a
- * root (what JsonParse returned); null or an inner node is ignored.
- * JsonGetStrerror/JsonPrintError crashed on an inner node (no state); they
+ * root (what json.parse returned); null or an inner node is ignored.
+ * json.errorStr/json.printError crashed on an inner node (no state); they
  * now return null / print nothing for null or an inner node. valgrind
  * checks the AOT binary for invalid reads and leaks. */
 

@@ -3,8 +3,8 @@ import fs, libc, mem, proc, str, test;
 /* Library functions that std.ktmh doesn't declare are internal helpers,
  * but libktm exported every non-static function as a weak symbol, so a
  * program with a function of the same name replaced the library's own
- * when compiled: its `RoundUpToNextPowerOf2` broke every IntMap, its
- * `JsonParseObject` broke JsonParse, its `_IntCmp` broke IntVecSort.
+ * when compiled: its `RoundUpToNextPowerOf2` broke every map.IntMap, its
+ * `JsonParseObject` broke json.parse, its `_IntCmp` broke vec.intSort.
  * libktm is one translation unit, so when it is built only what std.ktmh
  * declares is exported now and every other symbol is local. Replacing a
  * std.ktmh function still works (test 197). Compiled and JIT. */

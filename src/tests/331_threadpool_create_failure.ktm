@@ -1,9 +1,9 @@
 import libc, str, test, thread;
 
-/* ThreadPoolNew ignored pthread_create failing: the handles of the
+/* thread.poolNew ignored pthread_create failing: the handles of the
  * workers that never started were left as uninitialised MAlloc memory
- * and ThreadPoolStop/Release joined them (a crash). ThreadPoolNew(0) gave
- * a pool without workers, so ThreadPoolWait hung once a job was queued.
+ * and thread.poolStop/Release joined them (a crash). thread.poolNew(0) gave
+ * a pool without workers, so thread.poolWait hung once a job was queued.
  * Each case runs in a forked child with a watchdog alarm, so a crash or a
  * hang fails the test instead of the suite. */
 
@@ -21,7 +21,7 @@ void job(void *priv_data, void *argv) {
 u8 gBuf[4096];
 
 u8 *readProc(u8 *path)
-{// /proc files have no size, so FileRead can't be used
+{// /proc files have no size, so fs.readAll can't be used
     i32 fd = libc.open(path, libc.O_RDONLY);
     if (fd == -1) { return null; }
     i64 n = libc.read(fd, gBuf, sizeof(gBuf) - 1);

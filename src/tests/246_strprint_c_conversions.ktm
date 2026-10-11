@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* StrPrint took only `-` and `0` as flags and none of C's length
+/* str.formatTo took only `-` and `0` as flags and none of C's length
  * modifiers, %i or %o, ignored an integer precision (`%.3d` gave 7, not
  * 007), and `%.*d` / `%.*x` cut the number to the width instead. It now
  * takes the flags `-0+ #` in any order, the modifiers l ll h hh z j t L q
@@ -625,7 +625,7 @@ void modelCases() {
     chk(str.formatTo(null, "%-.*X", 1, -5178578408692706676), "B821FE5FE45D128C", "%-.*X -5178578408692706676");
 }
 
-/* Print statements and StrPrint print the formats they share alike
+/* Print statements and str.formatTo print the formats they share alike
  * (not h/hh: a statement is C's printf, which narrows the value) */
 u8 *stmtSrc =
 "import mem, str;

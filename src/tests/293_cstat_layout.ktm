@@ -1,8 +1,8 @@
 import fs, libc, mem, proc, str, test;
 
-/* On arm64 Linux cStat had x86_64's struct stat layout, so st_mode,
+/* On arm64 Linux libc.cStat had x86_64's struct stat layout, so st_mode,
  * st_size and the times were read from the wrong offsets: a regular file
- * didn't look regular and FileRead, Rm and MkDir misbehaved. */
+ * didn't look regular and fs.readAll, Rm and fs.makeDir misbehaved. */
 
 extern "c" u8 *mkdtemp(u8 *template);
 

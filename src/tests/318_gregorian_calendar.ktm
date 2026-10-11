@@ -2,8 +2,8 @@ import date, mem, str, test;
 
 /* CDate used the original calendar: no leap year in years divisible by
  * 4000, and none in year 0. From 4000-03-01 every date was a day off from
- * the Gregorian calendar (4000-02-29 didn't exist), which StrToCDate and
- * IsoFromTimespec use. It is now the proleptic Gregorian calendar, with
+ * the Gregorian calendar (4000-02-29 didn't exist), which date.parse and
+ * date.isoFromTimespec use. It is now the proleptic Gregorian calendar, with
  * year 0 a leap year, and day numbers of years 1 to 3999 are unchanged. */
 
 bool isLeap(i64 y) {

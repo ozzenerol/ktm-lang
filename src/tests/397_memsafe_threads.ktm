@@ -38,7 +38,7 @@ bool errHas(u8 *what, i64 times = 1) {
 i32 main() {
     printf("Test - -Memsafe in threads: ");
 
-    /* 8 threads x 2000 rounds of MAlloc/ReAlloc/CAlloc/Free, all freed:
+    /* 8 threads x 2000 rounds of MAlloc/mem.realloc/CAlloc/Free, all freed:
      * no crash and nothing reported */
     check(runMt(
 "import libc, mem;

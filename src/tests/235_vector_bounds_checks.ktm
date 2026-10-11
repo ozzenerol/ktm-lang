@@ -1,7 +1,7 @@
 import fs, libc, mem, proc, str, test, vec;
 
-/* IntVecGet/FloatVecGet/PtrVecGet only checked the index under
- * `#ifdef DEBUG`, which the library is never built with: IntVecGet(v, -1)
+/* vec.intGet/vec.floatGet/vec.ptrGet only checked the index under
+ * `#ifdef DEBUG`, which the library is never built with: vec.intGet(v, -1)
  * read the malloc header. Out-of-range indexes now print
  * "<Fn>: index N out of range (size M)" on stderr and exit with 1. */
 

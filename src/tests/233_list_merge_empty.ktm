@@ -1,8 +1,8 @@
 import list, test;
 
-/* ListMergeAppend/ListMergePrepend with an empty l2 linked the freed l2
- * head into l1 (use after free, endless walks). ListPop, ListCount and
- * ListRelease crashed on null while ListEmpty and ListDeque did not. */
+/* list.mergeAppend/list.mergePrepend with an empty l2 linked the freed l2
+ * head into l1 (use after free, endless walks). list.pop, list.count and
+ * list.release crashed on null while list.isEmpty and list.shift did not. */
 
 list.List *make(i64 from, i64 n) {
     list.List *l = list.new();
@@ -72,7 +72,7 @@ i32 main() {
     }
     tests++; if (ok) { correct++; }
 
-    /* Merging into a ListInit (stack) head */
+    /* Merging into a list.init (stack) head */
     list.List stackHead;
     stackHead.init();
     stackHead.mergeAppend(make(7, 2));
@@ -82,7 +82,7 @@ i32 main() {
     stackHead.pop();
     stackHead.pop();
 
-    /* null is safe everywhere, like ListEmpty/ListDeque */
+    /* null is safe everywhere, like list.isEmpty/list.shift */
     list.List *l = make(1, 2);
     l.mergeAppend(null);
     l.mergePrepend(null);

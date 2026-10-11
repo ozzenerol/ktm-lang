@@ -5,9 +5,9 @@ import fs, libc, mem, proc, str, test;
  * symbol, `static` ones included. A program defining a function with the
  * name of a library internal silently replaced it when compiled: its own
  * `CountNumberLen` (static in json.ktm; now JsonNumberLen, which the
- * test uses) broke JsonToString, its own
- * `GetNextNonWhitespaceIdx` (an internal helper of JsonParse, now
- * static) broke JsonParse. `static` functions and file-scope `static`
+ * test uses) broke json.toStr, its own
+ * `GetNextNonWhitespaceIdx` (an internal helper of json.parse, now
+ * static) broke json.parse. `static` functions and file-scope `static`
  * variables are now local symbols, in the library and in programs: a
  * program's static function neither replaces a library one of the same
  * name nor is replaced. Replacing a non-static library function still
@@ -72,7 +72,7 @@ void main()
 ";
 
 /* A program's static function named like a library function used inside
- * the library (MStrPrint calls StrNew) */
+ * the library (str.format calls str.dup) */
 u8 *srcUserStatic =
 "import mem, str;
 

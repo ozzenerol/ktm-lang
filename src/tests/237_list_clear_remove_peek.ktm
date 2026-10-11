@@ -1,8 +1,8 @@
 import list, test;
 
-/* New list functions: ListClear (free the nodes, keep the head - also a
- * ListInit stack head), ListRemove (unlink + free one node, return its
- * value), ListFirst/ListLast (peek). Checked against an array model. */
+/* New list functions: list.clear (free the nodes, keep the head - also a
+ * list.init stack head), list.remove (unlink + free one node, return its
+ * value), list.first/list.last (peek). Checked against an array model. */
 
 i64 gSeed = 7;
 i64 nextRand() {
@@ -75,7 +75,7 @@ i32 main() {
     else { printf("model mismatch\n"); }
     l.release(null);
 
-    /* A ListInit head on the stack: clear it, reuse it, clear it again */
+    /* A list.init head on the stack: clear it, reuse it, clear it again */
     list.List head;
     head.init();
     for (i64 i = 1; i <= 5; ++i) { head.append((void *)i); }

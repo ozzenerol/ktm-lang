@@ -1,8 +1,8 @@
 import json, mem, str, test;
 
-/* CatLenPrint never freed the string it formats into, so every call
- * leaked a block (JsonToString, built on it, leaked one per piece), and
- * CatLenPrint(null, ...) allocated no room for the '\0' it then wrote. */
+/* str.appendFormatLen never freed the string it formats into, so every call
+ * leaked a block (json.toStr, built on it, leaked one per piece), and
+ * str.appendFormatLen(null, ...) allocated no room for the '\0' it then wrote. */
 
 /* Bytes in use on the heap (test.heapInUse() is in the test module (src/tests/test)) */
 i64 inUse() {
@@ -57,7 +57,7 @@ i32 main() {
     }
     if (ok) { correct++; }
 
-    /* JsonToString no longer leaks */
+    /* json.toStr no longer leaks */
     tests++;
     json.Value *j = json.parse("{\"a\":[1,2,3,true,null],\"b\":\"x\",\"c\":{\"d\":1.5}}");
     s = json.toStr(j);

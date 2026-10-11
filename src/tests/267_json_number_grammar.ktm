@@ -5,7 +5,7 @@ import json, mem, str, test;
  * 1e 1e2.5 -abc --1` gave 0 and `1a 1-2` gave 1, also with
  * JSON_STRNUM_FLAG, which wrote the bad text back out. An integer outside
  * i64 saturated silently; it is now a JSON_FLOAT, as in JavaScript (with
- * STRNUM the text is kept). 1e400 is inf, and JsonToString writes inf and
+ * STRNUM the text is kept). 1e400 is inf, and json.toStr writes inf and
  * nan as null. */
 
 bool badFn(u8 *text, i64 flags=0) {

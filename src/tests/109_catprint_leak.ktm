@@ -1,9 +1,9 @@
 import libc, map, mem, str, test;
 
-/* CatPrint returned a brand new string and never freed the one passed
- * in, so the idiomatic `s = CatPrint(s, ...)` loop leaked every old s.
+/* str.appendFormat returned a brand new string and never freed the one passed
+ * in, so the idiomatic `s = str.appendFormat(s, ...)` loop leaked every old s.
  * It now appends into the heap string it is given, growing it with
- * ReAlloc (which frees the old block) when it is full. The leak is
+ * mem.realloc (which frees the old block) when it is full. The leak is
  * measured with libc's own count of bytes in use. */
 
 /* test.heapInUse() is in the test module (src/tests/test) */
@@ -71,7 +71,7 @@ i32 main() {
             s[300] == 'r' && s[301] == ']') { correct++; }
     mem.free(s);
 
-    /* 8, 9: the map printers use CatPrint; no double free, no leak */
+    /* 8, 9: the map printers use str.appendFormat; no double free, no leak */
     map.IntMap *im = map.intNew();
     for (i = 0; i < 50; i++) { im.set(i, (void *)i); }
     s = im.keysToStr();

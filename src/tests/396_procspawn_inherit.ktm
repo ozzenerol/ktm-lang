@@ -1,12 +1,12 @@
 import libc, mem, proc, str, test;
 
-/* On macOS a ProcSpawn child had no stdin, stdout or stderr when they
+/* On macOS a proc.spawn child had no stdin, stdout or stderr when they
  * were PROC_INHERIT (the default): POSIX_SPAWN_CLOEXEC_DEFAULT closes
  * every fd the file actions don't name, 0-2 included. Each case runs in a
  * forked child whose stdin, stdout and stderr are pipes of this test, so
  * what an inherited fd carries can be checked: a program writing to an
  * inherited stdout/stderr, reading an inherited stdin, alone and mixed
- * with PROC_PIPE / PROC_NULL / PROC_STDOUT, ProcRun's inherited stderr,
+ * with PROC_PIPE / PROC_NULL / PROC_STDOUT, proc.run's inherited stderr,
  * and a parent whose own stdin is closed. */
 
 extern "c" u32 alarm(u32 seconds);

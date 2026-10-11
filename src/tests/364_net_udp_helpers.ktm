@@ -1,7 +1,7 @@
 import date, libc, mem, net, os, str, test;
 
-/* NetCreateUdpSocket, NetSendTo, NetRecvFrom, NetSetRecvTimeout and
- * NetGetSocketPort: loopback only, ports picked by the kernel. Ends with a
+/* net.udpSocket, net.sendTo, net.recvFrom, net.setRecvTimeout and
+ * net.localPort: loopback only, ports picked by the kernel. Ends with a
  * DNS-style exchange: a client sends an A query, a server parses it and
  * answers the sender, the client checks the answer. */
 
@@ -144,7 +144,7 @@ i32 main() {
     echo("127.0.0.1", libc.AF_UNSPEC, "IPv4");
     echo("::1", libc.AF_INET6, "IPv6");
 
-    /* bind addresses and bad arguments, as NetCreateServer */
+    /* bind addresses and bad arguments, as net.listen */
     fd = net.udpSocket(0, "*");
     check(fd != -1 && net.localPort(fd) > 0, "\"*\" binds any IPv4 address");
     /* an IPv4 socket can't send to an IPv6 address */

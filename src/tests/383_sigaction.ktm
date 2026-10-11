@@ -1,10 +1,10 @@
 import libc, os, signal, test;
 
-/* sigaction-based signals (signals.ktm): SigAction/SigHandle install a
+/* sigaction-based signals (signals.ktm): signal.action/signal.handle install a
  * handler, SIG_IGN or SIG_DFL and return the previous action; the mask
  * blocks other signals while the handler runs; without SA_RESTART a
  * blocking read is interrupted (EINTR), with it the read goes on;
- * signal() and SigAction see each other's actions. SigStopInit: SIGINT
+ * signal() and signal.action see each other's actions. signal.stopInit: SIGINT
  * and SIGTERM set the flag and make the fd readable, errno survives the
  * handler, and a second signal ends the program. The struct sigaction
  * layouts (glibc x86_64/aarch64 and macOS) were checked in C. */
@@ -118,7 +118,7 @@ void restart() {
 }
 
 void withSignal()
-{// signal() and SigAction set the same action
+{// signal() and signal.action set the same action
     signal.Action got;
     libc.signal(libc.SIGUSR2, (i64)(&count));
     check(signal.action(libc.SIGUSR2, null, &got) && got.handler == (i64)(&count)

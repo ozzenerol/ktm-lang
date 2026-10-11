@@ -1,6 +1,6 @@
 import date, test;
 
-/* Str2CDateStruct left zone_diff at -1 when the format had no %z, the
+/* date.parseParts left zone_diff at -1 when the format had no %z, the
  * same value as a real -00:01 offset (zone_diff is +-hhmm). It is now
  * CDATE_NO_ZONE, which no offset can be. */
 

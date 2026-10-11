@@ -1,6 +1,6 @@
 import map, mem, str, test;
 
-/* StrMapSet stores the caller's key pointer (by design), but setting a key
+/* map.strSet stores the caller's key pointer (by design), but setting a key
  * that already existed replaced the stored pointer with the new one. Counting
  * words from a reused buffer then left the map's keys pointing at that
  * buffer, so every key turned into the last word read. Updates now keep the
@@ -177,7 +177,7 @@ i32 main() {
     tests++;
     if (gKeyFrees == 200 && gValueFrees == 200) { correct++; }
 
-    /* IntMap: replacing a value frees the old one once. */
+    /* map.IntMap: replacing a value frees the old one once. */
     gValueFrees = 0;
     map.IntMap *im = map.intNew();
     im.setFreeValue(&countingFreeValue);

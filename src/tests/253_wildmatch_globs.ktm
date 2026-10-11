@@ -1,6 +1,6 @@
 import mem, str, test;
 
-/* WildMatch got simple globs wrong: ("banana","*a") was false,
+/* str.globMatch got simple globs wrong: ("banana","*a") was false,
  * ("abc","**") false, ("","*x") true, ("ab","ab*c") true - it checked the
  * end of the text too early, never backtracked properly and searched for
  * '?' / '*' literally after a '*'. It is now a standard glob match ('*'

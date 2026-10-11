@@ -1,8 +1,8 @@
 import sql, test;
 
-/* SqlRowRelease on a row of a prepared statement finalized that
- * statement, so the next SqlExecPrepared or SqlFinalizePrepared used a
- * dead handle; and SqlIterPrepared never freed the column array, leaking
+/* sql.rowRelease on a row of a prepared statement finalized that
+ * statement, so the next sql.execPrepared or sql.finalize used a
+ * dead handle; and sql.nextPrepared never freed the column array, leaking
  * it on every execution. A row now knows whether it owns its statement. */
 
 i64 runPrepared(sql.Stmt *ps, i64 from) {
@@ -71,7 +71,7 @@ i32 main() {
     }
     sql.finalize(ps);
 
-    /* Rows of SqlSelect still own (and finalize) their statement. */
+    /* Rows of sql.select still own (and finalize) their statement. */
     n = 0;
     tests++;
     if (sql.select(ctx, &row, "SELECT id FROM t;")) {

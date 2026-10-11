@@ -1,10 +1,10 @@
 import libc, mem, net, test;
 
-/* NetConnect gave up when connecting to the first address a name resolved
+/* net.dial gave up when connecting to the first address a name resolved
  * to failed, instead of trying the next one: "localhost" resolving to ::1
  * and then 127.0.0.1 could not reach a server listening on 127.0.0.1 only
- * (NetCreateServer did the same when SO_REUSEADDR failed). The two
- * family checks need NetConnect to reach IPv6 addresses, ::1 to be
+ * (net.listen did the same when SO_REUSEADDR failed). The two
+ * family checks need net.dial to reach IPv6 addresses, ::1 to be
  * bindable and localhost to resolve to both families; otherwise they are
  * skipped. Only loopback addresses and kernel-chosen ports are used. */
 
@@ -52,7 +52,7 @@ bool resolves(u8 *name, i32 family) {
 }
 
 bool reach(u8 *name, i32 srv)
-{// NetConnect(name) gets to srv
+{// net.dial(name) gets to srv
     i32 c = net.dial(name, portFn(srv));
     if (c == -1) { return false; }
     i32 a = net.accept(srv);

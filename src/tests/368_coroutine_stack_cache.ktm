@@ -1,6 +1,6 @@
 import coro, libc, test;
 
-/* CoroutineRelease keeps the stack for the next CoroutineNew of the same
+/* coro.release keeps the stack for the next coro.spawn of the same
  * size on the same thread instead of unmapping it: at most 16 per
  * thread, the rest unmapped, and the cached ones unmapped when the
  * thread ends. A reused stack starts clean (its old data must not leak

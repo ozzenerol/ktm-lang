@@ -1,9 +1,9 @@
 import date, mem, test;
 
-/* Struct2Date indexed its month table with mon-1 unchecked: month 13
+/* date.fromParts indexed its month table with mon-1 unchecked: month 13
  * read past the table (January of the same year), 0 read before it.
  * A month outside 1-12 now carries into the year, the way a day past
- * the end of a month carries into the next month. Date2Struct read
+ * the end of a month carries into the next month. date.toParts read
  * mon_start_days[k+1] before checking k<11. */
 
 date.Date mkDate(i64 y, i64 mo, i64 d) {

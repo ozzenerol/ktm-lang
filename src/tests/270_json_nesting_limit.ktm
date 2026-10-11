@@ -1,7 +1,7 @@
 import json, mem, str, test;
 
 /* Deeply nested JSON (80000 `[`) overflowed the stack: the parser,
- * JsonToString and JsonRelease recurse once per level. Arrays and
+ * json.toStr and json.release recurse once per level. Arrays and
  * objects may now nest JSON_MAX_DEPTH (512) deep; deeper input is the
  * error JSON_NESTING_TOO_DEEP. */
 
@@ -22,7 +22,7 @@ u8 *nest(i64 n, bool obj) {
 }
 
 i64 parseErr(i64 n, bool obj)
-{ // the error (JSON_OK on success), after a JsonToString if it parsed
+{ // the error (JSON_OK on success), after a json.toStr if it parsed
     u8 *s = nest(n, obj);
     json.Value *j = json.parse(s);
     i64 err = j.state.error;

@@ -1,6 +1,6 @@
 import date, libc, mem, str, test;
 
-/* StrPrint ignored the width of %s and used its precision as the width:
+/* str.formatTo ignored the width of %s and used its precision as the width:
  * "[%5s][%-5s][%.2s]" gave "[ab][ab][abcd]". Right-justified padding was
  * also written through a copy of the destination pointer and then
  * overwritten by the string, and %-8d/%-8x padded on the left. Every case
@@ -98,19 +98,19 @@ i32 main() {
                             "       x|y       |z|7     |    -7")) { correct++; }
     mem.free(mid);
 
-    /* 6: StrPrint(null, ...) grows its buffer past STR_LEN while padding */
+    /* 6: str.formatTo(null, ...) grows its buffer past STR_LEN while padding */
     m = str.formatTo(null, "%300s|%-300s|%.3s", "right", "left", "truncated");
     libc.snprintf(want, sizeof(want), "%300s|%-300s|%.3s", "right", "left", "truncated");
     if (!str.cmp(m, want)) { correct++; }
     mem.free(m);
 
-    /* 7: MStrPrint, several regrowths, padding straddles each one */
+    /* 7: str.format, several regrowths, padding straddles each one */
     m = str.format("%255s%-257s%511s%d", "a", "b", "c", 42);
     libc.snprintf(want, sizeof(want), "%255s%-257s%511s%d", "a", "b", "c", 42);
     if (!str.cmp(m, want) && str.len(m) == 255 + 257 + 511 + 2) { correct++; }
     mem.free(m);
 
-    /* 8: CatPrint */
+    /* 8: str.appendFormat */
     c = str.format("[%3s]", "a");
     m = str.appendFormat(c, "[%-4s][%4.2s]", "bc", "def"); /* takes over c */
     if (!str.cmp(m, "[  a][bc  ][  de]")) { correct++; }

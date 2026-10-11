@@ -1,13 +1,13 @@
 import map, mem, str, test;
 
 /* Hash table API additions and fixes:
- *  - IntMapGet/StrMapGet/StrMapGetLen take an optional `bool *_ok`, true
+ *  - map.intGet/map.strGet/map.strGetLen take an optional `bool *_ok`, true
  *    when the key is there, so a stored null or 0 can be told from a
  *    missing key (calls without it still work);
- *  - a pointer that is both the key and the value (`StrMapSet(m,s,s)`)
+ *  - a pointer that is both the key and the value (`map.strSet(m,s,s)`)
  *    with both destructors registered was freed twice; it is now freed
  *    once, on release, delete, clear and update;
- *  - IntMapClear/StrMapClear remove every entry (running the
+ *  - map.intClear/map.strClear remove every entry (running the
  *    destructors) and keep the capacity;
  *  - a null map or key no longer crashes: Get/Has give null/false,
  *    Set/Delete false.
@@ -95,7 +95,7 @@ i32 main() {
     im.release();
     sm.release();
 
-    /* IntMapClear runs the value destructor, also after deletes */
+    /* map.intClear runs the value destructor, also after deletes */
     im = map.intNew();
     im.setFreeValue(&freeValue);
     for (i64 i = 0; i < 50; i++) { im.set(i, new("v")); }
@@ -106,7 +106,7 @@ i32 main() {
     else { printf("Failed - IntMapClear destructors: %d\n", gValueFrees); }
     im.release();
 
-    /* StrMapClear with destructors, shared and separate pointers */
+    /* map.strClear with destructors, shared and separate pointers */
     sm = countingMap();
     for (i64 i = 0; i < 40; i++) {
         u8 *k = str.formatTo(null, "k%d", i);

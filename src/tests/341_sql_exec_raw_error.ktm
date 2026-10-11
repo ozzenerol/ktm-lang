@@ -1,6 +1,6 @@
 import libc, mem, sql, test;
 
-/* SqlExecRaw's check was inverted: it returned sqlite's (null) message on
+/* sql.execRaw's check was inverted: it returned sqlite's (null) message on
  * success and null on failure, and leaked the message. It returns an
  * MAlloc'd copy of the error now (Free it), null on success. */
 

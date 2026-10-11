@@ -1,8 +1,8 @@
 import json, mem, str, test;
 
-/* New getters: JsonObjectGet (exact key), JsonArrayGet (index) and
- * JsonLen (items of an array/object). Checked against JsonSelect on
- * random documents, plus the cases JsonSelect can't express. */
+/* New getters: json.objectGet (exact key), json.arrayGet (index) and
+ * json.len (items of an array/object). Checked against json.select on
+ * random documents, plus the cases json.select can't express. */
 
 i64 gSeed = 5;
 i64 nextRand() {
@@ -42,7 +42,7 @@ u8 *randValue(u8 *s, i64 depth) {
 
 i64 gChecks = 0;
 
-/* Compare the getters with JsonSelect at `node` and below */
+/* Compare the getters with json.select at `node` and below */
 bool check(json.Value *node) {
     json.Value *it;
     i64 n = 0;
@@ -56,7 +56,7 @@ bool check(json.Value *node) {
         if (json.arrayGet(node, n) != null || json.arrayGet(node, -1) != null) { return false; }
     } else if (json.isObject(node)) {
         for (it = node.object; it; it = it.next) {
-            /* JsonSelect and JsonObjectGet both give the first node with a key */
+            /* json.select and json.objectGet both give the first node with a key */
             u8 sel[32];
             str.formatTo(sel, ".%s", it.key);
             if (json.objectGet(node, it.key) != json.select(node, sel)) { return false; }
@@ -90,7 +90,7 @@ i32 main() {
     }
     tests++; if (ok && gChecks > 500) { correct++; }
 
-    /* keys JsonSelect can't spell, duplicates, the empty key */
+    /* keys json.select can't spell, duplicates, the empty key */
     json.Value *d = json.parse("{\"a.b\": 1, \"x[0]\": 2, \"t:s\": 3, \"\": 4, \"dup\": 5, \"dup\": 6,"
                                             " \"arr\": [10, [20, 21], {}], \"e\": []}");
     tests++;

@@ -1,6 +1,6 @@
 import fzf, mem, str, test;
 
-/* Every FzF call leaked its parsed terms: releasing a term set freed the
+/* Every fzf.match call leaked its parsed terms: releasing a term set freed the
  * terms but not their text, and in case-sensitive mode the term's copy of
  * the text was not even recorded (og_str stayed null). */
 

@@ -52,7 +52,7 @@ i32 main() {
     /* A narrower intrinsic class. */
     if (mkP(250, -4).lo == 250 && mkP(250, -4).hi == -4) { correct++; }
 
-    /* The stdlib's Now() / Struct2Date(). */
+    /* The stdlib's Now() / date.fromParts(). */
     date.Date n = date.now();
     if (date.now().date >= n.date && date.now().date - n.date <= 1) { correct++; }
     date.Parts ds;

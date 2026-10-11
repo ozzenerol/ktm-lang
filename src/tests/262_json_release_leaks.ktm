@@ -1,6 +1,6 @@
 import json, test;
 
-/* JsonRelease never freed the parse state JsonParse hangs on the node it
+/* json.release never freed the parse state json.parse hangs on the node it
  * returns (32 bytes per parse), and a parse error in an array or object
  * freed only the first item of the list built so far, leaking the rest
  * with their keys and strings. Checked by the heap staying flat. */

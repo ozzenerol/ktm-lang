@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* RmDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
+/* fs.removeDir(path, RM_RECURSE) tested `ent->type & DT_DIR`, but d_type is a
  * number, not a bit mask: a socket (DT_SOCK 12) or block device (DT_BLK
  * 6) matched, was "recursed" into, failed, and stopped the removal. A
  * socket, a FIFO, a symlink and a file must all go. Everything happens

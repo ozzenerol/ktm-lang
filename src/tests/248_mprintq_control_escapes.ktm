@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* MPrintQ (and %Q) wrote a control byte as `x01`, with no backslash: the
+/* str.quote (and %Q) wrote a control byte as `x01`, with no backslash: the
  * result could not be told from the text "x01" and did not read back as
  * the same string. It is now `\x01`, which a ktm string literal reads
  * back as the byte (ktm's `\x` takes at most two hex digits). */

@@ -51,7 +51,7 @@ bool runRedefine(bool jit, u8 *source, i64 status, u8 *want1, u8 *want2) {
     return ok;
 }
 
-/* Own Now() plus other library functions (StrLen, MPrintDate) */
+/* Own Now() plus other library functions (str.len, date.formatDate) */
 u8 *rdSameSig =
 "import date, mem, str;
 
@@ -113,7 +113,7 @@ void main() { printf(\"now=%d %d\\n\", Now(), str.len(\"ab\")); }
     if (runRedefine(true, rdLibConflict, 1, "conflicting types for `Now`",
                                     RD_FILE ":1:5")) { correct++; }
 
-    /* i64 vs u64 return differ (std.ktmh: `public u64 NowMilliseconds();`) */
+    /* i64 vs u64 return differ (std.ktmh: `public u64 date.nowMs();`) */
     tests++;
     if (runRedefine(true,
 "i64 NowMilliseconds() { return 0; }

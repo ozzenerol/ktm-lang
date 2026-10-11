@@ -1,6 +1,6 @@
 import libc, map, mem, set, test;
 
-/* All red-black trees shared one global sentinel node: RBTreeNew reset
+/* All red-black trees shared one global sentinel node: map.rbNew reset
  * it and RBTransplant / the delete fix-up wrote its parent, so trees used
  * from different threads corrupted each other. Each tree now has its own
  * sentinel. */
@@ -50,7 +50,7 @@ struct RbtArgs {
 
 /* Random inserts and deletes against a shadow array, checking the tree
  * every so often. Every few hundred operations the tree is released and
- * a new one made, so RBTreeNew runs while other threads use their trees. */
+ * a new one made, so map.rbNew runs while other threads use their trees. */
 void *rbtWorker(RbtArgs *args) {
     bool shadow[RBT_KEYS];
     i64 i, k, n = 0, seed = args.seed;
@@ -125,7 +125,7 @@ i32 main() {
     b.release();
     c.release();
 
-    /* IntSet unchanged */
+    /* set.IntSet unchanged */
     set.IntSet *s = set.intNew();
     for (k = 10; k > 0; k--) { s.add(k); }
     s.delete(4);

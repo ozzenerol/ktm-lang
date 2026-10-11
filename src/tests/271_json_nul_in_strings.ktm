@@ -1,10 +1,10 @@
 import json, mem, str, test;
 
 /* A \u0000 in a JSON string or key cut it short: the parser decoded it
- * into a '\0' and everything after it was lost, also in JsonToString.
+ * into a '\0' and everything after it was lost, also in json.toStr.
  * Json now has `str_len` and `key_len` (at the end of the class) with
- * the full length; JsonToString writes the '\0' back as \u0000.
- * JsonSelect still matches a key up to its first '\0'. */
+ * the full length; json.toStr writes the '\0' back as \u0000.
+ * json.select still matches a key up to its first '\0'. */
 
 bool bytes(u8 *s, i64 len, u8 *want, i64 wantLen) {
     if (len != wantLen) {

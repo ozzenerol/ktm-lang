@@ -1,6 +1,6 @@
 import json, libc, mem, str, test;
 
-/* JsonToString found each float's text by trying %.1g, %.2g, ... up to
+/* json.toStr found each float's text by trying %.1g, %.2g, ... up to
  * %.17g until one read back as the same value: up to 17 formats per
  * number (500k floats took over a minute). It now tries %.15g, %.16g and
  * %.17g only (with C's snprintf), and every float still reads back

@@ -5,8 +5,8 @@
  * installed ktm).
  *
  * The harness forks the server on a pipe pair, frames JSON-RPC with
- * Content-Length headers, and parses replies with libktm's JsonParse/
- * JsonSelect. Every cursor position is COMPUTED from the fixture text
+ * Content-Length headers, and parses replies with libktm's json.parse/
+ * json.select. Every cursor position is COMPUTED from the fixture text
  * with PosOf() - never hardcoded. (Three separate debugging sessions
  * were lost to hand-counted coordinates pointing at whitespace.)
  *

@@ -1,6 +1,6 @@
 import fs, libc, mem, os, proc, str, test;
 
-/* ENOENT, EACCES and ECHILD were missing although the ProcSpawn docs name
+/* ENOENT, EACCES and ECHILD were missing although the proc.spawn docs name
  * them; so were ENETUNREACH, EHOSTUNREACH, EADDRNOTAVAIL, EMFILE, ENFILE
  * and the job-control signals SIGCONT, SIGTSTP, SIGSTOP, SIGTTIN and
  * SIGTTOU. Every errno and signal constant in std.ktmh is compared with the

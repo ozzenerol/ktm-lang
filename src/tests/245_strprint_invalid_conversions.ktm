@@ -1,6 +1,6 @@
 import fs, libc, mem, proc, str, test;
 
-/* StrPrint with a conversion it doesn't know: a trailing '%' read past
+/* str.formatTo with a conversion it doesn't know: a trailing '%' read past
  * the format's NUL; an unsupported conversion didn't take its argument,
  * so the later conversions got the wrong ones (`%ld %s` crashed; the
  * cases use letters that stay unsupported once %ld is), the

@@ -1,6 +1,6 @@
 import mem, set, str, test;
 
-/* IntSetToString appended every element with CatPrint, which measures
+/* set.intToStr appended every element with str.appendFormat, which measures
  * the whole string each time: O(n^2), about 24 s for 500k elements. */
 
 extern "c" i64 clock();

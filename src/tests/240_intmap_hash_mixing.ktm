@@ -1,6 +1,6 @@
 import libc, map, test;
 
-/* IntMap hashed a key as `key & mask`, so keys sharing their low bits
+/* map.IntMap hashed a key as `key & mask`, so keys sharing their low bits
  * (`i << 20`, multiples of 1024, aligned pointers) all went to the same
  * few slots and every insert and lookup walked one long probe chain:
  * 40000 keys `i << 20` took about 2 s. Keys are now mixed before masking.

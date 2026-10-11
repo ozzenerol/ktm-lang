@@ -1,8 +1,8 @@
 import sql, test;
 
-/* SqlPrepare ignored sqlite3_prepare_v2's result and returned an object
- * with a null stmt, which SqlExecPrepared then crashed on. It returns null
- * now. SqlExecPrepared with null params on a statement with parameters
+/* sql.prepare ignored sqlite3_prepare_v2's result and returned an object
+ * with a null stmt, which sql.execPrepared then crashed on. It returns null
+ * now. sql.execPrepared with null params on a statement with parameters
  * read params[0]; null now leaves every parameter unbound (SQL null). */
 
 i64 countRows(sql.Db *ctx, u8 *sqlVal) {

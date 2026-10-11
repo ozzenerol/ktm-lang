@@ -1,7 +1,7 @@
 import map, mem, set, test;
 
-/* RBTreeRelease freed the nodes but not the tree, and never called the
- * key/value destructors. RBTreeDelete already called them; updating an
+/* map.rbRelease freed the nodes but not the tree, and never called the
+ * key/value destructors. map.rbDelete already called them; updating an
  * existing key now also frees the duplicate key and the replaced value,
  * like StrMapAdd. */
 
@@ -49,7 +49,7 @@ bool releaseCallsDestructors() {
 }
 
 bool deleteThenRelease()
-{// Every entry is freed exactly once, by RBTreeDelete or RBTreeRelease
+{// Every entry is freed exactly once, by map.rbDelete or map.rbRelease
     resetCounts();
     map.RBTree *t = map.rbNew(&countKey, &countValue, &intCmp);
     i64 keySum = 0, valSum = 0;

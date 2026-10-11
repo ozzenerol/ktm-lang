@@ -1,6 +1,6 @@
 import mem, test, vec;
 
-/* IntVecSort/PtrVecSort used a last-element-pivot Lomuto quicksort that
+/* vec.intSort/vec.ptrSort used a last-element-pivot Lomuto quicksort that
  * recursed on both sides: O(n^2) on sorted, reversed and all-equal input,
  * and a stack overflow around 1e5 elements. It now uses a median-of-three
  * pivot, a three-way partition and recurses only into the smaller part.

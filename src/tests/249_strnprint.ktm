@@ -1,6 +1,6 @@
 import mem, str, test;
 
-/* StrNPrint: StrPrint into a buffer of a known size, with C's snprintf
+/* str.formatToSize: str.formatTo into a buffer of a known size, with C's snprintf
  * rules - at most size-1 characters, always a '\0' within size, nothing
  * written for size <= 0, longer output cut short, returns dst. */
 
@@ -55,7 +55,7 @@ i32 main() {
     mem.set(buf, '#', 16);
     str.formatToSize(buf, 16, "");
     if (bufIs(buf, 3, "0##")) { correct++; }
-    /* Same text as StrPrint for any size */
+    /* Same text as str.formatTo for any size */
     tests++;
     bool ok = true;
     u8 *full = str.formatTo(null, "%x|%5.2f|%-4s|", 48879, 3.14159, "z");

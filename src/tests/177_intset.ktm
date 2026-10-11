@@ -1,8 +1,8 @@
 import mem, set, str, test, vec;
 
-/* IntSet stored nothing: IntSetAdd is `return RBTreeInsert(...);` in a void
+/* set.IntSet stored nothing: set.intAdd is `return map.rbSet(...);` in a void
  * function and the compiler dropped the call (fixed in the compiler, test
- * 185). This checks IntSet end to end. Deleting is covered by test 186. */
+ * 185). This checks set.IntSet end to end. Deleting is covered by test 186. */
 
 i64 gCorrect = 0;
 void check(bool ok, u8 *what) {

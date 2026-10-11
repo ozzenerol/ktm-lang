@@ -1,6 +1,6 @@
 import map, set, test;
 
-/* RBTreeDelete (and so IntSetDelete) crashed: its search loop read `x->key`
+/* map.rbDelete (and so set.intDelete) crashed: its search loop read `x->key`
  * with x null and never stopped on a match. It also tested for null where
  * the tree uses a sentinel node, the mirrored fix-up case coloured a node
  * red instead of black, and free_key/free_value got the node, not the
@@ -98,7 +98,7 @@ i32 main() {
     t2.delete((void*)42);
     if (gFreed == 2 && gFreedSum == 13 && valid(t2) && t2.size == 8) { correct++; }
 
-    /* IntSetDelete */
+    /* set.intDelete */
     set.IntSet *s = set.intNew();
     for (i = 0; i < 20; i++) { s.tree.set((void*)i, null); }
     s.delete(3);

@@ -1,6 +1,6 @@
 import mem, test;
 
-/* ReAlloc copied MSize(old) bytes into the new block even when the new
+/* mem.realloc copied MSize(old) bytes into the new block even when the new
  * size was smaller, writing past the end of the new allocation. */
 
 i32 main() {

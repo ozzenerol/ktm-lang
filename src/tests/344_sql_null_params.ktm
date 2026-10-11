@@ -1,8 +1,8 @@
 import sql, str, test;
 
-/* SqlQuery and SqlSelect rejected SQL_NULL parameters (they fell into the
+/* sql.exec and sql.select rejected SQL_NULL parameters (they fell into the
  * default case, which returned SQLITE_OK as the error) while
- * SqlExecPrepared accepted them. They bind null now; an unknown type is
+ * sql.execPrepared accepted them. They bind null now; an unknown type is
  * still an error. */
 
 i64 count(sql.Db *ctx, u8 *sqlVal) {
@@ -39,7 +39,7 @@ i32 main() {
     tests++; if (sql.exec(ctx, "INSERT INTO t VALUES(?, 2, 3);", p, 1)) { correct++; }
     tests++; if (count(ctx, "SELECT * FROM t WHERE a IS NULL AND b = 2;") == 1) { correct++; }
 
-    /* SqlSelect with a null parameter */
+    /* sql.select with a null parameter */
     ok = sql.select(ctx, &row, "SELECT ? IS null, typeof(?1);", p, 1);
     tests++;
     if (ok && sql.next(&row) && row.col[0].intVal == 1 && row.col[1].type == sql.SQLITE_TEXT &&

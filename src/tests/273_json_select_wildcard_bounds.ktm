@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonSelect: a '*' in an object path copied the wrong buffer, so ".*"
+/* json.select: a '*' in an object path copied the wrong buffer, so ".*"
  * and ".price_*" never matched; a selector ending in '.' or '[' read past
  * its NUL; junk like "[1abc]", ":ixyz" and "..z" was accepted; a null
  * document or selector crashed. */

@@ -1,11 +1,11 @@
 import date, mem, str, test;
 
-/* Date2Struct, MPrintDate and MPrintTime segfaulted. The optimiser
+/* date.toParts, date.formatDate and date.formatTime segfaulted. The optimiser
  * folded `iadd t, param, k` into a later store's addressing mode across
- * a call, so `_ds->day_of_week = DayOfWeek(date)` stored through rdi
- * after DayOfWeek had clobbered it. Once that was fixed the time fields
- * were wrong (ModU64 did not divide) and FirstDayOfMon / LastDayOfMon
- * returned the wrong days. On the arm64 JIT, `Date2Struct(&ds, Now())`
+ * a call, so `_ds->day_of_week = date.dayOfWeek(date)` stored through rdi
+ * after date.dayOfWeek had clobbered it. Once that was fixed the time fields
+ * were wrong (math.divModU64 did not divide) and date.firstDayOfMonth / date.lastDayOfMonth
+ * returned the wrong days. On the arm64 JIT, `date.toParts(&ds, Now())`
  * in this big Main frame lost the CDate: its 16-byte slot sat past the
  * ldur/stur range and the register-offset store/load was not emitted. */
 
@@ -33,7 +33,7 @@ i64 mkDay(i64 y, i64 mo, i64 d) {
     return c.date;
 }
 
-/* Round trip through Date2Struct and check every field. */
+/* Round trip through date.toParts and check every field. */
 bool check(i64 y, i64 mo, i64 d, i64 h, i64 mi, i64 s, i64 dow) {
     date.Parts ds;
     date.toParts(&ds, mkDate(y, mo, d, h, mi, s));
@@ -101,7 +101,7 @@ i32 main() {
             ds.hour == 13 && ds.min == 45 && ds.sec == 7) { correct++; }
 
     /* Now() agrees with the libc broken-down local time. Read it on
-     * both sides of NowDateTimeStruct so an hour rolling over in between
+     * both sides of date.nowParts so an hour rolling over in between
      * can't fail the test. */
     date.Parts ds2;
     date.toParts(&ds, date.now());

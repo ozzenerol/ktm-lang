@@ -1,6 +1,6 @@
 import libc, test, thread;
 
-/* ThreadPoolRelease used to hang: the workers slept on a semaphore that
+/* thread.poolRelease used to hang: the workers slept on a semaphore that
  * shutdown never signalled, and the detached workers were then joined.
  * A hang must fail the test rather than hang the suite, so a watchdog
  * alarm kills the process (the runner then reports it as FAILED). */

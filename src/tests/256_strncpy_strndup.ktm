@@ -1,15 +1,15 @@
 import fzf, mem, str, test;
 
-/* StrNCpy(buf, len) copied exactly len bytes, past the end of a shorter
+/* str.dupLen(buf, len) copied exactly len bytes, past the end of a shorter
  * string, returned an uninitialised byte for len 0 (it returned before
  * writing the NUL) and crashed on a negative len. It is now strndup: at
  * most len bytes, stopping at the NUL, always terminated, len < 0 is 0.
  * fzf's internal str_replace called it as if it were C's strncpy (leaking
  * the copy and leaving the result unwritten); that use is fixed too. It
- * is checked through FzF, whose pattern parsing uses it to turn an escaped
+ * is checked through fzf.match, whose pattern parsing uses it to turn an escaped
  * space (`\ `) into one that is part of the term. */
 
-/* FzF(text, pattern) found a match covering `size` characters */
+/* fzf.match(text, pattern) found a match covering `size` characters */
 bool matches(u8 *text, u8 *pattern, i64 size) {
     fzf.Position *pos = fzf.match(text, pattern);
     bool ok = pos && pos.size == size;

@@ -132,7 +132,7 @@ bool oldForms() {
     return ok;
 }
 
-/* an error from a coroutine, rethrown by CoroutineNext */
+/* an error from a coroutine, rethrown by coro.next */
 void *gen(void *arg) {
     defer logFn("g");
     coro.yield((void *)1);

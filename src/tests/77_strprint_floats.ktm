@@ -1,7 +1,7 @@
 import json, libc, mem, str, test;
 
-/* StrPrint and friends printed "Floats not supported" and exited on %f,
- * so JsonToString exited on any JSON containing a float. %f, %e and %g
+/* str.formatTo and friends printed "Floats not supported" and exited on %f,
+ * so json.toStr exited on any JSON containing a float. %f, %e and %g
  * must now print exactly what C's printf prints for the same double. */
 
 extern "c" i64 snprintf(u8 *buf, u64 len, u8 *fmt, ...);
@@ -89,7 +89,7 @@ i32 main() {
         correct++; /* 0.0005 is just above the tie, so it rounds up */
     }
 
-    /* %s into a caller's buffer must not MSize/ReAlloc it: mid-array the
+    /* %s into a caller's buffer must not MSize/mem.realloc it: mid-array the
      * size header OutStr read is 0, so it "grew" and freed a bad pointer */
     u8 *mid = mem.allocZero(64);
     if (!str.cmp(str.formatTo(mid + 16, "%s|%c", "ab", 'z'), "ab|z")) {
@@ -97,12 +97,12 @@ i32 main() {
     }
     mem.free(mid);
 
-    /* MStrPrint and CatPrint go through the same formatter */
+    /* str.format and str.appendFormat go through the same formatter */
     u8 *m = str.format("pi=%.4f e=%.3e", 3.14159265358979, 2.718281828);
     if (!str.cmp(m, "pi=3.1416 e=2.718e+00")) { correct++; }
     mem.free(m);
 
-    /* JsonParse -> JsonToString with floats no longer exits */
+    /* json.parse -> json.toStr with floats no longer exits */
     json.Value *js = json.parse("{\"pi\": 3.5, \"neg\": -0.25, \"arr\": [1.5, 2, 0.1]}");
     u8 *s = json.toStr(js);
     if (!str.cmp(s, "{\"pi\": 3.5,\"neg\": -0.25,\"arr\": [1.5,2,0.1]}")) {

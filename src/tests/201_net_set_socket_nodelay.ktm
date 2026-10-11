@@ -1,6 +1,6 @@
 import libc, net, test;
 
-/* NetSetSocketNoDelay returned false when setsockopt succeeded and true
+/* net.setNoDelay returned false when setsockopt succeeded and true
  * when it failed. It must return true on success (and really set
  * TCP_NODELAY) and false on failure. */
 

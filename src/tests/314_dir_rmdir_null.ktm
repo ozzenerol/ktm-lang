@@ -1,6 +1,6 @@
 import fs, mem, proc, str, test;
 
-/* Dir(null) and RmDir(null, RM_RECURSE) passed null to opendir() and
+/* Dir(null) and fs.removeDir(null, RM_RECURSE) passed null to opendir() and
  * segfaulted. Both return -1 now; Dir also returns -1 (not 0, which is
  * an empty directory) for a path it can't open as a directory.
  * Everything happens in a fresh mkdtemp directory. */

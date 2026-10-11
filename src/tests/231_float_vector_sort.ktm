@@ -1,7 +1,7 @@
 import test, vec;
 
-/* FloatVecSort did nothing: its comparator took two f64 parameters but
- * QSortGeneric passes the entries as void * in integer registers, so it
+/* vec.floatSort did nothing: its comparator took two f64 parameters but
+ * vec.qsort passes the entries as void * in integer registers, so it
  * compared whatever was in the float registers. */
 
 i64 gSeed = 12345;

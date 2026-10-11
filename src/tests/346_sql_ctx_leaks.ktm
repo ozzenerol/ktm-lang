@@ -1,8 +1,8 @@
 import sql, test;
 
-/* SqlCtxNew leaked the sqlite handle when opening failed; SqlCtxRelease
+/* sql.open leaked the sqlite handle when opening failed; sql.close
  * used sqlite3_close, which fails with SQLITE_BUSY (and keeps the
- * connection) while a statement is still alive; SqlColumn.len was left
+ * connection) while a statement is still alive; sql.Column.len was left
  * uninitialised for INTEGER, FLOAT and null columns; sqlite3_open was
  * declared returning bool; the SQL_* type names were not exported. */
 

@@ -1,7 +1,7 @@
 import libc, mem, net, os, test;
 
 /* The basics socket code needs had no stdlib support: byte order
- * (Htons/Ntohs/Htonl/Ntohl), the C errno (Errno/SetErrno) and its E*
+ * (Htons/Ntohs/Htonl/Ntohl), the C errno (Errno/os.setErrno) and its E*
  * names, the MSG_* send/recv flags, SHUT_* and poll(2) with pollfd. */
 
 extern "c" i32 socketpair(i32 d, i32 t, i32 p, i32 *sv);

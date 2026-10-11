@@ -1,9 +1,9 @@
 import mem, test, vec;
 
 /* bitvec.ktm was not part of the library and every operation was broken:
- * BitVecSet grew to sizeof(u32) * block_idx + 1 bytes and left the new
- * last block uninitialised, BitVecUnSet cleared ~((1 << idx) & 31),
- * BitVecTest returned the whole word shifted by (idx & 31) & 1, and the
+ * vec.bitSet grew to sizeof(u32) * block_idx + 1 bytes and left the new
+ * last block uninitialised, vec.bitUnset cleared ~((1 << idx) & 31),
+ * vec.bitTest returned the whole word shifted by (idx & 31) & 1, and the
  * u32 block index wrapped for large indexes. */
 
 const i64 MODEL_BITS = 5000;

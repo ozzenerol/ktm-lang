@@ -1,6 +1,6 @@
 import libc, net, test;
 
-/* NetCreateServer and NetConnect printed the port into a 6-byte buffer, so
+/* net.listen and net.dial printed the port into a 6-byte buffer, so
  * a port above 65535 was cut to its first five digits (212345 listened on
  * 21234) and 65536 or a negative port was not rejected. Ports outside
  * 0..65535 now give -1. Only 127.0.0.1 and kernel-chosen ports are used; the server checks

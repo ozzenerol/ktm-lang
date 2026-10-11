@@ -1,7 +1,7 @@
 import str, test, vec;
 
-/* IntVecPop/FloatVecPop/PtrVecPop wrote through `_ok` unconditionally, so
- * IntVecPop(v, null) crashed and the flag had to be passed. It now
+/* vec.intPop/vec.floatPop/vec.ptrPop wrote through `_ok` unconditionally, so
+ * vec.intPop(v, null) crashed and the flag had to be passed. It now
  * defaults to null and is only written when given. The empty-vector
  * sentinels stay: -1, -1.0 and null. */
 

@@ -1,10 +1,10 @@
 import map, mem, str, test;
 
-/* What the library docs and std.ktmh now promise about IntMap and StrMap:
+/* What the library docs and std.ktmh now promise about map.IntMap and map.StrMap:
  * the capacity rule (slots, a power of two, grows at 60% full, never
  * shrinks, not even on Clear), insertion-order iteration with deletes
  * allowed during it and a re-set key coming last, an update keeping the
- * stored key and freeing the key passed, and StrMapToString's format. */
+ * stored key and freeing the key passed, and map.strToStr's format. */
 
 i64 gKeyFrees = 0;
 

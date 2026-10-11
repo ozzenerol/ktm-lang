@@ -2,7 +2,7 @@ import libc, mem, str, test;
 
 /* strings.ktm cleanup: strlen was declared twice (once as i64, once as
  * u64), strncasecmp and atol were public in the library but missing from
- * std.ktmh, and dead code went: MPrintQ's '$$' branch (a byte never equals
+ * std.ktmh, and dead code went: str.quote's '$$' branch (a byte never equals
  * the two-byte constant), U64ToStr's rem > 9 branch and the PRTF_/CH_
  * constants nothing used. Behaviour is unchanged; this checks that the
  * declarations are usable and the touched functions still work. */
@@ -24,7 +24,7 @@ i32 main() {
     i64 z = U64ToStr(buf + 16, 0);
     tests++; if (n == 5 && !str.cmp(buf, "54321") && z == 1 && !str.cmp(buf + 16, "0")) { correct++; }
 
-    /* MPrintQ: '$' is an ordinary character */
+    /* str.quote: '$' is an ordinary character */
     u8 *q = str.quote("a$$b\n\"c\"");
     tests++; if (!str.cmp(q, "a$$b\\n\\\"c\\\"")) { correct++; }
     else { printf("MPrintQ -> %s\n", q); }

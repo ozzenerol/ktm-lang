@@ -3,7 +3,7 @@ import mem, test, vec;
 /* `auto` in a range-based for over a container reached through a class
  * field (`h.v`, `p->v`, `a.b->v`) was given the type of the container's
  * `entries` pointer instead of the element type, so `s += it` did pointer
- * arithmetic and an IntVec of 10, 20, 30 summed to 830 instead of 60.
+ * arithmetic and an vec.IntVec of 10, 20, 30 summed to 830 instead of 60.
  * A container held by value in a field (`w.c`, `wp->c`) was dereferenced
  * as if it were a pointer. */
 
@@ -62,7 +62,7 @@ i32 main() {
     h.v.push(20);
     h.v.push(30);
 
-    /* IntVec through `h.field`. */
+    /* vec.IntVec through `h.field`. */
     sum = 0;
     for (auto it : h.v) { sum += it; }
     if (sum == 60) { correct++; }
@@ -77,7 +77,7 @@ i32 main() {
     for (auto it : h.v) { sum += sizeof(it) + (it + 1) - it; }
     if (sum == 27) { correct++; }
 
-    /* IntVec through `p->field`. */
+    /* vec.IntVec through `p->field`. */
     Holder *hp = &h;
     sum = 0;
     for (auto it : hp.v) { sum += it; }
@@ -100,7 +100,7 @@ i32 main() {
     for (i64 it : h.v) { sum += it; }
     if (sum == 60) { correct++; }
 
-    /* FloatVec: the element type is f64. */
+    /* vec.FloatVec: the element type is f64. */
     h.fv = vec.floatNew();
     h.fv.push(0.5);
     h.fv.push(1.25);
@@ -113,7 +113,7 @@ i32 main() {
     for (auto f : hp.fv) { fsum += f * 2.0; }
     if (fsum == 7.5) { correct++; }
 
-    /* PtrVec: the element type is a pointer, not a pointer to a pointer. */
+    /* vec.PtrVec: the element type is a pointer, not a pointer to a pointer. */
     h.pv = vec.ptrNew();
     h.pv.push(bInt(1));
     h.pv.push(bInt(4));

@@ -1,6 +1,6 @@
 import libc, mem, net, str, test;
 
-/* NetGetIpv4AddressFromAcceptedSocket read the peer address into a
+/* net.peerAddr read the peer address into a
  * 16-byte sockaddr, which cuts a sockaddr_in6 short, and NetGetInAddress
  * then read sin6_addr past the end of it: an IPv6 peer came out as
  * garbage. Any family other than AF_INET was treated as AF_INET6. Only

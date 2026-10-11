@@ -4,7 +4,7 @@ import set, test;
  * function has no return slot, and the value was only evaluated to be
  * stored there, so `void Wrap() { return Inc(); }` never called Inc.
  * It is now evaluated for its side effects and the value discarded.
- * IntSetAdd in the stdlib is written this way. */
+ * set.intAdd in the stdlib is written this way. */
 
 i64 g = 0;
 
@@ -56,7 +56,7 @@ i32 main() {
     inlWrap2();
     tests++; if (g == 2) { correct++; }
 
-    /* IntSetAdd is `void ... { return RBTreeInsert(...); }` */
+    /* set.intAdd is `void ... { return map.rbSet(...); }` */
     s = set.intNew();
     s.add(5);
     s.add(7);

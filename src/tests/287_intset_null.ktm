@@ -1,6 +1,6 @@
 import mem, set, str, test, vec;
 
-/* IntSetRelease(null) and IntSetSize(null) crashed. The IntSet functions
+/* set.intRelease(null) and set.intSize(null) crashed. The set.IntSet functions
  * that only read a set now treat null as the empty set, and the release
  * functions ignore null, like the vector and map APIs. */
 

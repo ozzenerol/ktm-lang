@@ -1,9 +1,9 @@
 import mem, test;
 
-/* MemSet and MemCpy are declared to return void * but returned junk: the
- * x86_64 MemSet copied RAX into RDI instead of the other way round,
- * MemCpy never set RAX, and on arm64 MemCpy returned dst + len and
- * MemSet with len 0 returned an uninitialised register. Both return
+/* mem.set and mem.copy are declared to return void * but returned junk: the
+ * x86_64 mem.set copied RAX into RDI instead of the other way round,
+ * mem.copy never set RAX, and on arm64 mem.copy returned dst + len and
+ * mem.set with len 0 returned an uninitialised register. Both return
  * dst now, like C's memset/memcpy. */
 
 i32 main() {

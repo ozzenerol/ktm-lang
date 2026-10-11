@@ -5,7 +5,7 @@ import fzf, libc, mem, str, test;
  * character instead of after a whole match, so only 1-character patterns
  * could match. Expected results are upstream telescope-fzf-native's. */
 
-/* FzF's result as "score: positions" or "null", compared with the output
+/* fzf.match's result as "score: positions" or "null", compared with the output
  * of upstream telescope-fzf-native (V1 algorithm) for the same input. */
 bool check(u8 *text, u8 *pat, i32 case_mode, bool fuzzy, u8 *want) {
     u8 got[256], *p = str.dup(pat);

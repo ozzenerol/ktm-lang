@@ -1,6 +1,6 @@
 import date, libc, net, os, test;
 
-/* NetConnect's timeout_ms, NetSetSendTimeout and NetSetRecvTimeout on TCP.
+/* net.dial's timeout_ms, net.setSendTimeout and net.setRecvTimeout on TCP.
  * Loopback only. A connect that never completes is made with a listening
  * socket whose accept queue is full: Linux and macOS then drop the SYN
  * instead of refusing it, so the connect stays pending. */

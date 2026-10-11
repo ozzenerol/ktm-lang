@@ -2,7 +2,7 @@ import mem, sql, str, test;
 
 /* Text and blob parameters were bound with SQLITE_STATIC, so sqlite kept
  * reading the caller's buffer while the rows were stepped: reusing or
- * freeing it after SqlSelect/SqlExecPrepared changed (or read freed)
+ * freeing it after sql.select/sql.execPrepared changed (or read freed)
  * data. They are bound with SQLITE_TRANSIENT now (sqlite copies them). */
 
 bool allRows(sql.Row *row, u8 *want, i64 count, bool prepared) {

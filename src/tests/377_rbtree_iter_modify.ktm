@@ -1,10 +1,10 @@
 import map, mem, set, str, test;
 
-/* RBIterNew, IntSetIterNew and RBTreeForEach size their stack from the
+/* map.rbIterNew, set.intIterNew and map.rbForEach size their stack from the
  * tree's size when they start, so adding keys during the walk wrote past
  * it, and a delete left freed nodes on it. The tree now counts its
  * changes: once a new key is added or one is deleted, the iterator stops
- * (Next returns null, RBTreeForEach returns after that callback).
+ * (Next returns null, map.rbForEach returns after that callback).
  * Replacing the value of a key that is there doesn't stop it. */
 
 i64 cmp(void *a, void *b) {
@@ -121,7 +121,7 @@ i32 main() {
     map.rbIterRelease(it);
     t.release();
 
-    /* RBTreeForEach stops after the callback that changed the tree */
+    /* map.rbForEach stops after the callback that changed the tree */
     t = treeFn(3);
     gCalls = 0;
     t.forEach(t, &insertMany);
@@ -140,7 +140,7 @@ i32 main() {
     tests++; if (gCalls == 8 && (i64)t.get((void *)30) == 103) { correct++; }
     t.release();
 
-    /* IntSet: adding many keys while iterating stops the iterator */
+    /* set.IntSet: adding many keys while iterating stops the iterator */
     setVal = set.intNew();
     for (i = 1; i <= 3; i++) { setVal.add(i); }
     sit = setVal.iterNew();
@@ -162,7 +162,7 @@ i32 main() {
     tests++; if (n == 503) { correct++; }
     set.intIterRelease(sit);
 
-    /* IntSet: deleting the current key stops it too */
+    /* set.IntSet: deleting the current key stops it too */
     sit = setVal.iterNew();
     n = 0;
     while ((e = set.intIterNext(sit))) {

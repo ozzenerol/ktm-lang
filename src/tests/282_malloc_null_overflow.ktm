@@ -3,8 +3,8 @@ import mem, test;
 /* MAlloc wrote its size header through malloc's result without checking
  * it for null, so a failed allocation crashed, and size + 8 wrapped for
  * sizes near U64_MAX, so MAlloc(-1) returned a 7-byte block claiming
- * MSize -1. MAlloc, CAlloc and ReAlloc now return null instead; a failed
- * ReAlloc leaves the old block alone, like C's realloc. */
+ * MSize -1. MAlloc, CAlloc and mem.realloc now return null instead; a failed
+ * mem.realloc leaves the old block alone, like C's realloc. */
 
 i32 main() {
     printf("Test - MAlloc null and overflow: ");
@@ -24,7 +24,7 @@ i32 main() {
     tests++; if (mem.allocZero(1 << 62) == null) { correct++; }
     tests++; if (mem.realloc(null, -1) == null) { correct++; }
 
-    /* A failed ReAlloc returns null and keeps the old block intact. */
+    /* A failed mem.realloc returns null and keeps the old block intact. */
     p = mem.alloc(32);
     for (i = 0; i < 32; i++) { p[i] = i; }
     q = mem.realloc(p, -1);

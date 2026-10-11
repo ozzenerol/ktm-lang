@@ -120,7 +120,7 @@ i32 main() {
     if (sum == 1111) { correct++; }
     mem.free(sc);
 
-    /* IntVec, directly and through a class reference. */
+    /* vec.IntVec, directly and through a class reference. */
     vec.IntVec *iv = vec.intNew();
     iv.push(10);
     iv.push(20);
@@ -136,7 +136,7 @@ i32 main() {
     if (sum == 60) { correct++; }
     iv.release();
 
-    /* PtrVec with a typed loop variable. */
+    /* vec.PtrVec with a typed loop variable. */
     vec.PtrVec *pv = vec.ptrNew();
     pv.push(bInt(1));
     pv.push(bInt(4));

@@ -67,7 +67,7 @@ i32 main() {
     if (!exists("tree")) { correct++; }
     if (exists("target/keep1") && exists("target/keep2")) { correct++; }
 
-    /* RmDir refuses a symlink: it is not a directory */
+    /* fs.removeDir refuses a symlink: it is not a directory */
     if (fs.removeDir(P("link3"), fs.REMOVE_RECURSE) == -1) { correct++; }
     if (exists("link3") && exists("target/keep1")) { correct++; }
 

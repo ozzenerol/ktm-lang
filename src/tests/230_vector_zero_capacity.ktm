@@ -1,7 +1,7 @@
 import test, vec;
 
-/* IntVecNew(0)/FloatVecNew(0) never grew (capacity * 2 of 0) and every
- * push wrote past the block; PtrVecNew ignored its size and always made
+/* vec.intNew(0)/vec.floatNew(0) never grew (capacity * 2 of 0) and every
+ * push wrote past the block; vec.ptrNew ignored its size and always made
  * room for 32. A size below 1 (0 or negative) now starts with room for
  * one entry, and growing from a tiny capacity goes to at least 8. */
 

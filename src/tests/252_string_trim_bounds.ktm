@@ -1,7 +1,7 @@
 import str, test;
 
-/* StrTrimEnd on an empty or all-blank string walked back past the start
- * and wrote the NUL before it; StrTrimStart ignored its str_len. Both now
+/* str.trimEnd on an empty or all-blank string walked back past the start
+ * and wrote the NUL before it; str.trimStart ignored its str_len. Both now
  * stay inside [0, len) and only look at the first str_len bytes when it
  * is given; null returns null with *_new_len = 0. */
 

@@ -1,6 +1,6 @@
 import json, str, test;
 
-/* JsonParse only accepted a non-empty object or array at the top level:
+/* json.parse only accepted a non-empty object or array at the top level:
  * `{}`, `[]`, `42`, `"text"`, `true` and `null` were errors (moving past the
  * last character of the input was treated as running off the end). */
 

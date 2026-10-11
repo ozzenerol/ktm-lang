@@ -1,7 +1,7 @@
 import fs, libc, mem, net, proc, str, test;
 
 /* The fds the library opens (sockets from the Net* helpers, accepted
- * connections, FileRead/FileWrite's file (also while FileRead reads a
+ * connections, fs.readAll/fs.writeAll's file (also while fs.readAll reads a
  * FIFO to its end), Shlurp's temporary file) were
  * inherited by every program started with System, Sh, Shlurp or exec:
  * a child kept a listening socket or a client connection open. They are
@@ -50,7 +50,7 @@ void kind(i32 fd, u8 *what) {
 
 u8 *gBig;
 void *writeFifo(void *arg)
-{// Blocks in FileWrite until main drains the fifo
+{// Blocks in fs.writeAll until main drains the fifo
     fs.writeAll(FIFO, gBig, BIG, libc.O_WRONLY);
     return null;
 }
@@ -69,14 +69,14 @@ void fileWriteFd() {
     /* Non-blocking so this open doesn't wait for a writer */
     rd = libc.open(FIFO, libc.O_RDONLY | libc.O_NONBLOCK | libc.O_CLOEXEC);
     check(rd != -1, "open the fifo for reading");
-    /* The fd FileWrite will get: the lowest free one */
+    /* The fd fs.writeAll will get: the lowest free one */
     probe = libc.open("/dev/null", libc.O_RDONLY | libc.O_CLOEXEC);
     libc.close(probe);
     gBig = mem.alloc(BIG);
     mem.set(gBig, 'x', BIG);
     libc.pthread_create(&th, null, &writeFifo);
 
-    /* FileWrite has the fifo open once that fd exists; the pipe then fills
+    /* fs.writeAll has the fifo open once that fd exists; the pipe then fills
      * (it holds far less than BIG) and its write waits with the fd open.
      * (poll can't tell: on macOS it misses data already in a fifo.) */
     for (i = 0; i < 500 && libc.fcntl(probe, libc.F_GETFD) == -1; i++) { libc.poll(null, 0, 10); }
@@ -85,7 +85,7 @@ void fileWriteFd() {
     check(!childHas(probe), "FileWrite: not inherited");
 
     /* Drain to EOF before the join, with blocking reads: EOF comes when
-     * FileWrite has written everything and closed its end. (alarm in Main
+     * fs.writeAll has written everything and closed its end. (alarm in Main
      * ends the test if this ever stalls.) */
     libc.fcntl(rd, libc.F_SETFL, libc.fcntl(rd, libc.F_GETFL) & ~libc.O_NONBLOCK);
     while ((n = libc.read(rd, buf, sizeof(buf))) > 0) { got += n; }
@@ -96,7 +96,7 @@ void fileWriteFd() {
     mem.free(gBig);
 }
 
-/* FileRead's fd: the FIFO fd that isn't `except` */
+/* fs.readAll's fd: the FIFO fd that isn't `except` */
 i32 fifoFd(i32 except) {
     libc.cStat st;
     i32 fd;
@@ -111,7 +111,7 @@ i32 fifoFd(i32 except) {
 u8 *gRead;
 i64 gReadLen;
 void *readFifo(void *arg)
-{// Blocks in FileRead (reading to EOF) until main closes its end
+{// Blocks in fs.readAll (reading to EOF) until main closes its end
     gRead = fs.readAll(FIFO, &gReadLen);
     return null;
 }
@@ -126,7 +126,7 @@ void fileReadFd() {
         return;
     }
     libc.pthread_create(&th, null, &readFifo);
-    /* A non-blocking open for writing works once FileRead has it open */
+    /* A non-blocking open for writing works once fs.readAll has it open */
     for (i = 0; i < 500 && wr == -1; i++) {
         wr = libc.open(FIFO, libc.O_WRONLY | libc.O_NONBLOCK | libc.O_CLOEXEC);
         if (wr == -1) { libc.poll(null, 0, 10); }
@@ -135,7 +135,7 @@ void fileReadFd() {
     /* Never leave the thread waiting in open(): a blocking open for writing
      * returns as soon as it has the fifo open */
     if (wr == -1) { wr = libc.open(FIFO, libc.O_WRONLY | libc.O_CLOEXEC); }
-    /* Nothing written yet: FileRead waits in its read with the fd open */
+    /* Nothing written yet: fs.readAll waits in its read with the fd open */
     for (i = 0; i < 200 && fd == -1; i++) {
         fd = fifoFd(wr);
         if (fd == -1) { libc.poll(null, 0, 10); }

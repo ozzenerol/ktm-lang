@@ -1,14 +1,14 @@
 import fs, libc, mem, proc, str, test;
 
-/* The compile-time check of a StrPrint-family format string against its
- * arguments only knew C's conversions: `StrPrint(null, "%Q %d", "a", 1)`
+/* The compile-time check of a str.formatTo-family format string against its
+ * arguments only knew C's conversions: `str.formatTo(null, "%Q %d", "a", 1)`
  * was an error ("expects 1 argument but 2"), as were %T %D %C %F %p, and
  * an unknown conversion was counted together with the next one. It now
- * follows StrPrint: flags `-0+ #`, `*` and `.*` taking an argument, length
+ * follows str.formatTo: flags `-0+ #`, `*` and `.*` taking an argument, length
  * modifiers, and %d %i %u %o %x %X %c %s %f %e %g %p %Q %D %T %C %F %%; an
  * unknown conversion is a warning and takes no argument. The error was
  * also placed at `file:0` when the format was not the first or second
- * argument (CatLenPrint, StrNPrint); it is now at the format string. */
+ * argument (str.appendFormatLen, str.formatToSize); it is now at the format string. */
 
 #define FMT_SRC "./ktm-261-fmt.ktm"
 #define FMT_OUT "./ktm-261-fmt.out"
@@ -108,7 +108,7 @@ i32 main() {
         correct++;
                          } else { printf("Failed - format on the next line\n"); }
 
-    /* StrNPrint (format third) once the library has it */
+    /* str.formatToSize (format third) once the library has it */
     u8 *probe = diagnose(MAIN "import str;\n\n  u8 b[8];\n\nvoid main()\n{\n  str.formatToSize(b, 8, \"%d\", 1);\n}\n" END);
     bool hasStrnprint = probe && !libc.strstr(probe, "not been defined") &&
                                              !libc.strstr(probe, "not defined");

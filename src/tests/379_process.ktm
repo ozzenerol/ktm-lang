@@ -1,9 +1,9 @@
 import libc, mem, net, os, proc, str, test;
 
-/* Processes (process.ktm): ProcSpawn runs argv without a shell; exit codes
- * and signals from ProcWait; ENOENT for a missing program; PROC_NULL,
- * PROC_STDOUT, cwd and env; ProcDone; ProcKill of a whole process group;
- * ProcCommunicate moving 1 MiB through stdin/stdout while 1 MiB goes to
+/* Processes (process.ktm): proc.spawn runs argv without a shell; exit codes
+ * and signals from proc.wait; ENOENT for a missing program; PROC_NULL,
+ * PROC_STDOUT, cwd and env; proc.done; proc.kill of a whole process group;
+ * proc.communicate moving 1 MiB through stdin/stdout while 1 MiB goes to
  * stderr (no deadlock); a child that never reads its stdin (no SIGPIPE);
  * no fd of ours leaking into the child; spawns from 4 threads at once.
  * Only sh, cat, echo, printf, pwd, yes and head are used: all exist on
@@ -11,7 +11,7 @@ import libc, mem, net, os, proc, str, test;
  * Under QEMU user emulation (docker/test.sh arm64 on an x86 host) glibc's
  * posix_spawn can't use clone(CLONE_VM|CLONE_VFORK): a missing program
  * then shows up as exit 127 instead of ENOENT and the process group isn't
- * made, so "missing program" and "ProcKill of a process group" fail
+ * made, so "missing program" and "proc.kill of a process group" fail
  * there; native arm64 Linux (Docker on the Mac) passes. */
 
 extern "c" u32 alarm(u32 seconds);

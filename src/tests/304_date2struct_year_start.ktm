@@ -1,6 +1,6 @@
 import date, mem, str, test;
 
-/* Date2Struct estimates the year from the day number and only corrected
+/* date.toParts estimates the year from the day number and only corrected
  * an estimate that was too high. For 182 years in 1..10000 (1903,
  * 1904..1932 every 4 years, 2304..2320, ...) the estimate for Jan 1 was
  * one too low and the day came out as Dec 32 of the year before. */
@@ -77,7 +77,7 @@ i32 main() {
     if (!bad) { correct++; }
     else { printf("%d bad days\n", bad); }
 
-    /* MPrintDate goes through Date2Struct */
+    /* date.formatDate goes through date.toParts */
     u8 *s = date.formatDate(mkDay(1904, 1, 1));
     if (!str.cmp(s, "01/01/1904")) { correct++; }
     else { printf("MPrintDate: %s\n", s); }

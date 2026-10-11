@@ -1,10 +1,10 @@
 import fs, libc, mem, test;
 
-/* FileRead asked read() for the whole file length on every call, even
+/* fs.readAll asked read() for the whole file length on every call, even
  * after the buffer was full, so the EOF probe claimed bytes past the end
  * of the buffer. A real kernel returns 0 without looking, but qemu-user
  * checks the range and fails with EFAULT when it crosses the end of the
- * heap, and FileRead then returned null. That only shows under qemu with
+ * heap, and fs.readAll then returned null. That only shows under qemu with
  * an unlucky heap layout (39_arg_count.ktm under the arm64 JIT caught it);
  * this test pins down that the bounded read loop returns every byte. */
 

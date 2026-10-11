@@ -1,9 +1,9 @@
 import libc, net, test;
 
 /* On macOS BSD's accept() copies O_NONBLOCK from the listening socket, so
- * NetAccept(srv) on a non-blocking listener returned a non-blocking socket
+ * net.accept(srv) on a non-blocking listener returned a non-blocking socket
  * (recv then gave -1 EAGAIN instead of waiting); Linux's accept doesn't.
- * NetAccept now sets the accepted socket's mode from non_blocking on every
+ * net.accept now sets the accepted socket's mode from non_blocking on every
  * OS. Checks all four listener x non_blocking combinations, that
  * FD_CLOEXEC is kept and that the socket carries data. */
 
@@ -11,7 +11,7 @@ bool isNonBlocking(i32 fd) {
     return (libc.fcntl(fd, libc.F_GETFL, 0) & libc.O_NONBLOCK) != 0;
 }
 
-/* Accept one connection with the listener (non-)blocking and NetAccept's
+/* Accept one connection with the listener (non-)blocking and net.accept's
  * non_blocking, and check the result */
 bool acceptMode(bool listenerNb, bool non_blocking) {
     i32 srv, cli, acc;

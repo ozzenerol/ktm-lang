@@ -1,8 +1,8 @@
 import date, test;
 
-/* Str2CDateStruct: %a/%b never matched (and read past short input), %b
+/* date.parseParts: %a/%b never matched (and read past short input), %b
  * stored a 0-based month, 12 PM became hour 24, a format without seconds
- * left sec at -1 (garbage time from StrToCDate), and empty, partial or
+ * left sec at -1 (garbage time from date.parse), and empty, partial or
  * out-of-range input still returned true. */
 
 bool parse(u8 *s, u8 *f, i64 y, i64 mon, i64 d, i64 h, i64 mi, i64 sec, i64 dow) {
@@ -76,7 +76,7 @@ i32 main() {
             t.dayOfMon == 2) { correct++; }
     else { printf("%%/%%z/trailing wrong\n"); }
 
-    /* StrToCDate: seconds default to 0, failure is 0 */
+    /* date.parse: seconds default to 0, failure is 0 */
     date.Parts ds;
     date.Date c = date.parse("2024-03-15 10:20", "%Y-%m-%d %H:%M");
     date.toParts(&ds, c);

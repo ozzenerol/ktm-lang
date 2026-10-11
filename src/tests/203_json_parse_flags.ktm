@@ -1,6 +1,6 @@
 import json, mem, str, test;
 
-/* JsonParse ignored its flags argument: JSON_STRNUM_FLAG (numbers kept
+/* json.parse ignored its flags argument: JSON_STRNUM_FLAG (numbers kept
  * as their text, JSON_STRNUM / ->strnum) behaved like flags 0. */
 
 bool strNumIs(json.Value *j, u8 *want) {
@@ -52,7 +52,7 @@ i32 main() {
     if (e && strNumIs(e.array, "1") && strNumIs(e.array.next, "2.5") &&
             strNumIs(e.array.next.next, "3") && !e.array.next.next.next) { correct++; }
     json.release(j);
-    /* JsonToString writes the text back unquoted */
+    /* json.toStr writes the text back unquoted */
     j = json.parse("[1, 2.50,-3e2, {\"x\": 1E5}]", -1, json.STRNUM_FLAG);
     if (toStringIs(j, "[1,2.50,-3e2,{\"x\": 1E5}]")) { correct++; }
     json.release(j);

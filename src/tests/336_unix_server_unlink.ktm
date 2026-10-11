@@ -1,6 +1,6 @@
 import libc, mem, net, str, test;
 
-/* NetCreateUnixServerSocket unlink()ed whatever was at the path before
+/* net.unixListen unlink()ed whatever was at the path before
  * binding: a regular file there was deleted, and a second server on the
  * path of a live one silently took it over, leaving the first one
  * listening on a socket nobody can reach. Now only a stale socket file

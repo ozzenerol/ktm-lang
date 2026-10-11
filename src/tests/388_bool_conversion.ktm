@@ -5,7 +5,7 @@ import fs, json, test;
  * is now 0 or 1 (value != 0) for arguments, assignments, initialisers,
  * return values, class fields, casts, default arguments and ++/--. bool
  * stays one byte. Library code that kept other values in a bool (Rm's and
- * RmDir's flags, JsonParseBool's -1 for an error) uses an i64 now. */
+ * fs.removeDir's flags, JsonParseBool's -1 for an error) uses an i64 now. */
 
 struct C {
     u8 a;
