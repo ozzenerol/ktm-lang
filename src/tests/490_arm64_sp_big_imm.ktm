@@ -20,13 +20,13 @@ i64 sumBig(Big a, Big b) {
 
 #ifdef IS_ARM_64
 asm {
-_T480_SP_PLUS::
+_T490_SP_PLUS::
         add     x0, sp, x0
         ret
-_T480_SP_MOV::
+_T490_SP_MOV::
         mov     x0, sp
         ret
-_T480_SP_SUB::
+_T490_SP_SUB::
         mov     x9, sp
         sub     sp, sp, x0
         mov     x10, sp
@@ -34,9 +34,9 @@ _T480_SP_SUB::
         sub     x0, x9, x10
         ret
 }
-pub _extern _T480_SP_PLUS i64 spPlus(i64 n);
-pub _extern _T480_SP_MOV i64 spMov();
-pub _extern _T480_SP_SUB i64 spSub(i64 n);
+pub _extern _T490_SP_PLUS i64 spPlus(i64 n);
+pub _extern _T490_SP_MOV i64 spMov();
+pub _extern _T490_SP_SUB i64 spSub(i64 n);
 #endif
 
 i32 main() {
