@@ -21,7 +21,7 @@ u8 *ktmOut(u8 *src) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     u8 *out = proc.shellOutput("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                               "-S -o /dev/null " SRC_FILE " 2>&1; echo \"exit=$?\"");
+                               "-S -o /dev/null " SRC_FILE " 2>&1; echo \"exit=$?\"").take();
     fs.remove(SRC_FILE);
     return out;
 }
