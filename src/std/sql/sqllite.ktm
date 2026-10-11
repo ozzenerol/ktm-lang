@@ -21,11 +21,11 @@ struct sqlite3 {};
 
 struct sqlite3_value {};
 
-pub struct SqlParam {
+pub struct Param {
     i64 type;
     union {
-        i64 i64;
-        f64 f64;
+        i64 intVal;
+        f64 floatVal;
         u8 *str;
         struct {
             void *blob;
@@ -34,32 +34,32 @@ pub struct SqlParam {
     };
 };
 
-pub struct SqlPreparedStmt {
+pub struct Stmt {
     sqlite3_stmt *stmt;
     i64  params_count;
 };
 
-pub struct SqlColumn {
+pub struct Column {
     i64 len;
     i64 type;
     union {
-        i64 i64;
+        i64 intVal;
         u8 *str;
         void *blob;
-        f64 f64;
+        f64 floatVal;
     };
 };
 
-pub struct SqlRow {
+pub struct Row {
     sqlite3_stmt *stmt;
     i64 cols;
-    SqlColumn *col;
+    Column *col;
     /* false for a row of a prepared statement, which SqlFinalizePrepared
      * finalizes. */
     bool owns_stmt;
 };
 
-pub struct SqlCtx {
+pub struct Db {
     sqlite3 *conn;
     u8 *dbname;
 };
@@ -145,9 +145,9 @@ pub extern "c" i32 sqlite3_close_v2(sqlite3 *db);
 
 pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
 
-pub SqlCtx *open(u8 *dbname, bool printerror=false) {
+pub Db *open(u8 *dbname, bool printerror=false) {
     sqlite3 *db = null;
-    SqlCtx *ctx;
+    Db *ctx;
     i32 rc = libc.sqlite3_open(dbname, &db);
 
     if (rc != libc.SQLITE_OK) {
@@ -160,13 +160,13 @@ pub SqlCtx *open(u8 *dbname, bool printerror=false) {
         return null;
     }
 
-    ctx = mem.alloc(sizeof(SqlCtx));
+    ctx = mem.alloc(sizeof(Db));
     ctx.dbname = dbname;
     ctx.conn = db;
     return ctx;
 }
 
-pub void close(SqlCtx *ctx) {
+pub void close(Db *ctx) {
     if (!ctx) { return; }
     /* Unlike sqlite3_close, closes once the last statement is finalized
      * instead of failing with SQLITE_BUSY and leaking the connection. */
@@ -177,7 +177,7 @@ pub void close(SqlCtx *ctx) {
 /* Only one statement may be given: anything after the first one other
  * than whitespace and comments is an error, rather than silently not
  * run. Preparing such a tail gives SQLITE_OK and no statement. */
-static bool sqlTailIsEmpty(SqlCtx *ctx, u8 *tail) {
+static bool sqlTailIsEmpty(Db *ctx, u8 *tail) {
     sqlite3_stmt *extra = null;
     if (!tail || !*tail) {
         return true;
@@ -190,8 +190,8 @@ static bool sqlTailIsEmpty(SqlCtx *ctx, u8 *tail) {
     return rc == libc.SQLITE_OK;
 }
 
-pub SqlPreparedStmt *prepare(SqlCtx *ctx, u8 *sql) {
-    SqlPreparedStmt *pstmt = mem.alloc(sizeof(SqlPreparedStmt));
+pub Stmt *prepare(Db *ctx, u8 *sql) {
+    Stmt *pstmt = mem.alloc(sizeof(Stmt));
     u8 *tail = null;
     pstmt.stmt = null;
     if (libc.sqlite3_prepare_v2(ctx.conn, sql, -1, &(pstmt.stmt), &tail) != libc.SQLITE_OK ||
@@ -205,12 +205,12 @@ pub SqlPreparedStmt *prepare(SqlCtx *ctx, u8 *sql) {
     return pstmt;
 }
 
-static void sqlReset(SqlPreparedStmt *pstmt) {
+static void sqlReset(Stmt *pstmt) {
     libc.sqlite3_clear_bindings(pstmt.stmt);
     libc.sqlite3_reset(pstmt.stmt);
 }
 
-pub void finalize(SqlPreparedStmt *pstmt) {
+pub void finalize(Stmt *pstmt) {
     if (!pstmt) { return; }
     libc.sqlite3_finalize(pstmt.stmt);
     mem.free(pstmt);
@@ -219,7 +219,7 @@ pub void finalize(SqlPreparedStmt *pstmt) {
 extern "c" void sqlite3_free(void *ptr);
 
 /* Unsafe */ 
-pub u8 *execRaw(SqlCtx *ctx, u8 *sql) {
+pub u8 *execRaw(Db *ctx, u8 *sql) {
     u8 *errmsg = null, *copy;
     i32 rc = libc.sqlite3_exec(ctx.conn, sql, 0, 0, &errmsg);
     if (rc == libc.SQLITE_OK) {
@@ -234,7 +234,7 @@ pub u8 *execRaw(SqlCtx *ctx, u8 *sql) {
     return copy;
 }
 
-pub i32 execPrepared(SqlPreparedStmt *pstmt, SqlRow *row, SqlParam *params) {
+pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
     i32 rc = 0;
 
     if (row) {
@@ -247,7 +247,7 @@ pub i32 execPrepared(SqlPreparedStmt *pstmt, SqlRow *row, SqlParam *params) {
 
     /* null params: every parameter is left unbound, which is SQL null. */
     for (auto i = 0; params && i < pstmt.params_count; ++i) {
-        SqlParam *param = &params[i];
+        Param *param = &params[i];
         switch (param.type) {
             case SQL_INT:
                 rc = sqlite3_bind_int64(pstmt.stmt, i + 1, param.intVal);
@@ -282,7 +282,7 @@ pub i32 execPrepared(SqlPreparedStmt *pstmt, SqlRow *row, SqlParam *params) {
     return rc;
 }
 
-static i32 sqlExecQuery(SqlCtx *ctx, SqlRow *row, u8 *sql, SqlParam *params,
+static i32 sqlExecQuery(Db *ctx, Row *row, u8 *sql, Param *params,
                                                 i32 paramCount) {
     i32 rc = libc.SQLITE_ERROR;
     sqlite3_stmt *stmt = null;
@@ -343,7 +343,7 @@ err:
     return rc;
 }
 
-pub void rowRelease(SqlRow *row) {
+pub void rowRelease(Row *row) {
     if (row.stmt == null) {
         return;
     }
@@ -355,18 +355,18 @@ pub void rowRelease(SqlRow *row) {
     row.stmt = null;
 }
 
-pub bool select(SqlCtx *ctx, SqlRow *row, u8 *sql, SqlParam *params=null,
+pub bool select(Db *ctx, Row *row, u8 *sql, Param *params=null,
         i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,row,sql,params,paramCount);
     return result == libc.SQLITE_DONE || result == libc.SQLITE_ROW;
 }
 
-pub bool exec(SqlCtx *ctx, u8 *sql, SqlParam *params=null, i32 paramCount=0) {
+pub bool exec(Db *ctx, u8 *sql, Param *params=null, i32 paramCount=0) {
     auto result = sqlExecQuery(ctx,null,sql,params,paramCount);
     return result == libc.SQLITE_DONE || result == libc.SQLITE_ROW;
 }
 
-static bool sqlIterGeneric(SqlRow *row) {
+static bool sqlIterGeneric(Row *row) {
     if (row.stmt == null) {
         return false;
     }
@@ -382,7 +382,7 @@ static bool sqlIterGeneric(SqlRow *row) {
      * as this function will be called in a loop */
     mem.free(row.col);
     row.cols = libc.sqlite3_data_count(row.stmt);
-    row.col = mem.allocZero(row.cols * sizeof(SqlColumn));
+    row.col = mem.allocZero(row.cols * sizeof(Column));
 
     for (auto i = 0; i < row.cols; i++) {
         row.col[i].type = sqlite3_column_type(row.stmt,i);
@@ -407,10 +407,10 @@ static bool sqlIterGeneric(SqlRow *row) {
     return true;
 }
 
-pub i32 next(SqlRow *row) {
+pub i32 next(Row *row) {
     return sqlIterGeneric(row);
 }
 
-pub i64 nextPrepared(SqlRow *row) {
+pub i64 nextPrepared(Row *row) {
     return sqlIterGeneric(row);
 }

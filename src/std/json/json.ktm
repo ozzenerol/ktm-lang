@@ -23,7 +23,7 @@ const i64 JSON_SEL_TYPECHECK = (3);
 
 const i64 JSON_SEL_MAX_BUF = (256);
 
-pub struct JsonState {
+pub struct State {
         u8 ch;
         i64 offset;
         i64 error;
@@ -31,21 +31,21 @@ pub struct JsonState {
         i64 col;
 };
 
-pub struct Json;
+pub struct Value;
 
-pub struct Json {
-        JsonState *state;
-        Json *next;
+pub struct Value {
+        State *state;
+        Value *next;
         i64 type;
         u8 *key;
         union
         {
-                Json *array;
-                Json *object;
+                Value *array;
+                Value *object;
                 u8 *str;
                 u8 *strnum;
-                f64 f64;
-                i64 i64;
+                f64 floatVal;
+                i64 intVal;
                 bool boolean;
         };
         /* Bytes in `str` (a JSON_STRING) and in `key`, before their '\0': a
@@ -62,10 +62,10 @@ struct JsonParser {
         i64 offset;
         i64 buflen;
         i32 error;
-        Json *J;
-        Json *ptr;
+        Value *J;
+        Value *ptr;
         i32 flags;
-        JsonState *state;
+        State *state;
         i64 depth; /* arrays/objects open around the current value */
 };
 
@@ -74,8 +74,8 @@ struct JsonStringBuilder {
         i64 len;
 };
 
-static Json *jsonNew() {
-        Json *J = mem.alloc(sizeof(Json));
+static Value *jsonNew() {
+        Value *J = mem.alloc(sizeof(Value));
         J.type = NULL;
         J.key = null;
         J.next = null;
@@ -85,8 +85,8 @@ static Json *jsonNew() {
         return J;
 }
 
-static JsonState *jsonStateNew() {
-        JsonState *jsonState = mem.alloc(sizeof(JsonState));
+static State *jsonStateNew() {
+        State *jsonState = mem.alloc(sizeof(State));
         jsonState.error = OK;
         jsonState.ch = '\0';
         jsonState.offset = 0;
@@ -537,7 +537,7 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *str, i64 len) {
 
 /* `J` and, with `siblings`, the nodes after it (an array's or object's
     * items, keys included); without it just J's value. */
-static void jsonToStringInternal(Json *J, JsonStringBuilder *js,
+static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
                                                                                                                             bool siblings=true) {
         u8 fbuf[64];
         if (J == null) {
@@ -588,7 +588,7 @@ static void jsonToStringInternal(Json *J, JsonStringBuilder *js,
         }
 }
 
-pub u8 *toStr(Json *json)
+pub u8 *toStr(Value *json)
 {// The JSON text of json's value - only that node, not the nodes after
     // it or its key, so a node from JsonSelect gives just its value. A new
     // string to Free.
@@ -603,9 +603,9 @@ pub u8 *toStr(Json *json)
 }
 
 /* Free J, the nodes after it and everything below them */
-static void jsonReleaseList(Json *J) {
-        Json *ptr = J;
-        Json *next = null;
+static void jsonReleaseList(Value *J) {
+        Value *ptr = J;
+        Value *next = null;
 
         while (ptr) {
                 next = ptr.next;
@@ -645,7 +645,7 @@ static void jsonReleaseList(Json *J) {
         }
 }
 
-pub void release(Json *J)
+pub void release(Value *J)
 {// Free a whole document: J must be what JsonParse returned (the root).
     // null, or a node inside a document (from JsonSelect, or an item of an
     // array or object), is ignored: those are views into the document.
@@ -659,7 +659,7 @@ pub void release(Json *J)
     * Very similar to parsing an object where starting char is '[',
     * if array is empty return null
     */
-static Json *jsonParseArray(JsonParser *p) {
+static Value *jsonParseArray(JsonParser *p) {
         /* move past '[' */
         jsonAdvance(p);
         jsonAdvanceWhitespace(p);
@@ -671,8 +671,8 @@ static Json *jsonParseArray(JsonParser *p) {
         }
 
         u8 ch = '\0';
-        Json *J;
-        Json *val = jsonNew();
+        Value *J;
+        Value *val = jsonNew();
         p.ptr = val;
 
         while (true) {
@@ -707,7 +707,7 @@ static Json *jsonParseArray(JsonParser *p) {
         return val;
 }
 
-Json *jsonParseObject(JsonParser *p) {
+Value *jsonParseObject(JsonParser *p) {
         jsonAdvance(p);
         jsonAdvanceWhitespace(p);
         if (jsonPeek(p) == '}') {
@@ -715,7 +715,7 @@ Json *jsonParseObject(JsonParser *p) {
                 return null;
         }
         u8 ch = '\0';
-        Json *J,*val;
+        Value *J,*val;
         val = jsonNew();
         p.ptr = val;
 
@@ -824,7 +824,7 @@ static bool jsonParseValue(JsonParser *p) {
         return p.error == OK;
 }
 
-Json *jsonParseWithLenAndFlags(u8 *raw, i64 len, i32 flags) {
+Value *jsonParseWithLenAndFlags(u8 *raw, i64 len, i32 flags) {
         auto J = jsonNew();
         JsonParser p;
         p.flags = flags;
@@ -874,7 +874,7 @@ Json *jsonParseWithLenAndFlags(u8 *raw, i64 len, i32 flags) {
     * nodes. `flags` is 0 or JSON_STRNUM_FLAG, which keeps numbers as the
     * text they were written as (type JSON_STRNUM, in `strnum`) instead of
     * converting them to JSON_INT / JSON_FLOAT. */
-pub Json *parse(u8 *raw, i64 len=-1, i64 flags=0) {
+pub Value *parse(u8 *raw, i64 len=-1, i64 flags=0) {
         if (!raw) { return null; }
         if (len == -1) { len = str.len(raw); }
         return jsonParseWithLenAndFlags(raw,len,flags);
@@ -955,7 +955,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
 /* If the json has state this will return the error as a human readable string
     * must be freed by the caller (allows it to be thread safe). It would be
     * advisable to use this for debugging purposes only as it calls malloc */
-pub u8 *errorStr(Json *json) {
+pub u8 *errorStr(Value *json) {
         if (!json || !json.state) { /* null or not a root: nothing to report */
                 return null;
         }
@@ -969,7 +969,7 @@ pub u8 *errorStr(Json *json) {
 
 /* Print the error to stdout ("No errors" if there was none); nothing for
     * null or a node that isn't a root */
-pub void printError(Json *json) {
+pub void printError(Value *json) {
         if (!json || !json.state) { /* null or not a root: prints nothing */
                 return;
         }
@@ -982,47 +982,47 @@ pub void printError(Json *json) {
         }
 }
 
-pub bool ok(Json *j) {
+pub bool ok(Value *j) {
         if (!j) { return false; }
         return j.state && j.state.error == OK;
 }
 
-pub bool isObject(Json *j) {
+pub bool isObject(Value *j) {
         if (!j) { return false; }
         return j.type == OBJECT;
 }
 
-pub bool isArray(Json *j) {
+pub bool isArray(Value *j) {
         if (!j) { return false; }
         return j.type == ARRAY;
 }
 
-pub bool isNull(Json *j) {
+pub bool isNull(Value *j) {
         if (!j) { return false; }
         return j.type == NULL;
 }
 
-pub bool isBool(Json *j) {
+pub bool isBool(Value *j) {
         if (!j) { return false; }
         return j.type == BOOL;
 }
 
-pub bool isString(Json *j) {
+pub bool isString(Value *j) {
         if (!j) { return false; }
         return j.type == STRING;
 }
 
-pub bool isInt(Json *j) {
+pub bool isInt(Value *j) {
         if (!j) { return false; }
         return j.type == INT;
 }
 
-pub bool isFloat(Json *j) {
+pub bool isFloat(Value *j) {
         if (!j) { return false; }
         return j.type == FLOAT;
 }
 
-static bool jsonTypeCheck(Json *j, u8 tk) {
+static bool jsonTypeCheck(Value *j, u8 tk) {
         switch (tk) {
                 case 's':
                         if (!isString(j)) {
@@ -1067,7 +1067,7 @@ static bool jsonTypeCheck(Json *j, u8 tk) {
 /**
     * Get item from an array of json or return null
     */
-Json *jsonArrayAt(Json *j, i64 idx) {
+Value *jsonArrayAt(Value *j, i64 idx) {
         if (!isArray(j) || idx < 0) {
                 return null;
         }
@@ -1087,7 +1087,7 @@ Json *jsonArrayAt(Json *j, i64 idx) {
         return node;
 }
 
-static Json *jsonObjectAt(Json *j, u8 *name) {
+static Value *jsonObjectAt(Value *j, u8 *name) {
         if (!isObject(j)) {
                 return null;
         }
@@ -1107,22 +1107,22 @@ static Json *jsonObjectAt(Json *j, u8 *name) {
         return el;
 }
 
-pub Json *objectGet(Json *obj, u8 *key)
+pub Value *objectGet(Value *obj, u8 *key)
 {// The value stored under exactly `key` (the first one if it is repeated),
     // or null if obj isn't an object or has no such key. Any key works, also
     // ones JsonSelect can't spell ('.', '[', ':' ...). A view, don't release.
         return jsonObjectAt(obj, key);
 }
 
-pub Json *arrayGet(Json *arr, i64 i)
+pub Value *arrayGet(Value *arr, i64 i)
 {// Item i (from 0) of an array, or null if arr isn't an array or i is
     // negative or past the end. A view, don't release.
         return jsonArrayAt(arr, i);
 }
 
-pub i64 len(Json *node)
+pub i64 len(Value *node)
 {// The number of items of an array or object; 0 for anything else and null
-        Json *it;
+        Value *it;
         i64 n = 0;
         if (isArray(node)) {
                 it = node.array;
@@ -1166,7 +1166,7 @@ pub i64 len(Json *node)
     *      "b" -> boolean
     *      "!" -> null
     */
-pub Json *select(Json *j, u8 *fmt, ...args) {
+pub Value *select(Value *j, u8 *fmt, ...args) {
         /**
             * Heavily inspired by:
             * https://github.com/antirez/stonky/blob/main/stonky.c

@@ -6,9 +6,9 @@ pub struct List {
         List *next, *prev;
 };
 
-pub void init(List *l) {
-        l.value = null;
-        l.next = l.prev = l;
+pub void List.init() {
+        self.value = null;
+        self.next = self.prev = self;
 }
 
 pub List *new() {
@@ -18,32 +18,32 @@ pub List *new() {
         return ll;
 }
 
-pub void prepend(List *head, void *value) {
+pub void List.prepend(void *value) {
         List *node = new();
         node.value = value;
-        node.prev = head;
-        node.next = head.next;
-        head.next.prev = node;
-        head.next = node;
+        node.prev = self;
+        node.next = self.next;
+        self.next.prev = node;
+        self.next = node;
 }
 
-pub bool isEmpty(List *l) {
-        return (l == null || l.next == l);
+pub bool List.isEmpty() {
+        return (self == null || self.next == self);
 }
 
-pub void append(List *head, void *value) {
-        List *tail = head.prev;
+pub void List.append(void *value) {
+        List *tail = self.prev;
         List *node = new();
         node.value = value;
         node.prev = tail;
-        node.next = head;
+        node.next = self;
         tail.next = node;
-        head.prev = node;
+        self.prev = node;
 }
 
-pub void *shift(List *l) {
-        if (!l) { return null; }
-        List *ll = (List *)l;
+pub void *List.shift() {
+        if (!self) { return null; }
+        List *ll = (List *)self;
         if (ll.next == ll) {
                 return null;
         }
@@ -55,22 +55,22 @@ pub void *shift(List *l) {
         return val;
 }
 
-pub void insertNodeBefore(List *ll, List *newNode) {
-        newNode.next = ll;
-        newNode.prev = ll.prev;
-        ll.prev.next = newNode;
-        ll.prev = newNode;
+pub void List.insertNodeBefore(List *newNode) {
+        newNode.next = self;
+        newNode.prev = self.prev;
+        self.prev.next = newNode;
+        self.prev = newNode;
 }
 
-pub void insertBefore(List *ll, void *value) {
+pub void List.insertBefore(void *value) {
         List *prev = new();
         prev.value = value;
-        insertNodeBefore(ll,prev);
+        insertNodeBefore(self,prev);
 }
 
-pub void *pop(List *l) {
-        if (!l) { return null; }
-        List *ll = (List *)l;
+pub void *List.pop() {
+        if (!self) { return null; }
+        List *ll = (List *)self;
         if (ll.next == ll) {
                 return null;
         }
@@ -82,11 +82,11 @@ pub void *pop(List *l) {
         return val;
 }
 
-pub void release(List *ll, fn(void *arg) void FreeValue) {
-        if (!ll) { return; }
-        List *node = ll.next;
+pub void List.release(fn(void *arg) void FreeValue) {
+        if (!self) { return; }
+        List *node = self.next;
         List *next;
-        while (node != ll) {
+        while (node != self) {
                 next = node.next;
                 if (FreeValue) {
                         FreeValue(node.value);
@@ -94,16 +94,16 @@ pub void release(List *ll, fn(void *arg) void FreeValue) {
                 mem.free(node);
                 node = next;
         }
-        mem.free(ll);
+        mem.free(self);
 }
 
-pub void clear(List *l, fn(void *value) void free_value=null)
+pub void List.clear(fn(void *value) void free_value=null)
 {// Free every node (calling free_value on each value, if given) and keep
     // the head, empty: works on a ListInit head too. null is ignored.
-        if (!l) { return; }
-        List *node = l.next;
+        if (!self) { return; }
+        List *node = self.next;
         List *next;
-        while (node != l) {
+        while (node != self) {
                 next = node.next;
                 if (free_value) {
                         free_value(node.value);
@@ -111,38 +111,38 @@ pub void clear(List *l, fn(void *value) void free_value=null)
                 mem.free(node);
                 node = next;
         }
-        l.next = l.prev = l;
+        self.next = self.prev = self;
 }
 
-pub void *remove(List *node)
+pub void *List.remove()
 {// Unlink `node` from its list, free it and return its value. Never pass
     // the list's head; an empty head (linked to itself) is left alone and
     // null is returned, as for a null node.
-        if (!node || node.next == node) { return null; }
-        void *value = node.value;
-        node.prev.next = node.next;
-        node.next.prev = node.prev;
-        mem.free(node);
+        if (!self || self.next == self) { return null; }
+        void *value = self.value;
+        self.prev.next = self.next;
+        self.next.prev = self.prev;
+        mem.free(self);
         return value;
 }
 
-pub void *first(List *l)
+pub void *List.first()
 {// The first value, without removing it; null if the list is empty or null
-        if (!l || l.next == l) { return null; }
-        return l.next.value;
+        if (!self || self.next == self) { return null; }
+        return self.next.value;
 }
 
-pub void *last(List *l)
+pub void *List.last()
 {// The last value, without removing it; null if the list is empty or null
-        if (!l || l.prev == l) { return null; }
-        return l.prev.value;
+        if (!self || self.prev == self) { return null; }
+        return self.prev.value;
 }
 
-pub i64 count(List *ll) {
-        if (!ll || ll == ll.next) { return 0; }
-        auto node = ll.next;
+pub i64 List.count() {
+        if (!self || self == self.next) { return 0; }
+        auto node = self.next;
         i64 count = 0;
-        while (node != ll) {
+        while (node != self) {
                 count++;
                 node = node.next;
         }
@@ -158,19 +158,19 @@ pub i64 count(List *ll) {
     * l2 has been freed and must not be used again. An empty l2 is just
     * freed; with l1 or l2 null nothing happens.
     */
-pub void mergePrepend(List *l1, List *l2) {
-        if (!l1 || !l2) { return; }
+pub void List.mergePrepend(List *l2) {
+        if (!self || !l2) { return; }
         if (l2.next == l2) {
                 mem.free(l2);
                 return;
         }
-        List *h1 = l1.next;
+        List *h1 = self.next;
 
         List *h2 = l2.next;
         List *t2 = l2.prev;
 
-        l1.next = h2;
-        h2.prev = l1;
+        self.next = h2;
+        h2.prev = self;
         t2.next = h1;
         h1.prev = t2;
         mem.free(l2);
@@ -185,20 +185,20 @@ pub void mergePrepend(List *l1, List *l2) {
     * l2 has been freed and must not be used again. An empty l2 is just
     * freed; with l1 or l2 null nothing happens.
     * */
-pub void mergeAppend(List *l1, List *l2) {
-        if (!l1 || !l2) { return; }
+pub void List.mergeAppend(List *l2) {
+        if (!self || !l2) { return; }
         if (l2.next == l2) {
                 mem.free(l2);
                 return;
         }
-        List *t1 = l1.prev;
+        List *t1 = self.prev;
 
         List *h2 = l2.next;
         List *t2 = l2.prev;
 
         h2.prev = t1;
         t1.next = h2;
-        t2.next = l1;
-        l1.prev = t2;
+        t2.next = self;
+        self.prev = t2;
         mem.free(l2);
 }

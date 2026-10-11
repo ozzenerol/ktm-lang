@@ -13,7 +13,7 @@ static map.RBNode *rbGrandParent(map.RBNode *n) {
 }
 
 pub struct IntSet {
-    RBTree *tree; 
+    map.RBTree *tree; 
 };
 
 i64 intSetCmp(void *k1, void *k2) {
@@ -30,9 +30,9 @@ pub IntSet *intNew() {
     return set;
 }
 
-pub i64 intSize(IntSet *set) {
-    if (!set) { return 0; }
-    return set.tree.size;
+pub i64 IntSet.size() {
+    if (!self) { return 0; }
+    return self.tree.size;
 }
 
 pub struct IntSetEntry {
@@ -41,23 +41,23 @@ pub struct IntSetEntry {
 
 pub struct IntSetIter {
     i64 sp;
-    RBNode **stack;
+    map.RBNode **stack;
     IntSetEntry *entry; 
-    RBTree *tree;
+    map.RBTree *tree;
     i64 version; /* tree->version when the iterator was made */
 };
 
-pub IntSetIter *intIterNew(IntSet *set) {
+pub IntSetIter *IntSet.iterNew() {
     IntSetIter *it = mem.alloc(sizeof(IntSetIter));
     it.sp = 0;
     it.entry = mem.alloc(sizeof(IntSetEntry));
-    it.stack = mem.alloc(sizeof(map.RBNode *) * intSize(set));
+    it.stack = mem.alloc(sizeof(map.RBNode *) * intSize(self));
     it.tree = null;
     it.version = 0;
-    if (!set) { return it; } /* yields nothing */
-    it.tree = set.tree;
-    it.version = set.tree.version;
-    map.RBNode *node = set.tree.root;
+    if (!self) { return it; } /* yields nothing */
+    it.tree = self.tree;
+    it.version = self.tree.version;
+    map.RBNode *node = self.tree.root;
     while (!rbIsNil(node)) {
         it.stack[it.sp++] = node;
         node = node.left;
@@ -93,22 +93,22 @@ pub void intIterRelease(IntSetIter *iter) {
     mem.free(iter);
 }
 
-pub bool intHas(IntSet *set, i64 key) {
-    if (!set) { return false; }
-    return set.tree.has((void*)key);
+pub bool IntSet.has(i64 key) {
+    if (!self) { return false; }
+    return self.tree.has((void*)key);
 }
 
-pub void intAdd(IntSet *set, i64 key) {
-    return set.tree.set((void*)key,null);
+pub void IntSet.add(i64 key) {
+    return self.tree.set((void*)key,null);
 }
 
-pub void intDelete(IntSet *set, i64 key) {
-    set.tree.delete((void*)key);
+pub void IntSet.delete(i64 key) {
+    self.tree.delete((void*)key);
 }
 
-pub IntSet *intUnion(IntSet *s1, IntSet *s2) {
+pub IntSet *IntSet.union(IntSet *s2) {
     IntSet *unionSet = intNew();
-    IntSetIter *i1 = intIterNew(s1);
+    IntSetIter *i1 = intIterNew(self);
     IntSetIter *i2 = intIterNew(s2);
     IntSetEntry *entry = null;
 
@@ -125,9 +125,9 @@ pub IntSet *intUnion(IntSet *s1, IntSet *s2) {
     return unionSet;
 }
 
-pub IntSet *intDiff(IntSet *s1, IntSet *s2) {
+pub IntSet *IntSet.diff(IntSet *s2) {
     IntSet *diffSet = intNew();
-    IntSetIter *i1 = intIterNew(s1);
+    IntSetIter *i1 = intIterNew(self);
     IntSetEntry *entry = null;
 
     while ((entry = intIterNext(i1))) {
@@ -140,9 +140,9 @@ pub IntSet *intDiff(IntSet *s1, IntSet *s2) {
     return diffSet;
 }
 
-pub IntSet *intIntersection(IntSet *s1, IntSet *s2) {
+pub IntSet *IntSet.intersection(IntSet *s2) {
     IntSet *intersectionSet = intNew();
-    IntSetIter *i1 = intIterNew(s1);
+    IntSetIter *i1 = intIterNew(self);
     IntSetIter *i2 = intIterNew(s2);
     IntSetEntry *entry = null;
 
@@ -153,7 +153,7 @@ pub IntSet *intIntersection(IntSet *s1, IntSet *s2) {
     }
 
     while ((entry = intIterNext(i2))) {
-        if (intHas(s1,entry.key)) {
+        if (intHas(self,entry.key)) {
             intAdd(intersectionSet,entry.key);
         }
     }
@@ -163,10 +163,10 @@ pub IntSet *intIntersection(IntSet *s1, IntSet *s2) {
     return intersectionSet;
 }
 
-pub bool intEq(IntSet *s1, IntSet *s2) {
-    if (intSize(s1) != intSize(s2)) { return false; }
+pub bool IntSet.eq(IntSet *s2) {
+    if (intSize(self) != intSize(s2)) { return false; }
 
-    IntSetIter *i1 = intIterNew(s1);
+    IntSetIter *i1 = intIterNew(self);
     IntSetIter *i2 = intIterNew(s2);
     IntSetEntry *entry = null;
     bool retval = true;
@@ -179,7 +179,7 @@ pub bool intEq(IntSet *s1, IntSet *s2) {
     }
 
     while ((entry = intIterNext(i2))) {
-        if (!intHas(s1,entry.key)) {
+        if (!intHas(self,entry.key)) {
             retval = false;
             goto out;
         }
@@ -191,9 +191,9 @@ out:
     return retval;
 }
 
-pub vec.IntVec *intToVec(IntSet *set) {
+pub vec.IntVec *IntSet.toVec() {
     vec.IntVec *vec = vec.intNew();
-    IntSetIter *i1 = intIterNew(set);
+    IntSetIter *i1 = intIterNew(self);
     IntSetEntry *entry = null;
     while ((entry = intIterNext(i1))) {
         vec.push(entry.key);
@@ -202,9 +202,9 @@ pub vec.IntVec *intToVec(IntSet *set) {
     return vec;
 }
 
-pub IntSet *intSymDiff(IntSet *s1, IntSet *s2) {
+pub IntSet *IntSet.symDiff(IntSet *s2) {
     IntSet *symDiffSet = intNew();
-    IntSetIter *i1 = intIterNew(s1);
+    IntSetIter *i1 = intIterNew(self);
     IntSetIter *i2 = intIterNew(s2);
     IntSetEntry *entry = null;
 
@@ -217,7 +217,7 @@ pub IntSet *intSymDiff(IntSet *s1, IntSet *s2) {
 
     /* Add elements from s2 that are not in s1 */
     while ((entry = intIterNext(i2))) {
-        if (!intHas(s1,entry.key)) {
+        if (!intHas(self,entry.key)) {
             intAdd(symDiffSet,entry.key);
         }
     }
@@ -227,10 +227,10 @@ pub IntSet *intSymDiff(IntSet *s1, IntSet *s2) {
     return symDiffSet;
 }
 
-pub u8 *intToStr(IntSet *set) {
+pub u8 *IntSet.toStr() {
     i64 len = 1;
     u8 *buf = str.dup("{");
-    IntSetIter *i1 = intIterNew(set);
+    IntSetIter *i1 = intIterNew(self);
     IntSetEntry *entry = null;
     bool first = true;
 
@@ -243,8 +243,8 @@ pub u8 *intToStr(IntSet *set) {
     return str.appendFormatLen(buf, &len, "}");
 }
 
-pub void intRelease(IntSet *set) {
-    if (!set) { return; }
-    set.tree.release();
-    mem.free(set);
+pub void IntSet.release() {
+    if (!self) { return; }
+    self.tree.release();
+    mem.free(self);
 }

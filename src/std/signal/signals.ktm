@@ -32,7 +32,7 @@ const i64 SIG_F_SETFL = 4;
 #endif
 
 /* A signal action, as SigAction takes and returns it. */
-pub struct SigAct {
+pub struct Action {
     i64 handler;  /* SIG_DFL, SIG_IGN, or a void F(i32 sig) as (&F)(i64) */
     u64 mask;     /* signals blocked while it runs: SigBit(s) | ... */
     i32 flags;    /* SA_RESTART, SA_RESETHAND, SA_NODEFER, ... */
@@ -47,7 +47,7 @@ pub u64 bit(i32 sig) {
 /* Set the action for sig to *act (unless act is null) and store the
  * previous one in *old (unless old is null). false on failure, Errno()
  * says why (EINVAL: a bad signal number, or SIGKILL/SIGSTOP). */
-pub bool action(i32 sig, SigAct *act, SigAct *old=null) {
+pub bool action(i32 sig, Action *act, Action *old=null) {
     i64 cact[SIG_SA_BYTES / 8], cold[SIG_SA_BYTES / 8];
     i32 s;
     void *pact = null, *pold = null;
@@ -78,8 +78,8 @@ pub bool action(i32 sig, SigAct *act, SigAct *old=null) {
 /* SigAction in one call: handler (SIG_DFL, SIG_IGN or (&F)(i64)) for
  * sig, with flags and mask; the previous action in *old if given. */
 pub bool handle(i32 sig, i64 handler, i32 flags=SIG_SA_RESTART,
-                                            u64 mask=0, SigAct *old=null) {
-    SigAct a;
+                                            u64 mask=0, Action *old=null) {
+    Action a;
     a.handler = handler;
     a.mask = mask;
     a.flags = flags;

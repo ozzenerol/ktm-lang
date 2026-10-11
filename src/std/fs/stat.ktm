@@ -17,9 +17,9 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
     i32 isVerbose = flags & RM_VERBOSE, result,r2;
     i64 pathlen,buflen;
     u8 *buf;
-    cDIR *dir;
+    libc.DIR *dir;
     libc.cStat st;
-    Dirent *ent;
+    libc.Dirent *ent;
     result = -1;
 
     if (!path) { return -1; }
@@ -39,12 +39,12 @@ pub i32 removeDir(u8 *path, i64 flags=0) {
         return result;
     }
 
-    if ((dir = opendir(path)) == null) {
+    if ((dir = libc.opendir(path)) == null) {
         return result;
     }
 
     result = 0;
-    while (!result && (ent = readdir(dir))) {
+    while (!result && (ent = libc.readdir(dir))) {
         r2 = -1;
         if (!str.cmp(ent.name,".") || !str.cmp(ent.name,"..")) {
             continue;

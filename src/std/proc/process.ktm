@@ -81,7 +81,7 @@ extern "c" void *dlsym(void *handle, u8 *name);
 _extern __NSGetEnviron u8 ***ProcNSGetEnviron();
 #endif
 
-pub struct ProcOpts {
+pub struct Opts {
     i64 in, out, err;
     u8 *cwd;
     u8 **env;
@@ -127,9 +127,9 @@ static bool procPipe(i32 *fds) {
 #else
     /* No pipe2: a spawn in another thread between pipe and fcntl is
      * harmless, as every child closes what it didn't ask for. */
-    if (pipe(fds) != 0) return false;
-    fcntl(fds[0], PROC_F_SETFD, PROC_FD_CLOEXEC);
-    fcntl(fds[1], PROC_F_SETFD, PROC_FD_CLOEXEC);
+    if (libc.pipe(fds) != 0) return false;
+    libc.fcntl(fds[0], PROC_F_SETFD, PROC_FD_CLOEXEC);
+    libc.fcntl(fds[1], PROC_F_SETFD, PROC_FD_CLOEXEC);
 #endif
     for (i = 0; i < 2; i++) {
         if (fds[i] <= 2) {
@@ -167,15 +167,15 @@ static void procSetStatus(Proc *p, i32 st) {
  * null or all zero: the child inherits our stdin, stdout, stderr, working
  * directory and environment. null on failure, with Errno() saying why
  * (ENOENT for a program that doesn't exist, EACCES, ...). */
-pub Proc *spawn(u8 **argv, ProcOpts *opts=null) {
+pub Proc *spawn(u8 **argv, Opts *opts=null) {
     return procSpawnEx(argv, opts, false);
 }
 
 /* ProcSpawn, or with like_system the way system(3) starts its shell:
  * the child keeps every fd that isn't close-on-exec and our signal mask
  * and ignored signals (Shlurp, whose commands may use them). */
-static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
-    ProcOpts zero;
+static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
+    Opts zero;
     /* i64 arrays: the glibc structs want 8-byte alignment */
     i64 fa[PROC_SPAWN_BUF / 8], attr[PROC_SPAWN_BUF / 8];
     i64 sigs[PROC_SIGSET_BUF / 8], nosigs[PROC_SIGSET_BUF / 8];
@@ -188,7 +188,7 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
         return null;
     }
     if (!opts) {
-        mem.set(&zero, 0, sizeof(ProcOpts));
+        mem.set(&zero, 0, sizeof(Opts));
         opts = &zero;
     }
     pin[0] = pin[1] = pout[0] = pout[1] = perr[0] = perr[1] = -1;
@@ -211,12 +211,12 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
      * closed fd named here makes the spawn fail, where Linux just leaves it
      * closed in the child. */
     if (!like_system) {
-        if (opts->in == PROC_INHERIT && fcntl(0, PROC_F_GETFD) != -1)
+        if (opts->in == INHERIT && libc.fcntl(0, PROC_F_GETFD) != -1)
             posix_spawn_file_actions_addinherit_np(fa, 0);
-        if ((opts->out == PROC_INHERIT || opts->err == PROC_STDOUT) &&
-                fcntl(1, PROC_F_GETFD) != -1)
+        if ((opts->out == INHERIT || opts->err == STDOUT) &&
+                libc.fcntl(1, PROC_F_GETFD) != -1)
             posix_spawn_file_actions_addinherit_np(fa, 1);
-        if (opts->err == PROC_INHERIT && fcntl(2, PROC_F_GETFD) != -1)
+        if (opts->err == INHERIT && libc.fcntl(2, PROC_F_GETFD) != -1)
             posix_spawn_file_actions_addinherit_np(fa, 2);
     }
 #endif
@@ -282,7 +282,7 @@ static Proc *procSpawnEx(u8 **argv, ProcOpts *opts, bool likeSystem) {
     p.err_fd = perr[0];
     p.group = opts.new_group;
 #ifdef IS_MACOS
-    if (p->in_fd != -1) fcntl(p->in_fd, PROC_F_SETNOSIGPIPE, 1);
+    if (p->in_fd != -1) libc.fcntl(p->in_fd, PROC_F_SETNOSIGPIPE, 1);
 #endif
     return p;
 }
@@ -335,7 +335,7 @@ pub bool kill(Proc *p, i32 sig=PROC_SIGTERM) {
  * write and a SIGPIPE the write raised is taken off the pending set. */
 static i64 procWriteNoSigpipe(i32 fd, u8 *buf, i64 len) {
 #ifdef IS_MACOS
-    return write(fd, buf, len);
+    return libc.write(fd, buf, len);
 #else
     i64 set[PROC_SIGSET_BUF / 8], old[PROC_SIGSET_BUF / 8];
     i64 pend[PROC_SIGSET_BUF / 8];
@@ -497,10 +497,10 @@ pub void release(Proc *p) {
  * removed; its exit code (as ProcWait) in *code. null if it couldn't be
  * started (Errno() says why). */
 pub u8 *run(u8 **argv, i64 *code=null) {
-    ProcOpts o;
+    Opts o;
     u8 *out = null;
     i64 len = 0, rc;
-    mem.set(&o, 0, sizeof(ProcOpts));
+    mem.set(&o, 0, sizeof(Opts));
     o.in = DEVNULL;
     o.out = PIPE;
     Proc *p = spawn(argv, &o);
@@ -520,7 +520,7 @@ pub u8 *run(u8 **argv, i64 *code=null) {
  * wakes up every 10 ms to notice that; the usual case ends at EOF. */
 u8 *procShellOutput(u8 *cmd, i64 *len) {
     u8 *argv[4];
-    ProcOpts o;
+    Opts o;
     ProcBuf b;
     ProcPollFd fd;
     i32 r;
@@ -528,7 +528,7 @@ u8 *procShellOutput(u8 *cmd, i64 *len) {
     argv[1] = "-c";
     argv[2] = cmd;
     argv[3] = null;
-    mem.set(&o, 0, sizeof(ProcOpts));
+    mem.set(&o, 0, sizeof(Opts));
     o.out = PIPE;
     Proc *p = procSpawnEx(argv, &o, true);
     if (!p) { return null; }

@@ -45,8 +45,8 @@ pub _extern _STRHASH u64 hash(u8 *str);
 #endif
 
 #ifdef IS_ARM_64
-pub u8 ToLower(u8 ch);
-pub u8 ToUpper(u8 ch);
-pub bool IsSpace(u8 ch);
-pub u64 StrHash(u8 *str);
+pub u8 toLower(u8 ch);
+pub u8 toUpper(u8 ch);
+pub bool isSpace(u8 ch);
+pub u64 hash(u8 *str);
 #endif

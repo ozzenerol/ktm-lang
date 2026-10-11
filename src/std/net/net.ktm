@@ -1,99 +1,6 @@
 module net;
 import date, libc, mem, os, str;
 
-/* Socket capabilities, a bit stripped down */
-#ifdef IS_LINUX
-  #define SOL_SOCKET      1   /* options for socket level */
-  #define SO_DEBUG        1   /* turn on debugging info recording */
-  #define SO_ACCEPTCONN   30  /* socket has had listen() */
-  #define SO_REUSEADDR    2   /* allow local address reuse */
-  #define SO_KEEPALIVE    9   /* keep connections alive */
-  #define SO_DONTROUTE    5   /* just use interface addresses */
-  #define SO_BROADCAST    6   /* permit sending of broadcast msgs */
-  #define SO_LINGER       13  /* linger on close if data present (in seconds) */
-  #define SO_OOBINLINE    10  /* leave received OOB data in line */
-  #define SO_REUSEPORT    15  /* allow local address & port reuse */
-  #define SO_TIMESTAMP    29  /* timestamp received dgram traffic */
-  #define SO_SNDBUF       7               /* Send buffer size */
-  #define SO_RCVBUF       8               /* Receive buffer size */
-  #define SO_ERROR        4               /* Get and clear the pending error */
-  #define SO_RCVTIMEO     20              /* Read timeout (a timeval) */
-  #define SO_SNDTIMEO     21              /* Write timeout (a timeval) */
-#else
-/*
-    * Option flags per-socket.
-    */
-  #define SOL_SOCKET      0xffff          /* options for socket level */
-  #define SO_DEBUG        0x0001          /* turn on debugging info recording */
-  #define SO_ACCEPTCONN   0x0002          /* socket has had listen() */
-  #define SO_REUSEADDR    0x0004          /* allow local address reuse */
-  #define SO_KEEPALIVE    0x0008          /* keep connections alive */
-  #define SO_DONTROUTE    0x0010          /* just use interface addresses */
-  #define SO_BROADCAST    0x0020          /* permit sending of broadcast msgs */
-  #define SO_LINGER       0x1080          /* linger on close if data present (in seconds) */
-  #define SO_OOBINLINE    0x0100          /* leave received OOB data in line */
-  #define SO_REUSEPORT    0x0200          /* allow local address & port reuse */
-  #define SO_TIMESTAMP    0x0400          /* timestamp received dgram traffic */
-  #define SO_TIMESTAMP_MONOTONIC  0x0800  /* Monotonically increasing timestamp on rcvd dgram */
-  #define SO_SNDBUF       0x1001          /* Send buffer size */
-  #define SO_RCVBUF       0x1002          /* Receive buffer size */
-  #define SO_ERROR        0x1007          /* Get and clear the pending error */
-  #define SO_RCVTIMEO     0x1006          /* Read timeout (a timeval) */
-  #define SO_SNDTIMEO     0x1005          /* Write timeout (a timeval) */
-#endif
-
-#ifdef IS_LINUX
-  #define AF_INET6        10              /* IPv6 */
-#else
-  #define AF_INET6        30              /* IPv6 */
-#endif
-
-#ifdef IS_LINUX
-  #define TCP_NODELAY             1       /* don't delay send to coalesce packets */
-  #define TCP_MAXSEG              2       /* set maximum segment size */
-        const i64 TCP_CORK = 3;       /* don't send out partial frames */
-        const i64 TCP_KEEPIDLE = 4;       /* idle time used when SO_KEEPALIVE is enabled */
-  #define TCP_KEEPALIVE           4       /* the macOS name of TCP_KEEPIDLE */
-  #define TCP_KEEPINTVL           5       /* interval between keepalives */
-  #define TCP_KEEPCNT             6       /* number of keepalives before close */
-        const i64 TCP_INFO = 11;      /* information about this connection */
-        const i64 TCP_QUICKACK = 12;      /* block/reenable quick acks */
-        const i64 TCP_USER_TIMEOUT = 18;      /* how long for loss retry before timeout */
-  #define TCP_FASTOPEN            23      /* Enable/Disable TCP Fastopen on this socket */
-#else
-  #define TCP_NODELAY             0x01    /* don't delay send to coalesce packets */
-  #define TCP_MAXSEG              0x02    /* set maximum segment size */
-  #define TCP_NOPUSH              0x04    /* don't push last block of write */
-  #define TCP_NOOPT               0x08    /* don't use TCP options */
-  #define TCP_KEEPALIVE           0x10    /* idle time used when SO_KEEPALIVE is enabled */
-  #define TCP_CONNECTIONTIMEOUT   0x20    /* connection timeout */
-  #define PERSIST_TIMEOUT         0x40    /* time after which a connection in
-                                                                                                                                        *  persist timeout will terminate.
-                                                                                                                                        *  see draft-ananth-tcpm-persist-02.txt
-                                                                                                                                        */
-  #define TCP_RXT_CONNDROPTIME    0x80    /* time after which tcp retransmissions will be
-                                                                                                                                        * stopped and the connection will be dropped
-                                                                                                                                        */
-  #define TCP_RXT_FINDROP         0x100   /* when this option is set, drop a connection
-                                                                                                                                        * after retransmitting the FIN 3 times. It will
-                                                                                                                                        * prevent holding too many mbufs in socket
-                                                                                                                                        * buffer queues.
-                                                                                                                                        */
-  #define TCP_KEEPINTVL           0x101   /* interval between keepalives */
-  #define TCP_KEEPCNT             0x102   /* number of keepalives before close */
-  #define TCP_SENDMOREACKS        0x103   /* always ack every other packet */
-  #define TCP_ENABLE_ECN          0x104   /* Enable ECN on a connection */
-  #define TCP_FASTOPEN            0x105   /* Enable/Disable TCP Fastopen on this socket */
-  #define TCP_CONNECTION_INFO     0x106   /* State of TCP connection */
-#endif
-
-#ifdef IS_LINUX
-  #define	AI_NUMERICSERV	0x00000400 /* prevent service name resolution */
-#else
-  #define	AI_NUMERICSERV	0x00001000 /* prevent service name resolution */
-  #define	AI_UNUSABLE	0x10000000 /* return addresses even if unusable (i.e. opposite of AI_DEFAULT) */
-#endif
-
 /* Byte order: the network is big endian, every target ktm supports is
     * little endian, so these swap the bytes. */
 pub u16 htons(u16 x) {
@@ -126,8 +33,8 @@ static i32 netSocket(i32 domain, i32 type, i32 protocol) {
 #ifdef IS_LINUX
         return libc.socket(domain, type | __NET_SOCK_CLOEXEC, protocol);
 #else
-        i32 fd = socket(domain, type, protocol);
-        if (fd != -1) fcntl(fd, F_SETFD, FD_CLOEXEC);
+        i32 fd = libc.socket(domain, type, protocol);
+        if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
         return fd;
 #endif
 }
@@ -136,8 +43,8 @@ static i32 netAcceptCloexec(i32 socket, libc.sockaddr *address, u32 *addressLen)
 #ifdef IS_LINUX
         return accept4(socket, address, addressLen, __NET_SOCK_CLOEXEC);
 #else
-        i32 fd = accept(socket, address, address_len);
-        if (fd != -1) fcntl(fd, F_SETFD, FD_CLOEXEC);
+        i32 fd = libc.accept(libc.socket, address, address_len);
+        if (fd != -1) libc.fcntl(fd, libc.F_SETFD, libc.FD_CLOEXEC);
         return fd;
 #endif
 }
@@ -162,7 +69,7 @@ static bool netSetSocketBlocking(i32 sockfd) {
 pub bool setReuseAddr(i32 sockfd) {
         i32 yes = 1;
 
-        if (libc.setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(i32)) == -1) {
+        if (libc.setsockopt(sockfd, libc.SOL_SOCKET, libc.SO_REUSEADDR, &yes, sizeof(i32)) == -1) {
                 return false;
         }
 
@@ -177,7 +84,7 @@ pub bool setReuseAddr(i32 sockfd) {
 pub bool setNoDelay(i32 sockfd) {
         i32 yes = 1;
 
-        if (libc.setsockopt(sockfd, libc.IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(i32)) == -1) {
+        if (libc.setsockopt(sockfd, libc.IPPROTO_TCP, libc.TCP_NODELAY, &yes, sizeof(i32)) == -1) {
                 return false;
         }
 
@@ -189,7 +96,7 @@ static void *netGetInAddress(libc.sockaddr *sa)
         if (sa.sa_family == libc.AF_INET) {
                 return &(((libc.sockaddr_in*)sa).sin_addr);
         }
-        if (sa.sa_family == AF_INET6) {
+        if (sa.sa_family == libc.AF_INET6) {
                 return &(((libc.sockaddr_in6 *)sa).sin6_addr);
         }
         return null;
@@ -269,7 +176,7 @@ static i32 netConnectBefore(i32 sockfd, libc.addrinfo *sa, i64 deadline) {
                 }
                 /* 0 (time is up) or EINTR: the loop checks the deadline again */
         }
-        if (libc.getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &err, &len) == -1) {
+        if (libc.getsockopt(sockfd, libc.SOL_SOCKET, libc.SO_ERROR, &err, &len) == -1) {
                 return -1;
         }
         if (err != 0) {
@@ -380,7 +287,7 @@ pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
         libc.snprintf(strport, sizeof(strport), "%d", port);
         mem.set(&hints, 0, sizeof(libc.addrinfo));
 
-        if (addrfam != libc.AF_UNSPEC && addrfam != libc.AF_INET && addrfam != AF_INET6) {
+        if (addrfam != libc.AF_UNSPEC && addrfam != libc.AF_INET && addrfam != libc.AF_INET6) {
                 return -1;
         }
 
@@ -391,7 +298,7 @@ pub i32 listen(i32 port, u8 *bindaddr, i32 backlog,
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
-                addrfam = AF_INET6;
+                addrfam = libc.AF_INET6;
                 bindaddr = null;
         } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
                 bindaddr = null;
@@ -503,7 +410,7 @@ static bool netUnixAddress(libc.sockaddr_un *addr, u8 *name) {
         }
         mem.set(addr, 0, sizeof(libc.sockaddr_un));
 #ifndef IS_LINUX
-        addr->sun_len = sizeof(sockaddr_un);
+        addr->sun_len = sizeof(libc.sockaddr_un);
 #endif
         addr.sun_family = libc.AF_UNIX;
         mem.copy(addr.sun_path, name, len + 1);
@@ -602,7 +509,7 @@ pub i32 localPort(i32 sockfd)
         if (ss.ss_family == libc.AF_INET) {
                 return ntohs(((libc.sockaddr_in *)(&ss)).sin_port);
         }
-        if (ss.ss_family == AF_INET6) {
+        if (ss.ss_family == libc.AF_INET6) {
                 return ntohs(((libc.sockaddr_in6 *)(&ss)).sin6_port);
         }
         return -1;
@@ -618,7 +525,7 @@ pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
         if (port < 0 || port > 65535) {
                 return -1;
         }
-        if (addrfam != libc.AF_UNSPEC && addrfam != libc.AF_INET && addrfam != AF_INET6) {
+        if (addrfam != libc.AF_UNSPEC && addrfam != libc.AF_INET && addrfam != libc.AF_INET6) {
                 return -1;
         }
         libc.snprintf(strport, sizeof(strport), "%d", port);
@@ -628,7 +535,7 @@ pub i32 udpSocket(i32 port, u8 *bindaddr, i32 addrfam=libc.AF_UNSPEC,
                 if (addrfam == libc.AF_INET) {
                         return -1;
                 }
-                addrfam = AF_INET6;
+                addrfam = libc.AF_INET6;
                 bindaddr = null;
         } else if (bindaddr != null && !str.cmp("*", bindaddr)) {
                 bindaddr = null;
@@ -721,7 +628,7 @@ pub i64 recvFrom(i32 sockfd, void *buf, i64 len, u8 *fromAddr=null,
         if (fromPort != null) {
                 if (from.ss_family == libc.AF_INET) {
                         *fromPort = ntohs(((libc.sockaddr_in *)(&from)).sin_port);
-                } else if (from.ss_family == AF_INET6) {
+                } else if (from.ss_family == libc.AF_INET6) {
                         *fromPort = ntohs(((libc.sockaddr_in6 *)(&from)).sin6_port);
                 } else {
                         *fromPort = -1;
@@ -741,15 +648,15 @@ static bool netSetTimeout(i32 sockfd, i32 opt, i64 ms) {
         mem.set(&tv, 0, sizeof(libc.timeval));
         tv.tv_sec = ms / 1000;
         tv.tv_usec = (ms % 1000) * 1000;
-        return libc.setsockopt(sockfd, SOL_SOCKET, opt, &tv, sizeof(libc.timeval)) == 0;
+        return libc.setsockopt(sockfd, libc.SOL_SOCKET, opt, &tv, sizeof(libc.timeval)) == 0;
 }
 
 pub bool setRecvTimeout(i32 sockfd, i64 ms)
 {// true if SO_RCVTIMEO was set
-        return netSetTimeout(sockfd, SO_RCVTIMEO, ms);
+        return netSetTimeout(sockfd, libc.SO_RCVTIMEO, ms);
 }
 
 pub bool setSendTimeout(i32 sockfd, i64 ms)
 {// true if SO_SNDTIMEO was set
-        return netSetTimeout(sockfd, SO_SNDTIMEO, ms);
+        return netSetTimeout(sockfd, libc.SO_SNDTIMEO, ms);
 }

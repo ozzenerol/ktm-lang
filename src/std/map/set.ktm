@@ -26,9 +26,9 @@ pub struct RBNode {
 pub struct RBTree {
         RBNode *root;
         i64 size;
-        void (*free_key)(void *);
-        void (*free_value)(void *);
-        i64 (*key_cmp)(void *, void *);
+        fn(void *) void free_key;
+        fn(void *) void free_value;
+        fn(void *, void *) i64 key_cmp;
         RBNode *nil;
         /* Bumped by every insert of a new key and every delete, so iterators
             * can tell the tree changed under them (their stack may then point at
@@ -158,16 +158,16 @@ static void rbInsertFixUp(RBTree *tree, RBNode *z) {
         tree.root.color = __RB_BLACK__;
 }
 
-pub void rbSet(RBTree *tree, void *key, void *value) {
-        if (!tree) { return; }
-        RBNode *x = tree.root;
+pub void RBTree.set(void *key, void *value) {
+        if (!self) { return; }
+        RBNode *x = self.root;
         RBNode *y = null;
         RBNode *z = null;
         i64 cmp = 0;
 
-        while (x != tree.nil) {
+        while (x != self.nil) {
                 y = x;
-                cmp = tree.key_cmp(key, x.key);
+                cmp = self.key_cmp(key, x.key);
 
                 if (cmp < 0) {
                         x = x.left;
@@ -178,25 +178,25 @@ pub void rbSet(RBTree *tree, void *key, void *value) {
                             * a key destructor the duplicate key is freed, and with a value
                             * destructor the replaced value is freed (unless it is the same
                             * pointer). */
-                        if (tree.free_key && x.key != key) { tree.free_key(key); }
-                        if (tree.free_value && x.value != value) { tree.free_value(x.value); }
+                        if (self.free_key && x.key != key) { self.free_key(key); }
+                        if (self.free_value && x.value != value) { self.free_value(x.value); }
                         x.value = value;
                         return;
                 }
         }
 
-        z = rbNodeNew(tree,key,value);
+        z = rbNodeNew(self,key,value);
         z.parent = y;
 
         if (y == null) {
-                tree.root = z;
-        } else if (tree.key_cmp(z.key, y.key) < 0) {
+                self.root = z;
+        } else if (self.key_cmp(z.key, y.key) < 0) {
                 y.left = z;
         } else {
                 y.right = z;
         }
-        tree.size++;
-        tree.version++;
+        self.size++;
+        self.version++;
 
         if (z.parent == null) {
                 z.color = __RB_BLACK__;
@@ -207,7 +207,7 @@ pub void rbSet(RBTree *tree, void *key, void *value) {
                 return;
         }
 
-        rbInsertFixUp(tree,z);
+        rbInsertFixUp(self,z);
 }
 
 static RBNode *rbNodeFind(RBTree *tree, RBNode *n, void *key) {
@@ -227,16 +227,16 @@ static RBNode *rbNodeFind(RBTree *tree, RBNode *n, void *key) {
         return null;
 }
 
-pub void *rbGet(RBTree *tree, void *key) {
-        if (!tree) { return null; }
-        RBNode *n = rbNodeFind(tree,tree.root,key);
+pub void *RBTree.get(void *key) {
+        if (!self) { return null; }
+        RBNode *n = rbNodeFind(self,self.root,key);
         if (n) { return n.value; }
         return n;
 }
 
-pub bool rbHas(RBTree *tree, void *key) {
-        if (!tree) { return false; }
-        RBNode *n = rbNodeFind(tree, tree.root, key);
+pub bool RBTree.has(void *key) {
+        if (!self) { return false; }
+        RBNode *n = rbNodeFind(self, self.root, key);
         return n != null;
 }
 
@@ -312,9 +312,9 @@ static void rbTreeFixDelete(RBTree *tree, RBNode *x) {
         x.color = __RB_BLACK__;
 }
 
-pub void rbDelete(RBTree *tree, void *key) {
-        if (!tree) { return; }
-        RBNode *z = rbNodeFind(tree, tree.root, key);
+pub void RBTree.delete(void *key) {
+        if (!self) { return; }
+        RBNode *z = rbNodeFind(self, self.root, key);
         RBNode *y = null;
         RBNode *x = null;
         i64 originalColor = -1;
@@ -326,47 +326,46 @@ pub void rbDelete(RBTree *tree, void *key) {
         y = z;
         originalColor = y.color;
 
-        if (z.left == tree.nil) {
+        if (z.left == self.nil) {
                 x = z.right;
-                rbTransplant(tree, z, z.right);
-        } else if (z.right == tree.nil) {
+                rbTransplant(self, z, z.right);
+        } else if (z.right == self.nil) {
                 x = z.left;
-                rbTransplant(tree, z, z.left);
+                rbTransplant(self, z, z.left);
         } else {
-                y = rbNodeMin(tree, z.right);
+                y = rbNodeMin(self, z.right);
                 originalColor = y.color;
                 x = y.right;
                 if (y != z.right) {
-                        rbTransplant(tree, y, y.right);
+                        rbTransplant(self, y, y.right);
                         y.right = z.right;
                         y.right.parent = y;
                 } else {
                         x.parent = y;
                 }
-                rbTransplant(tree, z, y);
+                rbTransplant(self, z, y);
                 y.left = z.left;
                 y.left.parent = y;
                 y.color = z.color;
         }
 
         if (originalColor == __RB_BLACK__) {
-                rbTreeFixDelete(tree, x);
+                rbTreeFixDelete(self, x);
         }
 
-        rbNodeRelease(tree, z);
-        tree.size--;
-        tree.version++;
+        rbNodeRelease(self, z);
+        self.size--;
+        self.version++;
 }
 
-pub void rbForEach(RBTree *tree,
-                                                                    void *userData,
+pub void RBTree.forEach(void *userData,
                                                                     fn(void *userData,
                                                                                                                                 void *key, 
                                                                                                                                 void *value) void callback) {
-        if (!tree) { return; }
-        RBNode **stack = mem.alloc(sizeof(RBNode*)*tree.size);
-        i64 sp = 0, version = tree.version;
-        RBNode *cur = tree.root;
+        if (!self) { return; }
+        RBNode **stack = mem.alloc(sizeof(RBNode*)*self.size);
+        i64 sp = 0, version = self.version;
+        RBNode *cur = self.root;
 
         while (cur) {
                 while (!rbIsNil(cur)) {
@@ -379,7 +378,7 @@ pub void rbForEach(RBTree *tree,
                 callback(userData,cur.key,cur.value);
                 /* The callback inserted or deleted: stop before touching the stack,
                     * which was sized for the old tree and may hold freed nodes. */
-                if (tree.version != version) { break; }
+                if (self.version != version) { break; }
                 cur = cur.right;
         }
 
@@ -394,24 +393,24 @@ pub struct RBIter {
         i64 version; /* tree->version when the iterator was made */
 };
 
-pub RBIter *rbIterNew(RBTree *tree) {
+pub RBIter *RBTree.iterNew() {
         RBIter *it = mem.alloc(sizeof(RBIter));
         it.sp = 0;
         it.cur = null;
-        it.tree = tree;
+        it.tree = self;
         it.version = 0;
-        if (!tree) {
+        if (!self) {
                 it.stack = null;
                 return it; /* yields nothing */
         }
-        it.version = tree.version;
-        it.stack = mem.alloc(sizeof(RBNode*)*tree.size);
-        RBNode *node = tree.root;
+        it.version = self.version;
+        it.stack = mem.alloc(sizeof(RBNode*)*self.size);
+        RBNode *node = self.root;
         while (!rbIsNil(node)) {
                 it.stack[it.sp++] = node;
                 node = node.left;
         }
-        it.cur = tree.root;
+        it.cur = self.root;
         return it;
 }
 
@@ -440,18 +439,18 @@ pub RBNode *rbIterNext(RBIter *it) {
         return node;
 }
 
-pub void rbRelease(RBTree *tree)
+pub void RBTree.release()
 {// Free every node, its key and value (with the tree's destructors, if
     // set) and the tree itself
-        if (!tree) { return; }
-        RBIter *it = rbIterNew(tree);
+        if (!self) { return; }
+        RBIter *it = rbIterNew(self);
         RBNode *node = null;
         /* RBIterNext has already pushed the node's right subtree, so the node
             * can be freed straight away */
         while ((node = rbIterNext(it)) != null) {
-                rbNodeRelease(tree, node);
+                rbNodeRelease(self, node);
         }
         rbIterRelease(it);
-        mem.free(tree.nil);
-        mem.free(tree);
+        mem.free(self.nil);
+        mem.free(self);
 }

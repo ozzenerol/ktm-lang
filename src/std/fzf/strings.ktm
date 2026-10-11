@@ -1,4 +1,5 @@
 module fzf;
+import str;
 
 #ifdef IS_X86_64
 asm {
@@ -338,22 +339,22 @@ _STRCPY::
                 RET
 }
 
-pub u8 ToLower(u8 ch) {
+pub u8 str.toLower(u8 ch) {
         if (ch >= 'A' && ch <= 'Z') return ch + 32;
         return ch;
 }
 
-pub u8 ToUpper(u8 ch) {
+pub u8 str.toUpper(u8 ch) {
         if (ch >= 'a' && ch <= 'z') return ch - 32;
         return ch;
 }
 
-pub bool IsSpace(u8 ch) {
+pub bool str.isSpace(u8 ch) {
         return ch == ' ' || ch == '\t' || ch == '\n' ||
                                     ch == '\v' || ch == '\f' || ch == '\r';
 }
 
-pub u64 StrHash(u8 *str)
+pub u64 str.hash(u8 *str)
 {// h = h*31 + c over the bytes (0 for ""), then the murmur3 finaliser;
     // must match _STRHASH on x86_64
         u64 h = 0;

@@ -34,9 +34,9 @@ pub struct Coroutine {
     void *stack_base;       /* the mapping: guard page, then the stack */
     i64 stack_len;        /* bytes mapped, guard included */
     Coroutine *resumer;   /* who to go back to on Yield/return */
-    void *(*fn)(void *arg);
+    fn(void *arg) void *body;
     void *arg;
-    CatchFrame *catch_top;/* this coroutine's catch chain while it is switched out */
+    rt.CatchFrame *catch_top;/* this coroutine's catch chain while it is switched out */
     u64 except_ch;
     Error error;          /* its error in flight while it is switched out */
     Error thrown;         /* an uncaught error, rethrown by Next */
@@ -253,7 +253,7 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
 #endif
 #ifdef IS_ARM_64
     u64 *sp = top - 20;
-    MemSet(sp, 0, 20 * sizeof(u64));
+    mem.set(sp, 0, 20 * sizeof(u64));
     sp[0] = (u64)c;              /* X19 */
     sp[11] = (u64)&CoroEntry;    /* X30 (lr); X29 (fp) stays 0 */
 #endif

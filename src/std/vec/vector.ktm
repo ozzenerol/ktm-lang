@@ -33,24 +33,24 @@ pub FloatVec *floatNew(i64 size = 32) {
     return vec;
 }
 
-pub u64 floatCapacity(FloatVec *vec) {
-    return mem.size(vec.entries)/sizeof(f64);
+pub u64 FloatVec.capacity() {
+    return mem.size(self.entries)/sizeof(f64);
 }
 
-pub void floatPush(FloatVec *vec, f64 value) {
-    auto capacity = mem.size(vec.entries)/sizeof(f64);
-    if (vec.size + 1 >= capacity) {
+pub void FloatVec.push(f64 value) {
+    auto capacity = mem.size(self.entries)/sizeof(f64);
+    if (self.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(f64)));
-        vec.entries = newEntries;
+        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(f64)));
+        self.entries = newEntries;
     }
-    vec.entries[vec.size++] = value;
+    self.entries[self.size++] = value;
 }
 
-pub f64 floatPop(FloatVec *vec, bool *_ok=null) {
-    if (vec.size > 0) {
-        auto value = vec.entries[--vec.size];
+pub f64 FloatVec.pop(bool *_ok=null) {
+    if (self.size > 0) {
+        auto value = self.entries[--self.size];
         if (_ok) { *_ok = true; }
         return value;
     }
@@ -58,26 +58,26 @@ pub f64 floatPop(FloatVec *vec, bool *_ok=null) {
     return -1.0;
 }
 
-pub f64 floatGet(FloatVec *vec, i64 idx) {
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("FloatVecGet", idx, vec.size);
+pub f64 FloatVec.get(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("FloatVecGet", idx, self.size);
     }
-    return vec.entries[idx];
+    return self.entries[idx];
 }
 
-pub void floatSet(FloatVec *vec, i64 idx, f64 value)
+pub void FloatVec.set(i64 idx, f64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("FloatVecSet", idx, vec.size);
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("FloatVecSet", idx, self.size);
     }
-    vec.entries[idx] = value;
+    self.entries[idx] = value;
 }
 
-pub f64 floatLast(FloatVec *vec, bool *_ok=null)
+pub f64 FloatVec.last(bool *_ok=null)
 {// The last entry without removing it; -1.0 and *_ok = false when empty
-    if (vec.size > 0) {
+    if (self.size > 0) {
         if (_ok) { *_ok = true; }
-        return vec.entries[vec.size - 1];
+        return self.entries[self.size - 1];
     }
     if (_ok) { *_ok = false; }
     return -1.0;
@@ -92,18 +92,18 @@ i64 floatCmp(void *a, void *b) {
     return f1 < f2;
 }
 
-pub void floatSort(FloatVec *vec) {
-    qsort((void**)vec.entries,vec.size-1,0,&floatCmp);
+pub void FloatVec.sort() {
+    qsort((void**)self.entries,self.size-1,0,&floatCmp);
 }
 
-pub void floatClear(FloatVec *vec) {
-    vec.size = 0;
+pub void FloatVec.clear() {
+    self.size = 0;
 }
 
-pub void floatRelease(FloatVec *vec) {
-    if (vec) {
-        mem.free(vec.entries);
-        mem.free(vec);
+pub void FloatVec.release() {
+    if (self) {
+        mem.free(self.entries);
+        mem.free(self);
     }
 }
 
@@ -115,24 +115,24 @@ pub IntVec *intNew(i64 size = 32) {
     return vec;
 }
 
-pub u64 intCapacity(IntVec *vec) {
-    return mem.size(vec.entries)/sizeof(i64);
+pub u64 IntVec.capacity() {
+    return mem.size(self.entries)/sizeof(i64);
 }
 
-pub void intPush(IntVec *vec, i64 value) {
-    auto capacity = intCapacity(vec);
-    if (vec.size + 1 >= capacity) {
+pub void IntVec.push(i64 value) {
+    auto capacity = intCapacity(self);
+    if (self.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(i64)));
-        vec.entries = newEntries;
+        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(i64)));
+        self.entries = newEntries;
     }
-    vec.entries[vec.size++] = value;
+    self.entries[self.size++] = value;
 }
 
-pub i64 intPop(IntVec *vec, bool *_ok=null) {
-    if (vec.size > 0) {
-        auto value = vec.entries[--vec.size];
+pub i64 IntVec.pop(bool *_ok=null) {
+    if (self.size > 0) {
+        auto value = self.entries[--self.size];
         if (_ok) { *_ok = true; }
         return value;
     }
@@ -140,26 +140,26 @@ pub i64 intPop(IntVec *vec, bool *_ok=null) {
     return -1;
 }
 
-pub i64 intGet(IntVec *vec, i64 idx) {
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("IntVecGet", idx, vec.size);
+pub i64 IntVec.get(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("IntVecGet", idx, self.size);
     }
-    return vec.entries[idx];
+    return self.entries[idx];
 }
 
-pub void intSet(IntVec *vec, i64 idx, i64 value)
+pub void IntVec.set(i64 idx, i64 value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("IntVecSet", idx, vec.size);
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("IntVecSet", idx, self.size);
     }
-    vec.entries[idx] = value;
+    self.entries[idx] = value;
 }
 
-pub i64 intLast(IntVec *vec, bool *_ok=null)
+pub i64 IntVec.last(bool *_ok=null)
 {// The last entry without removing it; -1 and *_ok = false when empty
-    if (vec.size > 0) {
+    if (self.size > 0) {
         if (_ok) { *_ok = true; }
-        return vec.entries[vec.size - 1];
+        return self.entries[self.size - 1];
     }
     if (_ok) { *_ok = false; }
     return -1;
@@ -169,18 +169,18 @@ i64 intCmp(void *i1, void *i2) {
     return (i64)i1 < (i64)i2;
 }
 
-pub void intSort(IntVec *vec) {
-    qsort((void**)vec.entries,vec.size-1,0,&intCmp);
+pub void IntVec.sort() {
+    qsort((void**)self.entries,self.size-1,0,&intCmp);
 }
 
-pub void intClear(IntVec *vec) {
-    vec.size = 0;
+pub void IntVec.clear() {
+    self.size = 0;
 }
 
-pub void intRelease(IntVec *vec) {
-    if (vec) {
-        mem.free(vec.entries);
-        mem.free(vec);
+pub void IntVec.release() {
+    if (self) {
+        mem.free(self.entries);
+        mem.free(self);
     }
 }
 
@@ -192,24 +192,24 @@ pub PtrVec *ptrNew(i64 size = 32) {
     return vec;
 }
 
-pub u64 ptrCapacity(PtrVec *vec) {
-    return mem.size(vec.entries)/sizeof(void*);
+pub u64 PtrVec.capacity() {
+    return mem.size(self.entries)/sizeof(void*);
 }
 
-pub void ptrPush(PtrVec *vec, void *value) {
-    auto capacity = mem.size(vec.entries)/sizeof(void*);
-    if (vec.size + 1 >= capacity) {
+pub void PtrVec.push(void *value) {
+    auto capacity = mem.size(self.entries)/sizeof(void*);
+    if (self.size + 1 >= capacity) {
         auto newCapacity = capacity * 2;
         if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(vec.entries, (u64)(newCapacity * sizeof(void*)));
-        vec.entries = newEntries;
+        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(void*)));
+        self.entries = newEntries;
     }
-    vec.entries[vec.size++] = value;
+    self.entries[self.size++] = value;
 }
 
-pub void *ptrPop(PtrVec *vec, bool *_ok=null) {
-    if (vec.size > 0) {
-        auto value = vec.entries[--vec.size];
+pub void *PtrVec.pop(bool *_ok=null) {
+    if (self.size > 0) {
+        auto value = self.entries[--self.size];
         if (_ok) { *_ok = true; }
         return value;
     }
@@ -217,26 +217,26 @@ pub void *ptrPop(PtrVec *vec, bool *_ok=null) {
     return null;
 }
 
-pub void *ptrGet(PtrVec *vec, i64 idx) {
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("PtrVecGet", idx, vec.size);
+pub void *PtrVec.get(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("PtrVecGet", idx, self.size);
     }
-    return vec.entries[idx];
+    return self.entries[idx];
 }
 
-pub void ptrSet(PtrVec *vec, i64 idx, void *value)
+pub void PtrVec.set(i64 idx, void *value)
 {// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= vec.size) {
-        vecIndexError("PtrVecSet", idx, vec.size);
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("PtrVecSet", idx, self.size);
     }
-    vec.entries[idx] = value;
+    self.entries[idx] = value;
 }
 
-pub void *ptrLast(PtrVec *vec, bool *_ok=null)
+pub void *PtrVec.last(bool *_ok=null)
 {// The last entry without removing it; null and *_ok = false when empty
-    if (vec.size > 0) {
+    if (self.size > 0) {
         if (_ok) { *_ok = true; }
-        return vec.entries[vec.size - 1];
+        return self.entries[self.size - 1];
     }
     if (_ok) { *_ok = false; }
     return null;
@@ -312,41 +312,41 @@ pub void qsort(void **arr, i64 high, i64 low,
     }
 }
 
-pub void ptrSort(PtrVec *vec, fn(void *_arg1, void *_arg2) i64 _compare_fn) {
-    qsort(vec.entries,vec.size-1,0,_compare_fn);
+pub void PtrVec.sort(fn(void *_arg1, void *_arg2) i64 _compare_fn) {
+    qsort(self.entries,self.size-1,0,_compare_fn);
 }
 
-pub void ptrClear(PtrVec *vec) {
-    vec.size = 0;
+pub void PtrVec.clear() {
+    self.size = 0;
 }
 
-pub void ptrRelease(PtrVec *vec, fn(void *_val) void _free_value = null)
+pub void PtrVec.release(fn(void *_val) void _free_value = null)
 { // Optionally pass a callback to free each item in the vector 
-    if (vec) {
+    if (self) {
         if (_free_value) {
-            void **entries = vec.entries;
-            i64 size = vec.size;
+            void **entries = self.entries;
+            i64 size = self.size;
             for (i64 i = 0; i < size; ++i) {
                 _free_value(entries[i]);
             }
         }
-        mem.free(vec.entries);
-        mem.free(vec);
+        mem.free(self.entries);
+        mem.free(self);
     }
 }
 
 #ifdef VEC_TEST
 void main() {
-    auto vec = FloatVecNew();
-    FloatVecPush(vec,32.32);
-    FloatVecPush(vec,30.33);
-    FloatVecPush(vec,42.65);
-    FloatVecPush(vec,52.99);
+    auto vec = floatNew();
+    floatPush(vec,32.32);
+    floatPush(vec,30.33);
+    floatPush(vec,42.65);
+    floatPush(vec,52.99);
 
     for (i64 i = 0; i < vec->size; ++i) {
         auto val = vec->entries[i];// FloatVecGet(vec,i);
         printf("[%d] => %f\n",i,(f64)val);
     }
-    FloatVecRelease(vec);
+    floatRelease(vec);
 }
 #endif

@@ -27,7 +27,7 @@ const i64 FZF_CHAR_LETTER = 3;
 
 const i64 FZF_CHAR_NUMBER = 4;
 
-pub struct FzFPosition {
+pub struct Position {
     i64 *data;
     i64 size;
     i64 cap;
@@ -55,8 +55,8 @@ struct FzFResult {
 };
 
 struct FzFSlab {
-    FzFI16 i16;
-    FzFI32 i32;
+    FzFI16 v16;
+    FzFI32 v32;
 };
 
 struct FzFSlabConfig {
@@ -70,8 +70,8 @@ struct FzFString {
 };
 
 struct FzFTerm {
-    void (*fn)(FzFResult *res, bool case_sensitive,
-            FzFString *text, FzFString *pattern, FzFPosition *pos, FzFSlab *slab);
+    fn(FzFResult *res, bool case_sensitive,
+            FzFString *text, FzFString *pattern, Position *pos, FzFSlab *slab) void cb;
     bool inv;
     u8 *ptr;
     void *text;
@@ -79,13 +79,13 @@ struct FzFTerm {
 };
 
 struct FzFTermSet {
-    List *entries;
+    list.List *entries;
     i64 size;
     i64 cap;
 };
 
 struct FzFPattern {
-    List *entries;
+    list.List *entries;
     i64 size;
     i64 cap;
     bool only_inv;
@@ -209,8 +209,8 @@ i16 max16(i16 a, i16 b) {
     return b;
 }
 
-FzFPosition *fzfPosArray(i64 len) {
-    FzFPosition *pos = mem.alloc(sizeof(FzFPosition));
+Position *fzfPosArray(i64 len) {
+    Position *pos = mem.alloc(sizeof(Position));
     pos.size = 0;
     pos.cap = len;
     if (len > 0) {
@@ -221,7 +221,7 @@ FzFPosition *fzfPosArray(i64 len) {
     return pos;
 }
 
-void resizePos(FzFPosition *pos, i64 addLen, i64 comp) {
+void resizePos(Position *pos, i64 addLen, i64 comp) {
     if (!pos) {
         return;
     }
@@ -235,7 +235,7 @@ void resizePos(FzFPosition *pos, i64 addLen, i64 comp) {
     }
 }
 
-void appendPos(FzFPosition *pos, i64 value) {
+void appendPos(Position *pos, i64 value) {
     if (pos) {
         resizePos(pos, pos.cap, 10);
         pos.data[pos.size] = value;
@@ -243,7 +243,7 @@ void appendPos(FzFPosition *pos, i64 value) {
     }
 }
 
-void insertRange(FzFPosition *pos, i64 start, i64 end) {
+void insertRange(Position *pos, i64 start, i64 end) {
     if (!pos) {
         return;
     }
@@ -341,7 +341,7 @@ i32 asciiFuzzyIndex(FzFString *input, u8 *pattern,
 }
 
 i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
-        i64 sidx, i64 eidx, FzFPosition *pos) {
+        i64 sidx, i64 eidx, Position *pos) {
     auto M = pattern.size;
 
     i64 pidx = 0;
@@ -396,7 +396,7 @@ i32 fzfCalculateScore(bool case_sensitive, FzFString *text, FzFString *pattern,
 }
 
 void fzfPrefixMatch(FzFResult *res, bool case_sensitive, FzFString *text,
-        FzFString *pattern, FzFPosition *pos, FzFSlab *slab) {
+        FzFString *pattern, Position *pos, FzFSlab *slab) {
     i64 M,trimmedLen,start,end;
     i32 score;
     u8 c;
@@ -432,7 +432,7 @@ no_match:
 
 void fzfSuffixMatch(FzFResult *res, bool case_sensitive,
         FzFString *text, FzFString *pattern,
-        FzFPosition *pos, FzFSlab *slab) {
+        Position *pos, FzFSlab *slab) {
     i64 trimmedLen = text.size, M = pattern.size,diff,start,end;
     i32 score;
 
@@ -467,7 +467,7 @@ no_match:
 }
 
 void fzfEqNaiveMatch(FzFResult *res, bool case_sensitive, FzFString *text,
-        FzFString *pattern, FzFPosition *pos, FzFSlab *slab) {
+        FzFString *pattern, Position *pos, FzFSlab *slab) {
     i64 M,N;
     i64 start,end,bestBonus,bonus,pidx;
     i32 bestPos,score;
@@ -534,7 +534,7 @@ no_match:
 }
 
 void fzfEqMatch(FzFResult *res, bool case_sensitive, FzFString *text,
-        FzFString *pattern, FzFPosition *pos, FzFSlab *slab) {
+        FzFString *pattern, Position *pos, FzFSlab *slab) {
     auto M = pattern.size;
     i64 trimmedLen,trimmedEndLen,start,end;
     i32 score;
@@ -585,7 +585,7 @@ out:
 }
 
 void fzfFuzzyMatchV1(FzFResult *res, bool case_sensitive, FzFString *text,
-        FzFString *pattern, FzFPosition *pos, FzFSlab *slab) {
+        FzFString *pattern, Position *pos, FzFSlab *slab) {
     auto M = pattern.size;
     auto N = text.size;
     i64 start, end;
@@ -683,7 +683,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     while (ptr != null) {
         fn(FzFResult *res, bool _case_sensitive,
                 FzFString *_text, FzFString *_pattern,
-                FzFPosition *_pos, FzFSlab *_slab) void cb = &fzfFuzzyMatchV1;
+                Position *_pos, FzFSlab *_slab) void cb = &fzfFuzzyMatchV1;
 
         bool inv = false;
 
@@ -908,7 +908,7 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     return totalScore;
 }
 
-pub void release(FzFPosition *pos) {
+pub void release(Position *pos) {
     if (pos) {
         if (pos.data) {
             mem.free(pos.data);
@@ -917,10 +917,10 @@ pub void release(FzFPosition *pos) {
     }
 }
 
-FzFPosition *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
+Position *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     FzFString input;
     FzFResult res;
-    FzFPosition *allPos;
+    Position *allPos;
     FzFTermSet *termSet;
     FzFString *fzfStr;
     FzFTerm *term;
@@ -996,7 +996,7 @@ void fzfSlabRelease(FzFSlab *slab) {
     }
 }
 
-pub FzFPosition *match(u8 *text, u8 *seq, i32 caseMode=CASE_SMART,
+pub Position *match(u8 *text, u8 *seq, i32 caseMode=CASE_SMART,
         bool fuzzy=true) {
     /* No slab: the matchers here (V1 and the exact/prefix/suffix ones)
      * never use one, and allocating the 200 KB default slab on every call

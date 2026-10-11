@@ -1,53 +1,11 @@
 module fs;
 import libc, mem, str;
 
-#ifdef IS_LINUX
-  #define F_GETOWN 0x9
-  #define F_SETOWN 0x8
-  #define F_GETLK  0x5
-  #define F_SETLK  0x6
-  #define F_SETLKW 0x7
-#else
-  #define F_GETOWN 0x5
-  #define F_SETOWN 0x6
-  #define F_GETLK  0x7
-  #define F_SETLK  0x8
-  #define F_SETLKW 0x9
-#endif
-
-/* record locking flags */
-#ifdef IS_LINUX
-  #define F_RDLCK 0
-  #define F_WRLCK 1
-  #define F_UNLCK 2
-#else
-  #define F_RDLCK 1
-  #define F_UNLCK 2
-  #define F_WRLCK 3
-#endif
-
-/* Just why? */
-#ifdef IS_LINUX
-  #define O_CREAT    0x040
-  #define O_TRUNC    0x200
-  #define O_EXCL     0x080
-  #define O_NONBLOCK 0x800
-  #define O_APPEND   0x400
-  #define O_CLOEXEC  0x80000
-#else
-  #define O_CREAT    0x200
-  #define O_TRUNC    0x400
-  #define O_EXCL     0x800
-  #define O_NONBLOCK 0x004
-  #define O_APPEND   0x008
-  #define O_CLOEXEC  0x1000000
-#endif
-
 /* Stantardise the stat function, though `std.ktmh` also allows 
  * calling the libc version. This is just much easier to use.
  * With the added benifit of including when a file was created 
  * for linux, which mac includes with `st_birthtimespec` */
-pub i32 stat(Fstat *fst, u8 *pathname) {
+pub i32 stat(FileStat *fst, u8 *pathname) {
 #if IS_LINUX
     libc.Statx stx;
 
@@ -95,8 +53,8 @@ pub i32 stat(Fstat *fst, u8 *pathname) {
     fst.st_btim.tv_nsec = stx.stx_btime.tv_nsec;
 
 #elif IS_MACOS
-    cStat st;
-    if (i32 ret = stat(pathname, &st); ret != 0) {
+    libc.cStat st;
+    if (i32 ret = libc.stat(pathname, &st); ret != 0) {
         return ret;
     }
 
@@ -158,7 +116,7 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
     libc.cStat st;
 
     /* The library's fds are close-on-exec: programs it starts don't get them */
-    if ((fd = libc.open(path,libc.O_RDONLY|O_CLOEXEC,438)) == -1) {
+    if ((fd = libc.open(path,libc.O_RDONLY|libc.O_CLOEXEC,438)) == -1) {
         return null;    
     }
 
@@ -217,7 +175,7 @@ pub u8 *readAll(u8 *path, i64 *_size=null) {
 }
 
 pub bool writeAll(u8 *filename, u8 *buf, i64 size,
-        i64 flags=O_CREAT|libc.O_WRONLY|O_TRUNC) {
+        i64 flags=libc.O_CREAT|libc.O_WRONLY|libc.O_TRUNC) {
     i64 towrite = size, nwritten = 0;
     i32 fd;
     i32 perms = 420;
@@ -226,7 +184,7 @@ pub bool writeAll(u8 *filename, u8 *buf, i64 size,
         return false;
     }
 
-    if ((fd = libc.open(filename,flags|O_CLOEXEC,perms)) == -1) {
+    if ((fd = libc.open(filename,flags|libc.O_CLOEXEC,perms)) == -1) {
         return false;
     }
 
@@ -296,7 +254,7 @@ struct DirHuman {
     u8  type;  /* Dirent type - catches symlinks, which Stat() follows */
 };
 
-DirHuman *dirHumanNew(u8 *pathname, Fstat *fst, u8 type) {
+DirHuman *dirHumanNew(u8 *pathname, FileStat *fst, u8 type) {
     DirHuman *dh = mem.alloc(sizeof(DirHuman));
     dh.pathname = pathname;
     dh.mode = fst.st_mode;

@@ -1,22 +1,22 @@
 module csv;
 
-pub struct CsvParser {
+pub struct Parser {
     u8 *csv;
     u64 len,off,row_off,nrows,nfields;
     i64 state;
 };
 
-pub struct CsvSlice {
+pub struct Slice {
     u64 idx,off,len;
 };
 
-pub void init(CsvParser *p, u8 *csv, u64 len) {
+pub void init(Parser *p, u8 *csv, u64 len) {
     p.csv = csv;
     p.len = len;
     p.off = p.row_off = p.nrows = p.nfields = p.state = 0;
 }
 
-pub i64 next(CsvParser *p, CsvSlice *s) {
+pub i64 next(Parser *p, Slice *s) {
     u8 *csv = p.csv;
     switch (p.state) {
         case 0:

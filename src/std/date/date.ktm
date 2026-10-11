@@ -1,14 +1,14 @@
 module date;
 import libc, math, str;
 
-pub i64 struct CDate {
+pub i64 struct Date {
   u32 time;
   i32 date;
 }
 
 ;
 
-pub struct CDateStruct {
+pub struct Parts {
   u64 sec10000,sec100,sec,min,hour,
     day_of_week,day_of_mon,mon;
   i32 year;
@@ -28,7 +28,7 @@ pub u64 nowMs() {
          (tm.tv_usec/1000);
 }
 
-pub void nowParts(CDateStruct *_ds) {
+pub void nowParts(Parts *_ds) {
   libc.timeval _tv;
   libc.tm *ptm;
   u64 milliseconds,seconds;
@@ -83,7 +83,7 @@ pub i64 dayOfWeek(i64 i)
   }
 }
 
-pub void toParts(CDateStruct *_ds,CDate cdt)
+pub void toParts(Parts *_ds,Date cdt)
 {//Cvt CDate to CDateStruct.
   i64 i,k,date=cdt.date;
   _ds.day_of_week=dayOfWeek(date);
@@ -122,9 +122,9 @@ pub void toParts(CDateStruct *_ds,CDate cdt)
   _ds.hour  =k;
 }
 
-pub CDate fromParts(CDateStruct *_ds)
+pub Date fromParts(Parts *_ds)
 {//Cvt CDateStruct to CDate.
-  CDate cdt;
+  Date cdt;
   i64 i1,i2,year=_ds.year,mon=(i64)_ds.mon-1;
   /* A month outside 1-12 carries into the year, as a day past the end
    * of the month carries into the next month: 13 is January of the next
@@ -160,8 +160,8 @@ pub CDate fromParts(CDateStruct *_ds)
 
 pub i32 firstDayOfMonth(i64 i)
 {//First day of month, given 32-bit day since AD 0.
-  CDateStruct ds;
-  CDate cdt=0;
+  Parts ds;
+  Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
   ds.day_of_mon=1;
@@ -171,8 +171,8 @@ pub i32 firstDayOfMonth(i64 i)
 
 pub i64 lastDayOfMonth(i64 i)
 {//Last day of month, given 32-bit day since AD 0.
-  CDateStruct ds;
-  CDate cdt=0;
+  Parts ds;
+  Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
   ds.mon++;
@@ -187,8 +187,8 @@ pub i64 lastDayOfMonth(i64 i)
 
 pub i32 firstDayOfYear(i64 i)
 {//First day of year, given 32-bit day since AD 0.
-  CDateStruct ds;
-  CDate cdt=0;
+  Parts ds;
+  Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
   ds.day_of_mon=1;
@@ -199,8 +199,8 @@ pub i32 firstDayOfYear(i64 i)
 
 pub i64 lastDayOfYear(i64 i)
 {//Last day of year, given 32-bit day since AD 0.
-  CDateStruct ds;
-  CDate cdt=0;
+  Parts ds;
+  Date cdt=0;
   cdt.date=i;
   toParts(&ds,cdt);
   ds.day_of_mon=1;
@@ -210,10 +210,10 @@ pub i64 lastDayOfYear(i64 i)
   return cdt.date-1;
 }
 
-pub CDate now()
+pub Date now()
 {//Current datetime.
-  CDateStruct ds;
-  CDate cdt = 0;
+  Parts ds;
+  Date cdt = 0;
   nowParts(&ds);
   cdt=fromParts(&ds);
   return cdt;

@@ -17,7 +17,7 @@ pub extern "c" i64 lseek(i32 __fd, i64 __offset, i32 __whence);
 pub extern "c" i32 chdir(u8 *path);
 
 /* XXX: Normalise stat ? */
-pub struct cTimespec {
+pub struct timespec {
     i64 tv_sec;
     i64 tv_nsec;
 };
@@ -626,13 +626,52 @@ pub #define DT_SOCK   12  /* Socket */
 
 pub #define DT_WHT    14  /* Whiteout */
 
-pub extern "c" i32 closedir(cDIR *dir);
+pub struct DIR;
 
-pub extern "c" void rewinddir(cDIR *dir);
+#ifdef IS_MACOS
+#define DIR_MAXPATHLEN (1024)
+struct Dirent {
+    u64 ino;           /* file number of entry */
+    u64 seekoff;       /* seek offset (optional, used by servers) */
+    u16 reclen;        /* length of this record */
+    u16 namlen;        /* length of string in d_name */
+    u8 type;           /* file type, one of the DT_* above */
+    i8 name[DIR_MAXPATHLEN]; /* entry name, NUL-terminated */
+};
+#endif
 
-pub extern "c" void seekdir(cDIR *dir, i64 pos);
+#ifdef IS_LINUX
+#define DIR_MAXPATHLEN (256)
+struct Dirent {
+    u64 ino;           /* inode number (d_ino) */
+    u64 seekoff;       /* position of the next entry, for seekdir (d_off) */
+    u16 reclen;        /* length of this record */
+    u8 type;           /* file type, one of the DT_* above; DT_UNKNOWN on
+                                            * filesystems that don't report it */
+    i8 name[DIR_MAXPATHLEN]; /* entry name, NUL-terminated */
+};
+pub extern "c" DIR *opendir(u8 *dirname);
+pub extern "c" Dirent *readdir(DIR *dir);
+#endif
 
-pub extern "c" i64 telldir(cDIR *dir);
+/* Mac x86 vs ARM symbol-name divergence -- see dir.ktm. */
+#ifdef IS_X86_64
+pub _extern _opendir$INODE64 DIR *opendir(u8 *dirname);
+pub _extern _readdir$INODE64 Dirent *readdir(DIR *dir);
+#endif
+
+#ifdef IS_ARM_64
+pub _extern _opendir DIR *opendir(u8 *dirname);
+pub _extern _readdir Dirent *readdir(DIR *dir);
+#endif
+
+pub extern "c" i32 closedir(DIR *dir);
+
+pub extern "c" void rewinddir(DIR *dir);
+
+pub extern "c" void seekdir(DIR *dir, i64 pos);
+
+pub extern "c" i64 telldir(DIR *dir);
 
 #ifdef IS_MACOS
 pub struct cStat {
@@ -643,10 +682,10 @@ pub struct cStat {
     u32 st_uid;
     u32 st_gid;
     i32 st_rdev;
-    cTimespec st_atimespec;
-    cTimespec st_mtimespec;
-    cTimespec st_ctimespec;
-    cTimespec st_birthtimespec;
+    timespec st_atimespec;
+    timespec st_mtimespec;
+    timespec st_ctimespec;
+    timespec st_birthtimespec;
     i64 st_size;
     i64 st_blocks;
     i32 st_blksize;
@@ -671,9 +710,9 @@ struct cStat {
     i32 st_blksize;
     i32 __pad2;
     i64 st_blocks;
-    cTimespec st_atim;
-    cTimespec st_mtim;
-    cTimespec st_ctim;
+    timespec st_atim;
+    timespec st_mtim;
+    timespec st_ctim;
     i32 __unused[2];
 };
 #else
@@ -689,9 +728,9 @@ struct cStat {
     i64 st_size;
     i64 st_blksize;
     i64 st_blocks;
-    cTimespec st_atim;
-    cTimespec st_mtim;
-    cTimespec st_ctim;
+    timespec st_atim;
+    timespec st_mtim;
+    timespec st_ctim;
     i64 __glibc_reserved[3];
 };
 #endif

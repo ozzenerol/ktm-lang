@@ -12,5 +12,5 @@ pub _extern _EXIT void exit(i64 exit_code = EXIT_FAIL);
 #endif
 
 #ifdef IS_ARM_64
-pub void Exit(i64 exit_code = EXIT_FAIL);
+pub void exit(i64 exit_code = EXIT_FAIL);
 #endif
