@@ -6,7 +6,7 @@ set -u
 steps=0
 failed=0
 hello="$(mktemp -d)"
-printf 'U0 Main() { I64 x = 6 * 7; "hello %%d\\n", x; }\n' > "$hello/hello.ktm"
+printf 'i32 main() { i64 x = 6 * 7; printf("hello %%d\\n", x); return 0; }\n' > "$hello/hello.ktm"
 
 # Test groups that failed; the ktm runners exit 0 even on failure.
 test_failures() { grep -c 'FAILED\|Failed to compile' "$1" || true; }

@@ -141,7 +141,7 @@ jobs:
           set -eux
           prefix="$PWD/smoke-prefix"
           "./$PKG/install.sh" --prefix="$prefix"
-          printf 'U0 Main(){\n  "hello %%d\\n", 40+2;\n}\n' > ./hello.ktm
+          printf 'i32 main() {\n    printf("hello %%d\\n", 40 + 2);\n    return 0;\n}\n' > ./hello.ktm
           "$prefix/bin/ktm" --install-dir="$prefix" ./hello.ktm -o ./hello
           test "$(./hello)" = "hello 42"
           test "$("$prefix/bin/ktm" --install-dir="$prefix" -jit ./hello.ktm)" = "hello 42"
