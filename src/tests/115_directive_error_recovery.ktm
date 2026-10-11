@@ -158,6 +158,14 @@ Bool TestUndefNothing(U0)
                              "Syntax is: #undef <TK_IDENT>");
 }
 
+/* nor take the next line's first word when it is an identifier
+ * (`void` is one) */
+Bool TestUndefNothingVoid(U0)
+{
+  return ErrorOnlyEverywhere("#undef", "#undef\nvoid F() {}\n",
+                             "Syntax is: #undef <TK_IDENT>");
+}
+
 Bool TestError(U0)
 {
   return ErrorOnlyEverywhere("#error", "#error \"stop here\" and more\n",
@@ -230,7 +238,7 @@ U0 Main() { Foo f; Bar b; Baz z; f.a = 1; b.a = 2; z.b = 3; }
 I32 Main()
 {
   "Test - directive errors after a class: \n";
-  I64 tests = 19;
+  I64 tests = 20;
   I64 correct = 0;
 
   if (TestIfBadCondition()) correct++;
@@ -243,6 +251,7 @@ I32 Main()
   if (TestLinkBadSyntax()) correct++;
   if (TestUndefBadSyntax()) correct++;
   if (TestUndefNothing()) correct++;
+  if (TestUndefNothingVoid()) correct++;
   if (TestError()) correct++;
   if (TestBadNumber()) correct++;
   if (TestLongCharConst()) correct++;
