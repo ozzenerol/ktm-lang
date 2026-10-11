@@ -663,7 +663,7 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
                 (uintptr_t)code->code + jit->pending_lines[i].addr;
             jit->lines[jit->n_lines].line = jit->pending_lines[i].line;
             /* KTM_DEBUG_LINES=1 dumps the table as chunks finalize -
-             * pairs with `Uf` output when debugging attribution. */
+             * pairs with `replDisasm` output when debugging attribution. */
             if (getenv("KTM_DEBUG_LINES"))
                 fprintf(stderr, "line-table: %p line %d\n",
                         (void *)jit->lines[jit->n_lines].addr,

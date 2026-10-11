@@ -16,7 +16,7 @@
  * blocks (SIGABRT, SIGTRAP or silent corruption, run-dependent); this
  * is deterministic.
  *
- * Used always by the REPL (plus the `ReplHeap;` builtin), and by
+ * Used always by the REPL (plus the `replHeap;` builtin), and by
  * `ktm -Memsafe -jit`, which adds a leak report at exit. */
 
 /* Register the tracking allocator in `jit`'s host_symbols. Must run
@@ -27,7 +27,7 @@ void memsafeInit(KtmJit *jit);
  * <= 0 are omitted from output. */
 void memsafeSetRound(int round);
 
-/* Live allocations, biggest first (the `ReplHeap;` builtin). */
+/* Live allocations, biggest first (the `replHeap;` builtin). */
 void memsafeDumpLive(FILE *f);
 
 /* End-of-run leak summary: silent when nothing is live. */

@@ -154,7 +154,7 @@ void main()
     else { printf("Failed - wild free\n"); }
 
     /* The REPL always tracks: churn leaves nothing live, a double free
-     * is reported once, ReplHeap shows the one real live block */
+     * is reported once, replHeap shows the one real live block */
     if (runMemsafe(
 "import mem;
 
@@ -166,7 +166,7 @@ u8 *p = mem.alloc(7);
 u8 *q = mem.alloc(9);
 mem.free(q);
 mem.free(q);
-ReplHeap;
+replHeap;
 ", MS_REPL) && check("grep -q '^heap: 1 live allocation(s), 7 bytes$' " MS_OUT
                                              " && test $(grep -c 'double free of .* (9 bytes)' " MS_ERR ") -eq 1")) {
         correct++;
