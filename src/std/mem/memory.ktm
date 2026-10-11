@@ -244,9 +244,9 @@ _REALLOC::
 
 #endif
 
-pub _extern _MALLOC void *alloc(u64 size);
+_extern _MALLOC void *rawAlloc(u64 size);
 
-pub _extern _FREE void free(void *ptr);
+_extern _FREE void rawFree(void *ptr);
 
 pub _extern _MSIZE u64 size(void *ptr);
 
@@ -254,6 +254,45 @@ pub _extern _MEMSET void *set(void *dst, i32 ch, u64 len);
 
 pub _extern _MEMCPY void *copy(void *dst, void *src, u64 len);
 
-pub _extern _CALLOC void *allocZero(u64 newSize);
+_extern _CALLOC void *rawAllocZero(u64 newSize);
 
-pub _extern _REALLOC void *realloc(void *ptr, u64 newSize);
+_extern _REALLOC void *rawRealloc(void *ptr, u64 newSize);
+
+/* A memory checker's replacements for alloc, free, allocZero and realloc,
+ * null otherwise: -Memsafe and the REPL set them, so every allocation goes
+ * through it, the library's own included (theirs keep the size header) */
+pub fn(u64) void * __allocHook;
+pub fn(void *) void __freeHook;
+pub fn(u64) void * __allocZeroHook;
+pub fn(void *, u64) void * __reallocHook;
+
+pub void *alloc(u64 size)
+{
+    fn(u64) void * hook = __allocHook;
+    if (hook) { return hook(size); }
+    return rawAlloc(size);
+}
+
+pub void free(void *ptr)
+{
+    fn(void *) void hook = __freeHook;
+    if (hook) {
+        hook(ptr);
+        return;
+    }
+    rawFree(ptr);
+}
+
+pub void *allocZero(u64 newSize)
+{
+    fn(u64) void * hook = __allocZeroHook;
+    if (hook) { return hook(newSize); }
+    return rawAllocZero(newSize);
+}
+
+pub void *realloc(void *ptr, u64 newSize)
+{
+    fn(void *, u64) void * hook = __reallocHook;
+    if (hook) { return hook(ptr, newSize); }
+    return rawRealloc(ptr, newSize);
+}
