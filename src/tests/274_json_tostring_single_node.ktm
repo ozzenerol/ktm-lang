@@ -5,7 +5,7 @@ import cstr, json, mem, test;
  * value; a whole document prints as before. */
 
 bool is(json.Value *n, u8 *want) {
-    u8 *s = json.toStr(n);
+    u8 *s = json.toStr(n).take();
     bool ok = !cstr.cmp(s, want);
     if (!ok) { printf("got %s, want %s\n", s, want); }
     mem.free(s);
@@ -29,9 +29,9 @@ i32 main() {
 
     /* the selected node is left as it was */
     json.Value *b = json.select(d, ".b");
-    u8 *again = json.toStr(d);
+    u8 *again = json.toStr(d).take();
     tests++;
-    if (b.next && !cstr.cmp(b.key, "b") &&
+    if (b.next && !cstr.cmp(b.key.ptr, "b") &&
             !cstr.cmp(again, "{\"a\": 1,\"b\": [2,{\"x\": null},\"s\"],\"c\": {\"k\": true},\"d\": 1.5}")) {
         correct++;
             }

@@ -60,11 +60,11 @@ i32 main() {
     /* json.toStr no longer leaks */
     tests++;
     json.Value *j = json.parse("{\"a\":[1,2,3,true,null],\"b\":\"x\",\"c\":{\"d\":1.5}}");
-    s = json.toStr(j);
+    s = json.toStr(j).take();
     mem.free(s);
     before = inUse();
     for (i = 0; i < 2000; i++) {
-        s = json.toStr(j);
+        s = json.toStr(j).take();
         mem.free(s);
     }
     if (inUse() - before < 4096) { correct++; }

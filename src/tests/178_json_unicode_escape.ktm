@@ -5,14 +5,14 @@ import cstr, json, mem, test;
 
 /* Parses `text` and returns the string at .e, or null if it didn't parse */
 u8 *parseE(u8 *text) {
-    json.Value *j = json.parse(text);
+    json.Value *j = json.parse(cstr.view(text));
     if (!json.ok(j)) {
         json.release(j);
         return null;
     }
     json.Value *e = json.select(j, ".e:s");
     u8 *res = null;
-    if (e) { res = cstr.dup(e.str); }
+    if (e) { res = cstr.dup(e.str.ptr); }
     json.release(j);
     return res;
 }
@@ -26,7 +26,7 @@ bool is(u8 *text, u8 *want) {
 }
 
 bool rejected(u8 *text) {
-    json.Value *j = json.parse(text);
+    json.Value *j = json.parse(cstr.view(text));
     bool bad = !json.ok(j);
     if (!bad) { printf("\n  %s should be rejected\n", text); }
     json.release(j);
@@ -51,7 +51,7 @@ i32 main() {
 
     /* In an array, and as an object key */
     json.Value *j = json.parse("[\"\\u0041\\u0042\", 1]");
-    if (json.ok(j) && !cstr.cmp(j.array.str, "AB")) { correct++; }
+    if (json.ok(j) && !cstr.cmp(j.array.str.ptr, "AB")) { correct++; }
     json.release(j);
     j = json.parse("{\"\\u006By\": 7}");
     if (json.ok(j) && json.select(j, ".ky:i") && json.select(j, ".ky:i").intVal == 7) { correct++; }

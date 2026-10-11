@@ -104,7 +104,7 @@ i32 main() {
 
     /* json.parse -> json.toStr with floats no longer exits */
     json.Value *js = json.parse("{\"pi\": 3.5, \"neg\": -0.25, \"arr\": [1.5, 2, 0.1]}");
-    u8 *s = json.toStr(js);
+    u8 *s = json.toStr(js).take();
     if (!cstr.cmp(s, "{\"pi\": 3.5,\"neg\": -0.25,\"arr\": [1.5,2,0.1]}")) {
         correct++;
     } else {
@@ -116,13 +116,13 @@ i32 main() {
     /* floats print so they read back as the same float (with 15, 16 or 17
      * digits, so the smallest denormal is not the shortest -5e-324) */
     js = json.parse("[2.0, 1.0e21, 0.30000000000000004, 1.0e-7, -4.9406564584124654e-324]");
-    s = json.toStr(js);
+    s = json.toStr(js).take();
     if (!cstr.cmp(s, "[2.0,1.0e+21,0.30000000000000004,1.0e-07,-4.94065645841247e-324]")) {
         correct++;
     } else {
         printf("\n  JsonToString gave: %s", s);
     }
-    json.Value *back = json.parse(s);
+    json.Value *back = json.parse(cstr.view(s));
     if (back.array.type == json.FLOAT &&
             back.array.next.floatVal == 1.0e21 &&
             back.array.next.next.floatVal == 0.30000000000000004) {

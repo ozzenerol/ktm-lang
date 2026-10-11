@@ -3,7 +3,8 @@ import cstr, json, mem, test;
 /* A \u0000 in a JSON string or key cut it short: the parser decoded it
  * into a '\0' and everything after it was lost, also in json.toStr.
  * Json now has `str_len` and `key_len` (at the end of the class) with
- * the full length; json.toStr writes the '\0' back as \u0000.
+ * the full length; json.toStr writes the '\0' back as \u0000. A key is
+ * a u8[], all of its bytes.
  * json.select still matches a key up to its first '\0'. */
 
 bool bytes(u8 *s, i64 len, u8 *want, i64 wantLen) {
@@ -24,19 +25,19 @@ i32 main() {
     json.Value *j = json.parse("[\"a\\u0000b\", \"\\u0000\", \"plain\", \"\"]");
     tests++;
     json.Value *e = j.array;
-    if (json.ok(j) && bytes(e.str, e.strLen, "a\0b", 3) &&
-            bytes(e.next.str, e.next.strLen, "\0", 1) &&
-            e.next.next.strLen == 5 && e.next.next.next.strLen == 0) {
+    if (json.ok(j) && bytes(e.str.ptr, e.str.len, "a\0b", 3) &&
+            bytes(e.next.str.ptr, e.next.str.len, "\0", 1) &&
+            e.next.next.str.len == 5 && e.next.next.next.str.len == 0) {
         correct++;
             }
     tests++;
-    u8 *s = json.toStr(j);
+    u8 *s = json.toStr(j).take();
     if (!cstr.cmp(s, "[\"a\\u0000b\",\"\\u0000\",\"plain\",\"\"]")) { correct++; }
     else { printf("[%s]\n", s); }
     /* ...which parses back the same */
     tests++;
-    json.Value *k = json.parse(s);
-    u8 *s2 = json.toStr(k);
+    json.Value *k = json.parse(cstr.view(s));
+    u8 *s2 = json.toStr(k).take();
     if (json.ok(k) && !cstr.cmp(s, s2)) { correct++; }
     mem.free(s);
     mem.free(s2);
@@ -46,20 +47,20 @@ i32 main() {
     /* Keys */
     j = json.parse("{\"a\\u0000b\": 1, \"c\": \"x\\u0000\"}");
     tests++;
-    if (json.ok(j) && bytes(j.object.key, j.object.keyLen, "a\0b", 3) &&
-            j.object.next.keyLen == 1 &&
-            bytes(j.object.next.str, j.object.next.strLen, "x\0", 2)) {
+    if (json.ok(j) && bytes(j.object.key.ptr, j.object.key.len, "a\0b", 3) &&
+            j.object.next.key.len == 1 &&
+            bytes(j.object.next.str.ptr, j.object.next.str.len, "x\0", 2)) {
         correct++;
             }
     tests++;
-    s = json.toStr(j);
+    s = json.toStr(j).take();
     if (!cstr.cmp(s, "{\"a\\u0000b\": 1,\"c\": \"x\\u0000\"}")) { correct++; }
     else { printf("[%s]\n", s); }
     mem.free(s);
-    /* A key with a '\0' is selected by what comes before it */
+    /* A key is all its bytes: objectGet finds "a\0b" whole, not by "a" */
     tests++;
-    json.Value *a = json.select(j, ".a:i");
-    if (a && a.intVal == 1) { correct++; }
+    json.Value *a = json.objectGet(j, "a\0b");
+    if (a && a.intVal == 1 && json.objectGet(j, "a") == null) { correct++; }
     json.release(j);
 
     test.printResult(correct, tests);

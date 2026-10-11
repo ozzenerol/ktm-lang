@@ -14,7 +14,7 @@ i32 main() {
     -14]
   }";
 
-    auto j = json.parse(raw);
+    auto j = json.parse(cstr.view(raw));
     if (j != null) { correct++; }
 
     auto obj = json.select(j,".hello:i");
@@ -22,12 +22,12 @@ i32 main() {
         if (obj.intVal == 10) { correct++; }
     }
 
-    u8 *strVal = json.toStr(j);
+    u8 *strVal = json.toStr(j).take();
     printf("%s\n",strVal);
     mem.free(strVal);
 
     if ((obj = json.select(j,".key:s"))) {
-        if (!cstr.cmpLen(obj.str,"some string",11)) { correct++; }
+        if (!cstr.cmpLen(obj.str.ptr,"some string",11)) { correct++; }
     }
 
     if ((obj = json.select(j,".id"))) {

@@ -1,4 +1,4 @@
-import json, test;
+import cstr, json, test;
 
 /* json.release never freed the parse state json.parse hangs on the node it
  * returns (32 bytes per parse), and a parse error in an array or object
@@ -12,11 +12,11 @@ i64 inUse() {
 
 /* Heap bytes left behind by parsing and releasing `text` 2000 times */
 i64 growth(u8 *text, i64 flags=0) {
-    json.Value *j = json.parse(text, -1, flags);   /* warm up */
+    json.Value *j = json.parse(cstr.view(text), flags);   /* warm up */
     json.release(j);
     i64 before = inUse();
     for (i64 i = 0; i < 2000; i++) {
-        j = json.parse(text, -1, flags);
+        j = json.parse(cstr.view(text), flags);
         json.select(j, ".a:s");
         json.release(j);
     }

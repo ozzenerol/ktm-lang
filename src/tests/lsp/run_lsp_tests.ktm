@@ -349,7 +349,7 @@ json.Value *lspNextMsg(LspClient *l) {
     u8 *body = sep + 4;
     i64 have = l.len - (body - l.buf);
     if (have < blen) { return null; }
-    json.Value *msg = json.parse(body, blen);
+    json.Value *msg = json.parse(body[0:blen]);
     i64 consumed = body - l.buf + blen;
     i64 rest = l.len - consumed;
     for (i64 i = 0; i < rest; i++) { l.buf[i] = l.buf[consumed + i]; }
@@ -366,7 +366,7 @@ json.Value *lspTake(LspClient *l) {
         if (msg == null) { return null; }
         json.Value *method = json.select(msg, ".method:s");
         if (method != null &&
-                cstr.cmp(method.str, "textDocument/publishDiagnostics") == 0) {
+                cstr.cmp(method.str.ptr, "textDocument/publishDiagnostics") == 0) {
             l.publishes++;
             l.lastPublish = msg;
             continue;
@@ -552,7 +552,7 @@ bool locEq(json.Value *resp, u8 *wantUri, i64 wantLine, i64 wantChr,
     json.Value *ln = json.select(resp, ".result.range.start.line:i");
     json.Value *ch = json.select(resp, ".result.range.start.character:i");
     if (u == null || ln == null || ch == null) { return false; }
-    if (cstr.cmp(u.str, wantUri) != 0) { return false; }
+    if (cstr.cmp(u.str.ptr, wantUri) != 0) { return false; }
     if (ln.intVal != wantLine) { return false; }
     if (checkChr && ch.intVal != wantChr) { return false; }
     return true;
@@ -562,7 +562,7 @@ bool hoverContains(json.Value *resp, u8 *needle) {
     if (resp == null) { return false; }
     json.Value *val = json.select(resp, ".result.contents.value:s");
     if (val == null) { return false; }
-    return libc.strstr(val.str, needle) != null;
+    return libc.strstr(val.str.ptr, needle) != null;
 }
 
 /* All labels start with `prefix`; `must1`/`must2` are present
@@ -577,9 +577,9 @@ bool labelsOk(json.Value *resp, u8 *prefix, u8 *must1, u8 *must2) {
     while (it != null) {
         json.Value *lab = json.select(it, ".label:s");
         if (lab == null) { return false; }
-        if (cstr.cmpLen(lab.str, prefix, cstr.len(prefix)) != 0) { return false; }
-        if (cstr.cmp(lab.str, must1) == 0) { has1 = true; }
-        if (must2 != null && cstr.cmp(lab.str, must2) == 0) { has2 = true; }
+        if (cstr.cmpLen(lab.str.ptr, prefix, cstr.len(prefix)) != 0) { return false; }
+        if (cstr.cmp(lab.str.ptr, must1) == 0) { has1 = true; }
+        if (must2 != null && cstr.cmp(lab.str.ptr, must2) == 0) { has2 = true; }
         it = it.next;
     }
     return has1 && has2;
@@ -593,7 +593,7 @@ json.Value *renameChangesFor(json.Value *resp, u8 *uri) {
     if (changes == null) { return null; }
     json.Value *it = changes.object;
     while (it != null) {
-        if (it.key != null && cstr.cmp(it.key, uri) == 0) { return it; }
+        if (it.key.ptr != null && cstr.cmp(it.key.ptr, uri) == 0) { return it; }
         it = it.next;
     }
     return null;
@@ -651,7 +651,7 @@ bool hasLocation(json.Value *arr, u8 *uri, i64 line, i64 chr) {
         json.Value *l = json.select(it, ".range.start.line:i");
         json.Value *c = json.select(it, ".range.start.character:i");
         if (u != null && l != null && c != null &&
-                cstr.cmp(u.str, uri) == 0 && l.intVal == line && c.intVal == chr) {
+                cstr.cmp(u.str.ptr, uri) == 0 && l.intVal == line && c.intVal == chr) {
             return true;
         }
         it = it.next;
@@ -675,7 +675,7 @@ void testHandshake() {
     json.Value *resp = lspRequest(l, "initialize", "{}");
     json.Value *enc = json.select(resp, ".result.capabilities.positionEncoding:s");
     check("utf-16 positions unless the client offers utf-8",
-                enc != null && cstr.cmp(enc.str, "utf-16") == 0);
+                enc != null && cstr.cmp(enc.str.ptr, "utf-16") == 0);
     bool ok = false;
     if (resp != null) {
         json.Value *df = json.select(resp, ".result.capabilities.definitionProvider:b");
@@ -894,7 +894,7 @@ void testDebounce() {
     before = l.publishes;
     lspSettle(l, 1000);
     i64 tail = l.publishes - before;
-    u8 *last = l.lastPublish ? json.toStr(l.lastPublish) : null;
+    u8 *last = l.lastPublish ? json.toStr(l.lastPublish).take() : null;
     bool finalSeen = last && libc.strstr(last, "notDefinedInFinalEdit") != null;
     check("continuous typing still publishes via the max-age cap",
                 mid >= 1 && tail <= 2 && finalSeen);
@@ -1011,7 +1011,7 @@ void testRename() {
     resp = lspPositionRequest(l, "textDocument/prepareRename", uri, line, chr);
     json.Value *ph = json.select(resp, ".result.placeholder:s");
     check("prepareRename yields the symbol's range",
-                ph != null && cstr.cmp(ph.str, "LibAdd") == 0);
+                ph != null && cstr.cmp(ph.str.ptr, "LibAdd") == 0);
     resp = lspPositionRequest(l, "textDocument/prepareRename", uri, 0, 0);
     check("prepareRename on a non-symbol is null", isNullResult(resp));
 
