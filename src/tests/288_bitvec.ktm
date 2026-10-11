@@ -70,9 +70,9 @@ i32 main() {
         idx = rand() % MODEL_BITS;
         switch (rand() % 4) {
             case 0:
-            case 1: bv.set(idx); model[idx] = 1; break;
-            case 2: bv.unset(idx); model[idx] = 0; break;
-            case 3: if (bv.test(idx) != model[idx]) { wrong++; } break;
+            case 1: bv.set(idx); model[idx] = 1;
+            case 2: bv.unset(idx); model[idx] = 0;
+            case 3: if (bv.test(idx) != model[idx]) { wrong++; }
         }
     }
     for (i = 0; i < MODEL_BITS + 100; i++) {

@@ -107,23 +107,20 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
                                         if ((dow = strDateName(&strdate, strDateDays, 7)) < 0) {
                                                 return false;
                                         }
-                                        break;
                                 case 'b': /* month name */
                                         if ((v = strDateName(&strdate, strDateMonths, 12)) < 0) {
                                                 return false;
                                         }
                                         mon = v + 1;
-                                        break;
-                                case 'd': if (!strDateNum(&strdate, 2, &day)) { return false; } break;
-                                case 'm': if (!strDateNum(&strdate, 2, &mon)) { return false; } break;
-                                case 'Y': if (!strDateNum(&strdate, 4, &year)) { return false; } break;
+                                case 'd': if (!strDateNum(&strdate, 2, &day)) { return false; }
+                                case 'm': if (!strDateNum(&strdate, 2, &mon)) { return false; }
+                                case 'Y': if (!strDateNum(&strdate, 4, &year)) { return false; }
                                 case 'H':
                                         if (!strDateNum(&strdate, 2, &hour)) { return false; }
                                         hasHour = true;
-                                        break;
-                                case 'M': if (!strDateNum(&strdate, 2, &min)) { return false; } break;
+                                case 'M': if (!strDateNum(&strdate, 2, &min)) { return false; }
                                 case 's':
-                                case 'S': if (!strDateNum(&strdate, 2, &sec)) { return false; } break;
+                                case 'S': if (!strDateNum(&strdate, 2, &sec)) { return false; }
                                 case 'p': /* am or pm */
                                         while (*strdate == ' ') { strdate++; }
                                         if (str.cmpLenNoCase(strdate, "AM", 2) == 0) {
@@ -134,7 +131,6 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
                                                 return false;
                                         }
                                         strdate += 2;
-                                        break;
                                 case 'z': /* timezone difference, e.g. +0100 */
                                         while (*strdate == ' ') { strdate++; }
                                         sign = 1;
@@ -147,11 +143,9 @@ pub bool parseParts(u8 *strdate, u8 *format, Parts *t) {
                                         if (!strDateNum(&strdate, 4, &zone)) { return false; }
                                         if (zone / 100 > 23 || zone % 100 > 59) { return false; }
                                         zone *= sign;
-                                        break;
                                 case '%':
                                         if (*strdate != '%') { return false; }
                                         strdate++;
-                                        break;
                                 default:
                                         return false;
                         }
@@ -242,27 +236,25 @@ pub u8 *format(Date d, u8 *fmt) {
                 }
                 ++p;
                 switch (*p) {
-                        case 'Y': out = str.appendFormatLen(out,&len,"%d",ds.year); break;
-                        case 'm': out = str.appendFormatLen(out,&len,"%02d",ds.mon); break;
-                        case 'd': out = str.appendFormatLen(out,&len,"%02d",ds.dayOfMon); break;
-                        case 'H': out = str.appendFormatLen(out,&len,"%02d",ds.hour); break;
-                        case 'M': out = str.appendFormatLen(out,&len,"%02d",ds.min); break;
-                        case 'S': out = str.appendFormatLen(out,&len,"%02d",ds.sec); break;
+                        case 'Y': out = str.appendFormatLen(out,&len,"%d",ds.year);
+                        case 'm': out = str.appendFormatLen(out,&len,"%02d",ds.mon);
+                        case 'd': out = str.appendFormatLen(out,&len,"%02d",ds.dayOfMon);
+                        case 'H': out = str.appendFormatLen(out,&len,"%02d",ds.hour);
+                        case 'M': out = str.appendFormatLen(out,&len,"%02d",ds.min);
+                        case 'S': out = str.appendFormatLen(out,&len,"%02d",ds.sec);
                         case 'a': {
                                 u8 *n = strDateDays[ds.dayOfWeek % 7];
                                 out = str.appendFormatLen(out,&len,"%c%c%c",
                                         str.toUpper(n[0]),n[1],n[2]);
-                                break;
                         }
                         case 'b': {
                                 u8 *n = strDateMonths[(ds.mon + 11) % 12];
                                 out = str.appendFormatLen(out,&len,"%c%c%c",
                                         str.toUpper(n[0]),n[1],n[2]);
-                                break;
                         }
-                        case 'p': out = str.appendFormatLen(out,&len,"%s",ds.hour < 12 ? "AM" : "PM"); break;
-                        case '%': out = str.appendFormatLen(out,&len,"%%"); break;
-                        default:  out = str.appendFormatLen(out,&len,"%%%c",*p); break;
+                        case 'p': out = str.appendFormatLen(out,&len,"%s",ds.hour < 12 ? "AM" : "PM");
+                        case '%': out = str.appendFormatLen(out,&len,"%%");
+                        default:  out = str.appendFormatLen(out,&len,"%%%c",*p);
                 }
         }
         return out;

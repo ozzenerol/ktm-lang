@@ -177,7 +177,6 @@ i64 inSwitch(i64 x) {
                 }
             }
             r = 10;
-            break;
         }
         default:
             r = 20;

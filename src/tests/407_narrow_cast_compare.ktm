@@ -42,7 +42,7 @@ void signed() {
 
     printf("switch on v(i8): ");
     switch ((i8)v) {
-        case -56: check(true, "i8 switch matches -56"); break;
+        case -56: check(true, "i8 switch matches -56");
         default:  check(false, "i8 switch matches -56");
     }
 

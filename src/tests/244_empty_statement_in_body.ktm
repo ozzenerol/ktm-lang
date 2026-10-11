@@ -39,9 +39,9 @@ i64 emptyBodies() {
 i64 inSwitch(i64 v) {
     i64 r = 0;
     switch (v) {
-        case 1: ; r = 10; break;
+        case 1: ; r = 10;
         case 2: ; ; break;
-        case 3: r = 30; ; break;
+        case 3: r = 30; ;
         default: ; r = -1;
     }
     return r;

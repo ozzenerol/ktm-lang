@@ -309,7 +309,6 @@ u8 *expandBuf(CArcCompress *arc)
   switch [arc.compressionType] {
     case CT_NONE:
       mem.copy(res,&arc.body,arc.expandedSize);
-      break;
     case CT_7_BIT:
     case CT_8_BIT:
       c=arcCtrlNew(true,arc.compressionType);
@@ -321,7 +320,6 @@ u8 *expandBuf(CArcCompress *arc)
       c.dstPos=0;
       arcExpandBuf(c);
       arcCtrlDel(c);
-      break;
   }
   return res;
 }

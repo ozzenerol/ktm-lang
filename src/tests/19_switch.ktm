@@ -13,7 +13,6 @@ bool testBreakInLoopCrazy() {
                 }
                 if (i == 7) { break; }
             }
-            break;
         case 2:  return false;
         default: return false;
     }
@@ -32,7 +31,6 @@ bool testBreakInLoop() {
                     break; // This break should be part of the loop
                 }
             }
-            break;
         case 2:  return false;
         default: return false;
     }
@@ -43,11 +41,11 @@ bool unNamedCase() {
     i32 num = 0;
     for (i32 i = 0; i <= 5; ++i) {
         switch (i) {
-            case: num++; break; //0
-            case: num++; break; //1
-            case 3: num++; break; //3
-            case: num++; break; //4
-            case: num++; break; //5
+            case: num++; //0
+            case: num++; //1
+            case 3: num++; //3
+            case: num++; //4
+            case: num++; //5
         }
     }
     return num == 5;
@@ -58,10 +56,10 @@ bool testOutOfRange() {
     i64 isSet = 0;
 
     switch (num) {
-        case 10: isSet = -1; break;
-        case 20: isSet = -1; break;
-        case 30: isSet = -1; break;
-        default: isSet = 1; break;
+        case 10: isSet = -1;
+        case 20: isSet = -1;
+        case 30: isSet = -1;
+        default: isSet = 1;
     }
 
     return isSet == 1;
@@ -71,10 +69,10 @@ bool testNoBoundsSwitch() {
     i64 num = 0;
     for (i64 i = 0; i < 5; ++i) {
         switch [i] {
-            case:   num++; break;
-            case 1: num++; break;
-            case 2: num++; break;
-            case 4: num++; break;
+            case:   num++;
+            case 1: num++;
+            case 2: num++;
+            case 4: num++;
             default: break;
         }
     }
@@ -87,14 +85,14 @@ bool testRangeWithoutSpaces() {
     i64 small = 0, big = 0, hex = 0, letters = 0;
     for (i64 i = 0; i < 40; ++i) {
         switch (i) {
-            case 1...3:       small++; break;
-            case 7...9:       big++; break;
-            case 0x10...0x1F: hex++; break;
+            case 1...3:       small++;
+            case 7...9:       big++;
+            case 0x10...0x1F: hex++;
         }
     }
     for (u8 *p = "a1b2c"; *p; ++p) {
         switch (*p) {
-            case 'a'...'z': letters++; break;
+            case 'a'...'z': letters++;
         }
     }
     return small == 3 && big == 3 && hex == 16 && letters == 3;
@@ -107,14 +105,14 @@ i32 main(i32 argc, u8 **argv) {
 
     for (; i < 10; ++i) {
         switch (i) {
-            case 1:  count++; break;
-            case 2:  count++; break;
-            case 3:  count++; break;
-            case 7:  count++; break;
-            case 8:  count++; break;
-            case 10: count++; break;
-            case 9:  count++; break;
-            default: count--; break;
+            case 1:  count++;
+            case 2:  count++;
+            case 3:  count++;
+            case 7:  count++;
+            case 8:  count++;
+            case 10: count++;
+            case 9:  count++;
+            default: count--;
         }
     }
     if (count == 2) {
@@ -125,12 +123,12 @@ i32 main(i32 argc, u8 **argv) {
     u8 *name = "hello", *ptr = name;
     while (*ptr) {
         switch (*ptr) {
-            case 'h': count++; break;
-            case 'e': count++; break;
-            case 'l': count++; break;
-            case 'o': count++; break;
-            case 'z': count++; break;
-            default:  count--; break;
+            case 'h': count++;
+            case 'e': count++;
+            case 'l': count++;
+            case 'o': count++;
+            case 'z': count++;
+            default:  count--;
         }
         ++ptr;
     }

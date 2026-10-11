@@ -288,12 +288,12 @@ static i32 jsonParseNull(JsonParser *p) {
 static bool jsonSetExpectedType(JsonParser *p) {
         auto peek = jsonPeek(p);
         switch (peek) {
-                case '{': p.type = JSON_PARSER_OBJECT; break;
-                case '[': p.type = JSON_PARSER_ARRAY; break;
-                case 'n': p.type = JSON_PARSER_NULL; break;
+                case '{': p.type = JSON_PARSER_OBJECT;
+                case '[': p.type = JSON_PARSER_ARRAY;
+                case 'n': p.type = JSON_PARSER_NULL;
                 case 't':
-                case 'f': p.type = JSON_PARSER_BOOL; break;
-                case '"': p.type = JSON_PARSER_STRING; break;
+                case 'f': p.type = JSON_PARSER_BOOL;
+                case '"': p.type = JSON_PARSER_STRING;
                 default: {
                         if (('0'<=peek<='9') || peek == '-' || peek == '+' || peek == '.') {
                                 p.type = JSON_PARSER_NUMERIC;
@@ -397,12 +397,12 @@ static u8 *jsonParseString(JsonParser *p, i64 *_len) {
                                 switch (jsonPeek(p)) {
                                         case '\\':
                                         case '"':
-                                        case '/': str[len++] = jsonPeek(p); break;
-                                        case 'b': str[len++] = '\b'; break;
-                                        case 'f': str[len++] = '\f'; break;
-                                        case 'n': str[len++] = '\n'; break;
-                                        case 'r': str[len++] = '\r'; break;
-                                        case 't': str[len++] = '\t'; break;
+                                        case '/': str[len++] = jsonPeek(p);
+                                        case 'b': str[len++] = '\b';
+                                        case 'f': str[len++] = '\f';
+                                        case 'n': str[len++] = '\n';
+                                        case 'r': str[len++] = '\r';
+                                        case 't': str[len++] = '\t';
                                         case 'u': {
                                                 i64 cp = jsonParseHex4(p);
                                                 if (cp < 0) {
@@ -433,23 +433,19 @@ static u8 *jsonParseString(JsonParser *p, i64 *_len) {
                                                         cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
                                                 }
                                                 len += jsonUtf8Encode(str + len, cp);
-                                                break;
                                         }
                                         default:
                                                 p.error = INVALID_ESCAPE_CHARACTER;
                                                 goto err;
                                 }
-                                break;
                         case '"':
                                 run = 0;
-                                break;
                         default:
                                 if (jsonPeek(p) < 0x20) { /* RFC 8259: control characters escaped */
                                         p.error = INVALID_CONTROL_CHARACTER;
                                         goto err;
                                 }
                                 str[len++] = jsonPeek(p);
-                                break;
                 }
 
                 jsonAdvance(p);
@@ -516,13 +512,13 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *strVal, i64 len) {
         while (strVal < end) {
                 ch = *strVal++;
                 switch (ch) {
-                        case '"':  *dst++ = '\\'; *dst++ = '"'; break;
-                        case '\\': *dst++ = '\\'; *dst++ = '\\'; break;
-                        case '\b': *dst++ = '\\'; *dst++ = 'b'; break;
-                        case '\f': *dst++ = '\\'; *dst++ = 'f'; break;
-                        case '\n': *dst++ = '\\'; *dst++ = 'n'; break;
-                        case '\r': *dst++ = '\\'; *dst++ = 'r'; break;
-                        case '\t': *dst++ = '\\'; *dst++ = 't'; break;
+                        case '"':  *dst++ = '\\'; *dst++ = '"';
+                        case '\\': *dst++ = '\\'; *dst++ = '\\';
+                        case '\b': *dst++ = '\\'; *dst++ = 'b';
+                        case '\f': *dst++ = '\\'; *dst++ = 'f';
+                        case '\n': *dst++ = '\\'; *dst++ = 'n';
+                        case '\r': *dst++ = '\\'; *dst++ = 'r';
+                        case '\t': *dst++ = '\\'; *dst++ = 't';
                         default:
                                 if (ch < 0x20) { /* other control characters */
                                         *dst++ = '\\'; *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
@@ -531,7 +527,6 @@ static void jsonCatQuoted(JsonStringBuilder *js, u8 *strVal, i64 len) {
                                 } else {
                                         *dst++ = ch;
                                 }
-                                break;
                 }
         }
         *dst++ = '"';
@@ -558,36 +553,28 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
                 switch (J.type) {
                         case INT:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"%d",J.intVal);
-                                break;
                         case FLOAT:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"%s",jsonFloatToStr(fbuf,J.floatVal));
-                                break;
                         case STRNUM:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"%s",J.strnum);
-                                break;
                         case STRING:
                                 jsonCatQuoted(js,J.str,J.strLen);
-                                break;
                         case ARRAY:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"[");
                                 if (J.array) { jsonToStringInternal(J.array,js); } /* null: empty */
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"]");
-                                break;
                         case OBJECT:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"{");
                                 if (J.object) { jsonToStringInternal(J.object,js); } /* null: empty */
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"}");
-                                break;
                         case BOOL:
                                 if (J.boolean == true) {
                                         js.buf = str.appendFormatLen(js.buf,&js.len,"true");
                                 } else {
                                         js.buf = str.appendFormatLen(js.buf,&js.len,"false");
                                 }
-                                break;
                         case NULL:
                                 js.buf = str.appendFormatLen(js.buf,&js.len,"null");
-                                break;
                         default:
                                 break;
                 }
@@ -631,21 +618,17 @@ static void jsonReleaseList(Value *J) {
                                 if (ptr.strnum) {
                                         mem.free(ptr.strnum);
                                 }
-                                break;
 
                         case STRING:
                                 if (ptr.str) {
                                         mem.free(ptr.str);
                                 }
-                                break;
 
                         case ARRAY:
                                 jsonReleaseList(ptr.array);
-                                break;
 
                         case OBJECT:
                                 jsonReleaseList(ptr.object);
-                                break;
 
                         case FLOAT:
                         case INT:
@@ -800,13 +783,11 @@ static bool jsonParseValue(JsonParser *p) {
                         } else {
                                         jsonParseNumber(p);
                         }
-                        break;
                 }
 
                 case JSON_PARSER_STRING:
                         J.type = STRING;
                         J.str = jsonParseString(p, &J.strLen);
-                        break;
 
                 case JSON_PARSER_NULL:
                         if (jsonParseNull(p) == 1) {
@@ -814,7 +795,6 @@ static bool jsonParseValue(JsonParser *p) {
                         } else if (p.error == OK) {
                                         p.error = INVALID_TYPE;
                         }
-                        break;
 
                 case JSON_PARSER_OBJECT:
                         J.type = OBJECT;
@@ -825,12 +805,10 @@ static bool jsonParseValue(JsonParser *p) {
                                 J.object = jsonParseObject(p);
                         }
                         p.depth--;
-                        break;
 
                 case JSON_PARSER_BOOL:
                         J.type = BOOL;
                         J.boolean = jsonParseBool(p);
-                        break;
 
                 case JSON_PARSER_ARRAY:
                         J.type = ARRAY;
@@ -841,7 +819,6 @@ static bool jsonParseValue(JsonParser *p) {
                                 J.array = jsonParseArray(p);
                         }
                         p.depth--;
-                        break;
         }
 
         return p.error == OK;
@@ -923,13 +900,13 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                 case OK:
                         return str.formatTo(null, "Success");
                 case INVALID_UTF16:
-                        what = "Invalid UTF-16 code in a \\u escape"; break;
+                        what = "Invalid UTF-16 code in a \\u escape";
                 case INVALID_UTF16_SURROGATE:
-                        what = "Invalid UTF-16 surrogate pair in a \\u escape"; break;
+                        what = "Invalid UTF-16 surrogate pair in a \\u escape";
                 case INVALID_HEX:
-                        what = "Expected 4 hex digits after \\u"; break;
+                        what = "Expected 4 hex digits after \\u";
                 case INVALID_STRING_NOT_TERMINATED:
-                        what = "Unterminated string"; break;
+                        what = "Unterminated string";
                 case INVALID_NUMBER:
                 case INVALID_DECIMAL:
                 case INVALID_SIGN:
@@ -955,7 +932,7 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                                                                                         "line %d, column %d", MAX_DEPTH, line, col);
                 case INVALID_BOOL:
                 case INVALID_LITERAL:
-                        what = "Invalid literal, expected true, false or null"; break;
+                        what = "Invalid literal, expected true, false or null";
                 case INVALID_JSON_TYPE_CHAR:
                 case INVALID_TYPE:
                         if (ch == '\0') {
@@ -965,10 +942,10 @@ static u8 *jsonGetStrerrorInternal(i32 error, u8 ch, i64 line, i64 col) {
                                                                                         "was expected at line %d, column %d", c, line, col);
                 case CANNOT_START_PARSE:
                         what = "Expected a JSON value (object, array, string, number, true, "
-                                                    "false or null)"; break;
+                                                    "false or null)";
                 case CANNOT_ADVANCE:
                 case EOF:
-                        what = "Unexpected end of the JSON text"; break;
+                        what = "Unexpected end of the JSON text";
                 default:
                         return null;
         }
@@ -1217,9 +1194,9 @@ pub Value *select(Value *j, u8 *fmt, ...args) {
 
         while (*ptr) {
                 switch (*ptr) {
-                        case '.': kind = JSON_SEL_OBJ; break;
-                        case '[': kind = JSON_SEL_ARRAY; break;
-                        case ':': kind = JSON_SEL_TYPECHECK; break;
+                        case '.': kind = JSON_SEL_OBJ;
+                        case '[': kind = JSON_SEL_ARRAY;
+                        case ':': kind = JSON_SEL_TYPECHECK;
                         default:  return null;
                 }
                 ptr++;
@@ -1268,13 +1245,10 @@ pub Value *select(Value *j, u8 *fmt, ...args) {
                                         if (idx < 0) { return null; } /* overflow */
                                 }
                                 j = jsonArrayAt(j, idx);
-                                break;
                         case JSON_SEL_OBJ:
                                 j = jsonObjectAt(j, path);
-                                break;
                         case JSON_SEL_TYPECHECK:
                                 if (pathLen != 1 || !jsonTypeCheck(j, path[0])) { return null; }
-                                break;
                 }
                 if (!j) {
                         return null;
