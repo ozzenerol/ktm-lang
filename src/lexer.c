@@ -3577,6 +3577,17 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     lexImportOne(l, file, kw, aliases[0], paths[0], firsts[0], lasts[0]);
 }
 
+/* How many columns `import ... last` takes, for an underline. By the
+ * columns: a later module of a list is read again from a copy of the
+ * line (lexImport), so its tokens' pointers aren't in the keyword's
+ * buffer (subtracting them printed megabytes of ^). */
+static s64 lexImportSpan(Lexeme *kw, Lexeme *last) {
+    if (last->line != kw->line || last->col < kw->col) {
+        return kw->len;
+    }
+    return last->col + last->len - kw->col;
+}
+
 /* One module of an `import` line of `file` */
 static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
                          AoStr *path, Lexeme *first, Lexeme *last)
@@ -3594,7 +3605,7 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
         !lexFileInStdModules(l, file)) {
         if (!LEX_PASS_QUIET(file->mod_pass)) {
             lexReportAt(l, kw->line, kw->col,
-                        (last->start + last->len) - kw->start,
+                        lexImportSpan(kw, last),
                         "rt is internal: the runtime is part of every program "
                         "and can't be imported");
         }
@@ -3603,7 +3614,7 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     if (!auto_prelude && !strcmp(path->data, "prelude")) {
         if (!LEX_PASS_QUIET(file->mod_pass)) {
             lexReportAt(l, kw->line, kw->col,
-                        (last->start + last->len) - kw->start,
+                        lexImportSpan(kw, last),
                         "the prelude is always imported: its names need no "
                         "import and no prefix");
         }
