@@ -1,5 +1,5 @@
 diff --git a/src/std/str/strings.ktm b/src/std/str/strings.ktm
-index 58251e7..a1ec863 100644
+index 476d084..49a3fd9 100644
 --- a/src/std/str/strings.ktm
 +++ b/src/std/str/strings.ktm
 @@ -1,5 +1,5 @@
@@ -9,7 +9,7 @@ index 58251e7..a1ec863 100644
  
  const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
  
-@@ -666,7 +666,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+@@ -1042,7 +1042,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
          i64 ch, sp = 0, len, flags, tlen,dec_len;
          u8 *ptr, *strarg, *tmp, *dst, *spec, buf[256];
          u8 **grow;
@@ -17,8 +17,8 @@ index 58251e7..a1ec863 100644
  
          /* Growth (SPutChar's and OutStr's MSize/Free dance) is only legal on a
              * buffer WE MAlloc'd. A caller-provided dst may live on the stack or mid-array,
-@@ -743,20 +742,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
-                                         mem.free(strarg);
+@@ -1121,22 +1120,6 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+                                         break;
                                  }
  
 -                                case 'T': {
@@ -26,6 +26,7 @@ index 58251e7..a1ec863 100644
 -                                        strarg = date.formatTime(cdt);
 -                                        outStr(strarg,grow,&ptr,tlen,flags);
 -                                        mem.free(strarg);
+-                                        break;
 -                                }
 -
 -                                case 'D': {
@@ -33,13 +34,14 @@ index 58251e7..a1ec863 100644
 -                                        strarg = date.formatDate(cdt);
 -                                        outStr(strarg,grow,&ptr,tlen,flags);
 -                                        mem.free(strarg);
+-                                        break;
 -                                }
 -
                                  /* Presently there is only f64, %f/%e/%g as C prints them */
                                  case 'e':
                                  case 'g':
-@@ -804,11 +789,24 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
-                                         outStr(strarg,grow,&ptr,tlen,flags&~PRTF_TRUNCATE,dec_len);
+@@ -1186,11 +1169,24 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt,i64 argc,i64 *argv) {
+                                         break;
                                  }
  
 -                                case 'F': { // a file
@@ -65,6 +67,6 @@ index 58251e7..a1ec863 100644
 +                                        for (tmp = spec; tmp < fmt; ++tmp) {
 +                                                strPutChar(&ptr,*tmp,grow);
 +                                        }
+                                         break;
                                  }
  
-                                 case 'c': {

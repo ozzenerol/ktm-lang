@@ -20,6 +20,8 @@ trap 'rm -f "$STD/_root.ktm"' EXIT
 "$HERE/ktm-convert" --install-dir="$ROOT/build/prefix" --map "$HERE/stdlib-modules.tsv" --names \
     --renames "$HERE/renames.tsv" --renames "$HERE/renames-locals.tsv" --layout \
     --root _root.ktm $(ls */*.ktm | grep -v '^prelude/') 2> "$ERR"
+# NO_FIXES=1 stops here: the converter's output, to remake a patch against
+[ -n "${NO_FIXES:-}" ] && exit 0
 # the hand fixes, in order (std-fixes/NN-what.patch, paths src/std/...)
 for p in "$HERE"/std-fixes/*.patch; do
     [ -e "$p" ] || continue

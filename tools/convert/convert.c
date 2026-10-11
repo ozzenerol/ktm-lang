@@ -784,9 +784,15 @@ static char *migLineIndent(MigFile *f, s64 off) {
     return mprintf("%.*s", (int)(e - ls), f->text + ls);
 }
 
-/* Y8: an arm's last `break;` goes (not when it is the arm's only
- * statement: `case 3: break;` does nothing, an empty arm would join the
- * next one); an arm that falls into the next label gets `fallthrough;` */
+/* --drop-breaks: Y8's removal of the arms' last breaks, for S3 once the
+ * compiler no longer falls through (until then a removed break changes
+ * what the code does; a kept one means the same under both) */
+static int mig_drop_breaks = 0;
+
+/* Y8: an arm's last `break;` goes with --drop-breaks (not when it is the
+ * arm's only statement: `case 3: break;` does nothing, an empty arm would
+ * join the next one); an arm that falls into the next label gets
+ * `fallthrough;` */
 void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, int n) {
     MigFile *f = migFileOf(cc, label ? label->src : NULL);
     if (!f || !prev_end) return;
@@ -797,7 +803,7 @@ void migrateSwitchLabel(Cctrl *cc, Lexeme *label, int kind, Lexeme *prev_end, in
     }
     char *t = f->text;
     int is_end = t[lab] == '}';
-    if (kind == 2 && n > 1) {
+    if (kind == 2 && n > 1 && mig_drop_breaks) {
         s64 semi = pe;
         if (t[semi] == '}') semi = migSkipSpaceBack(t, semi - 1);
         s64 b = migSkipSpaceBack(t, semi - 1);
@@ -3164,6 +3170,7 @@ static void migUsage(void) {
         "  --map TSV   also move stdlib names into modules (stdlib-modules.tsv)\n"
         "  --names     rename to the naming rule (camelCase functions/variables)\n"
         "  --layout    `->` to `.`, braces on the header's line, 4-space indents (last)\n"
+        "  --drop-breaks  Y8 for S3: drop each switch arm's last `break;` (S2 keeps them)\n"
         "  --renames TSV  the stdlib's own renames (renames.tsv, renames-locals.tsv)\n"
         "  --root FILE parse FILE (e.g. a library's all.ktm) and rewrite the\n"
         "              listed files it includes\n");
@@ -3243,6 +3250,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--report")) report = 1;
         else if (!strcmp(argv[i], "--names")) mig_names = 1;
         else if (!strcmp(argv[i], "--layout")) mig_layout = 1;
+        else if (!strcmp(argv[i], "--drop-breaks")) mig_drop_breaks = 1;
         else if (!strcmp(argv[i], "--renames") && i + 1 < argc) {
             if (!migLoadRenames(argv[++i])) {
                 fprintf(stderr, "ktm-convert: can't read %s\n", argv[i]);

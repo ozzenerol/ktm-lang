@@ -24,6 +24,8 @@ for src in "$HERE"/corpus/*.ktm; do
   # `// map` on the first line: converted with the stdlib map too
   MAP=""
   head -1 "$src" | grep -q '^// map' && MAP="--map $HERE/stdlib-modules.tsv"
+  # `// drop-breaks` in the first lines: with S3's --drop-breaks (Y8)
+  head -3 "$src" | grep -q '^// drop-breaks' && MAP="$MAP --drop-breaks"
   if $TO "$CONV" --install-dir="$DIR" $MAP --stdout "$src" > "$TMP/$name.got" 2> "$TMP/$name.err" &&
      cmp -s "$TMP/$name.got" "$HERE/corpus/$name.expected"; then
     ok
