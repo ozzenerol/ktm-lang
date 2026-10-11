@@ -1649,8 +1649,15 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
 Ast *parseVariableInitialiser(Cctrl *cc, Ast *var, s64 terminator_flags) {
     Lexeme *tok = cctrlTokenGet(cc);
     if (tokenPunctIs(tok,'=')) {
-        return parseVariableAssignment(cc,var,terminator_flags,
-                                       tok->line,tok->col);
+        /* as in Go, a local named like an import prefix shadows it only
+         * after its declaration: its initialiser still sees the module
+         * (`u8 *str = str.format(...)`, see cctrlTokenGet) */
+        Ast *outer = cc->decl_in_init;
+        cc->decl_in_init = var;
+        Ast *ast = parseVariableAssignment(cc,var,terminator_flags,
+                                           tok->line,tok->col);
+        cc->decl_in_init = outer;
+        return ast;
     }
     if (var->type->len == -1) {
         cctrlRaiseException(cc, "Missing array initializer: %s",astToString(var));
