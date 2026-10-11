@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -102,7 +102,7 @@ void main()
                 "-lib pointer globals (AOT)");
     proc.shell("rm -rf ./ktm-392-prefix ./ktm-392-work ./ktm-392-use.ktm ./ktm-392-use");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

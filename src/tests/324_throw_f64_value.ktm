@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* throw(42.75) passed the f64 in a float register, so KTM_Throw read
  * garbage from its integer argument register. The value is now
@@ -51,7 +51,7 @@ i32 main() {
     try { throw(vU32); } catch (Error e) { if (e.code == 0xFFFFFFFF) { correct++; } }
     try { throw(p); } catch (Error e) { if ((u8 *)e.code == p) { correct++; } }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

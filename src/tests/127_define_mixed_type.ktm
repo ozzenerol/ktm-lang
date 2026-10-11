@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -63,7 +63,7 @@ i32 main() {
     if (F_FIRST == 1.5 * N && F_LAST == N * 1.5) { correct++; }
     if (F_MIX == 1 + 2.5 && I_DIV == 7 / 2) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

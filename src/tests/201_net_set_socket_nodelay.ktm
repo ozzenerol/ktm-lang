@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, net;
 
@@ -40,7 +40,7 @@ i32 main() {
             net.setReuseAddr(fd) == false &&
             net.setNonBlocking(fd) == false) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

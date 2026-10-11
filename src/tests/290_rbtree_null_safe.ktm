@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map;
 
@@ -94,7 +94,7 @@ i32 main() {
     tests++; if (realTreeUnchanged()) { correct++; }
     else { printf("a real tree misbehaved\n"); }
     tests++; if (emptyTreeIter()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

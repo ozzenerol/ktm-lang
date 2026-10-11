@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 i32 main() {
     printf("Test - Taking the address of a local: ");
@@ -6,6 +6,6 @@ i32 main() {
     i64 *x = &i;
     *x = 69;
 
-    PrintResult(*x == 69, 1);
+    test.printResult(*x == 69, 1);
     return 0;
 }

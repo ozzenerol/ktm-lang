@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -60,7 +60,7 @@ i32 main() {
     if (!str.cmpLen(spr.s.name,"Wil",3)) { ++correct; }
     if (spr.s.age == 41) { ++correct; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     mem.free(c2);
     mem.free(s);
     printf("====\n");

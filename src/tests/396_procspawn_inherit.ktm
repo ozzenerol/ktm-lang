@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, proc, str;
 
@@ -141,7 +141,7 @@ i32 main() {
     Case("only stderr inherited", &errOnly, "", "", "y\n");
     Case("ProcRun: stderr inherited", &runErr, "", "", "e\n");
     Case("our stdin closed: the child starts anyway", &closedStdin, "", "ok\n", "");
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

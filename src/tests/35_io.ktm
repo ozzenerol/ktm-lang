@@ -1,4 +1,4 @@
-#include "./testhelper.ktm"
+import test;
 
 import fs, libc, str;
 
@@ -89,7 +89,7 @@ i32 main() {
     if (testTruncFile()) { correct++; }
     if (testAppendFile()) { correct++; }
     if (testReadOnlyFile()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

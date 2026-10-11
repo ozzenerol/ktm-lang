@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import coro, fs, libc, mem, proc, str;
 
@@ -209,9 +209,9 @@ void rounds() {
 
 bool noLeak() {
     rounds();
-    i64 before = HeapInUse();
+    i64 before = test.heapInUse();
     rounds();
-    i64 grew = HeapInUse() - before;
+    i64 grew = test.heapInUse() - before;
     if (grew) { printf("\n  heap grew by %d bytes\n", grew); }
     return grew == 0;
 }
@@ -348,7 +348,7 @@ i32 main() {
     } else { printf("\n%s\n", out); }
     mem.free(out);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

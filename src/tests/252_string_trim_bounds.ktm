@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -68,7 +68,7 @@ i32 main() {
     if (str.trimStart(null, -1, &len) == null && len == 0 &&
             str.trimEnd(null) == null) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

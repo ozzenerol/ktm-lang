@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os, proc;
 
@@ -47,7 +47,7 @@ void main() {
         correct++;
     }
     proc.shell("rm -rf ./ktm-85-prefix ./ktm-85-work ./ktm-85-use.ktm ./ktm-85-use");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

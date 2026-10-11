@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -166,7 +166,7 @@ i32 main() {
     if (ok.a == 3) { correct++; }
     else { printf("Failed - successful #define after a class\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A class value as an item of a local initialiser list,
  * `L l = {1, p0, 4}` or `P ps[2] = {p0, p0}`, stored the class's
@@ -201,7 +201,7 @@ i32 main() {
         correct++;
     } else { printf("Failed - globals\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

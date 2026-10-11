@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -221,7 +221,7 @@ i32 main() {
     if (testScalarElement()) { correct++; }
     else { printf("Failed - TestScalarElement()\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -34,7 +34,7 @@ i32 main() {
     gEsc[0] = 'A';
     tests++; if (!str.cmp(gEsc, "A\tb")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem;
 
@@ -62,7 +62,7 @@ i32 main() {
     if (zoneFor("ABC+1:30") == -130) { correct++; }
     if (zoneFor("UTC0") == 0) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

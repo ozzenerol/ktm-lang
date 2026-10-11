@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem;
 
@@ -72,7 +72,7 @@ i32 main() {
     date.Date c = mkDate(3, 4);
     if (c.date == 3 && c.time == 4) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

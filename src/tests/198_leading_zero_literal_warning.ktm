@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -125,6 +125,6 @@ void main() {
 }
 ", 1, 1, "rror: leading zero: 0644", null)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
 }

@@ -1,4 +1,9 @@
-pub void PrintResult(i64 correct, i64 total) {
+/* The tests' helpers: `import test;` (found next to the tests).
+ * printResult prints a test's PASSED/FAILED line; heapInUse the bytes the
+ * C heap has in use. */
+module test;
+
+pub void printResult(i64 correct, i64 total) {
     if (correct != total) { printf("\033[0;31mFAILED: %d/%d\033[0;0m\n", correct, total); }
     else { printf("\033[0;32mPASSED: %d/%d\033[0;0m\n", correct, total); }
 }
@@ -17,7 +22,7 @@ struct CHeapZoneStats {
     u64 size_allocated;
 };
 extern "c" void malloc_zone_statistics(void *zone, CHeapZoneStats *stats);
-i64 HeapInUse() {
+pub i64 heapInUse() {
     CHeapZoneStats st;
     malloc_zone_statistics(null, &st);
     return st.size_in_use;
@@ -28,7 +33,7 @@ struct CHeapMallInfo2 {
     u64 usmblks, fsmblks, uordblks, fordblks, keepcost;
 };
 extern "c" CHeapMallInfo2 mallinfo2();
-i64 HeapInUse() {
+pub i64 heapInUse() {
     CHeapMallInfo2 m = mallinfo2();
     return m.uordblks + m.hblkhd;
 }

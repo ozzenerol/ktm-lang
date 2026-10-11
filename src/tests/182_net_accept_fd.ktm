@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, net, str;
 
@@ -76,7 +76,7 @@ i32 main() {
     if (net.listen(0, "not-an-address!", 4) == -1) { correct++; } /* getaddrinfo fails */
 
     for (i = 0; i < 300; i++) { libc.close(fillers[i]); }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fzf;
 
@@ -67,7 +67,7 @@ i32 main() {
     if (textMatchExact(strings)) { correct++; }
     if (textMatchExactCaseInsensative(strings)) { correct++; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

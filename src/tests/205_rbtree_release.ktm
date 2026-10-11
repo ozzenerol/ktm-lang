@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem, set;
 
@@ -129,7 +129,7 @@ i32 main() {
     tests++; if (nullDestructors()) { correct++; }
     tests++; if (emptyTree()) { correct++; }
     tests++; if (intSetStillReleases()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

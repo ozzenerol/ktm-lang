@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -52,7 +52,7 @@ i32 main() {
     if (OR_ZERO == (z || 0) && NOT_F == !h) { correct++; }
     if (NOT_ZERO == !z && AND_ZERO == (h && z)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

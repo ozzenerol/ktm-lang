@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A goto to a label inside a block that follows a return crashed ktm
  * (AOT and JIT): IR lowering dropped every statement after the return
@@ -109,7 +109,7 @@ i32 main() {
     check(gCount == 1, "empty labelled block");
     check(noLabel(3) == 1, "dead block without a label");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

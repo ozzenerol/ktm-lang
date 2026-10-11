@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date;
 
@@ -40,7 +40,7 @@ i32 main() {
         correct++;
             }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

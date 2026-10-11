@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, os, proc, str;
 
@@ -193,7 +193,7 @@ i32 main() {
     os.setErrno(0);
     tests++; if (libc.waitpid(-1, &st, 1) == -1 && os.errno() == libc.ECHILD) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

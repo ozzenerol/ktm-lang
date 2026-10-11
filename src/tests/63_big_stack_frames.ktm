@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os;
 
@@ -88,7 +88,7 @@ void runMain() {
 void main() {
     printf("Test - big stack frames: ");
     runMain();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -85,7 +85,7 @@ i32 main() {
     if (liveCodeReports("#if 0\n0b2\n#elif (1 +\n#endif\nU0 Main() {}\n",
                                             "#elif")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, proc, str;
 
@@ -109,7 +109,7 @@ i32 main()
                 "double free in a thread caught, with its site");
 
     proc.shell("rm -f " MT_PROG " " MT_OUT " " MT_ERR);
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

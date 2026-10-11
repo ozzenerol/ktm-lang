@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fzf, mem, str;
 
@@ -42,7 +42,7 @@ i32 main() {
         correct++;
             } else { printf("FzF with escaped spaces\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

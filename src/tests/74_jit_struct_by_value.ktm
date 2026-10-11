@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Classes passed AND returned by value in the same function. Under -jit on
  * x86_64 the callee's parameter prologue reserved rdi for a hidden return
@@ -150,7 +150,7 @@ i32 main() {
     r = add(add(a, b), neg(c));
     if (r.x == -89 && r.y == -178) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

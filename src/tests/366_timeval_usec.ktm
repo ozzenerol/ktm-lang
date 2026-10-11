@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem;
 
@@ -63,7 +63,7 @@ i32 main() {
     check(set && libc.recv(fd, buf, 4, 0) == -1, "recv times out"); // or blocks forever
     libc.close(fd);
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

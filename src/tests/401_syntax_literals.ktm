@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -72,7 +72,7 @@ i32 main() {
     if (str.len(str.formatTo(null, "%d", true)) == 1) { correct++; }
     else { printf("\n  as an argument\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

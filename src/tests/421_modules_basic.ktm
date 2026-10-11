@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, mem, proc, str;
 
@@ -41,7 +41,7 @@ i32 main() {
     tests++;
     if (output(KTM "-jit " FIXTURE " > " MOD_OUT " 2>&1")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

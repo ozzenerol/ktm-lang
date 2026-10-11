@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Calling a function pointer field through anything other than a plain
  * variable - `arr[i]->f(x)`, `GetS()->f(x)`, `p->inner->f(x)` - was
@@ -110,7 +110,7 @@ i32 main() {
     a * b;
     if (a * b == 12) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

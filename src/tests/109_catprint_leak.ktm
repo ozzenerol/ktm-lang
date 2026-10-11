@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, map, mem, str;
 
@@ -8,7 +8,7 @@ import libc, map, mem, str;
  * ReAlloc (which frees the old block) when it is full. The leak is
  * measured with libc's own count of bytes in use. */
 
-/* HeapInUse() is in testhelper.ktm */
+/* test.heapInUse() is in the test module (src/tests/test) */
 
 u8 *valueStr(void *v) {
     return str.formatTo(null, "v%d", (i64)v);
@@ -22,11 +22,11 @@ i32 main() {
     u8 *s, *t, want[1024];
 
     /* 1: the leaking loop; ~11MB used to stay allocated */
-    before = HeapInUse();
+    before = test.heapInUse();
     s = str.dup("");
     for (i = 0; i < 2000; i++) { s = str.appendFormat(s, "%d", i); }
     mem.free(s);
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     if (delta < 65536) { correct++; }
     else { printf("\n  CatPrint loop leaked %d bytes\n", delta); }
 
@@ -84,17 +84,17 @@ i32 main() {
     }
     mem.free(s);
     mem.free(t);
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 200; i++) {
         s = im.toStr(&valueStr);
         mem.free(s);
     }
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     if (delta < 65536) { correct++; }
     else { printf("\n  IntMapToString leaked %d bytes\n", delta); }
     im.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

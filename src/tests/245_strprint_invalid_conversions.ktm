@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -72,7 +72,7 @@ i32 main() {
     mem.free(err);
     proc.shell("rm -f " FB_SRC " " FB_OUT " " FB_ERR);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

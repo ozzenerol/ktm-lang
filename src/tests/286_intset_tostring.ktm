@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, set, str;
 
@@ -61,7 +61,7 @@ i32 main() {
     mem.free(str);
     s.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

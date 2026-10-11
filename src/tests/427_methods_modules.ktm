@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -112,7 +112,7 @@ i32 main() {
     if (output(KTM "-jit " M_DIR "/main.ktm > " M_OUT " 2>&1", gWant)) { correct++; }
     proc.shell("rm -rf " M_DIR);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

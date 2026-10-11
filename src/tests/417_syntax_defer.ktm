@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import coro, fs, libc, mem, proc, str;
 
@@ -376,7 +376,7 @@ i32 main() {
         correct++;
 }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

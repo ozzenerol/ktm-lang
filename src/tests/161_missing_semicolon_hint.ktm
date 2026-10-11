@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -82,7 +82,7 @@ i32 main() {
     if (failsWith("void main()\n{\n  ) x;\n}\n", null, SH_HINT)) { correct++; }
 
     cleanupHintTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -47,7 +47,7 @@ i32 main() {
     i64 correct = 0, tests = 2;
     if (twoNodeList()) { correct++; }
     if (siblingChildren()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

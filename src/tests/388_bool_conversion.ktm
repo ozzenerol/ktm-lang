@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, json;
 
@@ -164,7 +164,7 @@ i32 main() {
     returns(p);
     casts(p);
     library();
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

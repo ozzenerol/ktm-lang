@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem, str;
 
@@ -205,7 +205,7 @@ i32 main() {
     tests++;
     if (gValueFrees == 600) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

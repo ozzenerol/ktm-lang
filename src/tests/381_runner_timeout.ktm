@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 #include "run_shared.ktm"
 
 import fs, libc, mem, proc, str, vec;
@@ -92,7 +92,7 @@ i32 main() {
     names.release(&mem.free);
     libc.unlink("__381_pid");
     libc.unlink("__381_out");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

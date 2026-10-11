@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* By-value struct/class assignment and copy-initialisation: `dst = src` and
  * `T d = src;` between two values of the same class copy the bytes (memcpy),
@@ -79,7 +79,7 @@ i32 main() {
     if (derefCopy())       { correct++; }
     if (callAndChained())  { correct++; }
     if (independentCopy()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, thread;
 
@@ -106,7 +106,7 @@ i32 main() {
 
     libc.pthread_mutex_destroy(&gLk);
     alarm(0);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

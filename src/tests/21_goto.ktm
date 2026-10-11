@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 bool testGoto() {
     for (i64 i = 0; i < 9; ++i) {
@@ -30,7 +30,7 @@ i32 main() {
     printf("Testing GOTO: ");
     if (testGoto()) { ++correct; }
     if (testGoto2()) { ++correct; }
-    PrintResult(correct,testCases);
+    test.printResult(correct,testCases);
     printf("=====\n");
     return 0;
 }

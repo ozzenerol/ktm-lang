@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import sql;
 
@@ -28,7 +28,7 @@ i32 main() {
 
     tests++; if (ctx) { correct++; }
     if (!ctx) {
-        PrintResult(correct, tests);
+        test.printResult(correct, tests);
         printf("====\n");
         return 0;
     }
@@ -66,9 +66,9 @@ i32 main() {
      * many runs, and an allowance of 128 KB. */
     if (ps) {
         for (i = 0; i < 20; i++) { runPrepared(ps, 1); }
-        before = HeapInUse();
+        before = test.heapInUse();
         for (i = 0; i < 20000; i++) { runPrepared(ps, 1); }
-        delta = HeapInUse() - before;
+        delta = test.heapInUse() - before;
         tests++; if (delta < 128 * 1024) { correct++; } else { printf("leaked %d bytes\n", delta); }
     }
     sql.finalize(ps);
@@ -88,7 +88,7 @@ i32 main() {
     }
 
     sql.close(ctx);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

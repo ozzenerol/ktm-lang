@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -41,7 +41,7 @@ i32 main() {
 
     if (arrayJuggling()) { correct++; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

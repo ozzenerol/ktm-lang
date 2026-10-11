@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -152,7 +152,7 @@ i32 main() {
     User **pp = &p;
     tests++; if ((*pp).age == 53 && pp[0].age == 53) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

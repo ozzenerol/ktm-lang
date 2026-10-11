@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -122,7 +122,7 @@ i32 main() {
     if (mixEq(&sM[0], 1, 1.0, "a", 2.0, 3, 4)) { correct++; }
     if (mixEq(&sM[1], 5, 6.0, "b", 7.0, 8, 9)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

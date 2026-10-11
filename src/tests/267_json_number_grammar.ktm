@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -97,7 +97,7 @@ i32 main() {
     if (json.ok(j) && j.type == json.INT && j.intVal == 123) { correct++; }
     json.release(j);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

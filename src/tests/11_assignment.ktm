@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 i64 identity(i64 i) {
     return i;
@@ -17,7 +17,7 @@ void assign() {
     if (i == 69) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void addAssign() {
@@ -34,7 +34,7 @@ void addAssign() {
     if (i == 99) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void subAssign() {
@@ -51,7 +51,7 @@ void subAssign() {
     if (i == -20) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void mulAssign() {
@@ -68,7 +68,7 @@ void mulAssign() {
     if (i == 200) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void divAssign() {
@@ -86,7 +86,7 @@ void divAssign() {
         correct++;
     }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void modAssign() {
@@ -103,7 +103,7 @@ void modAssign() {
     if (i == 1) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void orAssign() {
@@ -120,7 +120,7 @@ void orAssign() {
     if (i == 13) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void andAssign() {
@@ -138,7 +138,7 @@ void andAssign() {
         correct++;
     }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void xorAssign()
@@ -156,7 +156,7 @@ void xorAssign()
     if (i == 8) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void shrAssign() {
@@ -173,7 +173,7 @@ void shrAssign() {
     if (i == 256) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void shlAssign() {
@@ -190,7 +190,7 @@ void shlAssign() {
     if (i == 2048) {
         correct++;
     }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 i32 main() {

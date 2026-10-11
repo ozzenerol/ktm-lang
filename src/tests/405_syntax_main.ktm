@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, proc, str;
 
@@ -56,7 +56,7 @@ i32 main() {
     if (err && libc.strstr(err, "both `main` and `Main` are defined")) { correct++; }
     else { printf("\n  main and Main: [%s]\n", err); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

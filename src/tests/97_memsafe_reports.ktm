@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -192,7 +192,7 @@ void main()
 } else { printf("Failed - leak count over thousands\n"); }
 
     cleanupMemsafeTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

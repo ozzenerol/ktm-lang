@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -173,7 +173,7 @@ i64 fallsOff(i64 x)
 void main() { fallsOff(1); }
 ", true, GOTO_FALL_FILE ":2:5")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

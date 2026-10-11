@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* `inline` on an ordinary ktm function definition used to turn every
  * call into a statement block that the IR could not lower ("Expr
@@ -52,7 +52,7 @@ i32 main() {
     if (proto(10) == 9) { correct++; }
     if (twice(proto(fact(3))) == 10) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

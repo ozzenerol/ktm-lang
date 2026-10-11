@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* f32 arithmetic is only exact for values representable in single
  * precision (sums of powers of two within the 24-bit mantissa), so
@@ -200,7 +200,7 @@ i32 main() {
     if (f32Conversions()) { correct++; }
     if (f32Precision()) { correct++; }
     if (f32StructInit()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

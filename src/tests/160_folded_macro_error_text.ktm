@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -84,7 +84,7 @@ i32 main() {
     if (!str.cmp(V_S, "abcd")) { correct++; }
 
     cleanupFoldedTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

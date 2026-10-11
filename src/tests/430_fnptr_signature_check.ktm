@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -173,7 +173,7 @@ void f()
     tests++; if (o.op(3) == 4) { correct++; }
     tests++; if (back(4) == 5) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, sql, str;
 
@@ -110,7 +110,7 @@ i32 main() {
     tests++; if (ctx && preparedText(ctx)) { correct++; }
 
     if (ctx) { sql.close(ctx); }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

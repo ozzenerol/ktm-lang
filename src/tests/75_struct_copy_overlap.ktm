@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A <=16-byte class returned by value comes back in registers; the callee
  * copies the returned value into a struct-sized return slot that the
@@ -54,7 +54,7 @@ i32 main() {
     if (returnLocal())        { correct++; }
     if (returnFromBranches()) { correct++; }
     if (returnIntoExisting()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

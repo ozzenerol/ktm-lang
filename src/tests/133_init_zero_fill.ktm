@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A brace initialiser with fewer items than the object has elements or
  * fields must zero the rest, as in C. A global `P gp = {1};` only
@@ -139,7 +139,7 @@ i32 main() {
     if (dirty() != 0) { correct++; }
     correct += locals();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

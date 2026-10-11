@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, str;
 
@@ -121,7 +121,7 @@ i32 main() {
     tests++; if (!s && len == 0) { correct++; } else { printf("missing file read "); }
 
     cleanup();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

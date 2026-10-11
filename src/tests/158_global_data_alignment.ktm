@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Initialised globals were laid out back to back in .data with no
  * alignment directive, so an i64 / f64 / class / pointer global after a
@@ -97,7 +97,7 @@ i32 main() {
     if (pad0[2] == 3 && pad1[0] == 1 && pad9[0] == 1) { correct++; }
     if (gwides[0].a == 1 && gnarrow.a == 3 && ghalf.a == 5) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

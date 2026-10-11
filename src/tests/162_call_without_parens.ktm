@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A function name without `(` is a call with no arguments, wherever it
  * appears in an expression. Only `Function;`, `Function,` and `Function)`
@@ -52,7 +52,7 @@ i32 main() {
 
     tests++; if (gCalls == 14) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

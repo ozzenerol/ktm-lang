@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, mem, proc, str;
 
@@ -90,7 +90,7 @@ i32 main() {
                          }
 
     proc.shell("rm -rf " TREE " " MOVED " " OUT " " BIN);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

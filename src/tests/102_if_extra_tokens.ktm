@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -194,7 +194,7 @@ i32 main() {
     if (testValidConditionsInline()) { correct++; }
     else { printf("Failed - TestValidConditionsInline()\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

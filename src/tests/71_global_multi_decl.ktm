@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Several declarators in one global declaration - `i64 a = 1, b = 2;`
  * at file scope - failed with "unexpected character `,`" and left the
@@ -53,7 +53,7 @@ i32 main() {
     if (gAu1 + gAu2 == 13) { correct++; }
     if (gTop == 31) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

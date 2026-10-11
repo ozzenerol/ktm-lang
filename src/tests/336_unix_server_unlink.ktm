@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net, str;
 
@@ -108,7 +108,7 @@ i32 main() {
     check(libc.rmdir(dir) == 0, "temp dir cleaned");
 
     alarm(0);
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

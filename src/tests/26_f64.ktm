@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 bool floatAddition() {
     i64 tests = 6, correct = 0;
@@ -142,7 +142,7 @@ i32 main() {
     if (floatMultiplication()) { correct++; }
     if (floatOperators()) { correct++; }
     if (floatReturnConversions()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

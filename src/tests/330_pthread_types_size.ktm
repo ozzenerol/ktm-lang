@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc;
 
@@ -97,7 +97,7 @@ i32 main() {
     libc.pthread_cond_destroy(&c.v);
     pthread_condattr_destroy(&ca.v);
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

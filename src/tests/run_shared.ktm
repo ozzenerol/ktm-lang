@@ -43,7 +43,6 @@ bool shouldExclude(u8 *filename, i64 namelen) {
         "run.ktm",
         "run_shared.ktm",
         "run_jit.ktm",
-        "testhelper.ktm",
         "tests.sh",
         "Makefile",
         "a.out",

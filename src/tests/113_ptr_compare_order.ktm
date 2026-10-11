@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -122,7 +122,7 @@ i32 main() {
     /* pointer - int still compiles */
     if (q2 - 2 == q) { correct++; } else { printf("Failed - q2 - 2\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

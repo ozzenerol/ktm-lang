@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -142,7 +142,7 @@ i32 main() {
     /* `*&x` and `&*p` still cancel. */
     if (*&a == 50 && &*p == p) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

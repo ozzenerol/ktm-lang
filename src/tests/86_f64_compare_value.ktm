@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -111,7 +111,7 @@ i32 main() {
     str.formatTo(buf, "%d%d%d", b == 2.0, b < 1.0, nan != nan);
     expect(str.cmp(buf, "101"), 0);
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

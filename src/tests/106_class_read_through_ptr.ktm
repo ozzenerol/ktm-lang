@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date;
 
@@ -103,7 +103,7 @@ i32 main() {
     i32 i32s[3] = {-1, -2, -3}, *i32p = i32s;
     if (i32p[2] == -3 && *i32p == -1) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

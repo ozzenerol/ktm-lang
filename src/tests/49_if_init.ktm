@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* C++17-style `if` with an init-statement and/or a declaration used
  * directly as the condition: `if (init; cond)`. The declarations are
@@ -39,7 +39,7 @@ i32 main() {
     if (a == 99) { correct++; }
 
     printf("Test - if with initialiser (`if (init; cond)`):\n");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

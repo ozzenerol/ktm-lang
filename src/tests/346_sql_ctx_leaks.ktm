@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import sql;
 
@@ -32,9 +32,9 @@ i32 main() {
     /* a failed open frees the handle */
     tests++; if (sql.open(BAD_DB_PATH) == null) { correct++; }
     for (i = 0; i < 20; i++) { sql.open(BAD_DB_PATH); }
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 300; i++) { sql.open(BAD_DB_PATH); }
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     tests++; if (delta < 16384) { correct++; } else { printf("failed open leaked %d bytes\n", delta); }
 
     /* releasing a context with a live statement still closes it. A kept
@@ -45,13 +45,13 @@ i32 main() {
      * to another core during the loop (16 cores: up to ~2.1 MB). So allow
      * under 8 KB per open. */
     for (i = 0; i < 300; i++) {
-        if (i == 20) { before = HeapInUse(); }
+        if (i == 20) { before = test.heapInUse(); }
         ctx = sql.open(":memory:");
         ps = sql.prepare(ctx, "SELECT 1;");
         sql.close(ctx);
         sql.finalize(ps);
     }
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     tests++; if (delta < 280 * 8192) { correct++; } else { printf("busy close leaked %d bytes\n", delta); }
     sql.close(null);
 
@@ -79,7 +79,7 @@ i32 main() {
         sql.close(ctx);
     }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

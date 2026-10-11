@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -85,7 +85,7 @@ void main() { printf(\"%d\\n\", fp(4)); }
                 "library function pointer (AOT)");
     proc.shell("rm -rf ./ktm-393-prefix ./ktm-393-work ./ktm-393-use.ktm ./ktm-393-use");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

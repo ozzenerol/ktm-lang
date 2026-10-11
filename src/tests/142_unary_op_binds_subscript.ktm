@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A prefix operator followed by `name[` took the whole rest of the
  * expression as its operand: `-a[0] == -6` parsed as `-(a[0] == -6)` and
@@ -85,7 +85,7 @@ i32 main() {
     /* Stacked prefix operators. */
     if (- -a[0] == 6 && -~a[0] == 7 && !!a[0] + 1 == 2) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

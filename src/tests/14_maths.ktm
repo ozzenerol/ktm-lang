@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os;
 
@@ -54,7 +54,7 @@ void mulTests() {
         correct += testRunner(-3, -4, MATHS_MUL, 12);
         correct += testRunner(5, 0, MATHS_MUL, 0);
         correct += testRunner(0, -5, MATHS_MUL, 0);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void modTests() {
@@ -66,7 +66,7 @@ void modTests() {
         correct += testRunner(-13, 5, MATHS_MOD, -3);
         correct += testRunner(14, -3, MATHS_MOD, 2);
         correct += testRunner(-15, -4, MATHS_MOD, -3);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void subTests() {
@@ -80,7 +80,7 @@ void subTests() {
         correct += testRunner(-8,-8,MATHS_SUB,0);
         correct += testRunner(-8,24,MATHS_SUB,-32);
         correct += testRunner(16,24,MATHS_SUB,-8);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void addTests() {
@@ -92,7 +92,7 @@ void addTests() {
         correct += testRunner(-5, -5, MATHS_ADD, -10);
         correct += testRunner(0, 10, MATHS_ADD, 10);
         correct += testRunner(20, 0, MATHS_ADD, 20);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void divTests() {
@@ -102,7 +102,7 @@ void divTests() {
         correct += testRunner(20, 5, MATHS_DIV, 4);
         correct += testRunner(-15, 3, MATHS_DIV, -5);
         correct += testRunner(-24, -4, MATHS_DIV, 6);
-        PrintResult(correct,total);
+        test.printResult(correct,total);
 }
 
 void shlTests() {
@@ -112,7 +112,7 @@ void shlTests() {
         correct += testRunner(1, 2, MATHS_SHL, 4); // 1 << 2
         correct += testRunner(3, 3, MATHS_SHL, 24); // 3 << 3
         correct += testRunner(-2, 1, MATHS_SHL, -4); // -2 << 1
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void shrTests() {
@@ -122,7 +122,7 @@ void shrTests() {
         correct += testRunner(4, 1, MATHS_SHR, 2); // 4 >> 1
         correct += testRunner(16, 3, MATHS_SHR, 2); // 16 >> 3
         correct += testRunner(-8, 2, MATHS_SHR, -2); // -8 >> 2
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void xorTests() {
@@ -132,7 +132,7 @@ void xorTests() {
         correct += testRunner(5, 3, MATHS_XMATHS_OR, 6);
         correct += testRunner(6, 2, MATHS_XMATHS_OR, 4);
         correct += testRunner(-1, 1, MATHS_XMATHS_OR, -2);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void orTests() {
@@ -142,7 +142,7 @@ void orTests() {
         correct += testRunner(5, 3, MATHS_OR, 7);
         correct += testRunner(4, 2, MATHS_OR, 6);
         correct += testRunner(-1, 1, MATHS_OR, -1);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void andTests() {
@@ -152,7 +152,7 @@ void andTests() {
         correct += testRunner(5, 3, MATHS_AND, 1);
         correct += testRunner(6, 4, MATHS_AND, 4);
         correct += testRunner(-1, 1, MATHS_AND, 1);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 void notTests() {
@@ -162,7 +162,7 @@ void notTests() {
         correct += testRunner(5, 0, MATHS_NOT, -6); // MATHS_NOT operation usually only takes one operand
         correct += testRunner(-1, 0, MATHS_NOT, 0);
         correct += testRunner(0, 0, MATHS_NOT, -1);
-        PrintResult(correct, total);
+        test.printResult(correct, total);
 }
 
 i32 main() {

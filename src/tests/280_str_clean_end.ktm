@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -54,7 +54,7 @@ i32 main() {
     i64 len = str.trimEndChars(buffer, "\r\n");
     if (len == 4 && !str.cmp(buffer, "test")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

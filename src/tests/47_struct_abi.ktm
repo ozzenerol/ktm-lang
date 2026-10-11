@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Structs passed and returned BY VALUE, following the platform C ABI.
  * Exercises both sides (ktm callee + ktm caller): small integer
@@ -77,7 +77,7 @@ i32 main() {
     if (hfaArgs())       { correct++; }
     if (mixedArgs())     { correct++; }
     if (structReturns()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

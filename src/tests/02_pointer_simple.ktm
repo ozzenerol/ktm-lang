@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -19,7 +19,7 @@ i32 main() {
     Example *e = mem.alloc(sizeof(Example));
     i64 *p = &e.x;
     assign(p);
-    PrintResult(*p == 9, 1);
+    test.printResult(*p == 9, 1);
     mem.free(e);
     printf("====\n");
     return 0;

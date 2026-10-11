@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -111,7 +111,7 @@ i32 main() {
     if (res == 33) { correct++; }
 
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("=====\n");
     return 0;
 }

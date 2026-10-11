@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net;
 
@@ -107,7 +107,7 @@ i32 main() {
         closeIfOpen(s);
     }
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

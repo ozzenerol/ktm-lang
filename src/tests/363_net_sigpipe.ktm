@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, net, os;
 
@@ -77,7 +77,7 @@ i32 main() {
     tcpClosedPeer();
     unixClosedPeer();
     ignoreSigpipe();
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

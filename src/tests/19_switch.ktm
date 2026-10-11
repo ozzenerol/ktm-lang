@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 bool testBreakInLoopCrazy() {
     i64 i,j,k;
@@ -146,6 +146,6 @@ i32 main(i32 argc, u8 **argv) {
     if (testOutOfRange())       { correct++; }
     if (testRangeWithoutSpaces()) { correct++; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     return 0;
 }

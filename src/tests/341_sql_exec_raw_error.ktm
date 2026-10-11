@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, sql;
 
@@ -21,7 +21,7 @@ i32 main() {
 
     tests++; if (ctx) { correct++; }
     if (!ctx) {
-        PrintResult(correct, tests);
+        test.printResult(correct, tests);
         printf("====\n");
         return 0;
     }
@@ -34,13 +34,13 @@ i32 main() {
 
     /* The message is copied and sqlite's own copy freed. */
     for (i = 0; i < 50; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;")); }
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 2000; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;")); }
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     tests++; if (delta < 4096) { correct++; } else { printf("leaked %d bytes\n", delta); }
 
     sql.close(ctx);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

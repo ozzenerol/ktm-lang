@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A return value must be converted to the function's return type like an
  * assignment is: `f64 Conv(i64 u) { return u; }` returned the integer's
@@ -58,7 +58,7 @@ i32 main() {
     if (conv(Trunc(conv2(2))) == 4.0) { correct++; }
     if (conv(conv2(1)) == 2.0 && Trunc(conv(Trunc(lit()))) == 3) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

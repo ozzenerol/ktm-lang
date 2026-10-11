@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -21,7 +21,7 @@ void pointerAddressing() {
         correct++;
     }
     mem.free(ptr);
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 i32 main() {

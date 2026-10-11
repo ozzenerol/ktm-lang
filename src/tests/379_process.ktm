@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net, os, proc, str;
 
@@ -312,7 +312,7 @@ i32 main() {
     if (threads()) { correct++; }
     else { printf("\n  spawning from 4 threads\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

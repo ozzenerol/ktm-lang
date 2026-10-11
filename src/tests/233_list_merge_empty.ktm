@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import list;
 
@@ -95,7 +95,7 @@ i32 main() {
             list.List.isEmpty(null) && l.count() == 2) { correct++; }
     l.release(null);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, libc, mem, net, os, str;
 
@@ -190,7 +190,7 @@ i32 main() {
 
     dns();
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

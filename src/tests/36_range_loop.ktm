@@ -1,4 +1,4 @@
-#include "./testhelper.ktm"
+import test;
 
 import mem, vec;
 
@@ -197,7 +197,7 @@ i32 main(void) {
     if (testPtrVecLoop()) { correct++; }
     if (testArrayLoop()) { correct++; }
     if (testNested()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

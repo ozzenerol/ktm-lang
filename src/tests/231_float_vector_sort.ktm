@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import vec;
 
@@ -81,7 +81,7 @@ i32 main() {
     }
     tests++; if (ok) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

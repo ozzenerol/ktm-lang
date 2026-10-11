@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Assigning an integer constant to a narrower variable stored the
  * truncated value, but the assignment expression itself evaluated to the
@@ -86,7 +86,7 @@ i32 main() {
     f64 f;
     if ((f = 3) == 3.0) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

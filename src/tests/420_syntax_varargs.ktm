@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -197,7 +197,7 @@ i32 main() {
     if (fails("struct P { i64 a; };\ni64 S(P ...n) { return 0; }\n",
                         "the elements of `...n` must be numbers or pointers")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

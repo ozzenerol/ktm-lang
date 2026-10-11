@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fzf, libc, mem, str;
 
@@ -52,7 +52,7 @@ i32 main() {
     tests++; if (check("abc", "!^ab", 0, true, "null")) { correct++; }
 
     if (correct != tests) { printf("\n"); }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

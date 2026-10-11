@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, vec;
 
@@ -90,7 +90,7 @@ i32 main() {
     vec.BitVec.unset(null, 1);
     vec.BitVec.clear(null);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

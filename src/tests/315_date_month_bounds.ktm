@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem;
 
@@ -51,7 +51,7 @@ i32 main() {
     if (is(mkDate(2024, 12, 31), 2024, 12, 31) &&
             is(mkDate(2024, 11, 30), 2024, 11, 30)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -77,7 +77,7 @@ i32 main() {
     if (outputHas("void main()\n{\n  f64 f = 1.0;\n  f = f + \"a\\tb\";\n}\n",
                                 "`f64 + u8[4]` is invalid")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

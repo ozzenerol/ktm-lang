@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -111,7 +111,7 @@ i32 main() {
     s = "it\'s `q` \`r\`";
     if (!str.cmp(s, "it's `q` `r`") && sizeof("it\'s") == 5) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

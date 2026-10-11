@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -141,7 +141,7 @@ void main()
             ptrToBool(p) == 1 && ptrToBool(null) == 0) { correct++; }
     else { printf("values %d %d %d ", t, n, f); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

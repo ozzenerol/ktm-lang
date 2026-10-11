@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -78,7 +78,7 @@ i32 main() {
     tests++; if (cModule("i64 g;", ONLY "a variable")) { correct++; }
     tests++; if (cModule("pub struct S { i64 x; };\npub void S.f() { }", ONLY "a function with a body")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

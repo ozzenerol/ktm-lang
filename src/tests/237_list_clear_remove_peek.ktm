@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import list;
 
@@ -103,7 +103,7 @@ i32 main() {
     one.release(null);
     tests++; if (ok) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Global symbols whose name begins with an uppercase `L` (e.g. `LIGHTGRAY`)
  * must still assemble + link. On macOS/Mach-O the assembler treats any symbol
@@ -51,7 +51,7 @@ i32 main() {
     if (arrayGlobal())  { correct++; }
     if (scalarGlobal()) { correct++; }
     if (stringGlobal()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, mem, proc, str;
 
@@ -132,7 +132,7 @@ i32 main() {
     else { printf("Failed - compile with a missing TMPDIR succeeded\n"); }
 
     fs.removeDir(CC_DIR, fs.REMOVE_RECURSE);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

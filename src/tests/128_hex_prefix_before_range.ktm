@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -96,7 +96,7 @@ i32 main() {
     /* Ranges stop at the `...`, not at a float: `1.5` still lexes. */
     if (1.5 + 0x4 == 5.5) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

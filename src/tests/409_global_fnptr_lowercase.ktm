@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -57,7 +57,7 @@ i32 main() {
     if (gCalls == 3) { correct++; }
     else { printf("\n  top-level call: %d\n", gCalls); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

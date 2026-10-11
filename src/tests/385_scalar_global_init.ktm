@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -128,7 +128,7 @@ void main() {
                 "-lib globals (AOT)");
     proc.shell("rm -rf ./ktm-385-prefix ./ktm-385-work ./ktm-385-use.ktm ./ktm-385-use");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

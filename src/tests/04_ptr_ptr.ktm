@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -13,7 +13,7 @@ i32 main() {
     p.y = 420; // assign 420
     Point **ptr = &p; // Take a pointer to pointer p
     Point *x = *ptr;  // Dereference to get the pointer to p
-    PrintResult(x.y == 420, 1); // x should be the original value we set
+    test.printResult(x.y == 420, 1); // x should be the original value we set
     printf("=====\n");
     return 0;
 }

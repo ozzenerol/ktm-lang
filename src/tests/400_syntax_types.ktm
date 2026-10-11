@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, proc, str;
 
@@ -101,7 +101,7 @@ i32 main() {
     if (out && libc.strstr(out, "of type 'i64' expected 'void'")) { correct++; }
     else { printf("\n  diagnostic names: [%s]\n", out); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

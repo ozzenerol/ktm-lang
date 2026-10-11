@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fzf, libc;
 
@@ -86,19 +86,19 @@ i32 main() {
 
     /* many calls leave the heap where it was, macOS included */
     for (i = 0; i < 50; i++) { checkAll(); }
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 2000; i++) { checkAll(); }
-    grew = HeapInUse() - before;
+    grew = test.heapInUse() - before;
     tests++; if (grew < 4096) { correct++; } else { printf("heap grew %d bytes ", grew); }
 
     /* an empty pattern returns null and leaks nothing */
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 2000; i++) {
         pos = fzf.match(text, "");
         if (pos) { fzf.release(pos); grew = -1; }
     }
     tests++;
-    if (grew != -1 && HeapInUse() - before < 4096) { correct++; }
+    if (grew != -1 && test.heapInUse() - before < 4096) { correct++; }
     else { printf("empty pattern leaked "); }
 
     /* the same answers from four threads at once */
@@ -113,7 +113,7 @@ i32 main() {
     if (bad[0] + bad[1] + bad[2] + bad[3] == 0) { correct++; }
     else { printf("threads got wrong results "); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

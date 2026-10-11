@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, str;
 
@@ -96,7 +96,7 @@ i32 main() {
     bad("nulx");
     bad("x");
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

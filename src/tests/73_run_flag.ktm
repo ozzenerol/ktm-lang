@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -86,7 +86,7 @@ void main(i32 argc, u8 **argv)
     else { printf("Failed - -run top-level program\n"); }
 
     cleanupRunTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

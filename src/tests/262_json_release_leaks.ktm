@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json;
 
@@ -7,9 +7,9 @@ import json;
  * freed only the first item of the list built so far, leaking the rest
  * with their keys and strings. Checked by the heap staying flat. */
 
-/* Bytes in use on the heap (HeapInUse() is in testhelper.ktm) */
+/* Bytes in use on the heap (test.heapInUse() is in the test module (src/tests/test)) */
 i64 inUse() {
-    return HeapInUse();
+    return test.heapInUse();
 }
 
 /* Heap bytes left behind by parsing and releasing `text` 2000 times */
@@ -64,7 +64,7 @@ i32 main() {
     json.release(j);
     json.release(k);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

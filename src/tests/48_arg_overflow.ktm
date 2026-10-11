@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Argument register overflow: when a call has more arguments than there
  * are parameter registers, the excess spills onto the stack (caller) and
@@ -50,7 +50,7 @@ i32 main() {
     if (bigOv(1,2,3,4,5,6,7,8,bg) == 824) { correct++; }
 
     printf("Test - argument register overflow (stack spill):\n");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

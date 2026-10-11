@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -42,7 +42,7 @@ i32 main() {
     SPutChar(&dst, 'i', null);
     tests++; if (!str.cmp(fixed, "hi")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

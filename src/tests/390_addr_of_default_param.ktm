@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -68,7 +68,7 @@ i32 main() {
             two(5, 6) == 105206, "two defaulted params");
     check(gPt.x == 3 && gPt.y == 4, "the default object is untouched");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

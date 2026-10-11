@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Struct layout + the `alignof` operator. Sizes/alignments are checked
  * against the C ABI (a struct's alignment is its widest member's, and
@@ -87,7 +87,7 @@ i32 main() {
     if (structAlign())         { correct++; }
     if (alignofExpr())         { correct++; }
     if (sizeMultipleOfAlign()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

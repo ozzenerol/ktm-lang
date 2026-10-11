@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import thread;
 
@@ -35,7 +35,7 @@ i32 main() {
     tests++;
     if (ran == 1) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

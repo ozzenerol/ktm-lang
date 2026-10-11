@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 enum Err { help, aaa, foo, in, inn, out, aAA, bBB, big };
 
@@ -115,7 +115,7 @@ i32 main() {
     }
     if (marker8 == (Err.big ^ 0xFF)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("=====\n");
     return 0;
 }

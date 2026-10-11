@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -115,7 +115,7 @@ i32 main() {
     setenv("TMPDIR", tmpdir, 1);
     mem.free(tmpdir);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

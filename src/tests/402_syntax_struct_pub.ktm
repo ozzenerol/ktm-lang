@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import proc, str;
 
@@ -99,7 +99,7 @@ i32 main() {
     if (ok == 3) { correct++; }
     else { printf("\n  pub in a -lib library (%d/3)\n", ok); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

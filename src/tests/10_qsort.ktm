@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 pub void quickSort(i64 *arr, i64 hi, i64 lo=0) {
     if (lo < hi) {
@@ -32,7 +32,7 @@ i32 runMain() {
         } 
         correct++;
     }
-    PrintResult(correct == 10, 1);
+    test.printResult(correct == 10, 1);
     printf("====\n");
     return 0;
 }

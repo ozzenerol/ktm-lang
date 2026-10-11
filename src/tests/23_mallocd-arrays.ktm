@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -33,7 +33,7 @@ void intArray() {
     if (arr[9] == 10) { correct++; }
 
     mem.free(arr);
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 void pointerArray() {
@@ -47,7 +47,7 @@ void pointerArray() {
     if (arr[8].y == 420) { correct++; }
 
     mem.free(arr);
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
 }
 
 i32 main() {

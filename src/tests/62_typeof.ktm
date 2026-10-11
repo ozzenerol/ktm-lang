@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os, str;
 
@@ -32,7 +32,7 @@ void runMain() {
 void main() {
     printf("Test - typeof: ");
     runMain();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

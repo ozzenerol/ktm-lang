@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Float -> integer conversions across every integer width and both
  * signednesses, for f32 and f64. Truncation is toward zero (C semantics):
@@ -138,7 +138,7 @@ i32 main() {
     if (fnCallConversions()) { correct++; }
     if (varArgCoercion())   { correct++; }
     printf("Test - float<->int conversions (all widths, signed + unsigned):\n");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

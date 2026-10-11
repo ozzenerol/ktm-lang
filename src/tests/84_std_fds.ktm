@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, os, proc, str;
 
@@ -78,7 +78,7 @@ i32 main()
     else { printf("Failed - stdout and stderr through pipes\n"); }
 
     cleanupFdTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

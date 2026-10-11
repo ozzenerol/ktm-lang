@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date;
 
@@ -97,7 +97,7 @@ i32 main() {
     if (v[0] == 0x10A && v[1] == 32 && v[2] == 40 && v[3] == 47) { correct++; }
     if (b[0] == 1 && b[3] == 4 && w[3] == -4 && f[3] == 3.5) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

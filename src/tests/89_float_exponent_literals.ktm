@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, json, libc, mem, proc, str;
 
@@ -147,7 +147,7 @@ i32 main() {
     if (testMissingExponentDigits()) { correct++; }
     else { printf("Failed - TestMissingExponentDigits()\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

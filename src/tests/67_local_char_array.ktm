@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import proc, str;
 
@@ -101,7 +101,7 @@ i32 main() {
     }
     proc.shell("rm -f ./ktm-66-small.ktm");
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

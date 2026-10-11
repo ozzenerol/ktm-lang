@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -56,7 +56,7 @@ i32 main() {
     i64 correct = 0, tests = 2;
     if (variableAutos()) { correct++; }
     if (functionCalls()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

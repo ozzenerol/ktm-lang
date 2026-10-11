@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 #define DIR_ERR_FILE "__115_directive_error.ktm"
 #define DIR_ERR_OUT  "__115_directive_error.out"
@@ -250,7 +250,7 @@ i32 main() {
     if (ok.a == 3) { correct++; }
     else { printf("Failed - #if after a class\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

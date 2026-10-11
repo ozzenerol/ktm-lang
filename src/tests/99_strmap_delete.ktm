@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem, str;
 
@@ -313,7 +313,7 @@ i32 main() {
     if (bad == 0 && col.size == 3 && col.capacity <= 64) { correct++; }
     col.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, map;
 
@@ -90,7 +90,7 @@ i32 main() {
     else { printf("Failed - edge keys\n"); }
     m.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

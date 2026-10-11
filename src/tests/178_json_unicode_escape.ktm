@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -68,7 +68,7 @@ i32 main() {
     if (rejected("{\"e\": \"\\uDE00\"}")) { correct++; }        /* lone low surrogate */
     if (rejected("{\"e\": \"\\x41\"}")) { correct++; }          /* unknown escape */
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

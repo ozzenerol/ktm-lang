@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -146,7 +146,7 @@ void main() { C c; u8 *p = null; if (c && p) printf(\"x\\n\"); }
 ", "operator cannot be applied")) { correct++; }
     else { printf("Failed - class value && p\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -122,6 +122,6 @@ void main() {
     }
 
     cleanupTranspileCastTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
 }

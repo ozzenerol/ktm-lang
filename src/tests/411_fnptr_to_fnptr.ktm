@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A pointer to a function pointer, `i64 (**pp)(i64)`, was rejected
  * ("Expected function pointer name got *"), and `&fp` on a local function
@@ -64,7 +64,7 @@ i32 main() {
     if (fa(2) == 6 && fb(2) == 4 && a0(1) == 3 && a1(1) == 3) { correct++; }
     else { printf("\n  fields and arrays\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

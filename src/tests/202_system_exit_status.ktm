@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import proc;
 
@@ -29,7 +29,7 @@ i32 main() {
     if (proc.shellf("kill -%d $$", 9) == -1) { correct++; }
     if (proc.shellf(null) == -1) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

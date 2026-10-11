@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -104,7 +104,7 @@ i32 main() {
     if (castingClassMember(p)) { ++correct; }
     mem.free(foo);
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("=====\n");
     return 0;
 }

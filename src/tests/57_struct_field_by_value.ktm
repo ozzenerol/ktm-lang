@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Passing a struct field read through a pointer (`p->field`) BY VALUE,
  * including alongside a struct copy into the same object.
@@ -52,7 +52,7 @@ i32 main() {
     if (fieldByValueAfterCopy()) { correct++; }
     if (fieldByValueNoCopy())    { correct++; }
     if (twoFieldArgs())          { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

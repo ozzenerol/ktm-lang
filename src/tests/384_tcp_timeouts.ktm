@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, libc, net, os;
 
@@ -126,7 +126,7 @@ i32 main() {
     libc.close(cli);
     libc.close(srv);
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

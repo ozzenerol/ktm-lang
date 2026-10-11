@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -72,7 +72,7 @@ i32 main() {
 
     tests++; if (!str.globMatch(null, "*") && !str.globMatch("a", null)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

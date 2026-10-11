@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, set;
 
@@ -111,7 +111,7 @@ i32 main() {
     for (i = 0; i < 20; i++) { s.delete(i); }
     if (s.size() == 0 && valid(s.tree)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

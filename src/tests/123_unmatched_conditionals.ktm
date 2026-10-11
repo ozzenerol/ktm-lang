@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -281,7 +281,7 @@ i32 main() {
     if (nestedTaken() == 534) { correct++; }
     else { printf("Failed - NestedTaken() = %d\n", nestedTaken()); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

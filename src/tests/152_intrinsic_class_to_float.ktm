@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, fs, libc, mem, proc, str;
 
@@ -127,7 +127,7 @@ i32 main() {
     else { printf("\nunexpected output:\n%s\n", out); }
     mem.free(out);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

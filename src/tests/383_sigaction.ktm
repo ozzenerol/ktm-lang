@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, os, signal;
 
@@ -174,7 +174,7 @@ i32 main() {
     i32 rc = runInChild(&childStop);
     check(rc == 100 + libc.SIGTERM, "SigStopInit flag, fd, errno, second signal");
     if (rc != 100 + libc.SIGTERM) { printf("  (child: %d)\n", rc); }
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

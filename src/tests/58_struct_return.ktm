@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Returning a struct by value, per the platform C ABI. <=16-byte aggregates
  * come back in registers (AArch64: HFA->v0.., INTEGER->x0,x1; SysV: per
@@ -69,7 +69,7 @@ i32 main() {
     if (directFieldAccess())  { correct++; }
     if (returnPassedAsArg())  { correct++; }
     if (returnIntoCopy())     { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

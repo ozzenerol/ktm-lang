@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -49,7 +49,7 @@ i32 main() {
     printf("Test - transpile globals: ");
     if (proc.shell("command -v cc >/dev/null 2>&1") != 0) {
         /* no C compiler here: nothing to check */
-        PrintResult(1, 1);
+        test.printResult(1, 1);
         printf("====\n");
         return 0;
     }
@@ -127,7 +127,7 @@ void main() { fn(i64) i64 f = &twice; printf(\"%d\\n\", f(21)); }
 ",
 "42\n", "&Fn in a function");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

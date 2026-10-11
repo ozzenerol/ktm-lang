@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -361,7 +361,7 @@ i32 main() {
   i64 correct = 0, tests = 2;
   if (shortBufferRoundTrip()) { correct++; }
   if (repeatedBufferRoundTrip()) { correct++; }
-  PrintResult(correct, tests);
+  test.printResult(correct, tests);
   printf("====\n");
   return 0;
 }

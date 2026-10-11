@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -72,6 +72,6 @@ void main() {
     if (assemblesOrSkipped("aarch64-unknown-linux-gnu")) { correct++; }
 
     cleanupCrossTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
 }

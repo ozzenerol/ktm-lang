@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Leaf functions mixing constants with register-homed parameters.
  *
@@ -65,7 +65,7 @@ i32 main() {
     if (twoAndThreeParams())  { correct++; }
     if (floatLeafParams())    { correct++; }
     if (pointerStoreParam())  { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

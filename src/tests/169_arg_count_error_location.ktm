@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -62,7 +62,7 @@ i32 main() {
     tests++;
     if (errorAt("i64 x = One(1); i64 y = Va();", ":6:37", "^^^^\n")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

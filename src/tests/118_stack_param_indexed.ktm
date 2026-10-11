@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Parameters past the argument registers (the 7th integer argument on
  * x86_64, the 9th on arm64, the 9th float on x86_64) arrive on the
@@ -99,7 +99,7 @@ i32 main() {
     if (fp(0, 0, 0, 0, 0, 0, 0, 0, v, 3) == 40) { correct++; }
     if (ld8(0, 0, 0, 0, 0, 0, v, 1) == -3) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

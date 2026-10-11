@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -78,7 +78,7 @@ i32 main() {
     tests++;
     if (Ok("[1]xyz", "[1]", 3) && Ok("{\"a\":1}}", "{\"a\": 1}", 7)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

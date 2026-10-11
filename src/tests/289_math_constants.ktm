@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, math;
 
@@ -30,7 +30,7 @@ i32 main() {
     tests++; if (math.SQRT2 == libc.sqrt(2.0)) { correct++; }
     tests++; if (math.SQRT1_2 == libc.sqrt(0.5)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

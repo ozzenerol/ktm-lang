@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -83,7 +83,7 @@ i32 main() {
     json.release(j);
     mem.free(s);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

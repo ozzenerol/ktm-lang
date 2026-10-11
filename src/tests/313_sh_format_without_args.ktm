@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, proc, str;
 
@@ -24,7 +24,7 @@ i32 main() {
     if (is(proc.shellOutput("echo %d%%", 5), "5%")) { correct++; }
     if (is(proc.shellOutput("echo plain"), "plain")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

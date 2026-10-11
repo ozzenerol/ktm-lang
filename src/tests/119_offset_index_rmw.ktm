@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* `(p + k)[i]` and `p[i].field` address memory as base + index*scale
  * + a constant offset. The arm64 backends folded the offset into the
@@ -95,7 +95,7 @@ i32 main() {
     if (b[0] == 1 && b[5] == 6 && h[0] == 1 && w[0] == -1 && w[1] == -2) { correct++; }
     if (f[0] == 0.5 && pts[0].z == 0 && pts[0].y == 0.25) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

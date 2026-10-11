@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, str;
 
@@ -42,7 +42,7 @@ i32 main() {
 #endif
     tests++; if (gone && CH_SPACE == ' ' && PRTF_PAD_ZERO == 1) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

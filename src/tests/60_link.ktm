@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os, proc;
 
@@ -43,7 +43,7 @@ void main() {
     proc.shell("rm -f ./ktm-60-link.c ./ktm-60-link.so"
                  " ./ktm-60-link-path.ktm ./ktm-60-link-path"
                  " ./ktm-60-link-name.ktm ./ktm-60-link-name");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

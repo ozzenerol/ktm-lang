@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem, str;
 
@@ -138,7 +138,7 @@ i32 main() {
             !str.cmp(date.formatDate(d), "02/29/2024") &&
             !str.cmp(date.formatTime(d), "13:14:15")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

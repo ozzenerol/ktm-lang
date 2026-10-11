@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, str;
 
@@ -58,7 +58,7 @@ i32 main() {
     if (apply(&later, 20) == 21) { correct++; }
     else { printf("Failed - prototyped\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -208,6 +208,6 @@ void main() {
     tests++; if (testUndefinedFnMultiline()) { correct++; }
     tests++; if (testUndefinedFnLongArgs()) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
 }

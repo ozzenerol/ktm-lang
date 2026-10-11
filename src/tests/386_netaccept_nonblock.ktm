@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, net;
 
@@ -73,7 +73,7 @@ i32 main() {
     tests++; if (acceptMode(true, true)) { correct++; }
     else { printf("Failed - non-blocking listener, non-blocking accept\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

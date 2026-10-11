@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 i64 testWhileBreak() {
     i64 i = 0;
@@ -54,7 +54,7 @@ i32 main() {
     correct += testWhileContinue();
     correct += testForBreak();
     correct += testForContinue();
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -102,7 +102,7 @@ i32 main() {
     else { printf("got (status %d): '%s'\n", status, out); }
     mem.free(out);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

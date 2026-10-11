@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, sql, str;
 
@@ -130,7 +130,7 @@ i32 main()
     sql.close(ctx);
     /* Delete the database */
     libc.unlink(DB_NAME);
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -58,7 +58,7 @@ i32 main() {
     if (gFp(10) == 30 && pg == &gFp) { correct++; }
     else { printf("\n  pointer to function pointer return\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net, str;
 
@@ -119,7 +119,7 @@ i32 main() {
     check(libc.getaddrinfo("127.0.0.1", "80", &hints, &res) == 0, "AI_NUMERICSERV");
     if (res) { libc.freeaddrinfo(res); }
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

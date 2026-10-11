@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -66,7 +66,7 @@ i32 main() {
     tests++; if (total < n * 2 && worst < 40) { correct++; }
     else { printf("avg probes %d/100, max %d\n", total * 100 / n, worst); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, libc, mem, str;
 
@@ -134,7 +134,7 @@ i32 main() {
     json.release(back);
     json.release(js);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

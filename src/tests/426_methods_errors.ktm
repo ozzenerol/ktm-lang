@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -89,7 +89,7 @@ i32 main() {
     if (fails(USER "void User.f() {}\n", "methods are not supported with -transpile",
                         "-transpile")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

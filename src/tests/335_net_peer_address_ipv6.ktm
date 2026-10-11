@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net, str;
 
@@ -106,7 +106,7 @@ i32 main() {
     check(net.addrToStr((libc.sockaddr *)(&ss), libc.AF_INET, buf, sizeof(buf)) &&
                 !str.cmp(buf, "10.1.2.3"), "AF_INET address");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

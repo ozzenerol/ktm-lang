@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, set, str, vec;
 
@@ -63,7 +63,7 @@ i32 main() {
     tests++; if (s.size() == 2 && s.has(3) && !s.has(4)) { correct++; }
     s.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

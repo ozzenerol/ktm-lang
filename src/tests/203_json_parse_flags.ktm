@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -76,7 +76,7 @@ i32 main() {
     if (!json.ok(j) && j.state.error == json.INVALID_NUMBER) { correct++; }
     json.release(j);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

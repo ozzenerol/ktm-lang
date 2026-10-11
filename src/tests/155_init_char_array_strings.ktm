@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -201,7 +201,7 @@ void main() { D d = {printf(\"abcd\",1}); }
 ", "2:20")) { correct++; }
     else { printf("Failed - TestFieldTooLong(local)\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

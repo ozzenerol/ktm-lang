@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -100,7 +100,7 @@ i32 main() {
     if (compileFailsWith("w - &F", "`void * - fn() void` is invalid")) { correct++; }
     if (compileFailsWith("w * fp", "is invalid")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

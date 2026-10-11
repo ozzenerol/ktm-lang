@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 void testForLoop() {
     printf("Testing For Loop: ");
@@ -21,7 +21,7 @@ void testForLoop() {
         passed++;
     }
 
-    PrintResult(passed,testCases);
+    test.printResult(passed,testCases);
 }
 
 void testWhileLoop() {
@@ -34,7 +34,7 @@ void testWhileLoop() {
     if (i == 9) {
         passed++;
     }
-    PrintResult(passed,testCases);
+    test.printResult(passed,testCases);
 }
 
 void testDoWhileLoop() {
@@ -44,7 +44,7 @@ void testDoWhileLoop() {
         i = i + 1;
 
     } while (i < 10);
-    PrintResult(i == 11, 1);
+    test.printResult(i == 11, 1);
 }
 
 i32 main() {

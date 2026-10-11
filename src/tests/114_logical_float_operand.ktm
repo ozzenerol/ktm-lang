@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A float used as a truth value must be compared against 0.0, as in C
  * (-0.0 is false, NaN is true), and `&&` / `||` / `!` must give 0/1.
@@ -91,7 +91,7 @@ i32 main() {
     c = !p; check(c, 0);
     c = !256; check(c, 0);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

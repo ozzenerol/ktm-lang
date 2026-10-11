@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -90,7 +90,7 @@ i32 main() {
             "void main() { i64 x = 'ab' + \"a\\tb\\\"c\" + 0x10 + 1e3 + 10U + 1.5f64; }\n",
             "   1 |    void main() { i64 x = 'ab' + \"a\\tb\\\"c\" + 0x10 + 1e3 + 10U + 1.5f64; }\n")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

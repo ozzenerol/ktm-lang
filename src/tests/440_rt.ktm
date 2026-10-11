@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc;
 
@@ -86,7 +86,7 @@ i32 main() {
     if (output(KTM "-jit " APP "/main.ktm > " OUT " 2>&1", "42\n")) { correct++; }
 
     proc.shell("rm -rf " PREFIX " " OUT " " BIN);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

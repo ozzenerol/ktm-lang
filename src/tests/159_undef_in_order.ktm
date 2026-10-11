@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -61,7 +61,7 @@ i32 main() {
     if (gF1 == 1.5 && gF2 == 2.5) { correct++; }
     if (inFunc() == 101) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

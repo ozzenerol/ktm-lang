@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import set;
 
@@ -67,7 +67,7 @@ i32 main() {
     tests++; if (s.size() == 2) { correct++; }
     s.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

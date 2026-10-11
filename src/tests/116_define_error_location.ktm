@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -227,7 +227,7 @@ i32 main() {
     if (testLinkSyntax()) { correct++; }
     else { printf("Failed - TestLinkSyntax()\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

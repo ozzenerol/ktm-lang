@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, math;
 
@@ -69,7 +69,7 @@ i32 main() {
     tests++; if (math.power(1.5, -1e19) == 0.0) { correct++; }
     tests++; if (math.power(-2.0, 9223372036854775808.0) == inf) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

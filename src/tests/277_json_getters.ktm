@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -116,7 +116,7 @@ i32 main() {
             json.len(json.arrayGet(arr, 0)) == 0) { correct++; }
 
     json.release(d);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

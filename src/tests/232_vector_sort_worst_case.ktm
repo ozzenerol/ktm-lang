@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, vec;
 
@@ -120,7 +120,7 @@ i32 main() {
     else { printf("C-style comparator lost items\n"); }
 
     alarm(0);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

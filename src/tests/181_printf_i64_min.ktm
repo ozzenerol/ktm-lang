@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -49,7 +49,7 @@ i32 main() {
     len = I64ToStr(buf, -305, &neg);
     if (len == 3 && neg && !str.cmp(buf, "503")) { gCorrect++; }
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

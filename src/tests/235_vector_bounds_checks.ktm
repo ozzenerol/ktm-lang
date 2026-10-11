@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str, vec;
 
@@ -84,7 +84,7 @@ i32 main() {
 "  v.get(40); printf(\"unreachable\\n\"); return 0; }\n",
             "PtrVecGet: index 40 out of range (size 1)")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -54,7 +54,7 @@ i32 main() {
     mem.free(q);
     proc.shell("rm -f " PQ_SRC " " PQ_OUT);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

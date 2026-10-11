@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, mem, proc, str;
 
@@ -17,7 +17,7 @@ i32 main() {
 
     mem.copy(root, "/tmp/ktm-test-310-XXXXXX", 25);
     if (!mkdtemp(root)) {
-        PrintResult(0, tests);
+        test.printResult(0, tests);
         printf("====\n");
         return 0;
     }
@@ -53,7 +53,7 @@ i32 main() {
     proc.shell(cmd);
     mem.free(cmd);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import coro, libc, mem, str;
 
@@ -175,7 +175,7 @@ i32 main() {
      * SIGSEGV on macOS */
     if (!str.cmp(reached, "r") && (rc == 111 || rc == 110)) { correct++; }
     else { printf("\n  stack overflow not caught by the guard page (%d)\n", rc); }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

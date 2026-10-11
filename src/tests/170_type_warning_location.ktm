@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -67,7 +67,7 @@ i32 main() {
     if (diagAt("i64 *gq = null;\nf64 gf;\ni64 gy;\n \nvoid main() {\n  gy = 1;\n  gf = gq; }\n",
                          WARN, ":4:12", ":4:4")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -61,7 +61,7 @@ i32 main() {
     if (PLAIN_INT == 3 && !str.cmp(typeof(PLAIN_INT), "i64")) { correct++; }
     if (PLAIN_MIX == 3.5 && !str.cmp(typeof(PLAIN_MIX), "f64")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

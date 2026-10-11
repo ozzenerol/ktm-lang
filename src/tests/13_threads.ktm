@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, thread;
 
@@ -83,7 +83,7 @@ i32 main() {
     printf("Test - Simple Threading: \n");
     if (pthreadTest()) { correct++; }
     if (threadPoolTest()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

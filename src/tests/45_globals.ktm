@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* File-scope variables with initialisers are run by a synthetic entry
  * point that must also call the user's Main. The fact that Main runs at
@@ -52,7 +52,7 @@ i32 main() {
     if (globalScalars()) { correct++; }
     if (globalFloats()) { correct++; }
     if (globalMutation()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

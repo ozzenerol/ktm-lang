@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc;
 
@@ -81,7 +81,7 @@ i32 main() {
     check((status & 0x7F) == SIGSEGV || (status & 0x7F) == SIGBUS,
             "1 MiB frame on a 256 KiB thread stack faults (SIGSEGV/SIGBUS)");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

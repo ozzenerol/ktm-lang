@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -139,7 +139,7 @@ void main()
     if (rejects("import date;\n\nvoid main() { printf(\"%D %d\\n\", date.now, 1, 2); }\n",
                             "expects 2 arguments but 3 were supplied")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

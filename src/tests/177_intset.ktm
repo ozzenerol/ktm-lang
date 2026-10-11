@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, set, str, vec;
 
@@ -131,7 +131,7 @@ i32 main() {
     big.release();
     check(true, "release");
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

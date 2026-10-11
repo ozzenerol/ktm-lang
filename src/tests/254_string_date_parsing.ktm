@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date;
 
@@ -88,7 +88,7 @@ i32 main() {
             date.parse("10:20", "%H:%M") == 0) { correct++; }
     else { printf("StrToCDate wrong\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

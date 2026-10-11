@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net;
 
@@ -94,7 +94,7 @@ i32 main() {
     check(net.dial("localhost", port) == -1, "closed port gives -1");
     check(lowestFreeFd() == fdBefore, "no socket leaked");
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

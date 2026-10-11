@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os, proc;
 
@@ -61,7 +61,7 @@ void main() {
     }
     proc.shell("rm -f ./ktm-64-sret.c ./ktm-64-sret.so"
                  " ./ktm-64-sret.ktm ./ktm-64-sret");
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

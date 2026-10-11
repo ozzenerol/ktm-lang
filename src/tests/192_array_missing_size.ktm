@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -87,7 +87,7 @@ i32 main() {
                                 "Expected constant integer expression")) { correct++; }
     else { printf("Failed - a[n]\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

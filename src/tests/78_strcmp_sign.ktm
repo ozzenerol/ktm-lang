@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, str;
 
@@ -85,7 +85,7 @@ i32 main() {
     if (niCmpOk(hi, lo, 1, 1) && niCmpOk(lo, hi, 1, -1)) { correct++; }
     if (niCmpOk(g1, g2, 8, 0)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

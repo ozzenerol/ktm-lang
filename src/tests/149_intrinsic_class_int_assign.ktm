@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -126,7 +126,7 @@ i32 main() {
     if (contains(out, "y = 2; s =\n") && lacks(out, "Mk(4, 5, 6);\n")) { correct++; }
     mem.free(out);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

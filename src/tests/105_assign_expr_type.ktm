@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem;
 
@@ -96,7 +96,7 @@ i32 main() {
     while (*(t = s + len)) { len++; }
     if (len == 3) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

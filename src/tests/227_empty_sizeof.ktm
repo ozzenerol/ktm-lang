@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -91,7 +91,7 @@ i32 main() {
             sizeof(v) * 2 == 16 && sizeof(arr) == 64 && alignof(i64) == 8 &&
             alignof(v) == 8) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

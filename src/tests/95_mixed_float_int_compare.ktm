@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Comparing a float with an integer truncated the float to an integer
  * (`f64 b = 2.5; b == 2` was 1). Like C, the integer operand must be
@@ -120,7 +120,7 @@ i32 main() {
     v = u64ToF32(u63) == two63;   expect(v, 1);
     v = u64ToF32(u1) == 1.0;      expect(v, 1);
 
-    PrintResult(gCorrect, tests);
+    test.printResult(gCorrect, tests);
     printf("====\n");
     return 0;
 }

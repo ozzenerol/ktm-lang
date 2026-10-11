@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -63,7 +63,7 @@ i32 main() {
     if (layoutMatchesSizeof()) { correct++; }
     if (roundTripPayload()) { correct++; }
     if (mixedFieldsAligned()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

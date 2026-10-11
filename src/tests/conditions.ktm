@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 void testIfElse() {
     printf("Testing if else\n");
@@ -10,22 +10,22 @@ void testIfElse() {
 
     i = 9;
     if (i == 0) {
-        PrintResult(passed,testCases);
+        test.printResult(passed,testCases);
         return;
     } else if (i == 9) {
         passed++;
     } else {
-        PrintResult(passed,testCases);
+        test.printResult(passed,testCases);
         return;
     }
 
     i = 10;
     j = 420;
     if (i == 0 && j == 69) {
-        PrintResult(passed,testCases);
+        test.printResult(passed,testCases);
         return;
     } else if (i == 10 && j == 439) {
-        PrintResult(passed,testCases);
+        test.printResult(passed,testCases);
         return;
     } else {
         passed++;
@@ -36,7 +36,7 @@ void testIfElse() {
     if (i == 7 || j == 7) {
         passed++;
     }
-    PrintResult(passed,testCases);
+    test.printResult(passed,testCases);
 }
 
 i32 main() {

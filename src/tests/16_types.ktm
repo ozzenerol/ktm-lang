@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -13,7 +13,7 @@ i32 main() {
     if (!str.cmpLen(ptr2,"hey",3)) { ++correct; }
     if (ch == 'f') { ++correct; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

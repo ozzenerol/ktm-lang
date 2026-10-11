@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str, vec;
 
@@ -44,7 +44,7 @@ i32 main() {
     tests++; if (pv.pop(&ok) == null && !ok && pv.size == 0) { correct++; }
     pv.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, str;
 
@@ -101,7 +101,7 @@ i32 main() {
     check(from.sin_port == me.sin_port, "sender address");
     libc.close(u);
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

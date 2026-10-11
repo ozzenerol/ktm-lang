@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import math;
 
@@ -46,7 +46,7 @@ i32 main() {
     tests++; if (math.power(0.0, 3) == 0.0) { correct++; }
     tests++; if (math.power(0.0, -1) == inf) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

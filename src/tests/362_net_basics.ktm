@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem, net, os;
 
@@ -111,7 +111,7 @@ i32 main() {
     byteOrder();
     errnoValues();
     flagsAndPoll();
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

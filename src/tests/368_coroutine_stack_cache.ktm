@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import coro, libc;
 
@@ -215,7 +215,7 @@ i32 main() {
     if (rc == 111 || rc == 110) { correct++; }
     else { printf("\n  reused stack lost its guard page (%d)\n", rc); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

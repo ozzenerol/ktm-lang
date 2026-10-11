@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Arrays of function pointers, `i64 (*fns[2])(i64 x);`, did not parse
  * ("unexpected character `[`"): the declarator only took a name between
@@ -80,7 +80,7 @@ i32 main() {
     more[1] = one;
     tests++; if (more[1](3) == 9 && one(2) == 4) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

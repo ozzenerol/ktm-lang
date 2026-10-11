@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, mem;
 
@@ -93,7 +93,7 @@ i32 main() {
     if (test4()) { correct++; }
     if (test5()) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

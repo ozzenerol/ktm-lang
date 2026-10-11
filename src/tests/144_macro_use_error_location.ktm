@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -140,7 +140,7 @@ i32 main() {
             "   3 |      i64 x = N + N N;\n"
             "     |                    ^ expanded from macro `N`")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

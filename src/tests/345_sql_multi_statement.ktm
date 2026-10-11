@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import sql;
 
@@ -29,7 +29,7 @@ i32 main() {
 
     tests++; if (ctx) { correct++; }
     if (!ctx) {
-        PrintResult(correct, tests);
+        test.printResult(correct, tests);
         printf("====\n");
         return 0;
     }
@@ -62,7 +62,7 @@ i32 main() {
     tests++; if (hasTable(ctx, "d") && hasTable(ctx, "e")) { correct++; }
 
     sql.close(ctx);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

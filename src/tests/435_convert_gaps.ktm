@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -78,7 +78,7 @@ i32 main() {
     (fn(i64) i64) *q = ((fn(i64) i64) *)pp;
     tests++; if ((*q)(1) == 2 && ((fn(i64) i64)raw == raw)) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

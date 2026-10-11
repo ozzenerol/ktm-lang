@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -53,7 +53,7 @@ i32 main() {
     if (uncaught("try { throw(1); } catch { \"c\\n\"; } throw('Bye');",
                              "uncaught error 'Bye' (" UT_SRC ":3)\n", "c\n")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

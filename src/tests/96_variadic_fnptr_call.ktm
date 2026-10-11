@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -121,7 +121,7 @@ i32 main() {
     else { printf("Failed - format through a pointer: '%s'\n", s); }
     mem.free(s);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

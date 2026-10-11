@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A narrowing cast (to i8/u8/i16/u16/i32/u32, and bool) truncated its value
  * but did not sign or zero extend the result before it was used, so a
@@ -92,7 +92,7 @@ i32 main() {
     unsigned();
     prefix();
     bools();
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

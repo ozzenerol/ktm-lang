@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, os;
 
@@ -50,7 +50,7 @@ void main() {
     if (libc.strncmp("helo","hello",4) != 0) { correct++; }
     assign();
     runMain();
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     libc.free(c);
     printf("===\n");
     os.exit(0);

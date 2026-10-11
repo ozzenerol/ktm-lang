@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -6,9 +6,9 @@ import json, mem, str;
  * leaked a block (JsonToString, built on it, leaked one per piece), and
  * CatLenPrint(null, ...) allocated no room for the '\0' it then wrote. */
 
-/* Bytes in use on the heap (HeapInUse() is in testhelper.ktm) */
+/* Bytes in use on the heap (test.heapInUse() is in the test module (src/tests/test)) */
 i64 inUse() {
-    return HeapInUse();
+    return test.heapInUse();
 }
 
 i32 main() {
@@ -73,7 +73,7 @@ i32 main() {
     else { printf("JsonToString heap grew %d\n", inUse() - before); }
     json.release(j);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

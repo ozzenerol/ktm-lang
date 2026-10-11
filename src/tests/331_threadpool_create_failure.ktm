@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, str, thread;
 
@@ -125,7 +125,7 @@ i32 main() {
     else { printf("\n  pthread_create failure not handled (%d)\n", rc); }
 #endif
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -51,7 +51,7 @@ i32 main() {
     tests++; if (p && mem.size(p) == 7) { correct++; }
     mem.free(p);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

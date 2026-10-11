@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import os;
 
@@ -47,7 +47,7 @@ void main() {
     if (Mode() == 2) { correct++; }
     if (mode2() == 2) { correct++; }
     if (aotOnly == 42) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("===\n");
     os.exit(0);
 }

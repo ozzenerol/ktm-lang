@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, proc, str;
 
@@ -95,7 +95,7 @@ i32 main() {
             libc.strstr(err, "__404_bad.ktm:3:")) { correct++; }
     else { printf("\n  format check: [%s]\n", err); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

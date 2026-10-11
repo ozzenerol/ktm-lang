@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, mem, str;
 
@@ -68,7 +68,7 @@ i32 main() {
     json.printError(json.select(ok, ".a[0]"));
     json.release(ok);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

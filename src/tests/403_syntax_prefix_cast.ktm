@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* ktm syntax v0.2: C prefix casts `(T)x`. A `(` followed by a type name
  * (built-in, new or old spelling, class, union) opens a cast; its operand
@@ -76,7 +76,7 @@ i32 main() {
     if ((tm2) * 2 == 10 && (a + b) * 2 == 18 && (x) == 3) { correct++; }
     else { printf("\n  parentheses\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

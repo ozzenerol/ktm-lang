@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem, str;
 
@@ -112,7 +112,7 @@ i32 main() {
     if (sameHour(&ds, &nowDs) || sameHour(&ds2, &nowDs)) { correct++; }
     if (ds.year >= 2024 && ds.min < 60 && ds.sec < 60) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

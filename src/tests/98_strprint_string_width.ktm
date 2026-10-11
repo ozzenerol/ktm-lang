@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, libc, mem, str;
 
@@ -153,7 +153,7 @@ i32 main() {
     if (!str.cmp(ours, want)) { correct++; }
     else { printf("\n  mixed: got '%s', C printf gives '%s'", ours, want); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, map, mem, set;
 
@@ -164,7 +164,7 @@ i32 main() {
     t.release();
 
     alarm(0);
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

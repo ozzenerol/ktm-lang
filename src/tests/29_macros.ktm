@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -37,7 +37,7 @@ i32 main() {
     if (FOO == 24) { correct++; }
     if (BAR == 32) { correct++; }
     if (_INTVAL == 42) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, proc, str;
 
@@ -32,7 +32,7 @@ i32 main() {
                              !libc.strstr(s, ":lo12:g_p") && !libc.strstr(s, ":lo12:g_fn")) { correct++; }
     proc.shell("rm -f " N_SRC " " N_OUT);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

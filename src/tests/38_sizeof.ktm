@@ -1,4 +1,4 @@
-#include "./testhelper.ktm"
+import test;
 
 bool sizeofString() {
     if (sizeof("hello") != 6) { return false; }
@@ -173,7 +173,7 @@ i32 main() {
         printf("Failed - SizeofArrays()\n");
     }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

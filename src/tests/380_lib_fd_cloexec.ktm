@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, net, proc, str;
 
@@ -191,7 +191,7 @@ i32 main() {
     fileWriteFd();
     fileReadFd();
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

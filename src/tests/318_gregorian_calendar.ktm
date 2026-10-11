@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem, str;
 
@@ -126,7 +126,7 @@ i32 main() {
     if (strIs(date.formatDate(mkDay(4000, 12, 31)), "12/31/4000") &&
             mkDay(4001, 1, 1).date - mkDay(4000, 1, 1).date == 366) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

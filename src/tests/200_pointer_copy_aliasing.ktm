@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* `i64 *z = v; v = &x;` made z follow v: the IR store forwarding
  * recorded "z holds v" and kept rewriting reads of z into reads of v
@@ -138,7 +138,7 @@ i32 main() {
     ia = ib;
     if (ic == 1 && ia == 2) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

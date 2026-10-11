@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -80,7 +80,7 @@ i32 main() {
     if (failsWith("#define A (1 + \\\n 2)\ni64 x = A;\ni64 y = z;\nvoid main() {}\n",
                                 CL_FILE ":4:9")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

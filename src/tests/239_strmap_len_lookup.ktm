@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem, str;
 
@@ -99,7 +99,7 @@ i32 main() {
     else { printf("Failed - iteration order (%d)\n", bad); }
     m.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

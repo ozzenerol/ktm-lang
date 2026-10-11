@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A derived class with NO fields of its own used to lose its entire
  * inheritance: parseClassOffsets early-returned on an empty field list
@@ -57,7 +57,7 @@ i32 main() {
     fillBase(&e);
     if (e.a == 111 && e.b == 7) { correct++; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

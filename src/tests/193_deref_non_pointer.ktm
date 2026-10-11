@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -114,7 +114,7 @@ i32 main() {
                          "6 3 1 10 10 6\n")) { correct++; }
     else { printf("Failed - valid expressions\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem;
 
@@ -69,7 +69,7 @@ i32 main() {
     else { printf("Failed - growth\n"); }
     im.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

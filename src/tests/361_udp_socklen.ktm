@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, net, proc, str;
 
@@ -194,7 +194,7 @@ void main()
     roundTrip(libc.AF_INET6, "::1", "IPv6");
     truncated();
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

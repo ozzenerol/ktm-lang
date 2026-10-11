@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import proc;
 
@@ -85,7 +85,7 @@ i32 main() {
                          "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                          "-repl 2>&1 | grep -qx '3'") == 0) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

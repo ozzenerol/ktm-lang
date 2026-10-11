@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc;
 
@@ -129,7 +129,7 @@ i32 main() {
     else { printf("Failed - asm: %d %d\n", asmI32(), asmU16()); }
 #endif
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

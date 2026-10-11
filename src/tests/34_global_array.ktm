@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import str;
 
@@ -63,7 +63,7 @@ i32 main() {
     i64 tests = 2, correct = 0;
     if (testStaticArray()) { correct++; }
     if (testGlobalArray()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

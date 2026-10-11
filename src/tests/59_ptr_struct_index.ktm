@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Address-of a subscripted POINTER: `&ptr[i]` and `&ptr[i].field`.
  *
@@ -57,7 +57,7 @@ i32 main() {
     if (addressOfField())     { correct++; }
     if (pointerToElement())   { correct++; }
     if (scalarPointerIndex()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

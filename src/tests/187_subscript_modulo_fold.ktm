@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -108,7 +108,7 @@ i32 main() {
                                              "main(1);", "Division by zero")) { correct++; }
     else { printf("Failed - case 1 / 0\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

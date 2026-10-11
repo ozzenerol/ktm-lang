@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import json, str;
 
@@ -64,7 +64,7 @@ i32 main() {
     tests++;
     if (json.parse(null) == null && json.parse(null, 5) == null) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

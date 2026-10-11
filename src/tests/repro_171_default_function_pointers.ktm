@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, str;
 
@@ -25,7 +25,7 @@ i32 main() {
     if (!str.cmp(msg, "hello! i=24 N=4\n")) {
         correct++;
     }
-    PrintResult(correct,total);
+    test.printResult(correct,total);
     mem.free(msg);
 
     printf("====\n");

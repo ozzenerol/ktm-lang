@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* A tagged class or union defined inside a class body crashed ktm: the
  * field parser left the `class`/`union` keyword unread, so the tag was
@@ -82,7 +82,7 @@ i32 main() {
     yp.i = 42;
     tests++; if (yp.i == 42 && yp.z == 3) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

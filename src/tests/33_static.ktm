@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, str;
 
@@ -64,7 +64,7 @@ i32 main() {
     if (testStatic())    { correct++; }
     if (testGlobal())    { correct++; }
     if (testStaticInt()) { correct++; }
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }

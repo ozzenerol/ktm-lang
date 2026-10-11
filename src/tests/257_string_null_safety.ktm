@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, str;
 
@@ -48,7 +48,7 @@ i32 main() {
     str.copy(null, "x");   /* does nothing */
     tests++; if (ok) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

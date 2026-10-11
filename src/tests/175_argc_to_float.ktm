@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* argc and the argv slots shared one type tagged as a variadic slot,
  * so converting argc to a float reinterpreted its bits like
@@ -38,7 +38,7 @@ i32 main() {
     if (intArgc(1, 2, 3) == 3) { correct++; }
     if (retArgc(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) == 10.0) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

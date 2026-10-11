@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import map, mem, set, str;
 
@@ -175,7 +175,7 @@ i32 main() {
     set.intIterRelease(sit);
     set.release();
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

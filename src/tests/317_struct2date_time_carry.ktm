@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, mem, str;
 
@@ -82,7 +82,7 @@ i32 main() {
     if (ds.dayOfMon == 5 && ds.hour == 23 && ds.min == 59 && ds.sec == 59 &&
             ds.sec100 == 99) { gCorrect++; }
     else { printf("Failed - round trip of 23:59:59.99\n"); }
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

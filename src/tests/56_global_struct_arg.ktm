@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Passing a GLOBAL struct by value as a call argument. Regression for a bus
  * error: irLowerGlobal returned a scalar load of a class global's first 8
@@ -30,7 +30,7 @@ i32 main() {
     if (globalSmallArg()) { correct++; }
     if (globalBigArg())   { correct++; }
     if (globalHfaArg())   { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

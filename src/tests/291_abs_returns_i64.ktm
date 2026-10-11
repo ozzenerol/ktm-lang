@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import math, str;
 
@@ -50,7 +50,7 @@ i32 main() {
     str.formatTo(buf, "%d", math.abs(-42) - 50);
     tests++; if (!str.cmp(buf, "-8")) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

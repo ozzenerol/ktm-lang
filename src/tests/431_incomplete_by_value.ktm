@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -116,7 +116,7 @@ union V { B b; i64 x; };", 0)) { correct++; }
     Outer o;
     tests++; if (sizeof(Outer) == 24 && (u8 *)&o.x - (u8 *)&o == 16) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

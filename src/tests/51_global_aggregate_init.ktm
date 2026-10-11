@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Global aggregate initialisers: class/struct + arrays.
  *
@@ -86,7 +86,7 @@ i32 main() {
     if (globalSignedArrays()) { correct++; }
     if (globalExprFold())    { correct++; }
     if (globalFloatArrays()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

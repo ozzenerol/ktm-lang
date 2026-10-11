@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -68,7 +68,7 @@ i32 main() {
     tests++; if (jitRuns("i32 main() { return 3; }\n", false, "")) { correct++; }
 
     cleanupNoMainTest();
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

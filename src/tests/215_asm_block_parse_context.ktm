@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -118,7 +118,7 @@ i32 main() {
 #else
     tests++; correct++; /* the asm here is x86_64 */
 #endif
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import coro, libc, mem;
 
@@ -375,7 +375,7 @@ i32 main() {
     if (rc1 == 1 && rc2 == 1) { correct++; }
     else { printf("\n  misuse must exit with 1 (%d, %d)\n", rc1, rc2); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

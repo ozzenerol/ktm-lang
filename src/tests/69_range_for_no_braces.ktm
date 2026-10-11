@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem, vec;
 
@@ -159,7 +159,7 @@ i32 main() {
     for (i = 0; i < 4; i++) { sum += arr[i]; }
     if (sum == 10) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

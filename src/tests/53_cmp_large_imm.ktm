@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Comparing an integer against a large constant whose low 12 bits are zero
  * (a clean multiple of 4096, e.g. 0x100000) must use the shifted-imm12
@@ -55,7 +55,7 @@ i32 main() {
     if (shiftedRelational())     { correct++; }
     if (narrowReadThenCompare()) { correct++; }
     if (plainAndRegPath())       { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

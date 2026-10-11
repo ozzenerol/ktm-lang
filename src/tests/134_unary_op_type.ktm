@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import date, fs, libc, mem, proc, str;
 
@@ -139,7 +139,7 @@ i32 main() {
     if (!str.cmp(buf, "-5 128")) { correct++; }
     mem.free(buf);
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

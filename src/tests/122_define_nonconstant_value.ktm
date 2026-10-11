@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -185,7 +185,7 @@ i32 main() {
     if (!str.cmp(NC_STR, "hello") && !str.cmp(NC_PSTR, "abc")) { correct++; }
     else { printf("Failed - string defines: %s %s\n", NC_STR, NC_PSTR); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import libc, net;
 
@@ -69,7 +69,7 @@ i32 main() {
     check(s == -1, "NetCreateServer on i32 min");
     closeIfOpen(s);
 
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

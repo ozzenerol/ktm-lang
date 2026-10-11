@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fs, libc, mem, proc, str;
 
@@ -119,7 +119,7 @@ i32 main() {
                                              "The `*` operator cannot be applied")) { correct++; }
     else { printf("`*` on a float accepted\n"); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

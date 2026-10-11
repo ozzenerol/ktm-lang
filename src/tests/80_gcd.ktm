@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import math;
 
@@ -98,7 +98,7 @@ i32 main() {
     if (bad == 0) { correct++; }
     else { printf("Failed - %d scaled pairs\n", bad); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

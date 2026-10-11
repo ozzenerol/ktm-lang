@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Relational comparisons (`<`, `<=`, `>`, `>=`) between two pointers
  * of the same type. Used to be rejected even though `astIsValidPointerOp`
@@ -42,7 +42,7 @@ i32 main() {
     if (u8PtrCompare()) { correct++; }
     if (i64PtrCompare()) { correct++; }
     if (whileLoopOverBuffer()) { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

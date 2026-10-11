@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import mem;
 
@@ -110,7 +110,7 @@ i32 main() {
     check(frame1M(2) == 0, "1 MiB frames, 3 deep");
     check(frame4M(0) == 0, "4 MiB frame");
     check(mixed() == 0, "two 40000-byte arrays and scalars in one frame");
-    PrintResult(gCorrect, gTests);
+    test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;
 }

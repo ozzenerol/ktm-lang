@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 enum Err { neg, in };
 
@@ -240,7 +240,7 @@ i32 main() {
     if (Depth() == base) { correct++; }
     if (retComputed(9) == 30) { correct++; }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 import fzf, mem, str;
 
@@ -32,15 +32,15 @@ i32 main() {
 
     hits = runAll("aBc abc ABC abcd");
     for (i = 0; i < 20; i++) { runAll("aBc abc ABC abcd"); }
-    before = HeapInUse();
+    before = test.heapInUse();
     for (i = 0; i < 500; i++) {
         if (runAll("aBc abc ABC abcd") != hits) { hits = -1; }
     }
-    delta = HeapInUse() - before;
+    delta = test.heapInUse() - before;
     tests++; if (hits > 0) { correct++; }
     tests++; if (delta < 4096) { correct++; } else { printf("leaked %d bytes ", delta); }
 
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

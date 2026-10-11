@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* Narrow signed integer reads must sign-extend on load (C integer promotion):
  * a signed i8/i16 read in an expression widens to 64-bit with its sign. The
@@ -69,7 +69,7 @@ i32 main() {
     if (localFieldsAndArrays()) { correct++; }
     if (pointerDeref())         { correct++; }
     if (widenIntoWiderSlot())   { correct++; }
-    PrintResult(correct, tests);
+    test.printResult(correct, tests);
     printf("====\n");
     return 0;
 }

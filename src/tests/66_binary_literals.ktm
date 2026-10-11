@@ -1,4 +1,4 @@
-#include "testhelper.ktm"
+import test;
 
 /* `0b`/`0B` binary integer literals. Regression: `b`/`B` are hex digits,
  * so `0b1010` was lexed as one token and parsed base 10, which stopped at
@@ -24,7 +24,7 @@ i32 main() {
     if (0x1b == 27) { correct++; }
     if (0xBB == 187 && 0XbB == 187) { correct++; }
 
-    PrintResult(correct,tests);
+    test.printResult(correct,tests);
     printf("====\n");
     return 0;
 }
