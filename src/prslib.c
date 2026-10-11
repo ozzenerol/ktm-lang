@@ -3545,6 +3545,7 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             }
             assertNotArrayAssign(cc,LHS,tok->line,tok->col,tok->len);
             assertNotEnumArithAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotFnIncDec(cc,LHS,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,LHS);
             AstUnOp op;
             if (!astUnaryOpFromToken(tok->i64, &op)) {
@@ -3877,6 +3878,7 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
             }
             assertNotArrayAssign(cc,ast,tok->line,tok->col,tok->len);
             assertNotEnumArithAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotFnIncDec(cc,ast,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,ast);
             if (tok->i64 == TK_PLUS_PLUS) {
                 return astUnaryOperator(ast->type,AST_UN_OP_POST_INC,ast);
@@ -4188,6 +4190,7 @@ Ast *parseUnaryExpr(Cctrl *cc) {
         if (unary_op == AST_UN_OP_PRE_INC || unary_op == AST_UN_OP_PRE_DEC) {
             assertNotArrayAssign(cc,operand,op_line,op_col,op_len);
             assertNotEnumArithAssign(cc,operand,op_line,op_col,op_len);
+            assertNotFnIncDec(cc,operand,op_line,op_col,op_len);
             assertNotConstAssign(cc,operand);
         }
 

@@ -51,6 +51,8 @@ void typeCheckWarn(Cctrl *cc, int op_line, int op_col, Ast *expected,
                    Ast *actual);
 int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
                          int op_len);
+int assertNotFnIncDec(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                      int op_len);
 int assertNotEnumArithAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
                              int op_len);
 void typeCheckReturnTypeWarn(Cctrl *cc, Ast *maybe_func, 
