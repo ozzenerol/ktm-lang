@@ -4,6 +4,67 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.7.0 <small>(2026-10-12)</small></h2>
+<p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
+shares counters and flags between threads without a mutex. Locals are now always at their
+type's alignment, which atomics and C code need.</p>
+
+<pre><code>import atomic, libc;
+
+i64 gHits = 0;
+
+i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i &lt; 100000; i = next(i)) { atomic.add(&amp;gHits, 1); }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;worker, null); }
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&amp;gHits));
+}
+</code></pre>
+
+<h3>The compiler</h3>
+<ul>
+  <li>Inlining: a call to a short function of the program whose parameters and result are
+  numbers or pointers is compiled as the function's body in the caller, which saves the call.
+  It behaves exactly like the call (arguments convert to the parameter types, a result to the
+  return type, recursion is never inlined), and the function is still compiled on its own.
+  Loops calling small helpers ran 1.2 to 1.8 times as fast in our measurements.</li>
+  <li>Every local is at its type's natural alignment in the frame: an <code>i64</code>,
+  <code>f64</code> or pointer declared after a narrower local was 4-aligned, which atomic
+  instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
+  <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
+  <code>cas</code> on <code>i64</code>, <code>i32</code>, <code>u64</code> and <code>u32</code>
+  (the pointer type picks the width), pointer versions (<code>loadPtr</code>,
+  <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code>) and <code>fence()</code>, all
+  sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
+  <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
+  module.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
+  as a block's first statement it used to point at the block's <code>{</code>.</li>
+</ul>
+
 <h2>v0.6.0 <small>(2026-10-12)</small></h2>
 <p>Function overloading, and the library pieces the example projects still wrote by hand:
 hashing, case-insensitive and URL/HTML text helpers, portable file metadata, and waiting for
