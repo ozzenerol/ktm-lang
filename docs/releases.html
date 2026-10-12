@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,21 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-5-1-2026-10-12">v0.5.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-5-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
+or no longer applies to the frozen syntax).</p>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The old C declarator of a function that returns a function pointer,
+  <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
+  variable form, naming the way to write it: <code>fn(i64) i64 getHandler()</code>.</li>
+  <li>A <code>catch</code> block takes its frame's address again after the throw lands, as
+  <code>defer</code> already did, instead of relying on the value staying in place across the try
+  body. It never went wrong in practice (the code layout kept it alive), but nothing
+  guaranteed it.</li>
+</ul>
 
 <h2 id="v0-5-0-2026-10-12">v0.5.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-5-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>A systems library: what the example servers and tools used to write by hand. A coroutine
@@ -126,7 +141,7 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
@@ -227,7 +242,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -335,7 +350,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -360,7 +375,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -492,7 +507,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
