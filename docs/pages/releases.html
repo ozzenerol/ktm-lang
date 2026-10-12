@@ -4,6 +4,51 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.11.0 <small>(2026-10-12)</small></h2>
+<p>Networking that is fast by default. A TCP server written the plain way, a coroutine per
+connection with <code>coro.serve</code>, now uses every core and the kernel's event queue, and
+beats Go 1.27's goroutine-per-connection server on request/response traffic (an echo
+benchmark on one Linux machine, both servers untuned):</p>
+<table>
+  <thead><tr><th>64-byte request/response</th><th>ktm</th><th>Go</th></tr></thead>
+  <tbody>
+    <tr><td>16 clients</td><td>325k req/s</td><td>281k req/s</td></tr>
+    <tr><td>64 clients</td><td>379k req/s, p99 0.54 ms</td><td>282k req/s, p99 2.63 ms</td></tr>
+    <tr><td>256 clients</td><td>365k req/s</td><td>294k req/s</td></tr>
+    <tr><td>1024 clients</td><td>333k req/s</td><td>321k req/s</td></tr>
+  </tbody>
+</table>
+<p>With 4 KiB messages ktm serves 32% more requests with a fifth of Go's p99. A single bulk
+stream runs 22% faster; with 16 and 64 streams at once ktm is still about 3% behind Go, the
+first thing the next release works on.</p>
+
+<h3>Coroutines and networking</h3>
+<ul>
+  <li><code>coro.serve(port, &amp;handler, arg, threads, bindaddr)</code>: a whole TCP server in
+  one call. It runs <code>handler(fd, arg)</code> as a coroutine for each client on one loop per
+  CPU (<code>SO_REUSEPORT</code> on Linux; on macOS the loops share one listener).
+  <code>coro.serveStop()</code> stops it from any thread or coroutine, and the SIGINT/SIGTERM
+  coroutine of the docs works unchanged. Handlers run on several threads at once: shared globals
+  need the <code>atomic</code> module or a lock.</li>
+  <li><code>coro.read(fd, buf, ms)</code> and <code>coro.write(fd, data, ms)</code>: read what is
+  there and write all of it, pausing the coroutine instead of the thread, on sockets and pipes.
+  A read goes straight on while a stream keeps filling the buffer and waits first otherwise, so a
+  connection costs no more system calls than it must.</li>
+  <li>The coroutine loop waits on epoll (Linux) and kqueue (macOS) instead of
+  <code>poll</code>: a turn costs the fds that are ready, not every fd that is open. Nothing to
+  change in existing programs; a program that has run out of fds when its loop starts gets
+  <code>poll</code> as before.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>An fd waited on with <code>coro.wait</code> stays registered with the kernel between
+  waits, so close it with <code>coro.close</code>, as the docs already said for connections: a
+  plain <code>close(2)</code> of a waited-on fd whose number is then reused for an fd that is not
+  from <code>coro.accept</code> can leave a wait on the new fd unanswered.</li>
+  <li><code>coro.waitChild</code> closes its exit fd with <code>coro.close</code>.</li>
+</ul>
+
 <h2>v0.10.1 <small>(2026-10-12)</small></h2>
 <p>Editor support, fixed and made rich: the language server understands the whole current
 language and gains the features editors expect, and the Vim syntax is rewritten for today's
