@@ -382,6 +382,11 @@ const char *irOpcodeToString(IrInstr *ir_instr) {
         case IR_SHR:      ir_op_str = "shr"; break;
         case IR_SAR:      ir_op_str = "sar"; break;
         case IR_NOT:      ir_op_str = "not"; break;
+        case IR_ROTL:     ir_op_str = "rotl"; break;
+        case IR_ROTR:     ir_op_str = "rotr"; break;
+        case IR_BSWAP:    ir_op_str = "bswap"; break;
+        case IR_CLZ:      ir_op_str = "clz"; break;
+        case IR_CTZ:      ir_op_str = "ctz"; break;
         case IR_ICMP:
         case IR_FCMP:
             return irCmpKindToString(ir_instr->extra.cmp_kind);

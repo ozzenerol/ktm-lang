@@ -1415,6 +1415,37 @@ static void a64TxtFneg(void *be, int width) {
     aoStrCatFmt(((IrCgCtx *)be)->buf, "fneg    %s, %s\n\t",
                 aarch64Fpr(width, 0), aarch64Fpr(width, 0));
 }
+static void a64TxtBitop(void *be, IrOp op, int width, IrInstr *i) {
+    IrCgCtx *ctx = (IrCgCtx *)be;
+    const char *r0 = width == 64 ? "x0" : "w0", *r1 = width == 64 ? "x1" : "w1";
+    switch (op) {
+        case IR_ROTL:
+        case IR_ROTR:
+            if (i->r2 && i->r2->kind == IR_VAL_CONST_INT) {
+                s64 k = i->r2->as._i64 & (width - 1);
+                if (op == IR_ROTL) k = (width - k) & (width - 1);
+                aoStrCatFmt(ctx->buf, "ror %s, %s, #%I\n\t", r0, r0, k);
+            } else {
+                aarch64LoadToReg(ctx, i->r2, "x1");
+                /* rotl n = rotr -n: ror takes the count mod the width */
+                if (op == IR_ROTL) aoStrCatFmt(ctx->buf, "neg %s, %s\n\t", r1, r1);
+                aoStrCatFmt(ctx->buf, "ror %s, %s, %s\n\t", r0, r0, r1);
+            }
+            break;
+        case IR_BSWAP:
+            if (width == 16) aoStrCatFmt(ctx->buf, "rev16 w0, w0\n\tand w0, w0, #0xffff\n\t");
+            else aoStrCatFmt(ctx->buf, "rev %s, %s\n\t", r0, r0);
+            break;
+        case IR_CLZ:
+            aoStrCatFmt(ctx->buf, "clz %s, %s\n\t", r0, r0);
+            break;
+        case IR_CTZ:
+            aoStrCatFmt(ctx->buf, "rbit %s, %s\n\tclz %s, %s\n\t", r0, r0, r0, r0);
+            break;
+        default:
+            break;
+    }
+}
 static void a64TxtArithInit(A64ArithEmitter *e, IrCgCtx *ctx) {
     e->be        = ctx;
     e->load_gp   = a64TxtCvtLoadGp;   e->load_fpr  = a64TxtCvtLoadFpr;
@@ -1425,6 +1456,7 @@ static void a64TxtArithInit(A64ArithEmitter *e, IrCgCtx *ctx) {
     e->shift_reg = a64TxtShiftReg;    e->load_x1   = a64TxtLoadX1;
     e->fbinop    = a64TxtFbinop;      e->load_d1   = a64TxtLoadD1;
     e->fneg      = a64TxtFneg;
+    e->bitop     = a64TxtBitop;
 }
 
 static void aarch64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
@@ -1652,6 +1684,7 @@ static void aarch64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
         case IR_IADD: case IR_ISUB: case IR_AND: case IR_OR: case IR_XOR:
         case IR_IMUL: case IR_IDIV: case IR_UDIV: case IR_IREM: case IR_UREM:
         case IR_INEG: case IR_NOT: case IR_SHL: case IR_SHR: case IR_SAR:
+        case IR_ROTL: case IR_ROTR: case IR_BSWAP: case IR_CLZ: case IR_CTZ:
         case IR_FADD: case IR_FSUB: case IR_FMUL: case IR_FDIV: case IR_FNEG: {
             /* Unified arithmetic lowering shared with the JIT (aarch64-emit.h). */
             A64ArithEmitter ae;

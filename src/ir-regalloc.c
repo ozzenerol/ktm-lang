@@ -121,6 +121,7 @@ void irCgAllocOperandsForInstr(IrRaCtx *ra, IrInstr *I, int start) {
     case IR_AND:  case IR_OR:   case IR_XOR:
     case IR_IDIV: case IR_UDIV: case IR_IREM: case IR_UREM:
     case IR_SHL:  case IR_SHR:  case IR_SAR:
+    case IR_ROTL: case IR_ROTR:
     case IR_ICMP:
     case IR_FADD: case IR_FSUB: case IR_FMUL: case IR_FDIV:
     case IR_FCMP:
@@ -130,6 +131,7 @@ void irCgAllocOperandsForInstr(IrRaCtx *ra, IrInstr *I, int start) {
         return;
 
     case IR_FNEG:
+    case IR_BSWAP: case IR_CLZ: case IR_CTZ:
         if (!skip_dst) irCgAllocTmp(ra, I->dst, start);
         if (!skip_r1)  irCgAllocTmp(ra, I->r1, start);
         return;
