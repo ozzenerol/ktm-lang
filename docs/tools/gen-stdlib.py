@@ -151,12 +151,12 @@ def parse_module(mod):
                     i += 1
                     continue
                 # a function, method or binding: read to its `{` or `;`
-                while not re.search(r"[{;]\s*$", buf[-1]) and i + 1 < n:
+                # (a one-line body, `{ return ...; }`, ends at its `{` too)
+                while "{" not in buf[-1] and not buf[-1].rstrip().endswith(";") and i + 1 < n:
                     i += 1
                     buf.append(code[i].strip())
                 stmt = " ".join(buf)
-                body = stmt.rstrip().endswith("{")
-                stmt = re.sub(r"\s*[{;]\s*$", "", stmt)[4:]
+                stmt = (stmt[:stmt.index("{")] if "{" in stmt else stmt.rstrip()[:-1]).rstrip()[4:]
                 cfunc = stmt.startswith('extern "c"')
                 stmt = re.sub(r'^extern\s+"c"\s+|^_extern\s+\S+\s+', "", stmt)
                 fm = re.match(r"(.*?)\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s*\((.*)\)\s*$", stmt, re.S)
@@ -182,11 +182,26 @@ def tidy_class(text):
     return "\n".join(body)
 
 
+def param_types(sig):
+    """A signature's parameter types: an overload differs in them, while a
+    prototype, its definition and a platform's variant don't."""
+    params = sig[sig.index("(") + 1:sig.rindex(")")]
+    return tuple(re.sub(r"\s*\b[A-Za-z_]\w*\s*(=.*)?$", "", p).replace(" ", "")
+                 for p in params.split(",") if p.strip())
+
+
 def add(decls, order, mod, name, kind, sig, doc, line, cond):
     key = name if mod == "prelude" else f"{mod}.{name}"
     if key in decls:
-        if not decls[key]["doc"] and doc:
-            decls[key]["doc"] = doc
+        d = decls[key]
+        if kind == "func" and d["kind"] == "func" and \
+                param_types(sig) not in map(param_types, d["sig"].split("\n")):
+            # an overload: one entry with every signature, each one's doc
+            d["sig"] += "\n" + sig
+            if doc:
+                d["doc"] = (d["doc"] + "\n\n" + doc) if d["doc"] else doc
+        elif not d["doc"] and doc:
+            d["doc"] = doc
         return
     platform = [c for c in cond if re.match(r"(not )?(IS_LINUX|IS_MACOS|IS_X86_64|IS_ARM_64|__APPLE__)$", c)]
     decls[key] = {"name": key, "kind": kind, "sig": sig, "doc": doc,
@@ -230,8 +245,8 @@ def write_html(groups):
                         f'<div class="decl-head"><a class="decl-name" href="#{html.escape(d["name"])}">{html.escape(d["name"])}</a>'
                         f' <span class="kind">{kinds[d["kind"]]}</span>{plat}</div>'
                         f'<pre><code class="language-ktm">{html.escape(d["sig"])}</code></pre>')
-            if d["doc"]:
-                body.append(f'<p class="doc">{html.escape(d["doc"])}</p>')
+            for para in d["doc"].split("\n\n") if d["doc"] else []:
+                body.append(f'<p class="doc">{html.escape(para)}</p>')
             body.append("</div>")
         if defs:
             total += len(defs)
