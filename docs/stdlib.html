@@ -421,7 +421,9 @@ non-blocking fd (lfd is made non-blocking too); -1 when ms passed
 EINVAL: os.errno() says which). Out of fds or memory (EMFILE, ENFILE,
 ENOBUFS, ENOMEM) it neither spins nor retries at once (on macOS a
 failed accept has already dropped that client): every coro.accept of
-the loop rests until coro.close() frees an fd, or 2 s passed.</p></div><div class="decl" id="coro.close"><div class="decl-head"><a class="decl-name" href="#coro.close">coro.close</a> <span class="kind">function</span></div><pre><code class="language-ktm">i32 close(i32 fd);</code></pre><p class="doc">close(2) fd, and let a coro.accept resting out of fds try again. Can
+the loop rests until coro.close() frees an fd, or 2 s passed. After a
+rest it first checks with dup(lfd) that an fd is free, and rests again
+if not, so the retry doesn&#x27;t drop the next client too.</p></div><div class="decl" id="coro.close"><div class="decl-head"><a class="decl-name" href="#coro.close">coro.close</a> <span class="kind">function</span></div><pre><code class="language-ktm">i32 close(i32 fd);</code></pre><p class="doc">close(2) fd, and let a coro.accept resting out of fds try again. Can
 be called anywhere.</p></div><div class="decl" id="coro.stop"><div class="decl-head"><a class="decl-name" href="#coro.stop">coro.stop</a> <span class="kind">function</span></div><pre><code class="language-ktm">void stop();</code></pre><p class="doc">Ask the loop to wind down: every coro.waitIdle and coro.accept, now
 and later, returns -1; plain waits and sleeps go on, so the work in
 flight finishes, and coro.run returns once every coroutine has ended.

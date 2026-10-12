@@ -210,12 +210,15 @@ pub void sleep(i64 ms) {
  * EINVAL: os.errno() says which). Out of fds or memory (EMFILE, ENFILE,
  * ENOBUFS, ENOMEM) it neither spins nor retries at once (on macOS a
  * failed accept has already dropped that client): every coro.accept of
- * the loop rests until coro.close() frees an fd, or 2 s passed. */
+ * the loop rests until coro.close() frees an fd, or 2 s passed. After a
+ * rest it first checks with dup(lfd) that an fd is free, and rests again
+ * if not, so the retry doesn't drop the next client too. */
 pub i32 accept(i32 lfd, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.accept");
     Loop *lp = loopGet(true);
     i64 until = loopDeadline(ms), d, r;
     i32 fd, err;
+    bool rested = lp.fdsOut;
     net.setNonBlocking(lfd);
     while (!lp.stopping) {
         if (lp.fdsOut && date.monoMs() < lp.fdsOutUntil) {
@@ -224,7 +227,20 @@ pub i32 accept(i32 lfd, i64 ms=-1) {
             r = loopPark(t, -1, 0, d, true, true);
             if (r < 0) { return -1; }
             if (until >= 0 && date.monoMs() >= until) { return -1; }
+            rested = true;
             continue;
+        }
+        if (rested) {
+            /* still out of fds? then accept would fail, and drop a client
+             * on macOS: rest again instead */
+            rested = false;
+            fd = libc.dup(lfd);
+            if (fd < 0 && (os.errno() == libc.EMFILE || os.errno() == libc.ENFILE)) {
+                lp.fdsOut = true;
+                lp.fdsOutUntil = date.monoMs() + LOOP_PAUSE_MS;
+                continue;
+            }
+            if (fd >= 0) { libc.close(fd); }
         }
         lp.fdsOut = false;
         fd = net.accept(lfd, true);
