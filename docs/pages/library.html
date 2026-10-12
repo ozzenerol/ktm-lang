@@ -661,12 +661,16 @@ declared too.</p>
 <h2 id="csv">CSV</h2>
 <p><code>csv.next</code> walks a CSV text without copying it: each call gives the next
 field (<code>csv.FIELD</code>), then the whole row (<code>csv.ROW</code>), and
-<code>csv.EOF</code> at the end. A <code>csv.Item</code> has its number (<code>idx</code>, the
-field in its row or the row) and its <code>text</code>, a <code>u8[]</code> view of the input.
-The views are the raw text: a quoted field keeps its quotes and its doubled <code>""</code>,
-commas and newlines inside quotes don't split, and a row's text includes its <code>\n</code> or
-<code>\r\n</code>. Unquoting is up to you. <code>csv.init</code> takes any <code>u8[]</code>, so
-<code>text[0:n]</code> parses part of a buffer; the input must outlive the parser.</p>
+<code>csv.EOF</code> at the end.</p>
+<ul>
+  <li>A <code>csv.Item</code> has its number (<code>idx</code>, the field in its row or the
+  row) and its <code>text</code>, a <code>u8[]</code> view of the input.</li>
+  <li>The views are the raw text: a quoted field keeps its quotes and its doubled
+  <code>""</code>, commas and newlines inside quotes don't split, and a row's text includes its
+  <code>\n</code> or <code>\r\n</code>. Unquoting is up to you.</li>
+  <li><code>csv.init</code> takes any <code>u8[]</code>, so <code>text[0:n]</code> parses part of
+  a buffer; the input must outlive the parser.</li>
+</ul>
 <pre data-run><code>
 import csv;
 
@@ -725,14 +729,22 @@ gives 3, and a command the shell can't find gives 127. They return -1 if the com
 by a signal or the shell couldn't be run.</p>
 <p><code>proc.shellOutput</code> returns what the command printed to stdout, minus one trailing
 newline, as a new <code>String</code>; format arguments are optional, and <code>%s</code> takes a
-String or a slice as well. It doesn't capture stderr or return the exit status: a failing
-command gives whatever it printed, often <code>""</code>, and a shell that couldn't be started an
-empty String with a null <code>ptr</code>. It returns once the shell exits, without waiting for
-a background job (<code>cmd &amp;</code>) the command started. <code>os.exit(code)</code> ends the
-program. <code>os.eprintf(fmt, ...)</code> is <code>printf</code> to stderr (checked against its
-format the same way), for messages that must not mix into a program's output, and
-<code>os.flush()</code> writes out what <code>printf</code> still holds for stdout: do it before
-starting a command that writes to the same terminal or file.</p>
+String or a slice as well.</p>
+<ul>
+  <li>It doesn't capture stderr or return the exit status: a failing command gives whatever it
+  printed, often <code>""</code>, and a shell that couldn't be started an empty String with a
+  null <code>ptr</code>.</li>
+  <li>It returns once the shell exits, without waiting for a background job
+  (<code>cmd &amp;</code>) the command started.</li>
+</ul>
+<p>Related, in <code>os</code>:</p>
+<ul>
+  <li><code>os.exit(code)</code> ends the program.</li>
+  <li><code>os.eprintf(fmt, ...)</code> is <code>printf</code> to stderr (checked against its
+  format the same way), for messages that must not mix into a program's output.</li>
+  <li><code>os.flush()</code> writes out what <code>printf</code> still holds for stdout: do it
+  before starting a command that writes to the same terminal or file.</li>
+</ul>
 <p>The commands get the program's stdin, stdout and stderr, but none of the files or
 sockets the library opened: those (the <code>net</code> sockets and accepted connections,
 <code>fs.readAll</code>/<code>fs.writeAll</code>'s file, <code>proc.shellOutput</code>'s pipe)
@@ -784,20 +796,28 @@ void main()
 [it's $HOME|a b|] exit 0
 </pre>
 <p>For more control, <code>proc.spawn(argv, &amp;opts)</code> starts the program and returns a
-<code>proc.Proc</code>. In <code>proc.Opts</code> (zero it first: its fields are all optional)
-each of <code>in</code>, <code>out</code> and <code>err</code> is <code>proc.INHERIT</code> (ours,
-the default), <code>proc.PIPE</code> (our end is <code>p.inFd</code>, <code>outFd</code> or
-<code>errFd</code>), <code>proc.DEVNULL</code> (<code>/dev/null</code>) or, for <code>err</code>,
-<code>proc.STDOUT</code> (2&gt;&amp;1), or <code>proc.FD</code> (below); <code>cwd</code> and <code>env</code> (a null-terminated
-<code>"NAME=value"</code> list that replaces the environment) are optional.
-<code>proc.communicate(p, input, &amp;out, &amp;err)</code> writes the input (a <code>u8[]</code>),
-reads both outputs to the end into Strings and waits, all in one <code>poll()</code> loop, so a
-program that writes a lot to both, or echoes its input, can't block; pass <code>null</code> for
-an output you don't want (it is still read, and dropped). <code>proc.wait(p)</code> returns the
-exit code, or -1 when a signal killed the program (<code>p.termSignal</code> says which);
-<code>proc.done(p)</code> checks without waiting, <code>proc.kill(p, sig)</code> signals it (the
-whole group with <code>newGroup</code> or <code>pgid</code>, below), and <code>proc.release(p)</code> closes the pipes and
-frees it, waiting for a program that is still running.</p>
+<code>proc.Proc</code>. In <code>proc.Opts</code> (zero it first: its fields are all
+optional):</p>
+<ul>
+  <li>Each of <code>in</code>, <code>out</code> and <code>err</code> is <code>proc.INHERIT</code>
+  (ours, the default), <code>proc.PIPE</code> (our end is <code>p.inFd</code>,
+  <code>outFd</code> or <code>errFd</code>), <code>proc.DEVNULL</code> (<code>/dev/null</code>)
+  or, for <code>err</code>, <code>proc.STDOUT</code> (2&gt;&amp;1), or <code>proc.FD</code>
+  (below).</li>
+  <li><code>cwd</code> and <code>env</code> (a null-terminated <code>"NAME=value"</code> list
+  that replaces the environment) are optional.</li>
+</ul>
+<p>Then, with the <code>Proc</code>:</p>
+<table>
+  <thead><tr><th>Function</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>proc.communicate(p, input, &amp;out, &amp;err)</code></td><td>Writes the input (a <code>u8[]</code>), reads both outputs to the end into Strings and waits, all in one <code>poll()</code> loop, so a program that writes a lot to both, or echoes its input, can't block. Pass <code>null</code> for an output you don't want (it is still read, and dropped).</td></tr>
+    <tr><td><code>proc.wait(p)</code></td><td>The exit code, or -1 when a signal killed the program (<code>p.termSignal</code> says which)</td></tr>
+    <tr><td><code>proc.done(p)</code></td><td>Checks without waiting</td></tr>
+    <tr><td><code>proc.kill(p, sig)</code></td><td>Signals it (the whole group with <code>newGroup</code> or <code>pgid</code>, below)</td></tr>
+    <tr><td><code>proc.release(p)</code></td><td>Closes the pipes and frees it, waiting for a program that is still running</td></tr>
+  </tbody>
+</table>
 <pre data-run><code>
 import mem, proc;
 
@@ -824,21 +844,27 @@ out=HELLO
  exit=3
 </pre>
 <h4 id="pipelines">Pipelines and process groups</h4>
-<p><code>proc.FD</code> gives the program an fd of yours as its stdin, stdout or stderr: set
-<code>opts.in = proc.FD</code> and <code>opts.inFd</code> (likewise <code>out</code>/<code>outFd</code>
-and <code>err</code>/<code>errFd</code>). With <code>proc.pipe(fds)</code> (a pipe whose ends are
-close-on-exec and above 2) that connects processes the way a shell's <code>a | b | c</code> does:
-each stage gets the read end of the pipe before it and the write end of the pipe after it, and you
-close your copies of both once it is started, so the last reader sees end of input.
-<code>opts.newGroup</code> starts the program in a new process group that it leads, and
-<code>opts.pgid</code> puts it into an existing one: the later stages of a pipeline join the first
-one's (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or a terminal's Ctrl-C with
-the group in the foreground (<code>libc.tcsetpgrp</code>), reaches all of them.
-<code>opts.dups</code> lists more fds for the child as pairs <code>{from, to, ...}</code>
-(<code>opts.ndups</code> pairs), applied in order after stdin, stdout and stderr like a shell's
-<code>3&gt;file</code> or <code>2&gt;&amp;1</code>. A program that reaps its children itself
-(a shell's <code>waitpid(-1)</code>, <code>coro.waitChild</code>) frees a Proc with
-<code>proc.disown(p)</code>, which doesn't wait.</p>
+<p>Pipelines, process groups and more fds:</p>
+<ul>
+  <li><code>proc.FD</code> gives the program an fd of yours as its stdin, stdout or stderr: set
+  <code>opts.in = proc.FD</code> and <code>opts.inFd</code> (likewise
+  <code>out</code>/<code>outFd</code> and <code>err</code>/<code>errFd</code>).</li>
+  <li>With <code>proc.pipe(fds)</code> (a pipe whose ends are close-on-exec and above 2) that
+  connects processes the way a shell's <code>a | b | c</code> does: each stage gets the read end
+  of the pipe before it and the write end of the pipe after it, and you close your copies of
+  both once it is started, so the last reader sees end of input.</li>
+  <li><code>opts.newGroup</code> starts the program in a new process group that it leads, and
+  <code>opts.pgid</code> puts it into an existing one: the later stages of a pipeline join the
+  first one's (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or a terminal's
+  Ctrl-C with the group in the foreground (<code>libc.tcsetpgrp</code>), reaches all of
+  them.</li>
+  <li><code>opts.dups</code> lists more fds for the child as pairs <code>{from, to, ...}</code>
+  (<code>opts.ndups</code> pairs), applied in order after stdin, stdout and stderr like a
+  shell's <code>3&gt;file</code> or <code>2&gt;&amp;1</code>.</li>
+  <li>A program that reaps its children itself (a shell's <code>waitpid(-1)</code>,
+  <code>coro.waitChild</code>) frees a Proc with <code>proc.disown(p)</code>, which doesn't
+  wait.</li>
+</ul>
 <pre data-run><code>
 import libc, mem, proc;
 
@@ -893,21 +919,24 @@ set; <code>proc.hasEnv(name)</code> tells an empty value from a missing one),
 program and the ones it starts. <code>proc.selfPath()</code> is the running executable's absolute
 path (under <code>ktm -jit</code>, ktm's own), and <code>proc.cpuCount()</code> the CPUs
 online.</p>
-<p>A status from <code>libc.waitpid</code> or <code>libc.system</code> is read with
-<code>proc.exited(st)</code> and <code>proc.exitCode(st)</code>, <code>proc.signaled(st)</code>
-and <code>proc.termSignal(st)</code>, <code>proc.stopped(st)</code> and
-<code>proc.stopSignal(st)</code>; <code>proc.statusCode(st)</code> is what a shell puts in
-<code>$?</code>: the exit code, or 128 plus the signal. <code>proc.exitFd(pid)</code> is a
-file descriptor that polls readable once child <code>pid</code> has exited (a pidfd on Linux, a
-kqueue on macOS; -1 where the system can't make one, so check with <code>waitpid</code> and
-<code>WNOHANG</code> then): put it in your own <code>poll</code> loop instead of waking up every
-so often to reap, then <code>waitpid</code> or <code>proc.done</code> the child and close the
-fd. In a coroutine loop, <code>coro.waitChild</code> does all of that. The libc module also declares what
-shells and daemons call directly: <code>dup</code>, <code>dup2</code>, <code>setpgid</code>,
-<code>tcsetpgrp</code>, <code>getpid</code>, <code>setsid</code>, <code>readlink</code>,
-<code>realpath</code>, <code>pread</code>, <code>setrlimit</code> and more, with the common
-<code>errno</code> codes (<code>EEXIST</code>, <code>EMFILE</code>, <code>ENOTEMPTY</code>, ...)
-for each platform.</p>
+<ul>
+  <li>A status from <code>libc.waitpid</code> or <code>libc.system</code> is read with
+  <code>proc.exited(st)</code> and <code>proc.exitCode(st)</code>, <code>proc.signaled(st)</code>
+  and <code>proc.termSignal(st)</code>, <code>proc.stopped(st)</code> and
+  <code>proc.stopSignal(st)</code>. <code>proc.statusCode(st)</code> is what a shell puts in
+  <code>$?</code>: the exit code, or 128 plus the signal.</li>
+  <li><code>proc.exitFd(pid)</code> is a file descriptor that polls readable once child
+  <code>pid</code> has exited (a pidfd on Linux, a kqueue on macOS; -1 where the system can't
+  make one, so check with <code>waitpid</code> and <code>WNOHANG</code> then). Put it in your own
+  <code>poll</code> loop instead of waking up every so often to reap, then <code>waitpid</code>
+  or <code>proc.done</code> the child and close the fd. In a coroutine loop,
+  <code>coro.waitChild</code> does all of that.</li>
+  <li>The libc module also declares what shells and daemons call directly: <code>dup</code>,
+  <code>dup2</code>, <code>setpgid</code>, <code>tcsetpgrp</code>, <code>getpid</code>,
+  <code>setsid</code>, <code>readlink</code>, <code>realpath</code>, <code>pread</code>,
+  <code>setrlimit</code> and more, with the common <code>errno</code> codes
+  (<code>EEXIST</code>, <code>EMFILE</code>, <code>ENOTEMPTY</code>, ...) for each platform.</li>
+</ul>
 <pre data-run><code>
 import libc, proc;
 
@@ -941,14 +970,19 @@ signal 9, $? 137
 <h2 id="signals">Signals</h2>
 <p><code>signal.handle(sig, handler, flags, mask, &amp;old)</code> sets what happens when a signal arrives:
 <code>SIG_DFL</code>, <code>SIG_IGN</code>, or a function <code>void F(i32 sig)</code> passed as
-<code>(&amp;F)(i64)</code>. <code>flags</code> defaults to <code>SA_RESTART</code>, which makes a
-blocking <code>read</code>, <code>write</code> or <code>accept</code> carry on after the handler; pass 0 to
-have it return -1 with <code>os.errno() == EINTR</code> instead (<code>poll</code> always does).
-<code>mask</code> (<code>signal.bit(SIGUSR2) | ...</code>) holds other signals back while the handler runs,
-and <code>old</code>, if given, receives the previous action, so it can be put back with
-<code>signal.action(sig, &amp;old)</code>. <code>libc.signal(sig, handler)</code>, C's
-<code>signal</code>, is the same as <code>signal.handle</code> with <code>SA_RESTART</code>, and the
-two can be mixed.</p>
+<code>(&amp;F)(i64)</code>.</p>
+<ul>
+  <li><code>flags</code> defaults to <code>SA_RESTART</code>, which makes a blocking
+  <code>read</code>, <code>write</code> or <code>accept</code> carry on after the handler; pass 0
+  to have it return -1 with <code>os.errno() == EINTR</code> instead (<code>poll</code> always
+  does).</li>
+  <li><code>mask</code> (<code>signal.bit(SIGUSR2) | ...</code>) holds other signals back while
+  the handler runs.</li>
+  <li><code>old</code>, if given, receives the previous action, so it can be put back with
+  <code>signal.action(sig, &amp;old)</code>.</li>
+</ul>
+<p><code>libc.signal(sig, handler)</code>, C's <code>signal</code>, is the same as
+<code>signal.handle</code> with <code>SA_RESTART</code>, and the two can be mixed.</p>
 <pre data-run><code>
 import cstr, libc, signal;
 
@@ -971,12 +1005,14 @@ void main()
 <pre class="output">
 2 signals, previous handler SIG_DFL: 1
 </pre>
-<p>A handler interrupts the program wherever it is, on whichever thread the signal reached, so it
-may only set a global variable, call <code>write</code>, <code>_exit</code>, <code>kill</code> or
-<code>raise</code>, and keep <code>os.errno()</code> as it found it. Allocating, printing,
-<code>throw</code> or taking a mutex there can deadlock or corrupt memory: the interrupted code may be
-in the middle of the same thing. Actions are shared by all threads, and a signal sent to the
-process is handled by one of them, whichever doesn't block it.</p>
+<div class="warn"><p><strong>What a handler may do.</strong> A handler interrupts the program
+wherever it is, on whichever thread the signal reached, so it may only set a global variable,
+call <code>write</code>, <code>_exit</code>, <code>kill</code> or <code>raise</code>, and keep
+<code>os.errno()</code> as it found it. Allocating, printing, <code>throw</code> or taking a
+mutex there can deadlock or corrupt memory: the interrupted code may be in the middle of the
+same thing.</p>
+<p>Actions are shared by all threads, and a signal sent to the process is handled by one of
+them, whichever doesn't block it.</p></div>
 <p>For a server built around <code>poll()</code>, <code>signal.stopInit()</code> does this for SIGINT and
 SIGTERM: it returns an fd to add to the poll set, which becomes readable when either signal
 arrives, and from then on <code>signal.stopRequested()</code> is TRUE (<code>signal.stopSignal()</code> says
@@ -1127,19 +1163,24 @@ comparator as above, and <code>sort.asc(s)</code> for numbers
 
 <h2 id="sets">Sets and trees</h2>
 <p><code>set.Set&lt;T&gt;</code> is a hash set of <code>T</code>. It is a value: make one with
-<code>set.new&lt;T&gt;()</code> and free it with <code>s.free()</code>, or with <code>ad</code>.
-<code>s.add(v)</code> returns true when <code>v</code> is new, <code>s.delete(v)</code> true when it
-was there, <code>s.has(v)</code> tells, <code>s.len</code> counts and <code>s.clear()</code> empties
-it; all are O(1) on average. <code>unionWith</code>, <code>intersection</code>, <code>diff</code> (in
-the first set, not the second) and <code>symDiff</code> (in exactly one) take a pointer to the other
-set and return a new one, leaving both alone; <code>isSubset</code> and <code>equals</code> compare
-two sets. Walk it in the order values were added with
-<code>i64 it = 0; while (s.next(&amp;it, &amp;v)) { ... }</code>; <code>s.items()</code> gives the
-values as a <code>vec.Vec&lt;T&gt;</code> (yours to free), which <code>sortAsc()</code> puts in
-order. Values are hashed and compared like <code>map.Map</code>'s keys (the integer types,
-pointers, <code>u8[]</code> and <code>String</code>, and any other type byte by byte), and
-<code>u8[]</code> and <code>String</code> values are copied into the set. For a set kept in order,
-use a <code>map.Tree</code>.</p>
+<code>set.new&lt;T&gt;()</code> and free it with <code>s.free()</code>, or with <code>ad</code>.</p>
+<ul>
+  <li><code>s.add(v)</code> returns true when <code>v</code> is new, <code>s.delete(v)</code>
+  true when it was there, <code>s.has(v)</code> tells, <code>s.len</code> counts and
+  <code>s.clear()</code> empties it; all are O(1) on average.</li>
+  <li><code>unionWith</code>, <code>intersection</code>, <code>diff</code> (in the first set, not
+  the second) and <code>symDiff</code> (in exactly one) take a pointer to the other set and
+  return a new one, leaving both alone; <code>isSubset</code> and <code>equals</code> compare two
+  sets.</li>
+  <li>Walk it in the order values were added with
+  <code>i64 it = 0; while (s.next(&amp;it, &amp;v)) { ... }</code>; <code>s.items()</code> gives
+  the values as a <code>vec.Vec&lt;T&gt;</code> (yours to free), which <code>sortAsc()</code>
+  puts in order.</li>
+  <li>Values are hashed and compared like <code>map.Map</code>'s keys (the integer types,
+  pointers, <code>u8[]</code> and <code>String</code>, and any other type byte by byte), and
+  <code>u8[]</code> and <code>String</code> values are copied into the set.</li>
+</ul>
+<p>For a set kept in order, use a <code>map.Tree</code>.</p>
 <pre data-run><code>
 import set, vec;
 
@@ -1180,15 +1221,19 @@ seen apple before: 1
 <p><code>map.Tree&lt;K, V&gt;</code> maps keys to values in key order (a red-black tree). It is a value: make one with
 <code>map.treeNew&lt;K, V&gt;()</code> and free it with <code>t.free()</code>, so
 <code>ad map.Tree&lt;u8[], i64&gt; t = map.treeNew&lt;u8[], i64&gt;();</code> frees it at the end
-of the scope. <code>t.set(k, v)</code> adds a key or replaces its value,
-<code>t.get(k, &amp;v)</code> fills <code>v</code> and returns true (false for a missing key,
-<code>v</code> untouched), <code>t.getOr(k, def)</code> returns the value or <code>def</code>,
-<code>t.has(k)</code>, <code>t.delete(k)</code> (true if the key was there), <code>t.len</code>
-and <code>t.clear()</code>. Walk it in key order with
-<code>for (auto n = t.first(); n; n = t.after(n))</code>, reading <code>n.key</code> and
-<code>n.value</code>, or backwards with <code>t.last()</code> and <code>t.before(n)</code>. A delete
-leaves the other nodes where they are, so during a walk take <code>t.after(n)</code> before
-deleting <code>n</code>.</p>
+of the scope.</p>
+<ul>
+  <li><code>t.set(k, v)</code> adds a key or replaces its value.</li>
+  <li><code>t.get(k, &amp;v)</code> fills <code>v</code> and returns true (false for a missing
+  key, <code>v</code> untouched); <code>t.getOr(k, def)</code> returns the value or
+  <code>def</code>.</li>
+  <li><code>t.has(k)</code>, <code>t.delete(k)</code> (true if the key was there),
+  <code>t.len</code> and <code>t.clear()</code>.</li>
+  <li>Walk it in key order with <code>for (auto n = t.first(); n; n = t.after(n))</code>,
+  reading <code>n.key</code> and <code>n.value</code>, or backwards with <code>t.last()</code> and
+  <code>t.before(n)</code>. A delete leaves the other nodes where they are, so during a walk take
+  <code>t.after(n)</code> before deleting <code>n</code>.</li>
+</ul>
 <p>Keys are ordered by <code>map.compare(a, b)</code>, an overloaded function returning less than
 0, 0 or more than 0: there are overloads for the integer types, <code>f64</code> and
 <code>u8[]</code> (bytes, then length, which covers <code>String</code>). For a key type of your
@@ -1310,13 +1355,17 @@ void main()
 <h2 id="bytes">Byte buffers</h2>
 <p>Module <code>bytes</code> is for binary data that comes and goes in pieces: what a socket
 or a pipe delivers, or a message being put together. A <code>bytes.Buffer</code> is a queue of
-bytes: <code>append(u8[])</code>, <code>appendByte(b)</code> and
-<code>appendBe16/32/64</code> / <code>appendLe16/32/64</code> add at the end,
-<code>data()</code> is a view of the unread bytes, and <code>consume(n)</code> drops the first
-n once they are used. The space in front is reused, so a buffer that is filled and drained all
-the time doesn't keep growing. Make one with <code>bytes.bufferNew()</code> (a declared Buffer
-isn't zeroed) and free it with <code>b.free()</code>; <code>b.take()</code> gives the unread
-bytes as a String that is yours.</p>
+bytes:</p>
+<ul>
+  <li><code>append(u8[])</code>, <code>appendByte(b)</code> and <code>appendBe16/32/64</code> /
+  <code>appendLe16/32/64</code> add at the end.</li>
+  <li><code>data()</code> is a view of the unread bytes, and <code>consume(n)</code> drops the
+  first n once they are used. The space in front is reused, so a buffer that is filled and
+  drained all the time doesn't keep growing.</li>
+  <li>Make one with <code>bytes.bufferNew()</code> (a declared Buffer isn't zeroed) and free it
+  with <code>b.free()</code>; <code>b.take()</code> gives the unread bytes as a String that is
+  yours.</li>
+</ul>
 <p>To read into one, <code>room(n)</code> gives at least n writable bytes after the data and
 <code>commit(k)</code> counts the k you wrote; <code>b.readFrom(fd)</code> does one
 <code>read</code> that way and <code>b.writeTo(fd)</code> one <code>write</code> of the unread
@@ -1358,15 +1407,19 @@ type 8: hi
 </pre>
 
 <h2 id="hashing">Hashing</h2>
-<p>Module <code>hash</code> has SHA-256, CRC-32, FNV-1a and a constant-time compare.
-<code>hash.sha256(data, out)</code> writes the 32-byte digest of a <code>u8[]</code> into
-<code>out</code> (<code>hash.SHA256_SIZE</code> bytes; a shorter <code>out</code> throws
-<code>ERR_BOUNDS</code>). For data that comes in pieces (a file read in blocks, a body off a
-socket), make a <code>hash.Sha256</code> with <code>hash.sha256New()</code>, give it each piece
-with <code>h.update(piece)</code> and finish with <code>h.final(out)</code>, which also starts it
-over for the next message (<code>h.reset()</code> drops what was fed without finishing). A
-Sha256 holds no memory, so there is nothing to free. <code>hash.hex(bytes)</code> gives the
-lowercase hex of any bytes as a String that is yours.</p>
+<p>Module <code>hash</code> has SHA-256, CRC-32, FNV-1a and a constant-time compare.</p>
+<ul>
+  <li><code>hash.sha256(data, out)</code> writes the 32-byte digest of a <code>u8[]</code> into
+  <code>out</code> (<code>hash.SHA256_SIZE</code> bytes; a shorter <code>out</code> throws
+  <code>ERR_BOUNDS</code>).</li>
+  <li>For data that comes in pieces (a file read in blocks, a body off a socket), make a
+  <code>hash.Sha256</code> with <code>hash.sha256New()</code>, give it each piece with
+  <code>h.update(piece)</code> and finish with <code>h.final(out)</code>, which also starts it
+  over for the next message (<code>h.reset()</code> drops what was fed without finishing). A
+  Sha256 holds no memory, so there is nothing to free.</li>
+  <li><code>hash.hex(bytes)</code> gives the lowercase hex of any bytes as a String that is
+  yours.</li>
+</ul>
 <p><code>hash.crc32(data)</code> is the IEEE CRC-32 that zip, gzip and PNG use. It chains:
 <code>hash.crc32(b, hash.crc32(a))</code> is the CRC of a followed by b.
 <code>hash.fnv1a(data)</code> is a fast 64-bit hash for tables, sharding and cache keys (the one
@@ -1409,12 +1462,18 @@ crc32 cbf43926, chained cbf43926
 <p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
 returns its root; the text can be any one JSON value (an object, array, string, number,
 boolean or <code>null</code>). It always returns a root: check <code>json.ok</code> before
-using it, and free it with <code>json.release</code> either way. <code>json.select(node,
-path)</code> walks a path from any node: <code>.key</code> for an object member,
-<code>[n]</code> for an array item, and a type check that must match: <code>:s</code>
-string, <code>:i</code> integer, <code>:f</code> float, <code>:b</code> boolean,
-<code>:a</code> array, <code>:o</code> object, <code>:!</code> null. It returns
-<code>null</code> if the path doesn't match or is malformed (<code>[1x]</code>,
+using it, and free it with <code>json.release</code> either way.</p>
+<p><code>json.select(node, path)</code> walks a path from any node:</p>
+<table>
+  <thead><tr><th>In a path</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>.key</code></td><td>An object member</td></tr>
+    <tr><td><code>[n]</code></td><td>An array item</td></tr>
+    <tr><td><code>:s</code> <code>:i</code> <code>:f</code> <code>:b</code></td><td>A type check that must match: string, integer, float, boolean</td></tr>
+    <tr><td><code>:a</code> <code>:o</code> <code>:!</code></td><td>Array, object, null</td></tr>
+  </tbody>
+</table>
+<p>It returns <code>null</code> if the path doesn't match or is malformed (<code>[1x]</code>,
 <code>..a</code>, a trailing <code>.</code>).</p>
 <pre data-run><code>
 import json;
@@ -1456,26 +1515,37 @@ tag jit
 tag repl
 {"name": "ktm","version": 15,"ratio": 0.75,"tags": ["jit","repl"],"stable": false,"owner": null}
 </pre>
-<p>Each node has a <code>type</code> and its value in the matching field:
-<code>json.STRING</code> in <code>str</code> (a <code>u8[]</code>), <code>json.INT</code> in <code>intVal</code>,
-<code>json.FLOAT</code> in <code>floatVal</code>, <code>json.BOOL</code> in
-<code>boolean</code>, <code>json.NULL</code>, <code>json.STRNUM</code> in
-<code>strnum</code> (see below), and <code>json.ARRAY</code> / <code>json.OBJECT</code>,
-whose <code>array</code> / <code>object</code> points at the first item or member - or is
-<code>null</code> when the array or object is empty. A member has its name in
-<code>key</code> (a <code>u8[]</code>), and <code>next</code> leads to the following item or
-member, so that is how you iterate. <code>str</code> and <code>key</code> are views of bytes
-the document owns (each with a NUL after it, so <code>.ptr</code> is a C string).</p>
+<p>Each node has a <code>type</code> and its value in the matching field:</p>
+<table>
+  <thead><tr><th><code>type</code></th><th>Value in</th></tr></thead>
+  <tbody>
+    <tr><td><code>json.STRING</code></td><td><code>str</code> (a <code>u8[]</code>)</td></tr>
+    <tr><td><code>json.INT</code></td><td><code>intVal</code></td></tr>
+    <tr><td><code>json.FLOAT</code></td><td><code>floatVal</code></td></tr>
+    <tr><td><code>json.BOOL</code></td><td><code>boolean</code></td></tr>
+    <tr><td><code>json.NULL</code></td><td>(none)</td></tr>
+    <tr><td><code>json.STRNUM</code></td><td><code>strnum</code> (see below)</td></tr>
+    <tr><td><code>json.ARRAY</code> / <code>json.OBJECT</code></td><td><code>array</code> / <code>object</code>, the first item or member, or <code>null</code> when the array or object is empty</td></tr>
+  </tbody>
+</table>
+<p>A member has its name in <code>key</code> (a <code>u8[]</code>), and <code>next</code> leads
+to the following item or member, so that is how you iterate. <code>str</code> and
+<code>key</code> are views of bytes the document owns (each with a NUL after it, so
+<code>.ptr</code> is a C string).</p>
 
 <h3>Wildcards and getters</h3>
-<p>A <code>*</code> in a path takes the next argument: an <code>i64</code> inside
-<code>[]</code>, a string after <code>.</code>, and it can be part of a name
-(<code>.price_*</code>). Each part of a path is at most 256 bytes, and a key that contains
-<code>.</code> <code>[</code> <code>]</code> <code>:</code> or <code>*</code> can't be written
-in a path. <code>json.objectGet(obj, key)</code> (any <code>u8[]</code>, all its bytes) and <code>json.arrayGet(arr, i)</code> take
-any key or index directly (<code>null</code> if it isn't there or the node has the wrong
-type), and <code>json.len</code> counts the items of an array or object (0 for anything
-else). If a key appears twice, both members are kept; selecting it finds the first.</p>
+<ul>
+  <li>A <code>*</code> in a path takes the next argument: an <code>i64</code> inside
+  <code>[]</code>, a string after <code>.</code>, and it can be part of a name
+  (<code>.price_*</code>).</li>
+  <li>Each part of a path is at most 256 bytes, and a key that contains <code>.</code>
+  <code>[</code> <code>]</code> <code>:</code> or <code>*</code> can't be written in a path.
+  <code>json.objectGet(obj, key)</code> (any <code>u8[]</code>, all its bytes) and
+  <code>json.arrayGet(arr, i)</code> take any key or index directly (<code>null</code> if it
+  isn't there or the node has the wrong type).</li>
+  <li><code>json.len</code> counts the items of an array or object (0 for anything else).</li>
+  <li>If a key appears twice, both members are kept; selecting it finds the first.</li>
+</ul>
 <pre data-run><code>
 import json;
 
@@ -1513,11 +1583,15 @@ rows[1][0] = 3, rows[5]: 1
 <h3>Writing JSON and freeing</h3>
 <p><code>json.toStr(node)</code> returns the JSON text of that node's value as a String
 that is yours: for an inner node just its value, without its key or the nodes
-after it. Members are written as <code>"key": value</code> and items are separated by
-<code>,</code> without a space. Floats get 15, 16 or 17 significant digits, the fewest that
-read back as the same value, always with a decimal point (<code>0.75</code>,
-<code>2.0</code>, <code>1.0e+21</code>); infinity and NaN, which JSON lacks, are written as
-<code>null</code>. Strings are escaped (<code>\"</code>, <code>\\</code>, <code>\n</code>,
+after it.</p>
+<ul>
+  <li>Members are written as <code>"key": value</code> and items are separated by
+  <code>,</code> without a space.</li>
+  <li>Floats get 15, 16 or 17 significant digits, the fewest that read back as the same value,
+  always with a decimal point (<code>0.75</code>, <code>2.0</code>, <code>1.0e+21</code>);
+  infinity and NaN, which JSON lacks, are written as <code>null</code>.</li>
+</ul>
+<p>Strings are escaped (<code>\"</code>, <code>\\</code>, <code>\n</code>,
 <code>\t</code>, ..., <code>\u00XX</code> for other control characters), so the output
 parses back to the same values.</p>
 <p>The nodes inside a document - whatever <code>json.select</code>, the getters and
@@ -1547,19 +1621,26 @@ void main()
 </pre>
 
 <h3>Building JSON with a Writer</h3>
-<p>A <code>json.Writer</code> builds a document into a String without a tree: open arrays
-and objects with <code>beginArray()</code> / <code>beginObject()</code> and close the innermost
-one with <code>end()</code>, give each member's name with <code>key(k)</code>, and add values
-with <code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code>,
-<code>nil()</code> (JSON's <code>null</code>: <code>null</code> is a keyword),
-<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String),
-<code>cstr(p)</code> (a NUL-terminated <code>u8 *</code>; a null pointer is <code>null</code>) and
-<code>raw(text)</code> (JSON text made elsewhere, checked to be one value). Commas, quotes
-and escapes are written for you, the same escapes and float digits as <code>json.toStr</code>.
-<code>w.take()</code> returns the finished document as a String that is yours and leaves the
-Writer empty for the next one; <code>w.free()</code> frees what it holds. Make one with
+<p>A <code>json.Writer</code> builds a document into a String without a tree. Make one with
 <code>json.writerNew()</code> (a declared Writer isn't zeroed); <code>json.writerNew(2)</code>
 puts each member and item on its own line, indented 2 spaces per level.</p>
+<table>
+  <thead><tr><th>Method</th><th>Writes</th></tr></thead>
+  <tbody>
+    <tr><td><code>beginArray()</code> / <code>beginObject()</code></td><td>Opens an array or object</td></tr>
+    <tr><td><code>end()</code></td><td>Closes the innermost one</td></tr>
+    <tr><td><code>key(k)</code></td><td>The next member's name</td></tr>
+    <tr><td><code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code></td><td>A number or boolean</td></tr>
+    <tr><td><code>nil()</code></td><td>JSON's <code>null</code> (<code>null</code> is a keyword)</td></tr>
+    <tr><td><code>str(s)</code></td><td>Any <code>u8[]</code>: a literal, a slice or a String</td></tr>
+    <tr><td><code>cstr(p)</code></td><td>A NUL-terminated <code>u8 *</code>; a null pointer is <code>null</code></td></tr>
+    <tr><td><code>raw(text)</code></td><td>JSON text made elsewhere, checked to be one value</td></tr>
+  </tbody>
+</table>
+<p>Commas, quotes and escapes are written for you, the same escapes and float digits as
+<code>json.toStr</code>. <code>w.take()</code> returns the finished document as a String that is
+yours and leaves the Writer empty for the next one; <code>w.free()</code> frees what it
+holds.</p>
 <p>A call out of order throws <code>json.ERR_WRITER</code>, and so does a value JSON can't
 hold: a value where a key is expected, <code>key()</code> outside an object,
 <code>end()</code> with nothing open, a second top-level value, <code>take()</code> with
@@ -1595,12 +1676,17 @@ key(): no object is open
 </pre>
 
 <h3>Errors and strictness</h3>
-<p>The parser follows RFC 8259 strictly. It rejects trailing commas, anything after the
-top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
-<code>1.</code>, <code>1e</code> or hex, raw control characters (tab, newline, ...) inside
-strings, whitespace other than space, tab, newline and carriage return, anything but whitespace
-between a key and its <code>:</code>, and arrays and objects nested more than
-<code>json.MAX_DEPTH</code> (512) deep. On an error <code>json.errorStr(root)</code>
+<p>The parser follows RFC 8259 strictly. It rejects:</p>
+<ul>
+  <li>trailing commas, and anything after the top-level value;</li>
+  <li>numbers like <code>01</code>, <code>+1</code>, <code>.5</code>, <code>1.</code>,
+  <code>1e</code> or hex;</li>
+  <li>raw control characters (tab, newline, ...) inside strings;</li>
+  <li>whitespace other than space, tab, newline and carriage return, and anything but whitespace
+  between a key and its <code>:</code>;</li>
+  <li>arrays and objects nested more than <code>json.MAX_DEPTH</code> (512) deep.</li>
+</ul>
+<p>On an error <code>json.errorStr(root)</code>
 returns the message as a String (one without a <code>ptr</code> if there was no error) and
 <code>json.printError</code> prints it; both say where, as a line and a byte column, also
 found in <code>root-&gt;state</code> with the error code (<code>error</code>, <code>line</code>,
@@ -1702,16 +1788,27 @@ price 9.90
 </pre>
 
 <h3 id="json-structs">Structs to JSON and back</h3>
-<p><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
-<a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
-as the second argument for one member per line). <code>json.decode&lt;T&gt;(text)</code> returns
-the JSON as a <code>T</code> (a struct, a pointer to one, a slice, a String, a number), with the
-fields the JSON leaves out zero, and <code>json.free(reflect.of(x))</code> gives back what decode
-allocated. <code>json.decode(text, reflect.of(x))</code> fills a value you already have instead. A struct is an object of its fields by name, in order; ints, floats and bools are
-numbers and <code>true</code>/<code>false</code>; an enum is its member's name; a
-<code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array is a string;
-other arrays and slices are arrays; a pointer is what it points to, or <code>null</code>.
-Private fields are skipped. A union, a function or a <code>void *</code> can't be JSON.</p>
+<ul>
+  <li><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
+  <a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
+  as the second argument for one member per line).</li>
+  <li><code>json.decode&lt;T&gt;(text)</code> returns the JSON as a <code>T</code> (a struct, a
+  pointer to one, a slice, a String, a number), with the fields the JSON leaves out zero.
+  <code>json.decode(text, reflect.of(x))</code> fills a value you already have instead.</li>
+  <li><code>json.free(reflect.of(x))</code> gives back what decode allocated.</li>
+</ul>
+<table>
+  <thead><tr><th>ktm</th><th>JSON</th></tr></thead>
+  <tbody>
+    <tr><td>A struct</td><td>An object of its fields by name, in order (private fields are skipped)</td></tr>
+    <tr><td>Ints, floats and bools</td><td>Numbers and <code>true</code>/<code>false</code></td></tr>
+    <tr><td>An enum</td><td>Its member's name</td></tr>
+    <tr><td>A <code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array</td><td>A string</td></tr>
+    <tr><td>Other arrays and slices</td><td>Arrays</td></tr>
+    <tr><td>A pointer</td><td>What it points to, or <code>null</code></td></tr>
+  </tbody>
+</table>
+<p>A union, a function or a <code>void *</code> can't be JSON.</p>
 <pre data-run><code>
 import json, reflect;
 
@@ -1743,15 +1840,19 @@ void main()
 {"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
 tags[0].weight: expected an integer, got a string
 </pre>
-<p>A key the struct has no field for is ignored (<code>"since"</code> above). A field the JSON
-leaves out is zero with <code>json.decode&lt;T&gt;</code>, and keeps what it had with the
-<code>reflect.of(x)</code> form, so zero the value first there; with <code>json.STRICT</code> as the
-flags argument (<code>json.decode&lt;User&gt;(text, json.STRICT)</code>) both are errors. When
-<code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
-with where it is (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. Decode
-allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it fills in;
-<code>json.free</code> frees them all and zeroes them, also after a decode that threw half way,
-so use it only on values decode filled.</p>
+<ul>
+  <li>A key the struct has no field for is ignored (<code>"since"</code> above).</li>
+  <li>A field the JSON leaves out is zero with <code>json.decode&lt;T&gt;</code>, and keeps what
+  it had with the <code>reflect.of(x)</code> form, so zero the value first there. With
+  <code>json.STRICT</code> as the flags argument
+  (<code>json.decode&lt;User&gt;(text, json.STRICT)</code>) both are errors.</li>
+  <li>Anything that doesn't fit throws <code>json.ERR_DECODE</code> with where it is
+  (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. When
+  <code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in.</li>
+  <li>Decode allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it
+  fills in; <code>json.free</code> frees them all and zeroes them, also after a decode that
+  threw half way, so use it only on values decode filled.</li>
+</ul>
 
 <h2 id="dates">Dates and time</h2>
 <pre data-run><code>
@@ -1796,27 +1897,31 @@ elapsed ms is never negative: 1
 02/29/2024 12:34:00
 2024-02-29, day of week 4
 </pre>
-<p><code>date.now()</code> returns a <code>date.Date</code>, and
-<code>date.toParts</code> / <code>date.fromParts</code> convert between it and a
-<code>date.Parts</code>, which has <code>year</code>, <code>mon</code>,
-<code>day_of_mon</code>, <code>hour</code>, <code>min</code>, <code>sec</code> and
-<code>day_of_week</code> (0 is Sunday). <code>date.formatDate</code> and
-<code>date.formatTime</code> return Strings as <code>MM/DD/YYYY</code> and
-<code>HH:MM:SS</code>, and <code>date.timestampNow()</code> one as
-<code>YYYY-MM-DD HH:MM:SS</code>. A <code>date.Date</code> is an <code>i64 struct</code>, an integer
-underneath, so <code>date.Date d = 5;</code> and <code>i64 x = d;</code> need no cast,
-and <code>f64 f = d;</code> converts it to a float like any integer (a float assigned to a
-<code>date.Date</code> is truncated, as it would be for an <code>i64</code>).</p>
+<ul>
+  <li><code>date.now()</code> returns a <code>date.Date</code>, and <code>date.toParts</code> /
+  <code>date.fromParts</code> convert between it and a <code>date.Parts</code>, which has
+  <code>year</code>, <code>mon</code>, <code>day_of_mon</code>, <code>hour</code>,
+  <code>min</code>, <code>sec</code> and <code>day_of_week</code> (0 is Sunday).</li>
+  <li><code>date.formatDate</code> and <code>date.formatTime</code> return Strings as
+  <code>MM/DD/YYYY</code> and <code>HH:MM:SS</code>, and <code>date.timestampNow()</code> one as
+  <code>YYYY-MM-DD HH:MM:SS</code>.</li>
+  <li>A <code>date.Date</code> is an <code>i64 struct</code>, an integer underneath, so
+  <code>date.Date d = 5;</code> and <code>i64 x = d;</code> need no cast, and
+  <code>f64 f = d;</code> converts it to a float like any integer (a float assigned to a
+  <code>date.Date</code> is truncated, as it would be for an <code>i64</code>).</li>
+</ul>
 
-<p><code>date.now()</code> and <code>date.nowParts</code> give local time (the
-<code>TZ</code> time zone), not UTC; <code>date.nowParts</code> also sets
-<code>zone_diff</code>, the offset from UTC as &plusmn;hhmm (100 for +01:00), and
-<code>date.nowMs</code> counts from the Unix epoch. Below the seconds a
-<code>date.Parts</code> has <code>sec100</code> (hundredths, 0-99) and
-<code>sec10000</code> (the ten-thousandths below those, 0-99). <code>date.fromParts</code>
-carries fields that are out of range: day 32 of January is February 1, month 13 is
-January of the next year and month 0 December of the year before; the time carries the same
-way, so hour 24 is midnight of the next day.</p>
+<ul>
+  <li><code>date.now()</code> and <code>date.nowParts</code> give local time (the
+  <code>TZ</code> time zone), not UTC; <code>date.nowParts</code> also sets
+  <code>zone_diff</code>, the offset from UTC as &plusmn;hhmm (100 for +01:00), and
+  <code>date.nowMs</code> counts from the Unix epoch.</li>
+  <li>Below the seconds a <code>date.Parts</code> has <code>sec100</code> (hundredths, 0-99) and
+  <code>sec10000</code> (the ten-thousandths below those, 0-99).</li>
+  <li><code>date.fromParts</code> carries fields that are out of range: day 32 of January is
+  February 1, month 13 is January of the next year and month 0 December of the year before; the
+  time carries the same way, so hour 24 is midnight of the next day.</li>
+</ul>
 <pre data-run><code>
 import date, mem;
 
@@ -1845,16 +1950,21 @@ which formats a <code>fs.stat</code> time as UTC ISO 8601
 
 <p><code>date.parse(text, format)</code> parses a date with a <code>strptime</code>-like
 format and <code>date.parseParts(text, format, &amp;ds)</code> fills a
-<code>date.Parts</code>. The conversions are <code>%Y</code>, <code>%m</code>,
-<code>%d</code>, <code>%H</code>, <code>%M</code>, <code>%s</code> (or <code>%S</code>) for
-seconds, <code>%a</code> and <code>%b</code> for day and month names (full or three letters,
-any case), <code>%p</code> for AM/PM, <code>%z</code> for a zone offset and <code>%%</code>; a
-space in the format matches any run of spaces, other characters must match exactly.
-Missing time fields are 0, and without <code>%z</code> <code>zone_diff</code> is
-<code>date.NO_ZONE</code> (a value no &plusmn;hhmm offset can have). <code>date.parseParts</code> returns <code>false</code> and
-<code>date.parse</code> 0 for empty or short input, text that doesn't match, an unknown
-conversion or an impossible value (month 13, February 30, hour 24, ...);
-<code>date.parse</code> also needs the year, month and day.</p>
+<code>date.Parts</code>.</p>
+<ul>
+  <li>The conversions are <code>%Y</code>, <code>%m</code>, <code>%d</code>, <code>%H</code>,
+  <code>%M</code>, <code>%s</code> (or <code>%S</code>) for seconds, <code>%a</code> and
+  <code>%b</code> for day and month names (full or three letters, any case), <code>%p</code> for
+  AM/PM, <code>%z</code> for a zone offset and <code>%%</code>.</li>
+  <li>A space in the format matches any run of spaces; other characters must match
+  exactly.</li>
+  <li>Missing time fields are 0, and without <code>%z</code> <code>zone_diff</code> is
+  <code>date.NO_ZONE</code> (a value no &plusmn;hhmm offset can have).</li>
+  <li><code>date.parseParts</code> returns <code>false</code> and <code>date.parse</code> 0 for
+  empty or short input, text that doesn't match, an unknown conversion or an impossible value
+  (month 13, February 30, hour 24, ...); <code>date.parse</code> also needs the year, month and
+  day.</li>
+</ul>
 <pre data-run><code>
 import date;
 
@@ -1921,15 +2031,17 @@ Sunday 06 November 1994, day 310
 <code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
 <code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code>, <code>math.power</code>,
 <code>math.min(a, b)</code>, <code>math.max(a, b)</code> and <code>math.clamp(v, lo, hi)</code>
-(all on <code>i64</code>), and the
-constants <code>math.PI</code>, <code>math.E</code>, <code>math.SQRT2</code> and the rest of C's
-<code>M_*</code> set.
-<code>math.gcd</code> ignores signs: <code>math.gcd(0, n)</code> is <code>|n|</code> and
-<code>math.gcd(0, 0)</code> is 0. <code>math.power</code> takes an <code>f64</code> exponent: integral
-ones use exact repeated squaring (<code>math.power(2, 10)</code> is 1024.0) and the rest go to
-<code>pow</code>, so <code>math.power(4.0, 0.5)</code> is 2.0. <code>math.abs</code> returns an
-<code>i64</code>; like C's <code>labs</code>, <code>math.abs(I64_MIN)</code> is
-<code>I64_MIN</code>. Use <code>fabs</code> for floats.</p>
+(all on <code>i64</code>), and the constants <code>math.PI</code>, <code>math.E</code>,
+<code>math.SQRT2</code> and the rest of C's <code>M_*</code> set.</p>
+<ul>
+  <li><code>math.gcd</code> ignores signs: <code>math.gcd(0, n)</code> is <code>|n|</code> and
+  <code>math.gcd(0, 0)</code> is 0.</li>
+  <li><code>math.power</code> takes an <code>f64</code> exponent: integral ones use exact
+  repeated squaring (<code>math.power(2, 10)</code> is 1024.0) and the rest go to
+  <code>pow</code>, so <code>math.power(4.0, 0.5)</code> is 2.0.</li>
+  <li><code>math.abs</code> returns an <code>i64</code>; like C's <code>labs</code>,
+  <code>math.abs(I64_MIN)</code> is <code>I64_MIN</code>. Use <code>fabs</code> for floats.</li>
+</ul>
 <pre data-run><code>
 import cstr, libc, math;
 
@@ -1945,12 +2057,16 @@ void main()
 </pre>
 
 <p>Bit operations on a <code>u32</code> or a <code>u64</code> (cast an <code>i64</code> first: the
-type picks the width): <code>math.rotl(x, n)</code> and <code>math.rotr(x, n)</code> rotate by
-<code>n</code> bits (taken mod the width), <code>math.bswap(x)</code> reverses the bytes (also on
-a <code>u16</code>), <code>math.clz(x)</code> and <code>math.ctz(x)</code> count the leading and
-trailing zero bits (the width for 0) and <code>math.popcount(x)</code> the one bits. Where they
-are called, rotl, rotr, bswap, clz and ctz are one machine instruction each, so hashing and
-binary-format code can use them freely.</p>
+type picks the width):</p>
+<ul>
+  <li><code>math.rotl(x, n)</code> and <code>math.rotr(x, n)</code> rotate by <code>n</code> bits
+  (taken mod the width).</li>
+  <li><code>math.bswap(x)</code> reverses the bytes (also on a <code>u16</code>).</li>
+  <li><code>math.clz(x)</code> and <code>math.ctz(x)</code> count the leading and trailing zero
+  bits (the width for 0) and <code>math.popcount(x)</code> the one bits.</li>
+</ul>
+<p>Where they are called, rotl, rotr, bswap, clz and ctz are one machine instruction each, so
+hashing and binary-format code can use them freely.</p>
 <pre data-run><code>
 import math;
 
@@ -1969,38 +2085,57 @@ void main()
 </pre>
 
 <h2 id="net">Sockets</h2>
-<p><code>net.listen(port, bindaddr, backlog)</code> returns a listening TCP socket,
-<code>net.accept(server)</code> the next connection on it and <code>net.dial(addr, port)</code>
-a connected socket. All three return the socket as an <code>i32</code>, or -1 on failure
-(0 is a valid socket number). Read and write them with <code>read</code>/<code>write</code>
-or <code>recv</code>/<code>send</code>, and <code>close</code> them when done.
-Addresses, like all text here, are a <code>u8[]</code> (a literal, a slice, a String).
-<code>net.dial</code> takes a host name or an IPv4 or IPv6 address and tries every address
-the name resolves to. The server's bind address must be numeric (<code>"127.0.0.1"</code>,
-<code>"::1"</code>), <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6
-address; port 0 lets the kernel pick one. Ports outside 0..65535 give -1.
-<code>net.dial(addr, port, non_blocking, timeout_ms)</code> gives up after
-<code>timeout_ms</code> milliseconds (shared by all the addresses the name resolves to; the
-name lookup itself isn't timed) with -1 and <code>os.errno()</code> <code>ETIMEDOUT</code>;
-0, the default, waits as long as the system does. <code>net.setRecvTimeout(sock, ms)</code>
-and <code>net.setSendTimeout(sock, ms)</code> make a read or a write on a connected socket
-give up after <code>ms</code> milliseconds with -1 and <code>os.errno()</code>
-<code>EAGAIN</code> (a write returns the bytes it got out first, if any).
-Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which ends the
-program, as in C. <code>net.send(sock, data)</code>, with <code>data</code> a
-<code>u8[]</code> (a literal, a String, <code>buf[0:n]</code>), is a <code>send</code> that adds
-<code>MSG_NOSIGNAL</code> to its optional flags: it returns -1 with <code>os.errno()</code>
-<code>EPIPE</code> (or <code>ECONNRESET</code>) instead;
-<code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> does the same for every
-<code>write</code> and <code>send</code> in the program (see <a href="#signals">Signals</a>;
-<code>libc.signal(libc.SIGPIPE, libc.SIG_IGN)</code>, C's <code>signal</code>, works too: it
-takes <code>libc.SIG_DFL</code>, <code>libc.SIG_IGN</code> or a handler
-<code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous one
-or <code>libc.SIG_ERR</code>). <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
-<code>SIGKILL</code>, <code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGPIPE</code>,
-<code>SIGALRM</code>, <code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control signals
-<code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
-<code>SIGTTOU</code> are defined in <code>libc</code>, with each platform's numbers.</p>
+<table>
+  <thead><tr><th>Function</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>net.listen(port, bindaddr, backlog)</code></td><td>A listening TCP socket</td></tr>
+    <tr><td><code>net.accept(server)</code></td><td>The next connection on it</td></tr>
+    <tr><td><code>net.dial(addr, port)</code></td><td>A connected socket</td></tr>
+  </tbody>
+</table>
+<p>All three return the socket as an <code>i32</code>, or -1 on failure (0 is a valid socket
+number). Read and write them with <code>read</code>/<code>write</code> or
+<code>recv</code>/<code>send</code>, and <code>close</code> them when done.</p>
+<p><strong>Addresses</strong>, like all text here, are a <code>u8[]</code> (a literal, a slice,
+a String).</p>
+<ul>
+  <li><code>net.dial</code> takes a host name or an IPv4 or IPv6 address and tries every address
+  the name resolves to.</li>
+  <li>The server's bind address must be numeric (<code>"127.0.0.1"</code>, <code>"::1"</code>),
+  <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6 address; port 0 lets
+  the kernel pick one.</li>
+  <li>Ports outside 0..65535 give -1.</li>
+</ul>
+<p><strong>Timeouts:</strong></p>
+<ul>
+  <li><code>net.dial(addr, port, non_blocking, timeout_ms)</code> gives up after
+  <code>timeout_ms</code> milliseconds (shared by all the addresses the name resolves to; the
+  name lookup itself isn't timed) with -1 and <code>os.errno()</code> <code>ETIMEDOUT</code>;
+  0, the default, waits as long as the system does.</li>
+  <li><code>net.setRecvTimeout(sock, ms)</code> and <code>net.setSendTimeout(sock, ms)</code>
+  make a read or a write on a connected socket give up after <code>ms</code> milliseconds with
+  -1 and <code>os.errno()</code> <code>EAGAIN</code> (a write returns the bytes it got out
+  first, if any).</li>
+</ul>
+<p><strong>A closed peer.</strong> Writing to a socket whose peer has closed raises
+<code>SIGPIPE</code>, which ends the program, as in C. Two ways to get an error instead:</p>
+<ul>
+  <li><code>net.send(sock, data)</code>, with <code>data</code> a <code>u8[]</code> (a literal,
+  a String, <code>buf[0:n]</code>), is a <code>send</code> that adds <code>MSG_NOSIGNAL</code>
+  to its optional flags: it returns -1 with <code>os.errno()</code> <code>EPIPE</code> (or
+  <code>ECONNRESET</code>) instead.</li>
+  <li><code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> does the same for every
+  <code>write</code> and <code>send</code> in the program (see <a href="#signals">Signals</a>).
+  <code>libc.signal(libc.SIGPIPE, libc.SIG_IGN)</code>, C's <code>signal</code>, works too: it
+  takes <code>libc.SIG_DFL</code>, <code>libc.SIG_IGN</code> or a handler
+  <code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous
+  one or <code>libc.SIG_ERR</code>.</li>
+</ul>
+<p><code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>, <code>SIGKILL</code>,
+<code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGPIPE</code>, <code>SIGALRM</code>,
+<code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control signals <code>SIGCONT</code>,
+<code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and <code>SIGTTOU</code> are
+defined in <code>libc</code>, with each platform's numbers.</p>
 <pre data-run><code>
 import date, libc, net, os, signal;
 
@@ -2077,14 +2212,19 @@ void main()
   n = libc.recvfrom(fd, buf, sizeof(buf), 0, (libc.sockaddr *)(&from), &fromlen);
 }
 </code></pre>
-<p>For UDP, <code>net.udpSocket(port, bindaddr)</code> returns a bound datagram
-socket (the same bind addresses as <code>net.listen</code>, port 0 picks one:
-<code>net.localPort</code> tells which), <code>net.sendTo(sock, data, addr, port)</code>
-sends one datagram and <code>net.recvFrom(sock, buf, &amp;from, &amp;port)</code> receives one
-into <code>buf</code> (a <code>u8[]</code>) and says who sent it (<code>from</code> a String),
-so a server answers with <code>net.sendTo(sock, reply, from, port)</code>. Both work with IPv4 and IPv6 and return
--1 on failure. A datagram longer than the buffer is cut. <code>net.setRecvTimeout(sock, ms)</code>
-makes reads give up with -1 after <code>ms</code> milliseconds.</p>
+<p>For UDP:</p>
+<ul>
+  <li><code>net.udpSocket(port, bindaddr)</code> returns a bound datagram socket (the same bind
+  addresses as <code>net.listen</code>, port 0 picks one: <code>net.localPort</code> tells
+  which).</li>
+  <li><code>net.sendTo(sock, data, addr, port)</code> sends one datagram and
+  <code>net.recvFrom(sock, buf, &amp;from, &amp;port)</code> receives one into <code>buf</code> (a
+  <code>u8[]</code>) and says who sent it (<code>from</code> a String), so a server answers with
+  <code>net.sendTo(sock, reply, from, port)</code>. Both work with IPv4 and IPv6 and return -1 on
+  failure. A datagram longer than the buffer is cut.</li>
+  <li><code>net.setRecvTimeout(sock, ms)</code> makes reads give up with -1 after
+  <code>ms</code> milliseconds.</li>
+</ul>
 <pre data-run><code>
 import libc, net;
 
@@ -2117,13 +2257,19 @@ client got pong
 it: <code>net.recvFromAddr(sock, buf, &amp;from)</code> fills a <code>net.Addr</code> (a
 <code>sockaddr_storage</code> and its length, IPv4 or IPv6) and
 <code>net.sendToAddr(sock, reply, &amp;from)</code> answers it, with no text and no name lookup
-in between. <code>net.makeAddr(ip, port, &amp;a)</code> makes one from a numeric address
-(<code>"192.0.2.7"</code>, <code>"::1"</code>; false for anything else, host names included),
-and an Addr gives back <code>a.ip()</code> (a String), <code>a.port()</code>,
-<code>a.family()</code> (<code>libc.AF_INET</code> or <code>libc.AF_INET6</code>, 0 when empty),
-<code>a.equals(&amp;b)</code> (the same address and port) and <code>a.sameIp(&amp;b)</code>.
-<code>net.localAddr(sock, &amp;a)</code> and <code>net.remoteAddr(sock, &amp;a)</code> fill one
-with a socket's own address and its peer's (<code>getsockname</code>, <code>getpeername</code>).</p>
+in between.</p>
+<ul>
+  <li><code>net.makeAddr(ip, port, &amp;a)</code> makes one from a numeric address
+  (<code>"192.0.2.7"</code>, <code>"::1"</code>; false for anything else, host names
+  included).</li>
+  <li>An Addr gives back <code>a.ip()</code> (a String), <code>a.port()</code>,
+  <code>a.family()</code> (<code>libc.AF_INET</code> or <code>libc.AF_INET6</code>, 0 when
+  empty), <code>a.equals(&amp;b)</code> (the same address and port) and
+  <code>a.sameIp(&amp;b)</code>.</li>
+  <li><code>net.localAddr(sock, &amp;a)</code> and <code>net.remoteAddr(sock, &amp;a)</code> fill
+  one with a socket's own address and its peer's (<code>getsockname</code>,
+  <code>getpeername</code>).</li>
+</ul>
 <pre data-run><code>
 import libc, net;
 
@@ -2159,24 +2305,28 @@ void main()
 answer to id 42: !, from the server: 1
 </pre>
 
-<p>For code on the raw socket calls: <code>net.htons</code>/<code>net.ntohs</code> and
-<code>net.htonl</code>/<code>net.ntohl</code> convert ports and IPv4 addresses to network byte
-order and back; <code>os.errno()</code> is the C <code>errno</code> of the calling thread
-(<code>os.setErrno(0)</code> clears it), to compare with <code>EAGAIN</code>
+<p>For code on the raw socket calls:</p>
+<ul>
+  <li><code>net.htons</code>/<code>net.ntohs</code> and <code>net.htonl</code>/<code>net.ntohl</code>
+  convert ports and IPv4 addresses to network byte order and back.</li>
+  <li><code>os.errno()</code> is the C <code>errno</code> of the calling thread
+  (<code>os.setErrno(0)</code> clears it), to compare with <code>EAGAIN</code>
 (= <code>EWOULDBLOCK</code>), <code>EINTR</code>, <code>EINPROGRESS</code>,
 <code>ECONNREFUSED</code>, <code>ECONNRESET</code>, <code>EPIPE</code>,
 <code>EADDRINUSE</code>, <code>EADDRNOTAVAIL</code>, <code>ENETUNREACH</code>,
 <code>EHOSTUNREACH</code>, <code>ETIMEDOUT</code>, <code>EMFILE</code>,
 <code>ENFILE</code>, <code>ENOENT</code>, <code>EACCES</code>, <code>ECHILD</code>,
 <code>EBADF</code> and <code>EINVAL</code>, each with the platform's number (several
-differ between Linux and macOS). The flags
-<code>MSG_NOSIGNAL</code>, <code>MSG_DONTWAIT</code>, <code>MSG_PEEK</code>,
-<code>MSG_WAITALL</code>, <code>MSG_TRUNC</code> and <code>MSG_OOB</code>, and
-<code>SHUT_RD</code>/<code>SHUT_WR</code>/<code>SHUT_RDWR</code> for <code>shutdown</code>,
-have each platform's values. <code>poll(fds, n, timeout_ms)</code> waits on an array of
-<code>pollfd</code> (<code>fd</code>, <code>events</code>, <code>revents</code>) with the
-<code>POLLIN</code>, <code>POLLOUT</code>, <code>POLLERR</code>, <code>POLLHUP</code>,
-<code>POLLNVAL</code> and <code>POLLPRI</code> bits.</p>
+differ between Linux and macOS).</li>
+  <li>The flags <code>MSG_NOSIGNAL</code>, <code>MSG_DONTWAIT</code>, <code>MSG_PEEK</code>,
+  <code>MSG_WAITALL</code>, <code>MSG_TRUNC</code> and <code>MSG_OOB</code>, and
+  <code>SHUT_RD</code>/<code>SHUT_WR</code>/<code>SHUT_RDWR</code> for <code>shutdown</code>,
+  have each platform's values.</li>
+  <li><code>poll(fds, n, timeout_ms)</code> waits on an array of <code>pollfd</code>
+  (<code>fd</code>, <code>events</code>, <code>revents</code>) with the <code>POLLIN</code>,
+  <code>POLLOUT</code>, <code>POLLERR</code>, <code>POLLHUP</code>, <code>POLLNVAL</code> and
+  <code>POLLPRI</code> bits.</li>
+</ul>
 <pre data-run><code>
 import cstr, libc, net, os;
 
@@ -2196,25 +2346,34 @@ close(-1): EBADF
 </pre>
 
 <h2 id="coroutines">Coroutines</h2>
-<p>A coroutine runs a function on its own stack and can pause in the middle.
-<code>coro.spawn(&amp;Fn, arg)</code> makes one (nothing runs yet; NULL if its stack can't be
-mapped), <code>coro.next(c)</code> runs it until it calls <code>coro.yield(value)</code>
-and returns that value, and the next <code>coro.next</code> carries on after the yield.
-When the function returns, <code>coro.done(c)</code> becomes TRUE and that last
-<code>coro.next</code> returns the function's return value; after that it returns NULL. A yielded
-NULL is a value like any other, so loops test <code>coro.done</code>. Values also go the other
-way: <code>coro.next(c, send)</code> makes the paused <code>coro.yield</code> return
-<code>send</code> (the first <code>coro.next</code> just starts the function with its arg).
-<code>coro.release(c)</code> frees it, also while it is paused.</p>
-<p>The function is <code>void *Fn(void *arg)</code>. Coroutines can resume other coroutines
-(<code>coro.current()</code> is the running one, NULL outside), every thread can have its own,
-and a <code>try</code> may span a yield. A throw that leaves the coroutine's function goes on from the
-<code>coro.next</code> that resumed it. Each stack is 256 KiB unless <code>coro.spawn</code>'s
-third argument says otherwise, with a guard page below it: running past it crashes the program
-instead of overwriting memory. <code>coro.release</code> keeps up to 16 stacks per thread
-for the next <code>coro.spawn</code> of the same size, so short-lived coroutines (one per request)
-don't map and unmap a stack each time; they are unmapped when the thread ends. <code>coro.yield</code> outside a coroutine, or resuming one that is
-running, prints a message and exits with 1.</p>
+<p>A coroutine runs a function on its own stack and can pause in the middle.</p>
+<ul>
+  <li><code>coro.spawn(&amp;Fn, arg)</code> makes one (nothing runs yet; NULL if its stack can't
+  be mapped).</li>
+  <li><code>coro.next(c)</code> runs it until it calls <code>coro.yield(value)</code> and returns
+  that value, and the next <code>coro.next</code> carries on after the yield.</li>
+  <li>When the function returns, <code>coro.done(c)</code> becomes TRUE and that last
+  <code>coro.next</code> returns the function's return value; after that it returns NULL. A
+  yielded NULL is a value like any other, so loops test <code>coro.done</code>.</li>
+  <li>Values also go the other way: <code>coro.next(c, send)</code> makes the paused
+  <code>coro.yield</code> return <code>send</code> (the first <code>coro.next</code> just starts
+  the function with its arg).</li>
+  <li><code>coro.release(c)</code> frees it, also while it is paused.</li>
+</ul>
+<p>The function is <code>void *Fn(void *arg)</code>.</p>
+<ul>
+  <li>Coroutines can resume other coroutines (<code>coro.current()</code> is the running one,
+  NULL outside), and every thread can have its own.</li>
+  <li>A <code>try</code> may span a yield. A throw that leaves the coroutine's function goes on
+  from the <code>coro.next</code> that resumed it.</li>
+  <li>Each stack is 256 KiB unless <code>coro.spawn</code>'s third argument says otherwise, with
+  a guard page below it: running past it crashes the program instead of overwriting memory.</li>
+  <li><code>coro.release</code> keeps up to 16 stacks per thread for the next
+  <code>coro.spawn</code> of the same size, so short-lived coroutines (one per request) don't map
+  and unmap a stack each time; they are unmapped when the thread ends.</li>
+  <li><code>coro.yield</code> outside a coroutine, or resuming one that is running, prints a
+  message and exits with 1.</li>
+</ul>
 <pre data-run><code>
 import coro, cstr;
 
@@ -2298,8 +2457,8 @@ set as <code>proc.wait</code> sets them.</li>
 <p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
 deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
 deadline first; new coroutines run in the order they were started. Every thread that calls
-<code>coro.run</code> has its own loop, kept with the thread's coroutine state.
-<code>coro.stop()</code> winds the loop down: <code>coro.waitIdle</code> and
+<code>coro.run</code> has its own loop, kept with the thread's coroutine state.</p>
+<p><code>coro.stop()</code> winds the loop down: <code>coro.waitIdle</code> and
 <code>coro.accept</code> return -1 from then on, while plain waits and sleeps go on, so the
 work in flight finishes and <code>coro.run</code> returns when it has. <code>coro.stopping()</code>
 tells whether it was called (a server sends <code>Connection: close</code> then). After
@@ -2431,17 +2590,30 @@ still working
 <h2 id="fzf">Fuzzy matching</h2>
 <p><code>fzf.match(text, pattern)</code> matches text the way the fzf tool does and returns the
 score and the matched byte offsets, or NULL when it doesn't match. Terms separated by
-spaces must all match, <code>a | b</code> takes either. A plain term is fuzzy: its
-characters in order, with gaps. <code>'term</code> is an exact substring,
-<code>^term</code> a prefix, <code>term$</code> a suffix, <code>^term$</code> the whole
-text and <code>!term</code> must not occur; <code>\ </code> is a space inside a term.
-With the default <code>fzf.CASE_SMART</code> a term is case-sensitive only when it has an
-upper-case letter; <code>fzf.CASE_IGNORE</code> and <code>fzf.CASE_RESPECT</code> force it.
-Passing <code>false</code> as the last argument makes plain terms exact (and
-<code>'term</code> fuzzy). The offsets come term after term, so they are only sorted for
-a single term, and the matcher is fzf's greedy one: it finds a match, not always the
-best-scoring placement. The pattern is not modified, so a string literal is fine.
-fzf.match keeps no shared state, so threads can call it at the same time.</p>
+spaces must all match, <code>a | b</code> takes either.</p>
+<table>
+  <thead><tr><th>Term</th><th>Matches</th></tr></thead>
+  <tbody>
+    <tr><td><code>term</code></td><td>Fuzzy: its characters in order, with gaps</td></tr>
+    <tr><td><code>'term</code></td><td>An exact substring</td></tr>
+    <tr><td><code>^term</code></td><td>A prefix</td></tr>
+    <tr><td><code>term$</code></td><td>A suffix</td></tr>
+    <tr><td><code>^term$</code></td><td>The whole text</td></tr>
+    <tr><td><code>!term</code></td><td>Must not occur</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><code>\ </code> is a space inside a term.</li>
+  <li>With the default <code>fzf.CASE_SMART</code> a term is case-sensitive only when it has an
+  upper-case letter; <code>fzf.CASE_IGNORE</code> and <code>fzf.CASE_RESPECT</code> force
+  it.</li>
+  <li>Passing <code>false</code> as the last argument makes plain terms exact (and
+  <code>'term</code> fuzzy).</li>
+  <li>The offsets come term after term, so they are only sorted for a single term, and the
+  matcher is fzf's greedy one: it finds a match, not always the best-scoring placement.</li>
+  <li>The pattern is not modified, so a string literal is fine. fzf.match keeps no shared state,
+  so threads can call it at the same time.</li>
+</ul>
 <pre data-run><code>
 import cstr, fzf;
 
@@ -2480,20 +2652,25 @@ my file.txt  my\ file    score 176 at 0 1 2 3 4 5 6
 
 <h2 id="sqlite">SQLite</h2>
 <p>The SQLite functions exist when ktm and the library are built with
-<code>./build.sh --sqlite</code> (they are under <code>#ifdef __KTM_LINK_SQLITE3__</code>).
-<code>sql.open(path)</code> opens a database (<code>":memory:"</code> for a private one; the
-<code>sql.Db</code> keeps its own copy of the name) and <code>sql.close</code> closes it.
-<code>sql.execRaw</code> runs a script of statements and returns its error as a new String,
-empty when it ran. <code>sql.exec</code> and <code>sql.select</code> run one statement with
-<code>?</code> parameters from an array of <code>sql.Param</code> (<code>sql.INT</code>,
-<code>sql.FLOAT</code>, <code>sql.TEXT</code> with <code>str</code> a <code>u8[]</code>,
-<code>sql.BLOB</code>, <code>sql.NULL_TYPE</code>); text and blobs are copied, so they can be
-freed right away, and an empty text binds <code>''</code>. The SQL is a <code>u8[]</code> too,
-so <code>script[0:n]</code> runs part of a buffer. A text with a second statement is an error
-rather than half-run. <code>sql.next</code> steps through the rows of <code>sql.select</code>
-and frees the row after the last one; call <code>sql.rowRelease</code> if you stop early. A
-column's <code>str</code> (a <code>u8[]</code> view) and <code>blob</code> are only valid until
-the next row.</p>
+<code>./build.sh --sqlite</code> (they are under <code>#ifdef __KTM_LINK_SQLITE3__</code>).</p>
+<ul>
+  <li><code>sql.open(path)</code> opens a database (<code>":memory:"</code> for a private one;
+  the <code>sql.Db</code> keeps its own copy of the name) and <code>sql.close</code> closes
+  it.</li>
+  <li><code>sql.execRaw</code> runs a script of statements and returns its error as a new
+  String, empty when it ran.</li>
+  <li><code>sql.exec</code> and <code>sql.select</code> run one statement with <code>?</code>
+  parameters from an array of <code>sql.Param</code> (<code>sql.INT</code>,
+  <code>sql.FLOAT</code>, <code>sql.TEXT</code> with <code>str</code> a <code>u8[]</code>,
+  <code>sql.BLOB</code>, <code>sql.NULL_TYPE</code>); text and blobs are copied, so they can be
+  freed right away, and an empty text binds <code>''</code>. The SQL is a <code>u8[]</code> too,
+  so <code>script[0:n]</code> runs part of a buffer. A text with a second statement is an error
+  rather than half-run.</li>
+  <li><code>sql.next</code> steps through the rows of <code>sql.select</code> and frees the row
+  after the last one; call <code>sql.rowRelease</code> if you stop early. A column's
+  <code>str</code> (a <code>u8[]</code> view) and <code>blob</code> are only valid until the
+  next row.</li>
+</ul>
 <pre><code>
 import sql;
 
@@ -2530,22 +2707,31 @@ error without running the statement. Such a row belongs to the statement, which
 
 <h2 id="atomics">Atomics</h2>
 <p>Module <code>atomic</code> changes an integer that several threads share without a mutex:
-a counter they all add to, a flag one thread sets and others read, a lock-free swap.
-<code>atomic.add(&amp;n, v)</code> adds and returns the value from before, <code>sub</code> the
-same for a subtraction, <code>swap(&amp;n, v)</code> stores and returns the old value,
-<code>and</code>, <code>or</code> and <code>xor</code> apply a bit operation and return the old
-value, <code>load(&amp;n)</code> reads and <code>store(&amp;n, v)</code> writes, and
-<code>cas(&amp;n, expected, desired)</code> stores <code>desired</code> only if <code>n</code>
-still holds <code>expected</code>, and says whether it did. Each takes an <code>i64 *</code>,
-<code>i32 *</code>, <code>u64 *</code> or <code>u32 *</code>, and the pointer picks the width
-(the values are passed as <code>i64</code>). <code>loadPtr</code>, <code>storePtr</code>,
-<code>swapPtr</code> and <code>casPtr</code> do the same for a <code>void *</code>, and
-<code>atomic.fence()</code> is a full memory barrier.</p>
-<p>Every operation is sequentially consistent: all threads see all of them in one order, and
-no other load or store moves across one, so a value written before <code>store(&amp;flag, 1)</code>
-is there for a thread that has read the 1 with <code>load</code>. The integer must be aligned to
-its size, as a variable, a struct field or <code>mem.alloc</code>'d memory always is. Each
-operation is one function call (<code>LOCK XADD</code>, <code>XCHG</code> and
+a counter they all add to, a flag one thread sets and others read, a lock-free swap.</p>
+<table>
+  <thead><tr><th>Function</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>atomic.add(&amp;n, v)</code>, <code>sub</code></td><td>Adds (subtracts) and returns the value from before</td></tr>
+    <tr><td><code>swap(&amp;n, v)</code></td><td>Stores and returns the old value</td></tr>
+    <tr><td><code>and</code>, <code>or</code>, <code>xor</code></td><td>Apply a bit operation and return the old value</td></tr>
+    <tr><td><code>load(&amp;n)</code>, <code>store(&amp;n, v)</code></td><td>Reads, writes</td></tr>
+    <tr><td><code>cas(&amp;n, expected, desired)</code></td><td>Stores <code>desired</code> only if <code>n</code> still holds <code>expected</code>, and says whether it did</td></tr>
+    <tr><td><code>loadPtr</code>, <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code></td><td>The same for a <code>void *</code></td></tr>
+    <tr><td><code>atomic.fence()</code></td><td>A full memory barrier</td></tr>
+  </tbody>
+</table>
+<p>Each takes an <code>i64 *</code>, <code>i32 *</code>, <code>u64 *</code> or
+<code>u32 *</code>, and the pointer picks the width (the values are passed as
+<code>i64</code>).</p>
+<ul>
+  <li>Every operation is sequentially consistent: all threads see all of them in one order, and
+  no other load or store moves across one, so a value written before
+  <code>store(&amp;flag, 1)</code> is there for a thread that has read the 1 with
+  <code>load</code>.</li>
+  <li>The integer must be aligned to its size, as a variable, a struct field or
+  <code>mem.alloc</code>'d memory always is.</li>
+</ul>
+<p>Each operation is one function call (<code>LOCK XADD</code>, <code>XCHG</code> and
 <code>LOCK CMPXCHG</code> on x86_64; <code>LDAXR</code>/<code>STLXR</code> loops,
 <code>LDAR</code> and <code>STLR</code> on arm64). Use them only on memory more than one thread
 touches; for anything bigger than one integer, a mutex is still simpler. <code>atomic</code>
