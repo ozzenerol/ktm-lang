@@ -1161,46 +1161,47 @@ has 4: 1, has 5: 0, size 5
 both: {6, 12}
 2 3 4 6 8 9 12 
 </pre>
-<p><code>map.RBTree</code>, which <code>set.IntSet</code> is built on, maps <code>void *</code> keys to
-<code>void *</code> values in the order of a comparison function you pass to
-<code>map.rbNew(free_key, free_value, key_cmp)</code>: <code>key_cmp(a, b)</code> returns
-less than 0 when <code>a</code> comes first, 0 when they are equal and more than 0
-otherwise. The two free functions may be <code>null</code>; when set, the tree frees keys
-and values with them on delete, release and when an insert replaces a value (an insert of
-an existing key keeps the stored key). <code>get</code> returns <code>null</code> for
-a missing key, the same as a stored <code>null</code>, so ask <code>has</code> to tell
-them apart. <code>iterNew</code> and <code>forEach</code> visit the entries in key
-order; don't insert or delete while they run. Once a new key is added or one is deleted,
-<code>map.rbIterNext</code> returns <code>null</code> and <code>forEach</code> returns after
-that callback; replacing the value of a key that is there is fine.</p>
+<h3 id="tree">Ordered maps: map.Tree</h3>
+<p><code>map.Tree&lt;K, V&gt;</code> maps keys to values in key order (a red-black tree, which
+<code>set.IntSet</code> is built on). It is a value: make one with
+<code>map.treeNew&lt;K, V&gt;()</code> and free it with <code>t.free()</code>, so
+<code>ad map.Tree&lt;u8[], i64&gt; t = map.treeNew&lt;u8[], i64&gt;();</code> frees it at the end
+of the scope. <code>t.set(k, v)</code> adds a key or replaces its value,
+<code>t.get(k, &amp;v)</code> fills <code>v</code> and returns true (false for a missing key,
+<code>v</code> untouched), <code>t.getOr(k, def)</code> returns the value or <code>def</code>,
+<code>t.has(k)</code>, <code>t.delete(k)</code> (true if the key was there), <code>t.len</code>
+and <code>t.clear()</code>. Walk it in key order with
+<code>for (auto n = t.first(); n; n = t.after(n))</code>, reading <code>n.key</code> and
+<code>n.value</code>, or backwards with <code>t.last()</code> and <code>t.before(n)</code>. A delete
+leaves the other nodes where they are, so during a walk take <code>t.after(n)</code> before
+deleting <code>n</code>.</p>
+<p>Keys are ordered by <code>map.compare(a, b)</code>, an overloaded function returning less than
+0, 0 or more than 0: there are overloads for the integer types, <code>f64</code> and
+<code>u8[]</code> (bytes, then length, which covers <code>String</code>). For a key type of your
+own, add one: <code>i64 map.compare(Version a, Version b) { ... }</code>. <code>u8[]</code> and
+<code>String</code> keys are copied into the tree and freed with it, so the key you pass can be
+a reused buffer; other keys and every value are stored as they are, and what a value points to
+is yours to free.</p>
 <pre data-run><code>
-import cstr, map, str;
-
-i64 strKeyCmp(u8 *a, u8 *b)
-{
-  return cstr.cmp(a, b);
-}
+import map;
 
 void main()
 {
-  map.RBTree *ages = map.rbNew(null, null, &strKeyCmp);
-  ages.set("linus", (void *)55);
-  ages.set("ada", (void *)36);
-  ages.set("grace", (void *)85);
-  ages.set("ada", (void *)37);
+  ad map.Tree<u8[], i64> ages = map.treeNew<u8[], i64>();
+  ages.set("linus", 55);
+  ages.set("ada", 36);
+  ages.set("grace", 85);
+  ages.set("ada", 37);
   ages.delete("grace");
-  printf("ada %d, has grace: %d, %d entries\n",
-    ages.get("ada"), ages.has("grace"), ages.size);
-
-  map.RBIter *it = ages.iterNew();
-  map.RBNode *node;
-  while ((node = map.rbIterNext(it))) { printf("%s = %d\n", node.key, node.value); }
-  map.rbIterRelease(it);
-  ages.release();
+  i64 ada;
+  ages.get("ada", &ada);
+  printf("ada %d, has grace: %d, %d entries, bob %d\n",
+    ada, ages.has("grace"), ages.len, ages.getOr("bob", -1));
+  for (auto n = ages.first(); n; n = ages.after(n)) { printf("%s = %d\n", n.key, n.value); }
 }
 </code></pre>
 <pre class="output">
-ada 37, has grace: 0, 2 entries
+ada 37, has grace: 0, 2 entries, bob -1
 ada = 37
 linus = 55
 </pre>
