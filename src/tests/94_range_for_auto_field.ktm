@@ -3,7 +3,7 @@ import mem, test, vec;
 /* `auto` in a range-based for over a container reached through a class
  * field (`h.v`, `p->v`, `a.b->v`) was given the type of the container's
  * `entries` pointer instead of the element type, so `s += it` did pointer
- * arithmetic and an vec.IntVec of 10, 20, 30 summed to 830 instead of 60.
+ * arithmetic and a vector of 10, 20, 30 summed to 830 instead of 60.
  * A container held by value in a field (`w.c`, `wp->c`) was dereferenced
  * as if it were a pointer. */
 
@@ -28,20 +28,20 @@ struct StaticContainer {
     i64 size;
 };
 
+struct BoxInt {
+    i64 i;
+};
+
 struct Holder {
-    vec.IntVec *v;
-    vec.FloatVec *fv;
-    vec.PtrVec *pv;
+    vec.Vec<i64> v;
+    vec.Vec<f64> fv;
+    vec.Vec<BoxInt *> pv;
     StaticContainer *sc;
 };
 
 struct Outer {
     i64 pad;
     Holder *h;
-};
-
-struct BoxInt {
-    i64 i;
 };
 
 BoxInt *bInt(i64 i) {
@@ -57,12 +57,12 @@ i32 main() {
     printf("Test - range-based for with auto over a class field: ");
 
     Holder h;
-    h.v = vec.intNew();
+    h.v = vec.new<i64>();
     h.v.push(10);
     h.v.push(20);
     h.v.push(30);
 
-    /* vec.IntVec through `h.field`. */
+    /* vec.Vec<i64> through `h.field`. */
     sum = 0;
     for (auto it : h.v) { sum += it; }
     if (sum == 60) { correct++; }
@@ -100,8 +100,8 @@ i32 main() {
     for (i64 it : h.v) { sum += it; }
     if (sum == 60) { correct++; }
 
-    /* vec.FloatVec: the element type is f64. */
-    h.fv = vec.floatNew();
+    /* vec.Vec<f64>: the element type is f64. */
+    h.fv = vec.new<f64>();
     h.fv.push(0.5);
     h.fv.push(1.25);
     h.fv.push(2.0);
@@ -113,8 +113,8 @@ i32 main() {
     for (auto f : hp.fv) { fsum += f * 2.0; }
     if (fsum == 7.5) { correct++; }
 
-    /* vec.PtrVec: the element type is a pointer, not a pointer to a pointer. */
-    h.pv = vec.ptrNew();
+    /* vec.Vec<BoxInt *>: the element type is a pointer, not a pointer to a pointer. */
+    h.pv = vec.new<BoxInt *>();
     h.pv.push(bInt(1));
     h.pv.push(bInt(4));
     h.pv.push(bInt(8));
@@ -185,9 +185,9 @@ i32 main() {
 
     for (BoxInt *b : h.pv) { mem.free(b); }
     mem.free(h.sc);
-    h.pv.release();
-    h.fv.release();
-    h.v.release();
+    h.pv.free();
+    h.fv.free();
+    h.v.free();
 
     test.printResult(correct, tests);
     printf("====\n");
