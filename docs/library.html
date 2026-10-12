@@ -1956,6 +1956,28 @@ void main()
 5 6 4 2.25
 </pre>
 
+<p>Bit operations on a <code>u32</code> or a <code>u64</code> (cast an <code>i64</code> first: the
+type picks the width): <code>math.rotl(x, n)</code> and <code>math.rotr(x, n)</code> rotate by
+<code>n</code> bits (taken mod the width), <code>math.bswap(x)</code> reverses the bytes (also on
+a <code>u16</code>), <code>math.clz(x)</code> and <code>math.ctz(x)</code> count the leading and
+trailing zero bits (the width for 0) and <code>math.popcount(x)</code> the one bits. Where they
+are called, rotl, rotr, bswap, clz and ctz are one machine instruction each, so hashing and
+binary-format code can use them freely.</p>
+<pre data-run><code>import math;
+
+void main()
+{
+  u32 h = 0x80000001;
+  printf("%x %x\n", math.rotl(h, 1), math.rotr(h, 1));
+  printf("%x\n", math.bswap((u32)0x11223344));
+  printf("%d %d %d\n", math.clz((u32)1), math.ctz((u64)8), math.popcount((u64)0xFF));
+}
+</code></pre>
+<pre class="output">3 c0000000
+44332211
+31 3 8
+</pre>
+
 <h2 id="net">Sockets<a class="anchor" href="#net" aria-label="Link to this section">#</a></h2>
 <p><code>net.listen(port, bindaddr, backlog)</code> returns a listening TCP socket,
 <code>net.accept(server)</code> the next connection on it and <code>net.dial(addr, port)</code>
