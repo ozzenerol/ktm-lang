@@ -5900,7 +5900,11 @@ GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len) {
     if (!cc->generic_funcs) return NULL;
     char *qual = cctrlQualifyName(cc, name, len);
     GenericDef *d = qual ? mapGet(cc->generic_funcs, qual) : NULL;
-    if (!d) d = mapGetLen(cc->generic_funcs, name, len);
+    if (!d) {
+        d = mapGetLen(cc->generic_funcs, name, len);
+        /* `mod.name` from outside its module: it must be pub */
+        if (d && memchr(name, '.', len)) cctrlCheckModuleAccess(cc, name, len);
+    }
     return d;
 }
 
@@ -6241,7 +6245,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             parseModuleNamesDecl(cc, tok);
             continue;
         }
-        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying &&
+        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying && !cc->inst &&
             !cc->tmp_gvar_base_type) {
             char *mod_key = mprintf("%u", tok->module_id);
             if (!setHas(cc->mod_types_done, mod_key)) {
