@@ -3655,6 +3655,14 @@ static Ast *parseDeferStatement(Cctrl *cc) {
     return ast;
 }
 
+/* `type Name = ...`: tok is `type`, next the name, after the `=`. `type`
+ * is a keyword only there: a variable or field called `type` is fine. */
+static int parseStartsTypeAlias(Lexeme *tok, Lexeme *next, Lexeme *after) {
+    return tok && next && after && tok->tk_type == TK_IDENT && tok->len == 4 &&
+           !memcmp(tok->start, "type", 4) && next->tk_type == TK_IDENT &&
+           tokenPunctIs(after, '=');
+}
+
 /* `atomic` was a keyword that was silently skipped (`atomic i64 n;` was a
  * plain i64); now it is module atomic. `atomic` (tok) followed by a type
  * (next) is that old declaration: say so instead of a confusing syntax
@@ -3758,6 +3766,10 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
         }
 
         parseRejectAtomicDecl(cc, tok, cctrlTokenPeekBy(cc, 1));
+        if (parseStartsTypeAlias(tok, cctrlTokenPeekBy(cc, 1), cctrlTokenPeekBy(cc, 2))) {
+            cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                "a type alias goes at file scope, not inside a function");
+        }
 
         if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_DEFER) {
             listAppend(body->stms, parseDeferStatement(cc));
@@ -5330,6 +5342,73 @@ typedef struct ParseModDecl {
     int replayed;   /* parseModuleTypes is done with it */
 } ParseModDecl;
 
+/* In a module, `type name = target...` where target is no type yet but
+ * another alias of the module that never resolved (its types are parsed
+ * in any order until no more succeed): they refer to each other. */
+static void parseCheckAliasCycle(Cctrl *cc, Lexeme *name, Lexeme *target) {
+    if (target && target->tk_type == TK_IDENT && target->len == name->len &&
+        !memcmp(target->start, name->start, name->len) &&
+        !cctrlGetKeyWord(cc, target->start, target->len)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "type alias `%.*s` refers to itself", name->len, name->start);
+    }
+    if (!cc->cur_module || cc->replaying || !target || target->tk_type != TK_IDENT ||
+        cctrlGetKeyWord(cc, target->start, target->len)) {
+        return;
+    }
+    for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+        ParseModDecl *d = cc->mod_type_decls->entries[i];
+        if (d->module_id != cc->cur_module || !d->is_type) continue;
+        for (u64 j = 0; j + 2 < d->toks->size; ++j) {
+            Lexeme *n = d->toks->entries[j + 1];
+            if (parseStartsTypeAlias(d->toks->entries[j], n, d->toks->entries[j + 2]) &&
+                n->len == target->len && !memcmp(n->start, target->start, n->len)) {
+                cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                        "type aliases `%.*s` and `%.*s` refer to each other (a cycle)",
+                        name->len, name->start, n->len, n->start);
+            }
+        }
+    }
+}
+
+/* `type Name = T;` at file scope, `type` already taken: Name is T from
+ * here on (in a module: `mod.Name` outside it, if pub). No new type is
+ * made, so a Name and a T convert to each other as T does to itself. */
+static void parseTypeAlias(Cctrl *cc) {
+    Lexeme *name = cctrlTokenGetRequired(cc);
+    cctrlCheckPrefixHidden(cc, name);
+    char *qual = cctrlDeclName(cc, name->start, name->len);
+    char *key = qual ? qual : mprintf("%.*s", name->len, name->start);
+    cctrlTokenExpect(cc, '=');
+    parseCheckAliasCycle(cc, name, cctrlTokenPeek(cc));
+    AstType *type = parseFullType(cc);
+    cctrlTokenExpect(cc, ';');
+
+    TypeAlias *had = mapGet(cc->type_aliases, key);
+    if (had) {
+        /* a module's declarations are parsed again in its full pass */
+        if (had->type == type && cc->cur_module) return;
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "type `%s` has already been defined", key);
+    }
+    if (mapGet(cc->clsdefs, key) || mapGet(cc->uniondefs, key) ||
+        mapGet(cc->symbol_table, key)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "`%s` is already a type", key);
+    }
+    TypeAlias *alias = malloc(sizeof(TypeAlias));
+    alias->type = type;
+    alias->line = name->line;
+    alias->col = name->col;
+    alias->file_id = ast_file_hint;
+    mapAdd(cc->type_aliases, key, alias);
+    if (qual) {
+        if (cc->decl_pub) setAdd(cc->pub_names, key);
+    } else if (cc->decl_from_main && !cc->cur_module) {
+        setAdd(cc->main_names, key);
+    }
+}
+
 /* "file:line:col" of tok: the same declaration in another pass */
 static char *parseModDeclKey(Lexeme *tok) {
     LexFile *f = tok->file;
@@ -5494,6 +5573,10 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
     } else if (kw && kw->tk_type == TK_KEYWORD &&
                (kw->i64 == KW_ENUM || kw->i64 == KW_CONST)) {
         d->is_type = 1;
+    } else if (kw && i + 2 < d->toks->size &&
+               parseStartsTypeAlias(kw, d->toks->entries[i + 1], d->toks->entries[i + 2])) {
+        /* parsed with the module's types, in any order */
+        d->is_type = 1;
     }
     vecPush(cc->mod_type_decls, d);
 }
@@ -5581,6 +5664,17 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * `U0 F() {};`. Skip it, it would be taken for the type of the
          * next declaration and swallow it. */
         if (tokenPunctIs(tok, ';') && !cc->tmp_gvar_base_type) {
+            continue;
+        }
+
+        if (!cc->tmp_gvar_base_type &&
+            parseStartsTypeAlias(tok, cctrlTokenPeek(cc), cctrlTokenPeekBy(cc, 1))) {
+            if (is_static || is_const) {
+                cctrlRaiseException(cc, "a type alias can't be static or const");
+            }
+            parseTypeAlias(cc);
+            cc->decl_pub = 0;
+            saw_private = 0;
             continue;
         }
 
