@@ -57,8 +57,9 @@ pub bool setNonBlocking(i32 sockfd) {
         return true;
 }
 
-/* Clear O_NONBLOCK again; true on success */
-static bool netSetSocketBlocking(i32 sockfd) {
+/* Clear O_NONBLOCK again (reads, writes and accepts wait); true on
+ * success */
+pub bool setBlocking(i32 sockfd) {
         i32 flags = libc.fcntl(sockfd, libc.F_GETFL, 0);
         if (flags == -1 || libc.fcntl(sockfd, libc.F_SETFL, flags & ~libc.O_NONBLOCK) == -1) {
                 return false;
@@ -228,7 +229,7 @@ static i32 dialC(u8 *addr, i32 port, bool nonBlocking=false,
                                 if (err == __NET_ETIMEDOUT) { break; }
                                 continue;
                         }
-                        if (!nonBlocking && !netSetSocketBlocking(sockfd)) { goto error; }
+                        if (!nonBlocking && !setBlocking(sockfd)) { goto error; }
                 } else if (libc.connect(sockfd, ptr.ai_addr, ptr.ai_addrlen) == -1) {
                         err = os.errno();
                         libc.close(sockfd); /* try the next address */
@@ -366,7 +367,7 @@ pub i32 accept(i32 socket, bool nonBlocking=false)
                         libc.close(accepted);
                         return -1;
                 }
-        } else if (!netSetSocketBlocking(accepted)) {
+        } else if (!setBlocking(accepted)) {
                 libc.close(accepted);
                 return -1;
         }
@@ -761,4 +762,135 @@ pub i64 recvFrom(i32 sockfd, u8[] buf, String *fromAddr=null, i32 *fromPort=null
                 fromAddr.append(cstr.view(abuf));
         }
         return got;
+}
+
+/* ---- Binary addresses: a peer kept as the kernel gives it, so a UDP
+ * server can answer a datagram without turning the sender into text and
+ * back. ---- */
+
+/* An IPv4 or IPv6 address and port, as a sockaddr (ss, len bytes of it).
+ * Fill one with net.makeAddr, recvFromAddr, localAddr or remoteAddr; a
+ * declared Addr is not zeroed. */
+pub struct Addr {
+        libc.sockaddr_storage ss;
+        u32 len;
+};
+
+static bool netAddrFill(Addr *a, libc.sockaddr *sa, u32 len) {
+        if (len > sizeof(libc.sockaddr_storage) ||
+            (sa.sa_family != libc.AF_INET && sa.sa_family != libc.AF_INET6)) {
+                a.len = 0;
+                return false;
+        }
+        mem.set(&a.ss, 0, sizeof(libc.sockaddr_storage));
+        mem.copy(&a.ss, sa, len);
+        a.len = len;
+        return true;
+}
+
+/* *out for ip, a numeric IPv4 ("127.0.0.1") or IPv6 ("::1",
+ * "fe80::1%en0") address, and port (no name lookup: use dial or sendTo
+ * for host names). false, with out.len 0, when ip isn't one or the port
+ * is outside 0..65535. */
+pub bool makeAddr(u8[] ip, i32 port, Addr *out) {
+        u8 buf[256], strport[6];
+        libc.addrinfo hints, *res;
+        out.len = 0;
+        u8 *c = netCStr(ip, buf, sizeof(buf));
+        if (!c || port < 0 || port > 65535) { return false; }
+        /* IPv4 only as a full dotted quad: getaddrinfo also takes the old
+         * inet_aton forms ("1.2.3", "0x7f.1") */
+        u8 v4[16];
+        if (!cstr.firstOf(c, ":") && libc.inet_pton(libc.AF_INET, c, v4) != 1) { return false; }
+        libc.snprintf(strport, sizeof(strport), "%d", port);
+        mem.set(&hints, 0, sizeof(libc.addrinfo));
+        hints.ai_family = libc.AF_UNSPEC;
+        hints.ai_socktype = libc.SOCK_DGRAM;
+        hints.ai_flags = libc.AI_NUMERICHOST | libc.AI_NUMERICSERV;
+        if (libc.getaddrinfo(c, strport, &hints, &res) != 0) { return false; }
+        bool ok = netAddrFill(out, res.ai_addr, res.ai_addrlen);
+        libc.freeaddrinfo(res);
+        return ok;
+}
+
+/* libc.AF_INET or libc.AF_INET6, 0 for an empty Addr */
+pub i32 Addr.family() {
+        if (!self.len) { return 0; }
+        return self.ss.ss_family;
+}
+
+/* The address as text ("192.0.2.7", "::1"), a String that is yours; one
+ * without a ptr for an empty Addr */
+pub String Addr.ip() {
+        String out;
+        if (!self.len) { return out; }
+        return addrToStr((libc.sockaddr *)(&self.ss), self.ss.ss_family);
+}
+
+/* The port, -1 for an empty Addr */
+pub i32 Addr.port() {
+        if (self.len && self.ss.ss_family == libc.AF_INET) {
+                return ntohs(((libc.sockaddr_in *)(&self.ss)).sin_port);
+        }
+        if (self.len && self.ss.ss_family == libc.AF_INET6) {
+                return ntohs(((libc.sockaddr_in6 *)(&self.ss)).sin6_port);
+        }
+        return -1;
+}
+
+/* The same family and address, any port (the same host) */
+pub bool Addr.sameIp(Addr *other) {
+        if (!self.len || self.family() != other.family()) { return false; }
+        if (self.ss.ss_family == libc.AF_INET) {
+                return !libc.memcmp(&((libc.sockaddr_in *)(&self.ss)).sin_addr,
+                                    &((libc.sockaddr_in *)(&other.ss)).sin_addr, 4);
+        }
+        return !libc.memcmp(&((libc.sockaddr_in6 *)(&self.ss)).sin6_addr,
+                            &((libc.sockaddr_in6 *)(&other.ss)).sin6_addr, 16);
+}
+
+/* The same family, address and port */
+pub bool Addr.equals(Addr *other) {
+        return self.sameIp(other) && self.port() == other.port();
+}
+
+/* A datagram into buf, its sender into *from: the bytes received, or -1
+ * (with errno set; *from is then empty) */
+pub i64 recvFromAddr(i32 sockfd, u8[] buf, Addr *from) {
+        from.len = sizeof(libc.sockaddr_storage);
+        i64 got = libc.recvfrom(sockfd, buf.ptr, buf.len, 0,
+                                (libc.sockaddr *)(&from.ss), &from.len);
+        if (got < 0) { from.len = 0; }
+        return got;
+}
+
+/* data as one datagram to *to (from recvFromAddr or makeAddr): the bytes
+ * sent, or -1. Like send, never raises SIGPIPE. */
+pub i64 sendToAddr(i32 sockfd, u8[] data, Addr *to) {
+        if (!to.len) {
+                os.setErrno(__NET_EINVAL);
+                return -1;
+        }
+        return libc.sendto(sockfd, data.ptr, data.len, __NET_MSG_NOSIGNAL,
+                           (libc.sockaddr *)(&to.ss), to.len);
+}
+
+/* The address sockfd is bound to (getsockname) into *out; false on an
+ * error or a socket that isn't IPv4 or IPv6 */
+pub bool localAddr(i32 sockfd, Addr *out) {
+        libc.sockaddr_storage ss;
+        u32 len = sizeof(libc.sockaddr_storage);
+        out.len = 0;
+        if (libc.getsockname(sockfd, (libc.sockaddr *)(&ss), &len) == -1) { return false; }
+        return netAddrFill(out, (libc.sockaddr *)(&ss), len);
+}
+
+/* The address of sockfd's peer (getpeername) into *out; false on an
+ * error, an unconnected socket or one that isn't IPv4 or IPv6 */
+pub bool remoteAddr(i32 sockfd, Addr *out) {
+        libc.sockaddr_storage ss;
+        u32 len = sizeof(libc.sockaddr_storage);
+        out.len = 0;
+        if (libc.getpeername(sockfd, (libc.sockaddr *)(&ss), &len) == -1) { return false; }
+        return netAddrFill(out, (libc.sockaddr *)(&ss), len);
 }

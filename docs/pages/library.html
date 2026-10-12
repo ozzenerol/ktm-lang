@@ -1991,7 +1991,11 @@ libc.close(srv);
 </code></pre>
 <p><code>net.peerAddr(sock)</code> is the address of an accepted connection's peer and
 <code>net.addrToStr(sockaddr, family)</code> the address in a <code>sockaddr</code>, both as a
-String (without a <code>ptr</code> if there is none).</p>
+String (without a <code>ptr</code> if there is none). <code>net.setNonBlocking(sock)</code> and
+<code>net.setBlocking(sock)</code> set and clear <code>O_NONBLOCK</code>,
+<code>net.localPort(sock)</code> is the port a socket is bound to, and
+<code>net.localAddr</code> / <code>net.remoteAddr</code> (below, with UDP) both ends as a
+<code>net.Addr</code>.</p>
 <p>The raw calls are there too, for UDP and anything the helpers don't cover:
 <code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
 <code>sendmsg</code>, <code>recvmsg</code>, <code>getsockname</code>, <code>setsockopt</code>, ...
@@ -2050,6 +2054,51 @@ void main()
 <pre class="output">
 server got ping from 127.0.0.1
 client got pong
+</pre>
+<p>A server that answers many clients is better off keeping each sender as the kernel gives
+it: <code>net.recvFromAddr(sock, buf, &amp;from)</code> fills a <code>net.Addr</code> (a
+<code>sockaddr_storage</code> and its length, IPv4 or IPv6) and
+<code>net.sendToAddr(sock, reply, &amp;from)</code> answers it, with no text and no name lookup
+in between. <code>net.makeAddr(ip, port, &amp;a)</code> makes one from a numeric address
+(<code>"192.0.2.7"</code>, <code>"::1"</code>; false for anything else, host names included),
+and an Addr gives back <code>a.ip()</code> (a String), <code>a.port()</code>,
+<code>a.family()</code> (<code>libc.AF_INET</code> or <code>libc.AF_INET6</code>, 0 when empty),
+<code>a.equals(&amp;b)</code> (the same address and port) and <code>a.sameIp(&amp;b)</code>.
+<code>net.localAddr(sock, &amp;a)</code> and <code>net.remoteAddr(sock, &amp;a)</code> fill one
+with a socket's own address and its peer's (<code>getsockname</code>, <code>getpeername</code>).</p>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  net.setRecvTimeout(srv, 1000);
+  net.setRecvTimeout(cli, 1000);
+
+  net.Addr server;
+  net.makeAddr("127.0.0.1", net.localPort(srv), &server);
+  net.sendToAddr(cli, "\x00\x2Aquery", &server);    // a 2-byte id, then the question
+
+  u8 buf[512];
+  net.Addr from;
+  i64 n = net.recvFromAddr(srv, buf, &from);
+  String ip = from.ip();
+  defer ip.free();
+  printf("%d bytes from %s, port %s\n", n, ip, from.port() == net.localPort(cli) ? "the client's" : "?");
+  buf[2] = '!';
+  net.sendToAddr(srv, buf[0:3], &from);              // the id and the answer, straight back
+
+  net.Addr back;
+  n = net.recvFromAddr(cli, buf, &back);
+  printf("answer to id %d: %c, from the server: %d\n", buf[1], buf[2], back.equals(&server));
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">
+7 bytes from 127.0.0.1, port the client's
+answer to id 42: !, from the server: 1
 </pre>
 
 <p>For code on the raw socket calls: <code>net.htons</code>/<code>net.ntohs</code> and
