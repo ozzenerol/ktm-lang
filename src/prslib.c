@@ -3022,12 +3022,16 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
 
     /* `name<T>(...)`: a generic function with its type arguments;
      * `name(...)`: one whose arguments say what they are */
-    if (can_call_function && (tokenPunctIs(tok, '<') || is_lparen) &&
-        !cctrlGetVar(cc, name, len)) {
+    if (can_call_function && is_lparen && !cctrlGetVar(cc, name, len) &&
+        parseFindGenericFunc(cc, name, len)) {
+        return parseFunctionArguments(cc, name, len, ')');
+    }
+    /* `<` after the name of a generic function (plain functions of the
+     * name too, as for json.decode) is its type-argument list, unless a
+     * local of that name hides it */
+    if (can_call_function && tokenPunctIs(tok, '<') &&
+        !(cc->localenv && mapGetLen(cc->localenv, name, len))) {
         GenericDef *gd = parseFindGenericFunc(cc, name, len);
-        if (gd && is_lparen) {
-            return parseFunctionArguments(cc, name, len, ')');
-        }
         if (gd) {
             cctrlTokenRewind(cc);
             return parseGenericExplicitCall(cc, gd, name, len);

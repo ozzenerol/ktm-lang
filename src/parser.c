@@ -2539,6 +2539,26 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
         }
         return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
     }
+    /* a struct with `len` and `data` (vec.Vec<T>), held by value or
+     * through a pointer: data[0] to data[len - 1] */
+    {
+        AstType *st = container->type;
+        int through_ptr = st && st->kind == AST_TYPE_POINTER;
+        if (through_ptr) st = st->ptr;
+        AstType *len_field = st && st->kind == AST_TYPE_CLASS && st->fields
+                           ? mapGetLen(st->fields, str_lit("len")) : NULL;
+        AstType *data_field = len_field ? mapGetLen(st->fields, str_lit("data")) : NULL;
+        if (len_field && data_field && data_field->kind == AST_TYPE_POINTER &&
+            astIsIntType(len_field) && (container->kind == AST_LVAR ||
+                                        container->kind == AST_CLASS_REF ||
+                                        through_ptr)) {
+            Ast *base = through_ptr ? astUnaryOperator(st, AST_UN_OP_DEREF, container) : container;
+            Ast *len_ref = astClassRef(len_field, base, "len");
+            Ast *data_ref = astClassRef(data_field, base, "data");
+            if (iteratee->type->kind == AST_TYPE_AUTO) iteratee->type = data_field->ptr;
+            return parseCreateForRange(cc, iteratee, len_ref, data_ref);
+        }
+    }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
             if (container->type->ptr->kind != AST_TYPE_CLASS) {

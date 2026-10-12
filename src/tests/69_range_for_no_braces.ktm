@@ -16,7 +16,7 @@ struct StaticContainer {
 };
 
 struct Holder {
-    vec.IntVec *v;
+    vec.Vec<i64> v;
 };
 
 struct BoxInt {
@@ -120,8 +120,8 @@ i32 main() {
     if (sum == 1111) { correct++; }
     mem.free(sc);
 
-    /* vec.IntVec, directly and through a class reference. */
-    vec.IntVec *iv = vec.intNew();
+    /* vec.Vec<i64>, directly and through a class reference. */
+    vec.Vec<i64> iv = vec.new<i64>();
     iv.push(10);
     iv.push(20);
     iv.push(30);
@@ -134,10 +134,10 @@ i32 main() {
     sum = 0;
     for (i64 it : h.v) { sum += it; }
     if (sum == 60) { correct++; }
-    iv.release();
+    iv.free();
 
-    /* vec.PtrVec with a typed loop variable. */
-    vec.PtrVec *pv = vec.ptrNew();
+    /* vec.Vec<BoxInt *> with a typed loop variable. */
+    vec.Vec<BoxInt *> pv = vec.new<BoxInt *>();
     pv.push(bInt(1));
     pv.push(bInt(4));
     pv.push(bInt(8));
@@ -145,7 +145,7 @@ i32 main() {
     for (BoxInt *b : pv) { sum += b.i; }
     if (sum == 13) { correct++; }
     for (BoxInt *b : pv) { mem.free(b); }
-    pv.release();
+    pv.free();
 
     /* An empty body: `;` parses to no statement at all. */
     for (auto v : arr) {}

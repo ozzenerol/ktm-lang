@@ -79,8 +79,9 @@ i32 main() {
     a2.add(42);
     check(!a.eq(a2), "one extra key");
 
-    vec.IntVec *v = in.toVec();
-    check(v.size == 2 && v.entries[0] == -3 && v.entries[1] == 9, "IntSetToVec");
+    vec.Vec<i64> v = in.toVec();
+    check(v.len == 2 && v.get(0) == -3 && v.get(1) == 9, "IntSetToVec");
+    v.free();
 
     strVal = in.toStr();
     check(strVal.equals("{-3, 9}"), "IntSetToString");

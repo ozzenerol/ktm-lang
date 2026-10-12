@@ -523,9 +523,9 @@ three
 </pre>
 
 <h3 id="range-based-for">Range-based for<a class="anchor" href="#range-based-for" aria-label="Link to this section">#</a></h3>
-<p>An ktm addition. Loop over a fixed-size array, or over any struct with an
-<code>entries</code> field and a <code>size</code> field, such as the library's
-<code>vec.IntVec</code> and <code>vec.PtrVec</code>:</p>
+<p>An ktm addition. Loop over a fixed-size array, a slice, or a struct with
+<code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>),
+such as the library's <code>vec.Vec</code>:</p>
 <pre data-run><code>import cstr, vec;
 
 void main()
@@ -537,11 +537,10 @@ void main()
   }
   printf("sum = %d\n", sum);
 
-  vec.IntVec *v = vec.intNew();
+  ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();
   v.push(10);
   v.push(20);
   for (i64 x : v) { printf("%d\n", x); }
-  v.release();
 }
 </code></pre>
 <pre class="output">sum = 28

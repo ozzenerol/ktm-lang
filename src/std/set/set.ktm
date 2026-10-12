@@ -149,8 +149,8 @@ out:
     return retval;
 }
 
-pub vec.IntVec *IntSet.toVec() {
-    vec.IntVec *vecVal = vec.intNew();
+pub vec.Vec<i64> IntSet.toVec() {
+    vec.Vec<i64> vecVal = vec.new<i64>();
     IntSetIter *i1 = self.iterNew();
     IntSetEntry *entry = null;
     while ((entry = intIterNext(i1))) {

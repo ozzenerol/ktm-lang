@@ -41,7 +41,7 @@ i32 main() {
 
     setenv("KTM_TEST_TIMEOUT", "2", 1);
     setenv("JOBS", "2", 1);
-    vec.PtrVec *names = vec.ptrNew();
+    vec.Vec<u8 *> names = vec.new<u8 *>();
     names.push(cstr.dup("hang"));
     names.push(cstr.dup("quick"));
 
@@ -54,7 +54,7 @@ i32 main() {
         dup2(fd, 1);
         dup2(fd, 2);
         libc.close(fd);
-        runTests(names);
+        runTests(&names);
         libc.fflush(null);
         _exit(0);
     }
@@ -89,7 +89,8 @@ i32 main() {
     if (correct != tests && out) { printf("\n%s", out); }
     mem.free(out);
     mem.free(pidText);
-    names.release(&mem.free);
+    for (auto n : names) { mem.free(n); }
+    names.free();
     libc.unlink("__381_pid");
     libc.unlink("__381_out");
     test.printResult(correct, tests);

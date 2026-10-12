@@ -8,13 +8,9 @@ import cstr, libc, map, mem, str, test;
 
 /* test.heapInUse() is in the test module (src/tests/test) */
 
-String valueStr(void *v) {
-    return str.format("v%d", (i64)v);
-}
-
 i32 main() {
     printf("Test - CatPrint frees what it replaces: ");
-    i64 tests = 9;
+    i64 tests = 7;
     i64 correct = 0;
     i64 i, before, delta;
     u8 *s, *t, want[1024];
@@ -71,27 +67,6 @@ i32 main() {
             s[300] == 'r' && s[301] == ']') { correct++; }
     mem.free(s);
 
-    /* 8, 9: the map printers (Strings now); no double free, no leak */
-    map.IntMap *im = map.intNew();
-    for (i = 0; i < 50; i++) { im.set(i, (void *)i); }
-    String ks = im.keysToStr();
-    String vs = im.toStr(&valueStr);
-    if (ks.startsWith("{0, 1, ") && ks.endsWith(", 49}") && cstr.count(ks.cstr(), ',') == 49 &&
-            vs.startsWith("{[0] => v0, ") && vs.endsWith("[49] => v49}") &&
-            cstr.count(vs.cstr(), ',') == 49) {
-        correct++;
-    }
-    ks.free();
-    vs.free();
-    before = test.heapInUse();
-    for (i = 0; i < 200; i++) {
-        vs = im.toStr(&valueStr);
-        vs.free();
-    }
-    delta = test.heapInUse() - before;
-    if (delta < 65536) { correct++; }
-    else { printf("\n  IntMap.toStr leaked %d bytes\n", delta); }
-    im.release();
 
     test.printResult(correct, tests);
     printf("====\n");

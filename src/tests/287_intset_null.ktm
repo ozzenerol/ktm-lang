@@ -9,7 +9,7 @@ i32 main() {
     i64 correct = 0, tests = 0;
     set.IntSet *s = set.intNew(), *r;
     set.IntSetIter *it;
-    vec.IntVec *v;
+    vec.Vec<i64> v;
 
     String strVal;
 
@@ -51,8 +51,8 @@ i32 main() {
     tests++; if (!s.eq(null) && !set.IntSet.eq(null, s)) { correct++; }
 
     v = set.IntSet.toVec(null);
-    tests++; if (v != null && v.size == 0) { correct++; }
-    v.release();
+    tests++; if (v.len == 0) { correct++; }
+    v.free();
 
     strVal = set.IntSet.toStr(null);
     tests++; if (strVal.equals("{}")) { correct++; }

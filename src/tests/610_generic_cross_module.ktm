@@ -29,6 +29,10 @@ u64 h<K>(K k) { return 1; }
 u64 h(u8[] s) { return 2; }
 u64 h(i64 x) { return 3; }
 
+/* type arguments written on a name that has plain functions too */
+i64 f(i64 a, u8 *b) { return a; }
+T f<T>(i64 a) { T x; x = a; return x; }
+
 i32 main() {
     printf("Test - generics across modules: ");
     i64 correct = 0, tests = 0;
@@ -40,6 +44,8 @@ i32 main() {
     if (output(KTM "-jit " FIXTURE " > " GX_OUT " 2>&1", "24\n")) { correct++; }
 
     tests++; if (h("x") == 2 && h(5) == 3 && h(2.5) == 1 && h((u8)1) == 3) { correct++; }
+    i64 f2 = 3;
+    tests++; if (f<i64>(5) == 5 && f<f64>(2) == 2.0 && f(6, "x") == 6 && (f2 < 4)) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");
