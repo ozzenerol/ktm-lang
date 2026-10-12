@@ -600,8 +600,13 @@ in a library built with <code>-lib</code>. In a module it is that module's.</p>
 from an <code>f64</code> function becomes a float. In a
 <code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
 value"), but the expression is still evaluated for its side effects.</p>
-<p><code>inline</code> is accepted as a hint only: an <code>inline</code> function is compiled
-as an ordinary function, so it can recurse, take default arguments and have its address taken.</p>
+<p>The compiler inlines small functions by itself: a call to a short function of the program
+whose parameters and result are numbers or pointers is compiled as the function's body in the
+caller, which saves the call. It behaves exactly like the call (the arguments convert to the
+parameter types, recursion is never inlined), and the function is still compiled on its own for
+other callers and its address. <code>inline</code> is accepted as a hint only: an
+<code>inline</code> function is compiled as an ordinary function, so it can recurse, take
+default arguments and have its address taken.</p>
 <pre data-run><code>
 inline i64 twice(i64 x)
 {

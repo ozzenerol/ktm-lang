@@ -694,6 +694,7 @@ IrCtx *irCtxNew(Cctrl *cc) {
     ctx->defer_lowering = 0;
     ctx->label_tries = NULL;
     ctx->escape_set = NULL;
+    ctx->inl = NULL;
     return ctx;
 }
 
@@ -811,6 +812,8 @@ IrFunction *irFunctionNew(AoStr *fname) {
     func->variables = irVarValueMapNew();
     func->stack_space = 0;
     func->params = irValueVecNew();
+    func->inline_slots = NULL;
+    func->inline_loffs = NULL;
     return func;
 }
 

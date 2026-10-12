@@ -384,6 +384,12 @@ typedef struct IrFunction {
      * regalloc helpers in ir-regalloc.c take an IrRaCtx*; the codegen
      * passes `&ctx->ra` when calling into them. */
     IrRaCtx ra;
+    /* The frame slots of functions inlined into this one (their params,
+     * locals and result), `Vec<IrValue *>`, laid out after the AST's own
+     * locals; `inline_loffs` their offsets once laid out. NULL when
+     * nothing was inlined. */
+    Vec *inline_slots;
+    Vec *inline_loffs;
 } IrFunction;
 
 typedef struct IrCgCtx {
@@ -429,6 +435,16 @@ typedef struct IrTryChain {
     Ast *tries[IR_TRY_STACK_MAX];
 } IrTryChain;
 
+/* A call being inlined (irLowerInlineCall): where its `return` goes */
+typedef struct IrInline {
+    struct Ast *callee;
+    IrValue *ret_slot;   /* NULL for a void callee */
+    IrBlock *cont;       /* the block after the inlined body */
+    u16 try_base;        /* the caller's try depth: a return leaves none */
+    struct IrInline *outer;
+    int depth;
+} IrInline;
+
 typedef struct IrCtx {
     /* Current function being converted to IR */
     IrFunction *cur_func;
@@ -463,6 +479,8 @@ typedef struct IrCtx {
      * read can return the slot operand directly or must emit an
      * IR_LOAD tmp to capture the current value. */
     Set *escape_set;
+    /* The innermost call being inlined, NULL in the function's own body */
+    IrInline *inl;
 } IrCtx;
 
 extern VecType vec_ir_block_type;

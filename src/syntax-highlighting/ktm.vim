@@ -94,7 +94,7 @@ highlight def link PascalType Type
 " ---------------------------------------------------------------------------
 syn keyword ktmStorageClass extern _extern import _import public private static
 syn keyword ktmStorageClass reg noreg interrupt haserrcode argpop noargpop
-syn keyword ktmStorageClass nofink inline atomic lastclass
+syn keyword ktmStorageClass nofink inline lastclass
 
 " ---------------------------------------------------------------------------
 " Statements / keywords

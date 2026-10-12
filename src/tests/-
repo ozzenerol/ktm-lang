@@ -1,0 +1,34 @@
+.section __TEXT,__cstring,cstring_literals
+.L0:
+	.asciz " \t\n\013\f\r"
+.globl argc
+	.comm argc, 8, 8
+.globl argv
+	.comm argv, 8, 8
+.lcomm .L1, 16, 3
+	.text
+	.p2align 2
+	.globl _K05small
+_K05small:
+	mov x1, #7
+	mul x0, x0, x1
+	add x0, x0, #1
+	ret
+.text
+	.p2align 2
+	.globl _main
+_main:
+	stp x29, x30, [sp, #-16]!
+	mov x29, sp
+	sub sp, sp, #16
+	mov x0, #22
+	stur x0, [x29, #-8]
+	ldur x0, [x29, #-8]
+	mov w0, w0
+	sxtw    x0, w0
+	stur w0, [x29, #-16]
+	ldursw x0, [x29, #-16]
+	add sp, sp, #16
+	ldp x29, x30, [sp], #16
+	ret
+.ident      "ktm: Linux aarch64-apple-darwin v0.6.0 hash: 2364435faccc3c88e7e9e6403b124f0766aafe17"

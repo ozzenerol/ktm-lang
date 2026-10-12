@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,67 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-7-0-2026-10-12">v0.7.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-7-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
+shares counters and flags between threads without a mutex. Locals are now always at their
+type's alignment, which atomics and C code need.</p>
+
+<pre><code>import atomic, libc;
+
+i64 gHits = 0;
+
+i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i &amp;lt; 100000; i = next(i)) { atomic.add(&amp;amp;gHits, 1); }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i &amp;lt; 4; i++) { libc.pthread_create(&amp;amp;th[i], null, &amp;amp;worker, null); }
+  for (i64 i = 0; i &amp;lt; 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&amp;amp;gHits));
+}
+</code></pre>
+
+<h3 id="the-compiler">The compiler<a class="anchor" href="#the-compiler" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Inlining: a call to a short function of the program whose parameters and result are
+  numbers or pointers is compiled as the function's body in the caller, which saves the call.
+  It behaves exactly like the call (arguments convert to the parameter types, a result to the
+  return type, recursion is never inlined), and the function is still compiled on its own.
+  Loops calling small helpers ran 1.2 to 1.8 times as fast in our measurements.</li>
+  <li>Every local is at its type's natural alignment in the frame: an <code>i64</code>,
+  <code>f64</code> or pointer declared after a narrower local was 4-aligned, which atomic
+  instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
+  <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
+  <code>cas</code> on <code>i64</code>, <code>i32</code>, <code>u64</code> and <code>u32</code>
+  (the pointer type picks the width), pointer versions (<code>loadPtr</code>,
+  <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code>) and <code>fence()</code>, all
+  sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
+</ul>
+
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
+  <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
+  module.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
+  as a block's first statement it used to point at the block's <code>{</code>.</li>
+</ul>
 
 <h2 id="v0-6-0-2026-10-12">v0.6.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-6-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>Function overloading, and the library pieces the example projects still wrote by hand:
@@ -86,7 +147,7 @@ void main()
   change; once a name has two or more, each one's symbol carries its parameter types.</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
   <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
@@ -110,7 +171,7 @@ void main()
   that way in a <code>proc.Proc</code>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A second function of a name with other parameter types used to be the error "conflicting
   types"; it is now an overload. The same parameters with another return type is still that
@@ -121,7 +182,7 @@ void main()
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old C declarator of a function that returns a function pointer,
   <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
@@ -170,7 +231,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -210,7 +271,7 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
@@ -260,7 +321,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -280,7 +341,7 @@ more mistakes it used to let through. Code that uses <code>proc</code>, <code>cs
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -311,7 +372,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -383,7 +444,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -419,7 +480,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -444,7 +505,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -473,7 +534,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -547,7 +608,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
@@ -576,7 +637,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -598,7 +659,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
