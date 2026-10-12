@@ -96,6 +96,13 @@ u8 *REG_HC;
 u8 *UTF_HC;
 u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
+u8 *MOD_LIST_HC;
+u8 *ENUM_HC;
+u8 *DOC_HC;
+u8 *SIG_HC;
+u8 *SEM_HC;
+u8 *COMP_HC;
+u8 *FOLD_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -117,6 +124,7 @@ void initFixtures() {
         "module geo;\n"
         "pub struct Point { i64 x; i64 y; private i64 tag; };\n"
         "pub const i64 ORIGIN = 0;\n"
+        "pub enum Kind { square, circle };\n"
         "i64 square(i64 n) { return n * n; }\n"
         "pub i64 area(i64 side) { return square(side); }\n";
     /* geo's second file: uses geo.ktm's square bare */
@@ -131,6 +139,100 @@ void initFixtures() {
         "  i64 b = p.x;\n"
         "  geo.\n"
         "  return 0;\n"
+        "}\n";
+    /* geo after another module in one import list */
+    MOD_LIST_HC =
+        "import mem,\n"
+        "  g = geo; // the alias\n"
+        "i32 main() {\n"
+        "  g.Kind k = g.Kind.circle;\n"
+        "  return (i32)g.area(2);\n"
+        "}\n";
+    /* Enums: hover, definition and completion of types and members */
+    ENUM_HC =
+        "enum Color { red, green = 5 };\n"
+        "i32 main() {\n"
+        "  Color c = Color.green;\n"
+        "  Color d = Color.\n"
+        "  return 0;\n"
+        "}\n";
+    /* Doc comments: a block above, `//` lines above, none, one after */
+    DOC_HC =
+        "/* Adds two\n"
+        " * numbers. */\n"
+        "i64 add(i64 a, i64 b) { return a + b; }\n"
+        "// Scales n.\n"
+        "// Twice.\n"
+        "i64 scale(i64 n) { return n * 2; }\n"
+        "\n"
+        "i64 bare(i64 n) { return n; }\n"
+        "struct P {\n"
+        "  i64 x; // the x\n"
+        "};\n"
+        "i32 main() { P p; p.x = add(1, 2) + scale(3) + bare(4); return (i32)p.x; }\n";
+    /* Signature help: plain, nested, overloaded, method and variadic calls */
+    SIG_HC =
+        "/* Adds. */\n"
+        "i64 add(i64 a, i64 b) { return a + b; }\n"
+        "void show(i64 x) { }\n"
+        "void show(u8[] s) { }\n"
+        "i64 total(i64 ...nums) { return nums.len; }\n"
+        "struct User { i64 age; };\n"
+        "i64 User.older(i64 years, bool loud) { return self.age + years; }\n"
+        "i32 main() {\n"
+        "  User u;\n"
+        "  i64 r = add(1, add(2, 3));\n"
+        "  show(\"hi\");\n"
+        "  u.older(3, true);\n"
+        "  r = total(1, 2, 3);\n"
+        "  return (i32)r;\n"
+        "}\n";
+    /* Semantic tokens: one of each kind */
+    SEM_HC =
+        "import geo;\n"
+        "#define LIMIT 8\n"
+        "enum Color { red, green };\n"
+        "struct User { i64 age; };\n"
+        "const i64 MAX = 4;\n"
+        "i64 User.older(i64 years) { return self.age + years; }\n"
+        "i32 main() {\n"
+        "  User u;\n"
+        "  Color c = Color.green;\n"
+        "  i64 n = u.older(geo.area(LIMIT)) + MAX;\n"
+        "  return (i32)n;\n"
+        "}\n";
+    /* Completion kinds: modules, enums, keywords; module names in imports */
+    COMP_HC =
+        "import mem, geo;\n"
+        "enum Mode { fast };\n"
+        "i32 main() {\n"
+        "  ge\n"
+        "  Mo\n"
+        "  re\n"
+        "  return 0;\n"
+        "}\n";
+    /* Folding ranges and inlay hints */
+    FOLD_HC =
+        "import str;\n"
+        "/* a\n"
+        "   b */\n"
+        "struct P {\n"
+        "  i64 x;\n"
+        "};\n"
+        "#ifdef __KTM_JIT__\n"
+        "#define M 1\n"
+        "#else\n"
+        "#define M 2\n"
+        "#endif\n"
+        "i32 main() {\n"
+        "  auto n = 3 * 7;\n"
+        "  auto s = str.from(\"x\");\n"
+        "  i64 arr[] = {1, 2};\n"
+        "  for (auto k : arr) {\n"
+        "    n += k;\n"
+        "  }\n"
+        "  s.free();\n"
+        "  return (i32)n;\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1215,7 +1317,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 14;
+const i64 LSP_GROUPS = 21;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1225,6 +1327,7 @@ void testModules() {
     LspClient *l = lspStart();
     u8 *uri = uriOf("modmain.ktm");
     u8 *geoUri = uriOf("geo/geo.ktm");
+    u8 *moreUri0 = uriOf("geo/more.ktm");
     lspDidOpen(l, uri, MOD_MAIN_HC);
 
     i64 line;
@@ -1235,7 +1338,7 @@ void testModules() {
     json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
     json.Value *items = json.select(resp, ".result.items:a");
     check("completion after `geo.` offers exactly geo's pub names",
-                jsonArrayCount(items) == 3 && labelsOk(resp, "", "area", "Point"));
+                jsonArrayCount(items) == 4 && labelsOk(resp, "", "area", "Point"));
 
     posOf(MOD_MAIN_HC, "p.x;", 2, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
@@ -1253,14 +1356,51 @@ void testModules() {
     check("definition of geo.area is in geo/geo.ktm",
                 locEq(resp, geoUri, wantLine, wantChr, false));
 
+    /* `import mem, g = geo;` over two lines: g is geo too */
+    u8 *listUri = uriOf("modlist.ktm");
+    lspDidOpen(l, listUri, MOD_LIST_HC);
+    posOf(MOD_LIST_HC, "area(2)", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module named later in an import list",
+                hoverContains(resp, "geo.area(i64 side)"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    check("definition of a module named later in an import list",
+                locEq(resp, geoUri, wantLine, wantChr, false));
+
+    posOf(MOD_LIST_HC, "circle;", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's enum member shows its value",
+                hoverContains(resp, "geo.Kind.circle = 1"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    posOf(MOD_GEO_HC, "circle", 0, &wantLine, &wantChr);
+    check("definition of a module's enum member is in its enum",
+                locEq(resp, geoUri, wantLine, wantChr, true));
+    posOf(MOD_LIST_HC, "geo;", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's name in an import list", hoverContains(resp, "module geo"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    check("definition of a module's name lists its files",
+                hasLocation(json.select(resp, ".result:a"), geoUri, 0, 0) &&
+                hasLocation(json.select(resp, ".result:a"), moreUri0, 0, 0));
+    posOf(MOD_LIST_HC, "g.area", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on an import alias used as a prefix", hoverContains(resp, "module geo"));
+
+    posOf(MOD_LIST_HC, "Kind k", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's enum shows its members",
+                hoverContains(resp, "enum geo.Kind") && hoverContains(resp, "square = 0"));
+
     /* Inside geo's files its names are bare: `square(n)` in more.ktm
      * is geo.ktm's square */
     u8 *moreUri = uriOf("geo/more.ktm");
     lspDidOpen(l, moreUri, MOD_GEO2_HC);
+    check("a module's file opens without errors (it is read as its module)",
+                lastPublishClean(l));
     posOf(MOD_GEO2_HC, "square(n)", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", moreUri, line, chr);
     check("hover on a module's own bare name from its other file",
-                hoverContains(resp, "i64 square(i64 n)"));
+                hoverContains(resp, "i64 geo.square(i64 n)"));
     resp = lspPositionRequest(l, "textDocument/definition", moreUri, line, chr);
     posOf(MOD_GEO_HC, "square(i64", 0, &wantLine, &wantChr);
     check("definition of a module's own bare name from its other file",
@@ -1293,6 +1433,12 @@ void testMethods() {
     items = json.select(resp, ".result.items:a");
     check("completion after `self.` offers User's fields and methods",
                 jsonArrayCount(items) == 4 && labelsOk(resp, "", "age", "older"));
+
+    posOf(METH_HC, "age; }", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field where its struct declares it", hoverContains(resp, "i64 User.age"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    check("definition on a field's declaration is itself", locEq(resp, uri, line, chr, true));
 
     posOf(METH_HC, "older(1)", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
@@ -1376,6 +1522,10 @@ void testGenerics() {
     i64 chr;
     i64 wantLine;
     i64 wantChr;
+    posOf(GEN_HC, "v; }", 0, &line, &chr);
+    json.Value *fresp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a generic struct's field shows it with T", hoverContains(fresp, "T Box<T>.v"));
+
     posOf(GEN_HC, "get(), 2", 0, &line, &chr);
     json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
     check("hover on b.get() shows the instance's method",
@@ -1384,6 +1534,348 @@ void testGenerics() {
     resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
     posOf(GEN_HC, "maxOf<T>", 0, &wantLine, &wantChr);
     check("definition of maxOf(...) is the generic", locEq(resp, uri, wantLine, wantChr, true));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+void testEnums() {
+    printf("enums\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("enums.ktm");
+    lspDidOpen(l, uri, ENUM_HC);
+
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+    posOf(ENUM_HC, "Color c", 1, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on an enum shows its members and values",
+                hoverContains(resp, "enum Color") && hoverContains(resp, "green = 5"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(ENUM_HC, "Color {", 0, &wantLine, &wantChr);
+    check("definition of an enum is its declaration",
+                locEq(resp, uri, wantLine, wantChr, true));
+
+    posOf(ENUM_HC, "green;", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on Color.green shows its value", hoverContains(resp, "Color.green = 5"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(ENUM_HC, "green =", 0, &wantLine, &wantChr);
+    check("definition of Color.green is the member", locEq(resp, uri, wantLine, wantChr, true));
+
+    posOf(ENUM_HC, "red,", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a member where it is declared", hoverContains(resp, "Color.red = 0"));
+
+    posOf(ENUM_HC, "Color.\n", 6, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    json.Value *items = json.select(resp, ".result.items:a");
+    check("completion after `Color.` offers exactly its members",
+                jsonArrayCount(items) == 2 && labelsOk(resp, "", "red", "green"));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+void testDocs() {
+    printf("doc comments\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("docs.ktm");
+    lspDidOpen(l, uri, DOC_HC);
+    check("doc comment fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    posOf(DOC_HC, "add(1", 0, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows the block comment above a function",
+                hoverContains(resp, "add(i64 a, i64 b)") && hoverContains(resp, "Adds two\nnumbers.") &&
+                !hoverContains(resp, "/*"));
+    posOf(DOC_HC, "scale(3)", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows the // lines above a function",
+                hoverContains(resp, "Scales n.\nTwice.") && !hoverContains(resp, "//"));
+    posOf(DOC_HC, "bare(4)", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover after a blank line shows no comment",
+                hoverContains(resp, "bare(i64 n)") && !hoverContains(resp, "Twice"));
+    posOf(DOC_HC, "x = add", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field shows the comment after it", hoverContains(resp, "the x"));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+/* The symbol named `name` in a DocumentSymbol/SymbolInformation array */
+json.Value *symNamed(json.Value *arr, u8 *name) {
+    if (arr == null) { return null; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *n = json.select(it, ".name:s");
+        if (n != null && cstr.cmp(n.str.ptr, name) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+void testSymbols() {
+    printf("symbols\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("symbols.ktm");
+    lspDidOpen(l, uri, METH_HC);
+
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *resp = lspRequest(l, "textDocument/documentSymbol", params);
+    json.Value *top = json.select(resp, ".result:a");
+    json.Value *user = symNamed(top, "User");
+    json.Value *admin = symNamed(top, "Admin");
+    json.Value *mainSym = symNamed(top, "main");
+    check("outline lists the structs and main at the top",
+                user != null && admin != null && mainSym != null &&
+                json.select(mainSym, ".kind:i").intVal == 12 &&
+                json.select(user, ".kind:i").intVal == 23);
+    json.Value *uk = user ? json.select(user, ".children:a") : null;
+    check("a struct's fields and methods are its children",
+                symNamed(uk, "name") != null && symNamed(uk, "age") != null &&
+                symNamed(uk, "older") != null && symNamed(uk, "describe") != null &&
+                symNamed(top, "older") == null);
+    json.Value *older = symNamed(uk, "older");
+    check("a method's range spans its body, its detail has no self",
+                older != null && json.select(older, ".range.start.line:i").intVal == 2 &&
+                json.select(older, ".range.end.line:i").intVal == 5 &&
+                cstr.cmp(json.select(older, ".detail:s").str.ptr, "i64 User.older(i64 years);") == 0);
+
+    resp = lspRequest(l, "workspace/symbol", "{\"query\":\"oldr\"}");
+    json.Value *ws = json.select(resp, ".result:a");
+    json.Value *wo = symNamed(ws, "older");
+    check("workspace symbols match fuzzily and name the container",
+                wo != null && cstr.cmp(json.select(wo, ".containerName:s").str.ptr, "User") == 0 &&
+                symNamed(ws, "main") == null);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+/* The active signature's label and its active parameter's text */
+bool sigIs(json.Value *resp, u8 *label, u8 *param) {
+    json.Value *as = json.select(resp, ".result.activeSignature:i");
+    json.Value *sigs = json.select(resp, ".result.signatures:a");
+    if (as == null || sigs == null) { return false; }
+    i64 k = as.intVal;
+    json.Value *sig = sigs.array;
+    while (k > 0 && sig != null) { sig = sig.next; k--; }
+    if (sig == null) { return false; }
+    json.Value *lab = json.select(sig, ".label:s");
+    json.Value *apv = json.select(sig, ".activeParameter:i");
+    json.Value *params = json.select(sig, ".parameters:a");
+    if (lab == null || apv == null || params == null) { return false; }
+    if (cstr.cmp(lab.str.ptr, label) != 0) { return false; }
+    i64 ap = apv.intVal;
+    json.Value *ps = params.array;
+    while (ap > 0 && ps != null) { ps = ps.next; ap--; }
+    if (ps == null) { return false; }
+    json.Value *range = json.select(ps, ".label:a");
+    if (range == null || range.array == null || range.array.next == null) { return false; }
+    i64 s0 = range.array.intVal;
+    i64 s1 = range.array.next.intVal;
+    return s1 - s0 == cstr.len(param) && libc.strncmp(lab.str.ptr + s0, param, s1 - s0) == 0;
+}
+
+void testSignatureHelp() {
+    printf("signature help\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("sighelp.ktm");
+    lspDidOpen(l, uri, SIG_HC);
+    check("signature help fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    posOf(SIG_HC, "add(1, ", 7, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("in add(1, |: the second parameter of add",
+                sigIs(resp, "i64 add(i64 a, i64 b)", "i64 b") &&
+                json.select(resp, ".result.signatures:a").array != null &&
+                json.select(json.select(resp, ".result.signatures:a").array,
+                            ".documentation.value:s") != null);
+    posOf(SIG_HC, "add(2", 4, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("in a nested call: the inner call's first parameter",
+                sigIs(resp, "i64 add(i64 a, i64 b)", "i64 a"));
+    posOf(SIG_HC, "show(\"", 5, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("an overloaded call: both overloads, the one it calls active",
+                sigIs(resp, "void show(u8[] s)", "u8[] s") &&
+                jsonArrayCount(json.select(resp, ".result.signatures:a")) == 2);
+    posOf(SIG_HC, "older(3, ", 9, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("a method call: its signature without self",
+                sigIs(resp, "i64 User.older(i64 years, bool loud)", "bool loud"));
+    posOf(SIG_HC, "total(1, 2, ", 12, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("past a variadic's last parameter: still the variadic one",
+                sigIs(resp, "i64 total(i64 ...nums)", "i64 ...nums"));
+    posOf(SIG_HC, "User u", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("outside a call: no signature", isNullResult(resp));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+/* The semantic token starting at (line, chr): type * 8 + modifiers, -1
+ * when none starts there */
+i64 semAt(json.Value *resp, i64 line, i64 chr) {
+    json.Value *data = json.select(resp, ".result.data:a");
+    if (data == null) { return -1; }
+    json.Value *it = data.array;
+    i64 l = 0;
+    i64 c = 0;
+    while (it != null) {
+        i64 dl = it.intVal;
+        i64 dc = it.next.intVal;
+        json.Value *ty = it.next.next.next;
+        l += dl;
+        if (dl != 0) { c = dc; } else { c += dc; }
+        if (l == line && c == chr) { return ty.intVal * 8 + ty.next.intVal; }
+        it = ty.next.next;
+    }
+    return -1;
+}
+
+bool semIs(json.Value *resp, u8 *text, u8 *needle, i64 within, i64 type, i64 mods) {
+    i64 line;
+    i64 chr;
+    posOf(text, needle, within, &line, &chr);
+    return semAt(resp, line, chr) == type * 8 + mods;
+}
+
+void testSemanticTokens() {
+    printf("semantic tokens\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("semantic.ktm");
+    lspDidOpen(l, uri, SEM_HC);
+    check("semantic tokens fixture is clean", lastPublishClean(l));
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *r = lspRequest(l, "textDocument/semanticTokens/full", params);
+    /* types: 0 namespace 2 struct 3 enum 4 enumMember 5 function
+     * 6 method 7 property 8 parameter 9 variable 10 macro; mods:
+     * 1 declaration 2 readonly 4 defaultLibrary */
+    check("a module prefix is a namespace", semIs(r, SEM_HC, "geo.area", 0, 0, 0));
+    check("a module's function", semIs(r, SEM_HC, "area(LIMIT", 0, 5, 0));
+    check("a macro, declared and used", semIs(r, SEM_HC, "LIMIT 8", 0, 10, 1) &&
+                semIs(r, SEM_HC, "LIMIT))", 0, 10, 0));
+    check("an enum and its members", semIs(r, SEM_HC, "Color {", 0, 3, 1) &&
+                semIs(r, SEM_HC, "green;", 0, 4, 2) && semIs(r, SEM_HC, "red,", 0, 4, 3));
+    check("a struct and its field", semIs(r, SEM_HC, "User {", 0, 2, 1) &&
+                semIs(r, SEM_HC, "age; }", 0, 7, 1) && semIs(r, SEM_HC, "age + years", 0, 7, 0));
+    check("a method, declared and called", semIs(r, SEM_HC, "older(i64", 0, 6, 0) &&
+                semIs(r, SEM_HC, "older(geo", 0, 6, 0));
+    check("a parameter and a local", semIs(r, SEM_HC, "years)", 0, 8, 1) &&
+                semIs(r, SEM_HC, "years; }", 0, 8, 0) && semIs(r, SEM_HC, "n = u", 0, 9, 1) &&
+                semIs(r, SEM_HC, "(i32)n", 5, 9, 0));
+    check("a constant is a readonly variable", semIs(r, SEM_HC, "MAX;", 0, 9, 2));
+    check("keywords and builtin types are left to the grammar",
+                semIs(r, SEM_HC, "i32 main", 0, 0, 0) == false &&
+                semAt(r, 6, 0) == -1);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+/* The kind of the completion item labelled `label`, -1 when absent */
+i64 kindOf(json.Value *resp, u8 *label) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return -1; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *lab = json.select(it, ".label:s");
+        if (lab != null && cstr.cmp(lab.str.ptr, label) == 0) {
+            return json.select(it, ".kind:i").intVal;
+        }
+        it = it.next;
+    }
+    return -1;
+}
+
+void testCompletionKinds() {
+    printf("completion kinds\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("compkinds.ktm");
+    lspDidOpen(l, uri, COMP_HC);
+
+    i64 line;
+    i64 chr;
+    posOf(COMP_HC, "ge\n", 2, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("an import prefix completes as a module", kindOf(resp, "geo") == 9);
+    posOf(COMP_HC, "Mo\n", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("an enum completes as an enum", kindOf(resp, "Mode") == 13);
+    posOf(COMP_HC, "re\n", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("a keyword completes as a keyword, no internal names",
+                kindOf(resp, "return") == 14 && labelsOk(resp, "re", "return", null));
+    posOf(COMP_HC, "mem,", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("in an import: the standard library's modules", kindOf(resp, "mem") == 9 &&
+                labelsOk(resp, "me", "mem", null));
+    posOf(COMP_HC, "geo;", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("in an import list: the modules beside the document", kindOf(resp, "geo") == 9);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
+/* A folding range l0..l1 (of kind, "" for none) is in the answer */
+bool hasFold(json.Value *resp, i64 l0, i64 l1, u8 *kind) {
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return false; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *k = json.select(it, ".kind:s");
+        if (json.select(it, ".startLine:i").intVal == l0 &&
+                json.select(it, ".endLine:i").intVal == l1 &&
+                ((k == null && cstr.len(kind) == 0) || (k != null && cstr.cmp(k.str.ptr, kind) == 0))) {
+            return true;
+        }
+        it = it.next;
+    }
+    return false;
+}
+
+/* An inlay hint labelled `label` at the end of `needle` in FOLD_HC */
+bool hasHint(json.Value *resp, u8 *needle, u8 *label) {
+    i64 line;
+    i64 chr;
+    posOf(FOLD_HC, needle, cstr.len(needle), &line, &chr);
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return false; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        if (json.select(it, ".position.line:i").intVal == line &&
+                json.select(it, ".position.character:i").intVal == chr &&
+                cstr.cmp(json.select(it, ".label:s").str.ptr, label) == 0) {
+            return true;
+        }
+        it = it.next;
+    }
+    return false;
+}
+
+void testFoldingAndHints() {
+    printf("folding and inlay hints\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("folding.ktm");
+    lspDidOpen(l, uri, FOLD_HC);
+    check("folding fixture is clean", lastPublishClean(l));
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *resp = lspRequest(l, "textDocument/foldingRange", params);
+    check("a block comment folds", hasFold(resp, 1, 2, "comment"));
+    check("a struct body and a function body fold, the closing line visible",
+                hasFold(resp, 3, 4, "") && hasFold(resp, 11, 19, "") && hasFold(resp, 15, 16, ""));
+    check("#if ... #else ... #endif fold as regions",
+                hasFold(resp, 6, 7, "region") && hasFold(resp, 8, 9, "region"));
+    libc.snprintf(params, 512,
+                  "{\"textDocument\":{\"uri\":\"%s\"},\"range\":{\"start\":{\"line\":0,"
+                  "\"character\":0},\"end\":{\"line\":40,\"character\":0}}}", uri);
+    resp = lspRequest(l, "textDocument/inlayHint", params);
+    check("auto variables show the type they got",
+                hasHint(resp, "auto n", ": i64") && hasHint(resp, "auto s", ": String") &&
+                hasHint(resp, "auto k", ": i64") &&
+                jsonArrayCount(json.select(resp, ".result:a")) == 3);
     check("clean shutdown", lspClose(l) == 0);
 }
 
@@ -1403,6 +1895,13 @@ void runGroup(i64 group) {
         case 11: testOverloads();
         case 12: testTypeAlias();
         case 13: testGenerics();
+        case 14: testEnums();
+        case 15: testDocs();
+        case 16: testSymbols();
+        case 17: testSignatureHelp();
+        case 18: testSemanticTokens();
+        case 19: testCompletionKinds();
+        case 20: testFoldingAndHints();
     }
 }
 
@@ -1502,6 +2001,8 @@ i32 main() {
     fs.writeAll(path, cstr.view(MOD_GEO2_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_MAIN_HC));
+    libc.snprintf(path, 512, "%s/modlist.ktm", gDir);
+    fs.writeAll(path, cstr.view(MOD_LIST_HC));
 
     printf("ktm -lsp tests (%s)\n", gKtm);
     runGroups();

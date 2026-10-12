@@ -505,6 +505,37 @@ notes.txt: 11 bytes
 fs.remove: 0
 fs.remove again with fs.REMOVE_FORCE: 0
 </pre>
+<h3 id="directories">Reading directories, copying and moving</h3>
+<p><code>fs.openDir(path)</code> opens a directory; <code>d.next()</code> gives each entry as an
+<code>fs.DirEntry *</code> and <code>null</code> after the last, leaving out <code>.</code> and
+<code>..</code>. An entry has its <code>name</code>, its <code>kind</code> (an
+<code>fs.FileKind</code>; a symlink is <code>link</code>, never what it points to, and a
+filesystem that doesn't report types is asked with <code>lstat</code>) and its
+<code>path</code>, the directory's path joined with the name. Both belong to the
+<code>fs.Dir</code> and stay valid until its next <code>next()</code>: copy them
+(<code>str.from(e.name)</code>, <code>e.path.clone()</code>) to keep them. Close it with
+<code>d.close()</code>, usually right away as <code>defer d.close();</code>, or declare it with
+<code>ad fs.Dir d = fs.openDir(path);</code>. A directory that can't be opened gives a
+<code>Dir</code> whose <code>d.ok()</code> is false (<code>os.errno()</code> says why) and whose
+<code>next()</code> gives <code>null</code> at once.</p>
+<p><code>fs.list(path)</code> is the names of a directory as a sorted
+<code>vec.Vec&lt;String&gt;</code> (<code>fs.list(path, &amp;ok)</code> also says whether it could
+be read); free it with <code>fs.freeList(&amp;names)</code>. <code>fs.walk(root, &amp;visit,
+arg)</code> calls <code>bool visit(fs.DirEntry *e, void *arg)</code> for every entry under
+<code>root</code> at any depth, a directory before what is in it, and never enters a symlink,
+as <code>fs.remove</code> with <code>fs.REMOVE_RECURSE</code> never does; <code>visit</code>
+returns false to stop. It returns 0 when every entry was visited, 1 when <code>visit</code>
+stopped it and -1 when a directory couldn't be read.</p>
+<p><code>fs.join(a, b)</code> and <code>fs.join(a, b, c)</code> put one <code>/</code> between the
+parts and give a new String (an absolute part replaces what is before it).
+<code>fs.exists(path)</code> says whether there is something at a path, following a symlink.
+<code>fs.makeDirAll(path)</code> is <code>fs.makeDir(path,, true)</code>: the directory and every
+missing parent. <code>fs.copyFile(from, to)</code> copies a regular file with its permission
+bits, replacing what is at <code>to</code>; copying a file onto itself or a directory is an
+error, and a copy that fails part way is removed. <code>fs.rename(from, to)</code> renames on
+one filesystem; <code>fs.move(from, to)</code> does the same and, across filesystems
+(<code>EXDEV</code>), copies a regular file and removes the original. All three return 0, or
+-1 with <code>os.errno()</code>.</p>
 <h3 id="file-status">File status</h3>
 <p><code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code>, the same struct on
 every platform, so a program never needs <code>libc.cStat</code>, whose layout differs between

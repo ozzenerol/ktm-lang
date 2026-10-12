@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,59 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-10-1-2026-10-12">v0.10.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-10-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Editor support, fixed and made rich: the language server understands the whole current
+language and gains the features editors expect, and the Vim syntax is rewritten for today's
+ktm. Also: directories and file operations in <code>fs</code>.</p>
+
+<h3 id="the-language-server">The language server<a class="anchor" href="#the-language-server" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Fixed: only the first module of an import list (<code>import mem, str, json;</code>) was
+  seen, so hover, definition and completion failed on every stdlib call after it.</li>
+  <li>Fixed: opening one of a module's files (the standard library's too) showed a false
+  "not part of a module" error and more after it. A module's file is now checked as its module,
+  with the unsaved text of its other files.</li>
+  <li>Fixed: enums had no hover (it failed), no definition and no completion; now
+  <code>Color</code>, <code>Color.green</code> and <code>geo.Kind.rect</code> show their members and
+  values, jump to their declaration, and <code>Color.</code> completes the members.</li>
+  <li>Fixed: module names (in imports and as prefixes, aliases too) and fields at their
+  declaration had no hover or definition; a module's name jumps to its files.</li>
+  <li>Fixed: completion gave keywords the "operator" kind and offered internal names
+  (<code>_K3geo4area</code>, <code>Vec&lt;i64&gt;</code>).</li>
+  <li>New: hover shows a declaration's doc comment, the standard library's included.</li>
+  <li>New: signature help in calls (the parameter you are on, every overload), the document
+  outline, workspace symbol search, semantic highlighting (modules, types, enum members,
+  functions and methods, fields, parameters, locals, constants, macros, the stdlib's marked),
+  folding ranges, inlay hints with the type of each <code>auto</code> variable, and completion
+  of the modules an <code>import</code> can name.</li>
+</ul>
+
+<h3 id="vim-and-neovim">Vim and Neovim<a class="anchor" href="#vim-and-neovim" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The syntax file is rewritten for the current language: lowercase types, <code>fn</code>,
+  <code>module</code> and <code>import</code> lists, <code>pub</code>, <code>defer</code>,
+  <code>ad</code>, <code>type</code>, enums, generics, <code>String</code>,
+  <code>true</code>/<code>false</code>/<code>null</code>, digit separators, ktm's escapes and
+  format conversions. It comes with filetype detection (Neovim took <code>.ktm</code> for
+  another language) and an ftplugin, and installs into <code>&lt;prefix&gt;/share/ktm/vim</code>
+  (see <a href="tools.html">Tools</a>).</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>fs.openDir(path)</code> and <code>d.next()</code> read a directory: each entry's
+  name, kind (a symlink is a link) and joined path, without <code>.</code> and
+  <code>..</code>; close it with <code>defer d.close();</code> or <code>ad</code>.</li>
+  <li><code>fs.list(path)</code> gives the sorted names as a <code>vec.Vec&lt;String&gt;</code>
+  (<code>fs.freeList</code> frees them), and <code>fs.walk(root, &amp;visit, arg)</code> visits
+  every entry at any depth without following symlinks.</li>
+  <li><code>fs.join</code>, <code>fs.exists</code>, <code>fs.makeDirAll</code>,
+  <code>fs.copyFile</code> (with the permission bits), <code>fs.rename</code>, and
+  <code>fs.move</code>, which copies and removes across filesystems. See
+  <a href="library.html#directories">the library guide</a>.</li>
+  <li>libc's constants passed its C-only check in a normal build but not in the REPL; fixed.</li>
+</ul>
 
 <h2 id="v0-10-0-2026-10-12">v0.10.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-10-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
@@ -101,7 +154,7 @@ test
 5 6
 </pre>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>vec.Vec&lt;T&gt;</code>: <code>vec.new&lt;T&gt;(cap)</code>, <code>push</code>,
   <code>pop</code>, <code>get</code>, <code>at</code> (a pointer to an item), <code>set</code>,
@@ -286,7 +339,7 @@ void main()
   <a href="language.html#autodefer">ad (autodefer)</a>.</li>
 </ul>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
   and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
@@ -356,7 +409,7 @@ void main()
   instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
 </ul>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
   <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
@@ -417,7 +470,7 @@ void main()
   change; once a name has two or more, each one's symbol carries its parameter types.</li>
 </ul>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
   <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
@@ -501,7 +554,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -591,7 +644,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -714,7 +767,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-8">The standard library<a class="anchor" href="#the-standard-library-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -878,7 +931,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-8">The standard library<a class="anchor" href="#the-standard-library-8" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-9">The standard library<a class="anchor" href="#the-standard-library-9" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,

@@ -10,6 +10,7 @@
 #   <prefix>/lib/libktm.a
 #   <prefix>/lib/libktm.so.0.0.1   (Linux)
 #   <prefix>/lib/libktm.0.0.1.dylib (macOS)
+#   <prefix>/share/ktm/vim/         (Vim/Neovim syntax, filetype, ftplugin)
 #
 # Two deliberate details, both load-bearing:
 #
@@ -76,6 +77,9 @@ if [ "$UNINSTALL" -eq 1 ]; then
             rm -f "$f" && echo "removed $f"
         fi
     done
+    if [ -d "$PREFIX/share/ktm/vim" ]; then
+        rm -rf "$PREFIX/share/ktm/vim" && echo "removed $PREFIX/share/ktm/vim"
+    fi
     # the standard library's modules (the ones this archive has; other
     # modules under $PREFIX/modules stay)
     for d in "$SRC"/modules/*/; do
@@ -124,6 +128,12 @@ for d in "$SRC"/modules/*/; do
 done
 install_file "$SRC/lib/libktm.a"    "$PREFIX/lib/libktm.a"      644
 install_file "$SRC/lib/$SHLIB"      "$PREFIX/lib/$SHLIB"        755
+if [ -d "$SRC/vim" ] && mkdir -p "$PREFIX/share/ktm" 2>/dev/null; then
+    rm -rf "$PREFIX/share/ktm/vim"
+    cp -R "$SRC/vim" "$PREFIX/share/ktm/vim"
+    chmod -R u=rwX,go=rX "$PREFIX/share/ktm/vim"
+    echo "installed $PREFIX/share/ktm/vim"
+fi
 
 # Downloaded archives carry com.apple.quarantine, which makes the
 # binary unlaunchable until Gatekeeper is placated. Clearing it here
