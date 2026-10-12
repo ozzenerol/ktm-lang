@@ -126,6 +126,7 @@ jobs:
           set -eux
           cp ./ktm "./$PKG/ktm"
           cp ./packaging/install.sh "./$PKG/install.sh"
+          cp -R ./src/syntax-highlighting/vim "./$PKG/vim"
           chmod +x "./$PKG/ktm" "./$PKG/install.sh"
           ls -la "./$PKG" "./$PKG/lib" "./$PKG/modules"
           file "./$PKG/ktm" "./$PKG/lib/"*

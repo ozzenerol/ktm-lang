@@ -138,6 +138,9 @@ if [ "$RUN_TESTS" = 1 ]; then
 
     step "Running LSP tests"
     (cd "$ROOT/src/tests/lsp" && "$KTM" --install-dir="$PREFIX" ./run_lsp_tests.ktm -o lsp-test-runner && ./lsp-test-runner)
+
+    step "Checking the Vim syntax"
+    "$ROOT/src/syntax-highlighting/test/run.sh"
 fi
 
 if [ "$DO_INSTALL" = 1 ]; then
@@ -167,6 +170,10 @@ if [ "$DO_INSTALL" = 1 ]; then
     for f in "$PREFIX"/lib/*; do
         ${as[@]+"${as[@]}"} cp -fPR "$f" "$INSTALL_PREFIX/lib/"
     done
+    # Vim/Neovim support: `set rtp+=$INSTALL_PREFIX/share/ktm/vim`
+    ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/share/ktm/vim"
+    ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/share/ktm"
+    ${as[@]+"${as[@]}"} cp -R "$ROOT/src/syntax-highlighting/vim" "$INSTALL_PREFIX/share/ktm/vim"
 fi
 
 step "Done"

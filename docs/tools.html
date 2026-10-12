@@ -120,12 +120,31 @@ hello 9</code></pre>
 </ul>
 
 <h2 id="editor-support">Editor support<a class="anchor" href="#editor-support" aria-label="Link to this section">#</a></h2>
-<p><code>ktm -lsp</code> is a language server: errors and warnings as you type, hover,
-completion (including after <code>.</code> and <code>-&gt;</code>), go to definition,
-find references, highlighting and rename. It works with any editor that speaks LSP.</p>
+<p><code>ktm -lsp</code> is a language server. It works with any editor that speaks LSP
+and gives:</p>
+<ul>
+  <li>errors and warnings as you type, a module's files checked as the module they belong to;</li>
+  <li>hover with the declaration and its doc comment (the comment right above it, or after it
+  on its line), for functions, methods, fields, enums and their members, modules, aliases and
+  generics, the standard library's included;</li>
+  <li>completion: names in scope, fields and methods after <code>.</code> and
+  <code>-&gt;</code>, a module's names after its prefix, an enum's members, and the modules an
+  <code>import</code> can name;</li>
+  <li>signature help in calls, with the parameter you are on and every overload;</li>
+  <li>go to definition, find references, highlighting of a name's uses, and rename;</li>
+  <li>the document outline and workspace symbol search;</li>
+  <li>semantic highlighting: modules, types, enums and members, functions and methods, fields,
+  parameters, locals, constants and macros, with the standard library's marked;</li>
+  <li>folding (blocks, comments, imports, <code>#if</code> regions) and inlay hints with the type
+  of each <code>auto</code> variable.</li>
+</ul>
 
 <h3 id="neovim">Neovim<a class="anchor" href="#neovim" aria-label="Link to this section">#</a></h3>
-<pre><code>vim.filetype.add({ extension = { ktm = "ktm", ktmh = "ktm" } })
+<p>The syntax, filetype detection and indent settings install into
+<code>&lt;prefix&gt;/share/ktm/vim</code> (in a checkout:
+<code>src/syntax-highlighting/vim</code>). Add it to the runtime path and start the server for
+ktm files:</p>
+<pre><code>vim.opt.rtp:append("/usr/local/share/ktm/vim")
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "ktm",
@@ -136,15 +155,23 @@ vim.api.nvim_create_autocmd("FileType", {
       root_dir = vim.fs.root(ev.buf, { ".git" })
                  or vim.fs.dirname(vim.api.nvim_buf_get_name(ev.buf)),
     })
+    vim.lsp.inlay_hint.enable(true, { bufnr = ev.buf })
   end,
 })</code></pre>
+<p>Semantic highlighting needs nothing more: Neovim colours the server's tokens with its
+<code>@lsp.type.*</code> groups (link <code>@lsp.type.namespace.ktm</code> and the others to
+change them).</p>
+
+<h3 id="vim">Vim<a class="anchor" href="#vim" aria-label="Link to this section">#</a></h3>
+<pre><code>set runtimepath+=/usr/local/share/ktm/vim
+filetype plugin indent on
+syntax on</code></pre>
 
 <h3 id="other-editors">Other editors<a class="anchor" href="#other-editors" aria-label="Link to this section">#</a></h3>
 <p>Point your editor's generic LSP client at the command <code>ktm -lsp</code> for
 <code>.ktm</code> and <code>.ktmh</code> files. If ktm isn't installed, add
-<code>--install-dir=/path/to/build/prefix</code> so it can find the library header. Set
-<code>KTM_LSP_LOG=1</code> in the server's environment to log its traffic to stderr.
-Syntax highlighting for Vim is in <code>src/syntax-highlighting/ktm.vim</code>.</p>
+<code>--install-dir=/path/to/build/prefix</code> so it can find the standard library. Set
+<code>KTM_LSP_LOG=1</code> in the server's environment to log its traffic to stderr.</p>
 
 <h2 id="libraries">Libraries<a class="anchor" href="#libraries" aria-label="Link to this section">#</a></h2>
 <p>Build your own ktm library and install it next to the standard one:</p>
