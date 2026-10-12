@@ -5623,6 +5623,16 @@ static void parseGenericSkipParams(Cctrl *cc) {
     while ((t = cctrlTokenGet(cc)) != NULL && !tokenPunctIs(t, '>'));
 }
 
+/* How many errors have been reported so far */
+static u64 parseErrorCount(Cctrl *cc) {
+    u64 n = 0;
+    for (u64 i = 0; cc->diagnostics && i < cc->diagnostics->size; ++i) {
+        CctrlDiagnostic *d = cc->diagnostics->entries[i];
+        if (d->severity == CCTRL_ERROR) n++;
+    }
+    return n;
+}
+
 /* "Vec<i64, u8 *>" for a definition named `name` and its arguments */
 static AoStr *parseGenericInstName(AoStr *name, Vec *args) {
     AoStr *out = aoStrNew();
@@ -5694,6 +5704,7 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
 
     jmp_buf recovery;
     volatile int failed = 0;
+    u64 errors_before = parseErrorCount(cc);
     cc->token_buffer = replay;
     cc->current_recovery = &recovery;
     cc->replaying = 0;
@@ -5761,13 +5772,11 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     ast_col_hint = saved_col_hint;
     ast_file_hint = saved_file_hint;
     astSetLVarId(saved_lvar_id);
-    if (failed) {
-        if (in->at) {
-            cctrlInfoAt(cc, in->at->line, in->at->col, in->at->len,
-                        "in `%s`, made here", in->name->data);
-        }
-        longjmp(*saved_recovery, 1);
+    if ((failed || parseErrorCount(cc) > errors_before) && in->at) {
+        cctrlInfoAt(cc, in->at->line, in->at->col, in->at->len,
+                    "in `%s`, made here", in->name->data);
     }
+    if (failed) longjmp(*saved_recovery, 1);
 }
 
 /* Method `md` of struct instance `si`: its prototype now, its body with
