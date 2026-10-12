@@ -2532,15 +2532,34 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
-    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1] */
+    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1]. A slice
+     * that is not a variable or field (`str.split(...)`) is computed once,
+     * into a hidden local, not on every pass. */
     if (container->type && astTypeIsSlice(container->type)) {
+        Ast *once = NULL;
+        if (container->kind != AST_LVAR && container->kind != AST_GVAR &&
+            container->kind != AST_CLASS_REF) {
+            AoStr *tmp_name = getRangeLoopIdx();
+            Ast *tmp = astLVar(container->type, tmp_name->data, tmp_name->len);
+            mapAddLen(cc->localenv, tmp_name->data, tmp_name->len, tmp);
+            if (cc->tmp_locals) listAppend(cc->tmp_locals, tmp);
+            once = astDecl(tmp, container);
+            container = tmp;
+        }
         Map *fields = container->type->fields;
         Ast *len_ref = astClassRef(mapGetLen(fields, str_lit("len")), container, "len");
         Ast *ptr_ref = astClassRef(mapGetLen(fields, str_lit("ptr")), container, "ptr");
         if (iteratee->type->kind == AST_TYPE_AUTO) {
             iteratee->type = container->type->elem;
         }
-        return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
+        Ast *loop = parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
+        if (once) {
+            List *init = listNew();
+            listAppend(init, once);
+            listAppend(init, loop->forinit);
+            loop->forinit = astCompountStatement(init);
+        }
+        return loop;
     }
     /* a struct with `len` and `data` (vec.Vec<T>), held by value or
      * through a pointer: data[0] to data[len - 1] */
