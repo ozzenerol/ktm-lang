@@ -2550,6 +2550,7 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
         AstType *data_field = len_field ? mapGetLen(st->fields, str_lit("data")) : NULL;
         if (len_field && data_field && data_field->kind == AST_TYPE_POINTER &&
             astIsIntType(len_field) && (container->kind == AST_LVAR ||
+                                        container->kind == AST_GVAR ||
                                         container->kind == AST_CLASS_REF ||
                                         through_ptr)) {
             Ast *base = through_ptr ? astUnaryOperator(st, AST_UN_OP_DEREF, container) : container;
