@@ -121,11 +121,31 @@ bool overflowsIn(fn(void *arg) void *body, bool onCoroutine) {
     i32 status = 0;
     waitpid(pid, &status, 0);
     bool aborted = (status & 0x7F) == 6;    /* SIGABRT, the same on Linux and macOS */
-    return aborted && libc.strstr(errbuf, "stack overflow") != null;
+    bool said = libc.strstr(errbuf, "stack overflow") != null;
+    if (!aborted || !said) {
+        printf("\n  (the child ended with status 0x%x, signal %d, stderr \"%s\")",
+               status, status & 0x7F, errbuf);
+    }
+    return aborted && said;
 }
 
-void *deepOnThread(void *unused) {
+void *deepThread(void *unused) {
     deep(0);
+    return null;
+}
+
+/* deep() on a thread of its own with a 1 MiB stack, mapped in full
+ * when the thread starts. (The main thread's stack is grown by the
+ * kernel as it is used, and growing it can fail for reasons of the
+ * machine's, not ktm's: test 395 and the coroutine case cover the
+ * check on stacks that exist in full.) */
+void *deepOnThread(void *unused) {
+    libc.pthread_attr_t attr;
+    libc.pthread_t *th;
+    libc.pthread_attr_init(&attr);
+    libc.pthread_attr_setstacksize(&attr, 1024 * 1024);
+    if (libc.pthread_create(&th, &attr, &deepThread, null) != 0) { libc.exit(42); }
+    libc.pthread_join(th);
     return null;
 }
 
