@@ -78,7 +78,6 @@
 /* back to even */
 #define KW_F64          4
 #define KW_PUBLIC       6
-#define KW_ATOMIC       8
 #define KW_DEFINE       10
 #define KW_PP_INCLUDE   12
 #define KW_SIZEOF       16

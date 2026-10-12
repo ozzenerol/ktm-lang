@@ -2421,6 +2421,64 @@ void main()
 error without running the statement. Such a row belongs to the statement, which
 <code>sql.finalize</code> frees.</p>
 
+<h2 id="atomics">Atomics</h2>
+<p>Module <code>atomic</code> changes an integer that several threads share without a mutex:
+a counter they all add to, a flag one thread sets and others read, a lock-free swap.
+<code>atomic.add(&amp;n, v)</code> adds and returns the value from before, <code>sub</code> the
+same for a subtraction, <code>swap(&amp;n, v)</code> stores and returns the old value,
+<code>and</code>, <code>or</code> and <code>xor</code> apply a bit operation and return the old
+value, <code>load(&amp;n)</code> reads and <code>store(&amp;n, v)</code> writes, and
+<code>cas(&amp;n, expected, desired)</code> stores <code>desired</code> only if <code>n</code>
+still holds <code>expected</code>, and says whether it did. Each takes an <code>i64 *</code>,
+<code>i32 *</code>, <code>u64 *</code> or <code>u32 *</code>, and the pointer picks the width
+(the values are passed as <code>i64</code>). <code>loadPtr</code>, <code>storePtr</code>,
+<code>swapPtr</code> and <code>casPtr</code> do the same for a <code>void *</code>, and
+<code>atomic.fence()</code> is a full memory barrier.</p>
+<p>Every operation is sequentially consistent: all threads see all of them in one order, and
+no other load or store moves across one, so a value written before <code>store(&amp;flag, 1)</code>
+is there for a thread that has read the 1 with <code>load</code>. The integer must be aligned to
+its size, as a variable, a struct field or <code>mem.alloc</code>'d memory always is. Each
+operation is one function call (<code>LOCK XADD</code>, <code>XCHG</code> and
+<code>LOCK CMPXCHG</code> on x86_64; <code>LDAXR</code>/<code>STLXR</code> loops,
+<code>LDAR</code> and <code>STLR</code> on arm64). Use them only on memory more than one thread
+touches; for anything bigger than one integer, a mutex is still simpler. <code>atomic</code>
+used to be a keyword that was accepted and ignored: <code>atomic i64 n;</code> is an error now,
+with a pointer to this module.</p>
+<pre data-run><code>
+import atomic, libc;
+
+i64 gHits = 0;      // shared by every thread
+i64 gPlain = 0;     // the same, without atomics
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i < 100000; i++) {
+    atomic.add(&gHits, 1);
+  }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &worker, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&gHits));
+
+  i64 flags = 0b0101;
+  i64 before = atomic.or(&flags, 0b0010);
+  printf("or: %d -> %d\n", before, flags);
+  bool swapped = atomic.cas(&flags, 7, 0);    // flags is 7: now 0
+  bool again = atomic.cas(&flags, 7, 1);      // flags isn't 7 any more
+  printf("cas: %d %d, flags %d\n", swapped, again, flags);
+}
+</code></pre>
+<pre class="output">
+400000 hits
+or: 5 -> 7
+cas: 1 0, flags 0
+</pre>
+
 <h2>More modules</h2>
 <p>These are covered in the <a href="stdlib.html">library reference</a>:</p>
 <ul>

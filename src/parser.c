@@ -3650,11 +3650,26 @@ static Ast *parseDeferStatement(Cctrl *cc) {
     return ast;
 }
 
+/* `atomic` was a keyword that was silently skipped (`atomic i64 n;` was a
+ * plain i64); now it is module atomic. `atomic` (tok) followed by a type
+ * (next) is that old declaration: say so instead of a confusing syntax
+ * error. */
+static void parseRejectAtomicDecl(Cctrl *cc, Lexeme *tok, Lexeme *next) {
+    if (tok && next && tok->tk_type == TK_IDENT && tok->len == 6 &&
+        !memcmp(tok->start, "atomic", 6) && next->tk_type != TK_PUNCT &&
+        cctrlTokIsKeyword(cc, next)) {
+        cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+            "`atomic` is not a keyword (it never made anything atomic): declare a plain "
+            "integer and use module atomic on it, as in `atomic.add(&n, 1)`");
+    }
+}
+
 Ast *parseDeclOrStatement(Cctrl *cc) {
     Lexeme *tok = cctrlTokenPeek(cc);
     if (!tok) {
         return NULL;
     }
+    parseRejectAtomicDecl(cc, tok, cctrlTokenPeekBy(cc, 1));
     if ((cctrlTokIsKeyword(cc, tok) &&
          !parseTypeNameFollowedByDot(cc)) ||
         (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) ||
@@ -3736,6 +3751,8 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
             tok = cctrlTokenPeek(cc);
             continue;
         }
+
+        parseRejectAtomicDecl(cc, tok, cctrlTokenPeekBy(cc, 1));
 
         if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_DEFER) {
             listAppend(body->stms, parseDeferStatement(cc));
@@ -5417,7 +5434,7 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
         Lexeme *t = d->toks->entries[i];
         if (t->tk_type != TK_KEYWORD ||
             (t->i64 != KW_PUBLIC && t->i64 != KW_PRIVATE &&
-             t->i64 != KW_STATIC && t->i64 != KW_ATOMIC)) break;
+             t->i64 != KW_STATIC)) break;
         i++;
     }
     Lexeme *kw = i < d->toks->size ? d->toks->entries[i] : NULL;
@@ -5523,6 +5540,10 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         cc->decls_only = tok->mod_pass == LEX_PASS_DECLS;
         if (!cc->tmp_gvar_base_type) {
             cc->decl_from_main = tok->module_id == 0 && !tok->in_std;
+        }
+
+        if (!cc->tmp_gvar_base_type) {
+            parseRejectAtomicDecl(cc, tok, cctrlTokenPeek(cc));
         }
 
         /* An empty declaration: a stray `;` as in `I64 x = 1;;` or
@@ -5683,9 +5704,6 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     }
                     saw_private = 1;
                     continue;
-                case KW_ATOMIC:
-                    continue;
-
                 case KW_CONST:
                     is_const = 1;
                     continue;

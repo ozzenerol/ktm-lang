@@ -179,7 +179,6 @@ static LexerType lexer_types[] = {
     {"false",    KW_FALSE},
     {"null",     KW_NULL},
     {"inline",   KW_INLINE},
-    {"atomic",   KW_ATOMIC},
     {"volatile", KW_VOLATILE},
 
     {"public",  KW_PUBLIC},
@@ -659,7 +658,6 @@ AoStr *lexemeToAoStr(Lexeme *tok) {
                 case KW_F32:         aoStrCatPrintf(str,"F32");     break;
                 case KW_F64:         aoStrCatPrintf(str,"F64");     break;
                 case KW_PUBLIC:      aoStrCatPrintf(str,"public");  break;
-                case KW_ATOMIC:      aoStrCatPrintf(str,"atomic");  break;
                 case KW_DEFINE:      aoStrCatPrintf(str,"define");  break;
                 case KW_SIZEOF:      aoStrCatPrintf(str,"sizeof");  break;
                 case KW_ALIGNOF:     aoStrCatPrintf(str,"alignof"); break;
