@@ -14,42 +14,40 @@ void recordJob(void *priv, void *argv) {
 i32 main() {
     printf("Test - ListDeque FIFO order: ");
     i64 correct = 0, tests = 7, i;
-    list.List *l = list.new();
+    ad list.List<i64> l = list.new<i64>();
 
-    /* Empty and null lists */
-    if (l.shift() == null && l.pop() == null && list.List.shift(null) == null) {
+    /* An empty list */
+    bool okFlag = true;
+    if (l.shift(&okFlag) == 0 && !okFlag && l.pop() == 0 && l.len == 0) {
         correct++;
     }
 
-    l.append((void *)1);
-    l.append((void *)2);
-    l.append((void *)3);
-    if ((i64)l.shift() == 1 && (i64)l.shift() == 2 &&
-            (i64)l.shift() == 3 && l.shift() == null && l.isEmpty()) { correct++; }
+    l.append(1);
+    l.append(2);
+    l.append(3);
+    if (l.shift() == 1 && l.shift() == 2 && l.shift() == 3 && l.len == 0) { correct++; }
 
     /* Interleaved append / deque keeps FIFO order */
     bool ok = true;
     i64 nextIn = 0, nextOut = 0;
     for (i = 0; i < 50; i++) {
-        l.append((void *)nextIn++);
-        l.append((void *)nextIn++);
-        if ((i64)l.shift() != nextOut++) { ok = false; }
+        l.append(nextIn++);
+        l.append(nextIn++);
+        if (l.shift() != nextOut++) { ok = false; }
     }
-    while (!l.isEmpty()) {
-        if ((i64)l.shift() != nextOut++) { ok = false; }
+    while (l.len) {
+        if (l.shift() != nextOut++) { ok = false; }
     }
-    if (ok && nextOut == 100 && l.count() == 0) { correct++; }
+    if (ok && nextOut == 100 && l.len == 0) { correct++; }
 
     /* list.pop takes from the back */
-    l.append((void *)1);
-    l.append((void *)2);
-    l.append((void *)3);
-    if ((i64)l.pop() == 3 && l.count() == 2) { correct++; }
+    l.append(1);
+    l.append(2);
+    l.append(3);
+    if (l.pop() == 3 && l.len == 2) { correct++; }
     /* list.prepend puts at the front, where list.shift takes from */
-    l.prepend((void *)0);
-    if ((i64)l.shift() == 0 && (i64)l.shift() == 1 &&
-            (i64)l.pop() == 2 && l.isEmpty()) { correct++; }
-    l.release(null);
+    l.prepend(0);
+    if (l.shift() == 0 && l.shift() == 1 && l.pop() == 2 && l.len == 0) { correct++; }
 
     /* One worker: the jobs run in the order they were queued */
     thread.Pool *pool = thread.poolNew(1);

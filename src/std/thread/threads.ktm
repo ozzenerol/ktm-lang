@@ -22,7 +22,7 @@ pub struct Pool {
         libc.pthread_cond_t hasWork,noWork;
         libc.pthread_mutex_t lock;
         Worker *workers;
-        list.List *jobs;
+        list.List<Job *> jobs;
         void *privData;
 };
 
@@ -43,7 +43,7 @@ pub void poolWait(Pool *pool)
 {//Wait for all jobs in the queue to be complete
         if (!pool) { return; }
         libc.pthread_mutex_lock(&pool.lock);
-        while (!pool.jobs.isEmpty() || pool.activeThreads != 0) {
+        while (!!pool.jobs.len || pool.activeThreads != 0) {
                 libc.pthread_cond_wait(&pool.noWork,&pool.lock);
         }
         libc.pthread_mutex_unlock(&pool.lock);
@@ -58,7 +58,7 @@ static void *threadPoolMain(void *argv)
         libc.pthread_mutex_lock(&pool.lock);
         pool.aliveThreads++;
         while (true) {
-                while (pool.run && pool.jobs.isEmpty()) {
+                while (pool.run && !pool.jobs.len) {
                         libc.pthread_cond_wait(&pool.hasWork,&pool.lock);
                 }
                 job = pool.jobs.shift();
@@ -73,7 +73,7 @@ static void *threadPoolMain(void *argv)
 
                 libc.pthread_mutex_lock(&pool.lock);
                 pool.activeThreads--;
-                if (pool.activeThreads == 0 && pool.jobs.isEmpty()) {
+                if (pool.activeThreads == 0 && !pool.jobs.len) {
                         libc.pthread_cond_broadcast(&pool.noWork);
                 }
         }
@@ -92,7 +92,7 @@ pub Pool *poolNew(i64 workerCount)
         Worker *workers = mem.alloc(sizeof(Worker) * workerCount);
         i32 err;
 
-        pool.jobs = list.new();
+        pool.jobs = list.new<Job *>();
         pool.run = true;
         pool.activeThreads = 0;
         pool.aliveThreads = 0;
@@ -142,7 +142,8 @@ pub void poolRelease(Pool *pool)
                 libc.pthread_cond_destroy(&pool.noWork);
                 libc.pthread_mutex_destroy(&pool.lock);
                 /* Only jobs enqueued after ThreadPoolStop can be left */
-                pool.jobs.release(&mem.free);
+                for (auto n = pool.jobs.head; n; n = n.next) { mem.free(n.value); }
+                pool.jobs.free();
 
                 mem.free(pool.workers);
                 mem.free(pool);
