@@ -5284,10 +5284,8 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     }
     int here_std = !cc->cur_module && !cc->decl_from_main;
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
-    char *dot = NULL;
-    for (int i = (int)cls->clsname->len - 1; i >= 0 && !dot; --i) {
-        if (cls->clsname->data[i] == '.') dot = cls->clsname->data + i;
-    }
+    int top = astLastTopDot(cls->clsname->data, (int)cls->clsname->len);
+    char *dot = top >= 0 ? cls->clsname->data + top : NULL;
     int mine = cls->in_std == here_std;
     if (dot) {
         int mod_len = dot - cls->clsname->data;
@@ -5811,7 +5809,8 @@ Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len) {
     GenericInst *si = NULL;
     for (u64 i = 0; i < d->insts->size && !si; ++i) {
         GenericInst *in = d->insts->entries[i];
-        if (in->cls == cls) si = in;
+        /* a struct field's type is a copy of the instance type */
+        if (in->cls == cls || (in->cls && aoStrCmp(in->cls->clsname, cls->clsname))) si = in;
     }
     if (!si) return NULL;
     for (u64 i = 0; i < cc->generic_methods->size; ++i) {

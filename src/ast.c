@@ -456,6 +456,19 @@ const char *astSymbolDisplayName(const char *sym) {
 
 static char *astOverloadDemangleParams(const char *s, const char *end);
 
+/* Where the module part of `a.b.name` ends: its last `.` outside a
+ * generic's type arguments (`list.List<fzf.Term *>` is list's), -1 if
+ * there is none */
+int astLastTopDot(const char *name, int len) {
+    int depth = 0, last = -1;
+    for (int i = 0; i < len; ++i) {
+        if (name[i] == '<') depth++;
+        else if (name[i] == '>') depth--;
+        else if (name[i] == '.' && depth == 0) last = i;
+    }
+    return last;
+}
+
 /* `_K3net4dial` back to `net.dial`, for messages; any other name as is */
 char *astModuleDemangle(char *sym, int len) {
     if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||
