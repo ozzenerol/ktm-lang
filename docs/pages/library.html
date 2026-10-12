@@ -1620,15 +1620,16 @@ price 9.90
 <h3 id="json-structs">Structs to JSON and back</h3>
 <p><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
 <a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
-as the second argument for one member per line). <code>json.decode(text, reflect.of(x))</code>
-fills <code>x</code> from JSON, and <code>json.free(reflect.of(x))</code> gives back what decode
-allocated. A struct is an object of its fields by name, in order; ints, floats and bools are
+as the second argument for one member per line). <code>json.decode&lt;T&gt;(text)</code> returns
+the JSON as a <code>T</code> (a struct, a pointer to one, a slice, a String, a number), with the
+fields the JSON leaves out zero, and <code>json.free(reflect.of(x))</code> gives back what decode
+allocated. <code>json.decode(text, reflect.of(x))</code> fills a value you already have instead. A struct is an object of its fields by name, in order; ints, floats and bools are
 numbers and <code>true</code>/<code>false</code>; an enum is its member's name; a
 <code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array is a string;
 other arrays and slices are arrays; a pointer is what it points to, or <code>null</code>.
 Private fields are skipped. A union, a function or a <code>void *</code> can't be JSON.</p>
 <pre data-run><code>
-import json, mem, reflect;
+import json, reflect;
 
 enum Role { guest, admin };
 struct Tag { u8[] name; i64 weight; };
@@ -1636,10 +1637,8 @@ struct User { i64 id; String name; Role role; Tag[] tags; };
 
 void main()
 {
-  User u;
-  mem.set(&u, 0, sizeof(User));   // decode fills in what the JSON has
-  json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
-    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}", reflect.of(u));
+  User u = json.decode<User>("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
+    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}");
   defer json.free(reflect.of(u));
   printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
 
@@ -1649,7 +1648,7 @@ void main()
   printf("%s\n", text);
 
   try {
-    json.decode("{\"tags\": [{\"weight\": \"high\"}]}", reflect.of(u));
+    User bad = json.decode<User>("{\"tags\": [{\"weight\": \"high\"}]}");
   } catch (Error e) {
     printf("%s\n", e.message);
   }
@@ -1660,9 +1659,11 @@ void main()
 {"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
 tags[0].weight: expected an integer, got a string
 </pre>
-<p>A key the struct has no field for is ignored (<code>"since"</code> above), and a field the
-JSON leaves out keeps what it had, so zero the value first; with <code>json.STRICT</code> as the
-third argument both are errors. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
+<p>A key the struct has no field for is ignored (<code>"since"</code> above). A field the JSON
+leaves out is zero with <code>json.decode&lt;T&gt;</code>, and keeps what it had with the
+<code>reflect.of(x)</code> form, so zero the value first there; with <code>json.STRICT</code> as the
+flags argument (<code>json.decode&lt;User&gt;(text, json.STRICT)</code>) both are errors. When
+<code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
 with where it is (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. Decode
 allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it fills in;
 <code>json.free</code> frees them all and zeroes them, also after a decode that threw half way,
