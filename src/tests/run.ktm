@@ -13,13 +13,13 @@ void runTest(u8 *filename, i64 idx) {
     u8 *bin = cstr.format("%s/b/%d", gRoot, idx);
     u8 *cmd = cstr.format("cd '%s' && '%s' %s '%s' -o '%s'",
                                             gStartDir, gKtm, gKtmFlags, filename, bin);
-    auto res = proc.shell(cmd);
+    auto res = proc.shell(cstr.view(cmd));
 
     if (res != 0) {
         printf("\033[0;31mFailed to compile\033[0;0m: %s\n",filename);
     } else {
         libc.fflush(null);
-        if ((res = proc.shell(bin)) != 0) {
+        if ((res = proc.shell(cstr.view(bin))) != 0) {
             printf("\033[0;31mFAILED\033[0;0m to run: %s\n",filename);
         }
         fs.remove(cstr.view(bin));

@@ -234,7 +234,7 @@ u8 *compileRun(u8 *source, u8 *flags, bool run, i64 *status=null) {
                                         "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                         "%s " ERR_SRC " > " ERR_OUT " 2>&1", flags);
     }
-    i64 res = proc.shell(cmd);
+    i64 res = proc.shell(cstr.view(cmd));
     if (status) { *status = res; }
     mem.free(cmd);
     u8 *out = fs.readAll(ERR_OUT).take();

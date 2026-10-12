@@ -30,7 +30,7 @@ bool closeOnExec(i32 fd) {
 /* Does a shell started by Shlurp have fd open? (`[ -e /dev/fd/N ]` opens
  * nothing, so the child can't mistake one of its own fds for ours) */
 bool childHas(i32 fd) {
-    u8 *out = proc.shellOutput("[ -e /dev/fd/%d ] && echo yes", fd);
+    u8 *out = proc.shellOutput("[ -e /dev/fd/%d ] && echo yes", fd).take();
     bool has = out && !cstr.cmp(out, "yes");
     mem.free(out);
     return has;

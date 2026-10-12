@@ -2070,6 +2070,9 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 17 && !strncmp(fname, str_lit("cstr.formatToSize"))) return 2;
     /* s.appendFormat(fmt, ...) of a String (its arguments without self) */
     else if (len == 19 && !strncmp(fname, str_lit("String.appendFormat"))) return 0;
+    /* the shell commands built from a format */
+    else if (len == 11 && !strncmp(fname, str_lit("proc.shellf"))) return 0;
+    else if (len == 16 && !strncmp(fname, str_lit("proc.shellOutput"))) return 0;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
@@ -3036,6 +3039,7 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     /* `s[i]` of a slice: its element, once i is checked against its len */
     if (astTypeIsSlice(ast->type)) {
         Ast *elem = astSliceElem(ast, subscript, parseThrowFile(cc), line);
+        parseElideNoteElem(cc, ast, subscript, elem);
         return astUnaryOperator(ast->type->elem, AST_UN_OP_DEREF, elem);
     }
 
@@ -3336,6 +3340,10 @@ void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
+    if (operation == AST_BIN_OP_LOG_AND || operation == AST_BIN_OP_LOG_OR) {
+        parseCheckCondition(cc, left);
+        parseCheckCondition(cc, right);
+    }
     if ((operation == AST_BIN_OP_EQ || operation == AST_BIN_OP_NE) &&
         (astTypeIsSlice(left->type) || astTypeIsSlice(right->type))) {
         if (op_tok) cctrlRewindUntilPunctMatch(cc, op_tok, NULL);
@@ -3439,6 +3447,7 @@ static AstType *parseTernaryResultType(Cctrl *cc, Ast *then, Ast *els) {
  * which both are cast to so the phi is well typed. Right-associative and
  * not an lvalue (assertLValue has no AST_TERNARY case), as in C. */
 static Ast *parseTernary(Cctrl *cc, Ast *cond) {
+    parseCheckCondition(cc, cond);
     Ast *then = parseExpr(cc, 16);
     if (!then) {
         cctrlRaiseException(cc, "Expected an expression after `?`");
@@ -3545,6 +3554,7 @@ Ast *parseExpr(Cctrl *cc, int prec) {
             }
             assertNotArrayAssign(cc,LHS,tok->line,tok->col,tok->len);
             assertNotEnumArithAssign(cc,LHS,tok->line,tok->col,tok->len);
+            assertNotFnIncDec(cc,LHS,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,LHS);
             AstUnOp op;
             if (!astUnaryOpFromToken(tok->i64, &op)) {
@@ -3877,6 +3887,7 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
             }
             assertNotArrayAssign(cc,ast,tok->line,tok->col,tok->len);
             assertNotEnumArithAssign(cc,ast,tok->line,tok->col,tok->len);
+            assertNotFnIncDec(cc,ast,tok->line,tok->col,tok->len);
             assertNotConstAssign(cc,ast);
             if (tok->i64 == TK_PLUS_PLUS) {
                 return astUnaryOperator(ast->type,AST_UN_OP_POST_INC,ast);
@@ -4188,12 +4199,14 @@ Ast *parseUnaryExpr(Cctrl *cc) {
         if (unary_op == AST_UN_OP_PRE_INC || unary_op == AST_UN_OP_PRE_DEC) {
             assertNotArrayAssign(cc,operand,op_line,op_col,op_len);
             assertNotEnumArithAssign(cc,operand,op_line,op_col,op_len);
+            assertNotFnIncDec(cc,operand,op_line,op_col,op_len);
             assertNotConstAssign(cc,operand);
         }
 
         switch (unary_op) {
             case AST_UN_OP_ADDR_OF: {
                 parseCheckAddrOperand(cc, operand, op_line, op_col, op_len);
+                parseNoteSliceMoved(operand);
                 if (parseIsFunction(operand)) {
                     /* TODO;
                      * Making this a pointer type effects the return type of 
@@ -4236,7 +4249,10 @@ Ast *parseUnaryExpr(Cctrl *cc) {
                 break;
             /* 0/1 whatever the operand: typed as the operand, `!f` on
              * an F64 was converted back from a float and read as 0. */
-            case AST_UN_OP_LOG_NOT: type = ast_int_type; break;
+            case AST_UN_OP_LOG_NOT:
+                parseCheckCondition(cc, operand);
+                type = ast_int_type;
+                break;
             default:                type = operand->type; break;
         }
 

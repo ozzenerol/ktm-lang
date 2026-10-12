@@ -9,15 +9,15 @@ import cstr, fs, libc, mem, proc, test;
  * it printed (stderr is not captured); a null format gives null. */
 
 /* The result is `expected`; frees it */
-bool is(u8 *got, u8 *expected) {
+bool is(String got, u8[] expected) {
     bool ok;
-    if (!got) {
+    if (!got.ptr) {
         printf("got null, want '%s'\n", expected);
         return false;
     }
-    ok = cstr.cmp(got, expected) == 0;
+    ok = got.equals(expected);
     if (!ok) { printf("got '%s', want '%s'\n", got, expected); }
-    mem.free(got);
+    got.free();
     return ok;
 }
 
@@ -26,7 +26,7 @@ extern "c" i32 setenv(u8 *name, u8 *value, i32 overwrite);
 
 /* Number of Shlurp temporary files in $TMPDIR (the test's own) */
 i64 tempFiles() {
-    u8 *out = proc.shellOutput("ls \"${TMPDIR:-/tmp}\" | grep -c '^ktm-shlurp-'");
+    u8 *out = proc.shellOutput("ls \"${TMPDIR:-/tmp}\" | grep -c '^ktm-shlurp-'").take();
     i64 n = -1;
     if (out) {
         n = cstr.toInt(out);
@@ -80,18 +80,18 @@ i32 main() {
     else { printf("Failed - Shlurp failing command without output\n"); }
 
     /* null format */
-    if (proc.shellOutput(null) == null) { correct++; }
+    if (!proc.shellOutput(null).ptr) { correct++; }
     else { printf("Failed - Shlurp(null)\n"); }
 
     /* Larger output */
-    out = proc.shellOutput("seq 1 %d", 5000);
+    out = proc.shellOutput("seq 1 %d", 5000).take();
     if (out && cstr.len(out) == 23892 && cstr.cmpLen(out, "1\n2\n3\n", 6) == 0
             && out[cstr.len(out) - 1] == '0') { correct++; }
     else { printf("Failed - Shlurp large output\n"); }
     mem.free(out);
 
     /* No temporary file is left behind, even after many calls */
-    for (i = 0; i < 20; i++) { mem.free(proc.shellOutput("echo %d", i)); }
+    for (i = 0; i < 20; i++) { mem.free(proc.shellOutput("echo %d", i).take()); }
     if (before >= 0 && tempFiles() == before) { correct++; }
     else { printf("Failed - Shlurp left temporary files: %d before, %d after\n",
                  before, tempFiles());

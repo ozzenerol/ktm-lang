@@ -21,7 +21,7 @@ bool once(u8 *flags) {
     u8 *cmd = cstr.format("cd " D " && $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                          "../../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                          "%s main.ktm > out 2>&1", flags);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
     u8 *out = fs.readAll(D "/out").take();
     bool ok = out && count(out, "error:") == 1 &&

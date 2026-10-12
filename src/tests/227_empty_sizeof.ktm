@@ -14,7 +14,7 @@ u8 *diagnose(u8 *source, u8 *flags, i64 *statusArg) {
     u8 *cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                  "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                  "%s " SZ_SRC " > " SZ_OUT " 2>&1", flags);
-    *statusArg = proc.shell(cmd);
+    *statusArg = proc.shell(cstr.view(cmd));
     mem.free(cmd);
     u8 *out = fs.readAll(SZ_OUT).take();
     proc.shell("rm -f " SZ_SRC " " SZ_OUT);

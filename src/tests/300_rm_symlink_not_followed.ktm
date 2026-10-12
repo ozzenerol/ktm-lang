@@ -76,7 +76,7 @@ i32 main() {
     if (fs.remove(cstr.view(P("target")), fs.REMOVE_RECURSE) == 0 && !exists("target")) { correct++; }
 
     u8 *cmd = cstr.formatTo(null, "rm -rf '%s'", root);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     test.printResult(correct, tests);

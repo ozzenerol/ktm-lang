@@ -19,7 +19,7 @@ u8 *gWant = "ann:115:6 bob:4:7\n";
 
 bool output(u8 *cmd, u8 *want) {
     proc.shell("rm -f " M_OUT " " M_BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(M_OUT).take();
     bool ok = out && !cstr.cmp(out, want);
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

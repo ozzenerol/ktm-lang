@@ -31,6 +31,26 @@ int evalClassRef(Ast *ast, int offset);
 int assertLValue(Ast *ast);
 void parseRaiseNotLValue(Cctrl *cc, Ast *ast);
 void assertNotConstAssign(Cctrl *cc, Ast *ast);
+void parseCheckCondition(Cctrl *cc, Ast *ast);
+Ast *parseLiteralWriteBase(Ast *at);
+void parseCheckLiteralWrites(Cctrl *cc);
+void parseNoteSliceMoved(Ast *ast);
+
+/* A `for (i64 i = 0; i < s.len; i++)` loop being parsed (see
+ * parseElideLoopOpen): its s[i] elements, unchecked if neither i nor s
+ * changes in the body and neither has its address taken */
+typedef struct ElideLoop {
+    Ast *idx;
+    Ast *slice;
+    int spoiled;
+    List *elems;
+} ElideLoop;
+ElideLoop *parseElideLoopOpen(Cctrl *cc, Ast *init, Ast *cond, Ast *step);
+void parseElideLoopClose(Cctrl *cc, ElideLoop *loop);
+void parseElideNoteElem(Cctrl *cc, Ast *base, Ast *index, Ast *elem);
+void parseElideNoteWrite(Cctrl *cc, Ast *ast);
+void parseElideNoteLabel(Cctrl *cc);
+void parseElideSettle(Cctrl *cc);
 int parseIsFloatOrInt(Ast *ast);
 int parseIsClassOrUnion(int kind);
 void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len);
@@ -51,6 +71,8 @@ void typeCheckWarn(Cctrl *cc, int op_line, int op_col, Ast *expected,
                    Ast *actual);
 int assertNotArrayAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
                          int op_len);
+int assertNotFnIncDec(Cctrl *cc, Ast *lhs, int op_line, int op_col,
+                      int op_len);
 int assertNotEnumArithAssign(Cctrl *cc, Ast *lhs, int op_line, int op_col,
                              int op_len);
 void typeCheckReturnTypeWarn(Cctrl *cc, Ast *maybe_func, 

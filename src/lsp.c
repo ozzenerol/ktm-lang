@@ -2,6 +2,7 @@
  * answered from a fresh parse in a fork()ed child (lspRunIsolated). */
 
 #include <ctype.h>
+#include <dirent.h>
 #include <limits.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -277,6 +278,41 @@ static int lspParseUri(LspCtx *ctx, const char *uri) {
     return crashed;
 }
 
+static char *lspDocModule(AoStr *text);
+
+/* A module's files see each other's names bare, and the compiler reads
+ * them all together. When `uri` is one of them (`module a.b;`), parse
+ * the others in its directory first (their open text, else the file),
+ * so its uses of their names resolve. Open documents are skipped when
+ * `skip_open`: they were parsed already. */
+static int lspParseModuleSiblings(LspCtx *ctx, const char *uri, int skip_open) {
+    AoStr *text = lspDocGetOrLoad(ctx, uri);
+    if (text == NULL || lspDocModule(text) == NULL) return 0;
+    char *path = lspUriToPath(uri);
+    char *slash = strrchr(path, '/');
+    if (!slash) {
+        free(path);
+        return 0;
+    }
+    char *dir_path = mprintf("%.*s", (int)(slash - path), path);
+    DIR *dir = opendir(dir_path);
+    int crashed = 0;
+    struct dirent *ent;
+    while (dir && !crashed && (ent = readdir(dir)) != NULL) {
+        size_t n = strlen(ent->d_name);
+        if (n < 5 || strcmp(ent->d_name + n - 4, ".ktm") != 0) continue;
+        char *other = mprintf("%s/%s", dir_path, ent->d_name);
+        if (strcmp(other, path) == 0) continue;
+        const char *other_uri = NULL;
+        int was_open = skip_open && mapHas(ctx->docs, mprintf("file://%s", other));
+        AoStr *other_text = was_open ? NULL : lspTextForPath(ctx, other, &other_uri);
+        if (other_text) crashed = lspParse(ctx, other, other_text);
+    }
+    if (dir) closedir(dir);
+    free(path);
+    return crashed;
+}
+
 /* Run `handler` in a child against a fresh parse of `uri` (and of every
  * other open document first when `with_open_docs` - rename and
  * references must see callers in files that aren't included by `uri`).
@@ -305,8 +341,10 @@ static int lspRunIsolated(LspCtx *ctx, const char *uri, int with_open_docs,
                 if (sig) _exit(KTM_LSP_CHILD_CRASHED + sig);
             }
         }
+        int sig = lspParseModuleSiblings(ctx, uri, with_open_docs);
+        if (sig) _exit(KTM_LSP_CHILD_CRASHED + sig);
         /* Parsed last so its own symbols win any redefinition. */
-        int sig = lspParseUri(ctx, uri);
+        sig = lspParseUri(ctx, uri);
         if (sig) _exit(KTM_LSP_CHILD_CRASHED + sig);
         handler(ctx, id, params);
         fflush(stdout);
@@ -815,6 +853,28 @@ static Ast *lspModuleValue(LspCtx *ctx, const char *qual) {
     return entry ? entry : mapGet(ctx->cc->asm_funcs, (char *)qual);
 }
 
+static char *lspDocModule(AoStr *text);
+
+/* A bare name in one of a module's own files (`square` in geo's files is
+ * `geo.square`): "a.b.name" when the module has such a value or type and
+ * no local or parameter by that name hides it, else NULL */
+static char *lspOwnModuleQual(LspCtx *ctx, AoStr *text, u32 doc_id,
+                              int cursor_line, const char *ident, s64 ilen)
+{
+    char *mod = lspDocModule(text);
+    if (!mod) return NULL;
+    int in_doc = 0;
+    lspResolveValue(ctx, doc_id, cursor_line, ident, ilen, &in_doc);
+    if (in_doc) return NULL;
+    char *qual = mprintf("%s.%.*s", mod, (int)ilen, ident);
+    if (lspModuleValue(ctx, qual) || mapGet(ctx->cc->clsdefs, qual) ||
+        mapGet(ctx->cc->uniondefs, qual))
+    {
+        return qual;
+    }
+    return NULL;
+}
+
 /* A module's function is named by its symbol: show `a.b.name` */
 static char *lspModuleFnString(Ast *fn, const char *qual) {
     char *str = astFunctionToString(fn);
@@ -884,6 +944,8 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     AstType *mcls = qual ? NULL
                   : lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
+    if (!qual && !is_member)
+        qual = lspOwnModuleQual(ctx, text, doc_id, line + 1, ident, ilen);
     if (qual) {
         Ast *entry = lspModuleValue(ctx, qual);
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
@@ -1664,6 +1726,24 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     } else {
         mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                 &is_member);
+        /* a bare name in the module's own files: its declaration */
+        char *own = is_member ? NULL
+                  : lspOwnModuleQual(ctx, text, doc_id, cursor_line, ident, ilen);
+        if (own) {
+            Ast *entry = lspModuleValue(ctx, own);
+            AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, own);
+            if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, own);
+            is_member = 1;
+            if (entry) {
+                def_line = entry->line;
+                def_col = entry->col;
+                def_file = entry->file_id;
+            } else {
+                def_line = ty->line;
+                def_col = ty->col;
+                def_file = ty->file_id;
+            }
+        }
     }
     if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);

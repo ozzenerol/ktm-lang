@@ -1,6 +1,6 @@
 import cstr, mem, proc, test;
 
-/* proc.shellQuote(s) single-quotes s for sh, so text can go into Sh and Shlurp
+/* proc.shellQuote(cstr.view(s)).take() single-quotes s for sh, so text can go into Sh and Shlurp
  * commands as one word with nothing expanded. Each string goes through
  * Shlurp("printf '%%s.' %s", q) and must come back unchanged (the "."
  * keeps Shlurp from dropping a trailing newline). */
@@ -9,8 +9,8 @@ extern "c" u8 *mkdtemp(u8 *template);
 extern "c" i32 access(u8 *path, i32 mode);
 
 bool roundTrip(u8 *s) {
-    u8 *q = proc.shellQuote(s);
-    u8 *got = proc.shellOutput("printf '%%s.' %s", q);
+    u8 *q = proc.shellQuote(cstr.view(s)).take();
+    u8 *got = proc.shellOutput("printf '%%s.' %s", q).take();
     u8 *want = cstr.formatTo(null, "%s.", s);
     bool ok = got && !cstr.cmp(got, want);
     if (!ok) { printf("round trip of [%s] via [%s]: got [%s]\n", s, q, got); }
@@ -21,7 +21,7 @@ bool roundTrip(u8 *s) {
 }
 
 bool quoteIs(u8 *s, u8 *want) {
-    u8 *q = proc.shellQuote(s);
+    u8 *q = proc.shellQuote(cstr.view(s)).take();
     bool ok = !cstr.cmp(q, want);
     if (!ok) { printf("ShQuote: got [%s] want [%s]\n", q, want); }
     mem.free(q);
@@ -67,7 +67,7 @@ i32 main() {
         cstr.formatTo(path, "%s/pwned", dir);
         u8 *evil = cstr.formatTo(null, "x'; touch %s; echo '$(touch %s)`touch %s`",
                                                 path, path, path);
-        q = proc.shellQuote(evil);
+        q = proc.shellQuote(cstr.view(evil)).take();
         i64 st = proc.shellf("printf '%%s' %s > /dev/null", q);
         if (st == 0 && roundTrip(evil) && access(path, 0) != 0) { correct++; }
         else { printf("command ran: status %d\n", st); }
@@ -79,7 +79,7 @@ i32 main() {
     }
 
     /* One word to the shell, spaces and all */
-    q = proc.shellQuote("a b  c");
+    q = proc.shellQuote("a b  c").take();
     cmd = cstr.formatTo(null, "test %s = 'a b  c'", q);
     bad = proc.shellf(cmd);
     if (bad == 0 && proc.shellf("set -- %s; test $# -eq 1", q) == 0) { correct++; }

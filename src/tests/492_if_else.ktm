@@ -1,7 +1,7 @@
 import test;
 
 void testIfElse() {
-    printf("Testing if else\n");
+    printf("Test - if, else if, else: ");
     i64 testCases = 4, passed = 0;
     i64 i = 0, j = 0;
     if (i == 0) {
@@ -41,6 +41,6 @@ void testIfElse() {
 
 i32 main() {
     testIfElse();
-    printf("=====\n");
+    printf("====\n");
     return 0;
 }

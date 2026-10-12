@@ -355,8 +355,15 @@ static void aarch64EmitAddSubImm(AoStr *buf, const char *op,
         }
         return;
     }
-    aarch64EmitMovImm(buf, "x9", v);
-    aoStrCatFmt(buf, "%s %s, %s, x9\n\t", op, dst, src);
+    /* Past 24 bits: 4095 << 12 at a time, then the rest. No scratch
+     * register (x9 may be live, e.g. a call's struct address), and
+     * sp stays sp in the immediate form. */
+    while (v > 0xFFF000) {
+        aoStrCatFmt(buf, "%s %s, %s, #4095, lsl #12\n\t", op, dst, src);
+        v -= 0xFFF000;
+        src = dst;
+    }
+    aarch64EmitAddSubImm(buf, op, dst, src, v);
 }
 
 /* Base register for a `[base, idx]` access with a displacement:
@@ -1120,11 +1127,13 @@ static void a64TxtAggLoad(void *be, int is_fp, int reg, int src_off, int size) {
     else aarch64LoadBytes(buf, reg, "x9", src_off, size);
 }
 static void a64TxtPtrInReg(void *be, int reg, int sp_off) {
-    aoStrCatFmt(((IrCgCtx *)be)->buf, "add x%i, sp, #%i\n\t", reg, sp_off);
+    char r[8];
+    snprintf(r, sizeof(r), "x%d", reg);
+    aarch64EmitAddSubImm(((IrCgCtx *)be)->buf, "add", r, "sp", sp_off);
 }
 static void a64TxtPtrToStack(void *be, int sp_off, int nsaa) {
     AoStr *buf = ((IrCgCtx *)be)->buf;
-    aoStrCatFmt(buf, "add x10, sp, #%i\n\t", sp_off);
+    aarch64EmitAddSubImm(buf, "add", "x10", "sp", sp_off);
     aoStrCatFmt(buf, "str x10, [sp, #%i]\n\t", nsaa);
 }
 static void a64TxtScalarToReg(void *be, IrValue *a, int is_fp, int reg) {

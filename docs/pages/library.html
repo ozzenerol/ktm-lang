@@ -454,26 +454,27 @@ fs.remove again with fs.REMOVE_FORCE: 0
 declared too.</p>
 
 <h2 id="csv">CSV</h2>
-<p><code>csv.next</code> walks a CSV buffer without copying it: each call gives the next
+<p><code>csv.next</code> walks a CSV text without copying it: each call gives the next
 field (<code>csv.FIELD</code>), then the whole row (<code>csv.ROW</code>), and
-<code>csv.EOF</code> at the end. A <code>csv.Slice</code> is where that piece is in the
-buffer (<code>off</code>, <code>len</code>) and its number (<code>idx</code>, the field in
-its row or the row). The slices are the raw text: a quoted field keeps its quotes and
-its doubled <code>""</code>, commas and newlines inside quotes don't split, and a row's
-length includes its <code>\n</code> or <code>\r\n</code>. Unquoting is up to you.</p>
+<code>csv.EOF</code> at the end. A <code>csv.Item</code> has its number (<code>idx</code>, the
+field in its row or the row) and its <code>text</code>, a <code>u8[]</code> view of the input.
+The views are the raw text: a quoted field keeps its quotes and its doubled <code>""</code>,
+commas and newlines inside quotes don't split, and a row's text includes its <code>\n</code> or
+<code>\r\n</code>. Unquoting is up to you. <code>csv.init</code> takes any <code>u8[]</code>, so
+<code>text[0:n]</code> parses part of a buffer; the input must outlive the parser.</p>
 <pre data-run><code>
-import cstr, csv, str;
+import csv;
 
 void main()
 {
-  u8 *text = "name,quote\r\nann,\"say \"\"hi\"\", ok\"\nbob,\n";
+  u8[] text = "name,quote\r\nann,\"say \"\"hi\"\", ok\"\nbob,\n";
   csv.Parser p;
-  csv.Slice s;
+  csv.Item it;
   i64 kind;
-  csv.init(&p, text, cstr.len(text));
-  while ((kind = csv.next(&p, &s)) != csv.EOF) {
-    if (kind == csv.FIELD) { printf("field %d: [%.*s]\n", s.idx, s.len, text + s.off); }
-    else                   { printf("row %d: %d bytes\n", s.idx, s.len); }
+  csv.init(&p, text);
+  while ((kind = csv.next(&p, &it)) != csv.EOF) {
+    if (kind == csv.FIELD) { printf("field %d: [%s]\n", it.idx, it.text); }
+    else                   { printf("row %d: %d bytes\n", it.idx, it.text.len); }
   }
 }
 </code></pre>
@@ -491,17 +492,17 @@ row 2: 5 bytes
 
 <h2 id="system">Running commands</h2>
 <pre data-run><code>
-import cstr, mem, proc;
+import proc;
 
 void main()
 {
   i64 status = proc.shell("echo from the shell");
-  proc.shellf("echo %s has %d files", "/tmp", 3);    // printf-style
-  u8 *out = proc.shellOutput("echo %s", "captured");  // capture stdout
+  proc.shellf("echo %s has %d files", "/tmp", 3);       // printf-style
+  String out = proc.shellOutput("echo %s", "captured");  // capture stdout
+  defer out.free();
 
   printf("exit code %d\n", status);
   printf("[%s]\n", out);
-  mem.free(out);
 }
 </code></pre>
 <pre class="output">
@@ -513,17 +514,19 @@ exit code 0
 <p>Print statements are buffered, while commands write straight to the terminal. When
 output goes to a pipe or file, a command's output can appear before text you printed
 earlier.</p>
-<p><code>proc.shell</code> and <code>proc.shellf</code> run the command with <code>sh -c</code> and
-return its exit code, 0 to 255: <code>proc.shell("exit 3")</code> gives 3, and a command the
-shell can't find gives 127. They return -1 if the command was killed by a signal or the
-shell couldn't be run.</p>
+<p><code>proc.shell</code> (a <code>u8[]</code>) and <code>proc.shellf</code> (a format) run the
+command with <code>sh -c</code> and return its exit code, 0 to 255: <code>proc.shell("exit 3")</code>
+gives 3, and a command the shell can't find gives 127. They return -1 if the command was killed
+by a signal or the shell couldn't be run.</p>
 <p><code>proc.shellOutput</code> returns what the command printed to stdout, minus one trailing
-newline, as a string to <code>mem.free</code>; format arguments are optional. It doesn't
-capture stderr or return the exit status: a failing command gives whatever it printed,
-often <code>""</code>. It returns once the shell exits, without waiting for a background
-job (<code>cmd &amp;</code>) the command started. <code>os.exit(code)</code> ends the program.</p>
+newline, as a new <code>String</code>; format arguments are optional, and <code>%s</code> takes a
+String or a slice as well. It doesn't capture stderr or return the exit status: a failing
+command gives whatever it printed, often <code>""</code>, and a shell that couldn't be started an
+empty String with a null <code>ptr</code>. It returns once the shell exits, without waiting for
+a background job (<code>cmd &amp;</code>) the command started. <code>os.exit(code)</code> ends the
+program.</p>
 <p>The commands get the program's stdin, stdout and stderr, but none of the files or
-sockets the library opened: those (the <code>Net*</code> sockets and accepted connections,
+sockets the library opened: those (the <code>net</code> sockets and accepted connections,
 <code>fs.readAll</code>/<code>fs.writeAll</code>'s file, <code>proc.shellOutput</code>'s pipe)
 are close-on-exec. An fd you open yourself with <code>open</code> or <code>socket</code> is
 inherited unless you pass <code>O_CLOEXEC</code> (Linux also has <code>SOCK_CLOEXEC</code>)
@@ -531,19 +534,19 @@ or set <code>FD_CLOEXEC</code> with <code>fcntl(fd, F_SETFD, FD_CLOEXEC)</code>.
 <p>The command is shell text, so a string from elsewhere (a file name, user input) must
 not be pasted in as it is: a space splits it and <code>$</code>, <code>`</code>,
 <code>;</code> or <code>*</code> run or expand things. <code>proc.shellQuote(s)</code> returns
-<code>s</code> in single quotes as a new string to <code>mem.free</code>, with each
-<code>'</code> written as <code>'\''</code> (and <code>''</code> for <code>null</code>),
-so the shell gets it as one word, unchanged.</p>
+<code>s</code> in single quotes as a new String, with each <code>'</code> written as
+<code>'\''</code> (and <code>''</code> for an empty one), so the shell gets it as one word,
+unchanged.</p>
 <pre data-run><code>
-import cstr, mem, proc;
+import proc;
 
 void main()
 {
-  u8 *q = proc.shellQuote("it's $HOME; *");
-  u8 *out = proc.shellOutput("printf '%%s' %s", q);
+  String q = proc.shellQuote("it's $HOME; *");
+  defer q.free();
+  String out = proc.shellOutput("printf '%%s' %s", q);
+  defer out.free();
   printf("[%s]\n", out);
-  mem.free(out);
-  mem.free(q);
 }
 </code></pre>
 <pre class="output">
@@ -552,43 +555,43 @@ void main()
 
 <h3 id="processes">Running programs without a shell</h3>
 <p><code>proc.run(argv, &amp;code)</code> runs a program with the arguments in <code>argv</code>, a
-NULL-terminated array, and returns what it printed to stdout (minus one trailing newline, to
-<code>mem.free</code>) with its exit code in <code>code</code>. No shell is involved: every argument reaches
-the program exactly as written, so nothing needs quoting. The program is looked up in
-<code>$PATH</code>; NULL means it couldn't be started, and <code>os.errno()</code> says why
-(2, ENOENT, for a program that doesn't exist).</p>
+null-terminated array of C strings, and returns what it printed to stdout (minus one trailing
+newline) as a new String, with its exit code in <code>code</code>. No shell is involved: every
+argument reaches the program exactly as written, so nothing needs quoting. The program is looked
+up in <code>$PATH</code>; an empty String with a null <code>ptr</code> means it couldn't be
+started, and <code>os.errno()</code> says why (2, ENOENT, for a program that doesn't exist).</p>
 <pre data-run><code>
-import cstr, mem, proc;
+import proc;
 
 void main()
 {
   u8 *argv[] = {"printf", "%s|", "it's $HOME", "a b", null};
   i64 code;
-  u8 *out = proc.run(argv, &code);
-  printf("[%s] exit %d
-", out, code);
-  mem.free(out);
+  String out = proc.run(argv, &code);
+  defer out.free();
+  printf("[%s] exit %d\n", out, code);
 }
 </code></pre>
 <pre class="output">
 [it's $HOME|a b|] exit 0
 </pre>
 <p>For more control, <code>proc.spawn(argv, &amp;opts)</code> starts the program and returns a
-<code>proc.Proc</code>. In <code>proc.Opts</code> each of <code>in</code>, <code>out</code> and <code>err</code>
-is <code>proc.INHERIT</code> (ours, the default), <code>proc.PIPE</code> (our end is
-<code>p-&gt;in_fd</code>, <code>out_fd</code> or <code>err_fd</code>), <code>proc.DEVNULL</code>
-(<code>/dev/null</code>) or, for <code>err</code>, <code>proc.STDOUT</code> (2&gt;&amp;1);
-<code>cwd</code> and <code>env</code> (a NULL-terminated <code>"NAME=value"</code> list that replaces the
-environment) are optional. <code>proc.communicate(p, input, len, &amp;out, &amp;out_len, &amp;err,
-&amp;err_len)</code> writes the input, reads both outputs to the end and waits, all in one
-<code>poll()</code> loop, so a program that writes a lot to both, or echoes its input, can't block.
-<code>proc.wait(p)</code> returns the exit code, or -1 when a signal killed the program
-(<code>p-&gt;term_signal</code> says which); <code>proc.done(p)</code> checks without waiting,
-<code>proc.kill(p, sig)</code> signals it (the whole group with <code>new_group</code>), and
-<code>proc.release(p)</code> closes the pipes and frees it, waiting for a program that is still
-running.</p>
+<code>proc.Proc</code>. In <code>proc.Opts</code> (zero it first: its fields are all optional)
+each of <code>in</code>, <code>out</code> and <code>err</code> is <code>proc.INHERIT</code> (ours,
+the default), <code>proc.PIPE</code> (our end is <code>p.inFd</code>, <code>outFd</code> or
+<code>errFd</code>), <code>proc.DEVNULL</code> (<code>/dev/null</code>) or, for <code>err</code>,
+<code>proc.STDOUT</code> (2&gt;&amp;1); <code>cwd</code> and <code>env</code> (a null-terminated
+<code>"NAME=value"</code> list that replaces the environment) are optional.
+<code>proc.communicate(p, input, &amp;out, &amp;err)</code> writes the input (a <code>u8[]</code>),
+reads both outputs to the end into Strings and waits, all in one <code>poll()</code> loop, so a
+program that writes a lot to both, or echoes its input, can't block; pass <code>null</code> for
+an output you don't want (it is still read, and dropped). <code>proc.wait(p)</code> returns the
+exit code, or -1 when a signal killed the program (<code>p.termSignal</code> says which);
+<code>proc.done(p)</code> checks without waiting, <code>proc.kill(p, sig)</code> signals it (the
+whole group with <code>newGroup</code>), and <code>proc.release(p)</code> closes the pipes and
+frees it, waiting for a program that is still running.</p>
 <pre data-run><code>
-import cstr, mem, proc;
+import mem, proc;
 
 void main()
 {
@@ -599,11 +602,11 @@ void main()
   opts.out = proc.PIPE;
   opts.err = proc.PIPE;
   proc.Proc *p = proc.spawn(argv, &opts);
-  u8 *out, *err;
-  i64 code = proc.communicate(p, "hello\n", 6, &out, null, &err);
+  String out, err;
+  i64 code = proc.communicate(p, "hello\n", &out, &err);
   printf("out=%s err=%s exit=%d\n", out, err, code);
-  mem.free(out);
-  mem.free(err);
+  out.free();
+  err.free();
   proc.release(p);
 }
 </code></pre>
@@ -1782,47 +1785,46 @@ my file.txt  my\ file    score 176 at 0 1 2 3 4 5 6
 <h2 id="sqlite">SQLite</h2>
 <p>The SQLite functions exist when ktm and the library are built with
 <code>./build.sh --sqlite</code> (they are under <code>#ifdef __KTM_LINK_SQLITE3__</code>).
-<code>sql.open(path)</code> opens a database (<code>":memory:"</code> for a private one)
-and <code>sql.close</code> closes it. <code>sql.execRaw</code> runs a script of
-statements and returns NULL or an error message to <code>mem.free</code>.
-<code>sql.exec</code> and <code>sql.select</code> run one statement with <code>?</code>
-parameters from an array of <code>sql.Param</code> (<code>sql.INT</code>,
-<code>sql.FLOAT</code>, <code>sql.TEXT</code>, <code>sql.BLOB</code>,
-<code>sql.NULL_TYPE</code>); text and blobs are copied, so they can be freed right away. A
-string with a second statement is an error rather than half-run. <code>sql.next</code>
-steps through the rows of <code>sql.select</code> and frees the row after the last one;
-call <code>sql.rowRelease</code> if you stop early. A column's <code>str</code> and
-<code>blob</code> are only valid until the next row.</p>
+<code>sql.open(path)</code> opens a database (<code>":memory:"</code> for a private one; the
+<code>sql.Db</code> keeps its own copy of the name) and <code>sql.close</code> closes it.
+<code>sql.execRaw</code> runs a script of statements and returns its error as a new String,
+empty when it ran. <code>sql.exec</code> and <code>sql.select</code> run one statement with
+<code>?</code> parameters from an array of <code>sql.Param</code> (<code>sql.INT</code>,
+<code>sql.FLOAT</code>, <code>sql.TEXT</code> with <code>str</code> a <code>u8[]</code>,
+<code>sql.BLOB</code>, <code>sql.NULL_TYPE</code>); text and blobs are copied, so they can be
+freed right away, and an empty text binds <code>''</code>. The SQL is a <code>u8[]</code> too,
+so <code>script[0:n]</code> runs part of a buffer. A text with a second statement is an error
+rather than half-run. <code>sql.next</code> steps through the rows of <code>sql.select</code>
+and frees the row after the last one; call <code>sql.rowRelease</code> if you stop early. A
+column's <code>str</code> (a <code>u8[]</code> view) and <code>blob</code> are only valid until
+the next row.</p>
 <pre><code>
-import cstr, mem, sql;
-
-sql.Db *db;
-u8 *err;
-
-sql.Param p[2];
-
-sql.Row row;
+import sql;
 
 void main()
 {
-  db = sql.open(":memory:");
-  err = sql.execRaw(db, "CREATE TABLE users(id INTEGER, name TEXT);");
-  if (err) {
+  sql.Db *db = sql.open(":memory:");
+  String err = sql.execRaw(db, "CREATE TABLE users(id INTEGER, name TEXT);");
+  if (err.len) {
     printf("%s\n", err);
-    mem.free(err);
   }
+  err.free();
+
+  sql.Param p[2];
   p[0].type = sql.INT;
   p[0].intVal = 1;
   p[1].type = sql.TEXT;
   p[1].str = "ann";
   sql.exec(db, "INSERT INTO users VALUES(?, ?);", p, 2);
+
+  sql.Row row;
   if (sql.select(db, &row, "SELECT id, name FROM users;")) {
     while (sql.next(&row)) { printf("%d %s\n", row.col[0].intVal, row.col[1].str); }
   }
   sql.close(db);
 }
 </code></pre>
-<p><code>sql.prepare</code> compiles a statement once (NULL on an error) and
+<p><code>sql.prepare</code> compiles a statement once (null on an error) and
 <code>sql.execPrepared(stmt, &amp;row, params)</code> runs it with new parameters, returning
 <code>SQLITE_ROW</code>, <code>SQLITE_DONE</code> or an error code; read its rows with
 <code>sql.nextPrepared</code>. A parameter it can't bind (an unknown <code>type</code> gives

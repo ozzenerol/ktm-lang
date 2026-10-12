@@ -10,7 +10,7 @@ u8 *runKtm(u8 *src, u8 *args) {
     fs.writeAll(SRC_FILE, cstr.view(src));
     return proc.shellOutput(cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                                        "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
-                                       "-jit " SRC_FILE " %s 2>&1", args));
+                                       "-jit " SRC_FILE " %s 2>&1", args)).take();
 }
 
 i32 main() {

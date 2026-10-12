@@ -35,10 +35,10 @@ i32 main() {
     return 0;
 }
 ");
-    u8 *out = proc.shellOutput(KTM "-jit " DIR "/main.ktm 2>&1");
+    u8 *out = proc.shellOutput(KTM "-jit " DIR "/main.ktm 2>&1").take();
     if (out && !cstr.cmp(out, "8 10 6 12")) { correct++; }
     else { printf("\n  JIT: [%s]\n", out); }
-    out = proc.shellOutput(KTM DIR "/main.ktm -o " DIR "/bin 2>&1 && " DIR "/bin");
+    out = proc.shellOutput(KTM DIR "/main.ktm -o " DIR "/bin 2>&1 && " DIR "/bin").take();
     if (out && !cstr.cmp(out, "8 10 6 12")) { correct++; }
     else { printf("\n  AOT: [%s]\n", out); }
     proc.shell("rm -rf " DIR);

@@ -12,7 +12,7 @@ const i64 SQLITE_LIMIT_LENGTH = 0;
 i64 count(sql.Db *ctx, u8 *sqlVal) {
     sql.Row row;
     i64 n = 0;
-    if (!sql.select(ctx, &row, sqlVal)) { return -1; }
+    if (!sql.select(ctx, &row, cstr.view(sqlVal))) { return -1; }
     while (sql.next(&row)) { n++; }
     return n;
 }
@@ -67,7 +67,7 @@ i32 main() {
     rc = sql.execPrepared(sel, &row, p + 1);
     tests++;
     if (rc == sql.SQLITE_ROW && sql.nextPrepared(&row) && row.col[0].type == sql.TEXT &&
-            !cstr.cmp(row.col[0].str, "ok")) {
+            row.col[0].str.equals("ok")) {
         correct++;
     }
     sql.rowRelease(&row);

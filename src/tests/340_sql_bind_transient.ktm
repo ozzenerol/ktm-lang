@@ -14,7 +14,7 @@ bool allRows(sql.Row *row, u8 *want, i64 count, bool prepared) {
         } else if (!sql.next(row)) {
             break;
         }
-        if (row.col[0].type != sql.SQLITE_TEXT || cstr.cmp(row.col[0].str, want)) {
+        if (row.col[0].type != sql.SQLITE_TEXT || !row.col[0].str.equals(cstr.view(want))) {
             ok = false;
         }
         n++;
@@ -27,7 +27,7 @@ bool selectText(sql.Db *ctx) {
     sql.Param q[1];
     u8 *key = cstr.dup("original");
     q[0].type = sql.SQLITE_TEXT;
-    q[0].str = key;
+    q[0].str = cstr.view(key);
     if (!sql.select(ctx, &row, "SELECT ?, id FROM t;", q, 1)) { return false; }
     cstr.copy(key, "CHANGED!");
     mem.free(key);
@@ -63,7 +63,7 @@ bool insertThenFree(sql.Db *ctx) {
     sql.Param q[1];
     u8 *name = cstr.dup("kept");
     q[0].type = sql.SQLITE_TEXT;
-    q[0].str = name;
+    q[0].str = cstr.view(name);
     if (!sql.exec(ctx, "INSERT INTO names(name) VALUES(?);", q, 1)) { return false; }
     cstr.copy(name, "gone");
     mem.free(name);
@@ -78,7 +78,7 @@ bool preparedText(sql.Db *ctx) {
     sql.Stmt *st = sql.prepare(ctx, "SELECT ?, id FROM t;");
     u8 *key = cstr.dup("prepared");
     q[0].type = sql.SQLITE_TEXT;
-    q[0].str = key;
+    q[0].str = cstr.view(key);
     if (sql.execPrepared(st, &row, q) != sql.SQLITE_ROW) {
         sql.finalize(st);
         return false;

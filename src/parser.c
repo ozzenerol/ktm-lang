@@ -1629,6 +1629,10 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
 
     /* `i64[] s = array;`: the array becomes a slice */
     init = parseSliceFrom(cc, var->type, init);
+    if (var->kind == AST_LVAR && init->kind == AST_SLICE_MAKE &&
+        init->slice_ptr && init->slice_ptr->kind == AST_STRING) {
+        var->flags |= AST_FLAG_LIT_SLICE;
+    }
 
     /* `auto`: the type is the initialiser's, nothing to check it against
      * (a string's `u8[6]` "wasn't assignable to" its own `u8[6]`) */
@@ -2086,6 +2090,7 @@ Ast *parseIfStatement(Cctrl *cc) {
     } else {
         cond = cond_clause;
     }
+    parseCheckCondition(cc, cond);
 
     Lexeme *peek = cctrlTokenPeek(cc);
     if (peek == NULL) {
@@ -2502,6 +2507,7 @@ Ast *parseForStatement(Cctrl *cc) {
         }
 
         forcond = parseOptExpr(cc);
+        parseCheckCondition(cc, forcond);
         if (tokenPunctIs(cctrlTokenPeek(cc), ')')) {
             forstep = NULL;
         } else {
@@ -2529,7 +2535,9 @@ Ast *parseForStatement(Cctrl *cc) {
         cctrlRaiseException(cc,"Unexpected %s `%s` while parsing for loop body", 
                 lexemeTypeToString(peek->tk_type), lexemeAsWritten(peek));
     }
+    ElideLoop *elide = parseElideLoopOpen(cc, forinit, forcond, forstep);
     forbody = parseBracedBody(cc, "for");
+    parseElideLoopClose(cc, elide);
     /* Go back up */
     cc->localenv = cc->localenv->parent;
     cc->tmp_loop_begin = prev_begin;
@@ -2563,6 +2571,7 @@ Ast *parseWhileStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         whilecond = parseRequiredExpr(cc, "the `while` condition");
+        parseCheckCondition(cc, whilecond);
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
     }
@@ -2633,6 +2642,7 @@ Ast *parseDoWhileStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         whilecond = parseRequiredExpr(cc, "the `while` condition");
+        parseCheckCondition(cc, whilecond);
         cctrlTokenExpect(cc,')');
         parseCondGuardDone(cc, &guard);
     }
@@ -2667,6 +2677,21 @@ Ast *parseContinueStatement(Cctrl *cc) {
     Ast *ast = astContinue(cc->tmp_loop_begin);
     cctrlTokenExpect(cc,';');
     return ast;
+}
+
+/* A struct or union by value (String and slices included), not an
+ * intrinsic class */
+static int parseIsStructType(AstType *t) {
+    return t && (t->kind == AST_TYPE_CLASS || t->kind == AST_TYPE_UNION) &&
+           !t->is_intrinsic;
+}
+
+/* Two struct types that are the same one */
+static int parseSameStructType(AstType *a, AstType *b) {
+    if (a == b) return 1;
+    if (!parseIsStructType(a) || !parseIsStructType(b) || a->kind != b->kind) return 0;
+    if (a->fields && a->fields == b->fields) return 1;
+    return a->clsname && b->clsname && aoStrCmp(a->clsname, b->clsname);
 }
 
 Ast *parseReturnStatement(Cctrl *cc) {
@@ -2718,6 +2743,14 @@ Ast *parseReturnStatement(Cctrl *cc) {
         cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
                 "Cannot convert `%s` to enum `%s` without a cast",
                 astTypeToString(check), cc->tmp_rettype->clsname->data);
+    } else if (retval && (parseIsStructType(check) || parseIsStructType(cc->tmp_rettype)) &&
+               (!ok || !parseSameStructType(check, cc->tmp_rettype))) {
+        /* a struct (a String, a slice) for something else, or the other way
+         * round: there is nothing to convert, the value would be garbage
+         * (a call or an assignment says the same) */
+        cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
+                "cannot return a %s from a function returning %s",
+                astTypeToString(check), astTypeToString(cc->tmp_rettype));
     } else if (!ok) {
         Ast *func = mapGet(cc->global_env, cc->tmp_fname->data);
         typeCheckReturnTypeWarn(cc,func,check,retval,&ret_tok,&semi_tok);
@@ -2875,6 +2908,8 @@ static int parseArmEnds(Lexeme *peek) {
             (peek->i64 == KW_CASE || peek->i64 == KW_DEFAULT));
 }
 
+static Ast *parseArmBlock(Cctrl *cc);
+
 /* The statements of a `case` or `default` (Y8): every one up to the next
  * label. The arm leaves the switch at its end, unless its last statement
  * is `fallthrough;`, which runs on into the next arm. An empty arm
@@ -2883,29 +2918,17 @@ static void parseCaseArm(Cctrl *cc, Ast *arm) {
     List *stmts = arm->case_asts;
     int ft = 0;
     s64 ft_line = 0, ft_col = 0;
-    while (!parseArmEnds(cctrlTokenPeek(cc))) {
-        if (ft) {
-            cctrlRaiseExceptionAt(cc, ft_line, ft_col, 11,
-                "`fallthrough` must be the last statement of its case");
-        }
+    if (!parseArmEnds(cctrlTokenPeek(cc))) {
+        /* a block of its own (F33): declarations, `defer` and a scope,
+         * and the block's checks place a `fallthrough` */
         cc->fallthrough_pending = 0;
-        Ast *stmt = parseStatement(cc);
+        Ast *block = parseArmBlock(cc);
         if (cc->fallthrough_pending) {
-            /* a `{...}` arm ending in it is fine (the block checked it) */
-            if (stmt && stmt->kind != AST_COMPOUND_STMT) {
-                s64 line = cc->fallthrough_line, col = cc->fallthrough_col;
-                cc->fallthrough_pending = 0;
-                cctrlRaiseExceptionAt(cc, line, col, 11,
-                    "`fallthrough` must be the last statement of its case, "
-                    "not inside a block or another statement");
-            }
-            if (stmt) listAppend(stmts, stmt);    /* `{ ...; fallthrough; }` */
             ft = 1;
             ft_line = cc->fallthrough_line;
             ft_col = cc->fallthrough_col;
-            continue;
         }
-        if (stmt) listAppend(stmts, stmt);
+        if (!listEmpty(block->stms)) listAppend(stmts, block);
     }
     arm->case_fallthrough = ft;
     arm->case_ft_line = ft_line;
@@ -3300,6 +3323,7 @@ Ast *parseStatement(Cctrl *cc) {
         }
         label = createFunctionLevelGotoLabel(cc,tok);
         ret = astLabel(label);
+        parseElideNoteLabel(cc);
         /* consume ':' */
         cctrlTokenExpect(cc,':');
         return ret;
@@ -3391,7 +3415,10 @@ Ast *parseDeclOrStatement(Cctrl *cc) {
     return parseStatement(cc);
 }
 
-void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
+/* The statements of a `{ ... }` block into `body`, or, with `arm` set, of
+ * a switch case's arm: up to the next `case`, `default` or the switch's
+ * `}` (left for the switch), in a scope of its own like a block's */
+static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
     Ast *stmt = NULL;
     Ast *var = NULL;
     AstType *base_type, *type, *next_type;
@@ -3415,7 +3442,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
 
     tok = cctrlTokenPeek(cc);
 
-    while (tok && !tokenPunctIs(tok, '}')) {
+    while (tok && !(arm ? parseArmEnds(tok) : tokenPunctIs(tok, '}'))) {
         /* Snapshot the tail of body->stms and cc->tmp_locals
          * *before* attempting the next statement. If the parse
          * longjmps mid-way, half-built nodes may already have
@@ -3580,7 +3607,7 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
                 }
                 if (stmt) listAppend(body->stms, stmt);
                 tok = cctrlTokenPeek(cc);
-                if (tok && !tokenPunctIs(tok, '}')) {
+                if (tok && !(arm ? parseArmEnds(tok) : tokenPunctIs(tok, '}'))) {
                     cc->fallthrough_pending = 0;
                     cctrlRaiseExceptionAt(cc, line, col, 11,
                         "`fallthrough` must be the last statement of its case");
@@ -3601,8 +3628,21 @@ void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
     }
     cc->current_recovery = outer_recovery;
     cc->localenv = cc->localenv->parent;
-    cctrlTokenExpect(cc,'}');
+    if (!arm) {
+        cctrlTokenExpect(cc,'}');
+    }
     cctrlTokenPeek(cc);
+}
+
+void parseCompoundStatementInternal(Cctrl *cc, Ast *body) {
+    parseBlockInternal(cc, body, 0);
+}
+
+/* A case's arm (parseCaseArm): its statements as one block */
+static Ast *parseArmBlock(Cctrl *cc) {
+    Ast *block = astCompountStatement(listNew());
+    parseBlockInternal(cc, block, 1);
+    return block;
 }
 
 Ast *parseCompoundStatement(Cctrl *cc) {
@@ -4151,6 +4191,9 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
 
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cc->tmp_locals = locals;
+    cc->lit_writes = listNew();
+    cc->elide_open = listNew();
+    cc->elide_done = listNew();
 
     /* Upgrade a prototype to an actual function */
     func = mapGetLen(cc->global_env, fname, len);
@@ -4293,6 +4336,8 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
             astModuleDemangle(fname, len));
     }
 
+    parseCheckLiteralWrites(cc);
+    parseElideSettle(cc);
     cc->localenv = NULL;
     cc->tmp_locals = NULL;
     cc->tmp_rettype = NULL;

@@ -20,7 +20,7 @@ u8 *gWant = "hello\n16 3 7\n";
 
 bool output(u8 *cmd, u8 *want, u8 *not=null) {
     proc.shell("rm -f " MOD_OUT " " MOD_BIN);
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     u8 *out = fs.readAll(MOD_OUT).take();
     bool ok = out && libc.strstr(out, want) != null && (!not || !libc.strstr(out, not));
     if (!ok) { printf("\n%s\n----\n%s\n", cmd, out); }

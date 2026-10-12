@@ -32,7 +32,7 @@ u8 *runPrint(u8 *src, u8 *how, i64 *resArg) {
     } else {
         cmd = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) ../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} " PF_FILE " -o " PF_BIN " > " PF_OUT " 2>&1 && ./" PF_BIN " > " PF_OUT " 2>&1";
     }
-    *resArg = proc.shell(cmd);
+    *resArg = proc.shell(cstr.view(cmd));
     return fs.readAll(PF_OUT).take();
 }
 

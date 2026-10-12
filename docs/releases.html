@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,56 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-3-1-2026-10-12">v0.3.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-3-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>The rest of the library on <code>u8[]</code> and <code>String</code>, and the compiler catching
+more mistakes it used to let through. Code that uses <code>proc</code>, <code>csv</code> or
+<code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
+are errors now.</p>
+
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
+  <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
+  <code>proc.communicate(p, input, &amp;out, &amp;err)</code> takes its input as a <code>u8[]</code> and
+  gives stdout and stderr as Strings. <code>proc.shellf</code> and <code>proc.shellOutput</code> are
+  format-checked like <code>printf</code>, and their <code>%s</code> takes a String or a slice.</li>
+  <li><code>csv</code>: <code>csv.init(&amp;p, text)</code> takes a <code>u8[]</code>, and
+  <code>csv.next</code> fills a <code>csv.Item</code> whose <code>text</code> is a view of the input
+  (it was a <code>csv.Slice</code> of offsets).</li>
+  <li><code>sql</code>: <code>open</code>, <code>prepare</code>, <code>exec</code>, <code>select</code>
+  and <code>execRaw</code> take the SQL as a <code>u8[]</code>; <code>execRaw</code> returns its error
+  as a String (empty when it ran); a text <code>Param</code> and a text <code>Column</code> are
+  <code>u8[]</code>; the <code>Db</code> keeps its own copy of its name.</li>
+  <li>A write through a string literal the compiler can see is an error (the literal itself, or a
+  local initialised from one and never given anything else); other writes fault at run time, in
+  the JIT too, which kept literals writable.</li>
+  <li>A struct (a String, a slice, any struct) used as a condition is an error. It was tested by
+  its address, so <code>if (err)</code> on a String was always true.</li>
+  <li>Returning a struct from a function that returns something else, or another struct, is an
+  error. It was a warning, and the caller got garbage.</li>
+</ul>
+
+<h3 id="new">New<a class="anchor" href="#new" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A <code>case</code> is a block of its own: it can declare variables and use
+  <code>defer</code> without braces.</li>
+  <li>Bounds-check elision: <code>s[i]</code> in <code>for (i64 i = 0; i &lt; s.len; i++)</code> is
+  not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
+  <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
+  <li>An error on a later module of an import list (<code>import cstr, rt;</code>) printed
+  megabytes of <code>^</code>.</li>
+  <li>arm64: add and subtract with an immediate past 12 bits were truncated instead of split, and
+  two JIT encoders did the wrong thing with <code>sp</code>.</li>
+  <li><code>f + 0</code> on a function pointer crashed the compiler; it is a type error.</li>
+  <li>The test runners only run <code>NN_name.ktm</code> files.</li>
+  <li>LSP: hover and go-to-definition find a module's own names from its other files.</li>
+</ul>
 
 <h2 id="v0-3-0-2026-10-11">v0.3.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-3-0-2026-10-11" aria-label="Link to this section">#</a></h2>
 <p>Safe strings and slices. ktm gets a slice type that knows its length, a native <code>String</code>,
@@ -143,7 +193,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -168,7 +218,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -197,7 +247,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -300,7 +350,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -322,7 +372,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line

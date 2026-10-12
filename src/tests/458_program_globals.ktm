@@ -26,10 +26,10 @@ u8 *run(u8 *file, bool jit) {
     u8 *ktm = "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
               "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} ";
     if (jit) {
-        return proc.shellOutput(cstr.format("%s-jit " DIR "/%s 2>&1", ktm, file));
+        return proc.shellOutput(cstr.format("%s-jit " DIR "/%s 2>&1", ktm, file)).take();
     }
     return proc.shellOutput(cstr.format("rm -f " DIR "/bin; %s" DIR "/%s -o " DIR "/bin 2>&1 && "
-                                       DIR "/bin 2>&1", ktm, file));
+                                       DIR "/bin 2>&1", ktm, file)).take();
 }
 
 void both(u8 *file, u8 *want, u8 *what) {
@@ -52,7 +52,7 @@ i64 environ = 0;
 i64 optind = 6;
 i32 main() {
     u8 *argv[4] = {\"sh\", \"-c\", \"echo home=$HOME\", null};
-    u8 *out = proc.run(argv);
+    String out = proc.run(argv);
     printf(\"%d %d %s\", environ, optind, out);
     return 0;
 }

@@ -1,11 +1,11 @@
-import libc, mem, sql, test;
+import cstr, libc, mem, sql, test;
 
 /* sql.execRaw's check was inverted: it returned sqlite's (null) message on
  * success and null on failure, and leaked the message. It returns an
  * MAlloc'd copy of the error now (Free it), null on success. */
 
 bool fails(sql.Db *ctx, u8 *sqlVal, u8 *want) {
-    u8 *err = sql.execRaw(ctx, sqlVal);
+    u8 *err = sql.execRaw(ctx, cstr.view(sqlVal)).take();
     bool ok = err && libc.strstr(err, want) != null;
     if (!ok && err) { printf("%s\n", err); }
     mem.free(err);
@@ -24,16 +24,16 @@ i32 main() {
         return 0;
     }
 
-    tests++; if (sql.execRaw(ctx, "CREATE TABLE t(id INTEGER);") == null) { correct++; }
-    tests++; if (sql.execRaw(ctx, "INSERT INTO t VALUES(1); INSERT INTO t VALUES(2);") == null) { correct++; }
+    tests++; if (!sql.execRaw(ctx, "CREATE TABLE t(id INTEGER);").ptr) { correct++; }
+    tests++; if (!sql.execRaw(ctx, "INSERT INTO t VALUES(1); INSERT INTO t VALUES(2);").ptr) { correct++; }
     tests++; if (fails(ctx, "THIS IS NOT SQL;", "syntax error")) { correct++; }
     tests++; if (fails(ctx, "INSERT INTO nosuch VALUES(1);", "no such table")) { correct++; }
     tests++; if (fails(ctx, "CREATE TABLE t(x);", "already exists")) { correct++; }
 
     /* The message is copied and sqlite's own copy freed. */
-    for (i = 0; i < 50; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;")); }
+    for (i = 0; i < 50; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;").take()); }
     before = test.heapInUse();
-    for (i = 0; i < 2000; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;")); }
+    for (i = 0; i < 2000; i++) { mem.free(sql.execRaw(ctx, "SELEC 1;").take()); }
     delta = test.heapInUse() - before;
     tests++; if (delta < 4096) { correct++; } else { printf("leaked %d bytes\n", delta); }
 

@@ -22,7 +22,7 @@ u8 *diagnose(u8 *source, bool jit) {
                                     "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                                     "%s " RO_SRC " > " RO_OUT " 2>&1",
                                     mode);
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     if (res == 1) { out = fs.readAll(RO_OUT).take(); }
     else { printf("ktm exited with %d\n", res); }
     proc.shell("rm -f " RO_SRC " " RO_OUT);

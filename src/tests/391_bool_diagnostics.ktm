@@ -89,8 +89,8 @@ void main()
 ", 5, "'u8 *' is not assignable to type 'i32'",
             "expected 'u8' got 'u8 *'")) { correct++; }
 
-    /* messages spell bool as bool (a class passed for a bool is an
-     * error since argument types are checked like C) */
+    /* messages spell bool as bool (a class passed or returned for a bool
+     * is an error since argument and return types are checked like C) */
     tests++;
     out = diagnose(
 "struct C { i64 a; };
@@ -102,8 +102,8 @@ void main()
   Take(c);
 }
 ");
-    if (out && count(out, "warning:") == 1 && count(out, "error:") == 1 &&
-            libc.strstr(out, "bool Ret(void); unexpected return value 'c' of type 'C' expected 'bool'") &&
+    if (out && count(out, "error:") == 2 &&
+            libc.strstr(out, "error: cannot return a C from a function returning bool") &&
             libc.strstr(out, "error: Incompatible function argument, expected 'bool' got 'C' in function 'Take'")) {
         correct++;
     } else {

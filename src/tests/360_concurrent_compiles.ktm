@@ -44,7 +44,7 @@ bool writeSources() {
 
 /* Number of ktm temporary files left in dir */
 i64 leftoverTmpFiles(u8 *dir) {
-    u8 *out = proc.shellOutput("ls -A '%s' | grep -c '^ktm-'", dir);
+    u8 *out = proc.shellOutput("ls -A '%s' | grep -c '^ktm-'", dir).take();
     i64 n = -1;
     if (out) {
         n = cstr.toInt(out);
@@ -67,7 +67,7 @@ bool compileAllAtOnce(u8 *flags) {
     }
     cmd = cstr.appendFormatLen(cmd, &len, "wait\n");
     proc.shell("rm -f " CC_DIR "/p? " CC_DIR "/p?.log " CC_DIR "/p?.out");
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     /* Run them at once too: macOS checks every new binary on its first
@@ -79,7 +79,7 @@ bool compileAllAtOnce(u8 *flags) {
                                             id, id);
     }
     cmd = cstr.appendFormatLen(cmd, &len, "wait\n");
-    proc.shell(cmd);
+    proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     for (id = 0; id < CC_JOBS; id++) {

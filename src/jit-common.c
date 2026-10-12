@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "aostr.h"
 #include "asm.h"
@@ -213,8 +215,14 @@ static size_t jitGlobalsSize(KtmJit *jit, List *from) {
         if (mapGet(jit->host_symbols, (void *)label->data)) continue;
         total += (ast->declvar->type->size + 7) & ~7;  /* 8-byte align */
     }
-    /* String literals are stored in cc->strs (accumulates across
-     * chunks; the host_symbols check skips already-laid-out ones). */
+    return total;
+}
+
+/* The bytes the new string literals take (cc->strs accumulates across
+ * chunks; the host_symbols check skips already-laid-out ones) */
+static size_t jitStringsSize(KtmJit *jit) {
+    Cctrl *cc = jit->cc;
+    size_t total = 0;
     if (cc->strs) {
         MapIter mi; mapIterInit(cc->strs, &mi);
         while (mapIterNext(&mi)) {
@@ -225,6 +233,46 @@ static size_t jitGlobalsSize(KtmJit *jit, List *from) {
         }
     }
     return total;
+}
+
+/* Lay out the new string literals in a mapping of their own, made
+ * read-only once written: a write through a literal faults, as it does in
+ * a compiled program, instead of changing every later use of it */
+static int jitAllocateStrings(KtmJit *jit) {
+    size_t sz = jitStringsSize(jit);
+    if (sz == 0) return 0;
+    long page = sysconf(_SC_PAGESIZE);
+    sz = (sz + (size_t)page - 1) & ~((size_t)page - 1);
+    uint8_t *strs = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (strs == MAP_FAILED) return -1;
+    JitStrings *arena = (JitStrings *)malloc(sizeof(JitStrings));
+    arena->ptr = strs;
+    arena->len = sz;
+    listAppend(jit->string_arenas, arena);
+    size_t off = 0;
+    MapIter mi; mapIterInit(jit->cc->strs, &mi);
+    while (mapIterNext(&mi)) {
+        Ast *ast = (Ast *)mi.node->value;
+        if (ast->kind != AST_STRING) continue;
+        if (mapGet(jit->host_symbols, (void *)ast->slabel->data)) continue;
+        char *addr = (char *)(strs + off);
+        /* Decoded: the asm path lets the assembler decode the
+         * escapes, so JIT-emitted code sees the same byte image. */
+        int o = astStringDecode(ast, addr);
+        mapAdd(jit->host_symbols, strdup(ast->slabel->data), addr);
+        /* Allocate based on the *decoded* length plus NUL, 8-aligned. */
+        size_t decoded_size = (size_t)(o + 1);
+        off += (decoded_size + 7) & ~7;
+    }
+    mprotect(strs, sz, PROT_READ);
+    return 0;
+}
+
+static void jitStringsFree(void *p) {
+    JitStrings *arena = (JitStrings *)p;
+    munmap(arena->ptr, arena->len);
+    free(arena);
 }
 
 /* Write an initialiser's byte image (asmInitImage: fields at their
@@ -282,29 +330,13 @@ static void jitResolvePtrFixups(KtmJit *jit) {
  * them by their already-known addresses. Anything a previous chunk
  * already laid out keeps its old (registered) address. */
 static int jitAllocateGlobals(KtmJit *jit, List *from) {
+    if (jitAllocateStrings(jit) != 0) return -1;
     size_t sz = jitGlobalsSize(jit, from);
     if (sz == 0) return 0;
     sz += 64; /* slack */
     uint8_t *globals = calloc(1, sz);
     listAppend(jit->globals_arenas, globals);
     size_t off = 0;
-
-    if (jit->cc->strs) {
-        MapIter mi; mapIterInit(jit->cc->strs, &mi);
-        while (mapIterNext(&mi)) {
-            Ast *ast = (Ast *)mi.node->value;
-            if (ast->kind != AST_STRING) continue;
-            if (mapGet(jit->host_symbols, (void *)ast->slabel->data)) continue;
-            char *addr = (char *)(globals + off);
-            /* Decoded: the asm path lets the assembler decode the
-             * escapes, so JIT-emitted code sees the same byte image. */
-            int o = astStringDecode(ast, addr);
-            mapAdd(jit->host_symbols, strdup(ast->slabel->data), addr);
-            /* Allocate based on the *decoded* length plus NUL, 8-aligned. */
-            size_t decoded_size = (size_t)(o + 1);
-            off += (decoded_size + 7) & ~7;
-        }
-    }
 
     /* Globals. Strings are now addressable, so AST_ARRAY_INIT
      * containing AST_STRING elements can resolve element addresses. */
@@ -511,6 +543,7 @@ KtmJit *ktmJitNew(Cctrl *cc, const KtmJitBackend *backend) {
     jit->chunk_fns      = mapNew(64, &map_cstring_opaque_type);
     jit->chunks         = listNew();
     jit->globals_arenas = listNew();
+    jit->string_arenas = listNew();
     jit->ptr_fixups = listNew();
     jit->block_local    = mapNew(64, &map_uint_to_uint_type);
     jit->epi_local      = mapNew(16, &map_uint_to_uint_type);
@@ -857,6 +890,7 @@ void ktmJitFree(KtmJit *jit) {
         listRelease(jit->chunks, NULL);
     }
     if (jit->globals_arenas) listRelease(jit->globals_arenas, free);
+    if (jit->string_arenas) listRelease(jit->string_arenas, jitStringsFree);
     if (jit->symbols) mapRelease(jit->symbols);
     if (jit->host_symbols) mapRelease(jit->host_symbols);
     if (jit->chunk_fns) mapRelease(jit->chunk_fns);

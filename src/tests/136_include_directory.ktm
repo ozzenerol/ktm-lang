@@ -38,7 +38,7 @@ bool runKtm(u8 *args, i64 count, u8 *want) {
     bool ok = true;
 
     cmd = cstr.format(INCDIR_KTM "%s > " INCDIR_OUT " 2>&1", args);
-    res = proc.shell(cmd);
+    res = proc.shell(cstr.view(cmd));
     mem.free(cmd);
 
     out = fs.readAll(INCDIR_OUT).take();

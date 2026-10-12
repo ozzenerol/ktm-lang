@@ -1339,12 +1339,15 @@ AstType *astGetResultType(AstBinOp op, AstType *a, AstType *b) {
     if (op != AST_BIN_OP_ASSIGN && astIsValidPointerOp(op) &&
         (op == AST_BIN_OP_ADD || op == AST_BIN_OP_SUB))
     {
-        if ((ptr1->kind == AST_TYPE_POINTER || ptr1->kind == AST_TYPE_FUNC) &&
-            astIsIntrinsicClass(ptr2)) {
+        /* No arithmetic on a function pointer (it points at code, not
+         * at elements): `f + 0` is a type error. */
+        if (ptr1->kind == AST_TYPE_FUNC || ptr2->kind == AST_TYPE_FUNC) {
+            goto error;
+        }
+        if (ptr1->kind == AST_TYPE_POINTER && astIsIntrinsicClass(ptr2)) {
             return ptr1;
         }
-        if ((ptr2->kind == AST_TYPE_POINTER || ptr2->kind == AST_TYPE_FUNC) &&
-            astIsIntrinsicClass(ptr1)) {
+        if (ptr2->kind == AST_TYPE_POINTER && astIsIntrinsicClass(ptr1)) {
             return ptr2;
         }
     }

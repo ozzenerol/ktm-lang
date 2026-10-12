@@ -162,6 +162,7 @@ size_t aarch64_enc_add_imm(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, uint32_t 
 size_t aarch64_enc_sub_imm(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, uint32_t imm12);
 size_t aarch64_enc_add_reg(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, A64Reg rm);
 size_t aarch64_enc_sub_reg(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, A64Reg rm);
+size_t aarch64_enc_add_sub_sp_reg(AsmEnc *e, int is_64, int is_sub, A64Reg rd, A64Reg rn, A64Reg rm, int shift_amount);
 size_t aarch64_enc_add_reg_shifted(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, A64Reg rm, int shift_type, int shift_amount);
 size_t aarch64_enc_sub_reg_shifted(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn, A64Reg rm, int shift_type, int shift_amount);
 size_t aarch64_enc_uxtb(AsmEnc *e, int is_64, A64Reg rd, A64Reg rn);
