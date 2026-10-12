@@ -5852,16 +5852,25 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 case KW_CLASS:
                     parseClassDef(cc,NULL);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_UNION:
                     parseUnionDef(cc);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_ENUM:
                     parseEnumDef(cc);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_U0:
