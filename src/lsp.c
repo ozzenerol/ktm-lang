@@ -1085,6 +1085,181 @@ static AstType *lspTypeByName(LspCtx *ctx, AoStr *text, const char *name,
     return t ? t : mapGetLen(cc->uniondefs, (char *)name, len);
 }
 
+/* The field of `ty` declared at (line1, col1) and named name, or NULL */
+static AstType *lspFieldDeclaredAt(AstType *ty, u32 doc_id, int line1,
+                                   int col1, const char *name, size_t len) {
+    if (!ty || !ty->fields || ty->is_enum) return NULL;
+    AstType *f = mapGetLen(ty->fields, (char *)name, len);
+    if (f && f->file_id == doc_id && f->line == line1 && f->col == col1) {
+        return f;
+    }
+    return NULL;
+}
+
+/* `T Box<T>.v`: a generic struct's field as its declaration writes it
+ * (the type from its tokens, an instance's field has the same place) */
+static void lspCatGenericField(AoStr *out, GenericDef *d, AstType *f,
+                               const char *name) {
+    s64 at = -1, from = 0;
+    for (u64 i = 0; i < d->toks->size; ++i) {
+        Lexeme *t = d->toks->entries[i];
+        if (tokenPunctIs(t, '{') || tokenPunctIs(t, ';')) from = (s64)i + 1;
+        if (t->line == f->line && t->col == f->col) {
+            at = (s64)i;
+            break;
+        }
+    }
+    if (at > from) {
+        for (s64 i = from; i < at; ++i) {
+            Lexeme *t = d->toks->entries[i];
+            if (tokenPunctIs(t, ',')) break;
+            int glue = out->len == 0 || tokenPunctIs(t, '<') || tokenPunctIs(t, '>') ||
+                       tokenPunctIs(t, '[') || tokenPunctIs(t, ']') ||
+                       out->data[out->len - 1] == '<' || out->data[out->len - 1] == '[';
+            if (!glue) aoStrPutChar(out, ' ');
+            aoStrCat(out, lexemeAsWritten(t));
+        }
+        aoStrPutChar(out, ' ');
+    }
+    aoStrCatPrintf(out, "%s<", d->name->data);
+    for (u64 i = 0; i < d->params->size; ++i) {
+        AoStr *pn = d->params->entries[i];
+        aoStrCatPrintf(out, "%s%s", i ? ", " : "", pn->data);
+    }
+    aoStrCatPrintf(out, ">.%s", name);
+}
+
+/* A field's name where its struct or union declares it: the field
+ * (*_owner its type), NULL otherwise */
+static AstType *lspFieldDeclHere(LspCtx *ctx, AoStr *text, u32 doc_id, int line,
+                                 int character, AstType **_owner) {
+    const char *s = text->data;
+    size_t line_start = lspLineStart(text, line), line_end = line_start;
+    while (line_end < text->len && s[line_end] != '\n') line_end++;
+    size_t pos = line_start + (size_t)character;
+    if (pos > line_end) pos = line_end;
+    size_t start = pos, end = pos;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    while (end < line_end && lspIsIdentChar(s[end])) end++;
+    if (end == start || (start > line_start && s[start - 1] == '.')) return NULL;
+    int col1 = (int)(start - line_start) + 1;
+    /* a generic struct's own field, not one of its instances' copies */
+    if (ctx->cc->generic_structs) {
+        MapIter it;
+        mapIterInit(ctx->cc->generic_structs, &it);
+        while (mapIterNext(&it)) {
+            GenericDef *d = it.node->value;
+            AstType *f = d ? lspFieldDeclaredAt(d->tmpl, doc_id, line + 1, col1,
+                                                s + start, end - start) : NULL;
+            if (f) {
+                if (_owner) *_owner = d->tmpl;
+                return f;
+            }
+        }
+    }
+    Map *maps[2] = { ctx->cc->clsdefs, ctx->cc->uniondefs };
+    for (int k = 0; k < 2; ++k) {
+        MapIter it;
+        mapIterInit(maps[k], &it);
+        while (mapIterNext(&it)) {
+            AstType *ty = it.node->value;
+            AstType *f = lspFieldDeclaredAt(ty, doc_id, line + 1, col1,
+                                            s + start, end - start);
+            if (f) {
+                if (_owner) *_owner = ty;
+                return f;
+            }
+        }
+    }
+    return NULL;
+}
+
+static char *lspModuleDir(LspCtx *ctx, const char *path);
+
+/* Is byte offset `at` inside an `import ...;` statement? */
+static int lspInImport(AoStr *text, size_t at) {
+    const char *s = text->data;
+    size_t i = at;
+    while (i > 0 && s[i - 1] != ';' && s[i - 1] != '{' && s[i - 1] != '}') i--;
+    const char *p = lspSkipSpace(s + i, s + at);
+    /* a statement after a #directive or a comment line: its own line */
+    while (p < s + at && *p == '#') {
+        const char *eol = memchr(p, '\n', (s + at) - p);
+        if (!eol) return 0;
+        p = lspSkipSpace(eol + 1, s + at);
+    }
+    return (s + at) - p > 6 && !memcmp(p, "import", 6) && isspace((unsigned char)p[6]);
+}
+
+/* A module's name at the cursor: in an import list, or as the prefix of
+ * `geo.area`. Its path (`a.b`), NULL when the word isn't one or a local
+ * or parameter of that name hides it. */
+static char *lspModuleNameAt(LspCtx *ctx, AoStr *text, u32 doc_id, int line,
+                             int character) {
+    const char *s = text->data;
+    size_t line_start = lspLineStart(text, line), line_end = line_start;
+    while (line_end < text->len && s[line_end] != '\n') line_end++;
+    size_t pos = line_start + (size_t)character;
+    if (pos > line_end) pos = line_end;
+    size_t start = pos, end = pos;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    while (end < line_end && lspIsIdentChar(s[end])) end++;
+    if (end == start) return NULL;
+    if (lspInImport(text, start)) {
+        /* `import x = a.b, c;`: an alias or any part of a path */
+        const char *eq = s + end;
+        while (eq < s + text->len && isspace((unsigned char)*eq)) eq++;
+        if (eq < s + text->len && *eq == '=') {
+            return lspImportPath(text, s + start, end - start);
+        }
+        size_t p0 = start, p1 = end;
+        while (p0 > 0 && (lspIsIdentChar(s[p0 - 1]) || s[p0 - 1] == '.')) p0--;
+        while (p1 < text->len && (lspIsIdentChar(s[p1]) || s[p1] == '.')) p1++;
+        char *path = mprintf("%.*s", (int)(p1 - p0), s + p0);
+        return lspModuleDir(ctx, path) ? path : NULL;
+    }
+    if (start > line_start && s[start - 1] == '.') return NULL;
+    if (end >= line_end || s[end] != '.') return NULL;
+    char word[256];
+    size_t wlen = 0;
+    for (size_t i = start; i < end; ++i) {
+        if (wlen < sizeof(word) - 1) word[wlen++] = s[i];
+    }
+    word[wlen] = '\0';
+    int in_doc = 0;
+    lspResolveValue(ctx, doc_id, line + 1, word, (s64)wlen, &in_doc);
+    if (in_doc) return NULL;
+    return lspImportPath(text, word, wlen);
+}
+
+/* The directory module `path` was read from: any of its declarations'
+ * file's directory. NULL when nothing of it was loaded. */
+static char *lspModuleDir(LspCtx *ctx, const char *path) {
+    size_t plen = strlen(path);
+    Map *maps[3] = { ctx->cc->global_env, ctx->cc->clsdefs, ctx->cc->asm_funcs };
+    for (int k = 0; k < 3; ++k) {
+        MapIter it;
+        mapIterInit(maps[k], &it);
+        while (mapIterNext(&it)) {
+            const char *key = it.node->key;
+            if (strncmp(key, path, plen) || key[plen] != '.' ||
+                strchr(key + plen + 1, '.')) {
+                continue;
+            }
+            u32 file_id = k == 1 ? ((AstType *)it.node->value)->file_id
+                                 : ((Ast *)it.node->value)->file_id;
+            AoStr *f = file_id ? cctrlLookUpFile(ctx->cc, file_id) : NULL;
+            char *slash = f ? strrchr(f->data, '/') : NULL;
+            if (!slash) continue;
+            char abs_dir[PATH_MAX];
+            char *dir = mprintf("%.*s", (int)(slash - f->data), f->data);
+            if (dir[0] != '/' && realpath(dir, abs_dir)) dir = mprintf("%s", abs_dir);
+            return dir;
+        }
+    }
+    return NULL;
+}
+
 /* The enum named right before a `.` that ends at the cursor's word
  * (`Color.` or `geo.Kind.gr`), NULL when that isn't an enum */
 static AstType *lspEnumBeforeDot(LspCtx *ctx, AoStr *text, int line,
@@ -1175,15 +1350,30 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
      * then a macro. */
     AoStr *rendered = aoStrNew();
     int is_member = 0;
-    AstType *menum = NULL;
+    AstType *menum = NULL, *fowner = NULL;
     Ast *member = lspEnumMemberAt(ctx, text, doc_id, line, character, &menum);
-    char *qual = member ? NULL : lspModuleRefAt(text, line, character, 0, NULL);
-    AstType *mcls = (qual || member) ? NULL
+    AstType *fdecl = member ? NULL
+                   : lspFieldDeclHere(ctx, text, doc_id, line, character, &fowner);
+    char *modname = (member || fdecl) ? NULL
+                  : lspModuleNameAt(ctx, text, doc_id, line, character);
+    if (fdecl || modname) member = NULL;
+    char *qual = (member || fdecl || modname) ? NULL
+               : lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = (qual || member || fdecl || modname) ? NULL
                   : lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
-    if (!qual && !is_member && !member)
+    if (!qual && !is_member && !member && !fdecl && !modname)
         qual = lspOwnModuleQual(ctx, text, doc_id, line + 1, ident, ilen);
-    if (member) {
+    if (modname) {
+        char *dir = lspModuleDir(ctx, modname);
+        aoStrCatPrintf(rendered, "module %s", modname);
+        if (dir) aoStrCatPrintf(rendered, "  // %s", dir);
+    } else if (fdecl && fowner->generic) {
+        lspCatGenericField(rendered, fowner->generic, fdecl, ident);
+    } else if (fdecl) {
+        aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(fdecl),
+                       fowner->clsname ? fowner->clsname->data : "", ident);
+    } else if (member) {
         aoStrCatPrintf(rendered, "%s.%s = %lld", menum->clsname->data, ident,
                        (long long)member->i64);
     } else if (qual) {
@@ -1957,6 +2147,61 @@ static AoStr *lspMacroDefinition(LspCtx *ctx, const char *doc_path,
     return NULL;
 }
 
+static int lspCmpStr(const void *a, const void *b) {
+    return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+/* A module's name: its files, each at its `module` line */
+static void lspModuleDefinition(LspCtx *ctx, Json *id, const char *modname) {
+    char *dir = lspModuleDir(ctx, modname);
+    DIR *d = dir ? opendir(dir) : NULL;
+    if (!d) {
+        lspRespond(id, "null");
+        return;
+    }
+    Vec *names = vecNew(&vec_cstring_type);
+    struct dirent *ent;
+    while ((ent = readdir(d)) != NULL) {
+        size_t n = strlen(ent->d_name);
+        if (n >= 5 && !strcmp(ent->d_name + n - 4, ".ktm")) {
+            vecPush(names, mprintf("%s", ent->d_name));
+        }
+    }
+    closedir(d);
+    qsort(names->entries, names->size, sizeof(char *), lspCmpStr);
+    AoStr *result = aoStrNew();
+    aoStrPutChar(result, '[');
+    for (u64 i = 0; i < names->size; ++i) {
+        char *path = mprintf("%s/%s", dir, (char *)names->entries[i]);
+        const char *furi = NULL;
+        AoStr *ftext = lspTextForPath(ctx, path, &furi);
+        int mline = 0;
+        if (ftext) {
+            const char *p = ftext->data, *end = p + ftext->len;
+            for (int l = 0; p < end; ++l) {
+                const char *q = p;
+                while (q < end && (*q == ' ' || *q == '\t')) q++;
+                if (end - q > 7 && !memcmp(q, "module", 6) && isspace((unsigned char)q[6])) {
+                    mline = l;
+                    break;
+                }
+                const char *eol = memchr(p, '\n', end - p);
+                if (!eol) break;
+                p = eol + 1;
+            }
+        }
+        if (i) aoStrPutChar(result, ',');
+        aoStrCatPrintf(result, "{\"uri\":\"file://");
+        jsonEscapeInto(result, path, strlen(path));
+        aoStrCatLen(result, "\",", 2);
+        lspCatRange(ctx, result, ftext, mline, 0, 0);
+        aoStrPutChar(result, '}');
+    }
+    aoStrPutChar(result, ']');
+    lspRespond(id, names->size ? result->data : "null");
+    aoStrRelease(result);
+}
+
 static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1998,9 +2243,23 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
      * carry the provenance stamped at parse. */
     int is_member = 0;
     Ast *emember = lspEnumMemberAt(ctx, text, doc_id, line, character, NULL);
-    char *qual = emember ? NULL : lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *fdecl = emember ? NULL
+                   : lspFieldDeclHere(ctx, text, doc_id, line, character, NULL);
+    char *modname = (emember || fdecl) ? NULL
+                  : lspModuleNameAt(ctx, text, doc_id, line, character);
+    if (modname) {
+        lspModuleDefinition(ctx, id, modname);
+        return;
+    }
+    char *qual = (emember || fdecl) ? NULL
+               : lspModuleRefAt(text, line, character, 0, NULL);
     AstType *mcls = NULL;
-    if (emember) {
+    if (fdecl) {
+        is_member = 1;
+        def_line = fdecl->line;
+        def_col = fdecl->col;
+        def_file = fdecl->file_id;
+    } else if (emember) {
         is_member = 1;
         def_line = emember->line;
         def_col = emember->col;

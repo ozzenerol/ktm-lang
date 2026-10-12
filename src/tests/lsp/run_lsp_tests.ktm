@@ -1244,6 +1244,7 @@ void testModules() {
     LspClient *l = lspStart();
     u8 *uri = uriOf("modmain.ktm");
     u8 *geoUri = uriOf("geo/geo.ktm");
+    u8 *moreUri0 = uriOf("geo/more.ktm");
     lspDidOpen(l, uri, MOD_MAIN_HC);
 
     i64 line;
@@ -1291,6 +1292,17 @@ void testModules() {
     posOf(MOD_GEO_HC, "circle", 0, &wantLine, &wantChr);
     check("definition of a module's enum member is in its enum",
                 locEq(resp, geoUri, wantLine, wantChr, true));
+    posOf(MOD_LIST_HC, "geo;", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's name in an import list", hoverContains(resp, "module geo"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    check("definition of a module's name lists its files",
+                hasLocation(json.select(resp, ".result:a"), geoUri, 0, 0) &&
+                hasLocation(json.select(resp, ".result:a"), moreUri0, 0, 0));
+    posOf(MOD_LIST_HC, "g.area", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on an import alias used as a prefix", hoverContains(resp, "module geo"));
+
     posOf(MOD_LIST_HC, "Kind k", 0, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
     check("hover on a module's enum shows its members",
@@ -1336,6 +1348,12 @@ void testMethods() {
     items = json.select(resp, ".result.items:a");
     check("completion after `self.` offers User's fields and methods",
                 jsonArrayCount(items) == 4 && labelsOk(resp, "", "age", "older"));
+
+    posOf(METH_HC, "age; }", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field where its struct declares it", hoverContains(resp, "i64 User.age"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    check("definition on a field's declaration is itself", locEq(resp, uri, line, chr, true));
 
     posOf(METH_HC, "older(1)", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
@@ -1419,6 +1437,10 @@ void testGenerics() {
     i64 chr;
     i64 wantLine;
     i64 wantChr;
+    posOf(GEN_HC, "v; }", 0, &line, &chr);
+    json.Value *fresp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a generic struct's field shows it with T", hoverContains(fresp, "T Box<T>.v"));
+
     posOf(GEN_HC, "get(), 2", 0, &line, &chr);
     json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
     check("hover on b.get() shows the instance's method",
