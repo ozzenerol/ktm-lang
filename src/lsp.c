@@ -4692,6 +4692,188 @@ static void lspSemanticTokens(LspCtx *ctx, Json *id, Json *params) {
     aoStrRelease(sc.out);
 }
 
+/* ---- folding ranges ----
+ * Blocks (`{` ... `}` over several lines), block comments and runs of
+ * `//` lines, runs of imports, and #if ... #endif regions. */
+
+static void lspCatFold(AoStr *body, int *emitted, int l0, int l1, const char *kind) {
+    if (l1 <= l0) return;
+    if ((*emitted)++) aoStrPutChar(body, ',');
+    aoStrCatPrintf(body, "{\"startLine\":%d,\"endLine\":%d", l0, l1);
+    if (kind) aoStrCatPrintf(body, ",\"kind\":\"%s\"", kind);
+    aoStrPutChar(body, '}');
+}
+
+static void lspFoldingRange(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri = jsonStrOr(jsonObjGet(params, "textDocument"), "uri", NULL);
+    AoStr *text = uri ? lspDocGetOrLoad(ctx, uri) : NULL;
+    if (!text) {
+        lspRespond(id, "null");
+        return;
+    }
+    AoStr *body = aoStrNew();
+    aoStrPutChar(body, '[');
+    int emitted = 0;
+    int braces[256], nb = 0, ifs[64], ni = 0;
+    int line = 0, at_line_start = 1;
+    int imp_first = -1, imp_last = -1, cmt_first = -1, cmt_last = -1;
+    const char *s = text->data;
+    size_t n = text->len, i = 0;
+    while (i < n) {
+        char c = s[i];
+        if (c == '\n') {
+            line++;
+            i++;
+            at_line_start = 1;
+            continue;
+        }
+        if (c == ' ' || c == '\t' || c == '\r') {
+            i++;
+            continue;
+        }
+        if (at_line_start) {
+            at_line_start = 0;
+            /* a line's first word: runs of imports and of // lines */
+            int is_import = n - i > 7 && !memcmp(s + i, "import", 6) &&
+                            isspace((unsigned char)s[i + 6]);
+            int is_cmt = n - i > 1 && s[i] == '/' && s[i + 1] == '/';
+            if (is_import) {
+                if (imp_first < 0 || imp_last < line - 1) {
+                    if (imp_first >= 0) lspCatFold(body, &emitted, imp_first, imp_last, "imports");
+                    imp_first = line;
+                }
+                imp_last = line;
+            }
+            if (is_cmt) {
+                if (cmt_first < 0 || cmt_last < line - 1) {
+                    if (cmt_first >= 0) lspCatFold(body, &emitted, cmt_first, cmt_last, "comment");
+                    cmt_first = line;
+                }
+                cmt_last = line;
+            }
+            if (c == '#') {
+                size_t eol = i;
+                while (eol < n && s[eol] != '\n') eol++;
+                const char *d = s + i + 1;
+                while (d < s + eol && isspace((unsigned char)*d)) d++;
+                size_t dl = (s + eol) - d;
+                if ((dl >= 2 && !memcmp(d, "if", 2)) && ni < 64) {
+                    ifs[ni++] = line;
+                } else if (dl >= 5 && !memcmp(d, "endif", 5) && ni > 0) {
+                    lspCatFold(body, &emitted, ifs[--ni], line - 1, "region");
+                } else if (dl >= 4 && (!memcmp(d, "else", 4) || !memcmp(d, "elif", 4)) && ni > 0) {
+                    lspCatFold(body, &emitted, ifs[ni - 1], line - 1, "region");
+                    ifs[ni - 1] = line;
+                }
+                i = eol;
+                continue;
+            }
+        }
+        if (c == '/' && i + 1 < n && s[i + 1] == '/') {
+            while (i < n && s[i] != '\n') i++;
+            continue;
+        }
+        if (c == '/' && i + 1 < n && s[i + 1] == '*') {
+            int first = line;
+            i += 2;
+            while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) {
+                if (s[i] == '\n') line++;
+                i++;
+            }
+            i += 2;
+            lspCatFold(body, &emitted, first, line, "comment");
+            continue;
+        }
+        if (c == '"' || c == '\'') {
+            for (i++; i < n && s[i] != c && s[i] != '\n'; i++) {
+                if (s[i] == '\\') i++;
+            }
+            i++;
+            continue;
+        }
+        if (c == '{') {
+            if (nb < 256) braces[nb] = line;
+            nb++;
+        } else if (c == '}' && nb > 0) {
+            nb--;
+            /* the closing line stays visible */
+            if (nb < 256) lspCatFold(body, &emitted, braces[nb], line - 1, NULL);
+        }
+        i++;
+    }
+    if (imp_first >= 0) lspCatFold(body, &emitted, imp_first, imp_last, "imports");
+    if (cmt_first >= 0) lspCatFold(body, &emitted, cmt_first, cmt_last, "comment");
+    aoStrPutChar(body, ']');
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
+/* ---- inlay hints ----
+ * The type `auto` gave a variable, after its name (`auto n = 3`: `: i64`). */
+static void lspInlayHint(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri = jsonStrOr(jsonObjGet(params, "textDocument"), "uri", NULL);
+    AoStr *text = uri ? lspDocGetOrLoad(ctx, uri) : NULL;
+    if (!text) {
+        lspRespond(id, "null");
+        return;
+    }
+    Json *range = jsonObjGet(params, "range");
+    int first = (int)jsonIntOr(jsonObjGet(range, "start"), "line", 0);
+    int last = (int)jsonIntOr(jsonObjGet(range, "end"), "line", 1 << 30);
+    u32 doc_id = lspDocId(ctx, uri);
+    AoStr *body = aoStrNew();
+    aoStrPutChar(body, '[');
+    int emitted = 0;
+    const char *s = text->data;
+    size_t n = text->len;
+    int line = 0;
+    size_t line_start = 0;
+    for (size_t i = 0; i < n; ++i) {
+        if (s[i] == '\n') {
+            line++;
+            line_start = i + 1;
+            continue;
+        }
+        if (line < first || line > last) continue;
+        /* skip comments and literals */
+        if (s[i] == '/' && i + 1 < n && s[i + 1] == '/') {
+            while (i + 1 < n && s[i + 1] != '\n') i++;
+            continue;
+        }
+        if (s[i] == '"' || s[i] == '\'') {
+            char q = s[i];
+            for (i++; i < n && s[i] != q && s[i] != '\n'; i++) {
+                if (s[i] == '\\') i++;
+            }
+            continue;
+        }
+        if (n - i < 5 || memcmp(s + i, "auto", 4) || lspIsIdentChar(s[i + 4]) ||
+            (i > 0 && lspIsIdentChar(s[i - 1]))) {
+            continue;
+        }
+        size_t b = i + 4;
+        while (b < n && (s[b] == ' ' || s[b] == '\t')) b++;
+        size_t e = b;
+        while (e < n && lspIsIdentChar(s[e])) e++;
+        if (e == b) continue;
+        int in_doc = 0;
+        Ast *v = lspResolveValue(ctx, doc_id, line + 1, s + b, (s64)(e - b), &in_doc);
+        i = e - 1;
+        if (!v || !in_doc || !v->type) continue;
+        char *ty = astTypeToString(v->type);
+        if (!ty || !*ty) continue;
+        if (emitted++) aoStrPutChar(body, ',');
+        aoStrCatPrintf(body,
+            "{\"position\":{\"line\":%d,\"character\":%d},\"label\":\": ",
+            line, lspColToWire(ctx, text, line, (int)(e - line_start)));
+        jsonEscapeInto(body, ty, strlen(ty));
+        aoStrCat(body, "\",\"kind\":1,\"paddingLeft\":false}");
+    }
+    aoStrPutChar(body, ']');
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
 /* Answer a textDocument request from an isolated child; if the child
  * crashed or hung on the document, answer null ourselves. */
 static void lspServe(LspCtx *ctx, Json *id, Json *params,
@@ -4756,6 +4938,8 @@ static void lspInitialize(LspCtx *ctx, Json *id, Json *params) {
         "\"referencesProvider\":true,"
         "\"documentHighlightProvider\":true,"
         "\"documentSymbolProvider\":true,"
+        "\"foldingRangeProvider\":true,"
+        "\"inlayHintProvider\":true,"
         "\"semanticTokensProvider\":{\"legend\":" LSP_SEMANTIC_LEGEND ",\"full\":true},"
         "\"signatureHelpProvider\":{\"triggerCharacters\":[\"(\",\",\"],"
         "\"retriggerCharacters\":[\")\"]},"
@@ -4847,6 +5031,10 @@ int lspRun(CliArgs *args) {
             lspServe(ctx, id, params, lspSignatureHelp, 0);
         } else if (strcmp(method, "textDocument/semanticTokens/full") == 0) {
             lspServe(ctx, id, params, lspSemanticTokens, 0);
+        } else if (strcmp(method, "textDocument/foldingRange") == 0) {
+            lspServe(ctx, id, params, lspFoldingRange, 0);
+        } else if (strcmp(method, "textDocument/inlayHint") == 0) {
+            lspServe(ctx, id, params, lspInlayHint, 0);
         } else if (strcmp(method, "textDocument/documentSymbol") == 0) {
             lspServe(ctx, id, params, lspDocumentSymbol, 0);
         } else if (strcmp(method, "workspace/symbol") == 0) {

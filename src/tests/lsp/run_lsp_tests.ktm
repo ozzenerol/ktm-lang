@@ -102,6 +102,7 @@ u8 *DOC_HC;
 u8 *SIG_HC;
 u8 *SEM_HC;
 u8 *COMP_HC;
+u8 *FOLD_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -209,6 +210,29 @@ void initFixtures() {
         "  Mo\n"
         "  re\n"
         "  return 0;\n"
+        "}\n";
+    /* Folding ranges and inlay hints */
+    FOLD_HC =
+        "import str;\n"
+        "/* a\n"
+        "   b */\n"
+        "struct P {\n"
+        "  i64 x;\n"
+        "};\n"
+        "#ifdef __KTM_JIT__\n"
+        "#define M 1\n"
+        "#else\n"
+        "#define M 2\n"
+        "#endif\n"
+        "i32 main() {\n"
+        "  auto n = 3 * 7;\n"
+        "  auto s = str.from(\"x\");\n"
+        "  i64 arr[] = {1, 2};\n"
+        "  for (auto k : arr) {\n"
+        "    n += k;\n"
+        "  }\n"
+        "  s.free();\n"
+        "  return (i32)n;\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1293,7 +1317,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 20;
+const i64 LSP_GROUPS = 21;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1794,6 +1818,67 @@ void testCompletionKinds() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+/* A folding range l0..l1 (of kind, "" for none) is in the answer */
+bool hasFold(json.Value *resp, i64 l0, i64 l1, u8 *kind) {
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return false; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *k = json.select(it, ".kind:s");
+        if (json.select(it, ".startLine:i").intVal == l0 &&
+                json.select(it, ".endLine:i").intVal == l1 &&
+                ((k == null && cstr.len(kind) == 0) || (k != null && cstr.cmp(k.str.ptr, kind) == 0))) {
+            return true;
+        }
+        it = it.next;
+    }
+    return false;
+}
+
+/* An inlay hint labelled `label` at the end of `needle` in FOLD_HC */
+bool hasHint(json.Value *resp, u8 *needle, u8 *label) {
+    i64 line;
+    i64 chr;
+    posOf(FOLD_HC, needle, cstr.len(needle), &line, &chr);
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return false; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        if (json.select(it, ".position.line:i").intVal == line &&
+                json.select(it, ".position.character:i").intVal == chr &&
+                cstr.cmp(json.select(it, ".label:s").str.ptr, label) == 0) {
+            return true;
+        }
+        it = it.next;
+    }
+    return false;
+}
+
+void testFoldingAndHints() {
+    printf("folding and inlay hints\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("folding.ktm");
+    lspDidOpen(l, uri, FOLD_HC);
+    check("folding fixture is clean", lastPublishClean(l));
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *resp = lspRequest(l, "textDocument/foldingRange", params);
+    check("a block comment folds", hasFold(resp, 1, 2, "comment"));
+    check("a struct body and a function body fold, the closing line visible",
+                hasFold(resp, 3, 4, "") && hasFold(resp, 11, 19, "") && hasFold(resp, 15, 16, ""));
+    check("#if ... #else ... #endif fold as regions",
+                hasFold(resp, 6, 7, "region") && hasFold(resp, 8, 9, "region"));
+    libc.snprintf(params, 512,
+                  "{\"textDocument\":{\"uri\":\"%s\"},\"range\":{\"start\":{\"line\":0,"
+                  "\"character\":0},\"end\":{\"line\":40,\"character\":0}}}", uri);
+    resp = lspRequest(l, "textDocument/inlayHint", params);
+    check("auto variables show the type they got",
+                hasHint(resp, "auto n", ": i64") && hasHint(resp, "auto s", ": String") &&
+                hasHint(resp, "auto k", ": i64") &&
+                jsonArrayCount(json.select(resp, ".result:a")) == 3);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1816,6 +1901,7 @@ void runGroup(i64 group) {
         case 17: testSignatureHelp();
         case 18: testSemanticTokens();
         case 19: testCompletionKinds();
+        case 20: testFoldingAndHints();
     }
 }
 
