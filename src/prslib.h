@@ -19,6 +19,7 @@ AstType *parseArrayDimensions(Cctrl *cc, AstType *base_type);
 AstType *parsePointerType(Cctrl *cc, AstType *type);
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr);
 Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at);
+Ast *parseGenericExplicitCall(Cctrl *cc, struct GenericDef *d, char *fname, int len);
 Ast *parseResolveOverloadRef(Cctrl *cc, AstType *want, Ast *expr);
 void parseCheckOverloadRefs(Cctrl *cc);
 Ast *parseReflectCall(Cctrl *cc, char *name, int len);

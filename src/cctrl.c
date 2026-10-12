@@ -714,7 +714,8 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
             token = tokenRingBufferPeek(cc->token_buffer);
             continue;
         }
-        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying) {
+        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying &&
+            !cc->generic_replay) {
             cctrLoadNextTokens(cc,5);
         }
         cc->token_buffer->pos++;
@@ -1173,6 +1174,14 @@ void cctrlWarningAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
     int is_werror = cc->flags & (CCTRL_WERROR);
     int severity = is_werror ? CCTRL_ERROR : CCTRL_WARN;
     cctrlDiagAtVa(cc, severity, lineno, col, len, fmt, ap);
+    va_end(ap);
+}
+
+/* A note anchored at an explicit (line, col), see cctrlWarningAt */
+void cctrlInfoAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
+    va_list ap;
+    va_start(ap,fmt);
+    cctrlDiagAtVa(cc, CCTRL_INFO, lineno, col, len, fmt, ap);
     va_end(ap);
 }
 
@@ -1722,6 +1731,11 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     AstType *type;
     assert(name != NULL);
+    /* a type parameter of the generic instance being parsed */
+    if (cc->type_bindings &&
+        (type = mapGetLen(cc->type_bindings, name, len)) != NULL) {
+        return type;
+    }
     if ((type = mapGetLen(cc->symbol_table, name, len)) != NULL) {
         return type;
     }

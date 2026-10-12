@@ -99,6 +99,7 @@ u8 *MOD_MAIN_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
+u8 *GEN_HC;
 u8 *ALIAS_HC;
 
 void initFixtures() {
@@ -139,6 +140,16 @@ void initFixtures() {
         "  Text t = \"hi\";\n"
         "  Score s = t.len;\n"
         "  return s;\n"
+        "}\n";
+    /* Generics: a struct and a function used with type arguments */
+    GEN_HC =
+        "struct Box<T> { T v; };\n"
+        "T Box<T>.get() { return self.v; }\n"
+        "T maxOf<T>(T a, T b) { return a > b ? a : b; }\n"
+        "i32 main() {\n"
+        "  Box<i64> b = {41};\n"
+        "  i64 m = maxOf(b.get(), 2);\n"
+        "  return (i32)m;\n"
         "}\n";
     /* Overloads: a call shows and jumps to the one it picks */
     OVL_HC =
@@ -1204,7 +1215,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 13;
+const i64 LSP_GROUPS = 14;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1354,6 +1365,28 @@ void testTypeAlias() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testGenerics() {
+    printf("generics\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("generics.ktm");
+    lspDidOpen(l, uri, GEN_HC);
+    check("generics fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+    posOf(GEN_HC, "get(), 2", 0, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on b.get() shows the instance's method",
+                hoverContains(resp, "Box<i64>.get()"));
+    posOf(GEN_HC, "maxOf(b", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(GEN_HC, "maxOf<T>", 0, &wantLine, &wantChr);
+    check("definition of maxOf(...) is the generic", locEq(resp, uri, wantLine, wantChr, true));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1369,6 +1402,7 @@ void runGroup(i64 group) {
         case 10: testMethods();
         case 11: testOverloads();
         case 12: testTypeAlias();
+        case 13: testGenerics();
     }
 }
 

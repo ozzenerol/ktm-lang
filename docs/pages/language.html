@@ -1706,6 +1706,69 @@ void main()
 warmest 21.0, in Cluj (16 bytes)
 </pre>
 
+<h2 id="generics">Generics</h2>
+<p>A struct, its methods and a function can take type parameters, written in angle brackets
+after the name. Each use with other types (<code>Box&lt;i64&gt;</code>,
+<code>Box&lt;u8 *&gt;</code>) is a type of its own, compiled for those types: the same code
+you would write by hand for each, with no <code>void *</code> and no casts.</p>
+<pre data-run><code>
+import mem;
+
+struct Stack<T> { T *items; i64 len; i64 cap; };
+
+void Stack<T>.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack<T>.pop() { return self.items[--self.len]; }
+void Stack<T>.free() { mem.free(self.items); }
+
+T max<T>(T a, T b) { return a > b ? a : b; }
+
+struct Pair<K, V> { K key; V value; };
+
+void main()
+{
+  ad Stack<i64> nums = {null, 0, 0};
+  nums.push(1);
+  nums.push(2);
+  ad Stack<u8 *> words = {null, 0, 0};
+  words.push("hello");
+
+  Pair<u8 *, f64> p = {"pi", 3.14};
+  printf("%d %s %d %.1f %s %.2f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5),
+         p.key, p.value);
+}
+</code></pre>
+<pre class="output">
+2 hello 7 1.5 pi 3.14
+</pre>
+<ul>
+<li>A type is always written with its arguments: <code>Stack&lt;i64&gt;</code>; nested ones too,
+<code>Stack&lt;Stack&lt;i64&gt;&gt;</code>. A function call works them out from the
+arguments (<code>max(3, 7)</code> is <code>max&lt;i64&gt;</code>), through pointers, slices,
+<code>fn</code> types and generic structs (<code>T sum&lt;T&gt;(Stack&lt;T&gt; *s)</code>), or
+takes them written: <code>max&lt;f64&gt;(1, 2.5)</code>. When nothing says what a parameter
+is (<code>stackNew&lt;T&gt;()</code>), write it.</li>
+<li>Methods are written for the generic struct (<code>T Stack&lt;T&gt;.pop()</code>), as is a
+generic base: <code>struct Counted&lt;T&gt; : Stack&lt;T&gt; { i64 pushes; };</code>.</li>
+<li>The body is checked for each type it is used with: <code>max</code> of two structs is an
+error at the <code>&gt;</code>, followed by a note naming the instance
+(<code>max&lt;Point&gt;</code>) and the call that asked for it.</li>
+<li>A type alias names an instance: <code>type Ints = Stack&lt;i64&gt;;</code>.</li>
+<li>In a module, <code>pub</code> works as for any declaration and the program writes
+<code>coll.Vec&lt;i64&gt;</code> and <code>coll.vecNew&lt;i64&gt;()</code>. A library built with
+<code>-lib</code> keeps its generics as source, and each program makes the instances it
+uses.</li>
+<li>Not yet: constraints on the parameters, generic enums, number parameters
+(<code>Array&lt;T, 16&gt;</code>) and a different body for one type.</li>
+</ul>
+
 <h2 id="modules">Modules</h2>
 <p>A module is a directory of <code>.ktm</code> files. Each file in it starts with
 <code>module</code> and the directory's name, and a program uses it with
