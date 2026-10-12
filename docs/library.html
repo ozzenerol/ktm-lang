@@ -184,6 +184,61 @@ Qq 1
 <code>at</code> past it (U+FFFD for bytes that aren't UTF-8, -1 at the end),
 <code>str.runeCount(s)</code> counts them and <code>str.validUtf8(s)</code> checks a text.</p>
 
+<h3 id="case-folding">Ignoring case<a class="anchor" href="#case-folding" aria-label="Link to this section">#</a></h3>
+<p><code>str.equalsFold(a, b)</code>, <code>compareFold</code>, <code>findFold</code>,
+<code>containsFold</code>, <code>startsWithFold</code> and <code>endsWithFold</code> work as the
+functions without <code>Fold</code>, with A-Z equal to a-z. Only ASCII letters fold: every other
+byte, UTF-8 included, has to match exactly, so <code>"\xc3\xa9"</code> (&eacute;) does not
+equal <code>"\xc3\x89"</code> (&Eacute;). That is what protocol text wants: HTTP header names
+and values like <code>keep-alive</code>, MIME types, file extensions, hex.</p>
+
+<h3 id="url-html">URLs and HTML<a class="anchor" href="#url-html" aria-label="Link to this section">#</a></h3>
+<p><code>str.urlEncode(s)</code> percent-encodes one URL component (a query value, a path
+segment): every byte but <code>A-Z a-z 0-9 - _ . ~</code> becomes <code>%XX</code>, a space
+<code>%20</code>. <code>str.urlEncodePath(s)</code> also keeps <code>/</code>, for a whole path,
+and <code>str.formEncode(s)</code> writes a space as <code>+</code>, as HTML forms send it
+(<code>application/x-www-form-urlencoded</code>). Each gives a new String that is yours.</p>
+<p><code>str.urlDecode(s, &amp;out)</code> turns each <code>%XX</code> back into its byte and
+leaves <code>+</code> alone; <code>str.formDecode</code> also turns <code>+</code> into a space.
+The result goes into a String you pass (cleared first, its memory reused; free it when done).
+They return false, with <code>out</code> empty, when a <code>%</code> isn't followed by two hex
+digits. A decoded value can hold any byte, <code>%00</code> and <code>%2F</code> included, so
+check it before using it as a file name.</p>
+<p><code>str.htmlEscape(s)</code> replaces <code>&amp; &lt; &gt; " '</code> with
+<code>&amp;amp; &amp;lt; &amp;gt; &amp;quot; &amp;#39;</code>, which makes any text safe in
+HTML content and in a quoted attribute value.</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] header = "Connection: Keep-Alive";
+  u8[] name, value;
+  str.splitFirst(header, ": ", &amp;name, &amp;value);
+  printf("%d %d\n", name.equalsFold("connection"), value.containsFold("keep-alive"));
+
+  String q = str.urlEncode("tom &amp; jerry/2");
+  defer q.free();
+  String path = str.urlEncodePath("/docs/read me.txt");
+  defer path.free();
+  printf("%s?q=%s\n", path, q);
+
+  String got;
+  defer got.free();
+  if (str.formDecode("q=tom+%26+jerry%2F2", &amp;got)) { printf("%s\n", got); }
+  printf("%d\n", str.urlDecode("100%", &amp;got));
+
+  String html = str.htmlEscape("&lt;b&gt;\"5 &lt; 6\"&lt;/b&gt;");
+  defer html.free();
+  printf("%s\n", html);
+}
+</code></pre>
+<pre class="output">1 1
+/docs/read%20me.txt?q=tom%20%26%20jerry%2F2
+q=tom &amp; jerry/2
+0
+&amp;lt;b&amp;gt;&amp;quot;5 &amp;lt; 6&amp;quot;&amp;lt;/b&amp;gt;
+</pre>
+
 <h3 id="format-conversions">Format conversions<a class="anchor" href="#format-conversions" aria-label="Link to this section">#</a></h3>
 <p><code>str.format</code>, a String's <code>appendFormat</code>, <code>cstr.format</code>,
 <code>cstr.formatTo</code> and the other formatting functions share one format language with
