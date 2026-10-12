@@ -708,6 +708,85 @@ void main()
 <p>The extras are passed as their count and a pointer to an array the caller builds, so
 spreading them on costs nothing.</p>
 
+<h3 id="overloading">Overloading</h3>
+<p>Several functions can share a name when their parameter types differ: a call picks the
+one its arguments fit. Methods overload the same way, and so do a module's functions.
+Two functions with the same parameter types and another return type are an error.</p>
+<pre data-run><code>
+import str;
+
+void show(i64 n) { printf("number %d\n", n); }
+void show(f64 x) { printf("float %.2f\n", x); }
+void show(u8[] s) { printf("text %.*s\n", (i32)s.len, s.ptr); }
+void show(i64 a, i64 b) { printf("pair %d, %d\n", a, b); }
+
+struct Counter { i64 n; };
+void Counter.add(i64 by) { self.n += by; }
+void Counter.add(u8[] word) { self.n += word.len; }
+
+void main()
+{
+  show(42);
+  show(2.5);
+  show("hello");
+  show(1, 2);
+  String s = str.from("owned");
+  defer s.free();
+  show(s);                 // a String is passed as its u8[]
+
+  Counter c = {0};
+  c.add(3);
+  c.add("four");
+  printf("%d\n", c.n);
+}
+</code></pre>
+<pre class="output">
+number 42
+float 2.50
+text hello
+pair 1, 2
+text owned
+7
+</pre>
+<p>How a call picks: every overload the arguments convert to is a candidate (a conversion
+that would only warn, like a pointer for an integer, doesn't count). An argument fits a
+parameter exactly (the same type; an array or a string literal for a slice of its element),
+by a conversion in the same family (another integer width or sign, a String for a
+<code>u8[]</code>, any pointer for <code>void *</code>, an array for its pointer), or as an
+integer for a float. The overload that fits every argument at least as well as any other,
+and one better, wins; when they tie, the one that needs no default and no
+<code>T ...name</code> extras wins. Anything else is an error that lists the overloads:</p>
+<ul>
+<li>An integer literal is an <code>i64</code>: with <code>f(i32)</code> and <code>f(i64)</code>,
+<code>f(5)</code> calls <code>f(i64)</code> and <code>f((i32)5)</code> calls <code>f(i32)</code>.
+With only <code>f(i32)</code> and <code>f(i16)</code>, <code>f(5)</code> is ambiguous: cast it.</li>
+<li>An enum is its own type: <code>f(Color)</code> and <code>f(i32)</code> are two overloads.</li>
+<li>A derived type's method hides every overload of that name in its base.</li>
+<li><code>...s</code> can't spread into an overloaded function.</li>
+</ul>
+<p><code>&amp;f</code> of an overloaded function takes the overload of the function type it
+goes to: a declaration, an assignment, an argument or a <code>return</code>.
+<code>auto p = &amp;f;</code> has no type to pick by, so it is an error.</p>
+<pre data-run><code>
+i64 size(i64 n) { return n; }
+i64 size(u8[] s) { return s.len; }
+
+i64 apply(fn(u8[]) i64 f, u8[] s) { return f(s); }
+
+void main()
+{
+  fn(i64) i64 byNumber = &size;
+  printf("%d %d\n", byNumber(7), apply(&size, "four"));
+}
+</code></pre>
+<pre class="output">
+7 4
+</pre>
+<p>A function that has no overloads keeps its symbol, so libraries and C code see no
+change. Once a name has two or more, each one's symbol carries its parameter types (in
+messages and link errors it shows as <code>show(u8[])</code>). An <code>extern "c"</code>
+function has one C symbol and can't be overloaded.</p>
+
 <h3>Function pointers</h3>
 <pre data-run><code>
 i64 add(i64 a, i64 b) { return a + b; }

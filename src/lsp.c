@@ -209,7 +209,7 @@ static void lspBootstrap(LspCtx *ctx, Cctrl *cc) {
 
 static Cctrl *lspFreshCctrl(LspCtx *ctx) {
     Cctrl *cc = cctrlNew(ctx->target);
-    cc->flags |= CCTRL_REPL; /* redefinition replaces - re-parses work */
+    cc->flags |= CCTRL_REPL | CCTRL_LSP; /* redefinition replaces - re-parses work */
     cctrlAddDefine(cc, "__KTM_AOT__");
     lspBootstrap(ctx, cc);
     return cc;
@@ -920,6 +920,35 @@ static char *lspMethodString(Ast *fn, AstType *owner, const char *name) {
     return mprintf("%.*s%s", (int)(open + 1 - str), str, rest);
 }
 
+/* An overloaded function at (line1 1-based, character 0-based): the
+ * overload a call there picked, or the one declared on that line; NULL
+ * when neither (the name alone: every overload applies) */
+static Ast *lspPickOverload(LspCtx *ctx, u32 doc_id, int line1, int character,
+                            Ast *entry) {
+    if (!astOverloads(entry)) return entry;
+    Vec *calls = ctx->cc->overload_calls;
+    for (u64 i = 0; calls && i < calls->size; ++i) {
+        CctrlOverloadCall *c = calls->entries[i];
+        if (c->file_id == doc_id && c->line == line1 &&
+            character + 1 >= c->col && character + 1 < c->col + c->len) {
+            return c->fn;
+        }
+    }
+    for (u64 i = 0; i < entry->overloads->size; ++i) {
+        Ast *fn = entry->overloads->entries[i];
+        if (fn->file_id == doc_id && fn->line == line1) return fn;
+    }
+    return NULL;
+}
+
+/* Every overload of fn as `render` shows one, a line each */
+static void lspCatOverloads(AoStr *out, Ast *fn, const char *qual) {
+    for (u64 i = 0; i < fn->overloads->size; ++i) {
+        if (i) aoStrPutChar(out, '\n');
+        aoStrCat(out, lspModuleFnString(fn->overloads->entries[i], qual));
+    }
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -950,8 +979,12 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         Ast *entry = lspModuleValue(ctx, qual);
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
         if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
-        if (entry && lspIsFn(entry)) {
-            aoStrCatPrintf(rendered, "%s", lspModuleFnString(entry, qual));
+        Ast *pick = entry && lspIsFn(entry)
+                  ? lspPickOverload(ctx, doc_id, line + 1, character, entry) : entry;
+        if (entry && lspIsFn(entry) && !pick) {
+            lspCatOverloads(rendered, entry, qual);
+        } else if (entry && lspIsFn(entry)) {
+            aoStrCatPrintf(rendered, "%s", lspModuleFnString(pick, qual));
         } else if (entry && entry->type) {
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type), qual);
         } else if (ty) {
@@ -969,6 +1002,15 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
                            mcls->clsname->data, ident);
         else if (f)
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(f), ident);
+        else if (method && astOverloads(method)) {
+            Ast *pick = lspPickOverload(ctx, doc_id, line + 1, character, method);
+            for (u64 i = 0; i < method->overloads->size; ++i) {
+                Ast *o = method->overloads->entries[i];
+                if (pick && o != pick) continue;
+                if (rendered->len) aoStrPutChar(rendered, '\n');
+                aoStrCatPrintf(rendered, "%s", lspMethodString(o, owner, ident));
+            }
+        }
         else if (method)
             aoStrCatPrintf(rendered, "%s", lspMethodString(method, owner, ident));
     } else {
@@ -978,7 +1020,11 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         AstType *cls = mapGetLen(ctx->cc->clsdefs, ident, ilen);
         AstType *uni = cls ? NULL : mapGetLen(ctx->cc->uniondefs, ident, ilen);
         Lexeme *macro = mapGetLen(ctx->cc->macro_defs, ident, ilen);
-        if (entry && lspIsFn(entry)) {
+        if (entry && lspIsFn(entry) && entry->overloads) {
+            Ast *pick = lspPickOverload(ctx, doc_id, line + 1, character, entry);
+            if (pick) aoStrCat(rendered, lspModuleFnString(pick, ident));
+            else lspCatOverloads(rendered, entry, ident);
+        } else if (entry && lspIsFn(entry)) {
             aoStrCatPrintf(rendered, "%s", astFunctionToString(entry));
         } else if (entry && entry->type) {
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type),
@@ -1714,6 +1760,10 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
         if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
         is_member = 1;
+        if (entry && astOverloads(entry)) {
+            Ast *pick = lspPickOverload(ctx, doc_id, cursor_line, character, entry);
+            if (pick) entry = pick;
+        }
         if (entry) {
             def_line = entry->line;
             def_col = entry->col;
@@ -1734,6 +1784,10 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
             AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, own);
             if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, own);
             is_member = 1;
+            if (entry && astOverloads(entry)) {
+                Ast *pick = lspPickOverload(ctx, doc_id, cursor_line, character, entry);
+                if (pick) entry = pick;
+            }
             if (entry) {
                 def_line = entry->line;
                 def_col = entry->col;
@@ -1748,6 +1802,10 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     if (mcls && mcls->fields) {
         AstType *field = (AstType *)mapGetLen(mcls->fields, ident, ilen);
         Ast *method = field ? NULL : lspFindMethod(ctx, mcls, ident, ilen, NULL);
+        if (method && astOverloads(method)) {
+            Ast *pick = lspPickOverload(ctx, doc_id, cursor_line, character, method);
+            if (pick) method = pick;
+        }
         if (field && field->line > 0) {
             def_line = field->line;
             def_col = field->col;
@@ -1766,6 +1824,10 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
         in_doc = 0;
         Ast *entry = lspResolveValue(ctx, doc_id, cursor_line, ident, ilen,
                                      &in_doc);
+        if (entry && astOverloads(entry) && lspIsFn(entry)) {
+            Ast *pick = lspPickOverload(ctx, doc_id, cursor_line, character, entry);
+            if (pick) entry = pick;
+        }
         if (entry) {
             def_line = entry->line;
             def_col = entry->col;
