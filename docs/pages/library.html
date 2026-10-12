@@ -455,8 +455,8 @@ directory afterwards (made now or already there) and -1 if not, the convention
 symlink (never what it points to) or an empty directory; with <code>fs.REMOVE_RECURSE</code>
 a directory and everything in it, with <code>fs.REMOVE_FORCE</code> a path that doesn't exist
 is not an error. <code>fs.removeDir</code> is the directory half of it.
-<code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times),
-<code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
+<code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times;
+see <a href="#file-status">File status</a>), <code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
 <code>fs.currentDir()</code> returns the working directory as a String.</p>
 <pre data-run><code>
 import cstr, fs, libc, mem, str;
@@ -504,6 +504,71 @@ fs.readAll of a directory: 1
 notes.txt: 11 bytes
 fs.remove: 0
 fs.remove again with fs.REMOVE_FORCE: 0
+</pre>
+<h3 id="file-status">File status</h3>
+<p><code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code>, the same struct on
+every platform, so a program never needs <code>libc.cStat</code>, whose layout differs between
+Linux x86_64, Linux arm64 and macOS. Its fields: <code>st_size</code>, <code>st_mode</code>
+(type and permission bits), <code>st_ino</code>, <code>st_dev</code>, <code>st_nlink</code>,
+<code>st_uid</code>, <code>st_gid</code>, and the times <code>st_mtim</code>,
+<code>st_atim</code>, <code>st_ctim</code> and <code>st_btim</code> (creation), each with
+<code>tv_sec</code> and <code>tv_nsec</code>. <code>fst.kind()</code> says what it is:
+<code>fs.FileKind.file</code>, <code>dir</code>, <code>link</code> or <code>other</code> (a FIFO,
+a socket, a device), and <code>fst.isFile()</code>, <code>isDir()</code> and
+<code>isLink()</code> ask for one. <code>fs.stat</code> follows a symlink to what it points to;
+<code>fs.lstat</code> describes the link itself, the only way to get <code>link</code>, and
+<code>fs.fstat(&amp;fst, fd)</code> describes an open file. All three return 0, or -1 with
+<code>errno</code> set.</p>
+<p><code>fs.realPath(path)</code> is the absolute path with every symlink, <code>.</code> and
+<code>..</code> resolved, a String that is yours; its <code>ptr</code> is null (with
+<code>errno</code> set) when a part of the path doesn't exist. <code>fs.pread(fd, buf, off)</code>
+reads into a <code>u8[]</code> from an offset and <code>fs.pwrite(fd, data, off)</code> writes at
+one, neither moving the file's offset, so threads can share one fd.</p>
+<pre data-run><code>
+import cstr, fs, libc, mem, str;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(dir)) { return; }
+  u8[] root = cstr.view(dir);
+  String file = str.format("%s/data.txt", root);
+  String link = str.format("%s/latest", root);
+  defer file.free();
+  defer link.free();
+  fs.writeAll(file, "0123456789");
+  libc.symlink("data.txt", link.cstr());
+
+  fs.FileStat st;
+  fs.stat(&st, link);
+  printf("stat: file %d, %d bytes
+", st.isFile(), st.st_size);
+  fs.lstat(&st, link);
+  printf("lstat: link %d
+", st.kind() == fs.FileKind.link);
+
+  String real = fs.realPath(link);
+  defer real.free();
+  printf("%s
+", real.endsWith("/data.txt") ? "resolves to data.txt" : "?");
+
+  i32 fd = libc.open(file.cstr(), libc.O_RDONLY);
+  u8 buf[4];
+  i64 n = fs.pread(fd, buf, 6);
+  printf("%d bytes at 6: %s
+", n, buf[0:n]);
+  libc.close(fd);
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+stat: file 1, 10 bytes
+lstat: link 1
+resolves to data.txt
+4 bytes at 6: 6789
 </pre>
 <p>For lower-level work the POSIX calls (<code>open</code>, <code>read</code>,
 <code>write</code>, <code>close</code>, <code>lseek</code>, <code>stat</code>,
