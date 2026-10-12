@@ -1,109 +1,67 @@
 module set;
 import map, mem, str, vec;
 
-static bool rbIsNil(map.RBNode *n) {
-    return n == null || n.left == null;
-}
-
-static map.RBNode *rbGrandParent(map.RBNode *n) {
-    if (n == null || n.parent == null) {
-        return null;
-    }
-    return n.parent.parent;
-}
-
 pub struct IntSet {
-    map.RBTree *tree; 
+    map.Tree<i64, bool> tree;
 };
-
-i64 intSetCmp(void *k1, void *k2) {
-    i64 _k1 = (i64)k1;
-    i64 _k2 = (i64)k2;
-    if (_k1 < _k2) { return -1; }
-    if (_k1 > _k2) { return 1; }
-    return 0;
-}
 
 pub IntSet *intNew() {
     IntSet *set = mem.alloc(sizeof(IntSet));
-    set.tree = map.rbNew(null,null,&intSetCmp);
+    set.tree = map.treeNew<i64, bool>();
     return set;
 }
 
 pub i64 IntSet.size() {
     if (!self) { return 0; }
-    return self.tree.size;
+    return self.tree.len;
 }
 
 pub struct IntSetEntry {
     i64 key;
 };
 
+/* A walk in key order; adding or deleting other keys during it is fine,
+ * deleting the key it is on is not */
 pub struct IntSetIter {
-    i64 sp;
-    map.RBNode **stack;
-    IntSetEntry *entry; 
-    map.RBTree *tree;
-    i64 version; /* tree->version when the iterator was made */
+    map.TreeNode<i64, bool> *next;
+    IntSetEntry *entry;
+    map.Tree<i64, bool> *tree;
 };
 
 pub IntSetIter *IntSet.iterNew() {
     IntSetIter *it = mem.alloc(sizeof(IntSetIter));
-    it.sp = 0;
     it.entry = mem.alloc(sizeof(IntSetEntry));
-    it.stack = mem.alloc(sizeof(map.RBNode *) * self.size());
-    it.tree = null;
-    it.version = 0;
-    if (!self) { return it; } /* yields nothing */
-    it.tree = self.tree;
-    it.version = self.tree.version;
-    map.RBNode *node = self.tree.root;
-    while (!rbIsNil(node)) {
-        it.stack[it.sp++] = node;
-        node = node.left;
-    }
+    it.tree = self ? &self.tree : null;
+    it.next = self ? self.tree.first() : null;
     return it;
 }
 
 pub IntSetEntry *intIterNext(IntSetIter *it) {
-    if (!it || it.sp == 0) {
+    if (!it || !it.next) {
         return null;
     }
-    if (it.tree.version != it.version) {
-        it.sp = 0; /* the set changed: stop for good */
-        return null;
-    }
-
-    map.RBNode *node = it.stack[--it.sp];
-    it.entry.key = (i64)node.key;
-    auto rightTree = node.right;
-
-    while (!rbIsNil(rightTree)) {
-        it.stack[it.sp++] = rightTree;
-        rightTree = rightTree.left;
-    }
-
+    it.entry.key = it.next.key;
+    it.next = it.tree.after(it.next);
     return it.entry;
 }
 
 pub void intIterRelease(IntSetIter *iter) {
     if (!iter) { return; }
     mem.free(iter.entry);
-    mem.free(iter.stack);
     mem.free(iter);
 }
 
 pub bool IntSet.has(i64 key) {
     if (!self) { return false; }
-    return self.tree.has((void*)key);
+    return self.tree.has(key);
 }
 
 pub void IntSet.add(i64 key) {
-    return self.tree.set((void*)key,null);
+    self.tree.set(key, true);
 }
 
 pub void IntSet.delete(i64 key) {
-    self.tree.delete((void*)key);
+    self.tree.delete(key);
 }
 
 pub IntSet *IntSet.unionWith(IntSet *s2) {
@@ -245,6 +203,6 @@ pub String IntSet.toStr() {
 
 pub void IntSet.release() {
     if (!self) { return; }
-    self.tree.release();
+    self.tree.free();
     mem.free(self);
 }

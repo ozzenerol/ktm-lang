@@ -1,9 +1,9 @@
 import libc, map, mem, set, test;
 
-/* All red-black trees shared one global sentinel node: map.rbNew reset
- * it and RBTransplant / the delete fix-up wrote its parent, so trees used
- * from different threads corrupted each other. Each tree now has its own
- * sentinel. */
+/* All red-black trees shared one global sentinel node: making a tree reset
+ * it and the transplant / delete fix-up wrote its parent, so trees used
+ * from different threads corrupted each other. Each tree has its own
+ * sentinel (map.Tree since v0.10.0, map.RBTree before). */
 
 const i64 RBT_THREADS = 6;
 const i64 RBT_KEYS = 300;
@@ -11,35 +11,26 @@ const i64 RBT_OPS = 200000;
 
 extern "c" u32 alarm(u32 seconds);
 
-i64 rbtCmp(void *a, void *b) {
-    if ((i64)a < (i64)b) { return -1; }
-    if ((i64)a > (i64)b) { return 1; }
-    return 0;
-}
-
-/* A tree's sentinel is the only node whose `left` is null */
-bool isNil(map.RBNode *n) { return n.left == null; }
-
 /* Black height, or -1 if an invariant is broken */
-i64 check(map.RBNode *n, map.RBNode *parent, i64 lo, i64 hi, i64 *count) {
-    if (isNil(n)) { return 1; }
-    i64 k = (i64)n.key;
-    if (k <= lo || k >= hi) { return -1; }
+i64 check(map.Tree<i64, i64> *t, map.TreeNode<i64, i64> *n, map.TreeNode<i64, i64> *parent,
+          i64 lo, i64 hi, i64 *count) {
+    if (n == t.nil) { return 1; }
+    if (n.key <= lo || n.key >= hi) { return -1; }
     if (n.parent != parent) { return -1; }
     if (n.color == 0 && (n.left.color == 0 || n.right.color == 0)) { return -1; }
-    i64 l = check(n.left, n, lo, k, count);
-    i64 r = check(n.right, n, k, hi, count);
+    i64 l = check(t, n.left, n, lo, n.key, count);
+    i64 r = check(t, n.right, n, n.key, hi, count);
     if (l < 0 || r < 0 || l != r) { return -1; }
     ++*count;
     return l + (n.color == 1);
 }
 
-bool valid(map.RBTree *t) {
+bool valid(map.Tree<i64, i64> *t) {
     i64 count = 0;
-    if (isNil(t.root)) { return t.size == 0; }
+    if (!t.len) { return t.root == null || t.root == t.nil; }
     if (t.root.color != 1) { return false; }
-    if (check(t.root, null, I64_MIN, I64_MAX, &count) < 0) { return false; }
-    return count == t.size;
+    if (check(t, t.root, null, I64_MIN, I64_MAX, &count) < 0) { return false; }
+    return count == t.len;
 }
 
 struct RbtArgs {
@@ -49,12 +40,12 @@ struct RbtArgs {
 };
 
 /* Random inserts and deletes against a shadow array, checking the tree
- * every so often. Every few hundred operations the tree is released and
- * a new one made, so map.rbNew runs while other threads use their trees. */
+ * every so often. Every few hundred operations the tree is freed and a
+ * new one made, so a tree is made while other threads use theirs. */
 void *rbtWorker(RbtArgs *args) {
     bool shadow[RBT_KEYS];
-    i64 i, k, n = 0, seed = args.seed;
-    map.RBTree *t = map.rbNew(null, null, &rbtCmp);
+    i64 i, k, n = 0, seed = args.seed, v;
+    map.Tree<i64, i64> t = map.treeNew<i64, i64>();
     mem.set(shadow, 0, sizeof(shadow));
     args.ok = true;
 
@@ -62,33 +53,33 @@ void *rbtWorker(RbtArgs *args) {
         seed = seed * 6364136223846793005 + 1442695040888963407;
         k = ((seed >> 33) & 0x7FFFFFFF) % RBT_KEYS + 1;
         if ((seed >> 20) & 1) {
-            t.set((void *)k, (void *)(k * 2));
+            t.set(k, k * 2);
             if (!shadow[k - 1]) { n++; }
             shadow[k - 1] = true;
         } else {
-            t.delete((void *)k);
+            t.delete(k);
             if (shadow[k - 1]) { n--; }
             shadow[k - 1] = false;
         }
-        if (t.has((void *)k) != shadow[k - 1] || t.size != n) { args.ok = false; }
-        if (i % 97 == 0 && !valid(t)) { args.ok = false; }
+        if (t.has(k) != shadow[k - 1] || t.len != n) { args.ok = false; }
+        if (i % 97 == 0 && !valid(&t)) { args.ok = false; }
         if (i % 1500 == 1499) {
-            t.release();
-            t = map.rbNew(null, null, &rbtCmp);
+            t.free();
+            t = map.treeNew<i64, i64>();
             mem.set(shadow, 0, sizeof(shadow));
             n = 0;
         }
     }
-    if (!valid(t)) { args.ok = false; }
+    if (!valid(&t)) { args.ok = false; }
     for (k = 1; k <= RBT_KEYS; k++) {
-        if (shadow[k - 1] && (i64)t.get((void *)k) != k * 2) { args.ok = false; }
+        if (shadow[k - 1] && (!t.get(k, &v) || v != k * 2)) { args.ok = false; }
     }
-    t.release();
+    t.free();
     return null;
 }
 
 i32 main() {
-    printf("Test - RBTree sentinel per tree: ");
+    printf("Test - tree sentinel per tree: ");
     i64 correct = 0, tests = 5, i, k, n;
     RbtArgs args[RBT_THREADS];
 
@@ -107,25 +98,26 @@ i32 main() {
 
     /* Single thread, two trees interleaved: deleting from one doesn't
      * disturb the other */
-    map.RBTree *a = map.rbNew(null, null, &rbtCmp);
-    map.RBTree *b = map.rbNew(null, null, &rbtCmp);
+    ad map.Tree<i64, i64> a = map.treeNew<i64, i64>();
+    ad map.Tree<i64, i64> b = map.treeNew<i64, i64>();
     for (k = 1; k <= 200; k++) {
-        a.set((void *)k, (void *)k);
-        b.set((void *)(k * 3), (void *)k);
+        a.set(k, k);
+        b.set(k * 3, k);
         if (k % 3 == 0) {
-            a.delete((void *)(k / 3));
-            b.delete((void *)k);
+            a.delete(k / 3);
+            b.delete(k);
         }
     }
-    if (valid(a) && valid(b) && a.size == 134 && b.size == 134) { correct++; }
+    if (valid(&a) && valid(&b) && a.len == 134 && b.len == 134) { correct++; }
     /* A new tree made while others hold nodes is empty and independent */
-    map.RBTree *c = map.rbNew(null, null, &rbtCmp);
-    if (c.size == 0 && isNil(c.root) && valid(a) && valid(b)) { correct++; }
-    a.release();
-    b.release();
-    c.release();
+    ad map.Tree<i64, i64> c = map.treeNew<i64, i64>();
+    c.set(1, 1);
+    c.delete(1);
+    if (c.len == 0 && valid(&c) && valid(&a) && valid(&b) && a.nil != b.nil && b.nil != c.nil) {
+        correct++;
+    }
 
-    /* set.IntSet unchanged */
+    /* set.IntSet, on a tree */
     set.IntSet *s = set.intNew();
     for (k = 10; k > 0; k--) { s.add(k); }
     s.delete(4);
@@ -146,20 +138,16 @@ i32 main() {
     text.free();
     s.release();
 
-    /* RBIter walks in order */
-    map.RBTree *t = map.rbNew(null, null, &rbtCmp);
-    for (k = 1; k <= 50; k++) { t.set((void *)((k * 37) % 101), null); }
-    map.RBIter *ri = t.iterNew();
-    map.RBNode *node;
+    /* the walk is in order */
+    ad map.Tree<i64, i64> t = map.treeNew<i64, i64>();
+    for (k = 1; k <= 50; k++) { t.set((k * 37) % 101, 0); }
     n = 0; prev = -1; ok = true;
-    while ((node = map.rbIterNext(ri))) {
-        if ((i64)node.key <= prev) { ok = false; }
-        prev = (i64)node.key;
+    for (auto node = t.first(); node; node = t.after(node)) {
+        if (node.key <= prev) { ok = false; }
+        prev = node.key;
         n++;
     }
-    map.rbIterRelease(ri);
     if (ok && n == 50) { correct++; }
-    t.release();
 
     alarm(0);
     test.printResult(correct, tests);
