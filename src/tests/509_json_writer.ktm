@@ -13,7 +13,7 @@ void check(bool ok, u8 *what) {
 
 /* The ERR_WRITER message a call throws, "" when it doesn't */
 enum Call { valueTwice, valueNoKey, keyInArray, keyAtTop, endNone, endAfterKey, keyTwice,
-            takeOpen, takeEmpty, nan, inf, badUtf8, badKey, badRaw, rawTwo, tooDeep };
+            takeOpen, takeEmpty, nan, inf, badUtf8, badKey, badRaw, rawTwo, tooDeep, badCstr };
 
 bool throws(Call c, u8 *want) {
     json.Writer w = json.writerNew();
@@ -35,6 +35,7 @@ bool throws(Call c, u8 *want) {
             case Call.badKey:      w.beginObject(); w.key("\xED\xA0\x80");
             case Call.badRaw:      w.raw("{\"a\": }");
             case Call.rawTwo:      w.raw("1 2");
+            case Call.badCstr:     w.cstr("\xFF");
             case Call.tooDeep:
                 for (i64 i = 0; i <= json.MAX_DEPTH; i++) { w.beginArray(); }
         }
@@ -166,6 +167,14 @@ i32 main() {
     check(throws(Call.badRaw, "isn't one JSON value"), "raw() of bad JSON");
     check(throws(Call.rawTwo, "isn't one JSON value"), "raw() of two values");
     check(throws(Call.tooDeep, "MAX_DEPTH"), "deeper than json.MAX_DEPTH");
+
+    /* cstr(): a C string, null as null */
+    u8 *cs = "c \"str\"", *none = null;
+    w.beginArray(); w.cstr(cs); w.cstr(none); w.end();
+    text = w.take();
+    check(text.equals("[\"c \\\"str\\\"\",null]"), "cstr() of a C string and of null");
+    text.free();
+    check(throws(Call.badCstr, "isn't UTF-8"), "cstr() of bad UTF-8");
 
     /* A throw leaves the Writer as it was: the document can be finished */
     w.beginObject();
