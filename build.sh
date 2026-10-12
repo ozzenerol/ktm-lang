@@ -136,6 +136,13 @@ if [ "$RUN_TESTS" = 1 ]; then
     step "Running JIT unit tests"
     (cd "$ROOT/src/tests" && "$KTM" --install-dir="$PREFIX" ./run_jit.ktm -o test-runner-jit && ./test-runner-jit)
 
+    # coro's loop has several backends (io_uring, epoll, kqueue, poll):
+    # the runs above used the default one, this one runs every test that
+    # imports coro again on the next one down
+    if [ "$(uname -s)" = Darwin ]; then other=poll; else other=epoll; fi
+    step "Running the coro tests on the $other backend"
+    (cd "$ROOT/src/tests" && KTM_CORO_BACKEND=$other KTM_TEST_MODULE=coro ./test-runner)
+
     step "Running LSP tests"
     (cd "$ROOT/src/tests/lsp" && "$KTM" --install-dir="$PREFIX" ./run_lsp_tests.ktm -o lsp-test-runner && ./lsp-test-runner)
 
