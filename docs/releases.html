@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,155 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-10-0-2026-10-12">v0.10.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-10-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
+<code>map.Map&lt;K, V&gt;</code>, <code>map.Tree&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code> and
+<code>list.List&lt;T&gt;</code> hold any type with no <code>void *</code> and no casts, are values
+(made with <code>mod.new&lt;T&gt;()</code>, freed with <code>free()</code>, so <code>ad</code> works),
+and replace <code>IntVec</code>, <code>PtrVec</code>, <code>FloatVec</code>, <code>IntMap</code>,
+<code>StrMap</code>, <code>RBTree</code>, <code>IntSet</code> and the <code>void *</code> list, which
+are gone. New: module <code>sort</code> and <code>json.decode&lt;T&gt;</code>.</p>
+
+<pre><code>import json, list, map, set, vec;
+
+struct Point { i64 x; i64 y; };
+
+i64 byX(Point *a, Point *b) { return a.x - b.x; }
+
+void main()
+{
+  ad vec.Vec&amp;lt;Point&amp;gt; pts = vec.new&amp;lt;Point&amp;gt;();
+  Point a = {3, 1}, b = {1, 2};
+  pts.push(a);
+  pts.push(b);
+  pts.sort(&amp;amp;byX);
+  for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
+  printf("\n");
+
+  ad map.Map&amp;lt;u8[], i64&amp;gt; counts = map.new&amp;lt;u8[], i64&amp;gt;();
+  u8[] words[] = {"to", "be", "or", "not", "to", "be"};
+  for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
+  i64 it = 0, n;
+  u8[] word;
+  while (counts.next(&amp;amp;it, &amp;amp;word, &amp;amp;n)) { printf("%s=%d ", word, n); }
+  printf("\n");
+
+  ad set.Set&amp;lt;i64&amp;gt; seen = set.new&amp;lt;i64&amp;gt;();
+  printf("%d %d\n", seen.add(4), seen.add(4));
+
+  ad list.List&amp;lt;u8 *&amp;gt; jobs = list.new&amp;lt;u8 *&amp;gt;();
+  auto build = jobs.append("build");
+  jobs.append("test");
+  jobs.remove(build);
+  for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
+
+  Point p = json.decode&amp;lt;Point&amp;gt;("{\"x\": 5, \"y\": 6}");
+  printf("%d %d\n", p.x, p.y);
+}
+</code></pre>
+<pre class="output">(1,2) (3,1) 
+to=2 be=2 or=1 not=1 
+1 0
+test
+5 6
+</pre>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>vec.Vec&lt;T&gt;</code>: <code>vec.new&lt;T&gt;(cap)</code>, <code>push</code>,
+  <code>pop</code>, <code>get</code>, <code>at</code> (a pointer to an item), <code>set</code>,
+  <code>last</code>, <code>insert</code>, <code>removeAt</code>, <code>reserve</code>,
+  <code>items()</code> (a <code>T[]</code> view), <code>sort(cmp)</code>, <code>sortAsc()</code>,
+  <code>clear</code>, <code>free</code>, and the <code>len</code> field. A range <code>for</code> walks
+  it directly: <code>for (auto x : v)</code>.</li>
+  <li><code>map.Map&lt;K, V&gt;</code>, a hash map that keeps insertion order:
+  <code>map.new&lt;K, V&gt;(cap)</code>, <code>set</code>, <code>get(k, &amp;out)</code>,
+  <code>getOr(k, def)</code>, <code>ref(k)</code> (a pointer to the value), <code>has</code>,
+  <code>delete</code>, <code>next(&amp;it, &amp;k, &amp;v)</code> to walk it, <code>keys()</code> and
+  <code>values()</code> as a <code>vec.Vec</code>, <code>clear</code>, <code>free</code>. Keys of
+  any integer type, pointers, <code>u8[]</code> and <code>String</code> work as they are (the map
+  copies and owns <code>u8[]</code> and <code>String</code> keys); other key types are compared
+  byte by byte, or by your own <code>map.hashOf</code> and <code>map.keyEq</code> overloads.</li>
+  <li><code>map.Tree&lt;K, V&gt;</code>, the ordered map (a red-black tree):
+  <code>map.treeNew&lt;K, V&gt;()</code>, the same <code>set</code>/<code>get</code>/<code>getOr</code>/<code>has</code>/<code>delete</code>,
+  and an in-order walk with <code>first()</code>/<code>after(n)</code> (or <code>last()</code>/<code>before(n)</code>).
+  Keys are ordered by <code>map.compare</code> overloads.</li>
+  <li><code>set.Set&lt;T&gt;</code>, a hash set: <code>add</code> and <code>delete</code> (both say whether
+  they changed it), <code>has</code>, <code>next</code>, <code>items()</code>, and
+  <code>unionWith</code>, <code>diff</code>, <code>intersection</code>, <code>symDiff</code> (new
+  sets), <code>isSubset</code>, <code>equals</code>.</li>
+  <li><code>list.List&lt;T&gt;</code>, a doubly linked list: <code>append</code>,
+  <code>prepend</code>, <code>insertBefore</code> and <code>insertAfter</code> return the node, so
+  <code>remove(node)</code> takes it out in O(1); <code>shift</code>, <code>pop</code>,
+  <code>first</code>, <code>last</code>, <code>mergeAppend</code>, <code>mergePrepend</code>; walk it
+  with <code>for (auto n = l.head; n; n = n.next)</code>.</li>
+  <li>New module <code>sort</code>: <code>sort.slice(s, cmp)</code> sorts any slice in place with a
+  comparator, <code>sort.asc(s)</code> sorts numbers or pointers smallest first.</li>
+  <li><code>json.decode&lt;T&gt;(text)</code> returns the JSON as a <code>T</code> (a struct, a
+  slice, a pointer to a struct, ...). What it filled in is freed again if it throws. The
+  <code>json.decode(text, reflect.of(x))</code> form stays.</li>
+  <li>The new <code>Vec&lt;i64&gt;</code> ran about 14% faster than <code>IntVec</code>, and
+  <code>Map&lt;i64, i64&gt;</code> about 10% faster than <code>IntMap</code>, in our measurements.</li>
+</ul>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A generic struct's method is compiled the first time it is called, so a method that only
+  works for some types (<code>sortAsc</code> needs <code>&lt;</code>) does not stop
+  <code>Vec&lt;Point&gt;</code> from being used.</li>
+  <li>Generic instances work across modules (<code>list.List&lt;fzf.Term *&gt;</code>, a module's
+  generic used with another module's type), and <code>f&lt;T&gt;(...)</code> can be called when
+  plain overloads of <code>f</code> exist; a plain overload still wins over the generic.</li>
+  <li>A range <code>for</code> walks any struct with <code>len</code> and <code>data</code> fields
+  (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
+</ul>
+
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The old containers are removed. They map to the new ones as follows:
+  <div class="table-wrap"><table>
+    <tr><th>Before</th><th>Now</th></tr>
+    <tr><td><code>vec.intNew()</code>, <code>vec.ptrNew()</code>, <code>vec.floatNew()</code></td>
+        <td><code>vec.new&lt;i64&gt;()</code>, <code>vec.new&lt;User *&gt;()</code>, <code>vec.new&lt;f64&gt;()</code> (a value, not a pointer)</td></tr>
+    <tr><td><code>v.size</code>, <code>v.entries</code>, <code>v.capacity()</code></td>
+        <td><code>v.len</code>, <code>v.data</code>, <code>v.cap</code></td></tr>
+    <tr><td><code>v.release()</code>, <code>v.release(&amp;freeItem)</code></td>
+        <td><code>v.free()</code>; free the items yourself first: <code>for (auto u : v) { freeItem(u); }</code></td></tr>
+    <tr><td><code>v.sort()</code> on an <code>IntVec</code></td><td><code>v.sortAsc()</code></td></tr>
+    <tr><td><code>v.sort(&amp;less)</code>, <code>less(a, b)</code> true when a goes first</td>
+        <td><code>v.sort(&amp;cmp)</code>, <code>cmp(T *a, T *b)</code> negative, 0 or positive as C's <code>qsort</code></td></tr>
+    <tr><td><code>map.intNew()</code>, <code>map.strNew()</code></td>
+        <td><code>map.new&lt;i64, V&gt;()</code>, <code>map.new&lt;u8[], V&gt;()</code></td></tr>
+    <tr><td><code>m.get(k)</code> (a <code>void *</code>, null if missing), <code>m.get(k, &amp;ok)</code></td>
+        <td><code>m.getOr(k, def)</code>, <code>m.get(k, &amp;out)</code> (true if found), <code>m.ref(k)</code></td></tr>
+    <tr><td><code>m.setFreeValue(&amp;f)</code>, <code>m.release()</code></td>
+        <td><code>m.free()</code>; values that own memory are freed by you first (walk with <code>next</code>)</td></tr>
+    <tr><td><code>m.iter</code>, <code>m.keyIter</code>, <code>m.valueIter</code></td>
+        <td><code>i64 it = 0; while (m.next(&amp;it, &amp;k, &amp;v))</code> (either pointer may be null), or <code>keys()</code>/<code>values()</code></td></tr>
+    <tr><td><code>map.rbNew(...)</code> (<code>RBTree</code>)</td>
+        <td><code>map.treeNew&lt;K, V&gt;()</code>; <code>iterNew</code>/<code>rbIterNext</code> become <code>first()</code>/<code>after(n)</code></td></tr>
+    <tr><td><code>set.intNew()</code> (<code>IntSet</code>), <code>s.size()</code>, <code>s.eq(o)</code>, <code>s.toVec()</code></td>
+        <td><code>set.new&lt;i64&gt;()</code>, <code>s.len</code>, <code>s.equals(&amp;o)</code>, <code>s.items()</code> (insertion order: <code>sortAsc()</code> it for the old sorted order)</td></tr>
+    <tr><td><code>list.new()</code>, <code>l.count()</code>, <code>l.isEmpty()</code>, the circular walk from <code>l.next</code></td>
+        <td><code>list.new&lt;T&gt;()</code>, <code>l.len</code>, <code>!l.len</code>, <code>for (auto n = l.head; n; n = n.next)</code></td></tr>
+  </table></div></li>
+  <li>An index out of range (<code>get</code>, <code>set</code>, <code>removeAt</code>, ...) throws
+  <code>ERR_BOUNDS</code>, which a <code>try</code> can catch; the old vectors printed a message and
+  exited.</li>
+  <li>The containers no longer free their values: <code>free()</code> releases the container (and
+  the <code>u8[]</code>/<code>String</code> keys it copied), and what the values point to is yours,
+  as with any other struct.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A range <code>for</code> over a call that returns a slice (<code>for (auto w : str.split(s, " "))</code>)
+  ran the call again for the length and for every element, leaking what each call allocated. It runs
+  once.</li>
+  <li><code>reflect.of</code> inside a generic of a library module (as <code>json.decode&lt;T&gt;</code>
+  does) described an empty type unless the program also used <code>reflect.of</code> on that type.</li>
+</ul>
 
 <h2 id="v0-9-0-2026-10-12">v0.9.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-9-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>Generics and type aliases. A struct, its methods and a function can take type parameters,
@@ -84,7 +233,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Generics: <code>struct Stack&lt;T&gt;</code>, its methods <code>T Stack&lt;T&gt;.pop()</code>,
   and functions <code>T max&lt;T&gt;(T a, T b)</code>, with any number of parameters. A type is
@@ -103,7 +252,7 @@ void main()
   completes and jumps to them.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>pub</code> or <code>private</code> on an enum, struct or union applied to the next
   declaration of a module as well: a private function after a <code>pub enum</code> could be
@@ -127,7 +276,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
   end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
@@ -137,7 +286,7 @@ void main()
   <a href="language.html#autodefer">ad (autodefer)</a>.</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
   and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
@@ -158,7 +307,7 @@ void main()
   <code>net.setBlocking</code> are public.</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>macOS: a string literal with a NUL byte inside (<code>"\x00\x08\x00\x00"</code>) lost
   bytes in a compiled program: the linker splits the section literals went in at each NUL and
@@ -207,7 +356,7 @@ void main()
   instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
 </ul>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
   <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
@@ -217,14 +366,14 @@ void main()
   sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
   <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
   module.</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
   as a block's first statement it used to point at the block's <code>{</code>.</li>
@@ -255,7 +404,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Overloading: functions, methods and a module's functions can share a name when their
   parameter types differ, and a call picks the one its arguments fit best (an exact type over
@@ -268,7 +417,7 @@ void main()
   change; once a name has two or more, each one's symbol carries its parameter types.</li>
 </ul>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
   <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
@@ -292,7 +441,7 @@ void main()
   that way in a <code>proc.Proc</code>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A second function of a name with other parameter types used to be the error "conflicting
   types"; it is now an overload. The same parameters with another return type is still that
@@ -303,7 +452,7 @@ void main()
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old C declarator of a function that returns a function pointer,
   <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
@@ -352,7 +501,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -392,7 +541,7 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
@@ -423,7 +572,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
   kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
@@ -442,7 +591,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -462,7 +611,7 @@ more mistakes it used to let through. Code that uses <code>proc</code>, <code>cs
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -493,7 +642,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -536,7 +685,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-6">The language<a class="anchor" href="#the-language-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -565,7 +714,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -601,7 +750,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -626,7 +775,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-9">Fixes<a class="anchor" href="#fixes-9" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -655,7 +804,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -696,7 +845,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-6">The language<a class="anchor" href="#the-language-6" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-7">The language<a class="anchor" href="#the-language-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -729,7 +878,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-8">The standard library<a class="anchor" href="#the-standard-library-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
@@ -758,7 +907,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-9">Fixes<a class="anchor" href="#fixes-9" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-10">Fixes<a class="anchor" href="#fixes-10" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -780,7 +929,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line

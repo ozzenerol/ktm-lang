@@ -4,6 +4,155 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.10.0 <small>(2026-10-12)</small></h2>
+<p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
+<code>map.Map&lt;K, V&gt;</code>, <code>map.Tree&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code> and
+<code>list.List&lt;T&gt;</code> hold any type with no <code>void *</code> and no casts, are values
+(made with <code>mod.new&lt;T&gt;()</code>, freed with <code>free()</code>, so <code>ad</code> works),
+and replace <code>IntVec</code>, <code>PtrVec</code>, <code>FloatVec</code>, <code>IntMap</code>,
+<code>StrMap</code>, <code>RBTree</code>, <code>IntSet</code> and the <code>void *</code> list, which
+are gone. New: module <code>sort</code> and <code>json.decode&lt;T&gt;</code>.</p>
+
+<pre><code>import json, list, map, set, vec;
+
+struct Point { i64 x; i64 y; };
+
+i64 byX(Point *a, Point *b) { return a.x - b.x; }
+
+void main()
+{
+  ad vec.Vec&lt;Point&gt; pts = vec.new&lt;Point&gt;();
+  Point a = {3, 1}, b = {1, 2};
+  pts.push(a);
+  pts.push(b);
+  pts.sort(&amp;byX);
+  for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
+  printf("\n");
+
+  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
+  u8[] words[] = {"to", "be", "or", "not", "to", "be"};
+  for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
+  i64 it = 0, n;
+  u8[] word;
+  while (counts.next(&amp;it, &amp;word, &amp;n)) { printf("%s=%d ", word, n); }
+  printf("\n");
+
+  ad set.Set&lt;i64&gt; seen = set.new&lt;i64&gt;();
+  printf("%d %d\n", seen.add(4), seen.add(4));
+
+  ad list.List&lt;u8 *&gt; jobs = list.new&lt;u8 *&gt;();
+  auto build = jobs.append("build");
+  jobs.append("test");
+  jobs.remove(build);
+  for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
+
+  Point p = json.decode&lt;Point&gt;("{\"x\": 5, \"y\": 6}");
+  printf("%d %d\n", p.x, p.y);
+}
+</code></pre>
+<pre class="output">(1,2) (3,1) 
+to=2 be=2 or=1 not=1 
+1 0
+test
+5 6
+</pre>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>vec.Vec&lt;T&gt;</code>: <code>vec.new&lt;T&gt;(cap)</code>, <code>push</code>,
+  <code>pop</code>, <code>get</code>, <code>at</code> (a pointer to an item), <code>set</code>,
+  <code>last</code>, <code>insert</code>, <code>removeAt</code>, <code>reserve</code>,
+  <code>items()</code> (a <code>T[]</code> view), <code>sort(cmp)</code>, <code>sortAsc()</code>,
+  <code>clear</code>, <code>free</code>, and the <code>len</code> field. A range <code>for</code> walks
+  it directly: <code>for (auto x : v)</code>.</li>
+  <li><code>map.Map&lt;K, V&gt;</code>, a hash map that keeps insertion order:
+  <code>map.new&lt;K, V&gt;(cap)</code>, <code>set</code>, <code>get(k, &amp;out)</code>,
+  <code>getOr(k, def)</code>, <code>ref(k)</code> (a pointer to the value), <code>has</code>,
+  <code>delete</code>, <code>next(&amp;it, &amp;k, &amp;v)</code> to walk it, <code>keys()</code> and
+  <code>values()</code> as a <code>vec.Vec</code>, <code>clear</code>, <code>free</code>. Keys of
+  any integer type, pointers, <code>u8[]</code> and <code>String</code> work as they are (the map
+  copies and owns <code>u8[]</code> and <code>String</code> keys); other key types are compared
+  byte by byte, or by your own <code>map.hashOf</code> and <code>map.keyEq</code> overloads.</li>
+  <li><code>map.Tree&lt;K, V&gt;</code>, the ordered map (a red-black tree):
+  <code>map.treeNew&lt;K, V&gt;()</code>, the same <code>set</code>/<code>get</code>/<code>getOr</code>/<code>has</code>/<code>delete</code>,
+  and an in-order walk with <code>first()</code>/<code>after(n)</code> (or <code>last()</code>/<code>before(n)</code>).
+  Keys are ordered by <code>map.compare</code> overloads.</li>
+  <li><code>set.Set&lt;T&gt;</code>, a hash set: <code>add</code> and <code>delete</code> (both say whether
+  they changed it), <code>has</code>, <code>next</code>, <code>items()</code>, and
+  <code>unionWith</code>, <code>diff</code>, <code>intersection</code>, <code>symDiff</code> (new
+  sets), <code>isSubset</code>, <code>equals</code>.</li>
+  <li><code>list.List&lt;T&gt;</code>, a doubly linked list: <code>append</code>,
+  <code>prepend</code>, <code>insertBefore</code> and <code>insertAfter</code> return the node, so
+  <code>remove(node)</code> takes it out in O(1); <code>shift</code>, <code>pop</code>,
+  <code>first</code>, <code>last</code>, <code>mergeAppend</code>, <code>mergePrepend</code>; walk it
+  with <code>for (auto n = l.head; n; n = n.next)</code>.</li>
+  <li>New module <code>sort</code>: <code>sort.slice(s, cmp)</code> sorts any slice in place with a
+  comparator, <code>sort.asc(s)</code> sorts numbers or pointers smallest first.</li>
+  <li><code>json.decode&lt;T&gt;(text)</code> returns the JSON as a <code>T</code> (a struct, a
+  slice, a pointer to a struct, ...). What it filled in is freed again if it throws. The
+  <code>json.decode(text, reflect.of(x))</code> form stays.</li>
+  <li>The new <code>Vec&lt;i64&gt;</code> ran about 14% faster than <code>IntVec</code>, and
+  <code>Map&lt;i64, i64&gt;</code> about 10% faster than <code>IntMap</code>, in our measurements.</li>
+</ul>
+
+<h3>The language</h3>
+<ul>
+  <li>A generic struct's method is compiled the first time it is called, so a method that only
+  works for some types (<code>sortAsc</code> needs <code>&lt;</code>) does not stop
+  <code>Vec&lt;Point&gt;</code> from being used.</li>
+  <li>Generic instances work across modules (<code>list.List&lt;fzf.Term *&gt;</code>, a module's
+  generic used with another module's type), and <code>f&lt;T&gt;(...)</code> can be called when
+  plain overloads of <code>f</code> exist; a plain overload still wins over the generic.</li>
+  <li>A range <code>for</code> walks any struct with <code>len</code> and <code>data</code> fields
+  (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The old containers are removed. They map to the new ones as follows:
+  <table>
+    <tr><th>Before</th><th>Now</th></tr>
+    <tr><td><code>vec.intNew()</code>, <code>vec.ptrNew()</code>, <code>vec.floatNew()</code></td>
+        <td><code>vec.new&lt;i64&gt;()</code>, <code>vec.new&lt;User *&gt;()</code>, <code>vec.new&lt;f64&gt;()</code> (a value, not a pointer)</td></tr>
+    <tr><td><code>v.size</code>, <code>v.entries</code>, <code>v.capacity()</code></td>
+        <td><code>v.len</code>, <code>v.data</code>, <code>v.cap</code></td></tr>
+    <tr><td><code>v.release()</code>, <code>v.release(&amp;freeItem)</code></td>
+        <td><code>v.free()</code>; free the items yourself first: <code>for (auto u : v) { freeItem(u); }</code></td></tr>
+    <tr><td><code>v.sort()</code> on an <code>IntVec</code></td><td><code>v.sortAsc()</code></td></tr>
+    <tr><td><code>v.sort(&amp;less)</code>, <code>less(a, b)</code> true when a goes first</td>
+        <td><code>v.sort(&amp;cmp)</code>, <code>cmp(T *a, T *b)</code> negative, 0 or positive as C's <code>qsort</code></td></tr>
+    <tr><td><code>map.intNew()</code>, <code>map.strNew()</code></td>
+        <td><code>map.new&lt;i64, V&gt;()</code>, <code>map.new&lt;u8[], V&gt;()</code></td></tr>
+    <tr><td><code>m.get(k)</code> (a <code>void *</code>, null if missing), <code>m.get(k, &amp;ok)</code></td>
+        <td><code>m.getOr(k, def)</code>, <code>m.get(k, &amp;out)</code> (true if found), <code>m.ref(k)</code></td></tr>
+    <tr><td><code>m.setFreeValue(&amp;f)</code>, <code>m.release()</code></td>
+        <td><code>m.free()</code>; values that own memory are freed by you first (walk with <code>next</code>)</td></tr>
+    <tr><td><code>m.iter</code>, <code>m.keyIter</code>, <code>m.valueIter</code></td>
+        <td><code>i64 it = 0; while (m.next(&amp;it, &amp;k, &amp;v))</code> (either pointer may be null), or <code>keys()</code>/<code>values()</code></td></tr>
+    <tr><td><code>map.rbNew(...)</code> (<code>RBTree</code>)</td>
+        <td><code>map.treeNew&lt;K, V&gt;()</code>; <code>iterNew</code>/<code>rbIterNext</code> become <code>first()</code>/<code>after(n)</code></td></tr>
+    <tr><td><code>set.intNew()</code> (<code>IntSet</code>), <code>s.size()</code>, <code>s.eq(o)</code>, <code>s.toVec()</code></td>
+        <td><code>set.new&lt;i64&gt;()</code>, <code>s.len</code>, <code>s.equals(&amp;o)</code>, <code>s.items()</code> (insertion order: <code>sortAsc()</code> it for the old sorted order)</td></tr>
+    <tr><td><code>list.new()</code>, <code>l.count()</code>, <code>l.isEmpty()</code>, the circular walk from <code>l.next</code></td>
+        <td><code>list.new&lt;T&gt;()</code>, <code>l.len</code>, <code>!l.len</code>, <code>for (auto n = l.head; n; n = n.next)</code></td></tr>
+  </table></li>
+  <li>An index out of range (<code>get</code>, <code>set</code>, <code>removeAt</code>, ...) throws
+  <code>ERR_BOUNDS</code>, which a <code>try</code> can catch; the old vectors printed a message and
+  exited.</li>
+  <li>The containers no longer free their values: <code>free()</code> releases the container (and
+  the <code>u8[]</code>/<code>String</code> keys it copied), and what the values point to is yours,
+  as with any other struct.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A range <code>for</code> over a call that returns a slice (<code>for (auto w : str.split(s, " "))</code>)
+  ran the call again for the length and for every element, leaking what each call allocated. It runs
+  once.</li>
+  <li><code>reflect.of</code> inside a generic of a library module (as <code>json.decode&lt;T&gt;</code>
+  does) described an empty type unless the program also used <code>reflect.of</code> on that type.</li>
+</ul>
+
 <h2>v0.9.0 <small>(2026-10-12)</small></h2>
 <p>Generics and type aliases. A struct, its methods and a function can take type parameters,
 and each use with other types is compiled for those types: the same code you would write by
