@@ -2074,6 +2074,8 @@ static int parseFormatArgIdx(char *fname, int len) {
     /* the shell commands built from a format */
     else if (len == 11 && !strncmp(fname, str_lit("proc.shellf"))) return 0;
     else if (len == 16 && !strncmp(fname, str_lit("proc.shellOutput"))) return 0;
+    /* printf to stderr */
+    else if (len == 10 && !strncmp(fname, str_lit("os.eprintf"))) return 0;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
