@@ -450,3 +450,173 @@ pub bool splitLast(u8[] s, u8[] sep, u8[] *before, u8[] *after)
     *after = s[at + sep.len:];
     return true;
 }
+
+/* ---- Ignoring case: ASCII letters only (A-Z equals a-z); every other
+ * byte, UTF-8 included, must match exactly. Right for protocol text:
+ * HTTP header names, MIME types, file extensions, hex. ---- */
+
+static u8 foldByte(u8 ch)
+{
+    if (ch >= 'A' && ch <= 'Z') { return ch + 32; }
+    return ch;
+}
+
+/* <0, 0 or >0 as a sorts before, with or after b, ignoring ASCII case
+ * (as if both were lowercase) */
+pub i64 compareFold(u8[] a, u8[] b)
+{
+    i64 n = a.len < b.len ? a.len : b.len;
+    for (i64 i = 0; i < n; i++) {
+        i64 c = foldByte(a.ptr[i]) - foldByte(b.ptr[i]);
+        if (c) { return c; }
+    }
+    return a.len - b.len;
+}
+
+/* The same bytes, ignoring ASCII case: equalsFold("Content-Length",
+ * "content-length") */
+pub bool equalsFold(u8[] a, u8[] b)
+{
+    return a.len == b.len && !compareFold(a, b);
+}
+
+/* Where needle first is in s ignoring ASCII case, -1 when it isn't (an
+ * empty needle is at 0) */
+pub i64 findFold(u8[] s, u8[] needle)
+{
+    if (needle.len > s.len) { return -1; }
+    for (i64 i = 0; i <= s.len - needle.len; ++i) {
+        if (!compareFold(s[i:i + needle.len], needle)) { return i; }
+    }
+    return -1;
+}
+
+pub bool containsFold(u8[] s, u8[] needle)
+{
+    return findFold(s, needle) >= 0;
+}
+
+pub bool startsWithFold(u8[] s, u8[] prefix)
+{
+    return prefix.len <= s.len && !compareFold(s[:prefix.len], prefix);
+}
+
+pub bool endsWithFold(u8[] s, u8[] suffix)
+{
+    return suffix.len <= s.len && !compareFold(s[s.len - suffix.len:], suffix);
+}
+
+/* ---- URLs and HTML ---- */
+
+static bool urlUnreserved(u8 ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+           ch == '-' || ch == '_' || ch == '.' || ch == '~';
+}
+
+static String urlEncodeAs(u8[] s, u8 keep, bool plus)
+{
+    u8 *digits = "0123456789ABCDEF";
+    String out = withCap(s.len);
+    for (i64 i = 0; i < s.len; i++) {
+        u8 ch = s.ptr[i];
+        if (urlUnreserved(ch) || (keep && ch == keep)) {
+            out.appendByte(ch);
+        } else if (plus && ch == ' ') {
+            out.appendByte('+');
+        } else {
+            out.appendByte('%');
+            out.appendByte(digits[ch >> 4]);
+            out.appendByte(digits[ch & 15]);
+        }
+    }
+    return out;
+}
+
+/* s percent-encoded as one URL component (a query value, a path
+ * segment): every byte but A-Z a-z 0-9 - _ . ~ becomes %XX, space
+ * included (%20). A new String, yours. */
+pub String urlEncode(u8[] s)
+{
+    return urlEncodeAs(s, 0, false);
+}
+
+/* As urlEncode, keeping '/': for a whole path ("/a b/c" -> "/a%20b/c") */
+pub String urlEncodePath(u8[] s)
+{
+    return urlEncodeAs(s, '/', false);
+}
+
+/* As urlEncode, with space as '+': application/x-www-form-urlencoded,
+ * what HTML forms send */
+pub String formEncode(u8[] s)
+{
+    return urlEncodeAs(s, 0, true);
+}
+
+static i64 hexDigit(u8 ch)
+{
+    if (ch >= '0' && ch <= '9') { return ch - '0'; }
+    if (ch >= 'a' && ch <= 'f') { return ch - 'a' + 10; }
+    if (ch >= 'A' && ch <= 'F') { return ch - 'A' + 10; }
+    return -1;
+}
+
+static bool urlDecodeAs(u8[] s, String *out, bool plus)
+{
+    out.clear();
+    out.reserve(s.len);
+    for (i64 i = 0; i < s.len; i++) {
+        u8 ch = s.ptr[i];
+        if (ch == '%') {
+            i64 h = i + 2 < s.len ? hexDigit(s.ptr[i + 1]) : -1;
+            i64 l = h >= 0 ? hexDigit(s.ptr[i + 2]) : -1;
+            if (l < 0) {
+                out.clear();
+                return false;
+            }
+            out.appendByte(h * 16 + l);
+            i += 2;
+        } else if (plus && ch == '+') {
+            out.appendByte(' ');
+        } else {
+            out.appendByte(ch);
+        }
+    }
+    return true;
+}
+
+/* s with each %XX turned back into its byte, into *out (a String,
+ * replaced: what was in it is cleared, its memory reused). '+' stays '+'.
+ * False, with *out empty, when a '%' isn't followed by two hex digits.
+ * The result can hold any byte, %00 and %2F included: check it before
+ * using it as a path. */
+pub bool urlDecode(u8[] s, String *out)
+{
+    return urlDecodeAs(s, out, false);
+}
+
+/* As urlDecode, with '+' as a space: for form data and query strings */
+pub bool formDecode(u8[] s, String *out)
+{
+    return urlDecodeAs(s, out, true);
+}
+
+/* s with & < > " ' as &amp; &lt; &gt; &quot; &#39;, safe in HTML text
+ * and in a quoted attribute value. A new String, yours. */
+pub String htmlEscape(u8[] s)
+{
+    String out = withCap(s.len);
+    for (i64 i = 0; i < s.len; i++) {
+        u8 ch = s.ptr[i];
+        switch (ch) {
+            case '&': out.append("&amp;");
+            case '<': out.append("&lt;");
+            case '>': out.append("&gt;");
+            case '"': out.append("&quot;");
+            case '\'': out.append("&#39;");
+            default: out.appendByte(ch);
+        }
+    }
+    return out;
+}
