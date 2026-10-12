@@ -32,8 +32,12 @@
   }
 
   /* ---- ktm syntax highlighting ---- */
-  var KEYWORDS = /^(if|else|for|while|do|switch|case|default|break|continue|return|goto|try|catch|throw|class|union|public|private|extern|_extern|asm|static|inline|auto|sizeof|alignof|typeof|reg|noreg|volatile|atomic)$/;
-  var TYPES = /^(U0|I8|U8|I16|U16|I32|U32|I64|U64|F32|F64|Bool)$/;
+  /* The words of src/syntax-highlighting/vim/syntax/ktm.vim; `ad` only
+   * where it starts a declaration (see highlight). The HolyC type names
+   * are still read by the compiler, so they stay types here. */
+  var KEYWORDS = /^(if|else|for|while|do|switch|case|default|break|continue|return|goto|fallthrough|try|catch|throw|defer|struct|union|enum|type|fn|module|import|pub|private|static|const|extern|_extern|inline|volatile|reg|noreg|asm|sizeof|alignof|typeof|self|class)$/;
+  var TYPES = /^(void|bool|auto|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|String|Error|U0|I8|U8|I16|U16|I32|U32|I64|U64|F32|F64|Bool)$/;
+  var LITERALS = /^(true|false|null)$/;
 
   function esc(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -57,13 +61,16 @@
       } else if (c === "#" && /^\s*$/.test(src.slice(src.lastIndexOf("\n", i - 1) + 1, i)) &&
                  (m = /^#\s*[a-z]+/.exec(rest))) {
         span("pp", m[0]); i += m[0].length;
-      } else if ((m = /^(0x[0-9a-fA-F]+|0b[01]+|\d+\.\d*(e[+-]?\d+)?|\d+)/.exec(rest)) &&
+      } else if ((m = /^(0[xX][0-9a-fA-F_]+|0[bB][01_]+|\d[\d_]*\.\d*([eE][+-]?\d+)?|\d[\d_]*([eE][+-]?\d+)?)/.exec(rest)) &&
                  !/[A-Za-z_0-9]/.test(src[i - 1] || "")) {
         span("num", m[0]); i += m[0].length;
       } else if ((m = /^[A-Za-z_]\w*/.exec(rest))) {
         var w = m[0];
-        if (KEYWORDS.test(w)) span("kw", w);
+        if (src[i - 1] === ".") out += esc(w);  // a field or method: s.type
+        else if (KEYWORDS.test(w)) span("kw", w);
         else if (TYPES.test(w)) span("type", w);
+        else if (LITERALS.test(w)) span("num", w);
+        else if (w === "ad" && /^ad\s+[A-Za-z_][\w.<>, *]*\s[A-Za-z_*]/.test(rest)) span("kw", w);
         else out += esc(w);
         i += w.length;
       } else {
