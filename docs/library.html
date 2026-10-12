@@ -48,7 +48,7 @@
 without an <code>#include</code>. For every function and struct, see the
 <a href="stdlib.html">library reference</a>.</p>
 
-<h2 id="memory">Memory<a class="anchor" href="#memory" aria-label="Link to this section">#</a></h2>
+<h2 id="memory">Memory<a class="anchor" href="#memory" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#mem">mem reference</a></span></h2>
 <div class="table-wrap"><table>
   <thead><tr><th>Function</th><th>Does</th></tr></thead>
   <tbody>
@@ -107,7 +107,7 @@ leaking one goes unreported, and a block of yours that the library resizes
 (<code>cstr.appendFormat</code>, <code>cstr.appendFormatLen</code>) is reported as never
 freed.</p></div>
 
-<h2 id="strings">Strings<a class="anchor" href="#strings" aria-label="Link to this section">#</a></h2>
+<h2 id="strings">Strings<a class="anchor" href="#strings" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#str">str reference</a> <a href="stdlib.html#cstr">cstr reference</a></span></h2>
 <p>Text is two modules:</p>
 <ul>
   <li><code>str</code> is what code works with: <code>String</code>, a string you own that grows
@@ -461,7 +461,7 @@ void main()
 libktm + .tar.gz
 </pre>
 
-<h2 id="files">Files<a class="anchor" href="#files" aria-label="Link to this section">#</a></h2>
+<h2 id="files">Files<a class="anchor" href="#files" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#fs">fs reference</a></span></h2>
 <p>Paths are a <code>u8[]</code> (a literal, a slice or a String; a C string through
 <code>cstr.view(p)</code>). <code>fs.writeAll(path, data)</code> writes <code>data</code>, a
 <code>u8[]</code>, to a file and returns whether it worked. <code>fs.readAll(path)</code> reads a
@@ -678,7 +678,7 @@ resolves to data.txt
 <code>mkdir</code>, <code>unlink</code>, <code>opendir</code>, <code>readdir</code>) are
 declared too.</p>
 
-<h2 id="csv">CSV<a class="anchor" href="#csv" aria-label="Link to this section">#</a></h2>
+<h2 id="csv">CSV<a class="anchor" href="#csv" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#csv">csv reference</a></span></h2>
 <p><code>csv.next</code> walks a CSV text without copying it: each call gives the next
 field (<code>csv.FIELD</code>), then the whole row (<code>csv.ROW</code>), and
 <code>csv.EOF</code> at the end.</p>
@@ -717,7 +717,7 @@ field 1: []
 row 2: 5 bytes
 </pre>
 
-<h2 id="system">Running commands<a class="anchor" href="#system" aria-label="Link to this section">#</a></h2>
+<h2 id="system">Running commands<a class="anchor" href="#system" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#proc">proc reference</a> <a href="stdlib.html#os">os reference</a></span></h2>
 <pre data-run><code>import proc;
 
 void main()
@@ -973,7 +973,7 @@ exited 1 with 3, $? 3
 signal 9, $? 137
 </pre>
 
-<h2 id="signals">Signals<a class="anchor" href="#signals" aria-label="Link to this section">#</a></h2>
+<h2 id="signals">Signals<a class="anchor" href="#signals" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#signal">signal reference</a></span></h2>
 <p><code>signal.handle(sig, handler, flags, mask, &amp;old)</code> sets what happens when a signal arrives:
 <code>SIG_DFL</code>, <code>SIG_IGN</code>, or a function <code>void F(i32 sig)</code> passed as
 <code>(&amp;F)(i64)</code>.</p>
@@ -1039,7 +1039,7 @@ void main()
 <pre class="output">stopping cleanly after signal 15
 </pre>
 
-<h2 id="lists">Lists<a class="anchor" href="#lists" aria-label="Link to this section">#</a></h2>
+<h2 id="lists">Lists<a class="anchor" href="#lists" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#list">list reference</a></span></h2>
 <p><code>list.List&lt;T&gt;</code> is a doubly linked list of <code>T</code>. It is a value: make
 one with <code>list.new&lt;T&gt;()</code> (nothing is allocated until the first value) and free
 it with <code>l.free()</code>, or let <code>ad</code> do that at the end of the scope. Its nodes are
@@ -1095,7 +1095,7 @@ void main()
 first plan, last rest
 </pre>
 
-<h2 id="vectors">Vectors<a class="anchor" href="#vectors" aria-label="Link to this section">#</a></h2>
+<h2 id="vectors">Vectors<a class="anchor" href="#vectors" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#vec">vec reference</a> <a href="stdlib.html#sort">sort reference</a></span></h2>
 <p><code>vec.Vec&lt;T&gt;</code> is a growable array of any type, held by value like a String:
 make one with <code>vec.new&lt;T&gt;(cap = 8)</code> and free it with <code>free()</code>, or
 declare it with <code>ad</code>. It has <code>data</code>, <code>len</code> and
@@ -1159,7 +1159,7 @@ after clear: len 0, last 0, ok 0
 comparator as above, and <code>sort.asc(s)</code> for numbers
 (<code>sort.asc(temps[0:n])</code> on an array).</p>
 
-<h2 id="sets">Sets and trees<a class="anchor" href="#sets" aria-label="Link to this section">#</a></h2>
+<h2 id="sets">Sets and trees<a class="anchor" href="#sets" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#set">set reference</a></span></h2>
 <p><code>set.Set&lt;T&gt;</code> is a hash set of <code>T</code>. It is a value: make one with
 <code>set.new&lt;T&gt;()</code> and free it with <code>s.free()</code>, or with <code>ad</code>.</p>
 <ul>
@@ -1259,7 +1259,7 @@ ada = 37
 linus = 55
 </pre>
 
-<h2 id="hash-tables">Hash tables<a class="anchor" href="#hash-tables" aria-label="Link to this section">#</a></h2>
+<h2 id="hash-tables">Hash tables<a class="anchor" href="#hash-tables" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#map">map reference</a></span></h2>
 <p><code>map.Map&lt;K, V&gt;</code> is a hash map, held by value: make one with
 <code>map.new&lt;K, V&gt;()</code> and free it with <code>free()</code>, or declare it with
 <code>ad</code>. Setting an existing key replaces its value; iteration goes in insertion
@@ -1315,7 +1315,7 @@ pears = 6
 404: not found
 </pre>
 
-<h2 id="bit-vectors">Bit vectors<a class="anchor" href="#bit-vectors" aria-label="Link to this section">#</a></h2>
+<h2 id="bit-vectors">Bit vectors<a class="anchor" href="#bit-vectors" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#vec">vec reference</a></span></h2>
 <p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>set</code>
 grows it to fit any index (a <code>u64</code>), <code>test</code> and
 <code>unset</code> treat bits past the end as 0, and <code>clear</code> zeroes
@@ -1342,7 +1342,7 @@ void main()
 1000003: 1, 1000004: 0, 99999999: 0
 </pre>
 
-<h2 id="bytes">Byte buffers<a class="anchor" href="#bytes" aria-label="Link to this section">#</a></h2>
+<h2 id="bytes">Byte buffers<a class="anchor" href="#bytes" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#bytes">bytes reference</a></span></h2>
 <p>Module <code>bytes</code> is for binary data that comes and goes in pieces: what a socket
 or a pipe delivers, or a message being put together. A <code>bytes.Buffer</code> is a queue of
 bytes:</p>
@@ -1394,7 +1394,7 @@ type 8: hi
 0 bytes left
 </pre>
 
-<h2 id="hashing">Hashing<a class="anchor" href="#hashing" aria-label="Link to this section">#</a></h2>
+<h2 id="hashing">Hashing<a class="anchor" href="#hashing" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#hash">hash reference</a></span></h2>
 <p>Module <code>hash</code> has SHA-256, CRC-32, FNV-1a and a constant-time compare.</p>
 <ul>
   <li><code>hash.sha256(data, out)</code> writes the 32-byte digest of a <code>u8[]</code> into
@@ -1443,7 +1443,7 @@ same: 1
 crc32 cbf43926, chained cbf43926
 </pre>
 
-<h2 id="json">JSON<a class="anchor" href="#json" aria-label="Link to this section">#</a></h2>
+<h2 id="json">JSON<a class="anchor" href="#json" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#json">json reference</a></span></h2>
 <h3 id="parsing-and-selecting">Parsing and selecting<a class="anchor" href="#parsing-and-selecting" aria-label="Link to this section">#</a></h3>
 <p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
 returns its root; the text can be any one JSON value (an object, array, string, number,
@@ -1826,7 +1826,7 @@ tags[0].weight: expected an integer, got a string
   threw half way, so use it only on values decode filled.</li>
 </ul>
 
-<h2 id="dates">Dates and time<a class="anchor" href="#dates" aria-label="Link to this section">#</a></h2>
+<h2 id="dates">Dates and time<a class="anchor" href="#dates" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#date">date reference</a></span></h2>
 <pre data-run><code>import date, mem;
 
 void main()
@@ -1990,7 +1990,7 @@ Sun, 06 Nov 1994 08:49:37 GMT
 Sunday 06 November 1994, day 310
 </pre>
 
-<h2 id="maths">Maths<a class="anchor" href="#maths" aria-label="Link to this section">#</a></h2>
+<h2 id="maths">Maths<a class="anchor" href="#maths" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#math">math reference</a></span></h2>
 <p>The C maths library is declared under its usual names (<code>sqrt</code>,
 <code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
 <code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code>, <code>math.power</code>,
@@ -2044,7 +2044,7 @@ void main()
 31 3 8
 </pre>
 
-<h2 id="net">Sockets<a class="anchor" href="#net" aria-label="Link to this section">#</a></h2>
+<h2 id="net">Sockets<a class="anchor" href="#net" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#net">net reference</a></span></h2>
 <div class="table-wrap"><table>
   <thead><tr><th>Function</th><th>Returns</th></tr></thead>
   <tbody>
@@ -2295,7 +2295,7 @@ void main()
 close(-1): EBADF
 </pre>
 
-<h2 id="coroutines">Coroutines<a class="anchor" href="#coroutines" aria-label="Link to this section">#</a></h2>
+<h2 id="coroutines">Coroutines<a class="anchor" href="#coroutines" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#coro">coro reference</a></span></h2>
 <p>A coroutine runs a function on its own stack and can pause in the middle.</p>
 <ul>
   <li><code>coro.spawn(&amp;Fn, arg)</code> makes one (nothing runs yet; NULL if its stack can't
@@ -2531,7 +2531,7 @@ still working
 [sleep 0.5; exit 3] exit 3
 </pre>
 
-<h2 id="fzf">Fuzzy matching<a class="anchor" href="#fzf" aria-label="Link to this section">#</a></h2>
+<h2 id="fzf">Fuzzy matching<a class="anchor" href="#fzf" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#fzf">fzf reference</a></span></h2>
 <p><code>fzf.match(text, pattern)</code> matches text the way the fzf tool does and returns the
 score and the matched byte offsets, or NULL when it doesn't match. Terms separated by
 spaces must all match, <code>a | b</code> takes either.</p>
@@ -2592,7 +2592,7 @@ src/main.ktm !test main  score 104 at 4 5 6 7
 my file.txt  my\ file    score 176 at 0 1 2 3 4 5 6
 </pre>
 
-<h2 id="sqlite">SQLite<a class="anchor" href="#sqlite" aria-label="Link to this section">#</a></h2>
+<h2 id="sqlite">SQLite<a class="anchor" href="#sqlite" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#sql">sql reference</a></span></h2>
 <p>The SQLite functions exist when ktm and the library are built with
 <code>./build.sh --sqlite</code> (they are under <code>#ifdef __KTM_LINK_SQLITE3__</code>).</p>
 <ul>
@@ -2646,7 +2646,7 @@ void main()
 error without running the statement. Such a row belongs to the statement, which
 <code>sql.finalize</code> frees.</p>
 
-<h2 id="atomics">Atomics<a class="anchor" href="#atomics" aria-label="Link to this section">#</a></h2>
+<h2 id="atomics">Atomics<a class="anchor" href="#atomics" aria-label="Link to this section">#</a><span class="ref"><a href="stdlib.html#atomic">atomic reference</a></span></h2>
 <p>Module <code>atomic</code> changes an integer that several threads share without a mutex:
 a counter they all add to, a flag one thread sets and others read, a lock-free swap.</p>
 <div class="table-wrap"><table>

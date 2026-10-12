@@ -22,26 +22,50 @@ OUT = os.path.join(ROOT, "docs", "stdlib.html")
 MODULES = [
     ("prelude", "Prelude",           "In every program without an import: the Error struct, EXIT_* and the integer limits."),
     ("mem",     "Memory",            "Allocation and raw memory operations."),
-    ("str",     "Strings",           "Formatting, comparison, searching and conversion of NUL-terminated strings."),
+    ("str",     "Strings",           "String, the owned growable string, and the functions that read any text (u8[])."),
+    ("cstr",    "C strings",         "NUL-terminated u8 * strings: formatting, comparison, copying and conversion."),
     ("fs",      "Files",             "Reading and writing files, directories, file status and path names."),
     ("os",      "System",            "Process exit, errno and the environment."),
     ("proc",    "Processes",         "Shell commands, and running programs by argv without a shell, with pipes."),
     ("list",    "Lists",             "Circular doubly linked lists of void * values."),
     ("vec",     "Vectors",           "Growable arrays and bit vectors."),
-    ("map",     "Hash tables",       "String-keyed and integer-keyed hash tables, and red-black trees."),
-    ("set",     "Sets",              "Integer and string sets."),
-    ("math",    "Maths",             "Numeric helpers and libm bindings."),
+    ("sort",    "Sorting",           "Sorting a slice in place."),
+    ("map",     "Hash tables",       "Hash tables, and ordered maps (red-black trees)."),
+    ("set",     "Sets",              "Hash sets of any type."),
+    ("bytes",   "Byte buffers",      "A queue of bytes for binary data that comes and goes in pieces."),
+    ("hash",    "Hashing",           "SHA-256, CRC-32, FNV-1a and a constant-time compare."),
+    ("math",    "Maths",             "Numeric helpers, bit operations and libm bindings."),
     ("date",    "Dates and time",    "date.Date values and conversions."),
     ("json",    "JSON",              "Parsing, querying and printing JSON."),
     ("csv",     "CSV",               "A streaming CSV tokenizer."),
     ("fzf",     "Fuzzy matching",    "fzf-style fuzzy string matching."),
+    ("reflect", "Reflection",        "What the compiler tells a program about its types."),
     ("thread",  "Threads",           "pthreads helpers."),
+    ("atomic",  "Atomics",           "Atomic operations on integers and pointers shared between threads."),
     ("net",     "Networking",        "Sockets and address resolution."),
     ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
     ("coro",    "Coroutines",        "Functions that pause and resume on their own stacks."),
     ("sql",     "SQLite",            "SQLite bindings, available when ktm is built with sqlite."),
     ("libc",    "C library",         "The C functions, structs and constants ktm programs call by their C names."),
 ]
+
+# Module -> where the guides explain it (library.html unless the link says
+# otherwise); each module's section in the reference links there.
+GUIDE = {
+    "mem": "library.html#memory", "str": "library.html#strings",
+    "cstr": "library.html#c-strings", "fs": "library.html#files",
+    "os": "library.html#system", "proc": "library.html#system",
+    "list": "library.html#lists", "vec": "library.html#vectors",
+    "sort": "library.html#vectors", "map": "library.html#hash-tables",
+    "set": "library.html#sets", "bytes": "library.html#bytes",
+    "hash": "library.html#hashing", "math": "library.html#maths",
+    "date": "library.html#dates", "json": "library.html#json",
+    "csv": "library.html#csv", "fzf": "library.html#fzf",
+    "reflect": "language.html#reflection", "thread": "library.html#more-modules",
+    "atomic": "library.html#atomics", "net": "library.html#net",
+    "signal": "library.html#signals", "coro": "library.html#coroutines",
+    "sql": "library.html#sqlite",
+}
 
 
 def strip_comments_keep(text):
@@ -101,6 +125,19 @@ def comment_above(lines, idx):
     return text
 
 
+def comment_inside(lines, idx):
+    """A HolyC-style doc comment at the top of a function's body: `{// ...`
+    on line idx (the signature's last line), continued by `//` lines."""
+    if idx >= len(lines) or not lines[idx].lstrip().startswith("{//"):
+        return ""
+    block = [lines[idx].lstrip()[3:]]
+    j = idx + 1
+    while j < len(lines) and lines[j].lstrip().startswith("//"):
+        block.append(lines[j].lstrip()[2:])
+        j += 1
+    return " ".join(l.strip() for l in block).strip()
+
+
 def parse_module(mod):
     """The `pub` declarations of one module, in file order."""
     decls, order = {}, []
@@ -110,6 +147,7 @@ def parse_module(mod):
         lines = raw.split("\n")
         code = strip_comments_keep(raw).split("\n")
         i, n, depth, cond = 0, len(code), 0, []
+        last_doc = ""
         while i < n:
             line = code[i].strip()
             if line.startswith("#"):
@@ -159,11 +197,15 @@ def parse_module(mod):
                 stmt = (stmt[:stmt.index("{")] if "{" in stmt else stmt.rstrip()[:-1]).rstrip()[4:]
                 cfunc = stmt.startswith('extern "c"')
                 stmt = re.sub(r'^extern\s+"c"\s+|^_extern\s+\S+\s+', "", stmt)
-                fm = re.match(r"(.*?)\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s*\((.*)\)\s*$", stmt, re.S)
+                fm = re.match(r"(.*?)\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s*(?:<[^()<>]*>)?\s*\((.*)\)\s*$", stmt, re.S)
                 if fm:
                     sig = re.sub(r"\s+", " ", stmt).replace("( ", "(").replace(" )", ")") + ";"
+                    doc = comment_above(lines, start) or comment_inside(lines, i)
+                    if not doc and start > 0 and lines[start - 1].lstrip().startswith("pub "):
+                        doc = last_doc  # one comment above a run of declarations
                     add(decls, order, mod, fm.group(2), "cfunc" if cfunc else "func", sig,
-                        comment_above(lines, start), start, cond)
+                        doc, start, cond)
+                    last_doc = doc
                 for l in buf:
                     depth += l.count("{") - l.count("}")
                 i += 1
@@ -194,6 +236,10 @@ def add(decls, order, mod, name, kind, sig, doc, line, cond):
     key = name if mod == "prelude" else f"{mod}.{name}"
     if key in decls:
         d = decls[key]
+        if kind == d["kind"] and kind in ("struct", "union") and "{" not in d["sig"]:
+            d["sig"] = sig  # the definition after a forward declaration
+            d["doc"] = d["doc"] or doc
+            return
         if kind == "func" and d["kind"] == "func" and \
                 param_types(sig) not in map(param_types, d["sig"].split("\n")):
             # an overload: one entry with every signature, each one's doc
@@ -234,7 +280,9 @@ def write_html(groups):
         toc.append(f'<li><a href="#{anchor}">{html.escape(title)}</a> <span class="count">{len(items)}</span></li>')
         body.append(f'<section id="{anchor}"><h2>{html.escape(title)}</h2>')
         imp = "" if mod == "prelude" else f" <code>import {mod};</code>"
-        body.append(f'<p class="lede">{html.escape(summary)}{imp}</p>')
+        guide = (f' <a class="guide" href="{GUIDE[mod]}">How to use it</a>'
+                 if mod in GUIDE else "")
+        body.append(f'<p class="lede">{html.escape(summary)}{imp}{guide}</p>')
         # constants as one compact table
         defs = [d for d in items if d["kind"] == "define"]
         rest = [d for d in items if d["kind"] != "define"]
@@ -246,7 +294,8 @@ def write_html(groups):
                         f' <span class="kind">{kinds[d["kind"]]}</span>{plat}</div>'
                         f'<pre><code class="language-ktm">{html.escape(d["sig"])}</code></pre>')
             for para in d["doc"].split("\n\n") if d["doc"] else []:
-                body.append(f'<p class="doc">{html.escape(para)}</p>')
+                text = re.sub(r"`([^`\n]+)`", r"<code>\1</code>", html.escape(para))
+                body.append(f'<p class="doc">{text}</p>')
             body.append("</div>")
         if defs:
             total += len(defs)

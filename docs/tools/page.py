@@ -23,6 +23,18 @@ NAV = [
 
 REPO = "https://github.com/ozzenerol/ktm-lang"
 
+# Library guide section -> its module(s) in the library reference: the
+# section's heading links there.
+REFERENCE = {
+    "memory": ["mem"], "strings": ["str", "cstr"], "files": ["fs"],
+    "csv": ["csv"], "system": ["proc", "os"], "signals": ["signal"],
+    "lists": ["list"], "vectors": ["vec", "sort"], "sets": ["set"],
+    "hash-tables": ["map"], "bit-vectors": ["vec"], "bytes": ["bytes"],
+    "hashing": ["hash"], "json": ["json"], "dates": ["date"],
+    "maths": ["math"], "net": ["net"], "coroutines": ["coro"],
+    "fzf": ["fzf"], "sqlite": ["sql"], "atomics": ["atomic"],
+}
+
 # Filled by page(): [title, href, kind] rows for the search index.
 SEARCH = []
 
@@ -38,9 +50,10 @@ def text_of(fragment):
     return html.unescape(TAG.sub("", fragment)).strip()
 
 
-def headings(content):
-    """Give every h2/h3 an id and an anchor; return the new content and
-    the (tag, id, text) list."""
+def headings(content, refs=None):
+    """Give every h2/h3 an id and an anchor (and an h2 in refs a link to
+    its modules' reference); return the new content and the (tag, id,
+    text) list."""
     found = []
     # ids already in the page (the reference's <section id>s) aren't reused
     seen = set(re.findall(r'\sid="([^"]+)"', content))
@@ -60,8 +73,12 @@ def headings(content):
             seen.add(hid)
             attrs += f' id="{hid}"'
         found.append((tag, hid, text))
+        ref = ""
+        if refs and tag == "h2" and hid in refs:
+            ref = '<span class="ref">' + " ".join(
+                f'<a href="stdlib.html#{m}">{m} reference</a>' for m in refs[hid]) + "</span>"
         return (f'<{tag}{attrs}>{inner}<a class="anchor" href="#{hid}" '
-                f'aria-label="Link to this section">#</a></{tag}>')
+                f'aria-label="Link to this section">#</a>{ref}</{tag}>')
 
     return HEADING.sub(one, content), found
 
@@ -142,7 +159,7 @@ def record(title, filename, heads, content):
 
 
 def page(title, filename, content):
-    content, heads = headings(content)
+    content, heads = headings(content, REFERENCE if filename == "library.html" else None)
     content = wrap_tables(content)
     record(title, filename, heads, content)
     full_title = "ktm" if filename == "index.html" else f"{title} - ktm"

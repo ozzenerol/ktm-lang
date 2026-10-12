@@ -354,6 +354,10 @@ h2, h3 { position: relative; }
   opacity: 0;
 }
 h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
+h2 .ref { float: right; display: flex; gap: 0.75rem; margin-top: 0.45rem; }
+h2 .ref a { font: 400 0.8rem/1.4 var(--sans); letter-spacing: 0; text-decoration: none; color: var(--muted); }
+h2 .ref a:hover { color: var(--link); text-decoration: underline; }
+.lede .guide { white-space: nowrap; }
 
 p, ul, ol { margin: 0 0 1rem; }
 li + li { margin-top: 0.25rem; }
