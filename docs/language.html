@@ -266,14 +266,17 @@ void main()
 
 <h3 id="const">const<a class="anchor" href="#const" aria-label="Link to this section">#</a></h3>
 <p><code>const</code> marks a declaration read-only; it is not a type qualifier like
-C's. An initializer is required (except on a function parameter). A
-<code>const</code> of integer type whose initializer is itself a constant
-expression is a compile-time constant: usable in an array size, a
-<code>case</code> label, or another <code>const</code>'s initializer.
-Assigning to a <code>const</code> (<code>=</code>, a compound assignment,
-<code>++</code>/<code>--</code>), including a <code>const</code> parameter, is a
-compile error, and so is writing <code>const</code> anywhere but a declaration
-(a cast, a struct field, a return type, or after the type).</p>
+C's.</p>
+<ul>
+  <li>An initializer is required (except on a function parameter).</li>
+  <li>A <code>const</code> of integer type whose initializer is itself a constant expression is
+  a compile-time constant: usable in an array size, a <code>case</code> label, or another
+  <code>const</code>'s initializer.</li>
+  <li>Assigning to a <code>const</code> (<code>=</code>, a compound assignment,
+  <code>++</code>/<code>--</code>), including a <code>const</code> parameter, is a compile
+  error, and so is writing <code>const</code> anywhere but a declaration (a cast, a struct
+  field, a return type, or after the type).</li>
+</ul>
 <pre data-run><code>const i64 MAX_USERS = 4;
 const i64 DOUBLE_MAX = MAX_USERS * 2;   // built from another const
 i64 gUsers[MAX_USERS];                 // a const works as an array size
@@ -430,12 +433,15 @@ half is 7
 </pre>
 
 <h3 id="switch">switch<a class="anchor" href="#switch" aria-label="Link to this section">#</a></h3>
-<p><code>case</code> takes a value or a range <code>lo ... hi</code>. A case ends at the
-next one: unlike C it doesn't fall through, so no <code>break</code> is needed (one still
-leaves the switch early). Labels stacked with nothing between them share the code
-that follows. Each case is a block of its own, without braces: it can declare variables
-(two cases can use the same name, and one case's variables aren't seen in the next) and
-<code>defer</code>, which runs at the end of the case.</p>
+<p><code>case</code> takes a value or a range <code>lo ... hi</code>.</p>
+<ul>
+  <li>A case ends at the next one: unlike C it doesn't fall through, so no <code>break</code>
+  is needed (one still leaves the switch early).</li>
+  <li>Labels stacked with nothing between them share the code that follows.</li>
+  <li>Each case is a block of its own, without braces: it can declare variables (two cases can
+  use the same name, and one case's variables aren't seen in the next) and <code>defer</code>,
+  which runs at the end of the case.</li>
+</ul>
 <pre data-run><code>void grade(i64 score)
 {
   switch (score) {
@@ -580,15 +586,19 @@ and parameter types; a mismatch is an error ("conflicting types") at the later o
 Default arguments carry over: after <code>i64 later(i64 x=1);</code> the definition can be
 written <code>i64 later(i64 x) { ... }</code> and <code>later()</code> still passes 1.
 Repeating a default is allowed if it is the same value; a different value is an error.</p>
-<p>The standard library lives in modules, so a function of your own may have the same name
-as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
-<code>date.now()</code> and <code>os.exit()</code> stay the library's. The same holds for
-the C library: a program's functions and globals have symbols of their own, so your
-<code>read()</code>, <code>free()</code> or <code>environ</code> doesn't replace C's, which
-the standard library keeps using. A C function or variable you use is declared with
-<code>extern "c"</code>; a prototype without a body, or an <code>extern i64 x;</code>,
-without <code>extern "c"</code> is ktm's and must be defined somewhere: in the program, or
-in a library built with <code>-lib</code>. In a module it is that module's.</p>
+<p>Names don't clash with the libraries':</p>
+<ul>
+  <li>The standard library lives in modules, so a function of your own may have the same name
+  as a library one: your <code>now()</code> or <code>exit()</code> is yours, and
+  <code>date.now()</code> and <code>os.exit()</code> stay the library's.</li>
+  <li>The same holds for the C library: a program's functions and globals have symbols of their
+  own, so your <code>read()</code>, <code>free()</code> or <code>environ</code> doesn't replace
+  C's, which the standard library keeps using.</li>
+  <li>A C function or variable you use is declared with <code>extern "c"</code>. A prototype
+  without a body, or an <code>extern i64 x;</code>, without <code>extern "c"</code> is ktm's and
+  must be defined somewhere: in the program, or in a library built with <code>-lib</code>. In a
+  module it is that module's.</li>
+</ul>
 <p>A returned value is converted to the function's return type, as in C: an integer returned
 from an <code>f64</code> function becomes a float. In a
 <code>void</code> function, <code>return expr;</code> is a warning ("unexpected return
@@ -639,12 +649,16 @@ void main()
 <h3 id="variable-arguments">Variable arguments<a class="anchor" href="#variable-arguments" aria-label="Link to this section">#</a></h3>
 <p>The last parameter can take any number of extra arguments, zero included:
 <code>T ...name</code> takes them as values of type <code>T</code>, each checked and
-converted like an argument to a <code>T</code> parameter (a wrong type is an error).
-Inside the function <code>name</code> is a slice, a <code>T[]</code>: <code>name.len</code>
-is how many there are, <code>name[i]</code> is one of them (checked, as any slice's
-index), <code>for (auto v : name)</code> goes through them, and it can be sliced or passed
-on to a <code>T[]</code> parameter; <code>name</code> itself can't be assigned. Fixed and
+converted like an argument to a <code>T</code> parameter (a wrong type is an error). Fixed and
 default parameters can come before it.</p>
+<p>Inside the function <code>name</code> is a slice, a <code>T[]</code>:</p>
+<ul>
+  <li><code>name.len</code> is how many there are and <code>name[i]</code> is one of them
+  (checked, as any slice's index);</li>
+  <li><code>for (auto v : name)</code> goes through them;</li>
+  <li>it can be sliced or passed on to a <code>T[]</code> parameter, but <code>name</code>
+  itself can't be assigned.</li>
+</ul>
 <pre data-run><code>i64 sum(i64 ...nums)
 {
   i64 total = 0;
@@ -736,14 +750,19 @@ pair 1, 2
 text owned
 7
 </pre>
-<p>How a call picks: every overload the arguments convert to is a candidate (a conversion
-that would only warn, like a pointer for an integer, doesn't count). An argument fits a
-parameter exactly (the same type; an array or a string literal for a slice of its element),
-by a conversion in the same family (another integer width or sign, a String for a
-<code>u8[]</code>, any pointer for <code>void *</code>, an array for its pointer), or as an
-integer for a float. The overload that fits every argument at least as well as any other,
-and one better, wins; when they tie, the one that needs no default and no
-<code>T ...name</code> extras wins. Anything else is an error that lists the overloads:</p>
+<p>How a call picks:</p>
+<ol>
+  <li>Every overload the arguments convert to is a candidate (a conversion that would only
+  warn, like a pointer for an integer, doesn't count).</li>
+  <li>An argument fits a parameter, from best to worst: exactly (the same type; an array or a
+  string literal for a slice of its element), by a conversion in the same family (another
+  integer width or sign, a String for a <code>u8[]</code>, any pointer for <code>void *</code>,
+  an array for its pointer), or as an integer for a float.</li>
+  <li>The overload that fits every argument at least as well as any other, and one better,
+  wins; when they tie, the one that needs no default and no <code>T ...name</code> extras
+  wins.</li>
+</ol>
+<p>Anything else is an error that lists the overloads:</p>
 <ul>
 <li>An integer literal is an <code>i64</code>: with <code>f(i32)</code> and <code>f(i64)</code>,
 <code>f(5)</code> calls <code>f(i64)</code> and <code>f((i32)5)</code> calls <code>f(i32)</code>.
@@ -866,20 +885,25 @@ void main()
 <p>A function pointer only takes a function, or a function pointer, with the same
 signature: the same return type, the same parameter types and the same <code>...</code>,
 except that a <code>void *</code> parameter takes a pointer parameter of any type on the
-other side (and the other way round). So a comparator or a callback is written with the
-types it really gets, <code>i64 itemLess(Item *a, Item *b)</code>, and passed where a
+other side (and the other way round).</p>
+<p>So a comparator or a callback is written with the types it really gets,
+<code>i64 itemLess(Item *a, Item *b)</code>, and passed where a
 <code>fn(void *, void *) i64</code> is expected without a cast: every pointer is passed the
-same way, so the call is the one a cast would make. Anything else is an error naming both
-types, wherever the conversion happens (an assignment, an initialiser, an argument, a
-<code>return</code> or a conditional), so <code>fn(u8 *) i64 op = &amp;t;</code> with a
-<code>t</code> taking an <code>i64</code> gives <code>cannot convert fn(i64) i64 to fn(u8*)
-i64</code>. The return type must still match exactly (a function returning
-<code>Item *</code> is not a <code>fn(void *) void *</code>), as must integer, struct,
-slice and function pointer parameters, and so must a pointer to a function pointer
-(<code>(fn(Item *) i64) *</code> is not a <code>(fn(void *) i64) *</code>: storing
-through it could put <code>itemLess</code> where any pointer is passed). Those need a
-cast. A <code>void *</code> and <code>null</code> convert to a function pointer without
-one.</p>
+same way, so the call is the one a cast would make.</p>
+<p>Anything else is an error naming both types, wherever the conversion happens (an
+assignment, an initialiser, an argument, a <code>return</code> or a conditional), so
+<code>fn(u8 *) i64 op = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
+<code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. These still need a cast:</p>
+<ul>
+  <li>a different return type (a function returning <code>Item *</code> is not a
+  <code>fn(void *) void *</code>);</li>
+  <li>different integer, struct, slice and function pointer parameters;</li>
+  <li>a pointer to a function pointer (<code>(fn(Item *) i64) *</code> is not a
+  <code>(fn(void *) i64) *</code>: storing through it could put <code>itemLess</code> where any
+  pointer is passed).</li>
+</ul>
+<p>A <code>void *</code> and <code>null</code> convert to a function pointer without a
+cast.</p>
 <pre data-run><code>struct Item { i64 key; };
 
 i64 itemLess(Item *a, Item *b) { return a.key &lt; b.key; }
@@ -1005,14 +1029,19 @@ with <code>f64 f</code> (also when assigning, passing or returning it), and
 convert to and from any pointer without one; otherwise cast:
 <code>(&amp;f)(i64 *)</code>.</p>
 <p>Call arguments are checked against the parameter types as in C, for functions, function
-pointers and <code>extern</code> functions alike. Numbers convert silently (an
-<code>i64</code> passed for an <code>f64</code> becomes a float), <code>0</code> and
-<code>null</code> pass as any pointer, <code>void *</code> converts both ways, and a pointer to a
-derived struct is a pointer to its base struct. A pointer passed for an integer, an integer for a
-pointer (other than <code>0</code>) and a pointer to an incompatible type are warnings
-(<code>Twice("str")</code>: "makes an integer from a pointer without a cast"); a struct passed
-where another struct or a number is expected, or a number or pointer where a struct or a float
-is, is an error. Extra arguments of a <code>...</code> function are not checked.</p>
+pointers and <code>extern</code> functions alike.</p>
+<ul>
+  <li><strong>Fine:</strong> numbers convert silently (an <code>i64</code> passed for an
+  <code>f64</code> becomes a float), <code>0</code> and <code>null</code> pass as any pointer,
+  <code>void *</code> converts both ways, and a pointer to a derived struct is a pointer to its
+  base struct.</li>
+  <li><strong>Warnings:</strong> a pointer passed for an integer, an integer for a pointer (other
+  than <code>0</code>) and a pointer to an incompatible type (<code>Twice("str")</code>: "makes
+  an integer from a pointer without a cast").</li>
+  <li><strong>Errors:</strong> a struct passed where another struct or a number is expected, or
+  a number or pointer where a struct or a float is.</li>
+</ul>
+<p>Extra arguments of a <code>...</code> function are not checked.</p>
 <p>An initialiser list may be shorter than the array or struct it initialises; as in C,
 everything it leaves out is zero, for locals and globals alike:</p>
 <pre data-run><code>struct Point { i64 x, y, z; };
@@ -1107,11 +1136,15 @@ void main()
 
 <h2 id="slices">Slices<a class="anchor" href="#slices" aria-label="Link to this section">#</a></h2>
 <p>A slice <code>T[]</code> is a view of some <code>T</code>s that knows how many there are: a
-pointer and a length, 16 bytes, passed and returned in two registers. <code>s.len</code> is the
-length and <code>s.ptr</code> the pointer; both are read-only (assign the whole slice instead).
-<code>s[i]</code> reads and writes an element, and <code>s[a:b]</code> is a view of elements
-<code>a</code> up to (not including) <code>b</code>, with <code>s[a:]</code> and <code>s[:b]</code>
-running to the end or from the start. Nothing is copied: a view writes into what it views.</p>
+pointer and a length, 16 bytes, passed and returned in two registers.</p>
+<ul>
+  <li><code>s.len</code> is the length and <code>s.ptr</code> the pointer; both are read-only
+  (assign the whole slice instead).</li>
+  <li><code>s[i]</code> reads and writes an element.</li>
+  <li><code>s[a:b]</code> is a view of elements <code>a</code> up to (not including)
+  <code>b</code>, with <code>s[a:]</code> and <code>s[:b]</code> running to the end or from the
+  start. Nothing is copied: a view writes into what it views.</li>
+</ul>
 <pre data-run><code>i64 sum(i64[] xs)
 {
   i64 total = 0;
@@ -1225,16 +1258,21 @@ HELLO, THERE 2026 | Hello, world 2026
 [a][b][][c] 4 parts
 (padded) 00042 1
 </pre>
-<p><code>str.new()</code> allocates nothing until something is added, <code>str.withCap(n)</code>
-makes room ahead, <code>str.from(t)</code> copies a <code>u8[]</code> and <code>str.format</code>
-formats into a new String. The methods that change a String (<code>append</code>,
-<code>appendByte</code>, <code>appendFormat</code>, <code>insert</code>, <code>remove</code>,
-<code>replace</code>, <code>toLower</code>, <code>toUpper</code>, <code>reverse</code>,
-<code>clear</code>, <code>reserve</code>) are String methods; the ones that only read
-(<code>find</code>, <code>contains</code>, <code>startsWith</code>, <code>endsWith</code>,
-<code>equals</code>, <code>compare</code>, <code>trim</code>, <code>split</code> and the rest) take
-a <code>u8[]</code> and work on all three. A view of a String is valid until the String changes
-or is freed. The <a href="library.html#strings">library guide</a> lists them all.</p>
+<ul>
+  <li><code>str.new()</code> allocates nothing until something is added,
+  <code>str.withCap(n)</code> makes room ahead, <code>str.from(t)</code> copies a
+  <code>u8[]</code> and <code>str.format</code> formats into a new String.</li>
+  <li>The methods that change a String (<code>append</code>, <code>appendByte</code>,
+  <code>appendFormat</code>, <code>insert</code>, <code>remove</code>, <code>replace</code>,
+  <code>toLower</code>, <code>toUpper</code>, <code>reverse</code>, <code>clear</code>,
+  <code>reserve</code>) are String methods.</li>
+  <li>The ones that only read (<code>find</code>, <code>contains</code>,
+  <code>startsWith</code>, <code>endsWith</code>, <code>equals</code>, <code>compare</code>,
+  <code>trim</code>, <code>split</code> and the rest) take a <code>u8[]</code> and work on all
+  three.</li>
+  <li>A view of a String is valid until the String changes or is freed.</li>
+</ul>
+<p>The <a href="library.html#strings">library guide</a> lists them all.</p>
 <p>Assigning a String copies its three fields, as a struct, so both names share the same bytes:
 only one of them may free it, and a change through one can move the bytes under the other.
 Use <code>clone()</code> for a copy of its own. <code>free()</code> empties the String it is
@@ -1557,13 +1595,16 @@ void main()
 </pre>
 
 <h3 id="enums">Enums<a class="anchor" href="#enums" aria-label="Link to this section">#</a></h3>
-<p>An <code>enum</code> is a scoped set of named integer constants, at file scope only.
-The first member is 0, then each next one is the previous plus 1, unless it has its own
-<code>= constexpr</code>; an earlier member can be used unqualified inside the braces. The
-underlying type defaults to <code>i32</code>; <code>: Type</code> picks any other integer
-type, and <code>sizeof</code>/<code>alignof</code> follow it. Outside the braces a member is
-only reachable as <code>Name.member</code>, which is itself an integer constant expression
-(an array size, a <code>case</code> label, another const's initialiser):</p>
+<p>An <code>enum</code> is a scoped set of named integer constants, at file scope only.</p>
+<ul>
+  <li>The first member is 0, then each next one is the previous plus 1, unless it has its own
+  <code>= constexpr</code>; an earlier member can be used unqualified inside the braces.</li>
+  <li>The underlying type defaults to <code>i32</code>; <code>: Type</code> picks any other
+  integer type, and <code>sizeof</code>/<code>alignof</code> follow it.</li>
+  <li>Outside the braces a member is only reachable as <code>Name.member</code>, which is itself
+  an integer constant expression (an array size, a <code>case</code> label, another const's
+  initialiser):</li>
+</ul>
 <pre data-run><code>enum Color { red, green, blue };
 enum Status : u16 { ok = 200, notFound = 404, gone };
 pub enum Mode { read = 1, write = 2, both = read | write };
@@ -1591,15 +1632,18 @@ integers do; an integer, or a different enum, needs a cast to become one
 <h3 id="type-aliases">Type aliases<a class="anchor" href="#type-aliases" aria-label="Link to this section">#</a></h3>
 <p><code>type Name = T;</code> gives a type a second name. An alias is its type, not a new
 one: a <code>Text</code> and a <code>u8[]</code> pass to each other with no conversion, and
-<code>sizeof</code>, <code>reflect</code> and error messages see the real type. Any type can
-have one: a slice, a pointer, an <code>fn(...)</code> type, a fixed array
-(<code>type Buf = u8[64];</code>), a struct, another alias. Aliases are declared at file scope
-(not inside a function). In a program, an alias can only name types declared above it; in a
-module, its types and aliases can come in any order, and two aliases that name each other are
-an error. A module's alias is private unless it is <code>pub</code>, and is
-<code>mod.Name</code> outside it, like the module's structs. <code>type</code> is a keyword
-only at the start of such a declaration, so a variable or a field can still be called
-<code>type</code>.</p>
+<code>sizeof</code>, <code>reflect</code> and error messages see the real type.</p>
+<ul>
+  <li>Any type can have one: a slice, a pointer, an <code>fn(...)</code> type, a fixed array
+  (<code>type Buf = u8[64];</code>), a struct, another alias.</li>
+  <li>Aliases are declared at file scope (not inside a function). In a program, an alias can
+  only name types declared above it; in a module, its types and aliases can come in any order,
+  and two aliases that name each other are an error.</li>
+  <li>A module's alias is private unless it is <code>pub</code>, and is <code>mod.Name</code>
+  outside it, like the module's structs.</li>
+  <li><code>type</code> is a keyword only at the start of such a declaration, so a variable or a
+  field can still be called <code>type</code>.</li>
+</ul>
 <pre data-run><code>type Text = u8[];
 type Handler = fn(i64, Text) bool;
 type Celsius = f64;
@@ -1722,15 +1766,19 @@ i32 main() {
   printf("%d\n", geo.area(geo.Kind.square, 5));
   return 0;
 }</code></pre>
-<p>Inside a module every name of every one of its files is visible, in any order:
-a function can call one defined in a later file, and a struct can hold a later file's
-struct (by value too), enum or const (as an array size). Only a cycle of structs that
-hold each other by value is an error: one of them needs a pointer. Outside it, only the names marked
-<code>pub</code> are, and always through the prefix (<code>geo.area</code>, the type
-<code>geo.Point</code>, <code>geo.Kind.square</code>, <code>geo.SIZE</code>, which works
-in constant expressions too). A module can't use the names its program defines: a library
-doesn't depend on whoever uses it. The C functions it declares with <code>extern "c"</code>
-are its own names as well, private unless <code>pub</code>.</p>
+<ul>
+  <li><strong>Inside a module</strong> every name of every one of its files is visible, in any
+  order: a function can call one defined in a later file, and a struct can hold a later file's
+  struct (by value too), enum or const (as an array size). Only a cycle of structs that hold
+  each other by value is an error: one of them needs a pointer.</li>
+  <li><strong>Outside it</strong>, only the names marked <code>pub</code> are, and always
+  through the prefix (<code>geo.area</code>, the type <code>geo.Point</code>,
+  <code>geo.Kind.square</code>, <code>geo.SIZE</code>, which works in constant expressions
+  too).</li>
+  <li>A module can't use the names its program defines: a library doesn't depend on whoever
+  uses it. The C functions it declares with <code>extern "c"</code> are its own names as well,
+  private unless <code>pub</code>.</li>
+</ul>
 <p>A C function declared with <code>extern "c"</code> in a module keeps its C symbol, so
 <code>libc.write(fd, buf, n)</code>, or <code>&amp;libc.write</code>, is C's <code>write</code>. A
 module named <code>libc</code> holds the C library's declarations and nothing else: its files
@@ -1797,15 +1845,18 @@ there is nothing outside to hide them from, they are an error, and so is
 or a type, <code>private</code> just says what leaving out <code>pub</code> already means;
 <code>pub private</code> together is an error. The editor's completion leaves out the
 private fields outside their module.</p>
-<p><code>import net.http;</code> loads the directory <code>net/http</code> (its files
-start with <code>module http;</code>) and its names are <code>http.get</code>;
-<code>import h = net.http;</code> names it <code>h</code> instead. One line can import several:
-<code>import fs, str, h = net.http;</code>. The imports come first in
-a file, before any declaration. A module is looked for under the main file's directory,
-then in the standard library's module directory, then in each directory of
-<code>KTM_PATH</code> (separated by <code>:</code>); found in two places is an error.
-Each module is compiled once, before the code that imports it, so its globals are set
-up before its importers' (the files of a module in name order).</p>
+<ul>
+  <li><code>import net.http;</code> loads the directory <code>net/http</code> (its files start
+  with <code>module http;</code>) and its names are <code>http.get</code>;
+  <code>import h = net.http;</code> names it <code>h</code> instead.</li>
+  <li>One line can import several: <code>import fs, str, h = net.http;</code>. The imports come
+  first in a file, before any declaration.</li>
+  <li>A module is looked for under the main file's directory, then in the standard library's
+  module directory, then in each directory of <code>KTM_PATH</code> (separated by
+  <code>:</code>); found in two places is an error.</li>
+  <li>Each module is compiled once, before the code that imports it, so its globals are set up
+  before its importers' (the files of a module in name order).</li>
+</ul>
 <p>One module needs no import: the <em>prelude</em>, the standard library's
 <code>modules/prelude</code>. Its <code>pub</code> names are seen by every file, the
 program's and every module's, with no prefix: <code>Error</code> (what a
@@ -1854,22 +1905,26 @@ preprocessor.</p>
 <h2 id="preprocessor">The preprocessor<a class="anchor" href="#preprocessor" aria-label="Link to this section">#</a></h2>
 <h3 id="define">#define<a class="anchor" href="#define" aria-label="Link to this section">#</a></h3>
 <p>Macros name a single value: a number, a float, a string, or an expression that evaluates to
-one. Function-like macros (<code>#define F(x) ...</code>, no space before the
-<code>(</code>) are not supported: they are a compile error ("function-like macros are not
-supported"), so write a function instead. With a space, <code>#define CALC (2 * 21)</code>
-is an ordinary macro whose value is the expression in brackets. Names in a macro's value
-must be other macros. A numeric macro has the type of its value, as in C: if any operand
-is a float the macro is an <code>f64</code> (<code>#define AREA (1.5 * SIDE)</code> and
-<code>(SIDE * 1.5)</code> both are), otherwise an <code>i64</code>. A comparison or a
-logical operator (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>) is an
-<code>i64</code> 0 or 1 even with float operands, and a float counts as true when it isn't
-0.0, as at run time: <code>#define ON (0.5 &amp;&amp; 1)</code> is 1.
-A cast to a built-in type works and gives the macro that type:
-<code>#define BIG ((u64)5 % 3)</code> is a <code>u64</code>, <code>#define HALF ((f64)5 / 2)</code>
-an <code>f64</code> (2.5). Structs are not known to the preprocessor, so
-<code>(MyStruct *)0</code> is an error in a macro. A numeric constant is usually better
-written as <code>const</code>. A long value can go on over several lines:
-end each line but the last with a <code>\</code>, as in C.</p>
+one. A numeric constant is usually better written as <code>const</code>.</p>
+<ul>
+  <li>Function-like macros (<code>#define F(x) ...</code>, no space before the
+  <code>(</code>) are not supported: they are a compile error ("function-like macros are not
+  supported"), so write a function instead. With a space, <code>#define CALC (2 * 21)</code> is
+  an ordinary macro whose value is the expression in brackets.</li>
+  <li>Names in a macro's value must be other macros.</li>
+  <li>A numeric macro has the type of its value, as in C: if any operand is a float the macro is
+  an <code>f64</code> (<code>#define AREA (1.5 * SIDE)</code> and <code>(SIDE * 1.5)</code> both
+  are), otherwise an <code>i64</code>.</li>
+  <li>A comparison or a logical operator (<code>&amp;&amp;</code>, <code>||</code>,
+  <code>!</code>) is an <code>i64</code> 0 or 1 even with float operands, and a float counts as
+  true when it isn't 0.0, as at run time: <code>#define ON (0.5 &amp;&amp; 1)</code> is 1.</li>
+  <li>A cast to a built-in type works and gives the macro that type:
+  <code>#define BIG ((u64)5 % 3)</code> is a <code>u64</code>,
+  <code>#define HALF ((f64)5 / 2)</code> an <code>f64</code> (2.5). Structs are not known to
+  the preprocessor, so <code>(MyStruct *)0</code> is an error in a macro.</li>
+  <li>A long value can go on over several lines: end each line but the last with a
+  <code>\</code>, as in C.</li>
+</ul>
 <pre data-run><code>const i64 MAX_USERS = 64;
 #define APP_NAME  "demo"
 const f64 RATE = 0.5;
@@ -2047,14 +2102,18 @@ signal handler leaves that signal blocked.</p>
 <h2 id="reflection">Reflection<a class="anchor" href="#reflection" aria-label="Link to this section">#</a></h2>
 <p>A program can ask the compiler about its types at run time, through the <code>reflect</code>
 module. <code>reflect.typeOf(T)</code> (a type, or any expression) gives a
-<code>reflect.Type *</code>: its <code>kind</code> (a <code>reflect.Kind</code>: <code>int</code>,
-<code>float</code>, <code>boolean</code>, <code>enumType</code>, <code>pointer</code>,
-<code>array</code>, <code>slice</code>, <code>string</code>, <code>structType</code>,
-<code>unionType</code>, <code>fnType</code> or <code>none</code>), its <code>name</code> as
-<code>typeof</code> prints it, <code>size</code> and <code>isSigned</code>, the <code>elem</code>
-type and <code>len</code> of a pointer, array or slice, a struct's <code>fields</code> (name, type,
-offset, and <code>isPrivate</code>), in declaration order with inherited ones first, and an enum's
-<code>members</code>.</p>
+<code>reflect.Type *</code>, which has:</p>
+<ul>
+  <li><code>kind</code>, a <code>reflect.Kind</code>: <code>int</code>, <code>float</code>,
+  <code>boolean</code>, <code>enumType</code>, <code>pointer</code>, <code>array</code>,
+  <code>slice</code>, <code>string</code>, <code>structType</code>, <code>unionType</code>,
+  <code>fnType</code> or <code>none</code>;</li>
+  <li>its <code>name</code> as <code>typeof</code> prints it, <code>size</code> and
+  <code>isSigned</code>;</li>
+  <li>the <code>elem</code> type and <code>len</code> of a pointer, array or slice;</li>
+  <li>a struct's <code>fields</code> (name, type, offset, and <code>isPrivate</code>), in
+  declaration order with inherited ones first, and an enum's <code>members</code>.</li>
+</ul>
 <pre data-run><code>import reflect;
 
 enum Role { guest, admin = 10 };
