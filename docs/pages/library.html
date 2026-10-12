@@ -16,16 +16,21 @@ without an <code>#include</code>. For every function and struct, see the
     <tr><td><code>mem.copy(dst, src, n)</code>, <code>mem.set(dst, byte, n)</code></td><td>Copy and fill; both return <code>dst</code></td></tr>
   </tbody>
 </table>
-<p><code>mem.allocZero</code> takes one argument, the total size, unlike C's
-<code>calloc(count, size)</code>. <code>mem.alloc</code>, <code>mem.allocZero</code> and
-<code>mem.realloc</code> return <code>null</code> when out of memory or when the size is too
-large (a negative size passed as a <code>u64</code>, say). <code>mem.realloc</code> always
-moves the block and copies as much of it as fits; <code>mem.realloc(null, size)</code> is
-<code>mem.alloc(size)</code>, and when it fails the old block is left as it was, so keep
-the old pointer until you know it worked. Each block carries its size in a hidden header,
-so only pointers from these functions can go to <code>mem.free</code>, <code>mem.size</code> and
-<code>mem.realloc</code>. <code>mem.copy</code> copies front to back: for overlapping buffers
-use <code>memmove</code>.</p>
+<p>Where they differ from C:</p>
+<ul>
+  <li><code>mem.allocZero</code> takes one argument, the total size, unlike C's
+  <code>calloc(count, size)</code>.</li>
+  <li><code>mem.alloc</code>, <code>mem.allocZero</code> and <code>mem.realloc</code> return
+  <code>null</code> when out of memory or when the size is too large (a negative size passed as
+  a <code>u64</code>, say).</li>
+  <li><code>mem.realloc</code> always moves the block and copies as much of it as fits;
+  <code>mem.realloc(null, size)</code> is <code>mem.alloc(size)</code>. When it fails the old
+  block is left as it was, so keep the old pointer until you know it worked.</li>
+  <li>Each block carries its size in a hidden header, so only pointers from these functions can
+  go to <code>mem.free</code>, <code>mem.size</code> and <code>mem.realloc</code>.</li>
+  <li><code>mem.copy</code> copies front to back: for overlapping buffers use
+  <code>memmove</code>.</li>
+</ul>
 <pre data-run><code>
 import cstr, mem;
 
@@ -49,37 +54,53 @@ void main()
 <pre class="output">
 ada 10, linus
 </pre>
-<p>Run a program with <code>ktm -jit -Memsafe file.ktm</code> to have double frees and wild
-frees reported (and skipped) as they happen, and leaks reported at exit, each with the line
-that allocated or freed the block, in any thread. Only blocks your code gets from <code>mem.alloc</code>,
-<code>mem.allocZero</code> and <code>mem.realloc</code> are tracked: a string or container the standard
-library allocates for you (<code>cstr.dup</code>, <code>cstr.formatTo</code>, <code>vec.new</code>, ...)
-is not, so leaking one goes unreported, and a block of yours that the library resizes
-(<code>cstr.appendFormat</code>, <code>cstr.appendFormatLen</code>) is reported as never freed.</p>
+<div class="note"><p><strong>Finding memory bugs.</strong> Run a program with
+<code>ktm -jit -Memsafe file.ktm</code> to have double frees and wild frees reported (and
+skipped) as they happen, and leaks reported at exit, each with the line that allocated or freed
+the block, in any thread.</p>
+<p>Only blocks your code gets from <code>mem.alloc</code>, <code>mem.allocZero</code> and
+<code>mem.realloc</code> are tracked. A string or container the standard library allocates for
+you (<code>cstr.dup</code>, <code>cstr.formatTo</code>, <code>vec.new</code>, ...) is not, so
+leaking one goes unreported, and a block of yours that the library resizes
+(<code>cstr.appendFormat</code>, <code>cstr.appendFormatLen</code>) is reported as never
+freed.</p></div>
 
 <h2 id="strings">Strings</h2>
-<p>Text is two modules. <code>str</code> is what code works with: <code>String</code>, a string
-you own that grows as you add to it, and the functions that read text given as a
-<code>u8[]</code>, so a literal, a slice or a String. <code>cstr</code> is C's strings: a
-NUL-terminated <code>u8 *</code>, for C functions and the data they give you. A String's bytes
-are always followed by a NUL, so <code>s.cstr()</code> passes one to C for free, and
-<code>cstr.view(p)</code> is a C string's bytes as a <code>u8[]</code>, so <code>str.from(cstr.view(p))</code>
-makes a String of them. Case conversion
-and the case-insensitive compares only know ASCII letters.</p>
+<p>Text is two modules:</p>
+<ul>
+  <li><code>str</code> is what code works with: <code>String</code>, a string you own that grows
+  as you add to it, and the functions that read text given as a <code>u8[]</code>, so a
+  literal, a slice or a String.</li>
+  <li><code>cstr</code> is C's strings: a NUL-terminated <code>u8 *</code>, for C functions and
+  the data they give you.</li>
+</ul>
+<p>Going between them is cheap. A String's bytes are always followed by a NUL, so
+<code>s.cstr()</code> passes one to C for free, and <code>cstr.view(p)</code> is a C string's
+bytes as a <code>u8[]</code>, so <code>str.from(cstr.view(p))</code> makes a String of them.
+Case conversion and the case-insensitive compares only know ASCII letters.</p>
 
 <h3>String</h3>
 <p>A String is yours: free it, and the way to do that is <code>defer</code> right where you make
-it. <code>str.new()</code> makes an empty one (nothing is allocated until something is added; a
-declared <code>String s;</code> is empty too), <code>str.from(t)</code> a copy of
-<code>t</code>, <code>str.withCap(n)</code> one with room for <code>n</code> bytes and
-<code>str.format(fmt, ...)</code> the formatted text. Its methods change it in place:
-<code>append</code>, <code>appendByte</code>, <code>appendFormat</code>, <code>insert</code>,
-<code>remove</code>, <code>replace</code>, <code>clear</code>, <code>reserve</code>,
-<code>toLower</code>, <code>toUpper</code>, <code>reverse</code>; <code>clone()</code> gives a
-copy of your own. <code>s.len</code> is its length in bytes and <code>s[i]</code>,
-<code>s[a:b]</code> its bytes (checked); its fields are read-only. Copying a String
-(<code>String b = a;</code>) shares its bytes, so free only one of them: <code>-Memsafe</code>
-reports a double free or a String never freed.</p>
+it.</p>
+<table>
+  <thead><tr><th>Make one</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>str.new()</code></td><td>An empty String; nothing is allocated until something is added (a declared <code>String s;</code> is empty too)</td></tr>
+    <tr><td><code>str.from(t)</code></td><td>A copy of <code>t</code></td></tr>
+    <tr><td><code>str.withCap(n)</code></td><td>An empty String with room for <code>n</code> bytes</td></tr>
+    <tr><td><code>str.format(fmt, ...)</code></td><td>The formatted text</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Its methods change it in place: <code>append</code>, <code>appendByte</code>,
+  <code>appendFormat</code>, <code>insert</code>, <code>remove</code>, <code>replace</code>,
+  <code>clear</code>, <code>reserve</code>, <code>toLower</code>, <code>toUpper</code>,
+  <code>reverse</code>. <code>clone()</code> gives a copy of your own.</li>
+  <li><code>s.len</code> is its length in bytes and <code>s[i]</code>, <code>s[a:b]</code> its
+  bytes (checked); its fields are read-only.</li>
+  <li>Copying a String (<code>String b = a;</code>) shares its bytes, so free only one of them:
+  <code>-Memsafe</code> reports a double free or a String never freed.</li>
+</ul>
 <pre data-run><code>
 import str;
 
@@ -108,14 +129,17 @@ found 3 logs in /tmp (20 bytes)
 
 <h3>Reading text</h3>
 <p>These take a <code>u8[]</code>, so any text, and are called as functions or as methods of it
-(<code>s.find("x")</code> is <code>str.find(s, "x")</code>). <code>find</code> and
-<code>findLast</code> give the index of a part or -1, <code>contains</code>,
-<code>startsWith</code>, <code>endsWith</code> and <code>equals</code> say whether it is there,
-<code>compare</code> orders two texts. The trims and splits return views, parts of what you
-gave them with nothing copied: <code>trim</code>, <code>trimStart</code>, <code>trimEnd</code>
-(of whitespace, or of the bytes you give it), <code>splitFirst</code> and
-<code>splitLast</code> (around a separator), and <code>split</code>, a list of views that is
-allocated: <code>defer parts.free();</code>.</p>
+(<code>s.find("x")</code> is <code>str.find(s, "x")</code>).</p>
+<ul>
+  <li><strong>Searching:</strong> <code>find</code> and <code>findLast</code> give the index of a
+  part or -1; <code>contains</code>, <code>startsWith</code>, <code>endsWith</code> and
+  <code>equals</code> say whether it is there; <code>compare</code> orders two texts.</li>
+  <li><strong>Trimming and splitting</strong> return views, parts of what you gave them with
+  nothing copied: <code>trim</code>, <code>trimStart</code>, <code>trimEnd</code> (of
+  whitespace, or of the bytes you give it), <code>splitFirst</code> and <code>splitLast</code>
+  (around a separator), and <code>split</code>, a list of views that is allocated:
+  <code>defer parts.free();</code>.</li>
+</ul>
 <pre data-run><code>
 import str;
 
@@ -226,15 +250,19 @@ modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <cod
 <p>A date is formatted with <code>date.format(d, fmt)</code> (<code>%Y %m %d %H %M %S</code>,
 <code>%a %b %p</code>) and a file read with <code>fs.readAll</code>; <code>%D</code>,
 <code>%T</code> and <code>%F</code> are an error, with the way to do it in the message.</p>
-<p>Between the <code>%</code> and the letter come, in order: the flags <code>-</code> (left
-justify), <code>0</code> (pad with zeros), <code>+</code> (always a sign), a space (a space
-where a plus sign would go) and <code>#</code> (<code>0x</code> / <code>0</code> prefix for
-hex and octal); a width; and a precision after a <code>.</code>, which is the number of
-decimals for floats, the maximum length for <code>%s</code> and the minimum number of digits
-for integers (<code>%.3d</code> of 7 is <code>007</code>). Width and precision can be
-<code>*</code>, taken from the arguments. An unknown conversion is printed as it was written,
-with a warning on stderr, and still uses up its argument, so the ones after it stay in
-place.</p>
+<p>Between the <code>%</code> and the letter come, in order:</p>
+<ol>
+  <li>The flags: <code>-</code> (left justify), <code>0</code> (pad with zeros), <code>+</code>
+  (always a sign), a space (a space where a plus sign would go) and <code>#</code>
+  (<code>0x</code> / <code>0</code> prefix for hex and octal).</li>
+  <li>A width.</li>
+  <li>A precision after a <code>.</code>: the number of decimals for floats, the maximum length
+  for <code>%s</code> and the minimum number of digits for integers (<code>%.3d</code> of 7 is
+  <code>007</code>).</li>
+</ol>
+<p>Width and precision can be <code>*</code>, taken from the arguments. An unknown conversion
+is printed as it was written, with a warning on stderr, and still uses up its argument, so the
+ones after it stay in place.</p>
 <p><code>cstr.formatTo(buf, fmt, ...)</code> writes into <code>buf</code> with no bound. For a
 fixed-size buffer use <code>cstr.formatToSize(buf, size, fmt, ...)</code>, which works like C's
 <code>snprintf</code>: it writes at most <code>size - 1</code> characters and always ends them
@@ -266,16 +294,20 @@ void main()
 that you <code>mem.free</code>.</p>
 
 <h3>Building C strings</h3>
-<p><code>cstr.formatTo(null, fmt, ...)</code> returns a newly allocated formatted string, and
-<code>cstr.appendFormat(s, fmt, ...)</code> appends the formatted text to the heap string <code>s</code>
-and returns it, so write <code>s = cstr.appendFormat(s, fmt, ...)</code>: when <code>s</code> is full it
-is grown, which may move it and frees the old block. <code>s</code> must come from
-<code>mem.alloc</code>, <code>cstr.dup</code>, <code>cstr.formatTo(null, ...)</code> or an earlier
-<code>cstr.appendFormat</code>, or be <code>null</code> to start a new string; never pass a string
-literal or a stack buffer. <code>cstr.appendFormat</code> measures <code>s</code> on every call, so
-appending in a long loop is quadratic; <code>cstr.appendFormatLen(s, &amp;len, fmt, ...)</code> keeps
-the length in <code>len</code> and doesn't. <code>cstr.concat("a", "b", ...)</code> joins strings and <code>cstr.format(fmt, ...)</code> is
-<code>cstr.formatTo</code> into an exactly sized block.</p>
+<ul>
+  <li><code>cstr.formatTo(null, fmt, ...)</code> returns a newly allocated formatted string, and
+  <code>cstr.format(fmt, ...)</code> is the same into an exactly sized block.</li>
+  <li><code>cstr.concat("a", "b", ...)</code> joins strings.</li>
+  <li><code>cstr.appendFormat(s, fmt, ...)</code> appends the formatted text to the heap string
+  <code>s</code> and returns it, so write <code>s = cstr.appendFormat(s, fmt, ...)</code>: when
+  <code>s</code> is full it is grown, which may move it and frees the old block.
+  <code>s</code> must come from <code>mem.alloc</code>, <code>cstr.dup</code>,
+  <code>cstr.formatTo(null, ...)</code> or an earlier <code>cstr.appendFormat</code>, or be
+  <code>null</code> to start a new string; never pass a string literal or a stack buffer.</li>
+  <li><code>cstr.appendFormat</code> measures <code>s</code> on every call, so appending in a
+  long loop is quadratic; <code>cstr.appendFormatLen(s, &amp;len, fmt, ...)</code> keeps the
+  length in <code>len</code> and doesn't.</li>
+</ul>
 <pre data-run><code>
 import cstr, mem;
 
@@ -437,27 +469,35 @@ first line
 second line
 a missing file gives a String without a ptr
 </pre>
-<p><code>fs.writeAll</code> replaces the file's contents: by default it opens with
-<code>O_CREAT | O_WRONLY | O_TRUNC</code> (a new file gets mode 0644 minus the umask).
-Pass the flags yourself to do something else, <code>O_CREAT | O_WRONLY | O_APPEND</code>
-to add to the end. A path that can't be opened gives <code>false</code> and creates nothing.
-<code>fs.readAll</code> reads a regular file up to its size, and a FIFO, a pipe
-(<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a <code>/proc</code> file (which
-reports size 0) until end of file, so it waits for a FIFO's writer and never finishes on an
-endless device like <code>/dev/zero</code>. For a directory it gives a String without a
-<code>ptr</code>. A path longer than 4095 bytes fails in every function here, with
-<code>ENAMETOOLONG</code>.</p>
+<ul>
+  <li><code>fs.writeAll</code> replaces the file's contents: by default it opens with
+  <code>O_CREAT | O_WRONLY | O_TRUNC</code> (a new file gets mode 0644 minus the umask). Pass the
+  flags yourself to do something else, <code>O_CREAT | O_WRONLY | O_APPEND</code> to add to the
+  end. A path that can't be opened gives <code>false</code> and creates nothing.</li>
+  <li><code>fs.readAll</code> reads a regular file up to its size, and a FIFO, a pipe
+  (<code>/dev/fd/N</code>, <code>/dev/stdin</code>), a device or a <code>/proc</code> file (which
+  reports size 0) until end of file, so it waits for a FIFO's writer and never finishes on an
+  endless device like <code>/dev/zero</code>. For a directory it gives a String without a
+  <code>ptr</code>.</li>
+  <li>A path longer than 4095 bytes fails in every function here, with
+  <code>ENAMETOOLONG</code>.</li>
+</ul>
 
-<p>Directories: <code>fs.makeDir(path)</code> makes one directory and
-<code>fs.makeDir(path,, true)</code> the missing parents too; both return 0 if the path is a
-directory afterwards (made now or already there) and -1 if not, the convention
-<code>fs.remove</code> and <code>fs.removeDir</code> use too. <code>fs.remove(path)</code> removes a file, a
-symlink (never what it points to) or an empty directory; with <code>fs.REMOVE_RECURSE</code>
-a directory and everything in it, with <code>fs.REMOVE_FORCE</code> a path that doesn't exist
-is not an error. <code>fs.removeDir</code> is the directory half of it.
-<code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times;
-see <a href="#file-status">File status</a>), <code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
-<code>fs.currentDir()</code> returns the working directory as a String.</p>
+<p>Making, removing and moving between directories:</p>
+<ul>
+  <li><code>fs.makeDir(path)</code> makes one directory and <code>fs.makeDir(path,, true)</code>
+  the missing parents too. Both return 0 if the path is a directory afterwards (made now or
+  already there) and -1 if not, the convention <code>fs.remove</code> and
+  <code>fs.removeDir</code> use too.</li>
+  <li><code>fs.remove(path)</code> removes a file, a symlink (never what it points to) or an
+  empty directory; with <code>fs.REMOVE_RECURSE</code> a directory and everything in it, with
+  <code>fs.REMOVE_FORCE</code> a path that doesn't exist is not an error.
+  <code>fs.removeDir</code> is the directory half of it.</li>
+  <li><code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times;
+  see <a href="#file-status">File status</a>).</li>
+  <li><code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
+  <code>fs.currentDir()</code> returns the working directory as a String.</li>
+</ul>
 <pre data-run><code>
 import cstr, fs, libc, mem, str;
 
@@ -508,16 +548,21 @@ fs.remove again with fs.REMOVE_FORCE: 0
 <h3 id="directories">Reading directories, copying and moving</h3>
 <p><code>fs.openDir(path)</code> opens a directory; <code>d.next()</code> gives each entry as an
 <code>fs.DirEntry *</code> and <code>null</code> after the last, leaving out <code>.</code> and
-<code>..</code>. An entry has its <code>name</code>, its <code>kind</code> (an
-<code>fs.FileKind</code>; a symlink is <code>link</code>, never what it points to, and a
-filesystem that doesn't report types is asked with <code>lstat</code>) and its
-<code>path</code>, the directory's path joined with the name. Both belong to the
-<code>fs.Dir</code> and stay valid until its next <code>next()</code>: copy them
-(<code>str.from(e.name)</code>, <code>e.path.clone()</code>) to keep them. Close it with
-<code>d.close()</code>, usually right away as <code>defer d.close();</code>, or declare it with
-<code>ad fs.Dir d = fs.openDir(path);</code>. A directory that can't be opened gives a
-<code>Dir</code> whose <code>d.ok()</code> is false (<code>os.errno()</code> says why) and whose
-<code>next()</code> gives <code>null</code> at once.</p>
+<code>..</code>.</p>
+<ul>
+  <li>An entry has its <code>name</code>, its <code>kind</code> (an <code>fs.FileKind</code>; a
+  symlink is <code>link</code>, never what it points to, and a filesystem that doesn't report
+  types is asked with <code>lstat</code>) and its <code>path</code>, the directory's path joined
+  with the name.</li>
+  <li>The name and path belong to the <code>fs.Dir</code> and stay valid until its next
+  <code>next()</code>: copy them (<code>str.from(e.name)</code>, <code>e.path.clone()</code>) to
+  keep them.</li>
+  <li>Close it with <code>d.close()</code>, usually right away as <code>defer d.close();</code>,
+  or declare it with <code>ad fs.Dir d = fs.openDir(path);</code>.</li>
+  <li>A directory that can't be opened gives a <code>Dir</code> whose <code>d.ok()</code> is
+  false (<code>os.errno()</code> says why) and whose <code>next()</code> gives
+  <code>null</code> at once.</li>
+</ul>
 <p><code>fs.list(path)</code> is the names of a directory as a sorted
 <code>vec.Vec&lt;String&gt;</code> (<code>fs.list(path, &amp;ok)</code> also says whether it could
 be read); free it with <code>fs.freeList(&amp;names)</code>. <code>fs.walk(root, &amp;visit,
@@ -526,30 +571,37 @@ arg)</code> calls <code>bool visit(fs.DirEntry *e, void *arg)</code> for every e
 as <code>fs.remove</code> with <code>fs.REMOVE_RECURSE</code> never does; <code>visit</code>
 returns false to stop. It returns 0 when every entry was visited, 1 when <code>visit</code>
 stopped it and -1 when a directory couldn't be read.</p>
-<p><code>fs.join(a, b)</code> and <code>fs.join(a, b, c)</code> put one <code>/</code> between the
-parts and give a new String (an absolute part replaces what is before it).
-<code>fs.exists(path)</code> says whether there is something at a path, following a symlink.
-<code>fs.makeDirAll(path)</code> is <code>fs.makeDir(path,, true)</code>: the directory and every
-missing parent. <code>fs.copyFile(from, to)</code> copies a regular file with its permission
-bits, replacing what is at <code>to</code>; copying a file onto itself or a directory is an
-error, and a copy that fails part way is removed. <code>fs.rename(from, to)</code> renames on
-one filesystem; <code>fs.move(from, to)</code> does the same and, across filesystems
-(<code>EXDEV</code>), copies a regular file and removes the original. All three return 0, or
--1 with <code>os.errno()</code>.</p>
+<table>
+  <thead><tr><th>Function</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>fs.join(a, b)</code>, <code>fs.join(a, b, c)</code></td><td>The parts with one <code>/</code> between them, a new String (an absolute part replaces what is before it)</td></tr>
+    <tr><td><code>fs.exists(path)</code></td><td>Whether there is something at a path, following a symlink</td></tr>
+    <tr><td><code>fs.makeDirAll(path)</code></td><td><code>fs.makeDir(path,, true)</code>: the directory and every missing parent</td></tr>
+    <tr><td><code>fs.copyFile(from, to)</code></td><td>Copies a regular file with its permission bits, replacing what is at <code>to</code>; copying a file onto itself or a directory is an error, and a copy that fails part way is removed</td></tr>
+    <tr><td><code>fs.rename(from, to)</code></td><td>Renames, on one filesystem</td></tr>
+    <tr><td><code>fs.move(from, to)</code></td><td>The same, and across filesystems (<code>EXDEV</code>) copies a regular file and removes the original</td></tr>
+  </tbody>
+</table>
+<p><code>copyFile</code>, <code>rename</code> and <code>move</code> return 0, or -1 with
+<code>os.errno()</code>.</p>
 <h3 id="file-status">File status</h3>
 <p><code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code>, the same struct on
 every platform, so a program never needs <code>libc.cStat</code>, whose layout differs between
-Linux x86_64, Linux arm64 and macOS. Its fields: <code>st_size</code>, <code>st_mode</code>
-(type and permission bits), <code>st_ino</code>, <code>st_dev</code>, <code>st_nlink</code>,
-<code>st_uid</code>, <code>st_gid</code>, and the times <code>st_mtim</code>,
-<code>st_atim</code>, <code>st_ctim</code> and <code>st_btim</code> (creation), each with
-<code>tv_sec</code> and <code>tv_nsec</code>. <code>fst.kind()</code> says what it is:
-<code>fs.FileKind.file</code>, <code>dir</code>, <code>link</code> or <code>other</code> (a FIFO,
-a socket, a device), and <code>fst.isFile()</code>, <code>isDir()</code> and
-<code>isLink()</code> ask for one. <code>fs.stat</code> follows a symlink to what it points to;
-<code>fs.lstat</code> describes the link itself, the only way to get <code>link</code>, and
-<code>fs.fstat(&amp;fst, fd)</code> describes an open file. All three return 0, or -1 with
-<code>errno</code> set.</p>
+Linux x86_64, Linux arm64 and macOS.</p>
+<ul>
+  <li>Its fields: <code>st_size</code>, <code>st_mode</code> (type and permission bits),
+  <code>st_ino</code>, <code>st_dev</code>, <code>st_nlink</code>, <code>st_uid</code>,
+  <code>st_gid</code>, and the times <code>st_mtim</code>, <code>st_atim</code>,
+  <code>st_ctim</code> and <code>st_btim</code> (creation), each with <code>tv_sec</code> and
+  <code>tv_nsec</code>.</li>
+  <li><code>fst.kind()</code> says what it is: <code>fs.FileKind.file</code>, <code>dir</code>,
+  <code>link</code> or <code>other</code> (a FIFO, a socket, a device), and
+  <code>fst.isFile()</code>, <code>isDir()</code> and <code>isLink()</code> ask for one.</li>
+  <li><code>fs.stat</code> follows a symlink to what it points to; <code>fs.lstat</code>
+  describes the link itself, the only way to get <code>link</code>, and
+  <code>fs.fstat(&amp;fst, fd)</code> describes an open file. All three return 0, or -1 with
+  <code>errno</code> set.</li>
+</ul>
 <p><code>fs.realPath(path)</code> is the absolute path with every symlink, <code>.</code> and
 <code>..</code> resolved, a String that is yours; its <code>ptr</code> is null (with
 <code>errno</code> set) when a part of the path doesn't exist. <code>fs.pread(fd, buf, off)</code>
