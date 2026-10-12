@@ -99,6 +99,7 @@ u8 *MOD_MAIN_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
+u8 *ALIAS_HC;
 
 void initFixtures() {
     LIB_HC =
@@ -129,6 +130,15 @@ void initFixtures() {
         "  i64 b = p.x;\n"
         "  geo.\n"
         "  return 0;\n"
+        "}\n";
+    /* Type aliases: hover, definition and completion of the alias */
+    ALIAS_HC =
+        "type Text = u8[];\n"
+        "type Score = i64;\n"
+        "i32 main() {\n"
+        "  Text t = \"hi\";\n"
+        "  Score s = t.len;\n"
+        "  return s;\n"
         "}\n";
     /* Overloads: a call shows and jumps to the one it picks */
     OVL_HC =
@@ -1194,7 +1204,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 12;
+const i64 LSP_GROUPS = 13;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1320,6 +1330,30 @@ void testOverloads() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testTypeAlias() {
+    printf("type aliases\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("alias.ktm");
+    lspDidOpen(l, uri, ALIAS_HC);
+    check("alias fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+    posOf(ALIAS_HC, "Text t", 1, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on an alias shows `type Text = u8[]`", hoverContains(resp, "type Text = u8[]"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(ALIAS_HC, "Text =", 0, &wantLine, &wantChr);
+    check("definition of an alias is its `type` declaration",
+                locEq(resp, uri, wantLine, wantChr, true));
+    posOf(ALIAS_HC, "Score s", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("completion offers aliases", labelsOk(resp, "Sc", "Score", null));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1334,6 +1368,7 @@ void runGroup(i64 group) {
         case 9: testModules();
         case 10: testMethods();
         case 11: testOverloads();
+        case 12: testTypeAlias();
     }
 }
 

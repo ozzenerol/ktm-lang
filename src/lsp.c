@@ -1019,6 +1019,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
                                      &in_doc);
         AstType *cls = mapGetLen(ctx->cc->clsdefs, ident, ilen);
         AstType *uni = cls ? NULL : mapGetLen(ctx->cc->uniondefs, ident, ilen);
+        TypeAlias *alias = mapGetLen(ctx->cc->type_aliases, ident, ilen);
         Lexeme *macro = mapGetLen(ctx->cc->macro_defs, ident, ilen);
         if (entry && lspIsFn(entry) && entry->overloads) {
             Ast *pick = lspPickOverload(ctx, doc_id, line + 1, character, entry);
@@ -1033,6 +1034,9 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
             AoStr *body = astClassToAoStr(cls ? cls : uni);
             aoStrCatLen(rendered, body->data, body->len);
             aoStrRelease(body);
+        } else if (alias) {
+            aoStrCatPrintf(rendered, "type %.*s = %s", ilen, ident,
+                           astTypeToString(alias->type));
         } else if (macro) {
             lspCatMacro(rendered, ident, macro);
         }
@@ -1118,6 +1122,12 @@ static char *lspUnionSuggestionResolver(Ast *entry, int *_type) {
     (void)entry;
     *_type = KTM_LSP_UNION_STRUCT;
     return "union";
+}
+
+static char *lspAliasSuggestionResolver(Ast *entry, int *_type) {
+    (void)entry;   /* a TypeAlias, not an Ast */
+    *_type = KTM_LSP_CLASS;
+    return "type";
 }
 
 static char *lspConstantSuggestionResolver(Ast *entry, int *_type) {
@@ -1370,6 +1380,9 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
 
     lspScanMapForSuggestion(ctx->cc->uniondefs, prefix, plen, body, &emitted,
                             &lspUnionSuggestionResolver);
+
+    lspScanMapForSuggestion(ctx->cc->type_aliases, prefix, plen, body, &emitted,
+                            &lspAliasSuggestionResolver);
 
     lspScanMapForSuggestion(ctx->cc->macro_defs, prefix, plen, body, &emitted,
                             &lspConstantSuggestionResolver);
@@ -1836,10 +1849,15 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
             AstType *ty = (AstType *)mapGetLen(ctx->cc->clsdefs, ident, ilen);
             if (ty == NULL)
                 ty = (AstType *)mapGetLen(ctx->cc->uniondefs, ident, ilen);
+            TypeAlias *alias = ty ? NULL : mapGetLen(ctx->cc->type_aliases, ident, ilen);
             if (ty) {
                 def_line = ty->line;
                 def_col = ty->col;
                 def_file = ty->file_id;
+            } else if (alias) {
+                def_line = alias->line;
+                def_col = alias->col;
+                def_file = alias->file_id;
             }
         }
     }

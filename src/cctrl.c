@@ -280,6 +280,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
     cctrlAddBuiltinTypes(cc->symbol_table);
     cc->clsdefs = mapNew(32, &map_asttype_type);
     cc->uniondefs = mapNew(32, &map_asttype_type);
+    cc->type_aliases = mapNew(16, &map_cstring_opaque_type);
     cc->ast_list = NULL;
     /* The macro-processor stub Cctrl is passed to helpers that may
      * call cctrlRaiseException; keep diagnostics state consistent
@@ -316,6 +317,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);
     cc->uniondefs = mapNew(32, &map_asttype_type);
+    cc->type_aliases = mapNew(16, &map_cstring_opaque_type);
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
@@ -1728,10 +1730,13 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     if (qual) {
         if ((type = mapGet(cc->clsdefs, qual)) != NULL) return type;
         if ((type = mapGet(cc->uniondefs, qual)) != NULL) return type;
+        TypeAlias *alias = mapGet(cc->type_aliases, qual);
+        if (alias) return alias->type;
     }
     if (cctrlModuleHides(cc, name, len)) return NULL;
     if (memchr(name, '.', len) &&
-        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len)))
+        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len) ||
+         mapGetLen(cc->type_aliases, name, len)))
     {
         cctrlCheckModuleAccess(cc, name, len);
     }
@@ -1742,6 +1747,8 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     if ((type = mapGetLen(cc->uniondefs,name,len)) != NULL) {
         return type;
     }
+    TypeAlias *alias = mapGetLen(cc->type_aliases, name, len);
+    if (alias) return alias->type;
     return NULL;
 }
 

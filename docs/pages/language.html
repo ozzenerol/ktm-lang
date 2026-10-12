@@ -1661,6 +1661,51 @@ green
 integers do; an integer, or a different enum, needs a cast to become one
 (<code>(Color)2</code>). Two different enums never mix without a cast either.</p>
 
+<h3 id="type-aliases">Type aliases</h3>
+<p><code>type Name = T;</code> gives a type a second name. An alias is its type, not a new
+one: a <code>Text</code> and a <code>u8[]</code> pass to each other with no conversion, and
+<code>sizeof</code>, <code>reflect</code> and error messages see the real type. Any type can
+have one: a slice, a pointer, an <code>fn(...)</code> type, a fixed array
+(<code>type Buf = u8[64];</code>), a struct, another alias. Aliases are declared at file scope
+(not inside a function). In a program, an alias can only name types declared above it; in a
+module, its types and aliases can come in any order, and two aliases that name each other are
+an error. A module's alias is private unless it is <code>pub</code>, and is
+<code>mod.Name</code> outside it, like the module's structs. <code>type</code> is a keyword
+only at the start of such a declaration, so a variable or a field can still be called
+<code>type</code>.</p>
+<pre data-run><code>
+type Text = u8[];
+type Handler = fn(i64, Text) bool;
+type Celsius = f64;
+struct Reading { Text place; Celsius temp; };
+type Readings = Reading[];
+
+bool show(i64 i, Text place) { printf("%d: %s\n", i, place); return true; }
+
+Celsius warmest(Readings all, Handler each) {
+  Celsius best = -273.15;
+  for (i64 i = 0; i < all.len; i++) {
+    each(i, all[i].place);
+    if (all[i].temp > best) { best = all[i].temp; }
+  }
+  return best;
+}
+
+void main()
+{
+  Reading r[3] = {{"Iasi", 18.5}, {"Cluj", 21.0}, {"Sibiu", 16.25}};
+  f64 top = warmest(r, &show);          // a Celsius is an f64
+  u8[] name = r[1].place;               // and a Text a u8[]
+  printf("warmest %.1f, in %s (%d bytes)\n", top, name, sizeof(Text));
+}
+</code></pre>
+<pre class="output">
+0: Iasi
+1: Cluj
+2: Sibiu
+warmest 21.0, in Cluj (16 bytes)
+</pre>
+
 <h2 id="modules">Modules</h2>
 <p>A module is a directory of <code>.ktm</code> files. Each file in it starts with
 <code>module</code> and the directory's name, and a program uses it with

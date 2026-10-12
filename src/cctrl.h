@@ -45,6 +45,13 @@
  * to render a squiggle without re-tokenising. `message` and
  * `suggestion` are owned by the diagnostic. `file` is borrowed
  * from the Lexer's LexFile list and outlives the diagnostic. */
+/* A `type Name = T;`: T, and where Name was written (for the LSP) */
+typedef struct TypeAlias {
+    AstType *type;
+    int line, col;
+    u32 file_id;
+} TypeAlias;
+
 typedef struct CctrlDiagnostic {
     int severity;          /* CCTRL_INFO / CCTRL_WARN / CCTRL_ERROR */
     struct LexFile *file;  /* borrowed; NULL if the source is unknown */
@@ -120,6 +127,9 @@ typedef struct Cctrl {
 
     /* Union definitions */
     Map *uniondefs;
+    /* `type Name = T;`: Name (a module's qualified, as its types) -> its
+     * TypeAlias. An alias is its type: the same AstType, nothing new. */
+    Map *type_aliases;
 
     /* Local environment for a function */
     Map *localenv;
