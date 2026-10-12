@@ -807,12 +807,15 @@ same methods:</p>
   <li><code>sort()</code> of a <code>vec.IntVec</code> or <code>vec.FloatVec</code> sorts ascending.
   A <code>vec.PtrVec</code>'s <code>sort</code> takes a comparison that returns <code>true</code> when its first
   argument should come first. That's a "less than" test, not a C-style negative, zero or
-  positive result, which leaves the vector unsorted. The sorts are O(n log n), also for
+  positive result, which leaves the vector unsorted. Its parameters can be the pointers the
+  vector holds (<code>i64 byAge(User *a, User *b)</code>): a function's typed pointer
+  parameters stand for <code>void *</code> ones without a cast, here and in every callback
+  that takes <code>void *</code> (<code>release</code>'s <code>free_value</code> too). The sorts are O(n log n), also for
   sorted or all-equal input, and not stable: equal values may change order.</li>
 </ul>
 <pre data-run><code>import cstr, mem, str, vec;
 
-i64 shorterFirst(void *a, void *b)
+i64 shorterFirst(u8 *a, u8 *b)
 {
   return cstr.len(a) &lt; cstr.len(b);
 }
@@ -934,7 +937,7 @@ order; don't insert or delete while they run. Once a new key is added or one is 
 that callback; replacing the value of a key that is there is fine.</p>
 <pre data-run><code>import cstr, map, str;
 
-i64 strKeyCmp(void *a, void *b)
+i64 strKeyCmp(u8 *a, u8 *b)
 {
   return cstr.cmp(a, b);
 }

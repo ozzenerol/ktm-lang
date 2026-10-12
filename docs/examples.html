@@ -77,9 +77,7 @@ struct WordCount {
 
 // Sort predicate: true when a ranks above b. Most frequent first, then
 // alphabetical so ties have a stable order.
-i64 ranksHigher(void *aArg, void *bArg) {
-    WordCount *a = aArg;
-    WordCount *b = bArg;
+i64 ranksHigher(WordCount *a, WordCount *b) {
     if (a.count != b.count) {
         return a.count &gt; b.count;
     }
