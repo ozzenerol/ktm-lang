@@ -2,11 +2,23 @@ import coro, date, fs, libc, net, os, str, test;
 
 extern "c" i32 socketpair(i32 domain, i32 type, i32 protocol, i32 *sv);
 
+struct Rusage { libc.timeval utime; libc.timeval stime; i64 rest[14]; };
+extern "c" i32 getrusage(i32 who, Rusage *ru);
+
+i64 cpuMs() {
+    Rusage ru;
+    getrusage(0, &ru);
+    return (ru.utime.tv_sec + ru.stime.tv_sec) * 1000 + (ru.utime.tv_usec + ru.stime.tv_usec) / 1000;
+}
+
 /* coro's loop on the kernel's event queue (v0.11.0: epoll on Linux,
  * kqueue on macOS): many fds at once, a reader and a writer waiting on
  * one fd, an fd that fires while its waiter already timed out, a regular
  * file (always ready), coro.close of an fd still waited on, and the
- * echo of 200 connections through one loop. */
+ * echo of 200 connections through one loop. The queue keeps an fd
+ * registered between waits (v0.11.0): one that stays readable with nobody
+ * waiting doesn't make the loop spin, and a number coro.close freed and a
+ * new fd took gets its events. */
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -104,6 +116,43 @@ void *closesIt(void *unused) {
     return null;
 }
 
+i32 gIdle[2];
+i64 gIdleGot = -2;
+
+/* waits on gIdle once (registered), times out, then never again while
+ * its peer has data for it */
+void *idleOnce(void *unused) {
+    gIdleGot = coro.wait(gIdle[0], libc.POLLIN, 20);
+    libc.send(gIdle[1], "data", 4, 0);
+    return null;
+}
+
+void *sleeper(void *unused) {
+    coro.sleep(300);
+    return null;
+}
+
+i64 gReuseGot = -2;
+i32 gReuse[2];
+
+void *reuser(void *unused) {
+    i32 first[2];
+    socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, first);
+    coro.wait(first[0], libc.POLLIN, 10);          /* registers first[0] */
+    i32 num = first[0];
+    coro.close(first[0]);
+    libc.close(first[1]);
+    socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, gReuse);
+    if (gReuse[0] != num && gReuse[1] == num) {    /* the reused number is the other end */
+        i32 t = gReuse[0];
+        gReuse[0] = gReuse[1];
+        gReuse[1] = t;
+    }
+    libc.send(gReuse[1], "r", 1, 0);
+    gReuseGot = gReuse[0] == num ? coro.wait(gReuse[0], libc.POLLIN, 2000) : -3;
+    return null;
+}
+
 i32 main() {
     printf("Test - coro loop on epoll/kqueue: ");
 
@@ -178,6 +227,23 @@ i32 main() {
     check((gClosedGot & libc.POLLNVAL) != 0 && date.monoMs() - t0 < 2000,
           "coro.close wakes the coroutine waiting on that fd");
     libc.close(sv[1]);
+
+    /* readable, registered, nobody waiting: the loop sleeps, not spins */
+    socketpair(libc.AF_UNIX, libc.SOCK_STREAM, 0, gIdle);
+    i64 c0 = cpuMs();
+    coro.go(&idleOnce);
+    coro.go(&sleeper);
+    coro.run();
+    check(gIdleGot == 0 && cpuMs() - c0 < 100, "a readable fd nobody waits on doesn't spin the loop");
+    libc.close(gIdle[0]);
+    libc.close(gIdle[1]);
+
+    /* coro.close, then a new fd with the same number: it gets events */
+    coro.go(&reuser);
+    coro.run();
+    check(gReuseGot > 0 || gReuseGot == -3, "a reused fd number is registered afresh");
+    libc.close(gReuse[0]);
+    libc.close(gReuse[1]);
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

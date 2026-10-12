@@ -7,10 +7,15 @@ import date, libc, mem, net, os, rt;
  * (kept in its rt.HCFs, made on first use).
  *
  * The waits on fds go to the kernel's event queue, epoll(7) on Linux and
- * kqueue(2) on macOS, so a turn costs what is ready, not what is open: a
- * wait arms its fd once (one-shot), and the turn hands back only the fds
- * that fired. Several coroutines may wait on one fd (a reader and a
- * writer): each fd keeps its waiters and is armed for all their events. */
+ * kqueue(2) on macOS, so a turn costs what is ready, not what is open. An
+ * fd stays registered (level-triggered) for what its waiters want, and the
+ * queue is only told when that changes: a connection that waits to read,
+ * answers, and waits to read again costs no call to the queue after its
+ * first wait. One that fires while nobody waits for that is narrowed then.
+ * Several coroutines may wait on one fd (a reader and a writer): each fd
+ * keeps its waiters and is registered for all their events. coro.close
+ * and coro.accept forget a closed fd's registration (the kernel drops it
+ * on close(2)), so close the fds you wait on with coro.close. */
 
 /* The code of what the loop throws: run() inside a coroutine, wait() in a
  * coroutine coro.go didn't start, every coroutine waiting forever, poll
@@ -36,8 +41,8 @@ extern "c" i32 epoll_ctl(i32 epfd, i32 op, i32 fd, void *event);
 extern "c" i32 epoll_wait(i32 epfd, void *events, i32 maxevents, i32 timeout);
 const i64 LOOP_EPOLL_CLOEXEC = 0x80000;
 const i64 LOOP_EPOLL_CTL_ADD = 1;
+const i64 LOOP_EPOLL_CTL_DEL = 2;
 const i64 LOOP_EPOLL_CTL_MOD = 3;
-const i64 LOOP_EPOLLONESHOT = 0x40000000;
 /* struct epoll_event: u32 events, then u64 data, packed on x86_64 */
 #ifdef IS_X86_64
 const i64 LOOP_EV_SIZE = 12;
@@ -61,7 +66,7 @@ extern "c" i32 kevent(i32 kq, void *changes, i32 nchanges, void *events, i32 nev
 const i64 LOOP_EVFILT_READ = -1;
 const i64 LOOP_EVFILT_WRITE = -2;
 const i64 LOOP_EV_ADD = 0x1;
-const i64 LOOP_EV_ONESHOT = 0x10;
+const i64 LOOP_EV_DELETE = 0x2;
 const i64 LOOP_EV_ERROR = 0x4000;
 const i64 LOOP_EV_EOF = 0x8000;
 const i64 LOOP_EV_SIZE = 32;
@@ -69,10 +74,11 @@ const i64 LOOP_EV_SIZE = 32;
 /* events taken from the kernel in one turn at most (more wait a turn) */
 const i64 LOOP_MAXEV = 256;
 
-/* The coroutines waiting on one fd */
+/* The coroutines waiting on one fd, and what it is registered for */
 struct LoopFd {
     LoopTask **w;
     i64 n, cap;
+    i64 armed;           /* POLLIN/POLLOUT it is registered for, 0: none */
 };
 
 struct LoopTask {
@@ -277,48 +283,86 @@ static void loopFire(Loop *lp, i32 fd, i64 revents) {
     }
 }
 
-/* Arm fd (one-shot) for the events every one of its waiters wants. An fd
- * the queue refuses (a regular file: always ready to poll(2)) answers at
- * once; one that is closed gets POLLNVAL, as poll would say. */
-static void loopArm(Loop *lp, i32 fd) {
-    LoopFd *f = lp.fdw[fd];
+/* What fd's waiters want, of POLLIN (POLLPRI counts as it) and POLLOUT */
+static i64 loopWant(LoopFd *f) {
     i64 want = 0;
     for (i64 i = 0; i < f.n; i++) { want |= f.w[i].events; }
-    if (!want) { return; }
-    i32 q = loopQueue(lp);
-    if (q < 0) { return; }          /* poll(2): each turn polls the waiters */
+    if (want & libc.POLLPRI) { want |= libc.POLLIN; }
+    return want & (libc.POLLIN | libc.POLLOUT);
+}
+
+/* Register fd for exactly `want` (0: not at all), telling the queue only
+ * what changed. false when the queue refused it (errno set). */
+static bool loopRegister(Loop *lp, i32 fd, LoopFd *f, i64 want) {
+    if (want == f.armed) { return true; }
 #ifdef IS_LINUX
     u8 e[16];
-    u32 events = (u32)(want | LOOP_EPOLLONESHOT);
+    u32 events = (u32)want;
     u64 data = (u64)fd;
+    mem.set(e, 0, 16);
     mem.copy(e, &events, 4);
     mem.copy(e + LOOP_EV_DATA, &data, 8);
-    if (epoll_ctl(q, LOOP_EPOLL_CTL_MOD, fd, e) == 0) { return; }
-    if (os.errno() == libc.ENOENT) {
-        if (epoll_ctl(q, LOOP_EPOLL_CTL_ADD, fd, e) == 0) { return; }
-        if (os.errno() == libc.EEXIST && epoll_ctl(q, LOOP_EPOLL_CTL_MOD, fd, e) == 0) { return; }
+    i32 r;
+    if (!want) {
+        r = epoll_ctl(lp.q, LOOP_EPOLL_CTL_DEL, fd, e);
+        f.armed = 0;
+        return r == 0 || os.errno() == libc.ENOENT || os.errno() == libc.EBADF;
+    }
+    r = epoll_ctl(lp.q, f.armed ? LOOP_EPOLL_CTL_MOD : LOOP_EPOLL_CTL_ADD, fd, e);
+    if (r != 0 && os.errno() == libc.ENOENT) {
+        r = epoll_ctl(lp.q, LOOP_EPOLL_CTL_ADD, fd, e);
+    } else if (r != 0 && os.errno() == libc.EEXIST) {
+        r = epoll_ctl(lp.q, LOOP_EPOLL_CTL_MOD, fd, e);
+    }
+    if (r != 0) {
+        f.armed = 0;
+        return false;
     }
 #else
     LoopKevent ch[2];
     i32 n = 0;
-    if (want & (libc.POLLIN | libc.POLLPRI)) {
+    i64 bits[2] = {libc.POLLIN, libc.POLLOUT};
+    i16 filters[2] = {LOOP_EVFILT_READ, LOOP_EVFILT_WRITE};
+    for (i64 k = 0; k < 2; k++) {
+        i64 bit = bits[k];
+        if ((want & bit) == (f.armed & bit)) { continue; }
         mem.set(&ch[n], 0, sizeof(LoopKevent));
         ch[n].ident = (u64)fd;
-        ch[n].filter = LOOP_EVFILT_READ;
-        ch[n].flags = LOOP_EV_ADD | LOOP_EV_ONESHOT;
+        ch[n].filter = filters[k];
+        ch[n].flags = (want & bit) ? LOOP_EV_ADD : LOOP_EV_DELETE;
         n++;
     }
-    if (want & libc.POLLOUT) {
-        mem.set(&ch[n], 0, sizeof(LoopKevent));
-        ch[n].ident = (u64)fd;
-        ch[n].filter = LOOP_EVFILT_WRITE;
-        ch[n].flags = LOOP_EV_ADD | LOOP_EV_ONESHOT;
-        n++;
+    if (n && kevent(lp.q, ch, n, null, 0, null) != 0) {
+        i32 err = os.errno();
+        if (want) {
+            f.armed = 0;
+            os.setErrno(err);
+            return false;
+        }
     }
-    if (kevent(q, ch, n, null, 0, null) == 0) { return; }
 #endif
+    f.armed = want;
+    return true;
+}
+
+/* Register fd for what every one of its waiters wants. An fd the queue
+ * refuses (a regular file: always ready to poll(2)) answers at once; one
+ * that is closed gets POLLNVAL, as poll would say. */
+static void loopArm(Loop *lp, i32 fd) {
+    if (lp.q < 0) { return; }       /* poll(2): each turn polls the waiters */
+    LoopFd *f = lp.fdw[fd];
+    i64 want = loopWant(f);
+    if (!want || loopRegister(lp, fd, f, want | f.armed)) { return; }
     i32 err = os.errno();
-    loopFire(lp, fd, err == libc.EBADF ? libc.POLLNVAL : want);
+    i64 all = 0;
+    for (i64 i = 0; i < f.n; i++) { all |= f.w[i].events; }
+    loopFire(lp, fd, err == libc.EBADF ? libc.POLLNVAL : all);
+}
+
+/* A closed fd: the kernel dropped its registration, so a new fd with the
+ * same number starts unregistered */
+static void loopForget(Loop *lp, i32 fd) {
+    if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) { lp.fdw[fd].armed = 0; }
 }
 
 /* t waits on fd for events: one more waiter of fd, and fd armed. */
@@ -457,7 +501,10 @@ pub i32 accept(i32 lfd, i64 ms=-1) {
         }
         lp.fdsOut = false;
         fd = net.accept(lfd, true);
-        if (fd >= 0) { return fd; }
+        if (fd >= 0) {
+            loopForget(lp, fd);     /* its number may have been closed with close(2) */
+            return fd;
+        }
         err = os.errno();
         if (err == libc.EMFILE || err == libc.ENFILE || err == LOOP_ENOBUFS || err == libc.ENOMEM) {
             loopFdsOut(lp);
@@ -477,7 +524,10 @@ pub i32 close(i32 fd) {
     Loop *lp = loopGet(false);
     /* a coroutine still waiting on it would wait forever: the kernel
      * forgets a closed fd */
-    if (lp) { loopFire(lp, fd, libc.POLLNVAL); }
+    if (lp) {
+        loopFire(lp, fd, libc.POLLNVAL);
+        loopForget(lp, fd);
+    }
     i32 r = libc.close(fd);
     if (!lp || !lp.fdsOut) { return r; }
     lp.fdsOut = false;
@@ -569,7 +619,8 @@ static void loopPoll(Loop *lp, i64 timeout) {
         loopFire(lp, fd, rev);
 #endif
     }
-    /* who is left waiting on a fired one-shot fd is armed again */
+    /* a fired fd nobody waits for that event on is narrowed (or dropped),
+     * or a level-triggered queue would report it every turn */
     for (i = 0; i < n; i++) {
 #ifdef IS_LINUX
         u64 data;
@@ -578,7 +629,10 @@ static void loopPoll(Loop *lp, i64 timeout) {
 #else
         i32 fd = (i32)((LoopKevent *)(lp.ev + i * LOOP_EV_SIZE)).ident;
 #endif
-        if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd] && lp.fdw[fd].n) { loopArm(lp, fd); }
+        if (fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { continue; }
+        LoopFd *f = lp.fdw[fd];
+        i64 want = loopWant(f);
+        if (want != f.armed) { loopRegister(lp, fd, f, want); }
     }
 }
 
