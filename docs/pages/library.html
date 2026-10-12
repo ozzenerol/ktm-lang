@@ -620,6 +620,53 @@ inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shel
 are still the tools for shell pipelines, globs and redirections; use the <code>proc.Proc</code>
 functions whenever an argument comes from a file name or user input.</p>
 
+<h3 id="environment">The environment, the program's path, wait statuses</h3>
+<p><code>proc.getenv(name)</code> gives a variable's value as a String (empty when it isn't
+set; <code>proc.hasEnv(name)</code> tells an empty value from a missing one),
+<code>proc.setenv(name, value)</code> and <code>proc.unsetenv(name)</code> change it for this
+program and the ones it starts. <code>proc.selfPath()</code> is the running executable's absolute
+path (under <code>ktm -jit</code>, ktm's own), and <code>proc.cpuCount()</code> the CPUs
+online.</p>
+<p>A status from <code>libc.waitpid</code> or <code>libc.system</code> is read with
+<code>proc.exited(st)</code> and <code>proc.exitCode(st)</code>, <code>proc.signaled(st)</code>
+and <code>proc.termSignal(st)</code>, <code>proc.stopped(st)</code> and
+<code>proc.stopSignal(st)</code>; <code>proc.statusCode(st)</code> is what a shell puts in
+<code>$?</code>: the exit code, or 128 plus the signal. The libc module also declares what
+shells and daemons call directly: <code>dup</code>, <code>dup2</code>, <code>setpgid</code>,
+<code>tcsetpgrp</code>, <code>getpid</code>, <code>setsid</code>, <code>readlink</code>,
+<code>realpath</code>, <code>pread</code>, <code>setrlimit</code> and more, with the common
+<code>errno</code> codes (<code>EEXIST</code>, <code>EMFILE</code>, <code>ENOTEMPTY</code>, ...)
+for each platform.</p>
+<pre data-run><code>
+import libc, proc;
+
+void main()
+{
+  proc.setenv("GREETING", "hello");
+  String g = proc.getenv("GREETING");
+  printf("GREETING=%s\n", g);
+  g.free();
+  proc.unsetenv("GREETING");
+  printf("still set: %d\n", proc.hasEnv("GREETING"));
+
+  String me = proc.selfPath();
+  printf("absolute path: %d, CPUs: %d\n", me[0] == '/', proc.cpuCount() >= 1);
+  me.free();
+
+  i32 st = libc.system("exit 3");
+  printf("exited %d with %d, $? %d\n", proc.exited(st), proc.exitCode(st), proc.statusCode(st));
+  st = libc.system("kill -KILL $$");
+  printf("signal %d, $? %d\n", proc.termSignal(st), proc.statusCode(st));
+}
+</code></pre>
+<pre class="output">
+GREETING=hello
+still set: 0
+absolute path: 1, CPUs: 1
+exited 1 with 3, $? 3
+signal 9, $? 137
+</pre>
+
 <h2 id="signals">Signals</h2>
 <p><code>signal.handle(sig, handler, flags, mask, &amp;old)</code> sets what happens when a signal arrives:
 <code>SIG_DFL</code>, <code>SIG_IGN</code>, or a function <code>void F(i32 sig)</code> passed as
