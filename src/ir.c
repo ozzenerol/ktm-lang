@@ -2443,8 +2443,14 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
      *    then lower the handler, then jump to end. */
     irFnAddBlock(ctx->cur_func, catch_block);
     ctx->cur_block = catch_block;
+    /* Reached by longjmp, an edge the register allocator doesn't see:
+     * frame_addr only stays alive across the body because the catch
+     * block is laid out after it, so take the address again (as defer
+     * does) rather than rely on that. */
+    IrValue *caught_addr = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, caught_addr, frame_tmp, NULL));
     irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
-                        IR_TYPE_VOID, 8, frame_addr);
+                        IR_TYPE_VOID, 8, caught_addr);
     irLowerAst(ctx, ast->catch_body);
     if (!ctx->cur_block->sealed) {
         IrInstr *jmp = irJump(ctx->cur_func, ctx->cur_block, end_block);
