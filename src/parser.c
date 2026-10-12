@@ -2958,6 +2958,11 @@ Ast *parseReturnStatement(Cctrl *cc) {
     }
     Ast *retval = parseExpr(cc,16);
     AstType *check;
+    if (retval && retval->kind == AST_LVAR && (retval->flags & AST_FLAG_AUTODEFER)) {
+        cctrlRaiseExceptionAt(cc, ret_tok.line, ret_tok.col, ret_tok.len,
+            "`%s` is declared with `ad`, so it is freed when this function returns: "
+            "declare it without `ad` to return it", retval->lname->data);
+    }
     cctrlTokenExpect(cc,';');
     cctrlTokenRewind(cc);
     Lexeme semi_tok = *cctrlTokenGet(cc);
@@ -3760,6 +3765,16 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
             continue;
         }
 
+        /* `ad T name = ...;` (autodefer): `defer name.free();` follows */
+        Lexeme *ad_tok = NULL;
+        if (tok->tk_type == TK_IDENT && tok->len == 2 && !memcmp(tok->start, "ad", 2)) {
+            Lexeme *next = cctrlTokenPeekBy(cc, 1);
+            if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
+                ad_tok = cctrlTokenGet(cc);
+                tok = cctrlTokenPeek(cc);
+            }
+        }
+
         is_const = 0;
         if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_CONST) {
             is_const = 1;
@@ -3837,6 +3852,22 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
 
                 if (stmt) {
                     listAppend(body->stms,stmt);
+                }
+                if (ad_tok) {
+                    /* without a value only a String starts empty (zeroed) */
+                    if ((!stmt || stmt->kind != AST_DECL || !stmt->declinit) &&
+                        !astTypeIsString(var->type)) {
+                        cctrlRaiseExceptionAt(cc, var->line, var->col, var->lname->len,
+                            "`ad %s` needs a value to free later: write "
+                            "`ad %s %s = ...;`", var->lname->data,
+                            astTypeToString(var->type), var->lname->data);
+                    }
+                    var->flags |= AST_FLAG_AUTODEFER;
+                    Ast *free_call = parseAutoDeferFree(cc, var, ad_tok);
+                    Ast *deferred = astDefer(free_call);
+                    deferred->line = ad_tok->line;
+                    deferred->col = ad_tok->col;
+                    listAppend(body->stms, deferred);
                 }
                 cctrlTokenRewind(cc);
                 tok = cctrlTokenGet(cc);

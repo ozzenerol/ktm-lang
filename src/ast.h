@@ -285,6 +285,8 @@ typedef struct AstType {
 /* A module's function declared `pub`: for an overload, whose access is
  * checked on the one a call picks */
 #define AST_FLAG_PUB (1<<17)
+/* A local declared with `ad` (autodefer): freed at the end of its scope */
+#define AST_FLAG_AUTODEFER (1<<18)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
