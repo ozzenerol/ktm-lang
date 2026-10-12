@@ -23,6 +23,8 @@ pub struct HCFs {
     void *coroCache;         /* released coroutine stacks kept for reuse */
     i64 coroCached;        /* how many */
     Error error;            /* the error being thrown, until a catch takes it */
+    void *coroLoop;          /* the thread's coroutine loop (coro.go), or null */
+    fn(void *loop) void coroLoopFree;  /* frees it when the thread ends */
 };
 
 /* The "" of an Error without a message (or file): never freed. */
@@ -48,6 +50,7 @@ static u64 fsKey = 0;
 static void fsFree(void *p) {
     HCFs *fs = p;
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
+    if (fs.coroLoop) { fs.coroLoopFree(fs.coroLoop); }
     coroStacksFree(fs);
     libc.free(fs.coroRoot);
     libc.free(fs);
