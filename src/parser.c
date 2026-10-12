@@ -1511,10 +1511,13 @@ static LexModule *parseInitModule(Cctrl *cc) {
     return cc->lexer_->modules[cc->cur_module - 1];
 }
 
-/* A global's run-time initialiser: its module's, or the program's */
+/* A global's run-time initialiser: its module's, or the program's. A
+ * prebuilt module's `_init` is already compiled, so what a generic of it
+ * adds while made for this program (reflect.of in json.decode<T>) runs
+ * with the program's own initialisers. */
 static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
     LexModule *m = parseInitModule(cc);
-    if (m) {
+    if (m && !m->prebuilt) {
         if (!m->init_stmts) m->init_stmts = listNew();
         listAppend(m->init_stmts, ast);
         return;
