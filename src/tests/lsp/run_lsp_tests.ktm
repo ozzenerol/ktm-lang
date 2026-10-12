@@ -99,6 +99,7 @@ u8 *MOD_MAIN_HC;
 u8 *MOD_LIST_HC;
 u8 *ENUM_HC;
 u8 *DOC_HC;
+u8 *SIG_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -166,6 +167,23 @@ void initFixtures() {
         "  i64 x; // the x\n"
         "};\n"
         "i32 main() { P p; p.x = add(1, 2) + scale(3) + bare(4); return (i32)p.x; }\n";
+    /* Signature help: plain, nested, overloaded, method and variadic calls */
+    SIG_HC =
+        "/* Adds. */\n"
+        "i64 add(i64 a, i64 b) { return a + b; }\n"
+        "void show(i64 x) { }\n"
+        "void show(u8[] s) { }\n"
+        "i64 total(i64 ...nums) { return nums.len; }\n"
+        "struct User { i64 age; };\n"
+        "i64 User.older(i64 years, bool loud) { return self.age + years; }\n"
+        "i32 main() {\n"
+        "  User u;\n"
+        "  i64 r = add(1, add(2, 3));\n"
+        "  show(\"hi\");\n"
+        "  u.older(3, true);\n"
+        "  r = total(1, 2, 3);\n"
+        "  return (i32)r;\n"
+        "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
         "type Text = u8[];\n"
@@ -1249,7 +1267,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 17;
+const i64 LSP_GROUPS = 18;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1584,6 +1602,70 @@ void testSymbols() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+/* The active signature's label and its active parameter's text */
+bool sigIs(json.Value *resp, u8 *label, u8 *param) {
+    json.Value *as = json.select(resp, ".result.activeSignature:i");
+    json.Value *sigs = json.select(resp, ".result.signatures:a");
+    if (as == null || sigs == null) { return false; }
+    i64 k = as.intVal;
+    json.Value *sig = sigs.array;
+    while (k > 0 && sig != null) { sig = sig.next; k--; }
+    if (sig == null) { return false; }
+    json.Value *lab = json.select(sig, ".label:s");
+    json.Value *apv = json.select(sig, ".activeParameter:i");
+    json.Value *params = json.select(sig, ".parameters:a");
+    if (lab == null || apv == null || params == null) { return false; }
+    if (cstr.cmp(lab.str.ptr, label) != 0) { return false; }
+    i64 ap = apv.intVal;
+    json.Value *ps = params.array;
+    while (ap > 0 && ps != null) { ps = ps.next; ap--; }
+    if (ps == null) { return false; }
+    json.Value *range = json.select(ps, ".label:a");
+    if (range == null || range.array == null || range.array.next == null) { return false; }
+    i64 s0 = range.array.intVal;
+    i64 s1 = range.array.next.intVal;
+    return s1 - s0 == cstr.len(param) && libc.strncmp(lab.str.ptr + s0, param, s1 - s0) == 0;
+}
+
+void testSignatureHelp() {
+    printf("signature help\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("sighelp.ktm");
+    lspDidOpen(l, uri, SIG_HC);
+    check("signature help fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    posOf(SIG_HC, "add(1, ", 7, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("in add(1, |: the second parameter of add",
+                sigIs(resp, "i64 add(i64 a, i64 b)", "i64 b") &&
+                json.select(resp, ".result.signatures:a").array != null &&
+                json.select(json.select(resp, ".result.signatures:a").array,
+                            ".documentation.value:s") != null);
+    posOf(SIG_HC, "add(2", 4, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("in a nested call: the inner call's first parameter",
+                sigIs(resp, "i64 add(i64 a, i64 b)", "i64 a"));
+    posOf(SIG_HC, "show(\"", 5, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("an overloaded call: both overloads, the one it calls active",
+                sigIs(resp, "void show(u8[] s)", "u8[] s") &&
+                jsonArrayCount(json.select(resp, ".result.signatures:a")) == 2);
+    posOf(SIG_HC, "older(3, ", 9, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("a method call: its signature without self",
+                sigIs(resp, "i64 User.older(i64 years, bool loud)", "bool loud"));
+    posOf(SIG_HC, "total(1, 2, ", 12, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("past a variadic's last parameter: still the variadic one",
+                sigIs(resp, "i64 total(i64 ...nums)", "i64 ...nums"));
+    posOf(SIG_HC, "User u", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("outside a call: no signature", isNullResult(resp));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1603,6 +1685,7 @@ void runGroup(i64 group) {
         case 14: testEnums();
         case 15: testDocs();
         case 16: testSymbols();
+        case 17: testSignatureHelp();
     }
 }
 
