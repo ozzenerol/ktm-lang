@@ -8,6 +8,7 @@ pub struct CoroCached;
 pub struct CoroCached {
     CoroCached *next;
     i64 len;              /* bytes mapped, guard included */
+    bool trimmed;         /* its pages below the top were given back */
 };
 
 /* Unmap a thread's cached stacks: FsFree calls it when the thread ends. */

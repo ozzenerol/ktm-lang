@@ -649,6 +649,7 @@ Like coro.wait, coro.stop() doesn&#x27;t end it.</p></div><div class="decl" id="
     bool failed;
     bool isRoot;
     void *loopTask;
+    u64 stackLo;
 };</code></pre></div><div class="decl" id="coro.spawn"><div class="decl-head"><a class="decl-name" href="#coro.spawn">coro.spawn</a> <span class="kind">function</span></div><pre><code class="language-ktm">Coroutine *spawn(fn(void *arg) void *body, void *arg=null, i64 stackSize=0);</code></pre><p class="doc">A new coroutine that will run fn(arg) on its own stack of stack_size
 bytes (0 = 256 KiB; rounded up to whole pages, at least 4), with an
 inaccessible guard page below it so an overflow crashes instead of
