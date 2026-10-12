@@ -2979,8 +2979,9 @@ Ast *parseReturnStatement(Cctrl *cc) {
 
     if (retval && astFnPtrMismatch(cc->tmp_rettype, check)) {
         cctrlRaiseExceptionAt(cc,ret_tok.line,ret_tok.col,ret_tok.len,
-                "cannot convert %s to %s",
-                astTypeToString(check), astTypeToString(cc->tmp_rettype));
+                "cannot convert %s to %s%s",
+                astTypeToString(check), astTypeToString(cc->tmp_rettype),
+                parseFnConvertHint(cc->tmp_rettype, check));
     }
     AstType *ok = astTypeCheck(cc->tmp_rettype,retval,'\0');
     if (!ok && astIsEnumType(cc->tmp_rettype)) {

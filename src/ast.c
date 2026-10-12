@@ -1269,21 +1269,98 @@ int astFnTypesMatch(AstType *a, AstType *b) {
     }
 }
 
+static int astIsVoidPtr(AstType *ty) {
+    return ty && ty->kind == AST_TYPE_POINTER && ty->ptr && ty->ptr->kind == AST_TYPE_VOID;
+}
+
+/* A pointer to data (not to a function): what a void * parameter takes */
+static int astIsDataPtr(AstType *ty) {
+    if (!ty) return 0;
+    return (ty->kind == AST_TYPE_POINTER || ty->kind == AST_TYPE_ARRAY) && ty->ptr && ty->ptr->kind != AST_TYPE_FUNC;
+}
+
+/* Can a function of type `actual` be called as one of type `expected`
+ * (both AST_TYPE_FUNC)? As astFnTypesMatch, except that a void *
+ * parameter on either side takes a data pointer parameter on the other
+ * (`i64 byAge(User *a, User *b)` as a `fn(void *, void *) i64`): every
+ * data pointer is passed the same way, so the call is the one a cast
+ * would make. The return type, the count, `...` and every other
+ * parameter must match exactly. */
+static int astFnConvertible(AstType *expected, AstType *actual) {
+    if (expected == actual) return 1;
+    if (!astFnTypesMatch(expected->rettype, actual->rettype)) return 0;
+    u64 ne = expected->params ? expected->params->size : 0;
+    u64 na = actual->params ? actual->params->size : 0;
+    if (ne != na) return 0;
+    for (u64 i = 0; i < ne; ++i) {
+        Ast *pe = expected->params->entries[i];
+        Ast *pa = actual->params->entries[i];
+        if (!pe || !pa) return pe == pa;
+        if ((pe->kind == AST_VAR_ARGS) != (pa->kind == AST_VAR_ARGS)) return 0;
+        if ((pe->flags & AST_FLAG_VARARGS) != (pa->flags & AST_FLAG_VARARGS)) return 0;
+        if (pe->kind == AST_VAR_ARGS) continue;
+        if (astFnTypesMatch(pe->type, pa->type)) continue;
+        if ((astIsVoidPtr(pe->type) && astIsDataPtr(pa->type)) ||
+            (astIsVoidPtr(pa->type) && astIsDataPtr(pe->type))) {
+            continue;
+        }
+        return 0;
+    }
+    return 1;
+}
+
+/* `expected` and `actual` with arrays as pointers, then as many levels of
+ * pointer taken off both as they share; *_depth is how many */
+static void astFnPtrStrip(AstType **expected, AstType **actual, int *_depth) {
+    AstType *e = *expected, *a = *actual;
+    int depth = 0;
+    if (e->kind == AST_TYPE_ARRAY) e = astMakePointerType(e->ptr);
+    if (a->kind == AST_TYPE_ARRAY) a = astMakePointerType(a->ptr);
+    while (e->kind == AST_TYPE_POINTER && a->kind == AST_TYPE_POINTER && e->ptr && a->ptr) {
+        e = e->ptr;
+        a = a->ptr;
+        depth++;
+    }
+    *expected = e;
+    *actual = a;
+    *_depth = depth;
+}
+
+/* `actual` converts to `expected` where both are function pointers (or
+ * pointers to them, as deep as each other). Typed pointer parameters
+ * stand in for void * ones only for the function pointer itself: a
+ * pointer to one could be used to store a function that takes anything
+ * where only a User * is expected, so it must match exactly. Not
+ * function pointers (a void * or null on either side among them): 1,
+ * they convert freely. */
+int astFnPtrConvertible(AstType *expected, AstType *actual) {
+    if (!expected || !actual) return 1;
+    int depth;
+    astFnPtrStrip(&expected, &actual, &depth);
+    if (expected->kind != AST_TYPE_FUNC || actual->kind != AST_TYPE_FUNC) return 1;
+    if (depth > 0) return astFnTypesMatch(expected, actual);
+    return astFnConvertible(expected, actual);
+}
+
+/* A conversion astFnPtrConvertible refuses that would be allowed for the
+ * function pointer itself: a pointer to one whose typed pointer
+ * parameters stand for void * ones */
+int astFnPtrOnlyDirect(AstType *expected, AstType *actual) {
+    if (!expected || !actual) return 0;
+    int depth;
+    astFnPtrStrip(&expected, &actual, &depth);
+    if (depth == 0 || expected->kind != AST_TYPE_FUNC || actual->kind != AST_TYPE_FUNC) return 0;
+    return !astFnTypesMatch(expected, actual) && astFnConvertible(expected, actual);
+}
+
 /* `expected` and `actual` are both function pointers (or pointers to
  * them, as deep as each other) whose signatures differ: a conversion C
  * would only warn about and that calls through with the wrong arguments.
- * A void * (or null) on either side is not one: they convert freely. */
+ * A void * (or null) on either side is not one: they convert freely; nor
+ * is a function whose typed pointer parameters stand for void * ones
+ * (see astFnPtrConvertible). */
 int astFnPtrMismatch(AstType *expected, AstType *actual) {
-    if (!expected || !actual) return 0;
-    if (expected->kind == AST_TYPE_ARRAY) expected = astMakePointerType(expected->ptr);
-    if (actual->kind == AST_TYPE_ARRAY) actual = astMakePointerType(actual->ptr);
-    while (expected->kind == AST_TYPE_POINTER && actual->kind == AST_TYPE_POINTER &&
-           expected->ptr && actual->ptr) {
-        expected = expected->ptr;
-        actual = actual->ptr;
-    }
-    if (expected->kind != AST_TYPE_FUNC || actual->kind != AST_TYPE_FUNC) return 0;
-    return !astFnTypesMatch(expected, actual);
+    return !astFnPtrConvertible(expected, actual);
 }
 
 int astIsEnumType(AstType *ty) {

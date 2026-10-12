@@ -36,6 +36,7 @@ AstType *parseFnType(Cctrl *cc);
 Ast *findFunctionDecl(Cctrl *cc, char *fname, int len);
 Ast *parseCreateBinaryOp(Cctrl *cc, AstBinOp operation, Ast *left, Ast *right);
 void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual);
+char *parseFnConvertHint(AstType *expected, AstType *actual);
 Ast *parseSizeof(Cctrl *cc);
 Ast *parseAlignof(Cctrl *cc);
 Ast *parseTypeof(Cctrl *cc);
