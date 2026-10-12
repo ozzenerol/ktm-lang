@@ -4,6 +4,69 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.9.0 <small>(2026-10-12)</small></h2>
+<p>Generics and type aliases. A struct, its methods and a function can take type parameters,
+and each use with other types is compiled for those types: the same code you would write by
+hand, with no <code>void *</code> and no casts.</p>
+
+<pre><code>import mem;
+
+struct Stack&lt;T&gt; { T *items; i64 len; i64 cap; };
+
+void Stack&lt;T&gt;.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack&lt;T&gt;.pop() { return self.items[--self.len]; }
+void Stack&lt;T&gt;.free() { mem.free(self.items); }
+
+T max&lt;T&gt;(T a, T b) { return a &gt; b ? a : b; }
+
+type Ints = Stack&lt;i64&gt;;
+
+void main()
+{
+  ad Ints nums = {null, 0, 0};
+  nums.push(1);
+  nums.push(2);
+  ad Stack&lt;u8 *&gt; words = {null, 0, 0};
+  words.push("hello");
+  printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>Generics: <code>struct Stack&lt;T&gt;</code>, its methods <code>T Stack&lt;T&gt;.pop()</code>,
+  and functions <code>T max&lt;T&gt;(T a, T b)</code>, with any number of parameters. A type is
+  written with its arguments (<code>Stack&lt;i64&gt;</code>, <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>);
+  a call works them out from the arguments (through pointers, slices, <code>fn</code> types and
+  generic structs) or takes them written (<code>max&lt;f64&gt;(1, 2.5)</code>). Generic bases,
+  self-referencing structs, <code>ad</code>, modules (<code>coll.Vec&lt;i64&gt;</code>,
+  <code>pub</code> as for any declaration) and <code>-lib</code> libraries work with them. An error
+  in an instance names it and the use that asked for it. The language server shows instances and
+  goes to the generic's definition. A generic <code>Vec&lt;i64&gt;</code> ran faster than
+  <code>vec.IntVec</code> in our measurements. See <a href="language.html#generics">Generics</a>.</li>
+  <li>Type aliases: <code>type Name = T;</code> gives any type a second name (slices, pointers,
+  <code>fn</code> types, fixed arrays, structs, generic instances, other aliases). An alias is its
+  type, so values pass between them with no conversion; in a module <code>pub type</code> is used
+  as <code>mod.Name</code> and aliases may come in any order. The language server shows,
+  completes and jumps to them.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>pub</code> or <code>private</code> on an enum, struct or union applied to the next
+  declaration of a module as well: a private function after a <code>pub enum</code> could be
+  called from outside, and a <code>pub</code> declaration after a <code>private enum</code> was an
+  error.</li>
+</ul>
+
 <h2>v0.8.0 <small>(2026-10-12)</small></h2>
 <p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
 and UDP with binary addresses in <code>net</code>.</p>

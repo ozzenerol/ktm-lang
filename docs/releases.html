@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,69 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-9-0-2026-10-12">v0.9.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-9-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Generics and type aliases. A struct, its methods and a function can take type parameters,
+and each use with other types is compiled for those types: the same code you would write by
+hand, with no <code>void *</code> and no casts.</p>
+
+<pre><code>import mem;
+
+struct Stack&amp;lt;T&amp;gt; { T *items; i64 len; i64 cap; };
+
+void Stack&amp;lt;T&amp;gt;.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack&amp;lt;T&amp;gt;.pop() { return self.items[--self.len]; }
+void Stack&amp;lt;T&amp;gt;.free() { mem.free(self.items); }
+
+T max&amp;lt;T&amp;gt;(T a, T b) { return a &amp;gt; b ? a : b; }
+
+type Ints = Stack&amp;lt;i64&amp;gt;;
+
+void main()
+{
+  ad Ints nums = {null, 0, 0};
+  nums.push(1);
+  nums.push(2);
+  ad Stack&amp;lt;u8 *&amp;gt; words = {null, 0, 0};
+  words.push("hello");
+  printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Generics: <code>struct Stack&lt;T&gt;</code>, its methods <code>T Stack&lt;T&gt;.pop()</code>,
+  and functions <code>T max&lt;T&gt;(T a, T b)</code>, with any number of parameters. A type is
+  written with its arguments (<code>Stack&lt;i64&gt;</code>, <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>);
+  a call works them out from the arguments (through pointers, slices, <code>fn</code> types and
+  generic structs) or takes them written (<code>max&lt;f64&gt;(1, 2.5)</code>). Generic bases,
+  self-referencing structs, <code>ad</code>, modules (<code>coll.Vec&lt;i64&gt;</code>,
+  <code>pub</code> as for any declaration) and <code>-lib</code> libraries work with them. An error
+  in an instance names it and the use that asked for it. The language server shows instances and
+  goes to the generic's definition. A generic <code>Vec&lt;i64&gt;</code> ran faster than
+  <code>vec.IntVec</code> in our measurements. See <a href="language.html#generics">Generics</a>.</li>
+  <li>Type aliases: <code>type Name = T;</code> gives any type a second name (slices, pointers,
+  <code>fn</code> types, fixed arrays, structs, generic instances, other aliases). An alias is its
+  type, so values pass between them with no conversion; in a module <code>pub type</code> is used
+  as <code>mod.Name</code> and aliases may come in any order. The language server shows,
+  completes and jumps to them.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>pub</code> or <code>private</code> on an enum, struct or union applied to the next
+  declaration of a module as well: a private function after a <code>pub enum</code> could be
+  called from outside, and a <code>pub</code> declaration after a <code>private enum</code> was an
+  error.</li>
+</ul>
 
 <h2 id="v0-8-0-2026-10-12">v0.8.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-8-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
@@ -64,7 +127,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
   end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
@@ -95,7 +158,7 @@ void main()
   <code>net.setBlocking</code> are public.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>macOS: a string literal with a NUL byte inside (<code>"\x00\x08\x00\x00"</code>) lost
   bytes in a compiled program: the linker splits the section literals went in at each NUL and
@@ -161,7 +224,7 @@ void main()
   module.</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
   as a block's first statement it used to point at the block's <code>{</code>.</li>
@@ -192,7 +255,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Overloading: functions, methods and a module's functions can share a name when their
   parameter types differ, and a call picks the one its arguments fit best (an exact type over
@@ -240,7 +303,7 @@ void main()
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old C declarator of a function that returns a function pointer,
   <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
@@ -329,7 +392,7 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
@@ -360,7 +423,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
   kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
@@ -430,7 +493,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -473,7 +536,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -538,7 +601,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -563,7 +626,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -633,7 +696,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-6">The language<a class="anchor" href="#the-language-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -695,7 +758,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-9">Fixes<a class="anchor" href="#fixes-9" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
