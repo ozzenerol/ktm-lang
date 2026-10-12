@@ -2086,6 +2086,35 @@ block either, so it runs no defers.</li>
 <p>Only functions that use <code>defer</code> pay for it (each one reached sets up a frame
 like a <code>try</code> does); code without it compiles exactly as before.</p>
 
+<h3 id="autodefer">ad (autodefer)<a class="anchor" href="#autodefer" aria-label="Link to this section">#</a></h3>
+<p><code>ad</code> in front of a declaration frees the variable at the end of its scope, as if
+<code>defer name.free();</code> came right after it, on every way out (the end of the block, a
+<code>return</code>, <code>break</code>, <code>continue</code> or a throw). It works for a
+String, any slice, and a struct with a <code>free()</code> method that takes no arguments (or a
+pointer to one, which calls that method on it):</p>
+<pre data-run><code>import str;
+
+struct Conn { i64 fd; };
+void Conn.free() { printf("closing %d\n", self.fd); }
+
+void main()
+{
+  ad String name = str.from("Lorenzo");
+  ad u8[][] words = str.split("a b c", " ");
+  ad Conn c = {7};
+  printf("%s has %d words\n", name.cstr(), words.len);
+}
+</code></pre>
+<pre class="output">Lorenzo has 3 words
+closing 7
+</pre>
+<p>Since the variable is freed when its scope ends, returning it is an error: declare it
+without <code>ad</code> to hand it to the caller. A type with no such <code>free()</code> is an
+error too, and so is an <code>ad</code> struct without a value (only a String starts empty).
+Copying an <code>ad</code> variable copies its pointers, not what they point to: the copy is
+freed with the original. <code>ad</code> is not a reserved word: a variable can still be
+named <code>ad</code>.</p>
+
 <h2 id="calling-c">Calling C<a class="anchor" href="#calling-c" aria-label="Link to this section">#</a></h2>
 <p>Declare any C function with <code>extern "c"</code> and call it directly. libc is always
 linked:</p>

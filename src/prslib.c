@@ -3412,6 +3412,51 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
     return astUnaryOperator(binop->type->ptr, AST_UN_OP_DEREF, binop);
 }
 
+/* `ad T name = ...;`: the call that frees `var` at the end of its scope,
+ * `name.free()`: a slice's buffer (as `parts.free()`), or the `free()`
+ * method of its type or of the type it points to. An error naming the
+ * type when it has none. */
+Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at) {
+    AstType *t = var->type;
+    if (astTypeIsSlice(t) && !astTypeIsString(t)) {
+        Vec *args = astVecNew();
+        vecPush(args, astClassRef(mapGetLen(t->fields, str_lit("ptr")), var, "ptr"));
+        char *sym = astRuntimeSymbol("__ktmSliceFree");
+        return astFunctionCall(ast_void_type, sym, strlen(sym), args);
+    }
+    int is_ptr = t->kind == AST_TYPE_POINTER;
+    AstType *cls = is_ptr ? t->ptr : t;
+    AstType *owner = NULL;
+    Ast *fn = NULL;
+    if (cls && (cls->kind == AST_TYPE_CLASS || cls->kind == AST_TYPE_UNION) &&
+        !cls->is_intrinsic) {
+        fn = parseFindMethod(cc, cls, "free", 4, &owner);
+    }
+    /* of an overloaded free(), the one that takes nothing */
+    if (fn && fn->overloads) {
+        Ast *none = NULL;
+        for (u64 i = 0; i < fn->overloads->size; ++i) {
+            Ast *o = fn->overloads->entries[i];
+            if (o->params && o->params->size == 1) none = o;
+        }
+        fn = none;
+    }
+    if (!fn || !fn->params || fn->params->size != 1) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+            "`ad` frees its variable with `free()`, and `%s` has no `free()` that "
+            "takes no arguments: declare it without `ad` and free it yourself",
+            astTypeToString(t));
+    }
+    parseCheckMethodAccess(cc, owner, "free", 4);
+    Ast *recv = is_ptr ? var
+              : astUnaryOperator(astMakePointerType(t), AST_UN_OP_ADDR_OF, var);
+    AstType *self_type = ((Ast *)fn->params->entries[0])->type;
+    if (recv->type->ptr != self_type->ptr) recv = astCast(recv, self_type);
+    Vec *args = astVecNew();
+    vecPush(args, recv);
+    return astFunctionCall(fn->type->rettype, fn->fname->data, fn->fname->len, args);
+}
+
 /* `field` (named `name`) is private to another module than this code's */
 void parseCheckPrivateField(Cctrl *cc, AstType *field, char *name, int len) {
     if (!field || !field->private_module ||
