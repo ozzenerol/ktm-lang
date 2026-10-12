@@ -97,6 +97,7 @@ u8 *UTF_HC;
 u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
 u8 *MOD_LIST_HC;
+u8 *ENUM_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -118,6 +119,7 @@ void initFixtures() {
         "module geo;\n"
         "pub struct Point { i64 x; i64 y; private i64 tag; };\n"
         "pub const i64 ORIGIN = 0;\n"
+        "pub enum Kind { square, circle };\n"
         "i64 square(i64 n) { return n * n; }\n"
         "pub i64 area(i64 side) { return square(side); }\n";
     /* geo's second file: uses geo.ktm's square bare */
@@ -138,7 +140,16 @@ void initFixtures() {
         "import mem,\n"
         "  g = geo; // the alias\n"
         "i32 main() {\n"
+        "  g.Kind k = g.Kind.circle;\n"
         "  return (i32)g.area(2);\n"
+        "}\n";
+    /* Enums: hover, definition and completion of types and members */
+    ENUM_HC =
+        "enum Color { red, green = 5 };\n"
+        "i32 main() {\n"
+        "  Color c = Color.green;\n"
+        "  Color d = Color.\n"
+        "  return 0;\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1223,7 +1234,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 14;
+const i64 LSP_GROUPS = 15;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1243,7 +1254,7 @@ void testModules() {
     json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
     json.Value *items = json.select(resp, ".result.items:a");
     check("completion after `geo.` offers exactly geo's pub names",
-                jsonArrayCount(items) == 3 && labelsOk(resp, "", "area", "Point"));
+                jsonArrayCount(items) == 4 && labelsOk(resp, "", "area", "Point"));
 
     posOf(MOD_MAIN_HC, "p.x;", 2, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
@@ -1271,6 +1282,19 @@ void testModules() {
     resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
     check("definition of a module named later in an import list",
                 locEq(resp, geoUri, wantLine, wantChr, false));
+
+    posOf(MOD_LIST_HC, "circle;", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's enum member shows its value",
+                hoverContains(resp, "geo.Kind.circle = 1"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    posOf(MOD_GEO_HC, "circle", 0, &wantLine, &wantChr);
+    check("definition of a module's enum member is in its enum",
+                locEq(resp, geoUri, wantLine, wantChr, true));
+    posOf(MOD_LIST_HC, "Kind k", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module's enum shows its members",
+                hoverContains(resp, "enum geo.Kind") && hoverContains(resp, "square = 0"));
 
     /* Inside geo's files its names are bare: `square(n)` in more.ktm
      * is geo.ktm's square */
@@ -1406,6 +1430,44 @@ void testGenerics() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testEnums() {
+    printf("enums\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("enums.ktm");
+    lspDidOpen(l, uri, ENUM_HC);
+
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+    posOf(ENUM_HC, "Color c", 1, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on an enum shows its members and values",
+                hoverContains(resp, "enum Color") && hoverContains(resp, "green = 5"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(ENUM_HC, "Color {", 0, &wantLine, &wantChr);
+    check("definition of an enum is its declaration",
+                locEq(resp, uri, wantLine, wantChr, true));
+
+    posOf(ENUM_HC, "green;", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on Color.green shows its value", hoverContains(resp, "Color.green = 5"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(ENUM_HC, "green =", 0, &wantLine, &wantChr);
+    check("definition of Color.green is the member", locEq(resp, uri, wantLine, wantChr, true));
+
+    posOf(ENUM_HC, "red,", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a member where it is declared", hoverContains(resp, "Color.red = 0"));
+
+    posOf(ENUM_HC, "Color.\n", 6, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    json.Value *items = json.select(resp, ".result.items:a");
+    check("completion after `Color.` offers exactly its members",
+                jsonArrayCount(items) == 2 && labelsOk(resp, "", "red", "green"));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1422,6 +1484,7 @@ void runGroup(i64 group) {
         case 11: testOverloads();
         case 12: testTypeAlias();
         case 13: testGenerics();
+        case 14: testEnums();
     }
 }
 

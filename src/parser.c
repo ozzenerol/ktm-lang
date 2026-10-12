@@ -1241,6 +1241,10 @@ AstType *parseEnumDef(Cctrl *cc) {
     enum_type->alignment = (u32)underlying->size;
     enum_type->issigned = underlying->issigned;
     enum_type->enum_members = astMapNew();
+    /* Provenance for the LSP: the enum's name and each member's */
+    enum_type->line = tok->line;
+    enum_type->col = tok->col;
+    enum_type->file_id = ast_file_hint;
 
     Map *scope = cctrlCreateAstMap(cc->localenv);
     Map *saved_localenv = cc->localenv;
@@ -1295,6 +1299,9 @@ AstType *parseEnumDef(Cctrl *cc) {
 
         Ast *qualified = astI64Type(value);
         qualified->type = enum_type;
+        qualified->line = mtok->line;
+        qualified->col = mtok->col;
+        qualified->file_id = ast_file_hint;
         mapAdd(enum_type->enum_members, member_name->data, qualified);
 
         Lexeme *sep = cctrlTokenGetRequired(cc);
