@@ -175,6 +175,9 @@ typedef struct Cctrl {
      * bounds check (ElideLoop *): the open ones, innermost last, and the
      * finished ones, settled at the end of the function */
     List *elide_open;
+    /* reflect.typeOf: the hidden reflect.Type global of each type described,
+     * by its name (typeof's), made once per compilation unit */
+    Map *reflect_types;
     List *elide_done;
 
     /* Global variable whose declaration is mid-parse. If the

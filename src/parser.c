@@ -1506,6 +1506,234 @@ static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
     listAppend(cc->initalisers, ast);
 }
 
+/* ---- Reflection (v0.4.0): reflect.typeOf(T) and reflect.of(x) ----
+ *
+ * A type a program asks about is described by a hidden, zeroed static
+ * reflect.Type global, filled in when the program (or the module's
+ * _init) starts, with stores at the offsets of reflect's own structs:
+ * the same statements a global's run-time initialiser gets. Every type
+ * it leads to (fields, elements) is described too, each once. */
+
+/* reflect.Kind's members, in order (src/std/reflect/reflect.ktm) */
+enum {
+    REFLECT_NONE, REFLECT_INT, REFLECT_FLOAT, REFLECT_BOOLEAN, REFLECT_ENUM,
+    REFLECT_POINTER, REFLECT_ARRAY, REFLECT_SLICE, REFLECT_STRING,
+    REFLECT_STRUCT, REFLECT_UNION, REFLECT_FN
+};
+
+static AstType *parseReflectStruct(Cctrl *cc, char *name) {
+    AstType *t = mapGet(cc->clsdefs, name);
+    if (!t) {
+        cctrlRaiseException(cc, "reflect.typeOf and reflect.of need `import reflect;`");
+    }
+    return t;
+}
+
+static int parseReflectOffset(AstType *cls, char *field) {
+    AstType *f = mapGet(cls->fields, field);
+    assert(f);
+    return f->offset;
+}
+
+/* At start-up, `value` (a `ty`) into `var` at byte `off` */
+static void parseReflectStore(Cctrl *cc, Ast *var, int off, AstType *ty, Ast *value) {
+    int is_err = 0;
+    Ast *base = astCast(astUnaryOperator(astMakePointerType(var->type),
+                                         AST_UN_OP_ADDR_OF, var),
+                        astMakePointerType(ast_u8_type));
+    Ast *addr = astBinaryOp(AST_BIN_OP_ADD, base, astI64Type(off), &is_err);
+    Ast *slot = astUnaryOperator(ty, AST_UN_OP_DEREF,
+                                 astCast(addr, astMakePointerType(ty)));
+    parseAddInitialiser(cc, astBinaryOp(AST_BIN_OP_ASSIGN, slot, value, &is_err));
+}
+
+static void parseReflectStoreInt(Cctrl *cc, Ast *var, int off, s64 n) {
+    if (n) parseReflectStore(cc, var, off, ast_int_type, astI64Type(n));
+}
+
+/* A u8[] at `off`: the bytes of `s` (read-only data) */
+static void parseReflectStoreText(Cctrl *cc, Ast *var, int off, char *s, int len) {
+    AstType *u8p = astMakePointerType(ast_u8_type);
+    Ast *lit = cctrlGetOrSetString(cc, s, len, len + 1);
+    parseReflectStore(cc, var, off, u8p, astCast(lit, u8p));
+    parseReflectStoreInt(cc, var, off + 8, len);
+}
+
+/* A pointer at `off`: the address of the global `target` */
+static void parseReflectStoreAddr(Cctrl *cc, Ast *var, int off, Ast *target) {
+    AstType *vp = astMakePointerType(ast_void_type);
+    parseReflectStore(cc, var, off, vp,
+        astCast(astUnaryOperator(astMakePointerType(target->type),
+                                 AST_UN_OP_ADDR_OF, target), vp));
+}
+
+static Ast *parseReflectGlobal(Cctrl *cc, AstType *type) {
+    static int id = 0;
+    AoStr *name = aoStrPrintf("#reflect%d", id++);
+    Ast *var = astGVar(type, name->data, name->len, 1);
+    listAppend(cc->ast_list, astDecl(var, NULL));
+    return var;
+}
+
+static int parseReflectKind(AstType *t) {
+    if (astTypeIsString(t)) return REFLECT_STRING;
+    if (astTypeIsSlice(t)) return REFLECT_SLICE;
+    if (t->is_enum) return REFLECT_ENUM;
+    if (t->is_bool) return REFLECT_BOOLEAN;
+    switch (t->kind) {
+        case AST_TYPE_VOID:    return REFLECT_NONE;
+        case AST_TYPE_INT:
+        case AST_TYPE_CHAR:    return REFLECT_INT;
+        case AST_TYPE_FLOAT:   return REFLECT_FLOAT;
+        case AST_TYPE_POINTER: return REFLECT_POINTER;
+        case AST_TYPE_ARRAY:   return REFLECT_ARRAY;
+        case AST_TYPE_FUNC:    return REFLECT_FN;
+        case AST_TYPE_UNION:   return REFLECT_UNION;
+        case AST_TYPE_CLASS:   return t->is_intrinsic ? REFLECT_INT : REFLECT_STRUCT;
+        default:               return REFLECT_NONE;
+    }
+}
+
+/* The hidden reflect.Type global describing `t` */
+static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
+    AstType *rtype = parseReflectStruct(cc, "reflect.Type");
+    AoStr *key = astTypeToAoStr(t);
+    if (!cc->reflect_types) {
+        cc->reflect_types = mapNew(32, &map_cstring_opaque_type);
+    }
+    Ast *g = mapGet(cc->reflect_types, key->data);
+    if (g) {
+        aoStrRelease(key);
+        return g;
+    }
+    g = parseReflectGlobal(cc, rtype);
+    mapAdd(cc->reflect_types, strdup(key->data), g);
+
+    int kind = parseReflectKind(t);
+    parseReflectStoreInt(cc, g, parseReflectOffset(rtype, "kind"), kind);
+    parseReflectStoreText(cc, g, parseReflectOffset(rtype, "name"), key->data, key->len);
+    parseReflectStoreInt(cc, g, parseReflectOffset(rtype, "size"), t->size);
+    if (kind == REFLECT_INT || kind == REFLECT_ENUM) {
+        AstType *base = t;
+        if (t->is_enum && t->ptr) base = t->ptr;
+        parseReflectStoreInt(cc, g, parseReflectOffset(rtype, "isSigned"),
+                             base->issigned ? 1 : 0);
+    }
+    AstType *elem = NULL;
+    if (kind == REFLECT_SLICE) elem = t->elem;
+    else if (kind == REFLECT_POINTER || kind == REFLECT_ARRAY) elem = t->ptr;
+    if (elem) {
+        parseReflectStoreAddr(cc, g, parseReflectOffset(rtype, "elem"),
+                              parseReflectDescribe(cc, elem));
+    }
+    if (kind == REFLECT_ARRAY) {
+        parseReflectStoreInt(cc, g, parseReflectOffset(rtype, "len"), t->len);
+    }
+
+    if ((kind == REFLECT_STRUCT || kind == REFLECT_UNION) && t->fields &&
+        t->fields->indexes && t->fields->indexes->size) {
+        AstType *rfield = parseReflectStruct(cc, "reflect.Field");
+        Map *fields = t->fields;
+        int n = 0;
+        for (u64 i = 0; i < fields->indexes->size; ++i) {
+            u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+            if (fields->entries[fi].value) n++;
+        }
+        Ast *arr = parseReflectGlobal(cc, astMakeArrayType(rfield, n));
+        int j = 0;
+        for (u64 i = 0; i < fields->indexes->size; ++i) {
+            u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+            MapNode *node = &fields->entries[fi];
+            AstType *ft = (AstType *)node->value;
+            if (!ft) continue;
+            char *fname = (char *)node->key;
+            int at = j * rfield->size;
+            parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "name"),
+                                  fname, strlen(fname));
+            parseReflectStoreAddr(cc, arr, at + parseReflectOffset(rfield, "type"),
+                                  parseReflectDescribe(cc, ft));
+            parseReflectStoreInt(cc, arr, at + parseReflectOffset(rfield, "offset"),
+                                 ft->offset);
+            parseReflectStoreInt(cc, arr, at + parseReflectOffset(rfield, "isPrivate"),
+                                 ft->private_module ? 1 : 0);
+            j++;
+        }
+        int off = parseReflectOffset(rtype, "fields");
+        parseReflectStoreAddr(cc, g, off, arr);
+        parseReflectStoreInt(cc, g, off + 8, n);
+    }
+
+    if (kind == REFLECT_ENUM && t->enum_members && t->enum_members->indexes &&
+        t->enum_members->indexes->size) {
+        AstType *rmember = parseReflectStruct(cc, "reflect.EnumMember");
+        Map *members = t->enum_members;
+        int n = (int)members->indexes->size;
+        Ast *arr = parseReflectGlobal(cc, astMakeArrayType(rmember, n));
+        for (int j = 0; j < n; ++j) {
+            u64 mi = (u64)(uintptr_t)members->indexes->entries[j];
+            MapNode *node = &members->entries[mi];
+            Ast *value = (Ast *)node->value;
+            char *mname = (char *)node->key;
+            int at = j * rmember->size;
+            parseReflectStoreText(cc, arr, at + parseReflectOffset(rmember, "name"),
+                                  mname, strlen(mname));
+            parseReflectStoreInt(cc, arr, at + parseReflectOffset(rmember, "value"),
+                                 value ? value->i64 : 0);
+        }
+        int off = parseReflectOffset(rtype, "members");
+        parseReflectStoreAddr(cc, g, off, arr);
+        parseReflectStoreInt(cc, g, off + 8, n);
+    }
+    aoStrRelease(key);
+    return g;
+}
+
+/* `reflect.typeOf(T or expr)` (a reflect.Type *) and `reflect.of(x)` (a
+ * reflect.Value, x's address and type), the `(` read; NULL for any other
+ * call */
+Ast *parseReflectCall(Cctrl *cc, char *name, int len) {
+    int type_of = len == 14 && !memcmp(name, "reflect.typeOf", 14);
+    int value_of = len == 10 && !memcmp(name, "reflect.of", 10);
+    if (!type_of && !value_of) {
+        return NULL;
+    }
+    AstType *t = NULL;
+    Ast *operand = NULL;
+    Lexeme *peek = cctrlTokenPeek(cc);
+    if (type_of && peek && (cctrlTokIsKeyword(cc, peek) ||
+                            (tokenMayStartFnType(peek) && parseFnStartsType(cc)))) {
+        t = parseFullType(cc);
+    } else {
+        operand = parseExpr(cc, 16);
+        if (!operand || !operand->type) {
+            cctrlRaiseException(cc, "%.*s: expected %s", len, name,
+                                type_of ? "a type or an expression" : "a variable");
+        }
+        t = operand->type;
+    }
+    cctrlTokenExpect(cc, ')');
+    Ast *g = parseReflectDescribe(cc, t);
+    AstType *tp = astMakePointerType(g->type);
+    Ast *type_addr = astUnaryOperator(tp, AST_UN_OP_ADDR_OF, g);
+    if (type_of) {
+        return type_addr;
+    }
+    if (!assertLValue(operand)) {
+        cctrlRaiseException(cc, "reflect.of takes a variable, a field or an element "
+                            "(something with an address), not a value");
+    }
+    Ast *fn = findFunctionDecl(cc, str_lit("reflect.__value"));
+    if (!fn) {
+        cctrlRaiseException(cc, "reflect.typeOf and reflect.of need `import reflect;`");
+    }
+    Vec *argv = astVecNew();
+    AstType *vp = astMakePointerType(ast_void_type);
+    vecPush(argv, astCast(astUnaryOperator(astMakePointerType(t), AST_UN_OP_ADDR_OF,
+                                           operand), vp));
+    vecPush(argv, type_addr);
+    return astFunctionCall(fn->type->rettype, fn->fname->data, fn->fname->len, argv);
+}
+
 static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
                                         AstType *type, int off)
 {

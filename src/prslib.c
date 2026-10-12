@@ -2573,6 +2573,10 @@ Ast *parseCallArguments(Cctrl *cc, char *name, int len) {
     if (len == 6 && !memcmp(name, "printf", 6)) {
         return parsePrintCall(cc, ')');
     }
+    Ast *reflected = parseReflectCall(cc, name, len);
+    if (reflected) {
+        return reflected;
+    }
     return parseFunctionArguments(cc, name, len, ')');
 }
 
@@ -2745,6 +2749,11 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
      * argument parser raises the unterminated-`(` diagnostic. A type
      * name is never followed by `.`, so `f(Color.red)` is a call whose
      * first argument is an enum member, not a postfix cast. */
+    /* reflect.typeOf(T) takes a type: a call, never a postfix cast */
+    if ((len == 14 && !memcmp(name, "reflect.typeOf", 14)) ||
+        (len == 10 && !memcmp(name, "reflect.of", 10))) {
+        return parseCallArguments(cc,name,len);
+    }
     Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
     int peek_is_fn_type = peek && tokenMayStartFnType(peek) && parseFnStartsType(cc);
     /* `Call((fn(i64) i64)raw)` passes a cast; only something that can't
