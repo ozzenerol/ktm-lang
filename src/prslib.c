@@ -2469,6 +2469,8 @@ static Ast *parseMethodWithoutSelf(Ast *fn) {
  * calls: the one that fits every argument at least as well as any other
  * (see OVL_*); an error when none fits or two fit as well. `no_self`: a
  * method called through an object (its self is not in argv). */
+static int parse_overload_quiet = 0;
+
 static Ast *parseResolveOverload(Cctrl *cc, Vec *set, Vec *argv, int no_self,
                                  char *fname, int len, ParseCallLoc *loc,
                                  Ast **decl_out) {
@@ -2483,6 +2485,8 @@ static Ast *parseResolveOverload(Cctrl *cc, Vec *set, Vec *argv, int no_self,
     char *shown = astModuleDemangle(fname, len);
     char *paren = strchr(shown, '(');
     if (paren) *paren = '\0';
+    /* a generic of the same name is tried next (parseFunctionArguments) */
+    if (!nv && parse_overload_quiet) return NULL;
     if (!nv) {
         parseRaiseCallError(cc, loc, "no overload of `%s` takes %s; there are %s",
                             shown, parseOverloadArgTypes(argv), parseOverloadList(set));
@@ -2511,10 +2515,7 @@ static Ast *parseResolveOverload(Cctrl *cc, Vec *set, Vec *argv, int no_self,
  * be pub itself, not only another overload of its name */
 static void parseCheckOverloadAccess(Cctrl *cc, Ast *fn, char *fname, int len,
                                      ParseCallLoc *loc) {
-    int mod_len = -1;
-    for (int i = len - 1; i >= 0; --i) {
-        if (fname[i] == '.') { mod_len = i; break; }
-    }
+    int mod_len = astLastTopDot(fname, len);
     if (mod_len < 0 || (fn->flags & AST_FLAG_PUB)) return;
     AoStr *here = cctrlModulePath(cc, cc->cur_module);
     if (here && (int)here->len == mod_len && !memcmp(here->data, fname, mod_len)) return;
@@ -2631,14 +2632,32 @@ Ast *parseGenericExplicitCall(Cctrl *cc, GenericDef *d, char *fname, int len) {
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     AstType *rettype = NULL;
     Ast *maybe_fn = findFunctionDecl(cc,fname,len);
-    /* a generic function: its instance for the argument types */
-    GenericDef *generic = maybe_fn ? NULL : parseFindGenericFunc(cc, fname, len);
+    /* a generic function: its instance for the argument types. Next to
+     * plain functions of the name, those that take the arguments win and
+     * the generic is the fallback */
+    int plain = maybe_fn && (maybe_fn->kind == AST_FUNC || maybe_fn->kind == AST_FUN_PROTO);
+    GenericDef *generic = !maybe_fn || plain ? parseFindGenericFunc(cc, fname, len) : NULL;
     if (generic) {
         Lexeme *at = parseLastToken(cc);
         ParseCallLoc gloc = parseCallLocStart(cc, fname, len);
         gloc.args = vecNew(&vec_unsigned_long_type);
         Vec *gargv = parseArgv(cc, NULL, terminator, fname, len, gloc.args);
         parseCallLocEnd(cc, &gloc);
+        if (plain) {
+            Vec *set = maybe_fn->overloads;
+            if (!set) {
+                set = astVecNew();
+                vecPush(set, maybe_fn);
+            }
+            Ast *decl = NULL;
+            parse_overload_quiet = 1;
+            Ast *pick = parseResolveOverload(cc, set, gargv, 0, fname, len, &gloc, &decl);
+            parse_overload_quiet = 0;
+            if (pick) {
+                if (pick->flags & AST_FLAG_OVERLOAD) parseCheckOverloadAccess(cc, pick, fname, len, &gloc);
+                return parseGenericCallWith(cc, pick, gargv, &gloc, fname, len);
+            }
+        }
         char *why = NULL;
         Vec *targs = parseGenericInfer(cc, generic, gargv, &why);
         if (!targs) {
@@ -2773,10 +2792,7 @@ static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
 static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
                                    int len) {
     AoStr *cls = owner->clsname;
-    int mod_len = -1;
-    for (int i = (int)cls->len - 1; i >= 0; --i) {
-        if (cls->data[i] == '.') { mod_len = i; break; }
-    }
+    int mod_len = astLastTopDot(cls->data, (int)cls->len);
     if (mod_len < 0) return;
     AoStr *here = cctrlModulePath(cc, cc->cur_module);
     if (here && (int)here->len == mod_len && !memcmp(here->data, cls->data, mod_len)) {

@@ -1656,10 +1656,8 @@ int cctrlModuleHides(Cctrl *cc, char *name, int len) {
 
 /* `a.b.name` found: an error unless it is pub or used inside a.b */
 void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
-    char *dot = NULL;
-    for (int i = len - 1; i >= 0; --i) {
-        if (name[i] == '.') { dot = name + i; break; }
-    }
+    int at = astLastTopDot(name, len);
+    char *dot = at >= 0 ? name + at : NULL;
     if (!dot) return;
     AoStr *here = cctrlModulePath(cc, cc->cur_module);
     int mod_len = dot - name;

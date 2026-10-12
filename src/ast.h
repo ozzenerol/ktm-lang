@@ -632,6 +632,7 @@ char *astRuntimeName(const char *name);
 char *astRuntimeSymbol(const char *name);
 char *astModuleMangle(char *qual, int len);
 char *astModuleDemangle(char *sym, int len);
+int astLastTopDot(const char *name, int len);
 char *astOverloadSymbol(const char *base, Vec *params, int from);
 /* A function's overload set (AST_FLAG_OVERLOAD), NULL for anything else */
 #define astOverloads(ast) \
