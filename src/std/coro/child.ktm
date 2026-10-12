@@ -47,14 +47,14 @@ pub i32 waitChild(i32 pid, i64 ms=-1) {
         r = coroReap(pid, &st);
         if (r == pid || r < 0) { break; }
         if (until >= 0 && date.monoMs() >= until) {
-            if (fd >= 0) { libc.close(fd); }
+            if (fd >= 0) { close(fd); }
             os.setErrno(libc.ETIMEDOUT);
             return -1;
         }
     }
     if (fd >= 0) {
         i32 err = os.errno();
-        libc.close(fd);
+        close(fd);
         os.setErrno(err);
     }
     return r == pid ? st : -1;
