@@ -5597,10 +5597,6 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         d->name = d->of->name;
         d->method = aoStrDupRaw(h.method->start, h.method->len);
         vecPush(cc->generic_methods, d);
-        /* the instances already made get this method too */
-        for (u64 i = 0; i < d->of->insts->size; ++i) {
-            parseGenericMethodInstance(cc, d, d->of->insts->entries[i]);
-        }
         return 1;
     }
     char *qual = cctrlDeclName(cc, h.name->start, h.name->len);
@@ -5804,6 +5800,34 @@ static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *s
     vecPush(cc->generic_pending, body);
 }
 
+/* Method `name` of generic struct instance `cls`, made now if its
+ * generic struct has one of that name and it wasn't made yet: an
+ * instance's methods are made when first called, so one that only works
+ * for some types (a sort using `<`) doesn't stop the others. The
+ * function, or NULL. */
+Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len) {
+    if (!cls || !cls->generic || !cls->generic_args || !cc->generic_methods) return NULL;
+    GenericDef *d = cls->generic;
+    GenericInst *si = NULL;
+    for (u64 i = 0; i < d->insts->size && !si; ++i) {
+        GenericInst *in = d->insts->entries[i];
+        if (in->cls == cls) si = in;
+    }
+    if (!si) return NULL;
+    for (u64 i = 0; i < cc->generic_methods->size; ++i) {
+        GenericDef *md = cc->generic_methods->entries[i];
+        if (md->of != d || (int)md->method->len != len || memcmp(md->method->data, name, len)) {
+            continue;
+        }
+        char *key = mprintf("%s.%.*s", cls->clsname->data, len, name);
+        Ast *fn = mapGet(cc->global_env, key);
+        if (fn) return fn;
+        parseGenericMethodInstance(cc, md, si);
+        return mapGet(cc->global_env, key);
+    }
+    return NULL;
+}
+
 /* `Vec<args>` of generic struct template `tmpl`: the instance type, made
  * the first time (with its methods) */
 AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme *at) {
@@ -5844,10 +5868,7 @@ AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme 
     cls->generic_args = args;
     in->cls = cls;
     vecPush(d->insts, in);
-    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
-        GenericDef *md = cc->generic_methods->entries[i];
-        if (md->of == d) parseGenericMethodInstance(cc, md, in);
-    }
+    /* its methods are made when first called (parseGenericMethod) */
     return cls;
 }
 

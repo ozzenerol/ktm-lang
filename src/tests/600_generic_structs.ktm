@@ -4,7 +4,8 @@ import mem, test;
  * `T Vec<T>.get(...)`, an instance per argument list (`Vec<i64>`,
  * `Vec<Point>`, `Vec<u8 *>`, `Vec<Vec<i64>>`), each its own type with
  * its own layout; two parameters, a struct naming itself, a generic
- * base, type aliases of instances, `ad` with an instance's free(). */
+ * base, type aliases of instances, `ad` with an instance's free(). An
+ * instance's methods are made when first called (v0.10.0). */
 
 struct Vec<T> { T *data; i64 len; i64 cap; };
 
@@ -16,6 +17,13 @@ void Vec<T>.push(T x) {
     self.data[self.len++] = x;
 }
 T Vec<T>.get(i64 i) { return self.data[i]; }
+/* needs `>` on T: made only for instances that call it, so Vec<Point>
+ * (no `>`) still works */
+T Vec<T>.maxItem() {
+    T m = self.data[0];
+    for (i64 i = 1; i < self.len; i++) { if (self.data[i] > m) { m = self.data[i]; } }
+    return m;
+}
 void Vec<T>.free() { mem.free(self.data); }
 
 struct Pair<K, V> { K key; V value; };
@@ -40,7 +48,7 @@ i32 main() {
 
     Vec<i64> a = {null, 0, 0};
     for (i64 i = 0; i < 100; i++) { a.push(i * 2); }
-    tests++; if (a.len == 100 && a.get(99) == 198) { correct++; }
+    tests++; if (a.len == 100 && a.get(99) == 198 && a.maxItem() == 198) { correct++; }
 
     Vec<f64> f = {null, 0, 0};
     f.push(1.5);
