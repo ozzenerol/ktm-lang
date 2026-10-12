@@ -1,4 +1,4 @@
-import vec, test;
+import test;
 
 /* A function whose parameters are typed pointers converts to a function
  * pointer whose matching parameters are void * (v0.4.0), so a sort
