@@ -1415,6 +1415,134 @@ static Ast *lspEnumMemberAt(LspCtx *ctx, AoStr *text, u32 doc_id, int line,
     return NULL;
 }
 
+/* ---- doc comments ----
+ * The comment right above a declaration (a block, or `//` lines, with no
+ * blank line between), else one after it on its line, is its doc: hover
+ * shows it under the signature. */
+
+/* `line` (0-based) of text: its start and end, 0 past the last */
+static int lspLineSpan(AoStr *text, int line, const char **b, const char **e) {
+    const char *s = text->data, *end = s + text->len;
+    for (int l = 0; l < line; ++l) {
+        const char *nl = memchr(s, '\n', end - s);
+        if (!nl) return 0;
+        s = nl + 1;
+    }
+    const char *nl = memchr(s, '\n', end - s);
+    *b = s;
+    *e = nl ? nl : end;
+    return 1;
+}
+
+static void lspTrim(const char **b, const char **e) {
+    while (*b < *e && isspace((unsigned char)**b)) (*b)++;
+    while (*e > *b && isspace((unsigned char)(*e)[-1])) (*e)--;
+}
+
+/* One comment line's text, its markers gone, onto out */
+static void lspCatCommentLine(AoStr *out, const char *b, const char *e) {
+    lspTrim(&b, &e);
+    if (e - b >= 2 && b[0] == '/' && (b[1] == '/' || b[1] == '*')) {
+        b += 2;
+        while (b < e && (*b == '*' || *b == '/' || *b == '!')) b++;
+    } else if (b < e && *b == '*' && !(e - b >= 2 && b[1] == '/')) {
+        b++;
+    }
+    if (e - b >= 2 && e[-2] == '*' && e[-1] == '/') {
+        e -= 2;
+        while (e > b && e[-1] == '*') e--;
+    }
+    lspTrim(&b, &e);
+    if (out->len && b == e && out->data[out->len - 1] == '\n') return;
+    if (out->len) aoStrPutChar(out, '\n');
+    aoStrCatLen(out, b, e - b);
+}
+
+/* The doc comment of the declaration on line1 (1-based) of text: its
+ * lines, NULL when it has none */
+static AoStr *lspDocComment(AoStr *text, int line1) {
+    const char *b, *e;
+    int decl = line1 - 1;
+    AoStr *out = aoStrNew();
+    if (decl > 0 && lspLineSpan(text, decl - 1, &b, &e)) {
+        const char *tb = b, *te = e;
+        lspTrim(&tb, &te);
+        int first = decl - 1;
+        if (te - tb >= 2 && te[-2] == '*' && te[-1] == '/') {
+            /* a block: up to the line with its opening */
+            for (int l = decl - 1; l >= 0 && lspLineSpan(text, l, &b, &e); --l) {
+                first = l;
+                const char *o = b;
+                int opens = 0;
+                for (; o + 1 < e; ++o) {
+                    if (o[0] == '/' && o[1] == '*') { opens = 1; break; }
+                }
+                if (opens) {
+                    /* code before it on that line: not a doc block */
+                    const char *cb = b;
+                    while (cb < o && isspace((unsigned char)*cb)) cb++;
+                    if (cb != o) first = -1;
+                    break;
+                }
+                if (decl - l > 60) { first = -1; break; }
+            }
+        } else if (te - tb >= 2 && tb[0] == '/' && tb[1] == '/') {
+            while (first > 0 && lspLineSpan(text, first - 1, &b, &e)) {
+                lspTrim(&b, &e);
+                if (e - b < 2 || b[0] != '/' || b[1] != '/') break;
+                first--;
+            }
+        } else {
+            first = -1;
+        }
+        if (first >= 0 && !(te - tb >= 2 && tb[0] == '/' && tb[1] == '/' && 0)) {
+            int is_block = te - tb >= 2 && te[-2] == '*' && te[-1] == '/';
+            int is_line = te - tb >= 2 && tb[0] == '/' && tb[1] == '/';
+            if (is_block || is_line) {
+                for (int l = first; l < decl && lspLineSpan(text, l, &b, &e); ++l) {
+                    lspCatCommentLine(out, b, e);
+                }
+            }
+        }
+    }
+    if (out->len == 0 && lspLineSpan(text, decl, &b, &e)) {
+        /* `i64 n; // what n is` */
+        int in_str = 0;
+        for (const char *p = b; p + 1 < e; ++p) {
+            if (*p == '"' && (p == b || p[-1] != '\\')) in_str = !in_str;
+            if (in_str || p[0] != '/' || (p[1] != '/' && p[1] != '*')) continue;
+            const char *ce = e;
+            if (p[1] == '*') {
+                const char *c = p + 2;
+                while (c + 1 < e && !(c[0] == '*' && c[1] == '/')) c++;
+                if (c + 1 >= e) break;
+                ce = c + 2;
+            }
+            lspCatCommentLine(out, p, ce);
+            break;
+        }
+    }
+    /* drop blank lines at the ends */
+    while (out->len && (out->data[out->len - 1] == '\n' || out->data[out->len - 1] == ' ')) {
+        out->data[--out->len] = '\0';
+    }
+    if (out->len == 0) {
+        aoStrRelease(out);
+        return NULL;
+    }
+    return out;
+}
+
+/* Where a name is declared: see lspLocate */
+typedef struct LspLoc {
+    char *path;
+    int line;
+    int col;
+    int len;
+} LspLoc;
+static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
+                     int character, LspLoc *loc);
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1535,6 +1663,16 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     aoStrCatPrintf(result,
                    "{\"contents\":{\"kind\":\"markdown\",\"value\":\"");
     AoStr *md = aoStrPrintf("```ktm\n%s\n```", rendered->data);
+    LspLoc loc;
+    if (lspLocate(ctx, uri, text, line, character, &loc) && loc.line > 0) {
+        const char *def_uri = NULL;
+        AoStr *def_text = lspTextForPath(ctx, loc.path, &def_uri);
+        AoStr *doc = def_text ? lspDocComment(def_text, loc.line) : NULL;
+        if (doc) {
+            aoStrCatPrintf(md, "\n\n%s", doc->data);
+            aoStrRelease(doc);
+        }
+    }
     jsonEscapeInto(result, md->data, md->len);
     aoStrCatPrintf(result, "\"}}");
     lspRespond(id, result->data);
@@ -2287,23 +2425,15 @@ static void lspModuleDefinition(LspCtx *ctx, Json *id, const char *modname) {
     aoStrRelease(result);
 }
 
-static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
-    const char *uri;
-    int line, character;
+/* Where the name at (line, character) of `uri` is declared: its file
+ * (an absolute path), 1-based line and column (0: none) and the name's
+ * length. 0 when it isn't known. Module names are left to the caller. */
+
+static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
+                     int character, LspLoc *loc) {
     char ident[256];
-    AoStr *text;
-    if (!lspTextDocPosition(ctx, params, &uri, &line, &character) ||
-        (text = lspDocGetOrLoad(ctx, uri)) == NULL)
-    {
-        lspRespond(id, "null");
-        return;
-    }
-    /* Anywhere on an #include line jumps to the file itself. */
-    if (lspIncludeDefinition(ctx, id, uri, text, line)) return;
-    if (!lspIdentAt(text, line, character, 0, ident, sizeof(ident), NULL))
-    {
-        lspRespond(id, "null");
-        return;
+    if (!lspIdentAt(text, line, character, 0, ident, sizeof(ident), NULL)) {
+        return 0;
     }
     s64 ilen = (s64)strlen(ident);
 
@@ -2332,10 +2462,7 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
                    : lspFieldDeclHere(ctx, text, doc_id, line, character, NULL);
     char *modname = (emember || fdecl) ? NULL
                   : lspModuleNameAt(ctx, text, doc_id, line, character);
-    if (modname) {
-        lspModuleDefinition(ctx, id, modname);
-        return;
-    }
+    if (modname) return 0;
     char *qual = (emember || fdecl) ? NULL
                : lspModuleRefAt(text, line, character, 0, NULL);
     AstType *mcls = NULL;
@@ -2461,27 +2588,56 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
                                    &def_line, &def_col);
         free(doc_path);
     }
-    if (fname == NULL) {
-        lspRespond(id, "null");
-        return;
-    }
-    /* With a column the range spans exactly the defining name; without
-     * one (synthetic nodes) fall back to line start. */
-    int c0 = def_col > 0 ? def_col - 1 : 0;
-    int c1 = def_col > 0 ? c0 + (int)ilen : 0;
+    if (fname == NULL) return 0;
     /* file_map can hold a cwd-relative path (AOT-style invocations);
      * a file:// uri must be absolute or the editor guesses. */
     char abs_path[PATH_MAX];
     const char *out_path = fname->data;
     if (out_path[0] != '/' && realpath(out_path, abs_path) != NULL)
         out_path = abs_path;
+    loc->path = mprintf("%s", out_path);
+    loc->line = def_line;
+    loc->col = def_col;
+    loc->len = (int)ilen;
+    return 1;
+}
+
+static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri;
+    int line, character;
+    AoStr *text;
+    if (!lspTextDocPosition(ctx, params, &uri, &line, &character) ||
+        (text = lspDocGetOrLoad(ctx, uri)) == NULL)
+    {
+        lspRespond(id, "null");
+        return;
+    }
+    /* Anywhere on an #include line jumps to the file itself. */
+    if (lspIncludeDefinition(ctx, id, uri, text, line)) return;
+    u32 doc_id = lspDocId(ctx, uri);
+    char *modname = lspEnumMemberAt(ctx, text, doc_id, line, character, NULL) ||
+                    lspFieldDeclHere(ctx, text, doc_id, line, character, NULL)
+                  ? NULL : lspModuleNameAt(ctx, text, doc_id, line, character);
+    if (modname) {
+        lspModuleDefinition(ctx, id, modname);
+        return;
+    }
+    LspLoc loc;
+    if (!lspLocate(ctx, uri, text, line, character, &loc)) {
+        lspRespond(id, "null");
+        return;
+    }
+    /* With a column the range spans exactly the defining name; without
+     * one (synthetic nodes) fall back to line start. */
+    int c0 = loc.col > 0 ? loc.col - 1 : 0;
+    int c1 = loc.col > 0 ? c0 + loc.len : 0;
     AoStr *result = aoStrNew();
     const char *def_uri = NULL;
-    AoStr *def_text = lspTextForPath(ctx, out_path, &def_uri);
+    AoStr *def_text = lspTextForPath(ctx, loc.path, &def_uri);
     aoStrCatPrintf(result, "{\"uri\":\"file://");
-    jsonEscapeInto(result, out_path, strlen(out_path));
+    jsonEscapeInto(result, loc.path, strlen(loc.path));
     aoStrCatLen(result, "\",", 2);
-    lspCatRange(ctx, result, def_text, def_line - 1, c0, c1);
+    lspCatRange(ctx, result, def_text, loc.line - 1, c0, c1);
     aoStrPutChar(result, '}');
     lspRespond(id, result->data);
     aoStrRelease(result);

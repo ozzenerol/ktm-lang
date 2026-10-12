@@ -98,6 +98,7 @@ u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
 u8 *MOD_LIST_HC;
 u8 *ENUM_HC;
+u8 *DOC_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -151,6 +152,20 @@ void initFixtures() {
         "  Color d = Color.\n"
         "  return 0;\n"
         "}\n";
+    /* Doc comments: a block above, `//` lines above, none, one after */
+    DOC_HC =
+        "/* Adds two\n"
+        " * numbers. */\n"
+        "i64 add(i64 a, i64 b) { return a + b; }\n"
+        "// Scales n.\n"
+        "// Twice.\n"
+        "i64 scale(i64 n) { return n * 2; }\n"
+        "\n"
+        "i64 bare(i64 n) { return n; }\n"
+        "struct P {\n"
+        "  i64 x; // the x\n"
+        "};\n"
+        "i32 main() { P p; p.x = add(1, 2) + scale(3) + bare(4); return (i32)p.x; }\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
         "type Text = u8[];\n"
@@ -1234,7 +1249,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 15;
+const i64 LSP_GROUPS = 16;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1492,6 +1507,34 @@ void testEnums() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testDocs() {
+    printf("doc comments\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("docs.ktm");
+    lspDidOpen(l, uri, DOC_HC);
+    check("doc comment fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    posOf(DOC_HC, "add(1", 0, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows the block comment above a function",
+                hoverContains(resp, "add(i64 a, i64 b)") && hoverContains(resp, "Adds two\nnumbers.") &&
+                !hoverContains(resp, "/*"));
+    posOf(DOC_HC, "scale(3)", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows the // lines above a function",
+                hoverContains(resp, "Scales n.\nTwice.") && !hoverContains(resp, "//"));
+    posOf(DOC_HC, "bare(4)", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover after a blank line shows no comment",
+                hoverContains(resp, "bare(i64 n)") && !hoverContains(resp, "Twice"));
+    posOf(DOC_HC, "x = add", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field shows the comment after it", hoverContains(resp, "the x"));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1509,6 +1552,7 @@ void runGroup(i64 group) {
         case 12: testTypeAlias();
         case 13: testGenerics();
         case 14: testEnums();
+        case 15: testDocs();
     }
 }
 
