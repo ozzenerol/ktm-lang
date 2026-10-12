@@ -21,6 +21,10 @@
  * IrInstr.extra.va_named_count carries the number of named parameters
  * (the index of the implicit argc in the call's args). */
 #define IRCG_CALL_KTM_VA (1u << 2)
+/* The width of a bit intrinsic (IR_ROTL .. IR_CTZ): 32 or 16 bits; 64
+ * when neither */
+#define IRCG_BITOP_32 (1u << 8)
+#define IRCG_BITOP_16 (1u << 9)
 
 /* Where in an instruction's emission a clobber question is asked.
  * Both backends materialise r1 into their first scratch register and
