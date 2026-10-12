@@ -87,7 +87,7 @@ bool testStructWithArrayLoop(void) {
     return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-bool testFloatVecLoop(void) {
+bool testF64VecLoop(void) {
     vec.Vec<f64> fvec = vec.new<f64>();
 
     f64 cases[] = {8.8, 4.2, 3.8};
@@ -117,7 +117,7 @@ BoxInt *bInt(i64 i) {
     return b;
 }
 
-bool testPtrVecLoop(void) {
+bool testPointerVecLoop(void) {
     vec.Vec<BoxInt *> vecVal = vec.new<BoxInt *>();
     vecVal.push(bInt(1));
     vecVal.push(bInt(4));
@@ -192,8 +192,8 @@ i32 main(void) {
     if (testContainerLoop()) { correct++; }
     if (testStaticContainerEntriesLoop()) { correct++; }
     if (testStructWithArrayLoop()) { correct++; }
-    if (testFloatVecLoop()) { correct++; }
-    if (testPtrVecLoop()) { correct++; }
+    if (testF64VecLoop()) { correct++; }
+    if (testPointerVecLoop()) { correct++; }
     if (testArrayLoop()) { correct++; }
     if (testNested()) { correct++; }
     test.printResult(correct,tests);

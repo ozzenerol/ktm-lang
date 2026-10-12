@@ -77,7 +77,7 @@ i32 main() {
     for (auto it : h.v) { sum += sizeof(it) + (it + 1) - it; }
     if (sum == 27) { correct++; }
 
-    /* vec.IntVec through `p->field`. */
+    /* a vec.Vec<i64> through `p->field`. */
     Holder *hp = &h;
     sum = 0;
     for (auto it : hp.v) { sum += it; }
