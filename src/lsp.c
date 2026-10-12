@@ -4014,6 +4014,177 @@ static void lspWorkspaceSymbol(LspCtx *ctx, Json *id, Json *params) {
     aoStrRelease(body);
 }
 
+/* ---- signature help ----
+ * Inside a call's parentheses: the function's signature (every overload
+ * of it), the parameter the cursor is in, and the doc comment. */
+
+/* The call around byte offset `at`: the offset of its `(` and how many
+ * top-level commas come before `at`; 0 when not in one */
+static int lspCallAround(AoStr *text, size_t at, size_t *open, int *commas) {
+    const char *s = text->data;
+    int depth = 0, n = 0;
+    size_t i = at;
+    /* only the statement the cursor is in: stop at ; { } */
+    while (i > 0) {
+        char c = s[--i];
+        if (c == '"' || c == '\'') {
+            /* back over the literal */
+            while (i > 0 && !(s[i - 1] == c && (i < 2 || s[i - 2] != '\\'))) i--;
+            if (i > 0) i--;
+            continue;
+        }
+        if (c == ')' || c == ']') depth++;
+        else if (c == '[') depth--;
+        else if (c == '(') {
+            if (depth == 0) {
+                *open = i;
+                *commas = n;
+                return 1;
+            }
+            depth--;
+        } else if (c == ',' && depth == 0) n++;
+        else if (c == ';' || c == '{' || c == '}') return 0;
+    }
+    return 0;
+}
+
+/* The parameter list of a signature: each one's [start, end) in sig */
+static int lspSigParams(const char *sig, int starts[32], int ends[32]) {
+    const char *open = strchr(sig, '(');
+    if (!open) return 0;
+    int n = 0, depth = 0;
+    const char *p = open + 1, *b = p;
+    for (; *p; ++p) {
+        if (*p == '(' || *p == '[' || *p == '<') depth++;
+        else if ((*p == ')' || *p == ']' || *p == '>') && depth > 0) depth--;
+        else if ((*p == ',' || *p == ')') && depth == 0) {
+            const char *e = p;
+            while (b < e && *b == ' ') b++;
+            while (e > b && e[-1] == ' ') e--;
+            if (e > b && n < 32 && !(e - b == 4 && !memcmp(b, "void", 4))) {
+                starts[n] = (int)(b - sig);
+                ends[n] = (int)(e - sig);
+                n++;
+            }
+            if (*p == ')') break;
+            b = p + 1;
+        }
+    }
+    return n;
+}
+
+static void lspCatSignature(LspCtx *ctx, AoStr *body, char *sig, Ast *fn,
+                            int commas) {
+    size_t sl = strlen(sig);
+    while (sl && (sig[sl - 1] == ';' || sig[sl - 1] == ' ')) sig[--sl] = '\0';
+    aoStrCat(body, "{\"label\":\"");
+    jsonEscapeInto(body, sig, sl);
+    aoStrCat(body, "\",\"parameters\":[");
+    int st[32], en[32];
+    int n = lspSigParams(sig, st, en);
+    for (int i = 0; i < n; ++i) {
+        if (i) aoStrPutChar(body, ',');
+        aoStrCatPrintf(body, "{\"label\":[%d,%d]}", st[i], en[i]);
+    }
+    aoStrPutChar(body, ']');
+    /* past the last parameter of `...args`: still that one */
+    int active = commas;
+    if (n > 0 && active >= n && strstr(sig + st[n - 1], "...")) active = n - 1;
+    aoStrCatPrintf(body, ",\"activeParameter\":%d", active);
+    AoStr *fname = fn && fn->line > 0 ? cctrlLookUpFile(ctx->cc, fn->file_id) : NULL;
+    if (fname) {
+        const char *furi = NULL;
+        AoStr *ftext = lspTextForPath(ctx, fname->data, &furi);
+        AoStr *doc = ftext ? lspDocComment(ftext, fn->line) : NULL;
+        if (doc) {
+            aoStrCat(body, ",\"documentation\":{\"kind\":\"markdown\",\"value\":\"");
+            jsonEscapeInto(body, doc->data, doc->len);
+            aoStrCat(body, "\"}");
+        }
+    }
+    aoStrPutChar(body, '}');
+}
+
+static void lspSignatureHelp(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri;
+    int line, character;
+    AoStr *text;
+    if (!lspTextDocPosition(ctx, params, &uri, &line, &character) ||
+        (text = lspDocGetOrLoad(ctx, uri)) == NULL) {
+        lspRespond(id, "null");
+        return;
+    }
+    size_t at = lspOffsetOf(text, line + 1, character + 1), open;
+    int commas;
+    if (!lspCallAround(text, at, &open, &commas)) {
+        lspRespond(id, "null");
+        return;
+    }
+    /* the callee's name, right before the `(` */
+    size_t ne = open;
+    while (ne > 0 && (text->data[ne - 1] == ' ' || text->data[ne - 1] == '\t')) ne--;
+    if (ne == 0 || !lspIsIdentChar(text->data[ne - 1])) {
+        lspRespond(id, "null");
+        return;
+    }
+    int cl, cc;
+    lspLineColOf(text, ne - 1, &cl, &cc);
+    u32 doc_id = lspDocId(ctx, uri);
+    char ident[256];
+    if (!lspIdentAt(text, cl, cc, 0, ident, sizeof(ident), NULL)) {
+        lspRespond(id, "null");
+        return;
+    }
+    s64 ilen = (s64)strlen(ident);
+
+    Ast *fn = NULL;
+    AstType *owner = NULL;
+    char *qual = lspModuleRefAt(text, cl, cc, 0, NULL);
+    int is_member = 0;
+    AstType *mcls = qual ? NULL : lspMemberClassAt(ctx, text, doc_id, cl, cc, &is_member);
+    if (!qual && !is_member) qual = lspOwnModuleQual(ctx, text, doc_id, cl + 1, ident, ilen);
+    if (qual) {
+        fn = lspModuleValue(ctx, qual);
+    } else if (is_member) {
+        fn = mcls ? lspFindMethod(ctx, mcls, ident, ilen, &owner) : NULL;
+    } else {
+        int in_doc = 0;
+        fn = lspResolveValue(ctx, doc_id, cl + 1, ident, ilen, &in_doc);
+    }
+    GenericDef *gen = (!fn && !qual && !is_member) ? lspGeneric(ctx, ident, ilen) : NULL;
+    if ((!fn || !lspIsFn(fn)) && !gen) {
+        lspRespond(id, "null");
+        return;
+    }
+
+    AoStr *body = aoStrNew();
+    aoStrCat(body, "{\"signatures\":[");
+    int active = 0;
+    if (gen) {
+        AoStr *head = aoStrNew();
+        lspCatGenericHead(head, gen);
+        lspCatSignature(ctx, body, head->data, NULL, commas);
+    } else {
+        Ast *pick = astOverloads(fn) ? lspPickOverload(ctx, doc_id, cl + 1, cc, fn) : fn;
+        u64 n = fn->overloads ? fn->overloads->size : 1;
+        int best = -1;
+        for (u64 i = 0; i < n; ++i) {
+            Ast *o = fn->overloads ? fn->overloads->entries[i] : fn;
+            char *sig = owner ? lspMethodString(o, owner, ident)
+                              : lspModuleFnString(o, qual ? qual : ident);
+            if (i) aoStrPutChar(body, ',');
+            lspCatSignature(ctx, body, sig, o, commas);
+            if (o == pick) active = (int)i;
+            int st[32], en[32];
+            if (best < 0 && lspSigParams(sig, st, en) > commas) best = (int)i;
+        }
+        if ((!pick || pick == fn) && astOverloads(fn) && best >= 0) active = best;
+    }
+    aoStrCatPrintf(body, "],\"activeSignature\":%d,\"activeParameter\":%d}", active, commas);
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
 /* Answer a textDocument request from an isolated child; if the child
  * crashed or hung on the document, answer null ourselves. */
 static void lspServe(LspCtx *ctx, Json *id, Json *params,
@@ -4078,6 +4249,8 @@ static void lspInitialize(LspCtx *ctx, Json *id, Json *params) {
         "\"referencesProvider\":true,"
         "\"documentHighlightProvider\":true,"
         "\"documentSymbolProvider\":true,"
+        "\"signatureHelpProvider\":{\"triggerCharacters\":[\"(\",\",\"],"
+        "\"retriggerCharacters\":[\")\"]},"
         "\"workspaceSymbolProvider\":true"
         "},\"serverInfo\":{\"name\":\"ktm\",\"version\":\"%s\"}}",
         ctx->utf16 ? "utf-16" : "utf-8", cctrlGetVersion());
@@ -4162,6 +4335,8 @@ int lspRun(CliArgs *args) {
             lspServe(ctx, id, params, lspReferences, 1);
         } else if (strcmp(method, "textDocument/documentHighlight") == 0) {
             lspServe(ctx, id, params, lspDocumentHighlight, 0);
+        } else if (strcmp(method, "textDocument/signatureHelp") == 0) {
+            lspServe(ctx, id, params, lspSignatureHelp, 0);
         } else if (strcmp(method, "textDocument/documentSymbol") == 0) {
             lspServe(ctx, id, params, lspDocumentSymbol, 0);
         } else if (strcmp(method, "workspace/symbol") == 0) {
