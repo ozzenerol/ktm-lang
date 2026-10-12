@@ -2074,11 +2074,12 @@ void main()
   /* a plain write(2), without MSG_NOSIGNAL: the first may still get
    * through, a later one fails instead of ending the program */
   i64 r = 0;
-  for (i64 i = 0; i < 50 && r >= 0; i++) {
+  i32 err = 0;
+  for (i64 i = 0; i < 50; i++) {
     r = libc.write(client, "ping", 4);
+    if (r < 0) { err = os.errno(); break; }    // before anything else can change it
     date.sleepMs(10);
   }
-  i32 err = os.errno();
   printf("write: %d, EPIPE or ECONNRESET: %d\n", r, err == libc.EPIPE || err == libc.ECONNRESET);
   printf("still running\n");
   libc.close(client);
