@@ -1,34 +1,593 @@
-.section __TEXT,__cstring,cstring_literals
+sign_bit:
+	.quad 0x8000000000000000
+one_dbl:
+	.double 1.0
 .L0:
-	.asciz " \t\n\013\f\r"
+	.byte 32,9,10,11,12,13,0
+.L2:
+	.byte 27,91,48,59,51,49,109,70,65,73,76,69,68,58,32,37,100,47,37,100,27,91,48,59,48,109,10,0
+.L3:
+	.byte 27,91,48,59,51,49,109,70,65,73,76,69,68,58,32,37,108,108,100,47,37,108,108,100,27,91,48,59,48,109,10,0
+.L4:
+	.byte 27,91,48,59,51,50,109,80,65,83,83,69,68,58,32,37,100,47,37,100,27,91,48,59,48,109,10,0
+.L5:
+	.byte 27,91,48,59,51,50,109,80,65,83,83,69,68,58,32,37,108,108,100,47,37,108,108,100,27,91,48,59,48,109,10,0
+.L6:
+	.byte 0,1,0,0,127,0
+.L7:
+	.byte 97,0,0,0,98,0
+.L11:
+	.asciz "582_string_literal_bytes.ktm"
+.L12:
+	.asciz "Test - string literal bytes: "
+.L13:
+	.byte 0,8,0,0,0,2,104,105,0
+.L14:
+	.byte 9,10,13,27,127,255,0,120,0
+.L15:
+	.asciz "plain \"quoted\" text"
+.L16:
+	.asciz "====\n"
 .globl argc
 	.comm argc, 8, 8
 .globl argv
 	.comm argv, 8, 8
-.lcomm .L1, 16, 3
+.lcomm .L1, 16
 	.text
-	.p2align 2
-	.globl _K05small
-_K05small:
-	mov x1, #7
-	mul x0, x0, x1
-	add x0, x0, #1
-	ret
+	.p2align 4
+	.globl _K4test11printResult
+_K4test11printResult:
+	pushq   %rbp
+	movq    %rsp, %rbp
+	subq    $16, %rsp
+	movq    %rdi, -16(%rbp)
+	movq    %rsi, -8(%rbp)
+	movq    %rdi, %rax
+	movq    %rsi, %rcx
+	cmpq    %rcx, %rax
+	je     .LIRBB0_4
+	leaq    .L3(%rip), %rdi
+	movq    -16(%rbp), %rsi
+	movq    -8(%rbp), %rdx
+	movb    $0, %al
+	callq   printf
+	jmp     .LIRBB0_5
+.LIRBB0_4:
+	leaq    .L5(%rip), %rdi
+	movq    -16(%rbp), %rsi
+	movq    -8(%rbp), %rdx
+	movb    $0, %al
+	callq   printf
+.LIRBB0_5:
+	leaveq
+	retq
 .text
-	.p2align 2
-	.globl _main
-_main:
-	stp x29, x30, [sp, #-16]!
-	mov x29, sp
-	sub sp, sp, #16
-	mov x0, #22
-	stur x0, [x29, #-8]
-	ldur x0, [x29, #-8]
-	mov w0, w0
-	sxtw    x0, w0
-	stur w0, [x29, #-16]
-	ldursw x0, [x29, #-16]
-	add sp, sp, #16
-	ldp x29, x30, [sp], #16
-	ret
-.ident      "ktm: Linux aarch64-apple-darwin v0.6.0 hash: 2364435faccc3c88e7e9e6403b124f0766aafe17"
+	.p2align 4
+	.globl _K4test9heapInUse
+_K4test9heapInUse:
+	pushq   %rbp
+	movq    %rsp, %rbp
+	subq    $96, %rsp
+	leaq    -80(%rbp), %rax
+	movq    %rax, %rdi
+	callq   mallinfo2
+	movq    -24(%rbp), %rax
+	movq    %rax, -88(%rbp)
+	movq    -48(%rbp), %rax
+	movq    %rax, -96(%rbp)
+	movq    -88(%rbp), %rax
+	movq    -96(%rbp), %rcx
+	addq    %rcx, %rax
+	leaveq
+	retq
+.globl _K04gArr
+.data
+_K04gArr:
+	.byte 0,1,0,0,127,0
+	.zero 6
+.globl _K04gPtr
+.data
+	.p2align 3
+_K04gPtr:
+	.quad .L7
+	.text
+	.p2align 4
+	.globl _K04same
+_K04same:
+	pushq   %rbp
+	movq    %rsp, %rbp
+	subq    $80, %rsp
+	movq    %rdi, -40(%rbp)
+	movq    %rsi, -32(%rbp)
+	movq    %rdx, -24(%rbp)
+	movq    %rcx, -16(%rbp)
+	movq    -32(%rbp), %rax
+	movq    %rax, -56(%rbp)
+	movq    -16(%rbp), %rax
+	movq    %rax, -64(%rbp)
+	movq    -56(%rbp), %rax
+	movq    -64(%rbp), %rcx
+	cmpq    %rcx, %rax
+	je     .LIRBB2_11
+	xorl    %eax, %eax
+	movb    %al, -48(%rbp)
+	jmp     .LIRBB2_9
+.LIRBB2_11:
+	xorl    %eax, %eax
+	movq    %rax, -8(%rbp)
+.LIRBB2_12:
+	movq    -32(%rbp), %rax
+	movq    %rax, -56(%rbp)
+	movq    -8(%rbp), %rax
+	movq    -56(%rbp), %rcx
+	cmpq    %rcx, %rax
+	jge     .LIRBB2_15
+	leaq    -40(%rbp), %rax
+	movq    (%rax), %rax
+	movq    -8(%rbp), %rcx
+	addq    %rcx, %rax
+	movzbq  (%rax), %rax
+	movzbq  %al, %rax
+	movq    %rax, -56(%rbp)
+	leaq    -24(%rbp), %rax
+	movq    %rax, -64(%rbp)
+	movq    -64(%rbp), %rcx
+	movq    (%rcx), %rax
+	movq    %rax, -72(%rbp)
+	movq    -64(%rbp), %rcx
+	movq    8(%rcx), %rax
+	movq    %rax, -80(%rbp)
+	movq    -8(%rbp), %rax
+	movq    -80(%rbp), %rcx
+	cmpq    %rcx, %rax
+	jae     .LIRBB2_16
+	movq    -72(%rbp), %rax
+	movq    -8(%rbp), %rcx
+	addq    %rcx, %rax
+	movzbq  (%rax), %rax
+	movzbq  %al, %rax
+	movq    %rax, -64(%rbp)
+	movq    -56(%rbp), %rax
+	movq    -64(%rbp), %rcx
+	cmpq    %rcx, %rax
+	jne     .LIRBB2_18
+	jmp     .LIRBB2_19
+.LIRBB2_16:
+	movq    -8(%rbp), %rdi
+	movq    -80(%rbp), %rsi
+	leaq    .L11(%rip), %rdx
+	movq    $14, %rcx
+	callq   _K2rt16__ktmBoundsIndex
+.LIRBB2_18:
+	xorl    %eax, %eax
+	movb    %al, -48(%rbp)
+	jmp     .LIRBB2_9
+.LIRBB2_19:
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+	jmp     .LIRBB2_12
+.LIRBB2_15:
+	movq    $1, %rax
+	movb    %al, -48(%rbp)
+.LIRBB2_9:
+	movzbq  -48(%rbp), %rax
+	leaveq
+	retq
+.text
+	.p2align 4
+	.globl main
+main:
+	pushq   %rbp
+	movq    %rsp, %rbp
+	subq    $192, %rsp
+	leaq    .L12(%rip), %rdi
+	movb    $0, %al
+	callq   printf
+	xorl    %eax, %eax
+	movq    %rax, -8(%rbp)
+	xorl    %eax, %eax
+	movq    %rax, -16(%rbp)
+	leaq    -32(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	leaq    .L13(%rip), %rax
+	movq    %rax, -48(%rbp)
+	movq    $8, %rax
+	movq    %rax, -40(%rbp)
+	leaq    -48(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %rdi
+	movq    -184(%rbp), %rsi
+	movq    $16, %rdx
+	callq   memcpy
+	xorl    %eax, %eax
+	movb    %al, -56(%rbp)
+	movq    $8, %rax
+	movb    %al, -55(%rbp)
+	xorl    %eax, %eax
+	movb    %al, -54(%rbp)
+	xorl    %eax, %eax
+	movb    %al, -53(%rbp)
+	xorl    %eax, %eax
+	movb    %al, -52(%rbp)
+	movq    $2, %rax
+	movb    %al, -51(%rbp)
+	movq    $104, %rax
+	movb    %al, -50(%rbp)
+	movq    $105, %rax
+	movb    %al, -49(%rbp)
+	movq    -16(%rbp), %rax
+	incq    %rax
+	movq    %rax, -16(%rbp)
+	leaq    -32(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	leaq    -56(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	xorl    %eax, %eax
+	testq   %rax, %rax
+	jnz     .LIRBB3_22
+	xorl    %eax, %eax
+	testq   %rax, %rax
+	jnz     .LIRBB3_22
+	movq    -184(%rbp), %rax
+	movq    %rax, -72(%rbp)
+	movq    $8, %rax
+	movq    %rax, -64(%rbp)
+	leaq    -72(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %r10
+	movq    (%r10), %rdi
+	movq    8(%r10), %rsi
+	movq    -184(%rbp), %r10
+	movq    (%r10), %rdx
+	movq    8(%r10), %rcx
+	callq   _K04same
+	movsbq  %al, %rax
+	cmpq    $0, %rax
+	jne     .LIRBB3_25
+	jmp     .LIRBB3_26
+.LIRBB3_22:
+	xorl    %edi, %edi
+	movq    $8, %rsi
+	movq    $8, %rdx
+	leaq    .L11(%rip), %rcx
+	movq    $25, %r8
+	callq   _K2rt16__ktmBoundsSlice
+.LIRBB3_25:
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+.LIRBB3_26:
+	leaq    -88(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	leaq    .L14(%rip), %rax
+	movq    %rax, -104(%rbp)
+	movq    $8, %rax
+	movq    %rax, -96(%rbp)
+	leaq    -104(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %rdi
+	movq    -184(%rbp), %rsi
+	movq    $16, %rdx
+	callq   memcpy
+	movq    $9, %rax
+	movb    %al, -112(%rbp)
+	movq    $10, %rax
+	movb    %al, -111(%rbp)
+	movq    $13, %rax
+	movb    %al, -110(%rbp)
+	movq    $27, %rax
+	movb    %al, -109(%rbp)
+	movq    $127, %rax
+	movb    %al, -108(%rbp)
+	movq    $255, %rax
+	movb    %al, -107(%rbp)
+	xorl    %eax, %eax
+	movb    %al, -106(%rbp)
+	movq    $120, %rax
+	movb    %al, -105(%rbp)
+	movq    -16(%rbp), %rax
+	incq    %rax
+	movq    %rax, -16(%rbp)
+	leaq    -88(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	leaq    -112(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	xorl    %eax, %eax
+	testq   %rax, %rax
+	jnz     .LIRBB3_27
+	xorl    %eax, %eax
+	testq   %rax, %rax
+	jnz     .LIRBB3_27
+	movq    -184(%rbp), %rax
+	movq    %rax, -128(%rbp)
+	movq    $8, %rax
+	movq    %rax, -120(%rbp)
+	leaq    -128(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %r10
+	movq    (%r10), %rdi
+	movq    8(%r10), %rsi
+	movq    -184(%rbp), %r10
+	movq    (%r10), %rdx
+	movq    8(%r10), %rcx
+	callq   _K04same
+	movsbq  %al, %rax
+	cmpq    $0, %rax
+	jne     .LIRBB3_30
+	jmp     .LIRBB3_31
+.LIRBB3_27:
+	xorl    %edi, %edi
+	movq    $8, %rsi
+	movq    $8, %rdx
+	leaq    .L11(%rip), %rcx
+	movq    $29, %r8
+	callq   _K2rt16__ktmBoundsSlice
+.LIRBB3_30:
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+.LIRBB3_31:
+	movq    -16(%rbp), %rax
+	incq    %rax
+	movq    %rax, -16(%rbp)
+	leaq    _K04gArr(%rip), %rax
+	movzbq  (%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	jne     .LIRCB3_E0
+	jmp     .LIRBB3_38
+.LIRCB3_E0:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_39
+.LIRBB3_38:
+	leaq    _K04gArr(%rip), %rax
+	movzbq  1(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $1, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_39:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E0
+	jmp     .LIRBB3_36
+.LIRBR3_E0:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_37
+.LIRBB3_36:
+	leaq    _K04gArr(%rip), %rax
+	movzbq  3(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_37:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E1
+	jmp     .LIRBB3_34
+.LIRBR3_E1:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_35
+.LIRBB3_34:
+	leaq    _K04gArr(%rip), %rax
+	movzbq  4(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $127, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_35:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E2
+	jmp     .LIRBB3_32
+.LIRBR3_E2:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_33
+.LIRBB3_32:
+	leaq    _K04gArr(%rip), %rax
+	movzbq  11(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_33:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBB3_41
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+.LIRBB3_41:
+	movq    -16(%rbp), %rax
+	incq    %rax
+	movq    %rax, -16(%rbp)
+	movq    _K04gPtr(%rip), %rax
+	movzbq  (%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $97, %rax
+	jne     .LIRCB3_E1
+	jmp     .LIRBB3_48
+.LIRCB3_E1:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_49
+.LIRBB3_48:
+	movq    _K04gPtr(%rip), %rax
+	movzbq  1(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_49:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E3
+	jmp     .LIRBB3_46
+.LIRBR3_E3:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_47
+.LIRBB3_46:
+	movq    _K04gPtr(%rip), %rax
+	movzbq  3(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_47:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E4
+	jmp     .LIRBB3_44
+.LIRBR3_E4:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_45
+.LIRBB3_44:
+	movq    _K04gPtr(%rip), %rax
+	movzbq  4(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $98, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_45:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBR3_E5
+	jmp     .LIRBB3_42
+.LIRBR3_E5:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_43
+.LIRBB3_42:
+	movq    _K04gPtr(%rip), %rax
+	movzbq  5(%rax), %rax
+	movzbq  %al, %rax
+	cmpq    $0, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+.LIRBB3_43:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBB3_51
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+.LIRBB3_51:
+	leaq    -144(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	leaq    .L15(%rip), %rax
+	movq    %rax, -160(%rbp)
+	movq    $19, %rax
+	movq    %rax, -152(%rbp)
+	leaq    -160(%rbp), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %rdi
+	movq    -184(%rbp), %rsi
+	movq    $16, %rdx
+	callq   memcpy
+	movq    -16(%rbp), %rax
+	incq    %rax
+	movq    %rax, -16(%rbp)
+	movq    -136(%rbp), %rax
+	cmpq    $19, %rax
+	jne     .LIRCB3_E2
+	jmp     .LIRBB3_52
+.LIRCB3_E2:
+	xorl    %eax, %eax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_53
+.LIRBB3_52:
+	leaq    -144(%rbp), %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rcx
+	movq    (%rcx), %rax
+	movq    %rax, -184(%rbp)
+	movq    -176(%rbp), %rcx
+	movq    8(%rcx), %rax
+	movq    %rax, -192(%rbp)
+	movq    $6, %rax
+	movq    -192(%rbp), %rcx
+	cmpq    %rcx, %rax
+	jae     .LIRBB3_54
+	movq    -184(%rbp), %rcx
+	movzbq  6(%rcx), %rax
+	movzbq  %al, %rax
+	cmpq    $34, %rax
+	sete    %al
+	movzbq  %al, %rax
+	movq    %rax, -176(%rbp)
+	movq    -176(%rbp), %rax
+	movb    %al, -184(%rbp)
+	jmp     .LIRBB3_53
+.LIRBB3_54:
+	movq    $6, %rdi
+	movq    -192(%rbp), %rsi
+	leaq    .L11(%rip), %rdx
+	movq    $34, %rcx
+	callq   _K2rt16__ktmBoundsIndex
+.LIRBB3_53:
+	movzbq  -184(%rbp), %rax
+	testq   %rax, %rax
+	jz      .LIRBB3_57
+	movq    -8(%rbp), %rax
+	incq    %rax
+	movq    %rax, -8(%rbp)
+.LIRBB3_57:
+	movq    -8(%rbp), %rax
+	movq    -16(%rbp), %rcx
+	cmpq    %rcx, %rax
+	je     .LIRBB3_60
+	leaq    .L3(%rip), %rdi
+	movq    -8(%rbp), %rsi
+	movq    -16(%rbp), %rdx
+	movb    $0, %al
+	callq   printf
+	jmp     .LIRBB3_61
+.LIRBB3_60:
+	leaq    .L5(%rip), %rdi
+	movq    -8(%rbp), %rsi
+	movq    -16(%rbp), %rdx
+	movb    $0, %al
+	callq   printf
+.LIRBB3_61:
+	leaq    .L16(%rip), %rdi
+	movb    $0, %al
+	callq   printf
+	xorl    %eax, %eax
+	movq    %rax, -168(%rbp)
+	movslq  -168(%rbp), %rax
+	leaveq
+	retq
+.section    .note.GNU-stack,"",@progbits
+.ident      "ktm: Linux x86_64-unknown-linux-gnu v0.8.0 hash: eba0fb7475c28e54707ff69f4ebd15e54b14f848"

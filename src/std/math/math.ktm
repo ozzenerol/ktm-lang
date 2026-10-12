@@ -85,3 +85,62 @@ pub u64 divModU64(u64 *k, u64 m)
     *k /= m;
     return res;
 }
+
+/* ---- bit operations ----
+ * rotl/rotr/bswap/clz/ctz are compiled to one instruction where the call
+ * is written (rol/ror/bswap/bsr/bsf on x86_64, ror/rev/clz/rbit on
+ * arm64); the bodies below are what `&math.rotl` and the like point to,
+ * with the same results. Pass a u32 or a u64 (cast an i64 first): the
+ * type picks the width. */
+
+/* x rotated left (rotl) or right (rotr) by n bits, n taken mod the width */
+pub u32 rotl(u32 x, i64 n) { i64 k = n & 31; return (x << k) | (x >> ((32 - k) & 31)); }
+pub u64 rotl(u64 x, i64 n) { i64 k = n & 63; return (x << k) | (x >> ((64 - k) & 63)); }
+pub u32 rotr(u32 x, i64 n) { i64 k = n & 31; return (x >> k) | (x << ((32 - k) & 31)); }
+pub u64 rotr(u64 x, i64 n) { i64 k = n & 63; return (x >> k) | (x << ((64 - k) & 63)); }
+
+/* x with its bytes in the other order (big-endian <-> little-endian) */
+pub u16 bswap(u16 x) { return ((x & 0xFF) << 8) | (x >> 8); }
+pub u32 bswap(u32 x) {
+    return ((x & 0xFF) << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24);
+}
+pub u64 bswap(u64 x) {
+    u64 lo = bswap((u32)(x & 0xFFFFFFFF));
+    u64 hi = bswap((u32)(x >> 32));
+    return (lo << 32) | hi;
+}
+
+/* How many 0 bits lead (clz) or trail (ctz) x: the width (32 or 64) for 0 */
+pub i64 clz(u32 x) {
+    if (x == 0) { return 32; }
+    i64 n = 0;
+    while (!(x & 0x80000000)) { x <<= 1; n++; }
+    return n;
+}
+pub i64 clz(u64 x) {
+    if (x == 0) { return 64; }
+    i64 n = 0;
+    while (!(x & 0x8000000000000000)) { x <<= 1; n++; }
+    return n;
+}
+pub i64 ctz(u32 x) {
+    if (x == 0) { return 32; }
+    i64 n = 0;
+    while (!(x & 1)) { x >>= 1; n++; }
+    return n;
+}
+pub i64 ctz(u64 x) {
+    if (x == 0) { return 64; }
+    i64 n = 0;
+    while (!(x & 1)) { x >>= 1; n++; }
+    return n;
+}
+
+/* How many 1 bits x has */
+pub i64 popcount(u64 x) {
+    x = x - ((x >> 1) & 0x5555555555555555);
+    x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
+    x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0F;
+    return (x * 0x0101010101010101) >> 56;
+}
+pub i64 popcount(u32 x) { return popcount((u64)x); }

@@ -1,14 +1,13 @@
 module hash;
-import libc, rt, str;
+import libc, math, rt, str;
 
 /* Hashing: SHA-256 (FIPS 180-4) streaming and one-shot, CRC-32 (IEEE,
  * as zlib and PNG use it), FNV-1a for hash tables, and a constant-time
  * compare for digests and tokens.
  *
  * SHA-256 words are kept in u64 and masked to 32 bits after every
- * operation that can carry out of them; a rotate right by n is
- * (x >> n | x << (32 - n)), written out because a call per rotate costs
- * a third of the speed. */
+ * operation that can carry out of them; the rotates are math.rotr on
+ * the low 32 bits, one instruction each. */
 
 const i64 SHA256_BLOCK = 64;
 const i64 M32 = 0xFFFFFFFF;
@@ -68,17 +67,17 @@ static void sha256Block(Sha256 *s, u8 *p)
     }
     for (i = 16; i < 64; i++) {
         x = w[i - 15];
-        s0 = ((x >> 7 | x << 25) ^ (x >> 18 | x << 14) ^ x >> 3) & M32;
+        s0 = math.rotr((u32)x, 7) ^ math.rotr((u32)x, 18) ^ (x >> 3);
         x = w[i - 2];
-        s1 = ((x >> 17 | x << 15) ^ (x >> 19 | x << 13) ^ x >> 10) & M32;
+        s1 = math.rotr((u32)x, 17) ^ math.rotr((u32)x, 19) ^ (x >> 10);
         w[i] = (w[i - 16] + s0 + w[i - 7] + s1) & M32;
     }
     a = s.h[0]; b = s.h[1]; c = s.h[2]; d = s.h[3];
     e = s.h[4]; f = s.h[5]; g = s.h[6]; h = s.h[7];
     for (i = 0; i < 64; i++) {
-        s1 = ((e >> 6 | e << 26) ^ (e >> 11 | e << 21) ^ (e >> 25 | e << 7)) & M32;
+        s1 = math.rotr((u32)e, 6) ^ math.rotr((u32)e, 11) ^ math.rotr((u32)e, 25);
         t1 = (h + s1 + ((e & f) ^ (~e & g & M32)) + sha256K[i] + w[i]) & M32;
-        s0 = ((a >> 2 | a << 30) ^ (a >> 13 | a << 19) ^ (a >> 22 | a << 10)) & M32;
+        s0 = math.rotr((u32)a, 2) ^ math.rotr((u32)a, 13) ^ math.rotr((u32)a, 22);
         t2 = (s0 + ((a & b) ^ (a & c) ^ (b & c))) & M32;
         h = g; g = f; f = e;
         e = (d + t1) & M32;

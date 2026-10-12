@@ -997,7 +997,48 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     return result;
 }
 
+/* math's bit functions, compiled to one instruction where they are
+ * called: their overload symbols, the IR op and its width */
+static const struct {
+    const char *sym;
+    IrOp op;
+    int width;
+} ir_bit_intrinsics[] = {
+    {"_K4math4rotl_jl", IR_ROTL, 32}, {"_K4math4rotl_ml", IR_ROTL, 64},
+    {"_K4math4rotr_jl", IR_ROTR, 32}, {"_K4math4rotr_ml", IR_ROTR, 64},
+    {"_K4math5bswap_t", IR_BSWAP, 16}, {"_K4math5bswap_j", IR_BSWAP, 32},
+    {"_K4math5bswap_m", IR_BSWAP, 64},
+    {"_K4math3clz_j", IR_CLZ, 32}, {"_K4math3clz_m", IR_CLZ, 64},
+    {"_K4math3ctz_j", IR_CTZ, 32}, {"_K4math3ctz_m", IR_CTZ, 64},
+};
+
+static IrValue *irLowerBitIntrinsic(IrCtx *ctx, Ast *call) {
+    if (call->kind != AST_FUNCALL || !call->fname || !call->args) return NULL;
+    for (u64 i = 0; i < sizeof(ir_bit_intrinsics) / sizeof(ir_bit_intrinsics[0]); ++i) {
+        if (strcmp(call->fname->data, ir_bit_intrinsics[i].sym)) continue;
+        IrOp op = ir_bit_intrinsics[i].op;
+        int width = ir_bit_intrinsics[i].width;
+        /* No conversions: a 32- or 16-bit instruction reads only the low
+         * bits of its operand, and writes the result zero-extended to 64
+         * bits on both targets, so it is already the promoted value */
+        IrValue *v = irExpr(ctx, vecGet(Ast *, call->args, 0));
+        IrValue *n = NULL;
+        if (op == IR_ROTL || op == IR_ROTR) {
+            n = irExpr(ctx, vecGet(Ast *, call->args, 1));
+        }
+        IrValue *dst = irTmp(IR_TYPE_I64, 8);
+        IrInstr *I = irInstrNew(op, dst, v, n);
+        if (width == 32) I->flags |= IRCG_BITOP_32;
+        if (width == 16) I->flags |= IRCG_BITOP_16;
+        irBlockAddInstr(ctx, I);
+        return dst;
+    }
+    return NULL;
+}
+
 IrValue *irLowerFnCall(IrCtx *ctx, Ast *ast) {
+    IrValue *bit = irLowerBitIntrinsic(ctx, ast);
+    if (bit) return bit;
     Ast *callee = irInlineCandidate(ctx, ast);
     if (callee) return irLowerInlineCall(ctx, ast, callee);
     return irFnCallTo(ctx, ast, NULL);
@@ -2581,6 +2622,10 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
         case AST_ASM_FUNCALL:
         case AST_FUNPTR_CALL:
         case AST_FUNCALL:
+            if (ast->kind == AST_FUNCALL) {
+                IrValue *bit = irLowerBitIntrinsic(ctx, ast);
+                if (bit) return bit;
+            }
             /* SysV and AAPCS64 leave the bits above a narrow integer
              * return undefined (`extern "c" I32 strcmp` gave 0x00000000ffffffff
              * for -1), so the caller widens it, like any narrow read. */

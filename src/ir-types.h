@@ -55,6 +55,13 @@ typedef enum IrOp {
     IR_SHR,         /* Shift right (logical) */
     IR_SAR,         /* Shift right (arithmetic) */
     IR_NOT,         /* Bitwise NOT */
+    /* Bit intrinsics (math.rotl/rotr/bswap/clz/ctz): the width is r1's,
+     * 64 unless IRCG_BITOP_32 / IRCG_BITOP_16 is set on the instruction */
+    IR_ROTL,        /* dst = r1 rotated left by r2 (mod the width) */
+    IR_ROTR,        /* dst = r1 rotated right by r2 */
+    IR_BSWAP,       /* dst = r1 with its bytes reversed */
+    IR_CLZ,         /* dst = leading zero bits of r1 (the width for 0) */
+    IR_CTZ,         /* dst = trailing zero bits of r1 (the width for 0) */
     
     /* Comparison operations */
     IR_ICMP,        /* Integer comparison */

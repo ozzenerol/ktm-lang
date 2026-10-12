@@ -717,7 +717,7 @@ void main()
 each of <code>in</code>, <code>out</code> and <code>err</code> is <code>proc.INHERIT</code> (ours,
 the default), <code>proc.PIPE</code> (our end is <code>p.inFd</code>, <code>outFd</code> or
 <code>errFd</code>), <code>proc.DEVNULL</code> (<code>/dev/null</code>) or, for <code>err</code>,
-<code>proc.STDOUT</code> (2&gt;&amp;1); <code>cwd</code> and <code>env</code> (a null-terminated
+<code>proc.STDOUT</code> (2&gt;&amp;1), or <code>proc.FD</code> (below); <code>cwd</code> and <code>env</code> (a null-terminated
 <code>"NAME=value"</code> list that replaces the environment) are optional.
 <code>proc.communicate(p, input, &amp;out, &amp;err)</code> writes the input (a <code>u8[]</code>),
 reads both outputs to the end into Strings and waits, all in one <code>poll()</code> loop, so a
@@ -725,7 +725,7 @@ program that writes a lot to both, or echoes its input, can't block; pass <code>
 an output you don't want (it is still read, and dropped). <code>proc.wait(p)</code> returns the
 exit code, or -1 when a signal killed the program (<code>p.termSignal</code> says which);
 <code>proc.done(p)</code> checks without waiting, <code>proc.kill(p, sig)</code> signals it (the
-whole group with <code>newGroup</code>), and <code>proc.release(p)</code> closes the pipes and
+whole group with <code>newGroup</code> or <code>pgid</code>, below), and <code>proc.release(p)</code> closes the pipes and
 frees it, waiting for a program that is still running.</p>
 <pre data-run><code>import mem, proc;
 
@@ -750,8 +750,64 @@ void main()
  err=done
  exit=3
 </pre>
-<p>The program starts with default signal handlers and only stdin, stdout and stderr open: it
-inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shellf</code> and <code>proc.shellOutput</code>
+<h4 id="pipelines">Pipelines and process groups</h4>
+<p><code>proc.FD</code> gives the program an fd of yours as its stdin, stdout or stderr: set
+<code>opts.in = proc.FD</code> and <code>opts.inFd</code> (likewise <code>out</code>/<code>outFd</code>
+and <code>err</code>/<code>errFd</code>). With <code>proc.pipe(fds)</code> (a pipe whose ends are
+close-on-exec and above 2) that connects processes the way a shell's <code>a | b | c</code> does:
+each stage gets the read end of the pipe before it and the write end of the pipe after it, and you
+close your copies of both once it is started, so the last reader sees end of input.
+<code>opts.newGroup</code> starts the program in a new process group that it leads, and
+<code>opts.pgid</code> puts it into an existing one: the later stages of a pipeline join the first
+one's (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or a terminal's Ctrl-C with
+the group in the foreground (<code>libc.tcsetpgrp</code>), reaches all of them.
+<code>opts.dups</code> lists more fds for the child as pairs <code>{from, to, ...}</code>
+(<code>opts.ndups</code> pairs), applied in order after stdin, stdout and stderr like a shell's
+<code>3&gt;file</code> or <code>2&gt;&amp;1</code>. A program that reaps its children itself
+(a shell's <code>waitpid(-1)</code>, <code>coro.waitChild</code>) frees a Proc with
+<code>proc.disown(p)</code>, which doesn't wait.</p>
+<pre data-run><code>import libc, mem, proc;
+
+proc.Proc *stage(u8 *script, i32 in, i32 out, i32 pgid)
+{// sh -c script, reading in (-1: a PIPE from us) and writing out (-1: a PIPE to us)
+  u8 *argv[] = {"sh", "-c", script, null};
+  proc.Opts o;
+  mem.set(&amp;o, 0, sizeof(proc.Opts));
+  if (in &gt;= 0) { o.in = proc.FD; o.inFd = in; }
+  if (out &gt;= 0) { o.out = proc.FD; o.outFd = out; } else { o.out = proc.PIPE; }
+  if (pgid) { o.pgid = pgid; } else { o.newGroup = true; }
+  return proc.spawn(argv, &amp;o);
+}
+
+void main()
+{
+  i32 ab[2], bc[2];
+  proc.pipe(ab);
+  proc.pipe(bc);
+  proc.Proc *a = stage("printf 'pear\napple\npear\n'", -1, ab[1], 0);
+  proc.Proc *b = stage("sort", ab[0], bc[1], a.pgid);
+  proc.Proc *c = stage("uniq -c | tr -s ' '", bc[0], -1, a.pgid);
+  libc.close(ab[0]);
+  libc.close(ab[1]);
+  libc.close(bc[0]);
+  libc.close(bc[1]);
+
+  String out;
+  proc.communicate(c, "", &amp;out);
+  printf("%s", out);
+  printf("one group: %d\n", b.pgid == a.pid &amp;&amp; c.pgid == a.pid);
+  out.free();
+  proc.release(a);
+  proc.release(b);
+  proc.release(c);
+}
+</code></pre>
+<pre class="output"> 1 apple
+ 2 pear
+one group: 1
+</pre>
+<p>The program starts with default signal handlers and only stdin, stdout and stderr open (and
+the fds in <code>dups</code>): it inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shellf</code> and <code>proc.shellOutput</code>
 are still the tools for shell pipelines, globs and redirections; use the <code>proc.Proc</code>
 functions whenever an argument comes from a file name or user input.</p>
 
@@ -813,8 +869,9 @@ blocking <code>read</code>, <code>write</code> or <code>accept</code> carry on a
 have it return -1 with <code>os.errno() == EINTR</code> instead (<code>poll</code> always does).
 <code>mask</code> (<code>signal.bit(SIGUSR2) | ...</code>) holds other signals back while the handler runs,
 and <code>old</code>, if given, receives the previous action, so it can be put back with
-<code>signal.action(sig, &amp;old)</code>. <code>signal(sig, handler)</code> is the same as
-<code>signal.handle</code> with <code>SA_RESTART</code>, and the two can be mixed.</p>
+<code>signal.action(sig, &amp;old)</code>. <code>libc.signal(sig, handler)</code>, C's
+<code>signal</code>, is the same as <code>signal.handle</code> with <code>SA_RESTART</code>, and the
+two can be mixed.</p>
 <pre data-run><code>import cstr, libc, signal;
 
 i64 hits = 0;
@@ -1899,6 +1956,28 @@ void main()
 5 6 4 2.25
 </pre>
 
+<p>Bit operations on a <code>u32</code> or a <code>u64</code> (cast an <code>i64</code> first: the
+type picks the width): <code>math.rotl(x, n)</code> and <code>math.rotr(x, n)</code> rotate by
+<code>n</code> bits (taken mod the width), <code>math.bswap(x)</code> reverses the bytes (also on
+a <code>u16</code>), <code>math.clz(x)</code> and <code>math.ctz(x)</code> count the leading and
+trailing zero bits (the width for 0) and <code>math.popcount(x)</code> the one bits. Where they
+are called, rotl, rotr, bswap, clz and ctz are one machine instruction each, so hashing and
+binary-format code can use them freely.</p>
+<pre data-run><code>import math;
+
+void main()
+{
+  u32 h = 0x80000001;
+  printf("%x %x\n", math.rotl(h, 1), math.rotr(h, 1));
+  printf("%x\n", math.bswap((u32)0x11223344));
+  printf("%d %d %d\n", math.clz((u32)1), math.ctz((u64)8), math.popcount((u64)0xFF));
+}
+</code></pre>
+<pre class="output">3 c0000000
+44332211
+31 3 8
+</pre>
+
 <h2 id="net">Sockets<a class="anchor" href="#net" aria-label="Link to this section">#</a></h2>
 <p><code>net.listen(port, bindaddr, backlog)</code> returns a listening TCP socket,
 <code>net.accept(server)</code> the next connection on it and <code>net.dial(addr, port)</code>
@@ -1921,15 +2000,46 @@ Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which end
 program, as in C. <code>net.send(sock, data)</code>, with <code>data</code> a
 <code>u8[]</code> (a literal, a String, <code>buf[0:n]</code>), is a <code>send</code> that adds
 <code>MSG_NOSIGNAL</code> to its optional flags: it returns -1 with <code>os.errno()</code>
-<code>EPIPE</code> (or <code>ECONNRESET</code>) instead; <code>signal(SIGPIPE, SIG_IGN)</code>
-does the same for every <code>write</code> and <code>send</code> in the program.
-<code>signal</code> takes <code>SIG_DFL</code>, <code>SIG_IGN</code> or a handler
-<code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous
-one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
+<code>EPIPE</code> (or <code>ECONNRESET</code>) instead;
+<code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> does the same for every
+<code>write</code> and <code>send</code> in the program (see <a href="#signals">Signals</a>;
+<code>libc.signal(libc.SIGPIPE, libc.SIG_IGN)</code>, C's <code>signal</code>, works too: it
+takes <code>libc.SIG_DFL</code>, <code>libc.SIG_IGN</code> or a handler
+<code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous one
+or <code>libc.SIG_ERR</code>). <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
 <code>SIGKILL</code>, <code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGPIPE</code>,
 <code>SIGALRM</code>, <code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control signals
 <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
-<code>SIGTTOU</code> are defined, with each platform's numbers.</p>
+<code>SIGTTOU</code> are defined in <code>libc</code>, with each platform's numbers.</p>
+<pre data-run><code>import date, libc, net, os, signal;
+
+void main()
+{
+  signal.handle(libc.SIGPIPE, libc.SIG_IGN);    // or libc.signal(libc.SIGPIPE, libc.SIG_IGN)
+
+  i32 srv = net.listen(0, "127.0.0.1", 1);
+  i32 client = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  libc.close(conn);                              // the peer goes away
+
+  /* a plain write(2), without MSG_NOSIGNAL: the first may still get
+   * through, a later one fails instead of ending the program */
+  i64 r = 0;
+  i32 err = 0;
+  for (i64 i = 0; i &lt; 50; i++) {
+    r = libc.write(client, "ping", 4);
+    if (r &lt; 0) { err = os.errno(); break; }    // before anything else can change it
+    date.sleepMs(10);
+  }
+  printf("write: %d, EPIPE or ECONNRESET: %d\n", r, err == libc.EPIPE || err == libc.ECONNRESET);
+  printf("still running\n");
+  libc.close(client);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">write: -1, EPIPE or ECONNRESET: 1
+still running
+</pre>
 <pre><code>i32 srv = net.listen(8080, "127.0.0.1", 16);
 if (srv == -1) {
   printf("can't listen on 8080\n");
@@ -1946,7 +2056,11 @@ libc.close(srv);
 </code></pre>
 <p><code>net.peerAddr(sock)</code> is the address of an accepted connection's peer and
 <code>net.addrToStr(sockaddr, family)</code> the address in a <code>sockaddr</code>, both as a
-String (without a <code>ptr</code> if there is none).</p>
+String (without a <code>ptr</code> if there is none). <code>net.setNonBlocking(sock)</code> and
+<code>net.setBlocking(sock)</code> set and clear <code>O_NONBLOCK</code>,
+<code>net.localPort(sock)</code> is the port a socket is bound to, and
+<code>net.localAddr</code> / <code>net.remoteAddr</code> (below, with UDP) both ends as a
+<code>net.Addr</code>.</p>
 <p>The raw calls are there too, for UDP and anything the helpers don't cover:
 <code>socket</code>, <code>bind</code>, <code>sendto</code>, <code>recvfrom</code>,
 <code>sendmsg</code>, <code>recvmsg</code>, <code>getsockname</code>, <code>setsockopt</code>, ...
@@ -2002,6 +2116,49 @@ void main()
 </code></pre>
 <pre class="output">server got ping from 127.0.0.1
 client got pong
+</pre>
+<p>A server that answers many clients is better off keeping each sender as the kernel gives
+it: <code>net.recvFromAddr(sock, buf, &amp;from)</code> fills a <code>net.Addr</code> (a
+<code>sockaddr_storage</code> and its length, IPv4 or IPv6) and
+<code>net.sendToAddr(sock, reply, &amp;from)</code> answers it, with no text and no name lookup
+in between. <code>net.makeAddr(ip, port, &amp;a)</code> makes one from a numeric address
+(<code>"192.0.2.7"</code>, <code>"::1"</code>; false for anything else, host names included),
+and an Addr gives back <code>a.ip()</code> (a String), <code>a.port()</code>,
+<code>a.family()</code> (<code>libc.AF_INET</code> or <code>libc.AF_INET6</code>, 0 when empty),
+<code>a.equals(&amp;b)</code> (the same address and port) and <code>a.sameIp(&amp;b)</code>.
+<code>net.localAddr(sock, &amp;a)</code> and <code>net.remoteAddr(sock, &amp;a)</code> fill one
+with a socket's own address and its peer's (<code>getsockname</code>, <code>getpeername</code>).</p>
+<pre data-run><code>import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  net.setRecvTimeout(srv, 1000);
+  net.setRecvTimeout(cli, 1000);
+
+  net.Addr server;
+  net.makeAddr("127.0.0.1", net.localPort(srv), &amp;server);
+  net.sendToAddr(cli, "\x00\x2Aquery", &amp;server);    // a 2-byte id, then the question
+
+  u8 buf[512];
+  net.Addr from;
+  i64 n = net.recvFromAddr(srv, buf, &amp;from);
+  String ip = from.ip();
+  defer ip.free();
+  printf("%d bytes from %s, port %s\n", n, ip, from.port() == net.localPort(cli) ? "the client's" : "?");
+  buf[2] = '!';
+  net.sendToAddr(srv, buf[0:3], &amp;from);              // the id and the answer, straight back
+
+  net.Addr back;
+  n = net.recvFromAddr(cli, buf, &amp;back);
+  printf("answer to id %d: %c, from the server: %d\n", buf[1], buf[2], back.equals(&amp;server));
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">7 bytes from 127.0.0.1, port the client's
+answer to id 42: !, from the server: 1
 </pre>
 
 <p>For code on the raw socket calls: <code>net.htons</code>/<code>net.ntohs</code> and

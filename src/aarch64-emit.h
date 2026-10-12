@@ -496,6 +496,8 @@ typedef struct {
     void (*fbinop)(void *be, IrOp op, int width);/* fadd/.. d0,d0,d1 */
     void (*load_d1)(void *be, IrInstr *instr);   /* r2 -> d1 */
     void (*fneg)(void *be, int width);
+    /* bit intrinsics on x0 (IR_ROTL .. IR_CTZ), width 16, 32 or 64 */
+    void (*bitop)(void *be, IrOp op, int width, IrInstr *instr);
 } A64ArithEmitter;
 
 static inline void a64EmitArith(A64ArithEmitter *e, IrInstr *instr) {
@@ -521,6 +523,12 @@ static inline void a64EmitArith(A64ArithEmitter *e, IrInstr *instr) {
     case IR_INEG: case IR_NOT:
         e->load_gp(be, instr); e->unary(be, op); e->spill_gp(be, instr);
         break;
+    case IR_ROTL: case IR_ROTR: case IR_BSWAP: case IR_CLZ: case IR_CTZ: {
+        int width = (instr->flags & IRCG_BITOP_32) ? 32
+                  : (instr->flags & IRCG_BITOP_16) ? 16 : 64;
+        e->load_gp(be, instr); e->bitop(be, op, width, instr); e->spill_gp(be, instr);
+        break;
+    }
     case IR_SHL: case IR_SHR: case IR_SAR: {
         e->load_gp(be, instr);
         IrValue *r2 = instr->r2;

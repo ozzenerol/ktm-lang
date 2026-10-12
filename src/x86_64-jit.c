@@ -1179,6 +1179,64 @@ static void jitEmitInstr(JitFnCtx *ctx, IrInstr *instr) {
             jitSpillDst(ctx, instr, R_RAX);
             break;
 
+        /* Bit intrinsics on rax (rcx the count or the zero value), as
+         * raw bytes: the same instructions x86_64.c writes as text */
+        case IR_ROTL:
+        case IR_ROTR: {
+            int w32 = instr->flags & IRCG_BITOP_32;
+            uint8_t modrm = instr->op == IR_ROTL ? 0xC0 : 0xC8; /* /0 rol, /1 ror, rax */
+            jitLoadFirstSrc(ctx, instr->r1);
+            if (instr->r2 && instr->r2->kind == IR_VAL_CONST_INT) {
+                if (!w32) put_byte(enc, 0x48);
+                put_byte(enc, 0xC1);
+                put_byte(enc, modrm);
+                put_byte(enc, (uint8_t)(instr->r2->as._i64 & (w32 ? 31 : 63)));
+            } else {
+                jitLoadToReg(ctx, instr->r2, R_RCX);
+                if (!w32) put_byte(enc, 0x48);
+                put_byte(enc, 0xD3);
+                put_byte(enc, modrm);
+            }
+            jitSpillDst(ctx, instr, R_RAX);
+            break;
+        }
+
+        case IR_BSWAP:
+            jitLoadFirstSrc(ctx, instr->r1);
+            if (instr->flags & IRCG_BITOP_16) {
+                /* rolw $8, %ax ; movzwl %ax, %eax */
+                put_byte(enc, 0x66); put_byte(enc, 0xC1); put_byte(enc, 0xC0); put_byte(enc, 0x08);
+                put_byte(enc, 0x0F); put_byte(enc, 0xB7); put_byte(enc, 0xC0);
+            } else {
+                if (!(instr->flags & IRCG_BITOP_32)) put_byte(enc, 0x48);
+                put_byte(enc, 0x0F); put_byte(enc, 0xC8);              /* bswap eax/rax */
+            }
+            jitSpillDst(ctx, instr, R_RAX);
+            break;
+
+        case IR_CLZ:
+        case IR_CTZ: {
+            int w32 = instr->flags & IRCG_BITOP_32;
+            int clz = instr->op == IR_CLZ;
+            uint8_t zero = clz ? (w32 ? 63 : 127) : (w32 ? 32 : 64);
+            jitLoadFirstSrc(ctx, instr->r1);
+            /* movl $zero, %ecx */
+            put_byte(enc, 0xB9); put_byte(enc, zero); put_byte(enc, 0); put_byte(enc, 0); put_byte(enc, 0);
+            /* bsr/bsf %rax, %rax */
+            if (!w32) put_byte(enc, 0x48);
+            put_byte(enc, 0x0F); put_byte(enc, clz ? 0xBD : 0xBC); put_byte(enc, 0xC0);
+            /* cmovz %rcx, %rax */
+            if (!w32) put_byte(enc, 0x48);
+            put_byte(enc, 0x0F); put_byte(enc, 0x44); put_byte(enc, 0xC1);
+            if (clz) {
+                /* xor $width-1, %rax */
+                if (!w32) put_byte(enc, 0x48);
+                put_byte(enc, 0x83); put_byte(enc, 0xF0); put_byte(enc, w32 ? 31 : 63);
+            }
+            jitSpillDst(ctx, instr, R_RAX);
+            break;
+        }
+
         case IR_SHL:
         case IR_SHR:
         case IR_SAR: {

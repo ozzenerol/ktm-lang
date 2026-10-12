@@ -1737,6 +1737,62 @@ static void x86_64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
             x86_64SpillDst(ctx, instr, "rax");
             break;
 
+        case IR_ROTL:
+        case IR_ROTR: {
+            int w32 = instr->flags & IRCG_BITOP_32;
+            const char *op = instr->op == IR_ROTL ? (w32 ? "roll" : "rolq")
+                                                  : (w32 ? "rorl" : "rorq");
+            x86_64LoadFirstSrc(ctx, instr, instr->r1);
+            if (irIsConstInt(instr->r2)) {
+                aoStrCatFmt(ctx->buf, "%s    $%I, %%%s\n\t", op,
+                            (s64)(instr->r2->as._i64 & (w32 ? 31 : 63)),
+                            w32 ? "eax" : "rax");
+            } else {
+                x86_64LoadToReg(ctx, instr->r2, "rcx");
+                aoStrCatFmt(ctx->buf, "%s    %%cl, %%%s\n\t", op, w32 ? "eax" : "rax");
+            }
+            x86_64SpillDst(ctx, instr, "rax");
+            break;
+        }
+
+        case IR_BSWAP:
+            x86_64LoadFirstSrc(ctx, instr, instr->r1);
+            if (instr->flags & IRCG_BITOP_16) {
+                aoStrCatFmt(ctx->buf, "rolw    $8, %%ax\n\tmovzwl  %%ax, %%eax\n\t");
+            } else if (instr->flags & IRCG_BITOP_32) {
+                aoStrCatFmt(ctx->buf, "bswapl  %%eax\n\t");
+            } else {
+                aoStrCatFmt(ctx->buf, "bswapq  %%rax\n\t");
+            }
+            x86_64SpillDst(ctx, instr, "rax");
+            break;
+
+        case IR_CLZ:
+            /* bsr gives the top set bit's index (and sets ZF for 0, its
+             * result then undefined): width-1 - index, or the width */
+            x86_64LoadFirstSrc(ctx, instr, instr->r1);
+            if (instr->flags & IRCG_BITOP_32) {
+                aoStrCatFmt(ctx->buf, "movl    $63, %%ecx\n\tbsrl    %%eax, %%eax\n\t"
+                                      "cmovzl  %%ecx, %%eax\n\txorl    $31, %%eax\n\t");
+            } else {
+                aoStrCatFmt(ctx->buf, "movl    $127, %%ecx\n\tbsrq    %%rax, %%rax\n\t"
+                                      "cmovzq  %%rcx, %%rax\n\txorq    $63, %%rax\n\t");
+            }
+            x86_64SpillDst(ctx, instr, "rax");
+            break;
+
+        case IR_CTZ:
+            x86_64LoadFirstSrc(ctx, instr, instr->r1);
+            if (instr->flags & IRCG_BITOP_32) {
+                aoStrCatFmt(ctx->buf, "movl    $32, %%ecx\n\tbsfl    %%eax, %%eax\n\t"
+                                      "cmovzl  %%ecx, %%eax\n\t");
+            } else {
+                aoStrCatFmt(ctx->buf, "movl    $64, %%ecx\n\tbsfq    %%rax, %%rax\n\t"
+                                      "cmovzq  %%rcx, %%rax\n\t");
+            }
+            x86_64SpillDst(ctx, instr, "rax");
+            break;
+
         case IR_FADD:
         case IR_FSUB:
         case IR_FMUL:
@@ -2361,10 +2417,8 @@ void x86_64PasteDataSection(Cctrl *cc, AoStr *buf) {
         MapNode *n = it.node;
         Ast *ast = (Ast *)n->value;
         assert(ast->kind == AST_STRING);
-        aoStrCatFmt(buf,
-                    "%S:\n\t"
-                    ".asciz \"%S\"\n",
-                    ast->slabel, ast->sval);
+        aoStrCatFmt(buf, "%S:\n\t", ast->slabel);
+        asmEmitStringBytes(buf, ast);
     }
     aoStrPutChar(buf, '\t');
 }
@@ -2621,8 +2675,9 @@ void x86_64GlobalVar(Cctrl *cc,
                 if (!local) {
                     aoStrCatFmt(buf, ".globl %S\n", label);
                 }
-                aoStrCatFmt(buf, ".data\n%S:\n\t.asciz \"%S\"\n\t",
-                            label, declinit->sval);
+                aoStrCatFmt(buf, ".data\n%S:\n\t", label);
+                asmEmitStringBytes(buf, declinit);
+                aoStrPutChar(buf, '\t');
                 /* `U8 buf[8] = "abc"`: zero-fill past the string. */
                 int pad = declvar->type->size - (int)declinit->real_len;
                 if (pad > 0) {

@@ -18,6 +18,7 @@ AstType *parseReturnAuto(Cctrl *cc, Ast *retval);
 AstType *parseArrayDimensions(Cctrl *cc, AstType *base_type);
 AstType *parsePointerType(Cctrl *cc, AstType *type);
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr);
+Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at);
 Ast *parseResolveOverloadRef(Cctrl *cc, AstType *want, Ast *expr);
 void parseCheckOverloadRefs(Cctrl *cc);
 Ast *parseReflectCall(Cctrl *cc, char *name, int len);

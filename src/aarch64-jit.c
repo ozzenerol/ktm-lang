@@ -1294,6 +1294,44 @@ static void a64JitLoadD1(void *be, IrInstr *i) {
 static void a64JitFneg(void *be, int width) {
     aarch64_enc_fneg_scalar(&((JitFnCtx *)be)->jit->enc, width == 8, A_X0, A_X0);
 }
+static void a64JitBitop(void *be, IrOp op, int width, IrInstr *i) {
+    JitFnCtx *ctx = (JitFnCtx *)be;
+    AsmEnc *enc = &ctx->jit->enc;
+    int is64 = width == 64;
+    uint32_t sf = is64 ? 0x80000000u : 0u;
+    switch (op) {
+        case IR_ROTL:
+        case IR_ROTR:
+            if (i->r2 && i->r2->kind == IR_VAL_CONST_INT) {
+                uint32_t k = (uint32_t)(i->r2->as._i64 & (width - 1));
+                if (op == IR_ROTL) k = (uint32_t)((width - k) & (width - 1));
+                /* ror #k = extr x0, x0, x0, #k */
+                put_word(enc, (is64 ? 0x93C00000u : 0x13800000u) | (k << 10));
+            } else {
+                jitLoadToReg(ctx, i->r2, A_X1);
+                if (op == IR_ROTL) aarch64_enc_neg_reg(enc, is64, A_X1, A_X1);
+                put_word(enc, sf | 0x1AC02C00u | (1u << 16));       /* rorv x0, x0, x1 */
+            }
+            break;
+        case IR_BSWAP:
+            if (width == 16) {
+                put_word(enc, 0x5AC00400u);                         /* rev16 w0, w0 */
+                aarch64_enc_uxth(enc, A_X0, A_X0);
+            } else {
+                put_word(enc, is64 ? 0xDAC00C00u : 0x5AC00800u);    /* rev */
+            }
+            break;
+        case IR_CLZ:
+            put_word(enc, sf | 0x5AC01000u);                        /* clz */
+            break;
+        case IR_CTZ:
+            put_word(enc, sf | 0x5AC00000u);                        /* rbit */
+            put_word(enc, sf | 0x5AC01000u);                        /* clz */
+            break;
+        default:
+            break;
+    }
+}
 static void a64JitArithInit(A64ArithEmitter *e, JitFnCtx *ctx) {
     e->be        = ctx;
     e->load_gp   = a64JitCvtLoadGp;   e->load_fpr  = a64JitCvtLoadFpr;
@@ -1304,6 +1342,7 @@ static void a64JitArithInit(A64ArithEmitter *e, JitFnCtx *ctx) {
     e->shift_reg = a64JitShiftReg;    e->load_x1   = a64JitLoadX1;
     e->fbinop    = a64JitFbinop;      e->load_d1   = a64JitLoadD1;
     e->fneg      = a64JitFneg;
+    e->bitop     = a64JitBitop;
 }
 
 static void jitEmitInstr(JitFnCtx *ctx, IrInstr *instr) {
@@ -1501,6 +1540,7 @@ static void jitEmitInstr(JitFnCtx *ctx, IrInstr *instr) {
         case IR_IADD: case IR_ISUB: case IR_AND: case IR_OR: case IR_XOR:
         case IR_IMUL: case IR_IDIV: case IR_UDIV: case IR_IREM: case IR_UREM:
         case IR_INEG: case IR_NOT: case IR_SHL: case IR_SHR: case IR_SAR:
+        case IR_ROTL: case IR_ROTR: case IR_BSWAP: case IR_CLZ: case IR_CTZ:
         case IR_FADD: case IR_FSUB: case IR_FMUL: case IR_FDIV: case IR_FNEG: {
             /* Unified arithmetic lowering shared with the AOT (aarch64-emit.h). */
             A64ArithEmitter ae;
