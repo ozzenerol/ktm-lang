@@ -756,6 +756,15 @@ static AstType *parseBaseDeclSpecName(Cctrl *cc) {
             cctrlRewindUntilStrMatch(cc,tok->start,tok->len,NULL);
             cctrlRaiseException(cc,"Type `%.*s` has not been declared, expected type declaration",tok->len,tok->start);
         }
+        /* a generic struct: `Vec<i64>` names an instance */
+        if (type->generic && !type->generic_args) {
+            if (!tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+                cctrlRaiseException(cc, "`%s` is generic: write its type arguments, as in `%s<i64>`",
+                                    type->clsname->data, type->clsname->data);
+            }
+            Vec *args = parseGenericArgs(cc);
+            type = parseGenericStructInstance(cc, type, args, tok);
+        }
         return type;
     }
     cctrlRewindUntilStrMatch(cc,tok->start,tok->len,NULL);

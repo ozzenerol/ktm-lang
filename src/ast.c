@@ -347,6 +347,8 @@ AoStr *astMakeTmpName(void) {
 
 /* For assigning a unique identifier to variables */
 static u32 lvar_unique_id = 1;
+u32 astGetLVarId(void) { return lvar_unique_id; }
+void astSetLVarId(u32 id) { lvar_unique_id = id; }
 void astResetLVarId(void) {
     lvar_unique_id = 1;
 }
@@ -374,13 +376,41 @@ char *astRuntimeSymbol(const char *name) {
     return astModuleMangle(qual, strlen(qual));
 }
 
+/* A name part of a symbol, length-prefixed; a generic instance's
+ * `Vec<geo.Point *>` with the characters a symbol can't hold as letters
+ * (`<` I, `>` E, `,` _, `*` P, `[` S, `(` F, `)` E, `.` _) */
+static void astMangleCatPart(AoStr *out, const char *s, int n) {
+    if (!memchr(s, '<', n)) {
+        aoStrCatPrintf(out, "%d%.*s", n, n, s);
+        return;
+    }
+    AoStr *enc = aoStrNew();
+    for (int i = 0; i < n; ++i) {
+        char c = s[i];
+        switch (c) {
+            case '<': aoStrPutChar(enc, 'I'); break;
+            case '>': case ')': aoStrPutChar(enc, 'E'); break;
+            case ',': case '.': aoStrPutChar(enc, '_'); break;
+            case '*': aoStrPutChar(enc, 'P'); break;
+            case '[': aoStrPutChar(enc, 'S'); break;
+            case '(': aoStrPutChar(enc, 'F'); break;
+            case ']': case ' ': break;
+            default: aoStrPutChar(enc, c); break;
+        }
+    }
+    aoStrCatPrintf(out, "%d%s", (int)enc->len, enc->data);
+    aoStrRelease(enc);
+}
+
 char *astModuleMangle(char *qual, int len) {
     AoStr *out = aoStrNew();
     aoStrCatLen(out, "_K", 2);
-    int start = 0;
+    int start = 0, depth = 0;
     for (int i = 0; i <= len; ++i) {
-        if (i == len || qual[i] == '.') {
-            aoStrCatPrintf(out, "%d%.*s", i - start, i - start, qual + start);
+        if (i < len && qual[i] == '<') depth++;
+        if (i < len && qual[i] == '>') depth--;
+        if (i == len || (qual[i] == '.' && depth == 0)) {
+            astMangleCatPart(out, qual + start, i - start);
             start = i + 1;
         }
     }
@@ -393,6 +423,12 @@ char *astModuleMangle(char *qual, int len) {
  * can't be a module's symbol, and astModuleDemangle reads it back as
  * `read`. */
 char *astProgramSymbol(char *name, int len) {
+    if (memchr(name, '<', len)) {
+        AoStr *out = aoStrNew();
+        aoStrCatLen(out, "_K0", 3);
+        astMangleCatPart(out, name, len);
+        return aoStrMove(out);
+    }
     return mprintf("_K0%d%.*s", len, len, name);
 }
 

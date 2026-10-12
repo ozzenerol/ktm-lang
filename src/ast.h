@@ -211,6 +211,12 @@ typedef struct AstType {
      * and `i64 len`, interned per element type, whose element is `elem` */
     u8 is_slice;
     struct AstType *elem;
+    /* Generics: a generic struct's template (`Vec` before its arguments)
+     * points at its definition; an instance (`Vec<i64>`) at its
+     * definition and arguments; a type parameter stand-in (inference) */
+    void *generic;
+    Vec *generic_args;
+    u8 is_type_param;
     /* On a class field: a union member after the first one (directly or
      * through an anonymous class/union flattened into the class). A
      * union takes one initialiser item, for its first member, so
@@ -785,6 +791,8 @@ Ast *astMakeForeverSentinal(void);
 Ast *astMakeLoopSentinal(void);
 Ast *astMakePlaceHolder(void);
 void astResetLVarId(void);
+u32 astGetLVarId(void);
+void astSetLVarId(u32 id);
 
 /* Returns `1` on successful conversion and `0` on failure */
 int astUnaryOpFromToken(s64 op, AstUnOp *_result);
