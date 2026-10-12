@@ -1243,6 +1243,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
                 }
                 AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
                 if (type && arg && arg->kind != AST_PLACEHOLDER) {
+                    parseResolveOverloadRef(cc, type, arg);
                     argv->entries[i] = arg = parseSliceFrom(cc, type, arg);
                     parseCheckArgType(cc,type,arg,i,fname,len,loc);
                 }
@@ -1284,6 +1285,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
 
         AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
         if (type) {
+            parseResolveOverloadRef(cc, type, arg);
             argv->entries[i] = arg = parseSliceFrom(cc, type, arg);
             parseCheckArgType(cc,type,arg,i,fname,len,loc);
         }
@@ -1752,6 +1754,12 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
             }
             tok = cctrlTokenPeek(cc);
             continue;
+        }
+        if (tokenPunctIs(tok, TK_ELLIPSIS) && !decl &&
+            astOverloads(findFunctionDecl(cc, fname, len))) {
+            cctrlRaiseException(cc,
+                "`...` can't spread into `%.*s`, which is overloaded: pass the "
+                "items, or call the overload through a `fn` pointer", len, fname);
         }
         if (tokenPunctIs(tok, TK_ELLIPSIS)) {
             cctrlRaiseException(cc,
@@ -2270,14 +2278,334 @@ Ast *parseThrowCall(Cctrl *cc, Ast *file, int line, Ast **_code) {
 }
 
 /* Read function arguments for a function being called */
+/* ---- overloads (AST_FLAG_OVERLOAD): picking one for a call ---- */
+
+/* How well an argument fits a parameter type: not at all, int to float,
+ * a conversion in the same family (another int width, T * to void *, a
+ * String to u8[], an array to its pointer), or exactly */
+enum { OVL_NONE = 0, OVL_INT_FLOAT = 1, OVL_CONVERT = 2, OVL_EXACT = 3 };
+
+static AstType *parseParamType(Ast *param) {
+    if (!param) return NULL;
+    if (param->kind == AST_DEFAULT_PARAM && param->declvar) return param->declvar->type;
+    return param->type;
+}
+
+/* The overload of `&f`'s set whose type is `want`; NULL if none */
+static Ast *parseOverloadRefPick(Ast *ref, AstType *want) {
+    if (!ref || !want) return NULL;
+    Ast *fn = ref->kind == AST_UNOP ? ref->operand : ref;
+    if (want->kind == AST_TYPE_POINTER && want->ptr && want->ptr->kind == AST_TYPE_FUNC) {
+        want = want->ptr;
+    }
+    if (!fn || !fn->overloads || want->kind != AST_TYPE_FUNC) return NULL;
+    for (u64 i = 0; i < fn->overloads->size; ++i) {
+        Ast *o = fn->overloads->entries[i];
+        if (astFnTypesMatch(want, o->type)) return o;
+    }
+    return NULL;
+}
+
+static int parseOverloadArgRank(AstType *p, Ast *arg) {
+    if (!p || !arg || !arg->type) return OVL_CONVERT;
+    if (arg->flags & AST_FLAG_OVERLOAD_REF) {
+        return parseOverloadRefPick(arg, p) ? OVL_EXACT : OVL_NONE;
+    }
+    AstType *a = arg->type;
+    if (astTypeIsSlice(p)) {
+        if (a == p) return OVL_EXACT;
+        if (astTypeIsSlice(a)) {
+            return astFnTypesMatch(p->elem, a->elem) && p->elem->kind == a->elem->kind
+                   ? OVL_EXACT : OVL_NONE;
+        }
+        if (a->kind == AST_TYPE_ARRAY && a->len >= 0 && a->ptr &&
+            astFnTypesMatch(p->elem, a->ptr)) {
+            return OVL_EXACT;
+        }
+        if (p->elem->size == 1 && (p->elem->kind == AST_TYPE_CHAR || p->elem->kind == AST_TYPE_INT) &&
+            (astTypeIsString(a) || (a->kind == AST_TYPE_POINTER && astTypeIsString(a->ptr)))) {
+            return OVL_CONVERT;
+        }
+        return OVL_NONE;
+    }
+    if (parseArgCompat(p, arg) != ARG_OK) return OVL_NONE;
+    if (a->kind == AST_TYPE_ARRAY && p->kind == AST_TYPE_POINTER) return OVL_CONVERT;
+    if (p->kind == AST_TYPE_CHAR && a->kind == AST_TYPE_CHAR && p->is_bool != a->is_bool) {
+        return OVL_CONVERT;
+    }
+    if (astIsFloatType(p) != astIsFloatType(a)) {
+        return astIsFloatType(p) ? OVL_INT_FLOAT : OVL_NONE;
+    }
+    if (p->kind == a->kind || (astIsIntType(p) && astIsIntType(a))) {
+        if (astFnTypesMatch(p, a)) return OVL_EXACT;
+    }
+    return OVL_CONVERT;
+}
+
+typedef struct OvlCand {
+    Ast *fn;     /* the overload */
+    Ast *decl;   /* as the call sees it (a method without its self) */
+    int *ranks;  /* per argument */
+    int extra;   /* 1 when it needs a default or takes `T ...name` */
+} OvlCand;
+
+/* Does `decl` take `argv`? Fills c's ranks */
+static int parseOverloadViable(Ast *decl, Vec *argv, OvlCand *c) {
+    Vec *params = parseGetFunctionParams(decl);
+    int n = params ? (int)params->size : 0, argc = argv ? (int)argv->size : 0;
+    int fixed = n, va_at = -1, untyped = 0;
+    AstType *va_elem = NULL;
+    if (n >= 2) {
+        Ast *last = params->entries[n - 1];
+        if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
+            va_at = fixed = n - 2;
+            va_elem = last->type->ptr;
+        }
+    }
+    for (int i = 0; i < n && va_at < 0; ++i) {
+        Ast *p = params->entries[i];
+        if (p && p->kind == AST_VAR_ARGS) { fixed = i; untyped = 1; break; }
+    }
+    c->ranks = calloc(argc + 1, sizeof(int));
+    c->extra = va_at >= 0 || untyped;
+    for (int i = 0; i < fixed; ++i) {
+        Ast *p = params->entries[i];
+        Ast *arg = i < argc ? argv->entries[i] : NULL;
+        if (!arg || arg->kind == AST_PLACEHOLDER) {
+            int has_default = p->kind == AST_DEFAULT_PARAM ||
+                              (p->kind == AST_FUNPTR && p->default_fn);
+            if (!has_default) return 0;
+            c->extra = 1;
+            if (i < argc) c->ranks[i] = OVL_EXACT;
+            continue;
+        }
+        if (!(c->ranks[i] = parseOverloadArgRank(parseParamType(p), arg))) return 0;
+    }
+    for (int i = fixed; i < argc; ++i) {
+        Ast *arg = argv->entries[i];
+        if (va_at >= 0) {
+            if (!arg || arg->kind == AST_PLACEHOLDER) return 0;
+            if (!(c->ranks[i] = parseOverloadArgRank(va_elem, arg))) return 0;
+        } else if (untyped) {
+            c->ranks[i] = OVL_CONVERT;
+        } else {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* a fits at least as well as b on every argument and better on one, or
+ * as well everywhere without needing defaults or extras */
+static int parseOverloadBetter(OvlCand *a, OvlCand *b, int argc) {
+    int gt = 0;
+    for (int i = 0; i < argc; ++i) {
+        if (a->ranks[i] < b->ranks[i]) return 0;
+        if (a->ranks[i] > b->ranks[i]) gt = 1;
+    }
+    return gt || a->extra < b->extra;
+}
+
+/* An overload as messages show it: `f(i64)`, `geo.area(geo.Rect *)` */
+static char *parseOverloadName(Ast *fn) {
+    return astModuleDemangle(fn->fname->data, fn->fname->len);
+}
+
+/* Its name alone: `f`, `geo.area` */
+static char *parseOverloadBaseName(Ast *fn) {
+    char *name = parseOverloadName(fn);
+    char *paren = strchr(name, '(');
+    if (paren) *paren = '\0';
+    return name;
+}
+
+static char *parseOverloadArgTypes(Vec *argv) {
+    AoStr *out = aoStrNew();
+    aoStrPutChar(out, '(');
+    for (u64 i = 0; argv && i < argv->size; ++i) {
+        Ast *arg = argv->entries[i];
+        if (i) aoStrCat(out, ", ");
+        if (!arg || arg->kind == AST_PLACEHOLDER) aoStrCat(out, "<default>");
+        else if (arg->flags & AST_FLAG_OVERLOAD_REF) aoStrCatPrintf(out, "&%s", parseOverloadName(arg->operand));
+        else aoStrCat(out, astTypeToString(arg->type));
+    }
+    aoStrPutChar(out, ')');
+    return aoStrMove(out);
+}
+
+static char *parseOverloadList(Vec *fns) {
+    AoStr *out = aoStrNew();
+    for (u64 i = 0; i < fns->size; ++i) {
+        if (i) aoStrCat(out, ", ");
+        aoStrCatPrintf(out, "`%s`", parseOverloadName(fns->entries[i]));
+    }
+    return aoStrMove(out);
+}
+
+/* The method `fn` as a call through an object sees it: without self */
+static Ast *parseMethodWithoutSelf(Ast *fn) {
+    Vec *params = astVecNew();
+    for (u64 i = 1; i < fn->params->size; ++i) {
+        vecPush(params, fn->params->entries[i]);
+    }
+    Ast *decl = (Ast *)malloc(sizeof(Ast));
+    *decl = *fn;
+    decl->params = params;
+    decl->type = astTypeCopy(fn->type);
+    decl->type->params = params;
+    return decl;
+}
+
+/* The overload of `set` a call with `argv` (parsed without a target)
+ * calls: the one that fits every argument at least as well as any other
+ * (see OVL_*); an error when none fits or two fit as well. `no_self`: a
+ * method called through an object (its self is not in argv). */
+static Ast *parseResolveOverload(Cctrl *cc, Vec *set, Vec *argv, int no_self,
+                                 char *fname, int len, ParseCallLoc *loc,
+                                 Ast **decl_out) {
+    int argc = argv ? (int)argv->size : 0;
+    OvlCand *cands = calloc(set->size, sizeof(OvlCand));
+    int nv = 0;
+    for (u64 i = 0; i < set->size; ++i) {
+        Ast *fn = set->entries[i];
+        OvlCand c = {fn, no_self ? parseMethodWithoutSelf(fn) : fn, NULL, 0};
+        if (parseOverloadViable(c.decl, argv, &c)) cands[nv++] = c;
+    }
+    char *shown = astModuleDemangle(fname, len);
+    char *paren = strchr(shown, '(');
+    if (paren) *paren = '\0';
+    if (!nv) {
+        parseRaiseCallError(cc, loc, "no overload of `%s` takes %s; there are %s",
+                            shown, parseOverloadArgTypes(argv), parseOverloadList(set));
+    }
+    OvlCand *best = &cands[0];
+    for (int i = 1; i < nv; ++i) {
+        if (parseOverloadBetter(&cands[i], best, argc)) best = &cands[i];
+    }
+    Vec *tied = astVecNew();
+    for (int i = 0; i < nv; ++i) {
+        if (&cands[i] != best && !parseOverloadBetter(best, &cands[i], argc)) {
+            if (!tied->size) vecPush(tied, best->fn);
+            vecPush(tied, cands[i].fn);
+        }
+    }
+    if (tied->size) {
+        parseRaiseCallError(cc, loc, "the call `%s%s` is ambiguous: %s fit as well; "
+                            "cast an argument to pick one",
+                            shown, parseOverloadArgTypes(argv), parseOverloadList(tied));
+    }
+    *decl_out = best->decl;
+    return best->fn;
+}
+
+/* A module's overload picked from outside it (`a.b.f` written): it must
+ * be pub itself, not only another overload of its name */
+static void parseCheckOverloadAccess(Cctrl *cc, Ast *fn, char *fname, int len,
+                                     ParseCallLoc *loc) {
+    int mod_len = -1;
+    for (int i = len - 1; i >= 0; --i) {
+        if (fname[i] == '.') { mod_len = i; break; }
+    }
+    if (mod_len < 0 || (fn->flags & AST_FLAG_PUB)) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    if (here && (int)here->len == mod_len && !memcmp(here->data, fname, mod_len)) return;
+    parseRaiseCallError(cc, loc, "`%s` is private to module %.*s",
+                        parseOverloadName(fn), mod_len, fname);
+}
+
+/* Remember which overload the call at loc picked (the LSP shows it) */
+static void parseNoteOverloadCall(Cctrl *cc, ParseCallLoc *loc, int name_len, Ast *fn) {
+    if (!loc || !loc->line) return;
+    if (!cc->overload_calls) cc->overload_calls = vecNew(&vec_unsigned_long_type);
+    CctrlOverloadCall *call = malloc(sizeof(CctrlOverloadCall));
+    call->file_id = ast_file_hint;
+    call->line = loc->line;
+    call->col = loc->col;
+    call->len = name_len;
+    call->fn = fn;
+    vecPush(cc->overload_calls, call);
+}
+
+/* After the overload is picked: its `T ...name` extras (parsed as plain
+ * arguments, from the count's position on) packed as parseArgv does */
+static void parseOverloadPackVarArgs(Cctrl *cc, Ast *decl, Vec *argv, Vec *spans,
+                                     char *fname, int len) {
+    Vec *params = parseGetFunctionParams(decl);
+    if (!params || params->size < 2) return;
+    Ast *last = params->entries[params->size - 1];
+    if (!last || last->kind != AST_LVAR || !(last->flags & AST_FLAG_VARARGS)) return;
+    int va_at = (int)params->size - 2;
+    Vec *items = astVecNew();
+    Vec *item_spans = vecNew(&vec_unsigned_long_type);
+    for (int i = va_at; i < (int)argv->size; ++i) {
+        vecPush(items, argv->entries[i]);
+        vecPush(item_spans, spans && i < (int)spans->size ? spans->entries[i] : NULL);
+    }
+    if ((int)argv->size > va_at) argv->size = va_at;
+    if (spans && (int)spans->size > va_at) spans->size = va_at;
+    while ((int)argv->size < va_at) {
+        vecPush(argv, astMakePlaceHolder());
+        if (spans) vecPush(spans, NULL);
+    }
+    parseVarArgsPack(cc, argv, spans, last->type->ptr, items, item_spans,
+                     NULL, -1, va_at, fname, len);
+}
+
+/* `&f` of an overloaded f going where a `want` is expected: the overload
+ * of that type. Returns expr unchanged when it isn't such an `&f`. */
+Ast *parseResolveOverloadRef(Cctrl *cc, AstType *want, Ast *expr) {
+    if (!expr || !(expr->flags & AST_FLAG_OVERLOAD_REF) || !want) return expr;
+    Ast *pick = parseOverloadRefPick(expr, want);
+    if (!pick) {
+        AstType *w = want->kind == AST_TYPE_POINTER && want->ptr ? want->ptr : want;
+        if (w->kind != AST_TYPE_FUNC) return expr;
+        expr->flags &= ~AST_FLAG_OVERLOAD_REF;
+        cctrlRaiseException(cc, "no overload of `%s` has the type `%s`; there are %s",
+                            parseOverloadBaseName(expr->operand), astTypeToString(want),
+                            parseOverloadList(expr->operand->overloads));
+    }
+    expr->operand = pick;
+    expr->type = pick->type;
+    expr->flags &= ~AST_FLAG_OVERLOAD_REF;
+    return expr;
+}
+
+/* Every `&f` of an overloaded f must have met a function type that picks
+ * one (parseResolveOverloadRef); run at the end of each function */
+void parseCheckOverloadRefs(Cctrl *cc) {
+    if (!cc->overload_refs) return;
+    List *refs = cc->overload_refs;
+    cc->overload_refs = NULL;
+    listForEach(refs) {
+        Ast *ref = it->value;
+        if (!(ref->flags & AST_FLAG_OVERLOAD_REF)) continue;
+        char *name = parseOverloadBaseName(ref->operand);
+        cctrlRaiseExceptionAt(cc, ref->line, ref->col, 1,
+            "`%s` has overloads %s: `&%s` needs the function type to pick one, "
+            "as in `%s p = &%s;`",
+            name, parseOverloadList(ref->operand->overloads), name,
+            astTypeToString(((Ast *)ref->operand->overloads->entries[0])->type), name);
+    }
+}
+
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     AstType *rettype = NULL;
     Ast *maybe_fn = findFunctionDecl(cc,fname,len);
+    Vec *overloads = maybe_fn && (maybe_fn->kind == AST_FUNC || maybe_fn->kind == AST_FUN_PROTO)
+                   ? maybe_fn->overloads : NULL;
 
     ParseCallLoc loc = parseCallLocStart(cc, fname, len);
     loc.args = vecNew(&vec_unsigned_long_type);
-    Vec *argv = parseArgv(cc,maybe_fn,terminator,fname,len,loc.args);
+    /* an overloaded name: the arguments first, then the one they fit */
+    Vec *argv = parseArgv(cc,overloads ? NULL : maybe_fn,terminator,fname,len,loc.args);
     parseCallLocEnd(cc, &loc);
+    if (overloads) {
+        Ast *decl = NULL;
+        maybe_fn = parseResolveOverload(cc, overloads, argv, 0, fname, len, &loc, &decl);
+        parseOverloadPackVarArgs(cc, maybe_fn, argv, loc.args, fname, len);
+        parseCheckOverloadAccess(cc, maybe_fn, fname, len, &loc);
+        parseNoteOverloadCall(cc, &loc, len, maybe_fn);
+    }
 
     if (maybe_fn) {
         parseFunctionArgumentCheck(cc,maybe_fn,argv,fname,len,&loc);
@@ -2346,7 +2674,8 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
         case AST_FUN_PROTO:
             /* A module's function is called by its symbol (`a.b.f` or
              * `f` in its module names `_K1a1b1f`) */
-            if (cc->cur_module || memchr(fname, '.', len)) {
+            if (cc->cur_module || memchr(fname, '.', len) ||
+                (maybe_fn->flags & AST_FLAG_OVERLOAD)) {
                 return astFunctionCall(rettype, maybe_fn->fname->data,
                                        maybe_fn->fname->len, argv);
             }
@@ -2408,25 +2737,26 @@ static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
 static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
                             char *name, int len) {
     Ast *decl = fn;
-    if (recv) {
+    if (recv && !fn->overloads) {
         /* The method as seen by the caller: without `self` */
-        Vec *params = astVecNew();
-        for (u64 i = 1; i < fn->params->size; ++i) {
-            vecPush(params, fn->params->entries[i]);
-        }
-        decl = (Ast *)malloc(sizeof(Ast));
-        *decl = *fn;
-        decl->params = params;
-        decl->type = astTypeCopy(fn->type);
-        decl->type->params = params;
+        decl = parseMethodWithoutSelf(fn);
     }
     char *fname = mprintf("%s.%.*s", owner->clsname->data, len, name);
     int flen = strlen(fname);
 
     ParseCallLoc loc = parseCallLocStart(cc, name, len);
     loc.args = vecNew(&vec_unsigned_long_type);
-    Vec *argv = parseArgv(cc, decl, ')', fname, flen, loc.args);
+    Vec *argv = parseArgv(cc, fn->overloads ? NULL : decl, ')', fname, flen, loc.args);
     parseCallLocEnd(cc, &loc);
+    if (fn->overloads) {
+        fn = parseResolveOverload(cc, fn->overloads, argv, recv != NULL,
+                                  fname, flen, &loc, &decl);
+        /* its type's module, `geo` of `geo.User` */
+        parseCheckOverloadAccess(cc, fn, owner->clsname->data,
+                                 (int)owner->clsname->len, &loc);
+        parseNoteOverloadCall(cc, &loc, len, fn);
+        parseOverloadPackVarArgs(cc, decl, argv, loc.args, fname, flen);
+    }
     parseFunctionArgumentCheck(cc, decl, argv, fname, flen, &loc);
     parseFlattenDefaultArgs(decl, argv);
     parseAddEmptyVarArgCount(decl, argv);
@@ -3364,6 +3694,9 @@ char *parseFnConvertHint(AstType *expected, AstType *actual) {
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,
                                   Ast *right, s64 op_tok)
 {
+    if (operation == AST_BIN_OP_ASSIGN && left && right) {
+        parseResolveOverloadRef(cc, left->type, right);
+    }
     if (operation == AST_BIN_OP_LOG_AND || operation == AST_BIN_OP_LOG_OR) {
         parseCheckCondition(cc, left);
         parseCheckCondition(cc, right);
@@ -4281,6 +4614,17 @@ Ast *parseUnaryExpr(Cctrl *cc) {
         }
 
         ast = astUnaryOperator(type, unary_op, operand);
+        if (unary_op == AST_UN_OP_ADDR_OF &&
+            (operand->kind == AST_FUNC || operand->kind == AST_FUN_PROTO) &&
+            operand->overloads) {
+            /* `&f` of an overloaded f: where it goes picks one */
+            ast->flags |= AST_FLAG_OVERLOAD_REF;
+            ast->line = op_line;
+            ast->col = op_col;
+            if (!cc->overload_refs) cc->overload_refs = listNew();
+            listAppend(cc->overload_refs, ast);
+            if (addr_cast) ast = parseResolveOverloadRef(cc, addr_cast, ast);
+        }
         return addr_cast ? astCast(ast, addr_cast) : ast;
     }
     

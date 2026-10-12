@@ -113,6 +113,7 @@ Ast *parseFloatingCharConst(Cctrl *cc, Lexeme *tok) {
 void parseTypeCheckClassFieldInitaliser(Cctrl *cc, AstType *cls_field_type, Ast *init,
                                         Lexeme *start)
 {
+    parseResolveOverloadRef(cc, cls_field_type, init);
     if (astFnPtrMismatch(cls_field_type, init->type)) {
         parseRaiseFnConvert(cc, cls_field_type, init->type);
     }
@@ -290,6 +291,7 @@ static Ast *parseDeclScalarInit(Cctrl *cc, AstType *type, int is_class,
     if (type->ptr) {
         /* an array or a string for a slice element: its view */
         init = parseSliceFrom(cc, type->ptr, init);
+        parseResolveOverloadRef(cc, type->ptr, init);
         if (astFnPtrMismatch(type->ptr, init->type)) {
             parseRaiseFnConvert(cc, type->ptr, init->type);
         }
@@ -1873,6 +1875,7 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
 
     /* `i64[] s = array;`: the array becomes a slice */
     init = parseSliceFrom(cc, var->type, init);
+    parseResolveOverloadRef(cc, var->type, init);
     if (var->kind == AST_LVAR && init->kind == AST_SLICE_MAKE &&
         init->slice_ptr && init->slice_ptr->kind == AST_STRING) {
         var->flags |= AST_FLAG_LIT_SLICE;
@@ -2966,6 +2969,7 @@ Ast *parseReturnStatement(Cctrl *cc) {
     Ast *maybe_fn = findFunctionDecl(cc,cc->tmp_fname->data,cc->tmp_fname->len);
 
     if (retval) retval = parseSliceFrom(cc, cc->tmp_rettype, retval);
+    if (retval) parseResolveOverloadRef(cc, cc->tmp_rettype, retval);
     if (retval) check = retval->type;
     else        check = ast_void_type;
 
@@ -4270,6 +4274,9 @@ static void parseCheckGotoIntoTry(Cctrl *cc, Ast *body) {
     mapRelease(label_try);
 }
 
+static void parseOverloadJoin(Ast *fn, Vec *set);
+static int parseSameParamTypes(Vec *a, Vec *b);
+
 Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
         char *fname, int len, Vec *params, int has_var_args, int is_inline,
         s64 name_line, s64 name_col)
@@ -4449,9 +4456,15 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
         func = astFunction(fn_type,fname,len,params,NULL,locals,
                 has_var_args);
         mapAdd(cc->global_env, func->fname->data, func);
+        parseOverloadJoin(func, cc->tmp_overload_set);
+        cc->tmp_overload_set = NULL;
     } else {
         switch (func->kind) {
             case AST_EXTERN_FUNC:
+                if (!parseSameParamTypes(func->params, params)) {
+                    cctrlRaiseException(cc,"`%.*s` is an extern \"c\" function: "
+                            "it has one C symbol, so it can't be overloaded", len, fname);
+                }
                 cctrlRaiseException(cc,"Cannot redefine extern function: %.*s",len,fname);
 
             case AST_FUNC:
@@ -4463,9 +4476,19 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
                     cc->tmp_params = params;
                     cc->tmp_rettype = rettype;
                     fn_type = astMakeFunctionType(cc->tmp_rettype, params);
+                    Ast *old_fn = func;
                     func = astFunction(fn_type,fname,len,params,NULL,locals,
                             has_var_args);
                     mapAdd(cc->global_env, func->fname->data, func);
+                    if (old_fn->overloads) {
+                        /* the LSP: the new body takes the old one's place */
+                        Vec *set = old_fn->overloads;
+                        for (u64 i = 0; i < set->size; ++i) {
+                            if (set->entries[i] == old_fn) set->entries[i] = func;
+                        }
+                        func->overloads = set;
+                        func->flags |= AST_FLAG_OVERLOAD;
+                    }
                     break;
                 }
                 cctrlRaiseException(cc,"Cannot redefine function: %s",
@@ -4521,6 +4544,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     }
     parseCompoundStatementInternal(cc, func_body);
     parseCheckGotoIntoTry(cc, func_body);
+    parseCheckOverloadRefs(cc);
     fn_type->rettype = cc->tmp_rettype;
     /* `astFunction` shallow-copies the type into the AST node, so
      * `func->type` is a different AstType than the local `fn_type`.
@@ -4810,6 +4834,72 @@ static Lexeme *parseFnPtrDeclName(Cctrl *cc) {
     return name;
 }
 
+/* Do two parameter lists take the same types (names and defaults aside)?
+ * As overloads tell them apart: an enum is not its integer, bool not u8 */
+static int parseSameParamTypes(Vec *a, Vec *b) {
+    return !strcmp(astOverloadSymbol("", a, 0), astOverloadSymbol("", b, 0));
+}
+
+/* A function declared as `fname` (its symbol: `f` for a program's, the
+ * mangled `_K..` for a module's or a method) with `params`. When a ktm
+ * function of that name with other parameter types exists, this one is
+ * an overload: every function of the name is then known by its overload
+ * symbol (astOverloadSymbol), the first one renamed now (a call compiled
+ * before keeps naming it by its old name, which still leads to it, see
+ * asmNormaliseFunctionName). Returns the symbol to declare it under,
+ * fname itself when it isn't an overload or is the same function again;
+ * *set is the overload set a new overload joins. */
+static char *parseOverloadDecl(Cctrl *cc, char *fname, int len, Vec *params,
+                               int is_program_fn, int is_method, Vec **set)
+{
+    *set = NULL;
+    if ((cc->flags & CCTRL_REPL) && !(cc->flags & CCTRL_LSP)) return fname;
+    Ast *prev = mapGetLen(cc->global_env, fname, len);
+    if (!prev || (prev->kind != AST_FUNC && prev->kind != AST_FUN_PROTO)) {
+        return fname;
+    }
+    int is_ktm = is_program_fn || (len > 2 && fname[0] == '_' && fname[1] == 'K');
+    int prev_ktm = (prev->flags & (AST_FLAG_PROGRAM | AST_FLAG_OVERLOAD)) ||
+                   (prev->fname && !strncmp(prev->fname->data, "_K", 2));
+    if (!is_ktm || !prev_ktm) return fname;
+
+    int from = is_method ? 1 : 0;
+    if (prev->overloads) {
+        for (u64 i = 0; i < prev->overloads->size; ++i) {
+            Ast *fn = prev->overloads->entries[i];
+            if (parseSameParamTypes(fn->params, params)) return fn->fname->data;
+        }
+    } else if (parseSameParamTypes(prev->params, params)) {
+        return fname;
+    }
+
+    if (!prev->overloads) {
+        char *base = (prev->flags & AST_FLAG_PROGRAM)
+                   ? astProgramSymbol(prev->fname->data, prev->fname->len)
+                   : prev->fname->data;
+        char *sym = astOverloadSymbol(base, prev->params, from);
+        prev->fname = aoStrDupRaw(sym, strlen(sym));
+        prev->flags = (prev->flags | AST_FLAG_OVERLOAD) & ~AST_FLAG_PROGRAM;
+        prev->overloads = astVecNew();
+        vecPush(prev->overloads, prev);
+        mapAdd(cc->global_env, prev->fname->data, prev);
+    }
+    char *base = is_program_fn ? astProgramSymbol(fname, len) : mprintf("%.*s", len, fname);
+    *set = prev->overloads;
+    return astOverloadSymbol(base, params, from);
+}
+
+/* A new function joins the overload set parseOverloadDecl gave */
+static void parseOverloadJoin(Ast *fn, Vec *set) {
+    if (!fn || !set) return;
+    fn->flags = (fn->flags | AST_FLAG_OVERLOAD) & ~AST_FLAG_PROGRAM;
+    fn->overloads = set;
+    for (u64 i = 0; i < set->size; ++i) {
+        if (set->entries[i] == fn) return;
+    }
+    vecPush(set, fn);
+}
+
 /* `ret_fnptr` > 0: the function returns a function pointer, declared C's
  * way, `T (*Name(params))(fn_params)`, with `ret_fnptr` stars; rettype is
  * then the T those pointed-to functions return. */
@@ -4933,6 +5023,18 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         }
         skipped_body = 1;
     }
+    Vec *overload_set = NULL;
+    if ((tokenPunctIs(tok, '{') || tokenPunctIs(tok, ';')) && !is_lower_main) {
+        char *declared = parseOverloadDecl(cc, fname, len, params,
+                                           is_program_fn, self != NULL,
+                                           &overload_set);
+        if (declared != fname) {
+            /* an overload: its symbol is complete (no program symbol) */
+            fname = declared;
+            len = strlen(fname);
+            is_program_fn = 0;
+        }
+    }
     if (tokenPunctIs(tok, '{') || tokenPunctIs(tok, ';')) {
         parseCheckFunctionRedeclaration(cc, rettype, fname, len, params,
                                         has_var_args, name_tok_line,
@@ -4941,10 +5043,13 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
                                   has_var_args);
     }
     if (tokenPunctIs(tok, '{') && !skipped_body) {
+        cc->tmp_overload_set = overload_set;
         Ast *fn = parseFunctionDef(cc,rettype,fname,len,params,
                                    has_var_args,is_inline,
                                    name_tok_line,name_tok_col);
+        cc->tmp_overload_set = NULL;
         if (fn) {
+            if (cc->decl_pub) fn->flags |= AST_FLAG_PUB;
             fn->line = name_line;
             fn->col = name_col;
             fn->file_id = name_file;
@@ -4962,7 +5067,14 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         Ast *fn = astFunction(type,fname,len,params,NULL,NULL,has_var_args);
         fn->kind = AST_FUN_PROTO;
         if (is_program_fn) fn->flags |= AST_FLAG_PROGRAM;
+        Ast *same = mapGet(cc->global_env, fn->fname->data);
+        if (same && same->overloads && !overload_set) {
+            /* a prototype of an overload declared before: keep that one */
+            return same;
+        }
+        if (cc->decl_pub) fn->flags |= AST_FLAG_PUB;
         mapAdd(cc->global_env,fn->fname->data,fn);
+        parseOverloadJoin(fn, overload_set);
         if (is_lower_main) mapAdd(cc->global_env, "main", fn);
         if (module_name) mapAdd(cc->global_env, module_name, fn);
         return fn;
@@ -6011,6 +6123,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 Lexeme *eq = cctrlTokenGet(cc);     /* consume '=' */
                 int eq_line = eq->line, eq_col = eq->col;
                 Ast *rhs = parseExpr(cc,16);
+                parseResolveOverloadRef(cc, type, rhs);
                 if (astFnPtrMismatch(type, rhs->type)) {
                     parseRaiseFnConvert(cc, type, rhs->type);
                 }
@@ -6224,6 +6337,8 @@ void parseToAst(Cctrl *cc) {
                                           ? cc->initaliser_locals->prev : NULL;
 
         if (setjmp(recovery) != 0) {
+            cc->overload_refs = NULL;
+            cc->tmp_overload_set = NULL;
             cc->tmp_locals = NULL;
             cc->localenv = NULL;
             cc->tmp_func = NULL;
@@ -6261,6 +6376,7 @@ void parseToAst(Cctrl *cc) {
         s64 item_col = item_first ? item_first->col : 0;
         ast = parseToplevelDef(cc, &is_global);
         cc->tmp_gvar_decl = NULL; /* decl completed - nothing to roll back */
+        parseCheckOverloadRefs(cc);
         if (ast == NULL) break;
         parseCheckCModuleItem(cc, ast);
         /* The old file-scope code (ktm syntax v0.2 has none): a statement
