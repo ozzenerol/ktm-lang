@@ -1028,6 +1028,133 @@ static void lspCatGenericHead(AoStr *out, GenericDef *d) {
     }
 }
 
+/* A struct, union or enum as hover shows it */
+static void lspCatType(AoStr *out, AstType *ty) {
+    if (ty->is_enum) {
+        aoStrCatPrintf(out, "enum %s\n{\n", ty->clsname ? ty->clsname->data : "");
+        if (ty->enum_members) {
+            MapIter it;
+            mapIterInit(ty->enum_members, &it);
+            while (mapIterNext(&it)) {
+                Ast *m = it.node->value;
+                aoStrCatPrintf(out, "  %s = %lld,\n", (char *)it.node->key,
+                               (long long)m->i64);
+            }
+        }
+        aoStrCat(out, "};");
+        return;
+    }
+    if (!ty->fields) {
+        aoStrCatPrintf(out, "%s %s;", ty->kind == AST_TYPE_UNION ? "union" : "struct",
+                       ty->clsname ? ty->clsname->data : "");
+        return;
+    }
+    AoStr *body = astClassToAoStr(ty);
+    /* the compiler's dump says `class`: ktm writes `struct` */
+    if (body->len > 6 && !memcmp(body->data, "class ", 6)) {
+        aoStrCat(out, "struct");
+        aoStrCatLen(out, body->data + 5, body->len - 5);
+    } else {
+        aoStrCatLen(out, body->data, body->len);
+    }
+    aoStrRelease(body);
+}
+
+/* A type named as written in `text` (`Color`, `geo.Kind`, or a bare name
+ * of the document's own module): its struct, union or enum, NULL if none */
+static AstType *lspTypeByName(LspCtx *ctx, AoStr *text, const char *name,
+                              size_t len) {
+    Cctrl *cc = ctx->cc;
+    const char *dot = memchr(name, '.', len);
+    if (dot) {
+        char *path = lspImportPath(text, name, dot - name);
+        if (path) {
+            char *q = mprintf("%s%.*s", path, (int)(name + len - dot), dot);
+            AstType *t = mapGet(cc->clsdefs, q);
+            return t ? t : mapGet(cc->uniondefs, q);
+        }
+    } else {
+        char *mod = lspDocModule(text);
+        if (mod) {
+            char *q = mprintf("%s.%.*s", mod, (int)len, name);
+            AstType *t = mapGet(cc->clsdefs, q);
+            if (t) return t;
+        }
+    }
+    AstType *t = mapGetLen(cc->clsdefs, (char *)name, len);
+    return t ? t : mapGetLen(cc->uniondefs, (char *)name, len);
+}
+
+/* The enum named right before a `.` that ends at the cursor's word
+ * (`Color.` or `geo.Kind.gr`), NULL when that isn't an enum */
+static AstType *lspEnumBeforeDot(LspCtx *ctx, AoStr *text, int line,
+                                 int character) {
+    const char *s = text->data;
+    size_t line_start = lspLineStart(text, line), line_end = line_start;
+    while (line_end < text->len && s[line_end] != '\n') line_end++;
+    size_t start = line_start + (size_t)character;
+    if (start > line_end) start = line_end;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    if (start <= line_start || s[start - 1] != '.') return NULL;
+    size_t t_end = start - 1, t_start = t_end;
+    while (t_start > line_start &&
+           (lspIsIdentChar(s[t_start - 1]) || s[t_start - 1] == '.')) {
+        t_start--;
+    }
+    if (t_start == t_end) return NULL;
+    AstType *ty = lspTypeByName(ctx, text, s + t_start, t_end - t_start);
+    return ty && ty->is_enum && ty->enum_members ? ty : NULL;
+}
+
+/* `Enum.member` or `mod.Enum.member` with the cursor on `member`, or a
+ * member's name in its enum's declaration: the member (*_enum its enum),
+ * NULL otherwise */
+static Ast *lspEnumMemberAt(LspCtx *ctx, AoStr *text, u32 doc_id, int line,
+                            int character, AstType **_enum) {
+    const char *s = text->data;
+    size_t i = lspLineStart(text, line);
+    size_t line_start = i, line_end = i;
+    while (line_end < text->len && s[line_end] != '\n') line_end++;
+    size_t pos = line_start + (size_t)character;
+    if (pos > line_end) pos = line_end;
+    size_t start = pos, end = pos;
+    while (start > line_start && lspIsIdentChar(s[start - 1])) start--;
+    while (end < line_end && lspIsIdentChar(s[end])) end++;
+    if (end == start) return NULL;
+
+    if (start > line_start && s[start - 1] == '.') {
+        /* the dotted type name before the member */
+        size_t t_end = start - 1, t_start = t_end;
+        while (t_start > line_start &&
+               (lspIsIdentChar(s[t_start - 1]) || s[t_start - 1] == '.')) {
+            t_start--;
+        }
+        if (t_start == t_end) return NULL;
+        AstType *ty = lspTypeByName(ctx, text, s + t_start, t_end - t_start);
+        if (!ty || !ty->is_enum || !ty->enum_members) return NULL;
+        Ast *m = mapGetLen(ty->enum_members, (char *)s + start, end - start);
+        if (m && _enum) *_enum = ty;
+        return m;
+    }
+
+    /* a member where its enum declares it */
+    MapIter it;
+    mapIterInit(ctx->cc->clsdefs, &it);
+    while (mapIterNext(&it)) {
+        AstType *ty = it.node->value;
+        if (!ty || !ty->is_enum || !ty->enum_members || ty->file_id != doc_id) {
+            continue;
+        }
+        Ast *m = mapGetLen(ty->enum_members, (char *)s + start, end - start);
+        if (m && m->line == line + 1 &&
+            m->col == (int)(start - line_start) + 1) {
+            if (_enum) *_enum = ty;
+            return m;
+        }
+    }
+    return NULL;
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1048,13 +1175,18 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
      * then a macro. */
     AoStr *rendered = aoStrNew();
     int is_member = 0;
-    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
-    AstType *mcls = qual ? NULL
+    AstType *menum = NULL;
+    Ast *member = lspEnumMemberAt(ctx, text, doc_id, line, character, &menum);
+    char *qual = member ? NULL : lspModuleRefAt(text, line, character, 0, NULL);
+    AstType *mcls = (qual || member) ? NULL
                   : lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
-    if (!qual && !is_member)
+    if (!qual && !is_member && !member)
         qual = lspOwnModuleQual(ctx, text, doc_id, line + 1, ident, ilen);
-    if (qual) {
+    if (member) {
+        aoStrCatPrintf(rendered, "%s.%s = %lld", menum->clsname->data, ident,
+                       (long long)member->i64);
+    } else if (qual) {
         Ast *entry = lspModuleValue(ctx, qual);
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
         if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
@@ -1067,9 +1199,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         } else if (entry && entry->type) {
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type), qual);
         } else if (ty) {
-            AoStr *body = astClassToAoStr(ty);
-            aoStrCatLen(rendered, body->data, body->len);
-            aoStrRelease(body);
+            lspCatType(rendered, ty);
         }
     } else if (is_member) {
         AstType *f = (mcls && mcls->fields) ? mapGetLen(mcls->fields, ident, ilen) : NULL;
@@ -1112,9 +1242,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         } else if (lspGeneric(ctx, ident, ilen)) {
             lspCatGenericHead(rendered, lspGeneric(ctx, ident, ilen));
         } else if (cls || uni) {
-            AoStr *body = astClassToAoStr(cls ? cls : uni);
-            aoStrCatLen(rendered, body->data, body->len);
-            aoStrRelease(body);
+            lspCatType(rendered, cls ? cls : uni);
         } else if (alias) {
             aoStrCatPrintf(rendered, "type %.*s = %s", ilen, ident,
                            astTypeToString(alias->type));
@@ -1160,6 +1288,7 @@ static const char *lsp_keywords[] = {
 #define KTM_LSP_UNION_STRUCT 22
 #define KTM_LSP_CONSTANT     21
 #define KTM_LSP_KEYWORD      24
+#define KTM_LSP_ENUM_MEMBER  20
 
 /* One CompletionItem; label escaped, detail optional. */
 static void lspCatCompletion(AoStr *body, int *emitted, const char *label,
@@ -1358,6 +1487,28 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                      .capacity = 0 };
     u32 doc_id = cctrlRegisterFile(ctx->cc, &path_s);
     free(doc_path);
+    /* `Enum.` or `mod.Enum.`: the enum's members */
+    AstType *ety = lspEnumBeforeDot(ctx, text, line, character);
+    if (ety) {
+        AoStr *ebody = aoStrNew();
+        aoStrCatPrintf(ebody, "{\"isIncomplete\":false,\"items\":[");
+        int eemitted = 0;
+        MapIter ei;
+        mapIterInit(ety->enum_members, &ei);
+        while (mapIterNext(&ei)) {
+            const char *mname = (const char *)ei.node->key;
+            if (strncmp(mname, prefix, plen)) continue;
+            Ast *m = ei.node->value;
+            char *detail = mprintf("%s.%s = %lld", ety->clsname->data, mname,
+                                   (long long)m->i64);
+            lspCatCompletion(ebody, &eemitted, mname, KTM_LSP_ENUM_MEMBER, detail);
+        }
+        aoStrCatPrintf(ebody, "]}");
+        lspRespond(id, ebody->data);
+        aoStrRelease(ebody);
+        return;
+    }
+
     /* `prefix.` of an import: the module's pub names */
     char *mod_path = NULL;
     if (lspModuleRefAt(text, line, character, 1, &mod_path)) {
@@ -1846,9 +1997,15 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
      * The canonical class AstTypes are shared with clsdefs, so fields
      * carry the provenance stamped at parse. */
     int is_member = 0;
-    char *qual = lspModuleRefAt(text, line, character, 0, NULL);
+    Ast *emember = lspEnumMemberAt(ctx, text, doc_id, line, character, NULL);
+    char *qual = emember ? NULL : lspModuleRefAt(text, line, character, 0, NULL);
     AstType *mcls = NULL;
-    if (qual) {
+    if (emember) {
+        is_member = 1;
+        def_line = emember->line;
+        def_col = emember->col;
+        def_file = emember->file_id;
+    } else if (qual) {
         /* `prefix.name`: the module's declaration, in its own file */
         Ast *entry = lspModuleValue(ctx, qual);
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
