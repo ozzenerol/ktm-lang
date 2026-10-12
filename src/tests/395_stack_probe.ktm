@@ -1,19 +1,19 @@
 import libc, test;
 
-/* A function with a frame larger than a page now reserves it a page at a
- * time, touching each page as the stack descends (stack-clash probing).
- * A frame bigger than the guard page therefore faults on overflow instead
- * of leaping over the guard into other memory: a 1 MiB frame on a 256 KiB
- * thread stack dies with SIGSEGV rather than silently corrupting whatever
- * lies below the stack. Normal big frames are unaffected. Checked in a
- * forked child so the thread's fault doesn't take the test down. */
+/* A function with a frame larger than a page checks first that the
+ * frame fits on its stack (since v0.12.0 the runtime is asked; before,
+ * every page was touched on the way down). A frame bigger than the guard
+ * page therefore can't leap over the guard into other memory: a 1 MiB
+ * frame on a 256 KiB thread stack stops the program with "stack
+ * overflow" (SIGABRT) rather than silently corrupting whatever lies below
+ * the stack. Normal big frames are unaffected. Checked in a forked child
+ * so the thread's overflow doesn't take the test down. */
 
 extern "c" i32 pthread_attr_destroy(libc.pthread_attr_t *attr);
 extern "c" i32 fflush(void *stream);
 extern "c" void exit(i32 status);
 
-const i64 SIGSEGV = 11;
-const i64 SIGBUS = 10;          /* macOS delivers this for a guard-page hit */
+const i64 SIGABRT = 6;
 const i64 SMALL_STACK = (256 * 1024);
 const i64 BIG_FRAME = (1024 * 1024);
 
@@ -65,7 +65,7 @@ void check(bool ok, u8 *what) {
 
 i32 main() {
     i64 status;
-    printf("Test - stack-clash probing: ");
+    printf("Test - stack overflow on a thread: ");
 
     /* A 1 MiB frame on the main thread's 8 MiB stack is fine. */
     check(bigFrame() == 0x5A, "1 MiB frame on the main stack works");
@@ -74,10 +74,10 @@ i32 main() {
     status = childRunsThread();
     check((status & 0x7F) != 0 && (status & 0x7F) != 0x7F,
             "the child was killed by a signal");
-    /* Linux delivers SIGSEGV, macOS SIGBUS for the guard-page hit; both
-     * mean the overflow faulted instead of corrupting memory. */
-    check((status & 0x7F) == SIGSEGV || (status & 0x7F) == SIGBUS,
-            "1 MiB frame on a 256 KiB thread stack faults (SIGSEGV/SIGBUS)");
+    /* the runtime saw the frame wouldn't fit, reported a stack overflow
+     * and aborted, instead of letting it write past the guard */
+    check((status & 0x7F) == SIGABRT,
+            "1 MiB frame on a 256 KiB thread stack is a stack overflow (SIGABRT)");
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

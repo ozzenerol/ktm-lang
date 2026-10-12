@@ -2142,21 +2142,40 @@ static void aarch64EmitFunctionPrologue(Cctrl *cc, AoStr *buf, Ast *func,
     if (total_stack > 0) {
         u32 aligned = ((u32)total_stack + 15u) & ~15u;
         if (aligned > KTM_STACK_PROBE_STRIDE) {
-            /* Stack-clash probe: descend a page at a time, touching each
-             * page, so a frame larger than the guard page can't leap over
-             * it (see the x86_64 prologue). `ldr xzr` touches read-only;
-             * x9 is the backend's scratch and is free this early. Residual
-             * < a page, so the final register sub can't skip a page. */
+            /* A frame bigger than the guard page could leap over it: ask
+             * rt.__ktmStackCheck first (see the x86_64 prologue), keeping
+             * the argument registers (x0-x8, d0-d7) around the call.
+             * x29 is the frame base, so the frame's bottom is
+             * x29 - aligned. Nothing is touched. */
+            AoStr sym = { .data = astRuntimeSymbol("__ktmStackCheck"), .len = 0, .capacity = 0 };
+            sym.len = strlen(sym.data);
+            aoStrCatFmt(buf,
+                        "sub sp, sp, #144\n\t"
+                        "stp x0, x1, [sp]\n\t"
+                        "stp x2, x3, [sp, #16]\n\t"
+                        "stp x4, x5, [sp, #32]\n\t"
+                        "stp x6, x7, [sp, #48]\n\t"
+                        "str x8, [sp, #64]\n\t"
+                        "stp d0, d1, [sp, #80]\n\t"
+                        "stp d2, d3, [sp, #96]\n\t"
+                        "stp d4, d5, [sp, #112]\n\t"
+                        "stp d6, d7, [sp, #128]\n\t");
             aarch64EmitMovImm(buf, "x9", (s64)aligned);
-            aoStrCatFmt(buf, "1:\n\t");
-            aarch64EmitAddSubImm(buf, "sub", "sp", "sp",
-                                 (s64)KTM_STACK_PROBE_STRIDE);
-            aoStrCatFmt(buf, "ldr xzr, [sp]\n\t");
-            aarch64EmitAddSubImm(buf, "sub", "x9", "x9",
-                                 (s64)KTM_STACK_PROBE_STRIDE);
-            aoStrCatFmt(buf, "cmp x9, #%u, lsl #12\n\t",
-                        KTM_STACK_PROBE_STRIDE >> 12);
-            aoStrCatFmt(buf, "b.hs 1b\n\t");
+            aoStrCatFmt(buf,
+                        "sub x0, x29, x9\n\t"
+                        "bl  %s\n\t"
+                        "ldp x0, x1, [sp]\n\t"
+                        "ldp x2, x3, [sp, #16]\n\t"
+                        "ldp x4, x5, [sp, #32]\n\t"
+                        "ldp x6, x7, [sp, #48]\n\t"
+                        "ldr x8, [sp, #64]\n\t"
+                        "ldp d0, d1, [sp, #80]\n\t"
+                        "ldp d2, d3, [sp, #96]\n\t"
+                        "ldp d4, d5, [sp, #112]\n\t"
+                        "ldp d6, d7, [sp, #128]\n\t"
+                        "add sp, sp, #144\n\t",
+                        asmNormaliseFunctionName(cc, &sym));
+            aarch64EmitMovImm(buf, "x9", (s64)aligned);
             aoStrCatFmt(buf, "sub sp, sp, x9\n\t");
         } else {
             aarch64EmitAddSubImm(buf, "sub", "sp", "sp", (s64)aligned);

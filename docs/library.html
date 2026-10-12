@@ -2320,7 +2320,9 @@ close(-1): EBADF
   a guard page below it: running past it crashes the program instead of overwriting memory.</li>
   <li><code>coro.release</code> keeps up to 16 stacks per thread for the next
   <code>coro.spawn</code> of the same size, so short-lived coroutines (one per request) don't map
-  and unmap a stack each time; they are unmapped when the thread ends.</li>
+  and unmap a stack each time; they are unmapped when the thread ends. A cached stack behind
+  the 4 most recently released ones gives the memory its coroutine used back to the system,
+  keeping only its top pages, so a burst of finished coroutines doesn't stay resident.</li>
   <li><code>coro.yield</code> outside a coroutine, or resuming one that is running, prints a
   message and exits with 1.</li>
 </ul>

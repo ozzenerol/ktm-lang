@@ -1726,25 +1726,26 @@ static void jitEmitInstr(JitFnCtx *ctx, IrInstr *instr) {
 
 /* ---------------- prologue / epilogue ---------------- */
 
-/* Reserve `aligned` bytes of frame, probing each page as rsp descends so
- * a frame bigger than the guard page faults on overflow instead of
- * leaping over the guard (matches the AOT prologue). The backward branch
- * target is a byte offset we patched ourselves. */
-static void jitProbeStack(AsmEnc *enc, uint32_t aligned) {
-    jitEmitMovImm(enc, R_R11, (s64)aligned);
-    size_t top = enc->len;
-    x86_64_enc_subq_imm_reg(enc, R_RSP, (int32_t)KTM_STACK_PROBE_STRIDE);
-    /* Touch the new page (read-only, into rax; rax is scratch here). */
-    x86_64_enc_load_mem(enc, 8, R_RAX, R_RSP, -1, 0, 0);
-    x86_64_enc_subq_imm_reg(enc, R_R11, (int32_t)KTM_STACK_PROBE_STRIDE);
-    x86_64_enc_cmpq_imm_reg(enc, R_R11, (int32_t)KTM_STACK_PROBE_STRIDE);
-    size_t patch = x86_64_enc_jcc_rel32(enc, X86_CC_AE);  /* jae top */
-    int32_t rel = (int32_t)((int64_t)top - (int64_t)(patch + 4));
-    enc->bytes[patch]     = (uint8_t)(rel & 0xFF);
-    enc->bytes[patch + 1] = (uint8_t)((rel >> 8) & 0xFF);
-    enc->bytes[patch + 2] = (uint8_t)((rel >> 16) & 0xFF);
-    enc->bytes[patch + 3] = (uint8_t)((rel >> 24) & 0xFF);
-    x86_64_enc_alu_reg_reg(enc, '-', R_RSP, R_R11);  /* subq %r11, %rsp */
+/* Reserve `aligned` bytes of frame after asking rt.__ktmStackCheck
+ * whether rsp - aligned is still on the stack (matches the AOT
+ * prologue): a frame bigger than the guard page can't leap over it, and
+ * nothing is touched. The argument registers are kept around the call. */
+static void jitStackCheck(JitFnCtx *ctx, AsmEnc *enc, uint32_t aligned) {
+    static const X86Reg gp[8] = { R_RDI, R_RSI, R_RDX, R_RCX, R_R8, R_R9, R_RAX, R_R10 };
+    x86_64_enc_mov_reg_reg(enc, R_R11, R_RSP);
+    x86_64_enc_subq_imm_reg(enc, R_R11, (int32_t)aligned);
+    x86_64_enc_subq_imm_reg(enc, R_RSP, 128);
+    for (int i = 0; i < 8; ++i) x86_64_enc_store_mem(enc, 8, gp[i], R_RSP, -1, 0, i * 8);
+    for (int i = 0; i < 8; ++i) x86_64_enc_movsd_store(enc, i, R_RSP, -1, 0, 64 + i * 8);
+    x86_64_enc_mov_reg_reg(enc, R_RDI, R_R11);
+    AoStr sym = { .data = astRuntimeSymbol("__ktmStackCheck"), .len = 0, .capacity = 0 };
+    sym.len = strlen(sym.data);
+    size_t off = x86_64_enc_call_rel32(enc);
+    ktmJitAddCallFixup(enc, off, asmNormaliseFunctionName(ctx->jit->cc, &sym), AFR_X86_64_CALL32);
+    for (int i = 0; i < 8; ++i) x86_64_enc_load_mem(enc, 8, gp[i], R_RSP, -1, 0, i * 8);
+    for (int i = 0; i < 8; ++i) x86_64_enc_movsd_load(enc, i, R_RSP, -1, 0, 64 + i * 8);
+    x86_64_enc_addq_imm_reg(enc, R_RSP, 128);
+    x86_64_enc_subq_imm_reg(enc, R_RSP, (int32_t)aligned);
 }
 
 static void jitEmitPrologue(JitFnCtx *ctx) {
@@ -1754,7 +1755,7 @@ static void jitEmitPrologue(JitFnCtx *ctx) {
     x86_64_enc_mov_rsp_rbp(enc);  /* movq %rsp, %rbp */
     uint32_t aligned = ((uint32_t)ctx->fn->stack_space + 15u) & ~15u;
     if (aligned > KTM_STACK_PROBE_STRIDE) {
-        jitProbeStack(enc, aligned);
+        jitStackCheck(ctx, enc, aligned);
     } else if (aligned > 0) {
         x86_64_enc_subq_imm_reg(enc, R_RSP, (int32_t)aligned);
     }
