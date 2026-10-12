@@ -78,14 +78,53 @@ def sidebar(filename, heads):
             items.append(f'<li><a href="{href}">{html.escape(label)}</a></li>')
             continue
         sub = ""
-        h2s = [h for h in heads if h[0] == "h2"]
-        if h2s:
-            sub = '<ul class="toc">' + "".join(
-                f'<li><a href="#{hid}">{html.escape(text)}</a></li>'
-                for _, hid, text in h2s) + "</ul>"
+        if any(h[0] == "h2" for h in heads):
+            sub = '<ul class="toc">' + toc_items(heads) + "</ul>"
         items.append(f'<li class="current"><a href="{href}" aria-current="page">'
                      f'{html.escape(label)}</a>{sub}</li>')
     return '<ul class="pages">' + "".join(items) + "</ul>"
+
+
+def toc_items(heads):
+    """The page's h2s, each with its h3s in a nested list (shown for the
+    section being read; see docs.js)."""
+    out, h3s = [], []
+
+    def close():
+        if h3s:
+            out.append('<ul class="sub">' + "".join(h3s) + "</ul>")
+            h3s.clear()
+        out.append("</li>")
+
+    started = False
+    for tag, hid, text in heads:
+        link = f'<li><a href="#{hid}">{html.escape(text)}</a>'
+        if tag == "h2":
+            if started:
+                close()
+            out.append(link)
+            started = True
+        elif started:
+            h3s.append(link + "</li>")
+    if started:
+        close()
+    return "".join(out)
+
+
+def prev_next(filename):
+    """Links to the pages before and after this one in the sidebar's order."""
+    names = [href for href, _ in NAV]
+    if filename not in names:
+        return ""
+    i = names.index(filename)
+    links = []
+    if i > 0:
+        links.append(f'<a class="prev" href="{NAV[i - 1][0]}"><span>Previous</span>'
+                     f'{html.escape(NAV[i - 1][1])}</a>')
+    if i + 1 < len(NAV):
+        links.append(f'<a class="next" href="{NAV[i + 1][0]}"><span>Next</span>'
+                     f'{html.escape(NAV[i + 1][1])}</a>')
+    return '<nav class="prev-next" aria-label="Previous and next page">' + "".join(links) + "</nav>"
 
 
 def record(title, filename, heads, content):
@@ -159,6 +198,7 @@ def page(title, filename, content):
   <div class="scrim" hidden></div>
   <main id="content">
 {content}
+    {prev_next(filename)}
     <footer class="page-foot">
       <p>{edit}. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>

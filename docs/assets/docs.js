@@ -144,20 +144,32 @@
     if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
   }
 
-  /* ---- the current section in the sidebar ---- */
+  /* ---- the current section in the sidebar ----
+   * The section being read is marked, and only its subsections are
+   * listed under it. */
   function setupScrollSpy() {
     var links = document.querySelectorAll(".sidebar .toc a");
-    if (!links.length || !("IntersectionObserver" in window)) return;
+    if (!links.length) return;
     var byId = {};
     links.forEach(function (a) { byId[a.getAttribute("href").replace(/\?.*?#|^#/, "")] = a; });
-    var heads = document.querySelectorAll("main h2[id]");
+    function mark(id) {
+      var a = byId[id];
+      if (!a) return;
+      links.forEach(function (l) { l.classList.remove("active"); });
+      document.querySelectorAll(".sidebar .toc > li.open").forEach(function (li) { li.classList.remove("open"); });
+      a.classList.add("active");
+      var top = a.closest(".toc > li");
+      if (top) {
+        top.classList.add("open");
+        var h2 = top.querySelector("a");
+        if (h2 !== a) h2.classList.add("active");
+      }
+    }
+    if (location.hash) mark(decodeURIComponent(location.hash.slice(1)));
+    if (!("IntersectionObserver" in window)) return;
+    var heads = document.querySelectorAll("main h2[id], main h3[id]");
     var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        links.forEach(function (l) { l.classList.remove("active"); });
-        var a = byId[e.target.id];
-        if (a) a.classList.add("active");
-      });
+      entries.forEach(function (e) { if (e.isIntersecting) mark(e.target.id); });
     }, { rootMargin: "-60px 0px -70% 0px" });
     heads.forEach(function (h) { observer.observe(h); });
   }

@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a></li><li><a href="#libraries">Libraries</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a><ul class="sub"><li><a href="#all-flags">All flags</a></li></ul></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a><ul class="sub"><li><a href="#neovim">Neovim</a></li><li><a href="#vim">Vim</a></li><li><a href="#other-editors">Other editors</a></li></ul></li><li><a href="#libraries">Libraries</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -190,6 +190,7 @@ ktm --dump-ir main.ktm               # the SSA intermediate representation
 ktm -S -o- main.ktm                  # the generated assembly
 ktm -cfg main.ktm &amp;&amp; dot -Tpng main.dot -o main.png</code></pre>
 
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="stdlib.html"><span>Previous</span>Library reference</a><a class="next" href="examples.html"><span>Next</span>Examples</a></nav>
     <footer class="page-foot">
       <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/tools.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>
