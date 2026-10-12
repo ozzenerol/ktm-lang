@@ -63,6 +63,9 @@ pub struct Value {
  * address and type of a variable, field or element */
 pub Type *typeOf(...args);
 pub Value of(...args);
+/* name(e) of an enum value: its member's name, a view of read-only data
+ * ("" for a value that isn't one); reflect.nameOf(reflect.typeOf(e), e) */
+pub u8[] name(...args);
 
 /* reflect.of(x) is a call to this, made by the compiler */
 pub Value __value(void *ptr, Type *type)
@@ -71,6 +74,33 @@ pub Value __value(void *ptr, Type *type)
     v.ptr = ptr;
     v.type = type;
     return v;
+}
+
+/* The name of the member of enum type t whose value is `value`; "" when
+ * there is none (or t isn't an enum). The first one when two share it. */
+pub u8[] nameOf(Type *t, i64 value)
+{
+    if (t && t.kind == Kind.enumType) {
+        for (auto m : t.members) {
+            if (m.value == value) { return m.name; }
+        }
+    }
+    return "";
+}
+
+/* The value of enum type t's member `name` into *value: false (and *value
+ * left alone) when t has no such member */
+pub bool enumValue(Type *t, u8[] name, i64 *value)
+{
+    if (t && t.kind == Kind.enumType) {
+        for (auto m : t.members) {
+            if (m.name.equals(name)) {
+                if (value) { *value = m.value; }
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /* The same type: kind, name and size, and the same fields or element */

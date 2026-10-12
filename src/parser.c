@@ -1694,7 +1694,8 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
 Ast *parseReflectCall(Cctrl *cc, char *name, int len) {
     int type_of = len == 14 && !memcmp(name, "reflect.typeOf", 14);
     int value_of = len == 10 && !memcmp(name, "reflect.of", 10);
-    if (!type_of && !value_of) {
+    int name_of = len == 12 && !memcmp(name, "reflect.name", 12);
+    if (!type_of && !value_of && !name_of) {
         return NULL;
     }
     AstType *t = NULL;
@@ -1712,11 +1713,26 @@ Ast *parseReflectCall(Cctrl *cc, char *name, int len) {
         t = operand->type;
     }
     cctrlTokenExpect(cc, ')');
+    if (name_of && !t->is_enum) {
+        cctrlRaiseException(cc, "reflect.name takes an enum value, not a %s",
+                            astTypeToString(t));
+    }
     Ast *g = parseReflectDescribe(cc, t);
     AstType *tp = astMakePointerType(g->type);
     Ast *type_addr = astUnaryOperator(tp, AST_UN_OP_ADDR_OF, g);
     if (type_of) {
         return type_addr;
+    }
+    if (name_of) {
+        /* reflect.nameOf(reflect.typeOf(e), e) */
+        Ast *fn = findFunctionDecl(cc, str_lit("reflect.nameOf"));
+        if (!fn) {
+            cctrlRaiseException(cc, "reflect.name needs `import reflect;`");
+        }
+        Vec *argv = astVecNew();
+        vecPush(argv, type_addr);
+        vecPush(argv, astCast(operand, ast_int_type));
+        return astFunctionCall(fn->type->rettype, fn->fname->data, fn->fname->len, argv);
     }
     if (!assertLValue(operand)) {
         cctrlRaiseException(cc, "reflect.of takes a variable, a field or an element "
