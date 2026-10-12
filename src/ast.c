@@ -404,6 +404,8 @@ const char *astSymbolDisplayName(const char *sym) {
     return astModuleDemangle((char *)sym, strlen(sym));
 }
 
+static char *astOverloadDemangleParams(const char *s, const char *end);
+
 /* `_K3net4dial` back to `net.dial`, for messages; any other name as is */
 char *astModuleDemangle(char *sym, int len) {
     if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||
@@ -413,6 +415,13 @@ char *astModuleDemangle(char *sym, int len) {
     AoStr *out = aoStrNew();
     int i = 2;
     while (i < len) {
+        /* an overload's parameter types (astOverloadSymbol) */
+        if (sym[i] == '_' && out->len) {
+            char *params = astOverloadDemangleParams(sym + i + 1, sym + len);
+            if (!params) return mprintf("%.*s", len, sym);
+            aoStrCat(out, params);
+            break;
+        }
         int n = 0;
         while (i < len && isdigit((unsigned char)sym[i])) n = n * 10 + (sym[i++] - '0');
         if (n == 0 || i + n > len) return mprintf("%.*s", len, sym);
@@ -420,6 +429,201 @@ char *astModuleDemangle(char *sym, int len) {
         aoStrCatLen(out, sym + i, n);
         i += n;
     }
+    return aoStrMove(out);
+}
+
+/* Overload symbols: a function of a name with several (AST_FLAG_OVERLOAD)
+ * is its base symbol + `_` + a code per parameter type (Itanium-like):
+ * v (no parameters) b bool, a i8, h u8, s i16, t u16, i i32, j u32,
+ * l i64, m u64, f f32, d f64, P<t> pointer (an array parameter is its
+ * pointer), S<t> slice, N<len-prefixed parts>E a named type
+ * (`N3geo5PointE`), F<ret><params>E a function type, z<t> `T ...name`.
+ * A length-prefixed part never starts with `_`, so no plain name makes
+ * one, and astModuleDemangle shows it as `f(i64, u8[])`. */
+static void astOverloadTypeCode(AoStr *out, AstType *t);
+
+static void astOverloadParamsCode(AoStr *out, Vec *params, int from) {
+    int n = 0;
+    for (u64 i = (u64)from; params && i < params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p) continue;
+        if (p->kind == AST_VAR_ARGS) {
+            aoStrPutChar(out, 'z');
+            aoStrPutChar(out, 'm');
+            n++;
+            continue;
+        }
+        /* `T ...name`: the hidden count, then the data pointer */
+        if (i + 1 < params->size) {
+            Ast *next = params->entries[i + 1];
+            if (next && next->kind == AST_LVAR && (next->flags & AST_FLAG_VARARGS)) {
+                continue;
+            }
+        }
+        AstType *type = p->kind == AST_DEFAULT_PARAM && p->declvar ? p->declvar->type : p->type;
+        if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) {
+            aoStrPutChar(out, 'z');
+            astOverloadTypeCode(out, type && type->ptr ? type->ptr : type);
+        } else {
+            astOverloadTypeCode(out, type);
+        }
+        n++;
+    }
+    if (!n) aoStrPutChar(out, 'v');
+}
+
+static void astOverloadNameCode(AoStr *out, AoStr *name) {
+    aoStrPutChar(out, 'N');
+    int start = 0;
+    for (int i = 0; i <= (int)name->len; ++i) {
+        if (i == (int)name->len || name->data[i] == '.') {
+            aoStrCatPrintf(out, "%d%.*s", i - start, i - start, name->data + start);
+            start = i + 1;
+        }
+    }
+    aoStrPutChar(out, 'E');
+}
+
+static void astOverloadTypeCode(AoStr *out, AstType *t) {
+    if (!t) { aoStrPutChar(out, 'v'); return; }
+    switch (t->kind) {
+        case AST_TYPE_VOID: aoStrPutChar(out, 'v'); return;
+        case AST_TYPE_CHAR:
+        case AST_TYPE_INT: {
+            if (t->is_bool) { aoStrPutChar(out, 'b'); return; }
+            const char *signed_codes = "a s i   l", *unsigned_codes = "h t j   m";
+            int idx = t->size == 1 ? 0 : t->size == 2 ? 2 : t->size == 4 ? 4 : 8;
+            aoStrPutChar(out, (t->issigned ? signed_codes : unsigned_codes)[idx]);
+            return;
+        }
+        case AST_TYPE_FLOAT: aoStrPutChar(out, t->size == 4 ? 'f' : 'd'); return;
+        case AST_TYPE_ARRAY:
+        case AST_TYPE_POINTER:
+            aoStrPutChar(out, 'P');
+            astOverloadTypeCode(out, t->ptr);
+            return;
+        case AST_TYPE_FUNC:
+            aoStrPutChar(out, 'F');
+            astOverloadTypeCode(out, t->rettype);
+            astOverloadParamsCode(out, t->params, 0);
+            aoStrPutChar(out, 'E');
+            return;
+        case AST_TYPE_CLASS:
+        case AST_TYPE_UNION:
+            if (t->is_slice && t->elem) {
+                aoStrPutChar(out, 'S');
+                astOverloadTypeCode(out, t->elem);
+                return;
+            }
+            if (t->clsname) {
+                astOverloadNameCode(out, t->clsname);
+                return;
+            }
+            aoStrPutChar(out, 'v');
+            return;
+        default:
+            aoStrPutChar(out, 'v');
+            return;
+    }
+}
+
+/* The symbol of the overload of `base` (a symbol, `_K01f`) taking
+ * `params`; from > 0 skips a method's `self` */
+char *astOverloadSymbol(const char *base, Vec *params, int from) {
+    AoStr *out = aoStrNew();
+    aoStrCat(out, base);
+    aoStrPutChar(out, '_');
+    astOverloadParamsCode(out, params, from);
+    return aoStrMove(out);
+}
+
+/* One type of an overload suffix back as written (`u8[]`); *p moves past
+ * it. 0 on a code it doesn't know. */
+static int astOverloadDecodeType(AoStr *out, const char **p, const char *end) {
+    if (*p >= end) return 0;
+    char c = *(*p)++;
+    switch (c) {
+        case 'v': aoStrCat(out, "void"); return 1;
+        case 'b': aoStrCat(out, "bool"); return 1;
+        case 'a': aoStrCat(out, "i8"); return 1;
+        case 'h': aoStrCat(out, "u8"); return 1;
+        case 's': aoStrCat(out, "i16"); return 1;
+        case 't': aoStrCat(out, "u16"); return 1;
+        case 'i': aoStrCat(out, "i32"); return 1;
+        case 'j': aoStrCat(out, "u32"); return 1;
+        case 'l': aoStrCat(out, "i64"); return 1;
+        case 'm': aoStrCat(out, "u64"); return 1;
+        case 'f': aoStrCat(out, "f32"); return 1;
+        case 'd': aoStrCat(out, "f64"); return 1;
+        case 'P': {
+            /* `fn(..) T` is already a pointer to a function */
+            int is_fn = *p < end && **p == 'F';
+            if (!astOverloadDecodeType(out, p, end)) return 0;
+            if (!is_fn) aoStrCat(out, " *");
+            return 1;
+        }
+        case 'S':
+            if (!astOverloadDecodeType(out, p, end)) return 0;
+            aoStrCat(out, "[]");
+            return 1;
+        case 'z':
+            aoStrCat(out, "...");
+            return astOverloadDecodeType(out, p, end);
+        case 'N': {
+            int first = 1;
+            while (*p < end && **p != 'E') {
+                int n = 0;
+                if (!isdigit((unsigned char)**p)) return 0;
+                while (*p < end && isdigit((unsigned char)**p)) n = n * 10 + (*(*p)++ - '0');
+                if (*p + n > end) return 0;
+                if (!first) aoStrPutChar(out, '.');
+                aoStrCatLen(out, *p, n);
+                *p += n;
+                first = 0;
+            }
+            if (*p >= end) return 0;
+            (*p)++;
+            return 1;
+        }
+        case 'F': {
+            AoStr *ret = aoStrNew();
+            if (!astOverloadDecodeType(ret, p, end)) return 0;
+            aoStrCat(out, "fn(");
+            if (*p < end && **p == 'v') {
+                (*p)++;
+            } else {
+                int first = 1;
+                while (*p < end && **p != 'E') {
+                    if (!first) aoStrCat(out, ", ");
+                    if (!astOverloadDecodeType(out, p, end)) return 0;
+                    first = 0;
+                }
+            }
+            if (*p >= end || **p != 'E') return 0;
+            (*p)++;
+            aoStrCatPrintf(out, ") %s", ret->data);
+            return 1;
+        }
+        default:
+            return 0;
+    }
+}
+
+/* `_l` + `Sh` -> `(i64, u8[])`; NULL if it isn't an overload suffix */
+static char *astOverloadDemangleParams(const char *s, const char *end) {
+    AoStr *out = aoStrNew();
+    aoStrPutChar(out, '(');
+    if (end - s == 1 && *s == 'v') {
+        aoStrPutChar(out, ')');
+        return aoStrMove(out);
+    }
+    int first = 1;
+    while (s < end) {
+        if (!first) aoStrCat(out, ", ");
+        if (!astOverloadDecodeType(out, &s, end)) return NULL;
+        first = 0;
+    }
+    aoStrPutChar(out, ')');
     return aoStrMove(out);
 }
 
@@ -2252,6 +2456,9 @@ static char *astFunctionToStringInternal(Ast *func, AstType *type) {
     }
     /* by its name, not its symbol (`geo.area`, not `_K3geo4area`) */
     const char *name = astSymbolDisplayName(func->fname->data);
+    /* an overload's name shows its parameter types: they follow */
+    const char *paren = strchr(name, '(');
+    if (paren) name = mprintf("%.*s", (int)(paren - name), name);
     if (tmp->data[tmp->len - 1] == '*') {
         aoStrCatPrintf(str,"%s%s",tmp->data,name);
     } else {

@@ -4,6 +4,75 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.6.0 <small>(2026-10-12)</small></h2>
+<p>Function overloading, and the library pieces the example projects still wrote by hand:
+hashing, case-insensitive and URL/HTML text helpers, portable file metadata, and waiting for
+a child process inside the coroutine loop.</p>
+
+<pre><code>import hash, str;
+
+void send(i64 n) { printf("number %d\n", n); }
+void send(u8[] text) { printf("text %.*s\n", (i32)text.len, text.ptr); }
+
+void main()
+{
+  send(42);
+  send("hello");
+
+  u8 digest[32];
+  hash.sha256("abc", digest);
+  String hex = hash.hex(digest);
+  defer hex.free();
+  String q = str.urlEncode("a b&amp;c");
+  defer q.free();
+  printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>Overloading: functions, methods and a module's functions can share a name when their
+  parameter types differ, and a call picks the one its arguments fit best (an exact type over
+  a conversion in the same family over an integer for a float; on a tie, the one that needs no
+  default and no <code>T ...name</code> extras). An ambiguous call, or one no overload takes, is
+  an error that lists the overloads. <code>&amp;f</code> takes the overload of the function type
+  it goes to. <code>pub</code> is per overload. The language server shows and jumps to the
+  overload a call picks. See <a href="language.html#overloading">Overloading</a>.</li>
+  <li>A function with no overloads keeps its symbol, so existing libraries and C callers see no
+  change; once a name has two or more, each one's symbol carries its parameter types.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
+  <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
+  (chainable), 64-bit FNV-1a for tables, and <code>hash.equalCt</code>, a constant-time compare
+  for digests and tokens (the length is not secret).</li>
+  <li><code>str</code> gets ASCII case-insensitive <code>equalsFold</code>,
+  <code>compareFold</code>, <code>findFold</code>, <code>containsFold</code>,
+  <code>startsWithFold</code> and <code>endsWithFold</code>; URL percent-encoding
+  (<code>urlEncode</code> for a component, <code>urlEncodePath</code> keeping <code>/</code>,
+  <code>formEncode</code> with <code>+</code> for spaces) and decoding (<code>urlDecode</code>,
+  <code>formDecode</code>, false on a bad <code>%XX</code>); and <code>htmlEscape</code>.</li>
+  <li><code>fs</code> gets <code>lstat</code> and <code>fstat</code> next to <code>stat</code>,
+  <code>FileStat.kind()</code> (<code>fs.FileKind</code> file, dir, link, other) with
+  <code>isFile</code>, <code>isDir</code> and <code>isLink</code>, so code never needs
+  <code>libc.cStat</code>'s per-platform layout; plus <code>fs.realPath</code>,
+  <code>fs.pread</code> and <code>fs.pwrite</code>.</li>
+  <li><code>coro.waitChild(pid, ms)</code> waits for a child process inside the coroutine loop
+  without blocking the other coroutines (pidfd on Linux, kqueue on macOS, polling where neither
+  exists), returning its wait status or -1 on timeout. <code>proc.exitFd(pid)</code> gives the
+  pollable fd for your own poll loop, and <code>proc.setStatus(p, st)</code> records a status got
+  that way in a <code>proc.Proc</code>.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>A second function of a name with other parameter types used to be the error "conflicting
+  types"; it is now an overload. The same parameters with another return type is still that
+  error.</li>
+</ul>
+
 <h2>v0.5.1 <small>(2026-10-12)</small></h2>
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>

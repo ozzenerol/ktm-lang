@@ -30,6 +30,9 @@
 /* Create wrappers over MAlloc/Free and friends for tracking allocations
  * JIT only presently */
 #define CCTRL_MEMSAFE              (1<<8)
+/* The language server: REPL-style redefinition, but overloads as in a
+ * compile (each analysis parses the document afresh) */
+#define CCTRL_LSP                  (1<<9)
 
 /* For messages */
 #define CCTRL_ICE   0
@@ -84,6 +87,14 @@ typedef struct CctrlMacroUse {
     Lexeme *macro;     /* the value in macro_defs */
     Lexeme *expansion; /* `macro` at `use`'s line and column */
 } CctrlMacroUse;
+
+/* A call to an overloaded function and the overload it picked, for the
+ * LSP's hover and definition */
+typedef struct CctrlOverloadCall {
+    u32 file_id;
+    int line, col, len; /* the name as written, col 1-based */
+    struct Ast *fn;
+} CctrlOverloadCall;
 
 typedef struct Cctrl {
     u64 flags;
@@ -165,6 +176,14 @@ typedef struct Cctrl {
 
     /* Function being parsed */
     Ast *tmp_func;
+    /* The overload set the function parseFunctionDef is about to create
+     * joins (parseOverloadDecl), before its body can call it */
+    Vec *tmp_overload_set;
+    /* `&f` of overloaded functions no target type has picked yet
+     * (AST_FLAG_OVERLOAD_REF): an error at the end of the function */
+    List *overload_refs;
+    /* CctrlOverloadCall *: every call of an overloaded function */
+    Vec *overload_calls;
 
     /* Writes through a local initialised from a string literal
      * (AST_FLAG_LIT_SLICE), each an AST_SLICE_ELEM: errors at the end of

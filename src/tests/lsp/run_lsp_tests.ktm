@@ -98,6 +98,7 @@ u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
+u8 *OVL_HC;
 
 void initFixtures() {
     LIB_HC =
@@ -127,6 +128,20 @@ void initFixtures() {
         "  geo.Point p;\n"
         "  i64 b = p.x;\n"
         "  geo.\n"
+        "  return 0;\n"
+        "}\n";
+    /* Overloads: a call shows and jumps to the one it picks */
+    OVL_HC =
+        "void show(i64 x) { }\n"
+        "void show(u8[] s) { }\n"
+        "struct Box { i64 n; };\n"
+        "void Box.put(i64 v) { self.n = v; }\n"
+        "void Box.put(u8[] s) { self.n = s.len; }\n"
+        "i32 main() {\n"
+        "  show(1);\n"
+        "  show(\"hi\");\n"
+        "  Box b = {0};\n"
+        "  b.put(\"abc\");\n"
         "  return 0;\n"
         "}\n";
     /* Methods: Admin inherits older, hides describe */
@@ -1179,7 +1194,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 11;
+const i64 LSP_GROUPS = 12;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1270,6 +1285,41 @@ void testMethods() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testOverloads() {
+    printf("overloads\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("overloads.ktm");
+    lspDidOpen(l, uri, OVL_HC);
+    check("overload fixture is clean", lastPublishClean(l));
+
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+    posOf(OVL_HC, "show(1)", 1, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on show(1) shows show(i64 x) only",
+                hoverContains(resp, "show(i64 x)") && !hoverContains(resp, "u8[]"));
+
+    posOf(OVL_HC, "show(\"hi\")", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on show(\"hi\") shows show(u8[] s)", hoverContains(resp, "show(u8[] s)"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(OVL_HC, "show(u8[]", 0, &wantLine, &wantChr);
+    check("definition of show(\"hi\") is show(u8[] s)",
+                locEq(resp, uri, wantLine, wantChr, true));
+
+    posOf(OVL_HC, "put(\"abc\")", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on b.put(\"abc\") shows Box.put(u8[] s)",
+                hoverContains(resp, "Box.put(u8[] s)") && !hoverContains(resp, "i64 v"));
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(OVL_HC, "put(u8[]", 0, &wantLine, &wantChr);
+    check("definition of b.put(\"abc\") is Box.put(u8[] s)",
+                locEq(resp, uri, wantLine, wantChr, true));
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1283,6 +1333,7 @@ void runGroup(i64 group) {
         case 8: testRegressions();
         case 9: testModules();
         case 10: testMethods();
+        case 11: testOverloads();
     }
 }
 

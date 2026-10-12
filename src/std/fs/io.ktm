@@ -13,19 +13,32 @@ const i32 FS_ENAMETOOLONG = 36;
  * calling the libc version. This is just much easier to use.
  * With the added benifit of including when a file was created 
  * for linux, which mac includes with `st_birthtimespec` */
-static i32 statC(FileStat *fst, u8 *pathname) {
+/* How statC finds the file: stat, lstat (a link itself) or fstat */
+const i64 FS_STAT = 0;
+const i64 FS_LSTAT = 1;
+const i64 FS_FSTAT = 2;
+
+static i32 statC(FileStat *fst, u8 *pathname, i64 how = FS_STAT, i32 fd = -1) {
 #if IS_LINUX
     libc.Statx stx;
 
     const i64 AT_FDCWD = -100;
     const i64 AT_STATX_SYNC_AS_STAT = 0x0000;
+    const i64 AT_SYMLINK_NOFOLLOW = 0x100;
+    const i64 AT_EMPTY_PATH = 0x1000;
+    const i64 STATX_BASIC_STATS = 0x07ffU;
     const i64 STATX_BTIME = 0x0800U;
-    const i64 STATX_ATIME = 0x0020U;
-    const i64 STATX_MTIME = 0x0040U;
-    const i64 STATX_CTIME = 0x0080U;
 
-    if (i32 ret = libc.statx(AT_FDCWD, pathname, AT_STATX_SYNC_AS_STAT,
-                STATX_BTIME, &stx); ret != 0) {
+    i32 dirfd = AT_FDCWD;
+    i32 flags = AT_STATX_SYNC_AS_STAT;
+    if (how == FS_LSTAT) { flags |= AT_SYMLINK_NOFOLLOW; }
+    if (how == FS_FSTAT) {
+        dirfd = fd;
+        pathname = "";
+        flags |= AT_EMPTY_PATH;
+    }
+    if (i32 ret = libc.statx(dirfd, pathname, flags,
+                STATX_BASIC_STATS | STATX_BTIME, &stx); ret != 0) {
         return ret;
     }
 
@@ -62,7 +75,11 @@ static i32 statC(FileStat *fst, u8 *pathname) {
 
 #elif IS_MACOS
     libc.cStat st;
-    if (i32 ret = libc.stat(pathname, &st); ret != 0) {
+    i32 ret;
+    if (how == FS_LSTAT) { ret = libc.lstat(pathname, &st); }
+    else if (how == FS_FSTAT) { ret = libc.fstat(fd, &st); }
+    else { ret = libc.stat(pathname, &st); }
+    if (ret != 0) {
         return ret;
     }
 
@@ -325,12 +342,73 @@ i64 cmpDirHuman(void *_dh1, void *_dh2) {
     return cstr.cmp(str1,str2) < 0;
 }
 
-/* What is at path (fst filled): 0, or -1 with errno set */
+/* What is at path (fst filled; a symlink is followed to what it points
+ * to): 0, or -1 with errno set */
 pub i32 stat(FileStat *fst, u8[] path)
 {
     u8 cpath[FS_PATH_MAX];
     if (!fsPath(path, cpath)) { return -1; }
     return statC(fst, cpath);
+}
+
+/* As stat, but a symlink is described itself (kind() is
+ * FileKind.link), not what it points to */
+pub i32 lstat(FileStat *fst, u8[] path)
+{
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return -1; }
+    return statC(fst, cpath, FS_LSTAT);
+}
+
+/* As stat, for the file open as fd */
+pub i32 fstat(FileStat *fst, i32 fd)
+{
+    return statC(fst, null, FS_FSTAT, fd);
+}
+
+/* What it is: a regular file, a directory, a symlink (only from lstat),
+ * or something else (a FIFO, socket or device) */
+pub FileKind FileStat.kind()
+{
+    i64 t = self.st_mode & libc.S_IFMT;
+    if (t == libc.S_IFREG) { return FileKind.file; }
+    if (t == libc.S_IFDIR) { return FileKind.dir; }
+    if (t == libc.S_IFLNK) { return FileKind.link; }
+    return FileKind.other;
+}
+
+pub bool FileStat.isFile() { return self.kind() == FileKind.file; }
+pub bool FileStat.isDir() { return self.kind() == FileKind.dir; }
+pub bool FileStat.isLink() { return self.kind() == FileKind.link; }
+
+/* The absolute path of path with every symlink, "." and ".." resolved
+ * (realpath(3)), a String that is yours; its ptr is null, with errno
+ * set, when a part of it doesn't exist or can't be read */
+pub String realPath(u8[] path)
+{
+    String out;
+    u8 cpath[FS_PATH_MAX];
+    if (!fsPath(path, cpath)) { return out; }
+    u8 *real = libc.realpath(cpath, null);
+    if (!real) { return out; }
+    out = str.from(real[0:cstr.len(real)]);
+    libc.free(real);
+    return out;
+}
+
+/* Up to buf.len bytes of fd from offset off into buf, without moving
+ * fd's offset (pread(2)): the bytes read, 0 at end of file, -1 with
+ * errno set */
+pub i64 pread(i32 fd, u8[] buf, i64 off)
+{
+    return libc.pread(fd, buf.ptr, buf.len, off);
+}
+
+/* data written to fd at offset off, without moving fd's offset
+ * (pwrite(2)): the bytes written, or -1 with errno set */
+pub i64 pwrite(i32 fd, u8[] data, i64 off)
+{
+    return libc.pwrite(fd, data.ptr, data.len, off);
 }
 
 /* The working directory changed to path (`~` and `~/...` are under

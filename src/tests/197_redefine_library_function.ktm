@@ -4,8 +4,9 @@ import cstr, fs, libc, mem, proc, test;
  * AOT build once failed to link with "multiple definition of `Now'"):
  * with the library in modules its names are date.now, cstr.len, so the
  * program's own now() and len() are separate functions, in both modes.
- * A definition or prototype whose signature differs from an earlier one
- * in the program is an error at its name. */
+ * A definition or prototype with the parameter types of an earlier one
+ * and another return type is an error at its name; other parameter types
+ * make an overload (v0.6.0, test 550). */
 
 #define RD_FILE "__197_redefine.ktm"
 #define RD_EXE  "__197_redefine.exe"
@@ -74,34 +75,34 @@ void main() {
     tests++;
     if (runRedefine(true, rdOwnNames, 0, "now=42 len=7 cstr.len=3 real=1", null)) { correct++; }
 
-    /* Two prototypes in the program that disagree */
+    /* Two prototypes with other parameter types: two overloads */
     tests++;
     if (runRedefine(true,
 "i64 Twice(i64 a);
 i64 Twice(u8 *a);
 void main() { }
-", 1, "conflicting types for `Twice`: `i64 Twice(u8 *a);`", RD_FILE ":2:5")) { correct++; }
+", 0, null, null)) { correct++; }
 
-    /* A definition that disagrees with the program's prototype on a
-     * parameter, on varargs, or the number of parameters */
+    /* A definition with other parameters than the program's prototype
+     * is another overload; an old unnamed `...` is an error */
     tests++;
     if (runRedefine(false,
 "i64 Add(i64 a, i64 b);
 i64 Add(i64 a, f64 b) { return a; }
 void main() { }
-", 1, "conflicting types for `Add`", RD_FILE ":2:5")) { correct++; }
+", 0, null, null)) { correct++; }
     tests++;
     if (runRedefine(true,
 "void Log(u8 *fmt, ...);
 void Log(u8 *fmt) { }
 void main() { }
-", 1, "conflicting types for `Log`", null)) { correct++; }
+", 1, "`...` needs a name", null)) { correct++; }
     tests++;
     if (runRedefine(true,
 "i64 One(i64 a);
 i64 One(i64 a, i64 b) { return a + b; }
 void main() { }
-", 1, "conflicting types for `One`", null)) { correct++; }
+", 0, null, null)) { correct++; }
 
     /* A prototype after the definition that disagrees */
     tests++;

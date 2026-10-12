@@ -146,6 +146,63 @@ Qq 1
 <code>at</code> past it (U+FFFD for bytes that aren't UTF-8, -1 at the end),
 <code>str.runeCount(s)</code> counts them and <code>str.validUtf8(s)</code> checks a text.</p>
 
+<h3 id="case-folding">Ignoring case</h3>
+<p><code>str.equalsFold(a, b)</code>, <code>compareFold</code>, <code>findFold</code>,
+<code>containsFold</code>, <code>startsWithFold</code> and <code>endsWithFold</code> work as the
+functions without <code>Fold</code>, with A-Z equal to a-z. Only ASCII letters fold: every other
+byte, UTF-8 included, has to match exactly, so <code>"\xc3\xa9"</code> (&eacute;) does not
+equal <code>"\xc3\x89"</code> (&Eacute;). That is what protocol text wants: HTTP header names
+and values like <code>keep-alive</code>, MIME types, file extensions, hex.</p>
+
+<h3 id="url-html">URLs and HTML</h3>
+<p><code>str.urlEncode(s)</code> percent-encodes one URL component (a query value, a path
+segment): every byte but <code>A-Z a-z 0-9 - _ . ~</code> becomes <code>%XX</code>, a space
+<code>%20</code>. <code>str.urlEncodePath(s)</code> also keeps <code>/</code>, for a whole path,
+and <code>str.formEncode(s)</code> writes a space as <code>+</code>, as HTML forms send it
+(<code>application/x-www-form-urlencoded</code>). Each gives a new String that is yours.</p>
+<p><code>str.urlDecode(s, &amp;out)</code> turns each <code>%XX</code> back into its byte and
+leaves <code>+</code> alone; <code>str.formDecode</code> also turns <code>+</code> into a space.
+The result goes into a String you pass (cleared first, its memory reused; free it when done).
+They return false, with <code>out</code> empty, when a <code>%</code> isn't followed by two hex
+digits. A decoded value can hold any byte, <code>%00</code> and <code>%2F</code> included, so
+check it before using it as a file name.</p>
+<p><code>str.htmlEscape(s)</code> replaces <code>&amp; &lt; &gt; " '</code> with
+<code>&amp;amp; &amp;lt; &amp;gt; &amp;quot; &amp;#39;</code>, which makes any text safe in
+HTML content and in a quoted attribute value.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] header = "Connection: Keep-Alive";
+  u8[] name, value;
+  str.splitFirst(header, ": ", &name, &value);
+  printf("%d %d\n", name.equalsFold("connection"), value.containsFold("keep-alive"));
+
+  String q = str.urlEncode("tom & jerry/2");
+  defer q.free();
+  String path = str.urlEncodePath("/docs/read me.txt");
+  defer path.free();
+  printf("%s?q=%s\n", path, q);
+
+  String got;
+  defer got.free();
+  if (str.formDecode("q=tom+%26+jerry%2F2", &got)) { printf("%s\n", got); }
+  printf("%d\n", str.urlDecode("100%", &got));
+
+  String html = str.htmlEscape("<b>\"5 < 6\"</b>");
+  defer html.free();
+  printf("%s\n", html);
+}
+</code></pre>
+<pre class="output">
+1 1
+/docs/read%20me.txt?q=tom%20%26%20jerry%2F2
+q=tom & jerry/2
+0
+&lt;b&gt;&quot;5 &lt; 6&quot;&lt;/b&gt;
+</pre>
+
 <h3>Format conversions</h3>
 <p><code>str.format</code>, a String's <code>appendFormat</code>, <code>cstr.format</code>,
 <code>cstr.formatTo</code> and the other formatting functions share one format language with
@@ -398,8 +455,8 @@ directory afterwards (made now or already there) and -1 if not, the convention
 symlink (never what it points to) or an empty directory; with <code>fs.REMOVE_RECURSE</code>
 a directory and everything in it, with <code>fs.REMOVE_FORCE</code> a path that doesn't exist
 is not an error. <code>fs.removeDir</code> is the directory half of it.
-<code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times),
-<code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
+<code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code> (size, mode, times;
+see <a href="#file-status">File status</a>), <code>fs.changeDir</code> changes directory (<code>~</code> is <code>$HOME</code>) and
 <code>fs.currentDir()</code> returns the working directory as a String.</p>
 <pre data-run><code>
 import cstr, fs, libc, mem, str;
@@ -447,6 +504,71 @@ fs.readAll of a directory: 1
 notes.txt: 11 bytes
 fs.remove: 0
 fs.remove again with fs.REMOVE_FORCE: 0
+</pre>
+<h3 id="file-status">File status</h3>
+<p><code>fs.stat(&amp;fst, path)</code> fills an <code>fs.FileStat</code>, the same struct on
+every platform, so a program never needs <code>libc.cStat</code>, whose layout differs between
+Linux x86_64, Linux arm64 and macOS. Its fields: <code>st_size</code>, <code>st_mode</code>
+(type and permission bits), <code>st_ino</code>, <code>st_dev</code>, <code>st_nlink</code>,
+<code>st_uid</code>, <code>st_gid</code>, and the times <code>st_mtim</code>,
+<code>st_atim</code>, <code>st_ctim</code> and <code>st_btim</code> (creation), each with
+<code>tv_sec</code> and <code>tv_nsec</code>. <code>fst.kind()</code> says what it is:
+<code>fs.FileKind.file</code>, <code>dir</code>, <code>link</code> or <code>other</code> (a FIFO,
+a socket, a device), and <code>fst.isFile()</code>, <code>isDir()</code> and
+<code>isLink()</code> ask for one. <code>fs.stat</code> follows a symlink to what it points to;
+<code>fs.lstat</code> describes the link itself, the only way to get <code>link</code>, and
+<code>fs.fstat(&amp;fst, fd)</code> describes an open file. All three return 0, or -1 with
+<code>errno</code> set.</p>
+<p><code>fs.realPath(path)</code> is the absolute path with every symlink, <code>.</code> and
+<code>..</code> resolved, a String that is yours; its <code>ptr</code> is null (with
+<code>errno</code> set) when a part of the path doesn't exist. <code>fs.pread(fd, buf, off)</code>
+reads into a <code>u8[]</code> from an offset and <code>fs.pwrite(fd, data, off)</code> writes at
+one, neither moving the file's offset, so threads can share one fd.</p>
+<pre data-run><code>
+import cstr, fs, libc, mem, str;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(dir)) { return; }
+  u8[] root = cstr.view(dir);
+  String file = str.format("%s/data.txt", root);
+  String link = str.format("%s/latest", root);
+  defer file.free();
+  defer link.free();
+  fs.writeAll(file, "0123456789");
+  libc.symlink("data.txt", link.cstr());
+
+  fs.FileStat st;
+  fs.stat(&st, link);
+  printf("stat: file %d, %d bytes
+", st.isFile(), st.st_size);
+  fs.lstat(&st, link);
+  printf("lstat: link %d
+", st.kind() == fs.FileKind.link);
+
+  String real = fs.realPath(link);
+  defer real.free();
+  printf("%s
+", real.endsWith("/data.txt") ? "resolves to data.txt" : "?");
+
+  i32 fd = libc.open(file.cstr(), libc.O_RDONLY);
+  u8 buf[4];
+  i64 n = fs.pread(fd, buf, 6);
+  printf("%d bytes at 6: %s
+", n, buf[0:n]);
+  libc.close(fd);
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+stat: file 1, 10 bytes
+lstat: link 1
+resolves to data.txt
+4 bytes at 6: 6789
 </pre>
 <p>For lower-level work the POSIX calls (<code>open</code>, <code>read</code>,
 <code>write</code>, <code>close</code>, <code>lseek</code>, <code>stat</code>,
@@ -634,7 +756,12 @@ online.</p>
 <code>proc.exited(st)</code> and <code>proc.exitCode(st)</code>, <code>proc.signaled(st)</code>
 and <code>proc.termSignal(st)</code>, <code>proc.stopped(st)</code> and
 <code>proc.stopSignal(st)</code>; <code>proc.statusCode(st)</code> is what a shell puts in
-<code>$?</code>: the exit code, or 128 plus the signal. The libc module also declares what
+<code>$?</code>: the exit code, or 128 plus the signal. <code>proc.exitFd(pid)</code> is a
+file descriptor that polls readable once child <code>pid</code> has exited (a pidfd on Linux, a
+kqueue on macOS; -1 where the system can't make one, so check with <code>waitpid</code> and
+<code>WNOHANG</code> then): put it in your own <code>poll</code> loop instead of waking up every
+so often to reap, then <code>waitpid</code> or <code>proc.done</code> the child and close the
+fd. In a coroutine loop, <code>coro.waitChild</code> does all of that. The libc module also declares what
 shells and daemons call directly: <code>dup</code>, <code>dup2</code>, <code>setpgid</code>,
 <code>tcsetpgrp</code>, <code>getpid</code>, <code>setsid</code>, <code>readlink</code>,
 <code>realpath</code>, <code>pread</code>, <code>setrlimit</code> and more, with the common
@@ -1228,6 +1355,53 @@ void main()
 type 7: hello
 type 8: hi
 0 bytes left
+</pre>
+
+<h2 id="hashing">Hashing</h2>
+<p>Module <code>hash</code> has SHA-256, CRC-32, FNV-1a and a constant-time compare.
+<code>hash.sha256(data, out)</code> writes the 32-byte digest of a <code>u8[]</code> into
+<code>out</code> (<code>hash.SHA256_SIZE</code> bytes; a shorter <code>out</code> throws
+<code>ERR_BOUNDS</code>). For data that comes in pieces (a file read in blocks, a body off a
+socket), make a <code>hash.Sha256</code> with <code>hash.sha256New()</code>, give it each piece
+with <code>h.update(piece)</code> and finish with <code>h.final(out)</code>, which also starts it
+over for the next message (<code>h.reset()</code> drops what was fed without finishing). A
+Sha256 holds no memory, so there is nothing to free. <code>hash.hex(bytes)</code> gives the
+lowercase hex of any bytes as a String that is yours.</p>
+<p><code>hash.crc32(data)</code> is the IEEE CRC-32 that zip, gzip and PNG use. It chains:
+<code>hash.crc32(b, hash.crc32(a))</code> is the CRC of a followed by b.
+<code>hash.fnv1a(data)</code> is a fast 64-bit hash for tables, sharding and cache keys (the one
+<code>map.StrMap</code> uses), not for anything security-related.</p>
+<p><code>hash.equalCt(a, b)</code> compares two byte strings in a time that depends only on their
+length, not on where they differ: use it for digests, MACs and tokens, where
+<code>str.equals</code> would tell an attacker how many leading bytes were right. Strings of
+different lengths return false at once, so the length itself is not kept secret.</p>
+<pre data-run><code>
+import hash;
+
+void main()
+{
+  u8 d[hash.SHA256_SIZE];
+  hash.sha256("abc", d);
+  String hex = hash.hex(d);
+  defer hex.free();
+  printf("%s\n", hex);
+
+  /* the same digest, fed in pieces */
+  hash.Sha256 h = hash.sha256New();
+  h.update("a");
+  h.update("bc");
+  u8 again[hash.SHA256_SIZE];
+  h.final(again);
+  printf("same: %d\n", hash.equalCt(d, again));
+
+  printf("crc32 %x, chained %x\n", hash.crc32("123456789"),
+         hash.crc32("56789", hash.crc32("1234")));
+}
+</code></pre>
+<pre class="output">
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+same: 1
+crc32 cbf43926, chained cbf43926
 </pre>
 
 <h2 id="json">JSON</h2>
@@ -2005,6 +2179,14 @@ loop rests until <code>coro.close(fd)</code> closes an fd, or 2 s passed. For 10
 that it checks (with <code>dup</code>) before each accept that two fds are free, one for the
 client and one for its work, and rests again if not, so no further client is dropped. So close
 connections with <code>coro.close</code>.</li>
+<li><code>coro.waitChild(pid, ms)</code> waits for a child process to exit, reaps it and
+returns its wait status (0 or more: read it with <code>proc.exitCode</code>,
+<code>proc.signaled</code> and the others), or -1 when <code>ms</code> passed first (the child
+still runs; <code>os.errno()</code> is <code>ETIMEDOUT</code>) or <code>pid</code> isn't a child
+of this process (<code>ECHILD</code>). Any number of coroutines can each wait for a child. For a
+<code>proc.spawn</code>ed child give <code>p.pid</code> and pass the status to
+<code>proc.setStatus(p, st)</code>, so <code>p.exitCode</code> and <code>p.termSignal</code> are
+set as <code>proc.wait</code> sets them.</li>
 </ul>
 <p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
 deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
@@ -2094,6 +2276,49 @@ void main()
 ping -> PING
 hello -> HELLO
 stopped
+</pre>
+<p>Waiting for children in the loop: three jobs run at once, each waited for by its own
+coroutine, while another coroutine goes on with its work.</p>
+<pre data-run><code>
+import coro, proc;
+
+void *job(void *arg)
+{
+  u8 *script = arg;
+  u8 *argv[4] = {"/bin/sh", "-c", script, null};
+  proc.Proc *p = proc.spawn(argv);
+  i32 st = coro.waitChild(p.pid, 5000);
+  proc.setStatus(p, st);
+  printf("[%s] exit %d\n", script, p.exitCode);
+  proc.release(p);
+  return null;
+}
+
+void *busy(void *unused)
+{
+  for (i64 i = 0; i < 3; i++) {
+    printf("still working\n");
+    coro.sleep(200);
+  }
+  return null;
+}
+
+void main()
+{
+  coro.go(&job, "sleep 0.5; exit 3");
+  coro.go(&job, "sleep 0.1");
+  coro.go(&job, "sleep 0.3; exit 1");
+  coro.go(&busy);
+  coro.run();
+}
+</code></pre>
+<pre class="output">
+still working
+[sleep 0.1] exit 0
+still working
+[sleep 0.3; exit 1] exit 1
+still working
+[sleep 0.5; exit 3] exit 3
 </pre>
 
 <h2 id="fzf">Fuzzy matching</h2>

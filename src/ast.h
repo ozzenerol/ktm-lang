@@ -275,6 +275,16 @@ typedef struct AstType {
 #define AST_FLAG_NOCHECK (1<<13)
 /* A local whose address is taken somewhere in the function */
 #define AST_FLAG_ADDR_TAKEN (1<<14)
+/* A function with overloads (others of its name with other parameter
+ * types): its fname is its full symbol, the base symbol + `_` + its
+ * parameter types (astOverloadSymbol), and `overloads` lists the set */
+#define AST_FLAG_OVERLOAD (1<<15)
+/* `&f` of an overloaded `f` whose target type hasn't picked one yet
+ * (parseResolveOverloadRef) */
+#define AST_FLAG_OVERLOAD_REF (1<<16)
+/* A module's function declared `pub`: for an overload, whose access is
+ * checked on the one a call picks */
+#define AST_FLAG_PUB (1<<17)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
@@ -405,6 +415,9 @@ typedef struct Ast {
                               * value... we could use this for all default vals
                               * might be easier? */
             int has_var_args;
+            /* AST_FLAG_OVERLOAD: every function of this name, shared by
+             * all of them */
+            Vec *overloads;
         };
 
         /* Declaration */
@@ -611,6 +624,11 @@ char *astRuntimeName(const char *name);
 char *astRuntimeSymbol(const char *name);
 char *astModuleMangle(char *qual, int len);
 char *astModuleDemangle(char *sym, int len);
+char *astOverloadSymbol(const char *base, Vec *params, int from);
+/* A function's overload set (AST_FLAG_OVERLOAD), NULL for anything else */
+#define astOverloads(ast) \
+    ((ast) && ((ast)->kind == AST_FUNC || (ast)->kind == AST_FUN_PROTO) \
+     ? (ast)->overloads : NULL)
 char *astProgramSymbol(char *name, int len);
 const char *astSymbolDisplayName(const char *sym);
 Ast *astGVar(AstType *type, char *name, int len, int is_static);
