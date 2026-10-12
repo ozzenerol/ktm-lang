@@ -167,7 +167,18 @@ static void decodeInto(Value *n, reflect.Value v, String *path, i64 flags)
                 decodeFail(path, decodeIsByte(t.elem) ? "a string" : "an array", n);
             }
         case reflect.Kind.array:
-            if (n.type != ARRAY) { decodeFail(path, "an array", n); }
+            if (decodeIsByte(t.elem) && n.type == STRING) {
+                /* a C string buffer, as encode writes it: the text and a NUL */
+                if (n.str.len >= t.len) {
+                    String what = str.format("expected at most %d bytes, got %d", t.len - 1, n.str.len);
+                    defer what.free();
+                    decodeError(path, what.cstr());
+                }
+                mem.set(v.ptr, 0, t.len);
+                if (n.str.len) { mem.copy(v.ptr, n.str.ptr, n.str.len); }
+                return;
+            }
+            if (n.type != ARRAY) { decodeFail(path, decodeIsByte(t.elem) ? "a string" : "an array", n); }
             if (len(n) > t.len) {
                 String what = str.format("expected at most %d items, got %d", t.len, len(n));
                 defer what.free();
