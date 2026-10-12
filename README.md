@@ -125,12 +125,14 @@ AOT builds pass these to the linker; the JIT and the REPL `dlopen` them.
 Shorthand for `#ifdef __KTM_JIT__` / `#ifdef __KTM_AOT__`: exactly one is
 always defined.
 
-### Language server
-`ktm -lsp` gives diagnostics, go-to-definition, hover, completion (fields, methods and
-module members) and rename. Neovim setup:
+### Editor support
+`ktm -lsp` gives diagnostics, hover with doc comments, completion (fields, methods, module
+members, enum members, imports), signature help, go-to-definition, references, rename, the
+document outline, workspace symbols, semantic highlighting, folding and inlay hints. The Vim
+syntax installs into `<prefix>/share/ktm/vim`. Neovim setup:
 
 ```lua
-vim.filetype.add({ extension = { ktm = "ktm" } })
+vim.opt.rtp:append("/usr/local/share/ktm/vim")
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "ktm",
   callback = function(ev)

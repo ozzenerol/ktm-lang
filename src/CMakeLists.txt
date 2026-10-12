@@ -148,5 +148,7 @@ install(TARGETS ktm DESTINATION bin)
 # The standard library: its modules into <prefix>/modules, then compiled
 # as one tree into <prefix>/lib (libktm.a and the versioned shared object)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/std/ DESTINATION modules)
+# Vim/Neovim syntax, filetype and ftplugin: `set rtp+=<prefix>/share/ktm/vim`
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/syntax-highlighting/vim/ DESTINATION share/ktm/vim)
 # ${CMAKE_INSTALL_PREFIX} escaped: the prefix at install time (`cmake --install --prefix`)
 install(CODE "execute_process(COMMAND \"\${CMAKE_INSTALL_PREFIX}/bin/ktm\" -fPIC -lib ktm --install-dir=\${CMAKE_INSTALL_PREFIX} \${CMAKE_INSTALL_PREFIX}/modules)")
