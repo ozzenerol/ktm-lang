@@ -1128,6 +1128,56 @@ void main()
 1000003: 1, 1000004: 0, 99999999: 0
 </pre>
 
+<h2 id="bytes">Byte buffers</h2>
+<p>Module <code>bytes</code> is for binary data that comes and goes in pieces: what a socket
+or a pipe delivers, or a message being put together. A <code>bytes.Buffer</code> is a queue of
+bytes: <code>append(u8[])</code>, <code>appendByte(b)</code> and
+<code>appendBe16/32/64</code> / <code>appendLe16/32/64</code> add at the end,
+<code>data()</code> is a view of the unread bytes, and <code>consume(n)</code> drops the first
+n once they are used. The space in front is reused, so a buffer that is filled and drained all
+the time doesn't keep growing. Make one with <code>bytes.bufferNew()</code> (a declared Buffer
+isn't zeroed) and free it with <code>b.free()</code>; <code>b.take()</code> gives the unread
+bytes as a String that is yours.</p>
+<p>To read into one, <code>room(n)</code> gives at least n writable bytes after the data and
+<code>commit(k)</code> counts the k you wrote; <code>b.readFrom(fd)</code> does one
+<code>read</code> that way and <code>b.writeTo(fd)</code> one <code>write</code> of the unread
+bytes, consuming what went out. Both return what the system call did (-1 with
+<code>errno</code> <code>EAGAIN</code> on a non-blocking fd that has to wait).</p>
+<p>The integer helpers read and write a <code>u8[]</code> at an offset:
+<code>bytes.be16(s, at)</code>, <code>be32</code>, <code>be64</code> (big-endian, network order),
+<code>le16</code>, <code>le32</code>, <code>le64</code>, and <code>putBe16(s, at, v)</code> and
+the others to write. Past the end, like <code>consume</code> or <code>commit</code> past the
+data, throws <code>ERR_BOUNDS</code>.</p>
+<pre data-run><code>
+import bytes;
+
+void main()
+{
+  /* a message: a 2-byte type and a 4-byte length (network order), then the body */
+  bytes.Buffer b = bytes.bufferNew();
+  defer b.free();
+  b.appendBe16(7);
+  b.appendBe32(5);
+  b.append("hello");
+  b.append("\x00\x08\x00\x00\x00\x02hi");   /* a second message, already here */
+
+  /* read them back the way a server reads what arrived */
+  while (b.len >= 6) {
+    u8[] d = b.data();
+    i64 len = bytes.be32(d, 2);
+    if (b.len < 6 + len) { break; }        /* the rest hasn't arrived yet */
+    printf("type %d: %s\n", bytes.be16(d), d[6:6 + len]);
+    b.consume(6 + len);
+  }
+  printf("%d bytes left\n", b.len);
+}
+</code></pre>
+<pre class="output">
+type 7: hello
+type 8: hi
+0 bytes left
+</pre>
+
 <h2 id="json">JSON</h2>
 <h3>Parsing and selecting</h3>
 <p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
