@@ -30,9 +30,11 @@ const i64 LOOP_TIGHT_MS = 10000;
 #ifdef IS_MACOS
 const i64 LOOP_ECONNABORTED = 53;
 const i64 LOOP_ENOBUFS = 55;
+const i64 LOOP_ENOTSOCK = 38;
 #else
 const i64 LOOP_ECONNABORTED = 103;
 const i64 LOOP_ENOBUFS = 105;
+const i64 LOOP_ENOTSOCK = 88;
 #endif
 
 #ifdef IS_LINUX
@@ -73,12 +75,17 @@ const i64 LOOP_EV_SIZE = 32;
 #endif
 /* events taken from the kernel in one turn at most (more wait a turn) */
 const i64 LOOP_MAXEV = 256;
+/* coro.read reads at most this many times in a row without a turn of the
+ * loop, so one busy stream doesn't starve the others */
+const i64 LOOP_READ_STREAK = 32;
 
 /* The coroutines waiting on one fd, and what it is registered for */
 struct LoopFd {
     LoopTask **w;
     i64 n, cap;
     i64 armed;           /* POLLIN/POLLOUT it is registered for, 0: none */
+    bool full;           /* coro.read's last read filled its buffer */
+    i64 streak;          /* reads in a row that didn't wait */
 };
 
 struct LoopTask {
@@ -267,20 +274,23 @@ static i32 loopQueue(Loop *lp) {
 }
 
 /* Every waiter of fd that `revents` answers, ready with it. Not the ones
- * waiting for something else (a writer when only reading is possible). */
-static void loopFire(Loop *lp, i32 fd, i64 revents) {
-    if (fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { return; }
+ * waiting for something else (a writer when only reading is possible).
+ * How many it readied. */
+static i64 loopFire(Loop *lp, i32 fd, i64 revents) {
+    if (fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { return 0; }
     LoopFd *f = lp.fdw[fd];
-    i64 i = 0;
+    i64 i = 0, woken = 0;
     while (i < f.n) {
         LoopTask *t = f.w[i];
         i64 r = revents & (t.events | libc.POLLERR | libc.POLLHUP | libc.POLLNVAL);
         if (r && !t.ready) {
             loopReady(lp, t, r);     /* takes it out of f.w: same i again */
+            woken++;
         } else {
             i++;
         }
     }
+    return woken;
 }
 
 /* What fd's waiters want, of POLLIN (POLLPRI counts as it) and POLLOUT */
@@ -362,24 +372,17 @@ static void loopArm(Loop *lp, i32 fd) {
 /* A closed fd: the kernel dropped its registration, so a new fd with the
  * same number starts unregistered */
 static void loopForget(Loop *lp, i32 fd) {
-    if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) { lp.fdw[fd].armed = 0; }
+    if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
+        lp.fdw[fd].armed = 0;
+        lp.fdw[fd].full = false;
+    }
 }
 
 /* t waits on fd for events: one more waiter of fd, and fd armed. */
+static LoopFd *loopFdOf(Loop *lp, i32 fd);
+
 static void loopWaitFd(Loop *lp, LoopTask *t, i32 fd) {
-    if (fd >= lp.fdwCap) {
-        i64 cap = lp.fdwCap ? lp.fdwCap : 64;
-        while (cap <= fd) { cap *= 2; }
-        lp.fdw = loopGrow(lp.fdw, cap, sizeof(LoopFd *));
-        for (i64 i = lp.fdwCap; i < cap; i++) { lp.fdw[i] = null; }
-        lp.fdwCap = cap;
-    }
-    LoopFd *f = lp.fdw[fd];
-    if (!f) {
-        f = libc.calloc(1, sizeof(LoopFd));
-        if (!f) { loopOom(); }
-        lp.fdw[fd] = f;
-    }
+    LoopFd *f = loopFdOf(lp, fd);
     if (f.n == f.cap) {
         f.cap = f.cap ? f.cap * 2 : 2;
         f.w = loopGrow(f.w, f.cap, sizeof(LoopTask *));
@@ -434,6 +437,103 @@ pub i64 waitIdle(i32 fd, i16 events, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.waitIdle");
     if (loopGet(true).stopping) { return -1; }
     return loopPark(t, fd, events, loopDeadline(ms), true, false);
+}
+
+/* fd's waiters record (made on first use) */
+static LoopFd *loopFdOf(Loop *lp, i32 fd) {
+    if (fd >= lp.fdwCap) {
+        i64 cap = lp.fdwCap ? lp.fdwCap : 64;
+        while (cap <= fd) { cap *= 2; }
+        lp.fdw = loopGrow(lp.fdw, cap, sizeof(LoopFd *));
+        for (i64 i = lp.fdwCap; i < cap; i++) { lp.fdw[i] = null; }
+        lp.fdwCap = cap;
+    }
+    if (!lp.fdw[fd]) {
+        lp.fdw[fd] = libc.calloc(1, sizeof(LoopFd));
+        if (!lp.fdw[fd]) { loopOom(); }
+    }
+    return lp.fdw[fd];
+}
+
+/* In a loop coroutine: read what is there from the non-blocking fd into
+ * buf, pausing the coroutine until there is something (or ms passed;
+ * ms < 0: no limit). Returns the bytes read (at most buf.len), 0 at end
+ * of file or when the peer closed, -1 on an error or the timeout
+ * (os.errno() ETIMEDOUT). It reads at once when the last read filled
+ * its buffer (more is likely waiting, as in a stream), and waits first
+ * otherwise (the next request isn't there yet): either way a coroutine
+ * per connection costs no more system calls than it must. A few reads
+ * in a row at most skip the wait, so the loop's other coroutines get
+ * their turn. */
+pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
+    LoopTask *t = loopSelf("coro.read");
+    Loop *lp = loopGet(true);
+    LoopFd *f = fd >= 0 ? loopFdOf(lp, fd) : null;
+    if (!f || buf.len == 0) {
+        if (!f) { os.setErrno(libc.EBADF); return -1; }
+        return 0;
+    }
+    i64 until = loopDeadline(ms);
+    bool tryFirst = f.full && f.streak < LOOP_READ_STREAK;
+    f.streak = tryFirst ? f.streak + 1 : 0;
+    while (true) {
+        if (!tryFirst) {
+            if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
+                os.setErrno(libc.ETIMEDOUT);
+                return -1;
+            }
+        }
+        tryFirst = false;
+        i64 n = libc.read(fd, buf.ptr, buf.len);
+        if (n >= 0) {
+            f = lp.fdw[fd];
+            f.full = n == buf.len;
+            return n;
+        }
+        i32 err = os.errno();
+        if (err != libc.EAGAIN && err != libc.EWOULDBLOCK && err != libc.EINTR) { return -1; }
+        lp.fdw[fd].full = false;
+    }
+    return -1;
+}
+
+/* In a loop coroutine: write all of data to the non-blocking fd, pausing
+ * the coroutine while the fd is full (until ms passed; ms < 0: no
+ * limit): first for a turn or two of the loop (the peer is usually
+ * reading already), then until the fd is writable. Returns data.len, or
+ * -1 on an error (EPIPE for a peer that closed: never a SIGPIPE) or the
+ * timeout (ETIMEDOUT); the bytes sent before that are gone. */
+pub i64 write(i32 fd, u8[] data, i64 ms=-1) {
+    LoopTask *t = loopSelf("coro.write");
+    i64 until = loopDeadline(ms), off = 0, yields = 0;
+    while (off < data.len) {
+        i64 w = net.send(fd, data[off:data.len]);
+        if (w < 0 && os.errno() == LOOP_ENOTSOCK) {
+            w = libc.write(fd, data.ptr + off, data.len - off);   /* a pipe */
+        }
+        if (w > 0) {
+            off += w;
+            continue;
+        }
+        i32 err = os.errno();
+        if (w < 0 && err != libc.EAGAIN && err != libc.EWOULDBLOCK && err != libc.EINTR) {
+            return -1;
+        }
+        if (w < 0 && err == libc.EINTR) { continue; }
+        /* full: let the loop's others run one turn and try again before
+         * registering for POLLOUT (the peer is usually reading) */
+        if (yields < 2) {
+            yields++;
+            loopPark(t, -1, 0, date.monoMs(), false, false);
+            continue;
+        }
+        yields = 0;
+        if (loopPark(t, fd, libc.POLLOUT, until, false, false) == 0) {
+            os.setErrno(libc.ETIMEDOUT);
+            return -1;
+        }
+    }
+    return data.len;
 }
 
 /* In a loop coroutine: pause for ms milliseconds while the others run
@@ -609,30 +709,23 @@ static void loopPoll(Loop *lp, i64 timeout) {
         mem.copy(&events, e, 4);
         mem.copy(&data, e + LOOP_EV_DATA, 8);
         i32 fd = (i32)data;
-        loopFire(lp, fd, (i64)events);
+        i64 rev = (i64)events;
 #else
         LoopKevent *k = (LoopKevent *)(lp.ev + i * LOOP_EV_SIZE);
         i64 rev = k.filter == LOOP_EVFILT_WRITE ? libc.POLLOUT : libc.POLLIN;
         if (k.flags & LOOP_EV_EOF) { rev |= libc.POLLHUP; }
         if (k.flags & LOOP_EV_ERROR) { rev = libc.POLLERR; }
         i32 fd = (i32)k.ident;
-        loopFire(lp, fd, rev);
 #endif
-    }
-    /* a fired fd nobody waits for that event on is narrowed (or dropped),
-     * or a level-triggered queue would report it every turn */
-    for (i = 0; i < n; i++) {
-#ifdef IS_LINUX
-        u64 data;
-        mem.copy(&data, lp.ev + i * LOOP_EV_SIZE + LOOP_EV_DATA, 8);
-        i32 fd = (i32)data;
-#else
-        i32 fd = (i32)((LoopKevent *)(lp.ev + i * LOOP_EV_SIZE)).ident;
-#endif
-        if (fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { continue; }
-        LoopFd *f = lp.fdw[fd];
-        i64 want = loopWant(f);
-        if (want != f.armed) { loopRegister(lp, fd, f, want); }
+        /* fired with nobody waiting for it: narrow the registration to
+         * what the waiters want (or drop it), or a level-triggered queue
+         * reports it every turn. A woken waiter usually waits again in a
+         * moment, so its registration stays. */
+        if (loopFire(lp, fd, rev) == 0 && fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
+            LoopFd *f = lp.fdw[fd];
+            i64 want = loopWant(f);
+            if (want != f.armed) { loopRegister(lp, fd, f, want); }
+        }
     }
 }
 

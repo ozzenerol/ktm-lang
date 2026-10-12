@@ -2382,6 +2382,14 @@ instead of blocking the thread:</p>
 <li><code>coro.waitIdle(fd, events, ms)</code> is the same for waiting on more work (the
 next request, the next client), but returns -1 when <code>coro.stop()</code> is called, and
 at once when it was called before.</li>
+<li><code>coro.read(fd, buf, ms)</code> reads what is there into the <code>u8[]</code>
+<code>buf</code>, pausing until there is something, and returns the bytes read, 0 at end of file,
+or -1 on an error or the timeout (<code>ETIMEDOUT</code>). <code>coro.write(fd, data, ms)</code>
+writes all of <code>data</code>, pausing while the fd is full, and returns <code>data.len</code>
+or -1 (<code>EPIPE</code> for a peer that closed, never a <code>SIGPIPE</code>). Both work on
+sockets and pipes, and they are the fastest way to talk to a connection: a read waits first
+only when nothing is likely to be there yet, and goes straight on while a stream keeps
+coming.</li>
 <li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
 <code>coro.yield()</code> lets them have a turn.</li>
 <li><code>coro.accept(listener, ms)</code> returns the next client as a non-blocking fd (it
@@ -2402,10 +2410,15 @@ of this process (<code>ECHILD</code>). Any number of coroutines can each wait fo
 <code>proc.setStatus(p, st)</code>, so <code>p.exitCode</code> and <code>p.termSignal</code> are
 set as <code>proc.wait</code> sets them.</li>
 </ul>
-<p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
-deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
-deadline first; new coroutines run in the order they were started. Every thread that calls
-<code>coro.run</code> has its own loop, kept with the thread's coroutine state.</p>
+<p>Each turn of the loop asks the kernel which of the waited-on fds are ready, with the nearest
+deadline as its timeout: epoll on Linux and kqueue on macOS, so a turn costs the fds that are
+ready, not every fd that is open, and ten thousand idle connections cost nothing. Ready fds
+resume first, then the waits that timed out, earliest deadline first; new coroutines run in the
+order they were started. Every thread that calls <code>coro.run</code> has its own loop, kept
+with the thread's coroutine state. Each fd stays registered with the kernel between waits, and
+the kernel forgets an fd when it is closed, so close the fds you wait on with
+<code>coro.close</code> (it tells the loop); a program that has run out of fds when its loop
+starts gets <code>poll</code> instead, which needs none.</p>
 <p><code>coro.stop()</code> winds the loop down: <code>coro.waitIdle</code> and
 <code>coro.accept</code> return -1 from then on, while plain waits and sleeps go on, so the
 work in flight finishes and <code>coro.run</code> returns when it has. <code>coro.stopping()</code>
@@ -2545,7 +2558,8 @@ on one coroutine loop per thread, so the work spreads over the machine's cores.<
   <code>"::*"</code> (every IPv6 address) or a numeric address, as for
   <code>net.listen</code>.</li>
   <li>The client's fd is non-blocking with <code>TCP_NODELAY</code> set: read and write it with
-  <code>coro.wait</code> as in any loop coroutine, and don't close it, <code>serve</code> closes
+  <code>coro.read</code> and <code>coro.write</code> as in any loop coroutine, and don't close
+  it, <code>serve</code> closes
   it with <code>coro.close</code> when the handler returns. A handler that throws is reported on
   stderr and the server goes on.</li>
   <li>It returns 0 once stopped and every handler has finished, or -1 with
