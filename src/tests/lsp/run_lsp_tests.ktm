@@ -1312,10 +1312,12 @@ void testModules() {
      * is geo.ktm's square */
     u8 *moreUri = uriOf("geo/more.ktm");
     lspDidOpen(l, moreUri, MOD_GEO2_HC);
+    check("a module's file opens without errors (it is read as its module)",
+                lastPublishClean(l));
     posOf(MOD_GEO2_HC, "square(n)", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", moreUri, line, chr);
     check("hover on a module's own bare name from its other file",
-                hoverContains(resp, "i64 square(i64 n)"));
+                hoverContains(resp, "i64 geo.square(i64 n)"));
     resp = lspPositionRequest(l, "textDocument/definition", moreUri, line, chr);
     posOf(MOD_GEO_HC, "square(i64", 0, &wantLine, &wantChr);
     check("definition of a module's own bare name from its other file",

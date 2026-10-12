@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <limits.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -45,7 +46,12 @@ typedef struct LspCtx {
     Vec *pending;           /* uris awaiting a debounced analyze */
     const char *analyzing;  /* uri lspPublishHandler publishes for */
     s64 pending_since_ms;   /* when the oldest pending uri landed */
+    int module_doc;         /* the last parse was a module's file */
 } LspCtx;
+
+/* A module's file is analyzed as the compiler reads it: through a
+ * program, named this, that imports the module */
+#define KTM_LSP_MODULE_FILE ".ktm-lsp-module.ktm"
 
 /* Crash guard around parses. Stays global: the signal handler gets no
  * context argument. */
@@ -218,12 +224,81 @@ static Cctrl *lspFreshCctrl(LspCtx *ctx) {
 /* Parse `text` as `path`, leaving diagnostics on ctx->cc->diagnostics.
  * Returns 0 normally, the killing signal if the parser crashed. Only
  * ever called inside an isolated child (lspRunIsolated). */
+/* The lexer reads a file open in the editor from its text (a copy: the
+ * lexer owns what it reads), NULL for any other */
+static char *lspSourceFor(void *arg, const char *path, s64 *_len) {
+    LspCtx *ctx = arg;
+    MapIter mi;
+    mapIterInit(ctx->docs, &mi);
+    while (mapIterNext(&mi)) {
+        char *doc_path = lspUriToPath((const char *)mi.node->key);
+        int hit = strcmp(doc_path, path) == 0;
+        free(doc_path);
+        if (!hit) continue;
+        AoStr *t = mi.node->value;
+        char *copy = malloc(t->len + 1);
+        memcpy(copy, t->data, t->len);
+        copy[t->len] = '\0';
+        *_len = (s64)t->len;
+        return copy;
+    }
+    return NULL;
+}
+
+static char *lspDocModule(AoStr *text);
+
+static int lspIsDirPath(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* A file starting `module a.b;` in a directory .../a/b: the directory
+ * the module is found from (*_mod "a.b"), else NULL */
+static char *lspModuleRoot(const char *path, AoStr *text, char **_mod) {
+    char *mod = lspDocModule(text);
+    const char *slash = strrchr(path, '/');
+    if (!mod || !slash) return NULL;
+    char *rel = mprintf("%s", mod);
+    for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
+    size_t dlen = slash - path, rlen = strlen(rel);
+    if (dlen <= rlen || memcmp(path + dlen - rlen, rel, rlen) ||
+        path[dlen - rlen - 1] != '/') {
+        return NULL;
+    }
+    *_mod = mod;
+    return mprintf("%.*s", (int)(dlen - rlen - 1), path);
+}
+
 static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
     Lexer *l = (Lexer *)malloc(sizeof(Lexer));
     lexInit(l, NULL, CCF_PRE_PROC);
     l->cc = ctx->cc; /* lex-time raises route through diagnostics */
     lexSetBuiltinRoot(l, ctx->root_dir);
-    lexPushString(l, (char *)path, text->data, text->len);
+    l->source_for = lspSourceFor;
+    l->source_arg = ctx;
+    char *mod = NULL;
+    char *root = lspModuleRoot(path, text, &mod);
+    ctx->module_doc = root != NULL;
+    if (root) {
+        char *src = mprintf("import %s;\n", mod);
+        lexPushString(l, mprintf("%s/%s", root, KTM_LSP_MODULE_FILE), src,
+                      strlen(src));
+        /* A tree with rt and prelude is a standard library's source: it
+         * is the standard library while one of its files is edited, read
+         * into a compiler without the installed one (this child's own) */
+        if (lspIsDirPath(mprintf("%s/rt", root)) &&
+            lspIsDirPath(mprintf("%s/prelude", root))) {
+            l->std_modules = root;
+            ctx->cc = cctrlNew(ctx->target);
+            ctx->cc->flags |= CCTRL_REPL | CCTRL_LSP;
+            cctrlAddDefine(ctx->cc, "__KTM_AOT__");
+            l->cc = ctx->cc;
+            lexPushRuntime(l);
+            lexPushPrelude(l);
+        }
+    } else {
+        lexPushString(l, (char *)path, text->data, text->len);
+    }
 
     cctrlDiagClear(ctx->cc);
     cctrlResetTokenBuffer(ctx->cc);
@@ -289,6 +364,12 @@ static int lspParseModuleSiblings(LspCtx *ctx, const char *uri, int skip_open) {
     AoStr *text = lspDocGetOrLoad(ctx, uri);
     if (text == NULL || lspDocModule(text) == NULL) return 0;
     char *path = lspUriToPath(uri);
+    char *mod = NULL;
+    if (lspModuleRoot(path, text, &mod)) {
+        /* its import reads them all */
+        free(path);
+        return 0;
+    }
     char *slash = strrchr(path, '/');
     if (!slash) {
         free(path);
@@ -507,6 +588,10 @@ static void lspPublishDiagnostics(LspCtx *ctx, const char *uri,
         const char *dfile = (d->file && d->file->filename)
                           ? d->file->filename->data : NULL;
         int remote = dfile != NULL && strcmp(dfile, path) != 0;
+        /* the module's program says nothing of its own; the module's
+         * other files only matter for their errors */
+        if (dfile && strstr(dfile, KTM_LSP_MODULE_FILE)) continue;
+        if (remote && ctx->module_doc && d->severity != CCTRL_ERROR) continue;
         if (emitted++) aoStrPutChar(body, ',');
         lspCatDiagnostic(ctx, body, text, d, remote, dfile ? dfile : "?");
     }

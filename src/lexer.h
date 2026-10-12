@@ -365,6 +365,12 @@ typedef struct Lexer {
     /* `ktm -lib name dir` over a tree of modules: dir (a real path),
      * whose modules are all compiled in full */
     char *building_tree;
+    /* The LSP: the text of a file open in the editor, read instead of
+     * the file (NULL: read the file), and a standard library tree it is
+     * editing, used in place of <install>/modules */
+    char *(*source_for)(void *arg, const char *path, s64 *_len);
+    void *source_arg;
+    char *std_modules;
     /* Diagnostic engine back-pointer. When non-NULL the lexer
      * routes user-visible errors through cctrlRaiseException so
      * they accumulate in the same Vec the parser writes to and
