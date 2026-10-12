@@ -4,6 +4,59 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.10.1 <small>(2026-10-12)</small></h2>
+<p>Editor support, fixed and made rich: the language server understands the whole current
+language and gains the features editors expect, and the Vim syntax is rewritten for today's
+ktm. Also: directories and file operations in <code>fs</code>.</p>
+
+<h3>The language server</h3>
+<ul>
+  <li>Fixed: only the first module of an import list (<code>import mem, str, json;</code>) was
+  seen, so hover, definition and completion failed on every stdlib call after it.</li>
+  <li>Fixed: opening one of a module's files (the standard library's too) showed a false
+  "not part of a module" error and more after it. A module's file is now checked as its module,
+  with the unsaved text of its other files.</li>
+  <li>Fixed: enums had no hover (it failed), no definition and no completion; now
+  <code>Color</code>, <code>Color.green</code> and <code>geo.Kind.rect</code> show their members and
+  values, jump to their declaration, and <code>Color.</code> completes the members.</li>
+  <li>Fixed: module names (in imports and as prefixes, aliases too) and fields at their
+  declaration had no hover or definition; a module's name jumps to its files.</li>
+  <li>Fixed: completion gave keywords the "operator" kind and offered internal names
+  (<code>_K3geo4area</code>, <code>Vec&lt;i64&gt;</code>).</li>
+  <li>New: hover shows a declaration's doc comment, the standard library's included.</li>
+  <li>New: signature help in calls (the parameter you are on, every overload), the document
+  outline, workspace symbol search, semantic highlighting (modules, types, enum members,
+  functions and methods, fields, parameters, locals, constants, macros, the stdlib's marked),
+  folding ranges, inlay hints with the type of each <code>auto</code> variable, and completion
+  of the modules an <code>import</code> can name.</li>
+</ul>
+
+<h3>Vim and Neovim</h3>
+<ul>
+  <li>The syntax file is rewritten for the current language: lowercase types, <code>fn</code>,
+  <code>module</code> and <code>import</code> lists, <code>pub</code>, <code>defer</code>,
+  <code>ad</code>, <code>type</code>, enums, generics, <code>String</code>,
+  <code>true</code>/<code>false</code>/<code>null</code>, digit separators, ktm's escapes and
+  format conversions. It comes with filetype detection (Neovim took <code>.ktm</code> for
+  another language) and an ftplugin, and installs into <code>&lt;prefix&gt;/share/ktm/vim</code>
+  (see <a href="tools.html">Tools</a>).</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>fs.openDir(path)</code> and <code>d.next()</code> read a directory: each entry's
+  name, kind (a symlink is a link) and joined path, without <code>.</code> and
+  <code>..</code>; close it with <code>defer d.close();</code> or <code>ad</code>.</li>
+  <li><code>fs.list(path)</code> gives the sorted names as a <code>vec.Vec&lt;String&gt;</code>
+  (<code>fs.freeList</code> frees them), and <code>fs.walk(root, &amp;visit, arg)</code> visits
+  every entry at any depth without following symlinks.</li>
+  <li><code>fs.join</code>, <code>fs.exists</code>, <code>fs.makeDirAll</code>,
+  <code>fs.copyFile</code> (with the permission bits), <code>fs.rename</code>, and
+  <code>fs.move</code>, which copies and removes across filesystems. See
+  <a href="library.html#directories">the library guide</a>.</li>
+  <li>libc's constants passed its C-only check in a normal build but not in the REPL; fixed.</li>
+</ul>
+
 <h2>v0.10.0 <small>(2026-10-12)</small></h2>
 <p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
 <code>map.Map&lt;K, V&gt;</code>, <code>map.Tree&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code> and
