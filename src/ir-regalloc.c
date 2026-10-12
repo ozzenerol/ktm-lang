@@ -608,10 +608,22 @@ int irCgComputeAstLayout(Ast *ast_func, IrFunction *ir_func) {
          * irCgBindAstLoffs so both agree on the surviving loffs. */
         if (iv && !irFnLocalSlotNeeded(ir_func, iv))
             continue;
+        /* Its type's natural alignment (an i64 or pointer 8, a struct its
+         * own, up to the frame's 16): an atomic access (LDAXR, LOCK) faults
+         * or splits on a misaligned one, and C expects it */
+        AstType *lt = l->kind == AST_DEFAULT_PARAM ? l->declvar->type : l->type;
+        int al = size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
+        if (lt && (lt->kind == AST_TYPE_CLASS || lt->kind == AST_TYPE_UNION) &&
+            (int)lt->alignment > al) {
+            al = lt->alignment > 16 ? 16 : (int)lt->alignment;
+        }
+        if (lt && lt->kind == AST_TYPE_ARRAY && size >= 8) al = 8;
         total += align(size, 8);
-        new_offset -= size;
+        new_offset = -align(-new_offset + size, al);
         l->loff = new_offset;
     }
+    /* alignment padding can take the locals past the sum of their sizes */
+    if (align(-new_offset, 8) > total) total = align(-new_offset, 8);
 
     int param_total = 0;
     int has_hidden_out_ptr = irCgHasHiddenOutPtr(ast_func);
