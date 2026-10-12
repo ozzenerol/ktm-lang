@@ -136,9 +136,29 @@ const i64 LOOP_SOCK_CLOEXEC = 0x80000;
 const i64 LOOP_MAP_SHARED = 0x1;
 const i64 LOOP_MAP_POPULATE = 0x8000;
 #endif
-/* coro.read reads at most this many times in a row without a turn of the
- * loop, so one busy stream doesn't starve the others */
-const i64 LOOP_READ_STREAK = 32;
+/* How long coro.read goes on reading without a turn of the loop while
+ * each read fills its buffer (a busy stream), so it doesn't starve the
+ * loop's other coroutines: one sharing a loop with a saturating stream
+ * waits about twice this at most (test 636). Measured on the v0.13.0
+ * echo benchmark (bench/tcp-echo, 64 KiB streams at 16 and 64
+ * connections, MB per server CPU-second; Go: 3360-3400):
+ *   32 reads, the old cap (about 0.6 ms):  2870-2900
+ *   1 ms:                                  3070-3130
+ *   2 ms:                                  3410-3490, ties Go
+ *   4 ms:                                  3670-3780, +9-11% (7.3-7.5 GB/s
+ *                                          against Go's 6.5-6.6)
+ *   8 ms:                                  3710-3790, no further gain
+ * 4 ms is the knee, and its worst wait for another coroutine (about 8 ms)
+ * is still tighter than Go's 10 ms preemption tick. Requests (reads that
+ * don't fill the buffer) never use it, so they are unaffected. */
+const i64 LOOP_READ_BUDGET_NS = 4000000;
+
+/* io_uring: after a read of at least this much (a stream), coro.read
+ * waits with POLL_ADD and then reads what has piled up, as the other
+ * backends do; a RECV would take each bit as it comes, which keeps the
+ * kernel's receive buffer small (more segments and ACKs: 7% fewer bytes
+ * per CPU-second). Small reads (requests) keep the RECV. */
+const i64 LOOP_READ_BIG = 16384;
 
 /* The coroutines waiting on one fd, and what it is registered for */
 struct LoopFd {
@@ -146,7 +166,8 @@ struct LoopFd {
     i64 n, cap;
     i64 armed;           /* POLLIN/POLLOUT it is registered for, 0: none */
     bool full;           /* coro.read's last read filled its buffer */
-    i64 streak;          /* reads in a row that didn't wait */
+    bool big;            /* and was at least LOOP_READ_BIG */
+    i64 burstNs;         /* when the reads that didn't wait began */
     bool notSock;        /* io_uring: not a socket, so READ/WRITE, not RECV/SEND */
 };
 
@@ -815,9 +836,9 @@ static void loopUringFree(Loop *lp) {
  * (os.errno() ETIMEDOUT). It reads at once when the last read filled
  * its buffer (more is likely waiting, as in a stream), and waits first
  * otherwise (the next request isn't there yet): either way a coroutine
- * per connection costs no more system calls than it must. A few reads
- * in a row at most skip the wait, so the loop's other coroutines get
- * their turn. */
+ * per connection costs no more system calls than it must. Reads skip
+ * the wait for 4 ms at most (LOOP_READ_BUDGET_NS), then wait once, so the
+ * loop's other coroutines get their turn. */
 pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.read");
     Loop *lp = loopGet(true);
@@ -835,15 +856,32 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
          * cheaper: more is usually there already (measured: one stream
          * 4.3-4.8 GB/s with it, 3.6 without). */
         i64 len = buf.len > 0x7FFFFFFF ? 0x7FFFFFFF : buf.len;
-        if (f.full && f.streak < LOOP_READ_STREAK && !f.notSock) {
-            f.streak++;
+        if (f.full && !f.notSock && date.monoNs() - f.burstNs < LOOP_READ_BUDGET_NS) {
             i64 n0 = libc.recv(fd, buf.ptr, len, 0);
             if (n0 >= 0) {
                 f.full = n0 == len;
+                f.big = n0 >= LOOP_READ_BIG;
                 return n0;
             }
-        } else {
-            f.streak = 0;
+        }
+        if (f.big && !f.notSock) {
+            /* a stream: wait, then read what piled up */
+            while (true) {
+                if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
+                    os.setErrno(libc.ETIMEDOUT);
+                    return -1;
+                }
+                i64 n1 = libc.recv(fd, buf.ptr, len, 0);
+                if (n1 >= 0) {
+                    f = lp.fdw[fd];
+                    f.full = n1 == len;
+                    f.big = n1 >= LOOP_READ_BIG;
+                    f.burstNs = date.monoNs();
+                    return n1;
+                }
+                i32 e1 = os.errno();
+                if (e1 != libc.EAGAIN && e1 != libc.EWOULDBLOCK && e1 != libc.EINTR) { return -1; }
+            }
         }
         while (true) {
             f = lp.fdw[fd];
@@ -851,7 +889,10 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
                 ? loopOp(lp, t, LOOP_OP_READ, fd, (u64)buf.ptr, len, 0, (u64)-1, until, false)
                 : loopOp(lp, t, LOOP_OP_RECV, fd, (u64)buf.ptr, len, 0, 0, until, false);
             if (r >= 0) {
-                lp.fdw[fd].full = r == len;
+                f = lp.fdw[fd];
+                f.full = r == len;
+                f.big = r >= LOOP_READ_BIG;
+                f.burstNs = date.monoNs();
                 return r;
             }
             if (r == -LOOP_ECANCELED) {
@@ -874,8 +915,8 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
         }
     }
 #endif
-    bool tryFirst = f.full && f.streak < LOOP_READ_STREAK;
-    f.streak = tryFirst ? f.streak + 1 : 0;
+    bool tryFirst = f.full && date.monoNs() - f.burstNs < LOOP_READ_BUDGET_NS;
+    bool waited = !tryFirst;
     while (true) {
         if (!tryFirst) {
             if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
@@ -888,11 +929,13 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
         if (n >= 0) {
             f = lp.fdw[fd];
             f.full = n == buf.len;
+            if (waited) { f.burstNs = date.monoNs(); }   /* a new burst begins */
             return n;
         }
         i32 err = os.errno();
         if (err != libc.EAGAIN && err != libc.EWOULDBLOCK && err != libc.EINTR) { return -1; }
         lp.fdw[fd].full = false;
+        waited = true;
     }
     return -1;
 }
