@@ -411,6 +411,9 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->program_root = NULL;
     l->building_module = NULL;
     l->building_tree = NULL;
+    l->source_for = NULL;
+    l->source_arg = NULL;
+    l->std_modules = NULL;
     /* Default: no diagnostic engine wired up; lex errors fall
      * back to loggerPanic. cctrlInitParse plugs the real Cctrl
      * in when this lexer is being driven by a real parse. */
@@ -942,7 +945,9 @@ static void lexPushFileSource(Lexer *l, AoStr *filename, char *src,
 void lexPushFile(Lexer *l, AoStr *filename) {
     l->after_member = 0;
     s64 file_len = 0;
-    char *src = lexReadfile(filename->data, &file_len);
+    char *src = l->source_for
+              ? l->source_for(l->source_arg, filename->data, &file_len) : NULL;
+    if (!src) src = lexReadfile(filename->data, &file_len);
     lexPushFileSource(l, filename, src, file_len);
 }
 
@@ -3188,6 +3193,7 @@ static int lexIsDir(const char *path);
  * an install without include/ (the stdlib is modules) can't resolve
  * `include/..` */
 static char *lexInstallModules(Lexer *l) {
+    if (l->std_modules) return l->std_modules;
     char *root = l->builtin_root;
     size_t len = strlen(root);
     while (len > 0 && root[len - 1] == '/') len--;

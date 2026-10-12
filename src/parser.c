@@ -7089,6 +7089,11 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
         (ast->declvar->flags & (AST_FLAG_CONST | AST_FLAG_EXTERN_C))) {
         return;
     }
+    /* a constant with its value, as the REPL and the LSP read it */
+    if (ast->kind == AST_BINOP && ast->left && ast->left->kind == AST_GVAR &&
+        (ast->left->flags & AST_FLAG_CONST)) {
+        return;
+    }
     const char *what = "a statement";
     switch (ast->kind) {
         case AST_FUNC:      what = "a function with a body"; break;
