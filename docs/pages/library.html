@@ -524,7 +524,10 @@ String or a slice as well. It doesn't capture stderr or return the exit status: 
 command gives whatever it printed, often <code>""</code>, and a shell that couldn't be started an
 empty String with a null <code>ptr</code>. It returns once the shell exits, without waiting for
 a background job (<code>cmd &amp;</code>) the command started. <code>os.exit(code)</code> ends the
-program.</p>
+program. <code>os.eprintf(fmt, ...)</code> is <code>printf</code> to stderr (checked against its
+format the same way), for messages that must not mix into a program's output, and
+<code>os.flush()</code> writes out what <code>printf</code> still holds for stdout: do it before
+starting a command that writes to the same terminal or file.</p>
 <p>The commands get the program's stdin, stdout and stderr, but none of the files or
 sockets the library opened: those (the <code>net</code> sockets and accepted connections,
 <code>fs.readAll</code>/<code>fs.writeAll</code>'s file, <code>proc.shellOutput</code>'s pipe)
@@ -842,6 +845,8 @@ same methods:</p>
   return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
   <code>vec.PtrVec</code>) and set <code>ok</code> to <code>false</code>; the
   <code>ok</code> argument is optional.</li>
+  <li><code>v.removeAt(i)</code> removes and returns the entry at <code>i</code>; the ones
+  after it move down, so the order is kept. The index is checked as for <code>get</code>.</li>
   <li><code>v.clear()</code> sets the size to 0 and keeps the storage for reuse;
   <code>v.release()</code> frees it. A <code>vec.PtrVec</code>'s <code>v.release(free_value)</code> first calls
   <code>free_value</code> (for example <code>&amp;mem.free</code>) on every value.</li>
@@ -1738,7 +1743,9 @@ Sunday 06 November 1994, day 310
 <h2 id="maths">Maths</h2>
 <p>The C maths library is declared under its usual names (<code>sqrt</code>,
 <code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
-<code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code> and <code>math.power</code>, and the
+<code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code>, <code>math.power</code>,
+<code>math.min(a, b)</code>, <code>math.max(a, b)</code> and <code>math.clamp(v, lo, hi)</code>
+(all on <code>i64</code>), and the
 constants <code>math.PI</code>, <code>math.E</code>, <code>math.SQRT2</code> and the rest of C's
 <code>M_*</code> set.
 <code>math.gcd</code> ignores signs: <code>math.gcd(0, n)</code> is <code>|n|</code> and

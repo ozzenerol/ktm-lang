@@ -1,5 +1,5 @@
 module os;
-import libc;
+import cstr, libc, mem;
 
 /* End the program with exitCode (C's exit: atexit handlers run, stdio
  * is flushed) */
@@ -26,4 +26,20 @@ pub i32 errno() {
  * reports errors through errno. */
 pub void setErrno(i32 err) {
     *errnoPtr() = err;
+}
+
+/* Write out what printf has buffered for stdout (C's fflush(NULL)): before
+ * a fork, an exec, or a long wait, when the output must show now */
+pub void flush()
+{
+    libc.fflush(null);
+}
+
+/* printf's format to stderr (unbuffered), so it doesn't mix into what a
+ * program prints on stdout */
+pub void eprintf(u8 *fmt, ...args)
+{
+    u8 *text = cstr.formatArgs(null, fmt, args);
+    libc.write(STDERR, text, libc.strlen(text));
+    mem.free(text);
 }
