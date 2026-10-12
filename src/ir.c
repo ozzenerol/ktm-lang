@@ -1018,17 +1018,15 @@ static IrValue *irLowerBitIntrinsic(IrCtx *ctx, Ast *call) {
         if (strcmp(call->fname->data, ir_bit_intrinsics[i].sym)) continue;
         IrOp op = ir_bit_intrinsics[i].op;
         int width = ir_bit_intrinsics[i].width;
-        AstType *ut = width == 16 ? ast_u16_type : width == 32 ? ast_u32_type : ast_uint_type;
-        Ast *arg = vecGet(Ast *, call->args, 0);
-        IrValue *v = irExpr(ctx, arg);
-        v = irNarrowToTargetWidth(ctx, v, ut);
-        v = irWidenToTargetWidth(ctx, v, arg->type, ut);
+        /* No conversions: a 32- or 16-bit instruction reads only the low
+         * bits of its operand, and writes the result zero-extended to 64
+         * bits on both targets, so it is already the promoted value */
+        IrValue *v = irExpr(ctx, vecGet(Ast *, call->args, 0));
         IrValue *n = NULL;
         if (op == IR_ROTL || op == IR_ROTR) {
             n = irExpr(ctx, vecGet(Ast *, call->args, 1));
         }
-        AstType *rt = call->type;
-        IrValue *dst = irTmp(irConvertType(rt), rt->size);
+        IrValue *dst = irTmp(IR_TYPE_I64, 8);
         IrInstr *I = irInstrNew(op, dst, v, n);
         if (width == 32) I->flags |= IRCG_BITOP_32;
         if (width == 16) I->flags |= IRCG_BITOP_16;
@@ -2624,6 +2622,10 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
         case AST_ASM_FUNCALL:
         case AST_FUNPTR_CALL:
         case AST_FUNCALL:
+            if (ast->kind == AST_FUNCALL) {
+                IrValue *bit = irLowerBitIntrinsic(ctx, ast);
+                if (bit) return bit;
+            }
             /* SysV and AAPCS64 leave the bits above a narrow integer
              * return undefined (`extern "c" I32 strcmp` gave 0x00000000ffffffff
              * for -1), so the caller widens it, like any narrow read. */
