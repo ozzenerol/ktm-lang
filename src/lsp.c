@@ -949,6 +949,30 @@ static void lspCatOverloads(AoStr *out, Ast *fn, const char *qual) {
     }
 }
 
+/* A generic function or struct named `ident` (as written in the
+ * document, or `mod.name`): its definition, NULL if none */
+static GenericDef *lspGeneric(LspCtx *ctx, const char *ident, s64 ilen) {
+    Cctrl *cc = ctx->cc;
+    GenericDef *d = cc->generic_funcs ? mapGetLen(cc->generic_funcs, (char *)ident, ilen) : NULL;
+    if (!d && cc->generic_structs) d = mapGetLen(cc->generic_structs, (char *)ident, ilen);
+    return d;
+}
+
+/* `T maxOf<T>(T a, T b)`: a generic's declaration up to its body */
+static void lspCatGenericHead(AoStr *out, GenericDef *d) {
+    for (u64 i = 0; i < d->toks->size; ++i) {
+        Lexeme *t = d->toks->entries[i];
+        if (tokenPunctIs(t, '{') || tokenPunctIs(t, ';')) break;
+        if (tokenPunctIs(t, ',')) { aoStrCat(out, ", "); continue; }
+        int glue = out->len == 0 || tokenPunctIs(t, '(') || tokenPunctIs(t, ')') ||
+                   tokenPunctIs(t, '<') || tokenPunctIs(t, '>') || tokenPunctIs(t, '.') ||
+                   (out->len && (out->data[out->len - 1] == '(' || out->data[out->len - 1] == '<' ||
+                                 out->data[out->len - 1] == '.' || out->data[out->len - 1] == ' '));
+        if (!glue) aoStrPutChar(out, ' ');
+        aoStrCat(out, lexemeAsWritten(t));
+    }
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1019,6 +1043,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
                                      &in_doc);
         AstType *cls = mapGetLen(ctx->cc->clsdefs, ident, ilen);
         AstType *uni = cls ? NULL : mapGetLen(ctx->cc->uniondefs, ident, ilen);
+        TypeAlias *alias = mapGetLen(ctx->cc->type_aliases, ident, ilen);
         Lexeme *macro = mapGetLen(ctx->cc->macro_defs, ident, ilen);
         if (entry && lspIsFn(entry) && entry->overloads) {
             Ast *pick = lspPickOverload(ctx, doc_id, line + 1, character, entry);
@@ -1029,10 +1054,15 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         } else if (entry && entry->type) {
             aoStrCatPrintf(rendered, "%s %s", astTypeToString(entry->type),
                            ident);
+        } else if (lspGeneric(ctx, ident, ilen)) {
+            lspCatGenericHead(rendered, lspGeneric(ctx, ident, ilen));
         } else if (cls || uni) {
             AoStr *body = astClassToAoStr(cls ? cls : uni);
             aoStrCatLen(rendered, body->data, body->len);
             aoStrRelease(body);
+        } else if (alias) {
+            aoStrCatPrintf(rendered, "type %.*s = %s", ilen, ident,
+                           astTypeToString(alias->type));
         } else if (macro) {
             lspCatMacro(rendered, ident, macro);
         }
@@ -1118,6 +1148,12 @@ static char *lspUnionSuggestionResolver(Ast *entry, int *_type) {
     (void)entry;
     *_type = KTM_LSP_UNION_STRUCT;
     return "union";
+}
+
+static char *lspAliasSuggestionResolver(Ast *entry, int *_type) {
+    (void)entry;   /* a TypeAlias, not an Ast */
+    *_type = KTM_LSP_CLASS;
+    return "type";
 }
 
 static char *lspConstantSuggestionResolver(Ast *entry, int *_type) {
@@ -1370,6 +1406,9 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
 
     lspScanMapForSuggestion(ctx->cc->uniondefs, prefix, plen, body, &emitted,
                             &lspUnionSuggestionResolver);
+
+    lspScanMapForSuggestion(ctx->cc->type_aliases, prefix, plen, body, &emitted,
+                            &lspAliasSuggestionResolver);
 
     lspScanMapForSuggestion(ctx->cc->macro_defs, prefix, plen, body, &emitted,
                             &lspConstantSuggestionResolver);
@@ -1832,14 +1871,24 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
             def_line = entry->line;
             def_col = entry->col;
             def_file = entry->file_id;
+        } else if (lspGeneric(ctx, ident, ilen)) {
+            GenericDef *g = lspGeneric(ctx, ident, ilen);
+            def_line = g->at->line;
+            def_col = g->at->col;
+            def_file = g->file_id;
         } else {
             AstType *ty = (AstType *)mapGetLen(ctx->cc->clsdefs, ident, ilen);
             if (ty == NULL)
                 ty = (AstType *)mapGetLen(ctx->cc->uniondefs, ident, ilen);
+            TypeAlias *alias = ty ? NULL : mapGetLen(ctx->cc->type_aliases, ident, ilen);
             if (ty) {
                 def_line = ty->line;
                 def_col = ty->col;
                 def_file = ty->file_id;
+            } else if (alias) {
+                def_line = alias->line;
+                def_col = alias->col;
+                def_file = alias->file_id;
             }
         }
     }

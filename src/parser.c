@@ -990,6 +990,8 @@ Map *parseUnionOffsets(Cctrl *cc, int *real_size, int *out_align, List *fields) 
     return fields_dict;
 }
 
+static void parseGenericSkipParams(Cctrl *cc);
+
 AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         int is_class,
         u32 (*computeSize)(List *),
@@ -1018,6 +1020,12 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         char *qual = cctrlDeclName(cc, tok->start, tok->len);
         tag = qual ? aoStrDupRaw(qual, strlen(qual))
                    : aoStrDupRaw(tok->start,tok->len);
+        /* the generic struct instance being parsed: `Vec<i64>` */
+        if (cc->inst && cc->inst->def->kind == GEN_STRUCT &&
+            tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+            parseGenericSkipParams(cc);
+            tag = cc->inst->name;
+        }
         tag_line = tok->line;
         tag_col = tok->col;
         tag_file = ast_file_hint;
@@ -1039,6 +1047,12 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
             if (base_class == NULL) {
                 cctrlRaiseException(cc,"class %.*s has not been defined\n",
                         tok->len,tok->start);
+            }
+            /* a generic base: `: Vec<T>` */
+            if (base_class->generic && !base_class->generic_args) {
+                Lexeme *base_tok = tok;
+                Vec *args = parseGenericArgs(cc);
+                base_class = parseGenericStructInstance(cc, base_class, args, base_tok);
             }
 
             if (tokenPunctIs(cctrlTokenPeek(cc),',')) {
@@ -3655,6 +3669,14 @@ static Ast *parseDeferStatement(Cctrl *cc) {
     return ast;
 }
 
+/* `type Name = ...`: tok is `type`, next the name, after the `=`. `type`
+ * is a keyword only there: a variable or field called `type` is fine. */
+static int parseStartsTypeAlias(Lexeme *tok, Lexeme *next, Lexeme *after) {
+    return tok && next && after && tok->tk_type == TK_IDENT && tok->len == 4 &&
+           !memcmp(tok->start, "type", 4) && next->tk_type == TK_IDENT &&
+           tokenPunctIs(after, '=');
+}
+
 /* `atomic` was a keyword that was silently skipped (`atomic i64 n;` was a
  * plain i64); now it is module atomic. `atomic` (tok) followed by a type
  * (next) is that old declaration: say so instead of a confusing syntax
@@ -3758,6 +3780,10 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
         }
 
         parseRejectAtomicDecl(cc, tok, cctrlTokenPeekBy(cc, 1));
+        if (parseStartsTypeAlias(tok, cctrlTokenPeekBy(cc, 1), cctrlTokenPeekBy(cc, 2))) {
+            cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+                "a type alias goes at file scope, not inside a function");
+        }
 
         if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_DEFER) {
             listAppend(body->stms, parseDeferStatement(cc));
@@ -5244,7 +5270,9 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     int tlen = type_tok->len;
     AstType *cls = NULL;
     char *qual = cctrlQualifyName(cc, tname, tlen);
-    if (qual) cls = mapGet(cc->clsdefs, qual);
+    /* a method of the generic struct instance being parsed */
+    if (cc->inst && cc->inst->cls) cls = cc->inst->cls;
+    if (!cls && qual) cls = mapGet(cc->clsdefs, qual);
     if (!cls) cls = mapGetLen(cc->clsdefs, tname, tlen);
     if (!cls) cls = mapGetLen(cc->uniondefs, tname, tlen);
     if (!cls || cls->is_enum || cls->is_intrinsic ||
@@ -5330,6 +5358,73 @@ typedef struct ParseModDecl {
     int replayed;   /* parseModuleTypes is done with it */
 } ParseModDecl;
 
+/* In a module, `type name = target...` where target is no type yet but
+ * another alias of the module that never resolved (its types are parsed
+ * in any order until no more succeed): they refer to each other. */
+static void parseCheckAliasCycle(Cctrl *cc, Lexeme *name, Lexeme *target) {
+    if (target && target->tk_type == TK_IDENT && target->len == name->len &&
+        !memcmp(target->start, name->start, name->len) &&
+        !cctrlGetKeyWord(cc, target->start, target->len)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "type alias `%.*s` refers to itself", name->len, name->start);
+    }
+    if (!cc->cur_module || cc->replaying || !target || target->tk_type != TK_IDENT ||
+        cctrlGetKeyWord(cc, target->start, target->len)) {
+        return;
+    }
+    for (u64 i = 0; i < cc->mod_type_decls->size; ++i) {
+        ParseModDecl *d = cc->mod_type_decls->entries[i];
+        if (d->module_id != cc->cur_module || !d->is_type) continue;
+        for (u64 j = 0; j + 2 < d->toks->size; ++j) {
+            Lexeme *n = d->toks->entries[j + 1];
+            if (parseStartsTypeAlias(d->toks->entries[j], n, d->toks->entries[j + 2]) &&
+                n->len == target->len && !memcmp(n->start, target->start, n->len)) {
+                cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                        "type aliases `%.*s` and `%.*s` refer to each other (a cycle)",
+                        name->len, name->start, n->len, n->start);
+            }
+        }
+    }
+}
+
+/* `type Name = T;` at file scope, `type` already taken: Name is T from
+ * here on (in a module: `mod.Name` outside it, if pub). No new type is
+ * made, so a Name and a T convert to each other as T does to itself. */
+static void parseTypeAlias(Cctrl *cc) {
+    Lexeme *name = cctrlTokenGetRequired(cc);
+    cctrlCheckPrefixHidden(cc, name);
+    char *qual = cctrlDeclName(cc, name->start, name->len);
+    char *key = qual ? qual : mprintf("%.*s", name->len, name->start);
+    cctrlTokenExpect(cc, '=');
+    parseCheckAliasCycle(cc, name, cctrlTokenPeek(cc));
+    AstType *type = parseFullType(cc);
+    cctrlTokenExpect(cc, ';');
+
+    TypeAlias *had = mapGet(cc->type_aliases, key);
+    if (had) {
+        /* a module's declarations are parsed again in its full pass */
+        if (had->type == type && cc->cur_module) return;
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "type `%s` has already been defined", key);
+    }
+    if (mapGet(cc->clsdefs, key) || mapGet(cc->uniondefs, key) ||
+        mapGet(cc->symbol_table, key)) {
+        cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
+                "`%s` is already a type", key);
+    }
+    TypeAlias *alias = malloc(sizeof(TypeAlias));
+    alias->type = type;
+    alias->line = name->line;
+    alias->col = name->col;
+    alias->file_id = ast_file_hint;
+    mapAdd(cc->type_aliases, key, alias);
+    if (qual) {
+        if (cc->decl_pub) setAdd(cc->pub_names, key);
+    } else if (cc->decl_from_main && !cc->cur_module) {
+        setAdd(cc->main_names, key);
+    }
+}
+
 /* "file:line:col" of tok: the same declaration in another pass */
 static char *parseModDeclKey(Lexeme *tok) {
     LexFile *f = tok->file;
@@ -5368,6 +5463,606 @@ static void parseModDeclRest(Cctrl *cc, Lexeme *first, Vec *toks) {
             return;
         }
         t = cctrlTokenGet(cc);
+    }
+}
+
+
+/* ---- generics (v0.9.0) ----
+ * A generic declaration is recorded as its tokens when it is met
+ * (parseGenericDecl) and parsed again for each instance with its type
+ * parameters bound (parseGenericReplay): a struct `Vec<i64>` when the
+ * type is first written, its methods' prototypes with it and their
+ * bodies at the end of the file (parseGenericFlush), so the instance
+ * code is the same as hand-written code for that type. */
+
+/* The k-th token after the one in hand, loading more from the lexer */
+static Lexeme *parseLookahead(Cctrl *cc, int k) {
+    TokenRingBuffer *r = cc->token_buffer;
+    while (r->size < k && cc->lexer_ && !cc->replaying && !cc->generic_replay &&
+           r->size < r->capacity - 8) {
+        s64 before = r->size;
+        cctrLoadNextTokens(cc, 1);
+        if (r->size == before) break;
+    }
+    if (r->size < k) return NULL;
+    /* cctrlTokenPeekBy(cc, n) is the (n+1)th token ahead */
+    return k == 1 ? cctrlTokenPeek(cc) : cctrlTokenPeekBy(cc, k - 1);
+}
+
+typedef struct GenericHead {
+    int kind;
+    Lexeme *name;
+    Lexeme *method;
+    Vec *params;     /* AoStr * */
+    int is_pub;
+} GenericHead;
+
+/* Does the declaration starting at `first` (taken) declare a generic:
+ * `Name<A, B>` followed by `(` (a function), `.` (a method of a generic
+ * struct) or `{`/`:` after `struct` (a struct)? Its parameters must be
+ * names that aren't types. */
+static int parseGenericHead(Cctrl *cc, Lexeme *first, GenericHead *h) {
+    enum { MAXLA = 48 };
+    Lexeme *L[MAXLA];
+    int n = 0;
+    L[n++] = first;
+    while (n < MAXLA) {
+        Lexeme *t = parseLookahead(cc, n);
+        if (!t) break;
+        L[n++] = t;
+    }
+    int depth = 0;
+    memset(h, 0, sizeof(*h));
+    for (int i = 0; i + 3 < n; ++i) {
+        Lexeme *t = L[i];
+        if (tokenPunctIs(t, '(') || tokenPunctIs(t, '[')) { depth++; continue; }
+        if (tokenPunctIs(t, ')') || tokenPunctIs(t, ']')) { depth--; continue; }
+        if (depth == 0 && (tokenPunctIs(t, '{') || tokenPunctIs(t, ';') ||
+                           tokenPunctIs(t, '='))) {
+            return 0;
+        }
+        if (t->tk_type == TK_KEYWORD && t->i64 == KW_PUBLIC) h->is_pub = 1;
+        if (depth != 0 || t->tk_type != TK_IDENT || !tokenPunctIs(L[i + 1], '<')) continue;
+        Vec *params = vecNew(&vec_unsigned_long_type);
+        int j = i + 2, ok = 0;
+        while (j + 1 < n) {
+            Lexeme *p = L[j];
+            if (p->tk_type != TK_IDENT || cctrlTokIsKeyword(cc, p)) break;
+            vecPush(params, aoStrDupRaw(p->start, p->len));
+            if (tokenPunctIs(L[j + 1], ',')) { j += 2; continue; }
+            if (tokenPunctIs(L[j + 1], '>')) { j += 1; ok = 1; }
+            break;
+        }
+        if (!ok || j + 1 >= n) continue;
+        Lexeme *after = L[j + 1];
+        h->params = params;
+        h->name = t;
+        if (tokenPunctIs(after, '(')) {
+            h->kind = GEN_FUNC;
+            return 1;
+        }
+        if (tokenPunctIs(after, '.') && j + 3 < n && L[j + 2]->tk_type == TK_IDENT &&
+            tokenPunctIs(L[j + 3], '(')) {
+            h->kind = GEN_METHOD;
+            h->method = L[j + 2];
+            return 1;
+        }
+        if ((tokenPunctIs(after, '{') || tokenPunctIs(after, ':')) && i > 0 &&
+            L[i - 1]->tk_type == TK_KEYWORD && L[i - 1]->i64 == KW_CLASS) {
+            h->kind = GEN_STRUCT;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *si);
+static int parseTypeHasParam(AstType *t);
+
+/* A generic declaration starting at `first` (taken): recorded, not
+ * parsed. 1 if it was one (all of it is then taken). */
+static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
+    if (cc->inst || cc->tmp_gvar_base_type) return 0;
+    GenericHead h;
+    if (!parseGenericHead(cc, first, &h)) return 0;
+    Vec *toks = vecNew(&vec_unsigned_long_type);
+    parseModDeclRest(cc, first, toks);
+    char *key = parseModDeclKey(first);
+    if (!cc->generic_seen) cc->generic_seen = setNew(16, &set_cstring_type);
+    if (setHas(cc->generic_seen, key)) return 1;   /* another pass of a module */
+    setAdd(cc->generic_seen, key);
+
+    GenericDef *d = calloc(1, sizeof(GenericDef));
+    d->kind = h.kind;
+    d->params = h.params;
+    d->toks = toks;
+    d->module_id = first->module_id;
+    d->is_pub = h.is_pub;
+    d->at = h.name;
+    d->file_id = ast_file_hint;
+    d->insts = vecNew(&vec_unsigned_long_type);
+    if (!cc->generic_structs) cc->generic_structs = mapNew(16, &map_asttype_type);
+    if (!cc->generic_funcs) cc->generic_funcs = mapNew(16, &map_asttype_type);
+    if (!cc->generic_methods) cc->generic_methods = vecNew(&vec_unsigned_long_type);
+
+    if (h.kind == GEN_METHOD) {
+        AstType *tmpl = cctrlGetKeyWord(cc, h.name->start, h.name->len);
+        if (!tmpl || !tmpl->generic || tmpl->generic_args) {
+            cctrlRewindUntilStrMatch(cc, h.name->start, h.name->len, NULL);
+            cctrlRaiseException(cc, "`%.*s<...>.%.*s`: `%.*s` is not a generic struct",
+                                h.name->len, h.name->start, h.method->len, h.method->start,
+                                h.name->len, h.name->start);
+        }
+        d->of = tmpl->generic;
+        d->name = d->of->name;
+        d->method = aoStrDupRaw(h.method->start, h.method->len);
+        vecPush(cc->generic_methods, d);
+        /* the instances already made get this method too */
+        for (u64 i = 0; i < d->of->insts->size; ++i) {
+            parseGenericMethodInstance(cc, d, d->of->insts->entries[i]);
+        }
+        return 1;
+    }
+    char *qual = cctrlDeclName(cc, h.name->start, h.name->len);
+    d->name = qual ? aoStrDupRaw(qual, strlen(qual)) : aoStrDupRaw(h.name->start, h.name->len);
+    if (qual && h.is_pub) setAdd(cc->pub_names, d->name->data);
+    if (h.kind == GEN_STRUCT) {
+        AstType *t = calloc(1, sizeof(AstType));
+        t->kind = AST_TYPE_CLASS;
+        t->clsname = d->name;
+        t->generic = d;
+        t->line = first->line;
+        t->col = first->col;
+        d->tmpl = t;
+        mapAdd(cc->generic_structs, d->name->data, (void *)d);
+        mapAdd(cc->clsdefs, d->name->data, t);
+    } else {
+        mapAdd(cc->generic_funcs, d->name->data, (void *)d);
+    }
+    return 1;
+}
+
+/* `<` ... `>` after a declaration's name in an instance being parsed:
+ * the parameters, already bound */
+static void parseGenericSkipParams(Cctrl *cc) {
+    cctrlTokenExpect(cc, '<');
+    Lexeme *t;
+    while ((t = cctrlTokenGet(cc)) != NULL && !tokenPunctIs(t, '>'));
+}
+
+/* How many errors have been reported so far */
+static u64 parseErrorCount(Cctrl *cc) {
+    u64 n = 0;
+    for (u64 i = 0; cc->diagnostics && i < cc->diagnostics->size; ++i) {
+        CctrlDiagnostic *d = cc->diagnostics->entries[i];
+        if (d->severity == CCTRL_ERROR) n++;
+    }
+    return n;
+}
+
+/* "Vec<i64, u8 *>" for a definition named `name` and its arguments */
+static AoStr *parseGenericInstName(AoStr *name, Vec *args) {
+    AoStr *out = aoStrNew();
+    aoStrCatAoStr(out, name);
+    aoStrPutChar(out, '<');
+    for (u64 i = 0; i < args->size; ++i) {
+        if (i) aoStrCat(out, ", ");
+        aoStrCat(out, astTypeToString(args->entries[i]));
+    }
+    aoStrPutChar(out, '>');
+    return out;
+}
+
+/* Parse definition `d`'s tokens again as instance `in`: its parameters
+ * bound to the arguments, the parser's state saved around it. An error
+ * in it is reported where it is and where the instance was asked for. */
+static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
+    Vec *toks = d->toks;
+    u64 cap = roundUpToNextPowerOf2(toks->size + 1);
+    if (cap < 16) cap = 16;
+    Lexeme **ring = (Lexeme **)malloc(cap * sizeof(Lexeme *));
+    for (u64 i = 0; i < cap; ++i) {
+        ring[i] = i < toks->size ? (Lexeme *)toks->entries[i] : lexemeSentinal();
+    }
+    TokenRingBuffer *replay = calloc(1, sizeof(TokenRingBuffer));
+    replay->entries = ring;
+    replay->size = toks->size;
+    replay->capacity = cap;
+
+    Map *bindings = mapNew(8, &map_asttype_type);
+    for (u64 i = 0; i < d->params->size && i < in->args->size; ++i) {
+        AoStr *p = d->params->entries[i];
+        mapAdd(bindings, p->data, in->args->entries[i]);
+    }
+
+    TokenRingBuffer *saved_ring = cc->token_buffer;
+    jmp_buf *saved_recovery = cc->current_recovery;
+    Map *saved_localenv = cc->localenv;
+    List *saved_tmp_locals = cc->tmp_locals;
+    Ast *saved_tmp_func = cc->tmp_func;
+    AoStr *saved_tmp_fname = cc->tmp_fname;
+    AstType *saved_rettype = cc->tmp_rettype;
+    Vec *saved_params = cc->tmp_params;
+    AoStr *saved_loop_begin = cc->tmp_loop_begin, *saved_loop_end = cc->tmp_loop_end;
+    AstType *saved_gvar_base = cc->tmp_gvar_base_type;
+    Ast *saved_gvar_decl = cc->tmp_gvar_decl;
+    List *saved_lit_writes = cc->lit_writes;
+    List *saved_elide_open = cc->elide_open, *saved_elide_done = cc->elide_done;
+    Vec *saved_case_list = cc->tmp_case_list;
+    Ast *saved_default_case = cc->tmp_default_case;
+    AstType *saved_method_self = cc->method_self;
+    Vec *saved_overload_set = cc->tmp_overload_set;
+    List *saved_overload_refs = cc->overload_refs;
+    Map *saved_bindings = cc->type_bindings;
+    GenericInst *saved_inst = cc->inst;
+    u32 saved_module = cc->cur_module;
+    int saved_decls_only = cc->decls_only;
+    int saved_pub = cc->decl_pub;
+    int saved_from_main = cc->decl_from_main;
+    int saved_replaying = cc->replaying, saved_greplay = cc->generic_replay;
+    int saved_pending_gt = cc->pending_gt;
+    s64 saved_lineno = cc->lineno;
+    LexFile *saved_tok_file = cc->tok_file;
+    Lexeme *saved_pending_token = cc->pending_token;
+    int saved_line_hint = ast_line_hint, saved_col_hint = ast_col_hint;
+    u32 saved_file_hint = ast_file_hint;
+    /* a function parsed in the middle of another restarts the lvar ids */
+    u32 saved_lvar_id = astGetLVarId();
+
+    jmp_buf recovery;
+    volatile int failed = 0;
+    u64 errors_before = parseErrorCount(cc);
+    cc->token_buffer = replay;
+    cc->current_recovery = &recovery;
+    cc->replaying = 0;
+    cc->generic_replay = 1;
+    cc->pending_gt = 0;
+    cc->pending_token = NULL;
+    cc->localenv = NULL;
+    cc->tmp_locals = NULL;
+    cc->tmp_func = NULL;
+    cc->tmp_fname = NULL;
+    cc->tmp_gvar_base_type = NULL;
+    cc->tmp_gvar_decl = NULL;
+    cc->tmp_overload_set = NULL;
+    cc->overload_refs = NULL;
+    cc->method_self = NULL;
+    cc->type_bindings = bindings;
+    in->outer = saved_inst;
+    cc->inst = in;
+    if (setjmp(recovery) != 0) {
+        failed = 1;
+    } else {
+        int is_global = 0;
+        Ast *ast;
+        while ((ast = parseToplevelDef(cc, &is_global)) != NULL) {
+            if (!is_global && ast->kind != AST_FUN_PROTO) {
+                listAppend(cc->ast_list, ast);
+            }
+            is_global = 0;
+            cc->localenv = NULL;
+        }
+    }
+    cc->token_buffer = saved_ring;
+    cc->current_recovery = saved_recovery;
+    cc->localenv = saved_localenv;
+    cc->tmp_locals = saved_tmp_locals;
+    cc->tmp_func = saved_tmp_func;
+    cc->tmp_fname = saved_tmp_fname;
+    cc->tmp_rettype = saved_rettype;
+    cc->tmp_params = saved_params;
+    cc->tmp_loop_begin = saved_loop_begin;
+    cc->tmp_loop_end = saved_loop_end;
+    cc->tmp_gvar_base_type = saved_gvar_base;
+    cc->tmp_gvar_decl = saved_gvar_decl;
+    cc->lit_writes = saved_lit_writes;
+    cc->elide_open = saved_elide_open;
+    cc->elide_done = saved_elide_done;
+    cc->tmp_case_list = saved_case_list;
+    cc->tmp_default_case = saved_default_case;
+    cc->method_self = saved_method_self;
+    cc->tmp_overload_set = saved_overload_set;
+    cc->overload_refs = saved_overload_refs;
+    cc->type_bindings = saved_bindings;
+    cc->inst = saved_inst;
+    cc->cur_module = saved_module;
+    cc->decls_only = saved_decls_only;
+    cc->decl_pub = saved_pub;
+    cc->decl_from_main = saved_from_main;
+    cc->replaying = saved_replaying;
+    cc->generic_replay = saved_greplay;
+    cc->pending_gt = saved_pending_gt;
+    cc->lineno = saved_lineno;
+    cc->tok_file = saved_tok_file;
+    cc->pending_token = saved_pending_token;
+    ast_line_hint = saved_line_hint;
+    ast_col_hint = saved_col_hint;
+    ast_file_hint = saved_file_hint;
+    astSetLVarId(saved_lvar_id);
+    if ((failed || parseErrorCount(cc) > errors_before) && in->at) {
+        cctrlInfoAt(cc, in->at->line, in->at->col, in->at->len,
+                    "in `%s`, made here", in->name->data);
+    }
+    if (failed) longjmp(*saved_recovery, 1);
+}
+
+/* Method `md` of struct instance `si`: its prototype now, its body with
+ * the others at the end of the file */
+static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *si) {
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = md;
+    in->args = si->args;
+    in->name = si->name;
+    in->cls = si->cls;
+    in->at = si->at;
+    in->proto_only = 1;
+    parseGenericReplay(cc, md, in);
+    GenericInst *body = calloc(1, sizeof(GenericInst));
+    *body = *in;
+    body->proto_only = 0;
+    if (!cc->generic_pending) cc->generic_pending = vecNew(&vec_unsigned_long_type);
+    vecPush(cc->generic_pending, body);
+}
+
+/* `Vec<args>` of generic struct template `tmpl`: the instance type, made
+ * the first time (with its methods) */
+AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme *at) {
+    GenericDef *d = tmpl->generic;
+    if (args->size != d->params->size) {
+        cctrlRaiseException(cc, "`%s` takes %d type argument%s, got %d", d->name->data,
+                            (int)d->params->size, d->params->size == 1 ? "" : "s",
+                            (int)args->size);
+    }
+    AoStr *name = parseGenericInstName(d->name, args);
+    AstType *cls = mapGet(cc->clsdefs, name->data);
+    if (cls) return cls;
+    /* `Vec<T>` in a signature being matched (parseGenericInfer): only
+     * what it is made of, never laid out */
+    for (u64 i = 0; i < args->size; ++i) {
+        if (parseTypeHasParam(args->entries[i])) {
+            AstType *pat = calloc(1, sizeof(AstType));
+            pat->kind = AST_TYPE_CLASS;
+            pat->clsname = name;
+            pat->generic = d;
+            pat->generic_args = args;
+            pat->size = 8;
+            pat->alignment = 8;
+            return pat;
+        }
+    }
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = d;
+    in->args = args;
+    in->name = name;
+    in->at = at;
+    parseGenericReplay(cc, d, in);
+    cls = mapGet(cc->clsdefs, name->data);
+    if (!cls) {
+        cctrlRaiseException(cc, "could not make `%s`", name->data);
+    }
+    cls->generic = d;
+    cls->generic_args = args;
+    in->cls = cls;
+    vecPush(d->insts, in);
+    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
+        GenericDef *md = cc->generic_methods->entries[i];
+        if (md->of == d) parseGenericMethodInstance(cc, md, in);
+    }
+    return cls;
+}
+
+/* `<A, B>` (the `<` next): the type arguments; a `>>` closes this list
+ * and the one around it */
+Vec *parseGenericArgs(Cctrl *cc) {
+    cctrlTokenExpect(cc, '<');
+    Vec *args = vecNew(&vec_unsigned_long_type);
+    while (1) {
+        AstType *t = parseFullType(cc);
+        vecPush(args, t);
+        if (cc->pending_gt) {
+            cc->pending_gt = 0;
+            return args;
+        }
+        Lexeme *tok = cctrlTokenGetRequired(cc);
+        if (tokenPunctIs(tok, ',')) continue;
+        if (tokenPunctIs(tok, '>')) return args;
+        if (tok->tk_type == TK_PUNCT && tok->i64 == TK_SHR) {
+            cc->pending_gt = 1;
+            return args;
+        }
+        cctrlRaiseException(cc, "Expected `,` or `>` in a type-argument list, got `%s`",
+                            lexemeAsWritten(tok));
+    }
+}
+
+
+/* Does type `t` hold a type-parameter stand-in (inference patterns)? */
+static int parseTypeHasParam(AstType *t) {
+    if (!t) return 0;
+    if (t->is_type_param) return 1;
+    switch (t->kind) {
+        case AST_TYPE_POINTER: case AST_TYPE_ARRAY: return parseTypeHasParam(t->ptr);
+        case AST_TYPE_FUNC: {
+            if (parseTypeHasParam(t->rettype)) return 1;
+            for (u64 i = 0; t->params && i < t->params->size; ++i) {
+                Ast *p = t->params->entries[i];
+                if (p && parseTypeHasParam(p->type)) return 1;
+            }
+            return 0;
+        }
+        case AST_TYPE_CLASS:
+            if (t->is_slice) return parseTypeHasParam(t->elem);
+            for (u64 i = 0; t->generic_args && i < t->generic_args->size; ++i) {
+                if (parseTypeHasParam(t->generic_args->entries[i])) return 1;
+            }
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+/* A generic function `name` (as written, `geo.area` or `area` in its
+ * module), or NULL */
+GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len) {
+    if (!cc->generic_funcs) return NULL;
+    char *qual = cctrlQualifyName(cc, name, len);
+    GenericDef *d = qual ? mapGet(cc->generic_funcs, qual) : NULL;
+    if (!d) {
+        d = mapGetLen(cc->generic_funcs, name, len);
+        /* `mod.name` from outside its module: it must be pub */
+        if (d && memchr(name, '.', len)) cctrlCheckModuleAccess(cc, name, len);
+    }
+    return d;
+}
+
+/* Function `d` with type arguments `args`: its prototype (made the first
+ * time, its body at the end of the file) */
+Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
+    if (args->size != d->params->size) {
+        cctrlRaiseException(cc, "`%s` takes %d type argument%s, got %d", d->name->data,
+                            (int)d->params->size, d->params->size == 1 ? "" : "s",
+                            (int)args->size);
+    }
+    /* the unqualified name: a module's function is qualified when it is
+     * declared, as any other */
+    char *base = d->name->data;
+    char *dot = strrchr(base, '.');
+    AoStr *short_name = aoStrDup(dot && d->module_id ? aoStrDupRaw(dot + 1, strlen(dot + 1))
+                                                     : d->name);
+    AoStr *name = parseGenericInstName(short_name, args);
+    AoStr *full = parseGenericInstName(d->name, args);
+    Ast *fn = mapGet(cc->global_env, full->data);
+    if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (fn) return fn;
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = d;
+    in->args = args;
+    in->name = name;
+    in->at = at;
+    in->proto_only = 1;
+    parseGenericReplay(cc, d, in);
+    fn = mapGet(cc->global_env, full->data);
+    if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (!fn) cctrlRaiseException(cc, "could not make `%s`", full->data);
+    int pattern = 0;
+    for (u64 i = 0; i < args->size; ++i) pattern |= parseTypeHasParam(args->entries[i]);
+    if (!pattern) {
+        GenericInst *body = calloc(1, sizeof(GenericInst));
+        *body = *in;
+        body->proto_only = 0;
+        if (!cc->generic_pending) cc->generic_pending = vecNew(&vec_unsigned_long_type);
+        vecPush(cc->generic_pending, body);
+        vecPush(d->insts, in);
+    }
+    return fn;
+}
+
+static int parseTypesSame(AstType *a, AstType *b) {
+    return a == b || !strcmp(astTypeToString(a), astTypeToString(b));
+}
+
+/* Match pattern `pat` (with stand-ins) against argument type `arg`,
+ * binding the stand-ins in `b`. 0 on a conflict. */
+static int parseGenericUnify(AstType *pat, AstType *arg, Map *b, char **why) {
+    if (!pat || !arg) return 1;
+    if (pat->is_type_param) {
+        AstType *cur = mapGet(b, pat->clsname->data);
+        if (!cur) {
+            /* an array argument is its pointer, as a call passes it */
+            if (arg->kind == AST_TYPE_ARRAY) arg = astMakePointerType(arg->ptr);
+            mapAdd(b, pat->clsname->data, arg);
+            return 1;
+        }
+        if (parseTypesSame(cur, arg)) return 1;
+        *why = mprintf("`%s` is `%s` from one argument and `%s` from another",
+                       pat->clsname->data, astTypeToString(cur), astTypeToString(arg));
+        return 0;
+    }
+    switch (pat->kind) {
+        case AST_TYPE_POINTER:
+            if (arg->kind == AST_TYPE_POINTER || arg->kind == AST_TYPE_ARRAY) {
+                return parseGenericUnify(pat->ptr, arg->ptr, b, why);
+            }
+            return 1;
+        case AST_TYPE_CLASS:
+            if (pat->is_slice) {
+                if (astTypeIsSlice(arg)) return parseGenericUnify(pat->elem, arg->elem, b, why);
+                if (arg->kind == AST_TYPE_ARRAY) return parseGenericUnify(pat->elem, arg->ptr, b, why);
+                return 1;
+            }
+            if (pat->generic_args && arg->generic == pat->generic && arg->generic_args &&
+                arg->generic_args->size == pat->generic_args->size) {
+                for (u64 i = 0; i < pat->generic_args->size; ++i) {
+                    if (!parseGenericUnify(pat->generic_args->entries[i],
+                                           arg->generic_args->entries[i], b, why)) return 0;
+                }
+            }
+            return 1;
+        case AST_TYPE_FUNC:
+            if (arg->kind != AST_TYPE_FUNC) return 1;
+            if (!parseGenericUnify(pat->rettype, arg->rettype, b, why)) return 0;
+            for (u64 i = 0; pat->params && arg->params && i < pat->params->size &&
+                            i < arg->params->size; ++i) {
+                Ast *pp = pat->params->entries[i], *ap = arg->params->entries[i];
+                if (pp && ap && !parseGenericUnify(pp->type, ap->type, b, why)) return 0;
+            }
+            return 1;
+        default:
+            return 1;
+    }
+}
+
+/* The type arguments of a call to generic function `d` with `argv`
+ * (parsed without a target), from the argument types; NULL with *why
+ * when they can't all be found */
+Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
+    /* the signature with stand-ins for the parameters */
+    Vec *stand = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < d->params->size; ++i) {
+        AstType *t = calloc(1, sizeof(AstType));
+        t->kind = AST_TYPE_CLASS;
+        t->clsname = d->params->entries[i];
+        t->is_type_param = 1;
+        t->size = 8;
+        t->alignment = 8;
+        vecPush(stand, t);
+    }
+    Ast *pattern = parseGenericFuncInstance(cc, d, stand, NULL);
+    Vec *params = pattern->params;
+    Map *b = mapNew(8, &map_asttype_type);
+    for (u64 i = 0; params && i < params->size && argv && i < argv->size; ++i) {
+        Ast *p = params->entries[i];
+        Ast *arg = argv->entries[i];
+        if (!p || !arg || arg->kind == AST_PLACEHOLDER || !arg->type) continue;
+        if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) break;
+        AstType *pt = p->kind == AST_DEFAULT_PARAM ? p->declvar->type : p->type;
+        if (!parseGenericUnify(pt, arg->type, b, why)) return NULL;
+    }
+    Vec *args = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < d->params->size; ++i) {
+        AoStr *pname = d->params->entries[i];
+        AstType *t = mapGet(b, pname->data);
+        if (!t) {
+            *why = mprintf("nothing says what `%s` is", pname->data);
+            return NULL;
+        }
+        vecPush(args, t);
+    }
+    return args;
+}
+
+/* The method and function bodies of every instance, after the file; an
+ * instance made by one of them is added to the end and parsed too */
+void parseGenericFlush(Cctrl *cc) {
+    for (u64 i = 0; cc->generic_pending && i < cc->generic_pending->size; ++i) {
+        GenericInst *in = cc->generic_pending->entries[i];
+        jmp_buf recovery;
+        jmp_buf *prev = cc->current_recovery;
+        cc->current_recovery = &recovery;
+        if (setjmp(recovery) == 0) {
+            parseGenericReplay(cc, in->def, in);
+        }
+        cc->current_recovery = prev;
     }
 }
 
@@ -5494,6 +6189,10 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
     } else if (kw && kw->tk_type == TK_KEYWORD &&
                (kw->i64 == KW_ENUM || kw->i64 == KW_CONST)) {
         d->is_type = 1;
+    } else if (kw && i + 2 < d->toks->size &&
+               parseStartsTypeAlias(kw, d->toks->entries[i + 1], d->toks->entries[i + 2])) {
+        /* parsed with the module's types, in any order */
+        d->is_type = 1;
     }
     vecPush(cc->mod_type_decls, d);
 }
@@ -5553,7 +6252,7 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
             parseModuleNamesDecl(cc, tok);
             continue;
         }
-        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying &&
+        if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying && !cc->inst &&
             !cc->tmp_gvar_base_type) {
             char *mod_key = mprintf("%u", tok->module_id);
             if (!setHas(cc->mod_types_done, mod_key)) {
@@ -5568,9 +6267,15 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
         /* Which module this declaration is in, and its pass */
         cc->cur_module = tok->module_id;
-        cc->decls_only = tok->mod_pass == LEX_PASS_DECLS;
+        cc->decls_only = cc->inst ? cc->inst->proto_only
+                                  : tok->mod_pass == LEX_PASS_DECLS;
         if (!cc->tmp_gvar_base_type) {
             cc->decl_from_main = tok->module_id == 0 && !tok->in_std;
+        }
+        /* a generic struct, method or function: recorded for its
+         * instances (parseGenericDecl) */
+        if (!cc->tmp_gvar_base_type && parseGenericDecl(cc, tok)) {
+            continue;
         }
 
         if (!cc->tmp_gvar_base_type) {
@@ -5581,6 +6286,17 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * `U0 F() {};`. Skip it, it would be taken for the type of the
          * next declaration and swallow it. */
         if (tokenPunctIs(tok, ';') && !cc->tmp_gvar_base_type) {
+            continue;
+        }
+
+        if (!cc->tmp_gvar_base_type &&
+            parseStartsTypeAlias(tok, cctrlTokenPeek(cc), cctrlTokenPeekBy(cc, 1))) {
+            if (is_static || is_const) {
+                cctrlRaiseException(cc, "a type alias can't be static or const");
+            }
+            parseTypeAlias(cc);
+            cc->decl_pub = 0;
+            saw_private = 0;
             continue;
         }
 
@@ -5758,16 +6474,25 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 case KW_CLASS:
                     parseClassDef(cc,NULL);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_UNION:
                     parseUnionDef(cc);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_ENUM:
                     parseEnumDef(cc);
                     cctrlTokenExpect(cc,';');
+                    /* `pub`/`private` were this declaration's, not the next one's */
+                    cc->decl_pub = 0;
+                    saw_private = 0;
                     continue;
 
                 case KW_U0:
@@ -5927,6 +6652,17 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         name = cctrlTokenGetRequired(cc);
         cctrlCheckPrefixHidden(cc, name);
         parseCheckNotReserved(cc, name);
+        /* An instance being parsed: `Vec<T>.push` / `max<T>(`, its
+         * parameters bound; a function takes the instance's name */
+        if (cc->inst && name->tk_type == TK_IDENT &&
+            tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+            parseGenericSkipParams(cc);
+            if (cc->inst->def->kind == GEN_FUNC) {
+                name = lexemeCopy(name);
+                name->start = cc->inst->name->data;
+                name->len = cc->inst->name->len;
+            }
+        }
         /* `T User.name(...)`: a method */
         if (type && name->tk_type == TK_IDENT &&
             tokenPunctIs(cctrlTokenPeek(cc), '.'))
@@ -6460,5 +7196,6 @@ void parseToAst(Cctrl *cc) {
     }
 
     cc->current_recovery = prev_recovery;
+    parseGenericFlush(cc);
     if (!(cc->flags & CCTRL_REPL)) parseModuleInits(cc);
 }

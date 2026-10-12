@@ -280,6 +280,7 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
     cctrlAddBuiltinTypes(cc->symbol_table);
     cc->clsdefs = mapNew(32, &map_asttype_type);
     cc->uniondefs = mapNew(32, &map_asttype_type);
+    cc->type_aliases = mapNew(16, &map_cstring_opaque_type);
     cc->ast_list = NULL;
     /* The macro-processor stub Cctrl is passed to helpers that may
      * call cctrlRaiseException; keep diagnostics state consistent
@@ -316,6 +317,7 @@ Cctrl *cctrlNew(enum CliTarget target) {
     cc->global_env = mapNew(32, &map_ast_type);
     cc->clsdefs = mapNew(32, &map_asttype_type);
     cc->uniondefs = mapNew(32, &map_asttype_type);
+    cc->type_aliases = mapNew(16, &map_cstring_opaque_type);
     cc->symbol_table = mapNew(32, &map_asttype_type);
     cc->asm_funcs = mapNew(32, &map_ast_type);
     cc->c_externs = mapNew(32, &map_ast_type);
@@ -712,7 +714,8 @@ Lexeme *cctrlTokenGet(Cctrl *cc) {
             token = tokenRingBufferPeek(cc->token_buffer);
             continue;
         }
-        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying) {
+        if (cc->token_buffer->size < 3 && cc->lexer_ && !cc->replaying &&
+            !cc->generic_replay) {
             cctrLoadNextTokens(cc,5);
         }
         cc->token_buffer->pos++;
@@ -1171,6 +1174,14 @@ void cctrlWarningAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
     int is_werror = cc->flags & (CCTRL_WERROR);
     int severity = is_werror ? CCTRL_ERROR : CCTRL_WARN;
     cctrlDiagAtVa(cc, severity, lineno, col, len, fmt, ap);
+    va_end(ap);
+}
+
+/* A note anchored at an explicit (line, col), see cctrlWarningAt */
+void cctrlInfoAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...) {
+    va_list ap;
+    va_start(ap,fmt);
+    cctrlDiagAtVa(cc, CCTRL_INFO, lineno, col, len, fmt, ap);
     va_end(ap);
 }
 
@@ -1720,6 +1731,11 @@ Ast *cctrlGetVar(Cctrl *cc, char *varname, int len) {
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     AstType *type;
     assert(name != NULL);
+    /* a type parameter of the generic instance being parsed */
+    if (cc->type_bindings &&
+        (type = mapGetLen(cc->type_bindings, name, len)) != NULL) {
+        return type;
+    }
     if ((type = mapGetLen(cc->symbol_table, name, len)) != NULL) {
         return type;
     }
@@ -1728,10 +1744,13 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     if (qual) {
         if ((type = mapGet(cc->clsdefs, qual)) != NULL) return type;
         if ((type = mapGet(cc->uniondefs, qual)) != NULL) return type;
+        TypeAlias *alias = mapGet(cc->type_aliases, qual);
+        if (alias) return alias->type;
     }
     if (cctrlModuleHides(cc, name, len)) return NULL;
     if (memchr(name, '.', len) &&
-        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len)))
+        (mapGetLen(cc->clsdefs, name, len) || mapGetLen(cc->uniondefs, name, len) ||
+         mapGetLen(cc->type_aliases, name, len)))
     {
         cctrlCheckModuleAccess(cc, name, len);
     }
@@ -1742,6 +1761,8 @@ AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len) {
     if ((type = mapGetLen(cc->uniondefs,name,len)) != NULL) {
         return type;
     }
+    TypeAlias *alias = mapGetLen(cc->type_aliases, name, len);
+    if (alias) return alias->type;
     return NULL;
 }
 

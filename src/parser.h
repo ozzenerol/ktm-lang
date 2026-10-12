@@ -22,4 +22,10 @@ Ast *parseThrowFile(Cctrl *cc);
 Ast *parseRequiredExpr(Cctrl *cc, char *what);
 s64 evalIntConstExpr(Ast *ast);
 
+AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme *at);
+Vec *parseGenericArgs(Cctrl *cc);
+void parseGenericFlush(Cctrl *cc);
+GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len);
+Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at);
+Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why);
 #endif // !PARSER_H

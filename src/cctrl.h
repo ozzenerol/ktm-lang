@@ -12,7 +12,7 @@
 #include "containers.h"
 #include "lexer.h"
 
-#define CCTRL_TOKEN_BUFFER_SIZE 16
+#define CCTRL_TOKEN_BUFFER_SIZE 64
 #define CCTRL_TOKEN_BUFFER_MASK CCTRL_TOKEN_BUFFER_SIZE-1
 /* Expanded macro uses remembered; only a token in the ring buffer can be
  * peeked again, and every one was expanded as it was loaded, so twice
@@ -45,6 +45,13 @@
  * to render a squiggle without re-tokenising. `message` and
  * `suggestion` are owned by the diagnostic. `file` is borrowed
  * from the Lexer's LexFile list and outlives the diagnostic. */
+/* A `type Name = T;`: T, and where Name was written (for the LSP) */
+typedef struct TypeAlias {
+    AstType *type;
+    int line, col;
+    u32 file_id;
+} TypeAlias;
+
 typedef struct CctrlDiagnostic {
     int severity;          /* CCTRL_INFO / CCTRL_WARN / CCTRL_ERROR */
     struct LexFile *file;  /* borrowed; NULL if the source is unknown */
@@ -96,6 +103,38 @@ typedef struct CctrlOverloadCall {
     struct Ast *fn;
 } CctrlOverloadCall;
 
+/* A generic declaration (v0.9.0): `struct Vec<T> {...}`, a method
+ * `T Vec<T>.get(...)` or a function `T max<T>(...)`, kept as its tokens
+ * and parsed again for each instance with the parameters bound */
+#define GEN_STRUCT 1
+#define GEN_METHOD 2
+#define GEN_FUNC   3
+typedef struct GenericDef {
+    int kind;
+    AoStr *name;         /* the struct or function (`vec.Vec`, `max`) */
+    AoStr *method;       /* GEN_METHOD: the method's name */
+    Vec *params;         /* AoStr *: T, K, V */
+    Vec *toks;           /* Lexeme *: the whole declaration */
+    u32 module_id;
+    int is_pub;
+    struct AstType *tmpl;        /* GEN_STRUCT: the type `Vec` names */
+    struct GenericDef *of;       /* GEN_METHOD: its struct's definition */
+    Vec *insts;                  /* GEN_STRUCT/FUNC: GenericInst * made */
+    Lexeme *at;                  /* its name where it is declared */
+    u32 file_id;                 /* and that file */
+} GenericDef;
+
+/* One instance being made (or made): the definition and its arguments */
+typedef struct GenericInst {
+    GenericDef *def;
+    Vec *args;                   /* AstType * */
+    AoStr *name;                 /* `Vec<i64>`, `max<f64>` (unqualified for a function) */
+    struct AstType *cls;         /* a struct's instance type (methods: their struct's) */
+    int proto_only;              /* the declaration only, its body later */
+    Lexeme *at;                  /* the use that asked for it */
+    struct GenericInst *outer;
+} GenericInst;
+
 typedef struct Cctrl {
     u64 flags;
     /* The global environment for user defined types, functions and global
@@ -120,6 +159,9 @@ typedef struct Cctrl {
 
     /* Union definitions */
     Map *uniondefs;
+    /* `type Name = T;`: Name (a module's qualified, as its types) -> its
+     * TypeAlias. An alias is its type: the same AstType, nothing new. */
+    Map *type_aliases;
 
     /* Local environment for a function */
     Map *localenv;
@@ -242,6 +284,18 @@ typedef struct Cctrl {
     Set *mod_decls_done;
     Set *mod_types_done;   /* module ids parseModuleTypes has run for */
     int replaying;
+    /* Generics: struct and function definitions by name, every generic
+     * method, the type parameters bound while an instance is parsed, the
+     * instance being parsed, bodies still to parse, declarations seen */
+    Map *generic_structs;
+    Map *generic_funcs;
+    Vec *generic_methods;
+    Map *type_bindings;
+    GenericInst *inst;
+    Vec *generic_pending;
+    Set *generic_seen;
+    int generic_replay;
+    int pending_gt;     /* a `>>` closed an inner type-argument list */
     /* `((fn(i64) i64)raw + 1)`: the cast already parsed, handed back
      * by the next parseUnaryExpr as the start of the expression */
     Ast *pending_unary;
@@ -386,6 +440,8 @@ void cctrlWarning(Cctrl *cc, char *fmt, ...);
 void cctrlWarningAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlRaiseExceptionAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
 void cctrlErrorAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
+void cctrlInfoAt(Cctrl *cc, s64 lineno, s64 col, s64 len, char *fmt, ...);
+void cctrLoadNextTokens(Cctrl *cc, s64 token_count);
 void cctrlWarningFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseExceptionFromTo(Cctrl *cc, char *suggestion, char from, char to, char *fmt, ...);
 __noreturn void cctrlRaiseException(Cctrl *cc, char *fmt, ...);
