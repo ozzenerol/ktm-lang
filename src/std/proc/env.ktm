@@ -40,7 +40,8 @@ pub bool unsetenv(u8[] name)
 }
 
 #ifdef IS_MACOS
-extern "c" i32 _NSGetExecutablePath(u8 *buf, u32 *size);
+/* the raw Mach-O name: ktm doesn't prefix names starting with _ */
+_extern __NSGetExecutablePath i32 procExecutablePath(u8 *buf, u32 *size);
 const i32 PROC_SC_NPROCESSORS_ONLN = 58;
 #else
 const i32 PROC_SC_NPROCESSORS_ONLN = 84;
@@ -54,7 +55,7 @@ pub String selfPath()
     u8 buf[4096];
 #ifdef IS_MACOS
     u32 size = sizeof(buf);
-    if (_NSGetExecutablePath(buf, &size) != 0) { return out; }
+    if (procExecutablePath(buf, &size) != 0) { return out; }
 #else
     i64 n = libc.readlink("/proc/self/exe", buf, sizeof(buf) - 1);
     if (n <= 0) { return out; }
