@@ -4,6 +4,60 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.8.0 <small>(2026-10-12)</small></h2>
+<p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
+and UDP with binary addresses in <code>net</code>.</p>
+
+<pre><code>import math, str;
+
+void main()
+{
+  ad String text = str.from("one two three");
+  ad u8[][] words = str.split(text, " ");     // freed at the end of main
+  u32 h = 0x811C9DC5;
+  for (auto w : words) { h = math.rotl((u32)(h ^ w.len), 5); }
+  printf("%d words, hash %x\n", words.len, h);
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
+  end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
+  String, any slice, or a struct with a <code>free()</code> method (or a pointer to one). Returning
+  an <code>ad</code> variable is an error, and so is a type with no <code>free()</code>.
+  <code>ad</code> is not reserved: a variable can still be named <code>ad</code>. See
+  <a href="language.html#autodefer">ad (autodefer)</a>.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
+  and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
+  <code>u16</code>) compile to one instruction where they are called, on x86_64 and arm64, AOT and
+  JIT; <code>math.popcount</code> counts the one bits. <code>hash</code>'s SHA-256 uses them and
+  runs about 17% faster.</li>
+  <li><code>proc</code> can build pipelines: <code>proc.FD</code> gives a program an fd of yours as
+  its stdin, stdout or stderr (<code>Opts</code> <code>inFd</code>/<code>outFd</code>/<code>errFd</code>),
+  <code>Opts.pgid</code> joins an existing process group, <code>Opts.dups</code> maps more fds in
+  order, <code>proc.pipe</code> makes the connecting pipes and <code>proc.disown</code> frees a
+  <code>Proc</code> you reap yourself; <code>proc.kill</code> reaches the group a process
+  joined.</li>
+  <li><code>net.Addr</code> keeps an IPv4 or IPv6 address in binary: <code>net.recvFromAddr</code>
+  and <code>net.sendToAddr</code> let a UDP server answer each datagram without turning the
+  sender into text and back; <code>net.makeAddr</code> builds one from a numeric address, and
+  <code>Addr.ip()</code>, <code>port()</code>, <code>family()</code>, <code>equals()</code> and
+  <code>sameIp()</code> read it. <code>net.localAddr</code>, <code>net.remoteAddr</code> and
+  <code>net.setBlocking</code> are public.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>Docs: the sockets section showed a bare <code>signal(SIGPIPE, SIG_IGN)</code>, which doesn't
+  compile; it is <code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> or
+  <code>libc.signal(...)</code>, now with a runnable example.</li>
+</ul>
+
 <h2>v0.7.0 <small>(2026-10-12)</small></h2>
 <p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
 shares counters and flags between threads without a mutex. Locals are now always at their

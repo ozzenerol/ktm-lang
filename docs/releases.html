@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,60 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-8-0-2026-10-12">v0.8.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-8-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
+and UDP with binary addresses in <code>net</code>.</p>
+
+<pre><code>import math, str;
+
+void main()
+{
+  ad String text = str.from("one two three");
+  ad u8[][] words = str.split(text, " ");     // freed at the end of main
+  u32 h = 0x811C9DC5;
+  for (auto w : words) { h = math.rotl((u32)(h ^ w.len), 5); }
+  printf("%d words, hash %x\n", words.len, h);
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
+  end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
+  String, any slice, or a struct with a <code>free()</code> method (or a pointer to one). Returning
+  an <code>ad</code> variable is an error, and so is a type with no <code>free()</code>.
+  <code>ad</code> is not reserved: a variable can still be named <code>ad</code>. See
+  <a href="language.html#autodefer">ad (autodefer)</a>.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
+  and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
+  <code>u16</code>) compile to one instruction where they are called, on x86_64 and arm64, AOT and
+  JIT; <code>math.popcount</code> counts the one bits. <code>hash</code>'s SHA-256 uses them and
+  runs about 17% faster.</li>
+  <li><code>proc</code> can build pipelines: <code>proc.FD</code> gives a program an fd of yours as
+  its stdin, stdout or stderr (<code>Opts</code> <code>inFd</code>/<code>outFd</code>/<code>errFd</code>),
+  <code>Opts.pgid</code> joins an existing process group, <code>Opts.dups</code> maps more fds in
+  order, <code>proc.pipe</code> makes the connecting pipes and <code>proc.disown</code> frees a
+  <code>Proc</code> you reap yourself; <code>proc.kill</code> reaches the group a process
+  joined.</li>
+  <li><code>net.Addr</code> keeps an IPv4 or IPv6 address in binary: <code>net.recvFromAddr</code>
+  and <code>net.sendToAddr</code> let a UDP server answer each datagram without turning the
+  sender into text and back; <code>net.makeAddr</code> builds one from a numeric address, and
+  <code>Addr.ip()</code>, <code>port()</code>, <code>family()</code>, <code>equals()</code> and
+  <code>sameIp()</code> read it. <code>net.localAddr</code>, <code>net.remoteAddr</code> and
+  <code>net.setBlocking</code> are public.</li>
+</ul>
+
+<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Docs: the sockets section showed a bare <code>signal(SIGPIPE, SIG_IGN)</code>, which doesn't
+  compile; it is <code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> or
+  <code>libc.signal(...)</code>, now with a runnable example.</li>
+</ul>
 
 <h2 id="v0-7-0-2026-10-12">v0.7.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-7-0-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
@@ -86,7 +140,7 @@ void main()
   instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
   <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
@@ -103,7 +157,7 @@ void main()
   module.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
   as a block's first statement it used to point at the block's <code>{</code>.</li>
@@ -134,7 +188,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Overloading: functions, methods and a module's functions can share a name when their
   parameter types differ, and a call picks the one its arguments fit best (an exact type over
@@ -147,7 +201,7 @@ void main()
   change; once a name has two or more, each one's symbol carries its parameter types.</li>
 </ul>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
   <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
@@ -182,7 +236,7 @@ void main()
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old C declarator of a function that returns a function pointer,
   <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
@@ -231,7 +285,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -271,7 +325,7 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
@@ -302,7 +356,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
   kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
@@ -321,7 +375,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -372,7 +426,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -415,7 +469,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -444,7 +498,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -480,7 +534,7 @@ i32 main() {
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -505,7 +559,7 @@ i32 main() {
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -575,7 +629,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -608,7 +662,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
@@ -637,7 +691,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
+<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
