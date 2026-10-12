@@ -18,6 +18,7 @@ AstType *parseReturnAuto(Cctrl *cc, Ast *retval);
 AstType *parseArrayDimensions(Cctrl *cc, AstType *base_type);
 AstType *parsePointerType(Cctrl *cc, AstType *type);
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr);
+Ast *parseReflectCall(Cctrl *cc, char *name, int len);
 Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
 AstType *parseBaseDeclSpec(Cctrl *cc);
 AstType *parseDeclSpec(Cctrl *cc);
