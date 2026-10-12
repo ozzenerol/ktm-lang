@@ -3027,6 +3027,14 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                     break;
             }
         }
+        /* A word after it (`foo bar;`, `foo i64 n;`): no expression goes
+         * on like that, so it is the name that is unknown. (Falling
+         * through rewound past the name, and the caller reported the
+         * token before it: a block's `{`.) */
+        if (tok->tk_type == TK_IDENT) {
+            cctrlRaiseException(cc,"Type `%.*s` has not been declared", len, name);
+        }
+        cctrlRaiseException(cc,"Variable or function `%.*s` has not been defined", len, name);
     }
 
     if (!is_lparen) {
