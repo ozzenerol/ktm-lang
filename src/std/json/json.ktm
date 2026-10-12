@@ -391,7 +391,7 @@ static i64 jsonUtf8Len(JsonParser *p) {
 }
 
 /* The string at the current offset, decoded; its length (which a
-    * \u0000 inside makes more than its StrLen) goes in *_len */
+    * \u0000 inside makes more than its cstr.len) goes in *_len */
 static u8 *jsonParseString(JsonParser *p, i64 *_len) {
         bool run = true;
         i64 start = p.offset;
@@ -523,7 +523,7 @@ u8 *jsonFloatToStr(u8 *buf, f64 f)
 { // %.15g, %.16g or %.17g, the first that reads back as `f`, with a '.'
         // so it parses as a float. 17 digits always do; starting at 15 (not 1)
         // costs one or two tries instead of up to 17, and %g still drops
-        // trailing zeros (0.1 is "0.1"). C's snprintf: StrPrint's exact %g is
+        // trailing zeros (0.1 is "0.1"). C's snprintf: cstr.formatTo's exact %g is
         // the same text but several times slower. `buf` holds 64 bytes.
         i64 prec = 15, len;
         u8 *e;
@@ -643,7 +643,7 @@ static void jsonToStringInternal(Value *J, JsonStringBuilder *js,
 
 pub String toStr(Value *json)
 {// The JSON text of json's value - only that node, not the nodes after
-    // it or its key, so a node from JsonSelect gives just its value. A
+    // it or its key, so a node from json.select gives just its value. A
     // String that is yours.
         u8 *buf = mem.alloc(sizeof(u8)*1<<10);
         i64 len = 0;
@@ -690,7 +690,7 @@ static void jsonReleaseList(Value *J) {
                                 break;
                 }
 
-                if (ptr.state) { /* only on the node JsonParse returns */
+                if (ptr.state) { /* only on the node json.parse returns */
                         mem.free(ptr.state);
                 }
                 mem.free(ptr);
@@ -699,8 +699,8 @@ static void jsonReleaseList(Value *J) {
 }
 
 pub void release(Value *J)
-{// Free a whole document: J must be what JsonParse returned (the root).
-    // null, or a node inside a document (from JsonSelect, or an item of an
+{// Free a whole document: J must be what json.parse returned (the root).
+    // null, or a node inside a document (from json.select, or an item of an
     // array or object), is ignored: those are views into the document.
         if (J == null || J.state == null) {
                 return;
@@ -1168,7 +1168,7 @@ static Value *jsonObjectAt(Value *j, u8[] name) {
 pub Value *objectGet(Value *obj, u8[] key)
 {// The value stored under exactly `key` (the first one if it is repeated),
     // or null if obj isn't an object or has no such key. Any key works, also
-    // ones JsonSelect can't spell ('.', '[', ':' ...). A view, don't release.
+    // ones json.select can't spell ('.', '[', ':' ...). A view, don't release.
         return jsonObjectAt(obj, key);
 }
 
@@ -1199,10 +1199,10 @@ pub i64 len(Value *node)
 /**
     * Allows selections like:
     *
-    * Json *J = JsonParse(text);
-    * Json *width = JsonSelect(J,".foo.bar[*].baz",4);      // [*] takes an i64
-    * Json *height = JsonSelect(J,".tv.type[4].*","name");  // .* takes a u8 *
-    * Json *price = JsonSelect(J,".clothes.shirt[4].price_*","eur");
+    * Json *J = json.parse(text);
+    * Json *width = json.select(J,".foo.bar[*].baz",4);      // [*] takes an i64
+    * Json *height = json.select(J,".tv.type[4].*","name");  // .* takes a u8 *
+    * Json *price = json.select(J,".clothes.shirt[4].price_*","eur");
     *
     * You can also include a :<type> specifier, typically at the end, to verify the
     * type of the final JSON object selected. If the type doesn't match, the

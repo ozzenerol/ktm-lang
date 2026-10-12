@@ -22,7 +22,7 @@ pub struct FileStat {
 /* What a FileStat describes: FileStat.kind() */
 pub enum FileKind { file, dir, link, other };
 
-/* Default MkDir mode, 04775 (rwxrwxr-x; the set-user-ID bit means nothing
+/* Default fs.makeDir mode, 04775 (rwxrwxr-x; the set-user-ID bit means nothing
  * on a directory), minus the umask: drwxr-xr-x with the usual 022. */
 pub const i64 MAKE_DIR_DEFAULT = (libc.S_ISUID|libc.S_IRWXU|libc.S_IRWXG|libc.S_IROTH|libc.S_IXOTH);
 

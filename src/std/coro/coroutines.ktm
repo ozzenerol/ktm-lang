@@ -7,9 +7,9 @@ const i64 CORO_CACHE_MAX = 16;  /* released stacks kept per thread */
 
 const i64 CORO_READY = 0;  /* made, never resumed */
 
-const i64 CORO_SUSPENDED = 1;  /* paused in CoroutineYield */
+const i64 CORO_SUSPENDED = 1;  /* paused in coro.yield */
 
-const i64 CORO_ACTIVE = 2;  /* running, or waiting in a CoroutineNext */
+const i64 CORO_ACTIVE = 2;  /* running, or waiting in a coro.next */
 
 const i64 CORO_DONE = 3;  /* its function returned or threw */
 
@@ -211,7 +211,7 @@ void coroMain(Coroutine *c) {
 /* A new coroutine that will run fn(arg) on its own stack of stack_size
  * bytes (0 = 256 KiB; rounded up to whole pages, at least 4), with an
  * inaccessible guard page below it so an overflow crashes instead of
- * writing over other memory. Nothing runs until the first CoroutineNext.
+ * writing over other memory. Nothing runs until the first coro.next.
  * null if the stack can't be mapped. */
 pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
                                                              i64 stackSize=0) {
@@ -264,9 +264,9 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
 }
 
 /* Run c until it yields or returns, and return the value it yielded or,
- * once its function has returned (CoroutineDone(c) is then true), the
+ * once its function has returned (coro.done(c) is then true), the
  * function's return value. `send` becomes the return value of the
- * CoroutineYield that c is paused in; the first CoroutineNext ignores it
+ * coro.yield that c is paused in; the first coro.next ignores it
  * (the function gets its arg). If c's function throws, the throw goes on
  * from here. null if c is already done. */
 pub void *next(Coroutine *c, void *send=null) {
@@ -288,8 +288,8 @@ pub void *next(Coroutine *c, void *send=null) {
     return v;
 }
 
-/* Inside a coroutine: pause it and hand value to the CoroutineNext that
- * resumed it. Returns the `send` of the CoroutineNext that resumes it
+/* Inside a coroutine: pause it and hand value to the coro.next that
+ * resumed it. Returns the `send` of the coro.next that resumes it
  * again. */
 pub void *yield(void *value=null) {
     rt.HCFs *fs = rt.Fs();
@@ -312,8 +312,8 @@ pub Coroutine *current() {
 }
 
 /* Free c. Its stack goes to the calling thread's cache for the next
- * CoroutineNew of the same size (at most CORO_CACHE_MAX stacks),
- * otherwise it is unmapped. A coroutine paused in CoroutineYield is
+ * coro.spawn of the same size (at most CORO_CACHE_MAX stacks),
+ * otherwise it is unmapped. A coroutine paused in coro.yield is
  * dropped where it is: whatever it allocated is not freed. c must not
  * be running. null is ignored. */
 pub void release(Coroutine *c) {

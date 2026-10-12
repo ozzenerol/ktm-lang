@@ -323,7 +323,7 @@ pub extern "c" i32 getrlimit(i32 resource, rlimit *rl);
 pub extern "c" i32 setrlimit(i32 resource, rlimit *rl);
 
 /* errno values (the ones networking code checks most); they differ
- * between Linux and macOS, so compare Errno() with these names. */
+ * between Linux and macOS, so compare os.errno() with these names. */
 pub const i64 EPERM = 1;               /* Operation not permitted */
 
 pub const i64 ENOENT = 2;               /* No such file or directory (or program) */
@@ -402,7 +402,7 @@ pub const i64 EWOULDBLOCK = EAGAIN;          /* Same value on Linux and macOS */
 
 /* Signals (each platform's numbers) and signal(3). signal returns
  * the previous handler, or SIG_ERR. SIG_IGN on SIGPIPE makes a write to a
- * closed socket or pipe return -1 with Errno() EPIPE instead of ending
+ * closed socket or pipe return -1 with os.errno() EPIPE instead of ending
  * the program. */
 pub const i64 SIGHUP = 1;               /* Terminal hung up */
 
@@ -1476,7 +1476,7 @@ pub extern "c" i64 sendto(i32 socket, void *buffer, u64 length, i32 flags, socka
 
 /* Writing to a socket whose peer has closed raises SIGPIPE, which kills the
  * process, as in C. NetSend, or MSG_NOSIGNAL in the flags of send/sendto/
- * sendmsg, gives -1 with Errno() EPIPE instead; signal(SIGPIPE, SIG_IGN)
+ * sendmsg, gives -1 with os.errno() EPIPE instead; signal(SIGPIPE, SIG_IGN)
  * does that for every write in the program. */
 
 /* shutdown(2) `how` */
@@ -1488,7 +1488,7 @@ pub const i64 SHUT_RDWR = 2;               /* Both */
 
 /* poll(2): wait until one of nfds descriptors in fds is ready, at most
  * timeout milliseconds (-1: no limit, 0: just check). Returns how many
- * have revents set, 0 on timeout, -1 on error (Errno() EINTR: retry). */
+ * have revents set, 0 on timeout, -1 on error (os.errno() EINTR: retry). */
 pub struct pollfd {
     i32 fd;      /* Descriptor to watch; a negative fd is skipped */
     i16 events;  /* POLL* events wanted */

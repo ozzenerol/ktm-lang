@@ -15,7 +15,7 @@ pub struct Job {
 };
 
 /* `lock` guards `jobs`, `run`, `active_threads` and `alive_threads`.
-    * Workers sleep on `has_work`; ThreadPoolWait sleeps on `no_work`. */
+    * Workers sleep on `has_work`; thread.poolWait sleeps on `no_work`. */
 pub struct Pool {
         u64 workerCount,aliveThreads,activeThreads;
         bool run;
@@ -104,7 +104,7 @@ pub Pool *poolNew(i64 workerCount)
         libc.pthread_cond_init(&pool.hasWork);
         libc.pthread_mutex_init(&pool.lock);
 
-        /* The workers stay joinable so ThreadPoolStop can wait for them */
+        /* The workers stay joinable so thread.poolStop can wait for them */
         for (i64 i = 0; i < workerCount; ++i) {
                 Worker *worker = workers + i;
                 worker.id = i;
@@ -133,7 +133,7 @@ pub void poolStop(Pool *pool)
 }
 
 pub void poolRelease(Pool *pool)
-{// Stop the pool (queued jobs still run, see ThreadPoolStop), destroy
+{// Stop the pool (queued jobs still run, see thread.poolStop), destroy
     // conditions and locks and free the structures
         if (pool) {
                 poolStop(pool);
@@ -141,7 +141,7 @@ pub void poolRelease(Pool *pool)
                 libc.pthread_cond_destroy(&pool.hasWork);
                 libc.pthread_cond_destroy(&pool.noWork);
                 libc.pthread_mutex_destroy(&pool.lock);
-                /* Only jobs enqueued after ThreadPoolStop can be left */
+                /* Only jobs enqueued after thread.poolStop can be left */
                 for (auto n = pool.jobs.head; n; n = n.next) { mem.free(n.value); }
                 pool.jobs.free();
 

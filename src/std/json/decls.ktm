@@ -1,6 +1,6 @@
 module json;
 
-/* JsonParse flags: none, or keep numbers as their text (JSON_STRNUM) */
+/* json.parse flags: none, or keep numbers as their text (JSON_STRNUM) */
 pub const i64 NO_FLAGS = (0x0);
 
 pub const i64 STRNUM_FLAG = (0x1);
@@ -25,7 +25,7 @@ pub const i64 BOOL = 6;
 
 pub const i64 NULL = 7;
 
-/* JsonParse error codes (state->error). Not produced any more, kept for
+/* json.parse error codes (state->error). Not produced any more, kept for
  * old code: 1, 6, 7, 9, 10, 11 and 17 (the end of the input is reported
  * as 8, or as the error of what was being read). */
 pub const i64 OK = 0;
@@ -96,5 +96,5 @@ pub const i64 NESTING_TOO_DEEP = 20;
  * U+10FFFF (RFC 8259 text is UTF-8) */
 pub const i64 INVALID_UTF8 = 21;
 
-/* JsonParse rejects arrays and objects nested deeper than this */
+/* json.parse rejects arrays and objects nested deeper than this */
 pub const i64 MAX_DEPTH = 512;

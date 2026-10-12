@@ -200,7 +200,7 @@ static void procDupTo(void *fa, i32 from, i32 to) {
 /* Start argv[0] (looked up in $PATH unless opts->no_path) with the
  * arguments argv, a null-terminated list; never through a shell. opts
  * null or all zero: the child inherits our stdin, stdout, stderr, working
- * directory and environment. null on failure, with Errno() saying why
+ * directory and environment. null on failure, with os.errno() saying why
  * (ENOENT for a program that doesn't exist, EACCES, ...). */
 pub Proc *spawn(u8 **argv, Opts *opts=null) {
     return procSpawnEx(argv, opts, false);
@@ -385,7 +385,7 @@ pub bool kill(Proc *p, i32 sig=PROC_SIGTERM) {
     return libc.kill(p.pid, sig) == 0;
 }
 
-/* write() that gives -1 with Errno() EPIPE for a reader that has gone,
+/* write() that gives -1 with os.errno() EPIPE for a reader that has gone,
  * instead of a SIGPIPE that would end the program. macOS: the fd has
  * F_SETNOSIGPIPE. Linux: SIGPIPE is blocked in this thread around the
  * write and a SIGPIPE the write raised is taken off the pending set. */
@@ -534,7 +534,7 @@ pub i64 communicate(Proc *p, u8[] input, String *out=null, String *err=null) {
 }
 
 /* Close our pipe ends and free p (null is ignored). A child that is
- * still running is waited for: ProcKill it first to stop it. */
+ * still running is waited for: proc.kill it first to stop it. */
 pub void release(Proc *p) {
     if (!p) { return; }
     procClose(&p.inFd);

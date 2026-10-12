@@ -10,6 +10,7 @@ module reflect;
  * types they lead to), as read-only data. Compare two Types with
  * reflect.same, not ==: a library and a program each have their own. */
 
+/* What kind of type a Type describes */
 pub enum Kind {
     none,           /* void */
     int,
@@ -29,6 +30,7 @@ pub struct Type;
 pub struct Field;
 pub struct EnumMember;
 
+/* A type's description, from typeOf(T) or typeOf(expr) */
 pub struct Type {
     Kind kind;
     u8[] name;          /* as typeof prints it */
@@ -40,6 +42,7 @@ pub struct Type {
     EnumMember[] members;
 };
 
+/* A field of a struct or union */
 pub struct Field {
     u8[] name;
     Type *type;
@@ -47,6 +50,7 @@ pub struct Field {
     bool isPrivate;     /* `private` in its module: json skips it */
 };
 
+/* A member of an enum: its name and value */
 pub struct EnumMember {
     u8[] name;
     i64 value;

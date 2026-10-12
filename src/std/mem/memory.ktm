@@ -48,7 +48,7 @@ _CALLOC::
 
 // RDI = void *ptr
 // RSI = u64 size
-_REALLOC:: // void *ReAlloc(void *ptr, i64 size);
+_REALLOC:: // void *mem.realloc(void *ptr, i64 size);
     PUSHQ  RBP
     MOVQ   RBP, RSP
     SUB    RSP, 32

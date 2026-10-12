@@ -40,6 +40,7 @@ pub struct Sha256
     u8 block[64];
 };
 
+/* A Sha256 ready for update(); it holds no memory, so nothing to free */
 pub Sha256 sha256New()
 {
     Sha256 s;

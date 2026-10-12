@@ -26,7 +26,7 @@ module prelude;
 /* What a throw carries and `catch (Error e)` binds: the code (usually an
  * enum member), a message (never NULL, "" without one), and the file and
  * line of the throw. The message is freed when the catch block is left:
- * copy it (StrNew) to keep it. */
+ * copy it (cstr.dup) to keep it. */
 pub struct Error
 {
   i64 code;

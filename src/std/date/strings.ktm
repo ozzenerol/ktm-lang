@@ -206,7 +206,7 @@ static bool parsePartsC(u8 *strdate, u8 *format, Parts *t) {
 }
 
 static Date parseC(u8 *_str, u8 *fmt)
-{// Parse with Str2CDateStruct into a CDate; 0 if that fails or the
+{// Parse with date.parseParts into a date.Date; 0 if that fails or the
     // format doesn't give the year, month and day
         Parts ds;
         if (!parsePartsC(_str,fmt,&ds)) {

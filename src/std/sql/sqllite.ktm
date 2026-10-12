@@ -306,7 +306,7 @@ pub i32 execPrepared(Stmt *pstmt, Row *row, Param *params) {
         }
         if (rc != SQLITE_OK) {
             /* Don't run the statement with a parameter missing; the next
-             * SqlExecPrepared clears what was bound so far. */
+             * sql.execPrepared clears what was bound so far. */
             return rc;
         }
     }
@@ -425,7 +425,7 @@ static bool sqlIterGeneric(Row *row) {
         }
     }
 
-    /* XXX: MAlloc's and Free's on each call which is a bit expensive seeing 
+    /* XXX: mem.alloc's and Free's on each call which is a bit expensive seeing 
      * as this function will be called in a loop */
     mem.free(row.col);
     row.cols = sqlite3_data_count(row.stmt);

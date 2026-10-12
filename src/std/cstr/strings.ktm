@@ -422,6 +422,7 @@ pub u8 *dupLen(u8 *buf, i64 len)
         return str;
 }
 
+/* A new copy of buf, "" for null; mem.free it */
 pub u8 *dup(u8 *buf) {
         u8 *res;
         i64 size;
@@ -473,13 +474,13 @@ void outStr(u8 *instr,u8 **_buf,u8 **_dst,i64 len,i64 flags,
                 i=len(instr);
         }
         dst = *_dst;
-        /* No _buf: the caller's buffer is not ours to MSize/ReAlloc */
+        /* No _buf: the caller's buffer is not ours to mem.size/mem.realloc */
         if (_buf) {
                 buf = *_buf;
                 dstLen = dst-buf;
                 size = mem.size(buf);
 
-                if (i >= (size - dstLen)) { /* double, as CatPrint does */
+                if (i >= (size - dstLen)) { /* double, as cstr.appendFormat does */
                         buf = mem.realloc(buf,((size*2)+i)*sizeof(u8));
                         *_buf = buf;
                         *_dst = buf + dstLen;
@@ -509,7 +510,7 @@ void outStr(u8 *instr,u8 **_buf,u8 **_dst,i64 len,i64 flags,
 }
 
 pub i64 count(u8 *src, i64 ch)
-{// Count occurrences of a char.
+{// How many times the byte ch is in src (0 for null)
         i64 i=0;
         if (!src) { return 0; }
         while (*src) {
@@ -521,7 +522,8 @@ pub i64 count(u8 *src, i64 ch)
 }
 
 pub u8 *firstOf(u8 *src,u8 *marker)
-{// Point to 1st occurrence of marker set in str.
+{// The first byte of src that is one of the bytes in marker, null when
+    // none is (or either is null)
         i64 ch;
         if (!src || !marker) { return null; }
         while ((ch=*src++) && !count(marker,ch)) {}
@@ -533,7 +535,8 @@ pub u8 *firstOf(u8 *src,u8 *marker)
 }
 
 pub u8 *lastOf(u8 *src,u8 *marker)
-{// Point to last occurrence of market set in str.
+{// The last byte of src that is one of the bytes in marker, null when
+    // none is (or either is null)
         i64 ch;
         u8 *res=null;
         if (!src || !marker) { return null; }
@@ -613,6 +616,9 @@ static i64 hex(u8 *dst, i64 num) {
         return len;
 }
 
+/* A new string of ptr escaped for a C literal: \n \r \t \v \f \" \\ and
+ * \xNN for other control bytes (what %Q prints); with PRTF_SLASH each %
+ * is doubled too. mem.free it. */
 pub u8 *quote(u8 *ptr,i64 flags = 0) {
         u8 **_buf,*buf,**_dst,*dst,buf2[8],*ptr2;
         i64 ch;
@@ -887,6 +893,8 @@ static void strPrintInt(u8 **_ptr, u8 **grow, u64 val, i64 conv, i64 flags,
         }
 }
 
+/* formatTo with the arguments in a slice, for functions that take `...`
+ * and pass it on */
 pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
         if (!fmt) { return null; }
         u64 uintarg, curlen = 0;
@@ -895,9 +903,9 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
         u8 *ptr, *strarg, *tmp, *dst, *spec, buf[256];
         u8 **grow;
 
-        /* Growth (SPutChar's and OutStr's MSize/Free dance) is only legal on a
-            * buffer WE MAlloc'd. A caller-provided dst may live on the stack or mid-array,
-            * where MSize reads garbage and Free aborts - so, as in TempleOS, the
+        /* Growth (SPutChar's and OutStr's mem.size/Free dance) is only legal on a
+            * buffer WE mem.alloc'd. A caller-provided dst may live on the stack or mid-array,
+            * where mem.size reads garbage and Free aborts - so, as in TempleOS, the
             * caller's buffer is trusted to be big enough and never grown. */
         if (_dst == null) {
                 dst = mem.alloc(STR_LEN);
@@ -1072,7 +1080,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
                                 }
 
                                 default: {
-                                        /* *(fmt-1) is not a conversion StrPrint knows. Kept in the
+                                        /* *(fmt-1) is not a conversion cstr.formatTo knows. Kept in the
                                             * output as written, as C prints one, with a diagnostic on
                                             * stderr. As in C a conversion ends at a letter: what it may
                                             * still hold (`%ld`, `%+d`) is skipped and its argument taken,
@@ -1109,6 +1117,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
         return dst;
 }
 
+/* concat with the strings in a slice */
 pub u8 *concatArgs(u64[] args) {
         u8 *buf = mem.alloc(256), *dst = buf;
         for (auto arg : args) {
@@ -1117,10 +1126,15 @@ pub u8 *concatArgs(u64[] args) {
         return buf;
 }
 
+/* A new string of every argument (C strings) one after another; mem.free
+ * it */
 pub u8 *concat(...args) {
         return concatArgs(args);
 }
 
+/* The formatted text written into dst, with no bound (see formatToSize
+ * for a fixed buffer); with dst null, into a new block that you mem.free.
+ * Returns where it wrote. */
 pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
         return formatArgs(dst,fmt,args);
 }
@@ -1128,7 +1142,7 @@ pub u8 *formatTo(u8 *dst=null,u8 *fmt,...args) {
 /* Format into `dst`, which has room for `size` bytes, like C's snprintf:
     * at most size-1 characters are written, always followed by a '\0' (size
     * <= 0 writes nothing), and longer output is cut short. Returns dst.
-    * StrPrint(dst, ...) has no bound, so use this for a fixed buffer. */
+    * cstr.formatTo(dst, ...) has no bound, so use this for a fixed buffer. */
 pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
         if (!dst || size <= 0) { return dst; }
         u8 *full = formatArgs(null,fmt,args);
@@ -1144,21 +1158,21 @@ pub u8 *formatToSize(u8 *dst, i64 size, u8 *fmt, ...args) {
 }
 
 pub u8 *format(u8 *fmt,...args)
-{// MAlloc StrPrint.
+{// The formatted text in a new block of exactly its size; mem.free it
         u8 *res,*buf=formatArgs(null,fmt,args);
         res=dup(buf);
         mem.free(buf);
         return res;
 }
 
-/* Append formatted text to the heap string `_dst` (MAlloc, StrNew,
-    * StrPrint(null, ...) or a previous CatPrint; null starts a new one),
+/* Append formatted text to the heap string `_dst` (mem.alloc, cstr.dup,
+    * cstr.formatTo(null, ...) or a previous cstr.appendFormat; null starts a new one),
     * growing it when it is full, and return it. The block may move and the
-    * old pointer is then freed, so always write `s = CatPrint(s, ...)` and
+    * old pointer is then freed, so always write `s = cstr.appendFormat(s, ...)` and
     * never pass a string literal or a stack buffer. Each call measures the
     * whole of `_dst` to find its end, so n appends cost O(n^2) for a long
-    * string: in a loop keep the length yourself with CatLenPrint, or
-    * collect the pieces and StrPrint them once. */
+    * string: in a loop keep the length yourself with cstr.appendFormatLen, or
+    * collect the pieces and cstr.formatTo them once. */
 pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
         u8 *s2 = formatArgs(null,fmt,args);
         if (!s2) { return _dst; }
@@ -1174,8 +1188,8 @@ pub u8 *appendFormat(u8 *_dst,u8 *fmt,...args) {
         return _dst;
 }
 
-/* CatPrint for a string whose length the caller keeps in `*_len`, so no
-    * StrLen per call. `_dst` may be null (with *_len 0) to start one. */
+/* cstr.appendFormat for a string whose length the caller keeps in `*_len`, so no
+    * cstr.len per call. `_dst` may be null (with *_len 0) to start one. */
 pub u8 *appendFormatLen(u8 *_dst, i64 *_len, u8 *fmt, ...args) {
         i64 len = *_len;
         u8 *s2 = formatArgs(null,fmt,args);
@@ -1194,7 +1208,7 @@ pub u8 *appendFormatLen(u8 *_dst, i64 *_len, u8 *fmt, ...args) {
 }
 
 pub bool globMatch(u8 *testStr, u8 *wildStr)
-{// Wildcard match of the whole of test_str: '*' matches any run of
+{// Wildcard match of the whole of testStr: '*' matches any run of
     // characters (also none) and '?' any one character; everything else
     // matches itself. false if either string is null.
         u8 *starWild = null, *starTest = null;

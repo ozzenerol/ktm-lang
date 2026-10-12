@@ -53,7 +53,7 @@ pub void nowParts(Parts *_ds) {
   _ds.dayOfWeek = (u64)ptm.tm_wday;
   _ds.dayOfMon = (u64)ptm.tm_mday;
   _ds.year += 1900;
-  /* Offset from UTC as +-hhmm, like Str2CDateStruct's %z */
+  /* Offset from UTC as +-hhmm, like date.parseParts's %z */
   gmtoff = ptm.tm_gmtoff/60;
   if (gmtoff < 0) { _ds.zoneDiff = -((-gmtoff)/60*100 + (-gmtoff)%60); }
   else            { _ds.zoneDiff = gmtoff/60*100 + gmtoff%60; }
@@ -84,7 +84,7 @@ pub i64 dayOfWeek(i64 i)
 }
 
 pub void toParts(Parts *_ds,Date cdt)
-{//Cvt CDate to CDateStruct.
+{//Cvt date.Date to date.Parts.
   i64 i,k,date=cdt.date;
   _ds.dayOfWeek=dayOfWeek(date);
   /* An estimate, can be a year off either way */
@@ -123,7 +123,7 @@ pub void toParts(Parts *_ds,Date cdt)
 }
 
 pub Date fromParts(Parts *_ds)
-{//Cvt CDateStruct to CDate.
+{//Cvt date.Parts to date.Date.
   Date cdt;
   i64 i1,i2,year=_ds.year,mon=(i64)_ds.mon-1;
   /* A month outside 1-12 carries into the year, as a day past the end

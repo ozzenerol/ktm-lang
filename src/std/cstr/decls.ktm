@@ -1,9 +1,9 @@
 module cstr;
 
-/* The size StrPrint and MPrintQ start a new buffer at (it grows). */
+/* The size cstr.formatTo and cstr.quote start a new buffer at (it grows). */
 const i64 STR_LEN = 256;
 
-/* StrPrint's internal format flags; MPrintQ's `flags` takes PRTF_SLASH,
+/* cstr.formatTo's internal format flags; cstr.quote's `flags` takes PRTF_SLASH,
  * which doubles each '%'. */
 const i64 PRTF_PAD_ZERO = 0x001;
 
@@ -25,7 +25,7 @@ const i64 CH_SPACE = 0x20;
  * are equal), whatever len is. */
 pub _extern _STRNCMP i64 cmpLen(u8 *s1, u8 *s2, i64 len);
 
-/* StrNCmp ignoring ASCII case, like C's strncasecmp. */
+/* cstr.cmpLen ignoring ASCII case, like C's strncasecmp. */
 pub _extern _STRNICMP i64 cmpLenNoCase(u8 *s1, u8 *s2, i64 len);
 
 /* Copy src and its NUL into dst, which must be big enough. A null src

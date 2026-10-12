@@ -276,14 +276,23 @@ _extern _ATOMIC_FENCE void atomicFence();
  * returning the value from before it. cas(p, expected, desired): desired
  * at p if p holds expected, and whether it did. One set per width: */
 
+/* The value at p */
 pub i64 load(i64 *p) { return atomicLoad64(p); }
+/* v stored at p */
 pub void store(i64 *p, i64 v) { atomicStore64(p, v); }
+/* v added to the value at p; returns the value from before */
 pub i64 add(i64 *p, i64 v) { return atomicAdd64(p, v); }
+/* v subtracted from the value at p; returns the value from before */
 pub i64 sub(i64 *p, i64 v) { return atomicAdd64(p, (0 - v)); }
+/* v stored at p; returns the value from before */
 pub i64 swap(i64 *p, i64 v) { return atomicSwap64(p, v); }
+/* The value at p ANDed with v; returns the value from before */
 pub i64 and(i64 *p, i64 v) { return atomicAnd64(p, v); }
+/* The value at p ORed with v; returns the value from before */
 pub i64 or(i64 *p, i64 v) { return atomicOr64(p, v); }
+/* The value at p XORed with v; returns the value from before */
 pub i64 xor(i64 *p, i64 v) { return atomicXor64(p, v); }
+/* desired stored at p if p holds expected; whether it did */
 pub bool cas(i64 *p, i64 expected, i64 desired) { return atomicCas64(p, expected, desired); }
 
 pub i32 load(i32 *p) { return atomicLoad32(p); }

@@ -62,6 +62,7 @@ pub void Buffer.append(u8[] t)
     self.len += t.len;
 }
 
+/* One byte at the end */
 pub void Buffer.appendByte(u8 b)
 {
     self.reserve(1);
@@ -160,12 +161,16 @@ static void bytesCheck(u8[] s, i64 at, i64 n, u8 *what)
     }
 }
 
+/* The big-endian (network order) 16-bit integer at s[at] (2 bytes;
+ * past the end throws ERR_BOUNDS) */
 pub u16 be16(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 2, "be16");
     return (u16)((u64)s.ptr[at] << 8 | s.ptr[at + 1]);
 }
 
+/* The big-endian (network order) 32-bit integer at s[at] (4 bytes;
+ * past the end throws ERR_BOUNDS) */
 pub u32 be32(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 4, "be32");
@@ -173,6 +178,8 @@ pub u32 be32(u8[] s, i64 at = 0)
     return (u32)((u64)p[0] << 24 | (u64)p[1] << 16 | (u64)p[2] << 8 | p[3]);
 }
 
+/* The big-endian (network order) 64-bit integer at s[at] (8 bytes;
+ * past the end throws ERR_BOUNDS) */
 pub u64 be64(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 8, "be64");
@@ -182,12 +189,16 @@ pub u64 be64(u8[] s, i64 at = 0)
     return v;
 }
 
+/* The little-endian 16-bit integer at s[at] (2 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub u16 le16(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 2, "le16");
     return (u16)((u64)s.ptr[at + 1] << 8 | s.ptr[at]);
 }
 
+/* The little-endian 32-bit integer at s[at] (4 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub u32 le32(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 4, "le32");
@@ -195,6 +206,8 @@ pub u32 le32(u8[] s, i64 at = 0)
     return (u32)((u64)p[3] << 24 | (u64)p[2] << 16 | (u64)p[1] << 8 | p[0]);
 }
 
+/* The little-endian 64-bit integer at s[at] (8 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub u64 le64(u8[] s, i64 at = 0)
 {
     bytesCheck(s, at, 8, "le64");
@@ -204,6 +217,8 @@ pub u64 le64(u8[] s, i64 at = 0)
     return v;
 }
 
+/* v written big-endian (network order) at s[at] (2 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub void putBe16(u8[] s, i64 at, u16 v)
 {
     bytesCheck(s, at, 2, "putBe16");
@@ -211,18 +226,24 @@ pub void putBe16(u8[] s, i64 at, u16 v)
     s.ptr[at + 1] = v;
 }
 
+/* v written big-endian (network order) at s[at] (4 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub void putBe32(u8[] s, i64 at, u32 v)
 {
     bytesCheck(s, at, 4, "putBe32");
     for (i64 i = 0; i < 4; i++) { s.ptr[at + i] = v >> (24 - 8 * i); }
 }
 
+/* v written big-endian (network order) at s[at] (8 bytes; past the end
+ * throws ERR_BOUNDS) */
 pub void putBe64(u8[] s, i64 at, u64 v)
 {
     bytesCheck(s, at, 8, "putBe64");
     for (i64 i = 0; i < 8; i++) { s.ptr[at + i] = v >> (56 - 8 * i); }
 }
 
+/* v written little-endian at s[at] (2 bytes; past the end throws
+ * ERR_BOUNDS) */
 pub void putLe16(u8[] s, i64 at, u16 v)
 {
     bytesCheck(s, at, 2, "putLe16");
@@ -230,12 +251,16 @@ pub void putLe16(u8[] s, i64 at, u16 v)
     s.ptr[at + 1] = v >> 8;
 }
 
+/* v written little-endian at s[at] (4 bytes; past the end throws
+ * ERR_BOUNDS) */
 pub void putLe32(u8[] s, i64 at, u32 v)
 {
     bytesCheck(s, at, 4, "putLe32");
     for (i64 i = 0; i < 4; i++) { s.ptr[at + i] = v >> (8 * i); }
 }
 
+/* v written little-endian at s[at] (8 bytes; past the end throws
+ * ERR_BOUNDS) */
 pub void putLe64(u8[] s, i64 at, u64 v)
 {
     bytesCheck(s, at, 8, "putLe64");

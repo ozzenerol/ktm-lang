@@ -31,21 +31,21 @@ const i64 SIG_O_NONBLOCK = 0x4;
 const i64 SIG_O_NONBLOCK = 0x800;
 #endif
 
-/* A signal action, as SigAction takes and returns it. */
+/* A signal action, as signal.action takes and returns it. */
 pub struct Action {
     i64 handler;  /* SIG_DFL, SIG_IGN, or a void F(i32 sig) as (&F)(i64) */
-    u64 mask;     /* signals blocked while it runs: SigBit(s) | ... */
+    u64 mask;     /* signals blocked while it runs: signal.bit(s) | ... */
     i32 flags;    /* SA_RESTART, SA_RESETHAND, SA_NODEFER, ... */
 };
 
-/* The bit for sig in SigAct.mask. */
+/* The bit for sig in signal.Action.mask. */
 pub u64 bit(i32 sig) {
     if (sig < 1 || sig > 64) { return 0; }
     return (u64)1 << (sig - 1);
 }
 
 /* Set the action for sig to *act (unless act is null) and store the
- * previous one in *old (unless old is null). false on failure, Errno()
+ * previous one in *old (unless old is null). false on failure, os.errno()
  * says why (EINVAL: a bad signal number, or SIGKILL/SIGSTOP). */
 pub bool action(i32 sig, Action *act, Action *old=null) {
     i64 cact[SIG_SA_BYTES / 8], cold[SIG_SA_BYTES / 8];
@@ -75,7 +75,7 @@ pub bool action(i32 sig, Action *act, Action *old=null) {
     return true;
 }
 
-/* SigAction in one call: handler (SIG_DFL, SIG_IGN or (&F)(i64)) for
+/* signal.action in one call: handler (SIG_DFL, SIG_IGN or (&F)(i64)) for
  * sig, with flags and mask; the previous action in *old if given. */
 pub bool handle(i32 sig, i64 handler, i32 flags=SIG_SA_RESTART,
                                             u64 mask=0, Action *old=null) {
@@ -86,7 +86,7 @@ pub bool handle(i32 sig, i64 handler, i32 flags=SIG_SA_RESTART,
     return action(sig, &a, old);
 }
 
-/* The pipe SigStopInit made, -1 before; the signal that asked to stop */
+/* The pipe signal.stopInit made, -1 before; the signal that asked to stop */
 static i32 sigStopRfd = -1, sigStopWfd = -1;
 
 static i64 sigStopSig = 0;
@@ -102,7 +102,7 @@ static void sigStopHandler(i32 sig) {
 }
 
 /* Make SIGINT and SIGTERM request a clean stop instead of ending the
- * program: each sets SigStopRequested and makes the returned fd
+ * program: each sets signal.stopRequested and makes the returned fd
  * readable, for a poll() loop to notice. The handlers use SA_RESTART and
  * SA_RESETHAND, so a second SIGINT or SIGTERM ends the program as usual
  * (a way out if the loop never stops). The fd is non-blocking and
@@ -124,7 +124,7 @@ pub i32 stopInit() {
     return sigStopRfd;
 }
 
-/* true once SIGINT or SIGTERM arrived after SigStopInit. */
+/* true once SIGINT or SIGTERM arrived after signal.stopInit. */
 pub bool stopRequested() {
     return sigStopSig != 0;
 }

@@ -34,6 +34,8 @@ void sliceRange<T>(T *s, i64 lo, i64 hi, fn(T *, T *) i64 cmp) {
     }
 }
 
+/* s sorted in place by cmp(a, b): negative when a goes first, 0 when they
+ * are equal, positive when b goes first. Not stable. */
 pub void slice<T>(T[] s, fn(T *, T *) i64 cmp) {
     if (s.len > 1) { sliceRange(s.ptr, 0, s.len - 1, cmp); }
 }
@@ -60,6 +62,8 @@ void ascRange<T>(T *s, i64 lo, i64 hi) {
     }
 }
 
+/* s sorted in place, smallest first, by `<` (numbers, or anything `<`
+ * compares). Not stable. */
 pub void asc<T>(T[] s) {
     if (s.len > 1) { ascRange(s.ptr, 0, s.len - 1); }
 }

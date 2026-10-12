@@ -96,7 +96,7 @@ pub struct Row {
     sqlite3_stmt *stmt;
     i64 cols;
     Column *col;
-    /* false for a row of a prepared statement, which SqlFinalizePrepared
+    /* false for a row of a prepared statement, which sql.finalize
      * finalizes. */
     bool ownsStmt;
 };
@@ -164,13 +164,13 @@ pub extern "c" u8 *sqlite3_errmsg(sqlite3 *db);
  * printerror is true. The Db keeps its own copy of dbname. */
 pub Db *open(u8[] dbname, bool printerror=false);
 /* Close the database and free ctx. Statements not finalized yet keep
- * the connection open until SqlFinalizePrepared. null is ignored. */
+ * the connection open until sql.finalize. null is ignored. */
 pub void close(Db *ctx);
 /* Compile one SQL statement with `?` parameters, to run many times with
- * SqlExecPrepared. Only whitespace and comments may follow it. null on
- * an error; free it with SqlFinalizePrepared. */
+ * sql.execPrepared. Only whitespace and comments may follow it. null on
+ * an error; free it with sql.finalize. */
 pub Stmt *prepare(Db *ctx, u8[] sql);
-/* Free a statement of SqlPrepare. null is ignored. */
+/* Free a statement of sql.prepare. null is ignored. */
 pub void finalize(Stmt *pstmt);
 /* Run every statement in sql, with no parameters (so never with values
  * from outside the program). An empty String on success, otherwise the
@@ -179,34 +179,34 @@ pub String execRaw(Db *ctx, u8[] sql);
 /* Run a prepared statement with params[0] .. params[n - 1] for its n
  * parameters (null params binds them all to null). Returns sqlite's
  * code: SQLITE_ROW when row now holds the first row (read the rest with
- * SqlIterPrepared), SQLITE_DONE when there are no rows, or an error:
+ * sql.nextPrepared), SQLITE_DONE when there are no rows, or an error:
  * SQLITE_MISUSE for a null pstmt, SQLITE_MISMATCH for a parameter type
  * other than SQL_INT/FLOAT/TEXT/BLOB/null, or the code of a failed bind
  * (e.g. SQLITE_TOOBIG). On an error the statement does not run and row
  * holds no row. The row belongs to the statement:
- * it is valid until the next SqlExecPrepared or SqlFinalizePrepared. */
+ * it is valid until the next sql.execPrepared or sql.finalize. */
 pub i32 execPrepared(Stmt *pstmt, Row *row,
         Param *params);
 /* Run one SQL statement with param_count parameters and point row at
- * its first row, if any; read the rows with SqlIter. true if the
+ * its first row, if any; read the rows with sql.next. true if the
  * statement ran (also with no rows), false on an error, an unknown
  * parameter type or anything but whitespace and comments after the
- * statement. The row owns the statement: SqlIter frees it after the
- * last row, SqlRowRelease when you stop early. */
+ * statement. The row owns the statement: sql.next frees it after the
+ * last row, sql.rowRelease when you stop early. */
 pub bool select(Db *ctx, Row *row, u8[] sql,
         Param *params=null, i32 paramCount=0);
-/* Like SqlSelect, for a statement whose rows you don't need (INSERT,
+/* Like sql.select, for a statement whose rows you don't need (INSERT,
  * UPDATE, CREATE, ...). */
 pub bool exec(Db *ctx, u8[] sql, Param *params=null,
         i32 paramCount=0);
 /* Move row to its next row (the first one on the first call): true while
  * there is one, false after the last, when the row is released. */
 pub i32 next(Row *row);
-/* SqlIter for a row of SqlExecPrepared (the same, but returns i64). */
+/* sql.next for a row of sql.execPrepared (the same, but returns i64). */
 pub i64 nextPrepared(Row *row);
 /* Release a row before its last row was read: free its columns and, for
- * a row of SqlSelect, its statement. A row of SqlExecPrepared leaves its
- * statement to SqlFinalizePrepared. Calling it again does nothing. */
+ * a row of sql.select, its statement. A row of sql.execPrepared leaves its
+ * statement to sql.finalize. Calling it again does nothing. */
 pub void rowRelease(Row *row);
 
 #endif /* End of SQLite */
