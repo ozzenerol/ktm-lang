@@ -1399,6 +1399,55 @@ price 9.90
 {"id": 123456789012345678901234567890,"price": 9.90}
 </pre>
 
+<h3 id="json-structs">Structs to JSON and back<a class="anchor" href="#json-structs" aria-label="Link to this section">#</a></h3>
+<p><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
+<a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
+as the second argument for one member per line). <code>json.decode(text, reflect.of(x))</code>
+fills <code>x</code> from JSON, and <code>json.free(reflect.of(x))</code> gives back what decode
+allocated. A struct is an object of its fields by name, in order; ints, floats and bools are
+numbers and <code>true</code>/<code>false</code>; an enum is its member's name; a
+<code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array is a string;
+other arrays and slices are arrays; a pointer is what it points to, or <code>null</code>.
+Private fields are skipped. A union, a function or a <code>void *</code> can't be JSON.</p>
+<pre data-run><code>import json, mem, reflect;
+
+enum Role { guest, admin };
+struct Tag { u8[] name; i64 weight; };
+struct User { i64 id; String name; Role role; Tag[] tags; };
+
+void main()
+{
+  User u;
+  mem.set(&amp;u, 0, sizeof(User));   // decode fills in what the JSON has
+  json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
+    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}", reflect.of(u));
+  defer json.free(reflect.of(u));
+  printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
+
+  u.id = 8;
+  String text = json.encode(reflect.of(u));
+  defer text.free();
+  printf("%s\n", text);
+
+  try {
+    json.decode("{\"tags\": [{\"weight\": \"high\"}]}", reflect.of(u));
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">7 Ada admin math
+{"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
+tags[0].weight: expected an integer, got a string
+</pre>
+<p>A key the struct has no field for is ignored (<code>"since"</code> above), and a field the
+JSON leaves out keeps what it had, so zero the value first; with <code>json.STRICT</code> as the
+third argument both are errors. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
+with where it is (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. Decode
+allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it fills in;
+<code>json.free</code> frees them all and zeroes them, also after a decode that threw half way,
+so use it only on values decode filled.</p>
+
 <h2 id="dates">Dates and time<a class="anchor" href="#dates" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>import date, mem;
 
