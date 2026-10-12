@@ -5551,6 +5551,7 @@ static int parseGenericHead(Cctrl *cc, Lexeme *first, GenericHead *h) {
 }
 
 static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *si);
+static int parseTypeHasParam(AstType *t);
 
 /* A generic declaration starting at `first` (taken): recorded, not
  * parsed. 1 if it was one (all of it is then taken). */
@@ -5799,6 +5800,20 @@ AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme 
     AoStr *name = parseGenericInstName(d->name, args);
     AstType *cls = mapGet(cc->clsdefs, name->data);
     if (cls) return cls;
+    /* `Vec<T>` in a signature being matched (parseGenericInfer): only
+     * what it is made of, never laid out */
+    for (u64 i = 0; i < args->size; ++i) {
+        if (parseTypeHasParam(args->entries[i])) {
+            AstType *pat = calloc(1, sizeof(AstType));
+            pat->kind = AST_TYPE_CLASS;
+            pat->clsname = name;
+            pat->generic = d;
+            pat->generic_args = args;
+            pat->size = 8;
+            pat->alignment = 8;
+            return pat;
+        }
+    }
     GenericInst *in = calloc(1, sizeof(GenericInst));
     in->def = d;
     in->args = args;
@@ -5842,6 +5857,178 @@ Vec *parseGenericArgs(Cctrl *cc) {
         cctrlRaiseException(cc, "Expected `,` or `>` in a type-argument list, got `%s`",
                             lexemeAsWritten(tok));
     }
+}
+
+
+/* Does type `t` hold a type-parameter stand-in (inference patterns)? */
+static int parseTypeHasParam(AstType *t) {
+    if (!t) return 0;
+    if (t->is_type_param) return 1;
+    switch (t->kind) {
+        case AST_TYPE_POINTER: case AST_TYPE_ARRAY: return parseTypeHasParam(t->ptr);
+        case AST_TYPE_FUNC: {
+            if (parseTypeHasParam(t->rettype)) return 1;
+            for (u64 i = 0; t->params && i < t->params->size; ++i) {
+                Ast *p = t->params->entries[i];
+                if (p && parseTypeHasParam(p->type)) return 1;
+            }
+            return 0;
+        }
+        case AST_TYPE_CLASS:
+            if (t->is_slice) return parseTypeHasParam(t->elem);
+            for (u64 i = 0; t->generic_args && i < t->generic_args->size; ++i) {
+                if (parseTypeHasParam(t->generic_args->entries[i])) return 1;
+            }
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+/* A generic function `name` (as written, `geo.area` or `area` in its
+ * module), or NULL */
+GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len) {
+    if (!cc->generic_funcs) return NULL;
+    char *qual = cctrlQualifyName(cc, name, len);
+    GenericDef *d = qual ? mapGet(cc->generic_funcs, qual) : NULL;
+    if (!d) d = mapGetLen(cc->generic_funcs, name, len);
+    return d;
+}
+
+/* Function `d` with type arguments `args`: its prototype (made the first
+ * time, its body at the end of the file) */
+Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
+    if (args->size != d->params->size) {
+        cctrlRaiseException(cc, "`%s` takes %d type argument%s, got %d", d->name->data,
+                            (int)d->params->size, d->params->size == 1 ? "" : "s",
+                            (int)args->size);
+    }
+    /* the unqualified name: a module's function is qualified when it is
+     * declared, as any other */
+    char *base = d->name->data;
+    char *dot = strrchr(base, '.');
+    AoStr *short_name = aoStrDup(dot && d->module_id ? aoStrDupRaw(dot + 1, strlen(dot + 1))
+                                                     : d->name);
+    AoStr *name = parseGenericInstName(short_name, args);
+    AoStr *full = parseGenericInstName(d->name, args);
+    Ast *fn = mapGet(cc->global_env, full->data);
+    if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (fn) return fn;
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = d;
+    in->args = args;
+    in->name = name;
+    in->at = at;
+    in->proto_only = 1;
+    parseGenericReplay(cc, d, in);
+    fn = mapGet(cc->global_env, full->data);
+    if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (!fn) cctrlRaiseException(cc, "could not make `%s`", full->data);
+    int pattern = 0;
+    for (u64 i = 0; i < args->size; ++i) pattern |= parseTypeHasParam(args->entries[i]);
+    if (!pattern) {
+        GenericInst *body = calloc(1, sizeof(GenericInst));
+        *body = *in;
+        body->proto_only = 0;
+        if (!cc->generic_pending) cc->generic_pending = vecNew(&vec_unsigned_long_type);
+        vecPush(cc->generic_pending, body);
+        vecPush(d->insts, in);
+    }
+    return fn;
+}
+
+static int parseTypesSame(AstType *a, AstType *b) {
+    return a == b || !strcmp(astTypeToString(a), astTypeToString(b));
+}
+
+/* Match pattern `pat` (with stand-ins) against argument type `arg`,
+ * binding the stand-ins in `b`. 0 on a conflict. */
+static int parseGenericUnify(AstType *pat, AstType *arg, Map *b, char **why) {
+    if (!pat || !arg) return 1;
+    if (pat->is_type_param) {
+        AstType *cur = mapGet(b, pat->clsname->data);
+        if (!cur) {
+            /* an array argument is its pointer, as a call passes it */
+            if (arg->kind == AST_TYPE_ARRAY) arg = astMakePointerType(arg->ptr);
+            mapAdd(b, pat->clsname->data, arg);
+            return 1;
+        }
+        if (parseTypesSame(cur, arg)) return 1;
+        *why = mprintf("`%s` is `%s` from one argument and `%s` from another",
+                       pat->clsname->data, astTypeToString(cur), astTypeToString(arg));
+        return 0;
+    }
+    switch (pat->kind) {
+        case AST_TYPE_POINTER:
+            if (arg->kind == AST_TYPE_POINTER || arg->kind == AST_TYPE_ARRAY) {
+                return parseGenericUnify(pat->ptr, arg->ptr, b, why);
+            }
+            return 1;
+        case AST_TYPE_CLASS:
+            if (pat->is_slice) {
+                if (astTypeIsSlice(arg)) return parseGenericUnify(pat->elem, arg->elem, b, why);
+                if (arg->kind == AST_TYPE_ARRAY) return parseGenericUnify(pat->elem, arg->ptr, b, why);
+                return 1;
+            }
+            if (pat->generic_args && arg->generic == pat->generic && arg->generic_args &&
+                arg->generic_args->size == pat->generic_args->size) {
+                for (u64 i = 0; i < pat->generic_args->size; ++i) {
+                    if (!parseGenericUnify(pat->generic_args->entries[i],
+                                           arg->generic_args->entries[i], b, why)) return 0;
+                }
+            }
+            return 1;
+        case AST_TYPE_FUNC:
+            if (arg->kind != AST_TYPE_FUNC) return 1;
+            if (!parseGenericUnify(pat->rettype, arg->rettype, b, why)) return 0;
+            for (u64 i = 0; pat->params && arg->params && i < pat->params->size &&
+                            i < arg->params->size; ++i) {
+                Ast *pp = pat->params->entries[i], *ap = arg->params->entries[i];
+                if (pp && ap && !parseGenericUnify(pp->type, ap->type, b, why)) return 0;
+            }
+            return 1;
+        default:
+            return 1;
+    }
+}
+
+/* The type arguments of a call to generic function `d` with `argv`
+ * (parsed without a target), from the argument types; NULL with *why
+ * when they can't all be found */
+Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
+    /* the signature with stand-ins for the parameters */
+    Vec *stand = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < d->params->size; ++i) {
+        AstType *t = calloc(1, sizeof(AstType));
+        t->kind = AST_TYPE_CLASS;
+        t->clsname = d->params->entries[i];
+        t->is_type_param = 1;
+        t->size = 8;
+        t->alignment = 8;
+        vecPush(stand, t);
+    }
+    Ast *pattern = parseGenericFuncInstance(cc, d, stand, NULL);
+    Vec *params = pattern->params;
+    Map *b = mapNew(8, &map_asttype_type);
+    for (u64 i = 0; params && i < params->size && argv && i < argv->size; ++i) {
+        Ast *p = params->entries[i];
+        Ast *arg = argv->entries[i];
+        if (!p || !arg || arg->kind == AST_PLACEHOLDER || !arg->type) continue;
+        if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) break;
+        AstType *pt = p->kind == AST_DEFAULT_PARAM ? p->declvar->type : p->type;
+        if (!parseGenericUnify(pt, arg->type, b, why)) return NULL;
+    }
+    Vec *args = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < d->params->size; ++i) {
+        AoStr *pname = d->params->entries[i];
+        AstType *t = mapGet(b, pname->data);
+        if (!t) {
+            *why = mprintf("nothing says what `%s` is", pname->data);
+            return NULL;
+        }
+        vecPush(args, t);
+    }
+    return args;
 }
 
 /* The method and function bodies of every instance, after the file; an

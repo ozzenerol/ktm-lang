@@ -2597,9 +2597,57 @@ void parseCheckOverloadRefs(Cctrl *cc) {
     }
 }
 
+/* A call to instance `fn` of a generic function with `argv` parsed
+ * without a target: checked, completed and converted as any call */
+static Ast *parseGenericCallWith(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *loc,
+                                 char *fname, int len) {
+    parseOverloadPackVarArgs(cc, fn, argv, loc->args, fname, len);
+    parseFunctionArgumentCheck(cc, fn, argv, fname, len, loc);
+    parseFlattenDefaultArgs(fn, argv);
+    parseAddEmptyVarArgCount(fn, argv);
+    parseCoerceArgs(fn, argv);
+    parseCallLocFreeArgs(loc);
+    return astFunctionCall(fn->type->rettype, fn->fname->data, fn->fname->len, argv);
+}
+
+/* `name<T, U>(args)`, the `<` next: the call of that instance */
+Ast *parseGenericExplicitCall(Cctrl *cc, GenericDef *d, char *fname, int len) {
+    Lexeme *at = parseLastToken(cc);
+    Vec *targs = parseGenericArgs(cc);
+    Ast *inst = parseGenericFuncInstance(cc, d, targs, at);
+    cctrlTokenExpect(cc, '(');
+    ParseCallLoc loc = parseCallLocStart(cc, fname, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, inst, ')', fname, len, loc.args);
+    parseCallLocEnd(cc, &loc);
+    parseFunctionArgumentCheck(cc, inst, argv, fname, len, &loc);
+    parseFlattenDefaultArgs(inst, argv);
+    parseAddEmptyVarArgCount(inst, argv);
+    parseCoerceArgs(inst, argv);
+    parseCallLocFreeArgs(&loc);
+    return astFunctionCall(inst->type->rettype, inst->fname->data, inst->fname->len, argv);
+}
+
 Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     AstType *rettype = NULL;
     Ast *maybe_fn = findFunctionDecl(cc,fname,len);
+    /* a generic function: its instance for the argument types */
+    GenericDef *generic = maybe_fn ? NULL : parseFindGenericFunc(cc, fname, len);
+    if (generic) {
+        Lexeme *at = parseLastToken(cc);
+        ParseCallLoc gloc = parseCallLocStart(cc, fname, len);
+        gloc.args = vecNew(&vec_unsigned_long_type);
+        Vec *gargv = parseArgv(cc, NULL, terminator, fname, len, gloc.args);
+        parseCallLocEnd(cc, &gloc);
+        char *why = NULL;
+        Vec *targs = parseGenericInfer(cc, generic, gargv, &why);
+        if (!targs) {
+            parseRaiseCallError(cc, &gloc, "can't work out the type arguments of `%.*s`: %s; "
+                                "write them, as in `%.*s<i64>(...)`", len, fname, why, len, fname);
+        }
+        Ast *inst = parseGenericFuncInstance(cc, generic, targs, at);
+        return parseGenericCallWith(cc, inst, gargv, &gloc, fname, len);
+    }
     Vec *overloads = maybe_fn && (maybe_fn->kind == AST_FUNC || maybe_fn->kind == AST_FUN_PROTO)
                    ? maybe_fn->overloads : NULL;
 
@@ -2953,6 +3001,20 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
     Lexeme *tok = cctrlTokenGet(cc);
     Lexeme *peek = cctrlTokenPeek(cc);
     int is_lparen = tokenPunctIs(tok,'(');
+
+    /* `name<T>(...)`: a generic function with its type arguments;
+     * `name(...)`: one whose arguments say what they are */
+    if (can_call_function && (tokenPunctIs(tok, '<') || is_lparen) &&
+        !cctrlGetVar(cc, name, len)) {
+        GenericDef *gd = parseFindGenericFunc(cc, name, len);
+        if (gd && is_lparen) {
+            return parseFunctionArguments(cc, name, len, ')');
+        }
+        if (gd) {
+            cctrlTokenRewind(cc);
+            return parseGenericExplicitCall(cc, gd, name, len);
+        }
+    }
 
     if (tokenPunctIs(tok,'.')) {
         AstType *enum_type = NULL;
