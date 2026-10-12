@@ -1249,7 +1249,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 16;
+const i64 LSP_GROUPS = 17;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1535,6 +1535,55 @@ void testDocs() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+/* The symbol named `name` in a DocumentSymbol/SymbolInformation array */
+json.Value *symNamed(json.Value *arr, u8 *name) {
+    if (arr == null) { return null; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *n = json.select(it, ".name:s");
+        if (n != null && cstr.cmp(n.str.ptr, name) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+void testSymbols() {
+    printf("symbols\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("symbols.ktm");
+    lspDidOpen(l, uri, METH_HC);
+
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *resp = lspRequest(l, "textDocument/documentSymbol", params);
+    json.Value *top = json.select(resp, ".result:a");
+    json.Value *user = symNamed(top, "User");
+    json.Value *admin = symNamed(top, "Admin");
+    json.Value *mainSym = symNamed(top, "main");
+    check("outline lists the structs and main at the top",
+                user != null && admin != null && mainSym != null &&
+                json.select(mainSym, ".kind:i").intVal == 12 &&
+                json.select(user, ".kind:i").intVal == 23);
+    json.Value *uk = user ? json.select(user, ".children:a") : null;
+    check("a struct's fields and methods are its children",
+                symNamed(uk, "name") != null && symNamed(uk, "age") != null &&
+                symNamed(uk, "older") != null && symNamed(uk, "describe") != null &&
+                symNamed(top, "older") == null);
+    json.Value *older = symNamed(uk, "older");
+    check("a method's range spans its body, its detail has no self",
+                older != null && json.select(older, ".range.start.line:i").intVal == 2 &&
+                json.select(older, ".range.end.line:i").intVal == 5 &&
+                cstr.cmp(json.select(older, ".detail:s").str.ptr, "i64 User.older(i64 years);") == 0);
+
+    resp = lspRequest(l, "workspace/symbol", "{\"query\":\"oldr\"}");
+    json.Value *ws = json.select(resp, ".result:a");
+    json.Value *wo = symNamed(ws, "older");
+    check("workspace symbols match fuzzily and name the container",
+                wo != null && cstr.cmp(json.select(wo, ".containerName:s").str.ptr, "User") == 0 &&
+                symNamed(ws, "main") == null);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1553,6 +1602,7 @@ void runGroup(i64 group) {
         case 13: testGenerics();
         case 14: testEnums();
         case 15: testDocs();
+        case 16: testSymbols();
     }
 }
 

@@ -3476,6 +3476,544 @@ static void lspDocumentHighlight(LspCtx *ctx, Json *id, Json *params) {
     aoStrRelease(body);
 }
 
+/* ---- symbols ----
+ * The outline of a document (textDocument/documentSymbol): its functions,
+ * structs (their fields and methods inside), unions, enums (their
+ * members), constants and globals, type aliases, generics and macros,
+ * each with its whole declaration as its range. workspace/symbol searches
+ * the same over every open document. */
+
+#define LSP_SK_FUNCTION  12
+#define LSP_SK_METHOD    6
+#define LSP_SK_FIELD     8
+#define LSP_SK_ENUM      10
+#define LSP_SK_VARIABLE  13
+#define LSP_SK_CONSTANT  14
+#define LSP_SK_ENUM_MEMBER 22
+#define LSP_SK_STRUCT    23
+#define LSP_SK_TYPE_PARAM 26
+#define LSP_SK_MODULE    2
+
+typedef struct LspSym {
+    char *name;
+    char *detail;
+    int kind;
+    u32 file_id;
+    int line, col, len;  /* the name: 1-based line and column */
+    int end_line, end_col; /* the declaration's end, 0-based, exclusive */
+    char *owner;         /* a method's or field's type, nesting it */
+    Vec *children;       /* LspSym * */
+} LspSym;
+
+static int lspSymCmp(const void *a, const void *b) {
+    const LspSym *x = *(LspSym *const *)a, *y = *(LspSym *const *)b;
+    if (x->line != y->line) return x->line - y->line;
+    return x->col - y->col;
+}
+
+/* The byte offset of (line1, col1) in text */
+static size_t lspOffsetOf(AoStr *text, int line1, int col1) {
+    size_t off = lspLineStart(text, line1 - 1) + (size_t)(col1 > 0 ? col1 - 1 : 0);
+    return off > text->len ? text->len : off;
+}
+
+/* Past the end of the declaration whose name is at `off`: its `;`, or
+ * its body's closing `}` (and a `;` after it) */
+static size_t lspDeclEnd(AoStr *text, size_t off) {
+    const char *s = text->data;
+    size_t n = text->len, i = off;
+    int paren = 0;
+    while (i < n) {
+        char c = s[i];
+        if (c == '/' && i + 1 < n && s[i + 1] == '/') {
+            while (i < n && s[i] != '\n') i++;
+            continue;
+        }
+        if (c == '/' && i + 1 < n && s[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) i++;
+            i += 2;
+            continue;
+        }
+        if (c == '"' || c == '\'') {
+            for (i++; i < n && s[i] != c && s[i] != '\n'; i++) {
+                if (s[i] == '\\') i++;
+            }
+            i++;
+            continue;
+        }
+        if (c == '(') paren++;
+        else if (c == ')') paren--;
+        else if (c == ';' && paren <= 0) return i + 1;
+        else if (c == '{' && paren <= 0) {
+            int depth = 0;
+            while (i < n) {
+                char d = s[i];
+                if (d == '/' && i + 1 < n && s[i + 1] == '/') {
+                    while (i < n && s[i] != '\n') i++;
+                    continue;
+                }
+                if (d == '/' && i + 1 < n && s[i + 1] == '*') {
+                    i += 2;
+                    while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) i++;
+                    i += 2;
+                    continue;
+                }
+                if (d == '"' || d == '\'') {
+                    for (i++; i < n && s[i] != d && s[i] != '\n'; i++) {
+                        if (s[i] == '\\') i++;
+                    }
+                    i++;
+                    continue;
+                }
+                if (d == '{') depth++;
+                else if (d == '}' && --depth == 0) {
+                    size_t j = i + 1;
+                    while (j < n && (s[j] == ' ' || s[j] == '\t')) j++;
+                    return j < n && s[j] == ';' ? j + 1 : i + 1;
+                }
+                i++;
+            }
+            return n;
+        }
+        i++;
+    }
+    return n;
+}
+
+/* The 0-based line and byte column of offset off */
+static void lspLineColOf(AoStr *text, size_t off, int *line, int *col) {
+    int l = 0;
+    size_t start = 0;
+    for (size_t i = 0; i < off && i < text->len; ++i) {
+        if (text->data[i] == '\n') {
+            l++;
+            start = i + 1;
+        }
+    }
+    *line = l;
+    *col = (int)(off - start);
+}
+
+/* `name` without the document's module prefix (`geo.area` in geo: area) */
+static const char *lspLocalName(const char *name, const char *mod) {
+    size_t ml = mod ? strlen(mod) : 0;
+    if (ml && !strncmp(name, mod, ml) && name[ml] == '.') return name + ml + 1;
+    return name;
+}
+
+static LspSym *lspSymNew(Vec *out, const char *name, int kind, char *detail,
+                         u32 file_id, int line, int col, int len) {
+    LspSym *sym = calloc(1, sizeof(LspSym));
+    sym->name = mprintf("%s", name);
+    sym->kind = kind;
+    sym->detail = detail;
+    sym->file_id = file_id;
+    sym->line = line;
+    sym->col = col;
+    sym->len = len;
+    vecPush(out, sym);
+    return sym;
+}
+
+/* Every symbol declared in file `file_id` (whose module is `mod`, NULL
+ * when none), flat: methods and fields carry their owner */
+static void lspCollectSymbols(LspCtx *ctx, u32 file_id, const char *mod,
+                              Vec *out) {
+    Cctrl *cc = ctx->cc;
+    Set *seen = setNew(32, &set_cstring_type);
+    MapIter it;
+    mapIterInit(cc->global_env, &it);
+    while (mapIterNext(&it)) {
+        const char *key = it.node->key;
+        Ast *entry = it.node->value;
+        /* instances' and symbols' names (`_K4User5older`): the source's
+         * own name is there too */
+        if (!entry || strchr(key, '<') ||
+            (key[0] == '_' && key[1] == 'K' && isdigit((unsigned char)key[2]))) {
+            continue;
+        }
+        u64 n = entry->overloads ? entry->overloads->size : 1;
+        for (u64 k = 0; k < n; ++k) {
+            Ast *e = entry->overloads ? entry->overloads->entries[k] : entry;
+            if (!e || e->file_id != file_id || e->line <= 0) continue;
+            char *id = mprintf("%p", (void *)e);
+            if (setHas(seen, id)) continue;
+            setAdd(seen, id);
+            const char *name = lspLocalName(key, mod);
+            if (lspIsFn(e)) {
+                if (e->kind == AST_FUN_PROTO) continue;
+                if (lspIsMethod(e)) {
+                    const char *dot = strrchr(name, '.');
+                    LspSym *m = lspSymNew(out, dot ? dot + 1 : name, LSP_SK_METHOD,
+                                          NULL, file_id, e->line, e->col,
+                                          (int)strlen(dot ? dot + 1 : name));
+                    /* `i64 User.older(i64 years)`: without self */
+                    char *sig = lspModuleFnString(e, key);
+                    char *open = strchr(sig, '(');
+                    char *self = open ? strstr(open, "self") : NULL;
+                    if (self) {
+                        char *rest = self + 4;
+                        if (*rest == ',') rest++;
+                        while (*rest == ' ') rest++;
+                        sig = mprintf("%.*s%s", (int)(open + 1 - sig), sig, rest);
+                    }
+                    m->detail = sig;
+                    m->owner = dot ? mprintf("%.*s", (int)(dot - name), name) : NULL;
+                } else {
+                    const char *bare = strrchr(name, '.');
+                    bare = bare ? bare + 1 : name;
+                    lspSymNew(out, bare, LSP_SK_FUNCTION, lspModuleFnString(e, key),
+                              file_id, e->line, e->col, (int)strlen(bare));
+                }
+            } else if (e->kind == AST_GVAR || e->kind == AST_DECL) {
+                const char *bare = strrchr(name, '.');
+                bare = bare ? bare + 1 : name;
+                lspSymNew(out, bare,
+                          (e->flags & AST_FLAG_CONST) ? LSP_SK_CONSTANT : LSP_SK_VARIABLE,
+                          e->type ? astTypeToString(e->type) : NULL, file_id,
+                          e->line, e->col, (int)strlen(bare));
+            }
+        }
+    }
+    Map *types[2] = { cc->clsdefs, cc->uniondefs };
+    for (int t = 0; t < 2; ++t) {
+        mapIterInit(types[t], &it);
+        while (mapIterNext(&it)) {
+            const char *key = it.node->key;
+            AstType *ty = it.node->value;
+            if (!ty || ty->file_id != file_id || ty->line <= 0 || strchr(key, '<') ||
+                ty->generic) {
+                continue;
+            }
+            const char *name = lspLocalName(key, mod);
+            int kind = ty->is_enum ? LSP_SK_ENUM : LSP_SK_STRUCT;
+            LspSym *sym = lspSymNew(out, name, kind,
+                                    mprintf("%s", ty->is_enum ? "enum"
+                                            : ty->kind == AST_TYPE_UNION ? "union"
+                                                                         : "struct"),
+                                    file_id, ty->line, ty->col, (int)strlen(name));
+            (void)sym;
+            if (ty->is_enum && ty->enum_members) {
+                MapIter mi;
+                mapIterInit(ty->enum_members, &mi);
+                while (mapIterNext(&mi)) {
+                    Ast *m = mi.node->value;
+                    if (m->line <= 0) continue;
+                    LspSym *ms = lspSymNew(out, mi.node->key, LSP_SK_ENUM_MEMBER,
+                                           mprintf("= %lld", (long long)m->i64), file_id,
+                                           m->line, m->col, (int)strlen(mi.node->key));
+                    ms->owner = mprintf("%s", name);
+                }
+            } else if (ty->fields) {
+                MapIter fi;
+                mapIterInit(ty->fields, &fi);
+                while (mapIterNext(&fi)) {
+                    AstType *f = fi.node->value;
+                    if (!f || f->file_id != file_id || f->line <= 0) continue;
+                    LspSym *fs = lspSymNew(out, fi.node->key, LSP_SK_FIELD,
+                                           astTypeToString(f), file_id, f->line,
+                                           f->col, (int)strlen(fi.node->key));
+                    fs->owner = mprintf("%s", name);
+                }
+            }
+        }
+    }
+    if (cc->type_aliases) {
+        mapIterInit(cc->type_aliases, &it);
+        while (mapIterNext(&it)) {
+            TypeAlias *a = it.node->value;
+            if (!a || a->file_id != file_id || a->line <= 0) continue;
+            const char *name = lspLocalName(it.node->key, mod);
+            lspSymNew(out, name, LSP_SK_TYPE_PARAM,
+                      mprintf("type = %s", astTypeToString(a->type)), file_id,
+                      a->line, a->col, (int)strlen(name));
+        }
+    }
+    Map *gens[2] = { cc->generic_structs, cc->generic_funcs };
+    for (int g = 0; g < 2; ++g) {
+        if (!gens[g]) continue;
+        mapIterInit(gens[g], &it);
+        while (mapIterNext(&it)) {
+            GenericDef *d = it.node->value;
+            if (!d || d->file_id != file_id || !d->at) continue;
+            const char *name = lspLocalName(d->name->data, mod);
+            AoStr *head = aoStrNew();
+            lspCatGenericHead(head, d);
+            lspSymNew(out, mprintf("%s<%s>", name, ""),
+                      g == 0 ? LSP_SK_STRUCT : LSP_SK_FUNCTION, head->data, file_id,
+                      d->at->line, d->at->col, d->at->len);
+            LspSym *last = out->entries[out->size - 1];
+            AoStr *nm = aoStrNew();
+            aoStrCatPrintf(nm, "%s<", name);
+            for (u64 i = 0; i < d->params->size; ++i) {
+                aoStrCatPrintf(nm, "%s%s", i ? ", " : "",
+                               ((AoStr *)d->params->entries[i])->data);
+            }
+            aoStrPutChar(nm, '>');
+            last->name = nm->data;
+        }
+    }
+    if (cc->generic_methods) {
+        for (u64 i = 0; i < cc->generic_methods->size; ++i) {
+            GenericDef *d = cc->generic_methods->entries[i];
+            if (!d || d->file_id != file_id || !d->method) continue;
+            /* the method's name token: the first one spelled so after
+             * the struct's name */
+            Lexeme *at = NULL;
+            for (u64 k = 0; k < d->toks->size; ++k) {
+                Lexeme *t = d->toks->entries[k];
+                if (t->tk_type == TK_IDENT && (size_t)t->len == d->method->len &&
+                    !memcmp(t->start, d->method->data, t->len) &&
+                    (d->at == NULL || t->line > d->at->line ||
+                     (t->line == d->at->line && t->col > d->at->col))) {
+                    at = t;
+                    break;
+                }
+            }
+            if (!at) continue;
+            AoStr *head = aoStrNew();
+            lspCatGenericHead(head, d);
+            LspSym *m = lspSymNew(out, d->method->data, LSP_SK_METHOD, head->data,
+                                  file_id, at->line, at->col, at->len);
+            AoStr *owner = aoStrNew();
+            aoStrCatPrintf(owner, "%s<", lspLocalName(d->of->name->data, mod));
+            for (u64 k = 0; k < d->of->params->size; ++k) {
+                aoStrCatPrintf(owner, "%s%s", k ? ", " : "",
+                               ((AoStr *)d->of->params->entries[k])->data);
+            }
+            aoStrPutChar(owner, '>');
+            m->owner = owner->data;
+        }
+    }
+}
+
+/* `#define NAME` lines of text, as symbols */
+static void lspCollectMacros(AoStr *text, u32 file_id, Vec *out) {
+    const char *s = text->data, *end = s + text->len;
+    for (int line = 1; s < end; ++line) {
+        const char *eol = memchr(s, '\n', end - s);
+        if (!eol) eol = end;
+        const char *p = s;
+        while (p < eol && isspace((unsigned char)*p)) p++;
+        if (eol - p > 8 && !memcmp(p, "#define", 7) && isspace((unsigned char)p[7])) {
+            const char *q = p + 7;
+            while (q < eol && isspace((unsigned char)*q)) q++;
+            const char *ne = q;
+            while (ne < eol && lspIsIdentChar(*ne)) ne++;
+            if (ne > q) {
+                LspSym *m = lspSymNew(out, mprintf("%.*s", (int)(ne - q), q),
+                                      LSP_SK_CONSTANT, NULL, file_id, line,
+                                      (int)(q - s) + 1, (int)(ne - q));
+                const char *v = ne;
+                while (v < eol && isspace((unsigned char)*v)) v++;
+                m->detail = mprintf("%.*s", (int)(eol - v), v);
+                m->end_line = line - 1;
+                m->end_col = (int)(eol - s);
+            }
+        }
+        s = eol + 1;
+    }
+}
+
+/* Each symbol's whole-declaration range (from its text) and the nesting
+ * of fields, members and methods into their type: the top level */
+static Vec *lspNestSymbols(AoStr *text, Vec *flat) {
+    for (u64 i = 0; i < flat->size; ++i) {
+        LspSym *sym = flat->entries[i];
+        /* the name as the text spells it (`main`, which the compiler
+         * calls Main) */
+        if (sym->kind == LSP_SK_FUNCTION) {
+            size_t off = lspOffsetOf(text, sym->line, sym->col), e = off;
+            while (e < text->len && lspIsIdentChar(text->data[e])) e++;
+            if (e - off == (size_t)sym->len &&
+                !strncasecmp(text->data + off, sym->name, sym->len)) {
+                sym->name = mprintf("%.*s", sym->len, text->data + off);
+            }
+        }
+        if (sym->end_line || sym->end_col) continue;
+        if (sym->kind == LSP_SK_FIELD || sym->kind == LSP_SK_ENUM_MEMBER) {
+            sym->end_line = sym->line - 1;
+            sym->end_col = sym->col - 1 + sym->len;
+            continue;
+        }
+        size_t off = lspOffsetOf(text, sym->line, sym->col);
+        lspLineColOf(text, lspDeclEnd(text, off), &sym->end_line, &sym->end_col);
+    }
+    qsort(flat->entries, flat->size, sizeof(LspSym *), lspSymCmp);
+    Vec *top = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < flat->size; ++i) {
+        LspSym *sym = flat->entries[i];
+        LspSym *parent = NULL;
+        if (sym->owner) {
+            for (u64 k = 0; k < flat->size && !parent; ++k) {
+                LspSym *t = flat->entries[k];
+                if ((t->kind == LSP_SK_STRUCT || t->kind == LSP_SK_ENUM) &&
+                    !strcmp(t->name, sym->owner)) {
+                    parent = t;
+                }
+            }
+        }
+        if (parent) {
+            if (!parent->children) parent->children = vecNew(&vec_unsigned_long_type);
+            vecPush(parent->children, sym);
+            /* a method after its struct: the struct's range takes it in */
+            if (sym->end_line > parent->end_line ||
+                (sym->end_line == parent->end_line && sym->end_col > parent->end_col)) {
+                if (sym->kind != LSP_SK_METHOD) {
+                    parent->end_line = sym->end_line;
+                    parent->end_col = sym->end_col;
+                }
+            }
+        } else {
+            if (sym->owner && sym->kind == LSP_SK_METHOD) {
+                sym->name = mprintf("%s.%s", sym->owner, sym->name);
+            }
+            vecPush(top, sym);
+        }
+    }
+    return top;
+}
+
+static void lspCatSym(LspCtx *ctx, AoStr *body, AoStr *text, LspSym *sym) {
+    int l0 = sym->line - 1, c0 = sym->col - 1;
+    aoStrCat(body, "{\"name\":\"");
+    jsonEscapeInto(body, sym->name, strlen(sym->name));
+    aoStrCatPrintf(body, "\",\"kind\":%d,", sym->kind);
+    if (sym->detail) {
+        aoStrCat(body, "\"detail\":\"");
+        jsonEscapeInto(body, sym->detail, strlen(sym->detail));
+        aoStrCat(body, "\",");
+    }
+    /* a method declared outside its struct's range keeps its own */
+    int el = sym->end_line, ec = sym->end_col;
+    if (el < l0 || (el == l0 && ec < c0 + sym->len)) {
+        el = l0;
+        ec = c0 + sym->len;
+    }
+    aoStrCatPrintf(body,
+        "\"range\":{\"start\":{\"line\":%d,\"character\":%d},"
+        "\"end\":{\"line\":%d,\"character\":%d}},",
+        l0, 0, el, lspColToWire(ctx, text, el, ec));
+    aoStrCatPrintf(body,
+        "\"selectionRange\":{\"start\":{\"line\":%d,\"character\":%d},"
+        "\"end\":{\"line\":%d,\"character\":%d}}",
+        l0, lspColToWire(ctx, text, l0, c0), l0,
+        lspColToWire(ctx, text, l0, c0 + sym->len));
+    if (sym->children && sym->children->size) {
+        aoStrCat(body, ",\"children\":[");
+        for (u64 i = 0; i < sym->children->size; ++i) {
+            LspSym *c = sym->children->entries[i];
+            /* children inside the parent's range only: methods written
+             * after the struct are listed with it but range on their own */
+            if (i) aoStrPutChar(body, ',');
+            lspCatSym(ctx, body, text, c);
+        }
+        aoStrPutChar(body, ']');
+    }
+    aoStrPutChar(body, '}');
+}
+
+static void lspDocumentSymbol(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri = jsonStrOr(jsonObjGet(params, "textDocument"), "uri", NULL);
+    AoStr *text = uri ? lspDocGetOrLoad(ctx, uri) : NULL;
+    if (!text) {
+        lspRespond(id, "null");
+        return;
+    }
+    u32 doc_id = lspDocId(ctx, uri);
+    Vec *flat = vecNew(&vec_unsigned_long_type);
+    lspCollectSymbols(ctx, doc_id, lspDocModule(text), flat);
+    lspCollectMacros(text, doc_id, flat);
+    Vec *top = lspNestSymbols(text, flat);
+    AoStr *body = aoStrNew();
+    aoStrPutChar(body, '[');
+    for (u64 i = 0; i < top->size; ++i) {
+        if (i) aoStrPutChar(body, ',');
+        lspCatSym(ctx, body, text, top->entries[i]);
+    }
+    aoStrPutChar(body, ']');
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
+/* Does `name` contain every character of `query`, in order, ignoring
+ * case (the fuzzy match editors expect)? */
+static int lspFuzzy(const char *name, const char *query) {
+    for (; *query; ++query) {
+        while (*name && tolower((unsigned char)*name) != tolower((unsigned char)*query)) name++;
+        if (!*name) return 0;
+        name++;
+    }
+    return 1;
+}
+
+/* workspace/symbol: the symbols of every open document (and of the
+ * files of their modules) matching the query */
+static void lspWorkspaceSymbol(LspCtx *ctx, Json *id, Json *params) {
+    const char *query = jsonStrOr(params, "query", "");
+    AoStr *body = aoStrNew();
+    aoStrPutChar(body, '[');
+    int emitted = 0;
+    Set *files = setNew(16, &set_cstring_type);
+    MapIter di;
+    mapIterInit(ctx->docs, &di);
+    while (mapIterNext(&di)) {
+        char *path = lspUriToPath(di.node->key);
+        setAdd(files, path);
+        char *slash = strrchr(path, '/');
+        AoStr *dtext = di.node->value;
+        if (slash && lspDocModule(dtext)) {
+            /* its module's other files */
+            char *dir = mprintf("%.*s", (int)(slash - path), path);
+            DIR *d = opendir(dir);
+            struct dirent *ent;
+            while (d && (ent = readdir(d)) != NULL) {
+                size_t n = strlen(ent->d_name);
+                if (n >= 5 && !strcmp(ent->d_name + n - 4, ".ktm")) {
+                    setAdd(files, mprintf("%s/%s", dir, ent->d_name));
+                }
+            }
+            if (d) closedir(d);
+        }
+    }
+    SetIter si;
+    setIterInit(files, &si);
+    char *path;
+    while ((path = setNext(&si)) != NULL && emitted < 500) {
+        const char *furi = NULL;
+        AoStr *ftext = lspTextForPath(ctx, path, &furi);
+        if (!ftext) continue;
+        AoStr ps = { .data = path, .len = strlen(path), .capacity = 0 };
+        u32 fid = cctrlRegisterFile(ctx->cc, &ps);
+        Vec *flat = vecNew(&vec_unsigned_long_type);
+        lspCollectSymbols(ctx, fid, lspDocModule(ftext), flat);
+        lspCollectMacros(ftext, fid, flat);
+        for (u64 i = 0; i < flat->size && emitted < 500; ++i) {
+            LspSym *sym = flat->entries[i];
+            if (!lspFuzzy(sym->name, query)) continue;
+            if (emitted++) aoStrPutChar(body, ',');
+            aoStrCat(body, "{\"name\":\"");
+            jsonEscapeInto(body, sym->name, strlen(sym->name));
+            aoStrCatPrintf(body, "\",\"kind\":%d,", sym->kind);
+            if (sym->owner) {
+                aoStrCat(body, "\"containerName\":\"");
+                jsonEscapeInto(body, sym->owner, strlen(sym->owner));
+                aoStrCat(body, "\",");
+            }
+            aoStrCat(body, "\"location\":{\"uri\":\"file://");
+            jsonEscapeInto(body, path, strlen(path));
+            aoStrCat(body, "\",");
+            lspCatRange(ctx, body, ftext, sym->line - 1, sym->col - 1,
+                        sym->col - 1 + sym->len);
+            aoStrCat(body, "}}");
+        }
+    }
+    aoStrPutChar(body, ']');
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
 /* Answer a textDocument request from an isolated child; if the child
  * crashed or hung on the document, answer null ourselves. */
 static void lspServe(LspCtx *ctx, Json *id, Json *params,
@@ -3491,6 +4029,24 @@ static void lspServe(LspCtx *ctx, Json *id, Json *params,
     if (sig) {
         lspLog(ctx, "lsp: request failed on %s (signal %d)", uri, sig);
         lspRespond(id, "null");
+    }
+}
+
+/* A request about no one document: answered from a child that parsed
+ * every open document (an empty answer when none is open) */
+static void lspServeWorkspace(LspCtx *ctx, Json *id, Json *params,
+                              LspHandler handler) {
+    MapIter mi;
+    mapIterInit(ctx->docs, &mi);
+    if (!mapIterNext(&mi)) {
+        lspRespond(id, "[]");
+        return;
+    }
+    const char *uri = mi.node->key;
+    int sig = lspRunIsolated(ctx, uri, 1, handler, id, params);
+    if (sig) {
+        lspLog(ctx, "lsp: workspace request failed (signal %d)", sig);
+        lspRespond(id, "[]");
     }
 }
 
@@ -3520,7 +4076,9 @@ static void lspInitialize(LspCtx *ctx, Json *id, Json *params) {
         "\"completionProvider\":{\"triggerCharacters\":[\".\",\">\"]},"
         "\"renameProvider\":{\"prepareProvider\":true},"
         "\"referencesProvider\":true,"
-        "\"documentHighlightProvider\":true"
+        "\"documentHighlightProvider\":true,"
+        "\"documentSymbolProvider\":true,"
+        "\"workspaceSymbolProvider\":true"
         "},\"serverInfo\":{\"name\":\"ktm\",\"version\":\"%s\"}}",
         ctx->utf16 ? "utf-16" : "utf-8", cctrlGetVersion());
     lspRespond(id, result->data);
@@ -3604,6 +4162,10 @@ int lspRun(CliArgs *args) {
             lspServe(ctx, id, params, lspReferences, 1);
         } else if (strcmp(method, "textDocument/documentHighlight") == 0) {
             lspServe(ctx, id, params, lspDocumentHighlight, 0);
+        } else if (strcmp(method, "textDocument/documentSymbol") == 0) {
+            lspServe(ctx, id, params, lspDocumentSymbol, 0);
+        } else if (strcmp(method, "workspace/symbol") == 0) {
+            lspServeWorkspace(ctx, id, params, lspWorkspaceSymbol);
         } else if (id != NULL) {
             /* Requests we don't implement yet; notifications
              * (initialized, didSave, $/...) are silently fine. */
