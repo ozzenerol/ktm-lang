@@ -4185,6 +4185,419 @@ static void lspSignatureHelp(LspCtx *ctx, Json *id, Json *params) {
     aoStrRelease(body);
 }
 
+/* ---- semantic tokens ----
+ * What each name is, for editors to colour beyond what a grammar can
+ * tell: modules, types, enums and their members, functions and methods,
+ * fields, parameters, locals, constants, macros, type parameters; with
+ * `declaration`, `readonly` (consts) and `defaultLibrary` (the stdlib's).
+ * Keywords, literals and comments are left to the grammar. */
+
+enum {
+    LSP_ST_NAMESPACE, LSP_ST_TYPE, LSP_ST_STRUCT, LSP_ST_ENUM,
+    LSP_ST_ENUM_MEMBER, LSP_ST_FUNCTION, LSP_ST_METHOD, LSP_ST_PROPERTY,
+    LSP_ST_PARAMETER, LSP_ST_VARIABLE, LSP_ST_MACRO, LSP_ST_TYPE_PARAMETER,
+};
+#define LSP_SM_DECLARATION 1
+#define LSP_SM_READONLY    2
+#define LSP_SM_DEFAULT_LIB 4
+
+#define LSP_SEMANTIC_LEGEND \
+    "{\"tokenTypes\":[\"namespace\",\"type\",\"struct\",\"enum\",\"enumMember\"," \
+    "\"function\",\"method\",\"property\",\"parameter\",\"variable\",\"macro\"," \
+    "\"typeParameter\"],\"tokenModifiers\":[\"declaration\",\"readonly\"," \
+    "\"defaultLibrary\"]}"
+
+typedef struct LspSemCtx {
+    LspCtx *ctx;
+    AoStr *text;
+    u32 doc_id;
+    char *mod;          /* the document's module, NULL when none */
+    Vec *fns;           /* the document's functions, by line */
+    Map *std_files;     /* file id (as text) -> "1"/"0": in the stdlib */
+    Set *type_params;   /* every generic's parameter names */
+    AoStr *out;
+    int emitted, prev_line, prev_col;
+} LspSemCtx;
+
+static int lspFnLineCmp(const void *a, const void *b) {
+    return (*(Ast *const *)a)->line - (*(Ast *const *)b)->line;
+}
+
+static int lspSemStd(LspSemCtx *sc, u32 file_id) {
+    if (!file_id) return 0;
+    char *key = mprintf("%u", file_id);
+    char *v = mapGet(sc->std_files, key);
+    if (!v) {
+        AoStr *f = cctrlLookUpFile(sc->ctx->cc, file_id);
+        v = f && lspPathInStdlib(sc->ctx, f->data) ? "1" : "0";
+        mapAdd(sc->std_files, key, v);
+    }
+    return *v == '1';
+}
+
+/* The function of the document enclosing line1, NULL at file scope */
+static Ast *lspSemEnclosing(LspSemCtx *sc, int line1) {
+    Ast *encl = NULL;
+    for (u64 i = 0; i < sc->fns->size; ++i) {
+        Ast *fn = sc->fns->entries[i];
+        if (fn->line > line1) break;
+        encl = fn;
+    }
+    return encl;
+}
+
+static void lspSemEmit(LspSemCtx *sc, int line, int bcol, int blen, int type,
+                       int mods) {
+    int c0 = lspColToWire(sc->ctx, sc->text, line, bcol);
+    int c1 = lspColToWire(sc->ctx, sc->text, line, bcol + blen);
+    int dl = line - sc->prev_line;
+    int dc = dl == 0 ? c0 - sc->prev_col : c0;
+    if (sc->emitted++) aoStrPutChar(sc->out, ',');
+    aoStrCatPrintf(sc->out, "%d,%d,%d,%d,%d", dl, dc, c1 - c0, type, mods);
+    sc->prev_line = line;
+    sc->prev_col = c0;
+}
+
+static int lspSemIsKeyword(const char *w, size_t n) {
+    static const char *extra[] = {
+        "ad", "type", "asm", "volatile", "inline", "class", "public",
+        "noreg", "reg", "elif", "elifdef", "ifdef", "ifndef", "endif",
+        "define", "undef", "defined", "include", "link", "typeof", "alignof",
+    };
+    for (u64 i = 0; i < sizeof(lsp_keywords) / sizeof(lsp_keywords[0]); ++i) {
+        if (strlen(lsp_keywords[i]) == n && !memcmp(lsp_keywords[i], w, n)) return 1;
+    }
+    for (u64 i = 0; i < sizeof(extra) / sizeof(extra[0]); ++i) {
+        if (strlen(extra[i]) == n && !memcmp(extra[i], w, n)) return 1;
+    }
+    return 0;
+}
+
+/* A value's (function's, global's) token type and modifiers */
+static int lspSemValue(LspSemCtx *sc, Ast *e, int line1, int col1, int *mods) {
+    if (lspIsFn(e)) {
+        Ast *d = e->overloads && e->overloads->size ? e->overloads->entries[0] : e;
+        if (lspSemStd(sc, d->file_id)) *mods |= LSP_SM_DEFAULT_LIB;
+        if (e->overloads) {
+            for (u64 i = 0; i < e->overloads->size; ++i) {
+                Ast *o = e->overloads->entries[i];
+                if (o->file_id == sc->doc_id && o->line == line1 && o->col == col1) {
+                    *mods |= LSP_SM_DECLARATION;
+                }
+            }
+        }
+        if (e->file_id == sc->doc_id && e->line == line1 && e->col == col1) {
+            *mods |= LSP_SM_DECLARATION;
+        }
+        return lspIsMethod(e) ? LSP_ST_METHOD : LSP_ST_FUNCTION;
+    }
+    if (e->flags & AST_FLAG_CONST) *mods |= LSP_SM_READONLY;
+    if (lspSemStd(sc, e->file_id)) *mods |= LSP_SM_DEFAULT_LIB;
+    if (e->file_id == sc->doc_id && e->line == line1 && e->col == col1) {
+        *mods |= LSP_SM_DECLARATION;
+    }
+    return LSP_ST_VARIABLE;
+}
+
+static int lspSemType(LspSemCtx *sc, AstType *t, int line1, int col1, int *mods) {
+    if (lspSemStd(sc, t->generic ? ((GenericDef *)t->generic)->file_id : t->file_id)) {
+        *mods |= LSP_SM_DEFAULT_LIB;
+    }
+    if (t->file_id == sc->doc_id && t->line == line1 && t->col == col1) {
+        *mods |= LSP_SM_DECLARATION;
+    }
+    return t->is_enum ? LSP_ST_ENUM : LSP_ST_STRUCT;
+}
+
+/* A qualified name `a.b.name` (a module's): its token type, -1 if none */
+static int lspSemQual(LspSemCtx *sc, const char *qual, int line1, int col1,
+                      int *mods) {
+    Cctrl *cc = sc->ctx->cc;
+    Ast *e = lspModuleValue(sc->ctx, qual);
+    if (e) return lspSemValue(sc, e, line1, col1, mods);
+    AstType *t = mapGet(cc->clsdefs, (char *)qual);
+    if (!t) t = mapGet(cc->uniondefs, (char *)qual);
+    if (t) return lspSemType(sc, t, line1, col1, mods);
+    TypeAlias *a = cc->type_aliases ? mapGet(cc->type_aliases, (char *)qual) : NULL;
+    if (a) return LSP_ST_TYPE;
+    GenericDef *g = lspGeneric(sc->ctx, qual, strlen(qual));
+    if (g) {
+        if (lspSemStd(sc, g->file_id)) *mods |= LSP_SM_DEFAULT_LIB;
+        return g->kind == GEN_STRUCT ? LSP_ST_STRUCT : LSP_ST_FUNCTION;
+    }
+    return -1;
+}
+
+/* The identifier [b, e) on 0-based `line` (line_start its first byte) */
+static void lspSemIdent(LspSemCtx *sc, size_t b, size_t e, int line,
+                        size_t line_start) {
+    const char *s = sc->text->data;
+    size_t n = sc->text->len, len = e - b;
+    if (lspSemIsKeyword(s + b, len)) return;
+    int line1 = line + 1, col1 = (int)(b - line_start) + 1;
+    LspCtx *ctx = sc->ctx;
+    Cctrl *cc = ctx->cc;
+
+    /* what is around it */
+    size_t p = b;
+    while (p > line_start && (s[p - 1] == ' ' || s[p - 1] == '\t')) p--;
+    int after_dot = p > line_start && (s[p - 1] == '.' ||
+                    (s[p - 1] == '>' && p - 1 > line_start && s[p - 2] == '-'));
+    size_t q = e;
+    while (q < n && (s[q] == ' ' || s[q] == '\t')) q++;
+    int before_dot = q < n && s[q] == '.' && !(q + 1 < n && s[q + 1] == '.');
+    int before_call = q < n && s[q] == '(';
+    int mods = 0, type = -1;
+
+    if (after_dot) {
+        /* the dotted chain before: a module, an enum or a type */
+        size_t ce = p - 1;
+        if (s[ce] == '>') ce--;
+        size_t cb = ce;
+        while (cb > line_start && (lspIsIdentChar(s[cb - 1]) || s[cb - 1] == '.')) cb--;
+        if (cb < ce && s[cb] != '.' && s[ce] != '-') {
+            const char *dot = memchr(s + cb, '.', ce - cb);
+            size_t hl = dot ? (size_t)(dot - (s + cb)) : ce - cb;
+            char *path = lspImportPath(sc->text, s + cb, hl);
+            int in_doc = 0;
+            if (path) {
+                char word[256];
+                snprintf(word, sizeof(word), "%.*s", (int)hl, s + cb);
+                lspResolveValue(ctx, sc->doc_id, line1, word, (s64)hl, &in_doc);
+            }
+            if (path && !in_doc) {
+                char *qual = mprintf("%s%.*s.%.*s", path, (int)(ce - cb - hl), s + cb + hl,
+                                     (int)len, s + b);
+                type = lspSemQual(sc, qual, line1, col1, &mods);
+                if (type < 0) {
+                    /* `geo.Kind.rect` */
+                    AstType *t = lspTypeByName(ctx, sc->text, s + cb, ce - cb);
+                    if (t && t->is_enum) {
+                        type = LSP_ST_ENUM_MEMBER;
+                        mods |= LSP_SM_READONLY;
+                        if (lspSemStd(sc, t->file_id)) mods |= LSP_SM_DEFAULT_LIB;
+                    }
+                }
+            } else if (!in_doc) {
+                AstType *t = lspTypeByName(ctx, sc->text, s + cb, ce - cb);
+                int v_in_doc = 0;
+                Ast *v = dot ? NULL : lspResolveValue(ctx, sc->doc_id, line1, s + cb,
+                                                      (s64)(ce - cb), &v_in_doc);
+                if (t && t->is_enum && !v_in_doc && !(v && !lspIsFn(v))) {
+                    type = LSP_ST_ENUM_MEMBER;
+                    mods |= LSP_SM_READONLY;
+                    if (lspSemStd(sc, t->file_id)) mods |= LSP_SM_DEFAULT_LIB;
+                }
+            }
+        }
+        if (type < 0) type = before_call ? LSP_ST_METHOD : LSP_ST_PROPERTY;
+        lspSemEmit(sc, line, (int)(b - line_start), (int)len, type, mods);
+        return;
+    }
+
+    char word[256];
+    if (len >= sizeof(word)) return;
+    memcpy(word, s + b, len);
+    word[len] = '\0';
+
+    /* a module's prefix */
+    if (before_dot) {
+        char *path = lspImportPath(sc->text, word, len);
+        int in_doc = 0;
+        if (path) lspResolveValue(ctx, sc->doc_id, line1, word, (s64)len, &in_doc);
+        if (path && !in_doc) {
+            char *dir = lspModuleDir(ctx, path);
+            lspSemEmit(sc, line, (int)(b - line_start), (int)len, LSP_ST_NAMESPACE,
+                       dir && lspPathInStdlib(ctx, mprintf("%s/", dir))
+                       ? LSP_SM_DEFAULT_LIB : 0);
+            return;
+        }
+    }
+
+    /* a local or a parameter */
+    Ast *encl = lspSemEnclosing(sc, line1);
+    if (encl) {
+        Ast *hit = NULL;
+        int is_param = 0;
+        if (encl->params) {
+            for (u64 i = 0; i < encl->params->size; ++i) {
+                Ast *v = encl->params->entries[i];
+                if (v && v->kind == AST_LVAR && v->lname && v->lname->len == len &&
+                    !memcmp(v->lname->data, word, len)) {
+                    hit = v;
+                    is_param = 1;
+                }
+            }
+        }
+        if (encl->locals) {
+            listForEach(encl->locals) {
+                Ast *v = (Ast *)it->value;
+                if (v && v->kind == AST_DECL && v->declvar) v = v->declvar;
+                if (v && v->kind == AST_LVAR && v->lname && v->lname->len == len &&
+                    !memcmp(v->lname->data, word, len) && v->line > 0 &&
+                    v->line <= line1 && (hit == NULL || v->line >= hit->line)) {
+                    hit = v;
+                    is_param = 0;
+                }
+            }
+        }
+        if (hit) {
+            if (hit->flags & AST_FLAG_CONST) mods |= LSP_SM_READONLY;
+            if (hit->line == line1 && hit->col == col1) mods |= LSP_SM_DECLARATION;
+            /* `self`: a method's receiver */
+            lspSemEmit(sc, line, (int)(b - line_start), (int)len,
+                       is_param ? LSP_ST_PARAMETER : LSP_ST_VARIABLE, mods);
+            return;
+        }
+    }
+
+    /* a name of the document's own module, then any global */
+    if (sc->mod) {
+        char *qual = mprintf("%s.%s", sc->mod, word);
+        type = lspSemQual(sc, qual, line1, col1, &mods);
+    }
+    if (type < 0) {
+        Ast *e = mapGetLen(cc->global_env, word, len);
+        if (!e) e = mapGetLen(cc->asm_funcs, word, len);
+        if (e) type = lspSemValue(sc, e, line1, col1, &mods);
+    }
+    if (type < 0) type = lspSemQual(sc, word, line1, col1, &mods);
+    if (type < 0) {
+        /* a member where its enum declares it, a field where its struct does */
+        AstType *owner = NULL;
+        if (lspEnumMemberAt(ctx, sc->text, sc->doc_id, line, (int)(b - line_start), &owner)) {
+            type = LSP_ST_ENUM_MEMBER;
+            mods |= LSP_SM_DECLARATION | LSP_SM_READONLY;
+        } else if (lspFieldDeclHere(ctx, sc->text, sc->doc_id, line,
+                                    (int)(b - line_start), &owner)) {
+            type = LSP_ST_PROPERTY;
+            mods |= LSP_SM_DECLARATION;
+        }
+    }
+    if (type < 0 && mapGetLen(cc->macro_defs, word, len)) type = LSP_ST_MACRO;
+    if (type < 0 && setHas(sc->type_params, word)) type = LSP_ST_TYPE_PARAMETER;
+    if (type < 0 && lspImportPath(sc->text, word, len)) type = LSP_ST_NAMESPACE;
+    if (type < 0) return;
+    lspSemEmit(sc, line, (int)(b - line_start), (int)len, type, mods);
+}
+
+static void lspSemanticTokens(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri = jsonStrOr(jsonObjGet(params, "textDocument"), "uri", NULL);
+    AoStr *text = uri ? lspDocGetOrLoad(ctx, uri) : NULL;
+    if (!text) {
+        lspRespond(id, "null");
+        return;
+    }
+    LspSemCtx sc = {0};
+    sc.ctx = ctx;
+    sc.text = text;
+    sc.doc_id = lspDocId(ctx, uri);
+    sc.mod = lspDocModule(text);
+    sc.fns = vecNew(&vec_unsigned_long_type);
+    sc.std_files = mapNew(16, &map_cstring_opaque_type);
+    sc.type_params = setNew(16, &set_cstring_type);
+    sc.out = aoStrNew();
+    MapIter mi;
+    mapIterInit(ctx->cc->global_env, &mi);
+    Set *seen = setNew(16, &set_cstring_type);
+    while (mapIterNext(&mi)) {
+        Ast *fn = mi.node->value;
+        if (!fn || !astIsFnLike(fn) || fn->file_id != sc.doc_id || fn->line <= 0) continue;
+        char *k = mprintf("%p", (void *)fn);
+        if (setHas(seen, k)) continue;
+        setAdd(seen, k);
+        vecPush(sc.fns, fn);
+    }
+    qsort(sc.fns->entries, sc.fns->size, sizeof(Ast *), lspFnLineCmp);
+    Map *gens[2] = { ctx->cc->generic_structs, ctx->cc->generic_funcs };
+    for (int g = 0; g < 2; ++g) {
+        if (!gens[g]) continue;
+        mapIterInit(gens[g], &mi);
+        while (mapIterNext(&mi)) {
+            GenericDef *d = mi.node->value;
+            for (u64 i = 0; d && i < d->params->size; ++i) {
+                setAdd(sc.type_params, ((AoStr *)d->params->entries[i])->data);
+            }
+        }
+    }
+
+    const char *s = text->data;
+    size_t n = text->len, i = 0, line_start = 0;
+    int line = 0, at_line_start = 1;
+    while (i < n) {
+        char c = s[i];
+        if (c == '\n') {
+            line++;
+            i++;
+            line_start = i;
+            at_line_start = 1;
+            continue;
+        }
+        if (c == ' ' || c == '\t' || c == '\r') {
+            i++;
+            continue;
+        }
+        if (at_line_start && c == '#') {
+            /* a directive: `#define NAME` names a macro; the rest is the
+             * grammar's */
+            size_t eol = i;
+            while (eol < n && s[eol] != '\n') eol++;
+            if (eol - i > 8 && !memcmp(s + i, "#define", 7) && isspace((unsigned char)s[i + 7])) {
+                size_t b = i + 7;
+                while (b < eol && isspace((unsigned char)s[b])) b++;
+                size_t e = b;
+                while (e < eol && lspIsIdentChar(s[e])) e++;
+                if (e > b) {
+                    lspSemEmit(&sc, line, (int)(b - line_start), (int)(e - b),
+                               LSP_ST_MACRO, LSP_SM_DECLARATION);
+                }
+            }
+            i = eol;
+            continue;
+        }
+        at_line_start = 0;
+        if (c == '/' && i + 1 < n && s[i + 1] == '/') {
+            while (i < n && s[i] != '\n') i++;
+            continue;
+        }
+        if (c == '/' && i + 1 < n && s[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) {
+                if (s[i] == '\n') {
+                    line++;
+                    line_start = i + 1;
+                }
+                i++;
+            }
+            i += 2;
+            continue;
+        }
+        if (c == '"' || c == '\'') {
+            for (i++; i < n && s[i] != c && s[i] != '\n'; i++) {
+                if (s[i] == '\\') i++;
+            }
+            i++;
+            continue;
+        }
+        if (isdigit((unsigned char)c)) {
+            while (i < n && (lspIsIdentChar(s[i]) || s[i] == '.')) i++;
+            continue;
+        }
+        if (lspIsIdentChar(c)) {
+            size_t b = i;
+            while (i < n && lspIsIdentChar(s[i])) i++;
+            lspSemIdent(&sc, b, i, line, line_start);
+            continue;
+        }
+        i++;
+    }
+    AoStr *body = aoStrNew();
+    aoStrCatPrintf(body, "{\"data\":[%s]}", sc.out->data);
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+    aoStrRelease(sc.out);
+}
+
 /* Answer a textDocument request from an isolated child; if the child
  * crashed or hung on the document, answer null ourselves. */
 static void lspServe(LspCtx *ctx, Json *id, Json *params,
@@ -4249,6 +4662,7 @@ static void lspInitialize(LspCtx *ctx, Json *id, Json *params) {
         "\"referencesProvider\":true,"
         "\"documentHighlightProvider\":true,"
         "\"documentSymbolProvider\":true,"
+        "\"semanticTokensProvider\":{\"legend\":" LSP_SEMANTIC_LEGEND ",\"full\":true},"
         "\"signatureHelpProvider\":{\"triggerCharacters\":[\"(\",\",\"],"
         "\"retriggerCharacters\":[\")\"]},"
         "\"workspaceSymbolProvider\":true"
@@ -4337,6 +4751,8 @@ int lspRun(CliArgs *args) {
             lspServe(ctx, id, params, lspDocumentHighlight, 0);
         } else if (strcmp(method, "textDocument/signatureHelp") == 0) {
             lspServe(ctx, id, params, lspSignatureHelp, 0);
+        } else if (strcmp(method, "textDocument/semanticTokens/full") == 0) {
+            lspServe(ctx, id, params, lspSemanticTokens, 0);
         } else if (strcmp(method, "textDocument/documentSymbol") == 0) {
             lspServe(ctx, id, params, lspDocumentSymbol, 0);
         } else if (strcmp(method, "workspace/symbol") == 0) {

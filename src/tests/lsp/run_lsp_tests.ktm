@@ -100,6 +100,7 @@ u8 *MOD_LIST_HC;
 u8 *ENUM_HC;
 u8 *DOC_HC;
 u8 *SIG_HC;
+u8 *SEM_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -183,6 +184,20 @@ void initFixtures() {
         "  u.older(3, true);\n"
         "  r = total(1, 2, 3);\n"
         "  return (i32)r;\n"
+        "}\n";
+    /* Semantic tokens: one of each kind */
+    SEM_HC =
+        "import geo;\n"
+        "#define LIMIT 8\n"
+        "enum Color { red, green };\n"
+        "struct User { i64 age; };\n"
+        "const i64 MAX = 4;\n"
+        "i64 User.older(i64 years) { return self.age + years; }\n"
+        "i32 main() {\n"
+        "  User u;\n"
+        "  Color c = Color.green;\n"
+        "  i64 n = u.older(geo.area(LIMIT)) + MAX;\n"
+        "  return (i32)n;\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1267,7 +1282,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 18;
+const i64 LSP_GROUPS = 19;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1666,6 +1681,65 @@ void testSignatureHelp() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+/* The semantic token starting at (line, chr): type * 8 + modifiers, -1
+ * when none starts there */
+i64 semAt(json.Value *resp, i64 line, i64 chr) {
+    json.Value *data = json.select(resp, ".result.data:a");
+    if (data == null) { return -1; }
+    json.Value *it = data.array;
+    i64 l = 0;
+    i64 c = 0;
+    while (it != null) {
+        i64 dl = it.intVal;
+        i64 dc = it.next.intVal;
+        json.Value *ty = it.next.next.next;
+        l += dl;
+        if (dl != 0) { c = dc; } else { c += dc; }
+        if (l == line && c == chr) { return ty.intVal * 8 + ty.next.intVal; }
+        it = ty.next.next;
+    }
+    return -1;
+}
+
+bool semIs(json.Value *resp, u8 *text, u8 *needle, i64 within, i64 type, i64 mods) {
+    i64 line;
+    i64 chr;
+    posOf(text, needle, within, &line, &chr);
+    return semAt(resp, line, chr) == type * 8 + mods;
+}
+
+void testSemanticTokens() {
+    printf("semantic tokens\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("semantic.ktm");
+    lspDidOpen(l, uri, SEM_HC);
+    check("semantic tokens fixture is clean", lastPublishClean(l));
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *r = lspRequest(l, "textDocument/semanticTokens/full", params);
+    /* types: 0 namespace 2 struct 3 enum 4 enumMember 5 function
+     * 6 method 7 property 8 parameter 9 variable 10 macro; mods:
+     * 1 declaration 2 readonly 4 defaultLibrary */
+    check("a module prefix is a namespace", semIs(r, SEM_HC, "geo.area", 0, 0, 0));
+    check("a module's function", semIs(r, SEM_HC, "area(LIMIT", 0, 5, 0));
+    check("a macro, declared and used", semIs(r, SEM_HC, "LIMIT 8", 0, 10, 1) &&
+                semIs(r, SEM_HC, "LIMIT))", 0, 10, 0));
+    check("an enum and its members", semIs(r, SEM_HC, "Color {", 0, 3, 1) &&
+                semIs(r, SEM_HC, "green;", 0, 4, 2) && semIs(r, SEM_HC, "red,", 0, 4, 3));
+    check("a struct and its field", semIs(r, SEM_HC, "User {", 0, 2, 1) &&
+                semIs(r, SEM_HC, "age; }", 0, 7, 1) && semIs(r, SEM_HC, "age + years", 0, 7, 0));
+    check("a method, declared and called", semIs(r, SEM_HC, "older(i64", 0, 6, 0) &&
+                semIs(r, SEM_HC, "older(geo", 0, 6, 0));
+    check("a parameter and a local", semIs(r, SEM_HC, "years)", 0, 8, 1) &&
+                semIs(r, SEM_HC, "years; }", 0, 8, 0) && semIs(r, SEM_HC, "n = u", 0, 9, 1) &&
+                semIs(r, SEM_HC, "(i32)n", 5, 9, 0));
+    check("a constant is a readonly variable", semIs(r, SEM_HC, "MAX;", 0, 9, 2));
+    check("keywords and builtin types are left to the grammar",
+                semIs(r, SEM_HC, "i32 main", 0, 0, 0) == false &&
+                semAt(r, 6, 0) == -1);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1686,6 +1760,7 @@ void runGroup(i64 group) {
         case 15: testDocs();
         case 16: testSymbols();
         case 17: testSignatureHelp();
+        case 18: testSemanticTokens();
     }
 }
 
