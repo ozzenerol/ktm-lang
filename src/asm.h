@@ -6,6 +6,8 @@
 #include "types.h"
 
 char *asmNormaliseFunctionName(Cctrl *cc, AoStr *fname);
+void asmEmitStringBytes(AoStr *buf, Ast *str);
+int asmStringHasNul(Ast *str);
 void asmEmitFunctionGlobal(Cctrl *cc, AoStr *buf, char *label);
 void asmEmitFunctionSymbol(Cctrl *cc, AoStr *buf, char *label, Ast *func);
 AoStr *asmNormaliseGlobalLabel(Cctrl *cc, AoStr *name);

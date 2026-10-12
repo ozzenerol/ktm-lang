@@ -2084,14 +2084,21 @@ static void aarch64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
 }
 
 static void aarch64PasteDataSectionDarwin(Cctrl *cc, AoStr *buf) {
-    aoStrCatFmt(buf, ".section __TEXT,__cstring,cstring_literals\n");
-    MapIter it;
-    mapIterInit(cc->strs, &it);
-    while (mapIterNext(&it)) {
-        MapNode *n = it.node;
-        Ast *ast = (Ast *)n->value;
-        if (ast->kind != AST_STRING) continue;
-        aoStrCatFmt(buf, "%S:\n\t.asciz \"%S\"\n", ast->slabel, ast->sval);
+    /* __cstring is split at every NUL by the linker, which merges equal
+     * pieces across the program: a literal with a NUL inside ("\0\b\0\0")
+     * lost bytes there, so those go in __const */
+    for (int pass = 0; pass < 2; ++pass) {
+        aoStrCatFmt(buf, pass ? ".section __TEXT,__const\n"
+                              : ".section __TEXT,__cstring,cstring_literals\n");
+        MapIter it;
+        mapIterInit(cc->strs, &it);
+        while (mapIterNext(&it)) {
+            MapNode *n = it.node;
+            Ast *ast = (Ast *)n->value;
+            if (ast->kind != AST_STRING || asmStringHasNul(ast) != pass) continue;
+            aoStrCatFmt(buf, "%S:\n\t", ast->slabel);
+            asmEmitStringBytes(buf, ast);
+        }
     }
     aoStrPutChar(buf, '\t');
 }
@@ -2104,7 +2111,8 @@ static void aarch64PasteDataSectionLinux(Cctrl *cc, AoStr *buf) {
         MapNode *n = it.node;
         Ast *ast = (Ast *)n->value;
         if (ast->kind != AST_STRING) continue;
-        aoStrCatFmt(buf, "%S:\n\t.asciz \"%S\"\n", ast->slabel, ast->sval);
+        aoStrCatFmt(buf, "%S:\n\t", ast->slabel);
+        asmEmitStringBytes(buf, ast);
     }
     aoStrPutChar(buf, '\t');
 }
@@ -2325,8 +2333,9 @@ void aarch64GlobalVar(Cctrl *cc, Set *seen_globals, AoStr *buf, Ast *ast) {
                 if (!local) {
                     aoStrCatFmt(buf, ".globl %S\n", label);
                 }
-                aoStrCatFmt(buf, ".data\n%S:\n\t.asciz \"%S\"\n\t",
-                            label, declinit->sval);
+                aoStrCatFmt(buf, ".data\n%S:\n\t", label);
+                asmEmitStringBytes(buf, declinit);
+                aoStrPutChar(buf, '\t');
                 /* `U8 buf[8] = "abc"`: zero-fill past the string. */
                 int pad = declvar->type->size - (int)declinit->real_len;
                 if (pad > 0) {

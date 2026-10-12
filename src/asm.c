@@ -91,6 +91,42 @@ void asmEmitFunctionSymbol(Cctrl *cc, AoStr *buf, char *label, Ast *func) {
     asmEmitFunctionGlobal(cc, buf, label);
 }
 
+/* The bytes of string literal `str` (its NUL included) as assembler
+ * data: a string with escapes for bytes outside printable text as a
+ * `.byte` list, which every assembler reads the same way. */
+/* Does string literal `str` hold a NUL byte before its terminating one? */
+int asmStringHasNul(Ast *str) {
+    char *bytes = malloc(str->sval->len + 1);
+    int n = astStringDecode(str, bytes);
+    int has = memchr(bytes, 0, (size_t)n) != NULL;
+    free(bytes);
+    return has;
+}
+
+void asmEmitStringBytes(AoStr *buf, Ast *str) {
+    AoStr *sval = str->sval;
+    int has_octal = 0;
+    for (u64 i = 0; i + 1 < sval->len; ++i) {
+        if (sval->data[i] == '\\' && sval->data[i + 1] >= '0' && sval->data[i + 1] <= '7') {
+            has_octal = 1;
+            break;
+        }
+        if (sval->data[i] == '\\') ++i;
+    }
+    if (!has_octal) {
+        aoStrCatFmt(buf, ".asciz \"%S\"\n", sval);
+        return;
+    }
+    char *bytes = malloc(sval->len + 1);
+    int n = astStringDecode(str, bytes);
+    aoStrCatFmt(buf, ".byte ");
+    for (int i = 0; i <= n; ++i) {
+        aoStrCatFmt(buf, i ? ",%i" : "%i", (int)(unsigned char)bytes[i]);
+    }
+    aoStrPutChar(buf, '\n');
+    free(bytes);
+}
+
 char *asmNormaliseFunctionName(Cctrl *cc, AoStr *fname) {
     AoStr *newfn = aoStrNew();
     /* A main-program function's symbol is its own (astProgramSymbol), so

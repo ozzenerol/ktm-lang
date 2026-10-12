@@ -53,9 +53,13 @@ void main()
 
 <h3>Fixes</h3>
 <ul>
+  <li>macOS: a string literal with a NUL byte inside (<code>"\x00\x08\x00\x00"</code>) lost
+  bytes in a compiled program: the linker splits the section literals went in at each NUL and
+  merges the pieces. Such literals now go in a section it leaves alone.</li>
   <li>Docs: the sockets section showed a bare <code>signal(SIGPIPE, SIG_IGN)</code>, which doesn't
   compile; it is <code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> or
-  <code>libc.signal(...)</code>, now with a runnable example.</li>
+  <code>libc.signal(...)</code>, now with a runnable example (it reads <code>errno</code> right
+  after the failed write, which macOS needs).</li>
 </ul>
 
 <h2>v0.7.0 <small>(2026-10-12)</small></h2>
