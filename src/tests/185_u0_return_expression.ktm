@@ -30,7 +30,7 @@ void nested() { return twice(twice(1)); }
 
 i32 main() {
     i64 correct = 0, tests = 0;
-    set.IntSet *s;
+    set.Set<i64> s;
 
     printf("Test - return with an expression in a void function: ");
 
@@ -56,14 +56,14 @@ i32 main() {
     inlWrap2();
     tests++; if (g == 2) { correct++; }
 
-    /* set.intAdd is `void ... { return map.rbSet(...); }` */
-    s = set.intNew();
+    /* the old set.intAdd was `void ... { return map.rbSet(...); }` */
+    s = set.new<i64>();
     s.add(5);
     s.add(7);
     s.add(5);
     tests++; if (s.has(5) && s.has(7) && !s.has(6)) { correct++; }
-    tests++; if (s.size() == 2) { correct++; }
-    s.release();
+    tests++; if (s.len == 2) { correct++; }
+    s.free();
 
     test.printResult(correct, tests);
     printf("====\n");
