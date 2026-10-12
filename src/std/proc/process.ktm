@@ -81,12 +81,23 @@ extern "c" void *dlsym(void *handle, u8 *name);
 _extern __NSGetEnviron u8 ***ProcNSGetEnviron();
 #endif
 
+/* How to start a process; all zero (mem.set) is: inherit our stdin,
+ * stdout and stderr, working directory and environment, look the program
+ * up in $PATH, stay in our process group. */
 pub struct Opts {
-    i64 in, out, err;
+    i64 in, out, err;       /* INHERIT, PIPE, DEVNULL, FD (err also STDOUT) */
     u8 *cwd;
     u8 **env;
     bool noPath;
-    bool newGroup;
+    bool newGroup;          /* a new process group, led by the child */
+    i32 inFd, outFd, errFd; /* the fds for FD */
+    i32 pgid;               /* > 0: join this process group (a pipeline's
+                             * later processes join the first one's) */
+    i32 *dups;              /* more fds for the child, as pairs {from, to,
+                             * from, to, ...}: dup2(from, to) in this order,
+                             * after stdin, stdout and stderr (a shell's
+                             * `3>file`, `2>&1`) */
+    i64 ndups;              /* pairs in dups */
 };
 
 pub struct Proc {
@@ -95,7 +106,8 @@ pub struct Proc {
     bool done;
     i64 exitCode;
     i32 termSignal;
-    bool group;
+    bool group;             /* it has a process group of its own or joined one */
+    i32 pgid;               /* that group, 0 when it is in ours */
 };
 
 /* The current environment, as posix_spawn wants it. */
@@ -146,6 +158,13 @@ static bool procPipe(i32 *fds) {
     return true;
 }
 
+/* A pipe for connecting processes: fds[0] the read end, fds[1] the
+ * write end, both close-on-exec and above 2 (give an end to a child with
+ * Opts FD, close ours once it is started). false on failure. */
+pub bool pipe(i32 *fds) {
+    return procPipe(fds);
+}
+
 static void procNonBlocking(i32 fd) {
     if (fd != -1) { libc.fcntl(fd, PROC_F_SETFL, libc.fcntl(fd, PROC_F_GETFL, 0) | PROC_O_NONBLOCK); }
 }
@@ -160,6 +179,22 @@ static void procSetStatus(Proc *p, i32 st) {
         p.exitCode = -1;
         p.termSignal = st & 0x7F;
     }
+}
+
+/* The child's fd `to` is a copy of our `from` (dup2). The same fd stays
+ * as it is: dup2 of an fd onto itself would keep its close-on-exec flag,
+ * and on macOS only fds the file actions name survive. */
+static void procDupTo(void *fa, i32 from, i32 to) {
+    if (from != to) {
+        libc.posix_spawn_file_actions_adddup2(fa, from, to);
+        return;
+    }
+#ifdef IS_MACOS
+    posix_spawn_file_actions_addinherit_np(fa, to);
+#else
+    /* glibc 2.29+ clears close-on-exec for a dup2 of an fd onto itself */
+    libc.posix_spawn_file_actions_adddup2(fa, from, to);
+#endif
 }
 
 /* Start argv[0] (looked up in $PATH unless opts->no_path) with the
@@ -226,20 +261,27 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
     if (opts.in == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pin[0], 0); }
     else if (opts.in == DEVNULL) {
         libc.posix_spawn_file_actions_addopen(fa, 0, "/dev/null", PROC_O_RDWR, 0);
-    }
+    } else if (opts.in == FD) { procDupTo(fa, opts.inFd, 0); }
     if (opts.out == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, pout[1], 1); }
     else if (opts.out == DEVNULL) {
         libc.posix_spawn_file_actions_addopen(fa, 1, "/dev/null", PROC_O_RDWR, 0);
-    }
+    } else if (opts.out == FD) { procDupTo(fa, opts.outFd, 1); }
     if (opts.err == PIPE) { libc.posix_spawn_file_actions_adddup2(fa, perr[1], 2); }
     else if (opts.err == DEVNULL) {
         libc.posix_spawn_file_actions_addopen(fa, 2, "/dev/null", PROC_O_RDWR, 0);
     } else if (opts.err == STDOUT) { libc.posix_spawn_file_actions_adddup2(fa, 1, 2); }
+    else if (opts.err == FD) { procDupTo(fa, opts.errFd, 2); }
+    i32 maxfd = 2;
+    for (i64 d = 0; d < opts.ndups; d++) {
+        i32 to = opts.dups[d * 2 + 1];
+        procDupTo(fa, opts.dups[d * 2], to);
+        if (to > maxfd) { maxfd = to; }
+    }
     if (opts.cwd) { libc.posix_spawn_file_actions_addchdir_np(fa, opts.cwd); }
     libc.posix_spawnattr_init(attr);
     if (!likeSystem) {
 #ifdef IS_LINUX
-        posix_spawn_file_actions_addclosefrom_np(fa, 3);
+        posix_spawn_file_actions_addclosefrom_np(fa, maxfd + 1);
 #else
         flags |= PROC_SPAWN_CLOEXEC_DEFAULT;
 #endif
@@ -249,9 +291,9 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
         libc.posix_spawnattr_setsigdefault(attr, sigs);
         libc.posix_spawnattr_setsigmask(attr, nosigs);
     }
-    if (opts.newGroup) {
+    if (opts.newGroup || opts.pgid > 0) {
         flags |= PROC_SPAWN_SETPGROUP;
-        libc.posix_spawnattr_setpgroup(attr, 0);
+        libc.posix_spawnattr_setpgroup(attr, opts.newGroup ? 0 : opts.pgid);
     }
     libc.posix_spawnattr_setflags(attr, flags);
 
@@ -283,7 +325,10 @@ static Proc *procSpawnEx(u8 **argv, Opts *opts, bool likeSystem) {
     p.inFd = pin[1];
     p.outFd = pout[0];
     p.errFd = perr[0];
-    p.group = opts.newGroup;
+    if (opts.newGroup || opts.pgid > 0) {
+        p.group = true;
+        p.pgid = opts.newGroup ? pid : opts.pgid;
+    }
 #ifdef IS_MACOS
     if (p.inFd != -1) { libc.fcntl(p.inFd, PROC_F_SETNOSIGPIPE, 1); }
 #endif
@@ -332,10 +377,11 @@ pub bool done(Proc *p) {
 }
 
 /* Send sig to p (to its whole process group if it was started with
- * new_group). false if p has already been reaped or kill fails. */
+ * newGroup or joined one with pgid). false if p has already been reaped
+ * or kill fails. */
 pub bool kill(Proc *p, i32 sig=PROC_SIGTERM) {
     if (p.done) { return false; }
-    if (p.group) { return libc.kill(-p.pid, sig) == 0; }
+    if (p.group) { return libc.kill(-p.pgid, sig) == 0; }
     return libc.kill(p.pid, sig) == 0;
 }
 
@@ -495,6 +541,17 @@ pub void release(Proc *p) {
     procClose(&p.outFd);
     procClose(&p.errFd);
     procReap(p, 0);
+    libc.free(p);
+}
+
+/* Close our pipe ends and free p without waiting for it: for a program
+ * that reaps its children itself (a shell's waitpid(-1), coro.waitChild
+ * on p.pid). Keep p.pid first if you need it. */
+pub void disown(Proc *p) {
+    if (!p) { return; }
+    procClose(&p.inFd);
+    procClose(&p.outFd);
+    procClose(&p.errFd);
     libc.free(p);
 }
 

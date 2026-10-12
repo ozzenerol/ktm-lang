@@ -705,7 +705,7 @@ void main()
 each of <code>in</code>, <code>out</code> and <code>err</code> is <code>proc.INHERIT</code> (ours,
 the default), <code>proc.PIPE</code> (our end is <code>p.inFd</code>, <code>outFd</code> or
 <code>errFd</code>), <code>proc.DEVNULL</code> (<code>/dev/null</code>) or, for <code>err</code>,
-<code>proc.STDOUT</code> (2&gt;&amp;1); <code>cwd</code> and <code>env</code> (a null-terminated
+<code>proc.STDOUT</code> (2&gt;&amp;1), or <code>proc.FD</code> (below); <code>cwd</code> and <code>env</code> (a null-terminated
 <code>"NAME=value"</code> list that replaces the environment) are optional.
 <code>proc.communicate(p, input, &amp;out, &amp;err)</code> writes the input (a <code>u8[]</code>),
 reads both outputs to the end into Strings and waits, all in one <code>poll()</code> loop, so a
@@ -713,7 +713,7 @@ program that writes a lot to both, or echoes its input, can't block; pass <code>
 an output you don't want (it is still read, and dropped). <code>proc.wait(p)</code> returns the
 exit code, or -1 when a signal killed the program (<code>p.termSignal</code> says which);
 <code>proc.done(p)</code> checks without waiting, <code>proc.kill(p, sig)</code> signals it (the
-whole group with <code>newGroup</code>), and <code>proc.release(p)</code> closes the pipes and
+whole group with <code>newGroup</code> or <code>pgid</code>, below), and <code>proc.release(p)</code> closes the pipes and
 frees it, waiting for a program that is still running.</p>
 <pre data-run><code>
 import mem, proc;
@@ -740,8 +740,66 @@ out=HELLO
  err=done
  exit=3
 </pre>
-<p>The program starts with default signal handlers and only stdin, stdout and stderr open: it
-inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shellf</code> and <code>proc.shellOutput</code>
+<h4 id="pipelines">Pipelines and process groups</h4>
+<p><code>proc.FD</code> gives the program an fd of yours as its stdin, stdout or stderr: set
+<code>opts.in = proc.FD</code> and <code>opts.inFd</code> (likewise <code>out</code>/<code>outFd</code>
+and <code>err</code>/<code>errFd</code>). With <code>proc.pipe(fds)</code> (a pipe whose ends are
+close-on-exec and above 2) that connects processes the way a shell's <code>a | b | c</code> does:
+each stage gets the read end of the pipe before it and the write end of the pipe after it, and you
+close your copies of both once it is started, so the last reader sees end of input.
+<code>opts.newGroup</code> starts the program in a new process group that it leads, and
+<code>opts.pgid</code> puts it into an existing one: the later stages of a pipeline join the first
+one's (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or a terminal's Ctrl-C with
+the group in the foreground (<code>libc.tcsetpgrp</code>), reaches all of them.
+<code>opts.dups</code> lists more fds for the child as pairs <code>{from, to, ...}</code>
+(<code>opts.ndups</code> pairs), applied in order after stdin, stdout and stderr like a shell's
+<code>3&gt;file</code> or <code>2&gt;&amp;1</code>. A program that reaps its children itself
+(a shell's <code>waitpid(-1)</code>, <code>coro.waitChild</code>) frees a Proc with
+<code>proc.disown(p)</code>, which doesn't wait.</p>
+<pre data-run><code>
+import libc, mem, proc;
+
+proc.Proc *stage(u8 *script, i32 in, i32 out, i32 pgid)
+{// sh -c script, reading in (-1: a PIPE from us) and writing out (-1: a PIPE to us)
+  u8 *argv[] = {"sh", "-c", script, null};
+  proc.Opts o;
+  mem.set(&o, 0, sizeof(proc.Opts));
+  if (in >= 0) { o.in = proc.FD; o.inFd = in; }
+  if (out >= 0) { o.out = proc.FD; o.outFd = out; } else { o.out = proc.PIPE; }
+  if (pgid) { o.pgid = pgid; } else { o.newGroup = true; }
+  return proc.spawn(argv, &o);
+}
+
+void main()
+{
+  i32 ab[2], bc[2];
+  proc.pipe(ab);
+  proc.pipe(bc);
+  proc.Proc *a = stage("printf 'pear\napple\npear\n'", -1, ab[1], 0);
+  proc.Proc *b = stage("sort", ab[0], bc[1], a.pgid);
+  proc.Proc *c = stage("uniq -c | tr -s ' '", bc[0], -1, a.pgid);
+  libc.close(ab[0]);
+  libc.close(ab[1]);
+  libc.close(bc[0]);
+  libc.close(bc[1]);
+
+  String out;
+  proc.communicate(c, "", &out);
+  printf("%s", out);
+  printf("one group: %d\n", b.pgid == a.pid && c.pgid == a.pid);
+  out.free();
+  proc.release(a);
+  proc.release(b);
+  proc.release(c);
+}
+</code></pre>
+<pre class="output">
+ 1 apple
+ 2 pear
+one group: 1
+</pre>
+<p>The program starts with default signal handlers and only stdin, stdout and stderr open (and
+the fds in <code>dups</code>): it inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shellf</code> and <code>proc.shellOutput</code>
 are still the tools for shell pipelines, globs and redirections; use the <code>proc.Proc</code>
 functions whenever an argument comes from a file name or user input.</p>
 

@@ -10,3 +10,5 @@ pub const i64 PIPE = 1;  /* a pipe; our end is Proc in_fd / out_fd / err_fd */
 pub const i64 DEVNULL = 2;  /* /dev/null */
 
 pub const i64 STDOUT = 3;  /* stderr only: wherever its stdout goes (2>&1) */
+
+pub const i64 FD = 4;  /* an fd of ours, given in Opts inFd / outFd / errFd (the read end of the previous process's pipe, a file) */
