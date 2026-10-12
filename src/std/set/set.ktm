@@ -1,250 +1,124 @@
 module set;
-import map, mem, str, vec;
+import map, vec;
 
-static bool rbIsNil(map.RBNode *n) {
-    return n == null || n.left == null;
-}
-
-static map.RBNode *rbGrandParent(map.RBNode *n) {
-    if (n == null || n.parent == null) {
-        return null;
-    }
-    return n.parent.parent;
-}
-
-pub struct IntSet {
-    map.RBTree *tree; 
+/* A set of T, a hash set as a value type: `ad set.Set<i64> seen =
+ * set.new<i64>();`. Values are hashed and compared like map.Map's keys
+ * (map.hashOf / map.keyEq: overloads for the integer types, pointers,
+ * u8[] and String, and a byte-wise fallback for anything else; add
+ * overloads for a type of your own), and u8[] / String values are copied
+ * into the set and freed with it. Walk it in the order values were added
+ * with next(): `i64 it = 0; T v; while (s.next(&it, &v)) { ... }`. */
+pub struct Set<T> {
+    map.Map<T, bool> m;
+    i64 len;
 };
 
-i64 intSetCmp(void *k1, void *k2) {
-    i64 _k1 = (i64)k1;
-    i64 _k2 = (i64)k2;
-    if (_k1 < _k2) { return -1; }
-    if (_k1 > _k2) { return 1; }
-    return 0;
+/* An empty set, with room for cap values before it grows */
+pub Set<T> new<T>(i64 cap = 8) {
+    Set<T> s;
+    s.m = map.new<T, bool>(cap);
+    s.len = 0;
+    return s;
 }
 
-pub IntSet *intNew() {
-    IntSet *set = mem.alloc(sizeof(IntSet));
-    set.tree = map.rbNew(null,null,&intSetCmp);
-    return set;
+/* v added: true if it is new, false if it was there already */
+pub bool Set<T>.add(T v) {
+    if (self.m.has(v)) { return false; }
+    self.m.set(v, true);
+    self.len++;
+    return true;
 }
 
-pub i64 IntSet.size() {
-    if (!self) { return 0; }
-    return self.tree.size;
+pub bool Set<T>.has(T v) {
+    return self.m.has(v);
 }
 
-pub struct IntSetEntry {
-    i64 key;
-};
-
-pub struct IntSetIter {
-    i64 sp;
-    map.RBNode **stack;
-    IntSetEntry *entry; 
-    map.RBTree *tree;
-    i64 version; /* tree->version when the iterator was made */
-};
-
-pub IntSetIter *IntSet.iterNew() {
-    IntSetIter *it = mem.alloc(sizeof(IntSetIter));
-    it.sp = 0;
-    it.entry = mem.alloc(sizeof(IntSetEntry));
-    it.stack = mem.alloc(sizeof(map.RBNode *) * self.size());
-    it.tree = null;
-    it.version = 0;
-    if (!self) { return it; } /* yields nothing */
-    it.tree = self.tree;
-    it.version = self.tree.version;
-    map.RBNode *node = self.tree.root;
-    while (!rbIsNil(node)) {
-        it.stack[it.sp++] = node;
-        node = node.left;
-    }
-    return it;
+/* v taken out: true if it was there */
+pub bool Set<T>.delete(T v) {
+    if (!self.m.delete(v)) { return false; }
+    self.len--;
+    return true;
 }
 
-pub IntSetEntry *intIterNext(IntSetIter *it) {
-    if (!it || it.sp == 0) {
-        return null;
-    }
-    if (it.tree.version != it.version) {
-        it.sp = 0; /* the set changed: stop for good */
-        return null;
-    }
-
-    map.RBNode *node = it.stack[--it.sp];
-    it.entry.key = (i64)node.key;
-    auto rightTree = node.right;
-
-    while (!rbIsNil(rightTree)) {
-        it.stack[it.sp++] = rightTree;
-        rightTree = rightTree.left;
-    }
-
-    return it.entry;
+/* The next value from *it (start at 0) into *v, in the order they were
+ * added; false at the end */
+pub bool Set<T>.next(i64 *it, T *v) {
+    return self.m.next(it, v, null);
 }
 
-pub void intIterRelease(IntSetIter *iter) {
-    if (!iter) { return; }
-    mem.free(iter.entry);
-    mem.free(iter.stack);
-    mem.free(iter);
+/* The values, in the order they were added, as a new Vec (yours to
+ * free; u8[] values are views of the set's own copies) */
+pub vec.Vec<T> Set<T>.items() {
+    return self.m.keys();
 }
 
-pub bool IntSet.has(i64 key) {
-    if (!self) { return false; }
-    return self.tree.has((void*)key);
-}
-
-pub void IntSet.add(i64 key) {
-    return self.tree.set((void*)key,null);
-}
-
-pub void IntSet.delete(i64 key) {
-    self.tree.delete((void*)key);
-}
-
-pub IntSet *IntSet.unionWith(IntSet *s2) {
-    IntSet *unionSet = intNew();
-    IntSetIter *i1 = self.iterNew();
-    IntSetIter *i2 = s2.iterNew();
-    IntSetEntry *entry = null;
-
-    while ((entry = intIterNext(i1))) {
-        unionSet.add(entry.key);
-    }
-
-    while ((entry = intIterNext(i2))) {
-        unionSet.add(entry.key);
-    }
-
-    intIterRelease(i1);
-    intIterRelease(i2);
-    return unionSet;
-}
-
-pub IntSet *IntSet.diff(IntSet *s2) {
-    IntSet *diffSet = intNew();
-    IntSetIter *i1 = self.iterNew();
-    IntSetEntry *entry = null;
-
-    while ((entry = intIterNext(i1))) {
-        if (!s2.has((i64)entry.key)) {
-            diffSet.add((i64)entry.key);
-        }
-    }
-
-    intIterRelease(i1);
-    return diffSet;
-}
-
-pub IntSet *IntSet.intersection(IntSet *s2) {
-    IntSet *intersectionSet = intNew();
-    IntSetIter *i1 = self.iterNew();
-    IntSetIter *i2 = s2.iterNew();
-    IntSetEntry *entry = null;
-
-    while ((entry = intIterNext(i1))) {
-        if (s2.has(entry.key)) {
-            intersectionSet.add(entry.key);
-        }
-    }
-
-    while ((entry = intIterNext(i2))) {
-        if (self.has(entry.key)) {
-            intersectionSet.add(entry.key);
-        }
-    }
-
-    intIterRelease(i1);
-    intIterRelease(i2);
-    return intersectionSet;
-}
-
-pub bool IntSet.eq(IntSet *s2) {
-    if (self.size() != s2.size()) { return false; }
-
-    IntSetIter *i1 = self.iterNew();
-    IntSetIter *i2 = s2.iterNew();
-    IntSetEntry *entry = null;
-    bool retval = true;
-
-    while ((entry = intIterNext(i1))) {
-        if (!s2.has(entry.key)) {
-            retval = false;
-            goto out;
-        }
-    }
-
-    while ((entry = intIterNext(i2))) {
-        if (!self.has(entry.key)) {
-            retval = false;
-            goto out;
-        }
-    }
-
-out:
-    intIterRelease(i1);
-    intIterRelease(i2);
-    return retval;
-}
-
-pub vec.IntVec *IntSet.toVec() {
-    vec.IntVec *vecVal = vec.intNew();
-    IntSetIter *i1 = self.iterNew();
-    IntSetEntry *entry = null;
-    while ((entry = intIterNext(i1))) {
-        vecVal.push(entry.key);
-    }
-    intIterRelease(i1);
-    return vecVal;
-}
-
-pub IntSet *IntSet.symDiff(IntSet *s2) {
-    IntSet *symDiffSet = intNew();
-    IntSetIter *i1 = self.iterNew();
-    IntSetIter *i2 = s2.iterNew();
-    IntSetEntry *entry = null;
-
-    /* Add elements from s1 that are not in s2 */
-    while ((entry = intIterNext(i1))) {
-        if (!s2.has(entry.key)) {
-            symDiffSet.add(entry.key);
-        }
-    }
-
-    /* Add elements from s2 that are not in s1 */
-    while ((entry = intIterNext(i2))) {
-        if (!self.has(entry.key)) {
-            symDiffSet.add(entry.key);
-        }
-    }
-
-    intIterRelease(i1);
-    intIterRelease(i2);
-    return symDiffSet;
-}
-
-pub String IntSet.toStr() {
-    String out = str.from("{");
-    IntSetIter *i1 = self.iterNew();
-    IntSetEntry *entry = null;
-    bool first = true;
-
-    while ((entry = intIterNext(i1))) {
-        if (!first) { out.append(", "); }
-        out.appendFormat("%d", entry.key);
-        first = false;
-    }
-    intIterRelease(i1);
-    out.append("}");
+/* A new set: the values in this one or in other */
+pub Set<T> Set<T>.unionWith(Set<T> *other) {
+    Set<T> out = new<T>(self.len + other.len);
+    i64 it = 0;
+    T v;
+    while (self.next(&it, &v)) { out.add(v); }
+    it = 0;
+    while (other.next(&it, &v)) { out.add(v); }
     return out;
 }
 
-pub void IntSet.release() {
-    if (!self) { return; }
-    self.tree.release();
-    mem.free(self);
+/* A new set: the values in this one and not in other */
+pub Set<T> Set<T>.diff(Set<T> *other) {
+    Set<T> out = new<T>(self.len);
+    i64 it = 0;
+    T v;
+    while (self.next(&it, &v)) {
+        if (!other.has(v)) { out.add(v); }
+    }
+    return out;
+}
+
+/* A new set: the values in both */
+pub Set<T> Set<T>.intersection(Set<T> *other) {
+    Set<T> out = new<T>(self.len);
+    i64 it = 0;
+    T v;
+    while (self.next(&it, &v)) {
+        if (other.has(v)) { out.add(v); }
+    }
+    return out;
+}
+
+/* A new set: the values in exactly one of the two */
+pub Set<T> Set<T>.symDiff(Set<T> *other) {
+    Set<T> out = self.diff(other);
+    i64 it = 0;
+    T v;
+    while (other.next(&it, &v)) {
+        if (!self.has(v)) { out.add(v); }
+    }
+    return out;
+}
+
+/* Every value of this set is in other */
+pub bool Set<T>.isSubset(Set<T> *other) {
+    if (self.len > other.len) { return false; }
+    i64 it = 0;
+    T v;
+    while (self.next(&it, &v)) {
+        if (!other.has(v)) { return false; }
+    }
+    return true;
+}
+
+/* The same values (in any order) */
+pub bool Set<T>.equals(Set<T> *other) {
+    return self.len == other.len && self.isSubset(other);
+}
+
+/* Empty again, keeping its room */
+pub void Set<T>.clear() {
+    self.m.clear();
+    self.len = 0;
+}
+
+pub void Set<T>.free() {
+    self.m.free();
+    self.len = 0;
 }

@@ -225,7 +225,7 @@ pub u32 crc32(u8[] data, u32 crc = 0)
 }
 
 /* 64-bit FNV-1a of data: fast and simple, for hash tables, sharding and
- * cache keys; not for anything security-related. (map.StrMap uses the
+ * cache keys; not for anything security-related. (map.Map uses the
  * same hash, with a final bit mix.) */
 pub u64 fnv1a(u8[] data)
 {

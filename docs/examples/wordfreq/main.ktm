@@ -3,41 +3,29 @@
 //   ktm main.ktm -o wordfreq && ./wordfreq sample.txt
 //   ktm -jit main.ktm sample.txt
 //
-// Shows: reading a file (fs), scanning strings, counting in a map.StrMap,
-// sorting a vec.PtrVec, structs and command-line arguments.
+// Shows: reading a file (fs), scanning strings, counting in a map.Map,
+// sorting a vec.Vec, structs and command-line arguments.
 
-import cstr, fs, map, mem, str, vec;
+import cstr, fs, map, str, vec;
 
 const i64 TOP_N = 8;
 const i64 MAX_WORD = 64;
 
 struct WordCount {
-    String word;
+    u8[] word;
     i64 count;
 };
 
-// Sort predicate: true when a ranks above b. Most frequent first, then
-// alphabetical so ties have a stable order.
-i64 ranksHigher(WordCount *a, WordCount *b) {
+// Most frequent first, then alphabetical so ties have a stable order.
+i64 byRank(WordCount *a, WordCount *b) {
     if (a.count != b.count) {
-        return a.count > b.count;
+        return b.count - a.count;
     }
-    return str.compare(a.word, b.word) < 0;
+    return str.compare(a.word, b.word);
 }
 
 bool isLetter(u8 c) {
     return ('a' <= c <= 'z') || ('A' <= c <= 'Z');
-}
-
-void countWord(map.StrMap *counts, u8[] word) {
-    WordCount *wc = counts.get(word);
-    if (wc == null) {
-        wc = mem.alloc(sizeof(WordCount));
-        wc.word = str.from(word);
-        wc.count = 0;
-        counts.set(word, wc);           // the map copies the key
-    }
-    wc.count++;
 }
 
 i32 main(i32 argc, u8 **argv) {
@@ -46,15 +34,14 @@ i32 main(i32 argc, u8 **argv) {
         path = cstr.view(argv[1]);
     }
 
-    String text = fs.readAll(path);
-    defer text.free();
+    ad String text = fs.readAll(path);
     if (!text.ptr) {
-        printf("cannot read %s\n", path);
+        printf("cannot read %.*s\n", (i32)path.len, path.ptr);
         return 1;
     }
     i64 size = text.len;
 
-    map.StrMap *counts = map.strNew();
+    ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
     u8 word[MAX_WORD];
     i64 len = 0, total = 0;
 
@@ -67,24 +54,24 @@ i32 main(i32 argc, u8 **argv) {
                 word[len++] = str.toLower(c);
             }
         } else if (len > 0) {
-            countWord(counts, word[0:len]);
+            counts.set(word[0:len], counts.getOr(word[0:len], 0) + 1);   // the map copies the key
             total++;
             len = 0;
         }
     }
 
-    vec.PtrVec *ranked = vec.ptrNew();
-    i64 idx = 0;
-    WordCount *wc;
-    while (counts.valueIter(&idx, &wc)) {
+    ad vec.Vec<WordCount> ranked = vec.new<WordCount>(counts.len + 1);
+    i64 it = 0;
+    WordCount wc;
+    while (counts.next(&it, &wc.word, &wc.count)) {
         ranked.push(wc);
     }
-    ranked.sort(&ranksHigher);
+    ranked.sort(&byRank);
 
-    printf("%d words, %d distinct\n", total, ranked.size);
-    for (i64 i = 0; i < TOP_N && i < ranked.size; i++) {
-        WordCount *top = ranked.entries[i];
-        printf("%2d. %-10s %d\n", i + 1, top.word.cstr(), top.count);
+    printf("%d words, %d distinct\n", total, ranked.len);
+    for (i64 i = 0; i < TOP_N && i < ranked.len; i++) {
+        WordCount top = ranked.get(i);
+        printf("%2d. %-10.*s %d\n", i + 1, (i32)top.word.len, top.word.ptr, top.count);
     }
 
     return 0;

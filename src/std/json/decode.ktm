@@ -229,6 +229,23 @@ pub void decode(u8[] text, reflect.Value v, i64 flags = 0)
     decodeInto(doc, v, &path, flags);
 }
 
+/* The JSON in text as a T: `User u = json.decode<User>(text);`, freed
+ * with `json.free(reflect.of(u))`. Fields missing from the text are zero.
+ * Throws ERR_DECODE as decode does; what was filled in by then is freed
+ * first, so there is nothing to clean up after a throw. */
+pub T decode<T>(u8[] text, i64 flags = 0)
+{
+    T out;
+    mem.set(&out, 0, sizeof(T));
+    try {
+        decode(text, reflect.of(out), flags);
+    } catch (Error e) {
+        free(reflect.of(out));
+        throw(e);
+    }
+    return out;
+}
+
 /* Free what decode allocated in v: its Strings, the items of its slices,
  * its u8 * strings and what its other pointers point to, through nested
  * structs and arrays; they are zeroed. Only for values decode filled (or

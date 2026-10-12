@@ -54,8 +54,8 @@ i32 main() {
     tests++;
     if (fails("void Nope.f() {}\n", "`Nope` is not a struct")) { correct++; }
     tests++;
-    if (fails("import map;\nvoid map.StrMap.count() {}\n",
-                        "methods of `map.StrMap` can only be defined in the module that defines it")) { correct++; }
+    if (fails("import vec;\nvoid vec.BitVec.count() {}\n",
+                        "methods of `vec.BitVec` can only be defined in the module that defines it")) { correct++; }
     tests++;
     if (fails(USER "void User.f() { self = null; }\n",
                         "cannot assign to const 'self'")) { correct++; }

@@ -53,7 +53,7 @@ docs/examples/run.sh life     # just one</code></pre>
 
 <h2 id="word-frequency">Word frequency<a class="anchor" href="#word-frequency" aria-label="Link to this section">#</a></h2>
 <p>Reads a text file and prints its most common words. It shows reading a file, scanning
-characters, counting with a <code>map.StrMap</code>, ranking with a <code>vec.PtrVec</code>'s <code>sort</code>, and
+characters, counting with a <code>map.Map</code>, ranking with a <code>vec.Vec</code>'s <code>sort</code>, and
 reading command-line arguments.</p>
 <pre><code>cd docs/examples/wordfreq
 ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>
@@ -62,41 +62,29 @@ ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt</code></pre>
 //   ktm main.ktm -o wordfreq &amp;&amp; ./wordfreq sample.txt
 //   ktm -jit main.ktm sample.txt
 //
-// Shows: reading a file (fs), scanning strings, counting in a map.StrMap,
-// sorting a vec.PtrVec, structs and command-line arguments.
+// Shows: reading a file (fs), scanning strings, counting in a map.Map,
+// sorting a vec.Vec, structs and command-line arguments.
 
-import cstr, fs, map, mem, str, vec;
+import cstr, fs, map, str, vec;
 
 const i64 TOP_N = 8;
 const i64 MAX_WORD = 64;
 
 struct WordCount {
-    String word;
+    u8[] word;
     i64 count;
 };
 
-// Sort predicate: true when a ranks above b. Most frequent first, then
-// alphabetical so ties have a stable order.
-i64 ranksHigher(WordCount *a, WordCount *b) {
+// Most frequent first, then alphabetical so ties have a stable order.
+i64 byRank(WordCount *a, WordCount *b) {
     if (a.count != b.count) {
-        return a.count &gt; b.count;
+        return b.count - a.count;
     }
-    return str.compare(a.word, b.word) &lt; 0;
+    return str.compare(a.word, b.word);
 }
 
 bool isLetter(u8 c) {
     return ('a' &lt;= c &lt;= 'z') || ('A' &lt;= c &lt;= 'Z');
-}
-
-void countWord(map.StrMap *counts, u8[] word) {
-    WordCount *wc = counts.get(word);
-    if (wc == null) {
-        wc = mem.alloc(sizeof(WordCount));
-        wc.word = str.from(word);
-        wc.count = 0;
-        counts.set(word, wc);           // the map copies the key
-    }
-    wc.count++;
 }
 
 i32 main(i32 argc, u8 **argv) {
@@ -105,15 +93,14 @@ i32 main(i32 argc, u8 **argv) {
         path = cstr.view(argv[1]);
     }
 
-    String text = fs.readAll(path);
-    defer text.free();
+    ad String text = fs.readAll(path);
     if (!text.ptr) {
-        printf("cannot read %s\n", path);
+        printf("cannot read %.*s\n", (i32)path.len, path.ptr);
         return 1;
     }
     i64 size = text.len;
 
-    map.StrMap *counts = map.strNew();
+    ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
     u8 word[MAX_WORD];
     i64 len = 0, total = 0;
 
@@ -126,24 +113,24 @@ i32 main(i32 argc, u8 **argv) {
                 word[len++] = str.toLower(c);
             }
         } else if (len &gt; 0) {
-            countWord(counts, word[0:len]);
+            counts.set(word[0:len], counts.getOr(word[0:len], 0) + 1);   // the map copies the key
             total++;
             len = 0;
         }
     }
 
-    vec.PtrVec *ranked = vec.ptrNew();
-    i64 idx = 0;
-    WordCount *wc;
-    while (counts.valueIter(&amp;idx, &amp;wc)) {
+    ad vec.Vec&lt;WordCount&gt; ranked = vec.new&lt;WordCount&gt;(counts.len + 1);
+    i64 it = 0;
+    WordCount wc;
+    while (counts.next(&amp;it, &amp;wc.word, &amp;wc.count)) {
         ranked.push(wc);
     }
-    ranked.sort(&amp;ranksHigher);
+    ranked.sort(&amp;byRank);
 
-    printf("%d words, %d distinct\n", total, ranked.size);
-    for (i64 i = 0; i &lt; TOP_N &amp;&amp; i &lt; ranked.size; i++) {
-        WordCount *top = ranked.entries[i];
-        printf("%2d. %-10s %d\n", i + 1, top.word.cstr(), top.count);
+    printf("%d words, %d distinct\n", total, ranked.len);
+    for (i64 i = 0; i &lt; TOP_N &amp;&amp; i &lt; ranked.len; i++) {
+        WordCount top = ranked.get(i);
+        printf("%2d. %-10.*s %d\n", i + 1, (i32)top.word.len, top.word.ptr, top.count);
     }
 
     return 0;

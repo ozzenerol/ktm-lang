@@ -53,7 +53,7 @@ ada 10, linus
 frees reported (and skipped) as they happen, and leaks reported at exit, each with the line
 that allocated or freed the block, in any thread. Only blocks your code gets from <code>mem.alloc</code>,
 <code>mem.allocZero</code> and <code>mem.realloc</code> are tracked: a string or container the standard
-library allocates for you (<code>cstr.dup</code>, <code>cstr.formatTo</code>, <code>vec.ptrNew</code>, ...)
+library allocates for you (<code>cstr.dup</code>, <code>cstr.formatTo</code>, <code>vec.new</code>, ...)
 is not, so leaking one goes unreported, and a block of yours that the library resizes
 (<code>cstr.appendFormat</code>, <code>cstr.appendFormatLen</code>) is reported as never freed.</p>
 
@@ -919,423 +919,281 @@ stopping cleanly after signal 15
 </pre>
 
 <h2 id="lists">Lists</h2>
-<p><code>list.List</code> is a circular doubly linked list of <code>void *</code> values. The list
-is its head node, which links to itself when the list is empty, so iterate from
-<code>l.next</code> until you get back to <code>l</code>. The list never frees the values
-it holds unless you hand it a free function.</p>
-<pre data-run><code>
-import cstr, list;
-
-void main()
-{
-  list.List *l = list.new();
-  l.append("two");
-  l.append("three");
-  l.prepend("one");
-
-  for (list.List *it = l.next; it != l; it = it.next) {
-    printf("%s\n", it.value);
-  }
-  printf("first %s, last %s\n", l.first(), l.last());
-  printf("popped %s, %d left\n", l.pop(), l.count());
-  l.release(null);
-}
-</code></pre>
-<pre class="output">
-one
-two
-three
-first one, last three
-popped three, 2 left
-</pre>
+<p><code>list.List&lt;T&gt;</code> is a doubly linked list of <code>T</code>. It is a value: make
+one with <code>list.new&lt;T&gt;()</code> (nothing is allocated until the first value) and free
+it with <code>l.free()</code>, or let <code>ad</code> do that at the end of the scope. Its nodes are
+<code>list.Node&lt;T&gt;</code>, with <code>value</code>, <code>next</code> and <code>prev</code>;
+<code>l.head</code> and <code>l.tail</code> are the first and last (<code>null</code> when it is
+empty) and <code>l.len</code> counts them, so walk it with
+<code>for (auto n = l.head; n; n = n.next)</code>.</p>
 <ul>
-  <li><strong>Making one.</strong> <code>list.new()</code> allocates a head; free it with
-  <code>list.release</code>. <code>list.init(&amp;head)</code> turns a head you own (on the stack,
-  or inside a struct) into an empty list; empty that one with <code>list.clear</code>, because
-  <code>list.release</code> also frees the head.</li>
-  <li><strong>Adding.</strong> <code>list.append</code> and <code>list.prepend</code> add at the
-  end and the front; <code>list.insertBefore(node, value)</code> inserts before any node
-  (before the head is the end), and <code>list.insertNodeBefore(node, new_node)</code> links in a
-  node you made yourself.</li>
-  <li><strong>Removing.</strong> <code>list.shift</code> removes and returns the first value and
-  <code>list.pop</code> the last, so <code>list.append</code> with <code>list.shift</code> is a
-  first-in first-out queue and <code>list.append</code> with <code>list.pop</code> a stack.
-  <code>list.remove(node)</code> unlinks one node while you walk the list (take
-  <code>it.next</code> first) and returns its value; never pass it the head.</li>
-  <li><strong>Looking.</strong> <code>list.first</code> and <code>list.last</code> return a value
-  without removing it, <code>list.isEmpty</code> tells whether there are any, and
-  <code>list.count</code> counts them by walking the list, so it is O(n).</li>
-  <li><strong>Emptying.</strong> <code>list.clear(l, free_value)</code> frees every node and
-  keeps the head; <code>list.release(l, free_value)</code> frees the nodes and the head. Both
-  call <code>free_value</code> on each value when it isn't <code>null</code>.</li>
-  <li><strong>Joining.</strong> <code>list.mergeAppend(l1, l2)</code> and
-  <code>list.mergePrepend(l1, l2)</code> move all of <code>l2</code>'s values to the end or
-  the front of <code>l1</code> and free <code>l2</code>'s head, so <code>l2</code> (which
-  must come from <code>list.new</code>) can't be used afterwards.</li>
+  <li><strong>Adding.</strong> <code>l.append(v)</code> and <code>l.prepend(v)</code> add at the
+  end and the front, <code>l.insertBefore(node, v)</code> and <code>l.insertAfter(node, v)</code>
+  next to a node. Each returns the new node.</li>
+  <li><strong>Removing.</strong> <code>l.remove(node)</code> takes that node out in O(1) and returns
+  its value: keep the node <code>append</code> gave you (a timer, a client) and remove it later
+  without searching. During a walk, read <code>n.next</code> before removing <code>n</code>.
+  <code>l.shift()</code> removes the first value and <code>l.pop()</code> the last, so
+  <code>append</code> with <code>shift</code> is a first-in first-out queue and <code>append</code>
+  with <code>pop</code> a stack.</li>
+  <li><strong>Looking.</strong> <code>l.first()</code> and <code>l.last()</code> return a value
+  without removing it. On an empty list <code>shift</code>, <code>pop</code>, <code>first</code> and
+  <code>last</code> return a zeroed <code>T</code> (0, <code>null</code>) and set the optional
+  <code>bool *ok</code> to false, for when a stored zero must be told apart.</li>
+  <li><strong>Joining and emptying.</strong> <code>l.mergeAppend(&amp;other)</code> and
+  <code>l.mergePrepend(&amp;other)</code> move all of <code>other</code>'s nodes to the end or the
+  front, leaving <code>other</code> empty. <code>l.clear()</code> frees every node and leaves the
+  list empty and usable; <code>l.free()</code> is the same, for <code>ad</code>. Neither frees what
+  the values point to: that is yours.</li>
 </ul>
-<p><code>list.shift</code>, <code>list.pop</code>, <code>list.first</code> and
-<code>list.last</code> return <code>null</code> for an empty list, which looks the same as a
-stored <code>null</code>: check <code>list.isEmpty</code> first if you store them. The
-functions that remove, look or free accept a <code>null</code> list and do nothing
-(returning <code>null</code>, <code>0</code> from <code>list.count</code>, <code>true</code>
-from <code>list.isEmpty</code>); the ones that add need a real list.</p>
 <pre data-run><code>
-import cstr, list, mem, str;
+import cstr, list, mem;
 
 void main()
 {
-  list.List todo;              // a head on the stack
-  todo.init();
+  ad list.List<u8 *> todo = list.new<u8 *>();
   todo.append(cstr.dup("write"));
-  todo.append(cstr.dup("test"));
+  list.Node<u8 *> *test = todo.append(cstr.dup("test"));
   todo.append(cstr.dup("ship"));
+  todo.prepend(cstr.dup("plan"));
 
-  list.List *it = todo.next;
-  while (it != &todo) {   // drop "test" while walking
-    list.List *next = it.next;
-    if (!cstr.cmp(it.value, "test")) { mem.free(it.remove()); }
-    it = next;
-  }
+  mem.free(todo.remove(test));            // the node append gave back: O(1)
 
-  list.List *later = list.new();
+  ad list.List<u8 *> later = list.new<u8 *>();
   later.append(cstr.dup("rest"));
-  todo.mergeAppend(later);   // `later` is freed
+  todo.mergeAppend(&later);               // `later` is empty now
 
-  for (it = todo.next; it != &todo; it = it.next) { printf("%s ", it.value); }
-  printf("(%d)\n", todo.count());
-  todo.clear(&mem.free);         // keeps the stack head
-  printf("empty: %d\n", todo.isEmpty());
+  for (auto n = todo.head; n; n = n.next) { printf("%s ", n.value); }
+  printf("(%d)\n", todo.len);
+  u8 *first = todo.shift();
+  printf("first %s, last %s\n", first, todo.last());
+  mem.free(first);
+  for (auto n = todo.head; n; n = n.next) { mem.free(n.value); }   // the values are ours
 }
 </code></pre>
 <pre class="output">
-write ship rest (3)
-empty: 1
+plan write ship rest (4)
+first plan, last rest
 </pre>
 
 <h2 id="vectors">Vectors</h2>
-<p>Growable arrays: <code>vec.IntVec</code> of <code>i64</code>, <code>vec.FloatVec</code> of
-<code>f64</code> and <code>vec.PtrVec</code> of pointers. Each has <code>size</code> and
-<code>entries</code> fields, so a range-based <code>for</code> works on them. They have the
-same methods:</p>
+<p><code>vec.Vec&lt;T&gt;</code> is a growable array of any type, held by value like a String:
+make one with <code>vec.new&lt;T&gt;(cap = 8)</code> and free it with <code>free()</code>, or
+declare it with <code>ad</code>. It has <code>data</code>, <code>len</code> and
+<code>cap</code> fields; <code>for (auto x : v)</code> goes through the items, and
+<code>v.items()</code> is a <code>T[]</code> view of them (valid until the Vec grows), for
+anything that takes a slice. <code>free()</code> frees the array, not what its items point
+to.</p>
 <ul>
-  <li><code>vec.intNew(size = 32)</code> makes an empty vector with room for
-  <code>size</code> values (its initial capacity); a size below 1 is taken as 1.
-  <code>v.capacity()</code> says how many values fit before the storage has to grow, and
-  <code>v.push(value)</code> appends, doubling the storage when it is full.</li>
-  <li><code>v.get(i)</code> and <code>v.set(i, value)</code> read and replace an
-  entry. The index is always checked: outside <code>0</code> to <code>size - 1</code> they
-  print <code>IntVec.get: index 5 out of range (size 3)</code> on stderr and exit with
-  status 1. Reading <code>v.entries[i]</code> directly is not checked.</li>
-  <li><code>v.pop(&amp;ok)</code> removes and returns the last entry and
-  <code>v.last(&amp;ok)</code> returns it without removing it. On an empty vector they
-  return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
-  <code>vec.PtrVec</code>) and set <code>ok</code> to <code>false</code>; the
-  <code>ok</code> argument is optional.</li>
-  <li><code>v.removeAt(i)</code> removes and returns the entry at <code>i</code>; the ones
-  after it move down, so the order is kept. The index is checked as for <code>get</code>.</li>
-  <li><code>v.clear()</code> sets the size to 0 and keeps the storage for reuse;
-  <code>v.release()</code> frees it. A <code>vec.PtrVec</code>'s <code>v.release(free_value)</code> first calls
-  <code>free_value</code> (for example <code>&amp;mem.free</code>) on every value.</li>
-  <li><code>sort()</code> of a <code>vec.IntVec</code> or <code>vec.FloatVec</code> sorts ascending.
-  A <code>vec.PtrVec</code>'s <code>sort</code> takes a comparison that returns <code>true</code> when its first
-  argument should come first. That's a "less than" test, not a C-style negative, zero or
-  positive result, which leaves the vector unsorted. Its parameters can be the pointers the
-  vector holds (<code>i64 byAge(User *a, User *b)</code>): a function's typed pointer
-  parameters stand for <code>void *</code> ones without a cast, here and in every callback
-  that takes <code>void *</code> (<code>release</code>'s <code>free_value</code> too). The sorts are O(n log n), also for
-  sorted or all-equal input, and not stable: equal values may change order.</li>
+  <li><code>push(x)</code> appends, growing the array as needed; <code>reserve(n)</code> makes
+  room for <code>n</code> items at once.</li>
+  <li><code>get(i)</code>, <code>set(i, x)</code> and <code>at(i)</code> (a pointer to the item,
+  to change it in place) check the index: outside <code>0</code> to <code>len - 1</code> they
+  throw <code>ERR_BOUNDS</code>, as a slice index does.</li>
+  <li><code>pop(&amp;ok)</code> removes and returns the last item and <code>last(&amp;ok)</code>
+  returns it. On an empty Vec they set <code>ok</code> to <code>false</code> and return a
+  zeroed <code>T</code>; without <code>ok</code> they throw <code>ERR_BOUNDS</code>.</li>
+  <li><code>insert(i, x)</code> (<code>i</code> from 0 to <code>len</code>) and
+  <code>removeAt(i)</code> move the items after <code>i</code>, so the order is kept.</li>
+  <li><code>sort(cmp)</code> sorts with <code>cmp(a, b)</code>, given pointers to two items:
+  negative when <code>a</code> goes first, 0 when equal, positive when <code>b</code> does.
+  <code>sortAsc()</code> sorts numbers (anything <code>&lt;</code> compares) smallest first.
+  Both are O(n log n), also for sorted, reversed or all-equal input, and not stable.</li>
+  <li><code>clear()</code> empties it and keeps the room for reuse.</li>
 </ul>
 <pre data-run><code>
-import cstr, mem, str, vec;
+import str, vec;
 
-i64 shorterFirst(u8 *a, u8 *b)
-{
-  return cstr.len(a) < cstr.len(b);
-}
+struct User { u8 *name; i64 age; };
+
+i64 byAge(User **a, User **b) { return (*a).age - (*b).age; }
 
 void main()
 {
-  vec.IntVec *nums = vec.intNew();
+  ad vec.Vec<i64> nums = vec.new<i64>();
   nums.push(30);
   nums.push(10);
   nums.push(20);
-  nums.sort();
-  for (i64 n : nums) {
-    printf("%d\n", n);
-  }
+  nums.sortAsc();
+  for (auto n : nums) { printf("%d ", n); }
   nums.set(0, 15);
-  printf("popped %d, size %d, first %d\n", nums.pop(), nums.size, nums.get(0));
-  nums.release();
+  printf("| popped %d, len %d, first %d\n", nums.pop(), nums.len, nums.get(0));
 
-  vec.PtrVec *words = vec.ptrNew();
-  words.push(cstr.dup("banana"));
-  words.push(cstr.dup("fig"));
-  words.push(cstr.dup("kiwi"));
-  words.sort(&shorterFirst);
-  for (u8 *w : words) {
-    printf("%s\n", w);
-  }
-  words.release(&mem.free);   // frees the strings too
-}
-</code></pre>
-<pre class="output">
-10
-20
-30
-popped 30, size 2, first 15
-fig
-kiwi
-banana
-</pre>
-<pre data-run><code>
-import cstr, vec;
+  User ann = {"ann", 41}, bob = {"bob", 29};
+  ad vec.Vec<User *> users = vec.new<User *>();
+  users.push(&ann);
+  users.push(&bob);
+  users.sort(&byAge);
+  for (auto u : users) { printf("%s %d\n", u.name, u.age); }
 
-void main()
-{
-  vec.FloatVec *temps = vec.floatNew(4);
-  temps.push(21.5);
-  temps.push(-3.25);
-  temps.push(8.0);
-  temps.sort();
-  printf("lowest %.2f, highest %.2f, capacity %d\n",
-    temps.get(0), temps.last(), temps.capacity());
-
-  temps.clear();
   bool ok;
-  f64 last = temps.last(&ok);
-  printf("after clear: size %d, last %.1f, ok %d\n", temps.size, last, ok);
-  temps.release();
+  nums.clear();
+  i64 last = nums.last(&ok);
+  printf("after clear: len %d, last %d, ok %d\n", nums.len, last, ok);
 }
 </code></pre>
 <pre class="output">
-lowest -3.25, highest 21.50, capacity 4
-after clear: size 0, last -1.0, ok 0
+10 20 30 | popped 30, len 2, first 15
+bob 29
+ann 41
+after clear: len 0, last 0, ok 0
 </pre>
+<p>Module <code>sort</code> sorts any slice in place: <code>sort.slice(s, cmp)</code> with a
+comparator as above, and <code>sort.asc(s)</code> for numbers
+(<code>sort.asc(temps[0:n])</code> on an array).</p>
 
 <h2 id="sets">Sets and trees</h2>
-<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>add</code>,
-<code>delete</code> and <code>has</code> are O(log n); adding a value that is
-there, or deleting one that isn't, changes nothing. <code>unionWith</code>,
-<code>intersection</code>, <code>diff</code> (in the first set, not the
-second) and <code>symDiff</code> (in exactly one) return a new set and leave their
-arguments alone; <code>eq</code> compares two sets. An iterator, <code>toVec</code>
-and <code>toStr</code> (a String) give the values in ascending order. Don't add or delete
-values while iterating: once one is added or deleted, <code>set.intIterNext</code> returns
-<code>null</code> and the loop ends early, so collect the changes and apply them after it. The functions that only read a set, and
-<code>release</code>, treat <code>null</code> as the empty set.</p>
+<p><code>set.Set&lt;T&gt;</code> is a hash set of <code>T</code>. It is a value: make one with
+<code>set.new&lt;T&gt;()</code> and free it with <code>s.free()</code>, or with <code>ad</code>.
+<code>s.add(v)</code> returns true when <code>v</code> is new, <code>s.delete(v)</code> true when it
+was there, <code>s.has(v)</code> tells, <code>s.len</code> counts and <code>s.clear()</code> empties
+it; all are O(1) on average. <code>unionWith</code>, <code>intersection</code>, <code>diff</code> (in
+the first set, not the second) and <code>symDiff</code> (in exactly one) take a pointer to the other
+set and return a new one, leaving both alone; <code>isSubset</code> and <code>equals</code> compare
+two sets. Walk it in the order values were added with
+<code>i64 it = 0; while (s.next(&amp;it, &amp;v)) { ... }</code>; <code>s.items()</code> gives the
+values as a <code>vec.Vec&lt;T&gt;</code> (yours to free), which <code>sortAsc()</code> puts in
+order. Values are hashed and compared like <code>map.Map</code>'s keys (the integer types,
+pointers, <code>u8[]</code> and <code>String</code>, and any other type byte by byte), and
+<code>u8[]</code> and <code>String</code> values are copied into the set. For a set kept in order,
+use a <code>map.Tree</code>.</p>
 <pre data-run><code>
-import cstr, mem, set;
+import set, vec;
 
 void main()
 {
-  set.IntSet *evens = set.intNew();
-  set.IntSet *threes = set.intNew();
-  i64 i;
-  for (i = 1; i <= 6; i++) { evens.add(i * 2); }
-  for (i = 1; i <= 4; i++) { threes.add(i * 3); }
-  evens.add(4);
-  evens.delete(10);
-  printf("has 4: %d, has 5: %d, size %d\n",
-    evens.has(4), evens.has(5), evens.size());
+  ad set.Set<i64> evens = set.new<i64>();
+  ad set.Set<i64> threes = set.new<i64>();
+  for (i64 i = 1; i <= 6; i++) { evens.add(i * 2); }
+  for (i64 i = 1; i <= 4; i++) { threes.add(i * 3); }
+  printf("add 4 again: %d, delete 10: %d\n", evens.add(4), evens.delete(10));
+  printf("has 4: %d, has 5: %d, %d values\n", evens.has(4), evens.has(5), evens.len);
 
-  set.IntSet *both = evens.intersection(threes);
-  String text = both.toStr();
-  printf("both: %s\n", text);
-  text.free();
+  ad set.Set<i64> both = evens.intersection(&threes);
+  i64 it = 0, v;
+  while (both.next(&it, &v)) { printf("both %d\n", v); }
 
-  set.IntSet *either = evens.unionWith(threes);
-  set.IntSetIter *it = either.iterNew();
-  set.IntSetEntry *e;
-  while ((e = set.intIterNext(it))) { printf("%d ", e.key); }
+  ad set.Set<i64> either = evens.unionWith(&threes);
+  ad vec.Vec<i64> sorted = either.items();
+  sorted.sortAsc();
+  for (auto x : sorted.items()) { printf("%d ", x); }
   printf("\n");
-  set.intIterRelease(it);
 
-  either.release();
-  both.release();
-  threes.release();
-  evens.release();
+  ad set.Set<u8[]> seen = set.new<u8[]>();
+  seen.add("apple");
+  printf("seen apple before: %d\n", !seen.add("apple"));
 }
 </code></pre>
 <pre class="output">
-has 4: 1, has 5: 0, size 5
-both: {6, 12}
+add 4 again: 0, delete 10: 1
+has 4: 1, has 5: 0, 5 values
+both 6
+both 12
 2 3 4 6 8 9 12 
+seen apple before: 1
 </pre>
-<p><code>map.RBTree</code>, which <code>set.IntSet</code> is built on, maps <code>void *</code> keys to
-<code>void *</code> values in the order of a comparison function you pass to
-<code>map.rbNew(free_key, free_value, key_cmp)</code>: <code>key_cmp(a, b)</code> returns
-less than 0 when <code>a</code> comes first, 0 when they are equal and more than 0
-otherwise. The two free functions may be <code>null</code>; when set, the tree frees keys
-and values with them on delete, release and when an insert replaces a value (an insert of
-an existing key keeps the stored key). <code>get</code> returns <code>null</code> for
-a missing key, the same as a stored <code>null</code>, so ask <code>has</code> to tell
-them apart. <code>iterNew</code> and <code>forEach</code> visit the entries in key
-order; don't insert or delete while they run. Once a new key is added or one is deleted,
-<code>map.rbIterNext</code> returns <code>null</code> and <code>forEach</code> returns after
-that callback; replacing the value of a key that is there is fine.</p>
-<pre data-run><code>
-import cstr, map, str;
 
-i64 strKeyCmp(u8 *a, u8 *b)
-{
-  return cstr.cmp(a, b);
-}
+<h3 id="tree">Ordered maps: map.Tree</h3>
+<p><code>map.Tree&lt;K, V&gt;</code> maps keys to values in key order (a red-black tree). It is a value: make one with
+<code>map.treeNew&lt;K, V&gt;()</code> and free it with <code>t.free()</code>, so
+<code>ad map.Tree&lt;u8[], i64&gt; t = map.treeNew&lt;u8[], i64&gt;();</code> frees it at the end
+of the scope. <code>t.set(k, v)</code> adds a key or replaces its value,
+<code>t.get(k, &amp;v)</code> fills <code>v</code> and returns true (false for a missing key,
+<code>v</code> untouched), <code>t.getOr(k, def)</code> returns the value or <code>def</code>,
+<code>t.has(k)</code>, <code>t.delete(k)</code> (true if the key was there), <code>t.len</code>
+and <code>t.clear()</code>. Walk it in key order with
+<code>for (auto n = t.first(); n; n = t.after(n))</code>, reading <code>n.key</code> and
+<code>n.value</code>, or backwards with <code>t.last()</code> and <code>t.before(n)</code>. A delete
+leaves the other nodes where they are, so during a walk take <code>t.after(n)</code> before
+deleting <code>n</code>.</p>
+<p>Keys are ordered by <code>map.compare(a, b)</code>, an overloaded function returning less than
+0, 0 or more than 0: there are overloads for the integer types, <code>f64</code> and
+<code>u8[]</code> (bytes, then length, which covers <code>String</code>). For a key type of your
+own, add one: <code>i64 map.compare(Version a, Version b) { ... }</code>. <code>u8[]</code> and
+<code>String</code> keys are copied into the tree and freed with it, so the key you pass can be
+a reused buffer; other keys and every value are stored as they are, and what a value points to
+is yours to free.</p>
+<pre data-run><code>
+import map;
 
 void main()
 {
-  map.RBTree *ages = map.rbNew(null, null, &strKeyCmp);
-  ages.set("linus", (void *)55);
-  ages.set("ada", (void *)36);
-  ages.set("grace", (void *)85);
-  ages.set("ada", (void *)37);
+  ad map.Tree<u8[], i64> ages = map.treeNew<u8[], i64>();
+  ages.set("linus", 55);
+  ages.set("ada", 36);
+  ages.set("grace", 85);
+  ages.set("ada", 37);
   ages.delete("grace");
-  printf("ada %d, has grace: %d, %d entries\n",
-    ages.get("ada"), ages.has("grace"), ages.size);
-
-  map.RBIter *it = ages.iterNew();
-  map.RBNode *node;
-  while ((node = map.rbIterNext(it))) { printf("%s = %d\n", node.key, node.value); }
-  map.rbIterRelease(it);
-  ages.release();
+  i64 ada;
+  ages.get("ada", &ada);
+  printf("ada %d, has grace: %d, %d entries, bob %d\n",
+    ada, ages.has("grace"), ages.len, ages.getOr("bob", -1));
+  for (auto n = ages.first(); n; n = ages.after(n)) { printf("%s = %d\n", n.key, n.value); }
 }
 </code></pre>
 <pre class="output">
-ada 37, has grace: 0, 2 entries
+ada 37, has grace: 0, 2 entries, bob -1
 ada = 37
 linus = 55
 </pre>
 
 <h2 id="hash-tables">Hash tables</h2>
-<p><code>map.StrMap</code> maps text keys to <code>void *</code> values and <code>map.IntMap</code> maps
-<code>i64</code> keys. Values are pointers, so cast integers when storing them:
-<code>count(void *)</code>. Setting an existing key replaces its value.</p>
-<p>A <code>StrMap</code> key is a <code>u8[]</code>: a literal, a <code>String</code> or a view into a
-buffer, matched on all its bytes. The map stores its own copy of every new key and frees it
-itself, so the key you pass can be a reused buffer or a String you free right after.
-<code>node.key</code> and <code>keyIter</code> give views of the map's copy (with a NUL after it, so
-<code>key.ptr</code> is also a C string), valid until that key is deleted or the map is cleared or
-released.</p>
+<p><code>map.Map&lt;K, V&gt;</code> is a hash map, held by value: make one with
+<code>map.new&lt;K, V&gt;()</code> and free it with <code>free()</code>, or declare it with
+<code>ad</code>. Setting an existing key replaces its value; iteration goes in insertion
+order.</p>
+<ul>
+  <li><code>set(k, v)</code>; <code>get(k, &amp;v)</code> fills <code>v</code> and returns
+  whether <code>k</code> is there; <code>getOr(k, default)</code>; <code>ref(k)</code> is a
+  pointer to the value, to change it in place (<code>*m.ref(k) += 1</code>), or
+  <code>null</code>; <code>has(k)</code>; <code>delete(k)</code> returns whether it was there;
+  <code>len</code> counts the keys; <code>clear()</code>.</li>
+  <li><code>next(&amp;it, &amp;k, &amp;v)</code> steps through the keys and values (start
+  <code>it</code> at 0; either pointer may be <code>null</code>); <code>keys()</code> and
+  <code>values()</code> return them as a <code>vec.Vec</code>.</li>
+  <li>Keys are hashed with <code>map.hashOf</code> and compared with <code>map.keyEq</code>:
+  <code>i64</code>, <code>u64</code>, <code>i32</code>, <code>u32</code>, pointers,
+  <code>u8[]</code> and <code>String</code> have their own; any other type (a struct) is
+  hashed and compared by its bytes, so set every field of a struct key.</li>
+  <li>A <code>u8[]</code> or <code>String</code> key is copied: the key you pass can be a
+  reused buffer or a String you free right after, and the map frees its copies. The values
+  are yours (free what they point to before <code>free()</code>).</li>
+</ul>
 <pre data-run><code>
-import map;
+import map, str;
 
 void main()
 {
-  map.StrMap *stock = map.strNew();
-  defer stock.release();
-  stock.set("apples", (void *)3);
-  stock.set("pears", (void *)5);
-  stock.set("apples", (void *)4);
-  stock.set("plums", (void *)7);
+  ad map.Map<u8[], i64> stock = map.new<u8[], i64>();
+  stock.set("apples", 3);
+  stock.set("pears", 5);
+  stock.set("apples", 4);
+  stock.set("plums", 7);
   stock.delete("plums");
+  *stock.ref("pears") += 1;
 
   printf("%d apples, has kiwis: %d, %d keys\n",
-    stock.get("apples"), stock.has("kiwis"), stock.size);
+    stock.getOr("apples", 0), stock.has("kiwis"), stock.len);
 
-  i64 idx = 0;
-  map.StrMapNode *node;
-  while (stock.iter(&idx, &node)) {
-    printf("%s = %d\n", node.key, node.value);
+  i64 it = 0;
+  u8[] fruit;
+  i64 n;
+  while (stock.next(&it, &fruit, &n)) {
+    printf("%.*s = %d\n", (i32)fruit.len, fruit.ptr, n);
   }
 
-  map.IntMap *names = map.intNew();
-  defer names.release();
+  ad map.Map<i64, u8 *> names = map.new<i64, u8 *>();
   names.set(404, "not found");
-  names.set(200, "ok");
-  printf("%s\n", names.get(404));
-  printf("deleted 200: %d, deleted 500: %d\n", names.delete(200), names.delete(500));
+  u8 *why;
+  if (names.get(404, &why)) { printf("404: %s\n", why); }
 }
 </code></pre>
 <pre class="output">
 4 apples, has kiwis: 0, 2 keys
 apples = 4
-pears = 5
-not found
-deleted 200: 1, deleted 500: 0
+pears = 6
+404: not found
 </pre>
-<p><code>get</code> returns <code>null</code> for a missing key, which is also what a stored
-<code>null</code> or <code>0</code> gives. Pass a <code>bool</code> as the optional last argument to
-tell them apart: it is set to <code>true</code> when the key is there (<code>has</code> answers the
-same question). A word inside a larger buffer is looked up with a sub-slice, without copying it out.
-<code>clear</code> removes every entry and keeps the capacity.</p>
-<pre data-run><code>
-import map;
-
-void main()
-{
-  map.IntMap *seen = map.intNew();
-  defer seen.release();
-  seen.set(7, (void *)0);
-  bool ok;
-  i64 v = seen.get(7, &ok);
-  printf("7: %d (there: %d)\n", v, ok);
-  v = seen.get(8, &ok);
-  printf("8: %d (there: %d)\n", v, ok);
-
-  map.StrMap *words = map.strNew();
-  defer words.release();
-  words.set("let", (void *)1);
-  words.set("for", (void *)2);
-  u8[] line = "for x in xs";
-  printf("first word: %d\n", words.get(line[0:3]));
-
-  words.clear();
-  printf("after clear: %d keys, %d slots\n", words.size, words.capacity);
-}
-</code></pre>
-<pre class="output">
-7: 0 (there: 1)
-8: 0 (there: 0)
-first word: 2
-after clear: 0 keys, 32 slots
-</pre>
-<p>Iteration (<code>iter</code>, <code>keyIter</code> and <code>valueIter</code>, on both kinds of
-map) follows insertion order. Start the cursor at 0 and call until it returns <code>false</code>;
-the cursor is opaque, so don't compute with it. Deleting entries while iterating is safe (the
-loop above could delete <code>node.key</code>); adding entries is not, as an added entry can be
-skipped or the table rebuilt under the loop. A deleted key can be set again and then comes last.
-<code>toStr</code> and <code>keysToStr</code> print a map, in insertion order, into a new
-<code>String</code> (free it); <code>toStr</code> takes a function that turns a value into a
-<code>String</code>, which it frees after use.</p>
-<pre data-run><code>
-import map, str;
-
-String showCount(void *v)
-{
-  return str.format("%d", (i64)v);
-}
-
-void main()
-{
-  map.StrMap *m = map.strNew();
-  defer m.release();
-  m.set("a", (void *)1);
-  m.set("b", (void *)2);
-  String keys = m.keysToStr();
-  defer keys.free();
-  String all = m.toStr(&showCount);
-  defer all.free();
-  printf("%s %s\n", keys, all);
-}
-</code></pre>
-<pre class="output">
-{a, b} {[a] => 1, [b] => 2}
-</pre>
-<p><code>map.strNew</code> and <code>map.intNew</code> take an optional starting capacity
-(default 32): the number of slots, rounded up to a power of two, at least 8 (a negative
-request gets 8 and one above 2<sup>28</sup> gets 2<sup>28</sup>). The table is rebuilt,
-doubling, when its entries and deleted holes fill 60% of the slots, so a capacity of 1024
-holds about 600 entries before it grows. It never shrinks, not on delete and not on clear;
-release it and make a new one to give the memory back. <code>resize</code> doubles it ahead of
-time. It and the <code>New</code> functions return <code>false</code> or <code>null</code> when
-out of memory, as does a <code>set</code> that needed to grow the table or copy a key.</p>
-<p><code>setFreeValue</code> registers a value destructor. With it the map owns the values you
-give it: it runs on <code>delete</code>, <code>clear</code> and <code>release</code>, and when
-<code>set</code> replaces a value (not when you set the stored pointer again). <code>set</code>
-returns <code>true</code> for a new key and an update alike; check <code>has</code> first to know
-which. A <code>null</code> map is safe everywhere: <code>get</code> and <code>has</code> give
-<code>null</code> and <code>false</code>, <code>set</code> and <code>delete</code>
-<code>false</code>, and <code>release</code> and <code>clear</code> do nothing. An empty
-<code>u8[]</code> is the key <code>""</code>.</p>
 
 <h2 id="bit-vectors">Bit vectors</h2>
 <p>A <code>vec.BitVec</code> is a set of numbered bits, all 0 to begin with. <code>set</code>
@@ -1429,7 +1287,7 @@ lowercase hex of any bytes as a String that is yours.</p>
 <p><code>hash.crc32(data)</code> is the IEEE CRC-32 that zip, gzip and PNG use. It chains:
 <code>hash.crc32(b, hash.crc32(a))</code> is the CRC of a followed by b.
 <code>hash.fnv1a(data)</code> is a fast 64-bit hash for tables, sharding and cache keys (the one
-<code>map.StrMap</code> uses), not for anything security-related.</p>
+<code>map.Map</code> uses for text keys), not for anything security-related.</p>
 <p><code>hash.equalCt(a, b)</code> compares two byte strings in a time that depends only on their
 length, not on where they differ: use it for digests, MACs and tokens, where
 <code>str.equals</code> would tell an attacker how many leading bytes were right. Strings of
@@ -1763,15 +1621,16 @@ price 9.90
 <h3 id="json-structs">Structs to JSON and back</h3>
 <p><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
 <a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
-as the second argument for one member per line). <code>json.decode(text, reflect.of(x))</code>
-fills <code>x</code> from JSON, and <code>json.free(reflect.of(x))</code> gives back what decode
-allocated. A struct is an object of its fields by name, in order; ints, floats and bools are
+as the second argument for one member per line). <code>json.decode&lt;T&gt;(text)</code> returns
+the JSON as a <code>T</code> (a struct, a pointer to one, a slice, a String, a number), with the
+fields the JSON leaves out zero, and <code>json.free(reflect.of(x))</code> gives back what decode
+allocated. <code>json.decode(text, reflect.of(x))</code> fills a value you already have instead. A struct is an object of its fields by name, in order; ints, floats and bools are
 numbers and <code>true</code>/<code>false</code>; an enum is its member's name; a
 <code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array is a string;
 other arrays and slices are arrays; a pointer is what it points to, or <code>null</code>.
 Private fields are skipped. A union, a function or a <code>void *</code> can't be JSON.</p>
 <pre data-run><code>
-import json, mem, reflect;
+import json, reflect;
 
 enum Role { guest, admin };
 struct Tag { u8[] name; i64 weight; };
@@ -1779,10 +1638,8 @@ struct User { i64 id; String name; Role role; Tag[] tags; };
 
 void main()
 {
-  User u;
-  mem.set(&u, 0, sizeof(User));   // decode fills in what the JSON has
-  json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
-    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}", reflect.of(u));
+  User u = json.decode<User>("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
+    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}");
   defer json.free(reflect.of(u));
   printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
 
@@ -1792,7 +1649,7 @@ void main()
   printf("%s\n", text);
 
   try {
-    json.decode("{\"tags\": [{\"weight\": \"high\"}]}", reflect.of(u));
+    User bad = json.decode<User>("{\"tags\": [{\"weight\": \"high\"}]}");
   } catch (Error e) {
     printf("%s\n", e.message);
   }
@@ -1803,9 +1660,11 @@ void main()
 {"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
 tags[0].weight: expected an integer, got a string
 </pre>
-<p>A key the struct has no field for is ignored (<code>"since"</code> above), and a field the
-JSON leaves out keeps what it had, so zero the value first; with <code>json.STRICT</code> as the
-third argument both are errors. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
+<p>A key the struct has no field for is ignored (<code>"since"</code> above). A field the JSON
+leaves out is zero with <code>json.decode&lt;T&gt;</code>, and keeps what it had with the
+<code>reflect.of(x)</code> form, so zero the value first there; with <code>json.STRICT</code> as the
+flags argument (<code>json.decode&lt;User&gt;(text, json.STRICT)</code>) both are errors. When
+<code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
 with where it is (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. Decode
 allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it fills in;
 <code>json.free</code> frees them all and zeroes them, also after a decode that threw half way,

@@ -100,13 +100,13 @@ i64 nowMs() {
     return ts[0] * 1000 + ts[1] / 1000000;
 }
 
-vec.PtrVec *collectTests() {
+vec.Vec<u8 *> collectTests() {
     auto dir = libc.opendir(".");
     if (!dir) {
         printf("Failed to open directory\n");
         os.exit();
     }
-    auto vecVal = vec.ptrNew();
+    vec.Vec<u8 *> vecVal = vec.new<u8 *>();
     libc.Dirent *ent;
     while ((ent = libc.readdir(dir)) != null) {
         if (ent.type & libc.DT_REG) {
@@ -118,7 +118,7 @@ vec.PtrVec *collectTests() {
         }
     }
 
-    qSortStrings((u8 **)vecVal.entries,vecVal.size-1);
+    qSortStrings(vecVal.data, vecVal.len - 1);
     libc.closedir(dir);
     return vecVal;
 }
@@ -285,14 +285,14 @@ void timeOutTest(u8 *name, i64 idx, i32 pid, i64 timeout) {
 
 /* Run every test in `names`, JobCount() at a time, printing each test's
  * output once it and every test before it have finished. */
-void runTests(vec.PtrVec *names) {
-    i64 n = names.size, jobs = jobCount(), next = 0, printed = 0;
+void runTests(vec.Vec<u8 *> *names) {
+    i64 n = names.len, jobs = jobCount(), next = 0, printed = 0;
     i64 running = 0, i, timeout = testTimeout(), now;
     i32 pid, status;
     i32 *pids = mem.allocZero(sizeof(i32) * (n + 1));
     bool *done = mem.allocZero(sizeof(bool) * (n + 1));
     i64 *start = mem.allocZero(sizeof(i64) * (n + 1));
-    u8 **entries = (u8 **)names.entries;
+    u8 **entries = names.data;
 
     runnerInit();
     gInterrupted = 0;

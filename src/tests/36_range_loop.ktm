@@ -87,8 +87,8 @@ bool testStructWithArrayLoop(void) {
     return i == sizeof(cases)/sizeof(cases[0]);
 }
 
-bool testFloatVecLoop(void) {
-    vec.FloatVec *fvec = vec.floatNew();
+bool testF64VecLoop(void) {
+    vec.Vec<f64> fvec = vec.new<f64>();
 
     f64 cases[] = {8.8, 4.2, 3.8};
     i64 i = 0;
@@ -103,7 +103,7 @@ bool testFloatVecLoop(void) {
         i++;
     }
 
-    fvec.release();
+    fvec.free();
     return i == sizeof(cases)/sizeof(cases[0]);
 }
 
@@ -117,8 +117,8 @@ BoxInt *bInt(i64 i) {
     return b;
 }
 
-bool testPtrVecLoop(void) {
-    vec.PtrVec *vecVal = vec.ptrNew();
+bool testPointerVecLoop(void) {
+    vec.Vec<BoxInt *> vecVal = vec.new<BoxInt *>();
     vecVal.push(bInt(1));
     vecVal.push(bInt(4));
     vecVal.push(bInt(8));
@@ -133,6 +133,7 @@ bool testPtrVecLoop(void) {
         i++;
         mem.free(b);
     }
+    vecVal.free();
     return i == sizeof(cases)/sizeof(cases[0]);
 }
 
@@ -152,7 +153,7 @@ bool testArrayLoop(void) {
 }
 
 struct C2 {
-    vec.IntVec *v;
+    vec.Vec<i64> v;
 };
 
 struct C1 {
@@ -163,7 +164,7 @@ struct C1 {
 bool testNested(void) {
     C1 c1;
     c1.c2 = mem.alloc(sizeof(C2));
-    c1.c2.v = vec.intNew();
+    c1.c2.v = vec.new<i64>();
 
     c1.c2.v.push(10);
     c1.c2.v.push(100);
@@ -180,7 +181,7 @@ bool testNested(void) {
         i++;
     }
 
-    c1.c2.v.release();
+    c1.c2.v.free();
     mem.free(c1.c2);
     return i == sizeof(cases)/sizeof(cases[0]);
 }
@@ -191,8 +192,8 @@ i32 main(void) {
     if (testContainerLoop()) { correct++; }
     if (testStaticContainerEntriesLoop()) { correct++; }
     if (testStructWithArrayLoop()) { correct++; }
-    if (testFloatVecLoop()) { correct++; }
-    if (testPtrVecLoop()) { correct++; }
+    if (testF64VecLoop()) { correct++; }
+    if (testPointerVecLoop()) { correct++; }
     if (testArrayLoop()) { correct++; }
     if (testNested()) { correct++; }
     test.printResult(correct,tests);

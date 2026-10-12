@@ -1511,10 +1511,13 @@ static LexModule *parseInitModule(Cctrl *cc) {
     return cc->lexer_->modules[cc->cur_module - 1];
 }
 
-/* A global's run-time initialiser: its module's, or the program's */
+/* A global's run-time initialiser: its module's, or the program's. A
+ * prebuilt module's `_init` is already compiled, so what a generic of it
+ * adds while made for this program (reflect.of in json.decode<T>) runs
+ * with the program's own initialisers. */
 static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
     LexModule *m = parseInitModule(cc);
-    if (m) {
+    if (m && !m->prebuilt) {
         if (!m->init_stmts) m->init_stmts = listNew();
         listAppend(m->init_stmts, ast);
         return;
@@ -2529,15 +2532,55 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
     cctrlTokenGet(cc);
     Ast *container = parseExpr(cc,16);
 
-    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1] */
+    /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1]. A slice
+     * that is not a variable or field (`str.split(...)`) is computed once,
+     * into a hidden local, not on every pass. */
     if (container->type && astTypeIsSlice(container->type)) {
+        Ast *once = NULL;
+        if (container->kind != AST_LVAR && container->kind != AST_GVAR &&
+            container->kind != AST_CLASS_REF) {
+            AoStr *tmp_name = getRangeLoopIdx();
+            Ast *tmp = astLVar(container->type, tmp_name->data, tmp_name->len);
+            mapAddLen(cc->localenv, tmp_name->data, tmp_name->len, tmp);
+            if (cc->tmp_locals) listAppend(cc->tmp_locals, tmp);
+            once = astDecl(tmp, container);
+            container = tmp;
+        }
         Map *fields = container->type->fields;
         Ast *len_ref = astClassRef(mapGetLen(fields, str_lit("len")), container, "len");
         Ast *ptr_ref = astClassRef(mapGetLen(fields, str_lit("ptr")), container, "ptr");
         if (iteratee->type->kind == AST_TYPE_AUTO) {
             iteratee->type = container->type->elem;
         }
-        return parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
+        Ast *loop = parseCreateForRange(cc, iteratee, len_ref, ptr_ref);
+        if (once) {
+            List *init = listNew();
+            listAppend(init, once);
+            listAppend(init, loop->forinit);
+            loop->forinit = astCompountStatement(init);
+        }
+        return loop;
+    }
+    /* a struct with `len` and `data` (vec.Vec<T>), held by value or
+     * through a pointer: data[0] to data[len - 1] */
+    {
+        AstType *st = container->type;
+        int through_ptr = st && st->kind == AST_TYPE_POINTER;
+        if (through_ptr) st = st->ptr;
+        AstType *len_field = st && st->kind == AST_TYPE_CLASS && st->fields
+                           ? mapGetLen(st->fields, str_lit("len")) : NULL;
+        AstType *data_field = len_field ? mapGetLen(st->fields, str_lit("data")) : NULL;
+        if (len_field && data_field && data_field->kind == AST_TYPE_POINTER &&
+            astIsIntType(len_field) && (container->kind == AST_LVAR ||
+                                        container->kind == AST_GVAR ||
+                                        container->kind == AST_CLASS_REF ||
+                                        through_ptr)) {
+            Ast *base = through_ptr ? astUnaryOperator(st, AST_UN_OP_DEREF, container) : container;
+            Ast *len_ref = astClassRef(len_field, base, "len");
+            Ast *data_ref = astClassRef(data_field, base, "data");
+            if (iteratee->type->kind == AST_TYPE_AUTO) iteratee->type = data_field->ptr;
+            return parseCreateForRange(cc, iteratee, len_ref, data_ref);
+        }
     }
     if (container->kind == AST_LVAR) {
         if (container->type->kind == AST_TYPE_POINTER) {
@@ -5284,10 +5327,8 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     }
     int here_std = !cc->cur_module && !cc->decl_from_main;
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
-    char *dot = NULL;
-    for (int i = (int)cls->clsname->len - 1; i >= 0 && !dot; --i) {
-        if (cls->clsname->data[i] == '.') dot = cls->clsname->data + i;
-    }
+    int top = astLastTopDot(cls->clsname->data, (int)cls->clsname->len);
+    char *dot = top >= 0 ? cls->clsname->data + top : NULL;
     int mine = cls->in_std == here_std;
     if (dot) {
         int mod_len = dot - cls->clsname->data;
@@ -5597,10 +5638,6 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         d->name = d->of->name;
         d->method = aoStrDupRaw(h.method->start, h.method->len);
         vecPush(cc->generic_methods, d);
-        /* the instances already made get this method too */
-        for (u64 i = 0; i < d->of->insts->size; ++i) {
-            parseGenericMethodInstance(cc, d, d->of->insts->entries[i]);
-        }
         return 1;
     }
     char *qual = cctrlDeclName(cc, h.name->start, h.name->len);
@@ -5804,6 +5841,35 @@ static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *s
     vecPush(cc->generic_pending, body);
 }
 
+/* Method `name` of generic struct instance `cls`, made now if its
+ * generic struct has one of that name and it wasn't made yet: an
+ * instance's methods are made when first called, so one that only works
+ * for some types (a sort using `<`) doesn't stop the others. The
+ * function, or NULL. */
+Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len) {
+    if (!cls || !cls->generic || !cls->generic_args || !cc->generic_methods) return NULL;
+    GenericDef *d = cls->generic;
+    GenericInst *si = NULL;
+    for (u64 i = 0; i < d->insts->size && !si; ++i) {
+        GenericInst *in = d->insts->entries[i];
+        /* a struct field's type is a copy of the instance type */
+        if (in->cls == cls || (in->cls && aoStrCmp(in->cls->clsname, cls->clsname))) si = in;
+    }
+    if (!si) return NULL;
+    for (u64 i = 0; i < cc->generic_methods->size; ++i) {
+        GenericDef *md = cc->generic_methods->entries[i];
+        if (md->of != d || (int)md->method->len != len || memcmp(md->method->data, name, len)) {
+            continue;
+        }
+        char *key = mprintf("%s.%.*s", cls->clsname->data, len, name);
+        Ast *fn = mapGet(cc->global_env, key);
+        if (fn) return fn;
+        parseGenericMethodInstance(cc, md, si);
+        return mapGet(cc->global_env, key);
+    }
+    return NULL;
+}
+
 /* `Vec<args>` of generic struct template `tmpl`: the instance type, made
  * the first time (with its methods) */
 AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme *at) {
@@ -5844,10 +5910,7 @@ AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme 
     cls->generic_args = args;
     in->cls = cls;
     vecPush(d->insts, in);
-    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
-        GenericDef *md = cc->generic_methods->entries[i];
-        if (md->of == d) parseGenericMethodInstance(cc, md, in);
-    }
+    /* its methods are made when first called (parseGenericMethod) */
     return cls;
 }
 

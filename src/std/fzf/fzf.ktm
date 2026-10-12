@@ -79,13 +79,13 @@ struct FzFTerm {
 };
 
 struct FzFTermSet {
-    list.List *entries;
+    list.List<FzFTerm *> entries;
     i64 size;
     i64 cap;
 };
 
 struct FzFPattern {
-    list.List *entries;
+    list.List<FzFTermSet *> entries;
     i64 size;
     i64 cap;
     bool onlyInv;
@@ -652,7 +652,7 @@ void fzfFuzzyMatchV1(FzFResult *res, bool caseSensitive, FzFString *text,
 
 FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     FzFPattern *patObj = mem.allocZero(sizeof(FzFPattern));
-    patObj.entries = list.new();
+    patObj.entries = list.new<FzFTermSet *>();
     FzFTerm term;
 
     i64 patLen = cstr.len(pattern);
@@ -678,7 +678,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
     u8 *ptr = libc.strtok_r(patternCopy, delim, &tokSave);
 
     FzFTermSet *set = mem.allocZero(sizeof(FzFTermSet));
-    set.entries = list.new();
+    set.entries = list.new<FzFTerm *>();
 
     bool switchSet = false;
     bool afterBar = false;
@@ -761,7 +761,7 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
             if (switchSet) {
                 patObj.entries.append(set);
                 set = mem.alloc(sizeof(FzFTermSet));
-                set.entries = list.new();
+                set.entries = list.new<FzFTerm *>();
                 set.cap = 0;
                 set.size = 0;
             }
@@ -791,22 +791,20 @@ FzFPattern *fzfParsePattern(i32 caseMode, u8 *pattern, bool fuzzy=true) {
         patObj.size++;
     } else {
         if (set) {
-            if (set.entries) {
-                set.entries.release(&mem.free);
-            }
+            set.entries.free();
             mem.free(set);
         }
     }
     bool only = true;
 
-    for (auto it = patObj.entries.next; it != patObj.entries; it = it.next) {
+    for (auto it = patObj.entries.head; it; it = it.next) {
         auto termSet = (FzFTermSet *)it.value;
         if (termSet.size > 1) {
             only = false;
             break;
         }
 
-        bool x = ((FzFTerm *)termSet.entries.next.value).inv;
+        bool x = termSet.entries.head.value.inv;
         if (!x) {
             only = false;
             break;
@@ -832,36 +830,33 @@ static void fzfTermRelease(void *_term) {
 static void fzfTermSetRelease(void *_set) {
     FzFTermSet *set = _set;
     if (set) {
-        set.entries.release(&fzfTermRelease);
+        for (auto n = set.entries.head; n; n = n.next) { fzfTermRelease(n.value); }
+        set.entries.free();
         mem.free(set);
     }
 }
 
 void fzfPatternRelease(FzFPattern *pattern) {
     if (pattern) {
-        if (!pattern.entries.isEmpty()) {
-            pattern.entries.release(&fzfTermSetRelease);
-            mem.free(pattern);
-        } else if (pattern) {
-            pattern.entries.release(&mem.free);
-            mem.free(pattern);
-        }
+        for (auto n = pattern.entries.head; n; n = n.next) { fzfTermSetRelease(n.value); }
+        pattern.entries.free();
+        mem.free(pattern);
     }
 }
 
 i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
-    if (text == null || pattern.entries.isEmpty()) { return 1; }
+    if (text == null || !pattern.entries.len) { return 1; }
 
-    auto entries = pattern.entries;
+    auto entries = &pattern.entries;
     FzFString input;
     input.data = text;
     input.size = cstr.len(text);
 
     if (pattern.onlyInv) {
         i64 final = 0;
-        for (auto it = entries.next; it != entries; it = it.next) {
+        for (auto it = entries.head; it; it = it.next) {
             FzFTermSet *termSet = it.value;
-            FzFTerm *term = termSet.entries.next.value;
+            FzFTerm *term = termSet.entries.head.value;
             FzFResult res;
             term.cb(&res,term.caseSensitive,&input,(FzFString *)term.text,null,slab);
             final += res.score;
@@ -873,12 +868,12 @@ i64 fzfGetScore(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     }
 
     i64 totalScore = 0;
-    for (auto it = entries.next; it != entries; it = it.next) {
+    for (auto it = entries.head; it; it = it.next) {
         FzFTermSet *termSet = (FzFTermSet *)it.value;
         i64 currentScore = 0;
         bool matched = false;
-        auto termEntries = termSet.entries;
-        for (auto ii = termEntries.next; ii != termEntries; ii = ii.next) {
+        auto termEntries = &termSet.entries;
+        for (auto ii = termEntries.head; ii; ii = ii.next) {
             FzFTerm *term = (FzFTerm *)ii.value;
             auto fzfStr = (FzFString *)term.text;
 
@@ -928,19 +923,19 @@ Position *fzfGetPositions(u8 *text, FzFPattern *pattern, FzFSlab *slab) {
     FzFTerm *term;
     bool matched;
 
-    if (text == null || pattern.entries.isEmpty()) { return null; }
+    if (text == null || !pattern.entries.len) { return null; }
 
     input.data = text;
     input.size = cstr.len(text);
     allPos = fzfPosArray(0);
-    auto entries = pattern.entries;
+    auto entries = &pattern.entries;
 
-    for (auto it = entries.next; it != entries; it = it.next) {
+    for (auto it = entries.head; it; it = it.next) {
         termSet = (FzFTermSet *)it.value;
         matched = false;
 
-        auto termEntries = termSet.entries;
-        for (auto ii = termEntries.next; ii != termEntries; ii = ii.next) {
+        auto termEntries = &termSet.entries;
+        for (auto ii = termEntries.head; ii; ii = ii.next) {
             term = (FzFTermSet *)ii.value;
             fzfStr = (FzFString *)term.text;
 

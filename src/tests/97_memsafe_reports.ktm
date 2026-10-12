@@ -79,16 +79,19 @@ void main()
   s = cstr.formatTo(null, \"%d\", 42); mem.free(s);
   s = cstr.format(\"%d\", 7); mem.free(s);
   s = cstr.dup(\"a\"); s = cstr.appendFormat(s, \"%d\", 123); mem.free(s);
-  vec.PtrVec *v = vec.ptrNew();
+  vec.Vec<void *> v = vec.new<void *>();
   for (i = 0; i < 1000; i++) { v.push(mem.alloc(24)); }
-  v.release(&freeIt);
-  map.StrMap *m = map.strNew();
-  m.setFreeValue(&mem.free);
+  for (auto p : v) { freeIt(p); }
+  v.free();
+  map.Map<u8[], void *> m = map.new<u8[], void *>();
   u8 kb[16];
   for (i = 0; i < 2000; i++) {
     m.set(cstr.view(cstr.formatTo(kb, \"k%d\", i)), mem.allocZero(8));
   }
-  m.release();
+  i64 it = 0;
+  void *val;
+  while (m.next(&it, null, &val)) { mem.free(val); }
+  m.free();
   printf(\"ok\\n\");
 }
 ") && stdoutIs("ok\n") && check("test ! -s " MS_ERR)) { correct++; }

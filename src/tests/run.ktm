@@ -45,16 +45,17 @@ i32 main(i32 argc, u8 **argv) {
         argIdx = 2;
     }
 
-    vec.PtrVec *vecVal;
+    vec.Vec<u8 *> vecVal;
     if (argc > argIdx) {
-        vecVal = vec.ptrNew();
+        vecVal = vec.new<u8 *>();
         vecVal.push(cstr.dup(argv[argIdx]));
     } else {
         vecVal = collectTests();
     }
 
-    runTests(vecVal);
+    runTests(&vecVal);
 
-    vecVal.release(&mem.free);
+    for (auto name : vecVal.items()) { mem.free(name); }
+    vecVal.free();
     return 0;
 }

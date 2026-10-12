@@ -1,394 +1,133 @@
 module vec;
-import cstr, libc, mem, os;
+import libc, mem, rt, sort;
 
-pub struct IntVec {
-    i64 size;
-    i64 *entries;
+/* A growable array of T, held by value (like String): make one with
+ * vec.new<T>(), free it with free() (or declare it with `ad`). The values
+ * are yours: free() frees the array, not what its pointers point to.
+ * An index outside 0..len-1 throws ERR_BOUNDS, as a slice index does. */
+pub struct Vec<T> {
+    T *data;
+    i64 len;
+    i64 cap;
 };
 
-pub struct PtrVec {
-    i64 size;
-    void **entries;
-};
-
-pub struct FloatVec {
-    i64 size;
-    f64 *entries;
-};
-
-/* Get/Set with an index outside [0, size): report it on stderr and exit,
- * rather than read or write past the entries. */
-static void vecIndexError(u8 *fnName, i64 idx, i64 size) {
-    u8 *msg = cstr.formatTo(null, "%s: index %d out of range (size %d)\n",
-                                         fnName, idx, size);
-    libc.write(os.STDERR, msg, cstr.len(msg));
-    os.exit(1);
+/* An empty Vec<T> with room for `cap` items (at least 1) */
+pub Vec<T> new<T>(i64 cap = 8) {
+    Vec<T> v;
+    if (cap < 1) { cap = 1; }
+    v.data = mem.alloc(sizeof(T) * cap);
+    v.len = 0;
+    v.cap = cap;
+    return v;
 }
 
-pub FloatVec *floatNew(i64 size = 32) {
-    FloatVec *vec = mem.alloc(sizeof(FloatVec));
-    vec.size = 0;
-    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = mem.alloc(sizeof(f64) * size);
-    return vec;
+/* Room for at least `n` items in all, without growing again */
+pub void Vec<T>.reserve(i64 n) {
+    if (n <= self.cap) { return; }
+    i64 cap = self.cap > 0 ? self.cap : 1;
+    while (cap < n) { cap *= 2; }
+    self.data = mem.realloc(self.data, sizeof(T) * cap);
+    self.cap = cap;
 }
 
-pub u64 FloatVec.capacity() {
-    return mem.size(self.entries)/sizeof(f64);
+pub void Vec<T>.push(T x) {
+    if (self.len == self.cap) { self.reserve(self.len + 1); }
+    self.data[self.len] = x;
+    self.len++;
 }
 
-pub void FloatVec.push(f64 value) {
-    auto capacity = mem.size(self.entries)/sizeof(f64);
-    if (self.size + 1 >= capacity) {
-        auto newCapacity = capacity * 2;
-        if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(f64)));
-        self.entries = newEntries;
-    }
-    self.entries[self.size++] = value;
-}
-
-pub f64 FloatVec.pop(bool *_ok=null) {
-    if (self.size > 0) {
-        auto value = self.entries[--self.size];
-        if (_ok) { *_ok = true; }
-        return value;
-    }
-    if (_ok) { *_ok = false; }
-    return -1.0;
-}
-
-/* Remove and return the entry at idx, the ones after it moving down one
- * (their order kept); an idx outside 0..size-1 is reported and exits,
- * as get() does */
-pub f64 FloatVec.removeAt(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("FloatVec.removeAt", idx, self.size);
-    }
-    auto value = self.entries[idx];
-    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
-                 (self.size - idx - 1) * sizeof(self.entries[0]));
-    self.size--;
-    return value;
-}
-
-pub f64 FloatVec.get(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("FloatVec.get", idx, self.size);
-    }
-    return self.entries[idx];
-}
-
-pub void FloatVec.set(i64 idx, f64 value)
-{// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("FloatVec.set", idx, self.size);
-    }
-    self.entries[idx] = value;
-}
-
-pub f64 FloatVec.last(bool *_ok=null)
-{// The last entry without removing it; -1.0 and *_ok = false when empty
-    if (self.size > 0) {
-        if (_ok) { *_ok = true; }
-        return self.entries[self.size - 1];
-    }
-    if (_ok) { *_ok = false; }
-    return -1.0;
-}
-
-/* QSortGeneric hands the comparator two 64-bit slots as void *, in integer
- * registers: an f64 parameter would read the float registers instead, so
- * take the bits and reinterpret them. */
-i64 floatCmp(void *a, void *b) {
-    f64 f1 = *(f64 *)(&a);
-    f64 f2 = *(f64 *)(&b);
-    return f1 < f2;
-}
-
-pub void FloatVec.sort() {
-    qsort((void**)self.entries,0,self.size-1,&floatCmp);
-}
-
-pub void FloatVec.clear() {
-    self.size = 0;
-}
-
-pub void FloatVec.release() {
-    if (self) {
-        mem.free(self.entries);
-        mem.free(self);
-    }
-}
-
-pub IntVec *intNew(i64 size = 32) {
-    IntVec *vec = mem.alloc(sizeof(IntVec));
-    vec.size = 0;
-    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = mem.alloc(sizeof(i64) * size);
-    return vec;
-}
-
-pub u64 IntVec.capacity() {
-    return mem.size(self.entries)/sizeof(i64);
-}
-
-pub void IntVec.push(i64 value) {
-    auto capacity = self.capacity();
-    if (self.size + 1 >= capacity) {
-        auto newCapacity = capacity * 2;
-        if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(i64)));
-        self.entries = newEntries;
-    }
-    self.entries[self.size++] = value;
-}
-
-pub i64 IntVec.pop(bool *_ok=null) {
-    if (self.size > 0) {
-        auto value = self.entries[--self.size];
-        if (_ok) { *_ok = true; }
-        return value;
-    }
-    if (_ok) { *_ok = false; }
-    return -1;
-}
-
-/* Remove and return the entry at idx, the ones after it moving down one
- * (their order kept); an idx outside 0..size-1 is reported and exits,
- * as get() does */
-pub i64 IntVec.removeAt(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("IntVec.removeAt", idx, self.size);
-    }
-    auto value = self.entries[idx];
-    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
-                 (self.size - idx - 1) * sizeof(self.entries[0]));
-    self.size--;
-    return value;
-}
-
-pub i64 IntVec.get(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("IntVec.get", idx, self.size);
-    }
-    return self.entries[idx];
-}
-
-pub void IntVec.set(i64 idx, i64 value)
-{// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("IntVec.set", idx, self.size);
-    }
-    self.entries[idx] = value;
-}
-
-pub i64 IntVec.last(bool *_ok=null)
-{// The last entry without removing it; -1 and *_ok = false when empty
-    if (self.size > 0) {
-        if (_ok) { *_ok = true; }
-        return self.entries[self.size - 1];
-    }
-    if (_ok) { *_ok = false; }
-    return -1;
-}
-
-i64 intCmp(void *i1, void *i2) {
-    return (i64)i1 < (i64)i2;
-}
-
-pub void IntVec.sort() {
-    qsort((void**)self.entries,0,self.size-1,&intCmp);
-}
-
-pub void IntVec.clear() {
-    self.size = 0;
-}
-
-pub void IntVec.release() {
-    if (self) {
-        mem.free(self.entries);
-        mem.free(self);
-    }
-}
-
-pub PtrVec *ptrNew(i64 size = 32) {
-    PtrVec *vec = mem.alloc(sizeof(PtrVec));
-    vec.size = 0;
-    if (size < 1) { size = 1; } /* 0 or negative: start with room for one */
-    vec.entries = mem.alloc(sizeof(void*) * size);
-    return vec;
-}
-
-pub u64 PtrVec.capacity() {
-    return mem.size(self.entries)/sizeof(void*);
-}
-
-pub void PtrVec.push(void *value) {
-    auto capacity = mem.size(self.entries)/sizeof(void*);
-    if (self.size + 1 >= capacity) {
-        auto newCapacity = capacity * 2;
-        if (newCapacity < 8) { newCapacity = 8; }
-        auto newEntries = mem.realloc(self.entries, (u64)(newCapacity * sizeof(void*)));
-        self.entries = newEntries;
-    }
-    self.entries[self.size++] = value;
-}
-
-pub void *PtrVec.pop(bool *_ok=null) {
-    if (self.size > 0) {
-        auto value = self.entries[--self.size];
-        if (_ok) { *_ok = true; }
-        return value;
-    }
-    if (_ok) { *_ok = false; }
-    return null;
-}
-
-/* Remove and return the entry at idx, the ones after it moving down one
- * (their order kept); an idx outside 0..size-1 is reported and exits,
- * as get() does */
-pub void *PtrVec.removeAt(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("PtrVec.removeAt", idx, self.size);
-    }
-    auto value = self.entries[idx];
-    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
-                 (self.size - idx - 1) * sizeof(self.entries[0]));
-    self.size--;
-    return value;
-}
-
-pub void *PtrVec.get(i64 idx) {
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("PtrVec.get", idx, self.size);
-    }
-    return self.entries[idx];
-}
-
-pub void PtrVec.set(i64 idx, void *value)
-{// Replace the entry at `idx`; the index must be in [0, size), as for Get
-    if (idx < 0 || idx >= self.size) {
-        vecIndexError("PtrVec.set", idx, self.size);
-    }
-    self.entries[idx] = value;
-}
-
-pub void *PtrVec.last(bool *_ok=null)
-{// The last entry without removing it; null and *_ok = false when empty
-    if (self.size > 0) {
-        if (_ok) { *_ok = true; }
-        return self.entries[self.size - 1];
-    }
-    if (_ok) { *_ok = false; }
-    return null;
-}
-
-/* Sort arr[low..high] in place; `_compare_fn(a, b)` is true when `a` must
- * come before `b` (a "less than", not a C-style -1/0/1 comparator). Not
- * stable. Quicksort with a median-of-three pivot and a three-way
- * partition, so sorted, reversed and all-equal input stay O(n log n); it
- * recurses into the smaller part and loops on the larger one, so the
- * recursion depth is O(log n). Short ranges use an insertion sort. */
-pub void qsort(void **arr, i64 low, i64 high,
-        fn(void *_arg1, void *_arg2) i64 _compare_fn) {
-    void *tmp;
-    while (high - low >= 16) {
-        /* Pivot: the median of three entries, one from each third of the
-         * range, at offsets scrambled by a hash of the bounds. Fixed spots
-         * (first/middle/last) are defeated by the order the partition leaves
-         * sorted input in and degrade towards O(n^2). */
-        u64 third = (u64)((high - low + 1) / 3);
-        u64 h = (u64)low * 0x9E3779B97F4A7C15 + (u64)high * 0xC2B2AE3D27D4EB4F;
-        h ^= h >> 31;
-        i64 a = low + (i64)(h % third);
-        i64 c = low + (i64)third + (i64)((h >> 20) % third);
-        i64 b = high - (i64)((h >> 40) % third);
-        i64 m;
-        if (_compare_fn(arr[c], arr[a])) {
-            if (_compare_fn(arr[b], arr[c]))      { m = c; }
-            else if (_compare_fn(arr[b], arr[a])) { m = b; }
-            else                                  { m = a; }
-        } else {
-            if (_compare_fn(arr[b], arr[a]))      { m = a; }
-            else if (_compare_fn(arr[b], arr[c])) { m = b; }
-            else                                  { m = c; }
+/* The last item, removed; with `ok`, false (and a zero T) when empty, else
+ * an empty Vec throws ERR_BOUNDS */
+pub T Vec<T>.pop(bool *ok = null) {
+    if (self.len == 0) {
+        if (ok) {
+            *ok = false;
+            T zero;
+            libc.memset(&zero, 0, sizeof(T));
+            return zero;
         }
-        tmp = arr[low]; arr[low] = arr[m]; arr[m] = tmp;
-
-        /* Three-way partition: [low, lt) < pivot, [lt, gt] == pivot,
-         * (gt, high] > pivot. The pivot element itself is never compared,
-         * so the middle part is never empty and both sides shrink. */
-        void *pivot = arr[low];
-        i64 lt = low, i = low + 1, gt = high;
-        while (i <= gt) {
-            if (_compare_fn(arr[i], pivot)) {
-                tmp = arr[lt]; arr[lt] = arr[i]; arr[i] = tmp;
-                lt++;
-                i++;
-            } else if (_compare_fn(pivot, arr[i])) {
-                tmp = arr[gt]; arr[gt] = arr[i]; arr[i] = tmp;
-                gt--;
-            } else {
-                i++;
-            }
-        }
-
-        if (lt - low < high - gt) {
-            qsort(arr, low, lt - 1, _compare_fn);
-            low = gt + 1;
-        } else {
-            qsort(arr, gt + 1, high, _compare_fn);
-            high = lt - 1;
-        }
+        throw(ERR_BOUNDS, "vec.Vec.pop: the Vec is empty");
     }
+    if (ok) { *ok = true; }
+    self.len--;
+    return self.data[self.len];
+}
 
-    for (i64 j = low + 1; j <= high; ++j) {
-        void *x = arr[j];
-        i64 k = j - 1;
-        while (k >= low && _compare_fn(x, arr[k])) {
-            arr[k + 1] = arr[k];
-            k--;
+pub T Vec<T>.get(i64 i) {
+    if (i < 0 || i >= self.len) { throw(ERR_BOUNDS, "vec.Vec.get: index %d of %d", i, self.len); }
+    return self.data[i];
+}
+
+/* A pointer to item i, to change it in place (until the Vec grows) */
+pub T *Vec<T>.at(i64 i) {
+    if (i < 0 || i >= self.len) { throw(ERR_BOUNDS, "vec.Vec.at: index %d of %d", i, self.len); }
+    return &self.data[i];
+}
+
+pub void Vec<T>.set(i64 i, T x) {
+    if (i < 0 || i >= self.len) { throw(ERR_BOUNDS, "vec.Vec.set: index %d of %d", i, self.len); }
+    self.data[i] = x;
+}
+
+/* The last item; with `ok`, false (and a zero T) when empty, else an
+ * empty Vec throws ERR_BOUNDS */
+pub T Vec<T>.last(bool *ok = null) {
+    if (self.len == 0) {
+        if (ok) {
+            *ok = false;
+            T zero;
+            libc.memset(&zero, 0, sizeof(T));
+            return zero;
         }
-        arr[k + 1] = x;
+        throw(ERR_BOUNDS, "vec.Vec.last: the Vec is empty");
     }
+    if (ok) { *ok = true; }
+    return self.data[self.len - 1];
 }
 
-pub void PtrVec.sort(fn(void *_arg1, void *_arg2) i64 _compare_fn) {
-    qsort(self.entries,0,self.size-1,_compare_fn);
+/* x put at index i (0..len), the items from i on moving up one */
+pub void Vec<T>.insert(i64 i, T x) {
+    if (i < 0 || i > self.len) { throw(ERR_BOUNDS, "vec.Vec.insert: index %d of %d", i, self.len); }
+    if (self.len == self.cap) { self.reserve(self.len + 1); }
+    libc.memmove(&self.data[i + 1], &self.data[i], (self.len - i) * sizeof(T));
+    self.data[i] = x;
+    self.len++;
 }
 
-pub void PtrVec.clear() {
-    self.size = 0;
+/* Item i, removed, the ones after it moving down one (their order kept) */
+pub T Vec<T>.removeAt(i64 i) {
+    if (i < 0 || i >= self.len) { throw(ERR_BOUNDS, "vec.Vec.removeAt: index %d of %d", i, self.len); }
+    T x = self.data[i];
+    libc.memmove(&self.data[i], &self.data[i + 1], (self.len - i - 1) * sizeof(T));
+    self.len--;
+    return x;
 }
 
-pub void PtrVec.release(fn(void *_val) void freeValue = null)
-{ // Optionally pass a callback to free each item in the vector 
-    if (self) {
-        if (freeValue) {
-            void **entries = self.entries;
-            i64 size = self.size;
-            for (i64 i = 0; i < size; ++i) {
-                freeValue(entries[i]);
-            }
-        }
-        mem.free(self.entries);
-        mem.free(self);
-    }
+/* The items as a slice (a view: valid until the Vec grows or is freed),
+ * for `for (auto x : v.items())` and anything that takes a T[] */
+pub T[] Vec<T>.items() {
+    return self.data[0:self.len];
 }
 
-#ifdef VEC_TEST
-void main() {
-    auto vec = floatNew();
-    floatPush(vec,32.32);
-    floatPush(vec,30.33);
-    floatPush(vec,42.65);
-    floatPush(vec,52.99);
-
-    for (i64 i = 0; i < vec->size; ++i) {
-        auto val = vec->entries[i];// FloatVecGet(vec,i);
-        printf("[%d] => %f\n",i,(f64)val);
-    }
-    floatRelease(vec);
+/* Sorted with cmp(a, b): negative when a goes first, 0 when equal,
+ * positive when b goes first (sort.slice) */
+pub void Vec<T>.sort(fn(T *, T *) i64 cmp) {
+    sort.slice(self.data[0:self.len], cmp);
 }
-#endif
+
+/* Sorted smallest first, for a T that `<` compares (numbers, pointers) */
+pub void Vec<T>.sortAsc() {
+    sort.asc(self.data[0:self.len]);
+}
+
+/* Empty again, keeping its room */
+pub void Vec<T>.clear() {
+    self.len = 0;
+}
+
+pub void Vec<T>.free() {
+    mem.free(self.data);
+    self.data = null;
+    self.len = 0;
+    self.cap = 0;
+}
