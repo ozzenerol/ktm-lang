@@ -4910,6 +4910,11 @@ static Ast *parseFunctionOrDefImpl(Cctrl *cc, AstType *rettype, char *fname,
         for (int i = 1; i < ret_fnptr; ++i) {
             rettype = astMakePointerType(rettype);
         }
+        /* the old C declarator, an error like the variable one (see
+         * parseFunctionPointerType); the fn type in front is the way */
+        cctrlErrorAt(cc, name_tok_line, name_tok_col, len,
+            "a C function-pointer declarator: write `%s %.*s(...)`",
+            astTypeToString(rettype), len, fname);
     }
     Lexeme *tok = cctrlTokenGet(cc);
     /* A module's declarations-only pass: the body comes in the full
