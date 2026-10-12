@@ -11,8 +11,10 @@ import date, libc, net, os, rt;
  * failing. */
 pub const i64 ERR_LOOP = 0x6B746D13;
 
-/* Out of fds, accept tries again after this long at the latest. */
+/* Out of fds, accept tries again after this long at the latest, and
+ * checks for free fds first for this long after. */
 const i64 LOOP_PAUSE_MS = 2000;
+const i64 LOOP_TIGHT_MS = 10000;
 
 #ifdef IS_MACOS
 const i64 LOOP_ECONNABORTED = 53;
@@ -47,6 +49,7 @@ struct Loop {
     bool running, stopping;
     bool fdsOut;         /* accept ran out of fds (or memory) */
     i64 fdsOutUntil;     /* and rests until then (or a close()) */
+    i64 fdsTightUntil;   /* until then, accept checks for free fds first */
 };
 
 static void loopOom() {
@@ -204,13 +207,42 @@ pub void sleep(i64 ms) {
     loopPark(t, -1, 0, loopDeadline(ms), false, false);
 }
 
+/* Two fds free? accept() needs one, and the connection it makes needs
+ * another to do its work (open a file, ...). Probed with dup(lfd); false
+ * only when that runs out of fds. */
+static bool loopFdsFree(i32 lfd) {
+    i32 a = libc.dup(lfd), b, err;
+    if (a < 0) {
+        err = os.errno();
+        return err != libc.EMFILE && err != libc.ENFILE;
+    }
+    b = libc.dup(lfd);
+    err = os.errno();
+    libc.close(a);
+    if (b < 0) { return err != libc.EMFILE && err != libc.ENFILE; }
+    libc.close(b);
+    return true;
+}
+
+/* Out of fds (or memory): every coro.accept of the loop rests, and checks
+ * for free fds before each accept() for a while after. */
+static void loopFdsOut(Loop *lp) {
+    i64 now = date.monoMs();
+    lp.fdsOut = true;
+    lp.fdsOutUntil = now + LOOP_PAUSE_MS;
+    lp.fdsTightUntil = now + LOOP_TIGHT_MS;
+}
+
 /* In a loop coroutine: the next client of listening socket lfd, as a
  * non-blocking fd (lfd is made non-blocking too); -1 when ms passed
  * (ms < 0: no limit), on coro.stop(), or when lfd can't accept (EBADF,
  * EINVAL: os.errno() says which). Out of fds or memory (EMFILE, ENFILE,
- * ENOBUFS, ENOMEM) it neither spins nor retries at once (on macOS a
- * failed accept has already dropped that client): every coro.accept of
- * the loop rests until coro.close() frees an fd, or 2 s passed. */
+ * ENOBUFS, ENOMEM) it neither spins nor retries at once: every
+ * coro.accept of the loop rests until coro.close() frees an fd, or 2 s
+ * passed. For 10 s after that it checks with dup(lfd) before each
+ * accept() that two fds are free (one for the client, one for its work)
+ * and rests again if not: on macOS a failed accept() has already taken
+ * the client off the queue and resets it. */
 pub i32 accept(i32 lfd, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.accept");
     Loop *lp = loopGet(true);
@@ -226,13 +258,16 @@ pub i32 accept(i32 lfd, i64 ms=-1) {
             if (until >= 0 && date.monoMs() >= until) { return -1; }
             continue;
         }
+        if (date.monoMs() < lp.fdsTightUntil && !loopFdsFree(lfd)) {
+            loopFdsOut(lp);
+            continue;
+        }
         lp.fdsOut = false;
         fd = net.accept(lfd, true);
         if (fd >= 0) { return fd; }
         err = os.errno();
         if (err == libc.EMFILE || err == libc.ENFILE || err == LOOP_ENOBUFS || err == libc.ENOMEM) {
-            lp.fdsOut = true;
-            lp.fdsOutUntil = date.monoMs() + LOOP_PAUSE_MS;
+            loopFdsOut(lp);
         } else if (err == libc.EAGAIN || err == libc.EWOULDBLOCK) {
             r = loopPark(t, lfd, libc.POLLIN, until, true, false);
             if (r <= 0) { return -1; }
