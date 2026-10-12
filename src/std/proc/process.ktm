@@ -318,6 +318,13 @@ pub i64 wait(Proc *p) {
     return p.exitCode;
 }
 
+/* Record st, a wait status got for p's pid elsewhere (coro.waitChild,
+ * your own waitpid), so p is done with its exitCode and termSignal set
+ * as proc.wait would have set them. */
+pub void setStatus(Proc *p, i32 st) {
+    procSetStatus(p, st);
+}
+
 /* Without waiting: true once p has ended (then reaped: p->exit_code and
  * p->term_signal are set), false while it runs. */
 pub bool done(Proc *p) {
