@@ -2111,7 +2111,10 @@ a String).</p>
   <li><code>net.dial(addr, port, non_blocking, timeout_ms)</code> gives up after
   <code>timeout_ms</code> milliseconds (shared by all the addresses the name resolves to; the
   name lookup itself isn't timed) with -1 and <code>os.errno()</code> <code>ETIMEDOUT</code>;
-  0, the default, waits as long as the system does.</li>
+  0, the default, waits as long as the system does. <code>net.dial</code> waits in
+  <code>connect</code> either way, and <code>non_blocking</code> only makes the connected
+  socket non-blocking: in a loop coroutine use <code>coro.dial</code>, which pauses only the
+  coroutine (see <a href="#coroutine-loop">A coroutine server</a>).</li>
   <li><code>net.setRecvTimeout(sock, ms)</code> and <code>net.setSendTimeout(sock, ms)</code>
   make a read or a write on a connected socket give up after <code>ms</code> milliseconds with
   -1 and <code>os.errno()</code> <code>EAGAIN</code> (a write returns the bytes it got out
@@ -2446,6 +2449,12 @@ only when nothing is likely to be there yet, and goes straight on while a stream
 coming.</li>
 <li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
 <code>coro.yield()</code> lets them have a turn.</li>
+<li><code>coro.dial(addr, port, ms)</code> connects to <code>addr</code> (a host name or an
+address) and returns the connection as a non-blocking fd, pausing only the coroutine while the
+connection is made; every address the name resolves to is tried in turn, within
+<code>ms</code> milliseconds in all. -1 with <code>os.errno()</code> (<code>ECONNREFUSED</code>,
+<code>ETIMEDOUT</code>) when none accepts. Looking up a name still waits for the system's
+resolver, so give a numeric address where that matters.</li>
 <li><code>coro.accept(listener, ms)</code> returns the next client as a non-blocking fd (it
 makes the listener non-blocking too), or -1 on its timeout, on <code>coro.stop()</code>, or when
 the listener can't accept (<code>os.errno()</code> says why). Out of fds (<code>EMFILE</code>,
