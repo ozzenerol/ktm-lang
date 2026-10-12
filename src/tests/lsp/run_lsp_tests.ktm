@@ -96,6 +96,7 @@ u8 *REG_HC;
 u8 *UTF_HC;
 u8 *MOD_GEO_HC;
 u8 *MOD_MAIN_HC;
+u8 *MOD_LIST_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -131,6 +132,13 @@ void initFixtures() {
         "  i64 b = p.x;\n"
         "  geo.\n"
         "  return 0;\n"
+        "}\n";
+    /* geo after another module in one import list */
+    MOD_LIST_HC =
+        "import mem,\n"
+        "  g = geo; // the alias\n"
+        "i32 main() {\n"
+        "  return (i32)g.area(2);\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1253,6 +1261,17 @@ void testModules() {
     check("definition of geo.area is in geo/geo.ktm",
                 locEq(resp, geoUri, wantLine, wantChr, false));
 
+    /* `import mem, g = geo;` over two lines: g is geo too */
+    u8 *listUri = uriOf("modlist.ktm");
+    lspDidOpen(l, listUri, MOD_LIST_HC);
+    posOf(MOD_LIST_HC, "area(2)", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", listUri, line, chr);
+    check("hover on a module named later in an import list",
+                hoverContains(resp, "geo.area(i64 side)"));
+    resp = lspPositionRequest(l, "textDocument/definition", listUri, line, chr);
+    check("definition of a module named later in an import list",
+                locEq(resp, geoUri, wantLine, wantChr, false));
+
     /* Inside geo's files its names are bare: `square(n)` in more.ktm
      * is geo.ktm's square */
     u8 *moreUri = uriOf("geo/more.ktm");
@@ -1502,6 +1521,8 @@ i32 main() {
     fs.writeAll(path, cstr.view(MOD_GEO2_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_MAIN_HC));
+    libc.snprintf(path, 512, "%s/modlist.ktm", gDir);
+    fs.writeAll(path, cstr.view(MOD_LIST_HC));
 
     printf("ktm -lsp tests (%s)\n", gKtm);
     runGroups();

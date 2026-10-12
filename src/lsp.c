@@ -770,9 +770,29 @@ static u32 lspDocId(LspCtx *ctx, const char *uri) {
  * module's `a.b.name`. The imports are read from the document's text: the
  * lexer that loaded the modules is gone by the time a request runs. */
 
-/* The module path `import a.b;` (prefix b) or `import x = a.b;` (prefix
- * x) in `text` gives `recv`; NULL if no import does */
-static char *lspImportPath(AoStr *text, const char *recv, size_t rlen) {
+/* Skips spaces and comments from p up to end */
+static const char *lspSkipSpace(const char *p, const char *end) {
+    for (;;) {
+        while (p < end && isspace((unsigned char)*p)) p++;
+        if (end - p >= 2 && p[0] == '/' && p[1] == '/') {
+            while (p < end && *p != '\n') p++;
+        } else if (end - p >= 2 && p[0] == '/' && p[1] == '*') {
+            const char *c = p + 2;
+            while (end - c >= 2 && !(c[0] == '*' && c[1] == '/')) c++;
+            p = end - c >= 2 ? c + 2 : end;
+        } else {
+            return p;
+        }
+    }
+}
+
+/* Calls fn(path, path_len, prefix, prefix_len, arg) for each module of
+ * every `import [x =] a.b {, [y =] c};` in `text` (a list may span
+ * lines), the prefix being the alias or the path's last part. Stops at
+ * the first non-zero return of fn and returns it. */
+typedef int LspImportFn(const char *path, size_t path_len, const char *prefix,
+                        size_t prefix_len, void *arg);
+static int lspEachImport(AoStr *text, LspImportFn *fn, void *arg) {
     const char *s = text->data, *end = s + text->len;
     while (s < end) {
         const char *eol = memchr(s, '\n', end - s);
@@ -780,40 +800,75 @@ static char *lspImportPath(AoStr *text, const char *recv, size_t rlen) {
         const char *p = s;
         while (p < eol && isspace((unsigned char)*p)) p++;
         if (eol - p > 7 && !memcmp(p, "import", 6) && isspace((unsigned char)p[6])) {
-            const char *w[2];
-            size_t wl[2];
-            int nw = 0, alias = 0;
             p += 6;
-            while (p < eol && nw < 2) {
-                while (p < eol && isspace((unsigned char)*p)) p++;
-                if (p < eol && *p == '=') { alias = 1; p++; continue; }
-                const char *q = p;
-                while (q < eol && (lspIsIdentChar(*q) || *q == '.')) q++;
-                if (q == p) break;
-                w[nw] = p;
-                wl[nw++] = q - p;
-                p = q;
-            }
-            const char *path = NULL, *prefix = NULL;
-            size_t path_len = 0, prefix_len = 0;
-            if (alias && nw == 2) {
-                prefix = w[0]; prefix_len = wl[0];
-                path = w[1]; path_len = wl[1];
-            } else if (!alias && nw >= 1) {
-                path = w[0]; path_len = wl[0];
-                prefix = path;
-                for (size_t i = 0; i < path_len; ++i) {
-                    if (path[i] == '.') prefix = path + i + 1;
+            for (;;) {
+                const char *w[2];
+                size_t wl[2];
+                int nw = 0, alias = 0;
+                while (nw < 2) {
+                    p = lspSkipSpace(p, end);
+                    if (p < end && *p == '=') { alias = 1; p++; continue; }
+                    const char *q = p;
+                    while (q < end && (lspIsIdentChar(*q) || *q == '.')) q++;
+                    if (q == p) break;
+                    w[nw] = p;
+                    wl[nw++] = q - p;
+                    p = q;
+                    /* a path alone: `import a.b, ...` */
+                    if (!alias && nw == 1) {
+                        const char *n = lspSkipSpace(p, end);
+                        if (n >= end || *n != '=') break;
+                    }
                 }
-                prefix_len = path + path_len - prefix;
+                if (nw >= 1) {
+                    int aliased = alias && nw == 2;
+                    const char *path = aliased ? w[1] : w[0];
+                    size_t path_len = aliased ? wl[1] : wl[0];
+                    const char *prefix = aliased ? w[0] : path;
+                    size_t prefix_len = aliased ? wl[0] : 0;
+                    if (!aliased) {
+                        for (size_t i = 0; i < path_len; ++i) {
+                            if (path[i] == '.') prefix = path + i + 1;
+                        }
+                        prefix_len = path + path_len - prefix;
+                    }
+                    int r = fn(path, path_len, prefix, prefix_len, arg);
+                    if (r) return r;
+                }
+                p = lspSkipSpace(p, end);
+                if (p < end && *p == ',') { p++; continue; }
+                break;
             }
-            if (path && prefix_len == rlen && !memcmp(prefix, recv, rlen)) {
-                return mprintf("%.*s", (int)path_len, path);
+            if (p > eol) {
+                eol = memchr(p, '\n', end - p);
+                if (!eol) eol = end;
             }
         }
         s = eol + 1;
     }
-    return NULL;
+    return 0;
+}
+
+typedef struct LspImportFind {
+    const char *recv;
+    size_t rlen;
+    char *path;
+} LspImportFind;
+
+static int lspImportMatch(const char *path, size_t path_len,
+                          const char *prefix, size_t prefix_len, void *arg) {
+    LspImportFind *f = arg;
+    if (prefix_len != f->rlen || memcmp(prefix, f->recv, prefix_len)) return 0;
+    f->path = mprintf("%.*s", (int)path_len, path);
+    return 1;
+}
+
+/* The module path `import a.b;` (prefix b) or `import x = a.b;` (prefix
+ * x), alone or in a list, in `text` gives `recv`; NULL if no import does */
+static char *lspImportPath(AoStr *text, const char *recv, size_t rlen) {
+    LspImportFind f = { .recv = recv, .rlen = rlen, .path = NULL };
+    lspEachImport(text, lspImportMatch, &f);
+    return f.path;
 }
 
 /* `recv.name` at the cursor with `recv` an import prefix: "a.b.name",
