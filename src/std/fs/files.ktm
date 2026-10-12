@@ -17,7 +17,7 @@ pub struct DirEntry {
 
 /* An open directory: fs.openDir(path), next() until it gives null, then
  * close() (`defer d.close();`, or declare it with `ad`). "." and ".."
- * are left out. */
+ * are left out. Its fields are its own: use ok(), next() and close(). */
 pub struct Dir {
     libc.DIR *handle;
     String base;        /* the directory's path and a `/` */
@@ -149,7 +149,7 @@ pub String join(u8[] a, u8[] b) {
     return out;
 }
 
-/* `a/b/c`, as join(join(a, b), c) */
+/* `a/b/c`: join(join(a, b), c) */
 pub String join(u8[] a, u8[] b, u8[] c) {
     String ab = join(a, b);
     String out = join(ab, c);
@@ -164,8 +164,9 @@ pub bool exists(u8[] path) {
     return stat(&st, path) == 0;
 }
 
-/* makeDir with every missing parent made too: 0 when `path` is a
- * directory afterwards */
+/* The directory `path` made, with every missing parent, as
+ * makeDir(path, mode, true): 0 when `path` is a directory afterwards
+ * (also when it already was), -1 when not */
 pub i32 makeDirAll(u8[] path, i32 mode = MAKE_DIR_DEFAULT) {
     return makeDir(path, mode, true);
 }
@@ -235,8 +236,8 @@ pub i32 copyFile(u8[] from, u8[] to) {
     return result;
 }
 
-/* `from` renamed `to` (replacing a file there), on one filesystem: 0, or
- * -1 with os.errno() (EXDEV across filesystems: see move) */
+/* `from` renamed to `to` (replacing a file there), on one filesystem: 0,
+ * or -1 with os.errno() (EXDEV across filesystems: see move) */
 pub i32 rename(u8[] from, u8[] to) {
     u8 cfrom[FS_PATH_MAX];
     u8 cto[FS_PATH_MAX];
@@ -244,7 +245,7 @@ pub i32 rename(u8[] from, u8[] to) {
     return libc.rename(cfrom, cto);
 }
 
-/* rename(), and across filesystems a regular file is copied, then
+/* As rename(), and across filesystems a regular file is copied, then
  * removed: 0, or -1 with os.errno() (a directory can't move across
  * filesystems) */
 pub i32 move(u8[] from, u8[] to) {
