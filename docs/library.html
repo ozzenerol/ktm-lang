@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li class="current"><a href="library.html" aria-current="page">Library guide</a><ul class="toc"><li><a href="#memory">Memory</a></li><li><a href="#strings">Strings</a></li><li><a href="#files">Files</a></li><li><a href="#csv">CSV</a></li><li><a href="#system">Running commands</a></li><li><a href="#signals">Signals</a></li><li><a href="#lists">Lists</a></li><li><a href="#vectors">Vectors</a></li><li><a href="#sets">Sets and trees</a></li><li><a href="#hash-tables">Hash tables</a></li><li><a href="#bit-vectors">Bit vectors</a></li><li><a href="#json">JSON</a></li><li><a href="#dates">Dates and time</a></li><li><a href="#maths">Maths</a></li><li><a href="#net">Sockets</a></li><li><a href="#coroutines">Coroutines</a></li><li><a href="#fzf">Fuzzy matching</a></li><li><a href="#sqlite">SQLite</a></li><li><a href="#more-modules">More modules</a></li></ul></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li class="current"><a href="library.html" aria-current="page">Library guide</a><ul class="toc"><li><a href="#memory">Memory</a></li><li><a href="#strings">Strings</a></li><li><a href="#files">Files</a></li><li><a href="#csv">CSV</a></li><li><a href="#system">Running commands</a></li><li><a href="#signals">Signals</a></li><li><a href="#lists">Lists</a></li><li><a href="#vectors">Vectors</a></li><li><a href="#sets">Sets and trees</a></li><li><a href="#hash-tables">Hash tables</a></li><li><a href="#bit-vectors">Bit vectors</a></li><li><a href="#bytes">Byte buffers</a></li><li><a href="#json">JSON</a></li><li><a href="#dates">Dates and time</a></li><li><a href="#maths">Maths</a></li><li><a href="#net">Sockets</a></li><li><a href="#coroutines">Coroutines</a></li><li><a href="#fzf">Fuzzy matching</a></li><li><a href="#sqlite">SQLite</a></li><li><a href="#more-modules">More modules</a></li></ul></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -544,7 +544,10 @@ String or a slice as well. It doesn't capture stderr or return the exit status: 
 command gives whatever it printed, often <code>""</code>, and a shell that couldn't be started an
 empty String with a null <code>ptr</code>. It returns once the shell exits, without waiting for
 a background job (<code>cmd &amp;</code>) the command started. <code>os.exit(code)</code> ends the
-program.</p>
+program. <code>os.eprintf(fmt, ...)</code> is <code>printf</code> to stderr (checked against its
+format the same way), for messages that must not mix into a program's output, and
+<code>os.flush()</code> writes out what <code>printf</code> still holds for stdout: do it before
+starting a command that writes to the same terminal or file.</p>
 <p>The commands get the program's stdin, stdout and stderr, but none of the files or
 sockets the library opened: those (the <code>net</code> sockets and accepted connections,
 <code>fs.readAll</code>/<code>fs.writeAll</code>'s file, <code>proc.shellOutput</code>'s pipe)
@@ -633,6 +636,51 @@ void main()
 inherits none of your sockets or files. <code>proc.shell</code>, <code>proc.shellf</code> and <code>proc.shellOutput</code>
 are still the tools for shell pipelines, globs and redirections; use the <code>proc.Proc</code>
 functions whenever an argument comes from a file name or user input.</p>
+
+<h3 id="environment">The environment, the program's path, wait statuses<a class="anchor" href="#environment" aria-label="Link to this section">#</a></h3>
+<p><code>proc.getenv(name)</code> gives a variable's value as a String (empty when it isn't
+set; <code>proc.hasEnv(name)</code> tells an empty value from a missing one),
+<code>proc.setenv(name, value)</code> and <code>proc.unsetenv(name)</code> change it for this
+program and the ones it starts. <code>proc.selfPath()</code> is the running executable's absolute
+path (under <code>ktm -jit</code>, ktm's own), and <code>proc.cpuCount()</code> the CPUs
+online.</p>
+<p>A status from <code>libc.waitpid</code> or <code>libc.system</code> is read with
+<code>proc.exited(st)</code> and <code>proc.exitCode(st)</code>, <code>proc.signaled(st)</code>
+and <code>proc.termSignal(st)</code>, <code>proc.stopped(st)</code> and
+<code>proc.stopSignal(st)</code>; <code>proc.statusCode(st)</code> is what a shell puts in
+<code>$?</code>: the exit code, or 128 plus the signal. The libc module also declares what
+shells and daemons call directly: <code>dup</code>, <code>dup2</code>, <code>setpgid</code>,
+<code>tcsetpgrp</code>, <code>getpid</code>, <code>setsid</code>, <code>readlink</code>,
+<code>realpath</code>, <code>pread</code>, <code>setrlimit</code> and more, with the common
+<code>errno</code> codes (<code>EEXIST</code>, <code>EMFILE</code>, <code>ENOTEMPTY</code>, ...)
+for each platform.</p>
+<pre data-run><code>import libc, proc;
+
+void main()
+{
+  proc.setenv("GREETING", "hello");
+  String g = proc.getenv("GREETING");
+  printf("GREETING=%s\n", g);
+  g.free();
+  proc.unsetenv("GREETING");
+  printf("still set: %d\n", proc.hasEnv("GREETING"));
+
+  String me = proc.selfPath();
+  printf("absolute path: %d, CPUs: %d\n", me[0] == '/', proc.cpuCount() &gt;= 1);
+  me.free();
+
+  i32 st = libc.system("exit 3");
+  printf("exited %d with %d, $? %d\n", proc.exited(st), proc.exitCode(st), proc.statusCode(st));
+  st = libc.system("kill -KILL $$");
+  printf("signal %d, $? %d\n", proc.termSignal(st), proc.statusCode(st));
+}
+</code></pre>
+<pre class="output">GREETING=hello
+still set: 0
+absolute path: 1, CPUs: 1
+exited 1 with 3, $? 3
+signal 9, $? 137
+</pre>
 
 <h2 id="signals">Signals<a class="anchor" href="#signals" aria-label="Link to this section">#</a></h2>
 <p><code>signal.handle(sig, handler, flags, mask, &amp;old)</code> sets what happens when a signal arrives:
@@ -801,6 +849,8 @@ same methods:</p>
   return <code>-1</code> (<code>-1.0</code> for <code>vec.FloatVec</code>, <code>null</code> for
   <code>vec.PtrVec</code>) and set <code>ok</code> to <code>false</code>; the
   <code>ok</code> argument is optional.</li>
+  <li><code>v.removeAt(i)</code> removes and returns the entry at <code>i</code>; the ones
+  after it move down, so the order is kept. The index is checked as for <code>get</code>.</li>
   <li><code>v.clear()</code> sets the size to 0 and keeps the storage for reuse;
   <code>v.release()</code> frees it. A <code>vec.PtrVec</code>'s <code>v.release(free_value)</code> first calls
   <code>free_value</code> (for example <code>&amp;mem.free</code>) on every value.</li>
@@ -1118,6 +1168,54 @@ void main()
 1000003: 1, 1000004: 0, 99999999: 0
 </pre>
 
+<h2 id="bytes">Byte buffers<a class="anchor" href="#bytes" aria-label="Link to this section">#</a></h2>
+<p>Module <code>bytes</code> is for binary data that comes and goes in pieces: what a socket
+or a pipe delivers, or a message being put together. A <code>bytes.Buffer</code> is a queue of
+bytes: <code>append(u8[])</code>, <code>appendByte(b)</code> and
+<code>appendBe16/32/64</code> / <code>appendLe16/32/64</code> add at the end,
+<code>data()</code> is a view of the unread bytes, and <code>consume(n)</code> drops the first
+n once they are used. The space in front is reused, so a buffer that is filled and drained all
+the time doesn't keep growing. Make one with <code>bytes.bufferNew()</code> (a declared Buffer
+isn't zeroed) and free it with <code>b.free()</code>; <code>b.take()</code> gives the unread
+bytes as a String that is yours.</p>
+<p>To read into one, <code>room(n)</code> gives at least n writable bytes after the data and
+<code>commit(k)</code> counts the k you wrote; <code>b.readFrom(fd)</code> does one
+<code>read</code> that way and <code>b.writeTo(fd)</code> one <code>write</code> of the unread
+bytes, consuming what went out. Both return what the system call did (-1 with
+<code>errno</code> <code>EAGAIN</code> on a non-blocking fd that has to wait).</p>
+<p>The integer helpers read and write a <code>u8[]</code> at an offset:
+<code>bytes.be16(s, at)</code>, <code>be32</code>, <code>be64</code> (big-endian, network order),
+<code>le16</code>, <code>le32</code>, <code>le64</code>, and <code>putBe16(s, at, v)</code> and
+the others to write. Past the end, like <code>consume</code> or <code>commit</code> past the
+data, throws <code>ERR_BOUNDS</code>.</p>
+<pre data-run><code>import bytes;
+
+void main()
+{
+  /* a message: a 2-byte type and a 4-byte length (network order), then the body */
+  bytes.Buffer b = bytes.bufferNew();
+  defer b.free();
+  b.appendBe16(7);
+  b.appendBe32(5);
+  b.append("hello");
+  b.append("\x00\x08\x00\x00\x00\x02hi");   /* a second message, already here */
+
+  /* read them back the way a server reads what arrived */
+  while (b.len &gt;= 6) {
+    u8[] d = b.data();
+    i64 len = bytes.be32(d, 2);
+    if (b.len &lt; 6 + len) { break; }        /* the rest hasn't arrived yet */
+    printf("type %d: %s\n", bytes.be16(d), d[6:6 + len]);
+    b.consume(6 + len);
+  }
+  printf("%d bytes left\n", b.len);
+}
+</code></pre>
+<pre class="output">type 7: hello
+type 8: hi
+0 bytes left
+</pre>
+
 <h2 id="json">JSON<a class="anchor" href="#json" aria-label="Link to this section">#</a></h2>
 <h3 id="parsing-and-selecting">Parsing and selecting<a class="anchor" href="#parsing-and-selecting" aria-label="Link to this section">#</a></h3>
 <p><code>json.parse(text)</code> parses <code>text</code>, a <code>u8[]</code>, into a tree of <code>json.Value</code> nodes and
@@ -1260,7 +1358,8 @@ and objects with <code>beginArray()</code> / <code>beginObject()</code> and clos
 one with <code>end()</code>, give each member's name with <code>key(k)</code>, and add values
 with <code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code>,
 <code>nil()</code> (JSON's <code>null</code>: <code>null</code> is a keyword),
-<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String) and
+<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String),
+<code>cstr(p)</code> (a NUL-terminated <code>u8 *</code>; a null pointer is <code>null</code>) and
 <code>raw(text)</code> (JSON text made elsewhere, checked to be one value). Commas, quotes
 and escapes are written for you, the same escapes and float digits as <code>json.toStr</code>.
 <code>w.take()</code> returns the finished document as a String that is yours and leaves the
@@ -1568,10 +1667,50 @@ void main()
 0 1
 </pre>
 
+<h3 id="clocks">Clocks, sleeping and HTTP dates<a class="anchor" href="#clocks" aria-label="Link to this section">#</a></h3>
+<p><code>date.monoMs()</code> (and <code>date.monoNs()</code>) read a clock that only goes
+forward, which is what timeouts and deadlines want: <code>date.nowMs()</code> is the time of
+day and jumps when the system clock is set. <code>date.sleepMs(ms)</code> sleeps that long,
+even when a signal arrives in between. <code>date.unixNow()</code> is the Unix time in
+seconds.</p>
+<p><code>date.formatUnix(t, fmt)</code> writes a Unix time with <code>strftime</code>'s
+format (<code>%Y-%m-%d</code>, <code>%H:%M:%S</code>, <code>%a</code>, <code>%j</code>, ...) in
+UTC, or in local time with <code>formatUnix(t, fmt, false)</code>.
+<code>date.httpDate(t)</code> gives the date HTTP headers use (<code>Date</code>,
+<code>Last-Modified</code>), always in English and UTC; <code>date.parseHttpDate(text,
+&amp;t)</code> reads it back, and also the two older forms clients may still send. It returns
+false, and leaves <code>t</code> alone, for anything else.</p>
+<pre data-run><code>import date;
+
+void main()
+{
+  i64 start = date.monoMs();
+  date.sleepMs(20);
+  printf("slept at least 20 ms: %d\n", date.monoMs() - start &gt;= 20);
+
+  String h = date.httpDate(784111777);
+  printf("%s\n", h);
+  i64 t;
+  if (date.parseHttpDate("Sunday, 06-Nov-94 08:49:37 GMT", &amp;t)) { printf("%d\n", t); }
+  h.free();
+
+  String day = date.formatUnix(t, "%A %d %B %Y, day %j");
+  printf("%s\n", day);
+  day.free();
+}
+</code></pre>
+<pre class="output">slept at least 20 ms: 1
+Sun, 06 Nov 1994 08:49:37 GMT
+784111777
+Sunday 06 November 1994, day 310
+</pre>
+
 <h2 id="maths">Maths<a class="anchor" href="#maths" aria-label="Link to this section">#</a></h2>
 <p>The C maths library is declared under its usual names (<code>sqrt</code>,
 <code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
-<code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code> and <code>math.power</code>, and the
+<code>f64</code>), plus <code>math.abs</code>, <code>math.gcd</code>, <code>math.power</code>,
+<code>math.min(a, b)</code>, <code>math.max(a, b)</code> and <code>math.clamp(v, lo, hi)</code>
+(all on <code>i64</code>), and the
 constants <code>math.PI</code>, <code>math.E</code>, <code>math.SQRT2</code> and the rest of C's
 <code>M_*</code> set.
 <code>math.gcd</code> ignores signs: <code>math.gcd(0, n)</code> is <code>|n|</code> and
@@ -1791,6 +1930,122 @@ void main()
 <pre class="output">0 1 1 2 3 5 8 13 21 34 
 5
 12
+</pre>
+
+<h3 id="coroutine-loop">A coroutine server<a class="anchor" href="#coroutine-loop" aria-label="Link to this section">#</a></h3>
+<p>A server with one coroutine per connection needs a scheduler: something that knows what
+each coroutine waits for, polls all those fds at once and resumes the ready ones. Module
+<code>coro</code> has one. <code>coro.go(&amp;Fn, arg)</code> starts a coroutine in the
+calling thread's loop (it first runs in <code>coro.run</code>; NULL if its stack can't be
+mapped), and <code>coro.run()</code> runs the loop until every such coroutine has ended; the
+loop releases each one when its function returns. Inside them these pause the coroutine
+instead of blocking the thread:</p>
+<ul>
+<li><code>coro.wait(fd, events, ms)</code> waits until <code>fd</code> is ready for
+<code>events</code> (<code>libc.POLLIN</code>, <code>libc.POLLOUT</code>) and returns its
+<code>revents</code> (above 0; <code>POLLHUP</code> and <code>POLLERR</code> count), or 0 once
+<code>ms</code> milliseconds passed (leave it out to wait without a limit).</li>
+<li><code>coro.waitIdle(fd, events, ms)</code> is the same for waiting on more work (the
+next request, the next client), but returns -1 when <code>coro.stop()</code> is called, and
+at once when it was called before.</li>
+<li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
+<code>coro.yield()</code> lets them have a turn.</li>
+<li><code>coro.accept(listener, ms)</code> returns the next client as a non-blocking fd (it
+makes the listener non-blocking too), or -1 on its timeout, on <code>coro.stop()</code>, or when
+the listener can't accept (<code>os.errno()</code> says why). Out of fds (<code>EMFILE</code>,
+<code>ENFILE</code>, or <code>ENOBUFS</code>/<code>ENOMEM</code>) it doesn't spin or try again at once (on
+macOS a failed accept has already dropped that client): every <code>coro.accept</code> of the
+loop rests until <code>coro.close(fd)</code> closes an fd, or 2 s passed. For 10 s after
+that it checks (with <code>dup</code>) before each accept that two fds are free, one for the
+client and one for its work, and rests again if not, so no further client is dropped. So close
+connections with <code>coro.close</code>.</li>
+</ul>
+<p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
+deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
+deadline first; new coroutines run in the order they were started. Every thread that calls
+<code>coro.run</code> has its own loop, kept with the thread's coroutine state.
+<code>coro.stop()</code> winds the loop down: <code>coro.waitIdle</code> and
+<code>coro.accept</code> return -1 from then on, while plain waits and sleeps go on, so the
+work in flight finishes and <code>coro.run</code> returns when it has. <code>coro.stopping()</code>
+tells whether it was called (a server sends <code>Connection: close</code> then). After
+<code>coro.run</code> returns, the next loop starts afresh. A SIGINT/SIGTERM stop fits as one
+more coroutine waiting on <code>signal.stopInit()</code>'s fd, as below.</p>
+<p>The loop calls throw <code>coro.ERR_LOOP</code> when they can't work:
+<code>coro.run</code> inside a coroutine, <code>coro.wait</code> and the others outside a
+coroutine that <code>coro.go</code> started, a loop where every coroutine waits with no fd and
+no time limit. When a loop coroutine throws, the loop releases it and <code>coro.run</code>
+throws the error on; the other coroutines stay, and calling <code>coro.run</code> again carries
+on with them.</p>
+<pre data-run><code>import coro, cstr, libc, net, signal;
+
+i32 gListen;
+
+void *serve(void *arg)
+{// one coroutine per client: sends its line back in capitals
+  i32 fd = (i32)(i64)arg;
+  u8 buf[64];
+  if (coro.wait(fd, libc.POLLIN, 5000) &gt; 0) {
+    i64 n = libc.recv(fd, buf, sizeof(buf), 0);
+    for (i64 i = 0; i &lt; n; i++) {
+      if (buf[i] &gt;= 'a' &amp;&amp; buf[i] &lt;= 'z') { buf[i] -= 'a' - 'A'; }
+    }
+    if (n &gt; 0) { net.send(fd, buf[0:n]); }
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *unused)
+{// a coroutine per client, until coro.stop()
+  i32 fd;
+  while ((fd = coro.accept(gListen)) != -1) { coro.go(&amp;serve, (void *)(i64)fd); }
+  return null;
+}
+
+void *onSignal(void *unused)
+{// Ctrl-C or SIGTERM: stop taking clients, finish the rest
+  if (coro.waitIdle(signal.stopInit(), libc.POLLIN) &gt; 0) { coro.stop(); }
+  return null;
+}
+
+void ask(u8 *word)
+{
+  u8 buf[64];
+  i32 fd = net.dial("127.0.0.1", net.localPort(gListen), true);
+  coro.wait(fd, libc.POLLOUT, 5000);
+  net.send(fd, cstr.view(word));
+  if (coro.wait(fd, libc.POLLIN, 5000) &gt; 0) {
+    i64 n = libc.recv(fd, buf, sizeof(buf) - 1, 0);
+    if (n &gt; 0) {
+      buf[n] = 0;
+      printf("%s -&gt; %s\n", word, buf);
+    }
+  }
+  libc.close(fd);
+}
+
+void *clients(void *unused)
+{// the server's clients, in the same loop; then it stops
+  ask("ping");
+  ask("hello");
+  coro.stop();
+  return null;
+}
+
+void main()
+{
+  gListen = net.listen(0, "127.0.0.1", 16);
+  coro.go(&amp;acceptor);
+  coro.go(&amp;onSignal);
+  coro.go(&amp;clients);
+  coro.run();
+  libc.close(gListen);
+  printf("stopped\n");
+}
+</code></pre>
+<pre class="output">ping -&gt; PING
+hello -&gt; HELLO
+stopped
 </pre>
 
 <h2 id="fzf">Fuzzy matching<a class="anchor" href="#fzf" aria-label="Link to this section">#</a></h2>

@@ -241,17 +241,114 @@ pub extern "c" i32 waitpid(i32 pid, i32 *statlock, i32 options);
 
 pub extern "c" i32 fork();
 
+/* Processes, sessions and the terminal (shells and daemons). pid_t is
+ * i32 on Linux and macOS. */
+pub extern "c" i32 getpid();
+
+pub extern "c" i32 getppid();
+
+pub extern "c" i32 getpgrp();
+
+pub extern "c" i32 getpgid(i32 pid);
+
+pub extern "c" i32 setpgid(i32 pid, i32 pgid);
+
+pub extern "c" i32 setsid();
+
+pub extern "c" i32 tcgetpgrp(i32 fd);
+
+pub extern "c" i32 tcsetpgrp(i32 fd, i32 pgid);
+
+pub extern "c" u32 getuid();
+
+pub extern "c" u32 geteuid();
+
+/* File descriptors and paths */
+pub extern "c" i32 dup(i32 fd);
+
+pub extern "c" i32 dup2(i32 fd, i32 fd2);
+
+pub extern "c" i32 fsync(i32 fd);
+
+pub extern "c" i32 ftruncate(i32 fd, i64 length);
+
+pub extern "c" i64 pread(i32 fd, void *buf, u64 n, i64 offset);
+
+pub extern "c" i64 pwrite(i32 fd, void *buf, u64 n, i64 offset);
+
+/* The target of a symbolic link into buf, NOT NUL-terminated: returns its
+ * length, -1 on error */
+pub extern "c" i64 readlink(u8 *path, u8 *buf, u64 size);
+
+pub extern "c" i32 symlink(u8 *target, u8 *linkpath);
+
+pub extern "c" i32 rename(u8 *from, u8 *to);
+
+/* access(2) modes */
+pub const i64 F_OK = 0;
+
+pub const i64 X_OK = 1;
+
+pub const i64 W_OK = 2;
+
+pub const i64 R_OK = 4;
+
+pub extern "c" i32 access(u8 *path, i32 mode);
+
+/* realpath(3): resolved into a malloc'd C string (libc.free it) when
+ * resolved is null */
+pub extern "c" u8 *realpath(u8 *path, u8 *resolved);
+
+pub extern "c" i64 sysconf(i32 name);
+
+pub extern "c" i32 setenv(u8 *name, u8 *value, i32 overwrite);
+
+pub extern "c" i32 unsetenv(u8 *name);
+
+/* Resource limits (setrlimit/getrlimit); RLIMIT_NOFILE is the number of
+ * open file descriptors */
+pub struct rlimit {
+    u64 rlim_cur;
+    u64 rlim_max;
+};
+
+#ifdef IS_LINUX
+pub const i64 RLIMIT_NOFILE = 7;
+#else
+pub const i64 RLIMIT_NOFILE = 8;
+#endif
+
+pub extern "c" i32 getrlimit(i32 resource, rlimit *rl);
+
+pub extern "c" i32 setrlimit(i32 resource, rlimit *rl);
+
 /* errno values (the ones networking code checks most); they differ
  * between Linux and macOS, so compare Errno() with these names. */
+pub const i64 EPERM = 1;               /* Operation not permitted */
+
 pub const i64 ENOENT = 2;               /* No such file or directory (or program) */
 
+pub const i64 ESRCH = 3;               /* No such process */
+
 pub const i64 EINTR = 4;               /* Interrupted by a signal: retry */
+
+pub const i64 EIO = 5;               /* Input/output error */
 
 pub const i64 EBADF = 9;               /* Bad file descriptor */
 
 pub const i64 ECHILD = 10;              /* No child process to wait for */
 
+pub const i64 ENOMEM = 12;              /* Out of memory */
+
 pub const i64 EACCES = 13;              /* Permission denied */
+
+pub const i64 EEXIST = 17;              /* File exists */
+
+pub const i64 EXDEV = 18;              /* Rename across file systems */
+
+pub const i64 ENOTDIR = 20;              /* Not a directory */
+
+pub const i64 EISDIR = 21;              /* Is a directory */
 
 pub const i64 EINVAL = 22;              /* Invalid argument */
 
@@ -259,7 +356,17 @@ pub const i64 ENFILE = 23;              /* Too many open files in the system */
 
 pub const i64 EMFILE = 24;              /* Too many open files in this process */
 
+pub const i64 ENOTTY = 25;              /* Not a terminal */
+
+pub const i64 ENOSPC = 28;              /* No space left on the device */
+
+pub const i64 ESPIPE = 29;              /* Seek on a pipe or socket */
+
+pub const i64 EROFS = 30;              /* Read-only file system */
+
 pub const i64 EPIPE = 32;              /* Write to a closed pipe or socket */
+
+pub const i64 ERANGE = 34;              /* Result too large (a buffer too small) */
 
 #ifdef IS_LINUX
 pub const i64 EAGAIN = 11;              /* Would block: try again later */
@@ -271,6 +378,10 @@ pub const i64 ETIMEDOUT = 110;             /* Timed out */
 pub const i64 ECONNREFUSED = 111;             /* Connection refused */
 pub const i64 EHOSTUNREACH = 113;             /* No route to host */
 pub const i64 EINPROGRESS = 115;             /* Non-blocking connect started */
+pub const i64 ENAMETOOLONG = 36;              /* File name too long */
+pub const i64 ENOSYS = 38;              /* Not implemented */
+pub const i64 ENOTEMPTY = 39;              /* Directory not empty */
+pub const i64 ELOOP = 40;              /* Too many symbolic links */
 #else
 pub const i64 EAGAIN = 35;              /* Would block: try again later */
 pub const i64 EINPROGRESS = 36;              /* Non-blocking connect started */
@@ -281,6 +392,10 @@ pub const i64 ECONNRESET = 54;              /* Connection reset by the peer */
 pub const i64 ETIMEDOUT = 60;              /* Timed out */
 pub const i64 ECONNREFUSED = 61;              /* Connection refused */
 pub const i64 EHOSTUNREACH = 65;              /* No route to host */
+pub const i64 ELOOP = 62;              /* Too many symbolic links */
+pub const i64 ENAMETOOLONG = 63;              /* File name too long */
+pub const i64 ENOTEMPTY = 66;              /* Directory not empty */
+pub const i64 ENOSYS = 78;              /* Not implemented */
 #endif
 
 pub const i64 EWOULDBLOCK = EAGAIN;          /* Same value on Linux and macOS */

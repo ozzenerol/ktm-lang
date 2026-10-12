@@ -1,5 +1,5 @@
 module cstr;
-import libc, mem, os;
+import libc, mem;
 
 const i64 PRTF_PLUS = 0x1000; /* `+`: a sign on positive numbers too */
 
@@ -1031,7 +1031,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
                                                     : "fs.readAll(path, &len) and %s";
                                         len = libc.snprintf(buf,sizeof(buf),
                                                 "%%%c is not a conversion any more: use %s\n",conv,instead);
-                                        libc.write(os.STDERR,buf,len);
+                                        libc.write(2 /* stderr */,buf,len);
                                         for (tmp = spec; tmp < fmt; ++tmp) {
                                                 strPutChar(&ptr,*tmp,grow);
                                         }
@@ -1096,7 +1096,7 @@ pub u8 *formatArgs(u8 *_dst, u8 *fmt, u64[] args) {
                                                 }
                                                 len = libc.snprintf(buf,sizeof(buf),"Invalid format char: '%c'\n",bad);
                                         }
-                                        libc.write(os.STDERR,buf,len);
+                                        libc.write(2 /* stderr */,buf,len);
                                         for (tmp = spec; tmp < fmt; ++tmp) {
                                                 strPutChar(&ptr,*tmp,grow);
                                         }

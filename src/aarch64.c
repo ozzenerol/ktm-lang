@@ -1015,6 +1015,29 @@ static void aarch64StoreBytes(AoStr *buf, int reg, const char *base,
     }
 }
 
+/* Copy `size` bytes from [x11] to [x12] by a loop over 8-byte words
+ * (x13 counts, x10 carries) and then the 4/2/1-byte tail; x11 and x12
+ * end past the copy. For aggregates of A64_COPY_LOOP_MIN bytes and up,
+ * whose unrolled offsets would leave the immediate range. */
+static void aarch64CopyLoop(AoStr *buf, int size)
+{
+    aarch64EmitMovImm(buf, "x13", (s64)(size / 8));
+    aoStrCatFmt(buf, "1:\n\t");
+    aoStrCatFmt(buf, "ldr x10, [x11]\n\t");
+    aoStrCatFmt(buf, "str x10, [x12]\n\t");
+    aoStrCatFmt(buf, "add x11, x11, #8\n\t");
+    aoStrCatFmt(buf, "add x12, x12, #8\n\t");
+    aoStrCatFmt(buf, "subs x13, x13, #1\n\t");
+    aoStrCatFmt(buf, "b.ne 1b\n\t");
+    int o = 0, tail = size % 8;
+    while (o < tail) {
+        int c = aarch64ChunkSize(tail - o);
+        aarch64LoadBytes(buf, 10, "x11", o, c);
+        aarch64StoreBytes(buf, 10, "x12", o, c);
+        o += c;
+    }
+}
+
 /* Emit an `extern "c"` call that passes one or more structs by value,
  * following AAPCS64. Scalars and structs are classified together so the
  * GP/FP register counters (NGRN/NSRN) stay in sync with the C ABI.
@@ -1024,6 +1047,12 @@ static void aarch64StoreBytes(AoStr *buf, int reg, const char *base,
 /* Copy `size` bytes from [src_reg, #0..] to [sp, #dst] via x10. */
 static void aarch64CopyToSp(AoStr *buf, const char *src_reg, int size, int dst)
 {
+    if (size >= A64_COPY_LOOP_MIN) {
+        aoStrCatFmt(buf, "mov x11, %s\n\t", src_reg);
+        aarch64EmitAddSubImm(buf, "add", "x12", "sp", dst);
+        aarch64CopyLoop(buf, size);
+        return;
+    }
     int o = 0;
     while (size - o >= 8) {
         aoStrCatFmt(buf, "ldr x10, [%s, #%i]\n\t", src_reg, o);
@@ -1050,6 +1079,13 @@ static void aarch64CopyToSlot(AoStr *buf, const char *base_reg, int size,
                               int src, int dst)
 {
     const char *dst_base = "x29";
+    if (size >= A64_COPY_LOOP_MIN) {
+        if (src >= 0) aarch64EmitAddSubImm(buf, "add", "x11", base_reg, src);
+        else          aarch64EmitAddSubImm(buf, "sub", "x11", base_reg, -src);
+        aarch64EmitFrameAddr(buf, "x12", dst);
+        aarch64CopyLoop(buf, size);
+        return;
+    }
     if (src < -240 || src + size > 240) {
         if (src >= 0) aarch64EmitAddSubImm(buf, "add", "x11", base_reg, src);
         else          aarch64EmitAddSubImm(buf, "sub", "x11", base_reg, -src);
@@ -1180,11 +1216,21 @@ static void a64TxtSpillStructDst(void *be, IrInstr *instr) {
     aoStrCatFmt(ctx->buf, "mov x0, x9\n\t");
     aarch64SpillDst(ctx, instr, "x0");
 }
+/* The save slot sits above the call's copies of by-value structs, so
+ * its offset grows with them: past the scaled range, go through x10. */
+static void a64TxtSpSlot(AoStr *buf, const char *op, int sp_off) {
+    if (sp_off <= 32760) {
+        aoStrCatFmt(buf, "%s x9, [sp, #%i]\n\t", op, sp_off);
+    } else {
+        aarch64EmitAddSubImm(buf, "add", "x10", "sp", sp_off);
+        aoStrCatFmt(buf, "%s x9, [x10]\n\t", op);
+    }
+}
 static void a64TxtStashDest(void *be, int sp_off) {
-    aoStrCatFmt(((IrCgCtx *)be)->buf, "str x9, [sp, #%i]\n\t", sp_off);
+    a64TxtSpSlot(((IrCgCtx *)be)->buf, "str", sp_off);
 }
 static void a64TxtUnstashDest(void *be, int sp_off) {
-    aoStrCatFmt(((IrCgCtx *)be)->buf, "ldr x9, [sp, #%i]\n\t", sp_off);
+    a64TxtSpSlot(((IrCgCtx *)be)->buf, "ldr", sp_off);
 }
 static void a64TxtCallInit(A64CallEmitter *e, IrCgCtx *ctx) {
     e->be = ctx;

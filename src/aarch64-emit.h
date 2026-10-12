@@ -19,6 +19,12 @@
  * source (that bug is exactly why the first cut of this prototype crashed on
  * struct returns: the hidden out-pointer in x0 was overwritten).
  * ------------------------------------------------------------------------- */
+/* Aggregates at least this big are copied by a loop instead of one
+ * ldr/str pair per 8 bytes: unrolled, the offsets of a big struct leave
+ * the scaled-immediate range (32760 for 8 bytes) and the code grows with
+ * the struct. Both backends use it, so they emit the same shape. */
+#define A64_COPY_LOOP_MIN 256
+
 typedef struct {
     void *be;  /* backend context: IrCgCtx* (AOT) or JitFnCtx* (JIT) */
 

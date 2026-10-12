@@ -881,16 +881,38 @@ static void jitStoreBytes(AsmEnc *enc, A64Reg reg, A64Reg base, int off, int n) 
     }
 }
 
+/* reg = base + off for any signed off (the add/sub encoders split a
+ * large immediate into several instructions). */
+static void jitAddrOf(AsmEnc *enc, A64Reg reg, A64Reg base, int off) {
+    if (off >= 0) aarch64_enc_add_imm(enc, 1, reg, base, (uint32_t)off);
+    else          aarch64_enc_sub_imm(enc, 1, reg, base, (uint32_t)(-off));
+}
+
 /* x11 = x29 + loff, so the odd-sized frame accesses above can use a
  * non-negative offset. */
 static void jitFrameAddrX11(AsmEnc *enc, int loff) {
-    if (loff >= 0 && loff <= 0xFFF) {
-        aarch64_enc_add_imm(enc, 1, A_X11, A_FP, (uint32_t)loff);
-    } else if (loff < 0 && -loff <= 0xFFF) {
-        aarch64_enc_sub_imm(enc, 1, A_X11, A_FP, (uint32_t)(-loff));
-    } else {
-        jitEmitMovImm(enc, A_X11, (s64)loff);
-        aarch64_enc_add_reg(enc, 1, A_X11, A_FP, A_X11);
+    jitAddrOf(enc, A_X11, A_FP, loff);
+}
+
+/* Copy `size` bytes from [x11] to [x12] by a loop over 8-byte words (x13
+ * counts, x10 carries) and then the 4/2/1-byte tail. Mirrors
+ * aarch64CopyLoop: for aggregates of A64_COPY_LOOP_MIN bytes and up. */
+static void jitCopyLoop(AsmEnc *enc, int size) {
+    jitEmitMovImm(enc, A_X13, (s64)(size / 8));
+    size_t top = enc->len;
+    aarch64_enc_ldr_imm(enc, A_X10, A_X11, 0);
+    aarch64_enc_str_imm(enc, A_X10, A_X12, 0);
+    aarch64_enc_add_imm(enc, 1, A_X11, A_X11, 8);
+    aarch64_enc_add_imm(enc, 1, A_X12, A_X12, 8);
+    aarch64_enc_subs_imm(enc, 1, A_X13, A_X13, 1);
+    int32_t rel_words = (int32_t)(((int64_t)top - (int64_t)enc->len) / 4);
+    aarch64_enc_b_cond(enc, A_NE, rel_words);
+    int o = 0, tail = size % 8;
+    while (o < tail) {
+        int c = jitChunkSize(tail - o);
+        jitLoadBytes(enc, A_X10, A_X11, o, c);
+        jitStoreBytes(enc, A_X10, A_X12, o, c);
+        o += c;
     }
 }
 
@@ -901,6 +923,12 @@ static int jitIsPow2Access(int n) {
 
 /* Copy `size` bytes from [base, #src] to the frame slot at #dst via x10. */
 static void jitCopyToSlot(AsmEnc *enc, A64Reg base, int size, int src, int dst) {
+    if (size >= A64_COPY_LOOP_MIN) {
+        jitAddrOf(enc, A_X11, base, src);
+        jitAddrOf(enc, A_X12, A_FP, dst);
+        jitCopyLoop(enc, size);
+        return;
+    }
     int o = 0;
     while (size - o >= 8) {
         aarch64_enc_ldr_imm(enc, A_X10, base, (uint32_t)(src + o));
@@ -918,6 +946,12 @@ static void jitCopyToSlot(AsmEnc *enc, A64Reg base, int size, int src, int dst) 
 
 /* Copy `size` bytes from [src, #0..] to [sp, #dst] via x10. */
 static void jitCopyToSp(AsmEnc *enc, A64Reg src, int size, int dst) {
+    if (size >= A64_COPY_LOOP_MIN) {
+        aarch64_enc_mov_reg(enc, A_X11, src);
+        aarch64_enc_add_imm(enc, 1, A_X12, A_SP, (uint32_t)dst);
+        jitCopyLoop(enc, size);
+        return;
+    }
     int o = 0;
     while (size - o >= 8) {
         aarch64_enc_ldr_imm(enc, A_X10, src, (uint32_t)o);
@@ -1062,12 +1096,25 @@ static void a64JitSpillStructDst(void *be, IrInstr *instr) {
     jitSpillDst(ctx, instr, A_X0);
 }
 
+/* The save slot sits above the call's copies of by-value structs, so its
+ * offset grows with them: past the scaled range, go through x10. */
+static void a64JitSpSlot(AsmEnc *enc, int is_load, int sp_off) {
+    A64Reg base = A_SP;
+    if (sp_off > 32760) {
+        aarch64_enc_add_imm(enc, 1, A_X10, A_SP, (uint32_t)sp_off);
+        base = A_X10;
+        sp_off = 0;
+    }
+    if (is_load) aarch64_enc_ldr_imm(enc, A_X9, base, (uint32_t)sp_off);
+    else         aarch64_enc_str_imm(enc, A_X9, base, (uint32_t)sp_off);
+}
+
 static void a64JitStashDest(void *be, int sp_off) {
-    aarch64_enc_str_imm(&((JitFnCtx *)be)->jit->enc, A_X9, A_SP, (uint32_t)sp_off);
+    a64JitSpSlot(&((JitFnCtx *)be)->jit->enc, 0, sp_off);
 }
 
 static void a64JitUnstashDest(void *be, int sp_off) {
-    aarch64_enc_ldr_imm(&((JitFnCtx *)be)->jit->enc, A_X9, A_SP, (uint32_t)sp_off);
+    a64JitSpSlot(&((JitFnCtx *)be)->jit->enc, 1, sp_off);
 }
 
 static void a64JitCallInit(A64CallEmitter *e, JitFnCtx *ctx) {

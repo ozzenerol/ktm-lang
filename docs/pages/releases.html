@@ -4,6 +4,91 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.5.0 <small>(2026-10-12)</small></h2>
+<p>A systems library: what the example servers and tools used to write by hand. A coroutine
+loop for servers, a byte buffer, monotonic clocks and HTTP dates, the OS calls shells and
+daemons need, and small helpers. Nothing that compiled before changes meaning.</p>
+
+<pre><code>import bytes, coro, date, libc, net;
+
+void *client(void *arg)
+{// reads 4-byte big-endian lengths and their messages, answers with the time
+  i32 fd = (i32)(i64)arg;
+  bytes.Buffer in = bytes.bufferNew();
+  defer in.free();
+  while (coro.waitIdle(fd, libc.POLLIN, 5000) &gt; 0 &amp;&amp; in.readFrom(fd) &gt; 0) {
+    while (in.len &gt;= 4 &amp;&amp; in.len &gt;= 4 + bytes.be32(in.data())) {
+      in.consume(4 + bytes.be32(in.data()));
+      String now = date.httpDate(date.unixNow());
+      net.send(fd, now);
+      now.free();
+    }
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *arg)
+{
+  i32 lfd = (i32)(i64)arg, fd;
+  while ((fd = coro.accept(lfd)) != -1) { coro.go(&amp;client, (void *)(i64)fd); }
+  return null;
+}
+
+void main()
+{
+  coro.go(&amp;acceptor, (void *)(i64)net.listen(9000, "*", 64));
+  coro.run();
+}
+</code></pre>
+
+<h3>The standard library</h3>
+<ul>
+  <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
+  thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
+  Inside them <code>coro.wait(fd, events, ms)</code>, <code>coro.waitIdle</code>,
+  <code>coro.sleep</code> and <code>coro.accept</code> pause the coroutine instead of the
+  thread. <code>coro.stop()</code> winds the loop down gracefully, and an accept that runs out
+  of fds neither spins nor drops clients: it rests until <code>coro.close</code> frees one,
+  and for a while after it only accepts when two fds are free (on macOS a failed accept resets
+  the client it took off the queue). Misuse throws <code>coro.ERR_LOOP</code>.</li>
+  <li>Module <code>bytes</code>: a <code>bytes.Buffer</code> that grows at the end and is
+  consumed from the front (<code>append</code>, <code>consume</code>, <code>room</code>/<code>commit</code>,
+  <code>readFrom</code>/<code>writeTo</code>, <code>appendBe32</code> and the other byte orders), and
+  <code>bytes.be16/32/64</code>, <code>le16/32/64</code> and <code>putBe*</code>/<code>putLe*</code> on any
+  <code>u8[]</code>, bounds-checked.</li>
+  <li><code>date.monoMs()</code> and <code>date.monoNs()</code>, a clock that only goes forward,
+  for timeouts; <code>date.sleepMs</code>, <code>date.unixNow</code>;
+  <code>date.formatUnix(t, fmt)</code> (strftime, UTC or local); <code>date.httpDate</code> and
+  <code>date.parseHttpDate</code> (RFC 9110, all three forms).</li>
+  <li>The environment and the process: <code>proc.getenv</code>, <code>hasEnv</code>,
+  <code>setenv</code>, <code>unsetenv</code>; <code>proc.selfPath()</code>,
+  <code>proc.cpuCount()</code>; <code>proc.exited</code>, <code>exitCode</code>,
+  <code>signaled</code>, <code>termSignal</code>, <code>stopped</code>,
+  <code>stopSignal</code> and <code>proc.statusCode</code> (as <code>$?</code>) for wait
+  statuses.</li>
+  <li><code>libc</code> declares <code>dup</code>, <code>dup2</code>, <code>getpid</code>,
+  <code>getppid</code>, <code>getpgrp</code>, <code>setpgid</code>, <code>setsid</code>,
+  <code>tcgetpgrp</code>, <code>tcsetpgrp</code>, <code>pread</code>, <code>pwrite</code>,
+  <code>fsync</code>, <code>ftruncate</code>, <code>readlink</code>, <code>symlink</code>,
+  <code>rename</code>, <code>access</code>, <code>realpath</code>, <code>sysconf</code>,
+  <code>setenv</code>, <code>getrlimit</code>/<code>setrlimit</code> and more <code>errno</code>
+  codes (<code>EEXIST</code>, <code>ENOTEMPTY</code>, <code>ENOSPC</code>, <code>ELOOP</code>, ...),
+  each with its platform's value.</li>
+  <li><code>os.eprintf</code> (printf to stderr, format-checked) and <code>os.flush</code>;
+  <code>math.min</code>, <code>math.max</code>, <code>math.clamp</code>;
+  <code>removeAt(i)</code> on <code>PtrVec</code>, <code>IntVec</code> and
+  <code>FloatVec</code>; <code>json.Writer.cstr(u8 *)</code> for C strings (a null pointer is
+  <code>null</code>).</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
+  or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
+  also keeps the code small.</li>
+</ul>
+
 <h2>v0.4.0 <small>(2026-10-12)</small></h2>
 <p>Reflection. A program can ask the compiler about its types at run time, and the
 <code>json</code> module uses that to turn any struct into JSON and back without hand-written

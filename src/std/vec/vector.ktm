@@ -58,6 +58,20 @@ pub f64 FloatVec.pop(bool *_ok=null) {
     return -1.0;
 }
 
+/* Remove and return the entry at idx, the ones after it moving down one
+ * (their order kept); an idx outside 0..size-1 is reported and exits,
+ * as get() does */
+pub f64 FloatVec.removeAt(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("FloatVec.removeAt", idx, self.size);
+    }
+    auto value = self.entries[idx];
+    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
+                 (self.size - idx - 1) * sizeof(self.entries[0]));
+    self.size--;
+    return value;
+}
+
 pub f64 FloatVec.get(i64 idx) {
     if (idx < 0 || idx >= self.size) {
         vecIndexError("FloatVec.get", idx, self.size);
@@ -140,6 +154,20 @@ pub i64 IntVec.pop(bool *_ok=null) {
     return -1;
 }
 
+/* Remove and return the entry at idx, the ones after it moving down one
+ * (their order kept); an idx outside 0..size-1 is reported and exits,
+ * as get() does */
+pub i64 IntVec.removeAt(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("IntVec.removeAt", idx, self.size);
+    }
+    auto value = self.entries[idx];
+    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
+                 (self.size - idx - 1) * sizeof(self.entries[0]));
+    self.size--;
+    return value;
+}
+
 pub i64 IntVec.get(i64 idx) {
     if (idx < 0 || idx >= self.size) {
         vecIndexError("IntVec.get", idx, self.size);
@@ -215,6 +243,20 @@ pub void *PtrVec.pop(bool *_ok=null) {
     }
     if (_ok) { *_ok = false; }
     return null;
+}
+
+/* Remove and return the entry at idx, the ones after it moving down one
+ * (their order kept); an idx outside 0..size-1 is reported and exits,
+ * as get() does */
+pub void *PtrVec.removeAt(i64 idx) {
+    if (idx < 0 || idx >= self.size) {
+        vecIndexError("PtrVec.removeAt", idx, self.size);
+    }
+    auto value = self.entries[idx];
+    libc.memmove(&self.entries[idx], &self.entries[idx + 1],
+                 (self.size - idx - 1) * sizeof(self.entries[0]));
+    self.size--;
+    return value;
 }
 
 pub void *PtrVec.get(i64 idx) {

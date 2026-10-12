@@ -28,6 +28,18 @@ pub i64 abs(i64 num) {
  * Gcd(0, 0) == 0. Gcd(I64_MIN, 0) is 2^63, which only fits as a u64.
  * The loop runs on non-positive values because -|x| always fits in an
  * i64 while |I64_MIN| does not. */
+/* The smaller and the larger of two integers */
+pub i64 min(i64 a, i64 b) { return a < b ? a : b; }
+
+pub i64 max(i64 a, i64 b) { return a > b ? a : b; }
+
+/* v kept within lo..hi (lo when v < lo, hi when v > hi) */
+pub i64 clamp(i64 v, i64 lo, i64 hi)
+{
+    if (v < lo) { return lo; }
+    return v > hi ? hi : v;
+}
+
 pub u64 gcd(i64 a, i64 b) {
     i64 t;
     if (a > 0) { a = -a; }
