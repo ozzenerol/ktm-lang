@@ -1043,57 +1043,58 @@ comparator as above, and <code>sort.asc(s)</code> for numbers
 (<code>sort.asc(temps[0:n])</code> on an array).</p>
 
 <h2 id="sets">Sets and trees</h2>
-<p><code>set.IntSet</code> is a sorted set of <code>i64</code> values. <code>add</code>,
-<code>delete</code> and <code>has</code> are O(log n); adding a value that is
-there, or deleting one that isn't, changes nothing. <code>unionWith</code>,
-<code>intersection</code>, <code>diff</code> (in the first set, not the
-second) and <code>symDiff</code> (in exactly one) return a new set and leave their
-arguments alone; <code>eq</code> compares two sets. An iterator, <code>toVec</code>
-and <code>toStr</code> (a String) give the values in ascending order. Don't add or delete
-values while iterating: once one is added or deleted, <code>set.intIterNext</code> returns
-<code>null</code> and the loop ends early, so collect the changes and apply them after it. The functions that only read a set, and
-<code>release</code>, treat <code>null</code> as the empty set.</p>
+<p><code>set.Set&lt;T&gt;</code> is a hash set of <code>T</code>. It is a value: make one with
+<code>set.new&lt;T&gt;()</code> and free it with <code>s.free()</code>, or with <code>ad</code>.
+<code>s.add(v)</code> returns true when <code>v</code> is new, <code>s.delete(v)</code> true when it
+was there, <code>s.has(v)</code> tells, <code>s.len</code> counts and <code>s.clear()</code> empties
+it; all are O(1) on average. <code>unionWith</code>, <code>intersection</code>, <code>diff</code> (in
+the first set, not the second) and <code>symDiff</code> (in exactly one) take a pointer to the other
+set and return a new one, leaving both alone; <code>isSubset</code> and <code>equals</code> compare
+two sets. Walk it in the order values were added with
+<code>i64 it = 0; while (s.next(&amp;it, &amp;v)) { ... }</code>; <code>s.items()</code> gives the
+values as a <code>vec.Vec&lt;T&gt;</code> (yours to free), which <code>sortAsc()</code> puts in
+order. Values are hashed and compared like <code>map.Map</code>'s keys (the integer types,
+pointers, <code>u8[]</code> and <code>String</code>, and any other type byte by byte), and
+<code>u8[]</code> and <code>String</code> values are copied into the set. For a set kept in order,
+use a <code>map.Tree</code>.</p>
 <pre data-run><code>
-import cstr, mem, set;
+import set, vec;
 
 void main()
 {
-  set.IntSet *evens = set.intNew();
-  set.IntSet *threes = set.intNew();
-  i64 i;
-  for (i = 1; i <= 6; i++) { evens.add(i * 2); }
-  for (i = 1; i <= 4; i++) { threes.add(i * 3); }
-  evens.add(4);
-  evens.delete(10);
-  printf("has 4: %d, has 5: %d, size %d\n",
-    evens.has(4), evens.has(5), evens.size());
+  ad set.Set<i64> evens = set.new<i64>();
+  ad set.Set<i64> threes = set.new<i64>();
+  for (i64 i = 1; i <= 6; i++) { evens.add(i * 2); }
+  for (i64 i = 1; i <= 4; i++) { threes.add(i * 3); }
+  printf("add 4 again: %d, delete 10: %d\n", evens.add(4), evens.delete(10));
+  printf("has 4: %d, has 5: %d, %d values\n", evens.has(4), evens.has(5), evens.len);
 
-  set.IntSet *both = evens.intersection(threes);
-  String text = both.toStr();
-  printf("both: %s\n", text);
-  text.free();
+  ad set.Set<i64> both = evens.intersection(&threes);
+  i64 it = 0, v;
+  while (both.next(&it, &v)) { printf("both %d\n", v); }
 
-  set.IntSet *either = evens.unionWith(threes);
-  set.IntSetIter *it = either.iterNew();
-  set.IntSetEntry *e;
-  while ((e = set.intIterNext(it))) { printf("%d ", e.key); }
+  ad set.Set<i64> either = evens.unionWith(&threes);
+  ad vec.Vec<i64> sorted = either.items();
+  sorted.sortAsc();
+  for (auto x : sorted.items()) { printf("%d ", x); }
   printf("\n");
-  set.intIterRelease(it);
 
-  either.release();
-  both.release();
-  threes.release();
-  evens.release();
+  ad set.Set<u8[]> seen = set.new<u8[]>();
+  seen.add("apple");
+  printf("seen apple before: %d\n", !seen.add("apple"));
 }
 </code></pre>
 <pre class="output">
-has 4: 1, has 5: 0, size 5
-both: {6, 12}
+add 4 again: 0, delete 10: 1
+has 4: 1, has 5: 0, 5 values
+both 6
+both 12
 2 3 4 6 8 9 12 
+seen apple before: 1
 </pre>
+
 <h3 id="tree">Ordered maps: map.Tree</h3>
-<p><code>map.Tree&lt;K, V&gt;</code> maps keys to values in key order (a red-black tree, which
-<code>set.IntSet</code> is built on). It is a value: make one with
+<p><code>map.Tree&lt;K, V&gt;</code> maps keys to values in key order (a red-black tree). It is a value: make one with
 <code>map.treeNew&lt;K, V&gt;()</code> and free it with <code>t.free()</code>, so
 <code>ad map.Tree&lt;u8[], i64&gt; t = map.treeNew&lt;u8[], i64&gt;();</code> frees it at the end
 of the scope. <code>t.set(k, v)</code> adds a key or replaces its value,

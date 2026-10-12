@@ -1,4 +1,4 @@
-import libc, map, mem, set, test;
+import libc, map, mem, test;
 
 /* All red-black trees shared one global sentinel node: making a tree reset
  * it and the transplant / delete fix-up wrote its parent, so trees used
@@ -80,7 +80,7 @@ void *rbtWorker(RbtArgs *args) {
 
 i32 main() {
     printf("Test - tree sentinel per tree: ");
-    i64 correct = 0, tests = 5, i, k, n;
+    i64 correct = 0, tests = 4, i, k, n;
     RbtArgs args[RBT_THREADS];
 
     alarm(120); /* a corrupted tree can loop forever: fail instead of hanging */
@@ -117,31 +117,11 @@ i32 main() {
         correct++;
     }
 
-    /* set.IntSet, on a tree */
-    set.IntSet *s = set.intNew();
-    for (k = 10; k > 0; k--) { s.add(k); }
-    s.delete(4);
-    s.delete(99);
-    set.IntSetIter *it = s.iterNew();
-    set.IntSetEntry *e;
-    n = 0;
-    ok = true;
-    i64 prev = 0;
-    while ((e = set.intIterNext(it))) {
-        if (e.key <= prev || e.key == 4) { ok = false; }
-        prev = e.key;
-        n++;
-    }
-    set.intIterRelease(it);
-    if (ok && n == 9 && s.size() == 9 && s.has(10) && !s.has(4)) { correct++; }
-    String text = s.toStr();
-    text.free();
-    s.release();
-
     /* the walk is in order */
     ad map.Tree<i64, i64> t = map.treeNew<i64, i64>();
     for (k = 1; k <= 50; k++) { t.set((k * 37) % 101, 0); }
-    n = 0; prev = -1; ok = true;
+    i64 prev = -1;
+    n = 0; ok = true;
     for (auto node = t.first(); node; node = t.after(node)) {
         if (node.key <= prev) { ok = false; }
         prev = node.key;
