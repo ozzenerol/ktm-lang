@@ -55,6 +55,7 @@ void *timeoutThenTimer(void *arg) {
     gGot1 = gGot;
     gElapsed1 = gElapsed;
     gCpu1 = gCpu;
+    libc.close(gSpare[--gNspare]);           /* two: one for the client, one spare */
     libc.close(gSpare[--gNspare]);
     acceptor((void *)5000);
     return null;
@@ -62,6 +63,7 @@ void *timeoutThenTimer(void *arg) {
 
 void *closer(void *arg) {
     coro.sleep(150);
+    coro.close(gSpare[--gNspare]);
     coro.close(gSpare[--gNspare]);
     return null;
 }
