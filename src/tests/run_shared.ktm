@@ -100,7 +100,37 @@ i64 nowMs() {
     return ts[0] * 1000 + ts[1] / 1000000;
 }
 
+/* Whether the test file imports module `mod`: a line starting with
+ * `import` that names it as a whole word */
+bool importsModule(u8 *filename, u8 *mod) {
+    String src = fs.readAll(cstr.view(filename));
+    if (!src.ptr) { return false; }
+    i64 mlen = cstr.len(mod);
+    bool found = false;
+    u8 *p = src.ptr;
+    while (*p && !found) {
+        u8 *eol = p;
+        while (*eol && *eol != '\n') { eol++; }
+        if (eol - p > 7 && !cstr.cmpLen(p, "import ", 7)) {
+            for (u8 *q = p + 7; q + mlen <= eol; q++) {
+                bool start = q == p + 7 || q[-1] == ' ' || q[-1] == ',';
+                bool end = q + mlen == eol || q[mlen] == ',' || q[mlen] == ';' || q[mlen] == ' ';
+                if (start && end && !cstr.cmpLen(q, mod, mlen)) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        p = *eol ? eol + 1 : eol;
+    }
+    src.free();
+    return found;
+}
+
+/* Every test file here, or with KTM_TEST_MODULE set, only the ones that
+ * import that module (build.sh reruns the coro tests on another backend) */
 vec.Vec<u8 *> collectTests() {
+    u8 *onlyMod = libc.getenv("KTM_TEST_MODULE");
     auto dir = libc.opendir(".");
     if (!dir) {
         printf("Failed to open directory\n");
@@ -111,6 +141,9 @@ vec.Vec<u8 *> collectTests() {
     while ((ent = libc.readdir(dir)) != null) {
         if (ent.type & libc.DT_REG) {
             if (!isTestFile(ent.name)) {
+                continue;
+            }
+            if (onlyMod && *onlyMod && !importsModule(ent.name, onlyMod)) {
                 continue;
             }
             auto strVal = cstr.dup(ent.name);

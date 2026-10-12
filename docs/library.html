@@ -2412,9 +2412,26 @@ of this process (<code>ECHILD</code>). Any number of coroutines can each wait fo
 <code>proc.setStatus(p, st)</code>, so <code>p.exitCode</code> and <code>p.termSignal</code> are
 set as <code>proc.wait</code> sets them.</li>
 </ul>
+<p><strong>Backends.</strong> On Linux the loop uses io_uring where the kernel allows it (6.1
+or later, and not blocked: Docker's default seccomp profile blocks it, for one).
+<code>coro.read</code>, <code>coro.write</code> and <code>coro.accept</code> then go to the
+kernel as operations that complete when there is something to do, a wait on an fd becomes one
+such operation too, and one system call per turn of the loop submits them all and takes their
+results. A coroutine resumes only when its operation has completed, also after a timeout,
+<code>coro.stop</code> or <code>coro.close</code> cancelled it, so the kernel never writes into
+a buffer the coroutine has left. Elsewhere the loop uses the kernel's event queue, epoll on
+Linux and kqueue on macOS, and <code>poll</code> when it can't make one. Every backend behaves
+the same.</p>
+<ul>
+  <li><code>coro.backend()</code> says which one the calling thread's loop uses:
+  <code>"uring"</code>, <code>"epoll"</code>, <code>"kqueue"</code> or <code>"poll"</code>.</li>
+  <li><code>KTM_CORO_BACKEND=uring</code>, <code>epoll</code> (or <code>kqueue</code>) or
+  <code>poll</code> in the environment picks one, when a thread's loop is made; one the system
+  can't give falls back to the next one down, and an unknown value is ignored.</li>
+</ul>
 <p>Each turn of the loop asks the kernel which of the waited-on fds are ready, with the nearest
-deadline as its timeout: epoll on Linux and kqueue on macOS, so a turn costs the fds that are
-ready, not every fd that is open, and ten thousand idle connections cost nothing. Ready fds
+deadline as its timeout, so a turn costs the fds that are ready, not every fd that is open,
+and ten thousand idle connections cost nothing. Ready fds
 resume first, then the waits that timed out, earliest deadline first; new coroutines run in the
 order they were started. Every thread that calls <code>coro.run</code> has its own loop, kept
 with the thread's coroutine state. Each fd stays registered with the kernel between waits, and
