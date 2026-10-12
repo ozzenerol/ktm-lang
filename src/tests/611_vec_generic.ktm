@@ -9,6 +9,8 @@ import test, vec;
 
 struct Pt { i64 x; i64 y; };
 
+vec.Vec<i64> gNums;   /* range-for over a global Vec too */
+
 i64 gThrown = 0;
 void expectBounds(vec.Vec<i64> *v, i64 what) {
     try {
@@ -68,6 +70,14 @@ i32 main() {
     i64 sum2 = 0;
     for (Pt p : pts.items()) { sum2 += p.x; }
     tests++; if (sum == 4950 && sum2 == 4950 && pts.get(42).y == 84) { correct++; }
+
+    gNums = vec.new<i64>();
+    gNums.push(4);
+    gNums.push(5);
+    i64 gsum = 0;
+    for (auto x : gNums) { gsum += x; }
+    tests++; if (gsum == 9) { correct++; }
+    gNums.free();
 
     i64 cap = v.cap;
     v.clear();
