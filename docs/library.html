@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li class="current"><a href="library.html" aria-current="page">Library guide</a><ul class="toc"><li><a href="#memory">Memory</a></li><li><a href="#strings">Strings</a></li><li><a href="#files">Files</a></li><li><a href="#csv">CSV</a></li><li><a href="#system">Running commands</a></li><li><a href="#signals">Signals</a></li><li><a href="#lists">Lists</a></li><li><a href="#vectors">Vectors</a></li><li><a href="#sets">Sets and trees</a></li><li><a href="#hash-tables">Hash tables</a></li><li><a href="#bit-vectors">Bit vectors</a></li><li><a href="#bytes">Byte buffers</a></li><li><a href="#json">JSON</a></li><li><a href="#dates">Dates and time</a></li><li><a href="#maths">Maths</a></li><li><a href="#net">Sockets</a></li><li><a href="#coroutines">Coroutines</a></li><li><a href="#fzf">Fuzzy matching</a></li><li><a href="#sqlite">SQLite</a></li><li><a href="#more-modules">More modules</a></li></ul></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li class="current"><a href="library.html" aria-current="page">Library guide</a><ul class="toc"><li><a href="#memory">Memory</a></li><li><a href="#strings">Strings</a></li><li><a href="#files">Files</a></li><li><a href="#csv">CSV</a></li><li><a href="#system">Running commands</a></li><li><a href="#signals">Signals</a></li><li><a href="#lists">Lists</a></li><li><a href="#vectors">Vectors</a></li><li><a href="#sets">Sets and trees</a></li><li><a href="#hash-tables">Hash tables</a></li><li><a href="#bit-vectors">Bit vectors</a></li><li><a href="#bytes">Byte buffers</a></li><li><a href="#hashing">Hashing</a></li><li><a href="#json">JSON</a></li><li><a href="#dates">Dates and time</a></li><li><a href="#maths">Maths</a></li><li><a href="#net">Sockets</a></li><li><a href="#coroutines">Coroutines</a></li><li><a href="#fzf">Fuzzy matching</a></li><li><a href="#sqlite">SQLite</a></li><li><a href="#more-modules">More modules</a></li></ul></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -1214,6 +1214,51 @@ void main()
 <pre class="output">type 7: hello
 type 8: hi
 0 bytes left
+</pre>
+
+<h2 id="hashing">Hashing<a class="anchor" href="#hashing" aria-label="Link to this section">#</a></h2>
+<p>Module <code>hash</code> has SHA-256, CRC-32, FNV-1a and a constant-time compare.
+<code>hash.sha256(data, out)</code> writes the 32-byte digest of a <code>u8[]</code> into
+<code>out</code> (<code>hash.SHA256_SIZE</code> bytes; a shorter <code>out</code> throws
+<code>ERR_BOUNDS</code>). For data that comes in pieces (a file read in blocks, a body off a
+socket), make a <code>hash.Sha256</code> with <code>hash.sha256New()</code>, give it each piece
+with <code>h.update(piece)</code> and finish with <code>h.final(out)</code>, which also starts it
+over for the next message (<code>h.reset()</code> drops what was fed without finishing). A
+Sha256 holds no memory, so there is nothing to free. <code>hash.hex(bytes)</code> gives the
+lowercase hex of any bytes as a String that is yours.</p>
+<p><code>hash.crc32(data)</code> is the IEEE CRC-32 that zip, gzip and PNG use. It chains:
+<code>hash.crc32(b, hash.crc32(a))</code> is the CRC of a followed by b.
+<code>hash.fnv1a(data)</code> is a fast 64-bit hash for tables, sharding and cache keys (the one
+<code>map.StrMap</code> uses), not for anything security-related.</p>
+<p><code>hash.equalCt(a, b)</code> compares two byte strings in a time that depends only on their
+length, not on where they differ: use it for digests, MACs and tokens, where
+<code>str.equals</code> would tell an attacker how many leading bytes were right. Strings of
+different lengths return false at once, so the length itself is not kept secret.</p>
+<pre data-run><code>import hash;
+
+void main()
+{
+  u8 d[hash.SHA256_SIZE];
+  hash.sha256("abc", d);
+  String hex = hash.hex(d);
+  defer hex.free();
+  printf("%s\n", hex);
+
+  /* the same digest, fed in pieces */
+  hash.Sha256 h = hash.sha256New();
+  h.update("a");
+  h.update("bc");
+  u8 again[hash.SHA256_SIZE];
+  h.final(again);
+  printf("same: %d\n", hash.equalCt(d, again));
+
+  printf("crc32 %x, chained %x\n", hash.crc32("123456789"),
+         hash.crc32("56789", hash.crc32("1234")));
+}
+</code></pre>
+<pre class="output">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+same: 1
+crc32 cbf43926, chained cbf43926
 </pre>
 
 <h2 id="json">JSON<a class="anchor" href="#json" aria-label="Link to this section">#</a></h2>
