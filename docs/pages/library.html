@@ -1970,6 +1970,122 @@ void main()
 12
 </pre>
 
+<h3 id="coroutine-loop">A coroutine server</h3>
+<p>A server with one coroutine per connection needs a scheduler: something that knows what
+each coroutine waits for, polls all those fds at once and resumes the ready ones. Module
+<code>coro</code> has one. <code>coro.go(&amp;Fn, arg)</code> starts a coroutine in the
+calling thread's loop (it first runs in <code>coro.run</code>; NULL if its stack can't be
+mapped), and <code>coro.run()</code> runs the loop until every such coroutine has ended; the
+loop releases each one when its function returns. Inside them these pause the coroutine
+instead of blocking the thread:</p>
+<ul>
+<li><code>coro.wait(fd, events, ms)</code> waits until <code>fd</code> is ready for
+<code>events</code> (<code>libc.POLLIN</code>, <code>libc.POLLOUT</code>) and returns its
+<code>revents</code> (above 0; <code>POLLHUP</code> and <code>POLLERR</code> count), or 0 once
+<code>ms</code> milliseconds passed (leave it out to wait without a limit).</li>
+<li><code>coro.waitIdle(fd, events, ms)</code> is the same for waiting on more work (the
+next request, the next client), but returns -1 when <code>coro.stop()</code> is called, and
+at once when it was called before.</li>
+<li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
+<code>coro.yield()</code> lets them have a turn.</li>
+<li><code>coro.accept(listener, ms)</code> returns the next client as a non-blocking fd (it
+makes the listener non-blocking too), or -1 on its timeout, on <code>coro.stop()</code>, or when
+the listener can't accept (<code>os.errno()</code> says why). Out of fds (<code>EMFILE</code>,
+<code>ENFILE</code>, or <code>ENOBUFS</code>/<code>ENOMEM</code>) it doesn't spin or try again at once (on
+macOS a failed accept has already dropped that client): every <code>coro.accept</code> of the
+loop rests until <code>coro.close(fd)</code> closes an fd, or 2 s passed. So close
+connections with <code>coro.close</code>.</li>
+</ul>
+<p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
+deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
+deadline first; new coroutines run in the order they were started. Every thread that calls
+<code>coro.run</code> has its own loop, kept with the thread's coroutine state.
+<code>coro.stop()</code> winds the loop down: <code>coro.waitIdle</code> and
+<code>coro.accept</code> return -1 from then on, while plain waits and sleeps go on, so the
+work in flight finishes and <code>coro.run</code> returns when it has. <code>coro.stopping()</code>
+tells whether it was called (a server sends <code>Connection: close</code> then). After
+<code>coro.run</code> returns, the next loop starts afresh. A SIGINT/SIGTERM stop fits as one
+more coroutine waiting on <code>signal.stopInit()</code>'s fd, as below.</p>
+<p>The loop calls throw <code>coro.ERR_LOOP</code> when they can't work:
+<code>coro.run</code> inside a coroutine, <code>coro.wait</code> and the others outside a
+coroutine that <code>coro.go</code> started, a loop where every coroutine waits with no fd and
+no time limit. When a loop coroutine throws, the loop releases it and <code>coro.run</code>
+throws the error on; the other coroutines stay, and calling <code>coro.run</code> again carries
+on with them.</p>
+<pre data-run><code>
+import coro, cstr, libc, net, signal;
+
+i32 gListen;
+
+void *serve(void *arg)
+{// one coroutine per client: sends its line back in capitals
+  i32 fd = (i32)(i64)arg;
+  u8 buf[64];
+  if (coro.wait(fd, libc.POLLIN, 5000) > 0) {
+    i64 n = libc.recv(fd, buf, sizeof(buf), 0);
+    for (i64 i = 0; i < n; i++) {
+      if (buf[i] >= 'a' && buf[i] <= 'z') { buf[i] -= 'a' - 'A'; }
+    }
+    if (n > 0) { net.send(fd, buf[0:n]); }
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *unused)
+{// a coroutine per client, until coro.stop()
+  i32 fd;
+  while ((fd = coro.accept(gListen)) != -1) { coro.go(&serve, (void *)(i64)fd); }
+  return null;
+}
+
+void *onSignal(void *unused)
+{// Ctrl-C or SIGTERM: stop taking clients, finish the rest
+  if (coro.waitIdle(signal.stopInit(), libc.POLLIN) > 0) { coro.stop(); }
+  return null;
+}
+
+void ask(u8 *word)
+{
+  u8 buf[64];
+  i32 fd = net.dial("127.0.0.1", net.localPort(gListen), true);
+  coro.wait(fd, libc.POLLOUT, 5000);
+  net.send(fd, cstr.view(word));
+  if (coro.wait(fd, libc.POLLIN, 5000) > 0) {
+    i64 n = libc.recv(fd, buf, sizeof(buf) - 1, 0);
+    if (n > 0) {
+      buf[n] = 0;
+      printf("%s -> %s\n", word, buf);
+    }
+  }
+  libc.close(fd);
+}
+
+void *clients(void *unused)
+{// the server's clients, in the same loop; then it stops
+  ask("ping");
+  ask("hello");
+  coro.stop();
+  return null;
+}
+
+void main()
+{
+  gListen = net.listen(0, "127.0.0.1", 16);
+  coro.go(&acceptor);
+  coro.go(&onSignal);
+  coro.go(&clients);
+  coro.run();
+  libc.close(gListen);
+  printf("stopped\n");
+}
+</code></pre>
+<pre class="output">
+ping -> PING
+hello -> HELLO
+stopped
+</pre>
+
 <h2 id="fzf">Fuzzy matching</h2>
 <p><code>fzf.match(text, pattern)</code> matches text the way the fzf tool does and returns the
 score and the matched byte offsets, or NULL when it doesn't match. Terms separated by

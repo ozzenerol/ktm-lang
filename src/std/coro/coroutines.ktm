@@ -43,6 +43,7 @@ pub struct Coroutine {
     i64 status;
     bool failed;          /* fn threw; Next rethrows `thrown` */
     bool isRoot;         /* the save slot of a thread's own stack */
+    void *loopTask;      /* its LoopTask when coro.go started it (loop.ktm) */
 };
 
 #ifdef IS_X86_64
