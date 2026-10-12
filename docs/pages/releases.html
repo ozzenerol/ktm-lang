@@ -49,8 +49,9 @@ void main()
   Inside them <code>coro.wait(fd, events, ms)</code>, <code>coro.waitIdle</code>,
   <code>coro.sleep</code> and <code>coro.accept</code> pause the coroutine instead of the
   thread. <code>coro.stop()</code> winds the loop down gracefully, and an accept that runs out
-  of fds rests until <code>coro.close</code> frees one rather than spinning (or, on macOS,
-  dropping clients). Misuse throws <code>coro.ERR_LOOP</code>.</li>
+  of fds neither spins nor drops clients: it rests until <code>coro.close</code> frees one,
+  and for a while after it only accepts when two fds are free (on macOS a failed accept resets
+  the client it took off the queue). Misuse throws <code>coro.ERR_LOOP</code>.</li>
   <li>Module <code>bytes</code>: a <code>bytes.Buffer</code> that grows at the end and is
   consumed from the front (<code>append</code>, <code>consume</code>, <code>room</code>/<code>commit</code>,
   <code>readFrom</code>/<code>writeTo</code>, <code>appendBe32</code> and the other byte orders), and
