@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,63 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-4-0-2026-10-12">v0.4.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-4-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Reflection. A program can ask the compiler about its types at run time, and the
+<code>json</code> module uses that to turn any struct into JSON and back without hand-written
+code. Plus a JSON writer, enum names at run time, and typed comparators and callbacks.</p>
+
+<pre><code>import json, mem, reflect;
+
+enum Role { guest, admin };
+struct User { i64 id; String name; Role role; u8[][] tags; };
+
+void main()
+{
+    User u;
+    mem.set(&amp;amp;u, 0, sizeof(User));
+    json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
+                reflect.of(u));
+    defer json.free(reflect.of(u));
+    u.id++;
+    String text = json.encode(reflect.of(u));
+    defer text.free();
+    printf("%s\n", text);   // {"id":8,"name":"Ada","role":"admin","tags":["math"]}
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
+  kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
+  private or not; inherited ones first) and an enum's members. <code>reflect.of(x)</code> gives a
+  <code>reflect.Value</code>, x's address and type, so one function can take any value;
+  <code>reflect.field</code>, <code>getInt</code>/<code>setInt</code> and
+  <code>getFloat</code>/<code>setFloat</code> read and write through it. A description is made at
+  compile time, only for the types a program asks about; compare two with
+  <code>reflect.same</code>.</li>
+  <li>Enum names at run time: <code>reflect.name(Role.admin)</code> is <code>"admin"</code>,
+  <code>reflect.enumValue(t, "admin", &amp;v)</code> goes the other way. <code>printf</code> of an
+  enum still prints its number.</li>
+  <li>A function whose parameters are typed pointers now converts to a function pointer whose
+  matching parameters are <code>void *</code>, so comparators and callbacks are written with their
+  real types and no casts (<code>i64 byAge(User *a, User *b)</code> goes straight to
+  <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
+  <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
+  frees what decode allocated. Fields by name, private ones skipped, enums by name, Strings,
+  slices, arrays, nested structs and pointers. Unknown keys are ignored and missing fields kept,
+  unless <code>json.STRICT</code>. A value that doesn't fit throws <code>json.ERR_DECODE</code>
+  with where it is (<code>items[2].price: expected a number, got a string</code>).</li>
+  <li><code>json.Writer</code> builds JSON into a String: <code>beginObject</code>,
+  <code>key</code>, <code>int</code>/<code>float</code>/<code>bool</code>/<code>str</code>/<code>nil</code>,
+  <code>beginArray</code>, <code>end</code>, <code>raw</code>, <code>take</code>; escapes, commas
+  and an optional indent done for you, and misuse throws <code>json.ERR_WRITER</code>.</li>
+</ul>
 
 <h2 id="v0-3-1-2026-10-12">v0.3.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-3-1-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>The rest of the library on <code>u8[]</code> and <code>String</code>, and the compiler catching
@@ -128,7 +185,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -157,7 +214,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -288,7 +345,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -321,7 +378,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
