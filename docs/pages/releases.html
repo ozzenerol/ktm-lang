@@ -4,6 +4,39 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.12.0 <small>(2026-10-12)</small></h2>
+<p>Memory. A coroutine-per-connection server now uses less memory than Go's
+goroutine-per-connection server at every load of the echo benchmark: with 1024 clients,
+10.7 MB against Go's 11.6 MB (ktm v0.11.0 took 72 MB), and it keeps v0.11.0's speed
+(request/response 3% to 35% ahead of Go, a quarter of Go's p99 latency at 64 clients).</p>
+
+<h3>Big stack frames</h3>
+<ul>
+  <li>A function whose stack frame is bigger than a page used to touch every page of it on the
+  way in, so that a stack overflow couldn't jump over the guard page. That made every page of a
+  big local buffer real memory, used or not: a handler with <code>u8 buf[65536]</code> cost
+  64 KiB per connection. Now such a function asks the runtime whether the frame fits on its
+  stack, and touches nothing: the buffer costs only the pages it uses. AOT and JIT, x86_64 and
+  arm64.</li>
+</ul>
+
+<h3>Coroutines</h3>
+<ul>
+  <li>Released coroutine stacks kept for reuse give their memory back once they are older than
+  the four most recently released ones (<code>madvise</code> on Linux, a fresh mapping on
+  macOS), so a burst of connections that ends doesn't leave its memory behind. Starting and
+  releasing short coroutines costs the same as before.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Running off the end of a stack (deep recursion, a frame too big for a thread's stack) now
+  prints <code>stack overflow</code> and ends the program with SIGABRT, instead of a bare
+  SIGSEGV (SIGBUS on macOS).</li>
+  <li>The last 64 KiB of a thread's own stack count as overflow: a thread can use a little less
+  stack than before before it is stopped.</li>
+</ul>
+
 <h2>v0.11.0 <small>(2026-10-12)</small></h2>
 <p>Networking that is fast by default. A TCP server written the plain way, a coroutine per
 connection with <code>coro.serve</code>, now uses every core and the kernel's event queue, and
@@ -19,8 +52,8 @@ benchmark on one Linux machine, both servers untuned):</p>
   </tbody>
 </table>
 <p>With 4 KiB messages ktm serves 32% more requests with a fifth of Go's p99. A single bulk
-stream runs 22% faster; with 16 and 64 streams at once ktm is still about 3% behind Go, the
-first thing the next release works on.</p>
+stream runs 22% faster; with 16 and 64 streams at once ktm and Go are about even (within 3%
+either way, run to run).</p>
 
 <h3>Coroutines and networking</h3>
 <ul>
