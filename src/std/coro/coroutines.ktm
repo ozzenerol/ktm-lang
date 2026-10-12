@@ -44,6 +44,7 @@ pub struct Coroutine {
     bool failed;          /* fn threw; Next rethrows `thrown` */
     bool isRoot;         /* the save slot of a thread's own stack */
     void *loopTask;      /* its LoopTask when coro.go started it (loop.ktm) */
+    u64 stackLo;          /* the lowest usable address, above the guard */
 };
 
 #ifdef IS_X86_64
@@ -186,8 +187,14 @@ static void *coroSwitch(rt.HCFs *fs, Coroutine *from, Coroutine *to, void *value
     fs.catchTop = to.catchTop;
     fs.exceptCh = to.exceptCh;
     fs.error = to.error;
-    if (to.isRoot) { fs.coroCur = null; }
-    else             { fs.coroCur = to; }
+    if (to.isRoot) {
+        fs.coroCur = null;
+    } else {
+        fs.coroCur = to;
+        /* for rt.__ktmStackCheck: the stack it now runs on */
+        fs.stackLo = to.stackLo;
+        fs.stackHi = (u64)to.stackBase + (u64)to.stackLen;
+    }
     return coroSwap(&from.sp, to.sp, value);
 }
 
@@ -238,6 +245,7 @@ pub Coroutine *spawn(fn(void *arg) void *body, void *arg=null,
             return null;
         }
     }
+    c.stackLo = (u64)c.stackBase + (u64)page;
     c.body = body;
     c.arg = arg;
     c.status = CORO_READY;

@@ -25,6 +25,8 @@ pub struct HCFs {
     Error error;            /* the error being thrown, until a catch takes it */
     void *coroLoop;          /* the thread's coroutine loop (coro.go), or null */
     fn(void *loop) void coroLoopFree;  /* frees it when the thread ends */
+    u64 stackLo, stackHi;    /* the running coroutine's stack (coroutines.ktm) */
+    u64 threadLo, threadHi;  /* the thread's own stack, 0 until looked up */
 };
 
 /* The "" of an Error without a message (or file): never freed. */
@@ -217,6 +219,74 @@ pub void __ktmBoundsSlice(i64 lo, i64 hi, i64 len, u8 *file, i64 line) {
     ErrSet(fs, ERR_BOUNDS, cstr.format("slice %d:%d out of range for length %d", lo, hi, len),
            file, line);
     ErrJump(fs);
+}
+
+/* ---- stack limits ----
+ * A function with a frame bigger than a page calls __ktmStackCheck first
+ * (the compiler emits it), with the lowest address the frame would reach:
+ * past the bottom of the stack it is a stack overflow, reported here,
+ * instead of a frame that leaps over the guard page and writes into
+ * whatever lies below. Nothing is touched, so a big buffer on a stack
+ * costs only the pages actually used. */
+
+#ifdef IS_MACOS
+extern "c" void *pthread_get_stackaddr_np(void *th);
+extern "c" u64 pthread_get_stacksize_np(void *th);
+#else
+extern "c" i32 pthread_getattr_np(void *th, void *attr);
+extern "c" i32 pthread_attr_getstack(void *attr, void **addr, u64 *size);
+extern "c" i32 pthread_attr_destroy(void *attr);
+#endif
+extern "c" void *pthread_self();
+extern "c" void abort();
+
+const u64 STACK_RESERVE = 65536;
+
+/* The calling thread's own stack, looked up once */
+static void stackThreadBounds(HCFs *fs) {
+#ifdef IS_MACOS
+    void *th = pthread_self();
+    u64 hi = (u64)pthread_get_stackaddr_np(th);
+    fs.threadLo = hi - pthread_get_stacksize_np(th);
+    fs.threadHi = hi;
+#else
+    u8 attr[128];
+    void *addr = null;
+    u64 size = 0;
+    if (pthread_getattr_np(pthread_self(), attr) == 0) {
+        pthread_attr_getstack(attr, &addr, &size);
+        pthread_attr_destroy(attr);
+    }
+    fs.threadLo = (u64)addr;
+    fs.threadHi = (u64)addr + size;
+#endif
+    if (fs.threadHi == 0) {
+        fs.threadHi = 1;                           /* unknown: never look again */
+        return;
+    }
+    /* The main thread's stack grows on demand, and the kernel can stop
+     * it a few pages short of what the C library reports; the reserve
+     * also leaves the overflow report room to run. */
+    fs.threadLo += STACK_RESERVE;
+}
+
+pub void __ktmStackCheck(u64 low) {
+    HCFs *fs = Fs();
+    u64 lo, hi;
+    if (fs.coroCur) {
+        lo = fs.stackLo;
+        hi = fs.stackHi;
+    } else {
+        if (!fs.threadHi) { stackThreadBounds(fs); }
+        lo = fs.threadLo;
+        hi = fs.threadHi;
+    }
+    u64 here = (u64)&low;
+    /* a stack we don't know (a signal handler's, say): let it be */
+    if (here < lo || here > hi || low >= lo) { return; }
+    u8 *msg = "stack overflow\n";
+    libc.write(2, msg, 15);
+    abort();
 }
 
 /* `parts.free()` of a slice: the buffer its ptr points at, for one a
