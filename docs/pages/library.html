@@ -1648,6 +1648,46 @@ void main()
 0 1
 </pre>
 
+<h3 id="clocks">Clocks, sleeping and HTTP dates</h3>
+<p><code>date.monoMs()</code> (and <code>date.monoNs()</code>) read a clock that only goes
+forward, which is what timeouts and deadlines want: <code>date.nowMs()</code> is the time of
+day and jumps when the system clock is set. <code>date.sleepMs(ms)</code> sleeps that long,
+even when a signal arrives in between. <code>date.unixNow()</code> is the Unix time in
+seconds.</p>
+<p><code>date.formatUnix(t, fmt)</code> writes a Unix time with <code>strftime</code>'s
+format (<code>%Y-%m-%d</code>, <code>%H:%M:%S</code>, <code>%a</code>, <code>%j</code>, ...) in
+UTC, or in local time with <code>formatUnix(t, fmt, false)</code>.
+<code>date.httpDate(t)</code> gives the date HTTP headers use (<code>Date</code>,
+<code>Last-Modified</code>), always in English and UTC; <code>date.parseHttpDate(text,
+&amp;t)</code> reads it back, and also the two older forms clients may still send. It returns
+false, and leaves <code>t</code> alone, for anything else.</p>
+<pre data-run><code>
+import date;
+
+void main()
+{
+  i64 start = date.monoMs();
+  date.sleepMs(20);
+  printf("slept at least 20 ms: %d\n", date.monoMs() - start >= 20);
+
+  String h = date.httpDate(784111777);
+  printf("%s\n", h);
+  i64 t;
+  if (date.parseHttpDate("Sunday, 06-Nov-94 08:49:37 GMT", &t)) { printf("%d\n", t); }
+  h.free();
+
+  String day = date.formatUnix(t, "%A %d %B %Y, day %j");
+  printf("%s\n", day);
+  day.free();
+}
+</code></pre>
+<pre class="output">
+slept at least 20 ms: 1
+Sun, 06 Nov 1994 08:49:37 GMT
+784111777
+Sunday 06 November 1994, day 310
+</pre>
+
 <h2 id="maths">Maths</h2>
 <p>The C maths library is declared under its usual names (<code>sqrt</code>,
 <code>pow</code>, <code>sin</code>, <code>floor</code>, <code>fabs</code>, …, all on
