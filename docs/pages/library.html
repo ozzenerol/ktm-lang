@@ -2001,9 +2001,10 @@ makes the listener non-blocking too), or -1 on its timeout, on <code>coro.stop()
 the listener can't accept (<code>os.errno()</code> says why). Out of fds (<code>EMFILE</code>,
 <code>ENFILE</code>, or <code>ENOBUFS</code>/<code>ENOMEM</code>) it doesn't spin or try again at once (on
 macOS a failed accept has already dropped that client): every <code>coro.accept</code> of the
-loop rests until <code>coro.close(fd)</code> closes an fd, or 2 s passed. After a rest it
-first checks that an fd is free (with <code>dup</code>) and rests again if not, so the retry
-doesn't drop the next client as well. So close connections with <code>coro.close</code>.</li>
+loop rests until <code>coro.close(fd)</code> closes an fd, or 2 s passed. For 10 s after
+that it checks (with <code>dup</code>) before each accept that two fds are free, one for the
+client and one for its work, and rests again if not, so no further client is dropped. So close
+connections with <code>coro.close</code>.</li>
 </ul>
 <p>Each turn of the loop is one <code>poll</code> over every waiting fd, with the nearest
 deadline as its timeout. Ready fds resume first, then the waits that timed out, earliest
