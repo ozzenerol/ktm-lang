@@ -103,10 +103,11 @@ i32 main() {
     } else { printf("equal constant defaults rejected\n"); }
 
     tests++;
+    /* other parameters: another overload (v0.6.0), not a conflict */
     if (compile("i64 F(i64 a, i64 n=2);\ni64 F(i64 n) { return n; }\n"
-                            "i32 main() { return 0; }\n", true, "conflicting types for `F`")) {
+                            "i32 main() { return 0; }\n", false, null)) {
         correct++;
-    } else { printf("conflicting prototype not reported\n"); }
+    } else { printf("an overload with other parameters rejected\n"); }
 
     test.printResult(correct, tests);
     printf("====\n");
