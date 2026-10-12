@@ -1251,6 +1251,51 @@ void main()
 {"user": {"id": 7,"roles": ["admin"]},"n": null}
 </pre>
 
+<h3 id="building-json-with-a-writer">Building JSON with a Writer<a class="anchor" href="#building-json-with-a-writer" aria-label="Link to this section">#</a></h3>
+<p>A <code>json.Writer</code> builds a document into a String without a tree: open arrays
+and objects with <code>beginArray()</code> / <code>beginObject()</code> and close the innermost
+one with <code>end()</code>, give each member's name with <code>key(k)</code>, and add values
+with <code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code>,
+<code>nil()</code> (JSON's <code>null</code>: <code>null</code> is a keyword),
+<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String) and
+<code>raw(text)</code> (JSON text made elsewhere, checked to be one value). Commas, quotes
+and escapes are written for you, the same escapes and float digits as <code>json.toStr</code>.
+<code>w.take()</code> returns the finished document as a String that is yours and leaves the
+Writer empty for the next one; <code>w.free()</code> frees what it holds. Make one with
+<code>json.writerNew()</code> (a declared Writer isn't zeroed); <code>json.writerNew(2)</code>
+puts each member and item on its own line, indented 2 spaces per level.</p>
+<p>A call out of order throws <code>json.ERR_WRITER</code>, and so does a value JSON can't
+hold: a value where a key is expected, <code>key()</code> outside an object,
+<code>end()</code> with nothing open, a second top-level value, <code>take()</code> with
+something still open or nothing written, a NaN or infinite float, a string that isn't UTF-8.
+The message says which, and the Writer is left as it was.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Writer w = json.writerNew();
+  defer w.free();
+  w.beginObject();
+  w.key("id");    w.int(5);
+  w.key("name");  w.str("Ada \"the\" first");
+  w.key("tags");  w.beginArray(); w.str("a"); w.float(1.5); w.bool(true); w.nil(); w.end();
+  w.end();
+  String text = w.take();
+  printf("%s\n", text);
+  text.free();
+
+  try {
+    w.beginArray();
+    w.key("oops");
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">{"id":5,"name":"Ada \"the\" first","tags":["a",1.5,true,null]}
+key(): no object is open
+</pre>
+
 <h3 id="errors-and-strictness">Errors and strictness<a class="anchor" href="#errors-and-strictness" aria-label="Link to this section">#</a></h3>
 <p>The parser follows RFC 8259 strictly. It rejects trailing commas, anything after the
 top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
