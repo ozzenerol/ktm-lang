@@ -843,6 +843,26 @@ static int irInlineWrites(Ast *ast, u32 id) {
     }
 }
 
+/* Does `ast` hold a loop? An IR tmp lives from its definition to its
+ * last use in layout order, so one defined before a loop and read in it
+ * can lose its slot to a later tmp of the same iteration */
+static int irInlineHasLoop(Ast *ast) {
+    if (!ast) return 0;
+    switch (ast->kind) {
+        case AST_FOR: case AST_WHILE: case AST_DO_WHILE:
+            return 1;
+        case AST_IF:
+            return irInlineHasLoop(ast->then) || irInlineHasLoop(ast->els);
+        case AST_COMPOUND_STMT:
+            if (ast->stms) listForEach(ast->stms) {
+                if (irInlineHasLoop((Ast *)it->value)) return 1;
+            }
+            return 0;
+        default:
+            return 0;
+    }
+}
+
 /* Converted to `to` as a return converts the returned value */
 static IrValue *irInlineConvertResult(IrCtx *ctx, IrValue *v, AstType *from, AstType *to) {
     if (to->is_bool) {
@@ -903,6 +923,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     func->variables = irVarValueMapNew();
     ctx->escape_set = irCollectEscapingLVars(callee);
 
+    int has_loop = irInlineHasLoop(callee->body);
+
     /* `return expr;` alone: the value of expr, no result slot or jump */
     Ast *only_ret = NULL;
     if (callee->body->kind == AST_COMPOUND_STMT && callee->body->stms &&
@@ -927,7 +949,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         /* a parameter the body only reads is the argument's value */
         int plain = p->type->kind == AST_TYPE_INT || p->type->kind == AST_TYPE_CHAR ||
                     p->type->kind == AST_TYPE_FLOAT || p->type->kind == AST_TYPE_POINTER;
-        if (plain && !irInlineWrites(callee->body, p->lvar_id)) {
+        int stable = vals[i]->kind != IR_VAL_TMP || !has_loop;
+        if (plain && stable && !irInlineWrites(callee->body, p->lvar_id)) {
             irFnAddVar(func, p->lvar_id, vals[i]);
             continue;
         }

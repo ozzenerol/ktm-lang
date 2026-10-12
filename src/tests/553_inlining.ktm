@@ -33,6 +33,13 @@ i64 sumTo(i64 n) {
 }
 
 i64 inc(i64 x) { return x + 1; }
+
+/* read-only params read in a loop, passed computed values */
+i64 stepSum(i64 n, i64 step) {
+    i64 t = 0;
+    for (i64 i = 0; i < n; i++) { t += step * 3 + i; }
+    return t;
+}
 i64 twoIncs(i64 x) { return inc(inc(x)); }
 
 i64 fact(i64 n) { return n <= 1 ? 1 : n * fact(n - 1); }
@@ -90,6 +97,8 @@ i32 main() {
     tests++; if (sign(-9) == -1 && sign(0) == 0 && sign(4) == 1) { correct++; }
     tests++; if (sumTo(10) == 55) { correct++; }
     tests++; if (twoIncs(5) == 7) { correct++; }
+    i64 base = 4;
+    tests++; if (stepSum(base + 1, base * 2) == 130) { correct++; }
     tests++; if (fact(10) == 3628800) { correct++; }
 
     gCalls = 0;
