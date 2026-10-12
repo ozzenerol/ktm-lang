@@ -519,7 +519,7 @@ err:
         return null;
 }
 
-static u8 *jsonFloatToStr(u8 *buf, f64 f)
+u8 *jsonFloatToStr(u8 *buf, f64 f)
 { // %.15g, %.16g or %.17g, the first that reads back as `f`, with a '.'
         // so it parses as a float. 17 digits always do; starting at 15 (not 1)
         // costs one or two tries instead of up to 17, and %g still drops
