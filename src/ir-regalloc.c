@@ -466,6 +466,12 @@ void irCgBindAstLoffs(IrRaCtx *ra, Ast *ast_func) {
         }
     }
 
+    for (u64 i = 0; ra->func->inline_slots && i < ra->func->inline_slots->size; ++i) {
+        IrValue *iv = vecGet(IrValue *, ra->func->inline_slots, i);
+        s64 loff = (s64)ra->func->inline_loffs->entries[i];
+        if (loff) irCgSetLoff(ra, irVarId(iv), (int)loff);
+    }
+
     listForEach(ast_func->locals) {
         Ast *l = (Ast *)it->value;
         IrValue *iv = irFnGetVar(ra->func, irGetParamId(l));
@@ -624,6 +630,17 @@ int irCgComputeAstLayout(Ast *ast_func, IrFunction *ir_func) {
     }
     /* alignment padding can take the locals past the sum of their sizes */
     if (align(-new_offset, 8) > total) total = align(-new_offset, 8);
+
+    /* The slots of inlined calls (IrFunction.inline_slots), 8-aligned
+     * and at least 8 bytes each */
+    for (u64 i = 0; ir_func->inline_slots && i < ir_func->inline_slots->size; ++i) {
+        IrValue *iv = vecGet(IrValue *, ir_func->inline_slots, i);
+        if (!irFnLocalSlotNeeded(ir_func, iv)) continue;
+        int size = align(iv->as.var.size > 8 ? (int)iv->as.var.size : 8, 8);
+        new_offset = -align(-new_offset, 8) - size;
+        total += size;
+        ir_func->inline_loffs->entries[i] = (void *)(s64)new_offset;
+    }
 
     int param_total = 0;
     int has_hidden_out_ptr = irCgHasHiddenOutPtr(ast_func);
