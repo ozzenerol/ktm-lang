@@ -1,4 +1,4 @@
-import list, vec, test;
+import vec, test;
 
 /* A function whose parameters are typed pointers converts to a function
  * pointer whose matching parameters are void * (v0.4.0), so a sort
@@ -72,12 +72,6 @@ i32 main() {
     /* Free callbacks of the stdlib */
     v.release(&forget);
     check(gFreed == 100, "PtrVec.release(&forget) with a User *");
-    list.List *l = list.new();
-    l.append(&users[0]);
-    l.append(&users[1]);
-    gFreed = 0;
-    l.release(&forget);
-    check(gFreed == 60, "List.release(&forget) with a User *");
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

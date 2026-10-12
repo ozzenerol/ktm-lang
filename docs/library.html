@@ -921,93 +921,59 @@ void main()
 </pre>
 
 <h2 id="lists">Lists<a class="anchor" href="#lists" aria-label="Link to this section">#</a></h2>
-<p><code>list.List</code> is a circular doubly linked list of <code>void *</code> values. The list
-is its head node, which links to itself when the list is empty, so iterate from
-<code>l.next</code> until you get back to <code>l</code>. The list never frees the values
-it holds unless you hand it a free function.</p>
-<pre data-run><code>import cstr, list;
-
-void main()
-{
-  list.List *l = list.new();
-  l.append("two");
-  l.append("three");
-  l.prepend("one");
-
-  for (list.List *it = l.next; it != l; it = it.next) {
-    printf("%s\n", it.value);
-  }
-  printf("first %s, last %s\n", l.first(), l.last());
-  printf("popped %s, %d left\n", l.pop(), l.count());
-  l.release(null);
-}
-</code></pre>
-<pre class="output">one
-two
-three
-first one, last three
-popped three, 2 left
-</pre>
+<p><code>list.List&lt;T&gt;</code> is a doubly linked list of <code>T</code>. It is a value: make
+one with <code>list.new&lt;T&gt;()</code> (nothing is allocated until the first value) and free
+it with <code>l.free()</code>, or let <code>ad</code> do that at the end of the scope. Its nodes are
+<code>list.Node&lt;T&gt;</code>, with <code>value</code>, <code>next</code> and <code>prev</code>;
+<code>l.head</code> and <code>l.tail</code> are the first and last (<code>null</code> when it is
+empty) and <code>l.len</code> counts them, so walk it with
+<code>for (auto n = l.head; n; n = n.next)</code>.</p>
 <ul>
-  <li><strong>Making one.</strong> <code>list.new()</code> allocates a head; free it with
-  <code>list.release</code>. <code>list.init(&amp;head)</code> turns a head you own (on the stack,
-  or inside a struct) into an empty list; empty that one with <code>list.clear</code>, because
-  <code>list.release</code> also frees the head.</li>
-  <li><strong>Adding.</strong> <code>list.append</code> and <code>list.prepend</code> add at the
-  end and the front; <code>list.insertBefore(node, value)</code> inserts before any node
-  (before the head is the end), and <code>list.insertNodeBefore(node, new_node)</code> links in a
-  node you made yourself.</li>
-  <li><strong>Removing.</strong> <code>list.shift</code> removes and returns the first value and
-  <code>list.pop</code> the last, so <code>list.append</code> with <code>list.shift</code> is a
-  first-in first-out queue and <code>list.append</code> with <code>list.pop</code> a stack.
-  <code>list.remove(node)</code> unlinks one node while you walk the list (take
-  <code>it.next</code> first) and returns its value; never pass it the head.</li>
-  <li><strong>Looking.</strong> <code>list.first</code> and <code>list.last</code> return a value
-  without removing it, <code>list.isEmpty</code> tells whether there are any, and
-  <code>list.count</code> counts them by walking the list, so it is O(n).</li>
-  <li><strong>Emptying.</strong> <code>list.clear(l, free_value)</code> frees every node and
-  keeps the head; <code>list.release(l, free_value)</code> frees the nodes and the head. Both
-  call <code>free_value</code> on each value when it isn't <code>null</code>.</li>
-  <li><strong>Joining.</strong> <code>list.mergeAppend(l1, l2)</code> and
-  <code>list.mergePrepend(l1, l2)</code> move all of <code>l2</code>'s values to the end or
-  the front of <code>l1</code> and free <code>l2</code>'s head, so <code>l2</code> (which
-  must come from <code>list.new</code>) can't be used afterwards.</li>
+  <li><strong>Adding.</strong> <code>l.append(v)</code> and <code>l.prepend(v)</code> add at the
+  end and the front, <code>l.insertBefore(node, v)</code> and <code>l.insertAfter(node, v)</code>
+  next to a node. Each returns the new node.</li>
+  <li><strong>Removing.</strong> <code>l.remove(node)</code> takes that node out in O(1) and returns
+  its value: keep the node <code>append</code> gave you (a timer, a client) and remove it later
+  without searching. During a walk, read <code>n.next</code> before removing <code>n</code>.
+  <code>l.shift()</code> removes the first value and <code>l.pop()</code> the last, so
+  <code>append</code> with <code>shift</code> is a first-in first-out queue and <code>append</code>
+  with <code>pop</code> a stack.</li>
+  <li><strong>Looking.</strong> <code>l.first()</code> and <code>l.last()</code> return a value
+  without removing it. On an empty list <code>shift</code>, <code>pop</code>, <code>first</code> and
+  <code>last</code> return a zeroed <code>T</code> (0, <code>null</code>) and set the optional
+  <code>bool *ok</code> to false, for when a stored zero must be told apart.</li>
+  <li><strong>Joining and emptying.</strong> <code>l.mergeAppend(&amp;other)</code> and
+  <code>l.mergePrepend(&amp;other)</code> move all of <code>other</code>'s nodes to the end or the
+  front, leaving <code>other</code> empty. <code>l.clear()</code> frees every node and leaves the
+  list empty and usable; <code>l.free()</code> is the same, for <code>ad</code>. Neither frees what
+  the values point to: that is yours.</li>
 </ul>
-<p><code>list.shift</code>, <code>list.pop</code>, <code>list.first</code> and
-<code>list.last</code> return <code>null</code> for an empty list, which looks the same as a
-stored <code>null</code>: check <code>list.isEmpty</code> first if you store them. The
-functions that remove, look or free accept a <code>null</code> list and do nothing
-(returning <code>null</code>, <code>0</code> from <code>list.count</code>, <code>true</code>
-from <code>list.isEmpty</code>); the ones that add need a real list.</p>
-<pre data-run><code>import cstr, list, mem, str;
+<pre data-run><code>import cstr, list, mem;
 
 void main()
 {
-  list.List todo;              // a head on the stack
-  todo.init();
+  ad list.List&lt;u8 *&gt; todo = list.new&lt;u8 *&gt;();
   todo.append(cstr.dup("write"));
-  todo.append(cstr.dup("test"));
+  list.Node&lt;u8 *&gt; *test = todo.append(cstr.dup("test"));
   todo.append(cstr.dup("ship"));
+  todo.prepend(cstr.dup("plan"));
 
-  list.List *it = todo.next;
-  while (it != &amp;todo) {   // drop "test" while walking
-    list.List *next = it.next;
-    if (!cstr.cmp(it.value, "test")) { mem.free(it.remove()); }
-    it = next;
-  }
+  mem.free(todo.remove(test));            // the node append gave back: O(1)
 
-  list.List *later = list.new();
+  ad list.List&lt;u8 *&gt; later = list.new&lt;u8 *&gt;();
   later.append(cstr.dup("rest"));
-  todo.mergeAppend(later);   // `later` is freed
+  todo.mergeAppend(&amp;later);               // `later` is empty now
 
-  for (it = todo.next; it != &amp;todo; it = it.next) { printf("%s ", it.value); }
-  printf("(%d)\n", todo.count());
-  todo.clear(&amp;mem.free);         // keeps the stack head
-  printf("empty: %d\n", todo.isEmpty());
+  for (auto n = todo.head; n; n = n.next) { printf("%s ", n.value); }
+  printf("(%d)\n", todo.len);
+  u8 *first = todo.shift();
+  printf("first %s, last %s\n", first, todo.last());
+  mem.free(first);
+  for (auto n = todo.head; n; n = n.next) { mem.free(n.value); }   // the values are ours
 }
 </code></pre>
-<pre class="output">write ship rest (3)
-empty: 1
+<pre class="output">plan write ship rest (4)
+first plan, last rest
 </pre>
 
 <h2 id="vectors">Vectors<a class="anchor" href="#vectors" aria-label="Link to this section">#</a></h2>

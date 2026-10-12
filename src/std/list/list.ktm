@@ -1,204 +1,176 @@
 module list;
 import mem;
 
-pub struct List {
-        void *value;
-        List *next, *prev;
+/* A doubly linked list of T, a value type: `ad list.List<Job *> q =
+ * list.new<Job *>();`. append/prepend return the node, so remove(node)
+ * takes it out later in O(1) (a timer, a client to drop). Walk it with
+ * `for (auto n = l.head; n; n = n.next)` (n.value); head and tail are
+ * null for an empty list. free() frees the nodes, not what the values
+ * point to. */
+pub struct Node<T> {
+        T value;
+        Node<T> *next, *prev;
 };
 
-pub void List.init() {
-        self.value = null;
-        self.next = self.prev = self;
+pub struct List<T> {
+        Node<T> *head, *tail;
+        i64 len;
+};
+
+/* An empty list (nothing allocated until the first node) */
+pub List<T> new<T>() {
+        List<T> l;
+        l.head = null;
+        l.tail = null;
+        l.len = 0;
+        return l;
 }
 
-pub List *new() {
-        List *ll = mem.alloc(sizeof(List));
-        ll.value = null;
-        ll.next = ll.prev = ll;
-        return ll;
+static Node<T> *listNode<T>(T value) {
+        Node<T> *n = mem.alloc(sizeof(Node<T>));
+        n.value = value;
+        n.next = null;
+        n.prev = null;
+        return n;
 }
 
-pub void List.prepend(void *value) {
-        List *node = new();
-        node.value = value;
-        node.prev = self;
-        node.next = self.next;
-        self.next.prev = node;
-        self.next = node;
+/* value at the end; its node */
+pub Node<T> *List<T>.append(T value) {
+        Node<T> *n = listNode<T>(value);
+        n.prev = self.tail;
+        if (self.tail) { self.tail.next = n; } else { self.head = n; }
+        self.tail = n;
+        self.len++;
+        return n;
 }
 
-pub bool List.isEmpty() {
-        return (self == null || self.next == self);
+/* value at the front; its node */
+pub Node<T> *List<T>.prepend(T value) {
+        Node<T> *n = listNode<T>(value);
+        n.next = self.head;
+        if (self.head) { self.head.prev = n; } else { self.tail = n; }
+        self.head = n;
+        self.len++;
+        return n;
 }
 
-pub void List.append(void *value) {
-        List *tail = self.prev;
-        List *node = new();
-        node.value = value;
-        node.prev = tail;
-        node.next = self;
-        tail.next = node;
-        self.prev = node;
+/* value before node `at` of this list (at the end for a null `at`); its node */
+pub Node<T> *List<T>.insertBefore(Node<T> *at, T value) {
+        if (!at) { return self.append(value); }
+        Node<T> *n = listNode<T>(value);
+        n.next = at;
+        n.prev = at.prev;
+        if (at.prev) { at.prev.next = n; } else { self.head = n; }
+        at.prev = n;
+        self.len++;
+        return n;
 }
 
-pub void *List.shift() {
-        if (!self) { return null; }
-        List *ll = (List *)self;
-        if (ll.next == ll) {
-                return null;
-        }
-        List *node = ll.next;
-        void *val = node.value;
-        node.next.prev = ll;
-        ll.next = ll.next.next;
-        mem.free(node);
-        return val;
+/* value after node `at` of this list (at the front for a null `at`); its node */
+pub Node<T> *List<T>.insertAfter(Node<T> *at, T value) {
+        if (!at) { return self.prepend(value); }
+        Node<T> *n = listNode<T>(value);
+        n.prev = at;
+        n.next = at.next;
+        if (at.next) { at.next.prev = n; } else { self.tail = n; }
+        at.next = n;
+        self.len++;
+        return n;
 }
 
-pub void List.insertNodeBefore(List *newNode) {
-        newNode.next = self;
-        newNode.prev = self.prev;
-        self.prev.next = newNode;
-        self.prev = newNode;
-}
-
-pub void List.insertBefore(void *value) {
-        List *prev = new();
-        prev.value = value;
-        self.insertNodeBefore(prev);
-}
-
-pub void *List.pop() {
-        if (!self) { return null; }
-        List *ll = (List *)self;
-        if (ll.next == ll) {
-                return null;
-        }
-        List *node = ll.prev;
-        void *val = node.value;
-        node.prev.next = ll;
-        ll.prev = ll.prev.prev;
-        mem.free(node);
-        return val;
-}
-
-pub void List.release(fn(void *arg) void FreeValue) {
-        if (!self) { return; }
-        List *node = self.next;
-        List *next;
-        while (node != self) {
-                next = node.next;
-                if (FreeValue) {
-                        FreeValue(node.value);
-                }
-                mem.free(node);
-                node = next;
-        }
-        mem.free(self);
-}
-
-pub void List.clear(fn(void *value) void freeValue=null)
-{// Free every node (calling free_value on each value, if given) and keep
-    // the head, empty: works on a ListInit head too. null is ignored.
-        if (!self) { return; }
-        List *node = self.next;
-        List *next;
-        while (node != self) {
-                next = node.next;
-                if (freeValue) {
-                        freeValue(node.value);
-                }
-                mem.free(node);
-                node = next;
-        }
-        self.next = self.prev = self;
-}
-
-pub void *List.remove()
-{// Unlink `node` from its list, free it and return its value. Never pass
-    // the list's head; an empty head (linked to itself) is left alone and
-    // null is returned, as for a null node.
-        if (!self || self.next == self) { return null; }
-        void *value = self.value;
-        self.prev.next = self.next;
-        self.next.prev = self.prev;
-        mem.free(self);
+/* Take node n (of this list) out, free it and return its value */
+pub T List<T>.remove(Node<T> *n) {
+        T value = n.value;
+        if (n.prev) { n.prev.next = n.next; } else { self.head = n.next; }
+        if (n.next) { n.next.prev = n.prev; } else { self.tail = n.prev; }
+        self.len--;
+        mem.free(n);
         return value;
 }
 
-pub void *List.first()
-{// The first value, without removing it; null if the list is empty or null
-        if (!self || self.next == self) { return null; }
-        return self.next.value;
+static T listZero<T>(bool *ok) {
+        T zero;
+        mem.set(&zero, 0, sizeof(T));
+        if (ok) { *ok = false; }
+        return zero;
 }
 
-pub void *List.last()
-{// The last value, without removing it; null if the list is empty or null
-        if (!self || self.prev == self) { return null; }
-        return self.prev.value;
+/* The first value, taken out; for an empty list a zeroed T, and *ok
+ * (when given) false */
+pub T List<T>.shift(bool *ok = null) {
+        if (!self.head) { return listZero<T>(ok); }
+        if (ok) { *ok = true; }
+        return self.remove(self.head);
 }
 
-pub i64 List.count() {
-        if (!self || self == self.next) { return 0; }
-        auto node = self.next;
-        i64 count = 0;
-        while (node != self) {
-                count++;
-                node = node.next;
+/* The last value, taken out; as shift for an empty list */
+pub T List<T>.pop(bool *ok = null) {
+        if (!self.tail) { return listZero<T>(ok); }
+        if (ok) { *ok = true; }
+        return self.remove(self.tail);
+}
+
+/* The first value, left in; as shift for an empty list */
+pub T List<T>.first(bool *ok = null) {
+        if (!self.head) { return listZero<T>(ok); }
+        if (ok) { *ok = true; }
+        return self.head.value;
+}
+
+/* The last value, left in; as shift for an empty list */
+pub T List<T>.last(bool *ok = null) {
+        if (!self.tail) { return listZero<T>(ok); }
+        if (ok) { *ok = true; }
+        return self.tail.value;
+}
+
+/* Every node freed; the list is empty and can be used again */
+pub void List<T>.clear() {
+        Node<T> *n = self.head;
+        while (n) {
+                Node<T> *next = n.next;
+                mem.free(n);
+                n = next;
         }
-        return count;
+        self.head = null;
+        self.tail = null;
+        self.len = 0;
 }
 
-/* Move the nodes of l2 to the start of l1 and Free l2's head
-    * Example
-    * l1 = [1,2,3]
-    * l2 = [4,5,6]
-    * ListMergePrepend(l1,l2);
-    * l1 = [4,5,6,1,2,3] (and linked the otherway too)
-    * l2 has been freed and must not be used again. An empty l2 is just
-    * freed; with l1 or l2 null nothing happens.
-    */
-pub void List.mergePrepend(List *l2) {
-        if (!self || !l2) { return; }
-        if (l2.next == l2) {
-                mem.free(l2);
-                return;
-        }
-        List *h1 = self.next;
-
-        List *h2 = l2.next;
-        List *t2 = l2.prev;
-
-        self.next = h2;
-        h2.prev = self;
-        t2.next = h1;
-        h1.prev = t2;
-        mem.free(l2);
+/* The same as clear(): for `ad` and `defer l.free();` */
+pub void List<T>.free() {
+        self.clear();
 }
 
-/* Move the nodes of l2 to the end of l1 and Free l2's head.
-    * Example
-    * l1 = [1,2,3]
-    * l2 = [4,5,6]
-    * ListMergeAppend(l1,l2);
-    * l1 = [1,2,3,4,5,6] (and linked the otherway too)
-    * l2 has been freed and must not be used again. An empty l2 is just
-    * freed; with l1 or l2 null nothing happens.
-    * */
-pub void List.mergeAppend(List *l2) {
-        if (!self || !l2) { return; }
-        if (l2.next == l2) {
-                mem.free(l2);
-                return;
+/* other's nodes moved to the end of this list (no copying); other is
+ * left empty */
+pub void List<T>.mergeAppend(List<T> *other) {
+        if (!other.head) { return; }
+        if (self.tail) {
+                self.tail.next = other.head;
+                other.head.prev = self.tail;
+        } else {
+                self.head = other.head;
         }
-        List *t1 = self.prev;
+        self.tail = other.tail;
+        self.len += other.len;
+        other.head = null;
+        other.tail = null;
+        other.len = 0;
+}
 
-        List *h2 = l2.next;
-        List *t2 = l2.prev;
-
-        h2.prev = t1;
-        t1.next = h2;
-        t2.next = self;
-        self.prev = t2;
-        mem.free(l2);
+/* other's nodes moved to the front of this list; other is left empty */
+pub void List<T>.mergePrepend(List<T> *other) {
+        if (!other.head) { return; }
+        if (self.head) {
+                other.tail.next = self.head;
+                self.head.prev = other.tail;
+        } else {
+                self.tail = other.tail;
+        }
+        self.head = other.head;
+        self.len += other.len;
+        other.head = null;
+        other.tail = null;
+        other.len = 0;
 }
