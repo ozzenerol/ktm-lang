@@ -28,4 +28,5 @@ void parseGenericFlush(Cctrl *cc);
 GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len);
 Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at);
 Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why);
+Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len);
 #endif // !PARSER_H

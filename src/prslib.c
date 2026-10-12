@@ -2759,6 +2759,8 @@ static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
         /* inside its own body (a recursive call) only its symbol is
          * registered yet */
         if (!fn) fn = mapGet(cc->global_env, astModuleMangle(key, strlen(key)));
+        /* a generic instance's method, made when first called */
+        if (!fn) fn = parseGenericMethod(cc, t, name, len);
         if (fn && (fn->kind == AST_FUNC || fn->kind == AST_FUN_PROTO)) {
             *owner = t;
             return fn;
