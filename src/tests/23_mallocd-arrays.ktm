@@ -36,7 +36,7 @@ void intArray() {
 
 void pointerArray() {
     i64 j = 1, correct = 0, tests = 2;
-    Point *arr = mem.alloc(sizeof(Point *) * 10);
+    Point *arr = mem.alloc(sizeof(Point) * 10);
 
     arr[8].y = 420;
     arr[0].x = 10;

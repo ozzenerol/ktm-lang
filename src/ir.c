@@ -628,7 +628,378 @@ IrValue *irFnCallTo(IrCtx *ctx, Ast *ast, IrValue *preallocated_buffer) {
     return ir_ret_val;
 }
 
+/* ---- inlining: a call to a small function of this program is lowered
+ * as the function's body, in the caller's frame ----
+ *
+ * The callee's parameters, locals and result get fresh slots in the
+ * caller (IrFunction.inline_slots, laid out after its own locals); its
+ * lvar ids are looked up in a map of their own while its body is
+ * lowered, and `return` stores the result and jumps to the block after
+ * the body. Only what is known to lower the same way inline qualifies
+ * (irInlineCost): scalar parameters and result, no try/defer/throw,
+ * goto, switch, asm or `T ...name`. */
+#define IR_INLINE_MAX_COST 40
+#define IR_INLINE_MAX_DEPTH 3
+
+static IrValue *irBoolConvert(IrCtx *ctx, IrValue *val, AstType *from, AstType *to);
+static IrValue *irLowerCast(IrCtx *ctx, IrValue *src, AstType *from_type, AstType *to_type);
+static Set *irCollectEscapingLVars(Ast *ast_func);
+
+/* A parameter or result an inlined call can hold in a plain slot */
+static int irInlineScalar(AstType *t) {
+    if (!t) return 0;
+    switch (t->kind) {
+        case AST_TYPE_INT: case AST_TYPE_CHAR: case AST_TYPE_FLOAT:
+        case AST_TYPE_POINTER: case AST_TYPE_FUNC:
+            return 1;
+        case AST_TYPE_CLASS:
+            return t->is_intrinsic;
+        default:
+            return 0;
+    }
+}
+
+static int irInlineCost(Ast *ast);
+
+static int irInlineCostList(List *l) {
+    int cost = 0;
+    if (!l) return 0;
+    listForEach(l) {
+        int c = irInlineCost((Ast *)it->value);
+        if (c < 0) return -1;
+        cost += c;
+    }
+    return cost;
+}
+
+static int irInlineCostVec(Vec *v) {
+    int cost = 0;
+    for (u64 i = 0; v && i < v->size; ++i) {
+        int c = irInlineCost(vecGet(Ast *, v, i));
+        if (c < 0) return -1;
+        cost += c;
+    }
+    return cost;
+}
+
+/* The size of a function body for inlining, -1 when it holds something
+ * that doesn't lower the same way inside another function */
+static int irInlineCost(Ast *ast) {
+    if (!ast) return 0;
+    int a, b, c, d;
+    switch (ast->kind) {
+        case AST_LITERAL:
+        case AST_STRING:
+        case AST_GVAR:
+        case AST_BREAK:
+        case AST_CONTINUE:
+            return 1;
+        case AST_LVAR:
+            if ((ast->flags & AST_FLAG_VARARGS) || ast->pinned_kind == LVAR_REG) return -1;
+            return 1;
+        case AST_DEFAULT_PARAM:
+            return irInlineCost(ast->declvar);
+        case AST_UNOP:
+        case AST_CAST:
+            a = irInlineCost(ast->operand);
+            return a < 0 ? -1 : a + 1;
+        case AST_BINOP:
+            a = irInlineCost(ast->left);
+            b = irInlineCost(ast->right);
+            return a < 0 || b < 0 ? -1 : a + b + 1;
+        case AST_TERNARY:
+        case AST_IF:
+            a = irInlineCost(ast->cond);
+            b = irInlineCost(ast->then);
+            c = irInlineCost(ast->els);
+            return a < 0 || b < 0 || c < 0 ? -1 : a + b + c + 1;
+        case AST_FUNCALL:
+        case AST_FUNPTR_CALL:
+            a = irInlineCostVec(ast->args);
+            b = ast->kind == AST_FUNPTR_CALL ? irInlineCost(ast->ref) : 0;
+            return a < 0 || b < 0 ? -1 : a + b + 4;
+        case AST_RETURN:
+            if (ast->retval && irRetTypeIsAggregate(ast->retval->type)) return -1;
+            a = irInlineCost(ast->retval);
+            return a < 0 ? -1 : a + 1;
+        case AST_FOR:
+            a = irInlineCost(ast->forinit);
+            b = irInlineCost(ast->forcond);
+            c = irInlineCost(ast->forstep);
+            d = irInlineCost(ast->forbody);
+            return a < 0 || b < 0 || c < 0 || d < 0 ? -1 : a + b + c + d + 2;
+        case AST_WHILE:
+        case AST_DO_WHILE:
+            a = irInlineCost(ast->whilecond);
+            b = irInlineCost(ast->whilebody);
+            return a < 0 || b < 0 ? -1 : a + b + 2;
+        case AST_COMPOUND_STMT:
+            if (ast->inline_ret) return -1;
+            return irInlineCostList(ast->stms);
+        case AST_DECL: {
+            Ast *var = ast->declvar;
+            if (!var || var->kind != AST_LVAR || var->pinned_kind == LVAR_REG) return -1;
+            a = irInlineCost(ast->declinit);
+            return a < 0 ? -1 : a + 1;
+        }
+        case AST_CLASS_REF:
+            a = irInlineCost(ast->cls);
+            return a < 0 ? -1 : a + 1;
+        case AST_SLICE_MAKE:
+            a = irInlineCost(ast->slice_ptr);
+            b = irInlineCost(ast->slice_len);
+            return a < 0 || b < 0 ? -1 : a + b + 1;
+        case AST_SLICE_ELEM:
+        case AST_SUBSLICE:
+            a = irInlineCost(ast->sub_base);
+            b = irInlineCost(ast->sub_lo);
+            c = irInlineCost(ast->sub_hi);
+            return a < 0 || b < 0 || c < 0 ? -1 : a + b + c + 2;
+        default:
+            return -1;
+    }
+}
+
+/* The function `call` calls, when its body can be lowered in place */
+static Ast *irInlineCandidate(IrCtx *ctx, Ast *call) {
+    if (call->kind != AST_FUNCALL || !call->fname) return NULL;
+    if (call->flags & (AST_FLAG_BUILTIN | AST_FLAG_PRINT_STMT)) return NULL;
+    if (ctx->inl && ctx->inl->depth >= IR_INLINE_MAX_DEPTH) return NULL;
+    Ast *fn = mapGetLen(ctx->cc->global_env, call->fname->data, call->fname->len);
+    if (!fn || fn->kind != AST_FUNC || !fn->body || !fn->params) return NULL;
+    if (fn->has_var_args || (fn->flags & AST_FLAG_INLINE)) return NULL;
+    if (fn->fname == ctx->cur_func->name ||
+        aoStrCmp(fn->fname, ctx->cur_func->name)) return NULL;
+    for (IrInline *in = ctx->inl; in; in = in->outer) {
+        if (in->callee == fn) return NULL;
+    }
+    AstType *rt = fn->type ? fn->type->rettype : NULL;
+    if (!rt || (rt->kind != AST_TYPE_VOID && !irInlineScalar(rt))) return NULL;
+    if (!call->args || call->args->size != fn->params->size) return NULL;
+    for (u64 i = 0; i < fn->params->size; ++i) {
+        Ast *p = irUnwrapDefaultParam(vecGet(Ast *, fn->params, i));
+        if (!p || p->kind != AST_LVAR || (p->flags & AST_FLAG_VARARGS) ||
+            p->pinned_kind == LVAR_REG || !irInlineScalar(p->type)) return NULL;
+        Ast *arg = vecGet(Ast *, call->args, i);
+        if (!arg || !arg->type || !irInlineScalar(arg->type)) return NULL;
+    }
+    int cost = irInlineCost(fn->body);
+    if (cost < 0 || cost > IR_INLINE_MAX_COST) return NULL;
+    return fn;
+}
+
+/* Is the lvar `id` assigned, incremented or has its address taken in
+ * `ast`? (a parameter that isn't can be the argument's value itself) */
+static int irInlineWrites(Ast *ast, u32 id) {
+    if (!ast) return 0;
+    switch (ast->kind) {
+        case AST_BINOP:
+            if (ast->binop >= AST_BIN_OP_ASSIGN && ast->binop <= AST_BIN_OP_OR_ASSIGN) {
+                Ast *l = irUnwrapDefaultParam(ast->left);
+                if (l && l->kind == AST_LVAR && l->lvar_id == id) return 1;
+            }
+            return irInlineWrites(ast->left, id) || irInlineWrites(ast->right, id);
+        case AST_UNOP: {
+            Ast *o = irUnwrapDefaultParam(ast->operand);
+            if ((ast->unop == AST_UN_OP_ADDR_OF || ast->unop == AST_UN_OP_PRE_INC ||
+                 ast->unop == AST_UN_OP_PRE_DEC || ast->unop == AST_UN_OP_POST_INC ||
+                 ast->unop == AST_UN_OP_POST_DEC) &&
+                o && o->kind == AST_LVAR && o->lvar_id == id) return 1;
+            return irInlineWrites(ast->operand, id);
+        }
+        case AST_CAST: return irInlineWrites(ast->operand, id);
+        case AST_TERNARY:
+        case AST_IF:
+            return irInlineWrites(ast->cond, id) || irInlineWrites(ast->then, id) ||
+                   irInlineWrites(ast->els, id);
+        case AST_FUNCALL:
+        case AST_FUNPTR_CALL:
+            for (u64 i = 0; ast->args && i < ast->args->size; ++i) {
+                if (irInlineWrites(vecGet(Ast *, ast->args, i), id)) return 1;
+            }
+            return ast->kind == AST_FUNPTR_CALL && irInlineWrites(ast->ref, id);
+        case AST_RETURN: return irInlineWrites(ast->retval, id);
+        case AST_FOR:
+            return irInlineWrites(ast->forinit, id) || irInlineWrites(ast->forcond, id) ||
+                   irInlineWrites(ast->forstep, id) || irInlineWrites(ast->forbody, id);
+        case AST_WHILE:
+        case AST_DO_WHILE:
+            return irInlineWrites(ast->whilecond, id) || irInlineWrites(ast->whilebody, id);
+        case AST_COMPOUND_STMT:
+            if (ast->stms) listForEach(ast->stms) {
+                if (irInlineWrites((Ast *)it->value, id)) return 1;
+            }
+            return 0;
+        case AST_DECL: return irInlineWrites(ast->declinit, id);
+        case AST_CLASS_REF: return irInlineWrites(ast->cls, id);
+        case AST_SLICE_MAKE:
+            return irInlineWrites(ast->slice_ptr, id) || irInlineWrites(ast->slice_len, id);
+        case AST_SLICE_ELEM:
+        case AST_SUBSLICE:
+            return irInlineWrites(ast->sub_base, id) || irInlineWrites(ast->sub_lo, id) ||
+                   irInlineWrites(ast->sub_hi, id);
+        default:
+            return 0;
+    }
+}
+
+/* Does `ast` hold a loop? An IR tmp lives from its definition to its
+ * last use in layout order, so one defined before a loop and read in it
+ * can lose its slot to a later tmp of the same iteration */
+static int irInlineHasLoop(Ast *ast) {
+    if (!ast) return 0;
+    switch (ast->kind) {
+        case AST_FOR: case AST_WHILE: case AST_DO_WHILE:
+            return 1;
+        case AST_IF:
+            return irInlineHasLoop(ast->then) || irInlineHasLoop(ast->els);
+        case AST_COMPOUND_STMT:
+            if (ast->stms) listForEach(ast->stms) {
+                if (irInlineHasLoop((Ast *)it->value)) return 1;
+            }
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+/* Converted to `to` as a return converts the returned value */
+static IrValue *irInlineConvertResult(IrCtx *ctx, IrValue *v, AstType *from, AstType *to) {
+    if (to->is_bool) {
+        v = irBoolConvert(ctx, v, from, to);
+    } else if ((astIsFloatType(from) && astIsIntOrIntrinsic(to)) ||
+               (astIsIntOrIntrinsic(from) && astIsFloatType(to))) {
+        v = irLowerCast(ctx, v, from, to);
+    }
+    v = irNarrowToTargetWidth(ctx, v, to);
+    v = irWidenToTargetWidth(ctx, v, from, to);
+    return irConvertFloatToTargetWidth(ctx, v, to);
+}
+
+/* A frame slot for an inlined call: always 8 bytes or more, so a value
+ * wider than its type (an i64 into an i32 parameter) stays in it */
+static IrValue *irInlineSlot(IrCtx *ctx, IrValueType type, int size) {
+    IrFunction *fn = ctx->cur_func;
+    IrValue *slot = irTmp(type, size);
+    slot->kind = IR_VAL_LOCAL;
+    if (!fn->inline_slots) {
+        fn->inline_slots = vecNew(&vec_unsigned_long_type);
+        fn->inline_loffs = vecNew(&vec_unsigned_long_type);
+    }
+    vecPush(fn->inline_slots, slot);
+    vecPush(fn->inline_loffs, (void *)0);
+    return slot;
+}
+
+static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
+    IrFunction *func = ctx->cur_func;
+    u64 n = callee->params->size;
+    IrValue **vals = n ? malloc(sizeof(IrValue *) * n) : NULL;
+
+    /* the arguments, in the caller's scope, converted as a call would */
+    for (u64 i = 0; i < n; ++i) {
+        Ast *arg = vecGet(Ast *, call->args, i);
+        Ast *p = irUnwrapDefaultParam(vecGet(Ast *, callee->params, i));
+        IrValue *v = irExpr(ctx, arg);
+        /* as an assignment to the parameter converts it (irLowerAssign) */
+        if (p->type->is_bool) {
+            v = irBoolConvert(ctx, v, arg->type, p->type);
+        } else if ((astIsFloatType(arg->type) && astIsIntOrIntrinsic(p->type)) ||
+                   (astIsIntOrIntrinsic(arg->type) && astIsFloatType(p->type))) {
+            v = irLowerCast(ctx, v, arg->type, p->type);
+        }
+        v = irNarrowToTargetWidth(ctx, v, p->type);
+        v = irWidenToTargetWidth(ctx, v, arg->type, p->type);
+        v = irConvertFloatToTargetWidth(ctx, v, p->type);
+        vals[i] = v;
+    }
+
+    Map *saved_vars = func->variables;
+    Set *saved_escape = ctx->escape_set;
+    IrValue *saved_rv = func->return_value;
+    IrBlock *saved_exit = func->exit_block;
+    u16 saved_loops = ctx->loop_depth;
+
+    func->variables = irVarValueMapNew();
+    ctx->escape_set = irCollectEscapingLVars(callee);
+
+    int has_loop = irInlineHasLoop(callee->body);
+
+    /* `return expr;` alone: the value of expr, no result slot or jump */
+    Ast *only_ret = NULL;
+    if (callee->body->kind == AST_COMPOUND_STMT && callee->body->stms &&
+        listCount(callee->body->stms) == 1) {
+        Ast *st = (Ast *)callee->body->stms->next->value;
+        if (st && st->kind == AST_RETURN && st->retval) only_ret = st;
+    }
+
+    IrInline frame;
+    frame.callee = callee;
+    frame.cont = irBlockNew();
+    frame.try_base = ctx->try_depth;
+    frame.outer = ctx->inl;
+    frame.depth = ctx->inl ? ctx->inl->depth + 1 : 1;
+    AstType *rt = callee->type->rettype;
+    frame.ret_slot = rt->kind == AST_TYPE_VOID || only_ret ? NULL
+                   : irInlineSlot(ctx, irConvertType(rt), rt->size);
+    ctx->inl = &frame;
+
+    for (u64 i = 0; i < n; ++i) {
+        Ast *p = irUnwrapDefaultParam(vecGet(Ast *, callee->params, i));
+        /* a parameter the body only reads is the argument's value */
+        int plain = p->type->kind == AST_TYPE_INT || p->type->kind == AST_TYPE_CHAR ||
+                    p->type->kind == AST_TYPE_FLOAT || p->type->kind == AST_TYPE_POINTER;
+        int stable = vals[i]->kind != IR_VAL_TMP || !has_loop;
+        if (plain && stable && !irInlineWrites(callee->body, p->lvar_id)) {
+            irFnAddVar(func, p->lvar_id, vals[i]);
+            continue;
+        }
+        IrValue *slot = irInlineSlot(ctx, irConvertType(p->type), p->type->size);
+        irFnAddVar(func, p->lvar_id, slot);
+        irBlockAddInstr(ctx, irStore(slot, vals[i]));
+    }
+    free(vals);
+
+    if (only_ret) {
+        ir_line_hint = only_ret->line;
+        IrValue *v = irExpr(ctx, only_ret->retval);
+        v = irInlineConvertResult(ctx, v, only_ret->retval->type, rt);
+        setRelease(ctx->escape_set);
+        ctx->escape_set = saved_escape;
+        func->variables = saved_vars;
+        ctx->loop_depth = saved_loops;
+        ctx->inl = frame.outer;
+        return v;
+    }
+
+    func->return_value = frame.ret_slot;
+    func->exit_block = frame.cont;
+    irLowerAst(ctx, callee->body);
+    if (!ctx->cur_block->sealed) {
+        irBlockAddInstr(ctx, irJump(func, ctx->cur_block, frame.cont));
+    }
+    irFnAddBlock(func, frame.cont);
+    ctx->cur_block = frame.cont;
+
+    setRelease(ctx->escape_set);
+    ctx->escape_set = saved_escape;
+    func->variables = saved_vars;
+    func->return_value = saved_rv;
+    func->exit_block = saved_exit;
+    ctx->loop_depth = saved_loops;
+    ctx->inl = frame.outer;
+
+    IrValue *result = irTmp(frame.ret_slot ? irConvertType(rt) : IR_TYPE_I64,
+                            frame.ret_slot ? rt->size : 8);
+    if (frame.ret_slot) {
+        irBlockAddInstr(ctx, irLoad(result, frame.ret_slot));
+    }
+    return result;
+}
+
 IrValue *irLowerFnCall(IrCtx *ctx, Ast *ast) {
+    Ast *callee = irInlineCandidate(ctx, ast);
+    if (callee) return irLowerInlineCall(ctx, ast, callee);
     return irFnCallTo(ctx, ast, NULL);
 }
 
@@ -2337,7 +2708,8 @@ void irLowerReturn(IrCtx *ctx, Ast *ast) {
          * the expression still runs for its side effects. */
         irExpr(ctx, ast->retval);
     }
-    irLeaveTries(ctx, 0);
+    /* inlined: the caller's tries stay */
+    irLeaveTries(ctx, ctx->inl ? ctx->inl->try_base : 0);
     IrInstr *jmp = irJump(ctx->cur_func,
                           ctx->cur_block,
                           ctx->cur_func->exit_block);
@@ -2741,6 +3113,12 @@ static IrValue *irMakeLocalSlot(IrCtx *ctx,
     if (ctx->defer_lowering) {
         IrValue *again = irFnGetVar(ctx->cur_func, var_id);
         if (again) return again;
+    }
+    if (ctx->inl) {
+        /* a local of an inlined function: laid out with the inline slots */
+        IrValue *slot = irInlineSlot(ctx, ir_type, size);
+        irFnAddVar(ctx->cur_func, var_id, slot);
+        return slot;
     }
     IrValue *local = irTmp(ir_type, size);
     local->kind = IR_VAL_LOCAL;
