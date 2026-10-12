@@ -1358,7 +1358,8 @@ and objects with <code>beginArray()</code> / <code>beginObject()</code> and clos
 one with <code>end()</code>, give each member's name with <code>key(k)</code>, and add values
 with <code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code>,
 <code>nil()</code> (JSON's <code>null</code>: <code>null</code> is a keyword),
-<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String) and
+<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String),
+<code>cstr(p)</code> (a NUL-terminated <code>u8 *</code>; a null pointer is <code>null</code>) and
 <code>raw(text)</code> (JSON text made elsewhere, checked to be one value). Commas, quotes
 and escapes are written for you, the same escapes and float digits as <code>json.toStr</code>.
 <code>w.take()</code> returns the finished document as a String that is yours and leaves the

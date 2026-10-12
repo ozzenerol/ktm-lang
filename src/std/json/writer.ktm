@@ -200,6 +200,17 @@ pub void Writer.str(u8[] s)
     writerValueDone(self);
 }
 
+/* A C string value (NUL-terminated), as str() writes it; a null pointer
+ * is JSON's null, as json.encode writes a null u8 * */
+pub void Writer.cstr(u8 *s)
+{
+    if (!s) {
+        self.nil();
+        return;
+    }
+    self.str(cstr.view(s));
+}
+
 /* A value that is JSON text already (one value, checked with json.parse),
  * inserted as it is */
 pub void Writer.raw(u8[] text)
