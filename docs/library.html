@@ -813,8 +813,9 @@ blocking <code>read</code>, <code>write</code> or <code>accept</code> carry on a
 have it return -1 with <code>os.errno() == EINTR</code> instead (<code>poll</code> always does).
 <code>mask</code> (<code>signal.bit(SIGUSR2) | ...</code>) holds other signals back while the handler runs,
 and <code>old</code>, if given, receives the previous action, so it can be put back with
-<code>signal.action(sig, &amp;old)</code>. <code>signal(sig, handler)</code> is the same as
-<code>signal.handle</code> with <code>SA_RESTART</code>, and the two can be mixed.</p>
+<code>signal.action(sig, &amp;old)</code>. <code>libc.signal(sig, handler)</code>, C's
+<code>signal</code>, is the same as <code>signal.handle</code> with <code>SA_RESTART</code>, and the
+two can be mixed.</p>
 <pre data-run><code>import cstr, libc, signal;
 
 i64 hits = 0;
@@ -1921,15 +1922,45 @@ Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which end
 program, as in C. <code>net.send(sock, data)</code>, with <code>data</code> a
 <code>u8[]</code> (a literal, a String, <code>buf[0:n]</code>), is a <code>send</code> that adds
 <code>MSG_NOSIGNAL</code> to its optional flags: it returns -1 with <code>os.errno()</code>
-<code>EPIPE</code> (or <code>ECONNRESET</code>) instead; <code>signal(SIGPIPE, SIG_IGN)</code>
-does the same for every <code>write</code> and <code>send</code> in the program.
-<code>signal</code> takes <code>SIG_DFL</code>, <code>SIG_IGN</code> or a handler
-<code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous
-one or <code>SIG_ERR</code>. <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
+<code>EPIPE</code> (or <code>ECONNRESET</code>) instead;
+<code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> does the same for every
+<code>write</code> and <code>send</code> in the program (see <a href="#signals">Signals</a>;
+<code>libc.signal(libc.SIGPIPE, libc.SIG_IGN)</code>, C's <code>signal</code>, works too: it
+takes <code>libc.SIG_DFL</code>, <code>libc.SIG_IGN</code> or a handler
+<code>void F(i32 sig)</code> passed as <code>(&amp;F)(i64)</code>, and returns the previous one
+or <code>libc.SIG_ERR</code>). <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>,
 <code>SIGKILL</code>, <code>SIGUSR1</code>, <code>SIGUSR2</code>, <code>SIGPIPE</code>,
 <code>SIGALRM</code>, <code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control signals
 <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code> and
-<code>SIGTTOU</code> are defined, with each platform's numbers.</p>
+<code>SIGTTOU</code> are defined in <code>libc</code>, with each platform's numbers.</p>
+<pre data-run><code>import date, libc, net, os, signal;
+
+void main()
+{
+  signal.handle(libc.SIGPIPE, libc.SIG_IGN);    // or libc.signal(libc.SIGPIPE, libc.SIG_IGN)
+
+  i32 srv = net.listen(0, "127.0.0.1", 1);
+  i32 client = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  libc.close(conn);                              // the peer goes away
+
+  /* a plain write(2), without MSG_NOSIGNAL: the first may still get
+   * through, a later one fails instead of ending the program */
+  i64 r = 0;
+  for (i64 i = 0; i &lt; 50 &amp;&amp; r &gt;= 0; i++) {
+    r = libc.write(client, "ping", 4);
+    date.sleepMs(10);
+  }
+  i32 err = os.errno();
+  printf("write: %d, EPIPE or ECONNRESET: %d\n", r, err == libc.EPIPE || err == libc.ECONNRESET);
+  printf("still running\n");
+  libc.close(client);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">write: -1, EPIPE or ECONNRESET: 1
+still running
+</pre>
 <pre><code>i32 srv = net.listen(8080, "127.0.0.1", 16);
 if (srv == -1) {
   printf("can't listen on 8080\n");
