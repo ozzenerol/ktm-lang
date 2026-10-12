@@ -2454,25 +2454,55 @@ static void x86_64EmitFunctionPrologue(Cctrl *cc,
          * subq has to preserve that. */
         u32 aligned = ((u32)total_stack + 15u) & ~15u;
         if (aligned > KTM_STACK_PROBE_STRIDE) {
-            /* Stack-clash probe: reserve the frame a page at a time,
-             * touching each page as rsp descends, so a frame larger than
-             * the guard page can't leap over it (a pthread/coroutine
-             * stack overflow then faults here instead of silently writing
-             * past the guard). `orq $0` touches without changing memory;
-             * r11 is caller-saved and unused this early. Residual < a
-             * page, so the final sub can't skip a page either. GNU local
-             * labels keep it self-contained. */
+            /* A frame bigger than the guard page could leap over it, so
+             * first ask the runtime whether rsp - aligned is still on
+             * the stack (rt.__ktmStackCheck reports a stack overflow
+             * otherwise). Nothing is touched: a big buffer costs only
+             * the pages it uses. The argument registers are still live
+             * here, so they are kept around the call (128 bytes, rsp
+             * stays 16-aligned). */
+            AoStr sym = { .data = astRuntimeSymbol("__ktmStackCheck"), .len = 0, .capacity = 0 };
+            sym.len = strlen(sym.data);
             aoStrCatFmt(buf,
-                        "movq    $%u, %%r11\n\t"
-                        "1:\n\t"
-                        "subq    $%u, %%rsp\n\t"
-                        "orq     $0, (%%rsp)\n\t"
-                        "subq    $%u, %%r11\n\t"
-                        "cmpq    $%u, %%r11\n\t"
-                        "jae     1b\n\t"
-                        "subq    %%r11, %%rsp\n\t",
-                        aligned, KTM_STACK_PROBE_STRIDE,
-                        KTM_STACK_PROBE_STRIDE, KTM_STACK_PROBE_STRIDE);
+                        "leaq    -%u(%%rsp), %%r11\n\t"
+                        "subq    $128, %%rsp\n\t"
+                        "movq    %%rdi, 0(%%rsp)\n\t"
+                        "movq    %%rsi, 8(%%rsp)\n\t"
+                        "movq    %%rdx, 16(%%rsp)\n\t"
+                        "movq    %%rcx, 24(%%rsp)\n\t"
+                        "movq    %%r8, 32(%%rsp)\n\t"
+                        "movq    %%r9, 40(%%rsp)\n\t"
+                        "movq    %%rax, 48(%%rsp)\n\t"
+                        "movq    %%r10, 56(%%rsp)\n\t"
+                        "movsd   %%xmm0, 64(%%rsp)\n\t"
+                        "movsd   %%xmm1, 72(%%rsp)\n\t"
+                        "movsd   %%xmm2, 80(%%rsp)\n\t"
+                        "movsd   %%xmm3, 88(%%rsp)\n\t"
+                        "movsd   %%xmm4, 96(%%rsp)\n\t"
+                        "movsd   %%xmm5, 104(%%rsp)\n\t"
+                        "movsd   %%xmm6, 112(%%rsp)\n\t"
+                        "movsd   %%xmm7, 120(%%rsp)\n\t"
+                        "movq    %%r11, %%rdi\n\t"
+                        "callq   %s\n\t"
+                        "movq    0(%%rsp), %%rdi\n\t"
+                        "movq    8(%%rsp), %%rsi\n\t"
+                        "movq    16(%%rsp), %%rdx\n\t"
+                        "movq    24(%%rsp), %%rcx\n\t"
+                        "movq    32(%%rsp), %%r8\n\t"
+                        "movq    40(%%rsp), %%r9\n\t"
+                        "movq    48(%%rsp), %%rax\n\t"
+                        "movq    56(%%rsp), %%r10\n\t"
+                        "movsd   64(%%rsp), %%xmm0\n\t"
+                        "movsd   72(%%rsp), %%xmm1\n\t"
+                        "movsd   80(%%rsp), %%xmm2\n\t"
+                        "movsd   88(%%rsp), %%xmm3\n\t"
+                        "movsd   96(%%rsp), %%xmm4\n\t"
+                        "movsd   104(%%rsp), %%xmm5\n\t"
+                        "movsd   112(%%rsp), %%xmm6\n\t"
+                        "movsd   120(%%rsp), %%xmm7\n\t"
+                        "addq    $128, %%rsp\n\t"
+                        "subq    $%u, %%rsp\n\t",
+                        aligned, asmNormaliseFunctionName(cc, &sym), aligned);
         } else {
             aoStrCatFmt(buf, "subq    $%u, %%rsp\n\t", aligned);
         }
