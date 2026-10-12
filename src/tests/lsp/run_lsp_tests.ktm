@@ -101,6 +101,7 @@ u8 *ENUM_HC;
 u8 *DOC_HC;
 u8 *SIG_HC;
 u8 *SEM_HC;
+u8 *COMP_HC;
 u8 *MOD_GEO2_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -198,6 +199,16 @@ void initFixtures() {
         "  Color c = Color.green;\n"
         "  i64 n = u.older(geo.area(LIMIT)) + MAX;\n"
         "  return (i32)n;\n"
+        "}\n";
+    /* Completion kinds: modules, enums, keywords; module names in imports */
+    COMP_HC =
+        "import mem, geo;\n"
+        "enum Mode { fast };\n"
+        "i32 main() {\n"
+        "  ge\n"
+        "  Mo\n"
+        "  re\n"
+        "  return 0;\n"
         "}\n";
     /* Type aliases: hover, definition and completion of the alias */
     ALIAS_HC =
@@ -1282,7 +1293,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 19;
+const i64 LSP_GROUPS = 20;
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -1740,6 +1751,49 @@ void testSemanticTokens() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+/* The kind of the completion item labelled `label`, -1 when absent */
+i64 kindOf(json.Value *resp, u8 *label) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return -1; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *lab = json.select(it, ".label:s");
+        if (lab != null && cstr.cmp(lab.str.ptr, label) == 0) {
+            return json.select(it, ".kind:i").intVal;
+        }
+        it = it.next;
+    }
+    return -1;
+}
+
+void testCompletionKinds() {
+    printf("completion kinds\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("compkinds.ktm");
+    lspDidOpen(l, uri, COMP_HC);
+
+    i64 line;
+    i64 chr;
+    posOf(COMP_HC, "ge\n", 2, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("an import prefix completes as a module", kindOf(resp, "geo") == 9);
+    posOf(COMP_HC, "Mo\n", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("an enum completes as an enum", kindOf(resp, "Mode") == 13);
+    posOf(COMP_HC, "re\n", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("a keyword completes as a keyword, no internal names",
+                kindOf(resp, "return") == 14 && labelsOk(resp, "re", "return", null));
+    posOf(COMP_HC, "mem,", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("in an import: the standard library's modules", kindOf(resp, "mem") == 9 &&
+                labelsOk(resp, "me", "mem", null));
+    posOf(COMP_HC, "geo;", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    check("in an import list: the modules beside the document", kindOf(resp, "geo") == 9);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 void runGroup(i64 group) {
     switch (group) {
         case 0: testHandshake();
@@ -1761,6 +1815,7 @@ void runGroup(i64 group) {
         case 16: testSymbols();
         case 17: testSignatureHelp();
         case 18: testSemanticTokens();
+        case 19: testCompletionKinds();
     }
 }
 

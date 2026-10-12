@@ -1691,6 +1691,7 @@ static const char *lsp_keywords[] = {
     "true", "false", "null",
     "struct", "pub", "private", "const", "enum", "defer",
     "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
+    "type", "ad", "asm", "volatile", "inline",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -1700,7 +1701,9 @@ static const char *lsp_keywords[] = {
 /* tbh we could double up with out usage of class here */
 #define KTM_LSP_UNION_STRUCT 22
 #define KTM_LSP_CONSTANT     21
-#define KTM_LSP_KEYWORD      24
+#define KTM_LSP_KEYWORD      14
+#define KTM_LSP_MODULE       9
+#define KTM_LSP_ENUM         13
 #define KTM_LSP_ENUM_MEMBER  20
 
 /* One CompletionItem; label escaped, detail optional. */
@@ -1736,9 +1739,9 @@ static char *lspAsmFunctionSuggestionResolver(Ast *entry, int *_type) {
 }
 
 static char *lspClassSuggestionResolver(Ast *entry, int *_type) {
-    (void)entry;
-    *_type = KTM_LSP_CLASS;
-    return "class";
+    AstType *t = (AstType *)entry;   /* clsdefs holds types */
+    *_type = t && t->is_enum ? KTM_LSP_ENUM : KTM_LSP_UNION_STRUCT;
+    return t && t->is_enum ? "enum" : "struct";
 }
 
 static char *lspUnionSuggestionResolver(Ast *entry, int *_type) {
@@ -1773,6 +1776,12 @@ void lspScanMapForSuggestion(Map *suggestions,
     while (mapIterNext(&mi) && emitted < 1000) {
         const char *name = (const char *)mi.node->key;
         if (strncmp(name, prefix, plen) != 0) continue;
+        /* names written another way: a module's (`geo.area`, after
+         * `geo.`), an instance's (`Vec<i64>`), a symbol (`_K3geo4area`) */
+        if (strchr(name, '.') || strchr(name, '<') ||
+            (name[0] == '_' && name[1] == 'K' && isdigit((unsigned char)name[2]))) {
+            continue;
+        }
         Ast *entry = (Ast *)mi.node->value;
         /* a method is completed after `u.`, not on its own */
         if (lsp_suggestion_resolver == lspGlobalSuggestionResolver &&
@@ -1874,6 +1883,85 @@ static int lspFieldVisible(LspCtx *ctx, AstType *f, u32 doc_id) {
     return flen == dlen && !strncmp(fp, dp, flen);
 }
 
+typedef struct LspPrefixScan {
+    const char *prefix;
+    size_t plen;
+    AoStr *body;
+    int *emitted;
+} LspPrefixScan;
+
+static int lspCatImportPrefix(const char *path, size_t path_len,
+                              const char *prefix, size_t prefix_len, void *arg) {
+    LspPrefixScan *ps = arg;
+    if (prefix_len < ps->plen || strncmp(prefix, ps->prefix, ps->plen)) return 0;
+    lspCatCompletion(ps->body, ps->emitted, mprintf("%.*s", (int)prefix_len, prefix),
+                     KTM_LSP_MODULE, mprintf("module %.*s", (int)path_len, path));
+    return 0;
+}
+
+/* The modules in `dir` (directories holding .ktm files), as completions
+ * of `prefix`; `rel` is their path so far ("" or "a.") */
+static void lspCatModuleDirs(AoStr *body, int *emitted, const char *dir,
+                             const char *rel, const char *prefix, size_t plen,
+                             Set *seen) {
+    DIR *d = opendir(dir);
+    struct dirent *ent;
+    while (d && (ent = readdir(d)) != NULL) {
+        if (ent->d_name[0] == '.') continue;
+        char *name = mprintf("%s%s", rel, ent->d_name);
+        if (strncmp(name, prefix, plen) || setHas(seen, name)) continue;
+        char *sub = mprintf("%s/%s", dir, ent->d_name);
+        DIR *sd = opendir(sub);
+        int has_ktm = 0;
+        struct dirent *se;
+        while (sd && !has_ktm && (se = readdir(sd)) != NULL) {
+            size_t n = strlen(se->d_name);
+            has_ktm = n > 4 && !strcmp(se->d_name + n - 4, ".ktm");
+        }
+        if (sd) closedir(sd);
+        /* rt is the runtime, prelude is always there: not imported */
+        if (!has_ktm || (!*rel && (!strcmp(name, "rt") || !strcmp(name, "prelude")))) {
+            continue;
+        }
+        setAdd(seen, name);
+        lspCatCompletion(body, emitted, name, KTM_LSP_MODULE, sub);
+    }
+    if (d) closedir(d);
+}
+
+/* After `import ` (or a `,` of its list): the modules it can name, the
+ * standard library's and the ones beside the document */
+static int lspImportCompletion(LspCtx *ctx, Json *id, const char *uri,
+                               AoStr *text, int line, int character) {
+    size_t at = lspLineStart(text, line) + (size_t)character;
+    if (at > text->len) at = text->len;
+    size_t b = at;
+    while (b > 0 && (lspIsIdentChar(text->data[b - 1]) || text->data[b - 1] == '.')) b--;
+    if (!lspInImport(text, b)) return 0;
+    char *prefix = mprintf("%.*s", (int)(at - b), text->data + b);
+    char *dot = strrchr(prefix, '.');
+    AoStr *body = aoStrNew();
+    aoStrCat(body, "{\"isIncomplete\":false,\"items\":[");
+    int emitted = 0;
+    Set *seen = setNew(16, &set_cstring_type);
+    char *path = lspUriToPath(uri);
+    char *slash = strrchr(path, '/');
+    char *docdir = slash ? mprintf("%.*s", (int)(slash - path), path) : mprintf(".");
+    /* `a.` : a's submodules */
+    char *rel = dot ? mprintf("%.*s", (int)(dot - prefix + 1), prefix) : "";
+    char *reldir = mprintf("%s", rel);
+    for (char *p = reldir; *p; ++p) if (*p == '.') *p = '/';
+    lspCatModuleDirs(body, &emitted, mprintf("%s/%s", docdir, reldir), rel, prefix,
+                     strlen(prefix), seen);
+    lspCatModuleDirs(body, &emitted, mprintf("%s%s", ctx->std_dir, reldir), rel, prefix,
+                     strlen(prefix), seen);
+    free(path);
+    aoStrCat(body, "]}");
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+    return 1;
+}
+
 static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1890,6 +1978,7 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
      * (the client filters as the user types). */
     lspIdentAt(text, line, character, 1, prefix, sizeof(prefix), NULL);
     size_t plen = strlen(prefix);
+    if (lspImportCompletion(ctx, id, uri, text, line, character)) return;
 
     /* Member completion: after `recv.` / `recv->` (plus an optional
      * partial field prefix) the receiver class's FIELDS are the whole
@@ -2031,6 +2120,11 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
 
     lspScanMapForSuggestion(ctx->cc->macro_defs, prefix, plen, body, &emitted,
                             &lspConstantSuggestionResolver);
+
+    /* the document's import prefixes */
+    LspPrefixScan ps = { .prefix = prefix, .plen = plen, .body = body,
+                         .emitted = &emitted };
+    lspEachImport(text, lspCatImportPrefix, &ps);
 
     for (size_t i = 0; i < sizeof(lsp_keywords) / sizeof(lsp_keywords[0]); ++i) {
         if (strncmp(lsp_keywords[i], prefix, plen) != 0) continue;
