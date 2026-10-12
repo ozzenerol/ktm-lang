@@ -67,7 +67,9 @@ i32 main() {
         s = json.toStr(j).take();
         mem.free(s);
     }
-    if (inUse() - before < 4096) { correct++; }
+    /* 2000 leaked results would be 100 KB and more; macOS's allocator
+     * keeps a few KB in its caches when other tests run alongside */
+    if (inUse() - before < 16384) { correct++; }
     else { printf("JsonToString heap grew %d\n", inUse() - before); }
     json.release(j);
 
