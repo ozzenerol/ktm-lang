@@ -5,6 +5,14 @@ const i64 CORO_STACK_DEFAULT = (256 * 1024);
 
 const i64 CORO_CACHE_MAX = 16;  /* released stacks kept per thread */
 
+/* The most recently cached stacks keep their pages, for the next spawns;
+ * a stack pushed further down the cache gives them back (coroStackTrim) */
+const i64 CORO_CACHE_HOT = 4;
+
+/* Pages at the top of a stack that are never given back: the cache's node
+ * and the first frame live there, and every coroutine touches them */
+const i64 CORO_KEEP_PAGES = 2;
+
 const i64 CORO_READY = 0;  /* made, never resumed */
 
 const i64 CORO_SUSPENDED = 1;  /* paused in coro.yield */
@@ -25,7 +33,11 @@ const i64 CORO_MAP_PRIVATE = 0x02;
 const i64 CORO_MAP_ANONYMOUS = 0x1000;
 #else
 const i64 CORO_MAP_ANONYMOUS = 0x20;
+const i32 CORO_MADV_DONTNEED = 4;
+extern "c" i32 madvise(void *addr, u64 len, i32 advice);
 #endif
+
+const i64 CORO_MAP_FIXED = 0x10;
 
 pub struct Coroutine;
 
@@ -145,14 +157,45 @@ static void *coroStackGet(rt.HCFs *fs, i64 len) {
     return null;
 }
 
-/* Keep a released stack for reuse; false when the cache is full. */
+/* Give back the pages of cached stack n between its guard page and its
+ * top CORO_KEEP_PAGES (they read as zeros when touched again). Linux:
+ * madvise(MADV_DONTNEED). macOS: a fresh mapping over them, the only way
+ * there that lowers both the resident size and the footprint; MADV_FREE,
+ * MADV_FREE_REUSABLE and MADV_DONTNEED leave the resident size as it was
+ * (measured), and cost more. */
+static void coroStackTrim(rt.CoroCached *n) {
+    i64 page = libc.getpagesize();
+    u8 *base = (u8 *)n + sizeof(rt.CoroCached) - n.len;
+    u8 *lo = base + page;
+    i64 len = n.len - page - CORO_KEEP_PAGES * page;
+    n.trimmed = true;
+    if (len <= 0) { return; }
+#ifdef IS_MACOS
+    libc.mmap(lo, len, CORO_PROT_READ|CORO_PROT_WRITE,
+              CORO_MAP_PRIVATE|CORO_MAP_ANONYMOUS|CORO_MAP_FIXED, -1, 0);
+#else
+    madvise(lo, len, CORO_MADV_DONTNEED);
+#endif
+}
+
+/* Keep a released stack for reuse; false when the cache is full. The
+ * cache is last in, first out: a stack that now sits behind the
+ * CORO_CACHE_HOT newest ones gives its pages back, once. A spawn/release
+ * churn reuses the newest stacks and never pays for it; a burst of
+ * releases (a server's clients leaving) leaves at most that many stacks
+ * with their pages. Giving them back costs about twice a whole spawn, run
+ * and release of a short coroutine (measured), so it isn't done on every
+ * release. */
 static bool coroStackPut(rt.HCFs *fs, void *base, i64 len) {
     if (fs.coroCached >= CORO_CACHE_MAX) { return false; }
     rt.CoroCached *n = (rt.CoroCached *)(base + len - sizeof(rt.CoroCached));
     n.len = len;
+    n.trimmed = false;
     n.next = fs.coroCache;
     fs.coroCache = n;
     fs.coroCached++;
+    for (i64 i = 0; n && i < CORO_CACHE_HOT; i++) { n = n.next; }
+    if (n && !n.trimmed) { coroStackTrim(n); }
     return true;
 }
 
