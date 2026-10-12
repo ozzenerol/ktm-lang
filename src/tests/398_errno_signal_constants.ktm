@@ -7,10 +7,17 @@ import cstr, fs, libc, mem, os, proc, test;
  * platform's C headers (a C program compiled here), and the new ones are
  * checked against what the system really does where that is cheap. */
 
-#define EC_C   "398-consts.c"
-#define EC_EXE "398-consts"
-#define EC_OUT "398-consts.out"
-#define EC_NOX "398-noexec"
+/* Files named after the process: the AOT and JIT suites run this test at
+ * the same time in the same directory */
+u8 *gC, *gExe, *gOut, *gNox;
+
+void names() {
+    i32 pid = libc.getpid();
+    gC = cstr.format("398-%d-consts.c", pid);
+    gExe = cstr.format("398-%d-consts", pid);
+    gOut = cstr.format("398-%d-consts.out", pid);
+    gNox = cstr.format("./398-%d-noexec", pid);
+}
 
 const i64 N_CONSTS = 37;
 
@@ -55,13 +62,16 @@ i64 compareWithC() {
         src = cstr.appendFormat(src, "  printf(\"%s %%ld\\n\", (long)%s);\n", gNames[i], gNames[i]);
     }
     src = cstr.appendFormat(src, "  return 0;\n}\n");
-    fs.writeAll(EC_C, cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    fs.writeAll(cstr.view(gC), cstr.view(src), libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
     mem.free(src);
-    if (proc.shell("cc -w -o " EC_EXE " " EC_C " > " EC_OUT " 2>&1 && ./" EC_EXE " > " EC_OUT) != 0) {
+    u8 *cmd = cstr.format("cc -w -o %s %s > %s 2>&1 && ./%s > %s", gExe, gC, gOut, gExe, gOut);
+    i64 rc = proc.shell(cstr.view(cmd));
+    mem.free(cmd);
+    if (rc != 0) {
         printf("could not build the C program\n");
         return -1;
     }
-    out = fs.readAll(EC_OUT).take();
+    out = fs.readAll(cstr.view(gOut)).take();
     if (!out) { return -1; }
     line = out;
     for (i = 0; i < gN && line && *line; i++) {
@@ -75,7 +85,9 @@ i64 compareWithC() {
         if (line) { line++; }
     }
     mem.free(out);
-    proc.shell("rm -f " EC_C " " EC_EXE " " EC_OUT);
+    cmd = cstr.format("rm -f %s %s %s", gC, gExe, gOut);
+    proc.shell(cstr.view(cmd));
+    mem.free(cmd);
     if (n != gN) { return -1; }
     return bad;
 }
@@ -130,6 +142,7 @@ i32 main() {
     i32 fd, st;
     libc.sockaddr_in sa;
 
+    names();
     fill();
     tests++;
     bad = compareWithC();
@@ -140,21 +153,23 @@ i32 main() {
     os.setErrno(0);
     fd = libc.open("398-no-such-dir/file", libc.O_RDONLY, 0);
     tests++; if (fd == -1 && os.errno() == libc.ENOENT) { correct++; }
+    else { printf("Failed - open ENOENT: fd %d errno %d\n", fd, os.errno()); }
     mem.set(&o, 0, sizeof(proc.Opts));
     o.in = o.out = o.err = proc.DEVNULL;
     argv[0] = "ktm-398-no-such-program";
     argv[1] = null;
     p = proc.spawn(argv, &o);
     tests++; if (!p && os.errno() == libc.ENOENT) { correct++; }
+    else { printf("Failed - spawn ENOENT: proc %p errno %d\n", p, os.errno()); }
 
     /* EACCES: exec of a file without execute permission (root too) */
-    fs.writeAll(EC_NOX, "#!/bin/sh\n", libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
-    argv[0] = "./" EC_NOX;
+    fs.writeAll(cstr.view(gNox), "#!/bin/sh\n", libc.O_CREAT | libc.O_RDWR | libc.O_TRUNC);
+    argv[0] = gNox;
     o.noPath = true;
     p = proc.spawn(argv, &o);
     tests++; if (!p && os.errno() == libc.EACCES) { correct++; }
     else { printf("Failed - EACCES: got %d\n", os.errno()); }
-    fs.remove(EC_NOX);
+    fs.remove(cstr.view(gNox));
     o.noPath = false;
 
     /* EADDRNOTAVAIL: bind to an address this host doesn't have (TEST-NET-1) */
@@ -180,16 +195,23 @@ i32 main() {
             stopsAndContinues(p.pid, libc.SIGTTIN) && stopsAndContinues(p.pid, libc.SIGTTOU)) {
         correct++;
             } else { printf("Failed - stop/continue signals\n"); }
+    i32 reaped = 0;
     if (p) {
         proc.kill(p, libc.SIGKILL);
         proc.wait(p);
+        reaped = p.pid;
         tests++; if (p.termSignal == libc.SIGKILL) { correct++; }
+        else { printf("Failed - SIGKILL: exit %d signal %d\n", p.exitCode, p.termSignal); }
         proc.release(p);
     }
 
-    /* ECHILD: nothing left to wait for */
+    /* ECHILD: waiting again for the child reaped above. (Not waitpid(-1):
+     * on macOS the child of a spawn that just failed can still be there
+     * for a moment, so "no children at all" is not certain.) */
     os.setErrno(0);
-    tests++; if (libc.waitpid(-1, &st, 1) == -1 && os.errno() == libc.ECHILD) { correct++; }
+    i32 left = libc.waitpid(reaped, &st, 1);
+    tests++; if (reaped && left == -1 && os.errno() == libc.ECHILD) { correct++; }
+    else { printf("Failed - ECHILD: waitpid %d errno %d\n", left, os.errno()); }
 
     test.printResult(correct, tests);
     printf("====\n");
