@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -47,6 +47,75 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2 id="v0-6-0-2026-10-12">v0.6.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-6-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<p>Function overloading, and the library pieces the example projects still wrote by hand:
+hashing, case-insensitive and URL/HTML text helpers, portable file metadata, and waiting for
+a child process inside the coroutine loop.</p>
+
+<pre><code>import hash, str;
+
+void send(i64 n) { printf("number %d\n", n); }
+void send(u8[] text) { printf("text %.*s\n", (i32)text.len, text.ptr); }
+
+void main()
+{
+  send(42);
+  send("hello");
+
+  u8 digest[32];
+  hash.sha256("abc", digest);
+  String hex = hash.hex(digest);
+  defer hex.free();
+  String q = str.urlEncode("a b&amp;amp;c");
+  defer q.free();
+  printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
+}
+</code></pre>
+
+<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Overloading: functions, methods and a module's functions can share a name when their
+  parameter types differ, and a call picks the one its arguments fit best (an exact type over
+  a conversion in the same family over an integer for a float; on a tie, the one that needs no
+  default and no <code>T ...name</code> extras). An ambiguous call, or one no overload takes, is
+  an error that lists the overloads. <code>&amp;f</code> takes the overload of the function type
+  it goes to. <code>pub</code> is per overload. The language server shows and jumps to the
+  overload a call picks. See <a href="language.html#overloading">Overloading</a>.</li>
+  <li>A function with no overloads keeps its symbol, so existing libraries and C callers see no
+  change; once a name has two or more, each one's symbol carries its parameter types.</li>
+</ul>
+
+<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
+  <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
+  (chainable), 64-bit FNV-1a for tables, and <code>hash.equalCt</code>, a constant-time compare
+  for digests and tokens (the length is not secret).</li>
+  <li><code>str</code> gets ASCII case-insensitive <code>equalsFold</code>,
+  <code>compareFold</code>, <code>findFold</code>, <code>containsFold</code>,
+  <code>startsWithFold</code> and <code>endsWithFold</code>; URL percent-encoding
+  (<code>urlEncode</code> for a component, <code>urlEncodePath</code> keeping <code>/</code>,
+  <code>formEncode</code> with <code>+</code> for spaces) and decoding (<code>urlDecode</code>,
+  <code>formDecode</code>, false on a bad <code>%XX</code>); and <code>htmlEscape</code>.</li>
+  <li><code>fs</code> gets <code>lstat</code> and <code>fstat</code> next to <code>stat</code>,
+  <code>FileStat.kind()</code> (<code>fs.FileKind</code> file, dir, link, other) with
+  <code>isFile</code>, <code>isDir</code> and <code>isLink</code>, so code never needs
+  <code>libc.cStat</code>'s per-platform layout; plus <code>fs.realPath</code>,
+  <code>fs.pread</code> and <code>fs.pwrite</code>.</li>
+  <li><code>coro.waitChild(pid, ms)</code> waits for a child process inside the coroutine loop
+  without blocking the other coroutines (pidfd on Linux, kqueue on macOS, polling where neither
+  exists), returning its wait status or -1 on timeout. <code>proc.exitFd(pid)</code> gives the
+  pollable fd for your own poll loop, and <code>proc.setStatus(p, st)</code> records a status got
+  that way in a <code>proc.Proc</code>.</li>
+</ul>
+
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>A second function of a name with other parameter types used to be the error "conflicting
+  types"; it is now an overload. The same parameters with another return type is still that
+  error.</li>
+</ul>
 
 <h2 id="v0-5-1-2026-10-12">v0.5.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-5-1-2026-10-12" aria-label="Link to this section">#</a></h2>
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
@@ -101,7 +170,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -172,7 +241,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
   kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
@@ -191,7 +260,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -211,7 +280,7 @@ more mistakes it used to let through. Code that uses <code>proc</code>, <code>cs
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -285,7 +354,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -314,7 +383,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -404,7 +473,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -445,7 +514,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
+<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -478,7 +547,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
@@ -529,7 +598,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
