@@ -4,6 +4,21 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.5.1 <small>(2026-10-12)</small></h2>
+<p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
+or no longer applies to the frozen syntax).</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>The old C declarator of a function that returns a function pointer,
+  <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
+  variable form, naming the way to write it: <code>fn(i64) i64 getHandler()</code>.</li>
+  <li>A <code>catch</code> block takes its frame's address again after the throw lands, as
+  <code>defer</code> already did, instead of relying on the value staying in place across the try
+  body. It never went wrong in practice (the code layout kept it alive), but nothing
+  guaranteed it.</li>
+</ul>
+
 <h2>v0.5.0 <small>(2026-10-12)</small></h2>
 <p>A systems library: what the example servers and tools used to write by hand. A coroutine
 loop for servers, a byte buffer, monotonic clocks and HTTP dates, the OS calls shells and
