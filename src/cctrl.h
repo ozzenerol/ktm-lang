@@ -120,7 +120,8 @@ typedef struct GenericDef {
     struct AstType *tmpl;        /* GEN_STRUCT: the type `Vec` names */
     struct GenericDef *of;       /* GEN_METHOD: its struct's definition */
     Vec *insts;                  /* GEN_STRUCT/FUNC: GenericInst * made */
-    Lexeme *at;                  /* where it is declared */
+    Lexeme *at;                  /* its name where it is declared */
+    u32 file_id;                 /* and that file */
 } GenericDef;
 
 /* One instance being made (or made): the definition and its arguments */

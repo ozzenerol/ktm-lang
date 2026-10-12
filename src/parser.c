@@ -1048,6 +1048,12 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
                 cctrlRaiseException(cc,"class %.*s has not been defined\n",
                         tok->len,tok->start);
             }
+            /* a generic base: `: Vec<T>` */
+            if (base_class->generic && !base_class->generic_args) {
+                Lexeme *base_tok = tok;
+                Vec *args = parseGenericArgs(cc);
+                base_class = parseGenericStructInstance(cc, base_class, args, base_tok);
+            }
 
             if (tokenPunctIs(cctrlTokenPeek(cc),',')) {
                 cctrlRaiseException(cc,"Only one base class allowed at this time");
@@ -5572,7 +5578,8 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
     d->toks = toks;
     d->module_id = first->module_id;
     d->is_pub = h.is_pub;
-    d->at = first;
+    d->at = h.name;
+    d->file_id = ast_file_hint;
     d->insts = vecNew(&vec_unsigned_long_type);
     if (!cc->generic_structs) cc->generic_structs = mapNew(16, &map_asttype_type);
     if (!cc->generic_funcs) cc->generic_funcs = mapNew(16, &map_asttype_type);

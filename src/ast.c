@@ -402,6 +402,16 @@ static void astMangleCatPart(AoStr *out, const char *s, int n) {
     aoStrRelease(enc);
 }
 
+/* Generic instances' symbols and the names they are shown as
+ * (`_K8BoxIi64E3get` -> `Box<i64>.get`): the encoding can't be read
+ * back, so astModuleDemangle looks them up here */
+static Map *ast_generic_names = NULL;
+
+static void astNoteGenericName(char *sym, const char *name, int len) {
+    if (!ast_generic_names) ast_generic_names = mapNew(32, &map_cstring_opaque_type);
+    mapAdd(ast_generic_names, sym, mprintf("%.*s", len, name));
+}
+
 char *astModuleMangle(char *qual, int len) {
     AoStr *out = aoStrNew();
     aoStrCatLen(out, "_K", 2);
@@ -414,7 +424,9 @@ char *astModuleMangle(char *qual, int len) {
             start = i + 1;
         }
     }
-    return aoStrMove(out);
+    char *sym = aoStrMove(out);
+    if (memchr(qual, '<', len)) astNoteGenericName(sym, qual, len);
+    return sym;
 }
 
 /* The symbol of a main-program function or global `name`: the module
@@ -427,7 +439,9 @@ char *astProgramSymbol(char *name, int len) {
         AoStr *out = aoStrNew();
         aoStrCatLen(out, "_K0", 3);
         astMangleCatPart(out, name, len);
-        return aoStrMove(out);
+        char *sym = aoStrMove(out);
+        astNoteGenericName(sym, name, len);
+        return sym;
     }
     return mprintf("_K0%d%.*s", len, len, name);
 }
@@ -447,6 +461,10 @@ char *astModuleDemangle(char *sym, int len) {
     if (len < 4 || sym[0] != '_' || sym[1] != 'K' ||
         !isdigit((unsigned char)sym[2])) {
         return mprintf("%.*s", len, sym);
+    }
+    if (ast_generic_names) {
+        char *shown = mapGetLen(ast_generic_names, sym, len);
+        if (shown) return shown;
     }
     AoStr *out = aoStrNew();
     int i = 2;
