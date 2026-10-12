@@ -39,7 +39,7 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#slices">Slices</a></li><li><a href="#strings">Strings</a></li><li><a href="#structs">Structs</a></li><li><a href="#modules">Modules</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#defer">defer</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li class="current"><a href="language.html" aria-current="page">Language</a><ul class="toc"><li><a href="#program-structure">Program structure</a></li><li><a href="#printing">Printing</a></li><li><a href="#types">Types</a></li><li><a href="#literals">Literals</a></li><li><a href="#variables">Variables</a></li><li><a href="#operators">Operators</a></li><li><a href="#type-casts">Type casts</a></li><li><a href="#control-flow">Control flow</a></li><li><a href="#functions">Functions</a></li><li><a href="#pointers-and-arrays">Pointers and arrays</a></li><li><a href="#slices">Slices</a></li><li><a href="#strings">Strings</a></li><li><a href="#structs">Structs</a></li><li><a href="#modules">Modules</a></li><li><a href="#preprocessor">The preprocessor</a></li><li><a href="#exceptions">Exceptions</a></li><li><a href="#reflection">Reflection</a></li><li><a href="#defer">defer</a></li><li><a href="#calling-c">Calling C</a></li><li><a href="#inline-assembly">Inline assembly</a></li><li><a href="#differences-from-its-origins">Differences from its origins</a></li></ul></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
@@ -785,14 +785,22 @@ void main()
 8 1
 </pre>
 <p>A function pointer only takes a function, or a function pointer, with the same
-signature: the same return type, the same parameter types and the same <code>...</code>.
-Anything else is an error naming both types, wherever the conversion happens (an
-assignment, an initialiser, an argument, a <code>return</code> or a conditional), so
-<code>fn(u8 *) i64 op = &amp;t;</code> with a <code>t</code> taking an <code>i64</code> gives
-<code>cannot convert fn(i64) i64 to fn(u8*) i64</code>. A <code>void *</code> and
-<code>null</code> still convert without a cast. A function whose parameters are typed
-pointers, passed where one taking <code>void *</code> is expected (a comparator, a thread
-function), needs a cast, which makes the mismatch visible:</p>
+signature: the same return type, the same parameter types and the same <code>...</code>,
+except that a <code>void *</code> parameter takes a pointer parameter of any type on the
+other side (and the other way round). So a comparator or a callback is written with the
+types it really gets, <code>i64 itemLess(Item *a, Item *b)</code>, and passed where a
+<code>fn(void *, void *) i64</code> is expected without a cast: every pointer is passed the
+same way, so the call is the one a cast would make. Anything else is an error naming both
+types, wherever the conversion happens (an assignment, an initialiser, an argument, a
+<code>return</code> or a conditional), so <code>fn(u8 *) i64 op = &amp;t;</code> with a
+<code>t</code> taking an <code>i64</code> gives <code>cannot convert fn(i64) i64 to fn(u8*)
+i64</code>. The return type must still match exactly (a function returning
+<code>Item *</code> is not a <code>fn(void *) void *</code>), as must integer, struct,
+slice and function pointer parameters, and so must a pointer to a function pointer
+(<code>(fn(Item *) i64) *</code> is not a <code>(fn(void *) i64) *</code>: storing
+through it could put <code>itemLess</code> where any pointer is passed). Those need a
+cast. A <code>void *</code> and <code>null</code> convert to a function pointer without
+one.</p>
 <pre data-run><code>struct Item { i64 key; };
 
 i64 itemLess(Item *a, Item *b) { return a.key &lt; b.key; }
@@ -802,7 +810,7 @@ void main()
   Item a, b;
   a.key = 1;
   b.key = 2;
-  fn(void *, void *) i64 cmp = (fn(void *, void *) i64)(&amp;itemLess);
+  fn(void *, void *) i64 cmp = &amp;itemLess;
   printf("%d\n", cmp(&amp;a, &amp;b));
 }
 </code></pre>
@@ -1852,6 +1860,78 @@ what the program printed so far) and ends the program with exit code 1:</p>
 <p>Each <code>try</code> and each <code>defer</code> reached saves the registers but not the
 signal mask, so they cost no system call; the flip side is that a <code>throw</code> out of a
 signal handler leaves that signal blocked.</p>
+
+<h2 id="reflection">Reflection<a class="anchor" href="#reflection" aria-label="Link to this section">#</a></h2>
+<p>A program can ask the compiler about its types at run time, through the <code>reflect</code>
+module. <code>reflect.typeOf(T)</code> (a type, or any expression) gives a
+<code>reflect.Type *</code>: its <code>kind</code> (a <code>reflect.Kind</code>: <code>int</code>,
+<code>float</code>, <code>boolean</code>, <code>enumType</code>, <code>pointer</code>,
+<code>array</code>, <code>slice</code>, <code>string</code>, <code>structType</code>,
+<code>unionType</code>, <code>fnType</code> or <code>none</code>), its <code>name</code> as
+<code>typeof</code> prints it, <code>size</code> and <code>isSigned</code>, the <code>elem</code>
+type and <code>len</code> of a pointer, array or slice, a struct's <code>fields</code> (name, type,
+offset, and <code>isPrivate</code>), in declaration order with inherited ones first, and an enum's
+<code>members</code>.</p>
+<pre data-run><code>import reflect;
+
+enum Role { guest, admin = 10 };
+struct User { i64 id; u8[] name; Role role; User *boss; };
+
+void main()
+{
+  reflect.Type *t = reflect.typeOf(User);
+  printf("%s, %d bytes\n", t.name, t.size);
+  for (auto f : t.fields) {
+    printf("  %s at %d: %s\n", f.name, f.offset, f.type.name);
+  }
+  printf("%s is %s\n", t.fields[3].type.name, t.fields[3].type.elem.name);
+
+  Role r = Role.admin;
+  i64 v;
+  reflect.enumValue(reflect.typeOf(Role), "guest", &amp;v);
+  printf("%s, guest is %d\n", reflect.name(r), v);
+}
+</code></pre>
+<pre class="output">User, 40 bytes
+  id at 0: i64
+  name at 8: u8[]
+  role at 24: Role
+  boss at 32: User *
+User * is User
+admin, guest is 0
+</pre>
+<p><code>reflect.of(x)</code>, for a variable, field or element, gives a <code>reflect.Value</code>:
+its address and its type, so one function can take a value of any type.
+<code>reflect.field(v, "name")</code> is the value of one of a struct's fields (with a null
+<code>type</code> when there is none), and <code>reflect.getInt</code>/<code>setInt</code> and
+<code>getFloat</code>/<code>setFloat</code> read and write ints, bools, enums and floats of any
+size.</p>
+<pre data-run><code>import reflect;
+
+struct Point { i32 x; i32 y; };
+
+void bump(reflect.Value v, u8[] field)
+{
+  reflect.Value f = reflect.field(v, field);
+  reflect.setInt(f, reflect.getInt(f) + 1);
+}
+
+void main()
+{
+  Point p = {3, 4};
+  bump(reflect.of(p), "y");
+  printf("%d %d\n", p.x, p.y);
+}
+</code></pre>
+<pre class="output">3 5
+</pre>
+<p>A type's description is made at compile time, as read-only data, only for the types a program
+asks about and the types they lead to; nothing is added for the others. A library and a program
+each have their own copy, so compare two types with <code>reflect.same(a, b)</code>, not
+<code>==</code>. <code>reflect.name(e)</code> gives an enum value's member name (<code>""</code>
+for a value that isn't one), <code>reflect.nameOf(t, n)</code> the same from a type and a number,
+and <code>reflect.enumValue(t, name, &amp;v)</code> the other way; <code>printf</code> of an enum
+still prints its number.</p>
 
 <h2 id="defer">defer<a class="anchor" href="#defer" aria-label="Link to this section">#</a></h2>
 <p><code>defer</code> followed by a statement (or a <code>{ }</code> block) runs that

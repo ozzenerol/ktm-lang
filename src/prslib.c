@@ -1165,7 +1165,8 @@ static void parseCheckArgType(Cctrl *cc, AstType *type, Ast *arg, int i,
         char *msg_actual = astTypeToString(arg->type);
         if (at) {
             cctrlRaiseExceptionAt(cc,at->line,at->col,at->len,
-                    "cannot convert %s to %s", msg_actual, msg_expected);
+                    "cannot convert %s to %s%s", msg_actual, msg_expected,
+                    parseFnConvertHint(type, arg->type));
         } else {
             parseRaiseFnConvert(cc, type, arg->type);
         }
@@ -2573,6 +2574,10 @@ Ast *parseCallArguments(Cctrl *cc, char *name, int len) {
     if (len == 6 && !memcmp(name, "printf", 6)) {
         return parsePrintCall(cc, ')');
     }
+    Ast *reflected = parseReflectCall(cc, name, len);
+    if (reflected) {
+        return reflected;
+    }
     return parseFunctionArguments(cc, name, len, ')');
 }
 
@@ -2745,6 +2750,11 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
      * argument parser raises the unterminated-`(` diagnostic. A type
      * name is never followed by `.`, so `f(Color.red)` is a call whose
      * first argument is an enum member, not a postfix cast. */
+    /* reflect.typeOf(T) takes a type: a call, never a postfix cast */
+    if ((len == 14 && !memcmp(name, "reflect.typeOf", 14)) ||
+        (len == 10 && !memcmp(name, "reflect.of", 10))) {
+        return parseCallArguments(cc,name,len);
+    }
     Lexeme *after_peek = cctrlTokenPeekBy(cc,1);
     int peek_is_fn_type = peek && tokenMayStartFnType(peek) && parseFnStartsType(cc);
     /* `Call((fn(i64) i64)raw)` passes a cast; only something that can't
@@ -3333,8 +3343,20 @@ static s64 astBinOpToTokenPunct(AstBinOp op) {
  * naming both, wherever the conversion happens (assignment,
  * initialiser, argument, return, conditional) */
 void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
-    cctrlRaiseException(cc, "cannot convert %s to %s",
-            astTypeToString(actual), astTypeToString(expected));
+    cctrlRaiseException(cc, "cannot convert %s to %s%s",
+            astTypeToString(actual), astTypeToString(expected),
+            parseFnConvertHint(expected, actual));
+}
+
+/* What follows "cannot convert X to Y": a note when typed pointer
+ * parameters would stand for void * ones on the function pointer itself
+ * but not through a pointer to it, "" otherwise */
+char *parseFnConvertHint(AstType *expected, AstType *actual) {
+    if (astFnPtrOnlyDirect(expected, actual)) {
+        return " (typed pointer parameters stand for void * ones only on a "
+               "function pointer itself, not through a pointer to one)";
+    }
+    return "";
 }
 
 static Ast *parseCreateBinaryOpAt(Cctrl *cc, AstBinOp operation, Ast *left,

@@ -4,6 +4,63 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.4.0 <small>(2026-10-12)</small></h2>
+<p>Reflection. A program can ask the compiler about its types at run time, and the
+<code>json</code> module uses that to turn any struct into JSON and back without hand-written
+code. Plus a JSON writer, enum names at run time, and typed comparators and callbacks.</p>
+
+<pre><code>import json, mem, reflect;
+
+enum Role { guest, admin };
+struct User { i64 id; String name; Role role; u8[][] tags; };
+
+void main()
+{
+    User u;
+    mem.set(&amp;u, 0, sizeof(User));
+    json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
+                reflect.of(u));
+    defer json.free(reflect.of(u));
+    u.id++;
+    String text = json.encode(reflect.of(u));
+    defer text.free();
+    printf("%s\n", text);   // {"id":8,"name":"Ada","role":"admin","tags":["math"]}
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
+  kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
+  private or not; inherited ones first) and an enum's members. <code>reflect.of(x)</code> gives a
+  <code>reflect.Value</code>, x's address and type, so one function can take any value;
+  <code>reflect.field</code>, <code>getInt</code>/<code>setInt</code> and
+  <code>getFloat</code>/<code>setFloat</code> read and write through it. A description is made at
+  compile time, only for the types a program asks about; compare two with
+  <code>reflect.same</code>.</li>
+  <li>Enum names at run time: <code>reflect.name(Role.admin)</code> is <code>"admin"</code>,
+  <code>reflect.enumValue(t, "admin", &amp;v)</code> goes the other way. <code>printf</code> of an
+  enum still prints its number.</li>
+  <li>A function whose parameters are typed pointers now converts to a function pointer whose
+  matching parameters are <code>void *</code>, so comparators and callbacks are written with their
+  real types and no casts (<code>i64 byAge(User *a, User *b)</code> goes straight to
+  <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
+  <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
+  frees what decode allocated. Fields by name, private ones skipped, enums by name, Strings,
+  slices, arrays, nested structs and pointers. Unknown keys are ignored and missing fields kept,
+  unless <code>json.STRICT</code>. A value that doesn't fit throws <code>json.ERR_DECODE</code>
+  with where it is (<code>items[2].price: expected a number, got a string</code>).</li>
+  <li><code>json.Writer</code> builds JSON into a String: <code>beginObject</code>,
+  <code>key</code>, <code>int</code>/<code>float</code>/<code>bool</code>/<code>str</code>/<code>nil</code>,
+  <code>beginArray</code>, <code>end</code>, <code>raw</code>, <code>take</code>; escapes, commas
+  and an optional indent done for you, and misuse throws <code>json.ERR_WRITER</code>.</li>
+</ul>
+
 <h2>v0.3.1 <small>(2026-10-12)</small></h2>
 <p>The rest of the library on <code>u8[]</code> and <code>String</code>, and the compiler catching
 more mistakes it used to let through. Code that uses <code>proc</code>, <code>csv</code> or

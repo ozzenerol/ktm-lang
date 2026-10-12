@@ -807,12 +807,15 @@ same methods:</p>
   <li><code>sort()</code> of a <code>vec.IntVec</code> or <code>vec.FloatVec</code> sorts ascending.
   A <code>vec.PtrVec</code>'s <code>sort</code> takes a comparison that returns <code>true</code> when its first
   argument should come first. That's a "less than" test, not a C-style negative, zero or
-  positive result, which leaves the vector unsorted. The sorts are O(n log n), also for
+  positive result, which leaves the vector unsorted. Its parameters can be the pointers the
+  vector holds (<code>i64 byAge(User *a, User *b)</code>): a function's typed pointer
+  parameters stand for <code>void *</code> ones without a cast, here and in every callback
+  that takes <code>void *</code> (<code>release</code>'s <code>free_value</code> too). The sorts are O(n log n), also for
   sorted or all-equal input, and not stable: equal values may change order.</li>
 </ul>
 <pre data-run><code>import cstr, mem, str, vec;
 
-i64 shorterFirst(void *a, void *b)
+i64 shorterFirst(u8 *a, u8 *b)
 {
   return cstr.len(a) &lt; cstr.len(b);
 }
@@ -934,7 +937,7 @@ order; don't insert or delete while they run. Once a new key is added or one is 
 that callback; replacing the value of a key that is there is fine.</p>
 <pre data-run><code>import cstr, map, str;
 
-i64 strKeyCmp(void *a, void *b)
+i64 strKeyCmp(u8 *a, u8 *b)
 {
   return cstr.cmp(a, b);
 }
@@ -1251,6 +1254,51 @@ void main()
 {"user": {"id": 7,"roles": ["admin"]},"n": null}
 </pre>
 
+<h3 id="building-json-with-a-writer">Building JSON with a Writer<a class="anchor" href="#building-json-with-a-writer" aria-label="Link to this section">#</a></h3>
+<p>A <code>json.Writer</code> builds a document into a String without a tree: open arrays
+and objects with <code>beginArray()</code> / <code>beginObject()</code> and close the innermost
+one with <code>end()</code>, give each member's name with <code>key(k)</code>, and add values
+with <code>int(i64)</code>, <code>float(f64)</code>, <code>bool(b)</code>,
+<code>nil()</code> (JSON's <code>null</code>: <code>null</code> is a keyword),
+<code>str(s)</code> (any <code>u8[]</code>: a literal, a slice or a String) and
+<code>raw(text)</code> (JSON text made elsewhere, checked to be one value). Commas, quotes
+and escapes are written for you, the same escapes and float digits as <code>json.toStr</code>.
+<code>w.take()</code> returns the finished document as a String that is yours and leaves the
+Writer empty for the next one; <code>w.free()</code> frees what it holds. Make one with
+<code>json.writerNew()</code> (a declared Writer isn't zeroed); <code>json.writerNew(2)</code>
+puts each member and item on its own line, indented 2 spaces per level.</p>
+<p>A call out of order throws <code>json.ERR_WRITER</code>, and so does a value JSON can't
+hold: a value where a key is expected, <code>key()</code> outside an object,
+<code>end()</code> with nothing open, a second top-level value, <code>take()</code> with
+something still open or nothing written, a NaN or infinite float, a string that isn't UTF-8.
+The message says which, and the Writer is left as it was.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Writer w = json.writerNew();
+  defer w.free();
+  w.beginObject();
+  w.key("id");    w.int(5);
+  w.key("name");  w.str("Ada \"the\" first");
+  w.key("tags");  w.beginArray(); w.str("a"); w.float(1.5); w.bool(true); w.nil(); w.end();
+  w.end();
+  String text = w.take();
+  printf("%s\n", text);
+  text.free();
+
+  try {
+    w.beginArray();
+    w.key("oops");
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">{"id":5,"name":"Ada \"the\" first","tags":["a",1.5,true,null]}
+key(): no object is open
+</pre>
+
 <h3 id="errors-and-strictness">Errors and strictness<a class="anchor" href="#errors-and-strictness" aria-label="Link to this section">#</a></h3>
 <p>The parser follows RFC 8259 strictly. It rejects trailing commas, anything after the
 top-level value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
@@ -1353,6 +1401,55 @@ id 123456789012345678901234567890
 price 9.90
 {"id": 123456789012345678901234567890,"price": 9.90}
 </pre>
+
+<h3 id="json-structs">Structs to JSON and back<a class="anchor" href="#json-structs" aria-label="Link to this section">#</a></h3>
+<p><code>json.encode(reflect.of(x))</code> writes any value as JSON, by its type's
+<a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
+as the second argument for one member per line). <code>json.decode(text, reflect.of(x))</code>
+fills <code>x</code> from JSON, and <code>json.free(reflect.of(x))</code> gives back what decode
+allocated. A struct is an object of its fields by name, in order; ints, floats and bools are
+numbers and <code>true</code>/<code>false</code>; an enum is its member's name; a
+<code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array is a string;
+other arrays and slices are arrays; a pointer is what it points to, or <code>null</code>.
+Private fields are skipped. A union, a function or a <code>void *</code> can't be JSON.</p>
+<pre data-run><code>import json, mem, reflect;
+
+enum Role { guest, admin };
+struct Tag { u8[] name; i64 weight; };
+struct User { i64 id; String name; Role role; Tag[] tags; };
+
+void main()
+{
+  User u;
+  mem.set(&amp;u, 0, sizeof(User));   // decode fills in what the JSON has
+  json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\",
+    \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}", reflect.of(u));
+  defer json.free(reflect.of(u));
+  printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
+
+  u.id = 8;
+  String text = json.encode(reflect.of(u));
+  defer text.free();
+  printf("%s\n", text);
+
+  try {
+    json.decode("{\"tags\": [{\"weight\": \"high\"}]}", reflect.of(u));
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">7 Ada admin math
+{"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
+tags[0].weight: expected an integer, got a string
+</pre>
+<p>A key the struct has no field for is ignored (<code>"since"</code> above), and a field the
+JSON leaves out keeps what it had, so zero the value first; with <code>json.STRICT</code> as the
+third argument both are errors. Anything that doesn't fit throws <code>json.ERR_DECODE</code>
+with where it is (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. Decode
+allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it fills in;
+<code>json.free</code> frees them all and zeroes them, also after a decode that threw half way,
+so use it only on values decode filled.</p>
 
 <h2 id="dates">Dates and time<a class="anchor" href="#dates" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>import date, mem;
