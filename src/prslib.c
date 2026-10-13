@@ -2196,7 +2196,11 @@ static int parseCountktmFormatSpecs(const char *fmt, int len,
 static int parseIsCFormatFunction(char *fname, int len) {
     return (len == 6 && !strncmp(fname, str_lit("printf"))) ||
            (len == 7 && !strncmp(fname, str_lit("sprintf"))) ||
-           (len == 8 && !strncmp(fname, str_lit("snprintf")));
+           (len == 8 && !strncmp(fname, str_lit("snprintf"))) ||
+           (len == 7 && !strncmp(fname, str_lit("fprintf"))) ||
+           (len == 11 && !strncmp(fname, str_lit("libc.printf"))) ||
+           (len == 13 && !strncmp(fname, str_lit("libc.snprintf"))) ||
+           (len == 12 && !strncmp(fname, str_lit("libc.fprintf")));
 }
 
 /* Position of the format string within a known printf-style call's argument
@@ -2206,8 +2210,12 @@ static int parseIsCFormatFunction(char *fname, int len) {
 static int parseFormatArgIdx(char *fname, int len) {
     /* Feels like we may want to occasionally add to this list? */
     if      (len == 6 && !strncmp(fname, str_lit("printf"))) return 0;
-    else if (len == 7 && !strncmp(fname, str_lit("sprintf"))) return 0;
-    else if (len == 8 && !strncmp(fname, str_lit("snprintf"))) return 0;
+    else if (len == 7 && !strncmp(fname, str_lit("sprintf"))) return 1;
+    else if (len == 8 && !strncmp(fname, str_lit("snprintf"))) return 2;
+    else if (len == 7 && !strncmp(fname, str_lit("fprintf"))) return 1;
+    else if (len == 11 && !strncmp(fname, str_lit("libc.printf"))) return 0;
+    else if (len == 13 && !strncmp(fname, str_lit("libc.snprintf"))) return 2;
+    else if (len == 12 && !strncmp(fname, str_lit("libc.fprintf"))) return 1;
     /* May as well type-check ktm's library too which is even more
      * prone to erroring. */
     else if (len == 10 && !strncmp(fname, str_lit("str.format"))) return 0;

@@ -5500,6 +5500,26 @@ Ast *parseAsmFunctionBinding(Cctrl *cc) {
     }
     c_fname = aoStrDupRaw(tok->start,tok->len);
     int name_line = tok->line, name_col = tok->col;
+
+    /* `_extern _SYM T name;`: C data named by its symbol, as written in
+     * the assembly (macOS's `___stderrp` as libc's `stderr`); in a module,
+     * under the module's name */
+    if (tokenPunctIs(cctrlTokenPeek(cc),';')) {
+        cctrlTokenGet(cc);
+        char *qual = cctrlDeclName(cc, c_fname->data, c_fname->len);
+        char *gname = qual ? qual : c_fname->data;
+        Ast *gvar = astGVar(rettype, gname, strlen(gname), 0);
+        gvar->glabel = asm_fname;
+        gvar->line = name_line;
+        gvar->col = name_col;
+        Ast *decl = astDecl(gvar, NULL);
+        decl->flags |= AST_FLAG_EXTERN;
+        gvar->flags |= AST_FLAG_EXTERN | AST_FLAG_EXTERN_C;
+        mapAdd(cc->global_env, gvar->gname->data, gvar);
+        if (qual && cc->decl_pub) setAdd(cc->pub_names, qual);
+        return decl;
+    }
+
     cc->localenv = cctrlCreateAstMap(cc->localenv);
     cctrlTokenExpect(cc,'(');
 
