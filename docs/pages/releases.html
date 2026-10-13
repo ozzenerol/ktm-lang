@@ -4,6 +4,22 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.13.1 <small>(2026-10-13)</small></h2>
+<p>A clean build and a tidier library reference.</p>
+<ul>
+  <li>Building ktm prints no C compiler warnings. One was a real risk: a loop counter that was
+  live across a <code>setjmp</code> could come back stale after an error inside a generic
+  instance.</li>
+  <li>Building the standard library prints no warnings either. "module rt is imported but not
+  used" was wrong for files whose only use of <code>rt</code> is a <code>throw</code> with a
+  message, and the imports that really were unused are gone.</li>
+  <li><code>fs</code> no longer has its own <code>opendir</code> and <code>readdir</code>
+  declarations, which repeated <code>libc</code>'s and showed up in the library reference as
+  <code>fs.opendir</code>, <code>fs.readdir</code> and <code>fs.libc.*</code>.</li>
+  <li>The Neovim setup in <a href="tools.html">Tools</a> covers lazy.nvim, which resets the
+  runtime path: list ktm's vim directory in <code>performance.rtp.paths</code>.</li>
+</ul>
+
 <h2>v0.13.0 <small>(2026-10-13)</small></h2>
 <p>Ahead of Go on every load. On Linux the coroutine loop now runs on io_uring, and a
 coroutine-per-connection server written the plain way (<code>coro.serve</code>,

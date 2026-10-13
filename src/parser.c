@@ -5674,8 +5674,9 @@ static void parseGenericSkipParams(Cctrl *cc) {
     while ((t = cctrlTokenGet(cc)) != NULL && !tokenPunctIs(t, '>'));
 }
 
-/* How many errors have been reported so far */
-static u64 parseErrorCount(Cctrl *cc) {
+/* How many errors have been reported so far. Not inlined: parseGenericReplay
+ * calls it next to a setjmp, and gcc's -Wclobbered then flags its counter */
+__attribute__((noinline)) static u64 parseErrorCount(Cctrl *cc) {
     u64 n = 0;
     for (u64 i = 0; cc->diagnostics && i < cc->diagnostics->size; ++i) {
         CctrlDiagnostic *d = cc->diagnostics->entries[i];
@@ -6121,18 +6122,24 @@ Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
     return args;
 }
 
+/* Parse instance `in`; an error in it ends just that instance. The setjmp
+ * has a frame of its own, so the caller's loop counter isn't live across
+ * it (a longjmp could otherwise bring back a stale one) */
+static void parseGenericReplayGuarded(Cctrl *cc, GenericInst *in) {
+    jmp_buf recovery;
+    jmp_buf *prev = cc->current_recovery;
+    cc->current_recovery = &recovery;
+    if (setjmp(recovery) == 0) {
+        parseGenericReplay(cc, in->def, in);
+    }
+    cc->current_recovery = prev;
+}
+
 /* The method and function bodies of every instance, after the file; an
  * instance made by one of them is added to the end and parsed too */
 void parseGenericFlush(Cctrl *cc) {
     for (u64 i = 0; cc->generic_pending && i < cc->generic_pending->size; ++i) {
-        GenericInst *in = cc->generic_pending->entries[i];
-        jmp_buf recovery;
-        jmp_buf *prev = cc->current_recovery;
-        cc->current_recovery = &recovery;
-        if (setjmp(recovery) == 0) {
-            parseGenericReplay(cc, in->def, in);
-        }
-        cc->current_recovery = prev;
+        parseGenericReplayGuarded(cc, cc->generic_pending->entries[i]);
     }
 }
 
