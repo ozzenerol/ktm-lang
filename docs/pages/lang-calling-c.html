@@ -21,6 +21,35 @@ void main()
 1
 </pre>
 
+<h3>Streams and exit codes</h3>
+<p><code>libc.stdin</code>, <code>libc.stdout</code> and <code>libc.stderr</code> are C's streams, for
+<code>libc.fprintf</code> and <code>libc.fflush</code>. <code>printf</code> writes to <code>libc.stdout</code>, so
+the two stay in order. <code>libc.EXIT_SUCCESS</code> and <code>libc.EXIT_FAILURE</code> are
+<code>exit</code>'s statuses, as in C.</p>
+<pre data-run><code>
+import libc;
+
+i32 main(i32 argc, u8 **argv)
+{
+  printf("checking %d files\n", 2);
+  libc.fprintf(libc.stdout, "%s: ok\n", "a.txt");
+  if (argc > 5) {
+    libc.fprintf(libc.stderr, "usage: %s [file]\n", argv[0]);
+    libc.exit(libc.EXIT_FAILURE);
+  }
+  libc.exit(libc.EXIT_SUCCESS);
+  return 0;
+}
+</code></pre>
+<pre class="output">
+checking 2 files
+a.txt: ok
+</pre>
+<ul class="rules">
+  <li><code>libc.fprintf</code>'s format is checked against its arguments as <code>printf</code>'s is.</li>
+  <li><code>os.eprintf</code> and <code>os.exit</code> do the same in ktm's own style; see <a href="lib-environment.html">Environment</a>.</li>
+</ul>
+
 <h2>Declaring a C function</h2>
 <p>For anything libc doesn't declare, write the prototype yourself with <code>extern "c"</code>.</p>
 <pre data-run><code>
@@ -70,6 +99,17 @@ void main()
 <pre class="output">
 1
 </pre>
+<p>When the symbol isn't the name you want, or differs between systems, <code>_extern</code> gives the symbol
+as the assembly spells it, then the declaration. libc declares <code>stderr</code> this way, because macOS
+calls it <code>__stderrp</code> (with Mach-O's leading <code>_</code>):</p>
+<pre><code>
+#ifdef IS_MACOS
+pub _extern ___stderrp FILE *stderr;
+#else
+pub _extern stderr FILE *stderr;
+#endif
+</code></pre>
+<p>In a module, the name is the module's like any other: <code>libc.stderr</code>.</p>
 
 <h2>C structs</h2>
 <p>Declare the struct with the same fields in the same order: the layout is C's.</p>
