@@ -224,6 +224,27 @@ void main()
 <pre class="output">GET | /index.html | HTTP/1.1 | file index.html
 </pre>
 
+<h2 id="numbers-from-text">Numbers from text<a class="anchor" href="#numbers-from-text" aria-label="Link to this section">#</a></h2>
+<p><code>str.toInt(s, &amp;n)</code>, <code>str.toUint(s, &amp;u)</code> and <code>str.toFloat(s, &amp;f)</code> read the whole of a
+<code>u8[]</code> (or a String) as a number and return whether it was one: no spaces, nothing after it, and it must fit.
+On false the variable is left as it was. Integers take <code>0x</code> and <code>0b</code> prefixes; they work as methods too.</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] line = "port=8080";
+  i64 port = 80;
+  if (!str.toInt(line[5:], &amp;port)) { printf("bad port\n"); }
+  f64 ratio;
+  bool ok = "0.75".toFloat(&amp;ratio);
+  i64 n = -1;
+  bool bad = str.toInt("12abc", &amp;n);
+  printf("%d %d %.2f %d %d\n", port, ok, ratio, bad, n);
+}
+</code></pre>
+<pre class="output">8080 1 0.75 0 -1
+</pre>
+
 <h2 id="characters">Characters<a class="anchor" href="#characters" aria-label="Link to this section">#</a></h2>
 <p><code>str.toUpper(c)</code>, <code>str.toLower(c)</code> and <code>str.isSpace(c)</code> work on one byte (ASCII).</p>
 <pre data-run><code>import str;
@@ -273,7 +294,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#making-a-string">Making a String</a></li><li><a href="#changing-a-string">Changing a String</a></li><li><a href="#reading-text">Reading text</a></li><li><a href="#characters">Characters</a></li><li><a href="#utf-8">UTF-8</a></li><li><a href="#more">More</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#making-a-string">Making a String</a></li><li><a href="#changing-a-string">Changing a String</a></li><li><a href="#reading-text">Reading text</a></li><li><a href="#numbers-from-text">Numbers from text</a></li><li><a href="#characters">Characters</a></li><li><a href="#utf-8">UTF-8</a></li><li><a href="#more">More</a></li></ul></nav>
 </div>
 </body>
 </html>
