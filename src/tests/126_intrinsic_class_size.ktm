@@ -9,7 +9,7 @@ import cstr, fs, libc, mem, proc, test;
 #define INTR_FILE "__126_intrinsic_class_size.ktm"
 #define INTR_OUT  "__126_intrinsic_class_size.out"
 
-#define MSG_EOF "Unexpected end of input while parsing class Foo"
+#define MSG_EOF "Unexpected end of input while parsing struct Foo"
 
 u16 struct Pair126 {
     u8 lo;

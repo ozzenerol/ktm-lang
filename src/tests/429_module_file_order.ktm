@@ -103,7 +103,7 @@ i32 main() {
     tests++;
     if (compiles("module m;\npub struct A { Missing x; B *b; };\n",
                              "module m;\npub struct B { i64 v; };\n",
-                             1, "Unexpected type `Missing` while parsing class m.A")) {
+                             1, "Unexpected type `Missing` while parsing struct m.A")) {
         correct++;
                              }
 
