@@ -302,6 +302,8 @@ typedef struct Cctrl {
     /* `@json @yaml` read before a declaration (AstAttr *), for the struct
      * it must be (parseAttrs) */
     Vec *pending_attrs;
+    /* the @json structs whose methods were made (parseJsonGenerate) */
+    Set *json_done;
     int quiet_errors;
     /* The declaration being parsed is `pub`; it comes from the main
      * program (not a module, not a stdlib header) */
