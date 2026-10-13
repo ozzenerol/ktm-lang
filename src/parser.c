@@ -5887,6 +5887,8 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
     d->params = h.params;
     d->toks = toks;
     d->module_id = first->module_id;
+    AoStr *mpath = cctrlModulePath(cc, first->module_id);
+    d->module_path = mpath ? aoStrDup(mpath) : NULL;
     d->is_pub = h.is_pub;
     d->at = h.name;
     d->file_id = ast_file_hint;
@@ -5963,8 +5965,36 @@ static AoStr *parseGenericInstName(AoStr *name, Vec *args) {
 /* Parse definition `d`'s tokens again as instance `in`: its parameters
  * bound to the arguments, the parser's state saved around it. An error
  * in it is reported where it is and where the instance was asked for. */
+/* `d` was recorded by another parse whose lexer numbered the modules
+ * differently (the LSP's bootstrap, which reads rt and the prelude and
+ * what they import, before each document's parse): its tokens get this
+ * lexer's number for its module */
+static void parseGenericRenumber(Cctrl *cc, GenericDef *d) {
+    if (!d->module_path || !cc->lexer_) return;
+    AoStr *now_path = cctrlModulePath(cc, d->module_id);
+    if (now_path && now_path->len == d->module_path->len &&
+        !memcmp(now_path->data, d->module_path->data, now_path->len)) {
+        return;
+    }
+    for (int i = 0; i < cc->lexer_->modules_len; ++i) {
+        AoStr *p = cc->lexer_->modules[i]->path;
+        if (p->len != d->module_path->len ||
+            memcmp(p->data, d->module_path->data, p->len)) {
+            continue;
+        }
+        u32 old_id = d->module_id, new_id = (u32)i + 1;
+        for (u64 t = 0; t < d->toks->size; ++t) {
+            Lexeme *tok = d->toks->entries[t];
+            if (tok->module_id == old_id) tok->module_id = new_id;
+        }
+        d->module_id = new_id;
+        return;
+    }
+}
+
 static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     Vec *toks = d->toks;
+    parseGenericRenumber(cc, d);
     u64 cap = roundUpToNextPowerOf2(toks->size + 1);
     if (cap < 16) cap = 16;
     Lexeme **ring = (Lexeme **)malloc(cap * sizeof(Lexeme *));
