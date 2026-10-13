@@ -40,6 +40,7 @@ pub struct Logger {
     i32 fd;
     i64 size;          /* bytes in the file now */
     i64 failed;        /* lines a failed write or rotation dropped */
+    i64 whereWidth;    /* the widest file:line / function part so far */
     libc.pthread_mutex_t lock;
 };
 
@@ -163,11 +164,18 @@ static void logWrite(Logger *lg, Level level, u8 *file, i64 line, u8 *func,
     u8 *msg = cstr.formatArgs(null, fmt, args);
     String rest = str.new();
     defer rest.free();
-    rest.appendByte(' ');
-    rest.append(cstr.view(gLogLevelNames[level]));
-    rest.appendByte(' ');
+    /* the messages in one column: the level as wide as the widest name,
+     * the file:line and function part as wide as the widest one so far
+     * (at least 20) */
+    rest.appendFormat(" %-5s ", gLogLevelNames[level]);
+    i64 whereStart = rest.len;
     if (lg.opts.showFile) { rest.appendFormat("%s:%d ", logBaseName(file), line); }
     if (lg.opts.showFunc && func[0]) { rest.appendFormat("%s: ", func); }
+    i64 whereLen = rest.len - whereStart;
+    if (whereLen > 0) {
+        if (whereLen > lg.whereWidth) { lg.whereWidth = whereLen < 20 ? 20 : whereLen; }
+        for (i64 i = whereLen; i < lg.whereWidth; i++) { rest.appendByte(' '); }
+    }
     for (u8 *p = msg; p && *p; p++) {
         if (*p == '\n') { rest.append("\\n"); }
         else if (*p == '\r') { rest.append("\\r"); }
