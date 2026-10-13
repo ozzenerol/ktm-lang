@@ -29,9 +29,21 @@ u8[] lineAfterTime(u8[] text, i64 n) {
     return text[0:0];
 }
 
+/* the line with each run of spaces as one: the level and file:line
+ * columns are padded to line the messages up (v0.18.0) */
+String squeeze(u8[] l) {
+    String s = str.new();
+    for (i64 i = 0; i < l.len; i++) {
+        if (l[i] == ' ' && i > 0 && l[i - 1] == ' ') { continue; }
+        s.appendByte(l[i]);
+    }
+    return s;
+}
+
 bool lineIs(u8[] text, i64 n, u8 *want) {
     u8[] got = lineAfterTime(text, n);
-    bool ok = str.equals(got, cstr.view(want));
+    ad String flat = squeeze(got);
+    bool ok = str.equals(flat, cstr.view(want));
     if (!ok) { printf("\n  line %d: got [%.*s] want [%s]", n, got.len, got.ptr, want); }
     return ok;
 }

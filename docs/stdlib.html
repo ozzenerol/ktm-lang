@@ -750,6 +750,7 @@ Options isn&#x27;t zeroed), then change what you need.</p></div><div class="decl
     i32 fd;
     i64 size;
     i64 failed;
+    i64 whereWidth;
     libc.pthread_mutex_t lock;
 };</code></pre><p class="doc">An open log: make one with log.open, write with lg.info(...) and the
 others, end it with lg.close(). <code>level</code> can be changed at any time; the

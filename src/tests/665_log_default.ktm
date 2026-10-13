@@ -27,9 +27,21 @@ u8[] lineAfterTime(u8[] text, i64 n) {
     return text[0:0];
 }
 
+/* the line with each run of spaces as one: the level and file:line
+ * columns are padded to line the messages up (v0.18.0) */
+String squeeze(u8[] l) {
+    String s = str.new();
+    for (i64 i = 0; i < l.len; i++) {
+        if (l[i] == ' ' && i > 0 && l[i - 1] == ' ') { continue; }
+        s.appendByte(l[i]);
+    }
+    return s;
+}
+
 bool lineIs(u8[] text, i64 n, u8 *want) {
     u8[] got = lineAfterTime(text, n);
-    bool ok = str.equals(got, cstr.view(want));
+    ad String flat = squeeze(got);
+    bool ok = str.equals(flat, cstr.view(want));
     if (!ok) { printf("\n  line %d: got [%.*s]\n          want [%s]", n, got.len, got.ptr, want); }
     return ok;
 }
@@ -76,12 +88,12 @@ i32 main()
           "shutdown goes back to stderr at INFO");
 
     String text = fs.readAll(LOG_FILE);
-    check(lineIs(text, 0, "INFO 665_log_default.ktm:57 main: from main"), "a call from main");
-    check(lineIs(text, 1, "INFO 665_log_default.ktm:39 helper: info two"), "below the level is skipped");
-    check(lineIs(text, 2, "DEBUG 665_log_default.ktm:38 helper: debug 1"), "setLevel debug");
-    check(lineIs(text, 3, "INFO 665_log_default.ktm:39 helper: info two"), "the call's own line");
-    check(lineIs(text, 4, "ERROR 665_log_default.ktm:63 main: err\\nline"), "setLevel error");
-    check(lineIs(text, 5, "WARN 665_log_default.ktm:72 main: still here"), "the old logger kept");
+    check(lineIs(text, 0, "INFO 665_log_default.ktm:69 main: from main"), "a call from main");
+    check(lineIs(text, 1, "INFO 665_log_default.ktm:51 helper: info two"), "below the level is skipped");
+    check(lineIs(text, 2, "DEBUG 665_log_default.ktm:50 helper: debug 1"), "setLevel debug");
+    check(lineIs(text, 3, "INFO 665_log_default.ktm:51 helper: info two"), "the call's own line");
+    check(lineIs(text, 4, "ERROR 665_log_default.ktm:75 main: err\\nline"), "setLevel error");
+    check(lineIs(text, 5, "WARN 665_log_default.ktm:84 main: still here"), "the old logger kept");
     check(lineAfterTime(text, 6).len == 0, "nothing more");
     text.free();
     fs.remove(LOG_FILE);

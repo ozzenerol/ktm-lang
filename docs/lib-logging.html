@@ -71,12 +71,12 @@ void main()
   lg.debug("not written: below INFO");
 }
 </code></pre>
-<pre class="output">2026-10-13T14:02:11.482Z INFO listening on :8080
-2026-10-13T14:02:11.483Z WARN slow request: 950 ms
+<pre class="output">2026-10-13T14:02:11.482Z INFO  listening on :8080
+2026-10-13T14:02:11.483Z WARN  slow request: 950 ms
 2026-10-13T14:02:11.483Z ERROR db: connection refused
 </pre>
 <ul class="rules">
-  <li>Each line is the time in UTC with milliseconds, the level's name, then the message.</li>
+  <li>Each line is the time in UTC with milliseconds, the level's name, then the message. The level, and the file:line and function part when shown, are padded so the messages line up in one column.</li>
   <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments,
   checked as <code>printf</code>'s are; <code>%s</code> takes a C string, a String or a <code>u8[]</code>.</li>
   <li>A newline in a message is written as <code>\n</code>, so one call is always one line.</li>
@@ -115,10 +115,10 @@ void main()
 }
 </code></pre>
 <pre class="output">app.log:
-2026-10-13T14:02:11.482Z INFO main.ktm:13 main: starting
-2026-10-13T14:02:11.482Z WARN cli.ktm:9 cli.run: no args given
-2026-10-13T14:02:11.483Z DEBUG cli.ktm:8 cli.run: args: 0
-2026-10-13T14:02:11.483Z WARN cli.ktm:9 cli.run: no args given
+2026-10-13T14:02:11.482Z INFO  main.ktm:13 main:        starting
+2026-10-13T14:02:11.482Z WARN  cli.ktm:9 cli.run:      no args given
+2026-10-13T14:02:11.483Z DEBUG cli.ktm:8 cli.run:      args: 0
+2026-10-13T14:02:11.483Z WARN  cli.ktm:9 cli.run:      no args given
 </pre>
 <ul class="rules">
   <li>Until <code>log.setup</code> is called, <code>log.info(...)</code> and the others write to stderr at INFO, so a small program needs no setup at all.</li>
@@ -167,7 +167,7 @@ void main()
 }
 </code></pre>
 <p><code>app.log</code>:</p>
-<pre class="output">2026-10-13T14:02:11.482Z INFO main.ktm:17 main: listening on :8080
+<pre class="output">2026-10-13T14:02:11.482Z INFO  main.ktm:17 main:        listening on :8080
 2026-10-13T14:02:11.483Z WARN main.ktm:5 serve: slow request: 950 ms
 </pre>
 <p>The compiler fills in the file, line and function at each call, with
