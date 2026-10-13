@@ -1870,19 +1870,19 @@ struct User {
 
 void main()
 {
-  User u = json.decode&amp;lt;User&amp;gt;("{\"id\": 7, \"display-name\": \"Ada\", \"role\": \"admin\",
+  User u = json.decode&lt;User&gt;("{\"id\": 7, \"display-name\": \"Ada\", \"role\": \"admin\",
     \"tags\": [{\"name\": \"math\", \"weight\": 3}, {\"name\": \"poetry\"}]}");
   defer u.freeDecoded();
   printf("%d %s %s %d tags\n", u.id, u.name, reflect.name(u.role), u.tags.len);
 
   json.Writer w = json.writerNew();
-  u.toJson(&amp;amp;w);
+  u.toJson(&amp;w);
   String text = w.take();
   defer text.free();
   printf("%s\n", text);
 
   yaml.Writer y = yaml.writerNew();
-  u.toYaml(&amp;amp;y);
+  u.toYaml(&amp;y);
   String doc = y.take();
   defer doc.free();
   printf("%s", doc);
