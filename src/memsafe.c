@@ -21,12 +21,20 @@
 #endif
 #include <dlfcn.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <mach-o/loader.h>
+#include <mach/vm_prot.h>
+#else
+#include <link.h>
+#endif
 #if defined(__linux__)
 #include <elf.h>
 #include <fcntl.h>
@@ -636,6 +644,141 @@ void memsafeDumpLive(FILE *f) {
 static int memsafe_reported = 0;
 static pid_t memsafe_exit_pid = 0;
 
+/* ---- what is still reachable at exit ----
+ *
+ * Like valgrind's "definitely lost" and "still reachable": a block some
+ * root still points to (a global, libktm's data, or while exit() runs,
+ * the stack and registers of the code that called it) is not a leak, as
+ * the program could still have freed it; only a block nothing points to
+ * is. Pointers are found conservatively: any aligned word holding an
+ * address inside a live block (its start or anywhere in it). */
+
+/* Where the program's code was when it called exit(): the top of the
+ * stack to scan (0 = main returned: its variables are gone) */
+static uintptr_t memsafe_exit_sp = 0;
+static jmp_buf memsafe_exit_regs;
+
+typedef struct MemsafeMark {
+    MemsafeEntry **e;   /* sorted by address */
+    u8 *marked;
+    u64 n;
+    u64 *work;
+    u64 nwork;
+} MemsafeMark;
+
+static int memsafeCmpAddr(const void *a, const void *b) {
+    uintptr_t pa = (uintptr_t)(*(MemsafeEntry *const *)a)->ptr;
+    uintptr_t pb = (uintptr_t)(*(MemsafeEntry *const *)b)->ptr;
+    return pa < pb ? -1 : pa > pb;
+}
+
+/* The block holding address w, -1 for none */
+static s64 memsafeBlockAt(MemsafeMark *m, uintptr_t w) {
+    s64 lo = 0, hi = (s64)m->n - 1, found = -1;
+    while (lo <= hi) {
+        s64 mid = lo + (hi - lo) / 2;
+        if ((uintptr_t)m->e[mid]->ptr <= w) { found = mid; lo = mid + 1; }
+        else hi = mid - 1;
+    }
+    if (found < 0) return -1;
+    MemsafeEntry *e = m->e[found];
+    if (w >= (uintptr_t)e->ptr + (e->size ? e->size : 1)) return -1;
+    return found;
+}
+
+static void memsafeScan(MemsafeMark *m, uintptr_t lo, uintptr_t hi) {
+    lo = (lo + sizeof(uintptr_t) - 1) & ~(uintptr_t)(sizeof(uintptr_t) - 1);
+    for (uintptr_t a = lo; a + sizeof(uintptr_t) <= hi; a += sizeof(uintptr_t)) {
+        uintptr_t w = *(uintptr_t *)a;
+        if (w < 4096) continue;
+        s64 i = memsafeBlockAt(m, w);
+        if (i >= 0 && !m->marked[i]) {
+            m->marked[i] = 1;
+            m->work[m->nwork++] = (u64)i;
+        }
+    }
+}
+
+static size_t memsafeArenaSize(void *p) {
+#if defined(__APPLE__)
+    return malloc_size(p);
+#else
+    return malloc_usable_size(p);
+#endif
+}
+
+/* libktm's writable data (its module globals: the default logger, ...) */
+#if defined(__APPLE__)
+static void memsafeScanLibData(MemsafeMark *m) {
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; ++i) {
+        const char *name = _dyld_get_image_name(i);
+        const char *base = name ? strrchr(name, '/') : NULL;
+        base = base ? base + 1 : name;
+        if (!base || strncmp(base, "libktm", 6) != 0) continue;
+        const struct mach_header_64 *mh =
+            (const struct mach_header_64 *)_dyld_get_image_header(i);
+        intptr_t slide = _dyld_get_image_vmaddr_slide(i);
+        const u8 *lc = (const u8 *)(mh + 1);
+        for (uint32_t c = 0; c < mh->ncmds; ++c) {
+            const struct load_command *cmd = (const struct load_command *)lc;
+            if (cmd->cmd == LC_SEGMENT_64) {
+                const struct segment_command_64 *seg =
+                    (const struct segment_command_64 *)cmd;
+                if ((seg->initprot & VM_PROT_WRITE) && seg->vmsize) {
+                    uintptr_t lo = (uintptr_t)seg->vmaddr + slide;
+                    memsafeScan(m, lo, lo + seg->vmsize);
+                }
+            }
+            lc += cmd->cmdsize;
+        }
+    }
+}
+#else
+static int memsafeLibDataCb(struct dl_phdr_info *info, size_t size, void *arg) {
+    (void)size;
+    const char *base = info->dlpi_name ? strrchr(info->dlpi_name, '/') : NULL;
+    base = base ? base + 1 : info->dlpi_name;
+    if (!base || strncmp(base, "libktm", 6) != 0) return 0;
+    for (int i = 0; i < info->dlpi_phnum; ++i) {
+        const ElfW(Phdr) *ph = &info->dlpi_phdr[i];
+        if (ph->p_type != PT_LOAD || !(ph->p_flags & PF_W)) continue;
+        uintptr_t lo = info->dlpi_addr + ph->p_vaddr;
+        memsafeScan((MemsafeMark *)arg, lo, lo + ph->p_memsz);
+    }
+    return 0;
+}
+
+static void memsafeScanLibData(MemsafeMark *m) {
+    dl_iterate_phdr(memsafeLibDataCb, m);
+}
+#endif
+
+/* Mark every block reachable from the roots; marked[i] for m->e[i] */
+static void memsafeMarkReachable(MemsafeMark *m) {
+    if (memsafe_jit) {
+        listForEach(memsafe_jit->globals_arenas) {
+            uintptr_t lo = (uintptr_t)it->value;
+            memsafeScan(m, lo, lo + memsafeArenaSize(it->value));
+        }
+    }
+    memsafeScanLibData(m);
+    if (memsafe_exit_sp) {
+        uintptr_t lo, hi;
+        memsafeThreadStack(&lo, &hi);
+#if defined(__linux__)
+        if (hi <= lo) hi = memsafe_stack_hi;
+#endif
+        if (hi > memsafe_exit_sp) memsafeScan(m, memsafe_exit_sp, hi);
+        memsafeScan(m, (uintptr_t)&memsafe_exit_regs,
+                    (uintptr_t)&memsafe_exit_regs + sizeof(memsafe_exit_regs));
+    }
+    while (m->nwork) {
+        MemsafeEntry *e = m->e[m->work[--m->nwork]];
+        memsafeScan(m, (uintptr_t)e->ptr, (uintptr_t)e->ptr + e->size);
+    }
+}
+
 void memsafeReportLeaks(FILE *f) {
     memsafe_reported = 1;
     if (memsafe_live == NULL) return;
@@ -648,9 +791,41 @@ void memsafeReportLeaks(FILE *f) {
     fflush(stdout);
     u64 total = 0;
     Vec *v = memsafeCollect(&total);
-    fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) never freed\n",
-            (unsigned long long)v->size, (unsigned long long)total);
-    memsafeList(f, v);
+    MemsafeMark m;
+    m.n = v->size;
+    m.e = malloc(sizeof(MemsafeEntry *) * m.n);
+    m.marked = calloc(m.n, 1);
+    m.work = malloc(sizeof(u64) * m.n);
+    m.nwork = 0;
+    for (u64 i = 0; i < m.n; ++i) m.e[i] = vecGet(MemsafeEntry *, v, i);
+    qsort(m.e, m.n, sizeof(MemsafeEntry *), memsafeCmpAddr);
+    memsafeMarkReachable(&m);
+
+    Vec *lost = vecNew(&vec_unsigned_long_type);
+    u64 lost_bytes = 0, kept = 0, kept_bytes = 0;
+    for (u64 i = 0; i < m.n; ++i) {
+        if (m.marked[i]) {
+            kept++;
+            kept_bytes += m.e[i]->size;
+        } else {
+            vecPush(lost, m.e[i]);
+            lost_bytes += m.e[i]->size;
+        }
+    }
+    if (lost->size) {
+        fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) never freed\n",
+                (unsigned long long)lost->size, (unsigned long long)lost_bytes);
+        memsafeList(f, lost);
+    }
+    if (kept) {
+        fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) still in use at "
+                "exit (held by globals or live variables): not leaks\n",
+                (unsigned long long)kept, (unsigned long long)kept_bytes);
+    }
+    vecRelease(lost);
+    free(m.e);
+    free(m.marked);
+    free(m.work);
     vecRelease(v);
     fflush(f);
     memsafeUnlock();
@@ -660,7 +835,24 @@ void memsafeReportLeaks(FILE *f) {
  * once, from the process that ran it (not a forked child) */
 static void memsafeExitReport(void) {
     if (memsafe_reported || getpid() != memsafe_exit_pid) return;
+    if (!memsafe_exit_sp) {
+        setjmp(memsafe_exit_regs);
+        memsafe_exit_sp = (uintptr_t)__builtin_frame_address(0);
+    }
     memsafeReportLeaks(stderr);
+}
+
+/* (memsafe_exit_regs: the registers of the code that called exit(); a
+ * register-allocated variable is as live as one on the stack) */
+
+/* The program's exit(): note its caller's stack and registers, so what
+ * its variables hold is still reachable, then the real exit. The scan
+ * starts at the caller's frame, not below it: a function that returned
+ * before exit() left stale pointers down there. */
+static void memsafeExit(int code) {
+    setjmp(memsafe_exit_regs);
+    memsafe_exit_sp = (uintptr_t)__builtin_frame_address(0) + 2 * sizeof(uintptr_t);
+    exit(code);
 }
 
 void memsafeReportAtExit(void) {
@@ -702,6 +894,12 @@ void memsafeInit(KtmJit *jit) {
      * implementations at every JIT'd call site. Both the asm-label
      * spellings (_MALLOC on x86_64) and the compiled-ktm ones (Free
      * on aarch64) are covered; register before any chunk compiles. */
+    /* exact names: "_exit" on Linux is the other function */
+#if defined(__APPLE__)
+    mapAdd(jit->host_symbols, strdup("_exit"), (void *)(uintptr_t)memsafeExit);
+#else
+    mapAdd(jit->host_symbols, strdup("exit"), (void *)(uintptr_t)memsafeExit);
+#endif
     ktmJitDefineSymbol(jit, "_MALLOC",  (void *)(uintptr_t)memsafeMAlloc);
     ktmJitDefineSymbol(jit, "_CALLOC",  (void *)(uintptr_t)memsafeCAlloc);
     ktmJitDefineSymbol(jit, "_REALLOC", (void *)(uintptr_t)memsafeReAlloc);
