@@ -3890,6 +3890,7 @@ void irLowerAst(IrCtx *ctx, Ast *ast) {
         case AST_LVAR:
             break;
 
+        case AST_CLASS_REF:
         case AST_TERNARY:
         case AST_BINOP: {
             irExpr(ctx, ast);
