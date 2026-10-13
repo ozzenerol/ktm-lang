@@ -93,10 +93,10 @@ static void decodeStruct(Value *n, reflect.Value v, String *path, i64 flags)
     if (n.type != OBJECT) { decodeFail(path, "an object", n); }
     i64 mark = path.len;
     for (auto f : v.type.fields) {
-        if (f.isPrivate) { continue; }
-        Value *child = objectGet(n, f.name);
+        if (f.isPrivate || f.skip) { continue; }
+        Value *child = objectGet(n, f.key);
         if (mark) { path.append("."); }
-        path.append(f.name);
+        path.append(f.key);
         if (child) {
             decodeInto(child, reflect.__value((u8 *)v.ptr + f.offset, f.type), path, flags);
         } else if (flags & STRICT) {
@@ -108,7 +108,7 @@ static void decodeStruct(Value *n, reflect.Value v, String *path, i64 flags)
     for (Value *c = n.object; c; c = c.next) {
         bool known = false;
         for (auto f : v.type.fields) {
-            if (!f.isPrivate && f.name.equals(c.key)) { known = true; }
+            if (!f.isPrivate && !f.skip && f.key.equals(c.key)) { known = true; }
         }
         if (!known) {
             if (mark) { path.append("."); }
@@ -256,6 +256,15 @@ pub void decode(u8[] text, reflect.Value v, i64 flags = 0)
     if (!v.type || !v.ptr) {
         throw(ERR_DECODE, "decode: the value has no type (use reflect.of(x))");
     }
+    if (v.type.fromJson && !(flags & STRICT)) {
+        /* @json: its generated method reads the text itself, no tree */
+        fn(void *, Reader *) void fromJson = v.type.fromJson;
+        Reader r = readerNew(text);
+        defer r.free();
+        fromJson(v.ptr, &r);
+        r.finish();
+        return;
+    }
     Value *doc = parse(text);
     defer release(doc);
     if (!ok(doc)) {
@@ -294,6 +303,11 @@ pub void free(reflect.Value v)
 {
     reflect.Type *t = v.type;
     if (!t || !v.ptr) { return; }
+    if (t.freeDecoded) {
+        fn(void *) void freeDecoded = t.freeDecoded;
+        freeDecoded(v.ptr);
+        return;
+    }
     switch (t.kind) {
         case reflect.Kind.string:
             String *s = v.ptr;
@@ -334,7 +348,7 @@ pub void free(reflect.Value v)
                 return;
             }
             for (auto f : t.fields) {
-                if (!f.isPrivate) {
+                if (!f.isPrivate && !f.skip) {
                     free(reflect.__value((u8 *)v.ptr + f.offset, f.type));
                 }
             }
