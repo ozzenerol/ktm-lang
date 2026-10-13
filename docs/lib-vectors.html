@@ -59,7 +59,7 @@
 <p>At a glance</p>
 <pre><code>ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();   // freed at the end of the scope
 v.push(3);  v.get(0);  v.set(0, 4);  v.pop();
-v.len   v.items()                       // count; a T[] view
+v.len   v.items()   v.contains(3)       // count; a T[] view; bool
 for (auto x : v) { ... }
 v.sortAsc();  v.sort(&amp;cmp);
 sort.asc(slice);  sort.slice(slice, &amp;cmp);</code></pre>
@@ -96,6 +96,7 @@ array, not what the items point to.</p>
     <tr><td><code>pop(&amp;ok)</code>, <code>last(&amp;ok)</code></td><td>Removes / reads the last item</td></tr>
     <tr><td><code>insert(i, x)</code>, <code>removeAt(i)</code></td><td>Inserts or removes, keeping the order</td></tr>
     <tr><td><code>items()</code></td><td>A <code>T[]</code> view (valid until the Vec grows)</td></tr>
+    <tr><td><code>contains(x)</code></td><td><code>bool</code>: whether <code>x</code> is one of the items; a String or <code>u8[]</code> by its text, anything else by its value</td></tr>
     <tr><td><code>sort(cmp)</code>, <code>sortAsc()</code></td><td>Sorts in place</td></tr>
     <tr><td><code>reserve(n)</code>, <code>clear()</code>, <code>free()</code></td><td>Room for <code>n</code> more; empty it, keeping the room; free it</td></tr>
   </tbody>

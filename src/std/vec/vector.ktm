@@ -109,6 +109,27 @@ pub T[] Vec<T>.items() {
     return self.data[0:self.len];
 }
 
+/* Whether two items are equal, for contains: strings by their bytes,
+ * anything else by its value (as map.keyEq) */
+bool vecItemEq(u8[] a, u8[] b) {
+    return a.len == b.len && (a.len == 0 || libc.memcmp(a.ptr, b.ptr, a.len) == 0);
+}
+bool vecItemEq(String a, String b) {
+    return a.len == b.len && (a.len == 0 || libc.memcmp(a.ptr, b.ptr, a.len) == 0);
+}
+bool vecItemEq<T>(T a, T b) {
+    return libc.memcmp(&a, &b, sizeof(T)) == 0;
+}
+
+/* Whether x is one of the items: a String or u8[] by its text, a number
+ * or pointer by its value, a struct by its bytes */
+pub bool Vec<T>.contains(T x) {
+    for (i64 i = 0; i < self.len; ++i) {
+        if (vecItemEq(self.data[i], x)) { return true; }
+    }
+    return false;
+}
+
 /* Sorted with cmp(a, b): negative when a goes first, 0 when equal,
  * positive when b goes first (sort.slice) */
 pub void Vec<T>.sort(fn(T *, T *) i64 cmp) {
