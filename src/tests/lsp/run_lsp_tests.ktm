@@ -334,6 +334,14 @@ void initFixtures() {
         "  LibPoint p;\n"
         "  p.x = Square(counter);\n"
         "  return p.x;\n"
+        "}\n"
+        "void *Keep(void *arg = null)\n"
+        "{\n"
+        "  return arg;\n"
+        "}\n"
+        "void *Use()\n"
+        "{\n"
+        "  return Keep();\n"
         "}\n";
     /* A non-ASCII line: utf-16 columns differ from byte columns. */
     UTF_HC =
@@ -1186,6 +1194,11 @@ void testRegressions() {
     json.Value *resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
     check("hover names every param, defaults included",
                 hoverContains(resp, "Square(i64 n, i64 scale=2)"));
+
+    posOf(REG_HC, "Keep();", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows a null default as null",
+                hoverContains(resp, "Keep(void *arg=null)"));
 
     posOf(REG_HC, "counter);", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
