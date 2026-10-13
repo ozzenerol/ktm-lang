@@ -32,7 +32,7 @@ i32 main() {
     u8 *out = memsafe("import libc, str;\nvoid main() {\n    String s = str.from(\"leaked\");\n"
                       "    printf(\"end\");\n    libc.exit(3);\n}\n");
     check(out && libc.strstr(out, "end") && count(out, "memsafe: 1 allocation(s)") == 1 &&
-          libc.strstr(out, "line 3") && libc.strstr(out, "rc=3"),
+          libc.strstr(out, ".ktm:3 in main, via str.from") && libc.strstr(out, "rc=3"),
           "a String leaked before libc.exit", out);
 
     out = memsafe("import libc, str;\nvoid main() {\n    String s = str.from(\"freed\");\n"
