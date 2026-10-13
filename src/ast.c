@@ -1228,6 +1228,15 @@ AstType *astMakeFunctionType(AstType *rettype, Vec *param_types) {
     return type;
 }
 
+AstAttr *astAttrGet(Vec *attrs, const char *name) {
+    if (!attrs) return NULL;
+    for (u64 i = 0; i < attrs->size; ++i) {
+        AstAttr *a = attrs->entries[i];
+        if (!strcmp(a->name->data, name)) return a;
+    }
+    return NULL;
+}
+
 AstType *astMakeClassField(AstType *type, int offset) {
     AstType *field_type = astTypeNew();
     memcpy(field_type,type,sizeof(AstType));
@@ -1235,6 +1244,7 @@ AstType *astMakeClassField(AstType *type, int offset) {
     /* a field is public unless marked `private` itself */
     field_type->private_module = 0;
     field_type->private_of = NULL;
+    field_type->field_attrs = NULL;
     field_type->offset = offset;
     field_type->size = type->size;
     return field_type;

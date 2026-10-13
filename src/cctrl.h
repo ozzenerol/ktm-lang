@@ -135,6 +135,17 @@ typedef struct GenericInst {
     struct GenericInst *outer;
 } GenericInst;
 
+/* A @json/@yaml struct's pointer field whose struct had no body yet
+ * (parseJsonCheckDeferred) */
+typedef struct JsonDeferred {
+    struct AstType *pointee;
+    struct AstType *cls;
+    char *field;
+    const char *mod;
+    int line, col;
+    struct LexFile *file;
+} JsonDeferred;
+
 typedef struct Cctrl {
     u64 flags;
     /* The global environment for user defined types, functions and global
@@ -299,6 +310,12 @@ typedef struct Cctrl {
     /* `((fn(i64) i64)raw + 1)`: the cast already parsed, handed back
      * by the next parseUnaryExpr as the start of the expression */
     Ast *pending_unary;
+    /* `@json @yaml` read before a declaration (AstAttr *), for the struct
+     * it must be (parseAttrs) */
+    Vec *pending_attrs;
+    /* the @json structs whose methods were made (parseJsonGenerate) */
+    Set *json_done;
+    Vec *json_deferred;    /* JsonDeferred * */
     int quiet_errors;
     /* The declaration being parsed is `pub`; it comes from the main
      * program (not a module, not a stdlib header) */

@@ -40,6 +40,15 @@ pub struct Type {
     i64 len;            /* an array's length */
     Field[] fields;     /* a struct's or union's, in declaration order */
     EnumMember[] members;
+    bool json;          /* a struct marked @json (v0.14.0) */
+    bool yaml;          /* a struct marked @yaml */
+    /* @json's methods (null without @json): json.encode and json.decode
+     * call them instead of walking the fields. Each takes the struct's
+     * address first: fn(void *, json.Writer *) void, fn(void *,
+     * json.Reader *) void, fn(void *) void. */
+    void *toJson;
+    void *fromJson;
+    void *freeDecoded;
 };
 
 /* A field of a struct or union */
@@ -48,6 +57,9 @@ pub struct Field {
     Type *type;
     i64 offset;
     bool isPrivate;     /* `private` in its module: json skips it */
+    u8[] key;           /* its key in JSON and YAML: @key("...")'s, else its name */
+    bool skip;          /* @skip: never written or read */
+    bool omitEmpty;     /* @omitEmpty: not written when 0, empty or null */
 };
 
 /* A member of an enum: its name and value */

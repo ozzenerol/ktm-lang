@@ -1964,8 +1964,22 @@ static int lexCore(Lexer *l, Lexeme *le) {
                 }
                 return 1;
 
-            case '$':
             case '@':
+                /* `@json`, `@key("x")`: an attribute (v0.14.0); the
+                 * parser says where one can go. The methods @json makes
+                 * use the file's `import json` (or yaml's). */
+                lexemeAssignOp(le,start,1,ch,l->lineno);
+                for (int f = 0; f < 2; ++f) {
+                    const char *mod = f ? "yaml" : "json";
+                    if (strncmp(l->ptr, mod, 4) || isalnum((unsigned char)l->ptr[4]) ||
+                        l->ptr[4] == '_' || !l->cur_file) continue;
+                    for (LexImport *imp = l->cur_file->imports; imp; imp = imp->next) {
+                        if (!strcmp(imp->module->path->data, mod)) imp->used = 1;
+                    }
+                }
+                return 1;
+
+            case '$':
                 if (l->flags & CCF_ASM_BLOCK) {
                     lexemeAssignOp(le,start,1,ch,l->lineno);
                     return 1;

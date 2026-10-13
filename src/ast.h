@@ -157,6 +157,16 @@ typedef enum AstKind {
 
 
 typedef struct AstType AstType;
+
+/* An attribute (v0.14.0): `@json` on a struct, `@key("e-mail")` on a
+ * field. `arg` is the string argument, NULL when there is none. */
+typedef struct AstAttr {
+    AoStr *name;
+    AoStr *arg;
+    int line;
+    int col;
+} AstAttr;
+
 /* Type of the variable or type of return type of a function */
 typedef struct AstType {
     AstTypeKind kind;
@@ -222,6 +232,11 @@ typedef struct AstType {
      * union takes one initialiser item, for its first member, so
      * positional initialisers skip it. */
     int init_skip;
+    /* Attributes (AstAttr *, NULL for none): a struct's own (`@json`),
+     * kept on copies of its type; and a field's (`@key("x")`), on that
+     * field's type only (astMakeClassField starts it empty) */
+    Vec *attrs;
+    Vec *field_attrs;
 
     /* Function */
     AstType *rettype;
@@ -711,6 +726,9 @@ Ast *astJump(char *jumpname, int len);
 AstType *astMakePointerType(AstType *type);
 AstType *astMakeArrayType(AstType *type, int len);
 AstType *astMakeClassField(AstType *type, int offset);
+/* The attribute `@name` in attrs (AstType.attrs or .field_attrs), NULL if
+ * it isn't there */
+AstAttr *astAttrGet(Vec *attrs, const char *name);
 AstType *astMakeFunctionType(AstType *rettype, Vec *param_types);
 AstType *astConvertArray(AstType *ast_type);
 Ast *astClassRef(AstType *type, Ast *cls, char *field_name);

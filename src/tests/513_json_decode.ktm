@@ -39,14 +39,20 @@ Order fresh() {
     return o;
 }
 
-/* decode(text) into a fresh Order throws ERR_DECODE starting with want */
+/* decode(text) into a fresh Order throws ERR_DECODE "line:col: " and
+ * then want (v0.14.0: decode reads with a json.Reader, which says where) */
 bool fails(u8[] text, u8[] want, i64 flags = 0) {
     Order o = fresh();
     bool ok = false;
     try {
         json.decode(text, reflect.of(o), flags);
     } catch (Error e) {
-        ok = e.code == json.ERR_DECODE && cstr.view(e.message).startsWith(want);
+        /* after the "line:col: " the message starts with */
+        u8[] msg = cstr.view(e.message);
+        i64 sp = 0;
+        while (sp < msg.len && msg[sp] != ' ') { sp++; }
+        u8[] rest = sp < msg.len ? msg[sp + 1:] : msg;
+        ok = e.code == json.ERR_DECODE && msg.len && '1' <= msg[0] <= '9' && rest.startsWith(want);
         if (!ok) { printf("\n  got %s", e.message); }
     }
     json.free(reflect.of(o));
@@ -89,8 +95,8 @@ i32 main() {
     check(fails("{\"codes\": [1, 2, 3, 4]}", "codes: expected at most 3 items, got 4"), "too many items");
     check(fails("{\"tag\": \"much too long\"}", "tag: expected at most 7 bytes, got 13"), "a long string");
     check(fails("[1]", "expected an object, got an array"), "the root");
-    check(fails("{\"id\": ", "not JSON: "), "not JSON");
-    check(fails("{\"id\": 1, \"nope\": 2}", "who: missing", json.STRICT), "STRICT: a missing field");
+    check(fails("{\"id\": ", "id: expected a value, got the end of the input"), "not JSON");
+    check(fails("{\"id\": 1}", "who: missing", json.STRICT), "STRICT: a missing field");
     check(fails("{\"id\":1,\"who\":\"\",\"role\":0,\"paid\":false,\"ship\":{\"city\":\"\",\"zip\":0},"
                 "\"bill\":null,\"items\":[],\"codes\":[],\"tag\":\"\",\"note\":null,\"small\":0,\"x\":1}",
                 "x: no such field in Order", json.STRICT), "STRICT: an unknown key");

@@ -1,7 +1,8 @@
 import cstr, fs, libc, mem, proc, test;
 
 /* The lexer silently dropped characters it has no use for (`?`, a
- * backtick, `$` and `@` outside an asm block, non-ASCII bytes), so
+ * backtick, `$` outside an asm block, non-ASCII bytes; `@` is an
+ * attribute since v0.14.0, so it gets its own message there), so
  * `i64 x = 2.5 ? 3;` was reported as "Unexpected integer `3`". Each
  * one must be reported where it is as "unexpected character" (a UTF-8
  * character once, not once per byte) and ktm must exit 1, while the
@@ -86,7 +87,7 @@ bool testDollarAt(void) {
   $
     @
 }
-", 2, "error: unexpected character '@'\n --> " UNKNOWN_FILE ":3:5\n");
+", 2, "error: attributes go on a struct or on a struct's field, not inside a function\n --> " UNKNOWN_FILE ":3:5\n");
 }
 
 bool testControlChar(void) {

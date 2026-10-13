@@ -742,6 +742,7 @@ int main(int argc, char **argv) {
     /* now parse cli options */
     args.install_dir = INSTALL_PREFIX;
     cliParseArgs(&args,argc,argv);
+    parse_expand_generated = args.expand;
 
     /* The LSP owns its Cctrl lifecycle (fresh one after a parser
      * crash), so it dispatches before the shared `cc` is made. */
