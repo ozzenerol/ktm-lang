@@ -2,11 +2,13 @@ import cstr, fs, libc, proc, str, test;
 
 /* log.Options.toStdout (v0.17.0): with no path a Logger, or the default
  * logger, writes to stdout, in order with printf; stderr stays empty;
- * close leaves stdout open. */
+ * close leaves stdout open; with a path too, each line goes to the file
+ * and stdout both (v0.17.2; toStdout was ignored with a path before). */
 
 #define PROG "__667_prog.ktm"
 #define OUT  "__667_prog.out"
 #define ERR  "__667_prog.err"
+#define BOTH "__667_both.log"
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -19,6 +21,7 @@ void cleanup() {
     fs.remove(PROG);
     fs.remove(OUT);
     fs.remove(ERR);
+    fs.remove(BOTH);
 }
 
 /* stdout without the 25-byte times at the start of the log lines */
@@ -53,6 +56,11 @@ void main()
   log.warn(\"five\");
   printf(\"six\\n\");
   log.shutdown();
+  o.path = \"__667_both.log\";
+  log.setup(&o);
+  log.error(\"seven\");
+  printf(\"eight\\n\");
+  log.shutdown();
 }
 ";
 
@@ -69,11 +77,16 @@ i32 main()
         check(rc == 0, "the program runs");
         String out = fs.readAll(OUT);
         String plain = stripTimes(out);
-        bool ok = str.equals(plain, "one\nINFO two\nthree\nfour\nWARN five\nsix\n");
+        bool ok = str.equals(plain, "one\nINFO two\nthree\nfour\nWARN five\nsix\nERROR seven\neight\n");
         if (!ok) { printf("\n  stdout: [%.*s]", out.len, out.ptr); }
         check(ok, "log lines on stdout in order with printf");
         String err = fs.readAll(ERR);
         check(err.len == 0, "nothing on stderr");
+        String both = fs.readAll(BOTH);
+        String bothPlain = stripTimes(both);
+        check(str.equals(bothPlain, "ERROR seven\n"), "with a path, the line is in the file too");
+        fs.remove(BOTH);
+        both.free(); bothPlain.free();
         out.free(); plain.free(); err.free();
     }
     cleanup();

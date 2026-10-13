@@ -22,7 +22,7 @@ pub enum Level { debug, info, warn, error };
  * Options isn't zeroed), then change what you need. */
 pub struct Options {
     u8 *path;          /* the file, appended to; null for stderr */
-    bool toStdout;     /* with no path: stdout instead of stderr */
+    bool toStdout;     /* stdout: instead of stderr, or as well as the file */
     bool threadSafe;   /* a mutex around each line, for loggers threads share */
     i64 maxBytes;      /* rotate before a line would take the file past it; 0 never */
     i64 keep;          /* rotated files kept: path.1 (newest) to path.<keep> */
@@ -139,6 +139,21 @@ static u8 *logBaseName(u8 *path)
     return slash ? slash + 1 : path;
 }
 
+/* All of line to fd, what printf holds first when fd is stdout so the two
+ * stay in order; the bytes written */
+static i64 logWriteAll(i32 fd, String *line)
+{
+    if (fd == 1) { libc.fflush(libc.stdout); }
+    i64 done = 0;
+    while (fd >= 0 && done < line.len) {
+        i64 n = libc.write(fd, line.ptr + done, line.len - done);
+        if (n < 0 && os.errno() == libc.EINTR) { continue; }
+        if (n <= 0) { break; }
+        done += n;
+    }
+    return done;
+}
+
 /* One line: the parts after the time, the message on one line ('\n' and
  * '\r' written as \n and \r) */
 static void logWrite(Logger *lg, Level level, u8 *file, i64 line, u8 *func,
@@ -170,17 +185,13 @@ static void logWrite(Logger *lg, Level level, u8 *file, i64 line, u8 *func,
     {
         logRotate(lg);
     }
-    /* what printf holds comes first, so the two stay in order */
-    if (lg.fd == 1) { libc.fflush(libc.stdout); }
-    i64 done = 0;
-    while (lg.fd >= 0 && done < full.len) {
-        i64 n = libc.write(lg.fd, full.ptr + done, full.len - done);
-        if (n < 0 && os.errno() == libc.EINTR) { continue; }
-        if (n <= 0) { break; }
-        done += n;
-    }
+    i64 done = logWriteAll(lg.fd, &full);
     if (done < full.len) { lg.failed++; }
     lg.size += done;
+    /* a file and stdout both */
+    if (lg.opts.path && lg.opts.toStdout && logWriteAll(1, &full) < full.len) {
+        lg.failed++;
+    }
     if (lg.opts.threadSafe) { libc.pthread_mutex_unlock(&lg.lock); }
     full.free();
 }
