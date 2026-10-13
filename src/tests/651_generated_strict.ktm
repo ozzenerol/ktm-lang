@@ -4,8 +4,8 @@ import cstr, json, libc, mem, reflect, str, test, vec, yaml;
  * fromJson/fromYaml throw on a key the struct has no field for and on a
  * missing key, as json.decode's reflection path does ("ship.city:
  * missing", "extra: no such field in Order"), with the position in front.
- * @skip and private fields are never required. json.decode with STRICT
- * uses the generated method (it fell back to reflection before). */
+ * @skip and private fields are never required. Turned on with
+ * json.readerNew(text, json.STRICT) and yaml.readerNew(text, yaml.STRICT). */
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -51,18 +51,22 @@ struct PlainOrder {
     vec.Vec<PlainItem> items;
 };
 
-/* json.decode's ERR_DECODE message for text into an Order ("" if none) */
+/* The ERR_DECODE message of fromJson on text, a Reader with `flags`
+ * ("" if none) */
 String jsonError(u8 *text, i64 flags) {
     String msg;
     Order o;
     mem.set(&o, 0, sizeof(Order));
+    json.Reader r = json.readerNew(cstr.view(text), flags);
     try {
-        json.decode(cstr.view(text), reflect.of(o), flags);
+        o.fromJson(&r);
+        r.finish();
     } catch (Error e) {
         if (e.code == json.ERR_DECODE) { msg.append(cstr.view(e.message)); }
         else { msg.appendFormat("code %x", e.code); }
     }
-    json.free(reflect.of(o));
+    r.free();
+    o.freeDecoded();
     return msg;
 }
 
@@ -124,10 +128,15 @@ i32 main() {
     /* every key there: fine either way */
     is(jsonError(FULL, json.STRICT), "", "STRICT, nothing missing");
     is(jsonError(FULL, 0), "", "no flags");
-    Order o = json.decode<Order>(FULL, json.STRICT);
+    Order o;
+    mem.set(&o, 0, sizeof(Order));
+    json.Reader r = json.readerNew(FULL, json.STRICT);
+    o.fromJson(&r);
+    r.finish();
+    r.free();
     check(o.id == 1 && o.ship.zip == 150 && o.items.len == 1 && o.items.get(0).n == 2,
           "STRICT reads the document");
-    json.free(reflect.of(o));
+    o.freeDecoded();
 
     /* without STRICT, missing and unknown keys are fine */
     is(jsonError("{\"zzz\":[1],\"ship\":{\"q\":null}}", 0), "", "no flags: unknown and missing keys");

@@ -1868,10 +1868,11 @@ file has to <code>import json</code> (or <code>yaml</code>).</p>
   <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> call these
   methods by themselves for a <code>@json</code> struct, also one nested in a struct without
   <code>@json</code>, so code that uses them gets faster without changes. With
-  <code>json.STRICT</code> a key with no field and a missing key are errors here too
-  (<code>"1:27: ship.city: missing"</code>); <code>json.readerNew(text, json.STRICT)</code>
-  and <code>yaml.readerNew(text, yaml.STRICT)</code> do the same for <code>fromJson</code>
-  and <code>fromYaml</code>. <code>@skip</code> fields are never required.</li>
+  <code>json.STRICT</code>, decode keeps the reflection path.</li>
+  <li>A Reader made with <code>json.readerNew(text, json.STRICT)</code> (or
+  <code>yaml.readerNew(text, yaml.STRICT)</code>) makes <code>fromJson</code> and
+  <code>fromYaml</code> strict: a key with no field and a missing key are errors
+  (<code>"1:27: ship.city: missing"</code>). <code>@skip</code> fields are never required.</li>
   <li>On a field: <code>@key("e-mail")</code> gives its key in the text,
   <code>@skip</code> leaves it out, and <code>@omitEmpty</code> leaves it out when it is 0,
   empty or null.</li>
