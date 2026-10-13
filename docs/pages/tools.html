@@ -114,6 +114,17 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.lsp.inlay_hint.enable(true, { bufnr = ev.buf })
   end,
 })</code></pre>
+<p><strong>With lazy.nvim</strong>, the <code>rtp:append</code> line has no effect: lazy resets
+the runtime path when it starts, so ktm files get no filetype, no syntax and no server. List
+the directory in lazy's own setting instead, and on Neovim 0.11 or later the server can be
+set up like any other:</p>
+<pre><code>require("lazy").setup({
+  -- ...
+  performance = { rtp = { paths = { "/usr/local/share/ktm/vim" } } },
+})
+
+vim.lsp.config("ktm", { cmd = { "ktm", "-lsp" }, filetypes = { "ktm" }, root_markers = { ".git" } })
+vim.lsp.enable("ktm")</code></pre>
 <p>Semantic highlighting needs nothing more: Neovim colours the server's tokens with its
 <code>@lsp.type.*</code> groups (link <code>@lsp.type.namespace.ktm</code> and the others to
 change them).</p>
