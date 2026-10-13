@@ -25,7 +25,7 @@ i32 main() {
         "import str, vec;\n"
         "\n"
         "vec.Vec<String> gItems = vec.new<String>();\n"
-        "\n"
+        "pub void reset() { gItems = vec.new<String>(); }\n"
         "pub String make(u8[] s)\n"
         "{\n"
         "    return str.from(s);\n"
@@ -35,8 +35,9 @@ i32 main() {
         "\n"
         "void main()\n"
         "{\n"
-        "    String a = shop.make(\"apple\");\n"
-        "    u8 *raw = mem.alloc(40);\n"
+        "    shop.reset();\n"
+        "    mem.alloc(40);\n"
+        "    shop.make(\"apple\");\n"
         "}\n");
     u8 *out = proc.shellOutput("cd " DIR " && " KTM "-Memsafe -jit main.ktm 2>&1").take();
 
@@ -45,7 +46,8 @@ i32 main() {
           "a module global, through a generic", out);
     check(out && libc.strstr(out, "at shop/shop.ktm:8 in shop.make, via str.from"),
           "a module function, through the stdlib", out);
-    check(out && libc.strstr(out, "40 bytes  at main.ktm:6 in main\n"),
+    check(out && libc.strstr(out, "40 bytes  at main.ktm:6 in main\n") &&
+          libc.strstr(out, "memsafe: 1 allocation(s) (192 bytes) still in use at exit"),
           "mem.alloc in main: no via", out);
     check(out && !libc.strstr(out, "`"),
           "no raw offsets", out);
