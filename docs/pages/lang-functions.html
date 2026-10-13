@@ -118,6 +118,43 @@ example.com:8080
 </pre>
 <p>Repeating a default with the same value is fine. A different value is an error.</p>
 
+<h2>Where a call comes from</h2>
+<p>A parameter marked <code>@caller("file")</code>, <code>@caller("line")</code> or <code>@caller("func")</code>
+is filled in by every call with where that call is written. Callers never pass it, so a logging or
+checking function can say where it was called from.</p>
+<pre data-run><code>
+void trace(@caller("file") u8 *file, @caller("line") i64 line,
+           @caller("func") u8 *func, u8 *what)
+{
+  printf("%s:%d in %s: %s\n", file, line, func, what);
+}
+
+void load()
+{
+  trace("loading");
+}
+
+void main()
+{
+  trace("start");
+  load();
+}
+</code></pre>
+<pre class="output">
+example.ktm:14 in main: start
+example.ktm:9 in load: loading
+</pre>
+<ul class="rules">
+  <li><code>"file"</code> is the source file's path as ktm was given it, <code>"func"</code> the function the call is in
+    (<code>Type.method</code> for a method, <code>module.name</code> in a module, <code>""</code> outside any function).
+    Both are <code>u8 *</code>. <code>"line"</code> is an integer.</li>
+  <li>They can go anywhere in the list, before <code>...args</code> too, as in
+    <code>void info(@caller("line") i64 line, u8 *fmt, ...args)</code>.</li>
+  <li>A <code>@caller</code> parameter has no default, and a function with one can't be overloaded.</li>
+  <li>A call through <code>auto p = &amp;trace</code> fills them in too. A call through an <code>fn(...)</code> type
+    passes them like any other argument.</li>
+</ul>
+
 <h2>Returning values</h2>
 <pre data-run><code>
 struct Point { i64 x, y; };

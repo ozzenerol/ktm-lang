@@ -5203,6 +5203,15 @@ static char *parseOverloadDecl(Cctrl *cc, char *fname, int len, Vec *params,
         return fname;
     }
 
+    for (u64 i = 0; i < params->size + (prev->params ? prev->params->size : 0); ++i) {
+        Ast *p = i < params->size ? params->entries[i]
+                                  : prev->params->entries[i - params->size];
+        if (p && (p->flags & AST_FLAG_CALLER)) {
+            cctrlRaiseException(cc, "`%s` has a @caller parameter, so it can't be overloaded",
+                                astModuleDemangle(fname, len));
+        }
+    }
+
     if (!prev->overloads) {
         char *base = (prev->flags & AST_FLAG_PROGRAM)
                    ? astProgramSymbol(prev->fname->data, prev->fname->len)

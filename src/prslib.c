@@ -510,6 +510,57 @@ static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
     }
 }
 
+/* `@caller("file")`, `@caller("line")` or `@caller("func")` before a
+ * parameter, the `@` next: its AST_FLAG_CALLER_* bit. The type is checked
+ * once the parameter is parsed (parseCheckCallerParam). */
+static u64 parseCallerAttr(Cctrl *cc, Lexeme **at_tok) {
+    Lexeme *at = cctrlTokenGet(cc);
+    *at_tok = at;
+    Lexeme *name = cctrlTokenGet(cc);
+    if (!name || name->tk_type != TK_IDENT || name->len != 6 ||
+        strncmp(name->start, "caller", 6))
+    {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, 1,
+            "a parameter takes one attribute, @caller(\"file\"), "
+            "@caller(\"line\") or @caller(\"func\")");
+    }
+    Lexeme *open = cctrlTokenGet(cc);
+    Lexeme *arg = open && tokenPunctIs(open, '(') ? cctrlTokenGet(cc) : NULL;
+    Lexeme *close = arg ? cctrlTokenGet(cc) : NULL;
+    u64 flag = 0;
+    if (arg && arg->tk_type == TK_STR && close && tokenPunctIs(close, ')')) {
+        if (arg->len == 4 && !strncmp(arg->start, "file", 4)) flag = AST_FLAG_CALLER_FILE;
+        else if (arg->len == 4 && !strncmp(arg->start, "line", 4)) flag = AST_FLAG_CALLER_LINE;
+        else if (arg->len == 4 && !strncmp(arg->start, "func", 4)) flag = AST_FLAG_CALLER_FUNC;
+    }
+    if (!flag) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, 7,
+            "`@caller` takes \"file\", \"line\" or \"func\": @caller(\"line\") i64 line");
+    }
+    return flag;
+}
+
+/* A @caller parameter: "file" and "func" are a u8 *, "line" an integer,
+ * and none has a default (the call always fills it) */
+static void parseCheckCallerParam(Cctrl *cc, Ast *var, u64 flag, Lexeme *at) {
+    if (var->kind != AST_LVAR) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, 7,
+            "a `@caller` parameter has no default: every call fills it in");
+    }
+    AstType *t = var->type;
+    int ok = flag == AST_FLAG_CALLER_LINE
+           ? astIsIntType(t)
+           : t->kind == AST_TYPE_POINTER && t->ptr && t->ptr->kind == AST_TYPE_CHAR &&
+             t->ptr->size == 1;
+    if (!ok) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, 7,
+            "`@caller(\"%s\")` goes on a%s parameter, not a %s",
+            flag == AST_FLAG_CALLER_FILE ? "file" : flag == AST_FLAG_CALLER_LINE ? "line" : "func",
+            flag == AST_FLAG_CALLER_LINE ? "n integer" : " u8 *", astTypeToString(t));
+    }
+    var->flags |= flag;
+}
+
 Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
     Vec *params = astVecNew();
 
@@ -551,6 +602,12 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             return params;
         }
 
+        u64 caller_flag = 0;
+        Lexeme *caller_at = NULL;
+        if (tokenPunctIs(pname, '@')) {
+            caller_flag = parseCallerAttr(cc, &caller_at);
+        }
+
         int param_is_const = 0;
         Lexeme *const_tok = cctrlTokenPeek(cc);
         if (const_tok && const_tok->tk_type == TK_KEYWORD &&
@@ -567,6 +624,11 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         if (pname == NULL) {
             cctrlRaiseException(cc,
                     "Unexpected end of input in parameter list");
+        }
+        if (caller_flag && (tokenPunctIs(pname, TK_ELLIPSIS) || tokenPunctIs(pname, '('))) {
+            cctrlRaiseExceptionAt(cc, caller_at->line, caller_at->col, 7,
+                "`@caller` goes on a u8 * or integer parameter, not a %s",
+                tokenPunctIs(pname, '(') ? "function pointer" : "variadic one");
         }
         if (tokenPunctIs(pname, TK_ELLIPSIS)) {
             Lexeme ellipsis = *pname;
@@ -634,6 +696,9 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
                  * names omitted, register IS the identity). */
                 var->pinned_kind = pinned_kind;
                 var->pinned_reg = pinned_reg;
+                if (caller_flag) {
+                    parseCheckCallerParam(cc, var, caller_flag, caller_at);
+                }
                 if (cc->tmp_locals) {
                     listAppend(cc->tmp_locals, var);
                 }
@@ -686,6 +751,10 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
                 }
             }
        }
+
+        if (caller_flag) {
+            parseCheckCallerParam(cc, var, caller_flag, caller_at);
+        }
 
         if (cc->tmp_locals) {
             listAppend(cc->tmp_locals, var);
@@ -1222,6 +1291,13 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
     int param_count = params ? (int)params->size : 0;
     int arg_count = argv ? (int)argv->size : 0;
     int default_count = 0, required_count = 0, fixed_param_count = param_count;
+    /* @caller parameters are filled in, not written: the messages count
+     * the arguments as written */
+    int hidden = 0;
+    for (int i = 0; i < param_count; ++i) {
+        Ast *param = params->entries[i];
+        if (param && (param->flags & AST_FLAG_CALLER)) hidden++;
+    }
 
     /* A `T ...name` callee: its hidden (count, data) parameters always got
      * arguments (parseVarArgsPack), so only the fixed ones can be missing;
@@ -1248,7 +1324,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
                 {
                     parseRaiseCallError(cc, loc,
                         "Unexpected number of arguments %d in call to %.*s(), argument %d is required",
-                        written, len, fname, i + 1);
+                        written - hidden, len, fname, i + 1 - hidden);
                 }
                 AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
                 if (type && arg && arg->kind != AST_PLACEHOLDER) {
@@ -1284,12 +1360,12 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
             if (default_count) {
                 parseRaiseCallError(cc, loc,
                         "Unexpected number of arguments %d in call to %.*s(), argument %d is required",
-                        arg_count, len, fname, i + 1);
+                        arg_count - hidden, len, fname, i + 1 - hidden);
             }
 
             parseRaiseCallError(cc, loc,
                     "Unexpected number of arguments %d in call to %.*s(), expected %d args",
-                    arg_count, len, fname, fixed_param_count);
+                    arg_count - hidden, len, fname, fixed_param_count - hidden);
         }
 
         AstType *type = param->kind == AST_DEFAULT_PARAM ? param->declvar->type : param->type;
@@ -1305,7 +1381,7 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
         if (arg_count < required_count) {
             parseRaiseCallError(cc, loc,
                     "Unexpected number of arguments %d in call to %.*s(), expected at least %d args",
-                    arg_count, len, fname, required_count);
+                    arg_count - hidden, len, fname, required_count - hidden);
         }
         return;
     }
@@ -1315,12 +1391,12 @@ static void parseFunctionArgumentCheck(Cctrl *cc, Ast *def, Vec *argv, char *fna
         if (default_count) {
             parseRaiseCallError(cc, loc,
                     "Unexpected number of arguments %d in call to %.*s(), expected args in range %d to %d",
-                    arg_count, len, fname, required_count, fixed_param_count);
+                    arg_count - hidden, len, fname, required_count - hidden, fixed_param_count - hidden);
         }
 
         parseRaiseCallError(cc, loc,
                 "Unexpected number of arguments %d in call to %.*s(), expected %d args",
-                arg_count, len, fname, fixed_param_count);
+                arg_count - hidden, len, fname, fixed_param_count - hidden);
     }
 }
 
@@ -1696,6 +1772,37 @@ static void parseLowerSliceFormat(Cctrl *cc, Ast **fmt_slot, Vec *args,
     cc->fmt_lowered = added / 2;
 }
 
+/* The argument a @caller parameter gets at a call on `line`: the file
+ * the call is in, its line, or the function it is in ("" at the top
+ * level) */
+static Ast *parseCallerArg(Cctrl *cc, Ast *param, int line) {
+    if (param->flags & AST_FLAG_CALLER_LINE) return astI64Type(line);
+    const char *text = "";
+    if (param->flags & AST_FLAG_CALLER_FILE) {
+        LexFile *file = cc->lexer_ ? cctrlCurFile(cc) : NULL;
+        if (file && file->filename) text = file->filename->data;
+    } else if (cc->tmp_func && cc->tmp_func->fname) {
+        text = astSymbolDisplayName(cc->tmp_func->fname->data);
+        if (!strcmp(text, "Main")) text = "main";
+    }
+    int n = (int)strlen(text);
+    return cctrlGetOrSetString(cc, (char *)text, n, n);
+}
+
+/* Push the arguments of the @caller parameters from params[idx] on;
+ * returns the index of the first other parameter */
+static int parseFillCallerArgs(Cctrl *cc, Vec *params, int idx, Vec *argv,
+                               Vec *spans, int line) {
+    while (params && idx < (int)params->size) {
+        Ast *param = params->entries[idx];
+        if (!param || !(param->flags & AST_FLAG_CALLER)) break;
+        vecPush(argv, parseCallerArg(cc, param, line));
+        if (spans) vecPush(spans, NULL);
+        idx++;
+    }
+    return idx;
+}
+
 Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                Vec *spans) {
     List *var_args = NULL;
@@ -1726,11 +1833,13 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
 
     Vec *argv_vec = astVecNew();
     int saw_args = 0;
+    int call_line = cc->lineno;
 
     tok = cctrlTokenPeek(cc);
 
     while (tok && !tokenPunctIs(tok, terminator)) {
         saw_args = 1;
+        param_idx = parseFillCallerArgs(cc, params, param_idx, argv_vec, spans, call_line);
         if (va_at >= 0 && (int)argv_vec->size >= va_at) {
             Lexeme start = *tok;
             Ast *extra;
@@ -1866,6 +1975,26 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                 "(unterminated `( ... )`?)", len, fname);
     }
 
+    /* @caller parameters after the last argument written: the defaults
+     * between are left to parseFlattenDefaultArgs */
+    if (params && param_idx == (int)argv_vec->size) {
+        int last_caller = -1;
+        for (int i = param_idx; i < (int)params->size; ++i) {
+            Ast *p = params->entries[i];
+            if (!p || p->kind == AST_VAR_ARGS || (p->flags & AST_FLAG_VARARGS)) break;
+            if (p->flags & AST_FLAG_CALLER) last_caller = i;
+        }
+        for (int i = param_idx; i <= last_caller; ++i) {
+            Ast *p = params->entries[i];
+            if (p->flags & AST_FLAG_CALLER) {
+                vecPush(argv_vec, parseCallerArg(cc, p, call_line));
+            } else {
+                vecPush(argv_vec, astMakePlaceHolder());
+            }
+            if (spans) vecPush(spans, NULL);
+        }
+    }
+
     /* a `u8[]` printed by `%s`: its length and pointer (`%.*s`) */
     int fmt_idx = parseFormatArgIdx(fname, len);
     if (va_at >= 0) {
@@ -1899,7 +2028,9 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
         }
     }
 
-    if (vecEmpty(argv_vec)) {
+    /* With no argument written the `)` is still there (the @caller
+     * arguments may have been filled in) */
+    if (!saw_args || vecEmpty(argv_vec)) {
         cctrlTokenGet(cc);
     }
 

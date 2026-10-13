@@ -4200,8 +4200,15 @@ static void lspCatSignature(LspCtx *ctx, AoStr *body, char *sig, Ast *fn,
         aoStrCatPrintf(body, "{\"label\":[%d,%d]}", st[i], en[i]);
     }
     aoStrPutChar(body, ']');
-    /* past the last parameter of `...args`: still that one */
+    /* the commas count the arguments written: skip the @caller
+     * parameters, which a call never writes */
     int active = commas;
+    for (int i = 0, seen = 0; i < n; ++i) {
+        if (!strncmp(sig + st[i], "@caller", 7)) continue;
+        if (seen++ == commas) { active = i; break; }
+        active = i + 1;
+    }
+    /* past the last parameter of `...args`: still that one */
     if (n > 0 && active >= n && strstr(sig + st[n - 1], "...")) active = n - 1;
     aoStrCatPrintf(body, ",\"activeParameter\":%d", active);
     AoStr *fname = fn && fn->line > 0 ? cctrlLookUpFile(ctx->cc, fn->file_id) : NULL;
