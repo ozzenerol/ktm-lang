@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YAML - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li class="current"><a href="lib-yaml.html" aria-current="page">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#yaml"><code>yaml</code></a></span></div>
+<h1>YAML</h1>
+<p class="lede"><code>yaml.Reader</code> reads a YAML document front to back; <code>yaml.Writer</code> writes one in block style.
+A <code>@yaml</code> struct gets both for free.</p>
+
+<h2 id="reading-into-a-struct">Reading into a struct<a class="anchor" href="#reading-into-a-struct" aria-label="Link to this section">#</a></h2>
+<p>Mark the struct <code>@yaml</code> and call <code>fromYaml</code> with a Reader:</p>
+<pre data-run><code>import yaml;
+
+@yaml struct Server { String host; i64 port; bool tls; String[] aliases; };
+
+void main()
+{
+  u8[] text = "# the main server\n"
+              "host: example.com\n"
+              "port: 443\n"
+              "tls: true\n"
+              "aliases:\n"
+              "  - www.example.com\n"
+              "  - api.example.com\n";
+  yaml.Reader r = yaml.readerNew(text);
+  defer r.free();
+  Server s;
+  s.fromYaml(&amp;r);
+  defer s.freeDecoded();
+  printf("%s:%d tls %d, %d aliases, the last %s\n", s.host, s.port, s.tls, s.aliases.len, s.aliases[1]);
+}
+</code></pre>
+<pre class="output">example.com:443 tls 1, 2 aliases, the last api.example.com
+</pre>
+<p><code>yaml.readerNew(text, yaml.STRICT)</code> makes unknown and missing keys errors, as with JSON.</p>
+
+<h2 id="reading-by-hand">Reading by hand<a class="anchor" href="#reading-by-hand" aria-label="Link to this section">#</a></h2>
+<p>The Reader has the same calls as <a href="lib-json.html#reader"><code>json.Reader</code></a>: open a mapping and loop on
+<code>nextKey()</code>, open a sequence and loop on <code>nextItem()</code>.</p>
+<pre data-run><code>import yaml;
+
+void main()
+{
+  u8[] text = "name: Ada   # a comment\n"
+              "langs: [ktm, C]\n"
+              "bio: |\n"
+              "  first line\n"
+              "  second line\n"
+              "admin: true\n";
+  yaml.Reader r = yaml.readerNew(text);
+  defer r.free();
+  r.beginObject();
+  while (r.nextKey()) {
+    u8[] k = r.key();
+    if (k.equals("langs")) {
+      r.beginArray();
+      while (r.nextItem()) { printf("lang %s\n", r.readStr()); }
+    } else if (k.equals("admin")) {
+      printf("admin %d\n", r.readBool());
+    } else {
+      printf("%s: [%s]\n", k, r.readStr());
+    }
+  }
+  r.finish();
+}
+</code></pre>
+<pre class="output">name: [Ada]
+lang ktm
+lang C
+bio: [first line
+second line
+]
+admin 1
+</pre>
+
+<h2 id="scalar-types">Scalar types<a class="anchor" href="#scalar-types" aria-label="Link to this section">#</a></h2>
+<p>A plain (unquoted) scalar is typed by its form. A quoted or block scalar is always a string.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Written</th><th>Is</th></tr></thead>
+  <tbody>
+    <tr><td><code>true</code>, <code>False</code>, <code>TRUE</code></td><td>A bool</td></tr>
+    <tr><td><code>null</code>, <code>~</code>, nothing</td><td>Null</td></tr>
+    <tr><td><code>42</code>, <code>0x1F</code>, <code>0o17</code></td><td>An integer</td></tr>
+    <tr><td><code>1.5</code>, <code>.inf</code>, <code>.nan</code></td><td>A float</td></tr>
+    <tr><td><code>"42"</code>, <code>'yes'</code>, <code>hello</code></td><td>A string</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import yaml;
+
+void main()
+{
+  yaml.Reader r = yaml.readerNew("a: 0x1F\nb: \"0x1F\"\nc: ~\nd: 2.5\n");
+  defer r.free();
+  r.beginObject();
+  r.nextKey(); printf("a int %d\n", r.readInt());
+  r.nextKey(); printf("b string %s\n", r.readStr());
+  r.nextKey(); printf("c null %d\n", r.isNull());
+  r.nextKey(); printf("d is a float: %d\n", r.peek() == yaml.FLOAT);
+  r.skipValue();
+  r.finish();
+}
+</code></pre>
+<pre class="output">a int 31
+b string 0x1F
+c null 1
+d is a float: 1
+</pre>
+
+<h2 id="writing">Writing<a class="anchor" href="#writing" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import yaml;
+
+void main()
+{
+  yaml.Writer w = yaml.writerNew();
+  defer w.free();
+  w.beginObject();
+  w.key("name"); w.str("Ada");
+  w.key("flag"); w.str("true");         // a string: quoted, or it would read as a bool
+  w.key("count"); w.int(3);
+  w.key("langs");
+  w.beginArray(); w.str("ktm"); w.str("C"); w.end();
+  w.key("tags"); w.beginArray(); w.end();
+  w.end();
+  ad String out = w.take();
+  printf("%s", out);
+}
+</code></pre>
+<pre class="output">name: Ada
+flag: "true"
+count: 3
+langs:
+  - ktm
+  - C
+tags: []
+</pre>
+<ul class="rules">
+  <li>The Writer has <code>beginObject</code>, <code>beginArray</code>, <code>end</code>, <code>key</code>, <code>rawKey</code>, <code>int</code>, <code>uint</code>, <code>float</code>, <code>bool</code>, <code>nil</code> and <code>str</code>.</li>
+  <li>A string is quoted only when it would read back as something else: <code>"true"</code>, <code>"12"</code>, <code>""</code>, <code>"a: b"</code>, a line break.</li>
+  <li>Used out of order, it throws <code>yaml.ERR_WRITER</code>.</li>
+</ul>
+
+<h2 id="what-is-supported">What is supported<a class="anchor" href="#what-is-supported" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Block mappings and sequences, flow <code>[]</code> and <code>{}</code>.</li>
+  <li>Plain, single- and double-quoted scalars; <code>|</code> and <code>&gt;</code> block scalars; comments; <code>---</code> and <code>...</code>.</li>
+  <li><strong>Not supported</strong> (an error that says so): anchors and aliases, tags, <code>&lt;&lt;</code> merge keys, several documents in one text.</li>
+</ul>
+<pre data-run><code>import yaml;
+
+void main()
+{
+  yaml.Reader r = yaml.readerNew("lines:\n  - qty: two\n");
+  defer r.free();
+  try {
+    r.beginObject();
+    r.nextKey();
+    r.beginArray();
+    r.nextItem();
+    r.beginObject();
+    r.nextKey();
+    r.readInt();
+  } catch (Error e) {
+    printf("%d %s\n", e.code == yaml.ERR_DECODE, e.message);
+  }
+}
+</code></pre>
+<pre class="output">1 2:10: lines[0].qty: expected an integer, got a string
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-json-structs.html"><span>Previous</span>JSON: structs</a><a class="next" href="lib-dates.html"><span>Next</span>Dates</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-yaml.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#reading-into-a-struct">Reading into a struct</a></li><li><a href="#reading-by-hand">Reading by hand</a></li><li><a href="#scalar-types">Scalar types</a></li><li><a href="#writing">Writing</a></li><li><a href="#what-is-supported">What is supported</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dates - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li class="current"><a href="lib-dates.html" aria-current="page">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#date"><code>date</code></a></span></div>
+<h1>Dates</h1>
+<p class="lede">Calendar dates and times of day: <code>date.Date</code>, its parts, formatting and parsing.
+For clocks, timeouts and Unix time see <a href="lib-time.html">Clocks and sleeping</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>date.Date d = date.now();                       // local time
+date.Parts p;  date.toParts(&amp;p, d);              // year, mon, dayOfMon, hour, ...
+date.Date d2 = date.fromParts(&amp;p);
+String s = date.format(d, "%Y-%m-%d %H:%M");
+date.Date d3 = date.parse("2024-03-05", "%Y-%m-%d");</code></pre>
+</div>
+
+<h2 id="building-a-date-from-parts">Building a date from parts<a class="anchor" href="#building-a-date-from-parts" aria-label="Link to this section">#</a></h2>
+<p>A <code>date.Parts</code> has <code>year</code>, <code>mon</code> (1-12), <code>dayOfMon</code>, <code>hour</code>, <code>min</code>, <code>sec</code>,
+<code>dayOfWeek</code> (0 is Sunday), <code>sec100</code>, <code>sec10000</code> and <code>zoneDiff</code>. Zero it first: <code>fromParts</code> reads every field.</p>
+<pre data-run><code>import date, mem;
+
+void main()
+{
+  date.Parts p;
+  mem.set(&amp;p, 0, sizeof(date.Parts));
+  p.year = 2024;
+  p.mon = 2;
+  p.dayOfMon = 29;
+  p.hour = 12;
+  p.min = 34;
+  date.Date leap = date.fromParts(&amp;p);
+
+  ad String s = date.format(leap, "%a %d %b %Y, %H:%M");
+  printf("%s\n", s);
+
+  date.Parts back;
+  date.toParts(&amp;back, leap);
+  printf("%d-%02d-%02d, day of week %d\n", back.year, back.mon, back.dayOfMon, back.dayOfWeek);
+}
+</code></pre>
+<pre class="output">Thu 29 Feb 2024, 12:34
+2024-02-29, day of week 4
+</pre>
+
+<h2 id="out-of-range-parts-carry-over">Out-of-range parts carry over<a class="anchor" href="#out-of-range-parts-carry-over" aria-label="Link to this section">#</a></h2>
+<p>Day 32 of January is February 1; month 13 is January of the next year; hour 24 is midnight the next day.
+That makes date arithmetic easy:</p>
+<pre data-run><code>import date, mem;
+
+date.Date addDays(date.Date d, i64 n)
+{
+  date.Parts p;
+  date.toParts(&amp;p, d);
+  p.dayOfMon += n;
+  return date.fromParts(&amp;p);
+}
+
+void main()
+{
+  date.Parts p;
+  mem.set(&amp;p, 0, sizeof(date.Parts));
+  p.year = 2024;
+  p.mon = 13;
+  p.dayOfMon = 32;
+  ad String a = date.format(date.fromParts(&amp;p), "%Y-%m-%d");
+  printf("month 13, day 32 of 2024: %s\n", a);
+
+  date.Date d = date.parse("2024-12-30", "%Y-%m-%d");
+  ad String b = date.format(addDays(d, 5), "%Y-%m-%d");
+  printf("5 days after 2024-12-30: %s\n", b);
+}
+</code></pre>
+<pre class="output">month 13, day 32 of 2024: 2025-02-01
+5 days after 2024-12-30: 2025-01-04
+</pre>
+
+<h2 id="formatting">Formatting<a class="anchor" href="#formatting" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>date.format(d, fmt)</code></td><td>With <code>%Y %m %d %H %M %S %a %b %p %%</code></td></tr>
+    <tr><td><code>date.formatDate(d)</code></td><td><code>MM/DD/YYYY</code></td></tr>
+    <tr><td><code>date.formatTime(d)</code></td><td><code>HH:MM:SS</code></td></tr>
+    <tr><td><code>date.timestampNow()</code></td><td>Now as <code>YYYY-MM-DD HH:MM:SS</code></td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import date;
+
+void main()
+{
+  date.Date d = date.parse("2024-03-05 13:30", "%Y-%m-%d %H:%M");
+  ad String a = date.format(d, "%Y-%m-%d %H:%M:%S");
+  ad String b = date.format(d, "%a, %b %d at %H:%M %p");
+  ad String c = date.formatDate(d);
+  ad String t = date.formatTime(d);
+  printf("%s\n%s\n%s %s\n", a, b, c, t);
+
+  ad String now = date.timestampNow();
+  printf("timestamp is %d characters\n", now.len);
+}
+</code></pre>
+<pre class="output">2024-03-05 13:30:00
+Tue, Mar 05 at 13:30 PM
+03/05/2024 13:30:00
+timestamp is 19 characters
+</pre>
+<p>All return a String that is yours. In a <code>printf</code> format, <code>%D</code> and <code>%T</code> are errors that point here.</p>
+
+<h2 id="parsing">Parsing<a class="anchor" href="#parsing" aria-label="Link to this section">#</a></h2>
+<p><code>date.parse(text, fmt)</code> returns a Date, or 0 when the text doesn't match.
+<code>date.parseParts(text, fmt, &amp;p)</code> fills Parts and returns whether it worked.</p>
+<pre data-run><code>import date;
+
+void main()
+{
+  date.Date d = date.parse("Mar 5 2024 1:30 PM", "%b %d %Y %H:%M %p");
+  ad String s = date.format(d, "%Y-%m-%d %H:%M");
+  printf("%s\n", s);
+
+  date.Parts p;
+  printf("%d %d %d\n", date.parseParts("2023-02-29", "%Y-%m-%d", &amp;p),
+         date.parse("2024-03", "%Y-%m-%d") == 0,
+         date.parseParts("2024-02-29T10:00+0200", "%Y-%m-%dT%H:%M%z", &amp;p));
+  printf("zone %d, hour %d\n", p.zoneDiff, p.hour);
+}
+</code></pre>
+<pre class="output">2024-03-05 13:30
+0 1 1
+zone 200, hour 10
+</pre>
+<ul class="rules">
+  <li>Conversions: <code>%Y %m %d %H %M</code>, <code>%S</code> or <code>%s</code>, <code>%a</code> and <code>%b</code> (full or three letters, any case), <code>%p</code>, <code>%z</code> (a zone offset) and <code>%%</code>.</li>
+  <li>A space in the format matches any run of spaces; other characters must match exactly.</li>
+  <li>Impossible values fail: month 13, February 30, hour 24.</li>
+  <li>Without <code>%z</code>, <code>zoneDiff</code> is <code>date.NO_ZONE</code>; with it, it is the offset as &plusmn;hhmm (200 for +02:00).</li>
+</ul>
+
+<h2 id="now">Now<a class="anchor" href="#now" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import date;
+
+void main()
+{
+  date.Date today = date.now();
+  date.Parts p;
+  date.toParts(&amp;p, today);
+  date.Parts q;
+  date.nowParts(&amp;q);
+  printf("year looks right: %d, same year: %d\n", p.year &gt;= 2024, p.year == q.year);
+}
+</code></pre>
+<pre class="output">year looks right: 1, same year: 1
+</pre>
+<p><code>date.now()</code> and <code>date.nowParts</code> are local time (the <code>TZ</code> zone); <code>nowParts</code> also sets <code>zoneDiff</code>.</p>
+
+<h2 id="what-a-date-is">What a Date is<a class="anchor" href="#what-a-date-is" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>A <code>date.Date</code> is an integer underneath: <code>date.Date d = 5;</code> and <code>i64 x = d;</code> need no cast.</li>
+  <li>The calendar is the proleptic Gregorian one, with year 0 a leap year as in ISO 8601.</li>
+  <li><code>date.isoFromTimespec(&amp;ts)</code> formats a file time as UTC ISO 8601: <code>2026-07-05T14:30:00.123456789Z</code>.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-yaml.html"><span>Previous</span>YAML</a><a class="next" href="lib-time.html"><span>Next</span>Clocks and sleeping</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-dates.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#building-a-date-from-parts">Building a date from parts</a></li><li><a href="#out-of-range-parts-carry-over">Out-of-range parts carry over</a></li><li><a href="#formatting">Formatting</a></li><li><a href="#parsing">Parsing</a></li><li><a href="#now">Now</a></li><li><a href="#what-a-date-is">What a Date is</a></li></ul></nav>
+</div>
+</body>
+</html>

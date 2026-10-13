@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointers and arrays - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li class="current"><a href="lang-pointers.html" aria-current="page">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Pointers and arrays</h1>
+<p class="lede">C's pointers and fixed-size arrays, with initialiser lists and heap memory.
+For a pointer that knows its length, see <a href="lang-slices.html">Slices</a>.</p>
+
+<h2 id="pointers">Pointers<a class="anchor" href="#pointers" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void main()
+{
+  i64 x = 5;
+  i64 *p = &amp;x;      // the address of x
+  *p = 10;          // write through it
+  printf("%d %d\n", x, *p);
+
+  i64 **pp = &amp;p;
+  **pp = 20;
+  printf("%d\n", x);
+}
+</code></pre>
+<pre class="output">10 10
+20
+</pre>
+
+<h3 id="pointers-to-structs">Pointers to structs<a class="anchor" href="#pointers-to-structs" aria-label="Link to this section">#</a></h3>
+<p><code>.</code> works through one pointer, so <code>p.x</code> on a <code>Point *</code> is <code>p-&gt;x</code>.</p>
+<pre data-run><code>struct Point { i64 x, y; };
+
+void move(Point *p, i64 dx)
+{
+  p.x += dx;        // the same as p-&gt;x += dx
+}
+
+void main()
+{
+  Point a = {1, 2};
+  move(&amp;a, 10);
+  Point *p = &amp;a;
+  printf("%d %d %d\n", a.x, p.x, p-&gt;y);
+}
+</code></pre>
+<pre class="output">11 11 2
+</pre>
+<p>Only one level: on a <code>Point **pp</code>, write <code>(*pp).x</code>.</p>
+
+<h2 id="arrays">Arrays<a class="anchor" href="#arrays" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void main()
+{
+  i64 squares[5];
+  for (i64 i = 0; i &lt; 5; i++) { squares[i] = i * i; }
+
+  i64 *q = squares;              // an array decays to a pointer
+  printf("%d %d %d\n", q[3], *(q + 4), &amp;squares[4] - &amp;squares[1]);
+
+  i64 grid[3][4];
+  grid[2][3] = 7;
+  printf("%d %d %d\n", grid[2][3], sizeof(grid), sizeof(grid[0]));
+}
+</code></pre>
+<pre class="output">9 16 3
+7 96 32
+</pre>
+<ul class="rules">
+  <li>An array can't be assigned as a whole (<code>a = b;</code> is an error): copy it with <code>mem.copy</code>.</li>
+  <li>An array converts to a <a href="lang-slices.html">slice</a> wherever one is expected: that is the safe way to pass it.</li>
+  <li>Array indexes are not checked. Slice indexes are.</li>
+</ul>
+
+<h2 id="initialiser-lists">Initialiser lists<a class="anchor" href="#initialiser-lists" aria-label="Link to this section">#</a></h2>
+<p>Elements left out are zero, for locals and globals alike.</p>
+<pre data-run><code>i64 counts[4] = {1, 2};
+
+void main()
+{
+  i64 grid[2][3] = {{1}, {4, 5}};
+  i64 days[] = {31, 28, 31};       // the size comes from the list
+  printf("%d %d %d %d\n", counts[0], counts[1], counts[2], counts[3]);
+  printf("%d %d %d | %d %d %d\n", grid[0][0], grid[0][1], grid[0][2],
+                                 grid[1][0], grid[1][1], grid[1][2]);
+  printf("%d days in %d months\n", days[0] + days[1] + days[2], sizeof(days) / sizeof(i64));
+}
+</code></pre>
+<pre class="output">1 2 0 0
+1 0 0 | 4 5 0
+90 days in 3 months
+</pre>
+
+<h3 id="leaving-out-inner-braces">Leaving out inner braces<a class="anchor" href="#leaving-out-inner-braces" aria-label="Link to this section">#</a></h3>
+<p>As in C, the items fill the inner arrays and structs in order.</p>
+<pre data-run><code>struct Point { i64 x, y; };
+
+Point pts[] = {1, 2, 3};            // (1, 2) and (3, 0)
+
+void main()
+{
+  i64 m[2][2] = {1, 2, 3};
+  printf("%d %d %d %d\n", m[0][0], m[0][1], m[1][0], m[1][1]);
+  printf("%d points: (%d %d) (%d %d)\n", sizeof(pts) / sizeof(Point),
+         pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+}
+</code></pre>
+<pre class="output">1 2 3 0
+2 points: (1 2) (3 0)
+</pre>
+
+<h3 id="globals-built-at-start-up">Globals built at start-up<a class="anchor" href="#globals-built-at-start-up" aria-label="Link to this section">#</a></h3>
+<p>A global's initialiser items need not be constants: they are computed before <code>main</code>, in order.</p>
+<pre data-run><code>i64 dbl(i64 v) { return v * 2; }
+i64 sq(i64 v)  { return v * v; }
+
+struct Op { u8 *name; fn(i64) i64 run; };
+
+i64 base = 10;
+i64 limits[3] = {base, base * 2, 99};
+Op ops[2] = {{"double", &amp;dbl}, {"square", &amp;sq}};
+
+void main()
+{
+  printf("%d %d %d\n", limits[0], limits[1], limits[2]);
+  for (i64 i = 0; i &lt; 2; i++) { printf("%s %d\n", ops[i].name, ops[i].run(7)); }
+}
+</code></pre>
+<pre class="output">10 20 99
+double 14
+square 49
+</pre>
+
+<div class="warn"><p><strong>Braces only around aggregates.</strong> <code>i64 x = {1};</code> and
+<code>i64 a[2] = {1, {2}};</code> are compile errors: a scalar takes a plain value.</p></div>
+
+<h2 id="pointer-arithmetic">Pointer arithmetic<a class="anchor" href="#pointer-arithmetic" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void main()
+{
+  u8 *s = "hello";
+  u8 *end = s;
+  while (*end) { end++; }
+  printf("%d bytes, last is %c\n", end - s, *(end - 1));
+  printf("%c %c\n", *(2 + s), s[4]);   // n + p is p + n
+}
+</code></pre>
+<pre class="output">5 bytes, last is o
+l o
+</pre>
+<ul class="rules">
+  <li><code>n - p</code> is an error; <code>p - q</code> of two pointers is the number of elements between them.</li>
+  <li>A pointer compares with an integer on either side.</li>
+</ul>
+
+<h2 id="pointer-conversions">Pointer conversions<a class="anchor" href="#pointer-conversions" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>void *</code> and the byte pointers (<code>u8 *</code>, <code>i8 *</code>, <code>bool *</code>) convert to and from any pointer without a cast.</li>
+  <li>A pointer to a derived struct converts to a pointer to its base (see <a href="lang-methods.html#inheritance">inheritance</a>).</li>
+  <li>Any other pointer-to-pointer conversion is a warning, as in C: cast it.</li>
+  <li>A pointer passed for an integer, or an integer (other than 0) for a pointer, is a warning.</li>
+  <li>A struct passed where a number or another struct is expected is an error.</li>
+</ul>
+<pre data-run><code>void main()
+{
+  f64 f = 1.5;
+  void *any = &amp;f;          // fine
+  f64 *back = any;         // fine
+  u8 *bytes = &amp;f;          // fine: a byte pointer
+  i64 *bits = (i64 *)&amp;f;   // a cast: an f64 * isn't an i64 *
+  printf("%.1f %d %d\n", *back, bytes != null, *bits != 0);
+}
+</code></pre>
+<pre class="output">1.5 1 1
+</pre>
+
+<h2 id="heap-memory">Heap memory<a class="anchor" href="#heap-memory" aria-label="Link to this section">#</a></h2>
+<p><code>mem.alloc</code>, <code>mem.allocZero</code>, <code>mem.realloc</code> and <code>mem.free</code>.
+Nothing is garbage collected.</p>
+<pre data-run><code>import mem;
+
+void main()
+{
+  i64 n = 4;
+  i64 *nums = mem.allocZero(n * sizeof(i64));
+  nums[2] = 7;
+  nums = mem.realloc(nums, 8 * sizeof(i64));   // the first 4 are kept
+  printf("%d %d\n", nums[0], nums[2]);
+  mem.free(nums);
+}
+</code></pre>
+<pre class="output">0 7
+</pre>
+<p>More on the allocator, and finding leaks: <a href="lib-memory.html">Memory</a>. For growable arrays use
+<a href="lib-vectors.html"><code>vec.Vec</code></a> instead of <code>realloc</code> by hand.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-function-pointers.html"><span>Previous</span>Function pointers</a><a class="next" href="lang-slices.html"><span>Next</span>Slices</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-pointers.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#pointers">Pointers</a></li><li><a href="#arrays">Arrays</a></li><li><a href="#initialiser-lists">Initialiser lists</a></li><li><a href="#pointer-arithmetic">Pointer arithmetic</a></li><li><a href="#pointer-conversions">Pointer conversions</a></li><li><a href="#heap-memory">Heap memory</a></li></ul></nav>
+</div>
+</body>
+</html>

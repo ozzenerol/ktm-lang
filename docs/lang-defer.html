@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>defer and ad - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li class="current"><a href="lang-defer.html" aria-current="page">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>defer and ad</h1>
+<p class="lede"><code>defer</code> runs a statement when its block is left, however it is left.
+<code>ad</code> frees a variable at the end of its scope. Clean-up stays next to the code that needs it.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>u8 *buf = mem.alloc(64);
+defer mem.free(buf);              // runs when this block ends
+defer { a(); b(); }               // a block works too
+
+ad String s = str.from("x");      // = String s = ...; defer s.free();
+ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();</code></pre>
+</div>
+
+<h2 id="defer">defer<a class="anchor" href="#defer" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import mem;
+
+void work()
+{
+  u8 *buf = mem.alloc(64);
+  defer { mem.free(buf); printf("freed\n"); }
+  printf("working\n");
+}
+
+void main()
+{
+  work();
+}
+</code></pre>
+<pre class="output">working
+freed
+</pre>
+
+<h2 id="every-way-out">Every way out<a class="anchor" href="#every-way-out" aria-label="Link to this section">#</a></h2>
+<p>A defer runs at the end of the block, on <code>return</code>, <code>break</code>, <code>continue</code>,
+a <code>goto</code> out, and when a <code>throw</code> passes through.</p>
+<pre data-run><code>enum Err { neg };
+
+i64 check(i64 n)
+{
+  defer printf("  check(%d) done\n", n);
+  if (n &lt; 0) { throw(Err.neg); }
+  if (n == 0) { return 0; }
+  return n * 2;
+}
+
+void main()
+{
+  printf("%d\n", check(5));
+  printf("%d\n", check(0));
+  try {
+    check(-1);
+  } catch {
+    printf("caught\n");
+  }
+}
+</code></pre>
+<pre class="output">  check(5) done
+10
+  check(0) done
+0
+  check(-1) done
+caught
+</pre>
+
+<h2 id="order">Order<a class="anchor" href="#order" aria-label="Link to this section">#</a></h2>
+<p>Several defers in a block run last first. Inner blocks finish before outer ones.</p>
+<pre data-run><code>void main()
+{
+  defer printf("outer\n");
+  {
+    defer printf("1st registered, runs last\n");
+    defer printf("2nd registered, runs first\n");
+  }
+  printf("between\n");
+}
+</code></pre>
+<pre class="output">2nd registered, runs first
+1st registered, runs last
+between
+outer
+</pre>
+
+<h2 id="the-scope-is-the-block">The scope is the block<a class="anchor" href="#the-scope-is-the-block" aria-label="Link to this section">#</a></h2>
+<p>Not the function: in a loop body, it runs at the end of every iteration.</p>
+<pre data-run><code>void main()
+{
+  for (i64 i = 0; i &lt; 3; i++) {
+    defer printf("end of %d\n", i);
+    if (i == 1) { continue; }
+    printf("body %d\n", i);
+  }
+}
+</code></pre>
+<pre class="output">body 0
+end of 0
+end of 1
+body 2
+end of 2
+</pre>
+
+<h2 id="it-runs-as-written-later">It runs as written, later<a class="anchor" href="#it-runs-as-written-later" aria-label="Link to this section">#</a></h2>
+<p>The statement sees the values variables have when the block ends. <code>return</code> evaluates its value first.</p>
+<pre data-run><code>import mem;
+
+i64 first(i64 n)
+{
+  i64 *buf = mem.alloc(n * sizeof(i64));
+  defer mem.free(buf);
+  buf[0] = 42;
+  return buf[0];          // read before the free
+}
+
+void main()
+{
+  i64 x = 1;
+  {
+    defer printf("x is %d\n", x);
+    x = 2;
+  }
+  printf("%d\n", first(4));
+}
+</code></pre>
+<pre class="output">x is 2
+42
+</pre>
+
+<h2 id="only-if-reached">Only if reached<a class="anchor" href="#only-if-reached" aria-label="Link to this section">#</a></h2>
+<p>A defer written after an early <code>return</code> doesn't run on that return.</p>
+<pre data-run><code>void f(bool early)
+{
+  if (early) { return; }
+  defer printf("deferred\n");
+  printf("late part\n");
+}
+
+void main()
+{
+  f(true);
+  f(false);
+}
+</code></pre>
+<pre class="output">late part
+deferred
+</pre>
+
+<h2 id="ad">ad<a class="anchor" href="#ad" aria-label="Link to this section">#</a></h2>
+<p><code>ad</code> in front of a declaration means <code>defer name.free();</code> right after it.
+It works for a <code>String</code>, any slice, and any struct with a <code>free()</code> method that takes no arguments (or a pointer to one).</p>
+<pre data-run><code>import str;
+
+struct Conn { i64 fd; };
+void Conn.free() { printf("closing %d\n", self.fd); }
+
+void main()
+{
+  ad String name = str.from("Lorenzo");
+  ad u8[][] words = str.split("a b c", " ");
+  ad Conn c = {7};
+  printf("%s has %d words\n", name, words.len);
+}
+</code></pre>
+<pre class="output">Lorenzo has 3 words
+closing 7
+</pre>
+<p>The library's containers all have <code>free()</code>, so <code>ad</code> is the usual way to hold them:</p>
+<pre data-run><code>import map, set, vec;
+
+void main()
+{
+  ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();
+  ad map.Map&lt;u8[], i64&gt; m = map.new&lt;u8[], i64&gt;();
+  ad set.Set&lt;i64&gt; s = set.new&lt;i64&gt;();
+  v.push(1);
+  m.set("a", 1);
+  s.add(1);
+  printf("%d %d %d\n", v.len, m.len, s.len);
+}
+</code></pre>
+<pre class="output">1 1 1
+</pre>
+
+<h3 id="ad-rules">ad rules<a class="anchor" href="#ad-rules" aria-label="Link to this section">#</a></h3>
+<ul class="rules">
+  <li>Returning an <code>ad</code> variable is an error: it would be freed. Declare it without <code>ad</code> to hand it to the caller.</li>
+  <li>A type with no such <code>free()</code> is an error.</li>
+  <li>An <code>ad</code> struct needs a value. Only a String may start empty.</li>
+  <li>A copy of an <code>ad</code> variable shares what it points to, and is freed with the original.</li>
+  <li><code>ad</code> goes on a local variable, not a field. It is not reserved: a variable can be called <code>ad</code>.</li>
+</ul>
+<pre data-run><code>import str;
+
+String greeting(u8[] who)
+{
+  String s = str.format("hello, %s", who);   // no ad: the caller frees it
+  return s;
+}
+
+void main()
+{
+  ad String g = greeting("ada");             // the caller's ad
+  printf("%s\n", g);
+}
+</code></pre>
+<pre class="output">hello, ada
+</pre>
+
+<h2 id="rules-for-defer">Rules for defer<a class="anchor" href="#rules-for-defer" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>A <code>defer</code> must be a statement of a <code>{ }</code> block: directly after a <code>case</code> label, add braces.</li>
+  <li>A deferred statement can't <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> out of itself, or contain a label. A loop inside it keeps its own <code>break</code>.</li>
+  <li>A <code>goto</code> can't jump past a <code>defer</code> into the rest of its block.</li>
+  <li>A <code>throw</code> from a deferred statement goes on like any other throw.</li>
+  <li>Returning from <code>main</code> runs its defers. <code>os.exit()</code> and a crash don't.</li>
+  <li>Switching coroutines doesn't leave a block, so it runs no defers.</li>
+  <li>Only functions that use <code>defer</code> pay for it.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-exceptions.html"><span>Previous</span>Exceptions</a><a class="next" href="lang-reflection.html"><span>Next</span>Reflection</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-defer.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#defer">defer</a></li><li><a href="#every-way-out">Every way out</a></li><li><a href="#order">Order</a></li><li><a href="#the-scope-is-the-block">The scope is the block</a></li><li><a href="#it-runs-as-written-later">It runs as written, later</a></li><li><a href="#only-if-reached">Only if reached</a></li><li><a href="#ad">ad</a></li><li><a href="#rules-for-defer">Rules for defer</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variables and constants - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li class="current"><a href="lang-variables.html" aria-current="page">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Variables and constants</h1>
+<p class="lede">Declaring locals and globals, letting the compiler pick the type, and constants.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>i64 a = 1, b, c = 3;       // several in one line
+u8 *name = "ktm", letter;  // each * belongs to the name after it
+auto count = 3;            // i64, from the initialiser
+static i64 calls = 0;      // keeps its value between calls
+const i64 MAX = 64;        // read-only, a compile-time constant</code></pre>
+</div>
+
+<h2 id="declaring-variables">Declaring variables<a class="anchor" href="#declaring-variables" aria-label="Link to this section">#</a></h2>
+<p>Declare a local anywhere in a block. Several can share one declaration.</p>
+<pre data-run><code>void main()
+{
+  i64 a = 1, b = 2, c;
+  c = a + b;
+  f64 ratio = 0.25;
+  u8 *name = "ktm", letter = 'h';   // name is a u8 *, letter a u8
+  printf("%d %.2f %s %c\n", c, ratio, name, letter);
+}
+</code></pre>
+<pre class="output">3 0.25 ktm h
+</pre>
+
+<h2 id="globals">Globals<a class="anchor" href="#globals" aria-label="Link to this section">#</a></h2>
+<p>A global is declared at file scope and seen by everything below it. Uninitialised globals are 0.</p>
+<pre data-run><code>i64 gTotal = 100, gCount;
+u8 *gName = "server";
+
+void bump() { gCount++; }
+
+void main()
+{
+  bump();
+  bump();
+  printf("%s: %d of %d\n", gName, gCount, gTotal);
+}
+</code></pre>
+<pre class="output">server: 2 of 100
+</pre>
+
+<div class="warn"><p><strong>Locals are not zeroed.</strong> Only <code>String</code> locals start
+empty. Give every other local a value before you read it.</p></div>
+
+<h2 id="auto">auto<a class="anchor" href="#auto" aria-label="Link to this section">#</a></h2>
+<p><code>auto</code> takes its type from the initialiser.</p>
+<pre data-run><code>void main()
+{
+  auto count = 3;
+  auto price = 9.99;
+  auto label = "total";
+  auto half = count / 2.0;
+  printf("%s %s %s %s\n", typeof(count), typeof(price), typeof(label), typeof(half));
+}
+</code></pre>
+<pre class="output">i64 f64 u8[6] f64
+</pre>
+<p>It is most useful with long type names, and in <a href="lang-control-flow.html#range-based-for">range-based <code>for</code></a>:</p>
+<pre data-run><code>import map;
+
+void main()
+{
+  auto ages = map.new&lt;u8[], i64&gt;();     // map.Map&lt;u8[], i64&gt;
+  defer ages.free();
+  ages.set("ada", 36);
+  i64 nums[] = {1, 2, 3};
+  for (auto x : nums) { printf("%d ", x); }
+  printf("%d\n", ages.getOr("ada", 0));
+}
+</code></pre>
+<pre class="output">1 2 3 36
+</pre>
+
+<h2 id="static">static<a class="anchor" href="#static" aria-label="Link to this section">#</a></h2>
+<p>A <code>static</code> local keeps its value between calls.</p>
+<pre data-run><code>i64 nextId()
+{
+  static i64 id = 0;
+  id++;
+  return id;
+}
+
+void main()
+{
+  nextId();
+  nextId();
+  printf("%d\n", nextId());
+}
+</code></pre>
+<pre class="output">3
+</pre>
+<p>On a function or a global, <code>static</code> keeps it private to its file.</p>
+
+<h2 id="const">const<a class="anchor" href="#const" aria-label="Link to this section">#</a></h2>
+<p><code>const</code> marks a declaration read-only. With a constant initialiser it is a
+compile-time constant: usable as an array size, a <code>case</code> label, or in another <code>const</code>.</p>
+<pre data-run><code>const i64 MAX_USERS = 4;
+const i64 DOUBLE_MAX = MAX_USERS * 2;   // built from another const
+const f64 RATE = 0.5;
+i64 gUsers[MAX_USERS];                 // as an array size
+
+i64 classify(i64 n)
+{
+  switch (n) {
+    case MAX_USERS: return 1;           // as a case label
+    default:        return 0;
+  }
+}
+
+void main()
+{
+  printf("%d %d %.1f %d %d\n", MAX_USERS, DOUBLE_MAX, RATE, classify(4), sizeof(gUsers));
+}
+</code></pre>
+<pre class="output">4 8 0.5 1 32
+</pre>
+
+<h3 id="const-parameters">const parameters<a class="anchor" href="#const-parameters" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>i64 twice(const i64 n)    // n can't be assigned inside twice
+{
+  return n * 2;
+}
+
+void main()
+{
+  printf("%d\n", twice(21));
+}
+</code></pre>
+<pre class="output">42
+</pre>
+
+<h3 id="rules">Rules<a class="anchor" href="#rules" aria-label="Link to this section">#</a></h3>
+<ul class="rules">
+  <li>A <code>const</code> needs an initialiser (a parameter doesn't).</li>
+  <li>Assigning to it, with <code>=</code>, <code>+=</code> or <code>++</code>, is a compile error.</li>
+  <li><code>const</code> is not a type qualifier as in C: it goes only at the start of a
+  declaration. <code>u8 const *p</code>, a <code>const</code> field, a <code>const</code>
+  return type or a cast to <code>const</code> are errors.</li>
+</ul>
+<div class="tip"><p>Prefer <code>const</code> to <code>#define</code> for numbers: it has a type and the
+editor knows it.</p></div>
+
+<h2 id="shadowing-a-module">Shadowing a module<a class="anchor" href="#shadowing-a-module" aria-label="Link to this section">#</a></h2>
+<p>A local may have the name of an imported module. For its scope, the name means the local.</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] str = "a local called str";
+  printf("%s, %d bytes\n", str, str.len);
+}
+</code></pre>
+<pre class="output">a local called str, 18 bytes
+</pre>
+<p>A global can't: <code>i64 str;</code> at file scope would hide the module, and is an error.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-types.html"><span>Previous</span>Types and literals</a><a class="next" href="lang-operators.html"><span>Next</span>Operators and casts</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-variables.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#declaring-variables">Declaring variables</a></li><li><a href="#globals">Globals</a></li><li><a href="#auto">auto</a></li><li><a href="#static">static</a></li><li><a href="#const">const</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li></ul></nav>
+</div>
+</body>
+</html>

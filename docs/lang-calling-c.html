@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calling C and assembly - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li class="current"><a href="lang-calling-c.html" aria-current="page">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span><span class="refs">Reference: <a href="stdlib.html#libc"><code>libc</code></a></span></div>
+<h1>Calling C and assembly</h1>
+<p class="lede">Declare a C function with <code>extern "c"</code> and call it. Most of the C library is already declared in the <code>libc</code> module.</p>
+
+<h2 id="the-libc-module">The libc module<a class="anchor" href="#the-libc-module" aria-label="Link to this section">#</a></h2>
+<p>libc is always linked, and <code>import libc;</code> gives its functions, structs and constants by their C names.</p>
+<pre data-run><code>import libc;
+
+void main()
+{
+  printf("%.4f %.0f\n", libc.sqrt(2.0), libc.pow(2.0, 10.0));
+  printf("%d\n", libc.getenv("PATH") != null);
+  printf("%d\n", libc.getpid() &gt; 0);
+}
+</code></pre>
+<pre class="output">1.4142 1024
+1
+1
+</pre>
+
+<h2 id="declaring-a-c-function">Declaring a C function<a class="anchor" href="#declaring-a-c-function" aria-label="Link to this section">#</a></h2>
+<p>For anything libc doesn't declare, write the prototype yourself with <code>extern "c"</code>.</p>
+<pre data-run><code>extern "c" i32 abs(i32 x);
+extern "c" i64 strtol(u8 *s, u8 **end, i32 base);
+
+void main()
+{
+  u8 *end;
+  printf("%d %d\n", abs(-5), strtol("ff zz", &amp;end, 16));
+  printf("[%s]\n", end);
+}
+</code></pre>
+<pre class="output">5 255
+[ zz]
+</pre>
+
+<h3 id="c-types-in-ktm">C types in ktm<a class="anchor" href="#c-types-in-ktm" aria-label="Link to this section">#</a></h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>C</th><th>ktm</th></tr></thead>
+  <tbody>
+    <tr><td><code>char</code> / <code>unsigned char</code></td><td><code>i8</code> / <code>u8</code></td></tr>
+    <tr><td><code>char *</code></td><td><code>u8 *</code></td></tr>
+    <tr><td><code>short</code> / <code>int</code></td><td><code>i16</code> / <code>i32</code></td></tr>
+    <tr><td><code>long</code>, <code>size_t</code>, <code>ssize_t</code></td><td><code>i64</code> / <code>u64</code></td></tr>
+    <tr><td><code>socklen_t</code></td><td><code>u32</code></td></tr>
+    <tr><td><code>float</code> / <code>double</code></td><td><code>f32</code> / <code>f64</code></td></tr>
+    <tr><td><code>void *</code></td><td><code>void *</code></td></tr>
+    <tr><td><code>int (*)(int)</code></td><td><code>fn(i32) i32</code></td></tr>
+    <tr><td><code>printf(const char *, ...)</code></td><td><code>printf(u8 *, ...)</code></td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="c-data">C data<a class="anchor" href="#c-data" aria-label="Link to this section">#</a></h2>
+<p>A C global is declared the same way, by its C name:</p>
+<pre data-run><code>extern "c" u8 **environ;
+
+void main()
+{
+  i64 n = 0;
+  while (environ[n]) { n++; }
+  printf("%d\n", n &gt; 0);
+}
+</code></pre>
+<pre class="output">1
+</pre>
+
+<h2 id="c-structs">C structs<a class="anchor" href="#c-structs" aria-label="Link to this section">#</a></h2>
+<p>Declare the struct with the same fields in the same order: the layout is C's.</p>
+<pre data-run><code>struct tm
+{
+  i32 tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst;
+  i64 tm_gmtoff;
+  u8 *tm_zone;
+};
+
+extern "c" tm *gmtime_r(i64 *t, tm *out);
+
+void main()
+{
+  i64 t = 0;
+  tm out;
+  gmtime_r(&amp;t, &amp;out);
+  printf("%d-%02d-%02d\n", out.tm_year + 1900, out.tm_mon + 1, out.tm_mday);
+}
+</code></pre>
+<pre class="output">1970-01-01
+</pre>
+
+<h2 id="callbacks-into-ktm">Callbacks into ktm<a class="anchor" href="#callbacks-into-ktm" aria-label="Link to this section">#</a></h2>
+<p>A ktm function can be passed where C wants a function pointer: the calling convention is C's.</p>
+<pre data-run><code>extern "c" void qsort(void *base, u64 n, u64 size, fn(void *, void *) i32 cmp);
+
+i32 byValue(i64 *a, i64 *b) { return (i32)(*a - *b); }
+
+void main()
+{
+  i64 nums[] = {42, 7, 19, 3};
+  qsort(nums, 4, sizeof(i64), &amp;byValue);
+  for (auto n : nums) { printf("%d,", n); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">3,7,19,42,
+</pre>
+<p>To sort in ktm, <a href="lib-vectors.html"><code>sort.slice</code></a> and <code>vec.Vec.sort</code> are simpler.</p>
+
+<h2 id="other-c-libraries">Other C libraries<a class="anchor" href="#other-c-libraries" aria-label="Link to this section">#</a></h2>
+<p>Name the library in the source with <code>#link</code>, or on the command line with <code>-clibs</code>:</p>
+<pre><code>#link &lt;sqlite3&gt;          // like -lsqlite3
+#link "./libmine.so"     // a path, relative to the working directory
+
+extern "c" i32 sqlite3_libversion_number();
+
+void main()
+{
+  printf("%d\n", sqlite3_libversion_number());
+}</code></pre>
+<pre class="shell"><code>ktm app.ktm -clibs="-lcurl -lm" -o app</code></pre>
+<p><code>#link</code> works for compiled programs, the JIT and the REPL alike.</p>
+
+<h2 id="names-stay-apart">Names stay apart<a class="anchor" href="#names-stay-apart" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Your functions and globals have symbols of their own: your <code>read()</code> or <code>free()</code> doesn't replace C's.</li>
+  <li>A prototype without <code>extern "c"</code> is a ktm function, which must be defined in the program or a ktm library.</li>
+  <li>In a module, an <code>extern "c"</code> declaration is the module's name (private unless <code>pub</code>) but keeps its C symbol.</li>
+  <li>An <code>extern "c"</code> function can't be overloaded.</li>
+</ul>
+
+<h2 id="inline-assembly">Inline assembly<a class="anchor" href="#inline-assembly" aria-label="Link to this section">#</a></h2>
+<p>An <code>asm</code> block defines labelled routines; <code>_extern</code> binds one to a ktm prototype.
+Arguments arrive in the platform's C calling convention.</p>
+<pre data-run><code>#ifdef IS_X86_64
+asm {
+_ADD_ONE::
+  MOV RAX, RDI
+  INC RAX
+  RET
+}
+#endif
+
+#ifdef IS_ARM_64
+asm {
+_ADD_ONE::
+  ADD X0, X0, 1
+  RET
+}
+#endif
+
+_extern _ADD_ONE i64 addOne(i64 x);
+
+void main()
+{
+  printf("%d\n", addOne(41));
+}
+</code></pre>
+<pre class="output">42
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-preprocessor.html"><span>Previous</span>The preprocessor</a><a class="next" href="library.html"><span>Next</span>Overview</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-calling-c.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-libc-module">The libc module</a></li><li><a href="#declaring-a-c-function">Declaring a C function</a></li><li><a href="#c-data">C data</a></li><li><a href="#c-structs">C structs</a></li><li><a href="#callbacks-into-ktm">Callbacks into ktm</a></li><li><a href="#other-c-libraries">Other C libraries</a></li><li><a href="#names-stay-apart">Names stay apart</a></li><li><a href="#inline-assembly">Inline assembly</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Type aliases - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li class="current"><a href="lang-type-aliases.html" aria-current="page">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Type aliases</h1>
+<p class="lede"><code>type Name = T;</code> gives a type a second name. The alias is the type itself, not a new one.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>type Text = u8[];
+type Handler = fn(i64, Text) bool;
+type Buf = u8[64];
+type Ints = vec.Vec&lt;i64&gt;;
+pub type Port = u16;          // in a module: exported</code></pre>
+</div>
+
+<h2 id="naming-long-types">Naming long types<a class="anchor" href="#naming-long-types" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>type Text = u8[];
+type Handler = fn(i64, Text) bool;
+type Celsius = f64;
+struct Reading { Text place; Celsius temp; };
+type Readings = Reading[];
+
+bool show(i64 i, Text place) { printf("%d: %s\n", i, place); return true; }
+
+Celsius warmest(Readings all, Handler each)
+{
+  Celsius best = -273.15;
+  for (i64 i = 0; i &lt; all.len; i++) {
+    each(i, all[i].place);
+    if (all[i].temp &gt; best) { best = all[i].temp; }
+  }
+  return best;
+}
+
+void main()
+{
+  Reading r[3] = {{"Iasi", 18.5}, {"Cluj", 21.0}, {"Sibiu", 16.25}};
+  printf("warmest %.1f\n", warmest(r, &amp;show));
+}
+</code></pre>
+<pre class="output">0: Iasi
+1: Cluj
+2: Sibiu
+warmest 21.0
+</pre>
+
+<h2 id="an-alias-is-the-same-type">An alias is the same type<a class="anchor" href="#an-alias-is-the-same-type" aria-label="Link to this section">#</a></h2>
+<p>A <code>Celsius</code> and an <code>f64</code> pass to each other with no conversion.
+<code>sizeof</code>, <code>typeof</code> and error messages see the real type.</p>
+<pre data-run><code>type Celsius = f64;
+type Text = u8[];
+
+void main()
+{
+  Celsius c = 21.5;
+  f64 f = c;
+  Text t = "hello";
+  u8[] s = t;
+  printf("%.1f %s %d %s\n", f, s, sizeof(Text), typeof(c));
+}
+</code></pre>
+<pre class="output">21.5 hello 16 f64
+</pre>
+<div class="note"><p>Because an alias is not a new type, it doesn't stop you mixing
+<code>Celsius</code> and <code>Fahrenheit</code>. For that, wrap the value in a struct.</p></div>
+
+<h2 id="fixed-arrays-and-generics">Fixed arrays and generics<a class="anchor" href="#fixed-arrays-and-generics" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import vec;
+
+type Buf = u8[8];
+type Ints = vec.Vec&lt;i64&gt;;
+
+void main()
+{
+  Buf b;
+  b[0] = 'k';
+  ad Ints nums = vec.new&lt;i64&gt;();
+  nums.push(3);
+  printf("%d %c %d\n", sizeof(Buf), b[0], nums.len);
+}
+</code></pre>
+<pre class="output">8 k 1
+</pre>
+
+<h2 id="rules">Rules<a class="anchor" href="#rules" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Aliases are declared at file scope, not inside a function.</li>
+  <li>In a program, an alias can only name types declared above it. In a module, any order works.</li>
+  <li>Two aliases that name each other are an error.</li>
+  <li>In a module an alias is private unless <code>pub</code>, and is <code>mod.Name</code> outside it.</li>
+  <li><code>type</code> is a keyword only at the start of such a declaration: a variable or field can still be called <code>type</code>.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-enums.html"><span>Previous</span>Enums</a><a class="next" href="lang-generics.html"><span>Next</span>Generics</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-type-aliases.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#naming-long-types">Naming long types</a></li><li><a href="#an-alias-is-the-same-type">An alias is the same type</a></li><li><a href="#fixed-arrays-and-generics">Fixed arrays and generics</a></li><li><a href="#rules">Rules</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -11,7 +11,8 @@
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
   try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
-  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
@@ -24,6 +25,13 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
   <div class="search" role="search">
     <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
            aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
@@ -39,50 +47,45 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li class="current"><a href="getting-started.html" aria-current="page">Getting started</a><ul class="toc"><li><a href="#requirements">Requirements</a></li><li><a href="#build">Build</a></li><li><a href="#your-first-program">Your first program</a></li><li><a href="#run-without-compiling-a-binary">Run without compiling a binary</a></li><li><a href="#how-a-program-runs">How a program runs</a></li><li><a href="#the-standard-library">The standard library</a></li><li><a href="#text">Text</a></li><li><a href="#several-files">Several files</a></li><li><a href="#next-steps">Next steps</a></li></ul></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<details class="group" open><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li class="current"><a href="getting-started.html" aria-current="page">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
+<div class="crumbs"><span><a href="index.html">Start</a></span></div>
 <h1>Getting started</h1>
-<p class="lede">Build ktm from source, then compile and run your first programs.</p>
+<p class="lede">Build ktm, compile your first program, and set up a project with a module.</p>
 
-<h2 id="requirements">Requirements<a class="anchor" href="#requirements" aria-label="Link to this section">#</a></h2>
-<ul>
-  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon (arm64); macOS on Intel is not supported. On Windows, use WSL2.</li>
-  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>. ktm uses the C compiler to assemble and link the code it generates.</li>
-  <li>Optional: the SQLite development package, for the SQLite bindings.</li>
+<h2 id="1-requirements">1. Requirements<a class="anchor" href="#1-requirements" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon. On Windows, use WSL2.</li>
+  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>: ktm uses the C compiler to assemble and link.</li>
+  <li>Optional: the SQLite development package, for the <a href="lib-sqlite.html"><code>sql</code></a> module.</li>
 </ul>
 
-<h2 id="build">Build<a class="anchor" href="#build" aria-label="Link to this section">#</a></h2>
-<p>From the repository root, run as your normal user (not with <code>sudo</code>):</p>
-<pre><code>./build.sh</code></pre>
-<p>This builds the compiler as <code>./ktm</code> and the standard library into
-<code>build/prefix</code>. Useful options:</p>
+<h2 id="2-build-and-install">2. Build and install<a class="anchor" href="#2-build-and-install" aria-label="Link to this section">#</a></h2>
+<p>From the repository root, as your normal user:</p>
+<pre class="shell"><code>./build.sh             # builds ./ktm and the library into build/prefix
+./build.sh --install   # also installs to /usr/local (asks for sudo for the copy)</code></pre>
 <div class="table-wrap"><table>
-  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <thead><tr><th>Option</th><th>Does</th></tr></thead>
   <tbody>
-    <tr><td><code>./build.sh --test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
-    <tr><td><code>./build.sh --install</code></td><td>Also install <code>ktm</code> and the library to <code>/usr/local</code> (asks for sudo only for the copy)</td></tr>
-    <tr><td><code>./build.sh --sqlite</code></td><td>Include the SQLite bindings</td></tr>
-    <tr><td><code>./build.sh --debug</code></td><td>Debug build with AddressSanitizer</td></tr>
-    <tr><td><code>./build.sh --clean</code></td><td>Start from scratch</td></tr>
+    <tr><td><code>--test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
+    <tr><td><code>--install</code></td><td>Install <code>ktm</code> and the library</td></tr>
+    <tr><td><code>--sqlite</code></td><td>Include the SQLite bindings</td></tr>
+    <tr><td><code>--debug</code></td><td>A debug build with AddressSanitizer</td></tr>
+    <tr><td><code>--clean</code></td><td>Start from scratch</td></tr>
   </tbody>
 </table></div>
-<p>Set <code>INSTALL_PREFIX=$HOME/.local</code> to install somewhere else, and
-<code>CC=clang</code> to choose the C compiler, and <code>JOBS=4</code> to build and
-run the tests 4 at a time instead of one per CPU. A test that runs longer than
-<code>KTM_TEST_TIMEOUT</code> seconds (default 60, <code>0</code> for no limit) is
-stopped and reported as failed. The classic route also works:
-<code>make &amp;&amp; sudo make install</code>.</p>
+<p>Environment: <code>INSTALL_PREFIX=$HOME/.local</code> installs elsewhere, <code>CC=clang</code> picks the C compiler,
+<code>JOBS=4</code> limits parallel jobs, <code>KTM_TEST_TIMEOUT</code> (seconds, default 60) limits each test.</p>
+<div class="note"><p><strong>Without installing</strong>, point ktm at the local build:
+<code>./ktm --install-dir=build/prefix hello.ktm -o hello</code>. These docs assume <code>ktm</code> is on your <code>PATH</code>.</p></div>
+<p>Check it:</p>
+<pre class="shell"><code>$ ktm --version
+ktm v0.14.0</code></pre>
 
-<div class="note"><p><strong>Without installing.</strong> A program needs the standard library to
-compile. If you haven't installed ktm, point it at the local build with
-<code>--install-dir</code>:</p>
-<pre><code>./ktm --install-dir=build/prefix hello.ktm -o hello</code></pre>
-<p>The rest of these docs assume ktm is installed and on your <code>PATH</code>.</p></div>
-
-<h2 id="your-first-program">Your first program<a class="anchor" href="#your-first-program" aria-label="Link to this section">#</a></h2>
-<p>Create <code>hello.ktm</code>:</p>
+<h2 id="3-hello-world">3. Hello, world<a class="anchor" href="#3-hello-world" aria-label="Link to this section">#</a></h2>
+<p>Save this as <code>hello.ktm</code>:</p>
 <pre data-run><code>void main()
 {
   printf("Hello, %s!\n", "world");
@@ -90,89 +93,120 @@ compile. If you haven't installed ktm, point it at the local build with
 </code></pre>
 <pre class="output">Hello, world!
 </pre>
-<p>Compile and run it:</p>
-<pre><code>ktm hello.ktm -o hello
-./hello</code></pre>
-<p>Without <code>-o</code> the binary is called <code>a.out</code>.</p>
+<p>Run it three ways:</p>
+<pre class="shell"><code>ktm hello.ktm -o hello &amp;&amp; ./hello   # compile to a native binary
+ktm -jit hello.ktm                    # compile in memory and run
+ktm -run hello.ktm                    # compile to a temporary binary and run</code></pre>
 
-<h2 id="run-without-compiling-a-binary">Run without compiling a binary<a class="anchor" href="#run-without-compiling-a-binary" aria-label="Link to this section">#</a></h2>
-<p>The JIT compiles into memory and runs immediately, which is handy while developing:</p>
-<pre><code>ktm -jit hello.ktm</code></pre>
-<p>Make a file executable as a script with a shebang line. ktm skips a first line that
-starts with <code>#!</code>:</p>
-<pre><code>#!/usr/bin/env -S ktm -jit
-void main() { printf("Hello from a script\n"); }</code></pre>
-<pre><code>chmod +x hello.ktm
-./hello.ktm</code></pre>
+<h2 id="4-something-real">4. Something real<a class="anchor" href="#4-something-real" aria-label="Link to this section">#</a></h2>
+<p>A word counter: read a file named on the command line, count the words, print the top three.</p>
+<pre><code>import cstr, fs, map, os, str, vec;
 
-<h2 id="how-a-program-runs">How a program runs<a class="anchor" href="#how-a-program-runs" aria-label="Link to this section">#</a></h2>
-<p>A program starts at <code>main</code>. The file scope holds declarations (types,
-functions, globals, constants, imports); globals with an initialiser that runs code are set
-up in order before <code>main</code>.</p>
-<p>Return a value from <code>main</code> to set the exit code:</p>
-<pre><code>i32 main()
+struct Count { u8[] word; i64 n; };
+
+i64 byCount(Count *a, Count *b) { return b.n - a.n; }
+
+i32 main(i32 argc, u8 **argv)
 {
-  return 3;   // ./a.out; echo $? prints 3
+  if (argc &lt; 2) {
+    os.eprintf("usage: %s FILE\n", argv[0]);
+    return EXIT_FAIL;
+  }
+  ad String text = fs.readAll(cstr.view(argv[1]));
+  if (!text.ptr) {
+    os.eprintf("can't read %s\n", argv[1]);
+    return EXIT_FAIL;
+  }
+
+  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
+  ad u8[][] words = str.split(text, " ");
+  for (auto w : words) {
+    u8[] t = w.trim();
+    if (t.len) { counts.set(t, counts.getOr(t, 0) + 1); }
+  }
+
+  ad vec.Vec&lt;Count&gt; top = vec.new&lt;Count&gt;();
+  i64 it = 0;
+  Count c;
+  while (counts.next(&amp;it, &amp;c.word, &amp;c.n)) { top.push(c); }
+  top.sort(&amp;byCount);
+  for (i64 i = 0; i &lt; top.len &amp;&amp; i &lt; 3; i++) { printf("%d %s\n", top.get(i).n, top.get(i).word); }
+  return EXIT_OK;
 }</code></pre>
+<pre class="shell"><code>$ ktm wc.ktm -o wc
+$ echo "the cat and the dog and the bird the end" &gt; words.txt
+$ ./wc words.txt
+4 the
+2 and
+1 cat</code></pre>
+<p>The same program, checked here with a fixed text instead of a file:</p>
+<pre data-run><code>import map, str, vec;
 
-<h2 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h2>
-<p>The standard library is a set of modules: import the ones a file uses and call their
-names with the module in front (<code>import str, fs;</code> then <code>str.format(...)</code>,
-<code>fs.readAll(path)</code>). C's own functions are in <code>libc</code>. The compiler links
-<code>libktm</code> automatically. See the <a href="library.html">library guide</a>.</p>
+struct Count { u8[] word; i64 n; };
 
-<h2 id="text">Text<a class="anchor" href="#text" aria-label="Link to this section">#</a></h2>
-<p>A <code>String</code> is text you own: make it, free it where you made it with
-<code>defer</code>, and change it with its methods. Text you only read is a <code>u8[]</code>,
-a slice: a literal, part of a String or of a buffer, with its length, so nothing is
-copied.</p>
-<pre data-run><code>import str;
+i64 byCount(Count *a, Count *b) { return b.n - a.n; }
 
 void main()
 {
-  String greeting = str.format("Hello, %s", "world");
-  defer greeting.free();
-  greeting.append("!");
-  u8[] word = greeting[7:12];
-  printf("%s (%d bytes), the word is %s\n", greeting, greeting.len, word);
+  u8[] text = "the cat and the dog and the bird";
+  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
+  ad u8[][] words = str.split(text, " ");
+  for (auto w : words) {
+    u8[] t = w.trim();
+    if (t.len) { counts.set(t, counts.getOr(t, 0) + 1); }
+  }
+
+  ad vec.Vec&lt;Count&gt; top = vec.new&lt;Count&gt;();
+  i64 it = 0;
+  Count c;
+  while (counts.next(&amp;it, &amp;c.word, &amp;c.n)) { top.push(c); }
+  top.sort(&amp;byCount);
+  for (i64 i = 0; i &lt; top.len &amp;&amp; i &lt; 2; i++) { printf("%d %s\n", top.get(i).n, top.get(i).word); }
 }
 </code></pre>
-<pre class="output">Hello, world! (13 bytes), the word is world
+<pre class="output">3 the
+2 and
 </pre>
 
-<h2 id="several-files">Several files<a class="anchor" href="#several-files" aria-label="Link to this section">#</a></h2>
-<p>Put related code in a module: a directory whose files start with <code>module</code> and
-the directory's name. Mark what other code may use with <code>pub</code>:</p>
+<h2 id="5-a-project-with-a-module">5. A project with a module<a class="anchor" href="#5-a-project-with-a-module" aria-label="Link to this section">#</a></h2>
+<p>Put related code in a directory whose files start with <code>module</code> and its name. Mark what others may use <code>pub</code>.</p>
+<pre class="shell"><code>shapes/
+├── main.ktm
+└── geometry/
+    └── area.ktm</code></pre>
 <pre><code>// geometry/area.ktm
 module geometry;
 
-pub i64 area(i64 w, i64 h)
-{
-    return w * h;
-}</code></pre>
+pub i64 rect(i64 w, i64 h) { return w * h; }</code></pre>
 <pre><code>// main.ktm
 import geometry;
 
 void main()
 {
-    printf("%d\n", geometry.area(3, 4));
+  printf("%d\n", geometry.rect(3, 4));
 }</code></pre>
-<pre><code>ktm main.ktm -o shapes</code></pre>
-<p>See <a href="language.html#modules">Modules</a> for the rest.</p>
+<pre class="shell"><code>cd shapes &amp;&amp; ktm main.ktm -o shapes &amp;&amp; ./shapes
+12</code></pre>
+<p>Only the main file is named: ktm finds <code>geometry</code> by the import. More on <a href="lang-modules.html">Modules</a>.</p>
 
-<h2 id="next-steps">Next steps<a class="anchor" href="#next-steps" aria-label="Link to this section">#</a></h2>
-<ul>
-  <li><a href="language.html">The language</a>: types, structs, control flow, functions and more.</li>
-  <li><a href="tools.html">Tools</a>: every compiler flag, the REPL and editor setup.</li>
-  <li><a href="examples.html">Examples</a>: complete projects to read and run.</li>
-</ul>
+<h2 id="6-your-editor">6. Your editor<a class="anchor" href="#6-your-editor" aria-label="Link to this section">#</a></h2>
+<p>Install the syntax files and the language server: see <a href="tools-editors.html">Editors</a>.</p>
 
-    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="index.html"><span>Previous</span>Home</a><a class="next" href="language.html"><span>Next</span>Language</a></nav>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="tour.html"><strong>A quick tour</strong><span>The language in ten short programs.</span></a>
+  <a class="card" href="from-c.html"><strong>Coming from C</strong><span>The differences, side by side.</span></a>
+  <a class="card" href="language.html"><strong>The language</strong><span>One page per topic.</span></a>
+  <a class="card" href="library.html"><strong>The library</strong><span>Files, processes, sockets, JSON.</span></a>
+</div>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="index.html"><span>Previous</span>Home</a><a class="next" href="tour.html"><span>Next</span>A quick tour</a></nav>
     <footer class="page-foot">
       <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/getting-started.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#1-requirements">1. Requirements</a></li><li><a href="#2-build-and-install">2. Build and install</a></li><li><a href="#3-hello-world">3. Hello, world</a></li><li><a href="#4-something-real">4. Something real</a></li><li><a href="#5-a-project-with-a-module">5. A project with a module</a></li><li><a href="#6-your-editor">6. Your editor</a></li><li><a href="#next">Next</a></li></ul></nav>
 </div>
 </body>
 </html>

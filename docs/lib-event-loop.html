@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The coroutine loop - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li class="current"><a href="lib-event-loop.html" aria-current="page">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#coro"><code>coro</code></a></span></div>
+<h1>The coroutine loop</h1>
+<p class="lede">One coroutine per connection, all on one thread. <code>coro.go</code> starts a coroutine in the loop,
+<code>coro.run</code> runs the loop, and the I/O calls pause only the coroutine that waits.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>coro.go(&amp;handler, arg);        // start a coroutine in this thread's loop
+coro.run();                    // until every one has ended
+// inside a loop coroutine:
+coro.accept(listener)   coro.read(fd, buf)   coro.write(fd, data)   coro.dial(host, port)
+coro.wait(fd, events, ms)   coro.sleep(ms)   coro.waitChild(pid)   coro.close(fd)
+coro.stop();                   // stop taking work; finish what is in flight</code></pre>
+</div>
+
+<h2 id="an-echo-server">An echo server<a class="anchor" href="#an-echo-server" aria-label="Link to this section">#</a></h2>
+<p>The server and its clients run as coroutines in one loop, on one thread.</p>
+<pre data-run><code>import coro, cstr, libc, net;
+
+i32 gListen;
+
+void *serveOne(void *arg)
+{
+  i32 fd = (i32)(i64)arg;
+  u8 buf[256];
+  i64 n;
+  while ((n = coro.read(fd, buf, 5000)) &gt; 0) {      // pauses until data comes
+    coro.write(fd, buf[0:n]);                       // pauses while the socket is full
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *unused)
+{
+  i32 fd;
+  while ((fd = coro.accept(gListen)) != -1) { coro.go(&amp;serveOne, (void *)(i64)fd); }
+  return null;                                      // coro.stop() was called
+}
+
+void *client(void *word)
+{
+  i32 fd = coro.dial("127.0.0.1", net.localPort(gListen), 5000);
+  coro.write(fd, cstr.view(word));
+  u8 buf[64];
+  i64 n = coro.read(fd, buf, 5000);
+  printf("%s -&gt; %s\n", word, buf[0:n]);
+  coro.close(fd);
+  return null;
+}
+
+void *clients(void *unused)
+{
+  client("ping");
+  client("hello");
+  coro.stop();                                      // let the server finish
+  return null;
+}
+
+void main()
+{
+  gListen = net.listen(0, "127.0.0.1", 16);
+  coro.go(&amp;acceptor);
+  coro.go(&amp;clients);
+  coro.run();
+  libc.close(gListen);
+  printf("stopped\n");
+}
+</code></pre>
+<pre class="output">ping -&gt; ping
+hello -&gt; hello
+stopped
+</pre>
+
+<h2 id="the-calls">The calls<a class="anchor" href="#the-calls" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Pauses until</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>coro.read(fd, buf, ms)</code></td><td>Something can be read</td><td>Bytes read, 0 at end of file, -1 on error or timeout</td></tr>
+    <tr><td><code>coro.write(fd, data, ms)</code></td><td>All of <code>data</code> is written</td><td><code>data.len</code>, or -1 (<code>EPIPE</code>, never <code>SIGPIPE</code>)</td></tr>
+    <tr><td><code>coro.accept(listener, ms)</code></td><td>A client connects</td><td>A non-blocking fd; -1 on timeout, error or <code>coro.stop()</code></td></tr>
+    <tr><td><code>coro.dial(addr, port, ms)</code></td><td>The connection is made</td><td>A non-blocking fd, or -1 with <code>os.errno()</code></td></tr>
+    <tr><td><code>coro.wait(fd, events, ms)</code></td><td><code>fd</code> is ready for <code>events</code></td><td>Its <code>revents</code> (above 0), or 0 on timeout</td></tr>
+    <tr><td><code>coro.waitIdle(fd, events, ms)</code></td><td>The same, for waiting on more work</td><td>Also -1 once <code>coro.stop()</code> is called</td></tr>
+    <tr><td><code>coro.sleep(ms)</code>, <code>coro.yield()</code></td><td>Time passes / the others had a turn</td><td></td></tr>
+    <tr><td><code>coro.waitChild(pid, ms)</code></td><td>A child process exits</td><td>Its wait status, or -1</td></tr>
+    <tr><td><code>coro.close(fd)</code></td><td></td><td>Closes the fd and tells the loop</td></tr>
+  </tbody>
+</table></div>
+<ul class="rules">
+  <li><code>ms</code> is optional everywhere: leave it out to wait without a limit.</li>
+  <li>Close the fds you wait on with <code>coro.close</code>, not <code>libc.close</code>.</li>
+  <li>A read on a busy stream goes straight on without waiting, for 4 ms at most before others get a turn.</li>
+  <li>Out of fds, <code>coro.accept</code> rests instead of spinning, so no client is dropped.</li>
+  <li><code>coro.dial</code> still waits for the system resolver on a host name: give a numeric address where that matters.</li>
+</ul>
+
+<h2 id="timers-alongside-i-o">Timers alongside I/O<a class="anchor" href="#timers-alongside-i-o" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import coro;
+
+void *ticker(void *name)
+{
+  for (i64 i = 1; i &lt;= 3; i++) {
+    coro.sleep(40);
+    printf("%s tick %d\n", name, i);
+  }
+  return null;
+}
+
+void *slow(void *unused)
+{
+  coro.sleep(60);
+  printf("slow done\n");
+  return null;
+}
+
+void main()
+{
+  coro.go(&amp;ticker, "a");
+  coro.go(&amp;slow);
+  coro.run();
+  printf("all done\n");
+}
+</code></pre>
+<pre class="output">a tick 1
+slow done
+a tick 2
+a tick 3
+all done
+</pre>
+
+<h2 id="waiting-for-child-processes">Waiting for child processes<a class="anchor" href="#waiting-for-child-processes" aria-label="Link to this section">#</a></h2>
+<p>Three jobs run at once, each waited for by its own coroutine, while another keeps working.</p>
+<pre data-run><code>import coro, proc;
+
+void *job(void *arg)
+{
+  u8 *script = arg;
+  u8 *argv[4] = {"/bin/sh", "-c", script, null};
+  proc.Proc *p = proc.spawn(argv);
+  i32 st = coro.waitChild(p.pid, 5000);
+  proc.setStatus(p, st);
+  printf("[%s] exit %d\n", script, p.exitCode);
+  proc.release(p);
+  return null;
+}
+
+void *busy(void *unused)
+{
+  for (i64 i = 0; i &lt; 3; i++) {
+    printf("still working\n");
+    coro.sleep(200);
+  }
+  return null;
+}
+
+void main()
+{
+  coro.go(&amp;job, "sleep 0.5; exit 3");
+  coro.go(&amp;job, "sleep 0.1");
+  coro.go(&amp;job, "sleep 0.3; exit 1");
+  coro.go(&amp;busy);
+  coro.run();
+}
+</code></pre>
+<pre class="output">still working
+[sleep 0.1] exit 0
+still working
+[sleep 0.3; exit 1] exit 1
+still working
+[sleep 0.5; exit 3] exit 3
+</pre>
+
+<h2 id="stopping">Stopping<a class="anchor" href="#stopping" aria-label="Link to this section">#</a></h2>
+<p><code>coro.stop()</code> winds the loop down: <code>coro.accept</code> and <code>coro.waitIdle</code> return -1 from then on,
+while other waits go on, so the work in flight finishes and <code>coro.run</code> returns.
+<code>coro.stopping()</code> tells whether it was called (a server sends <code>Connection: close</code> then).</p>
+<p>Ctrl-C and SIGTERM fit as one more coroutine:</p>
+<pre><code>void *onSignal(void *unused)
+{
+  if (coro.waitIdle(signal.stopInit(), libc.POLLIN) &gt; 0) { coro.stop(); }
+  return null;
+}
+
+// in main, before coro.run():
+coro.go(&amp;onSignal);</code></pre>
+<p>It uses <code>waitIdle</code>, so it doesn't keep the loop alive once everything else has ended.</p>
+
+<h2 id="errors">Errors<a class="anchor" href="#errors" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>The loop calls throw <code>coro.ERR_LOOP</code> when they can't work: <code>coro.run</code> inside a coroutine, <code>coro.read</code> outside one, a loop where every coroutine waits forever with no fd.</li>
+  <li>When a loop coroutine throws, the loop releases it and <code>coro.run</code> throws the error on. The other coroutines stay; calling <code>coro.run</code> again carries on with them.</li>
+</ul>
+
+<h2 id="backends">Backends<a class="anchor" href="#backends" aria-label="Link to this section">#</a></h2>
+<p>On Linux the loop uses io_uring where the kernel allows it (6.1 or later, and not blocked, as Docker's default profile does);
+otherwise epoll (Linux), kqueue (macOS), or <code>poll</code>. Every backend behaves the same.</p>
+<pre data-run><code>import coro;
+
+void *show(void *unused)
+{
+  u8[] b = coro.backend();
+  printf("a known backend: %d\n", b.equals("uring") || b.equals("epoll") || b.equals("kqueue") || b.equals("poll"));
+  return null;
+}
+
+void main()
+{
+  coro.go(&amp;show);
+  coro.run();
+}
+</code></pre>
+<pre class="output">a known backend: 1
+</pre>
+<p><code>KTM_CORO_BACKEND=uring</code>, <code>epoll</code>, <code>kqueue</code> or <code>poll</code> picks one; a backend the system can't give falls back to the next one down.</p>
+<p>A turn of the loop costs the fds that are ready, not every fd that is open: ten thousand idle connections cost nothing.</p>
+
+<h2 id="on-every-core">On every core<a class="anchor" href="#on-every-core" aria-label="Link to this section">#</a></h2>
+<p>One loop runs on one thread. To use every core, see <a href="lib-serve.html"><code>coro.serve</code></a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-coroutines.html"><span>Previous</span>Coroutines</a><a class="next" href="lib-serve.html"><span>Next</span>Serving on every core</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-event-loop.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#an-echo-server">An echo server</a></li><li><a href="#the-calls">The calls</a></li><li><a href="#timers-alongside-i-o">Timers alongside I/O</a></li><li><a href="#waiting-for-child-processes">Waiting for child processes</a></li><li><a href="#stopping">Stopping</a></li><li><a href="#errors">Errors</a></li><li><a href="#backends">Backends</a></li><li><a href="#on-every-core">On every core</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vectors and sorting - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li class="current"><a href="lib-vectors.html" aria-current="page">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#vec"><code>vec</code></a> <a href="stdlib.html#sort"><code>sort</code></a></span></div>
+<h1>Vectors and sorting</h1>
+<p class="lede"><code>vec.Vec&lt;T&gt;</code> is a growable array of any type. <code>sort</code> sorts any slice in place.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();   // freed at the end of the scope
+v.push(3);  v.get(0);  v.set(0, 4);  v.pop();
+v.len   v.items()                       // count; a T[] view
+for (auto x : v) { ... }
+v.sortAsc();  v.sort(&amp;cmp);
+sort.asc(slice);  sort.slice(slice, &amp;cmp);</code></pre>
+</div>
+
+<h2 id="the-basics">The basics<a class="anchor" href="#the-basics" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import vec;
+
+void main()
+{
+  ad vec.Vec&lt;i64&gt; nums = vec.new&lt;i64&gt;();
+  for (i64 i = 1; i &lt;= 5; i++) { nums.push(i * 10); }
+  nums.set(0, 15);
+  printf("len %d, first %d, last %d\n", nums.len, nums.get(0), nums.last());
+  printf("popped %d, len %d\n", nums.pop(), nums.len);
+  for (auto n : nums) { printf("%d,", n); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">len 5, first 15, last 50
+popped 50, len 4
+15,20,30,40,
+</pre>
+<p>A Vec is a value with <code>data</code>, <code>len</code> and <code>cap</code> fields. <code>free()</code> frees its
+array, not what the items point to.</p>
+
+<h2 id="methods">Methods<a class="anchor" href="#methods" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>push(x)</code></td><td>Appends, growing as needed</td></tr>
+    <tr><td><code>get(i)</code>, <code>set(i, x)</code></td><td>Reads or writes item <code>i</code> (checked)</td></tr>
+    <tr><td><code>at(i)</code></td><td>A pointer to item <code>i</code>, to change it in place (checked)</td></tr>
+    <tr><td><code>pop(&amp;ok)</code>, <code>last(&amp;ok)</code></td><td>Removes / reads the last item</td></tr>
+    <tr><td><code>insert(i, x)</code>, <code>removeAt(i)</code></td><td>Inserts or removes, keeping the order</td></tr>
+    <tr><td><code>items()</code></td><td>A <code>T[]</code> view (valid until the Vec grows)</td></tr>
+    <tr><td><code>sort(cmp)</code>, <code>sortAsc()</code></td><td>Sorts in place</td></tr>
+    <tr><td><code>reserve(n)</code>, <code>clear()</code>, <code>free()</code></td><td>Room for <code>n</code> more; empty it, keeping the room; free it</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="checked-access">Checked access<a class="anchor" href="#checked-access" aria-label="Link to this section">#</a></h2>
+<p>An index outside <code>0</code> to <code>len - 1</code> throws <code>ERR_BOUNDS</code>. <code>pop</code> and <code>last</code>
+on an empty Vec throw too, unless you pass <code>&amp;ok</code>.</p>
+<pre data-run><code>import vec;
+
+void main()
+{
+  ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();
+  bool ok;
+  i64 x = v.pop(&amp;ok);
+  printf("empty pop: %d, ok %d\n", x, ok);
+  try {
+    v.get(3);
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">empty pop: 0, ok 0
+vec.Vec.get: index 3 of 0
+</pre>
+
+<h2 id="changing-items-in-place">Changing items in place<a class="anchor" href="#changing-items-in-place" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import vec;
+
+struct Player { u8 *name; i64 score; };
+
+void main()
+{
+  ad vec.Vec&lt;Player&gt; team = vec.new&lt;Player&gt;();
+  Player a = {"ada", 10}, b = {"bob", 5}, c = {"cy", 1};
+  team.push(a);
+  team.push(b);
+  team.at(1).score += 20;          // bob: through a pointer into the Vec
+  team.insert(0, c);               // cy, ada, bob
+  team.removeAt(1);                // cy, bob
+  for (auto p : team) { printf("%s %d\n", p.name, p.score); }
+}
+</code></pre>
+<pre class="output">cy 1
+bob 25
+</pre>
+
+<h2 id="sorting">Sorting<a class="anchor" href="#sorting" aria-label="Link to this section">#</a></h2>
+<p><code>sortAsc()</code> sorts anything <code>&lt;</code> compares. <code>sort(cmp)</code> takes a comparator given pointers to two
+items: negative when <code>a</code> goes first, 0 when equal, positive when <code>b</code> does.</p>
+<pre data-run><code>import vec;
+
+struct User { u8 *name; i64 age; };
+
+i64 byAge(User *a, User *b) { return a.age - b.age; }
+
+void main()
+{
+  ad vec.Vec&lt;f64&gt; temps = vec.new&lt;f64&gt;();
+  temps.push(21.5);
+  temps.push(18.0);
+  temps.push(19.25);
+  temps.sortAsc();
+  for (auto t : temps) { printf("%.2f,", t); }
+  printf("\n");
+
+  ad vec.Vec&lt;User&gt; users = vec.new&lt;User&gt;();
+  User ann = {"ann", 41}, bob = {"bob", 29}, cy = {"cy", 35};
+  users.push(ann);
+  users.push(bob);
+  users.push(cy);
+  users.sort(&amp;byAge);
+  for (auto u : users) { printf("%s %d\n", u.name, u.age); }
+}
+</code></pre>
+<pre class="output">18.00,19.25,21.50,
+bob 29
+cy 35
+ann 41
+</pre>
+<p>Both are O(n log n) on any input, and not stable.</p>
+
+<h3 id="sorting-any-slice">Sorting any slice<a class="anchor" href="#sorting-any-slice" aria-label="Link to this section">#</a></h3>
+<p>The <code>sort</code> module sorts arrays and slices in place.</p>
+<pre data-run><code>import sort;
+
+i64 byLength(u8[] *a, u8[] *b) { return a.len - b.len; }
+
+void main()
+{
+  i64 nums[] = {5, 2, 9, 1};
+  sort.asc(nums);
+  printf("%d %d %d %d\n", nums[0], nums[1], nums[2], nums[3]);
+
+  u8[] words[] = {"pear", "fig", "banana"};
+  sort.slice(words, &amp;byLength);
+  printf("%s %s %s\n", words[0], words[1], words[2]);
+
+  i64 part[] = {9, 8, 7, 6, 5};
+  sort.asc(part[1:4]);               // only the middle three
+  printf("%d %d %d %d %d\n", part[0], part[1], part[2], part[3], part[4]);
+}
+</code></pre>
+<pre class="output">1 2 5 9
+fig pear banana
+9 6 7 8 5
+</pre>
+
+<h2 id="passing-a-vec-as-a-slice">Passing a Vec as a slice<a class="anchor" href="#passing-a-vec-as-a-slice" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import vec;
+
+i64 sum(i64[] xs) { i64 t = 0; for (auto x : xs) { t += x; } return t; }
+
+void main()
+{
+  ad vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();
+  for (i64 i = 1; i &lt;= 4; i++) { v.push(i); }
+  printf("%d %d\n", sum(v.items()), sum(v.items()[2:]));
+}
+</code></pre>
+<pre class="output">10 7
+</pre>
+
+<h2 id="returning-a-vec">Returning a Vec<a class="anchor" href="#returning-a-vec" aria-label="Link to this section">#</a></h2>
+<p>Make it without <code>ad</code>, return it, and let the caller free it:</p>
+<pre data-run><code>import vec;
+
+vec.Vec&lt;i64&gt; evens(i64 upTo)
+{
+  vec.Vec&lt;i64&gt; v = vec.new&lt;i64&gt;();
+  for (i64 i = 0; i &lt;= upTo; i += 2) { v.push(i); }
+  return v;
+}
+
+void main()
+{
+  ad vec.Vec&lt;i64&gt; e = evens(8);
+  printf("%d evens, the last %d\n", e.len, e.last());
+}
+</code></pre>
+<pre class="output">5 evens, the last 8
+</pre>
+
+<h2 id="bit-vectors">Bit vectors<a class="anchor" href="#bit-vectors" aria-label="Link to this section">#</a></h2>
+<p><code>vec.BitVec</code> is a set of numbered bits, all 0 at first. <code>set</code> grows it to fit any index.</p>
+<pre data-run><code>import vec;
+
+void main()
+{
+  vec.BitVec *seen = vec.bitNew();
+  i64 primes[] = {2, 3, 5, 7, 1000003};
+  for (auto p : primes) { seen.set(p); }
+  seen.unset(5);
+
+  for (i64 n = 0; n &lt; 10; n++) {
+    if (seen.test(n)) { printf("%d,", n); }
+  }
+  printf(" 1000003: %d, 99999999: %d\n", seen.test(1000003), seen.test(99999999));
+  seen.release();
+}
+</code></pre>
+<pre class="output">2,3,7, 1000003: 1, 99999999: 0
+</pre>
+<ul class="rules">
+  <li><code>test</code> and <code>unset</code> treat bits past the end as 0.</li>
+  <li><code>set</code> returns false when it can't grow; <code>clear</code> zeroes every bit.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-signals.html"><span>Previous</span>Signals</a><a class="next" href="lib-lists.html"><span>Next</span>Lists</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-vectors.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-basics">The basics</a></li><li><a href="#methods">Methods</a></li><li><a href="#checked-access">Checked access</a></li><li><a href="#changing-items-in-place">Changing items in place</a></li><li><a href="#sorting">Sorting</a></li><li><a href="#passing-a-vec-as-a-slice">Passing a Vec as a slice</a></li><li><a href="#returning-a-vec">Returning a Vec</a></li><li><a href="#bit-vectors">Bit vectors</a></li></ul></nav>
+</div>
+</body>
+</html>

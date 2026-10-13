@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordered maps - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li class="current"><a href="lib-trees.html" aria-current="page">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#map"><code>map</code></a></span></div>
+<h1>Ordered maps</h1>
+<p class="lede"><code>map.Tree&lt;K, V&gt;</code> keeps its keys sorted (a red-black tree). Use it to walk keys in order, or to find the neighbours of a key.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad map.Tree&lt;u8[], i64&gt; t = map.treeNew&lt;u8[], i64&gt;();
+t.set(k, v)  t.get(k, &amp;v)  t.getOr(k, def)  t.has(k)  t.delete(k)  t.len
+for (auto n = t.first(); n; n = t.after(n)) { n.key; n.value; }
+for (auto n = t.last(); n; n = t.before(n)) { ... }   // backwards</code></pre>
+</div>
+
+<h2 id="in-key-order">In key order<a class="anchor" href="#in-key-order" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import map;
+
+void main()
+{
+  ad map.Tree&lt;u8[], i64&gt; ages = map.treeNew&lt;u8[], i64&gt;();
+  ages.set("linus", 55);
+  ages.set("ada", 36);
+  ages.set("grace", 85);
+  ages.set("ada", 37);           // replaces
+  ages.delete("grace");
+
+  i64 ada;
+  ages.get("ada", &amp;ada);
+  printf("ada %d, has grace: %d, %d entries, bob %d\n",
+         ada, ages.has("grace"), ages.len, ages.getOr("bob", -1));
+  for (auto n = ages.first(); n; n = ages.after(n)) { printf("%s = %d\n", n.key, n.value); }
+}
+</code></pre>
+<pre class="output">ada 37, has grace: 0, 2 entries, bob -1
+ada = 37
+linus = 55
+</pre>
+
+<h2 id="backwards-and-top-n">Backwards, and top N<a class="anchor" href="#backwards-and-top-n" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import map;
+
+void main()
+{
+  ad map.Tree&lt;i64, u8 *&gt; scores = map.treeNew&lt;i64, u8 *&gt;();
+  scores.set(72, "bob");
+  scores.set(95, "ann");
+  scores.set(88, "cy");
+  scores.set(60, "dan");
+
+  i64 shown = 0;
+  for (auto n = scores.last(); n &amp;&amp; shown &lt; 3; n = scores.before(n)) {
+    printf("%d. %s (%d)\n", ++shown, n.value, n.key);
+  }
+}
+</code></pre>
+<pre class="output">1. ann (95)
+2. cy (88)
+3. bob (72)
+</pre>
+
+<h2 id="deleting-while-walking">Deleting while walking<a class="anchor" href="#deleting-while-walking" aria-label="Link to this section">#</a></h2>
+<p>A delete leaves the other nodes where they are: take <code>after(n)</code> before deleting <code>n</code>.</p>
+<pre data-run><code>import map;
+
+void main()
+{
+  ad map.Tree&lt;i64, bool&gt; t = map.treeNew&lt;i64, bool&gt;();
+  for (i64 i = 1; i &lt;= 8; i++) { t.set(i, true); }
+  auto n = t.first();
+  while (n) {
+    auto next = t.after(n);
+    if (n.key % 3 == 0) { t.delete(n.key); }
+    n = next;
+  }
+  for (auto m = t.first(); m; m = t.after(m)) { printf("%d,", m.key); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">1,2,4,5,7,8,
+</pre>
+
+<h2 id="your-own-key-type">Your own key type<a class="anchor" href="#your-own-key-type" aria-label="Link to this section">#</a></h2>
+<p>Keys are ordered by <code>map.compare(a, b)</code>, an overloaded function returning less than 0, 0 or more than 0.
+There are overloads for the integer types, <code>f64</code> and <code>u8[]</code> (which covers <code>String</code>).
+For your own type, add one:</p>
+<pre data-run><code>import map;
+
+struct Version { i64 major, minor; };
+
+i64 map.compare(Version a, Version b)
+{
+  if (a.major != b.major) { return a.major - b.major; }
+  return a.minor - b.minor;
+}
+
+void main()
+{
+  ad map.Tree&lt;Version, u8 *&gt; notes = map.treeNew&lt;Version, u8 *&gt;();
+  Version v1 = {1, 10}, v2 = {1, 2}, v3 = {0, 9};
+  notes.set(v1, "generics");
+  notes.set(v2, "slices");
+  notes.set(v3, "first");
+  for (auto n = notes.first(); n; n = notes.after(n)) {
+    printf("%d.%d %s\n", n.key.major, n.key.minor, n.value);
+  }
+}
+</code></pre>
+<pre class="output">0.9 first
+1.2 slices
+1.10 generics
+</pre>
+
+<h2 id="memory">Memory<a class="anchor" href="#memory" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>u8[]</code> and <code>String</code> keys are copied in and freed with the tree, so the key you pass can be a reused buffer.</li>
+  <li>Other keys and every value are stored as they are: what a value points to is yours to free.</li>
+  <li><code>clear()</code> empties the tree; <code>free()</code> does the same, for <code>ad</code>.</li>
+</ul>
+<p>A tree with <code>bool</code> values is an ordered set.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-maps.html"><span>Previous</span>Hash maps</a><a class="next" href="lib-sets.html"><span>Next</span>Sets</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-trees.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#in-key-order">In key order</a></li><li><a href="#backwards-and-top-n">Backwards, and top N</a></li><li><a href="#deleting-while-walking">Deleting while walking</a></li><li><a href="#your-own-key-type">Your own key type</a></li><li><a href="#memory">Memory</a></li></ul></nav>
+</div>
+</body>
+</html>

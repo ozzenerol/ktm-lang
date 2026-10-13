@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Format strings - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li class="current"><a href="lib-formatting.html" aria-current="page">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#cstr"><code>cstr</code></a> <a href="stdlib.html#str"><code>str</code></a></span></div>
+<h1>Format strings</h1>
+<p class="lede"><code>printf</code>, <code>str.format</code>, <code>appendFormat</code>, <code>os.eprintf</code>,
+<code>throw</code> and the <code>cstr</code> formatters share one format language.</p>
+
+<h2 id="conversions">Conversions<a class="anchor" href="#conversions" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Conversion</th><th>Prints</th></tr></thead>
+  <tbody>
+    <tr><td><code>%d</code> <code>%i</code></td><td>A signed integer (all 64 bits)</td></tr>
+    <tr><td><code>%u</code></td><td>An unsigned integer</td></tr>
+    <tr><td><code>%x</code> <code>%X</code> <code>%o</code></td><td>Hex (lower / upper case), octal</td></tr>
+    <tr><td><code>%f</code> <code>%e</code> <code>%g</code></td><td>An <code>f64</code>, as C prints it</td></tr>
+    <tr><td><code>%s</code></td><td>A C string; in a literal format also a <code>u8[]</code> or a <code>String</code></td></tr>
+    <tr><td><code>%c</code> <code>%C</code></td><td>A character; <code>%C</code> in upper case</td></tr>
+    <tr><td><code>%p</code></td><td>A pointer: <code>0x</code> and 16 hex digits</td></tr>
+    <tr><td><code>%Q</code></td><td>A string escaped as a C literal</td></tr>
+    <tr><td><code>%%</code></td><td>A <code>%</code></td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>void main()
+{
+  printf("%d %i %u\n", -42, 7, 3000000000);
+  printf("%x %X %o\n", 255, 255, 8);
+  printf("%f %e %g\n", 3.25, 31250.0, 0.0001);
+  printf("%s %c %C %Q %%\n", "text", 'k', 'k', "a\tb");
+}
+</code></pre>
+<pre class="output">-42 7 3000000000
+ff FF 10
+3.250000 3.125000e+04 0.0001
+text k K a\tb %
+</pre>
+
+<h2 id="flags-width-and-precision">Flags, width and precision<a class="anchor" href="#flags-width-and-precision" aria-label="Link to this section">#</a></h2>
+<p>Between the <code>%</code> and the letter, in this order:</p>
+<ol>
+  <li><strong>Flags</strong>: <code>-</code> left-justify, <code>0</code> pad with zeros, <code>+</code> always a sign, a space where a plus would go, <code>#</code> a <code>0x</code> / <code>0</code> prefix.</li>
+  <li><strong>Width</strong>: the minimum number of characters.</li>
+  <li><strong>Precision</strong> after a <code>.</code>: decimals for floats, the maximum length for <code>%s</code>, the minimum digits for integers.</li>
+</ol>
+<pre data-run><code>void main()
+{
+  printf("[%5d] [%-5d] [%05d]\n", 42, 42, 42);
+  printf("[%+d] [% d] [%#x] [%#o]\n", 7, 7, 255, 8);
+  printf("[%.2f] [%8.3f] [%-8.1f]\n", 3.14159, 3.14159, 3.14159);
+  printf("[%.3s] [%.3d]\n", "abcdef", 7);
+}
+</code></pre>
+<pre class="output">[   42] [42   ] [00042]
+[+7] [ 7] [0xff] [010]
+[3.14] [   3.142] [3.1     ]
+[abc] [007]
+</pre>
+
+<h3 id="width-from-an-argument">Width from an argument<a class="anchor" href="#width-from-an-argument" aria-label="Link to this section">#</a></h3>
+<p><code>*</code> takes the width or precision from the arguments.</p>
+<pre data-run><code>void main()
+{
+  for (i64 w = 1; w &lt;= 3; w++) {
+    printf("[%*d] [%.*f]\n", w * 2, w, w, 3.14159);
+  }
+}
+</code></pre>
+<pre class="output">[ 1] [3.1]
+[   2] [3.14]
+[     3] [3.142]
+</pre>
+
+<h2 id="tables">Tables<a class="anchor" href="#tables" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>struct Row { u8 *name; i64 count; f64 share; };
+
+void main()
+{
+  Row rows[] = {{"apples", 12, 0.4}, {"pears", 3, 0.1}, {"plums", 15, 0.5}};
+  printf("%-8s %5s %7s\n", "fruit", "count", "share");
+  for (auto r : rows) {
+    printf("%-8s %5d %6.1f%%\n", r.name, r.count, r.share * 100);
+  }
+}
+</code></pre>
+<pre class="output">fruit    count   share
+apples      12   40.0%
+pears        3   10.0%
+plums       15   50.0%
+</pre>
+
+<h2 id="where-the-text-goes">Where the text goes<a class="anchor" href="#where-the-text-goes" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Writes to</th></tr></thead>
+  <tbody>
+    <tr><td><code>printf(fmt, ...)</code></td><td>stdout (buffered)</td></tr>
+    <tr><td><code>os.eprintf(fmt, ...)</code></td><td>stderr</td></tr>
+    <tr><td><code>str.format(fmt, ...)</code></td><td>A new String</td></tr>
+    <tr><td><code>s.appendFormat(fmt, ...)</code></td><td>The end of a String</td></tr>
+    <tr><td><code>cstr.format(fmt, ...)</code></td><td>A new C string, <code>mem.free</code> it</td></tr>
+    <tr><td><code>cstr.formatToSize(buf, n, fmt, ...)</code></td><td>A fixed buffer, like <code>snprintf</code></td></tr>
+    <tr><td><code>throw(code, fmt, ...)</code></td><td>The error's message</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import cstr, mem, str;
+
+void main()
+{
+  ad String s = str.format("%s-%03d", "id", 7);
+  u8 *c = cstr.format("%.1f%%", 99.5);
+  u8 small[8];
+  cstr.formatToSize(small, sizeof(small), "%s-%d", "overflow", 12345);
+  printf("%s %s [%s] %d\n", s, c, small, cstr.len(small));
+  mem.free(c);
+}
+</code></pre>
+<pre class="output">id-007 99.5% [overflo] 7
+</pre>
+
+<h2 id="checked-at-compile-time">Checked at compile time<a class="anchor" href="#checked-at-compile-time" aria-label="Link to this section">#</a></h2>
+<p>For a literal format, the compiler checks the number of arguments. These are errors with the way to do it in the message:</p>
+<ul class="rules">
+  <li><code>%D</code>, <code>%T</code>, <code>%F</code>: format a date with <a href="lib-dates.html"><code>date.format</code></a>.</li>
+  <li>A slice or String passed to a format that isn't a literal: pass <code>s.cstr()</code>.</li>
+</ul>
+
+<h2 id="details">Details<a class="anchor" href="#details" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>C's length modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <code>z</code>, <code>j</code> are accepted and ignored, so C formats can be pasted in.</li>
+  <li><code>%c</code> of a wider integer prints its bytes as characters, low byte first (up to 8); the value 0 prints nothing.</li>
+  <li>An unknown conversion is printed as written, with a warning on stderr, and still uses up its argument.</li>
+  <li><code>printf</code> is buffered: call <code>os.flush()</code> before running a command that writes to the same terminal.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-text.html"><span>Previous</span>Text helpers</a><a class="next" href="lib-cstrings.html"><span>Next</span>C strings</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-formatting.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#conversions">Conversions</a></li><li><a href="#flags-width-and-precision">Flags, width and precision</a></li><li><a href="#tables">Tables</a></li><li><a href="#where-the-text-goes">Where the text goes</a></li><li><a href="#checked-at-compile-time">Checked at compile time</a></li><li><a href="#details">Details</a></li></ul></nav>
+</div>
+</body>
+</html>

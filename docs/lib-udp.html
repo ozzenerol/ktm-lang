@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UDP sockets - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li class="current"><a href="lib-udp.html" aria-current="page">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#net"><code>net</code></a></span></div>
+<h1>UDP sockets</h1>
+<p class="lede">Datagrams: <code>net.udpSocket</code> to bind, <code>net.sendTo</code> and <code>net.recvFrom</code> to talk.
+<code>net.Addr</code> keeps a sender's address without text in between.</p>
+
+<h2 id="send-and-answer">Send and answer<a class="anchor" href="#send-and-answer" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  u8 buf[64];
+  ad String from;
+  i32 port;
+
+  net.sendTo(cli, "ping", "127.0.0.1", net.localPort(srv));
+  i64 n = net.recvFrom(srv, buf, &amp;from, &amp;port);
+  printf("server got %s from %s\n", buf[0:n], from);
+  net.sendTo(srv, "pong", from, port);       // answer the sender
+
+  net.setRecvTimeout(cli, 1000);
+  n = net.recvFrom(cli, buf);
+  printf("client got %s\n", buf[0:n]);
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">server got ping from 127.0.0.1
+client got pong
+</pre>
+<ul class="rules">
+  <li><code>net.udpSocket(port, bindaddr)</code> takes the same bind addresses as <code>net.listen</code>; port 0 picks one.</li>
+  <li><code>recvFrom</code> receives one datagram into a <code>u8[]</code>; one longer than the buffer is cut.</li>
+  <li>Both work with IPv4 and IPv6 and return -1 on failure.</li>
+  <li><code>net.setRecvTimeout(sock, ms)</code> makes reads give up with -1 after <code>ms</code>.</li>
+</ul>
+
+<h2 id="net-addr-answering-many-clients">net.Addr: answering many clients<a class="anchor" href="#net-addr-answering-many-clients" aria-label="Link to this section">#</a></h2>
+<p>A server that answers many senders keeps each address as the kernel gives it: no text, no name lookup.</p>
+<pre data-run><code>import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  net.setRecvTimeout(srv, 1000);
+  net.setRecvTimeout(cli, 1000);
+
+  net.Addr server;
+  net.makeAddr("127.0.0.1", net.localPort(srv), &amp;server);
+  net.sendToAddr(cli, "\x00\x2Aquery", &amp;server);     // a 2-byte id, then the question
+
+  u8 buf[512];
+  net.Addr from;
+  i64 n = net.recvFromAddr(srv, buf, &amp;from);
+  ad String ip = from.ip();
+  printf("%d bytes from %s, the client's port: %d\n", n, ip, from.port() == net.localPort(cli));
+  buf[2] = '!';
+  net.sendToAddr(srv, buf[0:3], &amp;from);              // the id and the answer, straight back
+
+  net.Addr back;
+  n = net.recvFromAddr(cli, buf, &amp;back);
+  printf("answer to id %d: %c, from the server: %d\n", buf[1], buf[2], back.equals(&amp;server));
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">7 bytes from 127.0.0.1, the client's port: 1
+answer to id 42: !, from the server: 1
+</pre>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>net.makeAddr(ip, port, &amp;a)</code></td><td>Makes one from a numeric address (false for anything else)</td></tr>
+    <tr><td><code>a.ip()</code>, <code>a.port()</code>, <code>a.family()</code></td><td>Its parts (<code>libc.AF_INET</code>, <code>AF_INET6</code>, or 0 when empty)</td></tr>
+    <tr><td><code>a.equals(&amp;b)</code>, <code>a.sameIp(&amp;b)</code></td><td>Compare address and port, or just the address</td></tr>
+    <tr><td><code>net.localAddr(sock, &amp;a)</code>, <code>net.remoteAddr(sock, &amp;a)</code></td><td>A socket's own end and its peer's</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="ipv6">IPv6<a class="anchor" href="#ipv6" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import libc, net;
+
+void main()
+{
+  net.Addr a;
+  printf("%d %d\n", net.makeAddr("::1", 53, &amp;a), a.family() == libc.AF_INET6);
+  ad String ip = a.ip();
+  printf("%s port %d\n", ip, a.port());
+  printf("host names aren't addresses: %d\n", net.makeAddr("localhost", 53, &amp;a));
+}
+</code></pre>
+<pre class="output">1 1
+::1 port 53
+host names aren't addresses: 0
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-tcp.html"><span>Previous</span>TCP sockets</a><a class="next" href="lib-coroutines.html"><span>Next</span>Coroutines</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-udp.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#send-and-answer">Send and answer</a></li><li><a href="#net-addr-answering-many-clients">net.Addr: answering many clients</a></li><li><a href="#ipv6">IPv6</a></li></ul></nav>
+</div>
+</body>
+</html>

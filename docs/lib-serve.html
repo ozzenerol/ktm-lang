@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serving on every core - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li class="current"><a href="lib-serve.html" aria-current="page">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#coro"><code>coro</code></a></span></div>
+<h1>Serving on every core</h1>
+<p class="lede"><code>coro.serve</code> is a whole TCP server in one call: one <a href="lib-event-loop.html">coroutine loop</a> per core,
+and your handler runs as a coroutine for each client.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>void handle(i32 fd, void *arg) { ... coro.read(fd, ...); coro.write(fd, ...); }
+
+coro.serve(8080, &amp;handle);                         // every IPv4 address, one loop per CPU
+coro.serve(8080, &amp;handle, arg, 4, "127.0.0.1");    // 4 loops, loopback only
+coro.serveStop();                                  // from any thread or coroutine</code></pre>
+</div>
+
+<h2 id="a-complete-server">A complete server<a class="anchor" href="#a-complete-server" aria-label="Link to this section">#</a></h2>
+<p>Here the clients run as a coroutine in the calling thread's loop, then stop the server.</p>
+<pre data-run><code>import atomic, coro, cstr;
+
+i64 gServed = 0;
+
+void handle(i32 fd, void *arg)
+{
+  u8 buf[256];
+  i64 n = coro.read(fd, buf, 5000);
+  if (n &lt;= 0) { return; }
+  for (i64 i = 0; i &lt; n; i++) {
+    if (buf[i] &gt;= 'a' &amp;&amp; buf[i] &lt;= 'z') { buf[i] -= 32; }
+  }
+  coro.write(fd, buf[0:n]);
+  atomic.add(&amp;gServed, 1);
+}
+
+void *clients(void *unused)
+{
+  u8 *words[] = {"ping", "hello", "ktm"};
+  for (auto w : words) {
+    i32 fd = coro.dial("127.0.0.1", 18631, 5000);
+    coro.write(fd, cstr.view(w));
+    u8 buf[64];
+    i64 n = coro.read(fd, buf, 5000);
+    printf("%s -&gt; %s\n", w, buf[0:n]);
+    coro.close(fd);
+  }
+  coro.serveStop();
+  return null;
+}
+
+void main()
+{
+  coro.go(&amp;clients);                       // runs in this thread's loop
+  i32 r = coro.serve(18631, &amp;handle, null, 2, "127.0.0.1");
+  printf("serve returned %d, served %d\n", r, atomic.load(&amp;gServed));
+}
+</code></pre>
+<pre class="output">ping -&gt; PING
+hello -&gt; HELLO
+ktm -&gt; KTM
+serve returned 0, served 3
+</pre>
+
+<h2 id="arguments">Arguments<a class="anchor" href="#arguments" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Argument</th><th>Default</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>port</code></td><td></td><td>The TCP port</td></tr>
+    <tr><td><code>handler</code></td><td></td><td><code>void handler(i32 fd, void *arg)</code>, run once per client</td></tr>
+    <tr><td><code>arg</code></td><td><code>null</code></td><td>Passed to every handler</td></tr>
+    <tr><td><code>threads</code></td><td>0</td><td>The number of loops; 0 is one per CPU the process may use</td></tr>
+    <tr><td><code>bindaddr</code></td><td><code>"*"</code></td><td><code>"*"</code>, <code>"::*"</code> or a numeric address, as for <code>net.listen</code></td></tr>
+  </tbody>
+</table></div>
+<ul class="rules">
+  <li>The calling thread runs one of the loops, so <code>serve</code> returns only when the server has stopped. Call it from a thread, not a coroutine.</li>
+  <li>It returns 0 once stopped and every handler has finished, or -1 with <code>os.errno()</code> when it can't listen (port in use, bad address).</li>
+  <li>The client's fd is non-blocking with <code>TCP_NODELAY</code>. Use <code>coro.read</code> and <code>coro.write</code>, and don't close it: <code>serve</code> does when the handler returns.</li>
+  <li>A handler that throws is reported on stderr and the server goes on.</li>
+</ul>
+
+<div class="warn"><p><strong>Handlers run on several threads at once.</strong> A global they share (a counter, a cache,
+a map) needs the <a href="lib-threads.html#atomics"><code>atomic</code></a> module or a lock, as <code>gServed</code> above.
+The coroutines of one loop never run at the same time.</p></div>
+
+<h2 id="stopping">Stopping<a class="anchor" href="#stopping" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>coro.serveStop()</code> stops every running <code>serve</code>, from any thread or coroutine (not from a signal handler).</li>
+  <li>A <code>coro.stop()</code> in one of its loops stops the whole server the same way.</li>
+  <li>Each loop stops taking clients, the handlers in flight finish, then <code>serve</code> returns 0.</li>
+</ul>
+<p>For Ctrl-C, start the <a href="lib-event-loop.html#stopping">signal coroutine</a> with <code>coro.go</code> before calling <code>serve</code>.</p>
+
+<h2 id="how-clients-are-spread">How clients are spread<a class="anchor" href="#how-clients-are-spread" aria-label="Link to this section">#</a></h2>
+<p>On Linux each loop has its own listener on the port (<code>SO_REUSEPORT</code>) and the kernel shares the connections out.
+On macOS the loops share one listener, and each takes the clients it wins the <code>accept</code> for.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-event-loop.html"><span>Previous</span>The coroutine loop</a><a class="next" href="lib-threads.html"><span>Next</span>Threads and atomics</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-serve.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-complete-server">A complete server</a></li><li><a href="#arguments">Arguments</a></li><li><a href="#stopping">Stopping</a></li><li><a href="#how-clients-are-spread">How clients are spread</a></li></ul></nav>
+</div>
+</body>
+</html>

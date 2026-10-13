@@ -11,7 +11,8 @@
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
   try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
-  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
@@ -24,6 +25,13 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
   <div class="search" role="search">
     <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
            aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
@@ -39,10 +47,11 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a><ul class="toc"><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a><ul class="sub"><li><a href="#changes-you-may-notice">Changes you may notice</a></li></ul></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a><ul class="sub"><li><a href="#coroutines-and-networking">Coroutines and networking</a></li><li><a href="#changes-you-may-notice-2">Changes you may notice</a></li></ul></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a><ul class="sub"><li><a href="#big-stack-frames">Big stack frames</a></li><li><a href="#coroutines">Coroutines</a></li><li><a href="#changes-you-may-notice-3">Changes you may notice</a></li></ul></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a><ul class="sub"><li><a href="#coroutines-and-networking-2">Coroutines and networking</a></li><li><a href="#changes-you-may-notice-4">Changes you may notice</a></li></ul></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a><ul class="sub"><li><a href="#the-language-server">The language server</a></li><li><a href="#vim-and-neovim">Vim and Neovim</a></li><li><a href="#the-standard-library">The standard library</a></li></ul></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-standard-library-2">The standard library</a></li><li><a href="#the-language">The language</a></li><li><a href="#changes-you-may-notice-5">Changes you may notice</a></li><li><a href="#fixes">Fixes</a></li></ul></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-language-2">The language</a></li><li><a href="#fixes-2">Fixes</a></li></ul></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-language-3">The language</a></li><li><a href="#the-standard-library-3">The standard library</a></li><li><a href="#fixes-3">Fixes</a></li></ul></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-compiler">The compiler</a></li><li><a href="#the-standard-library-4">The standard library</a></li><li><a href="#changes-you-may-notice-6">Changes you may notice</a></li><li><a href="#fixes-4">Fixes</a></li></ul></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-language-4">The language</a></li><li><a href="#the-standard-library-5">The standard library</a></li><li><a href="#changes-you-may-notice-7">Changes you may notice</a></li></ul></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a><ul class="sub"><li><a href="#fixes-5">Fixes</a></li></ul></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-standard-library-6">The standard library</a></li><li><a href="#fixes-6">Fixes</a></li></ul></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a><ul class="sub"><li><a href="#the-language-5">The language</a></li><li><a href="#the-standard-library-7">The standard library</a></li></ul></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a><ul class="sub"><li><a href="#changes-you-may-notice-8">Changes you may notice</a></li><li><a href="#new">New</a></li><li><a href="#fixes-7">Fixes</a></li></ul></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a><ul class="sub"><li><a href="#the-language-6">The language</a></li><li><a href="#the-standard-library-8">The standard library</a></li><li><a href="#watch-out">Watch out</a></li><li><a href="#fixes-8">Fixes</a></li><li><a href="#known-issue">Known issue</a></li></ul></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a><ul class="sub"><li><a href="#fixes-9">Fixes</a></li><li><a href="#changes-you-may-notice-9">Changes you may notice</a></li></ul></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a><ul class="sub"><li><a href="#the-language-7">The language</a></li><li><a href="#the-standard-library-9">The standard library</a></li><li><a href="#removed">Removed</a></li><li><a href="#fixes-10">Fixes</a></li><li><a href="#known-issue-2">Known issue</a></li></ul></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a><ul class="sub"><li><a href="#changes-you-may-notice-10">Changes you may notice</a></li></ul></li></ul></li></ul>
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a></li></ul></details>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
+<div class="crumbs"><span><a href="stdlib.html">Reference</a></span></div>
 <h1>Releases</h1>
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
@@ -321,32 +330,32 @@ i64 byX(Point *a, Point *b) { return a.x - b.x; }
 
 void main()
 {
-  ad vec.Vec&amp;lt;Point&amp;gt; pts = vec.new&amp;lt;Point&amp;gt;();
+  ad vec.Vec&lt;Point&gt; pts = vec.new&lt;Point&gt;();
   Point a = {3, 1}, b = {1, 2};
   pts.push(a);
   pts.push(b);
-  pts.sort(&amp;amp;byX);
+  pts.sort(&amp;byX);
   for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
   printf("\n");
 
-  ad map.Map&amp;lt;u8[], i64&amp;gt; counts = map.new&amp;lt;u8[], i64&amp;gt;();
+  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
   u8[] words[] = {"to", "be", "or", "not", "to", "be"};
   for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
   i64 it = 0, n;
   u8[] word;
-  while (counts.next(&amp;amp;it, &amp;amp;word, &amp;amp;n)) { printf("%s=%d ", word, n); }
+  while (counts.next(&amp;it, &amp;word, &amp;n)) { printf("%s=%d ", word, n); }
   printf("\n");
 
-  ad set.Set&amp;lt;i64&amp;gt; seen = set.new&amp;lt;i64&amp;gt;();
+  ad set.Set&lt;i64&gt; seen = set.new&lt;i64&gt;();
   printf("%d %d\n", seen.add(4), seen.add(4));
 
-  ad list.List&amp;lt;u8 *&amp;gt; jobs = list.new&amp;lt;u8 *&amp;gt;();
+  ad list.List&lt;u8 *&gt; jobs = list.new&lt;u8 *&gt;();
   auto build = jobs.append("build");
   jobs.append("test");
   jobs.remove(build);
   for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
 
-  Point p = json.decode&amp;lt;Point&amp;gt;("{\"x\": 5, \"y\": 6}");
+  Point p = json.decode&lt;Point&gt;("{\"x\": 5, \"y\": 6}");
   printf("%d %d\n", p.x, p.y);
 }
 </code></pre>
@@ -460,9 +469,9 @@ hand, with no <code>void *</code> and no casts.</p>
 
 <pre><code>import mem;
 
-struct Stack&amp;lt;T&amp;gt; { T *items; i64 len; i64 cap; };
+struct Stack&lt;T&gt; { T *items; i64 len; i64 cap; };
 
-void Stack&amp;lt;T&amp;gt;.push(T x)
+void Stack&lt;T&gt;.push(T x)
 {
   if (self.len == self.cap) {
     self.cap = self.cap ? self.cap * 2 : 4;
@@ -471,19 +480,19 @@ void Stack&amp;lt;T&amp;gt;.push(T x)
   self.items[self.len++] = x;
 }
 
-T Stack&amp;lt;T&amp;gt;.pop() { return self.items[--self.len]; }
-void Stack&amp;lt;T&amp;gt;.free() { mem.free(self.items); }
+T Stack&lt;T&gt;.pop() { return self.items[--self.len]; }
+void Stack&lt;T&gt;.free() { mem.free(self.items); }
 
-T max&amp;lt;T&amp;gt;(T a, T b) { return a &amp;gt; b ? a : b; }
+T max&lt;T&gt;(T a, T b) { return a &gt; b ? a : b; }
 
-type Ints = Stack&amp;lt;i64&amp;gt;;
+type Ints = Stack&lt;i64&gt;;
 
 void main()
 {
   ad Ints nums = {null, 0, 0};
   nums.push(1);
   nums.push(2);
-  ad Stack&amp;lt;u8 *&amp;gt; words = {null, 0, 0};
+  ad Stack&lt;u8 *&gt; words = {null, 0, 0};
   words.push("hello");
   printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
 }
@@ -587,16 +596,16 @@ i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
 
 void *worker(void *unused)
 {
-  for (i64 i = 0; i &amp;lt; 100000; i = next(i)) { atomic.add(&amp;amp;gHits, 1); }
+  for (i64 i = 0; i &lt; 100000; i = next(i)) { atomic.add(&amp;gHits, 1); }
   return null;
 }
 
 void main()
 {
   libc.pthread_t *th[4];
-  for (i64 i = 0; i &amp;lt; 4; i++) { libc.pthread_create(&amp;amp;th[i], null, &amp;amp;worker, null); }
-  for (i64 i = 0; i &amp;lt; 4; i++) { libc.pthread_join(th[i]); }
-  printf("%d hits\n", atomic.load(&amp;amp;gHits));
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;worker, null); }
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&amp;gHits));
 }
 </code></pre>
 
@@ -654,7 +663,7 @@ void main()
   hash.sha256("abc", digest);
   String hex = hash.hex(digest);
   defer hex.free();
-  String q = str.urlEncode("a b&amp;amp;c");
+  String q = str.urlEncode("a b&amp;c");
   defer q.free();
   printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
 }
@@ -731,8 +740,8 @@ void *client(void *arg)
   i32 fd = (i32)(i64)arg;
   bytes.Buffer in = bytes.bufferNew();
   defer in.free();
-  while (coro.waitIdle(fd, libc.POLLIN, 5000) &amp;gt; 0 &amp;amp;&amp;amp; in.readFrom(fd) &amp;gt; 0) {
-    while (in.len &amp;gt;= 4 &amp;amp;&amp;amp; in.len &amp;gt;= 4 + bytes.be32(in.data())) {
+  while (coro.waitIdle(fd, libc.POLLIN, 5000) &gt; 0 &amp;&amp; in.readFrom(fd) &gt; 0) {
+    while (in.len &gt;= 4 &amp;&amp; in.len &gt;= 4 + bytes.be32(in.data())) {
       in.consume(4 + bytes.be32(in.data()));
       String now = date.httpDate(date.unixNow());
       net.send(fd, now);
@@ -746,13 +755,13 @@ void *client(void *arg)
 void *acceptor(void *arg)
 {
   i32 lfd = (i32)(i64)arg, fd;
-  while ((fd = coro.accept(lfd)) != -1) { coro.go(&amp;amp;client, (void *)(i64)fd); }
+  while ((fd = coro.accept(lfd)) != -1) { coro.go(&amp;client, (void *)(i64)fd); }
   return null;
 }
 
 void main()
 {
-  coro.go(&amp;amp;acceptor, (void *)(i64)net.listen(9000, "*", 64));
+  coro.go(&amp;acceptor, (void *)(i64)net.listen(9000, "*", 64));
   coro.run();
 }
 </code></pre>
@@ -817,7 +826,7 @@ struct User { i64 id; String name; Role role; u8[][] tags; };
 void main()
 {
     User u;
-    mem.set(&amp;amp;u, 0, sizeof(User));
+    mem.set(&amp;u, 0, sizeof(User));
     json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
                 reflect.of(u));
     defer json.free(reflect.of(u));
@@ -1206,6 +1215,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>

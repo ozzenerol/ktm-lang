@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modules - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li class="current"><a href="lang-modules.html" aria-current="page">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Modules</h1>
+<p class="lede">A module is a directory of <code>.ktm</code> files. You <code>import</code> it and use its
+<code>pub</code> names with the module's name in front.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>// geo/shapes.ktm             // main.ktm
+module geo;                   import geo;
+pub i64 area(i64 s) {...}     geo.area(5);
+
+import fs, str;               // several at once
+import h = net.http;          // the directory net/http, named h
+pub   private                 // exported; a field only the module sees</code></pre>
+</div>
+
+<h2 id="a-first-module">A first module<a class="anchor" href="#a-first-module" aria-label="Link to this section">#</a></h2>
+<p>Each file of the module starts with <code>module</code> and the directory's name.</p>
+<pre class="shell"><code>shapes/
+├── main.ktm
+└── geo/
+    ├── shapes.ktm
+    └── helpers.ktm</code></pre>
+<pre><code>// geo/shapes.ktm
+module geo;
+
+pub struct Point { i64 x, y; };
+pub enum Kind { square, circle };
+pub const i64 SIZE = 4;
+
+pub i64 area(Kind k, i64 side)
+{
+  if (k == Kind.square) { return square(side); }   // in another file of geo
+  return 3 * square(side);
+}</code></pre>
+<pre><code>// geo/helpers.ktm
+module geo;
+
+i64 square(i64 n) { return n * n; }   // not pub: private to geo</code></pre>
+<pre><code>// main.ktm
+import geo;
+
+void main()
+{
+  geo.Point p = {1, 2};
+  i64 cells[geo.SIZE];               // a module's const works in constant expressions
+  printf("%d %d %d\n", geo.area(geo.Kind.square, 5), p.y, sizeof(cells));
+}</code></pre>
+<pre class="shell"><code>$ ktm main.ktm -o shapes &amp;&amp; ./shapes
+25 2 32</code></pre>
+
+<h2 id="inside-and-outside">Inside and outside<a class="anchor" href="#inside-and-outside" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Inside the module</th><th>Outside</th></tr></thead>
+  <tbody>
+    <tr><td>Which names</td><td>Every name of every file</td><td>Only <code>pub</code> names</td></tr>
+    <tr><td>Order</td><td>Any: no prototypes needed, a struct can hold a later file's struct</td><td>-</td></tr>
+    <tr><td>How</td><td><code>area(...)</code>, <code>Point</code></td><td><code>geo.area(...)</code>, <code>geo.Point</code>, <code>geo.Kind.square</code></td></tr>
+  </tbody>
+</table></div>
+<p>Using a private name from outside is an error: <code>`square` is private to module geo</code>.</p>
+
+<h2 id="methods-across-modules">Methods across modules<a class="anchor" href="#methods-across-modules" aria-label="Link to this section">#</a></h2>
+<p>Only the module that defines a type can define its methods. Outside, its <code>pub</code> methods are
+called on the object with no prefix.</p>
+<pre><code>// bank/account.ktm
+module bank;
+
+import mem;
+
+pub struct Account { u8 *owner; i64 balance; };
+
+pub Account *open(u8 *owner)
+{
+  Account *a = mem.allocZero(sizeof(Account));
+  a.owner = owner;
+  return a;
+}
+
+pub void Account.deposit(i64 x) { self.balance += x; self.audit(); }
+void Account.audit() { }                 // private to bank
+pub void Account.close() { mem.free(self); }</code></pre>
+<pre><code>// main.ktm
+import bank;
+
+void main()
+{
+  bank.Account *a = bank.open("ann");
+  a.deposit(5);                          // no prefix on a method
+  printf("%s %d\n", a.owner, a.balance);
+  a.close();
+}</code></pre>
+<p><code>&amp;bank.Account.deposit</code> is the method as a function pointer.</p>
+
+<h2 id="private-fields">Private fields<a class="anchor" href="#private-fields" aria-label="Link to this section">#</a></h2>
+<p>A field marked <code>private</code> can only be used inside the module that defines the struct.</p>
+<pre><code>// chat/conn.ktm
+module chat;
+
+pub struct Conn {
+  i32 fd;              // public, as in C
+  private u8 *buf;     // only chat uses it
+};
+
+pub void reset(Conn *c) { c.buf = null; }</code></pre>
+<pre><code>// main.ktm
+import chat;
+
+void main()
+{
+  chat.Conn c;
+  c.fd = 3;                // fine
+  chat.Conn copy = c;      // fine: only the name is hidden
+  c.buf = null;            // error: `buf` is a private field of chat.Conn
+}</code></pre>
+<ul class="rules">
+  <li>Outside the module, reading, writing or taking the address of a private field is an error, and so is an initialiser list or a <code>for</code> that reaches it, or a struct inheriting it.</li>
+  <li><code>sizeof</code>, copying and passing by value still work: the layout isn't hidden.</li>
+  <li><code>private</code> fields exist only in modules. In the main program they are an error.</li>
+  <li><code>pub</code> on a field is an error (fields are public unless marked).</li>
+  <li>The editor's completion leaves private fields out.</li>
+</ul>
+
+<h2 id="imports">Imports<a class="anchor" href="#imports" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Write</th><th>Loads</th><th>Use as</th></tr></thead>
+  <tbody>
+    <tr><td><code>import geo;</code></td><td>the directory <code>geo</code></td><td><code>geo.area</code></td></tr>
+    <tr><td><code>import fs, str;</code></td><td>two modules</td><td><code>fs.readAll</code>, <code>str.from</code></td></tr>
+    <tr><td><code>import net.http;</code></td><td>the directory <code>net/http</code> (its files say <code>module http;</code>)</td><td><code>http.get</code></td></tr>
+    <tr><td><code>import h = net.http;</code></td><td>the same</td><td><code>h.get</code></td></tr>
+  </tbody>
+</table></div>
+<ul class="rules">
+  <li>Imports come first in a file, before any declaration.</li>
+  <li>A module is looked for next to the main file, then in the standard library, then in each directory of <code>KTM_PATH</code> (separated by <code>:</code>).</li>
+  <li>Found in two places is an error: name your modules differently from the standard library's.</li>
+  <li>An import that is never used is a warning.</li>
+</ul>
+
+<h2 id="order-of-start-up">Order of start-up<a class="anchor" href="#order-of-start-up" aria-label="Link to this section">#</a></h2>
+<p>Each module is compiled once, before the code that imports it. A module's globals are set up
+before its importers' globals and before <code>main</code>; a module's files in name order.</p>
+
+<h2 id="two-special-modules">Two special modules<a class="anchor" href="#two-special-modules" aria-label="Link to this section">#</a></h2>
+<h3 id="the-prelude">The prelude<a class="anchor" href="#the-prelude" aria-label="Link to this section">#</a></h3>
+<p>Its <code>pub</code> names are seen by every file with no import and no prefix:</p>
+<ul class="rules">
+  <li><code>Error</code>, the struct a <code>catch</code> binds;</li>
+  <li><code>EXIT_OK</code> and <code>EXIT_FAIL</code>;</li>
+  <li>the integer limits <code>I8_MIN</code>, <code>I8_MAX</code>, <code>U8_MAX</code> ... <code>I64_MIN</code>, <code>I64_MAX</code>, <code>U64_MAX</code>;</li>
+  <li><code>ERR_BOUNDS</code>, the code of an out-of-range index.</li>
+</ul>
+<pre data-run><code>void main()
+{
+  printf("%d %d %u\n", I32_MAX, I8_MIN, U16_MAX);
+  printf("%d %d\n", EXIT_OK, EXIT_FAIL);
+}
+</code></pre>
+<pre class="output">2147483647 -128 65535
+0 1
+</pre>
+<h3 id="the-runtime">The runtime<a class="anchor" href="#the-runtime" aria-label="Link to this section">#</a></h3>
+<p><code>rt</code> is part of every program but is internal: <code>import rt;</code> outside the
+standard library is an error.</p>
+
+<h2 id="shadowing-a-module">Shadowing a module<a class="anchor" href="#shadowing-a-module" aria-label="Link to this section">#</a></h2>
+<p>A local or a parameter may have an import's name; for its scope the name is the local.</p>
+<pre data-run><code>import str;
+
+i64 count(u8[] str)          // the parameter hides the module here
+{
+  return str.len;
+}
+
+void main()
+{
+  ad String s = str.from("module again");   // and here it's the module
+  printf("%d %s\n", count("four"), s);
+}
+</code></pre>
+<pre class="output">4 module again
+</pre>
+<p>A member the local doesn't have is an error that says so: <code>u8 * has no member `len` (note: the local `str` hides the module str)</code>.</p>
+
+<h2 id="errors">Errors<a class="anchor" href="#errors" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Using a name that isn't <code>pub</code> from outside its module.</li>
+  <li>A module not found, or found twice.</li>
+  <li>An import cycle: the message shows it, <code>a -&gt; b -&gt; a</code>.</li>
+  <li>A file whose <code>module</code> line is missing or doesn't match its directory.</li>
+  <li>A global with an import's name (<code>i64 geo;</code> would hide the module).</li>
+  <li>A cycle of structs that hold each other by value: one of them needs a pointer.</li>
+</ul>
+
+<h2 id="symbols">Symbols<a class="anchor" href="#symbols" aria-label="Link to this section">#</a></h2>
+<p>A module's names get symbols of their own (<code>geo.area</code> is <code>_K3geo4area</code>), so they
+never clash with C functions or the program's names. A C function a module declares with
+<code>extern "c"</code> keeps its C symbol.</p>
+<p>To compile a module once and link it as a library, see <a href="tools-libraries.html">Building libraries</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-generics.html"><span>Previous</span>Generics</a><a class="next" href="lang-exceptions.html"><span>Next</span>Exceptions</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-modules.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-module">A first module</a></li><li><a href="#inside-and-outside">Inside and outside</a></li><li><a href="#methods-across-modules">Methods across modules</a></li><li><a href="#private-fields">Private fields</a></li><li><a href="#imports">Imports</a></li><li><a href="#order-of-start-up">Order of start-up</a></li><li><a href="#two-special-modules">Two special modules</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li><li><a href="#errors">Errors</a></li><li><a href="#symbols">Symbols</a></li></ul></nav>
+</div>
+</body>
+</html>

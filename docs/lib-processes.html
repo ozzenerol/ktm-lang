@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Processes - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li class="current"><a href="lib-processes.html" aria-current="page">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#proc"><code>proc</code></a></span></div>
+<h1>Processes</h1>
+<p class="lede">Run a program by its argument list, with no shell: every argument arrives exactly as written,
+so nothing needs quoting. Then talk to it through pipes.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>u8 *argv[] = {"ls", "-l", path, null};       // null-terminated
+String out = proc.run(argv, &amp;code);          // run, capture stdout, get the exit code
+
+proc.Opts o;  mem.set(&amp;o, 0, sizeof(proc.Opts));
+o.in = proc.PIPE;  o.out = proc.PIPE;
+proc.Proc *p = proc.spawn(argv, &amp;o);
+proc.communicate(p, input, &amp;out, &amp;err);      // write, read both, wait
+proc.release(p);</code></pre>
+</div>
+
+<h2 id="proc-run">proc.run<a class="anchor" href="#proc-run" aria-label="Link to this section">#</a></h2>
+<p>Runs a program found in <code>$PATH</code>, returns what it printed (minus one trailing newline) and its exit code.</p>
+<pre data-run><code>import proc;
+
+void main()
+{
+  u8 *argv[] = {"printf", "%s|", "it's $HOME", "a b", null};
+  i64 code;
+  ad String out = proc.run(argv, &amp;code);
+  printf("[%s] exit %d\n", out, code);
+}
+</code></pre>
+<pre class="output">[it's $HOME|a b|] exit 0
+</pre>
+<p>No shell saw <code>$HOME</code> or the space: the program got them as they are.</p>
+
+<h3 id="when-it-can-t-start">When it can't start<a class="anchor" href="#when-it-can-t-start" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>import os, proc;
+
+void main()
+{
+  u8 *argv[] = {"no-such-program", null};
+  String out = proc.run(argv);
+  if (!out.ptr) { printf("couldn't start: errno %d\n", os.errno()); }
+}
+</code></pre>
+<pre class="output">couldn't start: errno 2
+</pre>
+
+<h2 id="proc-spawn-and-pipes">proc.spawn and pipes<a class="anchor" href="#proc-spawn-and-pipes" aria-label="Link to this section">#</a></h2>
+<p>For more control, <code>proc.spawn(argv, &amp;opts)</code> starts the program and returns a <code>proc.Proc</code>.
+Zero the <code>proc.Opts</code> first: every field is optional.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Opts field</th><th>Values</th></tr></thead>
+  <tbody>
+    <tr><td><code>in</code>, <code>out</code>, <code>err</code></td><td><code>proc.INHERIT</code> (ours, the default), <code>proc.PIPE</code>, <code>proc.DEVNULL</code>, <code>proc.FD</code>; <code>err</code> also <code>proc.STDOUT</code> (2&gt;&amp;1)</td></tr>
+    <tr><td><code>inFd</code>, <code>outFd</code>, <code>errFd</code></td><td>Your fd, with <code>proc.FD</code></td></tr>
+    <tr><td><code>cwd</code></td><td>The directory to start in</td></tr>
+    <tr><td><code>env</code></td><td>A null-terminated <code>"NAME=value"</code> list that replaces the environment</td></tr>
+    <tr><td><code>newGroup</code>, <code>pgid</code></td><td>A new process group, or an existing one</td></tr>
+    <tr><td><code>dups</code>, <code>ndups</code></td><td>More fds for the child, as pairs <code>{from, to, ...}</code></td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import mem, proc;
+
+void main()
+{
+  u8 *argv[] = {"sh", "-c", "tr a-z A-Z; echo done &gt;&amp;2; exit 3", null};
+  proc.Opts opts;
+  mem.set(&amp;opts, 0, sizeof(proc.Opts));
+  opts.in = proc.PIPE;
+  opts.out = proc.PIPE;
+  opts.err = proc.PIPE;
+  proc.Proc *p = proc.spawn(argv, &amp;opts);
+  ad String out, err;
+  i64 code = proc.communicate(p, "hello\n", &amp;out, &amp;err);
+  printf("out=[%s] err=[%s] exit=%d\n", out.trimEnd(), err.trimEnd(), code);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">out=[HELLO] err=[done] exit=3
+</pre>
+
+<h2 id="working-with-a-proc">Working with a Proc<a class="anchor" href="#working-with-a-proc" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>proc.communicate(p, input, &amp;out, &amp;err)</code></td><td>Writes the input, reads both outputs to the end, waits. One <code>poll()</code> loop, so it can't deadlock. <code>null</code> drops an output</td></tr>
+    <tr><td><code>proc.wait(p)</code></td><td>The exit code, or -1 if a signal killed it (<code>p.termSignal</code>)</td></tr>
+    <tr><td><code>proc.done(p)</code></td><td>Whether it has ended, without waiting</td></tr>
+    <tr><td><code>proc.kill(p, sig)</code></td><td>Sends a signal (SIGTERM by default)</td></tr>
+    <tr><td><code>proc.release(p)</code></td><td>Closes the pipes and frees it, waiting if it still runs</td></tr>
+    <tr><td><code>proc.disown(p)</code></td><td>Frees it without waiting, when you reap children yourself</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import libc, proc;
+
+void main()
+{
+  u8 *argv[] = {"sleep", "10", null};
+  proc.Proc *p = proc.spawn(argv);
+  printf("done yet: %d\n", proc.done(p));
+  proc.kill(p);
+  printf("exit %d, signal %d\n", proc.wait(p), p.termSignal == libc.SIGTERM);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">done yet: 0
+exit -1, signal 1
+</pre>
+
+<h3 id="options-directory-and-environment">Options: directory and environment<a class="anchor" href="#options-directory-and-environment" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>import mem, proc;
+
+void main()
+{
+  u8 *argv[] = {"sh", "-c", "echo $GREETING from $(pwd)", null};
+  u8 *env[] = {"GREETING=hello", "PATH=/usr/bin:/bin", null};
+  proc.Opts o;
+  mem.set(&amp;o, 0, sizeof(proc.Opts));
+  o.out = proc.PIPE;
+  o.cwd = "/";
+  o.env = env;
+  proc.Proc *p = proc.spawn(argv, &amp;o);
+  ad String out;
+  proc.communicate(p, "", &amp;out);
+  printf("%s", out);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">hello from /
+</pre>
+
+<h2 id="pipelines">Pipelines<a class="anchor" href="#pipelines" aria-label="Link to this section">#</a></h2>
+<p>Connect programs the way a shell's <code>a | b | c</code> does: <code>proc.pipe(fds)</code> makes a pipe, each
+stage gets the read end before it and the write end after it, and you close your copies once all are started.</p>
+<pre data-run><code>import libc, mem, proc;
+
+proc.Proc *stage(u8 *script, i32 in, i32 out, i32 pgid)
+{
+  u8 *argv[] = {"sh", "-c", script, null};
+  proc.Opts o;
+  mem.set(&amp;o, 0, sizeof(proc.Opts));
+  if (in &gt;= 0) { o.in = proc.FD; o.inFd = in; }
+  if (out &gt;= 0) { o.out = proc.FD; o.outFd = out; } else { o.out = proc.PIPE; }
+  if (pgid) { o.pgid = pgid; } else { o.newGroup = true; }
+  return proc.spawn(argv, &amp;o);
+}
+
+void main()
+{
+  i32 ab[2], bc[2];
+  proc.pipe(ab);
+  proc.pipe(bc);
+  proc.Proc *a = stage("printf 'pear\napple\npear\n'", -1, ab[1], 0);
+  proc.Proc *b = stage("sort", ab[0], bc[1], a.pgid);
+  proc.Proc *c = stage("uniq -c | tr -s ' '", bc[0], -1, a.pgid);
+  libc.close(ab[0]);
+  libc.close(ab[1]);
+  libc.close(bc[0]);
+  libc.close(bc[1]);
+
+  ad String out;
+  proc.communicate(c, "", &amp;out);
+  printf("%s", out);
+  printf("one group: %d\n", b.pgid == a.pid &amp;&amp; c.pgid == a.pid);
+  proc.release(a);
+  proc.release(b);
+  proc.release(c);
+}
+</code></pre>
+<pre class="output"> 1 apple
+ 2 pear
+one group: 1
+</pre>
+<ul class="rules">
+  <li>The later stages join the first one's group (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or Ctrl-C with the group in the foreground, reaches all of them.</li>
+  <li>The child starts with default signal handlers and only stdin, stdout, stderr (and <code>dups</code>) open.</li>
+</ul>
+
+<h2 id="waiting-in-a-coroutine-loop">Waiting in a coroutine loop<a class="anchor" href="#waiting-in-a-coroutine-loop" aria-label="Link to this section">#</a></h2>
+<p>In a <a href="lib-event-loop.html">coroutine loop</a>, <code>coro.waitChild(p.pid, ms)</code> waits for a child
+without blocking the thread; <code>proc.setStatus(p, st)</code> then fills in <code>p.exitCode</code>.
+Outside a loop, <code>proc.exitFd(pid)</code> is an fd that polls readable when the child exits.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-shell.html"><span>Previous</span>Shell commands</a><a class="next" href="lib-environment.html"><span>Next</span>Environment and exit</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-processes.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#proc-run">proc.run</a></li><li><a href="#proc-spawn-and-pipes">proc.spawn and pipes</a></li><li><a href="#working-with-a-proc">Working with a Proc</a></li><li><a href="#pipelines">Pipelines</a></li><li><a href="#waiting-in-a-coroutine-loop">Waiting in a coroutine loop</a></li></ul></nav>
+</div>
+</body>
+</html>

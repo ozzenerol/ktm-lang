@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON: writing - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li class="current"><a href="lib-json-writer.html" aria-current="page">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#json"><code>json</code></a></span></div>
+<h1>JSON: writing</h1>
+<p class="lede">Build JSON with a <code>json.Writer</code>, print a parsed tree with <code>json.toStr</code>, or encode a whole
+struct with <a href="lib-json-structs.html"><code>json.encode</code></a>.</p>
+
+<h2 id="json-writer">json.Writer<a class="anchor" href="#json-writer" aria-label="Link to this section">#</a></h2>
+<p>A Writer builds a document into a String, without a tree. Commas, quotes and escapes are written for you.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Writer w = json.writerNew();
+  defer w.free();
+  w.beginObject();
+  w.key("id");    w.int(5);
+  w.key("name");  w.str("Ada \"the\" first");
+  w.key("tags");
+  w.beginArray(); w.str("a"); w.float(1.5); w.bool(true); w.nil(); w.end();
+  w.end();
+  ad String text = w.take();
+  printf("%s\n", text);
+}
+</code></pre>
+<pre class="output">{"id":5,"name":"Ada \"the\" first","tags":["a",1.5,true,null]}
+</pre>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>Writes</th></tr></thead>
+  <tbody>
+    <tr><td><code>beginObject()</code>, <code>beginArray()</code>, <code>end()</code></td><td>Opens and closes</td></tr>
+    <tr><td><code>key(k)</code>, <code>rawKey(k)</code></td><td>The next member's name (<code>rawKey</code> writes it unescaped)</td></tr>
+    <tr><td><code>int(i64)</code>, <code>uint(u64)</code>, <code>float(f64)</code>, <code>bool(b)</code></td><td>Numbers and booleans</td></tr>
+    <tr><td><code>nil()</code></td><td>JSON's <code>null</code></td></tr>
+    <tr><td><code>str(s)</code>, <code>cstr(p)</code></td><td>A string from a <code>u8[]</code>, or a C string (<code>null</code> for a null pointer)</td></tr>
+    <tr><td><code>raw(text)</code></td><td>JSON made elsewhere, checked to be one value</td></tr>
+    <tr><td><code>take()</code></td><td>The finished document as a String; the Writer is empty again</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="pretty-output">Pretty output<a class="anchor" href="#pretty-output" aria-label="Link to this section">#</a></h2>
+<p><code>json.writerNew(2)</code> puts each member and item on its own line, indented 2 spaces per level.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Writer w = json.writerNew(2);
+  defer w.free();
+  w.beginObject();
+  w.key("server"); w.beginObject();
+  w.key("host"); w.str("localhost");
+  w.key("ports"); w.beginArray(); w.int(80); w.int(443); w.end();
+  w.end();
+  w.end();
+  ad String text = w.take();
+  printf("%s\n", text);
+}
+</code></pre>
+<pre class="output">{
+  "server": {
+    "host": "localhost",
+    "ports": [
+      80,
+      443
+    ]
+  }
+}
+</pre>
+
+<h2 id="writing-a-list-from-data">Writing a list from data<a class="anchor" href="#writing-a-list-from-data" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import json;
+
+struct Item { u8 *name; i64 qty; f64 price; };
+
+void main()
+{
+  Item items[] = {{"pen", 3, 1.5}, {"book", 1, 12.0}};
+  json.Writer w = json.writerNew();
+  defer w.free();
+  w.beginArray();
+  for (auto it : items) {
+    w.beginObject();
+    w.key("name");  w.cstr(it.name);
+    w.key("total"); w.float(it.qty * it.price);
+    w.end();
+  }
+  w.end();
+  ad String text = w.take();
+  printf("%s\n", text);
+}
+</code></pre>
+<pre class="output">[{"name":"pen","total":4.5},{"name":"book","total":12.0}]
+</pre>
+<p>Floats get the fewest digits (15 to 17) that read back as the same value, always with a decimal point.</p>
+
+<h2 id="mistakes-throw">Mistakes throw<a class="anchor" href="#mistakes-throw" aria-label="Link to this section">#</a></h2>
+<p>A call out of order, or a value JSON can't hold, throws <code>json.ERR_WRITER</code>. The Writer is left as it was.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Writer w = json.writerNew();
+  defer w.free();
+  try {
+    w.beginArray();
+    w.key("oops");
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+  try {
+    w.float(0.0 / 0.0);
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">key(): no object is open
+float(): JSON has no NaN or infinity
+</pre>
+<p>Also: a value where a key is expected, <code>end()</code> with nothing open, a second top-level value,
+<code>take()</code> with something still open, a string that isn't UTF-8.</p>
+
+<h2 id="printing-a-parsed-tree">Printing a parsed tree<a class="anchor" href="#printing-a-parsed-tree" aria-label="Link to this section">#</a></h2>
+<p><code>json.toStr(node)</code> is the JSON text of a node from <a href="lib-json.html"><code>json.parse</code></a>:
+for an inner node just its value.</p>
+<pre data-run><code>import json;
+
+void main()
+{
+  json.Value *doc = json.parse("{\"user\": {\"id\": 7, \"roles\": [\"admin\"]}, \"n\": 1e400}");
+  defer json.release(doc);
+  ad String user = json.toStr(json.select(doc, ".user"));
+  ad String all = json.toStr(doc);          // 1e400 is too big for an f64: null
+  printf("%s\n%s\n", user, all);
+}
+</code></pre>
+<pre class="output">{"id": 7,"roles": ["admin"]}
+{"user": {"id": 7,"roles": ["admin"]},"n": null}
+</pre>
+<p><code>json.release</code> frees a whole document and only does something given a root; on an inner node it does nothing.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-json.html"><span>Previous</span>JSON: reading</a><a class="next" href="lib-json-structs.html"><span>Next</span>JSON: structs</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-json-writer.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#json-writer">json.Writer</a></li><li><a href="#pretty-output">Pretty output</a></li><li><a href="#writing-a-list-from-data">Writing a list from data</a></li><li><a href="#mistakes-throw">Mistakes throw</a></li><li><a href="#printing-a-parsed-tree">Printing a parsed tree</a></li></ul></nav>
+</div>
+</body>
+</html>

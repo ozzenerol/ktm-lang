@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generics - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li class="current"><a href="lang-generics.html" aria-current="page">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Generics</h1>
+<p class="lede">Structs, methods and functions can take type parameters. Each use is compiled for its
+types: the same code you would write by hand, with no <code>void *</code> and no casts.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>T max&lt;T&gt;(T a, T b) { return a &gt; b ? a : b; }
+max(3, 7);  max&lt;f64&gt;(1, 2.5);        // inferred, or written
+struct Pair&lt;K, V&gt; { K key; V value; };
+Pair&lt;u8 *, f64&gt; p;
+void Stack&lt;T&gt;.push(T x) { ... }       // a method of a generic struct
+type Ints = Stack&lt;i64&gt;;              // name an instance</code></pre>
+</div>
+
+<h2 id="generic-functions">Generic functions<a class="anchor" href="#generic-functions" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>T max&lt;T&gt;(T a, T b)
+{
+  return a &gt; b ? a : b;
+}
+
+void swap&lt;T&gt;(T *a, T *b)
+{
+  T t = *a;
+  *a = *b;
+  *b = t;
+}
+
+void main()
+{
+  printf("%d %.1f %c\n", max(3, 7), max(1.5, 0.5), max('a', 'z'));
+  i64 x = 1, y = 2;
+  swap(&amp;x, &amp;y);
+  printf("%d %d\n", x, y);
+  printf("%.1f\n", max&lt;f64&gt;(1, 2.5));     // written out: 1 becomes 1.0
+}
+</code></pre>
+<pre class="output">7 1.5 z
+2 1
+2.5
+</pre>
+<p>A call works the types out from the arguments, through pointers, slices, <code>fn</code> types
+and generic structs. When nothing says what a parameter is, write it: <code>make&lt;i64&gt;()</code>.</p>
+
+<h2 id="generic-structs">Generic structs<a class="anchor" href="#generic-structs" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>struct Pair&lt;K, V&gt; { K key; V value; };
+
+Pair&lt;K, V&gt; pairOf&lt;K, V&gt;(K k, V v)
+{
+  Pair&lt;K, V&gt; p = {k, v};
+  return p;
+}
+
+void main()
+{
+  Pair&lt;u8 *, f64&gt; pi = {"pi", 3.14};
+  auto e = pairOf("e", 2.72);
+  Pair&lt;i64, bool&gt; flag = pairOf(7, true);
+  printf("%s=%.2f %s=%.2f %d=%d\n", pi.key, pi.value, e.key, e.value, flag.key, flag.value);
+  printf("%s\n", typeof(e));
+}
+</code></pre>
+<pre class="output">pi=3.14 e=2.72 7=1
+Pair&lt;u8 *, f64&gt;
+</pre>
+<p>A type is always written with its arguments, nested ones too: <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>.</p>
+
+<h2 id="methods-of-a-generic-struct">Methods of a generic struct<a class="anchor" href="#methods-of-a-generic-struct" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import mem;
+
+struct Stack&lt;T&gt; { T *items; i64 len; i64 cap; };
+
+void Stack&lt;T&gt;.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack&lt;T&gt;.pop() { return self.items[--self.len]; }
+bool Stack&lt;T&gt;.empty() { return self.len == 0; }
+void Stack&lt;T&gt;.free() { mem.free(self.items); }
+
+void main()
+{
+  ad Stack&lt;i64&gt; nums = {null, 0, 0};
+  for (i64 i = 1; i &lt;= 5; i++) { nums.push(i * i); }
+  while (!nums.empty()) { printf("%d,", nums.pop()); }
+  printf("\n");
+
+  ad Stack&lt;u8 *&gt; words = {null, 0, 0};
+  words.push("first");
+  words.push("second");
+  printf("%s\n", words.pop());
+}
+</code></pre>
+<pre class="output">25,16,9,4,1,
+second
+</pre>
+
+<h2 id="generic-functions-over-generic-structs">Generic functions over generic structs<a class="anchor" href="#generic-functions-over-generic-structs" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>struct Box&lt;T&gt; { T value; };
+
+T unbox&lt;T&gt;(Box&lt;T&gt; *b) { return b.value; }
+
+T sum&lt;T&gt;(T[] xs)
+{
+  T total = 0;
+  for (auto x : xs) { total += x; }
+  return total;
+}
+
+void main()
+{
+  Box&lt;f64&gt; b = {2.5};
+  i64 ints[] = {1, 2, 3};
+  f64 floats[] = {0.5, 0.25};
+  printf("%.1f %d %.2f\n", unbox(&amp;b), sum(ints), sum(floats));
+}
+</code></pre>
+<pre class="output">2.5 6 0.75
+</pre>
+
+<h2 id="a-generic-base">A generic base<a class="anchor" href="#a-generic-base" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>struct List&lt;T&gt; { T items[4]; i64 len; };
+struct Counted&lt;T&gt; : List&lt;T&gt; { i64 adds; };
+
+void List&lt;T&gt;.add(T x) { self.items[self.len++] = x; }
+
+void main()
+{
+  Counted&lt;i64&gt; c;
+  c.len = 0;
+  c.adds = 0;
+  c.add(10);
+  c.adds++;
+  printf("%d %d %d\n", c.len, c.items[0], c.adds);
+}
+</code></pre>
+<pre class="output">1 10 1
+</pre>
+
+<h2 id="the-library-s-generics">The library's generics<a class="anchor" href="#the-library-s-generics" aria-label="Link to this section">#</a></h2>
+<p>The containers are generic: <a href="lib-vectors.html"><code>vec.Vec&lt;T&gt;</code></a>,
+<a href="lib-maps.html"><code>map.Map&lt;K, V&gt;</code></a>, <a href="lib-sets.html"><code>set.Set&lt;T&gt;</code></a>,
+<a href="lib-lists.html"><code>list.List&lt;T&gt;</code></a>.</p>
+<pre data-run><code>import map, vec;
+
+void main()
+{
+  ad vec.Vec&lt;u8[]&gt; names = vec.new&lt;u8[]&gt;();
+  names.push("ann");
+  names.push("bob");
+  ad map.Map&lt;u8[], i64&gt; ages = map.new&lt;u8[], i64&gt;();
+  ages.set("ann", 41);
+  for (auto n : names) { printf("%s %d\n", n, ages.getOr(n, -1)); }
+}
+</code></pre>
+<pre class="output">ann 41
+bob -1
+</pre>
+
+<h2 id="errors-are-checked-per-instance">Errors are checked per instance<a class="anchor" href="#errors-are-checked-per-instance" aria-label="Link to this section">#</a></h2>
+<p>The body is checked for each type it is used with. <code>max</code> of two structs is an error at the
+<code>&gt;</code>, with a note naming the instance (<code>max&lt;Point&gt;</code>) and the call that asked for it.</p>
+
+<h2 id="in-modules-and-libraries">In modules and libraries<a class="anchor" href="#in-modules-and-libraries" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>pub</code> works as for any declaration; outside, write <code>coll.Vec&lt;i64&gt;</code> and <code>coll.vecNew&lt;i64&gt;()</code>.</li>
+  <li>A library built with <code>-lib</code> keeps its generics as source, and each program makes the instances it uses.</li>
+</ul>
+
+<h2 id="not-yet">Not yet<a class="anchor" href="#not-yet" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Constraints on type parameters.</li>
+  <li>Generic enums.</li>
+  <li>Number parameters (<code>Array&lt;T, 16&gt;</code>).</li>
+  <li>A different body for one type (specialisation).</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-type-aliases.html"><span>Previous</span>Type aliases</a><a class="next" href="lang-modules.html"><span>Next</span>Modules</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-generics.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#generic-functions">Generic functions</a></li><li><a href="#generic-structs">Generic structs</a></li><li><a href="#methods-of-a-generic-struct">Methods of a generic struct</a></li><li><a href="#generic-functions-over-generic-structs">Generic functions over generic structs</a></li><li><a href="#a-generic-base">A generic base</a></li><li><a href="#the-library-s-generics">The library&#x27;s generics</a></li><li><a href="#errors-are-checked-per-instance">Errors are checked per instance</a></li><li><a href="#in-modules-and-libraries">In modules and libraries</a></li><li><a href="#not-yet">Not yet</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clocks and sleeping - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li class="current"><a href="lib-time.html" aria-current="page">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#date"><code>date</code></a></span></div>
+<h1>Clocks and sleeping</h1>
+<p class="lede">Measure time, sleep, work with Unix time, and read and write HTTP dates.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Gives</th><th>Use it for</th></tr></thead>
+  <tbody>
+    <tr><td><code>date.monoMs()</code>, <code>date.monoNs()</code></td><td>A clock that only goes forward</td><td>Timeouts, deadlines, measuring</td></tr>
+    <tr><td><code>date.nowMs()</code></td><td>Milliseconds since the Unix epoch</td><td>Timestamps (it jumps when the clock is set)</td></tr>
+    <tr><td><code>date.unixNow()</code></td><td>Seconds since the Unix epoch</td><td>Unix time</td></tr>
+    <tr><td><code>date.sleepMs(ms)</code></td><td>Sleeps, even through signals</td><td>Waiting</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="measuring">Measuring<a class="anchor" href="#measuring" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import date;
+
+i64 slowSum(i64 n)
+{
+  i64 t = 0;
+  for (i64 i = 0; i &lt; n; i++) { t += i % 7; }
+  return t;
+}
+
+void main()
+{
+  i64 start = date.monoNs();
+  i64 r = slowSum(1000000);
+  i64 took = date.monoNs() - start;
+  printf("result %d, took more than 0 ns: %d\n", r, took &gt; 0);
+
+  i64 t0 = date.monoMs();
+  date.sleepMs(20);
+  printf("slept at least 20 ms: %d\n", date.monoMs() - t0 &gt;= 20);
+}
+</code></pre>
+<pre class="output">result 2999997, took more than 0 ns: 1
+slept at least 20 ms: 1
+</pre>
+
+<h2 id="a-deadline">A deadline<a class="anchor" href="#a-deadline" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import date;
+
+void main()
+{
+  i64 deadline = date.monoMs() + 50;
+  i64 tries = 0;
+  while (date.monoMs() &lt; deadline) {
+    tries++;
+    date.sleepMs(10);
+  }
+  printf("tried more than once: %d\n", tries &gt; 1);
+}
+</code></pre>
+<pre class="output">tried more than once: 1
+</pre>
+<div class="tip"><p>Use <code>monoMs</code>, not <code>nowMs</code>, for deadlines: the time of day can jump back when the clock is set.</p></div>
+
+<h2 id="unix-time">Unix time<a class="anchor" href="#unix-time" aria-label="Link to this section">#</a></h2>
+<p><code>date.formatUnix(t, fmt)</code> writes a Unix time with <code>strftime</code>'s format, in UTC; pass <code>false</code> as the third argument for local time.</p>
+<pre data-run><code>import date;
+
+void main()
+{
+  ad String a = date.formatUnix(0, "%Y-%m-%d %H:%M:%S");
+  ad String b = date.formatUnix(784111777, "%A %d %B %Y, day %j");
+  printf("%s\n%s\n", a, b);
+  printf("now is after 2024: %d\n", date.unixNow() &gt; 1704067200);
+}
+</code></pre>
+<pre class="output">1970-01-01 00:00:00
+Sunday 06 November 1994, day 310
+now is after 2024: 1
+</pre>
+
+<h2 id="http-dates">HTTP dates<a class="anchor" href="#http-dates" aria-label="Link to this section">#</a></h2>
+<p><code>date.httpDate(t)</code> is the form HTTP headers use (<code>Date</code>, <code>Last-Modified</code>), always English and UTC.
+<code>date.parseHttpDate(text, &amp;t)</code> reads it back, and the two older forms clients may still send.</p>
+<pre data-run><code>import date;
+
+void main()
+{
+  ad String h = date.httpDate(784111777);
+  printf("%s\n", h);
+
+  u8[] forms[] = {"Sun, 06 Nov 1994 08:49:37 GMT", "Sunday, 06-Nov-94 08:49:37 GMT",
+                  "Sun Nov  6 08:49:37 1994", "yesterday"};
+  for (auto f : forms) {
+    i64 t = -1;
+    bool ok = date.parseHttpDate(f, &amp;t);
+    printf("%d %d\n", ok, t);
+  }
+}
+</code></pre>
+<pre class="output">Sun, 06 Nov 1994 08:49:37 GMT
+1 784111777
+1 784111777
+1 784111777
+0 -1
+</pre>
+<p>On failure it returns false and leaves <code>t</code> alone.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-dates.html"><span>Previous</span>Dates</a><a class="next" href="lib-maths.html"><span>Next</span>Maths</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-time.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#measuring">Measuring</a></li><li><a href="#a-deadline">A deadline</a></li><li><a href="#unix-time">Unix time</a></li><li><a href="#http-dates">HTTP dates</a></li></ul></nav>
+</div>
+</body>
+</html>

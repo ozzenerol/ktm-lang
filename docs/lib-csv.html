@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSV - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li class="current"><a href="lib-csv.html" aria-current="page">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#csv"><code>csv</code></a></span></div>
+<h1>CSV</h1>
+<p class="lede"><code>csv.next</code> walks CSV text without copying it: each field, then the whole row, then <code>csv.EOF</code>.</p>
+
+<h2 id="walking-a-text">Walking a text<a class="anchor" href="#walking-a-text" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import csv;
+
+void main()
+{
+  u8[] text = "name,age\nann,41\nbob,29\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind;
+  csv.init(&amp;p, text);
+  while ((kind = csv.next(&amp;p, &amp;it)) != csv.EOF) {
+    if (kind == csv.FIELD) { printf("[%s]", it.text); }
+    else                   { printf(" &lt;- row %d\n", it.idx); }
+  }
+}
+</code></pre>
+<pre class="output">[name][age] &lt;- row 0
+[ann][41] &lt;- row 1
+[bob][29] &lt;- row 2
+</pre>
+<ul class="rules">
+  <li>A <code>csv.Item</code> has <code>idx</code> (the field's number in its row, or the row's number) and <code>text</code>, a <code>u8[]</code> view of the input.</li>
+  <li><code>csv.init</code> takes any <code>u8[]</code>: <code>text[0:n]</code> parses part of a buffer. The input must outlive the parser.</li>
+</ul>
+
+<h2 id="quotes-are-kept">Quotes are kept<a class="anchor" href="#quotes-are-kept" aria-label="Link to this section">#</a></h2>
+<p>The views are the raw text: a quoted field keeps its quotes and doubled <code>""</code>. Commas and
+newlines inside quotes don't split. A row's text includes its line ending.</p>
+<pre data-run><code>import csv;
+
+void main()
+{
+  u8[] text = "name,quote\r\nann,\"say \"\"hi\"\", ok\"\nbob,\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind;
+  csv.init(&amp;p, text);
+  while ((kind = csv.next(&amp;p, &amp;it)) != csv.EOF) {
+    if (kind == csv.FIELD) { printf("field %d: [%s]\n", it.idx, it.text); }
+    else                   { printf("row %d: %d bytes\n", it.idx, it.text.len); }
+  }
+}
+</code></pre>
+<pre class="output">field 0: [name]
+field 1: [quote]
+row 0: 12 bytes
+field 0: [ann]
+field 1: ["say ""hi"", ok"]
+row 1: 21 bytes
+field 0: [bob]
+field 1: []
+row 2: 5 bytes
+</pre>
+
+<h2 id="unquoting-a-field">Unquoting a field<a class="anchor" href="#unquoting-a-field" aria-label="Link to this section">#</a></h2>
+<p>Unquoting is up to you. A small helper:</p>
+<pre data-run><code>import csv, str;
+
+String unquote(u8[] f)
+{
+  if (f.len &lt; 2 || f[0] != '"') { return str.from(f); }
+  String out = str.withCap(f.len);
+  for (i64 i = 1; i &lt; f.len - 1; i++) {
+    out.appendByte(f[i]);
+    if (f[i] == '"') { i++; }        // "" is one quote
+  }
+  return out;
+}
+
+void main()
+{
+  u8[] text = "id,comment\n7,\"fine, \"\"really\"\"\"\n";
+  csv.Parser p;
+  csv.Item it;
+  csv.init(&amp;p, text);
+  while (csv.next(&amp;p, &amp;it) != csv.EOF) {
+    if (it.idx == 1 &amp;&amp; it.text.len &amp;&amp; it.text[0] == '"') {
+      ad String v = unquote(it.text);
+      printf("%s\n", v);
+    }
+  }
+}
+</code></pre>
+<pre class="output">fine, "really"
+</pre>
+
+<h2 id="summing-a-column">Summing a column<a class="anchor" href="#summing-a-column" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import cstr, csv, str;
+
+void main()
+{
+  u8[] text = "item,price\npen,3\nbook,12\nbag,25\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind, total = 0;
+  bool header = true;
+  csv.init(&amp;p, text);
+  while ((kind = csv.next(&amp;p, &amp;it)) != csv.EOF) {
+    if (kind == csv.ROW) { header = false; continue; }
+    if (!header &amp;&amp; it.idx == 1) {
+      ad String n = str.from(it.text);
+      total += cstr.toInt(n.cstr());
+    }
+  }
+  printf("total %d\n", total);
+}
+</code></pre>
+<pre class="output">total 40
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-directories.html"><span>Previous</span>Directories and file status</a><a class="next" href="lib-shell.html"><span>Next</span>Shell commands</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-csv.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#walking-a-text">Walking a text</a></li><li><a href="#quotes-are-kept">Quotes are kept</a></li><li><a href="#unquoting-a-field">Unquoting a field</a></li><li><a href="#summing-a-column">Summing a column</a></li></ul></nav>
+</div>
+</body>
+</html>

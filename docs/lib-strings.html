@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strings - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li class="current"><a href="lib-strings.html" aria-current="page">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#str"><code>str</code></a></span></div>
+<h1>Strings</h1>
+<p class="lede">The <code>str</code> module: <code>String</code>, the text you own, and the functions that read any text (<code>u8[]</code>).
+The language side is on <a href="lang-strings.html">Strings</a>.</p>
+
+<h2 id="making-a-string">Making a String<a class="anchor" href="#making-a-string" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>str.new()</code></td><td>Empty; nothing allocated until something is added</td></tr>
+    <tr><td><code>str.from(t)</code></td><td>A copy of any text</td></tr>
+    <tr><td><code>str.withCap(n)</code></td><td>Empty, with room for <code>n</code> bytes</td></tr>
+    <tr><td><code>str.format(fmt, ...)</code></td><td>Formatted text (<a href="lib-formatting.html">format strings</a>)</td></tr>
+    <tr><td><code>str.adopt(p, len)</code></td><td>Takes over a <code>mem.alloc</code>'d block with a NUL after <code>len</code> bytes, without copying</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="changing-a-string">Changing a String<a class="anchor" href="#changing-a-string" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>append(t)</code>, <code>appendByte(b)</code>, <code>appendFormat(fmt, ...)</code></td><td>Adds at the end</td></tr>
+    <tr><td><code>insert(at, t)</code></td><td>Inserts at a byte index</td></tr>
+    <tr><td><code>remove(a, b)</code></td><td>Removes bytes <code>a</code> up to <code>b</code></td></tr>
+    <tr><td><code>replace(old, new)</code></td><td>Replaces every occurrence</td></tr>
+    <tr><td><code>toLower()</code>, <code>toUpper()</code>, <code>reverse()</code></td><td>In place (ASCII letters)</td></tr>
+    <tr><td><code>clear()</code>, <code>reserve(n)</code></td><td>Empty it (keeping its memory), make room</td></tr>
+    <tr><td><code>clone()</code></td><td>A copy of its own</td></tr>
+    <tr><td><code>cstr()</code></td><td>Its bytes as a C string, no copy</td></tr>
+    <tr><td><code>take()</code></td><td>Its bytes as a C string that is now yours; the String is empty after</td></tr>
+    <tr><td><code>free()</code></td><td>Frees it; a second <code>free()</code> does nothing</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import str;
+
+void main()
+{
+  ad String s = str.format("%d files", 3);
+  s.insert(0, "found ");
+  s.append(" in /tmp");
+  s.replace("files", "logs");
+  printf("%s (%d bytes)\n", s, s.len);
+
+  ad String path = str.from("/var/log");
+  path.appendFormat("/%s.%d", "app", 2);
+  path.toUpper();
+  printf("%s %s %c\n", path, path[1:4], path[5]);
+}
+</code></pre>
+<pre class="output">found 3 logs in /tmp (20 bytes)
+/VAR/LOG/APP.2 VAR L
+</pre>
+
+<h3 id="building-text-in-a-loop">Building text in a loop<a class="anchor" href="#building-text-in-a-loop" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>import str;
+
+void main()
+{
+  ad String csv = str.withCap(64);
+  csv.append("id,square");
+  for (i64 i = 1; i &lt;= 4; i++) {
+    csv.appendFormat("\n%d,%d", i, i * i);
+  }
+  printf("%s\n", csv);
+}
+</code></pre>
+<pre class="output">id,square
+1,1
+2,4
+3,9
+4,16
+</pre>
+
+<h2 id="reading-text">Reading text<a class="anchor" href="#reading-text" aria-label="Link to this section">#</a></h2>
+<p>These take a <code>u8[]</code>: a literal, a slice or a String. Call them as functions or as methods:
+<code>s.find("x")</code> is <code>str.find(s, "x")</code>.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Function</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>find(s, part)</code>, <code>findLast(s, part)</code></td><td>The byte index, or -1</td></tr>
+    <tr><td><code>contains</code>, <code>startsWith</code>, <code>endsWith</code></td><td><code>bool</code></td></tr>
+    <tr><td><code>equals(a, b)</code></td><td><code>bool</code>: the same bytes</td></tr>
+    <tr><td><code>compare(a, b)</code></td><td>Negative, 0 or positive, for sorting</td></tr>
+    <tr><td><code>trim(s)</code>, <code>trimStart(s)</code>, <code>trimEnd(s, chars)</code></td><td>A view without the whitespace (or the given bytes)</td></tr>
+    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after</td></tr>
+    <tr><td><code>split(s, sep)</code></td><td>A <code>u8[][]</code> of views, allocated: free it</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] text = "the cat sat on the mat";
+  printf("%d %d %d\n", text.find("the"), text.findLast("the"), text.find("dog"));
+  printf("%d %d %d\n", text.contains("sat"), text.startsWith("the"), text.endsWith("hat"));
+  printf("%d %d\n", str.equals("abc", "abc"), str.compare("apple", "banana") &lt; 0);
+}
+</code></pre>
+<pre class="output">0 15 -1
+1 1 0
+1 1
+</pre>
+
+<h3 id="trimming-and-splitting">Trimming and splitting<a class="anchor" href="#trimming-and-splitting" aria-label="Link to this section">#</a></h3>
+<p>Trimming and <code>splitFirst</code> return views: parts of the text you gave, nothing copied.</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] line = "  name = ktm, lang  \r\n";
+  u8[] t = line.trimEnd("\r\n").trim();
+  u8[] key, value;
+  if (str.splitFirst(t, " = ", &amp;key, &amp;value)) {
+    printf("[%s] [%s]\n", key, value);
+  }
+  ad u8[][] parts = value.split(", ");
+  for (auto p : parts) { printf("&lt;%s&gt;", p); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">[name] [ktm, lang]
+&lt;ktm&gt;&lt;lang&gt;
+</pre>
+<p><code>split</code> keeps empty parts:</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  ad u8[][] parts = str.split("a,b,,c", ",");
+  for (auto p : parts) { printf("[%s]", p); }
+  printf(" %d parts\n", parts.len);
+}
+</code></pre>
+<pre class="output">[a][b][][c] 4 parts
+</pre>
+
+<h3 id="parsing-a-line">Parsing a line<a class="anchor" href="#parsing-a-line" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] request = "GET /index.html HTTP/1.1";
+  u8[] method, rest, path, version;
+  str.splitFirst(request, " ", &amp;method, &amp;rest);
+  str.splitFirst(rest, " ", &amp;path, &amp;version);
+  u8[] dir, file;
+  str.splitLast(path, "/", &amp;dir, &amp;file);
+  printf("%s | %s | %s | file %s\n", method, path, version, file);
+}
+</code></pre>
+<pre class="output">GET | /index.html | HTTP/1.1 | file index.html
+</pre>
+
+<h2 id="characters">Characters<a class="anchor" href="#characters" aria-label="Link to this section">#</a></h2>
+<p><code>str.toUpper(c)</code>, <code>str.toLower(c)</code> and <code>str.isSpace(c)</code> work on one byte (ASCII).</p>
+<pre data-run><code>import str;
+
+void main()
+{
+  printf("%c%c %d %d\n", str.toUpper('q'), str.toLower('Q'), str.isSpace('\t'), str.isSpace('x'));
+}
+</code></pre>
+<pre class="output">Qq 1 0
+</pre>
+
+<h2 id="utf-8">UTF-8<a class="anchor" href="#utf-8" aria-label="Link to this section">#</a></h2>
+<p><code>len</code> and <code>s[i]</code> count bytes. For characters:</p>
+<ul class="rules">
+  <li><code>str.decodeRune(s, &amp;at)</code>: the code point at byte <code>at</code>, moving <code>at</code> past it. U+FFFD for bytes that aren't UTF-8, -1 at the end.</li>
+  <li><code>str.runeCount(s)</code>: the number of code points.</li>
+  <li><code>str.validUtf8(s)</code>: whether the text is valid UTF-8.</li>
+</ul>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] s = "añb€";
+  printf("%d bytes, %d runes, valid %d\n", s.len, str.runeCount(s), str.validUtf8(s));
+  i64 at = 0;
+  i32 r;
+  while ((r = str.decodeRune(s, &amp;at)) &gt;= 0) { printf("[U+%04X]", r); }
+  printf("\n%d\n", str.validUtf8("\xff"));
+}
+</code></pre>
+<pre class="output">7 bytes, 4 runes, valid 1
+[U+0061][U+00F1][U+0062][U+20AC]
+0
+</pre>
+
+<h2 id="more">More<a class="anchor" href="#more" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="lib-text.html"><strong>Text helpers</strong><span>Ignoring case, URL and HTML encoding, file names.</span></a>
+  <a class="card" href="lib-formatting.html"><strong>Format strings</strong><span>Every <code>%</code> conversion.</span></a>
+  <a class="card" href="lib-cstrings.html"><strong>C strings</strong><span>The <code>cstr</code> module.</span></a>
+</div>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-memory.html"><span>Previous</span>Memory</a><a class="next" href="lib-text.html"><span>Next</span>Text helpers</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-strings.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#making-a-string">Making a String</a></li><li><a href="#changing-a-string">Changing a String</a></li><li><a href="#reading-text">Reading text</a></li><li><a href="#characters">Characters</a></li><li><a href="#utf-8">UTF-8</a></li><li><a href="#more">More</a></li></ul></nav>
+</div>
+</body>
+</html>

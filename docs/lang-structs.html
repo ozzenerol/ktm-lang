@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structs and unions - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li class="current"><a href="lang-structs.html" aria-current="page">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Structs and unions</h1>
+<p class="lede">A <code>struct</code> is a C struct whose name is a type straight away: no <code>typedef</code>.
+Methods and inheritance have <a href="lang-methods.html">their own page</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>struct Point { i64 x, y; };     // a type named Point
+Point a = {1, 2};               // fields in order
+Point *p = &amp;a;  p.x = 5;        // . also works through a pointer
+struct Node;                    // declared ahead, defined later
+union Bits { i64 i; f64 f; };   // fields share memory</code></pre>
+</div>
+
+<h2 id="defining-and-using">Defining and using<a class="anchor" href="#defining-and-using" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>struct Point
+{
+  i64 x, y;
+};
+
+struct Player
+{
+  u8 *name;
+  Point pos;
+  i64 score;
+};
+
+void main()
+{
+  Point origin = {0, 0};
+  Player p = {"ada", {3, 4}, 0};
+  p.score += 10;
+  p.pos.x = origin.x;
+  printf("%s at (%d, %d) with %d\n", p.name, p.pos.x, p.pos.y, p.score);
+}
+</code></pre>
+<pre class="output">ada at (0, 4) with 10
+</pre>
+
+<h2 id="values-are-copied">Values are copied<a class="anchor" href="#values-are-copied" aria-label="Link to this section">#</a></h2>
+<p>Structs are passed, returned and assigned by value.</p>
+<pre data-run><code>struct Point { i64 x, y; };
+
+Point make(i64 x, i64 y)
+{
+  Point r = {x, y};
+  return r;
+}
+
+i64 sum(Point p)
+{
+  p.x = 1000;          // changes the copy only
+  return p.x + p.y;
+}
+
+void main()
+{
+  Point a = make(1, 2);
+  Point b = a;         // a copy
+  b.x = 9;
+  printf("%d %d %d\n", a.x, b.x, sum(a));
+  printf("%d\n", a.x);
+}
+</code></pre>
+<pre class="output">1 9 1002
+1
+</pre>
+<p>To change the caller's struct, pass a pointer:</p>
+<pre data-run><code>struct Counter { i64 n; };
+
+void bump(Counter *c) { c.n++; }   // c.n is c-&gt;n
+
+void main()
+{
+  Counter c = {0};
+  bump(&amp;c);
+  bump(&amp;c);
+  printf("%d\n", c.n);
+}
+</code></pre>
+<pre class="output">2
+</pre>
+
+<h2 id="initialising">Initialising<a class="anchor" href="#initialising" aria-label="Link to this section">#</a></h2>
+<p>A list fills the fields in order; the rest are zero. Inner structs and arrays take nested lists.</p>
+<pre data-run><code>struct Point { i64 x, y; };
+struct Line  { Point from, to; i64 tags[2]; };
+
+Line g = {{0, 0}, {3, 4}, {7, 8}};
+
+void main()
+{
+  Line m = {{1, 2}, {5, 6}};       // tags are zero
+  Point p = {7};                   // y is zero
+  printf("%d %d %d\n", g.to.x, g.to.y, g.tags[1]);
+  printf("%d %d %d | %d %d\n", m.from.y, m.to.x, m.tags[0], p.x, p.y);
+}
+</code></pre>
+<pre class="output">3 4 8
+2 5 0 | 7 0
+</pre>
+<div class="warn"><p><strong>A declared struct is not zeroed.</strong> <code>Point p;</code> holds whatever was there.
+Write <code>Point p = {0};</code> or set every field.</p></div>
+
+<h3 id="strings-in-fields">Strings in fields<a class="anchor" href="#strings-in-fields" aria-label="Link to this section">#</a></h3>
+<p>A string for a <code>u8</code> array field is copied in and must fit with its NUL.
+A <code>u8 *</code> field points at the string instead.</p>
+<pre data-run><code>struct Item { i64 id; u8 name[8]; u8 *note; };
+
+u8 days[3][4] = {"Mon", "Tue", "Wed"};
+
+void main()
+{
+  Item it = {1, "pen", "blue ink"};
+  it.name[0] = 'P';             // our own copy: writable
+  printf("%s %s %s %d\n", it.name, it.note, days[2], sizeof(Item));
+}
+</code></pre>
+<pre class="output">Pen blue ink Wed 24
+</pre>
+
+<h2 id="size-and-layout">Size and layout<a class="anchor" href="#size-and-layout" aria-label="Link to this section">#</a></h2>
+<p>The same layout as C: fields in order, each aligned to its size.</p>
+<pre data-run><code>struct A { u8 tag; i64 value; };    // 7 bytes of padding after tag
+struct B { i64 value; u8 tag; };    // padded at the end
+
+void main()
+{
+  printf("%d %d %d\n", sizeof(A), sizeof(B), alignof(A));
+}
+</code></pre>
+<pre class="output">16 16 8
+</pre>
+
+<h2 id="declaring-ahead">Declaring ahead<a class="anchor" href="#declaring-ahead" aria-label="Link to this section">#</a></h2>
+<p><code>struct Node;</code> declares a struct defined later. It can be pointed to at once; it can be
+held by value only after its definition.</p>
+<pre data-run><code>struct Node;
+
+struct List { Node *head; i64 len; };
+
+struct Node { i64 value; Node *next; };
+
+void main()
+{
+  Node b = {2, null};
+  Node a = {1, &amp;b};
+  List l = {&amp;a, 2};
+  for (Node *n = l.head; n; n = n.next) { printf("%d,", n.value); }
+  printf(" len %d\n", l.len);
+}
+</code></pre>
+<pre class="output">1,2, len 2
+</pre>
+<p>Holding it by value too early is the error <code>field `b` of A holds a B, which is not complete here: use a pointer</code>.</p>
+
+<h2 id="unions">Unions<a class="anchor" href="#unions" aria-label="Link to this section">#</a></h2>
+<p>All fields of a <code>union</code> share the same memory.</p>
+<pre data-run><code>union Bits
+{
+  i64 i;
+  f64 f;
+  u8 bytes[8];
+};
+
+void main()
+{
+  Bits b;
+  b.i = 0x41;
+  printf("%c %d\n", b.bytes[0], sizeof(Bits));
+  b.f = 1.0;
+  printf("%x\n", b.i);
+}
+</code></pre>
+<pre class="output">A 8
+3ff0000000000000
+</pre>
+<p>An initialiser list gives a union one item, for its first field.</p>
+
+<h3 id="anonymous-unions-in-a-struct">Anonymous unions in a struct<a class="anchor" href="#anonymous-unions-in-a-struct" aria-label="Link to this section">#</a></h3>
+<p>Its fields are used as the struct's own. A tagged value is the classic use:</p>
+<pre data-run><code>enum Kind { num, text };
+
+struct Value
+{
+  Kind kind;
+  union { i64 n; u8 *s; };
+};
+
+void show(Value v)
+{
+  switch (v.kind) {
+    case Kind.num:  printf("number %d\n", v.n);
+    case Kind.text: printf("text %s\n", v.s);
+  }
+}
+
+void main()
+{
+  Value a = {Kind.num, 42};
+  Value b;
+  b.kind = Kind.text;
+  b.s = "hi";
+  show(a);
+  show(b);
+}
+</code></pre>
+<pre class="output">number 42
+text hi
+</pre>
+
+<h3 id="named-inner-types">Named inner types<a class="anchor" href="#named-inner-types" aria-label="Link to this section">#</a></h3>
+<p>A struct or union defined inside a struct can have a tag and be used elsewhere:</p>
+<pre data-run><code>struct Shape
+{
+  u8 kind;
+  union Size { i32 side; f32 radius; };    // fields are Shape's own
+  struct Pos { i32 x, y; } at;             // a field named at
+};
+
+void main()
+{
+  Shape s;
+  s.side = 3;
+  s.at.x = 10;
+  Size z;
+  z.radius = 1.5;
+  printf("%d %d %d %d\n", s.side, s.at.x, sizeof(Size), sizeof(Shape));
+}
+</code></pre>
+<pre class="output">3 10 4 16
+</pre>
+
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="lang-methods.html"><strong>Methods and inheritance</strong><span><code>void User.greet()</code>, <code>struct Admin : User</code>.</span></a>
+  <a class="card" href="lang-generics.html"><strong>Generics</strong><span><code>struct Stack&lt;T&gt;</code>.</span></a>
+  <a class="card" href="lang-reflection.html"><strong>Reflection</strong><span>A struct's fields at run time.</span></a>
+</div>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-strings.html"><span>Previous</span>Strings</a><a class="next" href="lang-methods.html"><span>Next</span>Methods and inheritance</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-structs.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#defining-and-using">Defining and using</a></li><li><a href="#values-are-copied">Values are copied</a></li><li><a href="#initialising">Initialising</a></li><li><a href="#size-and-layout">Size and layout</a></li><li><a href="#declaring-ahead">Declaring ahead</a></li><li><a href="#unions">Unions</a></li><li><a href="#next">Next</a></li></ul></nav>
+</div>
+</body>
+</html>

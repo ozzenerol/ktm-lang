@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overloading - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li class="current"><a href="lang-overloading.html" aria-current="page">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Overloading</h1>
+<p class="lede">Several functions can share a name when their parameter types differ. A call picks the one its arguments fit best.</p>
+
+<h2 id="a-first-example">A first example<a class="anchor" href="#a-first-example" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void show(i64 n)        { printf("number %d\n", n); }
+void show(f64 x)        { printf("float %.2f\n", x); }
+void show(u8[] s)       { printf("text %s\n", s); }
+void show(i64 a, i64 b) { printf("pair %d, %d\n", a, b); }
+
+void main()
+{
+  show(42);
+  show(2.5);
+  show("hello");
+  show(1, 2);
+}
+</code></pre>
+<pre class="output">number 42
+float 2.50
+text hello
+pair 1, 2
+</pre>
+<p>Methods and a module's functions overload the same way.</p>
+<pre data-run><code>import str;
+
+struct Counter { i64 n; };
+void Counter.add(i64 by)     { self.n += by; }
+void Counter.add(u8[] word)  { self.n += word.len; }
+
+void main()
+{
+  Counter c = {0};
+  c.add(3);
+  c.add("four");
+  String s = str.from("owned");
+  defer s.free();
+  c.add(s);                  // a String is passed as its u8[]
+  printf("%d\n", c.n);
+}
+</code></pre>
+<pre class="output">12
+</pre>
+
+<h2 id="how-a-call-picks">How a call picks<a class="anchor" href="#how-a-call-picks" aria-label="Link to this section">#</a></h2>
+<ol>
+  <li>Every overload the arguments can convert to is a candidate. A conversion that would only
+  warn (a pointer for an integer) doesn't count.</li>
+  <li>Each argument fits its parameter, best to worst:
+    <ul>
+      <li><strong>exactly</strong>: the same type, or an array or string literal for a slice of its element;</li>
+      <li><strong>in the same family</strong>: another integer width or sign, a String for a <code>u8[]</code>, any pointer for <code>void *</code>;</li>
+      <li><strong>as an integer for a float</strong>.</li>
+    </ul></li>
+  <li>The overload that fits every argument at least as well as any other, and one better, wins.
+  On a tie, the one that needs no defaults and no <code>...</code> extras wins.</li>
+</ol>
+<p>Anything else is an error that lists the overloads.</p>
+
+<h2 id="integer-literals-are-i64">Integer literals are i64<a class="anchor" href="#integer-literals-are-i64" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void f(i32 x) { printf("i32\n"); }
+void f(i64 x) { printf("i64\n"); }
+
+void main()
+{
+  f(5);           // a literal is an i64
+  f((i32)5);      // cast for the other one
+  i32 small = 5;
+  f(small);
+}
+</code></pre>
+<pre class="output">i64
+i32
+i32
+</pre>
+<p>With only <code>f(i32)</code> and <code>f(i16)</code>, <code>f(5)</code> is ambiguous: cast it.</p>
+
+<h2 id="enums-are-their-own-type">Enums are their own type<a class="anchor" href="#enums-are-their-own-type" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>enum Color { red, green };
+
+void paint(Color c) { printf("color %d\n", c); }
+void paint(i32 n)   { printf("number %d\n", n); }
+
+void main()
+{
+  paint(Color.green);
+  paint((i32)7);
+}
+</code></pre>
+<pre class="output">color 1
+number 7
+</pre>
+
+<h2 id="defaults-and-ties">Defaults and ties<a class="anchor" href="#defaults-and-ties" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void send(u8[] msg)                { printf("plain: %s\n", msg); }
+void send(u8[] msg, i64 retry = 3) { printf("retry %d: %s\n", retry, msg); }
+
+void main()
+{
+  send("a");       // both fit; the one without a default wins
+  send("b", 5);
+}
+</code></pre>
+<pre class="output">plain: a
+retry 5: b
+</pre>
+
+<h2 id="taking-the-address-of-an-overload">Taking the address of an overload<a class="anchor" href="#taking-the-address-of-an-overload" aria-label="Link to this section">#</a></h2>
+<p><code>&amp;f</code> picks the overload whose type the destination asks for.</p>
+<pre data-run><code>i64 size(i64 n)  { return n; }
+i64 size(u8[] s) { return s.len; }
+
+i64 apply(fn(u8[]) i64 f, u8[] s) { return f(s); }
+
+void main()
+{
+  fn(i64) i64 byNumber = &amp;size;
+  printf("%d %d\n", byNumber(7), apply(&amp;size, "four"));
+}
+</code></pre>
+<pre class="output">7 4
+</pre>
+<p><code>auto p = &amp;size;</code> has no type to pick by, so it is an error.</p>
+
+<h2 id="rules">Rules<a class="anchor" href="#rules" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Two overloads with the same parameter types and different return types are an error.</li>
+  <li>A derived struct's method hides every overload of that name in its base.</li>
+  <li><code>...s</code> can't be spread into an overloaded function.</li>
+  <li>An <code>extern "c"</code> function has one C symbol and can't be overloaded.</li>
+  <li>A function with no overloads keeps its plain symbol. Overloaded ones carry their parameter
+  types in the symbol, shown in messages as <code>show(u8[])</code>.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-varargs.html"><span>Previous</span>Variable arguments</a><a class="next" href="lang-function-pointers.html"><span>Next</span>Function pointers</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-overloading.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-example">A first example</a></li><li><a href="#how-a-call-picks">How a call picks</a></li><li><a href="#integer-literals-are-i64">Integer literals are i64</a></li><li><a href="#enums-are-their-own-type">Enums are their own type</a></li><li><a href="#defaults-and-ties">Defaults and ties</a></li><li><a href="#taking-the-address-of-an-overload">Taking the address of an overload</a></li><li><a href="#rules">Rules</a></li></ul></nav>
+</div>
+</body>
+</html>

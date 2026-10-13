@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threads and atomics - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li class="current"><a href="lib-threads.html" aria-current="page">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#thread"><code>thread</code></a> <a href="stdlib.html#atomic"><code>atomic</code></a></span></div>
+<h1>Threads and atomics</h1>
+<p class="lede">POSIX threads straight from <code>libc</code>, a thread pool in <code>thread</code>, and lock-free integers in <code>atomic</code>.</p>
+
+<h2 id="starting-threads">Starting threads<a class="anchor" href="#starting-threads" aria-label="Link to this section">#</a></h2>
+<p><code>libc.pthread_create</code> takes a <code>void *f(void *arg)</code>. Pass <code>&amp;th</code> to create and <code>th</code> to join.</p>
+<pre data-run><code>import libc;
+
+i64 sums[4];
+
+void *sum(void *arg)
+{
+  i64 part = (i64)arg, total = 0;
+  for (i64 i = part * 250 + 1; i &lt;= (part + 1) * 250; i++) { total += i; }
+  sums[part] = total;          // each thread writes its own slot
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;sum, (void *)i); }
+  i64 total = 0;
+  for (i64 i = 0; i &lt; 4; i++) {
+    libc.pthread_join(th[i]);
+    total += sums[i];
+  }
+  printf("1 + 2 + ... + 1000 = %d\n", total);
+}
+</code></pre>
+<pre class="output">1 + 2 + ... + 1000 = 500500
+</pre>
+
+<h2 id="a-mutex">A mutex<a class="anchor" href="#a-mutex" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import libc, map;
+
+libc.pthread_mutex_t gLock;
+map.Map&lt;i64, i64&gt; gCounts;
+
+void *work(void *arg)
+{
+  for (i64 i = 0; i &lt; 1000; i++) {
+    libc.pthread_mutex_lock(&amp;gLock);
+    i64 *c = gCounts.ref(i % 10);
+    if (c) { *c += 1; } else { gCounts.set(i % 10, 1); }
+    libc.pthread_mutex_unlock(&amp;gLock);
+  }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_mutex_init(&amp;gLock, null);
+  gCounts = map.new&lt;i64, i64&gt;();
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;work, null); }
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d keys, key 3 counted %d times\n", gCounts.len, gCounts.getOr(3, 0));
+  gCounts.free();
+}
+</code></pre>
+<pre class="output">10 keys, key 3 counted 400 times
+</pre>
+<p>Condition variables (<code>pthread_cond_*</code>) are declared too.</p>
+
+<h2 id="a-thread-pool">A thread pool<a class="anchor" href="#a-thread-pool" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>thread.poolNew(n)</code></td><td>Starts <code>n</code> workers (<code>null</code> if <code>n</code> &lt;= 0 or a thread can't start)</td></tr>
+    <tr><td><code>thread.poolEnqueue(pool, argv, &amp;fn)</code></td><td>Runs <code>fn(pool.privData, argv)</code> on a worker</td></tr>
+    <tr><td><code>thread.poolWait(pool)</code></td><td>Waits until the queue is empty (never from inside a job)</td></tr>
+    <tr><td><code>thread.poolRelease(pool)</code></td><td>Runs what is left and frees the pool</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import atomic, thread;
+
+i64 gDone = 0;
+
+void square(void *priv, i64 *n)
+{
+  *n = *n * *n;
+  atomic.add(&amp;gDone, 1);
+}
+
+void main()
+{
+  thread.Pool *pool = thread.poolNew(3);
+  i64 nums[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+  for (i64 i = 0; i &lt; 8; i++) { thread.poolEnqueue(pool, &amp;nums[i], &amp;square); }
+  thread.poolWait(pool);
+  thread.poolRelease(pool);
+  printf("%d jobs: %d %d %d\n", atomic.load(&amp;gDone), nums[0], nums[3], nums[7]);
+}
+</code></pre>
+<pre class="output">8 jobs: 1 16 64
+</pre>
+
+<h2 id="atomics">Atomics<a class="anchor" href="#atomics" aria-label="Link to this section">#</a></h2>
+<p>Change an integer several threads share, without a mutex: a counter, a flag, a lock-free swap.</p>
+<pre data-run><code>import atomic, libc;
+
+i64 gHits = 0;
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i &lt; 100000; i++) { atomic.add(&amp;gHits, 1); }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;worker, null); }
+  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&amp;gHits));
+}
+</code></pre>
+<pre class="output">400000 hits
+</pre>
+<div class="table-wrap"><table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>atomic.add(&amp;n, v)</code>, <code>sub</code></td><td>Adds or subtracts; returns the value before</td></tr>
+    <tr><td><code>atomic.and</code>, <code>or</code>, <code>xor</code></td><td>A bit operation; returns the value before</td></tr>
+    <tr><td><code>atomic.swap(&amp;n, v)</code></td><td>Stores; returns the old value</td></tr>
+    <tr><td><code>atomic.load(&amp;n)</code>, <code>store(&amp;n, v)</code></td><td>Reads, writes</td></tr>
+    <tr><td><code>atomic.cas(&amp;n, expected, desired)</code></td><td>Stores <code>desired</code> only if <code>n</code> is <code>expected</code>; says whether it did</td></tr>
+    <tr><td><code>loadPtr</code>, <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code></td><td>The same for a <code>void *</code></td></tr>
+    <tr><td><code>atomic.fence()</code></td><td>A full memory barrier</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import atomic;
+
+void main()
+{
+  i64 flags = 0b0101;
+  i64 before = atomic.or(&amp;flags, 0b0010);
+  printf("or: %d -&gt; %d\n", before, flags);
+  bool swapped = atomic.cas(&amp;flags, 7, 0);    // flags is 7: now 0
+  bool again = atomic.cas(&amp;flags, 7, 1);      // flags isn't 7 any more
+  printf("cas: %d %d, flags %d\n", swapped, again, flags);
+
+  u32 small = 10;
+  atomic.sub(&amp;small, 3);                      // the pointer picks the width
+  printf("%d\n", small);
+}
+</code></pre>
+<pre class="output">or: 5 -&gt; 7
+cas: 1 0, flags 0
+7
+</pre>
+<ul class="rules">
+  <li>Each takes an <code>i64 *</code>, <code>i32 *</code>, <code>u64 *</code> or <code>u32 *</code>; values are passed as <code>i64</code>.</li>
+  <li>Every operation is sequentially consistent: all threads see them in one order.</li>
+  <li>The integer must be aligned to its size, as variables, fields and <code>mem.alloc</code>'d memory are.</li>
+  <li>For anything bigger than one integer, a mutex is simpler.</li>
+</ul>
+
+<h2 id="threads-and-the-rest-of-ktm">Threads and the rest of ktm<a class="anchor" href="#threads-and-the-rest-of-ktm" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Each thread has its own <code>try</code>/<code>catch</code> chain and its own coroutines.</li>
+  <li>An uncaught error in any thread ends the program with exit code 1.</li>
+  <li>For a server, <a href="lib-serve.html"><code>coro.serve</code></a> runs a coroutine loop per core and is usually simpler than threads by hand.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-serve.html"><span>Previous</span>Serving on every core</a><a class="next" href="lib-fzf.html"><span>Next</span>Fuzzy matching</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-threads.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#starting-threads">Starting threads</a></li><li><a href="#a-mutex">A mutex</a></li><li><a href="#a-thread-pool">A thread pool</a></li><li><a href="#atomics">Atomics</a></li><li><a href="#threads-and-the-rest-of-ktm">Threads and the rest of ktm</a></li></ul></nav>
+</div>
+</body>
+</html>

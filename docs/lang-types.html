@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types and literals - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li class="current"><a href="lang-types.html" aria-current="page">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Types and literals</h1>
+<p class="lede">The built-in types, their sizes, and how to write numbers, characters and strings.</p>
+
+<h2 id="built-in-types">Built-in types<a class="anchor" href="#built-in-types" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Type</th><th>Size</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>i8</code> <code>i16</code> <code>i32</code> <code>i64</code></td><td>1 2 4 8</td><td>Signed integers. <code>i64</code> is the default integer type</td></tr>
+    <tr><td><code>u8</code> <code>u16</code> <code>u32</code> <code>u64</code></td><td>1 2 4 8</td><td>Unsigned integers. <code>u8</code> is the character (byte) type</td></tr>
+    <tr><td><code>f64</code> <code>f32</code></td><td>8 4</td><td>Floats. <code>f64</code> is the default</td></tr>
+    <tr><td><code>bool</code></td><td>1</td><td><code>true</code> (1) or <code>false</code> (0)</td></tr>
+    <tr><td><code>void</code></td><td>0</td><td>Nothing</td></tr>
+    <tr><td><code>T *</code></td><td>8</td><td>A pointer. <code>null</code> is the null pointer</td></tr>
+    <tr><td><code>T[]</code></td><td>16</td><td>A <a href="lang-slices.html">slice</a>: a pointer and a length</td></tr>
+    <tr><td><code>String</code></td><td>24</td><td>An owned, growable <a href="lang-strings.html">string</a></td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>void main()
+{
+  printf("%d %d %d %d\n", sizeof(i8), sizeof(i16), sizeof(i32), sizeof(i64));
+  printf("%d %d %d\n", sizeof(f32), sizeof(f64), sizeof(bool));
+  printf("%d %d %d\n", sizeof(u8 *), sizeof(u8[]), sizeof(String));
+}
+</code></pre>
+<pre class="output">1 2 4 8
+4 8 1
+8 16 24
+</pre>
+<div class="tip"><p>Type names are not keywords: a struct field can be called <code>i64</code>. A variable can't.</p></div>
+
+<h2 id="bool">bool<a class="anchor" href="#bool" aria-label="Link to this section">#</a></h2>
+<p>Any value becomes a <code>bool</code> by comparing it with 0, wherever the conversion
+happens: an assignment, an argument, a return, a cast.</p>
+<pre data-run><code>bool isSet(i64 flags, i64 bit) { return flags &amp; bit; }
+
+void main()
+{
+  bool a = 0x100;          // 1: not just the low byte
+  bool b = (bool)0.5;      // 1: not 0.0
+  bool c = (bool)(-1);     // 1
+  u8 *p = null;
+  bool d = p;              // 0: a null pointer
+  printf("%d %d %d %d %d\n", a, b, c, d, isSet(0x800, 0x800));
+}
+</code></pre>
+<pre class="output">1 1 1 0 1
+</pre>
+<ul class="rules">
+  <li>A pointer becomes a <code>bool</code> without a cast.</li>
+  <li>Other integer types warn without a cast when stored into a <code>bool</code>.</li>
+</ul>
+
+<h2 id="null-true-and-false">null, true and false<a class="anchor" href="#null-true-and-false" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>null</code> is 0 as a <code>void *</code>: it can be assigned to any pointer or function pointer.</li>
+  <li><code>true</code> and <code>false</code> are <code>bool</code> values, 1 and 0.</li>
+</ul>
+<pre data-run><code>void main()
+{
+  u8 *name = null;
+  if (!name) { printf("no name yet\n"); }
+  printf("%d %d\n", true, false);
+}
+</code></pre>
+<pre class="output">no name yet
+1 0
+</pre>
+
+<h2 id="integer-literals">Integer literals<a class="anchor" href="#integer-literals" aria-label="Link to this section">#</a></h2>
+<p>Decimal, hex (<code>0x</code>) or binary (<code>0b</code>). <code>_</code> between digits groups them.</p>
+<pre data-run><code>void main()
+{
+  i64 dec = 42, hex = 0xFF, bin = 0b1010;
+  i64 million = 1_000_000;
+  i64 mask = 0xFF_FF;
+  printf("%d %d %d %d %d\n", dec, hex, bin, million, mask);
+}
+</code></pre>
+<pre class="output">42 255 10 1000000 65535
+</pre>
+<ul class="rules">
+  <li>A literal too big for <code>i64</code> is a <code>u64</code>.</li>
+  <li><code>_</code> is only valid between two digits: <code>_100</code> is a name, <code>1__0</code> and <code>1_</code> are errors.</li>
+  <li>A malformed number is an error that says what is wrong: <code>0x</code> with no digits, <code>0b102</code>, <code>12ab</code>, <code>1e</code>.</li>
+</ul>
+
+<div class="warn"><p><strong>No octal literals.</strong> A leading zero doesn't change the base:
+<code>0644</code> is six hundred and forty-four, not octal 420 as in C. The compiler warns at
+such a literal and suggests the hex spelling (<code>0x1A4</code>).</p></div>
+
+<h2 id="float-literals">Float literals<a class="anchor" href="#float-literals" aria-label="Link to this section">#</a></h2>
+<p>A number with a <code>.</code> or an exponent is an <code>f64</code>.</p>
+<pre data-run><code>void main()
+{
+  f64 a = 1.5, b = 1.5e3, c = 2e-3, price = 1_000.25;
+  printf("%.1f %.1f %.3f %.2f\n", a, b, c, price);
+  printf("%s %s\n", typeof(2), typeof(2.0));
+}
+</code></pre>
+<pre class="output">1.5 1500.0 0.002 1000.25
+i64 f64
+</pre>
+
+<h2 id="character-literals">Character literals<a class="anchor" href="#character-literals" aria-label="Link to this section">#</a></h2>
+<p>A character constant is one character and has an integer value. An escape counts as one character.</p>
+<pre data-run><code>void main()
+{
+  i64 a = 'A', nl = '\n', zero = '0';
+  printf("%d %d %d %c\n", a, nl, zero, a + 1);
+  u8 c = 'x';
+  printf("%c is a letter: %d\n", c, c &gt;= 'a' &amp;&amp; c &lt;= 'z');
+}
+</code></pre>
+<pre class="output">65 10 48 B
+x is a letter: 1
+</pre>
+<p><code>'ab'</code> is an error: use a string, or an <a href="lang-enums.html">enum</a> for a set of tags.</p>
+
+<h2 id="string-literals">String literals<a class="anchor" href="#string-literals" aria-label="Link to this section">#</a></h2>
+<p>A string literal is a <code>u8 *</code> to read-only bytes ending in a NUL. It converts
+to a <code>u8[]</code> wherever a slice is expected.</p>
+<pre data-run><code>void main()
+{
+  printf("tab:[\t] quote:[\"] backslash:[\\]\n");
+  printf("hex:[\x41\x42] octal:[\101] dollar:[\d]\n");
+  printf("%d\n", sizeof("abc"));   // 3 bytes and the NUL
+}
+</code></pre>
+<pre class="output">tab:[	] quote:["] backslash:[\]
+hex:[AB] octal:[A] dollar:[$]
+4
+</pre>
+<div class="table-wrap"><table>
+  <thead><tr><th>Escape</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>\n \t \r \b \f \v \a</code></td><td>The C control characters</td></tr>
+    <tr><td><code>\\ \' \"</code></td><td>A backslash, a quote</td></tr>
+    <tr><td><code>\xHH</code></td><td>A byte in hex, at most two digits: <code>"\x01b"</code> is 1 then <code>b</code></td></tr>
+    <tr><td><code>\0</code> to <code>\7</code></td><td>Start an octal escape of up to three digits: <code>"\033"</code> is ESC</td></tr>
+    <tr><td><code>\d</code></td><td>A <code>$</code></td></tr>
+  </tbody>
+</table></div>
+<p>Writing into a literal is an error when the compiler can see it, and a crash when it can't.
+Copy it first: see <a href="lang-strings.html">Strings</a>.</p>
+
+<h2 id="asking-for-a-type">Asking for a type<a class="anchor" href="#asking-for-a-type" aria-label="Link to this section">#</a></h2>
+<p><code>typeof(x)</code> is the name of an expression's type, as a string, made at compile time.
+<code>sizeof</code> and <code>alignof</code> give sizes in bytes.</p>
+<pre data-run><code>void main()
+{
+  u8 small = 1;
+  printf("%s %s %s\n", typeof(small), typeof(small + 1), typeof("hi"));
+  printf("%d %d\n", sizeof(small), alignof(f64));
+}
+</code></pre>
+<pre class="output">u8 i64 u8[3]
+1 8
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-basics.html"><span>Previous</span>Program basics</a><a class="next" href="lang-variables.html"><span>Next</span>Variables and constants</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-types.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#built-in-types">Built-in types</a></li><li><a href="#bool">bool</a></li><li><a href="#null-true-and-false">null, true and false</a></li><li><a href="#integer-literals">Integer literals</a></li><li><a href="#float-literals">Float literals</a></li><li><a href="#character-literals">Character literals</a></li><li><a href="#string-literals">String literals</a></li><li><a href="#asking-for-a-type">Asking for a type</a></li></ul></nav>
+</div>
+</body>
+</html>

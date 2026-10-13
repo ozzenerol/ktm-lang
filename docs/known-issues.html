@@ -11,7 +11,8 @@
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
   try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
-  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
@@ -24,6 +25,13 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
   <div class="search" role="search">
     <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
            aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
@@ -39,10 +47,11 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li><a href="tools.html">Tools</a></li><li><a href="examples.html">Examples</a></li><li class="current"><a href="known-issues.html" aria-current="page">Known issues</a><ul class="toc"><li><a href="#compiler">Compiler</a><ul class="sub"><li><a href="#diagnostics">Diagnostics</a></li></ul></li><li><a href="#jit-and-code-generation">JIT and code generation</a></li><li><a href="#standard-library">Standard library</a></li><li><a href="#reporting">Reporting</a></li></ul></li><li><a href="releases.html">Releases</a></li></ul>
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li class="current"><a href="known-issues.html" aria-current="page">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
+<div class="crumbs"><span><a href="stdlib.html">Reference</a></span></div>
 <h1>Known issues</h1>
 <p class="lede">Bugs found while writing and testing these docs and while testing the compiler,
 each with a way to reproduce it and a workaround. The other pages avoid them, so every example
@@ -64,12 +73,13 @@ there works as shown.</p>
 <p>Please report bugs on <a href="https://github.com/ozzenerol/ktm-lang/issues">GitHub</a>.
 A minimal <code>.ktm</code> file that reproduces the problem helps the most.</p>
 
-    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="examples.html"><span>Previous</span>Examples</a><a class="next" href="releases.html"><span>Next</span>Releases</a></nav>
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="examples.html"><span>Previous</span>Example projects</a><a class="next" href="releases.html"><span>Next</span>Releases</a></nav>
     <footer class="page-foot">
       <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/known-issues.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#compiler">Compiler</a></li><li><a href="#jit-and-code-generation">JIT and code generation</a></li><li><a href="#standard-library">Standard library</a></li><li><a href="#reporting">Reporting</a></li></ul></nav>
 </div>
 </body>
 </html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enums - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li class="current"><a href="lang-enums.html" aria-current="page">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Enums</h1>
+<p class="lede">A scoped set of named integer constants. Members are always written with the enum's name: <code>Color.red</code>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>enum Color { red, green, blue };              // 0, 1, 2
+enum Status : u16 { ok = 200, notFound = 404 };  // another integer type
+enum Mode { read = 1, write = 2, both = read | write };
+Color c = Color.green;
+i64 n = c;                 // to an integer: implicit
+Color d = (Color)2;        // from an integer: a cast</code></pre>
+</div>
+
+<h2 id="values">Values<a class="anchor" href="#values" aria-label="Link to this section">#</a></h2>
+<p>The first member is 0, each next one the previous plus 1, unless it has its own value.</p>
+<pre data-run><code>enum Color { red, green, blue };
+enum Status : u16 { ok = 200, created, notFound = 404, gone };
+
+void main()
+{
+  printf("%d %d %d\n", Color.red, Color.green, Color.blue);
+  printf("%d %d %d %d\n", Status.ok, Status.created, Status.notFound, Status.gone);
+  printf("%d %d\n", sizeof(Color), sizeof(Status));
+}
+</code></pre>
+<pre class="output">0 1 2
+200 201 404 405
+4 2
+</pre>
+<ul class="rules">
+  <li>The underlying type is <code>i32</code> unless <code>: Type</code> picks another integer type.</li>
+  <li>Inside the braces, earlier members can be used without the prefix.</li>
+  <li>Enums are declared at file scope only.</li>
+</ul>
+
+<h2 id="members-as-constants">Members as constants<a class="anchor" href="#members-as-constants" aria-label="Link to this section">#</a></h2>
+<p><code>Name.member</code> is a constant expression: an array size, a <code>case</code> label, a <code>const</code>.</p>
+<pre data-run><code>enum Color { red, green, blue, count };
+
+u8 *names[Color.count] = {"red", "green", "blue"};
+const i64 LAST = Color.blue;
+
+void main()
+{
+  Color c = Color.green;
+  switch (c) {
+    case Color.red:   printf("warm\n");
+    case Color.green: printf("calm\n");
+    case Color.blue:  printf("cool\n");
+  }
+  printf("%s, %d names, last %d\n", names[c], sizeof(names) / sizeof(u8 *), LAST);
+}
+</code></pre>
+<pre class="output">calm
+green, 3 names, last 2
+</pre>
+
+<h2 id="flags">Flags<a class="anchor" href="#flags" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>enum Perm { read = 1, write = 2, exec = 4, all = read | write | exec };
+
+void main()
+{
+  i64 p = Perm.read | Perm.write;
+  printf("can write: %d, can exec: %d, all: %d\n",
+         (p &amp; Perm.write) != 0, (p &amp; Perm.exec) != 0, Perm.all);
+}
+</code></pre>
+<pre class="output">can write: 1, can exec: 0, all: 7
+</pre>
+
+<h2 id="conversions">Conversions<a class="anchor" href="#conversions" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>An enum value converts to any integer type implicitly, in arithmetic and comparisons too.</li>
+  <li>An integer, or a value of another enum, needs a cast to become one: <code>(Color)2</code>.</li>
+  <li>Two different enums never mix without a cast.</li>
+</ul>
+<pre data-run><code>enum Color { red, green, blue };
+
+Color next(Color c)
+{
+  return (Color)((c + 1) % 3);
+}
+
+void main()
+{
+  Color c = Color.blue;
+  i64 asInt = c;
+  printf("%d %d %d\n", asInt, next(c), c &gt; Color.red);
+}
+</code></pre>
+<pre class="output">2 0 1
+</pre>
+
+<h2 id="names-at-run-time">Names at run time<a class="anchor" href="#names-at-run-time" aria-label="Link to this section">#</a></h2>
+<p><code>printf</code> of an enum prints its number. <a href="lang-reflection.html"><code>reflect</code></a> gives the member's name, and the value back from a name:</p>
+<pre data-run><code>import reflect;
+
+enum Role { guest, member, admin = 10 };
+
+void main()
+{
+  Role r = Role.admin;
+  printf("%d %s\n", r, reflect.name(r));
+
+  i64 v;
+  if (reflect.enumValue(reflect.typeOf(Role), "member", &amp;v)) {
+    printf("member is %d\n", v);
+  }
+  printf("[%s]\n", reflect.name((Role)7));   // not a member
+}
+</code></pre>
+<pre class="output">10 admin
+member is 1
+[]
+</pre>
+<p>JSON and YAML write an enum as its member's name: see <a href="lib-json-structs.html">JSON: structs</a>.</p>
+
+<h2 id="errors-in-your-own-code">Errors in your own code<a class="anchor" href="#errors-in-your-own-code" aria-label="Link to this section">#</a></h2>
+<p>An enum is the usual <code>code</code> of an <a href="lang-exceptions.html">exception</a>:</p>
+<pre data-run><code>enum ParseError { empty, notNumber };
+
+i64 parse(u8[] s)
+{
+  if (!s.len) { throw(ParseError.empty, "empty input"); }
+  i64 n = 0;
+  for (u8 c : s) {
+    if (c &lt; '0' || c &gt; '9') { throw(ParseError.notNumber, "bad digit '%c'", c); }
+    n = n * 10 + c - '0';
+  }
+  return n;
+}
+
+void main()
+{
+  u8[] inputs[] = {"42", "", "4x"};
+  for (auto in : inputs) {
+    try {
+      printf("%d\n", parse(in));
+    } catch (Error e) {
+      printf("error %d: %s\n", e.code, e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">42
+error 0: empty input
+error 1: bad digit 'x'
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-methods.html"><span>Previous</span>Methods and inheritance</a><a class="next" href="lang-type-aliases.html"><span>Next</span>Type aliases</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-enums.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#values">Values</a></li><li><a href="#members-as-constants">Members as constants</a></li><li><a href="#flags">Flags</a></li><li><a href="#conversions">Conversions</a></li><li><a href="#names-at-run-time">Names at run time</a></li><li><a href="#errors-in-your-own-code">Errors in your own code</a></li></ul></nav>
+</div>
+</body>
+</html>

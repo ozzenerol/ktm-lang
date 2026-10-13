@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tools - ktm</title>
+<title>The compiler - ktm</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="stylesheet" href="assets/style.css">
@@ -11,7 +11,8 @@
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
   try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
-  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
@@ -24,6 +25,13 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
   <div class="search" role="search">
     <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
            aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
@@ -39,174 +47,100 @@
 </header>
 <div class="layout">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<ul class="pages"><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="language.html">Language</a></li><li><a href="library.html">Library guide</a></li><li><a href="stdlib.html">Library reference</a></li><li class="current"><a href="tools.html" aria-current="page">Tools</a><ul class="toc"><li><a href="#compiling">Compiling</a><ul class="sub"><li><a href="#all-flags">All flags</a></li></ul></li><li><a href="#the-jit">The JIT</a></li><li><a href="#the-repl">The REPL</a></li><li><a href="#editor-support">Editor support</a><ul class="sub"><li><a href="#neovim">Neovim</a></li><li><a href="#vim">Vim</a></li><li><a href="#other-editors">Other editors</a></li></ul></li><li><a href="#libraries">Libraries</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li></ul></li><li><a href="examples.html">Examples</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul>
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group" open><summary>Tools</summary><ul><li class="current"><a href="tools.html" aria-current="page">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
-<h1>Tools</h1>
-<p class="lede">One binary, <code>ktm</code>, does everything: compiling, JIT, REPL, language
-server and debugging output.</p>
+<div class="crumbs"><span>Tools</span></div>
+<h1>The compiler</h1>
+<p class="lede">One binary, <code>ktm</code>, compiles, runs, serves your editor and shows you what it generated.</p>
 
-<h2 id="compiling">Compiling<a class="anchor" href="#compiling" aria-label="Link to this section">#</a></h2>
-<pre><code>ktm main.ktm -o app          # build ./app
+<h2 id="everyday-commands">Everyday commands<a class="anchor" href="#everyday-commands" aria-label="Link to this section">#</a></h2>
+<pre class="shell"><code>ktm main.ktm -o app          # build ./app
 ktm main.ktm                 # build ./a.out
-ktm -S main.ktm -o main.s    # assembly only
-ktm -S -o- main.ktm          # assembly to stdout
-ktm -c main.ktm -o main.o    # object file, to link later
-ktm main.ktm util.o -o app   # link object files in
-ktm -DDEBUG main.ktm         # define a macro (no value)
-ktm -Werror main.ktm         # treat warnings as errors</code></pre>
-<p>Link C libraries with <code>-clibs</code>, or record them in the source with
-<a href="language.html#calling-c"><code>#link</code></a>:</p>
-<pre><code>ktm game.ktm -clibs="-lSDL2 -lm" -o game</code></pre>
-<p>ktm hands the generated assembly to the system C compiler through a temporary
-file in <code>$TMPDIR</code> (<code>/tmp</code> if unset), one per compile and
-removed afterwards, so several compiles can run at once.</p>
+ktm -run main.ktm a b        # build to a temporary binary, run it with args a b, delete it
+ktm -jit main.ktm a b        # compile in memory and run, no files written
+ktm -repl                    # an interactive session
+ktm -DDEBUG main.ktm         # define a macro
+ktm -Werror main.ktm         # warnings are errors</code></pre>
+<p>Only the main file is named: the <a href="lang-modules.html">modules</a> it imports are found and compiled with it.</p>
 
-<h3 id="all-flags">All flags<a class="anchor" href="#all-flags" aria-label="Link to this section">#</a></h3>
+<h2 id="run-and-jit">-run and -jit<a class="anchor" href="#run-and-jit" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th><code>-run</code></th><th><code>-jit</code></th></tr></thead>
+  <tbody>
+    <tr><td>Code</td><td>Compiled to a binary, like a normal build</td><td>Assembled into memory by ktm itself</td></tr>
+    <tr><td>Needs a C compiler</td><td>Yes (to assemble and link)</td><td>No</td></tr>
+    <tr><td>Exit code</td><td>The program's</td><td>The program's</td></tr>
+    <tr><td>Extra</td><td></td><td><code>-Memsafe</code> leak and double-free reports</td></tr>
+  </tbody>
+</table></div>
+<p>Use <code>#ifjit</code> / <code>#ifaot</code> for code that should differ between them. See <a href="tools-jit-repl.html">JIT and REPL</a>.</p>
+
+<h2 id="object-files-and-c">Object files and C<a class="anchor" href="#object-files-and-c" aria-label="Link to this section">#</a></h2>
+<pre class="shell"><code>ktm -c util.ktm -o util.o            # an object file
+ktm main.ktm util.o -o app           # link object files in
+ktm -c -fPIC util.ktm -o util.o      # for a shared library
+ktm game.ktm -clibs="-lSDL2 -lm"     # link C libraries</code></pre>
+<p>In the source, <code>#link &lt;sqlite3&gt;</code> does what <code>-clibs="-lsqlite3"</code> does: see <a href="lang-calling-c.html">Calling C</a>.</p>
+
+<h2 id="without-installing">Without installing<a class="anchor" href="#without-installing" aria-label="Link to this section">#</a></h2>
+<p>A program needs the standard library to compile. If ktm isn't installed, point it at a local build:</p>
+<pre class="shell"><code>./ktm --install-dir=build/prefix hello.ktm -o hello</code></pre>
+
+<h2 id="cross-compiling">Cross-compiling<a class="anchor" href="#cross-compiling" aria-label="Link to this section">#</a></h2>
+<pre class="shell"><code>ktm --target=aarch64-apple-darwin -S main.ktm -o main.s
+ktm --target=x86_64-unknown-linux-gnu -S main.ktm -o main.s</code></pre>
+<p>With <code>-S</code> this checks the other platform's <code>#if</code> branches without its machine.</p>
+
+<h2 id="all-flags">All flags<a class="anchor" href="#all-flags" aria-label="Link to this section">#</a></h2>
 <div class="table-wrap"><table>
   <thead><tr><th>Flag</th><th>What it does</th></tr></thead>
   <tbody>
     <tr><td><code>-o &lt;file&gt;</code></td><td>Output file name</td></tr>
-    <tr><td><code>-run</code></td><td>Compile to a temporary binary, run it and delete it; arguments after the file are passed to the program and its exit code becomes ktm's</td></tr>
+    <tr><td><code>-run</code></td><td>Compile to a temporary binary, run it and delete it; arguments after the file go to the program</td></tr>
     <tr><td><code>-jit</code></td><td>Compile in memory and run (x86_64 and arm64)</td></tr>
-    <tr><td><code>-Memsafe</code></td><td>With <code>-jit</code>: report double frees, wild frees and leaks at exit</td></tr>
+    <tr><td><code>-Memsafe</code></td><td>With <code>-jit</code>: report double frees, wild frees and leaks</td></tr>
     <tr><td><code>-repl</code></td><td>Interactive session</td></tr>
-    <tr><td><code>-lsp</code></td><td>Language server over stdio, for editors</td></tr>
-    <tr><td><code>-S</code></td><td>Emit assembly only</td></tr>
-    <tr><td><code>-o-</code></td><td>With <code>-S</code>: write the assembly to stdout</td></tr>
+    <tr><td><code>-lsp</code></td><td>Language server over stdio</td></tr>
+    <tr><td><code>-S</code>, <code>-o-</code></td><td>Emit assembly only; to stdout</td></tr>
     <tr><td><code>-c</code></td><td>Emit an object file</td></tr>
-    <tr><td><code>-fPIC</code></td><td>Position-independent code, for object files that go into shared libraries</td></tr>
-    <tr><td><code>-lib &lt;name&gt;</code></td><td>Build <code>lib&lt;name&gt;.a</code> and a shared library and install them under the install prefix</td></tr>
-    <tr><td><code>-clibs="..."</code></td><td>Extra linker flags, such as <code>-lcurl</code></td></tr>
+    <tr><td><code>-fPIC</code></td><td>Position-independent code</td></tr>
+    <tr><td><code>-lib &lt;name&gt;</code></td><td>Build a static and a shared library (<a href="tools-libraries.html">Building libraries</a>)</td></tr>
+    <tr><td><code>-clibs="..."</code></td><td>Extra linker flags</td></tr>
     <tr><td><code>-D&lt;NAME&gt;</code></td><td>Define a macro (no value)</td></tr>
-    <tr><td><code>-Werror</code></td><td>Treat warnings as errors</td></tr>
-    <tr><td><code>--install-dir &lt;dir&gt;</code></td><td>Use <code>&lt;dir&gt;/include</code> and <code>&lt;dir&gt;/lib</code> instead of the install prefix</td></tr>
-    <tr><td><code>--target &lt;triple&gt;</code></td><td>Cross-compile: <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-apple-darwin</code>, <code>aarch64-apple-darwin</code>, …</td></tr>
-    <tr><td><code>-ast</code>, <code>-tokens</code></td><td>Print the syntax tree or the token stream and exit</td></tr>
-    <tr><td><code>--dump-ir</code></td><td>Print the intermediate representation</td></tr>
-    <tr><td><code>-cfg</code>, <code>-cfg-png</code>, <code>-cfg-svg</code></td><td>Write a Graphviz control flow graph (PNG and SVG need Graphviz)</td></tr>
-    <tr><td><code>--mem-stats</code></td><td>Report the compiler's own memory use</td></tr>
+    <tr><td><code>-Werror</code></td><td>Warnings are errors</td></tr>
+    <tr><td><code>--install-dir &lt;dir&gt;</code></td><td>Use <code>&lt;dir&gt;</code> instead of the install prefix</td></tr>
+    <tr><td><code>--target &lt;triple&gt;</code></td><td><code>x86_64-unknown-linux-gnu</code>, <code>x86_64-apple-darwin</code>, <code>aarch64-apple-darwin</code>, ...</td></tr>
+    <tr><td><code>--expand</code></td><td>Print the code <code>@json</code>/<code>@yaml</code> made, on stderr</td></tr>
+    <tr><td><code>-tokens</code>, <code>-ast</code>, <code>--dump-ir</code></td><td>Print the tokens, the syntax tree, the IR</td></tr>
+    <tr><td><code>-cfg</code>, <code>-cfg-png</code>, <code>-cfg-svg</code></td><td>A Graphviz control flow graph</td></tr>
+    <tr><td><code>--mem-stats</code></td><td>The compiler's own memory use</td></tr>
+    <tr><td><code>-v</code></td><td>Print the commands that build a library</td></tr>
     <tr><td><code>--version</code>, <code>--help</code></td><td>Version and build details; all flags</td></tr>
   </tbody>
 </table></div>
 
-<h2 id="the-jit">The JIT<a class="anchor" href="#the-jit" aria-label="Link to this section">#</a></h2>
-<p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's built-in
-assembler and runs it. No C compiler, linker or files are involved, so it starts fast.
-Arguments after the file are passed to the program. A file with no <code>main</code> has nothing to
-run: <code>-jit</code> says so and exits with 1. Use
-<code>#ifjit</code> / <code>#ifaot</code> for code that should differ between the two modes.</p>
-<pre><code>ktm -jit server.ktm 8080</code></pre>
+<h2 id="how-it-builds">How it builds<a class="anchor" href="#how-it-builds" aria-label="Link to this section">#</a></h2>
+<p>ktm parses to a syntax tree, lowers it to an SSA IR and emits x86_64 or AArch64 assembly. The system C compiler
+assembles and links that, through a temporary file in <code>$TMPDIR</code> (one per compile, so several can run at once).
+The JIT skips that step with its own assembler.</p>
 
-<h2 id="the-repl">The REPL<a class="anchor" href="#the-repl" aria-label="Link to this section">#</a></h2>
-<pre><code>ktm -repl</code></pre>
-<p>ktm runs as you type it. Functions, structs, globals and
-<code>#define</code>s accumulate across the session, and the value of a trailing expression
-is echoed:</p>
-<pre><code>&amp;gt; i64 Sq(i64 x) { return x * x; }
-&amp;gt; Sq(7);
-49
-&amp;gt; printf("hello %d\n", Sq(3));
-hello 9</code></pre>
-<ul>
-  <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
-  <li><code>~/.ktm_rc.ktm</code> is included at start-up. Put <code>#define KTM_NO_REPL_HELLO</code> in it to hide the welcome message.</li>
-  <li><code>replDisasm("name");</code> disassembles a function. <code>replDel("name");</code> forgets a definition so you can redefine it.</li>
-  <li><code>replListFn();</code> lists the functions defined so far. <code>replFindFn("name");</code> shows the functions whose names contain <code>name</code>.</li>
-  <li><code>replListGVars();</code> lists the globals. <code>replClassRep("name");</code> prints a struct, class or union. <code>replEval("code");</code> runs a string as REPL input. <code>replHeap();</code> lists the live allocations, biggest first. <code>replReloadRc();</code> reads <code>~/.ktm_rc.ktm</code> again.</li>
-  <li><code>@ ls -la</code> runs a shell command. It goes through <code>system()</code>, so <code>@ cd</code> doesn't change the REPL's directory.</li>
-  <li>Allocations are tracked, so leaks and bad frees are reported.</li>
-</ul>
+<h2 id="more-tools">More tools<a class="anchor" href="#more-tools" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="tools-jit-repl.html"><strong>JIT and REPL</strong><span>Run without building, scripts, the interactive session.</span></a>
+  <a class="card" href="tools-editors.html"><strong>Editors</strong><span>The language server, Neovim, Vim, others.</span></a>
+  <a class="card" href="tools-libraries.html"><strong>Building libraries</strong><span><code>-lib</code> for modules and C callers.</span></a>
+  <a class="card" href="tools-debugging.html"><strong>Debugging</strong><span><code>-Memsafe</code>, the IR, assembly, graphs.</span></a>
+</div>
 
-<h2 id="editor-support">Editor support<a class="anchor" href="#editor-support" aria-label="Link to this section">#</a></h2>
-<p><code>ktm -lsp</code> is a language server. It works with any editor that speaks LSP
-and gives:</p>
-<ul>
-  <li>errors and warnings as you type, a module's files checked as the module they belong to;</li>
-  <li>hover with the declaration and its doc comment (the comment right above it, or after it
-  on its line), for functions, methods, fields, enums and their members, modules, aliases and
-  generics, the standard library's included;</li>
-  <li>completion: names in scope, fields and methods after <code>.</code> and
-  <code>-&gt;</code>, a module's names after its prefix, an enum's members, and the modules an
-  <code>import</code> can name;</li>
-  <li>signature help in calls, with the parameter you are on and every overload;</li>
-  <li>go to definition, find references, highlighting of a name's uses, and rename;</li>
-  <li>the document outline and workspace symbol search;</li>
-  <li>semantic highlighting: modules, types, enums and members, functions and methods, fields,
-  parameters, locals, constants and macros, with the standard library's marked;</li>
-  <li>folding (blocks, comments, imports, <code>#if</code> regions) and inlay hints with the type
-  of each <code>auto</code> variable.</li>
-</ul>
-
-<h3 id="neovim">Neovim<a class="anchor" href="#neovim" aria-label="Link to this section">#</a></h3>
-<p>The syntax, filetype detection and indent settings install into
-<code>&lt;prefix&gt;/share/ktm/vim</code> (in a checkout:
-<code>src/syntax-highlighting/vim</code>). Add it to the runtime path and start the server for
-ktm files:</p>
-<pre><code>vim.opt.rtp:append("/usr/local/share/ktm/vim")
-
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "ktm",
-  callback = function(ev)
-    vim.lsp.start({
-      name = "ktm",
-      cmd = { "ktm", "-lsp" },
-      root_dir = vim.fs.root(ev.buf, { ".git" })
-                 or vim.fs.dirname(vim.api.nvim_buf_get_name(ev.buf)),
-    })
-    vim.lsp.inlay_hint.enable(true, { bufnr = ev.buf })
-  end,
-})</code></pre>
-<p><strong>With lazy.nvim</strong>, the <code>rtp:append</code> line has no effect: lazy resets
-the runtime path when it starts, so ktm files get no filetype, no syntax and no server. List
-the directory in lazy's own setting instead, and on Neovim 0.11 or later the server can be
-set up like any other:</p>
-<pre><code>require("lazy").setup({
-  -- ...
-  performance = { rtp = { paths = { "/usr/local/share/ktm/vim" } } },
-})
-
-vim.lsp.config("ktm", { cmd = { "ktm", "-lsp" }, filetypes = { "ktm" }, root_markers = { ".git" } })
-vim.lsp.enable("ktm")</code></pre>
-<p>Semantic highlighting needs nothing more: Neovim colours the server's tokens with its
-<code>@lsp.type.*</code> groups (link <code>@lsp.type.namespace.ktm</code> and the others to
-change them).</p>
-
-<h3 id="vim">Vim<a class="anchor" href="#vim" aria-label="Link to this section">#</a></h3>
-<pre><code>set runtimepath+=/usr/local/share/ktm/vim
-filetype plugin indent on
-syntax on</code></pre>
-
-<h3 id="other-editors">Other editors<a class="anchor" href="#other-editors" aria-label="Link to this section">#</a></h3>
-<p>Point your editor's generic LSP client at the command <code>ktm -lsp</code> for
-<code>.ktm</code> and <code>.ktmh</code> files. If ktm isn't installed, add
-<code>--install-dir=/path/to/build/prefix</code> so it can find the standard library. Set
-<code>KTM_LSP_LOG=1</code> in the server's environment to log its traffic to stderr.</p>
-
-<h2 id="libraries">Libraries<a class="anchor" href="#libraries" aria-label="Link to this section">#</a></h2>
-<p>Build your own ktm library and install it next to the standard one:</p>
-<pre><code>ktm -lib mylib --install-dir=$HOME/.local mylib.ktm</code></pre>
-<p>This produces <code>libmylib.a</code> and a shared library in
-<code>$HOME/.local/lib</code>. Mark the functions and globals it exports
-<code>pub</code>. To use the library, declare its functions, and its globals with
-<code>extern</code> (<code>extern i64 count;</code>, <code>extern fn(i64) i64 hook;</code>),
-usually in a <code>.ktmh</code> header you <code>#include</code>, and add
-<code>#link &lt;mylib&gt;</code>.</p>
-
-<h2 id="looking-under-the-hood">Looking under the hood<a class="anchor" href="#looking-under-the-hood" aria-label="Link to this section">#</a></h2>
-<pre><code>ktm -tokens main.ktm                 # what the lexer sees
-ktm -ast main.ktm                    # the parsed program
-ktm --dump-ir main.ktm               # the SSA intermediate representation
-ktm -S -o- main.ktm                  # the generated assembly
-ktm -cfg main.ktm &amp;&amp; dot -Tpng main.dot -o main.png</code></pre>
-
-    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="stdlib.html"><span>Previous</span>Library reference</a><a class="next" href="examples.html"><span>Next</span>Examples</a></nav>
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-sqlite.html"><span>Previous</span>SQLite</a><a class="next" href="tools-jit-repl.html"><span>Next</span>JIT and REPL</a></nav>
     <footer class="page-foot">
       <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/tools.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#everyday-commands">Everyday commands</a></li><li><a href="#run-and-jit">-run and -jit</a></li><li><a href="#object-files-and-c">Object files and C</a></li><li><a href="#without-installing">Without installing</a></li><li><a href="#cross-compiling">Cross-compiling</a></li><li><a href="#all-flags">All flags</a></li><li><a href="#how-it-builds">How it builds</a></li><li><a href="#more-tools">More tools</a></li></ul></nav>
 </div>
 </body>
 </html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>switch - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li class="current"><a href="lang-switch.html" aria-current="page">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>switch</h1>
+<p class="lede">Like C's <code>switch</code>, but cases don't fall through, and a case can be a range.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>switch (x) {
+  case 1:          ...           // no break needed
+  case 10 ... 19:  ...           // a range, both ends included
+  case 20:
+  case 21:         ...           // stacked labels share the code
+  case 30:         ...; fallthrough;   // run on into the next case
+  default:         ...
+}</code></pre>
+</div>
+
+<h2 id="no-fall-through">No fall-through<a class="anchor" href="#no-fall-through" aria-label="Link to this section">#</a></h2>
+<p>A case ends where the next one starts. No <code>break</code> is needed.</p>
+<pre data-run><code>void describe(i64 n)
+{
+  switch (n) {
+    case 0: printf("zero\n");
+    case 1: printf("one\n");
+    default: printf("many\n");
+  }
+}
+
+void main()
+{
+  describe(0);
+  describe(1);
+  describe(7);
+}
+</code></pre>
+<pre class="output">zero
+one
+many
+</pre>
+<p><code>break</code> still works: it leaves the switch early.</p>
+<pre data-run><code>void main()
+{
+  i64 n = -3;
+  switch (n) {
+    default:
+      if (n &lt; 0) {
+        printf("negative, stop here\n");
+        break;
+      }
+      printf("not printed\n");
+  }
+}
+</code></pre>
+<pre class="output">negative, stop here
+</pre>
+
+<h2 id="ranges">Ranges<a class="anchor" href="#ranges" aria-label="Link to this section">#</a></h2>
+<p><code>case lo ... hi:</code> matches every value from <code>lo</code> to <code>hi</code>, both included.</p>
+<pre data-run><code>void grade(i64 score)
+{
+  switch (score) {
+    case 90 ... 100: printf("%d: A\n", score);
+    case 80 ... 89:  printf("%d: B\n", score);
+    case 0:          printf("%d: no score\n", score);
+    default:         printf("%d: C or below\n", score);
+  }
+}
+
+void main()
+{
+  grade(95);
+  grade(83);
+  grade(0);
+  grade(42);
+}
+</code></pre>
+<pre class="output">95: A
+83: B
+0: no score
+42: C or below
+</pre>
+<p>It works on characters too:</p>
+<pre data-run><code>u8 *kind(u8 c)
+{
+  switch (c) {
+    case 'a' ... 'z': return "lower";
+    case 'A' ... 'Z': return "upper";
+    case '0' ... '9': return "digit";
+    default:          return "other";
+  }
+}
+
+void main()
+{
+  printf("%s %s %s %s\n", kind('q'), kind('Q'), kind('7'), kind('!'));
+}
+</code></pre>
+<pre class="output">lower upper digit other
+</pre>
+
+<h2 id="several-values-one-body">Several values, one body<a class="anchor" href="#several-values-one-body" aria-label="Link to this section">#</a></h2>
+<p>Labels stacked with nothing between them share the code that follows.</p>
+<pre data-run><code>u8 *dayType(i64 day)
+{
+  switch (day) {
+    case 0:
+    case 6:
+      return "weekend";
+    default:
+      return "weekday";
+  }
+}
+
+void main()
+{
+  printf("%s %s %s\n", dayType(0), dayType(3), dayType(6));
+}
+</code></pre>
+<pre class="output">weekend weekday weekend
+</pre>
+
+<h2 id="fallthrough">fallthrough<a class="anchor" href="#fallthrough" aria-label="Link to this section">#</a></h2>
+<p><code>fallthrough;</code> as the last statement of a case runs on into the next case.</p>
+<pre data-run><code>void main()
+{
+  for (i64 i = 1; i &lt;= 3; i++) {
+    switch (i) {
+      case 1: printf("one, "); fallthrough;
+      case 2: printf("two or after one\n");
+      default: printf("three\n");
+    }
+  }
+}
+</code></pre>
+<pre class="output">one, two or after one
+two or after one
+three
+</pre>
+<p>It is an error anywhere else:</p>
+<ul class="rules">
+  <li>outside a switch, or before other statements of its case;</li>
+  <li>inside an <code>if</code> or a loop;</li>
+  <li>in the last case, where there is no next one;</li>
+  <li>into or out of a <code>default</code> that isn't the last label.</li>
+</ul>
+
+<h2 id="each-case-is-a-block">Each case is a block<a class="anchor" href="#each-case-is-a-block" aria-label="Link to this section">#</a></h2>
+<p>A case can declare variables without braces. Two cases can use the same name.</p>
+<pre data-run><code>void main()
+{
+  for (i64 i = 0; i &lt; 2; i++) {
+    switch (i) {
+      case 0:
+        i64 doubled = i * 2;
+        printf("case 0: %d\n", doubled);
+      case 1:
+        i64 doubled = i * 2;      // another variable
+        printf("case 1: %d\n", doubled);
+    }
+  }
+}
+</code></pre>
+<pre class="output">case 0: 0
+case 1: 2
+</pre>
+<p>A <a href="lang-defer.html"><code>defer</code></a> in a case runs at the end of that case. It needs braces: <code>case 1: { defer ...; }</code>.</p>
+
+<h2 id="switching-on-enums">Switching on enums<a class="anchor" href="#switching-on-enums" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>enum Color { red, green, blue };
+
+u8 *hex(Color c)
+{
+  switch (c) {
+    case Color.red:   return "#f00";
+    case Color.green: return "#0f0";
+    case Color.blue:  return "#00f";
+  }
+  return "?";
+}
+
+void main()
+{
+  printf("%s %s\n", hex(Color.green), hex(Color.blue));
+}
+</code></pre>
+<pre class="output">#0f0 #00f
+</pre>
+
+<h2 id="two-extras">Two extras<a class="anchor" href="#two-extras" aria-label="Link to this section">#</a></h2>
+<h3 id="implicit-case-values">Implicit case values<a class="anchor" href="#implicit-case-values" aria-label="Link to this section">#</a></h3>
+<p>A bare <code>case:</code> is the previous case's value plus one (starting from 0).</p>
+<pre data-run><code>void main()
+{
+  for (i64 i = 0; i &lt; 4; i++) {
+    switch (i) {
+      case 0: printf("zero,");
+      case:   printf("one,");      // 1
+      case:   printf("two,");      // 2
+      default: printf("other\n");
+    }
+  }
+}
+</code></pre>
+<pre class="output">zero,one,two,other
+</pre>
+
+<h3 id="unchecked-switch">Unchecked switch<a class="anchor" href="#unchecked-switch" aria-label="Link to this section">#</a></h3>
+<p><code>switch [x]</code> skips the range check on <code>x</code>. Use it only when you know <code>x</code>
+matches a case: anything else is undefined.</p>
+<pre data-run><code>void main()
+{
+  for (i64 i = 0; i &lt; 3; i++) {
+    switch [i] {
+      case 0: printf("a");
+      case 1: printf("b");
+      case 2: printf("c\n");
+    }
+  }
+}
+</code></pre>
+<pre class="output">abc
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-control-flow.html"><span>Previous</span>Control flow</a><a class="next" href="lang-functions.html"><span>Next</span>Functions</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-switch.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#no-fall-through">No fall-through</a></li><li><a href="#ranges">Ranges</a></li><li><a href="#several-values-one-body">Several values, one body</a></li><li><a href="#fallthrough">fallthrough</a></li><li><a href="#each-case-is-a-block">Each case is a block</a></li><li><a href="#switching-on-enums">Switching on enums</a></li><li><a href="#two-extras">Two extras</a></li></ul></nav>
+</div>
+</body>
+</html>

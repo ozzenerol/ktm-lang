@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Function pointers - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li class="current"><a href="lang-function-pointers.html" aria-current="page">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Function pointers</h1>
+<p class="lede">A function pointer type is written <code>fn(params) Ret</code>. No C declarator puzzles.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>fn(i64) i64 f = &amp;twice;          // a variable
+f(5);                            // call it
+fn(i64) i64 ops[] = {&amp;a, &amp;b};    // an array of them
+fn(i64) i64 pick(bool b);        // a function returning one
+(fn(i64) i64) *pf = &amp;f;          // a pointer to one: parentheses
+type Handler = fn(u8[]) bool;    // give it a name</code></pre>
+</div>
+
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>int (*op)(int, int) = &amp;add;
+int (*ops[2])(int) = {...};
+int (*pick(int))(int);</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>fn(i32, i32) i32 op = &amp;add;
+fn(i32) i32 ops[2] = {...};
+fn(i32) i32 pick(i32);</code></pre></div>
+</div>
+
+<h2 id="passing-a-function">Passing a function<a class="anchor" href="#passing-a-function" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
+
+i64 fold(fn(i64, i64) i64 op, i64[] nums)
+{
+  i64 acc = nums[0];
+  for (i64 i = 1; i &lt; nums.len; i++) { acc = op(acc, nums[i]); }
+  return acc;
+}
+
+void main()
+{
+  i64 nums[] = {1, 2, 3, 4};
+  printf("%d %d\n", fold(&amp;add, nums), fold(&amp;mul, nums));
+}
+</code></pre>
+<pre class="output">10 24
+</pre>
+<ul class="rules">
+  <li>Parameter names are optional and ignored: <code>fn(i64 a, i64 b) i64</code> is <code>fn(i64, i64) i64</code>.</li>
+  <li><code>(*f)(x)</code> calls it too, as in C.</li>
+  <li>The arguments are checked against the pointer's parameter types, like a direct call.</li>
+</ul>
+
+<h2 id="tables-of-functions">Tables of functions<a class="anchor" href="#tables-of-functions" aria-label="Link to this section">#</a></h2>
+<p>The array size goes after the name, as in C. Locals, globals, fields and parameters all work.</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+i64 neg(i64 x) { return -x; }
+
+fn(i64) i64 ops[] = {&amp;dbl, &amp;sq, &amp;neg};
+u8 *names[] = {"double", "square", "negate"};
+
+void main()
+{
+  for (i64 i = 0; i &lt; 3; i++) {
+    printf("%s(5) = %d\n", names[i], ops[i](5));
+  }
+}
+</code></pre>
+<pre class="output">double(5) = 10
+square(5) = 25
+negate(5) = -5
+</pre>
+
+<h2 id="in-a-struct">In a struct<a class="anchor" href="#in-a-struct" aria-label="Link to this section">#</a></h2>
+<p>A field can be a function pointer. A default in its parameter list fills a left-out argument.</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+
+struct Calc { u8 *name; fn(i64 x = 21) i64 op; };
+
+void main()
+{
+  Calc c = {"doubler", &amp;dbl};
+  printf("%s: %d %d\n", c.name, c.op(5), c.op());
+}
+</code></pre>
+<pre class="output">doubler: 10 42
+</pre>
+
+<h2 id="returning-a-function">Returning a function<a class="anchor" href="#returning-a-function" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+
+fn(i64) i64 choose(bool square)
+{
+  if (square) { return &amp;sq; }
+  return &amp;dbl;
+}
+
+void main()
+{
+  fn(i64) i64 f = choose(true);
+  printf("%d %d\n", f(5), choose(false)(5));
+}
+</code></pre>
+<pre class="output">25 10
+</pre>
+<p>A <code>*</code> after the return type belongs to it: <code>fn(u8 *) u8 *</code> returns a <code>u8 *</code>.</p>
+
+<h2 id="a-pointer-to-a-function-pointer">A pointer to a function pointer<a class="anchor" href="#a-pointer-to-a-function-pointer" aria-label="Link to this section">#</a></h2>
+<p>Put the <code>fn</code> type in parentheses: <code>(fn(i64) i64) *</code>.</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+
+void swapIn((fn(i64) i64) *slot, fn(i64) i64 g) { *slot = g; }
+
+void main()
+{
+  fn(i64) i64 f = &amp;sq;
+  printf("%d ", f(5));
+  swapIn(&amp;f, &amp;dbl);            // changes f through the pointer
+  printf("%d %s\n", f(5), typeof(&amp;f));
+}
+</code></pre>
+<pre class="output">25 10 (fn(i64) i64) *
+</pre>
+
+<h2 id="calling-any-expression">Calling any expression<a class="anchor" href="#calling-any-expression" aria-label="Link to this section">#</a></h2>
+<p>Anything whose type is a function pointer can be called: a cast, a call's result, an assignment.</p>
+<pre data-run><code>import cstr;
+
+i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
+
+void *lookup(u8 *name)
+{
+  if (!cstr.cmp(name, "add")) { return &amp;add; }
+  return &amp;mul;
+}
+
+void main()
+{
+  fn(i64, i64) i64 f;
+  printf("%d\n", ((fn(i64, i64) i64)lookup("add"))(2, 3));
+  printf("%d\n", (f = &amp;mul)(4, 5));
+}
+</code></pre>
+<pre class="output">5
+20
+</pre>
+
+<h2 id="defaults-and-varargs">Defaults and varargs<a class="anchor" href="#defaults-and-varargs" aria-label="Link to this section">#</a></h2>
+<p>A function pointer's parameters can have defaults and take extras in every form a function does.</p>
+<pre data-run><code>i64 add(i64 a, i64 b) { return a + b; }
+i64 count(...args) { return args.len; }
+
+void main()
+{
+  fn(i64 a, i64 b = 10) i64 k = &amp;add;
+  fn(...args) i64 c = &amp;count;
+  printf("%d %d %d\n", k(1), k(1, 2), c(4, 5, 6));
+}
+</code></pre>
+<pre class="output">11 3 3
+</pre>
+
+<h2 id="callbacks-with-real-types">Callbacks with real types<a class="anchor" href="#callbacks-with-real-types" aria-label="Link to this section">#</a></h2>
+<p>A <code>void *</code> parameter on one side matches any pointer parameter on the other. So a
+comparator takes the types it really gets, and is passed where <code>fn(void *, void *) i64</code>
+is expected, without a cast.</p>
+<pre data-run><code>struct Item { i64 key; };
+
+i64 itemLess(Item *a, Item *b) { return a.key &lt; b.key; }
+
+void main()
+{
+  Item a = {1}, b = {2};
+  fn(void *, void *) i64 cmp = &amp;itemLess;
+  printf("%d %d\n", cmp(&amp;a, &amp;b), cmp(&amp;b, &amp;a));
+}
+</code></pre>
+<pre class="output">1 0
+</pre>
+<p>A <code>void *</code> and <code>null</code> convert to and from a function pointer without a cast:</p>
+<pre data-run><code>i64 dbl(i64 x) { return x * 2; }
+
+void main()
+{
+  void *raw = &amp;dbl;
+  fn(i64) i64 back = raw;
+  fn(i64) i64 none = null;
+  printf("%d %d %d\n", back(4), raw == &amp;dbl, none == null);
+}
+</code></pre>
+<pre class="output">8 1 1
+</pre>
+
+<h2 id="what-doesn-t-convert">What doesn't convert<a class="anchor" href="#what-doesn-t-convert" aria-label="Link to this section">#</a></h2>
+<p>Anything else is an error that names both types:</p>
+<pre><code>i64 t(i64 x) { return x; }
+fn(u8 *) i64 op = &amp;t;    // error: cannot convert fn(i64) i64 to fn(u8*) i64</code></pre>
+<p>These need a cast:</p>
+<ul class="rules">
+  <li>a different return type (returning <code>Item *</code> is not <code>fn(void *) void *</code>);</li>
+  <li>different integer, struct, slice or function pointer parameters;</li>
+  <li>a pointer to a function pointer: <code>(fn(Item *) i64) *</code> is not <code>(fn(void *) i64) *</code>.</li>
+</ul>
+<div class="note"><p>C's form, <code>i64 (*f)(i64)</code>, is an error that shows the <code>fn(...)</code> spelling to use.
+<code>fn</code> is a keyword.</p></div>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-overloading.html"><span>Previous</span>Overloading</a><a class="next" href="lang-pointers.html"><span>Next</span>Pointers and arrays</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-function-pointers.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#passing-a-function">Passing a function</a></li><li><a href="#tables-of-functions">Tables of functions</a></li><li><a href="#in-a-struct">In a struct</a></li><li><a href="#returning-a-function">Returning a function</a></li><li><a href="#a-pointer-to-a-function-pointer">A pointer to a function pointer</a></li><li><a href="#calling-any-expression">Calling any expression</a></li><li><a href="#defaults-and-varargs">Defaults and varargs</a></li><li><a href="#callbacks-with-real-types">Callbacks with real types</a></li><li><a href="#what-doesn-t-convert">What doesn&#x27;t convert</a></li></ul></nav>
+</div>
+</body>
+</html>

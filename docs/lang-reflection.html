@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reflection - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li class="current"><a href="lang-reflection.html" aria-current="page">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span><span class="refs">Reference: <a href="stdlib.html#reflect"><code>reflect</code></a></span></div>
+<h1>Reflection</h1>
+<p class="lede">The <code>reflect</code> module tells a program about its own types at run time:
+a struct's fields, an enum's members, a value's type.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>reflect.Type *t = reflect.typeOf(User);   // a type, or any expression
+t.name  t.size  t.kind  t.fields  t.members  t.elem
+reflect.Value v = reflect.of(x);          // a value of any type: address + type
+reflect.field(v, "name")                  // one field of a struct value
+reflect.getInt(v)  reflect.setFloat(v, 1.5)
+reflect.name(Role.admin)                  // "admin"</code></pre>
+</div>
+
+<h2 id="describing-a-type">Describing a type<a class="anchor" href="#describing-a-type" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import reflect;
+
+enum Role { guest, admin = 10 };
+struct User { i64 id; u8[] name; Role role; User *boss; };
+
+void main()
+{
+  reflect.Type *t = reflect.typeOf(User);
+  printf("%s, %d bytes, %d fields\n", t.name, t.size, t.fields.len);
+  for (auto f : t.fields) {
+    printf("  %-5s at %2d: %s\n", f.name, f.offset, f.type.name);
+  }
+  reflect.Type *boss = t.fields[3].type;
+  printf("%s points to %s\n", boss.name, boss.elem.name);
+}
+</code></pre>
+<pre class="output">User, 40 bytes, 4 fields
+  id    at  0: i64
+  name  at  8: u8[]
+  role  at 24: Role
+  boss  at 32: User *
+User * points to User
+</pre>
+
+<h2 id="what-a-type-has">What a Type has<a class="anchor" href="#what-a-type-has" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>kind</code></td><td>A <code>reflect.Kind</code>: <code>int</code>, <code>float</code>, <code>boolean</code>, <code>enumType</code>, <code>pointer</code>, <code>array</code>, <code>slice</code>, <code>string</code>, <code>structType</code>, <code>unionType</code>, <code>fnType</code>, <code>none</code></td></tr>
+    <tr><td><code>name</code></td><td>As <code>typeof</code> prints it</td></tr>
+    <tr><td><code>size</code>, <code>isSigned</code></td><td>Size in bytes; signedness of an integer</td></tr>
+    <tr><td><code>elem</code>, <code>len</code></td><td>Element type and length of a pointer, array or slice</td></tr>
+    <tr><td><code>fields</code></td><td>A struct's fields (name, type, offset, <code>isPrivate</code>), inherited ones first</td></tr>
+    <tr><td><code>members</code></td><td>An enum's members</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import reflect;
+
+void describe(reflect.Type *t)
+{
+  switch (t.kind) {
+    case reflect.Kind.int:     printf("%s: integer, %d bytes, signed %d\n", t.name, t.size, t.isSigned);
+    case reflect.Kind.float:   printf("%s: float\n", t.name);
+    case reflect.Kind.array:   printf("%s: %d x %s\n", t.name, t.len, t.elem.name);
+    case reflect.Kind.slice:   printf("%s: slice of %s\n", t.name, t.elem.name);
+    case reflect.Kind.string:  printf("%s: String\n", t.name);
+    default:                   printf("%s: something else\n", t.name);
+  }
+}
+
+void main()
+{
+  i64 grid[4];
+  describe(reflect.typeOf(u16));
+  describe(reflect.typeOf(f64));
+  describe(reflect.typeOf(grid));
+  describe(reflect.typeOf(u8[]));
+  describe(reflect.typeOf(String));
+}
+</code></pre>
+<pre class="output">u16: integer, 2 bytes, signed 0
+f64: float
+i64[4]: 4 x i64
+u8[]: slice of u8
+String: String
+</pre>
+
+<h2 id="values-of-any-type">Values of any type<a class="anchor" href="#values-of-any-type" aria-label="Link to this section">#</a></h2>
+<p><code>reflect.of(x)</code>, for a variable, field or element, gives a <code>reflect.Value</code>:
+its address and its type. One function can then take a value of any type.</p>
+<pre data-run><code>import reflect;
+
+struct Point { i32 x; i32 y; };
+struct Stats { i64 hits; f64 ratio; };
+
+void bump(reflect.Value v, u8[] field)
+{
+  reflect.Value f = reflect.field(v, field);
+  if (!f.type) { printf("no field %s\n", field); return; }
+  reflect.setInt(f, reflect.getInt(f) + 1);
+}
+
+void main()
+{
+  Point p = {3, 4};
+  Stats s = {10, 0.5};
+  bump(reflect.of(p), "y");
+  bump(reflect.of(s), "hits");
+  bump(reflect.of(s), "misses");
+  reflect.setFloat(reflect.field(reflect.of(s), "ratio"), 0.75);
+  printf("%d %d | %d %.2f\n", p.x, p.y, s.hits, s.ratio);
+}
+</code></pre>
+<pre class="output">no field misses
+3 5 | 11 0.75
+</pre>
+<p><code>getInt</code>/<code>setInt</code> and <code>getFloat</code>/<code>setFloat</code> read and write
+integers, bools, enums and floats of any size.</p>
+
+<h2 id="a-generic-printer">A generic printer<a class="anchor" href="#a-generic-printer" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import reflect;
+
+struct Server { u8[] host; i64 port; bool tls; f64 timeout; };
+
+void dump(reflect.Value v)
+{
+  for (auto f : v.type.fields) {
+    reflect.Value fv = reflect.field(v, f.name);
+    printf("%s = ", f.name);
+    switch (f.type.kind) {
+      case reflect.Kind.int:
+      case reflect.Kind.boolean: printf("%d\n", reflect.getInt(fv));
+      case reflect.Kind.float: printf("%.1f\n", reflect.getFloat(fv));
+      case reflect.Kind.slice: printf("%s\n", *(u8[] *)fv.ptr);
+      default: printf("?\n");
+    }
+  }
+}
+
+void main()
+{
+  Server s = {"localhost", 8080, true, 2.5};
+  dump(reflect.of(s));
+}
+</code></pre>
+<pre class="output">host = localhost
+port = 8080
+tls = 1
+timeout = 2.5
+</pre>
+
+<h2 id="enum-names">Enum names<a class="anchor" href="#enum-names" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import reflect;
+
+enum Level { debug, info, warn };
+
+void main()
+{
+  Level l = Level.warn;
+  printf("%s\n", reflect.name(l));
+  printf("%s\n", reflect.nameOf(reflect.typeOf(Level), 1));
+  i64 v;
+  if (reflect.enumValue(reflect.typeOf(Level), "debug", &amp;v)) { printf("debug is %d\n", v); }
+}
+</code></pre>
+<pre class="output">warn
+info
+debug is 0
+</pre>
+
+<h2 id="notes">Notes<a class="anchor" href="#notes" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>A type's description is made at compile time, as read-only data, only for the types a program asks about and the types they lead to.</li>
+  <li>A library and a program each have their own copy: compare types with <code>reflect.same(a, b)</code>, not <code>==</code>.</li>
+  <li><code>reflect.name(e)</code> is <code>""</code> for a value that isn't a member.</li>
+  <li><a href="lang-attributes.html">Attributes</a> show up too: <code>Type.json</code>, <code>Field.key</code>, <code>Field.skip</code>, <code>Field.omitEmpty</code>.</li>
+  <li><code>json.encode</code> and <code>json.decode</code> are built on this: see <a href="lib-json-structs.html">JSON: structs</a>.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-defer.html"><span>Previous</span>defer and ad</a><a class="next" href="lang-attributes.html"><span>Next</span>Attributes</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-reflection.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#describing-a-type">Describing a type</a></li><li><a href="#what-a-type-has">What a Type has</a></li><li><a href="#values-of-any-type">Values of any type</a></li><li><a href="#a-generic-printer">A generic printer</a></li><li><a href="#enum-names">Enum names</a></li><li><a href="#notes">Notes</a></li></ul></nav>
+</div>
+</body>
+</html>

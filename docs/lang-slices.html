@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slices - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li class="current"><a href="lang-slices.html" aria-current="page">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Slices</h1>
+<p class="lede">A slice <code>T[]</code> is a pointer and a length: a view of some <code>T</code>s that knows how many there are. Every index is checked.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>i64 nums[6] = {1, 2, 3, 4, 5, 6};
+i64[] all = nums;          // an array converts: len 6
+i64[] mid = all[1:4];      // elements 1, 2, 3: a view, nothing copied
+all[:2]   all[4:]          // from the start, to the end
+s.len   s.ptr   s[i]       // length, pointer, an element (checked)
+u8[] word = "hello";       // a literal is a u8[] of its bytes
+p[0:n]                     // a raw pointer becomes a slice: you vouch for n</code></pre>
+</div>
+
+<h2 id="making-and-viewing">Making and viewing<a class="anchor" href="#making-and-viewing" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void main()
+{
+  i64 nums[6] = {1, 2, 3, 4, 5, 6};
+  i64[] all = nums;
+  i64[] mid = all[1:4];
+  printf("%d %d | %d %d %d\n", all.len, mid.len, mid[0], mid[1], mid[2]);
+  printf("%d %d\n", all[:2].len, all[4:][0]);
+  printf("%s\n", typeof(mid));
+}
+</code></pre>
+<pre class="output">6 3 | 2 3 4
+2 5
+i64[]
+</pre>
+<p><code>s[a:b]</code> runs from <code>a</code> up to, not including, <code>b</code>.</p>
+
+<h2 id="a-view-writes-into-what-it-views">A view writes into what it views<a class="anchor" href="#a-view-writes-into-what-it-views" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>void main()
+{
+  i64 nums[4] = {1, 2, 3, 4};
+  i64[] tail = nums[2:];
+  tail[0] = 30;              // writes nums[2]
+  printf("%d %d %d %d\n", nums[0], nums[1], nums[2], nums[3]);
+}
+</code></pre>
+<pre class="output">1 2 30 4
+</pre>
+
+<h2 id="passing-arrays-as-slices">Passing arrays as slices<a class="anchor" href="#passing-arrays-as-slices" aria-label="Link to this section">#</a></h2>
+<p>A function that takes a slice accepts an array, a slice, or part of one.</p>
+<pre data-run><code>i64 sum(i64[] xs)
+{
+  i64 total = 0;
+  for (auto x : xs) { total += x; }
+  return total;
+}
+
+i64 maxOf(i64[] xs)
+{
+  i64 best = xs[0];
+  for (i64 i = 1; i &lt; xs.len; i++) {
+    if (xs[i] &gt; best) { best = xs[i]; }
+  }
+  return best;
+}
+
+void main()
+{
+  i64 nums[6] = {4, 8, 15, 16, 23, 42};
+  printf("%d %d %d\n", sum(nums), sum(nums[:3]), maxOf(nums[1:4]));
+}
+</code></pre>
+<pre class="output">108 27 16
+</pre>
+
+<h2 id="text-is-a-u8">Text is a u8[]<a class="anchor" href="#text-is-a-u8" aria-label="Link to this section">#</a></h2>
+<p>A string literal converts to a <code>u8[]</code> of its bytes, without the NUL. So does a <code>String</code>.</p>
+<pre data-run><code>void main()
+{
+  u8[] word = "hello";
+  printf("%s %d %c %s\n", word, word.len, word[1], word[1:4]);
+}
+</code></pre>
+<pre class="output">hello 5 e ell
+</pre>
+<div class="warn"><p><strong>A <code>u8</code> buffer is all its bytes.</strong> A <code>u8 buf[64]</code> passed as a
+<code>u8[]</code> has length 64, not the length of the text in it. Use <code>cstr.view(buf)</code> for
+the text up to its NUL, or <code>buf[0:n]</code> when you know <code>n</code>.</p></div>
+<pre data-run><code>import cstr;
+
+void main()
+{
+  u8 buf[64];
+  cstr.copy(buf, "hi");
+  u8[] whole = buf;
+  printf("%d %d %d\n", whole.len, cstr.view(buf).len, buf[0:2].len);
+}
+</code></pre>
+<pre class="output">64 2 2
+</pre>
+
+<h2 id="bounds-checks">Bounds checks<a class="anchor" href="#bounds-checks" aria-label="Link to this section">#</a></h2>
+<p>Every index and sub-slice is checked, compiled and in the JIT. Out of range throws
+<code>ERR_BOUNDS</code>, which you can <a href="lang-exceptions.html">catch</a>.</p>
+<pre data-run><code>void main()
+{
+  i64 nums[3] = {1, 2, 3};
+  i64[] s = nums;
+  try {
+    printf("%d\n", s[3]);
+  } catch (Error e) {
+    printf("caught: %s\n", e.message);
+  }
+  try {
+    i64[] t = s[2:5];
+  } catch (Error e) {
+    printf("caught: %s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">caught: index 3 out of range for length 3
+caught: slice 2:5 out of range for length 3
+</pre>
+<ul class="rules">
+  <li>A check costs one compare and a branch.</li>
+  <li>The compiler drops it where it can't fail: <code>s[i]</code> inside <code>for (i64 i = 0; i &lt; s.len; i++)</code> when the body doesn't change <code>i</code> or <code>s</code>.</li>
+  <li><code>s.ptr[i]</code> is the unchecked way, for loops that checked their range themselves.</li>
+</ul>
+
+<h2 id="from-a-pointer">From a pointer<a class="anchor" href="#from-a-pointer" aria-label="Link to this section">#</a></h2>
+<p><code>p[0:n]</code> turns a raw pointer into a slice. It can't be checked: you vouch for <code>n</code>.
+The other way, <code>s.ptr</code> is the pointer.</p>
+<pre data-run><code>import mem;
+
+void main()
+{
+  i64 *raw = mem.allocZero(4 * sizeof(i64));
+  i64[] s = raw[0:4];
+  s[3] = 9;
+  printf("%d %d %d\n", s.len, raw[3], s.ptr == raw);
+  mem.free(raw);
+}
+</code></pre>
+<pre class="output">4 9 1
+</pre>
+
+<h2 id="comparing-and-freeing">Comparing and freeing<a class="anchor" href="#comparing-and-freeing" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>a == b</code> on slices is an error. Compare text with <code>a.equals(b)</code>, identity with <code>a.ptr == b.ptr</code>.</li>
+  <li>A slice a function allocated for you (like the parts <code>str.split</code> returns) is freed with <code>s.free()</code>.</li>
+  <li>A slice of an array, or of someone else's memory, is not yours to free.</li>
+  <li><code>s.len</code> and <code>s.ptr</code> are read-only: assign the whole slice instead.</li>
+</ul>
+<pre data-run><code>import str;
+
+void main()
+{
+  u8[] a = "abc";
+  u8 buf[3] = {'a', 'b', 'c'};
+  u8[] b = buf;
+  printf("%d %d\n", a.equals(b), a.ptr == b.ptr);
+
+  u8[][] parts = str.split("x,y,z", ",");   // allocated: ours to free
+  defer parts.free();
+  printf("%d parts, the last is %s\n", parts.len, parts[2]);
+}
+</code></pre>
+<pre class="output">1 0
+3 parts, the last is z
+</pre>
+
+<h2 id="slices-of-anything">Slices of anything<a class="anchor" href="#slices-of-anything" aria-label="Link to this section">#</a></h2>
+<p>Slices of structs, slice fields, slices of slices (<code>u8[][]</code>) and slices in function types all work.</p>
+<pre data-run><code>struct User { u8[] name; i64[] scores; };
+
+i64 best(User[] users, fn(i64[]) i64 score)
+{
+  i64 top = 0;
+  for (auto u : users) {
+    if (score(u.scores) &gt; top) { top = score(u.scores); }
+  }
+  return top;
+}
+
+i64 total(i64[] xs) { i64 t = 0; for (auto x : xs) { t += x; } return t; }
+
+void main()
+{
+  i64 a[] = {3, 4}, b[] = {10};
+  User users[2] = {{"ann", a}, {"bob", b}};
+  printf("%d\n", best(users, &amp;total));
+}
+</code></pre>
+<pre class="output">10
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-pointers.html"><span>Previous</span>Pointers and arrays</a><a class="next" href="lang-strings.html"><span>Next</span>Strings</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-slices.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#making-and-viewing">Making and viewing</a></li><li><a href="#a-view-writes-into-what-it-views">A view writes into what it views</a></li><li><a href="#passing-arrays-as-slices">Passing arrays as slices</a></li><li><a href="#text-is-a-u8">Text is a u8[]</a></li><li><a href="#bounds-checks">Bounds checks</a></li><li><a href="#from-a-pointer">From a pointer</a></li><li><a href="#comparing-and-freeing">Comparing and freeing</a></li><li><a href="#slices-of-anything">Slices of anything</a></li></ul></nav>
+</div>
+</body>
+</html>

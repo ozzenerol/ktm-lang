@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON: structs - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li class="current"><a href="lib-json-structs.html" aria-current="page">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#json"><code>json</code></a></span></div>
+<h1>JSON: structs</h1>
+<p class="lede">Turn a struct into JSON and back in one call. Mark it <code>@json</code> and the compiler writes the code, so it is fast.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>@json struct User { i64 id; String name; };
+User u = json.decode&lt;User&gt;(text);          // throws json.ERR_DECODE on bad input
+defer u.freeDecoded();                     // or json.free(reflect.of(u))
+String out = json.encode(reflect.of(u));   // json.encode(..., 2) to indent
+json.decode&lt;User&gt;(text, json.STRICT);      // unknown and missing keys are errors</code></pre>
+</div>
+
+<h2 id="decode-and-encode">Decode and encode<a class="anchor" href="#decode-and-encode" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import json, reflect;
+
+enum Role { guest, admin };
+
+@json struct Tag { u8[] name; i64 weight; };
+@json struct User { i64 id; String name; Role role; Tag[] tags; };
+
+void main()
+{
+  User u = json.decode&lt;User&gt;("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\","
+                             " \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}");
+  defer u.freeDecoded();
+  printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
+
+  u.id = 8;
+  ad String text = json.encode(reflect.of(u));
+  printf("%s\n", text);
+}
+</code></pre>
+<pre class="output">7 Ada admin math
+{"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
+</pre>
+<ul class="rules">
+  <li>A key the struct has no field for is ignored (<code>"since"</code> above).</li>
+  <li>A field the JSON leaves out is zero.</li>
+  <li>An enum is written as its member's name.</li>
+</ul>
+
+<h2 id="types">Types<a class="anchor" href="#types" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>ktm</th><th>JSON</th></tr></thead>
+  <tbody>
+    <tr><td>A struct</td><td>An object of its fields, in order (private fields are skipped)</td></tr>
+    <tr><td>Integers, floats, <code>bool</code></td><td>Numbers, <code>true</code>/<code>false</code></td></tr>
+    <tr><td>An enum</td><td>Its member's name</td></tr>
+    <tr><td><code>String</code>, <code>u8[]</code>, <code>u8 *</code>, a <code>u8</code> array</td><td>A string</td></tr>
+    <tr><td>Other arrays and slices, <code>vec.Vec&lt;T&gt;</code></td><td>Arrays</td></tr>
+    <tr><td>A pointer</td><td>What it points to, or <code>null</code></td></tr>
+  </tbody>
+</table></div>
+<p>A union, a function pointer or a <code>void *</code> can't be JSON.</p>
+
+<h2 id="errors">Errors<a class="anchor" href="#errors" aria-label="Link to this section">#</a></h2>
+<p>Anything that doesn't fit throws <code>json.ERR_DECODE</code>, with the line and column and the path to the value.</p>
+<pre data-run><code>import json;
+
+@json struct Tag { u8[] name; i64 weight; };
+@json struct User { i64 id; Tag[] tags; };
+
+void main()
+{
+  u8[] inputs[] = {
+    "{\"tags\": [{\"weight\": \"high\"}]}",
+    "{\"id\": 1,",
+    "[1, 2]",
+  };
+  for (auto in : inputs) {
+    try {
+      User u = json.decode&lt;User&gt;(in);
+    } catch (Error e) {
+      printf("%s\n", e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">1:22: tags[0].weight: expected an integer, got a string
+1:10: id: expected a key, got the end of the input
+1:1: expected an object, got an array
+</pre>
+<p>When <code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in.</p>
+
+<h2 id="strict-decoding">Strict decoding<a class="anchor" href="#strict-decoding" aria-label="Link to this section">#</a></h2>
+<p>With <code>json.STRICT</code>, a key with no field and a missing key are errors.</p>
+<pre data-run><code>import json;
+
+@json struct Point { i64 x; i64 y; };
+
+void main()
+{
+  u8[] inputs[] = {"{\"x\": 1, \"y\": 2}", "{\"x\": 1}", "{\"x\": 1, \"y\": 2, \"z\": 3}"};
+  for (auto in : inputs) {
+    try {
+      Point p = json.decode&lt;Point&gt;(in, json.STRICT);
+      printf("ok: %d %d\n", p.x, p.y);
+    } catch (Error e) {
+      printf("%s\n", e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">ok: 1 2
+1:9: y: missing
+1:22: z: no such field in Point
+</pre>
+
+<h2 id="json-and-yaml-attributes">@json and @yaml<a class="anchor" href="#json-and-yaml-attributes" aria-label="Link to this section">#</a></h2>
+<p>Mark a struct <code>@json</code> (or <code>@yaml</code>, or both) and the compiler writes its encoder and decoder as methods.
+The struct's file must <code>import json</code> (or <code>yaml</code>).</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>u.toJson(&amp;w)</code></td><td>Writes it to a <a href="lib-json-writer.html"><code>json.Writer</code></a></td></tr>
+    <tr><td><code>u.fromJson(&amp;r)</code></td><td>Reads it from a <a href="lib-json.html#reader"><code>json.Reader</code></a></td></tr>
+    <tr><td><code>u.freeDecoded()</code></td><td>Frees what <code>fromJson</code> (or <code>decode</code>) allocated</td></tr>
+    <tr><td><code>u.toYaml(&amp;w)</code>, <code>u.fromYaml(&amp;r)</code></td><td>The same for <a href="lib-yaml.html">YAML</a></td></tr>
+  </tbody>
+</table></div>
+<ul class="rules">
+  <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> call these methods by themselves, at any depth. Adding <code>@json</code> makes existing code faster with no other change.</li>
+  <li>Without <code>@json</code>, the same calls work by <a href="lang-reflection.html">reflection</a>, about 3 times slower to decode.</li>
+  <li><code>ktm --expand file.ktm</code> prints the generated methods.</li>
+</ul>
+
+<h3 id="field-attributes">Field attributes<a class="anchor" href="#field-attributes" aria-label="Link to this section">#</a></h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Attribute</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>@key("display-name")</code></td><td>The key in the text</td></tr>
+    <tr><td><code>@skip</code></td><td>Never written or read (never required by STRICT)</td></tr>
+    <tr><td><code>@omitEmpty</code></td><td>Not written when 0, empty or null</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>import json, reflect, yaml;
+
+enum Role { guest, admin };
+
+@json @yaml
+struct Tag {
+  String name;
+  @omitEmpty i64 weight;
+};
+
+@json @yaml
+struct User {
+  i64 id;
+  @key("display-name") String name;
+  Role role;
+  Tag[] tags;
+  @skip i64 visits;
+};
+
+void main()
+{
+  User u = json.decode&lt;User&gt;("{\"id\": 7, \"display-name\": \"Ada\", \"role\": \"admin\","
+                             " \"tags\": [{\"name\": \"math\", \"weight\": 3}, {\"name\": \"poetry\"}]}");
+  defer u.freeDecoded();
+  printf("%d %s %s %d tags\n", u.id, u.name, reflect.name(u.role), u.tags.len);
+
+  json.Writer w = json.writerNew();
+  defer w.free();
+  u.toJson(&amp;w);
+  ad String text = w.take();
+  printf("%s\n", text);
+
+  yaml.Writer y = yaml.writerNew();
+  defer y.free();
+  u.toYaml(&amp;y);
+  ad String doc = y.take();
+  printf("%s", doc);
+}
+</code></pre>
+<pre class="output">7 Ada admin 2 tags
+{"id":7,"display-name":"Ada","role":"admin","tags":[{"name":"math","weight":3},{"name":"poetry"}]}
+id: 7
+display-name: Ada
+role: admin
+tags:
+  - name: math
+    weight: 3
+  - name: poetry
+</pre>
+
+<h2 id="filling-a-value-you-have">Filling a value you have<a class="anchor" href="#filling-a-value-you-have" aria-label="Link to this section">#</a></h2>
+<p><code>json.decode(text, reflect.of(x))</code> fills an existing value. Fields the JSON leaves out keep what they had, so zero it first.</p>
+<pre data-run><code>import json, reflect;
+
+struct Config { i64 port; i64 workers; bool debug; };
+
+void main()
+{
+  Config c = {8080, 4, false};        // defaults
+  json.decode("{\"workers\": 16}", reflect.of(c));
+  printf("%d %d %d\n", c.port, c.workers, c.debug);
+}
+</code></pre>
+<pre class="output">8080 16 0
+</pre>
+<p>That is a handy way to apply a config file on top of defaults.</p>
+
+<h2 id="memory">Memory<a class="anchor" href="#memory" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Decoding allocates the Strings, slices, Vecs, <code>u8 *</code> strings and pointed-to structs it fills.</li>
+  <li><code>u.freeDecoded()</code> or <code>json.free(reflect.of(u))</code> frees them all and zeroes the fields, also after a decode that threw half way.</li>
+  <li>Use them only on values that decode filled.</li>
+  <li>A decoded Vec is an ordinary one: <code>push</code> grows it.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-json-writer.html"><span>Previous</span>JSON: writing</a><a class="next" href="lib-yaml.html"><span>Next</span>YAML</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-json-structs.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#decode-and-encode">Decode and encode</a></li><li><a href="#types">Types</a></li><li><a href="#errors">Errors</a></li><li><a href="#strict-decoding">Strict decoding</a></li><li><a href="#json-and-yaml-attributes">@json and @yaml</a></li><li><a href="#filling-a-value-you-have">Filling a value you have</a></li><li><a href="#memory">Memory</a></li></ul></nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methods and inheritance - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li class="current"><a href="lang-methods.html" aria-current="page">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Methods and inheritance</h1>
+<p class="lede">A method is a function named <code>Type.name</code>. A struct can extend one other struct.
+There are no classes, no constructors and no virtual dispatch.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>struct User { u8 *name; i64 age; };
+void User.greet() { printf("hi %s\n", self.name); }  // self is a User *
+u.greet();  p.greet();                                // on a value or a pointer
+struct Admin : User { i64 level; };                   // Admin has User's fields and methods
+User.greet(self);                                     // call the base's explicitly
+fn(User *) void f = &amp;User.greet;                      // a method is a function</code></pre>
+</div>
+
+<h2 id="methods">Methods<a class="anchor" href="#methods" aria-label="Link to this section">#</a></h2>
+<p>Write the method outside the struct. Inside, <code>self</code> is a pointer to the object it was called on.</p>
+<pre data-run><code>struct Account
+{
+  u8 *owner;
+  i64 balance;
+};
+
+void Account.deposit(i64 amount)
+{
+  self.balance += amount;        // changes the caller's object
+}
+
+bool Account.withdraw(i64 amount)
+{
+  if (amount &gt; self.balance) { return false; }
+  self.balance -= amount;
+  return true;
+}
+
+void Account.print()
+{
+  printf("%s: %d\n", self.owner, self.balance);
+}
+
+void main()
+{
+  Account a = {"ann", 0};
+  a.deposit(100);
+  a.withdraw(30);
+  printf("too much: %d\n", a.withdraw(500));
+  a.print();
+
+  Account *p = &amp;a;
+  p.deposit(5);                  // the same on a pointer
+  p-&gt;print();
+}
+</code></pre>
+<pre class="output">too much: 0
+ann: 70
+ann: 75
+</pre>
+<ul class="rules">
+  <li><code>self</code> can't be assigned, and no parameter may be called <code>self</code>.</li>
+  <li>Default arguments, <code>T ...name</code> and <a href="lang-overloading.html">overloading</a> work as for functions.</li>
+  <li>A prototype, <code>void Account.print();</code>, declares a method defined later.</li>
+  <li>A union can have methods too.</li>
+</ul>
+
+<h2 id="a-constructor-is-just-a-function">A constructor is just a function<a class="anchor" href="#a-constructor-is-just-a-function" aria-label="Link to this section">#</a></h2>
+<p>By convention, a module's <code>new</code> or <code>open</code> function makes the value; a <code>free()</code> method releases it.</p>
+<pre data-run><code>import mem;
+
+struct Buffer { u8 *data; i64 len; };
+
+Buffer bufferNew(i64 size)
+{
+  Buffer b = {mem.allocZero(size), size};
+  return b;
+}
+
+void Buffer.free()
+{
+  mem.free(self.data);
+  self.data = null;
+  printf("freed %d bytes\n", self.len);
+}
+
+void main()
+{
+  ad Buffer b = bufferNew(64);     // ad calls b.free() at the end
+  b.data[0] = 'x';
+  printf("%c\n", b.data[0]);
+}
+</code></pre>
+<pre class="output">x
+freed 64 bytes
+</pre>
+
+<h2 id="inheritance">Inheritance<a class="anchor" href="#inheritance" aria-label="Link to this section">#</a></h2>
+<p><code>struct Admin : User</code> starts with all of <code>User</code>'s fields, so an <code>Admin *</code>
+can be used wherever a <code>User *</code> is expected. It also has <code>User</code>'s methods.</p>
+<pre data-run><code>struct User  { u8 *name; i64 age; };
+struct Admin : User { i64 level; };
+
+void User.describe() { printf("%s is %d\n", self.name, self.age); }
+void User.birthday() { self.age++; }
+
+void greet(User *u) { printf("hello %s\n", u.name); }
+
+void main()
+{
+  Admin a;
+  a.name = "bob";
+  a.age = 40;
+  a.level = 2;
+  a.birthday();          // inherited
+  a.describe();          // inherited
+  greet(&amp;a);             // an Admin * is a User *
+  printf("%d\n", sizeof(Admin));
+}
+</code></pre>
+<pre class="output">bob is 41
+hello bob
+24
+</pre>
+
+<h3 id="hiding-a-base-method">Hiding a base method<a class="anchor" href="#hiding-a-base-method" aria-label="Link to this section">#</a></h3>
+<p>A method of the same name on the derived struct hides the base's. <code>Base.name(self)</code> still calls the base's.</p>
+<pre data-run><code>struct User  { u8 *name; };
+struct Admin : User { i64 level; };
+
+void User.describe()  { printf("user %s\n", self.name); }
+void Admin.describe()
+{
+  printf("admin %d, ", self.level);
+  User.describe(self);
+}
+
+void main()
+{
+  Admin a;
+  a.name = "bob";
+  a.level = 2;
+  a.describe();
+
+  User *u = &amp;a;
+  u.describe();      // the pointer's type decides: User.describe
+}
+</code></pre>
+<pre class="output">admin 2, user bob
+user bob
+</pre>
+<div class="note"><p><strong>No virtual dispatch.</strong> Which method runs is decided by the type the compiler
+sees, never at run time. For behaviour chosen at run time, store a function pointer in the struct.</p></div>
+
+<h3 id="run-time-dispatch-with-a-function-pointer">Run-time dispatch with a function pointer<a class="anchor" href="#run-time-dispatch-with-a-function-pointer" aria-label="Link to this section">#</a></h3>
+<pre data-run><code>struct Shape
+{
+  u8 *name;
+  fn(Shape *) f64 area;
+};
+
+struct Circle : Shape { f64 r; };
+struct Rect : Shape { f64 w, h; };
+
+f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * c.r * c.r; }
+f64 rectArea(Shape *s)   { Rect *r = s; return r.w * r.h; }
+
+void main()
+{
+  Circle c;
+  c.name = "circle";
+  c.area = &amp;circleArea;
+  c.r = 1.0;
+
+  Rect r;
+  r.name = "rect";
+  r.area = &amp;rectArea;
+  r.w = 2.0;
+  r.h = 3.0;
+
+  Shape *shapes[2] = {&amp;c, &amp;r};
+  for (auto s : shapes) {
+    printf("%s: %.2f\n", s.name, s.area(s));
+  }
+}
+</code></pre>
+<pre class="output">circle: 3.14
+rect: 6.00
+</pre>
+
+<h2 id="methods-as-function-pointers">Methods as function pointers<a class="anchor" href="#methods-as-function-pointers" aria-label="Link to this section">#</a></h2>
+<p><code>&amp;User.describe</code> is an ordinary function whose first parameter is <code>self</code>.</p>
+<pre data-run><code>struct User { u8 *name; };
+void User.hello() { printf("hello %s\n", self.name); }
+
+void each(User[] users, fn(User *) void f)
+{
+  for (i64 i = 0; i &lt; users.len; i++) { f(&amp;users[i]); }
+}
+
+void main()
+{
+  User all[2] = {{"ann"}, {"bob"}};
+  each(all, &amp;User.hello);
+}
+</code></pre>
+<pre class="output">hello ann
+hello bob
+</pre>
+<p><code>u.hello</code> without <code>()</code> is an error: there are no bound methods.</p>
+
+<h2 id="errors">Errors<a class="anchor" href="#errors" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>A method with the name of a field, inherited fields included.</li>
+  <li>The same method defined twice (with the same parameter types).</li>
+  <li>A method of something that isn't a struct or union.</li>
+  <li>A method added to a type of the standard library or another module: only the module that defines a type can add methods.</li>
+  <li>Calling a field as a method: <code>s.len()</code> says "`len` is a field, not a method: read it without `()`".</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-structs.html"><span>Previous</span>Structs and unions</a><a class="next" href="lang-enums.html"><span>Next</span>Enums</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-methods.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#methods">Methods</a></li><li><a href="#a-constructor-is-just-a-function">A constructor is just a function</a></li><li><a href="#inheritance">Inheritance</a></li><li><a href="#methods-as-function-pointers">Methods as function pointers</a></li><li><a href="#errors">Errors</a></li></ul></nav>
+</div>
+</body>
+</html>

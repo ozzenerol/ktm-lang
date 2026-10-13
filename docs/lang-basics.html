@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Program basics - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group" open><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li class="current"><a href="lang-basics.html" aria-current="page">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="language.html">Language</a></span></div>
+<h1>Program basics</h1>
+<p class="lede">What a ktm file looks like, where a program starts, and how it prints.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>// a comment              /* a block comment */
+import str;               // imports first
+i64 gCount = 0;           // globals, types, functions at file scope
+
+i32 main(i32 argc, u8 **argv)
+{
+  printf("%d args\n", argc);
+  return 0;               // the exit code
+}</code></pre>
+</div>
+
+<h2 id="the-smallest-program">The smallest program<a class="anchor" href="#the-smallest-program" aria-label="Link to this section">#</a></h2>
+<p>A program starts at <code>main</code>, as in C.</p>
+<pre data-run><code>void main()
+{
+  printf("Hello\n");
+}
+</code></pre>
+<pre class="output">Hello
+</pre>
+<p>Save it as <code>hello.ktm</code> and run it:</p>
+<pre class="shell"><code>ktm hello.ktm -o hello &amp;&amp; ./hello   # compile to a binary
+ktm -jit hello.ktm                    # or compile in memory and run</code></pre>
+
+<h2 id="main">main<a class="anchor" href="#main" aria-label="Link to this section">#</a></h2>
+<p>Three forms are allowed. The value <code>main</code> returns is the exit code.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Form</th><th>Exit code</th></tr></thead>
+  <tbody>
+    <tr><td><code>void main()</code></td><td>0</td></tr>
+    <tr><td><code>i32 main()</code></td><td>what it returns</td></tr>
+    <tr><td><code>i32 main(i32 argc, u8 **argv)</code></td><td>what it returns; <code>argv</code> holds the arguments</td></tr>
+  </tbody>
+</table></div>
+<pre data-run><code>i32 main(i32 argc, u8 **argv)
+{
+  printf("%d argument(s), the first is the program\n", argc);
+  return 0;
+}
+</code></pre>
+<pre class="output">1 argument(s), the first is the program
+</pre>
+
+<h2 id="what-goes-where">What goes where<a class="anchor" href="#what-goes-where" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><strong>File scope</strong> holds declarations: imports, types, functions, globals and constants.</li>
+  <li><strong>Statements</strong> go inside functions.</li>
+  <li><strong>Imports</strong> come first in a file, before any declaration.</li>
+  <li>Globals whose initialiser runs code are set up <strong>in order, before <code>main</code></strong>.</li>
+</ul>
+<pre data-run><code>i64 square(i64 n) { return n * n; }
+
+i64 gBase = 7;
+i64 gArea = square(gBase);   // runs before main
+
+void main()
+{
+  printf("%d\n", gArea);
+}
+</code></pre>
+<pre class="output">49
+</pre>
+
+<h2 id="comments">Comments<a class="anchor" href="#comments" aria-label="Link to this section">#</a></h2>
+<p>The same as C. Block comments don't nest.</p>
+<pre data-run><code>/* A block comment
+   over several lines. */
+void main()
+{
+  // to the end of the line
+  printf("comments are ignored\n");   /* or inline */
+}
+</code></pre>
+<pre class="output">comments are ignored
+</pre>
+<p>A block comment still open at the end of the file is an error: <code>unterminated comment</code>.</p>
+
+<h2 id="printing">Printing<a class="anchor" href="#printing" aria-label="Link to this section">#</a></h2>
+<p><code>printf</code> works as in C. The compiler checks the arguments against the format.</p>
+<pre data-run><code>void main()
+{
+  printf("plain text\n");
+  printf("%s is %d years old\n", "Ada", 36);
+  printf("[%5d] [%-5d] [%05d]\n", 42, 42, 42);
+  printf("%x %X %c %.3f\n", 255, 255, 'A', 3.14159);
+  printf("100%%\n");
+}
+</code></pre>
+<pre class="output">plain text
+Ada is 36 years old
+[   42] [42   ] [00042]
+ff FF A 3.142
+100%
+</pre>
+<ul class="rules">
+  <li>The first argument is always a format, so a literal <code>%</code> is written <code>%%</code>.</li>
+  <li><code>%d</code>, <code>%u</code>, <code>%x</code> and <code>%o</code> print the full 64 bits: no need for <code>%ld</code> (it works too).</li>
+  <li><code>%s</code> takes a C string, a slice (<code>u8[]</code>) or a <code>String</code>.</li>
+</ul>
+<pre data-run><code>import str;
+
+void main()
+{
+  i64 big = 5000000000;
+  printf("%d %ld\n", big, big);
+
+  u8[] word = "slice";
+  String owned = str.from("String");
+  defer owned.free();
+  printf("%s, %s and %s\n", "C string", word, owned);
+}
+</code></pre>
+<pre class="output">5000000000 5000000000
+C string, slice and String
+</pre>
+
+<h3 id="ktm-s-own-conversions">ktm's own conversions<a class="anchor" href="#ktm-s-own-conversions" aria-label="Link to this section">#</a></h3>
+<p><code>%Q</code> prints a string escaped as a C literal, and <code>%C</code> a character in upper case.</p>
+<pre data-run><code>void main()
+{
+  printf("%Q\n", "say \"hi\"\n");
+  printf("%C%c\n", 'h', 'i');
+}
+</code></pre>
+<pre class="output">say \"hi\"\n
+Hi
+</pre>
+<p>Every conversion, flag and width is listed on <a href="lib-formatting.html">Format strings</a>.</p>
+
+<h2 id="printing-to-stderr">Printing to stderr<a class="anchor" href="#printing-to-stderr" aria-label="Link to this section">#</a></h2>
+<p><code>os.eprintf</code> is <code>printf</code> to stderr, checked the same way.</p>
+<pre><code>import os;
+
+void main()
+{
+  os.eprintf("warning: %s\n", "disk almost full");
+}</code></pre>
+
+<h2 id="exiting-early">Exiting early<a class="anchor" href="#exiting-early" aria-label="Link to this section">#</a></h2>
+<p>Return from <code>main</code>, or call <code>os.exit(code)</code> from anywhere.</p>
+<pre data-run><code>import os;
+
+void check(i64 n)
+{
+  if (n &lt; 0) {
+    printf("negative, giving up\n");
+    os.exit(0);
+  }
+  printf("%d is fine\n", n);
+}
+
+void main()
+{
+  check(3);
+  check(-1);
+  printf("never printed\n");
+}
+</code></pre>
+<pre class="output">3 is fine
+negative, giving up
+</pre>
+<div class="note"><p><code>os.exit</code> ends the program at once: <a href="lang-defer.html">defer</a> statements
+don't run. Returning from <code>main</code> runs them.</p></div>
+
+<h2 id="scripts">Scripts<a class="anchor" href="#scripts" aria-label="Link to this section">#</a></h2>
+<p>ktm skips a first line that starts with <code>#!</code>, so a file can run as a script:</p>
+<pre><code>#!/usr/bin/env -S ktm -jit
+void main() { printf("Hello from a script\n"); }</code></pre>
+<pre class="shell"><code>chmod +x hello.ktm
+./hello.ktm</code></pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="language.html"><span>Previous</span>Overview</a><a class="next" href="lang-types.html"><span>Next</span>Types and literals</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lang-basics.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-smallest-program">The smallest program</a></li><li><a href="#main">main</a></li><li><a href="#what-goes-where">What goes where</a></li><li><a href="#comments">Comments</a></li><li><a href="#printing">Printing</a></li><li><a href="#printing-to-stderr">Printing to stderr</a></li><li><a href="#exiting-early">Exiting early</a></li><li><a href="#scripts">Scripts</a></li></ul></nav>
+</div>
+</body>
+</html>
