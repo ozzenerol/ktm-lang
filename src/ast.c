@@ -1121,8 +1121,8 @@ int astTypeIsString(AstType *type) {
 }
 
 /* A slice or a String, or a struct, union or array with one in it: what
- * a local starts empty without an initialiser (zeroed), since its len
- * (and a String's ptr) guard its use */
+ * is always zeroed without an initialiser, even in a big array, since
+ * its len (and a String's ptr) guard its use */
 int astTypeHasSlice(AstType *type) {
     if (!type) return 0;
     if (astTypeIsSlice(type) || astTypeIsString(type)) return 1;

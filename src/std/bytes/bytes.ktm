@@ -5,7 +5,7 @@ import libc, mem, rt, str;
  * For what a socket or a file gives in pieces (read into room(), parse
  * data(), consume() what was used) and for building binary messages
  * (appendBe32(...), then data() or take()). Make one with
- * bytes.bufferNew() (a declared Buffer isn't zeroed), free it with
+ * bytes.bufferNew() or declare one (it starts empty), free it with
  * b.free(). Its fields are read-only outside module bytes. */
 pub struct Buffer
 {

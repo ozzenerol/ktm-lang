@@ -107,8 +107,8 @@ void main()
 3 4 8
 2 5 0 | 7 0
 </pre>
-<div class="warn"><p><strong>A declared struct is not zeroed.</strong> <code>Point p;</code> holds whatever was there.
-Write <code>Point p = {0};</code> or set every field.</p></div>
+<p>A declared struct starts zeroed: after <code>Point p;</code> every field is 0, as with
+<code>Point p = {0};</code>.</p>
 
 <h3>Strings in fields</h3>
 <p>A string for a <code>u8</code> array field is copied in and must fit with its NUL.

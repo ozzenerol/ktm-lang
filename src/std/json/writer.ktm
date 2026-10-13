@@ -18,7 +18,7 @@ const u8 WRITER_KEY = 4;      /* an object whose key() is waiting for its value 
 /* Builds a JSON document into a String: begin/end the arrays and objects,
  * key() each member, and add the values; commas, quotes and escapes are
  * written for you. Make one with json.writerNew() (a declared Writer
- * isn't zeroed), free it with w.free(), and take the text with w.take().
+ * is all zero, not set up), free it with w.free(), and take the text with w.take().
  * Its fields are read-only outside module json. */
 pub struct Writer
 {
