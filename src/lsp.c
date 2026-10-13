@@ -1113,6 +1113,18 @@ static void lspCatGenericHead(AoStr *out, GenericDef *d) {
     }
 }
 
+/* A struct's or field's attributes as written, each followed by a space:
+ * `@json @yaml `, `@key("e-mail") ` */
+static void lspCatAttrs(AoStr *out, Vec *attrs) {
+    if (!attrs) return;
+    for (u64 i = 0; i < attrs->size; ++i) {
+        AstAttr *a = attrs->entries[i];
+        aoStrCatPrintf(out, "@%s", a->name->data);
+        if (a->arg) aoStrCatPrintf(out, "(\"%s\")", a->arg->data);
+        aoStrPutChar(out, ' ');
+    }
+}
+
 /* A struct, union or enum as hover shows it */
 static void lspCatType(AoStr *out, AstType *ty) {
     if (ty->is_enum) {
@@ -1128,6 +1140,10 @@ static void lspCatType(AoStr *out, AstType *ty) {
         }
         aoStrCat(out, "};");
         return;
+    }
+    if (ty->attrs && ty->attrs->size) {   /* on their own line, as written */
+        lspCatAttrs(out, ty->attrs);
+        out->data[out->len - 1] = '\n';
     }
     if (!ty->fields) {
         aoStrCatPrintf(out, "%s %s;", ty->kind == AST_TYPE_UNION ? "union" : "struct",
@@ -1582,8 +1598,10 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         aoStrCatPrintf(rendered, "module %s", modname);
         if (dir) aoStrCatPrintf(rendered, "  // %s", dir);
     } else if (fdecl && fowner->generic) {
+        lspCatAttrs(rendered, fdecl->field_attrs);
         lspCatGenericField(rendered, fowner->generic, fdecl, ident);
     } else if (fdecl) {
+        lspCatAttrs(rendered, fdecl->field_attrs);
         aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(fdecl),
                        fowner->clsname ? fowner->clsname->data : "", ident);
     } else if (member) {
@@ -1609,6 +1627,7 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
         AstType *owner = NULL;
         Ast *method = (mcls && !f) ? lspFindMethod(ctx, mcls, ident, ilen, &owner)
                                    : NULL;
+        if (f) lspCatAttrs(rendered, f->field_attrs);
         if (f && mcls->clsname)
             aoStrCatPrintf(rendered, "%s %s.%s", astTypeToString(f),
                            mcls->clsname->data, ident);
