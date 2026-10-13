@@ -1,13 +1,23 @@
 module coro;
-import date, libc, mem, net, os, rt;
+import atomic, cstr, date, libc, mem, net, os, rt;
 
 /* A loop of coroutines: coro.go starts one, coro.run runs them until none
  * is left, and inside them coro.wait, coro.sleep and coro.accept pause the
  * coroutine instead of blocking the thread. Each thread has its own loop
  * (kept in its rt.HCFs, made on first use).
  *
- * The waits on fds go to the kernel's event queue, epoll(7) on Linux and
- * kqueue(2) on macOS, so a turn costs what is ready, not what is open. An
+ * On Linux the loop uses io_uring when the kernel allows it (6.1 or later,
+ * not blocked by seccomp or a container): coro.read, coro.write and
+ * coro.accept go to the ring as RECV, SEND and ACCEPT, a wait on an fd as
+ * POLL_ADD, and one io_uring_enter per turn submits them all and waits
+ * for their completions. A coroutine is resumed only by its operation's
+ * completion, also after a timeout, coro.stop or coro.close cancelled it,
+ * so the kernel never writes into a buffer the coroutine has left.
+ * KTM_CORO_BACKEND=uring|epoll|kqueue|poll picks a backend; coro.backend()
+ * says which one the thread's loop uses.
+ *
+ * Otherwise the waits on fds go to the kernel's event queue, epoll(7) on
+ * Linux and kqueue(2) on macOS, so a turn costs what is ready, not what is open. An
  * fd stays registered (level-triggered) for what its waiters want, and the
  * queue is only told when that changes: a connection that waits to read,
  * answers, and waits to read again costs no call to the queue after its
@@ -75,9 +85,80 @@ const i64 LOOP_EV_SIZE = 32;
 #endif
 /* events taken from the kernel in one turn at most (more wait a turn) */
 const i64 LOOP_MAXEV = 256;
-/* coro.read reads at most this many times in a row without a turn of the
- * loop, so one busy stream doesn't starve the others */
-const i64 LOOP_READ_STREAK = 32;
+
+/* The loop's backend, chosen when the loop is made (loopQueue) */
+const i64 LOOP_BK_POLL = 1;      /* poll(2) over the waiters, every turn */
+const i64 LOOP_BK_QUEUE = 2;     /* epoll (Linux) or kqueue (macOS) */
+const i64 LOOP_BK_URING = 3;     /* io_uring (Linux) */
+
+/* why an io_uring operation was cancelled: what its caller returns */
+const i64 LOOP_WHY_TIMEOUT = 1;
+const i64 LOOP_WHY_STOP = 2;
+const i64 LOOP_WHY_CLOSE = 3;
+
+#ifdef IS_LINUX
+/* io_uring through raw system calls (the same numbers on x86_64 and
+ * arm64) and its mmap'd rings: no liburing */
+extern "c" i64 syscall(i64 nr, i64 a, i64 b, i64 c, i64 d, i64 e, i64 f);
+const i64 LOOP_SYS_URING_SETUP = 425;
+const i64 LOOP_SYS_URING_ENTER = 426;
+const i64 LOOP_SYS_URING_REGISTER = 427;
+/* SQ and CQ sizes: about 32 KiB per loop thread; a CQ overflow is kept by
+ * the kernel (FEAT_NODROP) and handed over at the next enter */
+const i64 LOOP_URING_SQ = 256;
+const i64 LOOP_URING_CQ = 1024;
+const i64 LOOP_URING_SETUP_CQSIZE = 0x8;
+const i64 LOOP_URING_SETUP_SINGLE_ISSUER = 0x1000;
+const i64 LOOP_URING_SETUP_DEFER_TASKRUN = 0x2000;
+const i64 LOOP_URING_FEAT_SINGLE_MMAP = 0x1;
+const i64 LOOP_URING_FEAT_NODROP = 0x2;
+const i64 LOOP_URING_FEAT_EXT_ARG = 0x100;
+const i64 LOOP_URING_ENTER_GETEVENTS = 0x1;
+const i64 LOOP_URING_ENTER_EXT_ARG = 0x8;
+const i64 LOOP_URING_OFF_SQ_RING = 0;
+const i64 LOOP_URING_OFF_CQ_RING = 0x8000000;
+const i64 LOOP_URING_OFF_SQES = 0x10000000;
+const i64 LOOP_URING_REGISTER_PROBE = 8;
+const i64 LOOP_OP_POLL_ADD = 6;
+const i64 LOOP_OP_ACCEPT = 13;
+const i64 LOOP_OP_ASYNC_CANCEL = 14;
+const i64 LOOP_OP_READ = 22;
+const i64 LOOP_OP_WRITE = 23;
+const i64 LOOP_OP_SEND = 26;
+const i64 LOOP_OP_RECV = 27;
+const i64 LOOP_ECANCELED = 125;
+const i64 LOOP_ETIME = 62;
+const i64 LOOP_EBUSY = 16;
+const i64 LOOP_MSG_WAITALL = 0x100;
+const i64 LOOP_MSG_NOSIGNAL = 0x4000;
+const i64 LOOP_SOCK_NONBLOCK = 0x800;
+const i64 LOOP_SOCK_CLOEXEC = 0x80000;
+const i64 LOOP_MAP_SHARED = 0x1;
+const i64 LOOP_MAP_POPULATE = 0x8000;
+#endif
+/* How long coro.read goes on reading without a turn of the loop while
+ * each read fills its buffer (a busy stream), so it doesn't starve the
+ * loop's other coroutines: one sharing a loop with a saturating stream
+ * waits about twice this at most (test 636). Measured on the v0.13.0
+ * echo benchmark (bench/tcp-echo, 64 KiB streams at 16 and 64
+ * connections, MB per server CPU-second; Go: 3360-3400):
+ *   32 reads, the old cap (about 0.6 ms):  2870-2900
+ *   1 ms:                                  3070-3130
+ *   2 ms:                                  3410-3490, ties Go
+ *   4 ms:                                  3670-3780, +9-11% (7.3-7.5 GB/s
+ *                                          against Go's 6.5-6.6)
+ *   8 ms:                                  3710-3790, no further gain
+ * 4 ms is the knee, and its worst wait for another coroutine (about 8 ms)
+ * is still tighter than Go's 10 ms preemption tick. Requests (reads that
+ * don't fill the buffer) never use it, so they are unaffected. */
+const i64 LOOP_READ_BUDGET_NS = 4000000;
+
+/* io_uring: after a read of at least this much (a stream), coro.read
+ * waits with POLL_ADD and then reads what has piled up, as the other
+ * backends do; a RECV would take each bit as it comes, which keeps the
+ * kernel's receive buffer small (more segments and ACKs: 7% fewer bytes
+ * per CPU-second). Small reads (requests) keep the RECV. */
+const i64 LOOP_READ_BIG = 16384;
 
 /* The coroutines waiting on one fd, and what it is registered for */
 struct LoopFd {
@@ -85,7 +166,9 @@ struct LoopFd {
     i64 n, cap;
     i64 armed;           /* POLLIN/POLLOUT it is registered for, 0: none */
     bool full;           /* coro.read's last read filled its buffer */
-    i64 streak;          /* reads in a row that didn't wait */
+    bool big;            /* and was at least LOOP_READ_BIG */
+    i64 burstNs;         /* when the reads that didn't wait began */
+    bool notSock;        /* io_uring: not a socket, so READ/WRITE, not RECV/SEND */
 };
 
 struct LoopTask {
@@ -100,6 +183,9 @@ struct LoopTask {
     bool ready;          /* in Loop.ready, to be resumed with `result` */
     bool idle;           /* stop() ends the wait with -1 */
     bool paused;         /* accept out of fds: close() ends the wait */
+    bool op;             /* io_uring: its operation is in flight */
+    bool cancelled;      /* io_uring: and an ASYNC_CANCEL was sent for it */
+    i64 why;             /* io_uring: LOOP_WHY_* of that cancel */
 };
 
 struct Loop {
@@ -121,6 +207,15 @@ struct Loop {
     bool fdsOut;         /* accept ran out of fds (or memory) */
     i64 fdsOutUntil;     /* and rests until then (or a close()) */
     i64 fdsTightUntil;   /* until then, accept checks for free fds first */
+    i64 backend;         /* LOOP_BK_*, 0 until loopQueue chose */
+    /* io_uring (LOOP_BK_URING): the ring fd and its three mappings */
+    i32 ring;
+    u8 *sqMap, *cqMap, *sqes;
+    i64 sqMapLen, cqMapLen, sqesLen;
+    u32 *sqHead, *sqTail, *cqHead, *cqTail;
+    u32 sqMask, cqMask, sqEntries;
+    u32 sqLocal;         /* the SQ tail as filled so far */
+    u8 *cqes;
 };
 
 static void loopOom() {
@@ -143,8 +238,15 @@ static void loopDrop(Coroutine *c) {
     libc.free(c);
 }
 
+#ifdef IS_LINUX
+static void loopUringFree(Loop *lp);
+#endif
+
 static void loopFree(void *p) {
     Loop *lp = p;
+#ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING) { loopUringFree(lp); }
+#endif
     for (i64 i = 0; i < lp.n; i++) {
         loopDrop(lp.tasks[i].co);
         libc.free(lp.tasks[i]);
@@ -258,19 +360,64 @@ pub Coroutine *go(fn(void *arg) void *body, void *arg=null, i64 stackSize=0) {
     return c;
 }
 
-/* The loop's kernel queue, made with the loop; -1 when the system
- * wouldn't make one (out of fds): the loop then polls with poll(2). */
+#ifdef IS_LINUX
+static bool loopUringSetup(Loop *lp);
+#endif
+
+/* The backend KTM_CORO_BACKEND asks for (LOOP_BK_*), 0 for the default */
+static i64 loopBackendWanted() {
+    u8 *v = (u8 *)libc.getenv("KTM_CORO_BACKEND");
+    if (!v) { return 0; }
+    if (!cstr.cmp(v, "uring")) { return LOOP_BK_URING; }
+    if (!cstr.cmp(v, "epoll") || !cstr.cmp(v, "kqueue")) { return LOOP_BK_QUEUE; }
+    if (!cstr.cmp(v, "poll")) { return LOOP_BK_POLL; }
+    return 0;
+}
+
+/* Choose the loop's backend when it is made: io_uring on Linux when the
+ * kernel allows it, else the kernel's event queue (epoll, kqueue), else
+ * poll(2) (no fd for a queue). KTM_CORO_BACKEND picks one; one that
+ * can't be had gives the next one down. The queue's fd, -1 for io_uring
+ * and poll(2). */
 static i32 loopQueue(Loop *lp) {
-    if (lp.q >= 0 || lp.ev) { return lp.q; }
+    if (lp.backend) { return lp.q; }
+    i64 want = loopBackendWanted();
+    lp.ev = libc.malloc(LOOP_MAXEV * LOOP_EV_SIZE);
+    if (!lp.ev) { loopOom(); }
+#ifdef IS_LINUX
+    if ((want == 0 || want == LOOP_BK_URING) && loopUringSetup(lp)) {
+        lp.backend = LOOP_BK_URING;
+        return -1;
+    }
+#endif
+    if (want == LOOP_BK_POLL) {
+        lp.backend = LOOP_BK_POLL;
+        return -1;
+    }
 #ifdef IS_LINUX
     lp.q = epoll_create1(LOOP_EPOLL_CLOEXEC);
 #else
     lp.q = kqueue();
     if (lp.q >= 0) { libc.fcntl(lp.q, libc.F_SETFD, libc.FD_CLOEXEC); }
 #endif
-    lp.ev = libc.malloc(LOOP_MAXEV * LOOP_EV_SIZE);
-    if (!lp.ev) { loopOom(); }
+    lp.backend = lp.q >= 0 ? LOOP_BK_QUEUE : LOOP_BK_POLL;
     return lp.q;
+}
+
+/* The backend of the calling thread's loop (made now if there is none):
+ * "uring" (io_uring, Linux), "epoll" (Linux), "kqueue" (macOS) or "poll"
+ * (poll(2), when no queue could be made or KTM_CORO_BACKEND=poll). */
+pub u8[] backend() {
+    Loop *lp = loopGet(true);
+    if (lp.backend == LOOP_BK_URING) { return "uring"; }
+    if (lp.backend == LOOP_BK_QUEUE) {
+#ifdef IS_LINUX
+        return "epoll";
+#else
+        return "kqueue";
+#endif
+    }
+    return "poll";
 }
 
 /* Every waiter of fd that `revents` answers, ready with it. Not the ones
@@ -375,13 +522,14 @@ static void loopForget(Loop *lp, i32 fd) {
     if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
         lp.fdw[fd].armed = 0;
         lp.fdw[fd].full = false;
+        lp.fdw[fd].notSock = false;
     }
 }
 
 /* t waits on fd for events: one more waiter of fd, and fd armed. */
 static LoopFd *loopFdOf(Loop *lp, i32 fd);
 
-static void loopWaitFd(Loop *lp, LoopTask *t, i32 fd) {
+static void loopAddWaiter(Loop *lp, LoopTask *t, i32 fd) {
     LoopFd *f = loopFdOf(lp, fd);
     if (f.n == f.cap) {
         f.cap = f.cap ? f.cap * 2 : 2;
@@ -390,6 +538,10 @@ static void loopWaitFd(Loop *lp, LoopTask *t, i32 fd) {
     f.w[f.n++] = t;
     t.onFd = true;
     lp.nonFd++;
+}
+
+static void loopWaitFd(Loop *lp, LoopTask *t, i32 fd) {
+    loopAddWaiter(lp, t, fd);
     loopArm(lp, fd);
 }
 
@@ -404,8 +556,27 @@ static LoopTask *loopSelf(u8 *what) {
 
 /* Pause t until fd (if >= 0) is ready for events, the deadline (if >= 0)
  * passes, or stop() (idle) or close() (paused) ends the wait. */
+#ifdef IS_LINUX
+static i64 loopOp(Loop *lp, LoopTask *t, i64 opcode, i32 fd, u64 addr, i64 len, i64 opFlags,
+                  u64 off, i64 deadline, bool idle);
+#endif
+
 static i64 loopPark(LoopTask *t, i32 fd, i16 events, i64 deadline, bool idle, bool paused) {
     Loop *lp = loopGet(true);
+#ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING && fd >= 0) {
+        /* POLL_ADD; a cancel answers as the other backends do: 0 for the
+         * deadline, -1 for coro.stop, POLLNVAL for coro.close */
+        i64 r = loopOp(lp, t, LOOP_OP_POLL_ADD, fd, 0, 0, (u16)events, 0, deadline, idle);
+        if (r > 0) { return r; }
+        if (r == -LOOP_ECANCELED) {
+            if (t.why == LOOP_WHY_TIMEOUT) { return 0; }
+            if (t.why == LOOP_WHY_STOP) { return -1; }
+        }
+        return libc.POLLNVAL;
+    }
+#endif
+    t.cancelled = false;            /* io_uring: from an operation before */
     t.fd = fd;
     t.events = events;
     t.deadline = deadline;
@@ -455,6 +626,209 @@ static LoopFd *loopFdOf(Loop *lp, i32 fd) {
     return lp.fdw[fd];
 }
 
+#ifdef IS_LINUX
+/* ---- io_uring ---- */
+
+/* An io_uring for the loop: SINGLE_ISSUER and DEFER_TASKRUN (only this
+ * thread uses it, and completions are handed over at its enter), and a
+ * kernel that has every operation used here, NODROP and EXT_ARG; false
+ * (and nothing kept) otherwise: no io_uring (ENOSYS), seccomp (EPERM),
+ * RLIMIT_MEMLOCK (ENOMEM), a kernel before 6.1 (EINVAL). */
+static bool loopUringSetup(Loop *lp) {
+    u32 p[30];               /* struct io_uring_params, 120 bytes */
+    u8 probe[16 + 64 * 8];   /* struct io_uring_probe with 64 ops */
+    i64 need[7] = {LOOP_OP_POLL_ADD, LOOP_OP_ACCEPT, LOOP_OP_ASYNC_CANCEL,
+                   LOOP_OP_READ, LOOP_OP_WRITE, LOOP_OP_SEND, LOOP_OP_RECV};
+    mem.set(p, 0, sizeof(p));
+    p[1] = LOOP_URING_CQ;
+    p[2] = LOOP_URING_SETUP_CQSIZE | LOOP_URING_SETUP_SINGLE_ISSUER | LOOP_URING_SETUP_DEFER_TASKRUN;
+    i64 fd = syscall(LOOP_SYS_URING_SETUP, LOOP_URING_SQ, (i64)p, 0, 0, 0, 0);
+    if (fd < 0) { return false; }
+    i32 ring = (i32)fd;
+    libc.fcntl(ring, libc.F_SETFD, libc.FD_CLOEXEC);
+    i64 feat = p[5];
+    bool ok = (feat & LOOP_URING_FEAT_NODROP) && (feat & LOOP_URING_FEAT_EXT_ARG);
+    mem.set(probe, 0, sizeof(probe));
+    if (ok && syscall(LOOP_SYS_URING_REGISTER, ring, LOOP_URING_REGISTER_PROBE, (i64)probe, 64, 0, 0) < 0) {
+        ok = false;
+    }
+    for (i64 i = 0; ok && i < 7; i++) {
+        u16 flags = *(u16 *)(probe + 16 + need[i] * 8 + 2);
+        if (need[i] > probe[0] || !(flags & 1)) { ok = false; }   /* IO_URING_OP_SUPPORTED */
+    }
+    if (!ok) {
+        libc.close(ring);
+        return false;
+    }
+    i64 sqLen = p[16] + p[0] * 4;          /* sq_off.array + sq_entries u32s */
+    i64 cqLen = p[25] + p[1] * 16;         /* cq_off.cqes + cq_entries cqes */
+    bool single = feat & LOOP_URING_FEAT_SINGLE_MMAP;
+    if (single && cqLen > sqLen) { sqLen = cqLen; }
+    i32 prot = CORO_PROT_READ | CORO_PROT_WRITE;
+    i32 flags = LOOP_MAP_SHARED | LOOP_MAP_POPULATE;
+    u8 *sq = libc.mmap(null, sqLen, prot, flags, ring, LOOP_URING_OFF_SQ_RING);
+    u8 *cq = (u8 *)-1, *sqes = (u8 *)-1;
+    if ((i64)sq != -1) {
+        cq = single ? sq : libc.mmap(null, cqLen, prot, flags, ring, LOOP_URING_OFF_CQ_RING);
+        sqes = libc.mmap(null, p[0] * 64, prot, flags, ring, LOOP_URING_OFF_SQES);
+    }
+    if ((i64)sq == -1 || (i64)cq == -1 || (i64)sqes == -1) {
+        if ((i64)sqes != -1) { libc.munmap(sqes, p[0] * 64); }
+        if ((i64)cq != -1 && cq != sq) { libc.munmap(cq, cqLen); }
+        if ((i64)sq != -1) { libc.munmap(sq, sqLen); }
+        libc.close(ring);
+        return false;
+    }
+    lp.ring = ring;
+    lp.sqMap = sq;
+    lp.sqMapLen = sqLen;
+    lp.cqMap = cq;
+    lp.cqMapLen = single ? 0 : cqLen;
+    lp.sqes = sqes;
+    lp.sqesLen = p[0] * 64;
+    lp.sqHead = (u32 *)(sq + p[10]);
+    lp.sqTail = (u32 *)(sq + p[11]);
+    lp.sqMask = *(u32 *)(sq + p[12]);
+    lp.sqEntries = *(u32 *)(sq + p[13]);
+    lp.cqHead = (u32 *)(cq + p[20]);
+    lp.cqTail = (u32 *)(cq + p[21]);
+    lp.cqMask = *(u32 *)(cq + p[22]);
+    lp.cqes = cq + p[25];
+    u32 *array = (u32 *)(sq + p[16]);
+    for (u32 i = 0; i < lp.sqEntries; i++) { array[i] = i; }   /* SQE i at slot i, for good */
+    lp.sqLocal = *lp.sqTail;
+    return true;
+}
+
+/* io_uring_enter: submit what was queued and, when `wait`, take the
+ * completions (at least one unless timeout is 0, for at most timeout ms;
+ * -1: no limit). The system call's result; -1 with errno on an error. */
+static i64 loopUringEnter(Loop *lp, i64 timeout, bool wait) {
+    i64 n = (i64)((lp.sqLocal - atomic.load(lp.sqHead)) & 0xFFFFFFFF);
+    i64 flags = 0, min = 0, arg = 0, argSize = 0;
+    i64 ts[2];
+    i64 ga[3];               /* struct io_uring_getevents_arg */
+    if (wait) {
+        flags = LOOP_URING_ENTER_GETEVENTS;
+        if (timeout != 0) { min = 1; }
+        if (timeout > 0) {
+            ts[0] = timeout / 1000;
+            ts[1] = (timeout % 1000) * 1000000;
+            ga[0] = 0;
+            ga[1] = 0;
+            ga[2] = (i64)ts;
+            flags |= LOOP_URING_ENTER_EXT_ARG;
+            arg = (i64)ga;
+            argSize = 24;
+        }
+    } else if (n == 0) {
+        return 0;
+    }
+    return syscall(LOOP_SYS_URING_ENTER, lp.ring, n, min, flags, arg, argSize);
+}
+
+/* A zeroed SQE to fill; a full SQ is submitted first */
+static u8 *loopSqe(Loop *lp) {
+    while (((lp.sqLocal - atomic.load(lp.sqHead)) & 0xFFFFFFFF) >= lp.sqEntries) {
+        if (loopUringEnter(lp, 0, false) < 0 && os.errno() != libc.EINTR && os.errno() != libc.EAGAIN &&
+            os.errno() != LOOP_EBUSY) {
+            throw(ERR_LOOP, "coro: io_uring submission failed (errno %d)", os.errno());
+        }
+    }
+    u8 *e = lp.sqes + (i64)(lp.sqLocal & lp.sqMask) * 64;
+    mem.set(e, 0, 64);
+    return e;
+}
+
+/* Fill the SQE e (struct io_uring_sqe) and hand it to the kernel's ring */
+static void loopSqePut(Loop *lp, u8 *e, i64 opcode, i32 fd, u64 addr, i64 len, i64 opFlags,
+                       u64 off, u64 userData) {
+    *e = (u8)opcode;
+    *(i32 *)(e + 4) = fd;
+    *(u64 *)(e + 8) = off;
+    *(u64 *)(e + 16) = addr;
+    *(u32 *)(e + 24) = (u32)len;
+    *(u32 *)(e + 28) = (u32)opFlags;
+    *(u64 *)(e + 32) = userData;
+    lp.sqLocal++;
+    atomic.store(lp.sqTail, lp.sqLocal);
+}
+
+/* Every completion there is: each resumes its operation's task with the
+ * CQE's res. A cancel's own completion (user_data 0) is dropped. */
+static void loopUringReap(Loop *lp) {
+    u32 head = *lp.cqHead, tail = atomic.load(lp.cqTail);
+    while (head != tail) {
+        u8 *c = lp.cqes + (i64)(head & lp.cqMask) * 16;
+        u64 ud = *(u64 *)c;
+        i32 res = *(i32 *)(c + 8);
+        head++;
+        if (ud) {
+            LoopTask *t = (LoopTask *)ud;
+            t.op = false;
+            loopReady(lp, t, res);
+        }
+    }
+    atomic.store(lp.cqHead, head);
+}
+
+/* Submit t's operation and pause until its completion: the CQE's res (the
+ * bytes, the fd, the revents, or -errno; -ECANCELED after loopCancel, with
+ * t.why saying why). The deadline (if >= 0) cancels it, and so does
+ * coro.stop when idle. */
+static i64 loopOp(Loop *lp, LoopTask *t, i64 opcode, i32 fd, u64 addr, i64 len, i64 opFlags,
+                  u64 off, i64 deadline, bool idle) {
+    u8 *e = loopSqe(lp);
+    loopSqePut(lp, e, opcode, fd, addr, len, opFlags, off, (u64)t);
+    t.fd = fd;
+    t.events = 0;
+    t.deadline = deadline;
+    t.idle = idle;
+    t.paused = false;
+    t.result = 0;
+    t.waiting = true;
+    t.op = true;
+    t.cancelled = false;
+    t.why = 0;
+    if (deadline >= 0) { lp.ndeadline++; }
+    loopAddWaiter(lp, t, fd);       /* so coro.close finds it */
+    yield();
+    return t.result;
+}
+
+/* Ask the kernel to cancel t's operation (once); t resumes with its
+ * completion, -ECANCELED or what it did before the cancel reached it */
+static void loopCancel(Loop *lp, LoopTask *t, i64 why) {
+    if (!t.op || t.cancelled) { return; }
+    t.cancelled = true;
+    t.why = why;
+    u8 *e = loopSqe(lp);
+    loopSqePut(lp, e, LOOP_OP_ASYNC_CANCEL, -1, (u64)t, 0, 0, 0, 0);
+}
+
+/* The thread's loop goes away with operations in flight: cancel them and
+ * wait for their completions (a second or so at most), so the kernel
+ * writes into no stack after it is unmapped; then drop the ring. */
+static void loopUringFree(Loop *lp) {
+    for (i64 round = 0; round < 20; round++) {
+        bool any = false;
+        for (i64 i = 0; i < lp.n; i++) {
+            if (lp.tasks[i].op) {
+                loopCancel(lp, lp.tasks[i], LOOP_WHY_STOP);
+                any = true;
+            }
+        }
+        if (!any) { break; }
+        loopUringEnter(lp, 50, true);
+        loopUringReap(lp);
+    }
+    libc.munmap(lp.sqes, lp.sqesLen);
+    if (lp.cqMapLen) { libc.munmap(lp.cqMap, lp.cqMapLen); }
+    libc.munmap(lp.sqMap, lp.sqMapLen);
+    libc.close(lp.ring);
+}
+#endif
+
 /* In a loop coroutine: read what is there from the non-blocking fd into
  * buf, pausing the coroutine until there is something (or ms passed;
  * ms < 0: no limit). Returns the bytes read (at most buf.len), 0 at end
@@ -462,9 +836,9 @@ static LoopFd *loopFdOf(Loop *lp, i32 fd) {
  * (os.errno() ETIMEDOUT). It reads at once when the last read filled
  * its buffer (more is likely waiting, as in a stream), and waits first
  * otherwise (the next request isn't there yet): either way a coroutine
- * per connection costs no more system calls than it must. A few reads
- * in a row at most skip the wait, so the loop's other coroutines get
- * their turn. */
+ * per connection costs no more system calls than it must. Reads skip
+ * the wait for 4 ms at most (LOOP_READ_BUDGET_NS), then wait once, so the
+ * loop's other coroutines get their turn. */
 pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.read");
     Loop *lp = loopGet(true);
@@ -474,8 +848,75 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
         return 0;
     }
     i64 until = loopDeadline(ms);
-    bool tryFirst = f.full && f.streak < LOOP_READ_STREAK;
-    f.streak = tryFirst ? f.streak + 1 : 0;
+#ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING) {
+        /* RECV straight into buf: the kernel reads what is there at once,
+         * or when it comes; READ for what isn't a socket (a pipe). After a
+         * read that filled its buffer (a stream) a plain recv first is
+         * cheaper: more is usually there already (measured: one stream
+         * 4.3-4.8 GB/s with it, 3.6 without). */
+        i64 len = buf.len > 0x7FFFFFFF ? 0x7FFFFFFF : buf.len;
+        if (f.full && !f.notSock && date.monoNs() - f.burstNs < LOOP_READ_BUDGET_NS) {
+            i64 n0 = libc.recv(fd, buf.ptr, len, 0);
+            if (n0 >= 0) {
+                f.full = n0 == len;
+                f.big = n0 >= LOOP_READ_BIG;
+                return n0;
+            }
+        }
+        if (f.big && !f.notSock) {
+            /* a stream: wait, then read what piled up */
+            while (true) {
+                if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
+                    os.setErrno(libc.ETIMEDOUT);
+                    return -1;
+                }
+                i64 n1 = libc.recv(fd, buf.ptr, len, 0);
+                if (n1 >= 0) {
+                    f = lp.fdw[fd];
+                    f.full = n1 == len;
+                    f.big = n1 >= LOOP_READ_BIG;
+                    f.burstNs = date.monoNs();
+                    return n1;
+                }
+                i32 e1 = os.errno();
+                if (e1 != libc.EAGAIN && e1 != libc.EWOULDBLOCK && e1 != libc.EINTR) { return -1; }
+            }
+        }
+        while (true) {
+            f = lp.fdw[fd];
+            i64 r = f.notSock
+                ? loopOp(lp, t, LOOP_OP_READ, fd, (u64)buf.ptr, len, 0, (u64)-1, until, false)
+                : loopOp(lp, t, LOOP_OP_RECV, fd, (u64)buf.ptr, len, 0, 0, until, false);
+            if (r >= 0) {
+                f = lp.fdw[fd];
+                f.full = r == len;
+                f.big = r >= LOOP_READ_BIG;
+                f.burstNs = date.monoNs();
+                return r;
+            }
+            if (r == -LOOP_ECANCELED) {
+                os.setErrno(t.why == LOOP_WHY_TIMEOUT ? libc.ETIMEDOUT : libc.EBADF);
+                return -1;
+            }
+            if (r == -LOOP_ENOTSOCK && !f.notSock) {
+                f.notSock = true;
+                continue;
+            }
+            if (r == -libc.EAGAIN || r == -libc.EINTR) {
+                if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
+                    os.setErrno(libc.ETIMEDOUT);
+                    return -1;
+                }
+                continue;
+            }
+            os.setErrno((i32)(-r));
+            return -1;
+        }
+    }
+#endif
+    bool tryFirst = f.full && date.monoNs() - f.burstNs < LOOP_READ_BUDGET_NS;
+    bool waited = !tryFirst;
     while (true) {
         if (!tryFirst) {
             if (loopPark(t, fd, libc.POLLIN, until, false, false) == 0) {
@@ -488,11 +929,13 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
         if (n >= 0) {
             f = lp.fdw[fd];
             f.full = n == buf.len;
+            if (waited) { f.burstNs = date.monoNs(); }   /* a new burst begins */
             return n;
         }
         i32 err = os.errno();
         if (err != libc.EAGAIN && err != libc.EWOULDBLOCK && err != libc.EINTR) { return -1; }
         lp.fdw[fd].full = false;
+        waited = true;
     }
     return -1;
 }
@@ -506,6 +949,55 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
 pub i64 write(i32 fd, u8[] data, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.write");
     i64 until = loopDeadline(ms), off = 0, yields = 0;
+#ifdef IS_LINUX
+    Loop *lp = loopGet(true);
+    if (lp.backend == LOOP_BK_URING && fd >= 0) {
+        /* SEND (all of it: MSG_WAITALL; a short one sends the rest), or
+         * WRITE for what isn't a socket (a pipe) */
+        LoopFd *f = loopFdOf(lp, fd);
+        /* a plain send first: the socket usually has room, and SEND would
+         * cost the coroutine a turn of the loop for its completion */
+        if (!f.notSock) {
+            while (off < data.len) {
+                i64 w0 = libc.send(fd, data.ptr + off, data.len - off, LOOP_MSG_NOSIGNAL | libc.MSG_DONTWAIT);
+                if (w0 <= 0) { break; }
+                off += w0;
+            }
+            if (off == data.len) { return data.len; }
+        }
+        while (off < data.len) {
+            i64 len = data.len - off;
+            if (len > 0x7FFFFFFF) { len = 0x7FFFFFFF; }
+            f = lp.fdw[fd];
+            i64 r = f.notSock
+                ? loopOp(lp, t, LOOP_OP_WRITE, fd, (u64)(data.ptr + off), len, 0, (u64)-1, until, false)
+                : loopOp(lp, t, LOOP_OP_SEND, fd, (u64)(data.ptr + off), len,
+                         LOOP_MSG_NOSIGNAL | LOOP_MSG_WAITALL, 0, until, false);
+            if (r > 0) {
+                off += r;
+                continue;
+            }
+            if (r == -LOOP_ECANCELED) {
+                os.setErrno(t.why == LOOP_WHY_TIMEOUT ? libc.ETIMEDOUT : libc.EBADF);
+                return -1;
+            }
+            if (r == -LOOP_ENOTSOCK && !f.notSock) {
+                f.notSock = true;
+                continue;
+            }
+            if (r == 0 || r == -libc.EAGAIN || r == -libc.EINTR) {
+                if (loopPark(t, fd, libc.POLLOUT, until, false, false) == 0) {
+                    os.setErrno(libc.ETIMEDOUT);
+                    return -1;
+                }
+                continue;
+            }
+            os.setErrno((i32)(-r));
+            return -1;
+        }
+        return data.len;
+    }
+#endif
     while (off < data.len) {
         i64 w = net.send(fd, data[off:data.len]);
         if (w < 0 && os.errno() == LOOP_ENOTSOCK) {
@@ -600,6 +1092,34 @@ pub i32 accept(i32 lfd, i64 ms=-1) {
             continue;
         }
         lp.fdsOut = false;
+#ifdef IS_LINUX
+        if (lp.backend == LOOP_BK_URING) {
+            /* ACCEPT: the client as a non-blocking, close-on-exec fd, as
+             * net.accept gives it; coro.stop cancels it */
+            r = loopOp(lp, t, LOOP_OP_ACCEPT, lfd, 0, 0, LOOP_SOCK_NONBLOCK | LOOP_SOCK_CLOEXEC, 0,
+                       until, true);
+            if (r >= 0) {
+                fd = (i32)r;
+                loopForget(lp, fd);
+                return fd;
+            }
+            if (r == -LOOP_ECANCELED) {
+                if (t.why == LOOP_WHY_CLOSE) { os.setErrno(libc.EBADF); }
+                return -1;
+            }
+            err = (i32)(-r);
+            os.setErrno(err);
+            if (err == libc.EMFILE || err == libc.ENFILE || err == LOOP_ENOBUFS || err == libc.ENOMEM) {
+                loopFdsOut(lp);
+            } else if (err == libc.EAGAIN || err == libc.EWOULDBLOCK) {
+                r = loopPark(t, lfd, libc.POLLIN, until, true, false);
+                if (r <= 0) { return -1; }
+            } else if (err != libc.EINTR && err != LOOP_ECONNABORTED) {
+                return -1;
+            }
+            continue;
+        }
+#endif
         fd = net.accept(lfd, true);
         if (fd >= 0) {
             loopForget(lp, fd);     /* its number may have been closed with close(2) */
@@ -624,7 +1144,17 @@ pub i32 close(i32 fd) {
     Loop *lp = loopGet(false);
     /* a coroutine still waiting on it would wait forever: the kernel
      * forgets a closed fd */
-    if (lp) {
+    if (lp && lp.backend == LOOP_BK_URING) {
+#ifdef IS_LINUX
+        /* its operations hold the file: cancel them, and each waiter
+         * resumes on its completion (EBADF, POLLNVAL) */
+        if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
+            LoopFd *f = lp.fdw[fd];
+            for (i64 i = 0; i < f.n; i++) { loopCancel(lp, f.w[i], LOOP_WHY_CLOSE); }
+        }
+        loopForget(lp, fd);
+#endif
+    } else if (lp) {
         loopFire(lp, fd, libc.POLLNVAL);
         loopForget(lp, fd);
     }
@@ -648,7 +1178,14 @@ pub void stop() {
     lp.stopping = true;
     for (i64 i = 0; i < lp.n; i++) {
         LoopTask *t = lp.tasks[i];
-        if (t.waiting && !t.ready && t.idle) { loopReady(lp, t, -1); }
+        if (!t.waiting || t.ready || !t.idle) { continue; }
+#ifdef IS_LINUX
+        if (t.op) {
+            loopCancel(lp, t, LOOP_WHY_STOP);   /* resumes on its completion */
+            continue;
+        }
+#endif
+        loopReady(lp, t, -1);
     }
 }
 
@@ -683,6 +1220,18 @@ static void loopPollFallback(Loop *lp, i64 timeout);
 
 static void loopPoll(Loop *lp, i64 timeout) {
     i32 q = loopQueue(lp), n, i;
+#ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING) {
+        if (loopUringEnter(lp, timeout, true) < 0) {
+            i32 err = os.errno();
+            if (err != libc.EINTR && err != LOOP_ETIME && err != LOOP_EBUSY && err != libc.EAGAIN) {
+                throw(ERR_LOOP, "coro.run: io_uring_enter failed (errno %d)", err);
+            }
+        }
+        loopUringReap(lp);
+        return;
+    }
+#endif
     if (q < 0) {
         loopPollFallback(lp, timeout);
         return;
@@ -769,7 +1318,7 @@ static void loopTurn(Loop *lp) {
         nd = 0;
         for (i = 0; i < lp.n; i++) {
             t = lp.tasks[i];
-            if (!t.waiting || t.ready || t.deadline < 0) { continue; }
+            if (!t.waiting || t.ready || t.deadline < 0 || t.cancelled) { continue; }
             nd++;
             d = t.deadline - now;
             if (d < 0) { d = 0; }
@@ -791,6 +1340,12 @@ static void loopTurn(Loop *lp) {
         for (i = 0; i < lp.n; i++) {
             t = lp.tasks[i];
             if (t.waiting && !t.ready && t.deadline >= 0 && t.deadline <= now) {
+#ifdef IS_LINUX
+                if (t.op) {
+                    loopCancel(lp, t, LOOP_WHY_TIMEOUT);   /* resumes on its completion */
+                    continue;
+                }
+#endif
                 loopReady(lp, t, 0);
                 for (j = lp.nready - 1; j > first && lp.ready[j - 1].deadline > t.deadline; j--) {
                     lp.ready[j] = lp.ready[j - 1];

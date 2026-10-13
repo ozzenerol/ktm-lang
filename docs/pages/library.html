@@ -2111,7 +2111,10 @@ a String).</p>
   <li><code>net.dial(addr, port, non_blocking, timeout_ms)</code> gives up after
   <code>timeout_ms</code> milliseconds (shared by all the addresses the name resolves to; the
   name lookup itself isn't timed) with -1 and <code>os.errno()</code> <code>ETIMEDOUT</code>;
-  0, the default, waits as long as the system does.</li>
+  0, the default, waits as long as the system does. <code>net.dial</code> waits in
+  <code>connect</code> either way, and <code>non_blocking</code> only makes the connected
+  socket non-blocking: in a loop coroutine use <code>coro.dial</code>, which pauses only the
+  coroutine (see <a href="#coroutine-loop">A coroutine server</a>).</li>
   <li><code>net.setRecvTimeout(sock, ms)</code> and <code>net.setSendTimeout(sock, ms)</code>
   make a read or a write on a connected socket give up after <code>ms</code> milliseconds with
   -1 and <code>os.errno()</code> <code>EAGAIN</code> (a write returns the bytes it got out
@@ -2443,9 +2446,18 @@ writes all of <code>data</code>, pausing while the fd is full, and returns <code
 or -1 (<code>EPIPE</code> for a peer that closed, never a <code>SIGPIPE</code>). Both work on
 sockets and pipes, and they are the fastest way to talk to a connection: a read waits first
 only when nothing is likely to be there yet, and goes straight on while a stream keeps
-coming.</li>
+coming, for 4 ms at most before it lets the loop's other coroutines have a turn. So a
+coroutine that shares its loop with a saturating stream waits about 8 ms at worst, less
+than Go's 10 ms preemption tick, while the stream moves 12-14% more data than Go's
+(measured on 64 KiB streams; a shorter bound cost up to a third of that).</li>
 <li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
 <code>coro.yield()</code> lets them have a turn.</li>
+<li><code>coro.dial(addr, port, ms)</code> connects to <code>addr</code> (a host name or an
+address) and returns the connection as a non-blocking fd, pausing only the coroutine while the
+connection is made; every address the name resolves to is tried in turn, within
+<code>ms</code> milliseconds in all. -1 with <code>os.errno()</code> (<code>ECONNREFUSED</code>,
+<code>ETIMEDOUT</code>) when none accepts. Looking up a name still waits for the system's
+resolver, so give a numeric address where that matters.</li>
 <li><code>coro.accept(listener, ms)</code> returns the next client as a non-blocking fd (it
 makes the listener non-blocking too), or -1 on its timeout, on <code>coro.stop()</code>, or when
 the listener can't accept (<code>os.errno()</code> says why). Out of fds (<code>EMFILE</code>,
@@ -2464,9 +2476,26 @@ of this process (<code>ECHILD</code>). Any number of coroutines can each wait fo
 <code>proc.setStatus(p, st)</code>, so <code>p.exitCode</code> and <code>p.termSignal</code> are
 set as <code>proc.wait</code> sets them.</li>
 </ul>
+<p><strong>Backends.</strong> On Linux the loop uses io_uring where the kernel allows it (6.1
+or later, and not blocked: Docker's default seccomp profile blocks it, for one).
+<code>coro.read</code>, <code>coro.write</code> and <code>coro.accept</code> then go to the
+kernel as operations that complete when there is something to do, a wait on an fd becomes one
+such operation too, and one system call per turn of the loop submits them all and takes their
+results. A coroutine resumes only when its operation has completed, also after a timeout,
+<code>coro.stop</code> or <code>coro.close</code> cancelled it, so the kernel never writes into
+a buffer the coroutine has left. Elsewhere the loop uses the kernel's event queue, epoll on
+Linux and kqueue on macOS, and <code>poll</code> when it can't make one. Every backend behaves
+the same.</p>
+<ul>
+  <li><code>coro.backend()</code> says which one the calling thread's loop uses:
+  <code>"uring"</code>, <code>"epoll"</code>, <code>"kqueue"</code> or <code>"poll"</code>.</li>
+  <li><code>KTM_CORO_BACKEND=uring</code>, <code>epoll</code> (or <code>kqueue</code>) or
+  <code>poll</code> in the environment picks one, when a thread's loop is made; one the system
+  can't give falls back to the next one down, and an unknown value is ignored.</li>
+</ul>
 <p>Each turn of the loop asks the kernel which of the waited-on fds are ready, with the nearest
-deadline as its timeout: epoll on Linux and kqueue on macOS, so a turn costs the fds that are
-ready, not every fd that is open, and ten thousand idle connections cost nothing. Ready fds
+deadline as its timeout, so a turn costs the fds that are ready, not every fd that is open,
+and ten thousand idle connections cost nothing. Ready fds
 resume first, then the waits that timed out, earliest deadline first; new coroutines run in the
 order they were started. Every thread that calls <code>coro.run</code> has its own loop, kept
 with the thread's coroutine state. Each fd stays registered with the kernel between waits, and
