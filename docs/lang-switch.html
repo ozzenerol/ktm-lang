@@ -53,7 +53,7 @@
   <main id="content">
 <div class="crumbs"><span><a href="language.html">Language</a></span></div>
 <h1>switch</h1>
-<p class="lede">Like C's <code>switch</code>, but cases don't fall through, and a case can be a range.</p>
+<p class="lede">Like C's <code>switch</code>, but cases don't fall through, a case can be a range, and you can switch on a string.</p>
 
 <div class="glance">
 <p>At a glance</p>
@@ -238,6 +238,36 @@ void main()
 <pre class="output">#0f0 #00f
 </pre>
 
+<h2 id="switching-on-strings">Switching on strings<a class="anchor" href="#switching-on-strings" aria-label="Link to this section">#</a></h2>
+<p>A <code>u8[]</code> or a <code>String</code> can be switched on, with string literals as the cases. A case
+matches when the value has exactly its bytes: same length, case-sensitive, no trimming.</p>
+<pre data-run><code>i64 run(u8[] cmd)
+{
+  switch (cmd) {
+    case "GET":  return 1;
+    case "SET":  return 2;
+    case "DEL":
+    case "REMOVE": return 3;
+    default:     return 0;
+  }
+}
+
+void main()
+{
+  u8[] line = "SET name ktm";
+  printf("%d %d %d %d\n", run("GET"), run(line[0:3]), run("REMOVE"), run("get"));
+}
+</code></pre>
+<pre class="output">1 2 3 0
+</pre>
+<ul class="rules">
+  <li>every case is a string literal: no ranges, no bare <code>case:</code>, no integers;</li>
+  <li>a string given twice is an error (<code>duplicate case value "GET"</code>);</li>
+  <li>the value is read once, so <code>switch (readCommand())</code> calls the function once;</li>
+  <li><code>default</code>, stacked labels and <code>fallthrough</code> work as in an integer switch.</li>
+</ul>
+<p>For a case-insensitive match, switch on a lowercased copy: a <code>String</code> made with <code>str.from</code>, then <code>s.toLower()</code>.</p>
+
 <h2 id="two-extras">Two extras<a class="anchor" href="#two-extras" aria-label="Link to this section">#</a></h2>
 <h3 id="implicit-case-values">Implicit case values<a class="anchor" href="#implicit-case-values" aria-label="Link to this section">#</a></h3>
 <p>A bare <code>case:</code> is the previous case's value plus one (starting from 0).</p>
@@ -258,7 +288,7 @@ void main()
 
 <h3 id="unchecked-switch">Unchecked switch<a class="anchor" href="#unchecked-switch" aria-label="Link to this section">#</a></h3>
 <p><code>switch [x]</code> skips the range check on <code>x</code>. Use it only when you know <code>x</code>
-matches a case: anything else is undefined.</p>
+matches a case: anything else is undefined. A switch on strings always checks.</p>
 <pre data-run><code>void main()
 {
   for (i64 i = 0; i &lt; 3; i++) {
@@ -279,7 +309,7 @@ matches a case: anything else is undefined.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#no-fall-through">No fall-through</a></li><li><a href="#ranges">Ranges</a></li><li><a href="#several-values-one-body">Several values, one body</a></li><li><a href="#fallthrough">fallthrough</a></li><li><a href="#each-case-is-a-block">Each case is a block</a></li><li><a href="#switching-on-enums">Switching on enums</a></li><li><a href="#two-extras">Two extras</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#no-fall-through">No fall-through</a></li><li><a href="#ranges">Ranges</a></li><li><a href="#several-values-one-body">Several values, one body</a></li><li><a href="#fallthrough">fallthrough</a></li><li><a href="#each-case-is-a-block">Each case is a block</a></li><li><a href="#switching-on-enums">Switching on enums</a></li><li><a href="#switching-on-strings">Switching on strings</a></li><li><a href="#two-extras">Two extras</a></li></ul></nav>
 </div>
 </body>
 </html>
