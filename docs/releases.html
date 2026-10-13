@@ -57,6 +57,25 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-17-0-2026-10-13">v0.17.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-17-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<p>C's stdio in libc, and logging to stdout.</p>
+<ul>
+  <li><code>libc.fprintf(stream, fmt, ...)</code> with <code>libc.stdin</code>, <code>libc.stdout</code> and
+  <code>libc.stderr</code>, and <code>libc.EXIT_SUCCESS</code> / <code>libc.EXIT_FAILURE</code> for
+  <code>libc.exit</code>. <code>fprintf(libc.stdout, ...)</code> stays in order with <code>printf</code>.</li>
+  <li><code>log.Options.toStdout</code>: with no <code>path</code>, a Logger or the default logger writes to
+  stdout instead of stderr, in order with <code>printf</code>.</li>
+  <li><code>_extern</code> binds C data by its symbol too: <code>_extern ___stderrp FILE *stderr;</code>,
+  and in a module it has the module's name.</li>
+</ul>
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>The format strings of <code>libc.printf</code>, <code>libc.snprintf</code> and <code>libc.fprintf</code>
+  are now checked against their arguments, as <code>printf</code>'s always was, so a wrong count is now
+  a compile error. A bare <code>snprintf</code> or <code>sprintf</code> declared with <code>extern "c"</code>
+  is checked too (its format was looked for in the wrong argument before).</li>
+</ul>
+
 <h2 id="v0-16-0-2026-10-13">v0.16.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-16-0-2026-10-13" aria-label="Link to this section">#</a></h2>
 <p>A default logger, so a program logs from anywhere without passing a Logger around.</p>
 <ul>
@@ -134,7 +153,7 @@ the compiler writes its encoder and decoder.</p>
   block and flow mappings and sequences, plain and quoted scalars, block scalars and comments.
   Anchors, tags, merge keys and more than one document are reported as not supported.</li>
 </ul>
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Decode errors start with the line and column in the text:
   <code>1:22: tags[0].weight: expected an integer, got a string</code>. The rest of each
@@ -229,7 +248,7 @@ goroutine-per-connection server in every scenario of the echo benchmark, with le
   its loop meanwhile; its docs now say so.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On Linux, programs using the coroutine loop run on io_uring by default. Set
   <code>KTM_CORO_BACKEND=epoll</code> to keep the previous loop.</li>
@@ -259,7 +278,7 @@ goroutine-per-connection server at every load of the echo benchmark: with 1024 c
   releasing short coroutines costs the same as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Running off the end of a stack (deep recursion, a frame too big for a thread's stack) now
   prints <code>stack overflow</code> and ends the program with SIGABRT, instead of a bare
@@ -304,7 +323,7 @@ either way, run to run).</p>
   <code>poll</code> as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>An fd waited on with <code>coro.wait</code> stays registered with the kernel between
   waits, so close it with <code>coro.close</code>, as the docs already said for connections: a
@@ -469,7 +488,7 @@ test
   (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old containers are removed. They map to the new ones as follows:
   <div class="table-wrap"><table>
@@ -684,7 +703,7 @@ void main()
   sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-7">Changes you may notice<a class="anchor" href="#changes-you-may-notice-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
   <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
@@ -759,7 +778,7 @@ void main()
   that way in a <code>proc.Proc</code>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-7">Changes you may notice<a class="anchor" href="#changes-you-may-notice-7" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-8">Changes you may notice<a class="anchor" href="#changes-you-may-notice-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A second function of a name with other parameter types used to be the error "conflicting
   types"; it is now an overload. The same parameters with another return type is still that
@@ -929,7 +948,7 @@ more mistakes it used to let through. Code that uses <code>proc</code>, <code>cs
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice-8">Changes you may notice<a class="anchor" href="#changes-you-may-notice-8" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-9">Changes you may notice<a class="anchor" href="#changes-you-may-notice-9" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -1122,7 +1141,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-9">Changes you may notice<a class="anchor" href="#changes-you-may-notice-9" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-10">Changes you may notice<a class="anchor" href="#changes-you-may-notice-10" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -1247,7 +1266,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-10">Changes you may notice<a class="anchor" href="#changes-you-may-notice-10" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-11">Changes you may notice<a class="anchor" href="#changes-you-may-notice-11" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
@@ -1268,7 +1287,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>
