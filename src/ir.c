@@ -2332,6 +2332,19 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
         if (astTypeIsArray(ast->type) ||
             (ast->type->kind == AST_TYPE_CLASS && !ast->type->is_intrinsic))
         {
+            /* A by-value struct argument tags the value it gets
+             * (irLowerCall), but `ptr` may be shared by every other use
+             * of p (p's own slot read operand-direct, or the argument an
+             * inlined call bound p to): tagging it made `g(p)` elsewhere
+             * in the function pass the struct, not p. So a struct gets a
+             * fresh tmp via an explicit add #0, as `e->field` at offset 0
+             * does (irEvalCanFold keeps it when tagged, folds it if not). */
+            if (!astTypeIsArray(ast->type)) {
+                IrValue *own = irTmp(IR_TYPE_PTR, 8);
+                irBlockAddInstr(ctx, irInstrNew(IR_IADD, own, ptr,
+                                                irConstInt(IR_TYPE_I64, 0)));
+                return own;
+            }
             return ptr;
         }
         IrValueType ir_type = irConvertType(ast->type);
