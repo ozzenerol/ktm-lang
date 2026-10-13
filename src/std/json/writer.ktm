@@ -155,10 +155,45 @@ pub void Writer.key(u8[] k)
     *lvl |= WRITER_KEY | WRITER_ITEMS;
 }
 
+/* key() for a key that is JSON already: k is written between the quotes
+ * as it is, with no escaping and no checks (generated encoders pass their
+ * keys escaped in advance) */
+pub void Writer.rawKey(u8[] k)
+{
+    if (!self.depth || !(self.levels[self.depth - 1] & WRITER_OBJECT)) {
+        throw(ERR_WRITER, "rawKey(): no object is open");
+    }
+    u8 *lvl = &self.levels[self.depth - 1];
+    if (*lvl & WRITER_KEY) { throw(ERR_WRITER, "rawKey(): the last key has no value yet"); }
+    if (*lvl & WRITER_ITEMS) { self.out.appendByte(','); }
+    writerNewline(self);
+    self.out.reserve(k.len + 4);
+    self.out.appendByte('"');
+    self.out.append(k);
+    self.out.appendByte('"');
+    self.out.appendByte(':');
+    if (self.indent) { self.out.appendByte(' '); }
+    *lvl |= WRITER_KEY | WRITER_ITEMS;
+}
+
 pub void Writer.int(i64 v)
 {
     writerValue(self, "int()");
     self.out.appendFormat("%d", v);
+    writerValueDone(self);
+}
+
+/* An unsigned integer: all of a u64, also past the i64 range */
+pub void Writer.uint(u64 v)
+{
+    writerValue(self, "uint()");
+    u8 digits[24];
+    i64 at = 24;
+    do {
+        digits[--at] = '0' + v % 10;
+        v /= 10;
+    } while (v);
+    self.out.append(digits[at:24]);
     writerValueDone(self);
 }
 
