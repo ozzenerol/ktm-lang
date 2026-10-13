@@ -68,6 +68,8 @@ syn match   ktmExternC     /\<extern\s\+"c"/ contains=ktmStorage
 
 " `case 1 ... 5:` and `T ...rest`
 syn match   ktmEllipsis    /\.\.\./
+" `@json`, `@key("x")`: attributes on a struct or a field (v0.14.0)
+syn match   ktmAttribute   /@\h\w*/
 
 " ---------------------------------------------------------------------------
 " Numbers: decimal, hex, binary, digit separators, floats
@@ -177,6 +179,7 @@ hi def link ktmException      Exception
 hi def link ktmDefer          Keyword
 hi def link ktmOperatorKw     Operator
 hi def link ktmEllipsis       Operator
+hi def link ktmAttribute      PreProc
 
 hi def link ktmBoolean        Boolean
 hi def link ktmNull           Constant
