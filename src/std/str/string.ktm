@@ -261,6 +261,68 @@ pub i64 compare(u8[] a, u8[] b)
     return a.len - b.len;
 }
 
+/* ---- Numbers from text: the whole of s must be the number (no spaces,
+ * nothing after it); false, with *out untouched, when it isn't one or
+ * doesn't fit. `s.toInt(&n)` works as a method too ---- */
+
+/* An unsigned number in base 10, or 16 after 0x / 0X, or 2 after 0b */
+pub bool toUint(u8[] s, u64 *out)
+{
+    i64 i = 0;
+    u64 base = 10;
+    if (s.len > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) { base = 16; i = 2; }
+    else if (s.len > 2 && s[0] == '0' && (s[1] == 'b' || s[1] == 'B')) { base = 2; i = 2; }
+    if (i >= s.len) { return false; }
+    u64 v = 0;
+    for (; i < s.len; i++) {
+        u8 c = s[i];
+        u64 d;
+        if (c >= '0' && c <= '9') { d = c - '0'; }
+        else if (c >= 'a' && c <= 'f') { d = c - 'a' + 10; }
+        else if (c >= 'A' && c <= 'F') { d = c - 'A' + 10; }
+        else { return false; }
+        if (d >= base) { return false; }
+        if (v > (0xFFFFFFFFFFFFFFFF - d) / base) { return false; }
+        v = v * base + d;
+    }
+    *out = v;
+    return true;
+}
+
+/* A signed number: an optional + or -, then as toUint */
+pub bool toInt(u8[] s, i64 *out)
+{
+    bool neg = false;
+    i64 i = 0;
+    if (s.len > 0 && (s[0] == '-' || s[0] == '+')) { neg = s[0] == '-'; i = 1; }
+    u64 v;
+    if (!toUint(s[i:s.len], &v)) { return false; }
+    if (neg) {
+        if (v > 0x8000000000000000) { return false; }
+        *out = -(i64)v;
+    } else {
+        if (v > 0x7FFFFFFFFFFFFFFF) { return false; }
+        *out = (i64)v;
+    }
+    return true;
+}
+
+/* A floating point number as C writes one: 1.5, -2e10, .5, inf, nan */
+pub bool toFloat(u8[] s, f64 *out)
+{
+    if (s.len == 0 || s.len > 511) { return false; }
+    u8 c0 = s[0];
+    if (c0 == ' ' || c0 == '\t' || c0 == '\n' || c0 == '\r' || c0 == '\v' || c0 == '\f') { return false; }
+    u8 buf[512];
+    libc.memcpy(buf, s.ptr, s.len);
+    buf[s.len] = 0;
+    u8 *end = null;
+    f64 v = libc.strtod(buf, &end);
+    if (end != buf + s.len) { return false; }
+    *out = v;
+    return true;
+}
+
 /* The same bytes */
 pub bool equals(u8[] a, u8[] b)
 {
