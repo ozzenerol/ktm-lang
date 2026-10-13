@@ -14,7 +14,8 @@ a round of stdlib additions.</p>
   <code>map.keys()</code> and <code>values()</code> give copies of their own.</li>
   <li><code>-Memsafe</code>: a leak is a block nothing points to any more. What globals or live variables still hold at
   exit is listed apart as <code>still in use at exit ... not leaks</code>. Every report names the file and line in your
-  code and the library call it went through (<code>at cli/cli.ktm:16 in cli's globals, via vec.new&lt;String&gt;</code>),
+  code and the public library call it went through (<code>at cli/cli.ktm:16 in cli's globals, via vec.new&lt;String&gt;</code>;
+  under <code>-Memsafe</code> library functions are not inlined into your code, so the name is the one you called),
   and a program that ends with <code>exit()</code> gets its report too.</li>
   <li>A warning when a function changes a Vec, List, Map, Tree, Set or String it got by value (<code>push</code>,
   <code>removeAt</code>, <code>append</code>...): only its copy changes. Take a pointer.</li>
@@ -25,6 +26,8 @@ a round of stdlib additions.</p>
   <li><code>T[] s = {a, b, c};</code> makes a slice of a hidden array; it compiled with warnings and crashed before.
   <code>{ptr, len}</code> still sets the slice's own fields.</li>
   <li>A function of your own with <code>u8 *fmt, ...args</code> takes Strings for <code>%s</code> as printf does.</li>
+  <li>A String variable or field converts to <code>u8 *</code> where one is expected (its bytes always end in a NUL):
+  <code>cstr.len(s)</code> and C calls without <code>.cstr()</code>.</li>
   <li><code>str.join(parts, sep)</code> from a slice or a <code>vec.Vec</code>; <code>vec.Vec.contains(x)</code>;
   <code>str.toInt</code>, <code>str.toUint</code> and <code>str.toFloat</code> read a whole <code>u8[]</code> as a number;
   <code>proc.expandEnv(text)</code> fills in <code>${NAME}</code> and <code>${NAME:default}</code>.</li>
