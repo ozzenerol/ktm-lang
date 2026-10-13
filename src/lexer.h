@@ -393,6 +393,7 @@ void lexUnSetAsmFlags(Lexer *l);
 void lexSetBuiltinRoot(Lexer *l, char *root);
 void lexInit(Lexer *l, char *source, int flag);
 void lexPushFile(Lexer *l, AoStr *filename);
+int lexModuleExists(Lexer *l, const char *name, int len);
 /* Push an in-memory buffer as if it were a file (REPL input). `src`
  * is borrowed and must outlive the parse of this buffer. */
 void lexPushString(Lexer *l, char *name, char *src, s64 len);

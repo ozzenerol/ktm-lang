@@ -4066,6 +4066,21 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
             if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
                 ad_tok = cctrlTokenGet(cc);
                 tok = cctrlTokenPeek(cc);
+            } else if (next && next->tk_type == TK_IDENT) {
+                /* `ad Name x` / `ad mod.Name x`: a declaration whose type
+                 * isn't known (two names in a row are no expression) */
+                Lexeme *after = cctrlTokenPeekBy(cc, 2);
+                Lexeme *member = after && tokenPunctIs(after, '.') ? cctrlTokenPeekBy(cc, 3) : NULL;
+                if (member) {
+                    parseRaiseIfNotImported(cc, next, next->start, next->len);
+                }
+                if (member && member->tk_type == TK_IDENT) {
+                    cctrlRaiseExceptionAt(cc, next->line, next->col, next->len,
+                        "Type `%.*s.%.*s` has not been declared", next->len, next->start,
+                        member->len, member->start);
+                }
+                cctrlRaiseExceptionAt(cc, next->line, next->col, next->len,
+                    "Type `%.*s` has not been declared", next->len, next->start);
             }
         }
 
