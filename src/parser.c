@@ -8094,6 +8094,11 @@ static void parseModuleInits(Cctrl *cc) {
             Ast *fn = astFunction(fn_type, sym, strlen(sym), astVecNew(),
                                   astCompountStatement(stmts),
                                   m->init_locals ? m->init_locals : listNew(), 0);
+            /* the module's file, not the one parsed last (reports) */
+            listForEach(m->init_stmts) {
+                Ast *st = it->value;
+                if (st && st->file_id) { fn->file_id = st->file_id; break; }
+            }
             listAppend(cc->ast_list, fn);
             m->has_init = 1;
             char *real = realpath(m->dir->data, NULL);

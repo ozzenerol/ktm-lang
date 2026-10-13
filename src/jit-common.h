@@ -79,6 +79,9 @@ typedef struct KtmJit {
      * (pending_lines); ktmJitCompileChunk rebases the offsets onto the
      * finalized chunk's address and appends to `lines`. Consulted only
      * when reporting (faults, memsafe), so a linear scan is fine. */
+    /* function symbol -> the source file it was written in (char *);
+     * for reports, like `lines` */
+    Map *sym_files;
     struct KtmJitLine *lines;
     u32 n_lines, cap_lines;
     struct KtmJitLine *pending_lines;
@@ -146,6 +149,9 @@ void ktmJitNoteLine(KtmJit *jit, int line);
 
 /* Source line for a pc inside JIT code, 0 when unknown. */
 int ktmJitFindLineForAddr(KtmJit *jit, void *pc);
+/* The source file of the function `sym` (from ktmJitFindSymbolForAddr),
+ * NULL if unknown. */
+const char *ktmJitFindFileForSymbol(KtmJit *jit, const char *sym);
 
 /* Register a host-provided symbol (e.g. printf, malloc, a libktm hook)
  * so JITted code can call it. Overrides dlsym for that name. */
