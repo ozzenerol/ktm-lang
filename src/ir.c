@@ -760,6 +760,15 @@ static int irInlineCost(Ast *ast) {
     }
 }
 
+/* Is file `id` one of the stdlib's (<install_dir>/modules/...)? */
+static int irIsStdlibFile(Cctrl *cc, u32 id) {
+    AoStr *path = id ? cctrlLookUpFile(cc, id) : NULL;
+    if (!path || !cc->install_dir) return 0;
+    size_t n = strlen(cc->install_dir);
+    return path->len > n + 9 && !strncmp(path->data, cc->install_dir, n) &&
+           !strncmp(path->data + n, "/modules/", 9);
+}
+
 /* The function `call` calls, when its body can be lowered in place */
 static Ast *irInlineCandidate(IrCtx *ctx, Ast *call) {
     if (call->kind != AST_FUNCALL || !call->fname) return NULL;
@@ -768,6 +777,12 @@ static Ast *irInlineCandidate(IrCtx *ctx, Ast *call) {
     Ast *fn = mapGetLen(ctx->cc->global_env, call->fname->data, call->fname->len);
     if (!fn || fn->kind != AST_FUNC || !fn->body || !fn->params) return NULL;
     if (fn->has_var_args || (fn->flags & AST_FLAG_INLINE)) return NULL;
+    /* -Memsafe names the stdlib function the program called (via
+     * vec.Vec<String>.free): one called from outside the stdlib keeps
+     * its frame */
+    if ((ctx->cc->flags & CCTRL_MEMSAFE) && fn->file_id != call->file_id &&
+        irIsStdlibFile(ctx->cc, fn->file_id) &&
+        !irIsStdlibFile(ctx->cc, call->file_id)) return NULL;
     if (fn->fname == ctx->cur_func->name ||
         aoStrCmp(fn->fname, ctx->cur_func->name)) return NULL;
     for (IrInline *in = ctx->inl; in; in = in->outer) {
