@@ -1,4 +1,4 @@
-import cstr, fs, json, libc, mem, proc, reflect, test;
+import cstr, fs, json, libc, mem, proc, reflect, test, yaml;
 
 /* Attributes (v0.14.0): @json and @yaml on a struct, @key("..."), @skip
  * and @omitEmpty on its fields. reflect shows them (Type.json/.yaml,
