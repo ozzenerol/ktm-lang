@@ -1856,6 +1856,101 @@ tags[0].weight: expected an integer, got a string
   threw half way, so use it only on values decode filled.</li>
 </ul>
 
+<h2 id="yaml">YAML</h2>
+<p><code>yaml.Reader</code> reads a YAML document front to back and <code>yaml.Writer</code>
+writes one in block style. The Reader has the same calls as <code>json.Reader</code>, so one
+decoder can read both formats.</p>
+<ul>
+  <li><code>yaml.readerNew(text)</code> views the text (keep it alive), <code>r.free()</code> frees
+  the Reader. Open a mapping with <code>r.beginObject()</code> and loop on
+  <code>r.nextKey()</code> (the key is <code>r.key()</code>); open a sequence with
+  <code>r.beginArray()</code> and loop on <code>r.nextItem()</code>. Both return false at the end.</li>
+  <li>Read values with <code>readString(&amp;s)</code>, <code>readStr()</code> (a view),
+  <code>readBytes()</code>, <code>readInt()</code>, <code>readUint()</code>, <code>readFloat()</code>
+  and <code>readBool()</code>. <code>isNull()</code> reads a null if there is one,
+  <code>peek()</code> says what comes next (<code>yaml.STRING</code>, <code>INT</code>,
+  <code>FLOAT</code>, <code>BOOL</code>, <code>NULL</code>, <code>ARRAY</code>,
+  <code>OBJECT</code>), <code>skipValue()</code> drops one, and <code>finish()</code> checks
+  the whole document was read.</li>
+  <li>A plain (unquoted) scalar is typed by its form: <code>true</code>/<code>false</code>
+  (also <code>True</code>, <code>TRUE</code> ...), <code>null</code>, <code>~</code> or nothing for
+  null, integers (also <code>0x1F</code> and <code>0o17</code>) and floats (also <code>.inf</code>
+  and <code>.nan</code>). A quoted or block scalar is always a string, and
+  <code>readString</code> takes any scalar as the text it is written as.</li>
+  <li>Supported: block mappings and sequences, <code>[]</code> and <code>{}</code>, plain,
+  single- and double-quoted scalars, <code>|</code> and <code>&gt;</code> block scalars, comments,
+  <code>---</code> and <code>...</code>. Anchors and aliases, tags, <code>&lt;&lt;</code> merge
+  keys and several documents in one text are errors that say they are not supported.</li>
+  <li>Errors throw <code>yaml.ERR_DECODE</code> with the line, column and path:
+  <code>4:10: lines[0].qty: expected an integer, got a string</code>.</li>
+</ul>
+<pre data-run><code>
+import cstr, str, yaml;
+
+void main()
+{
+  u8 *text = "name: Ada   # a comment\n"
+             "langs: [ktm, C]\n"
+             "bio: |\n"
+             "  first line\n"
+             "  second line\n"
+             "admin: true\n";
+  yaml.Reader r = yaml.readerNew(cstr.view(text));
+  defer r.free();
+  r.beginObject();
+  while (r.nextKey()) {
+    u8[] k = r.key();
+    if (str.equals(k, "langs")) {
+      r.beginArray();
+      while (r.nextItem()) { printf("lang %s\n", r.readStr()); }
+    } else if (str.equals(k, "admin")) {
+      printf("admin %d\n", r.readBool());
+    } else {
+      printf("%s: %s", k, r.readStr());
+      printf("\n");
+    }
+  }
+  r.finish();
+
+  yaml.Writer w = yaml.writerNew();
+  defer w.free();
+  w.beginObject();
+  w.key("name"); w.str("Ada");
+  w.key("note"); w.str("yes");
+  w.key("langs");
+  w.beginArray(); w.str("ktm"); w.str("C"); w.end();
+  w.key("tags"); w.beginArray(); w.end();
+  w.end();
+  String out = w.take();
+  defer out.free();
+  printf("%s", out);
+}
+</code></pre>
+<pre class="output">
+name: Ada
+lang ktm
+lang C
+bio: first line
+second line
+
+admin 1
+name: Ada
+note: yes
+langs:
+  - ktm
+  - C
+tags: []
+</pre>
+<ul>
+  <li>The Writer has <code>beginObject</code>, <code>beginArray</code>, <code>end</code>,
+  <code>key</code>, <code>rawKey</code> (a key written as it is), <code>int</code>,
+  <code>uint</code>, <code>float</code>, <code>bool</code>, <code>nil</code> and
+  <code>str</code>. A string is quoted only when it would read back as something else
+  (<code>"true"</code>, <code>"12"</code>, <code>""</code>, <code>"a: b"</code>, a line break).
+  <code>w.take()</code> returns the text, and a Writer used out of order throws
+  <code>yaml.ERR_WRITER</code>.</li>
+</ul>
+
 <h2 id="dates">Dates and time</h2>
 <pre data-run><code>
 import date, mem;
