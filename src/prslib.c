@@ -2958,6 +2958,68 @@ static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
                         len, name, cls->data, mod_len, cls->data);
 }
 
+/* `p.push(x)` on a parameter the function got by value (`void f(vec.Vec<T>
+ * p)`): p is a copy of the caller's Vec, Map, List, Tree, Set or String
+ * header, so a method that changes its length or moves its buffer changes
+ * the copy only; the caller keeps the old one (and frees what it held
+ * twice, or loses what was added). Warn, pointing at the method. */
+static void parseWarnByValueChange(Cctrl *cc, AstType *owner, Ast *recv,
+                                   char *name, int len, ParseCallLoc *loc) {
+    if (!recv || !cc->tmp_params || recv->kind != AST_UNOP ||
+        recv->unop != AST_UN_OP_ADDR_OF || !recv->operand ||
+        recv->operand->kind != AST_LVAR) {
+        return;
+    }
+    Ast *var = recv->operand;
+    int is_param = 0;
+    for (u64 i = 0; i < cc->tmp_params->size; ++i) {
+        Ast *p = cc->tmp_params->entries[i];
+        if (p && p->kind == AST_DEFAULT_PARAM) p = p->declvar;
+        if (p && p->kind == AST_LVAR && p->lvar_id == var->lvar_id) {
+            is_param = 1;
+            break;
+        }
+    }
+    if (!is_param || var->type->kind != AST_TYPE_CLASS) return;
+
+    static const char *vec_m[] = {"push", "pop", "insert", "removeAt", "clear", "reserve", NULL};
+    static const char *list_m[] = {"append", "prepend", "insertBefore", "insertAfter", "remove",
+                                   "shift", "pop", "clear", "mergeAppend", "mergePrepend", NULL};
+    static const char *map_m[] = {"set", "delete", "clear", NULL};
+    static const char *set_m[] = {"add", "remove", "delete", "clear", NULL};
+    static const char *str_m[] = {"append", "appendByte", "appendFormat", "reserve", "clear",
+                                  "take", "truncate", "insert", NULL};
+    const char **methods = NULL;
+    const char *what = NULL;
+    GenericDef *g = owner && owner->generic && owner->generic_args ? owner->generic : NULL;
+    if (astTypeIsString(var->type)) {
+        methods = str_m;
+        what = "String";
+    } else if (g && g->name) {
+        if (!strcmp(g->name->data, "vec.Vec")) { methods = vec_m; what = "vec.Vec"; }
+        else if (!strcmp(g->name->data, "list.List")) { methods = list_m; what = "list.List"; }
+        else if (!strcmp(g->name->data, "map.Map") ||
+                 !strcmp(g->name->data, "map.Tree")) { methods = map_m; what = g->name->data; }
+        else if (!strcmp(g->name->data, "set.Set")) { methods = set_m; what = "set.Set"; }
+    }
+    if (!methods) return;
+    int hit = 0;
+    for (int i = 0; methods[i]; ++i) {
+        if ((int)strlen(methods[i]) == len && !memcmp(methods[i], name, len)) {
+            hit = 1;
+            break;
+        }
+    }
+    if (!hit) return;
+    AoStr *tname = astTypeToAoStr(var->type);
+    cctrlWarningAt(cc, loc->line, loc->col, loc->len,
+                   "`%s` is a copy of the caller's %s: `%.*s` changes only the copy "
+                   "(the caller still has the old one); take `%s *%s` "
+                   "and pass `&%s`",
+                   var->lname->data, what, len, name, tname->data,
+                   var->lname->data, var->lname->data);
+}
+
 /* The arguments of a call to the method `fn`, the `(` just taken. With
  * `recv` (`u.name(...)`, a pointer to the object) the arguments are the
  * method's own and `recv` becomes `self`; without (`User.name(p, ...)`)
@@ -2991,6 +3053,7 @@ static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
     parseCoerceArgs(decl, argv);
     parsePrintfFormatCheck(cc, decl, argv, fname, flen, &loc);
     parseCallLocFreeArgs(&loc);
+    parseWarnByValueChange(cc, owner, recv, name, len, &loc);
 
     if (recv) {
         AstType *self_type = ((Ast *)fn->params->entries[0])->type;

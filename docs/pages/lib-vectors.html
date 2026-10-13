@@ -35,6 +35,9 @@ popped 50, len 4
 </pre>
 <p>A Vec is a value with <code>data</code>, <code>len</code> and <code>cap</code> fields. <code>free()</code> frees its
 array and the Strings in it (a <code>vec.Vec&lt;String&gt;</code> owns its Strings; <code>clear()</code> and a <code>set</code> that replaces one free them too, and <code>pop</code> and <code>removeAt</code> hand one back to you). Other items are yours: it doesn't free what they point to.</p>
+<p>Passing a Vec to a function copies those three fields, not the items. A function that adds or removes items
+needs a pointer, <code>void f(vec.Vec&lt;String&gt; *v)</code> called as <code>f(&amp;v)</code>: on a copy, <code>push</code>
+or <code>removeAt</code> change only the copy, and ktm warns when it sees that. The same goes for List, Map, Tree, Set and String.</p>
 
 <h2>Methods</h2>
 <table>
