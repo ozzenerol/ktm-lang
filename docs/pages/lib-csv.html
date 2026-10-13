@@ -1,0 +1,122 @@
+<!-- title: CSV -->
+<!-- ref: csv -->
+<h1>CSV</h1>
+<p class="lede"><code>csv.next</code> walks CSV text without copying it: each field, then the whole row, then <code>csv.EOF</code>.</p>
+
+<h2>Walking a text</h2>
+<pre data-run><code>
+import csv;
+
+void main()
+{
+  u8[] text = "name,age\nann,41\nbob,29\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind;
+  csv.init(&p, text);
+  while ((kind = csv.next(&p, &it)) != csv.EOF) {
+    if (kind == csv.FIELD) { printf("[%s]", it.text); }
+    else                   { printf(" <- row %d\n", it.idx); }
+  }
+}
+</code></pre>
+<pre class="output">
+[name][age] <- row 0
+[ann][41] <- row 1
+[bob][29] <- row 2
+</pre>
+<ul class="rules">
+  <li>A <code>csv.Item</code> has <code>idx</code> (the field's number in its row, or the row's number) and <code>text</code>, a <code>u8[]</code> view of the input.</li>
+  <li><code>csv.init</code> takes any <code>u8[]</code>: <code>text[0:n]</code> parses part of a buffer. The input must outlive the parser.</li>
+</ul>
+
+<h2>Quotes are kept</h2>
+<p>The views are the raw text: a quoted field keeps its quotes and doubled <code>""</code>. Commas and
+newlines inside quotes don't split. A row's text includes its line ending.</p>
+<pre data-run><code>
+import csv;
+
+void main()
+{
+  u8[] text = "name,quote\r\nann,\"say \"\"hi\"\", ok\"\nbob,\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind;
+  csv.init(&p, text);
+  while ((kind = csv.next(&p, &it)) != csv.EOF) {
+    if (kind == csv.FIELD) { printf("field %d: [%s]\n", it.idx, it.text); }
+    else                   { printf("row %d: %d bytes\n", it.idx, it.text.len); }
+  }
+}
+</code></pre>
+<pre class="output">
+field 0: [name]
+field 1: [quote]
+row 0: 12 bytes
+field 0: [ann]
+field 1: ["say ""hi"", ok"]
+row 1: 21 bytes
+field 0: [bob]
+field 1: []
+row 2: 5 bytes
+</pre>
+
+<h2>Unquoting a field</h2>
+<p>Unquoting is up to you. A small helper:</p>
+<pre data-run><code>
+import csv, str;
+
+String unquote(u8[] f)
+{
+  if (f.len < 2 || f[0] != '"') { return str.from(f); }
+  String out = str.withCap(f.len);
+  for (i64 i = 1; i < f.len - 1; i++) {
+    out.appendByte(f[i]);
+    if (f[i] == '"') { i++; }        // "" is one quote
+  }
+  return out;
+}
+
+void main()
+{
+  u8[] text = "id,comment\n7,\"fine, \"\"really\"\"\"\n";
+  csv.Parser p;
+  csv.Item it;
+  csv.init(&p, text);
+  while (csv.next(&p, &it) != csv.EOF) {
+    if (it.idx == 1 && it.text.len && it.text[0] == '"') {
+      ad String v = unquote(it.text);
+      printf("%s\n", v);
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+fine, "really"
+</pre>
+
+<h2>Summing a column</h2>
+<pre data-run><code>
+import cstr, csv, str;
+
+void main()
+{
+  u8[] text = "item,price\npen,3\nbook,12\nbag,25\n";
+  csv.Parser p;
+  csv.Item it;
+  i64 kind, total = 0;
+  bool header = true;
+  csv.init(&p, text);
+  while ((kind = csv.next(&p, &it)) != csv.EOF) {
+    if (kind == csv.ROW) { header = false; continue; }
+    if (!header && it.idx == 1) {
+      ad String n = str.from(it.text);
+      total += cstr.toInt(n.cstr());
+    }
+  }
+  printf("total %d\n", total);
+}
+</code></pre>
+<pre class="output">
+total 40
+</pre>

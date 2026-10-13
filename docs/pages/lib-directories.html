@@ -1,0 +1,227 @@
+<!-- title: Directories and file status -->
+<!-- ref: fs -->
+<h1>Directories and file status</h1>
+<p class="lede">Listing a directory, walking a tree, and asking what a path is.</p>
+
+<p>The examples on this page work in a fresh temporary directory, made like this:</p>
+<pre><code>extern "c" u8 *mkdtemp(u8 *template);
+
+u8 dir[32];
+mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+mkdtemp(dir);</code></pre>
+
+<h2>Listing names</h2>
+<p><code>fs.list(path)</code> is the names in a directory, sorted, as a <code>vec.Vec&lt;String&gt;</code>. Free it with <code>fs.freeList</code>.</p>
+<pre data-run><code>
+import cstr, fs, mem, vec;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  mkdtemp(dir);
+  u8[] root = cstr.view(dir);
+  u8 *names[] = {"b.txt", "a.txt", "c.log"};
+  for (auto n : names) {
+    ad String p = fs.join(root, cstr.view(n));
+    fs.writeAll(p, "x");
+  }
+
+  bool ok;
+  vec.Vec<String> list = fs.list(root, &ok);
+  printf("ok %d:", ok);
+  for (auto name : list) { printf(" %s", name); }
+  printf("\n");
+  fs.freeList(&list);
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+ok 1: a.txt b.txt c.log
+</pre>
+
+<h2>Reading entries</h2>
+<p><code>fs.openDir</code> gives each entry with its name, kind and full path. <code>.</code> and <code>..</code> are left out.</p>
+<pre data-run><code>
+import cstr, fs, mem;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  mkdtemp(dir);
+  u8[] root = cstr.view(dir);
+  ad String sub = fs.join(root, "logs");
+  ad String file = fs.join(root, "notes.txt");
+  fs.makeDir(sub);
+  fs.writeAll(file, "hi");
+
+  ad fs.Dir d = fs.openDir(root);
+  i64 files = 0, dirs = 0;
+  bool pathsOk = true;
+  for (fs.DirEntry *e = d.next(); e; e = d.next()) {
+    if (e.kind == fs.FileKind.dir) { dirs++; } else { files++; }
+    if (!e.path.endsWith(e.name)) { pathsOk = false; }
+  }
+  printf("%d dirs, %d files, paths end with the name: %d\n", dirs, files, pathsOk);
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+1 dirs, 1 files, paths end with the name: 1
+</pre>
+<ul class="rules">
+  <li>An entry has <code>name</code>, <code>kind</code> (an <code>fs.FileKind</code>: <code>file</code>, <code>dir</code>, <code>link</code>, <code>other</code>) and <code>path</code>, the directory joined with the name.</li>
+  <li>A symlink's kind is <code>link</code>, never what it points to.</li>
+  <li>The name and path are valid until the next <code>next()</code>: copy them to keep them.</li>
+  <li>Close it with <code>d.close()</code>, or declare it with <code>ad</code> as above.</li>
+  <li>A directory that can't be opened gives a Dir whose <code>d.ok()</code> is false and whose <code>next()</code> is <code>null</code> at once.</li>
+  <li>Entries come in the order the filesystem gives them. Use <code>fs.list</code> for sorted names.</li>
+</ul>
+
+<h2>Walking a tree</h2>
+<p><code>fs.walk(root, &amp;visit, arg)</code> calls <code>bool visit(fs.DirEntry *e, void *arg)</code> for every
+entry under <code>root</code>, a directory before what is in it. Return false to stop.</p>
+<pre data-run><code>
+import cstr, fs, mem;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+bool countBytes(fs.DirEntry *e, i64 *total)
+{
+  if (e.kind == fs.FileKind.file) {
+    fs.FileStat st;
+    fs.stat(&st, e.path);
+    *total += st.st_size;
+  }
+  return true;
+}
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  mkdtemp(dir);
+  u8[] root = cstr.view(dir);
+  ad String deep = fs.join(root, "a/b");
+  fs.makeDirAll(deep);
+  ad String f1 = fs.join(root, "a/one.txt");
+  ad String f2 = fs.join(root, "a/b/two.txt");
+  fs.writeAll(f1, "12345");
+  fs.writeAll(f2, "1234567890");
+
+  i64 total = 0;
+  i32 r = fs.walk(root, &countBytes, &total);
+  printf("walk returned %d, %d bytes in files\n", r, total);
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+walk returned 0, 15 bytes in files
+</pre>
+<p>It returns 0 when every entry was visited, 1 when <code>visit</code> stopped it, -1 when a directory couldn't be read.
+It never follows a symlink into a directory.</p>
+
+<h2 id="file-status">File status</h2>
+<p><code>fs.stat(&amp;st, path)</code> fills an <code>fs.FileStat</code>, the same struct on every platform.</p>
+<table>
+  <thead><tr><th>Field or method</th><th>Holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>st_size</code></td><td>Size in bytes</td></tr>
+    <tr><td><code>st_mode</code></td><td>Type and permission bits</td></tr>
+    <tr><td><code>st_mtim</code>, <code>st_atim</code>, <code>st_ctim</code>, <code>st_btim</code></td><td>Modified, accessed, changed, created; each with <code>tv_sec</code> and <code>tv_nsec</code></td></tr>
+    <tr><td><code>st_ino</code>, <code>st_dev</code>, <code>st_nlink</code>, <code>st_uid</code>, <code>st_gid</code></td><td>As in C</td></tr>
+    <tr><td><code>kind()</code>, <code>isFile()</code>, <code>isDir()</code>, <code>isLink()</code></td><td>What it is</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Call</th><th>Describes</th></tr></thead>
+  <tbody>
+    <tr><td><code>fs.stat(&amp;st, path)</code></td><td>The path, following a symlink</td></tr>
+    <tr><td><code>fs.lstat(&amp;st, path)</code></td><td>The symlink itself</td></tr>
+    <tr><td><code>fs.fstat(&amp;st, fd)</code></td><td>An open file</td></tr>
+  </tbody>
+</table>
+<p>All three return 0, or -1 with <code>os.errno()</code> set.</p>
+<pre data-run><code>
+import cstr, fs, libc, mem;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  mkdtemp(dir);
+  u8[] root = cstr.view(dir);
+  ad String file = fs.join(root, "data.txt");
+  ad String link = fs.join(root, "latest");
+  fs.writeAll(file, "0123456789");
+  libc.symlink("data.txt", link.cstr());
+
+  fs.FileStat st;
+  fs.stat(&st, link);
+  printf("stat: file %d, %d bytes, mode %o\n", st.isFile(), st.st_size, st.st_mode & 0x1FF);
+  fs.lstat(&st, link);
+  printf("lstat: link %d\n", st.kind() == fs.FileKind.link);
+  printf("missing: %d\n", fs.stat(&st, "/no/such/path"));
+
+  ad String real = fs.realPath(link);
+  printf("resolves to data.txt: %d\n", real.endsWith("/data.txt"));
+  fs.remove(root, fs.REMOVE_RECURSE);
+}
+</code></pre>
+<pre class="output">
+stat: file 1, 10 bytes, mode 644
+lstat: link 1
+missing: -1
+resolves to data.txt: 1
+</pre>
+<p><code>fs.realPath(path)</code> is the absolute path with every symlink, <code>.</code> and <code>..</code> resolved;
+its <code>ptr</code> is null when part of the path doesn't exist.</p>
+
+<h3>Times</h3>
+<p><code>date.isoFromTimespec(&amp;t)</code> formats a stat time as UTC ISO 8601:</p>
+<pre data-run><code>
+import date, fs;
+
+void main()
+{
+  fs.FileStat st;
+  fs.stat(&st, "/");
+  ad String when = date.isoFromTimespec(&st.st_mtim);
+  printf("%d %c %d\n", when.len >= 20, when[10], when.endsWith("Z"));
+}
+</code></pre>
+<pre class="output">
+1 T 1
+</pre>
+
+<h2>Reading at an offset</h2>
+<p><code>fs.pread(fd, buf, off)</code> and <code>fs.pwrite(fd, data, off)</code> don't move the file offset, so threads can share an fd.</p>
+<pre data-run><code>
+import fs, libc;
+
+void main()
+{
+  u8[] path = "/tmp/ktm_docs_pread.txt";
+  fs.writeAll(path, "0123456789");
+  i32 fd = libc.open("/tmp/ktm_docs_pread.txt", libc.O_RDWR);
+  u8 buf[4];
+  i64 n = fs.pread(fd, buf, 6);
+  printf("%d bytes at 6: %s\n", n, buf[0:n]);
+  fs.pwrite(fd, "AB", 0);
+  n = fs.pread(fd, buf, 0);
+  printf("%s\n", buf[0:n]);
+  libc.close(fd);
+  fs.remove(path);
+}
+</code></pre>
+<pre class="output">
+4 bytes at 6: 6789
+AB23
+</pre>

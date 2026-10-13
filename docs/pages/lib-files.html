@@ -1,0 +1,194 @@
+<!-- title: Files -->
+<!-- ref: fs -->
+<h1>Files</h1>
+<p class="lede">Read a whole file, write one, make and remove directories. Paths are a <code>u8[]</code>: a literal, a slice or a String.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>String text = fs.readAll(path);       // text.ptr == null: couldn't read
+bool ok = fs.writeAll(path, data);    // replaces the file
+fs.makeDir(path,, true);              // with missing parents
+fs.remove(path, fs.REMOVE_RECURSE);   // a directory and everything in it
+fs.exists(path)  fs.copyFile(a, b)  fs.move(a, b)</code></pre>
+</div>
+
+<h2>Reading and writing a whole file</h2>
+<pre data-run><code>
+import fs;
+
+void main()
+{
+  u8[] path = "/tmp/ktm_docs_example.txt";
+  if (!fs.writeAll(path, "first line\nsecond line\n")) {
+    printf("could not write %s\n", path);
+    return;
+  }
+
+  ad String contents = fs.readAll(path);
+  printf("%d bytes\n%s", contents.len, contents);
+  fs.remove(path);
+}
+</code></pre>
+<pre class="output">
+23 bytes
+first line
+second line
+</pre>
+
+<h2>When it fails</h2>
+<p><code>fs.readAll</code> gives a String whose <code>ptr</code> is <code>null</code>; <code>os.errno()</code> says why.
+An empty file gives an empty String that has a <code>ptr</code>.</p>
+<pre data-run><code>
+import fs, libc, os;
+
+void main()
+{
+  String missing = fs.readAll("/no/such/file");
+  if (!missing.ptr) {
+    printf("can't read: ENOENT %d\n", os.errno() == libc.ENOENT);
+  }
+  printf("write to a bad path: %d\n", fs.writeAll("/no/such/dir/x.txt", "data"));
+}
+</code></pre>
+<pre class="output">
+can't read: ENOENT 1
+write to a bad path: 0
+</pre>
+
+<h2>Lines of a file</h2>
+<pre data-run><code>
+import fs, str;
+
+void main()
+{
+  u8[] path = "/tmp/ktm_docs_lines.txt";
+  fs.writeAll(path, "alpha\nbeta\n\ngamma\n");
+
+  ad String text = fs.readAll(path);
+  ad u8[][] lines = str.split(text.trimEnd("\n"), "\n");
+  for (i64 i = 0; i < lines.len; i++) {
+    printf("%d: [%s]\n", i + 1, lines[i]);
+  }
+  fs.remove(path);
+}
+</code></pre>
+<pre class="output">
+1: [alpha]
+2: [beta]
+3: []
+4: [gamma]
+</pre>
+
+<h2>Appending</h2>
+<p><code>fs.writeAll</code> opens with <code>O_CREAT | O_WRONLY | O_TRUNC</code> by default. Pass other flags to append:</p>
+<pre data-run><code>
+import fs, libc;
+
+void main()
+{
+  u8[] path = "/tmp/ktm_docs_append.log";
+  fs.writeAll(path, "one\n");
+  for (i64 i = 0; i < 2; i++) {
+    fs.writeAll(path, "more\n", libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
+  }
+  ad String text = fs.readAll(path);
+  printf("%s", text);
+  fs.remove(path);
+}
+</code></pre>
+<pre class="output">
+one
+more
+more
+</pre>
+<p>A new file gets mode 0644 minus the umask.</p>
+
+<h2>Directories</h2>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>fs.makeDir(path)</code></td><td>Makes one directory</td></tr>
+    <tr><td><code>fs.makeDir(path,, true)</code>, <code>fs.makeDirAll(path)</code></td><td>Also the missing parents</td></tr>
+    <tr><td><code>fs.remove(path)</code></td><td>A file, a symlink (never what it points to) or an empty directory</td></tr>
+    <tr><td><code>fs.remove(path, fs.REMOVE_RECURSE)</code></td><td>A directory and everything in it</td></tr>
+    <tr><td><code>fs.remove(path, fs.REMOVE_FORCE)</code></td><td>A missing path is not an error</td></tr>
+    <tr><td><code>fs.changeDir(path)</code>, <code>fs.currentDir()</code></td><td>Change directory (<code>~</code> is <code>$HOME</code>); the working directory as a String</td></tr>
+  </tbody>
+</table>
+<p>They return 0 on success and -1 on failure (with <code>os.errno()</code>). <code>makeDir</code> returns 0 if the path is a directory afterwards, made now or already there.</p>
+<pre data-run><code>
+import cstr, fs, mem;
+
+extern "c" u8 *mkdtemp(u8 *template);
+
+void main()
+{
+  u8 dir[32];
+  mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
+  if (!mkdtemp(dir)) { return; }          // a fresh directory to work in
+  u8[] root = cstr.view(dir);
+
+  ad String deep = fs.join(root, "a/b/c");
+  printf("makeDir: %d %d\n", fs.makeDir(deep), fs.makeDir(deep,, true));
+  printf("again: %d, exists: %d\n", fs.makeDirAll(deep), fs.exists(deep));
+
+  printf("remove non-empty: %d\n", fs.remove(root));
+  printf("recursive: %d\n", fs.remove(root, fs.REMOVE_RECURSE));
+  printf("missing, forced: %d\n", fs.remove(root, fs.REMOVE_FORCE));
+}
+</code></pre>
+<pre class="output">
+makeDir: -1 0
+again: 0, exists: 1
+remove non-empty: -1
+recursive: 0
+missing, forced: 0
+</pre>
+
+<h2>Copying and moving</h2>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>fs.copyFile(from, to)</code></td><td>Copies a regular file with its permission bits, replacing <code>to</code>. A copy that fails part way is removed</td></tr>
+    <tr><td><code>fs.rename(from, to)</code></td><td>Renames, on one filesystem</td></tr>
+    <tr><td><code>fs.move(from, to)</code></td><td>Renames, or across filesystems copies and removes the original</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import fs;
+
+void main()
+{
+  fs.writeAll("/tmp/ktm_docs_a.txt", "payload");
+  printf("copy %d\n", fs.copyFile("/tmp/ktm_docs_a.txt", "/tmp/ktm_docs_b.txt"));
+  printf("move %d\n", fs.move("/tmp/ktm_docs_b.txt", "/tmp/ktm_docs_c.txt"));
+  printf("%d %d %d\n", fs.exists("/tmp/ktm_docs_a.txt"), fs.exists("/tmp/ktm_docs_b.txt"),
+         fs.exists("/tmp/ktm_docs_c.txt"));
+  ad String c = fs.readAll("/tmp/ktm_docs_c.txt");
+  printf("%s\n", c);
+  fs.remove("/tmp/ktm_docs_a.txt");
+  fs.remove("/tmp/ktm_docs_c.txt");
+}
+</code></pre>
+<pre class="output">
+copy 0
+move 0
+1 0 1
+payload
+</pre>
+
+<h2>Details</h2>
+<ul class="rules">
+  <li><code>fs.readAll</code> reads a regular file up to its size, and a pipe, FIFO, device or <code>/proc</code> file until end of file. It never finishes on an endless device like <code>/dev/zero</code>.</li>
+  <li>For a directory, <code>fs.readAll</code> gives a String without a <code>ptr</code>.</li>
+  <li>A path longer than 4095 bytes fails with <code>ENAMETOOLONG</code>.</li>
+  <li>The files <code>fs</code> opens are close-on-exec: programs you start don't inherit them.</li>
+  <li>The POSIX calls (<code>libc.open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, ...) are there for lower-level work.</li>
+</ul>
+
+<h2>More</h2>
+<div class="cards">
+  <a class="card" href="lib-directories.html"><strong>Directories and file status</strong><span>Listing, walking a tree, <code>fs.stat</code>.</span></a>
+  <a class="card" href="lib-text.html#paths-and-file-names"><strong>File names</strong><span><code>fs.ext</code>, <code>fs.join</code>.</span></a>
+  <a class="card" href="lib-csv.html"><strong>CSV</strong><span>Reading CSV text.</span></a>
+</div>

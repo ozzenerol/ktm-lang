@@ -1,0 +1,110 @@
+<!-- title: Clocks and sleeping -->
+<!-- ref: date -->
+<h1>Clocks and sleeping</h1>
+<p class="lede">Measure time, sleep, work with Unix time, and read and write HTTP dates.</p>
+
+<table>
+  <thead><tr><th>Call</th><th>Gives</th><th>Use it for</th></tr></thead>
+  <tbody>
+    <tr><td><code>date.monoMs()</code>, <code>date.monoNs()</code></td><td>A clock that only goes forward</td><td>Timeouts, deadlines, measuring</td></tr>
+    <tr><td><code>date.nowMs()</code></td><td>Milliseconds since the Unix epoch</td><td>Timestamps (it jumps when the clock is set)</td></tr>
+    <tr><td><code>date.unixNow()</code></td><td>Seconds since the Unix epoch</td><td>Unix time</td></tr>
+    <tr><td><code>date.sleepMs(ms)</code></td><td>Sleeps, even through signals</td><td>Waiting</td></tr>
+  </tbody>
+</table>
+
+<h2>Measuring</h2>
+<pre data-run><code>
+import date;
+
+i64 slowSum(i64 n)
+{
+  i64 t = 0;
+  for (i64 i = 0; i < n; i++) { t += i % 7; }
+  return t;
+}
+
+void main()
+{
+  i64 start = date.monoNs();
+  i64 r = slowSum(1000000);
+  i64 took = date.monoNs() - start;
+  printf("result %d, took more than 0 ns: %d\n", r, took > 0);
+
+  i64 t0 = date.monoMs();
+  date.sleepMs(20);
+  printf("slept at least 20 ms: %d\n", date.monoMs() - t0 >= 20);
+}
+</code></pre>
+<pre class="output">
+result 2999997, took more than 0 ns: 1
+slept at least 20 ms: 1
+</pre>
+
+<h2>A deadline</h2>
+<pre data-run><code>
+import date;
+
+void main()
+{
+  i64 deadline = date.monoMs() + 50;
+  i64 tries = 0;
+  while (date.monoMs() < deadline) {
+    tries++;
+    date.sleepMs(10);
+  }
+  printf("tried more than once: %d\n", tries > 1);
+}
+</code></pre>
+<pre class="output">
+tried more than once: 1
+</pre>
+<div class="tip"><p>Use <code>monoMs</code>, not <code>nowMs</code>, for deadlines: the time of day can jump back when the clock is set.</p></div>
+
+<h2>Unix time</h2>
+<p><code>date.formatUnix(t, fmt)</code> writes a Unix time with <code>strftime</code>'s format, in UTC; pass <code>false</code> as the third argument for local time.</p>
+<pre data-run><code>
+import date;
+
+void main()
+{
+  ad String a = date.formatUnix(0, "%Y-%m-%d %H:%M:%S");
+  ad String b = date.formatUnix(784111777, "%A %d %B %Y, day %j");
+  printf("%s\n%s\n", a, b);
+  printf("now is after 2024: %d\n", date.unixNow() > 1704067200);
+}
+</code></pre>
+<pre class="output">
+1970-01-01 00:00:00
+Sunday 06 November 1994, day 310
+now is after 2024: 1
+</pre>
+
+<h2>HTTP dates</h2>
+<p><code>date.httpDate(t)</code> is the form HTTP headers use (<code>Date</code>, <code>Last-Modified</code>), always English and UTC.
+<code>date.parseHttpDate(text, &amp;t)</code> reads it back, and the two older forms clients may still send.</p>
+<pre data-run><code>
+import date;
+
+void main()
+{
+  ad String h = date.httpDate(784111777);
+  printf("%s\n", h);
+
+  u8[] forms[] = {"Sun, 06 Nov 1994 08:49:37 GMT", "Sunday, 06-Nov-94 08:49:37 GMT",
+                  "Sun Nov  6 08:49:37 1994", "yesterday"};
+  for (auto f : forms) {
+    i64 t = -1;
+    bool ok = date.parseHttpDate(f, &t);
+    printf("%d %d\n", ok, t);
+  }
+}
+</code></pre>
+<pre class="output">
+Sun, 06 Nov 1994 08:49:37 GMT
+1 784111777
+1 784111777
+1 784111777
+0 -1
+</pre>
+<p>On failure it returns false and leaves <code>t</code> alone.</p>

@@ -1,0 +1,118 @@
+<!-- title: Byte buffers -->
+<!-- ref: bytes -->
+<h1>Byte buffers</h1>
+<p class="lede">The <code>bytes</code> module is for binary data that comes and goes in pieces: what a socket delivers,
+or a message being put together.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>bytes.Buffer b = bytes.bufferNew();  defer b.free();
+b.append(data)  b.appendByte(x)  b.appendBe32(n)  b.appendLe16(n)
+b.data()      // a view of the unread bytes
+b.consume(n)  // drop the first n
+b.readFrom(fd)  b.writeTo(fd)       // one read / one write
+bytes.be32(s, at)  bytes.putLe16(s, at, v)   // integers in a u8[]</code></pre>
+</div>
+
+<h2>A queue of bytes</h2>
+<p>Add at the end, read from the front with <code>data()</code>, drop what you used with <code>consume(n)</code>.</p>
+<pre data-run><code>
+import bytes;
+
+void main()
+{
+  // a message: a 2-byte type and a 4-byte length (network order), then the body
+  bytes.Buffer b = bytes.bufferNew();
+  defer b.free();
+  b.appendBe16(7);
+  b.appendBe32(5);
+  b.append("hello");
+  b.append("\x00\x08\x00\x00\x00\x02hi");   // a second message, already here
+
+  while (b.len >= 6) {
+    u8[] d = b.data();
+    i64 len = bytes.be32(d, 2);
+    if (b.len < 6 + len) { break; }         // the rest hasn't arrived yet
+    printf("type %d: %s\n", bytes.be16(d), d[6:6 + len]);
+    b.consume(6 + len);
+  }
+  printf("%d bytes left\n", b.len);
+}
+</code></pre>
+<pre class="output">
+type 7: hello
+type 8: hi
+0 bytes left
+</pre>
+<ul class="rules">
+  <li>Make one with <code>bytes.bufferNew()</code>: a declared Buffer isn't zeroed.</li>
+  <li>The space in front is reused, so a buffer filled and drained all the time doesn't keep growing.</li>
+  <li><code>b.take()</code> gives the unread bytes as a String that is yours.</li>
+</ul>
+
+<h2>Reading into it</h2>
+<p><code>room(n)</code> gives at least <code>n</code> writable bytes after the data; <code>commit(k)</code> counts the <code>k</code> you wrote.
+<code>readFrom(fd)</code> does one <code>read</code> that way.</p>
+<pre data-run><code>
+import bytes, libc;
+
+void main()
+{
+  i32 fds[2];
+  libc.pipe(fds);
+  libc.write(fds[1], "chunk one|chunk two", 19);
+  libc.close(fds[1]);
+
+  bytes.Buffer b = bytes.bufferNew();
+  defer b.free();
+  i64 n;
+  while ((n = b.readFrom(fds[0])) > 0) { }
+  libc.close(fds[0]);
+  printf("%d bytes: %s\n", b.len, b.data());
+
+  u8[] room = b.room(4);
+  room[0] = '!';
+  b.commit(1);
+  ad String all = b.take();
+  printf("%s\n", all);
+}
+</code></pre>
+<pre class="output">
+19 bytes: chunk one|chunk two
+chunk one|chunk two!
+</pre>
+<p><code>readFrom</code> and <code>writeTo</code> return what the system call did: -1 with <code>EAGAIN</code> on a non-blocking fd that has to wait.
+<code>writeTo</code> consumes what went out.</p>
+
+<h2>Integers in a slice</h2>
+<p>Read and write fixed-size integers at an offset, big-endian (network order) or little-endian.</p>
+<table>
+  <thead><tr><th>Read</th><th>Write</th></tr></thead>
+  <tbody>
+    <tr><td><code>bytes.be16(s, at)</code>, <code>be32</code>, <code>be64</code></td><td><code>bytes.putBe16(s, at, v)</code>, <code>putBe32</code>, <code>putBe64</code></td></tr>
+    <tr><td><code>bytes.le16(s, at)</code>, <code>le32</code>, <code>le64</code></td><td><code>bytes.putLe16(s, at, v)</code>, <code>putLe32</code>, <code>putLe64</code></td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import bytes;
+
+void main()
+{
+  u8 header[8];
+  bytes.putBe16(header, 0, 0xCAFE);
+  bytes.putLe32(header, 2, 1000);
+  bytes.putBe16(header, 6, 2);
+  printf("%x %x | %X %d %d\n", header[0], header[1], bytes.be16(header), bytes.le32(header, 2),
+         bytes.be16(header, 6));
+  try {
+    bytes.be32(header, 6);         // 4 bytes from 6: past the end
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+ca fe | CAFE 1000 2
+bytes.be32: 4 bytes at 6 of a 8-byte slice
+</pre>
+<p>Past the end throws <code>ERR_BOUNDS</code>, like <code>consume</code> or <code>commit</code> past the data.</p>

@@ -1,0 +1,221 @@
+<!-- title: JSON: structs -->
+<!-- ref: json -->
+<h1>JSON: structs</h1>
+<p class="lede">Turn a struct into JSON and back in one call. Mark it <code>@json</code> and the compiler writes the code, so it is fast.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>@json struct User { i64 id; String name; };
+User u = json.decode<User>(text);          // throws json.ERR_DECODE on bad input
+defer u.freeDecoded();                     // or json.free(reflect.of(u))
+String out = json.encode(reflect.of(u));   // json.encode(..., 2) to indent
+json.decode<User>(text, json.STRICT);      // unknown and missing keys are errors</code></pre>
+</div>
+
+<h2>Decode and encode</h2>
+<pre data-run><code>
+import json, reflect;
+
+enum Role { guest, admin };
+
+@json struct Tag { u8[] name; i64 weight; };
+@json struct User { i64 id; String name; Role role; Tag[] tags; };
+
+void main()
+{
+  User u = json.decode<User>("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\","
+                             " \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}");
+  defer u.freeDecoded();
+  printf("%d %s %s %s\n", u.id, u.name, reflect.name(u.role), u.tags[0].name);
+
+  u.id = 8;
+  ad String text = json.encode(reflect.of(u));
+  printf("%s\n", text);
+}
+</code></pre>
+<pre class="output">
+7 Ada admin math
+{"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
+</pre>
+<ul class="rules">
+  <li>A key the struct has no field for is ignored (<code>"since"</code> above).</li>
+  <li>A field the JSON leaves out is zero.</li>
+  <li>An enum is written as its member's name.</li>
+</ul>
+
+<h2>Types</h2>
+<table>
+  <thead><tr><th>ktm</th><th>JSON</th></tr></thead>
+  <tbody>
+    <tr><td>A struct</td><td>An object of its fields, in order (private fields are skipped)</td></tr>
+    <tr><td>Integers, floats, <code>bool</code></td><td>Numbers, <code>true</code>/<code>false</code></td></tr>
+    <tr><td>An enum</td><td>Its member's name</td></tr>
+    <tr><td><code>String</code>, <code>u8[]</code>, <code>u8 *</code>, a <code>u8</code> array</td><td>A string</td></tr>
+    <tr><td>Other arrays and slices, <code>vec.Vec&lt;T&gt;</code></td><td>Arrays</td></tr>
+    <tr><td>A pointer</td><td>What it points to, or <code>null</code></td></tr>
+  </tbody>
+</table>
+<p>A union, a function pointer or a <code>void *</code> can't be JSON.</p>
+
+<h2>Errors</h2>
+<p>Anything that doesn't fit throws <code>json.ERR_DECODE</code>, with the line and column and the path to the value.</p>
+<pre data-run><code>
+import json;
+
+@json struct Tag { u8[] name; i64 weight; };
+@json struct User { i64 id; Tag[] tags; };
+
+void main()
+{
+  u8[] inputs[] = {
+    "{\"tags\": [{\"weight\": \"high\"}]}",
+    "{\"id\": 1,",
+    "[1, 2]",
+  };
+  for (auto in : inputs) {
+    try {
+      User u = json.decode<User>(in);
+    } catch (Error e) {
+      printf("%s\n", e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+1:22: tags[0].weight: expected an integer, got a string
+1:10: id: expected a key, got the end of the input
+1:1: expected an object, got an array
+</pre>
+<p>When <code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in.</p>
+
+<h2>Strict decoding</h2>
+<p>With <code>json.STRICT</code>, a key with no field and a missing key are errors.</p>
+<pre data-run><code>
+import json;
+
+@json struct Point { i64 x; i64 y; };
+
+void main()
+{
+  u8[] inputs[] = {"{\"x\": 1, \"y\": 2}", "{\"x\": 1}", "{\"x\": 1, \"y\": 2, \"z\": 3}"};
+  for (auto in : inputs) {
+    try {
+      Point p = json.decode<Point>(in, json.STRICT);
+      printf("ok: %d %d\n", p.x, p.y);
+    } catch (Error e) {
+      printf("%s\n", e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+ok: 1 2
+1:9: y: missing
+1:22: z: no such field in Point
+</pre>
+
+<h2 id="json-and-yaml-attributes">@json and @yaml</h2>
+<p>Mark a struct <code>@json</code> (or <code>@yaml</code>, or both) and the compiler writes its encoder and decoder as methods.
+The struct's file must <code>import json</code> (or <code>yaml</code>).</p>
+<table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>u.toJson(&amp;w)</code></td><td>Writes it to a <a href="lib-json-writer.html"><code>json.Writer</code></a></td></tr>
+    <tr><td><code>u.fromJson(&amp;r)</code></td><td>Reads it from a <a href="lib-json.html#reader"><code>json.Reader</code></a></td></tr>
+    <tr><td><code>u.freeDecoded()</code></td><td>Frees what <code>fromJson</code> (or <code>decode</code>) allocated</td></tr>
+    <tr><td><code>u.toYaml(&amp;w)</code>, <code>u.fromYaml(&amp;r)</code></td><td>The same for <a href="lib-yaml.html">YAML</a></td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> call these methods by themselves, at any depth. Adding <code>@json</code> makes existing code faster with no other change.</li>
+  <li>Without <code>@json</code>, the same calls work by <a href="lang-reflection.html">reflection</a>, about 3 times slower to decode.</li>
+  <li><code>ktm --expand file.ktm</code> prints the generated methods.</li>
+</ul>
+
+<h3>Field attributes</h3>
+<table>
+  <thead><tr><th>Attribute</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>@key("display-name")</code></td><td>The key in the text</td></tr>
+    <tr><td><code>@skip</code></td><td>Never written or read (never required by STRICT)</td></tr>
+    <tr><td><code>@omitEmpty</code></td><td>Not written when 0, empty or null</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import json, reflect, yaml;
+
+enum Role { guest, admin };
+
+@json @yaml
+struct Tag {
+  String name;
+  @omitEmpty i64 weight;
+};
+
+@json @yaml
+struct User {
+  i64 id;
+  @key("display-name") String name;
+  Role role;
+  Tag[] tags;
+  @skip i64 visits;
+};
+
+void main()
+{
+  User u = json.decode<User>("{\"id\": 7, \"display-name\": \"Ada\", \"role\": \"admin\","
+                             " \"tags\": [{\"name\": \"math\", \"weight\": 3}, {\"name\": \"poetry\"}]}");
+  defer u.freeDecoded();
+  printf("%d %s %s %d tags\n", u.id, u.name, reflect.name(u.role), u.tags.len);
+
+  json.Writer w = json.writerNew();
+  defer w.free();
+  u.toJson(&w);
+  ad String text = w.take();
+  printf("%s\n", text);
+
+  yaml.Writer y = yaml.writerNew();
+  defer y.free();
+  u.toYaml(&y);
+  ad String doc = y.take();
+  printf("%s", doc);
+}
+</code></pre>
+<pre class="output">
+7 Ada admin 2 tags
+{"id":7,"display-name":"Ada","role":"admin","tags":[{"name":"math","weight":3},{"name":"poetry"}]}
+id: 7
+display-name: Ada
+role: admin
+tags:
+  - name: math
+    weight: 3
+  - name: poetry
+</pre>
+
+<h2>Filling a value you have</h2>
+<p><code>json.decode(text, reflect.of(x))</code> fills an existing value. Fields the JSON leaves out keep what they had, so zero it first.</p>
+<pre data-run><code>
+import json, reflect;
+
+struct Config { i64 port; i64 workers; bool debug; };
+
+void main()
+{
+  Config c = {8080, 4, false};        // defaults
+  json.decode("{\"workers\": 16}", reflect.of(c));
+  printf("%d %d %d\n", c.port, c.workers, c.debug);
+}
+</code></pre>
+<pre class="output">
+8080 16 0
+</pre>
+<p>That is a handy way to apply a config file on top of defaults.</p>
+
+<h2>Memory</h2>
+<ul class="rules">
+  <li>Decoding allocates the Strings, slices, Vecs, <code>u8 *</code> strings and pointed-to structs it fills.</li>
+  <li><code>u.freeDecoded()</code> or <code>json.free(reflect.of(u))</code> frees them all and zeroes the fields, also after a decode that threw half way.</li>
+  <li>Use them only on values that decode filled.</li>
+  <li>A decoded Vec is an ordinary one: <code>push</code> grows it.</li>
+</ul>

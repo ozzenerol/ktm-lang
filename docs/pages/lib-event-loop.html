@@ -1,0 +1,228 @@
+<!-- title: The coroutine loop -->
+<!-- ref: coro -->
+<h1>The coroutine loop</h1>
+<p class="lede">One coroutine per connection, all on one thread. <code>coro.go</code> starts a coroutine in the loop,
+<code>coro.run</code> runs the loop, and the I/O calls pause only the coroutine that waits.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>coro.go(&handler, arg);        // start a coroutine in this thread's loop
+coro.run();                    // until every one has ended
+// inside a loop coroutine:
+coro.accept(listener)   coro.read(fd, buf)   coro.write(fd, data)   coro.dial(host, port)
+coro.wait(fd, events, ms)   coro.sleep(ms)   coro.waitChild(pid)   coro.close(fd)
+coro.stop();                   // stop taking work; finish what is in flight</code></pre>
+</div>
+
+<h2>An echo server</h2>
+<p>The server and its clients run as coroutines in one loop, on one thread.</p>
+<pre data-run><code>
+import coro, cstr, libc, net;
+
+i32 gListen;
+
+void *serveOne(void *arg)
+{
+  i32 fd = (i32)(i64)arg;
+  u8 buf[256];
+  i64 n;
+  while ((n = coro.read(fd, buf, 5000)) > 0) {      // pauses until data comes
+    coro.write(fd, buf[0:n]);                       // pauses while the socket is full
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *unused)
+{
+  i32 fd;
+  while ((fd = coro.accept(gListen)) != -1) { coro.go(&serveOne, (void *)(i64)fd); }
+  return null;                                      // coro.stop() was called
+}
+
+void *client(void *word)
+{
+  i32 fd = coro.dial("127.0.0.1", net.localPort(gListen), 5000);
+  coro.write(fd, cstr.view(word));
+  u8 buf[64];
+  i64 n = coro.read(fd, buf, 5000);
+  printf("%s -> %s\n", word, buf[0:n]);
+  coro.close(fd);
+  return null;
+}
+
+void *clients(void *unused)
+{
+  client("ping");
+  client("hello");
+  coro.stop();                                      // let the server finish
+  return null;
+}
+
+void main()
+{
+  gListen = net.listen(0, "127.0.0.1", 16);
+  coro.go(&acceptor);
+  coro.go(&clients);
+  coro.run();
+  libc.close(gListen);
+  printf("stopped\n");
+}
+</code></pre>
+<pre class="output">
+ping -> ping
+hello -> hello
+stopped
+</pre>
+
+<h2>The calls</h2>
+<table>
+  <thead><tr><th>Call</th><th>Pauses until</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>coro.read(fd, buf, ms)</code></td><td>Something can be read</td><td>Bytes read, 0 at end of file, -1 on error or timeout</td></tr>
+    <tr><td><code>coro.write(fd, data, ms)</code></td><td>All of <code>data</code> is written</td><td><code>data.len</code>, or -1 (<code>EPIPE</code>, never <code>SIGPIPE</code>)</td></tr>
+    <tr><td><code>coro.accept(listener, ms)</code></td><td>A client connects</td><td>A non-blocking fd; -1 on timeout, error or <code>coro.stop()</code></td></tr>
+    <tr><td><code>coro.dial(addr, port, ms)</code></td><td>The connection is made</td><td>A non-blocking fd, or -1 with <code>os.errno()</code></td></tr>
+    <tr><td><code>coro.wait(fd, events, ms)</code></td><td><code>fd</code> is ready for <code>events</code></td><td>Its <code>revents</code> (above 0), or 0 on timeout</td></tr>
+    <tr><td><code>coro.waitIdle(fd, events, ms)</code></td><td>The same, for waiting on more work</td><td>Also -1 once <code>coro.stop()</code> is called</td></tr>
+    <tr><td><code>coro.sleep(ms)</code>, <code>coro.yield()</code></td><td>Time passes / the others had a turn</td><td></td></tr>
+    <tr><td><code>coro.waitChild(pid, ms)</code></td><td>A child process exits</td><td>Its wait status, or -1</td></tr>
+    <tr><td><code>coro.close(fd)</code></td><td></td><td>Closes the fd and tells the loop</td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li><code>ms</code> is optional everywhere: leave it out to wait without a limit.</li>
+  <li>Close the fds you wait on with <code>coro.close</code>, not <code>libc.close</code>.</li>
+  <li>A read on a busy stream goes straight on without waiting, for 4 ms at most before others get a turn.</li>
+  <li>Out of fds, <code>coro.accept</code> rests instead of spinning, so no client is dropped.</li>
+  <li><code>coro.dial</code> still waits for the system resolver on a host name: give a numeric address where that matters.</li>
+</ul>
+
+<h2>Timers alongside I/O</h2>
+<pre data-run><code>
+import coro;
+
+void *ticker(void *name)
+{
+  for (i64 i = 1; i <= 3; i++) {
+    coro.sleep(40);
+    printf("%s tick %d\n", name, i);
+  }
+  return null;
+}
+
+void *slow(void *unused)
+{
+  coro.sleep(60);
+  printf("slow done\n");
+  return null;
+}
+
+void main()
+{
+  coro.go(&ticker, "a");
+  coro.go(&slow);
+  coro.run();
+  printf("all done\n");
+}
+</code></pre>
+<pre class="output">
+a tick 1
+slow done
+a tick 2
+a tick 3
+all done
+</pre>
+
+<h2>Waiting for child processes</h2>
+<p>Three jobs run at once, each waited for by its own coroutine, while another keeps working.</p>
+<pre data-run><code>
+import coro, proc;
+
+void *job(void *arg)
+{
+  u8 *script = arg;
+  u8 *argv[4] = {"/bin/sh", "-c", script, null};
+  proc.Proc *p = proc.spawn(argv);
+  i32 st = coro.waitChild(p.pid, 5000);
+  proc.setStatus(p, st);
+  printf("[%s] exit %d\n", script, p.exitCode);
+  proc.release(p);
+  return null;
+}
+
+void *busy(void *unused)
+{
+  for (i64 i = 0; i < 3; i++) {
+    printf("still working\n");
+    coro.sleep(200);
+  }
+  return null;
+}
+
+void main()
+{
+  coro.go(&job, "sleep 0.5; exit 3");
+  coro.go(&job, "sleep 0.1");
+  coro.go(&job, "sleep 0.3; exit 1");
+  coro.go(&busy);
+  coro.run();
+}
+</code></pre>
+<pre class="output">
+still working
+[sleep 0.1] exit 0
+still working
+[sleep 0.3; exit 1] exit 1
+still working
+[sleep 0.5; exit 3] exit 3
+</pre>
+
+<h2 id="stopping">Stopping</h2>
+<p><code>coro.stop()</code> winds the loop down: <code>coro.accept</code> and <code>coro.waitIdle</code> return -1 from then on,
+while other waits go on, so the work in flight finishes and <code>coro.run</code> returns.
+<code>coro.stopping()</code> tells whether it was called (a server sends <code>Connection: close</code> then).</p>
+<p>Ctrl-C and SIGTERM fit as one more coroutine:</p>
+<pre><code>void *onSignal(void *unused)
+{
+  if (coro.waitIdle(signal.stopInit(), libc.POLLIN) > 0) { coro.stop(); }
+  return null;
+}
+
+// in main, before coro.run():
+coro.go(&onSignal);</code></pre>
+<p>It uses <code>waitIdle</code>, so it doesn't keep the loop alive once everything else has ended.</p>
+
+<h2>Errors</h2>
+<ul class="rules">
+  <li>The loop calls throw <code>coro.ERR_LOOP</code> when they can't work: <code>coro.run</code> inside a coroutine, <code>coro.read</code> outside one, a loop where every coroutine waits forever with no fd.</li>
+  <li>When a loop coroutine throws, the loop releases it and <code>coro.run</code> throws the error on. The other coroutines stay; calling <code>coro.run</code> again carries on with them.</li>
+</ul>
+
+<h2>Backends</h2>
+<p>On Linux the loop uses io_uring where the kernel allows it (6.1 or later, and not blocked, as Docker's default profile does);
+otherwise epoll (Linux), kqueue (macOS), or <code>poll</code>. Every backend behaves the same.</p>
+<pre data-run><code>
+import coro;
+
+void *show(void *unused)
+{
+  u8[] b = coro.backend();
+  printf("a known backend: %d\n", b.equals("uring") || b.equals("epoll") || b.equals("kqueue") || b.equals("poll"));
+  return null;
+}
+
+void main()
+{
+  coro.go(&show);
+  coro.run();
+}
+</code></pre>
+<pre class="output">
+a known backend: 1
+</pre>
+<p><code>KTM_CORO_BACKEND=uring</code>, <code>epoll</code>, <code>kqueue</code> or <code>poll</code> picks one; a backend the system can't give falls back to the next one down.</p>
+<p>A turn of the loop costs the fds that are ready, not every fd that is open: ten thousand idle connections cost nothing.</p>
+
+<h2>On every core</h2>
+<p>One loop runs on one thread. To use every core, see <a href="lib-serve.html"><code>coro.serve</code></a>.</p>

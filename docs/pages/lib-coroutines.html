@@ -1,0 +1,156 @@
+<!-- title: Coroutines -->
+<!-- ref: coro -->
+<h1>Coroutines</h1>
+<p class="lede">A coroutine runs a function on its own stack and can pause in the middle. This page is the core: generators and two-way values.
+For a server with one coroutine per connection, see <a href="lib-event-loop.html">The coroutine loop</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>void *body(void *arg) { coro.yield(v); ... return last; }
+coro.Coroutine *c = coro.spawn(&body, arg);   // nothing runs yet
+void *v = coro.next(c);       // run until the next yield; get its value
+coro.next(c, send);           // ... and make that yield return send
+coro.done(c)                  // true once body has returned
+coro.release(c);</code></pre>
+</div>
+
+<h2>A generator</h2>
+<pre data-run><code>
+import coro;
+
+void *fib(void *max)
+{
+  i64 a = 0, b = 1, t;
+  while (a < (i64)max) {
+    coro.yield((void *)a);
+    t = a + b;
+    a = b;
+    b = t;
+  }
+  return null;
+}
+
+void main()
+{
+  coro.Coroutine *f = coro.spawn(&fib, (void *)50);
+  for (void *v = coro.next(f); !coro.done(f); v = coro.next(f)) {
+    printf("%d,", v);
+  }
+  printf("\n");
+  coro.release(f);
+}
+</code></pre>
+<pre class="output">
+0,1,1,2,3,5,8,13,21,34,
+</pre>
+<ul class="rules">
+  <li>The function is <code>void *f(void *arg)</code>.</li>
+  <li><code>coro.next(c)</code> runs it until <code>coro.yield(value)</code> and returns that value.</li>
+  <li>When the function returns, <code>coro.done(c)</code> is true and that last <code>next</code> returns the function's return value. After that, <code>next</code> returns <code>null</code>.</li>
+  <li>A yielded <code>null</code> is a value like any other, so loops test <code>coro.done</code>.</li>
+</ul>
+
+<h2>Sending values in</h2>
+<p><code>coro.next(c, send)</code> makes the paused <code>coro.yield</code> return <code>send</code>. The first <code>next</code> only starts the function.</p>
+<pre data-run><code>
+import coro;
+
+void *runningTotal(void *unused)
+{
+  i64 total = 0;
+  while (true) { total += (i64)coro.yield((void *)total); }
+  return null;
+}
+
+void main()
+{
+  coro.Coroutine *s = coro.spawn(&runningTotal);
+  coro.next(s);                         // runs to the first yield
+  printf("%d\n", coro.next(s, (void *)5));
+  printf("%d\n", coro.next(s, (void *)7));
+  printf("%d\n", coro.next(s, (void *)30));
+  coro.release(s);                      // fine while it is paused
+}
+</code></pre>
+<pre class="output">
+5
+12
+42
+</pre>
+
+<h2>Passing more than a number</h2>
+<p>Pass a pointer to a struct as the argument, and yield pointers to data that outlives the yield.</p>
+<pre data-run><code>
+import coro, str;
+
+struct Job { u8[] text; i64 words; };
+
+void *splitWords(void *arg)
+{
+  Job *j = arg;
+  ad u8[][] parts = str.split(j.text, " ");
+  for (i64 i = 0; i < parts.len; i++) {
+    j.words++;
+    coro.yield(&parts[i]);              // a pointer to this word's view
+  }
+  return null;
+}
+
+void main()
+{
+  Job j = {"one two three", 0};
+  coro.Coroutine *c = coro.spawn(&splitWords, &j);
+  for (u8[] *w = coro.next(c); !coro.done(c); w = coro.next(c)) {
+    printf("[%s]", *w);
+  }
+  printf(" %d words\n", j.words);
+  coro.release(c);
+}
+</code></pre>
+<pre class="output">
+[one][two][three] 3 words
+</pre>
+
+<h2>Exceptions and defer</h2>
+<ul class="rules">
+  <li>A <code>try</code> may span a yield.</li>
+  <li>A throw that leaves the coroutine's function goes on from the <code>coro.next</code> that resumed it.</li>
+  <li>Pausing doesn't leave a block, so it runs no <code>defer</code>s.</li>
+</ul>
+<pre data-run><code>
+import coro;
+
+enum Err { bad };
+
+void *failing(void *unused)
+{
+  coro.yield((void *)1);
+  throw(Err.bad, "failed after one value");
+  return null;
+}
+
+void main()
+{
+  coro.Coroutine *c = coro.spawn(&failing);
+  printf("%d\n", coro.next(c));
+  try {
+    coro.next(c);
+  } catch (Error e) {
+    printf("caught: %s\n", e.message);
+  }
+  coro.release(c);
+}
+</code></pre>
+<pre class="output">
+1
+caught: failed after one value
+</pre>
+
+<h2>Stacks</h2>
+<ul class="rules">
+  <li>Each stack is 256 KiB unless <code>coro.spawn</code>'s third argument says otherwise, with a guard page: running past it crashes instead of overwriting memory.</li>
+  <li><code>coro.spawn</code> returns <code>null</code> if the stack can't be mapped.</li>
+  <li><code>coro.release</code> keeps up to 16 stacks per thread for reuse, so short-lived coroutines are cheap.</li>
+  <li>Coroutines can resume other coroutines; <code>coro.current()</code> is the running one (<code>null</code> outside). Every thread can have its own.</li>
+  <li><code>coro.yield</code> outside a coroutine, or resuming a running one, prints a message and exits with 1.</li>
+</ul>

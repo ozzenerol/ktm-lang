@@ -1,0 +1,87 @@
+<!-- title: Shell commands -->
+<!-- ref: proc -->
+<h1>Shell commands</h1>
+<p class="lede">Run a command line through <code>sh -c</code>: for pipelines, globs and redirections.
+To run a program with arguments that come from users or files, use <a href="lib-processes.html"><code>proc.run</code></a> instead.</p>
+
+<table>
+  <thead><tr><th>Call</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>proc.shell(cmd)</code></td><td>The exit code, 0 to 255 (-1 if killed or the shell couldn't run)</td></tr>
+    <tr><td><code>proc.shellf(fmt, ...)</code></td><td>The same, with a format</td></tr>
+    <tr><td><code>proc.shellOutput(fmt, ...)</code></td><td>What it printed to stdout, minus one trailing newline, as a String</td></tr>
+    <tr><td><code>proc.shellQuote(s)</code></td><td><code>s</code> as one safe shell word, a String</td></tr>
+  </tbody>
+</table>
+
+<h2>Running and capturing</h2>
+<pre data-run><code>
+import os, proc;
+
+void main()
+{
+  i64 status = proc.shell("echo from the shell");
+  proc.shellf("echo %s has %d files", "/tmp", 3);
+  ad String out = proc.shellOutput("echo %s | tr a-z A-Z", "captured");
+  os.flush();
+  printf("exit code %d, output [%s]\n", status, out);
+  printf("%d %d\n", proc.shell("exit 3"), proc.shell("no-such-command 2>/dev/null"));
+}
+</code></pre>
+<pre class="output">
+from the shell
+/tmp has 3 files
+exit code 0, output [CAPTURED]
+3 127
+</pre>
+<div class="note"><p><strong>Output order.</strong> <code>printf</code> is buffered; commands write straight to the
+terminal. Call <code>os.flush()</code> before a command so your earlier output comes first.</p></div>
+
+<h2>shellOutput</h2>
+<ul class="rules">
+  <li>The command is a format: write <code>%%</code> for a <code>%</code> the shell should see. Arguments are optional, and <code>%s</code> takes a String or a slice too.</li>
+  <li>stderr isn't captured and the exit status isn't returned: a failing command gives whatever it printed, often <code>""</code>.</li>
+  <li>A shell that couldn't start gives a String with a null <code>ptr</code>.</li>
+  <li>It returns when the shell exits, without waiting for a background job (<code>cmd &amp;</code>).</li>
+</ul>
+<pre data-run><code>
+import proc, str;
+
+void main()
+{
+  ad String n = proc.shellOutput("printf 'a\\nb\\nc\\n' | wc -l");
+  ad String files = proc.shellOutput("printf '%%s\\n' one two three");   // %% : the command is a format
+  ad u8[][] names = str.split(files, "\n");
+  printf("[%s] %d names, the last is %s\n", n.trim(), names.len, names[2]);
+}
+</code></pre>
+<pre class="output">
+[3] 3 names, the last is three
+</pre>
+
+<h2>Quoting what you paste in</h2>
+<p>A command is shell text: a file name or user input must never go in as it is. A space splits it,
+and <code>$</code>, <code>`</code>, <code>;</code> or <code>*</code> run or expand things.
+<code>proc.shellQuote</code> makes it one word, unchanged.</p>
+<pre data-run><code>
+import proc;
+
+void main()
+{
+  u8[] name = "it's $HOME; rm *";
+  ad String q = proc.shellQuote(name);
+  ad String out = proc.shellOutput("printf '%%s' %s", q);
+  printf("%s\n[%s]\n", q, out);
+}
+</code></pre>
+<pre class="output">
+'it'\''s $HOME; rm *'
+[it's $HOME; rm *]
+</pre>
+
+<h2>What the command inherits</h2>
+<ul class="rules">
+  <li>It gets the program's stdin, stdout and stderr.</li>
+  <li>It gets none of the files and sockets the library opened: those are close-on-exec.</li>
+  <li>An fd you open yourself is inherited unless you pass <code>O_CLOEXEC</code> (or set <code>FD_CLOEXEC</code>).</li>
+</ul>

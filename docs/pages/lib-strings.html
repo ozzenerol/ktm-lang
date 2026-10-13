@@ -1,0 +1,212 @@
+<!-- title: Strings -->
+<!-- ref: str -->
+<h1>Strings</h1>
+<p class="lede">The <code>str</code> module: <code>String</code>, the text you own, and the functions that read any text (<code>u8[]</code>).
+The language side is on <a href="lang-strings.html">Strings</a>.</p>
+
+<h2>Making a String</h2>
+<table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>str.new()</code></td><td>Empty; nothing allocated until something is added</td></tr>
+    <tr><td><code>str.from(t)</code></td><td>A copy of any text</td></tr>
+    <tr><td><code>str.withCap(n)</code></td><td>Empty, with room for <code>n</code> bytes</td></tr>
+    <tr><td><code>str.format(fmt, ...)</code></td><td>Formatted text (<a href="lib-formatting.html">format strings</a>)</td></tr>
+    <tr><td><code>str.adopt(p, len)</code></td><td>Takes over a <code>mem.alloc</code>'d block with a NUL after <code>len</code> bytes, without copying</td></tr>
+  </tbody>
+</table>
+
+<h2>Changing a String</h2>
+<table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>append(t)</code>, <code>appendByte(b)</code>, <code>appendFormat(fmt, ...)</code></td><td>Adds at the end</td></tr>
+    <tr><td><code>insert(at, t)</code></td><td>Inserts at a byte index</td></tr>
+    <tr><td><code>remove(a, b)</code></td><td>Removes bytes <code>a</code> up to <code>b</code></td></tr>
+    <tr><td><code>replace(old, new)</code></td><td>Replaces every occurrence</td></tr>
+    <tr><td><code>toLower()</code>, <code>toUpper()</code>, <code>reverse()</code></td><td>In place (ASCII letters)</td></tr>
+    <tr><td><code>clear()</code>, <code>reserve(n)</code></td><td>Empty it (keeping its memory), make room</td></tr>
+    <tr><td><code>clone()</code></td><td>A copy of its own</td></tr>
+    <tr><td><code>cstr()</code></td><td>Its bytes as a C string, no copy</td></tr>
+    <tr><td><code>take()</code></td><td>Its bytes as a C string that is now yours; the String is empty after</td></tr>
+    <tr><td><code>free()</code></td><td>Frees it; a second <code>free()</code> does nothing</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String s = str.format("%d files", 3);
+  s.insert(0, "found ");
+  s.append(" in /tmp");
+  s.replace("files", "logs");
+  printf("%s (%d bytes)\n", s, s.len);
+
+  ad String path = str.from("/var/log");
+  path.appendFormat("/%s.%d", "app", 2);
+  path.toUpper();
+  printf("%s %s %c\n", path, path[1:4], path[5]);
+}
+</code></pre>
+<pre class="output">
+found 3 logs in /tmp (20 bytes)
+/VAR/LOG/APP.2 VAR L
+</pre>
+
+<h3>Building text in a loop</h3>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String csv = str.withCap(64);
+  csv.append("id,square");
+  for (i64 i = 1; i <= 4; i++) {
+    csv.appendFormat("\n%d,%d", i, i * i);
+  }
+  printf("%s\n", csv);
+}
+</code></pre>
+<pre class="output">
+id,square
+1,1
+2,4
+3,9
+4,16
+</pre>
+
+<h2 id="reading-text">Reading text</h2>
+<p>These take a <code>u8[]</code>: a literal, a slice or a String. Call them as functions or as methods:
+<code>s.find("x")</code> is <code>str.find(s, "x")</code>.</p>
+<table>
+  <thead><tr><th>Function</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>find(s, part)</code>, <code>findLast(s, part)</code></td><td>The byte index, or -1</td></tr>
+    <tr><td><code>contains</code>, <code>startsWith</code>, <code>endsWith</code></td><td><code>bool</code></td></tr>
+    <tr><td><code>equals(a, b)</code></td><td><code>bool</code>: the same bytes</td></tr>
+    <tr><td><code>compare(a, b)</code></td><td>Negative, 0 or positive, for sorting</td></tr>
+    <tr><td><code>trim(s)</code>, <code>trimStart(s)</code>, <code>trimEnd(s, chars)</code></td><td>A view without the whitespace (or the given bytes)</td></tr>
+    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after</td></tr>
+    <tr><td><code>split(s, sep)</code></td><td>A <code>u8[][]</code> of views, allocated: free it</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] text = "the cat sat on the mat";
+  printf("%d %d %d\n", text.find("the"), text.findLast("the"), text.find("dog"));
+  printf("%d %d %d\n", text.contains("sat"), text.startsWith("the"), text.endsWith("hat"));
+  printf("%d %d\n", str.equals("abc", "abc"), str.compare("apple", "banana") < 0);
+}
+</code></pre>
+<pre class="output">
+0 15 -1
+1 1 0
+1 1
+</pre>
+
+<h3>Trimming and splitting</h3>
+<p>Trimming and <code>splitFirst</code> return views: parts of the text you gave, nothing copied.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] line = "  name = ktm, lang  \r\n";
+  u8[] t = line.trimEnd("\r\n").trim();
+  u8[] key, value;
+  if (str.splitFirst(t, " = ", &key, &value)) {
+    printf("[%s] [%s]\n", key, value);
+  }
+  ad u8[][] parts = value.split(", ");
+  for (auto p : parts) { printf("<%s>", p); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+[name] [ktm, lang]
+<ktm><lang>
+</pre>
+<p><code>split</code> keeps empty parts:</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad u8[][] parts = str.split("a,b,,c", ",");
+  for (auto p : parts) { printf("[%s]", p); }
+  printf(" %d parts\n", parts.len);
+}
+</code></pre>
+<pre class="output">
+[a][b][][c] 4 parts
+</pre>
+
+<h3>Parsing a line</h3>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] request = "GET /index.html HTTP/1.1";
+  u8[] method, rest, path, version;
+  str.splitFirst(request, " ", &method, &rest);
+  str.splitFirst(rest, " ", &path, &version);
+  u8[] dir, file;
+  str.splitLast(path, "/", &dir, &file);
+  printf("%s | %s | %s | file %s\n", method, path, version, file);
+}
+</code></pre>
+<pre class="output">
+GET | /index.html | HTTP/1.1 | file index.html
+</pre>
+
+<h2>Characters</h2>
+<p><code>str.toUpper(c)</code>, <code>str.toLower(c)</code> and <code>str.isSpace(c)</code> work on one byte (ASCII).</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  printf("%c%c %d %d\n", str.toUpper('q'), str.toLower('Q'), str.isSpace('\t'), str.isSpace('x'));
+}
+</code></pre>
+<pre class="output">
+Qq 1 0
+</pre>
+
+<h2>UTF-8</h2>
+<p><code>len</code> and <code>s[i]</code> count bytes. For characters:</p>
+<ul class="rules">
+  <li><code>str.decodeRune(s, &amp;at)</code>: the code point at byte <code>at</code>, moving <code>at</code> past it. U+FFFD for bytes that aren't UTF-8, -1 at the end.</li>
+  <li><code>str.runeCount(s)</code>: the number of code points.</li>
+  <li><code>str.validUtf8(s)</code>: whether the text is valid UTF-8.</li>
+</ul>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] s = "añb€";
+  printf("%d bytes, %d runes, valid %d\n", s.len, str.runeCount(s), str.validUtf8(s));
+  i64 at = 0;
+  i32 r;
+  while ((r = str.decodeRune(s, &at)) >= 0) { printf("[U+%04X]", r); }
+  printf("\n%d\n", str.validUtf8("\xff"));
+}
+</code></pre>
+<pre class="output">
+7 bytes, 4 runes, valid 1
+[U+0061][U+00F1][U+0062][U+20AC]
+0
+</pre>
+
+<h2>More</h2>
+<div class="cards">
+  <a class="card" href="lib-text.html"><strong>Text helpers</strong><span>Ignoring case, URL and HTML encoding, file names.</span></a>
+  <a class="card" href="lib-formatting.html"><strong>Format strings</strong><span>Every <code>%</code> conversion.</span></a>
+  <a class="card" href="lib-cstrings.html"><strong>C strings</strong><span>The <code>cstr</code> module.</span></a>
+</div>

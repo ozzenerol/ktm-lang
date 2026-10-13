@@ -1,0 +1,124 @@
+<!-- title: Maths -->
+<!-- ref: math libc -->
+<h1>Maths</h1>
+<p class="lede">Integer helpers and bit operations in <code>math</code>; the C maths library (<code>sqrt</code>, <code>sin</code>, ...) in <code>libc</code>.</p>
+
+<h2>Integers</h2>
+<table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>math.abs(n)</code></td><td>|n| as an <code>i64</code> (<code>math.abs(I64_MIN)</code> is <code>I64_MIN</code>, as C's <code>labs</code>)</td></tr>
+    <tr><td><code>math.min(a, b)</code>, <code>math.max(a, b)</code></td><td>The smaller, the larger</td></tr>
+    <tr><td><code>math.clamp(v, lo, hi)</code></td><td><code>v</code> kept between <code>lo</code> and <code>hi</code></td></tr>
+    <tr><td><code>math.gcd(a, b)</code></td><td>The greatest common divisor, ignoring signs</td></tr>
+    <tr><td><code>math.power(x, y)</code></td><td><code>x</code> to the <code>y</code>, an <code>f64</code>; exact for integral <code>y</code></td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import math;
+
+void main()
+{
+  printf("%d %d %d %d\n", math.abs(-5), math.min(3, 9), math.max(3, 9), math.clamp(150, 0, 100));
+  printf("%d %d %d\n", math.gcd(12, 18), math.gcd(-4, 0), math.gcd(0, 0));
+  printf("%.0f %.2f %.1f\n", math.power(2, 10), math.power(1.5, 2), math.power(4.0, 0.5));
+}
+</code></pre>
+<pre class="output">
+5 3 9 100
+6 4 0
+1024 2.25 2.0
+</pre>
+
+<h2>Floating point: libc</h2>
+<p>The C maths functions are declared in <code>libc</code> under their usual names, all on <code>f64</code>.</p>
+<pre data-run><code>
+import libc, math;
+
+void main()
+{
+  printf("%.4f %.0f %.1f %.1f %.1f\n", libc.sqrt(2.0), libc.pow(2.0, 10.0), libc.floor(2.7),
+         libc.ceil(2.1), libc.fabs(-1.5));
+  printf("%.4f %.4f %.4f\n", libc.sin(math.PI / 2), libc.cos(0.0), libc.log(math.E));
+}
+</code></pre>
+<pre class="output">
+1.4142 1024 2.0 3.0 1.5
+1.0000 1.0000 1.0000
+</pre>
+<p>Constants: <code>math.PI</code>, <code>math.E</code>, <code>math.SQRT2</code> and the rest of C's <code>M_*</code> set.</p>
+
+<h2>A worked example: distance</h2>
+<pre data-run><code>
+import libc;
+
+struct Point { f64 x, y; };
+
+f64 dist(Point a, Point b)
+{
+  f64 dx = a.x - b.x, dy = a.y - b.y;
+  return libc.sqrt(dx * dx + dy * dy);
+}
+
+void main()
+{
+  Point a = {0, 0}, b = {3, 4};
+  printf("%.1f\n", dist(a, b));
+}
+</code></pre>
+<pre class="output">
+5.0
+</pre>
+
+<h2>Bit operations</h2>
+<p>On a <code>u32</code> or a <code>u64</code>: the type picks the width, so cast an <code>i64</code> first.
+Each is a single machine instruction where it is called.</p>
+<table>
+  <thead><tr><th>Call</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>math.rotl(x, n)</code>, <code>math.rotr(x, n)</code></td><td>Rotated by <code>n</code> bits</td></tr>
+    <tr><td><code>math.bswap(x)</code></td><td>The bytes reversed (also on a <code>u16</code>)</td></tr>
+    <tr><td><code>math.clz(x)</code>, <code>math.ctz(x)</code></td><td>Leading / trailing zero bits (the width for 0)</td></tr>
+    <tr><td><code>math.popcount(x)</code></td><td>The number of one bits</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import math;
+
+void main()
+{
+  u32 h = 0x80000001;
+  printf("%x %x\n", math.rotl(h, 1), math.rotr(h, 1));
+  printf("%x\n", math.bswap((u32)0x11223344));
+  printf("%d %d %d\n", math.clz((u32)1), math.ctz((u64)8), math.popcount((u64)0xFF));
+}
+</code></pre>
+<pre class="output">
+3 c0000000
+44332211
+31 3 8
+</pre>
+
+<h3>Next power of two</h3>
+<pre data-run><code>
+import math;
+
+u64 nextPow2(u64 n)
+{
+  if (n <= 1) { return 1; }
+  return (u64)1 << (64 - math.clz(n - 1));
+}
+
+void main()
+{
+  u64 tests[] = {1, 5, 16, 17, 1000};
+  for (auto t : tests) { printf("%d -> %d\n", t, nextPow2(t)); }
+}
+</code></pre>
+<pre class="output">
+1 -> 1
+5 -> 8
+16 -> 16
+17 -> 32
+1000 -> 1024
+</pre>

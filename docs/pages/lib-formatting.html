@@ -1,0 +1,140 @@
+<!-- title: Format strings -->
+<!-- ref: cstr str -->
+<h1>Format strings</h1>
+<p class="lede"><code>printf</code>, <code>str.format</code>, <code>appendFormat</code>, <code>os.eprintf</code>,
+<code>throw</code> and the <code>cstr</code> formatters share one format language.</p>
+
+<h2>Conversions</h2>
+<table>
+  <thead><tr><th>Conversion</th><th>Prints</th></tr></thead>
+  <tbody>
+    <tr><td><code>%d</code> <code>%i</code></td><td>A signed integer (all 64 bits)</td></tr>
+    <tr><td><code>%u</code></td><td>An unsigned integer</td></tr>
+    <tr><td><code>%x</code> <code>%X</code> <code>%o</code></td><td>Hex (lower / upper case), octal</td></tr>
+    <tr><td><code>%f</code> <code>%e</code> <code>%g</code></td><td>An <code>f64</code>, as C prints it</td></tr>
+    <tr><td><code>%s</code></td><td>A C string; in a literal format also a <code>u8[]</code> or a <code>String</code></td></tr>
+    <tr><td><code>%c</code> <code>%C</code></td><td>A character; <code>%C</code> in upper case</td></tr>
+    <tr><td><code>%p</code></td><td>A pointer: <code>0x</code> and 16 hex digits</td></tr>
+    <tr><td><code>%Q</code></td><td>A string escaped as a C literal</td></tr>
+    <tr><td><code>%%</code></td><td>A <code>%</code></td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+void main()
+{
+  printf("%d %i %u\n", -42, 7, 3000000000);
+  printf("%x %X %o\n", 255, 255, 8);
+  printf("%f %e %g\n", 3.25, 31250.0, 0.0001);
+  printf("%s %c %C %Q %%\n", "text", 'k', 'k', "a\tb");
+}
+</code></pre>
+<pre class="output">
+-42 7 3000000000
+ff FF 10
+3.250000 3.125000e+04 0.0001
+text k K a\tb %
+</pre>
+
+<h2>Flags, width and precision</h2>
+<p>Between the <code>%</code> and the letter, in this order:</p>
+<ol>
+  <li><strong>Flags</strong>: <code>-</code> left-justify, <code>0</code> pad with zeros, <code>+</code> always a sign, a space where a plus would go, <code>#</code> a <code>0x</code> / <code>0</code> prefix.</li>
+  <li><strong>Width</strong>: the minimum number of characters.</li>
+  <li><strong>Precision</strong> after a <code>.</code>: decimals for floats, the maximum length for <code>%s</code>, the minimum digits for integers.</li>
+</ol>
+<pre data-run><code>
+void main()
+{
+  printf("[%5d] [%-5d] [%05d]\n", 42, 42, 42);
+  printf("[%+d] [% d] [%#x] [%#o]\n", 7, 7, 255, 8);
+  printf("[%.2f] [%8.3f] [%-8.1f]\n", 3.14159, 3.14159, 3.14159);
+  printf("[%.3s] [%.3d]\n", "abcdef", 7);
+}
+</code></pre>
+<pre class="output">
+[   42] [42   ] [00042]
+[+7] [ 7] [0xff] [010]
+[3.14] [   3.142] [3.1     ]
+[abc] [007]
+</pre>
+
+<h3>Width from an argument</h3>
+<p><code>*</code> takes the width or precision from the arguments.</p>
+<pre data-run><code>
+void main()
+{
+  for (i64 w = 1; w <= 3; w++) {
+    printf("[%*d] [%.*f]\n", w * 2, w, w, 3.14159);
+  }
+}
+</code></pre>
+<pre class="output">
+[ 1] [3.1]
+[   2] [3.14]
+[     3] [3.142]
+</pre>
+
+<h2>Tables</h2>
+<pre data-run><code>
+struct Row { u8 *name; i64 count; f64 share; };
+
+void main()
+{
+  Row rows[] = {{"apples", 12, 0.4}, {"pears", 3, 0.1}, {"plums", 15, 0.5}};
+  printf("%-8s %5s %7s\n", "fruit", "count", "share");
+  for (auto r : rows) {
+    printf("%-8s %5d %6.1f%%\n", r.name, r.count, r.share * 100);
+  }
+}
+</code></pre>
+<pre class="output">
+fruit    count   share
+apples      12   40.0%
+pears        3   10.0%
+plums       15   50.0%
+</pre>
+
+<h2>Where the text goes</h2>
+<table>
+  <thead><tr><th>Call</th><th>Writes to</th></tr></thead>
+  <tbody>
+    <tr><td><code>printf(fmt, ...)</code></td><td>stdout (buffered)</td></tr>
+    <tr><td><code>os.eprintf(fmt, ...)</code></td><td>stderr</td></tr>
+    <tr><td><code>str.format(fmt, ...)</code></td><td>A new String</td></tr>
+    <tr><td><code>s.appendFormat(fmt, ...)</code></td><td>The end of a String</td></tr>
+    <tr><td><code>cstr.format(fmt, ...)</code></td><td>A new C string, <code>mem.free</code> it</td></tr>
+    <tr><td><code>cstr.formatToSize(buf, n, fmt, ...)</code></td><td>A fixed buffer, like <code>snprintf</code></td></tr>
+    <tr><td><code>throw(code, fmt, ...)</code></td><td>The error's message</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import cstr, mem, str;
+
+void main()
+{
+  ad String s = str.format("%s-%03d", "id", 7);
+  u8 *c = cstr.format("%.1f%%", 99.5);
+  u8 small[8];
+  cstr.formatToSize(small, sizeof(small), "%s-%d", "overflow", 12345);
+  printf("%s %s [%s] %d\n", s, c, small, cstr.len(small));
+  mem.free(c);
+}
+</code></pre>
+<pre class="output">
+id-007 99.5% [overflo] 7
+</pre>
+
+<h2>Checked at compile time</h2>
+<p>For a literal format, the compiler checks the number of arguments. These are errors with the way to do it in the message:</p>
+<ul class="rules">
+  <li><code>%D</code>, <code>%T</code>, <code>%F</code>: format a date with <a href="lib-dates.html"><code>date.format</code></a>.</li>
+  <li>A slice or String passed to a format that isn't a literal: pass <code>s.cstr()</code>.</li>
+</ul>
+
+<h2>Details</h2>
+<ul class="rules">
+  <li>C's length modifiers <code>l</code>, <code>ll</code>, <code>h</code>, <code>hh</code>, <code>z</code>, <code>j</code> are accepted and ignored, so C formats can be pasted in.</li>
+  <li><code>%c</code> of a wider integer prints its bytes as characters, low byte first (up to 8); the value 0 prints nothing.</li>
+  <li>An unknown conversion is printed as written, with a warning on stderr, and still uses up its argument.</li>
+  <li><code>printf</code> is buffered: call <code>os.flush()</code> before running a command that writes to the same terminal.</li>
+</ul>

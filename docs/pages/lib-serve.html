@@ -1,0 +1,96 @@
+<!-- title: Serving on every core -->
+<!-- ref: coro -->
+<h1>Serving on every core</h1>
+<p class="lede"><code>coro.serve</code> is a whole TCP server in one call: one <a href="lib-event-loop.html">coroutine loop</a> per core,
+and your handler runs as a coroutine for each client.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>void handle(i32 fd, void *arg) { ... coro.read(fd, ...); coro.write(fd, ...); }
+
+coro.serve(8080, &handle);                         // every IPv4 address, one loop per CPU
+coro.serve(8080, &handle, arg, 4, "127.0.0.1");    // 4 loops, loopback only
+coro.serveStop();                                  // from any thread or coroutine</code></pre>
+</div>
+
+<h2>A complete server</h2>
+<p>Here the clients run as a coroutine in the calling thread's loop, then stop the server.</p>
+<pre data-run><code>
+import atomic, coro, cstr;
+
+i64 gServed = 0;
+
+void handle(i32 fd, void *arg)
+{
+  u8 buf[256];
+  i64 n = coro.read(fd, buf, 5000);
+  if (n <= 0) { return; }
+  for (i64 i = 0; i < n; i++) {
+    if (buf[i] >= 'a' && buf[i] <= 'z') { buf[i] -= 32; }
+  }
+  coro.write(fd, buf[0:n]);
+  atomic.add(&gServed, 1);
+}
+
+void *clients(void *unused)
+{
+  u8 *words[] = {"ping", "hello", "ktm"};
+  for (auto w : words) {
+    i32 fd = coro.dial("127.0.0.1", 18631, 5000);
+    coro.write(fd, cstr.view(w));
+    u8 buf[64];
+    i64 n = coro.read(fd, buf, 5000);
+    printf("%s -> %s\n", w, buf[0:n]);
+    coro.close(fd);
+  }
+  coro.serveStop();
+  return null;
+}
+
+void main()
+{
+  coro.go(&clients);                       // runs in this thread's loop
+  i32 r = coro.serve(18631, &handle, null, 2, "127.0.0.1");
+  printf("serve returned %d, served %d\n", r, atomic.load(&gServed));
+}
+</code></pre>
+<pre class="output">
+ping -> PING
+hello -> HELLO
+ktm -> KTM
+serve returned 0, served 3
+</pre>
+
+<h2>Arguments</h2>
+<table>
+  <thead><tr><th>Argument</th><th>Default</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>port</code></td><td></td><td>The TCP port</td></tr>
+    <tr><td><code>handler</code></td><td></td><td><code>void handler(i32 fd, void *arg)</code>, run once per client</td></tr>
+    <tr><td><code>arg</code></td><td><code>null</code></td><td>Passed to every handler</td></tr>
+    <tr><td><code>threads</code></td><td>0</td><td>The number of loops; 0 is one per CPU the process may use</td></tr>
+    <tr><td><code>bindaddr</code></td><td><code>"*"</code></td><td><code>"*"</code>, <code>"::*"</code> or a numeric address, as for <code>net.listen</code></td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li>The calling thread runs one of the loops, so <code>serve</code> returns only when the server has stopped. Call it from a thread, not a coroutine.</li>
+  <li>It returns 0 once stopped and every handler has finished, or -1 with <code>os.errno()</code> when it can't listen (port in use, bad address).</li>
+  <li>The client's fd is non-blocking with <code>TCP_NODELAY</code>. Use <code>coro.read</code> and <code>coro.write</code>, and don't close it: <code>serve</code> does when the handler returns.</li>
+  <li>A handler that throws is reported on stderr and the server goes on.</li>
+</ul>
+
+<div class="warn"><p><strong>Handlers run on several threads at once.</strong> A global they share (a counter, a cache,
+a map) needs the <a href="lib-threads.html#atomics"><code>atomic</code></a> module or a lock, as <code>gServed</code> above.
+The coroutines of one loop never run at the same time.</p></div>
+
+<h2>Stopping</h2>
+<ul class="rules">
+  <li><code>coro.serveStop()</code> stops every running <code>serve</code>, from any thread or coroutine (not from a signal handler).</li>
+  <li>A <code>coro.stop()</code> in one of its loops stops the whole server the same way.</li>
+  <li>Each loop stops taking clients, the handlers in flight finish, then <code>serve</code> returns 0.</li>
+</ul>
+<p>For Ctrl-C, start the <a href="lib-event-loop.html#stopping">signal coroutine</a> with <code>coro.go</code> before calling <code>serve</code>.</p>
+
+<h2>How clients are spread</h2>
+<p>On Linux each loop has its own listener on the port (<code>SO_REUSEPORT</code>) and the kernel shares the connections out.
+On macOS the loops share one listener, and each takes the clients it wins the <code>accept</code> for.</p>

@@ -1,0 +1,194 @@
+<!-- title: Processes -->
+<!-- ref: proc -->
+<h1>Processes</h1>
+<p class="lede">Run a program by its argument list, with no shell: every argument arrives exactly as written,
+so nothing needs quoting. Then talk to it through pipes.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>u8 *argv[] = {"ls", "-l", path, null};       // null-terminated
+String out = proc.run(argv, &code);          // run, capture stdout, get the exit code
+
+proc.Opts o;  mem.set(&o, 0, sizeof(proc.Opts));
+o.in = proc.PIPE;  o.out = proc.PIPE;
+proc.Proc *p = proc.spawn(argv, &o);
+proc.communicate(p, input, &out, &err);      // write, read both, wait
+proc.release(p);</code></pre>
+</div>
+
+<h2>proc.run</h2>
+<p>Runs a program found in <code>$PATH</code>, returns what it printed (minus one trailing newline) and its exit code.</p>
+<pre data-run><code>
+import proc;
+
+void main()
+{
+  u8 *argv[] = {"printf", "%s|", "it's $HOME", "a b", null};
+  i64 code;
+  ad String out = proc.run(argv, &code);
+  printf("[%s] exit %d\n", out, code);
+}
+</code></pre>
+<pre class="output">
+[it's $HOME|a b|] exit 0
+</pre>
+<p>No shell saw <code>$HOME</code> or the space: the program got them as they are.</p>
+
+<h3>When it can't start</h3>
+<pre data-run><code>
+import os, proc;
+
+void main()
+{
+  u8 *argv[] = {"no-such-program", null};
+  String out = proc.run(argv);
+  if (!out.ptr) { printf("couldn't start: errno %d\n", os.errno()); }
+}
+</code></pre>
+<pre class="output">
+couldn't start: errno 2
+</pre>
+
+<h2>proc.spawn and pipes</h2>
+<p>For more control, <code>proc.spawn(argv, &amp;opts)</code> starts the program and returns a <code>proc.Proc</code>.
+Zero the <code>proc.Opts</code> first: every field is optional.</p>
+<table>
+  <thead><tr><th>Opts field</th><th>Values</th></tr></thead>
+  <tbody>
+    <tr><td><code>in</code>, <code>out</code>, <code>err</code></td><td><code>proc.INHERIT</code> (ours, the default), <code>proc.PIPE</code>, <code>proc.DEVNULL</code>, <code>proc.FD</code>; <code>err</code> also <code>proc.STDOUT</code> (2&gt;&amp;1)</td></tr>
+    <tr><td><code>inFd</code>, <code>outFd</code>, <code>errFd</code></td><td>Your fd, with <code>proc.FD</code></td></tr>
+    <tr><td><code>cwd</code></td><td>The directory to start in</td></tr>
+    <tr><td><code>env</code></td><td>A null-terminated <code>"NAME=value"</code> list that replaces the environment</td></tr>
+    <tr><td><code>newGroup</code>, <code>pgid</code></td><td>A new process group, or an existing one</td></tr>
+    <tr><td><code>dups</code>, <code>ndups</code></td><td>More fds for the child, as pairs <code>{from, to, ...}</code></td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import mem, proc;
+
+void main()
+{
+  u8 *argv[] = {"sh", "-c", "tr a-z A-Z; echo done >&2; exit 3", null};
+  proc.Opts opts;
+  mem.set(&opts, 0, sizeof(proc.Opts));
+  opts.in = proc.PIPE;
+  opts.out = proc.PIPE;
+  opts.err = proc.PIPE;
+  proc.Proc *p = proc.spawn(argv, &opts);
+  ad String out, err;
+  i64 code = proc.communicate(p, "hello\n", &out, &err);
+  printf("out=[%s] err=[%s] exit=%d\n", out.trimEnd(), err.trimEnd(), code);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">
+out=[HELLO] err=[done] exit=3
+</pre>
+
+<h2>Working with a Proc</h2>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>proc.communicate(p, input, &amp;out, &amp;err)</code></td><td>Writes the input, reads both outputs to the end, waits. One <code>poll()</code> loop, so it can't deadlock. <code>null</code> drops an output</td></tr>
+    <tr><td><code>proc.wait(p)</code></td><td>The exit code, or -1 if a signal killed it (<code>p.termSignal</code>)</td></tr>
+    <tr><td><code>proc.done(p)</code></td><td>Whether it has ended, without waiting</td></tr>
+    <tr><td><code>proc.kill(p, sig)</code></td><td>Sends a signal (SIGTERM by default)</td></tr>
+    <tr><td><code>proc.release(p)</code></td><td>Closes the pipes and frees it, waiting if it still runs</td></tr>
+    <tr><td><code>proc.disown(p)</code></td><td>Frees it without waiting, when you reap children yourself</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import libc, proc;
+
+void main()
+{
+  u8 *argv[] = {"sleep", "10", null};
+  proc.Proc *p = proc.spawn(argv);
+  printf("done yet: %d\n", proc.done(p));
+  proc.kill(p);
+  printf("exit %d, signal %d\n", proc.wait(p), p.termSignal == libc.SIGTERM);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">
+done yet: 0
+exit -1, signal 1
+</pre>
+
+<h3>Options: directory and environment</h3>
+<pre data-run><code>
+import mem, proc;
+
+void main()
+{
+  u8 *argv[] = {"sh", "-c", "echo $GREETING from $(pwd)", null};
+  u8 *env[] = {"GREETING=hello", "PATH=/usr/bin:/bin", null};
+  proc.Opts o;
+  mem.set(&o, 0, sizeof(proc.Opts));
+  o.out = proc.PIPE;
+  o.cwd = "/";
+  o.env = env;
+  proc.Proc *p = proc.spawn(argv, &o);
+  ad String out;
+  proc.communicate(p, "", &out);
+  printf("%s", out);
+  proc.release(p);
+}
+</code></pre>
+<pre class="output">
+hello from /
+</pre>
+
+<h2 id="pipelines">Pipelines</h2>
+<p>Connect programs the way a shell's <code>a | b | c</code> does: <code>proc.pipe(fds)</code> makes a pipe, each
+stage gets the read end before it and the write end after it, and you close your copies once all are started.</p>
+<pre data-run><code>
+import libc, mem, proc;
+
+proc.Proc *stage(u8 *script, i32 in, i32 out, i32 pgid)
+{
+  u8 *argv[] = {"sh", "-c", script, null};
+  proc.Opts o;
+  mem.set(&o, 0, sizeof(proc.Opts));
+  if (in >= 0) { o.in = proc.FD; o.inFd = in; }
+  if (out >= 0) { o.out = proc.FD; o.outFd = out; } else { o.out = proc.PIPE; }
+  if (pgid) { o.pgid = pgid; } else { o.newGroup = true; }
+  return proc.spawn(argv, &o);
+}
+
+void main()
+{
+  i32 ab[2], bc[2];
+  proc.pipe(ab);
+  proc.pipe(bc);
+  proc.Proc *a = stage("printf 'pear\napple\npear\n'", -1, ab[1], 0);
+  proc.Proc *b = stage("sort", ab[0], bc[1], a.pgid);
+  proc.Proc *c = stage("uniq -c | tr -s ' '", bc[0], -1, a.pgid);
+  libc.close(ab[0]);
+  libc.close(ab[1]);
+  libc.close(bc[0]);
+  libc.close(bc[1]);
+
+  ad String out;
+  proc.communicate(c, "", &out);
+  printf("%s", out);
+  printf("one group: %d\n", b.pgid == a.pid && c.pgid == a.pid);
+  proc.release(a);
+  proc.release(b);
+  proc.release(c);
+}
+</code></pre>
+<pre class="output">
+ 1 apple
+ 2 pear
+one group: 1
+</pre>
+<ul class="rules">
+  <li>The later stages join the first one's group (<code>p.pgid</code>), so <code>proc.kill</code> on any stage, or Ctrl-C with the group in the foreground, reaches all of them.</li>
+  <li>The child starts with default signal handlers and only stdin, stdout, stderr (and <code>dups</code>) open.</li>
+</ul>
+
+<h2>Waiting in a coroutine loop</h2>
+<p>In a <a href="lib-event-loop.html">coroutine loop</a>, <code>coro.waitChild(p.pid, ms)</code> waits for a child
+without blocking the thread; <code>proc.setStatus(p, st)</code> then fills in <code>p.exitCode</code>.
+Outside a loop, <code>proc.exitFd(pid)</code> is an fd that polls readable when the child exits.</p>

@@ -1,0 +1,148 @@
+<!-- title: Hash maps -->
+<!-- ref: map -->
+<h1>Hash maps</h1>
+<p class="lede"><code>map.Map&lt;K, V&gt;</code> maps keys to values. Iteration goes in insertion order.
+For keys kept sorted, see <a href="lib-trees.html">Ordered maps</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad map.Map<u8[], i64> m = map.new<u8[], i64>();
+m.set("a", 1);                 // add or replace
+m.get("a", &v)                 // true and v filled, or false
+m.getOr("a", 0)                // the value or a default
+*m.ref("a") += 1;              // change in place
+m.has("a")  m.delete("a")  m.len
+i64 it = 0; while (m.next(&it, &k, &v)) { ... }</code></pre>
+</div>
+
+<h2>The basics</h2>
+<pre data-run><code>
+import map;
+
+void main()
+{
+  ad map.Map<u8[], i64> stock = map.new<u8[], i64>();
+  stock.set("apples", 3);
+  stock.set("pears", 5);
+  stock.set("apples", 4);         // replaces
+  stock.set("plums", 7);
+  stock.delete("plums");
+  *stock.ref("pears") += 1;
+
+  printf("%d apples, has kiwis: %d, %d keys\n",
+         stock.getOr("apples", 0), stock.has("kiwis"), stock.len);
+
+  i64 n;
+  if (stock.get("pears", &n)) { printf("pears: %d\n", n); }
+  if (!stock.get("kiwis", &n)) { printf("no kiwis\n"); }
+}
+</code></pre>
+<pre class="output">
+4 apples, has kiwis: 0, 2 keys
+pears: 6
+no kiwis
+</pre>
+
+<h2>Iterating</h2>
+<p><code>next(&amp;it, &amp;k, &amp;v)</code> steps through keys and values in insertion order; start <code>it</code> at 0.
+Either pointer may be <code>null</code>.</p>
+<pre data-run><code>
+import map, vec;
+
+void main()
+{
+  ad map.Map<u8[], i64> ages = map.new<u8[], i64>();
+  ages.set("ann", 41);
+  ages.set("bob", 29);
+  ages.set("cy", 35);
+
+  i64 it = 0;
+  u8[] name;
+  i64 age;
+  while (ages.next(&it, &name, &age)) { printf("%s=%d,", name, age); }
+  printf("\n");
+
+  ad vec.Vec<u8[]> keys = ages.keys();
+  ad vec.Vec<i64> values = ages.values();
+  printf("%d keys, first %s, last value %d\n", keys.len, keys.get(0), values.last());
+}
+</code></pre>
+<pre class="output">
+ann=41,bob=29,cy=35,
+3 keys, first ann, last value 35
+</pre>
+
+<h2>Counting</h2>
+<pre data-run><code>
+import map, str;
+
+void main()
+{
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+  ad u8[][] words = str.split("the cat and the hat and the bat", " ");
+  for (auto w : words) {
+    i64 *c = counts.ref(w);
+    if (c) { *c += 1; } else { counts.set(w, 1); }
+  }
+  printf("the=%d and=%d cat=%d, %d distinct\n",
+         counts.getOr("the", 0), counts.getOr("and", 0), counts.getOr("cat", 0), counts.len);
+}
+</code></pre>
+<pre class="output">
+the=3 and=2 cat=1, 5 distinct
+</pre>
+
+<h2>Key types</h2>
+<ul class="rules">
+  <li><code>i64</code>, <code>u64</code>, <code>i32</code>, <code>u32</code>, pointers, <code>u8[]</code> and <code>String</code> have their own hash and compare.</li>
+  <li>Any other type (a struct) is hashed and compared by its bytes: set every field of a struct key, padding included (start from <code>{0}</code>).</li>
+  <li>A <code>u8[]</code> or <code>String</code> key is copied: you can pass a reused buffer, and the map frees its copies.</li>
+  <li>Values are stored as they are: free what they point to yourself before <code>free()</code>.</li>
+</ul>
+<pre data-run><code>
+import map;
+
+struct Point { i64 x, y; };
+
+void main()
+{
+  ad map.Map<i64, u8 *> status = map.new<i64, u8 *>();
+  status.set(404, "not found");
+  status.set(200, "ok");
+  printf("%s\n", status.getOr(404, "?"));
+
+  ad map.Map<Point, u8 *> grid = map.new<Point, u8 *>();
+  Point p = {2, 3};
+  grid.set(p, "treasure");
+  Point q = {2, 3};
+  printf("%s\n", grid.getOr(q, "nothing"));
+}
+</code></pre>
+<pre class="output">
+not found
+treasure
+</pre>
+
+<h2>A cache of Strings</h2>
+<p>When the values are Strings you made, free them before the map goes:</p>
+<pre data-run><code>
+import map, str;
+
+void main()
+{
+  map.Map<i64, String> cache = map.new<i64, String>();
+  for (i64 i = 1; i <= 3; i++) { cache.set(i, str.format("value %d", i * i)); }
+  printf("%s\n", cache.getOr(3, str.new()));
+
+  i64 it = 0;
+  String v;
+  while (cache.next(&it, null, &v)) { v.free(); }
+  cache.free();
+}
+</code></pre>
+<pre class="output">
+value 9
+</pre>
+
+<h2>Sharing between threads</h2>
+<p>A Map is not thread-safe. In <a href="lib-serve.html"><code>coro.serve</code></a> handlers or threads, guard a shared one with a lock.</p>

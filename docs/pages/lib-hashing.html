@@ -1,0 +1,114 @@
+<!-- title: Hashing -->
+<!-- ref: hash -->
+<h1>Hashing</h1>
+<p class="lede">The <code>hash</code> module: SHA-256, CRC-32, FNV-1a, hex, and a constant-time compare.</p>
+
+<table>
+  <thead><tr><th>Call</th><th>Gives</th><th>Use it for</th></tr></thead>
+  <tbody>
+    <tr><td><code>hash.sha256(data, out)</code></td><td>The 32-byte digest in <code>out</code></td><td>Integrity, signatures, content addresses</td></tr>
+    <tr><td><code>hash.crc32(data, prev)</code></td><td>The IEEE CRC-32 (zip, gzip, PNG)</td><td>Checksums</td></tr>
+    <tr><td><code>hash.fnv1a(data)</code></td><td>A fast 64-bit hash</td><td>Tables, sharding, cache keys; not security</td></tr>
+    <tr><td><code>hash.hex(bytes)</code></td><td>Lowercase hex, a String</td><td>Printing digests</td></tr>
+    <tr><td><code>hash.equalCt(a, b)</code></td><td>Equality in constant time</td><td>Comparing tokens, MACs, digests</td></tr>
+  </tbody>
+</table>
+
+<h2>SHA-256</h2>
+<pre data-run><code>
+import hash;
+
+void main()
+{
+  u8 d[hash.SHA256_SIZE];
+  hash.sha256("abc", d);
+  ad String hex = hash.hex(d);
+  printf("%s\n", hex);
+}
+</code></pre>
+<pre class="output">
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+</pre>
+<p>An <code>out</code> shorter than <code>hash.SHA256_SIZE</code> throws <code>ERR_BOUNDS</code>.</p>
+
+<h3>In pieces</h3>
+<p>For data that arrives in parts (a file read in blocks, a body off a socket):</p>
+<pre data-run><code>
+import hash;
+
+void main()
+{
+  hash.Sha256 h = hash.sha256New();
+  h.update("a");
+  h.update("bc");
+  u8 d[hash.SHA256_SIZE];
+  h.final(d);                     // also starts h over
+  ad String hex = hash.hex(d[0:8]);
+  printf("%s...\n", hex);
+
+  h.update("abc");                // the next message
+  u8 again[hash.SHA256_SIZE];
+  h.final(again);
+  printf("same: %d\n", hash.equalCt(d, again));
+}
+</code></pre>
+<pre class="output">
+ba7816bf8f01cfea...
+same: 1
+</pre>
+<p>A <code>Sha256</code> holds no memory: nothing to free. <code>h.reset()</code> drops what was fed without finishing.</p>
+
+<h2>CRC-32</h2>
+<p>It chains: <code>hash.crc32(b, hash.crc32(a))</code> is the CRC of <code>a</code> followed by <code>b</code>.</p>
+<pre data-run><code>
+import hash;
+
+void main()
+{
+  printf("%x %x\n", hash.crc32("123456789"), hash.crc32("56789", hash.crc32("1234")));
+}
+</code></pre>
+<pre class="output">
+cbf43926 cbf43926
+</pre>
+
+<h2>FNV-1a</h2>
+<pre data-run><code>
+import hash;
+
+void main()
+{
+  u8[] users[] = {"ann", "bob", "cy", "dan"};
+  for (auto u : users) {
+    printf("%s -> shard %d\n", u, hash.fnv1a(u) % 7);
+  }
+}
+</code></pre>
+<pre class="output">
+ann -> shard 5
+bob -> shard 2
+cy -> shard 1
+dan -> shard 0
+</pre>
+
+<h2>Comparing secrets</h2>
+<p><code>str.equals</code> stops at the first difference, which tells an attacker how many leading bytes were right.
+<code>hash.equalCt</code> takes the same time whatever the bytes are.</p>
+<pre data-run><code>
+import hash;
+
+bool checkToken(u8[] given, u8[] expected)
+{
+  return hash.equalCt(given, expected);
+}
+
+void main()
+{
+  printf("%d %d %d\n", checkToken("s3cret", "s3cret"), checkToken("s3creX", "s3cret"),
+         checkToken("short", "s3cret"));
+}
+</code></pre>
+<pre class="output">
+1 0 0
+</pre>
+<p>Texts of different lengths return false at once: the length itself is not kept secret.</p>

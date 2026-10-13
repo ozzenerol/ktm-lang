@@ -1,0 +1,145 @@
+<!-- title: C strings -->
+<!-- ref: cstr -->
+<h1>C strings</h1>
+<p class="lede">The <code>cstr</code> module works on NUL-terminated <code>u8 *</code> strings, for C code and the data it gives you.
+For your own text, prefer <a href="lib-strings.html"><code>String</code></a>.</p>
+
+<div class="note"><p><strong>Who frees what.</strong> Functions that make a C string (<code>cstr.dup</code>,
+<code>cstr.format</code>, <code>cstr.formatTo(null, ...)</code>, <code>cstr.concat</code>, <code>cstr.dupLen</code>,
+<code>cstr.quote</code>) return a new block that you <code>mem.free</code>.</p></div>
+
+<h2>Between String and u8 *</h2>
+<pre data-run><code>
+import cstr, mem, str;
+
+void main()
+{
+  u8 *fromC = cstr.dup("from C");
+  ad String s = str.from(cstr.view(fromC));   // a C string to a String: copy
+  mem.free(fromC);
+
+  u8 *forC = s.cstr();                        // a String to C: no copy
+  printf("%s %d\n", forC, cstr.len(forC));
+
+  u8 *mine = s.take();                        // the bytes are now ours
+  printf("%s, String empty: %d\n", mine, s.len == 0);
+  mem.free(mine);
+}
+</code></pre>
+<pre class="output">
+from C 6
+from C, String empty: 1
+</pre>
+
+<h2>Building</h2>
+<table>
+  <thead><tr><th>Function</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>cstr.format(fmt, ...)</code></td><td>A new, exactly sized formatted string</td></tr>
+    <tr><td><code>cstr.formatTo(null, fmt, ...)</code></td><td>The same into a new block; with a buffer, into it (no bound)</td></tr>
+    <tr><td><code>cstr.formatToSize(buf, n, fmt, ...)</code></td><td>At most <code>n - 1</code> characters and a NUL, like <code>snprintf</code></td></tr>
+    <tr><td><code>cstr.concat(a, b, ...)</code></td><td>The strings joined</td></tr>
+    <tr><td><code>cstr.appendFormat(s, fmt, ...)</code></td><td>Appends to a heap string and returns it (it may move)</td></tr>
+    <tr><td><code>cstr.appendFormatLen(s, &amp;len, fmt, ...)</code></td><td>The same, keeping the length, so loops stay linear</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import cstr, mem;
+
+void main()
+{
+  u8 *s = cstr.formatTo(null, "%d|%05d|%s|%.2f", 5000000000, 42, "x", 3.14159);
+  printf("%s\n", s);
+
+  u8 *csv = cstr.dup("id");
+  for (i64 i = 1; i <= 3; i++) {
+    csv = cstr.appendFormat(csv, ",%d", i);   // always reassign
+  }
+  printf("%s\n", csv);
+
+  i64 len = 0;
+  u8 *log = null;                              // null starts a new string
+  for (i64 i = 0; i < 3; i++) {
+    log = cstr.appendFormatLen(log, &len, "[%d]", i * i);
+  }
+  printf("%s (%d)\n", log, len);
+
+  u8 *joined = cstr.concat("con", "cat", "enate");
+  printf("%s\n", joined);
+  mem.free(s);
+  mem.free(csv);
+  mem.free(log);
+  mem.free(joined);
+}
+</code></pre>
+<pre class="output">
+5000000000|00042|x|3.14
+id,1,2,3
+[0][1][4] (9)
+concatenate
+</pre>
+<div class="warn"><p><code>cstr.appendFormat</code> grows its string, which may move and free the old block. Pass only
+heap strings from these functions (or <code>null</code>), never a literal or a stack buffer.</p></div>
+
+<h2>Inspecting</h2>
+<pre data-run><code>
+import cstr;
+
+void main()
+{
+  printf("%d %d %d\n", cstr.len("hello"), cstr.cmp("abc", "abc"), cstr.cmp("abc", "abd") < 0);
+  printf("%d %d\n", cstr.cmpLen("prefix-rest", "prefix", 6), cstr.cmpLenNoCase("ABC", "abc", 3));
+  printf("%d\n", cstr.count("banana", 'a'));
+  printf("%s %s\n", cstr.firstOf("key=value", "="), cstr.lastOf("a/b/c.ktm", "/"));
+  printf("%d\n", cstr.toInt("1234") + 1);
+}
+</code></pre>
+<pre class="output">
+5 0 1
+0 0
+3
+=value /c.ktm
+1235
+</pre>
+<ul class="rules">
+  <li>The compares return negative, zero or positive like <code>strcmp</code>, comparing bytes as unsigned.</li>
+  <li><code>firstOf</code> and <code>lastOf</code> find the first or last character that is any of the second string's.</li>
+  <li><code>null</code> is safe: compares sort it first, the finders return <code>null</code>, <code>count</code> and <code>toInt</code> 0.</li>
+</ul>
+
+<h2>Copying</h2>
+<pre data-run><code>
+import cstr, mem;
+
+void main()
+{
+  u8 *copy = cstr.dup("a copy");
+  u8 *part = cstr.dupLen("truncate me", 8);    // like strndup
+  u8 buf[16];
+  cstr.copy(buf, "fixed");                      // into your buffer
+  printf("[%s] [%s] [%s]\n", copy, part, buf);
+  mem.free(copy);
+  mem.free(part);
+}
+</code></pre>
+<pre class="output">
+[a copy] [truncate] [fixed]
+</pre>
+
+<h2>Walking bytes</h2>
+<pre data-run><code>
+import cstr;
+
+void main()
+{
+  u8 *text = "hello world";
+  i64 vowels = 0;
+  for (u8 *c = text; *c; c++) {
+    if (*c == 'e' || *c == 'o') { vowels++; }
+  }
+  printf("%d vowels, %d as a slice\n", vowels, cstr.view(text).len);
+}
+</code></pre>
+<pre class="output">
+3 vowels, 11 as a slice
+</pre>

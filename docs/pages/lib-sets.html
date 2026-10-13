@@ -1,0 +1,104 @@
+<!-- title: Sets -->
+<!-- ref: set -->
+<h1>Sets</h1>
+<p class="lede"><code>set.Set&lt;T&gt;</code> is a hash set: add, remove and test membership in O(1), and combine sets.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad set.Set<i64> s = set.new<i64>();
+s.add(v)      // true if it was new
+s.delete(v)   // true if it was there
+s.has(v)  s.len  s.clear()
+s.unionWith(&o)  s.intersection(&o)  s.diff(&o)  s.symDiff(&o)   // new sets
+s.isSubset(&o)  s.equals(&o)</code></pre>
+</div>
+
+<h2>Adding and testing</h2>
+<pre data-run><code>
+import set;
+
+void main()
+{
+  ad set.Set<u8[]> seen = set.new<u8[]>();
+  u8[] visits[] = {"/home", "/about", "/home", "/blog", "/about"};
+  for (auto v : visits) {
+    if (seen.add(v)) { printf("first visit to %s\n", v); }
+  }
+  printf("%d distinct, has /blog: %d\n", seen.len, seen.has("/blog"));
+}
+</code></pre>
+<pre class="output">
+first visit to /home
+first visit to /about
+first visit to /blog
+3 distinct, has /blog: 1
+</pre>
+
+<h2>Combining</h2>
+<p>These take a pointer to the other set, return a new set, and leave both alone.</p>
+<pre data-run><code>
+import set, vec;
+
+void show(u8 *label, set.Set<i64> *s)
+{
+  ad vec.Vec<i64> items = s.items();
+  items.sortAsc();
+  printf("%-12s", label);
+  for (auto x : items) { printf(" %d", x); }
+  printf("\n");
+}
+
+void main()
+{
+  ad set.Set<i64> evens = set.new<i64>();
+  ad set.Set<i64> threes = set.new<i64>();
+  for (i64 i = 1; i <= 6; i++) { evens.add(i * 2); }
+  for (i64 i = 1; i <= 4; i++) { threes.add(i * 3); }
+
+  ad set.Set<i64> u = evens.unionWith(&threes);
+  ad set.Set<i64> both = evens.intersection(&threes);
+  ad set.Set<i64> onlyEven = evens.diff(&threes);
+  ad set.Set<i64> either = evens.symDiff(&threes);
+  show("union", &u);
+  show("both", &both);
+  show("even only", &onlyEven);
+  show("exactly one", &either);
+  printf("both is a subset of evens: %d\n", both.isSubset(&evens));
+}
+</code></pre>
+<pre class="output">
+union        2 3 4 6 8 9 10 12
+both         6 12
+even only    2 4 8 10
+exactly one  2 3 4 8 9 10
+both is a subset of evens: 1
+</pre>
+
+<h2>Walking a set</h2>
+<p>In the order values were added:</p>
+<pre data-run><code>
+import set;
+
+void main()
+{
+  ad set.Set<i64> s = set.new<i64>();
+  s.add(30);
+  s.add(10);
+  s.add(20);
+  s.delete(10);
+  i64 it = 0, v;
+  while (s.next(&it, &v)) { printf("%d,", v); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+30,20,
+</pre>
+<p><code>s.items()</code> gives the values as a <code>vec.Vec</code> (yours to free), which <code>sortAsc()</code> puts in order.</p>
+
+<h2>Values</h2>
+<ul class="rules">
+  <li>Values are hashed and compared like <a href="lib-maps.html#key-types"><code>map.Map</code>'s keys</a>.</li>
+  <li><code>u8[]</code> and <code>String</code> values are copied into the set.</li>
+  <li>For a set kept in order, use a <a href="lib-trees.html"><code>map.Tree</code></a> with <code>bool</code> values.</li>
+</ul>

@@ -1,0 +1,146 @@
+<!-- title: Memory -->
+<!-- ref: mem -->
+<h1>Memory</h1>
+<p class="lede">The <code>mem</code> module allocates, resizes and frees. Nothing is garbage collected.</p>
+
+<table>
+  <thead><tr><th>Function</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>mem.alloc(size)</code></td><td>Allocates <code>size</code> bytes (not zeroed)</td></tr>
+    <tr><td><code>mem.allocZero(size)</code></td><td>Allocates <code>size</code> zeroed bytes</td></tr>
+    <tr><td><code>mem.realloc(p, size)</code></td><td>Resizes; <code>mem.realloc(null, n)</code> is <code>mem.alloc(n)</code></td></tr>
+    <tr><td><code>mem.free(p)</code></td><td>Releases it; <code>null</code> is fine</td></tr>
+    <tr><td><code>mem.size(p)</code></td><td>The size that was asked for (0 for <code>null</code>)</td></tr>
+    <tr><td><code>mem.copy(dst, src, n)</code></td><td>Copies <code>n</code> bytes, front to back; returns <code>dst</code></td></tr>
+    <tr><td><code>mem.set(dst, byte, n)</code></td><td>Fills <code>n</code> bytes; returns <code>dst</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Allocating</h2>
+<pre data-run><code>
+import mem;
+
+struct Player { u8 *name; i64 score; };
+
+void main()
+{
+  Player *team = mem.allocZero(3 * sizeof(Player));
+  defer mem.free(team);
+  team[0].name = "ada";
+  team[0].score = 10;
+  printf("%s %d, %d bytes, second is empty: %d\n",
+         team[0].name, team[0].score, mem.size(team), team[1].name == null);
+}
+</code></pre>
+<pre class="output">
+ada 10, 48 bytes, second is empty: 1
+</pre>
+
+<h2>Growing</h2>
+<p><code>mem.realloc</code> always moves the block and copies what fits. When it fails it returns
+<code>null</code> and the old block is untouched, so keep the old pointer until you know it worked.</p>
+<pre data-run><code>
+import mem;
+
+void main()
+{
+  i64 cap = 2, len = 0;
+  i64 *items = mem.alloc(cap * sizeof(i64));
+  for (i64 i = 1; i <= 5; i++) {
+    if (len == cap) {
+      i64 *bigger = mem.realloc(items, cap * 2 * sizeof(i64));
+      if (!bigger) { break; }     // items is still valid
+      items = bigger;
+      cap *= 2;
+    }
+    items[len++] = i * 10;
+  }
+  printf("%d items, room for %d, last %d\n", len, cap, items[len - 1]);
+  mem.free(items);
+}
+</code></pre>
+<pre class="output">
+5 items, room for 8, last 50
+</pre>
+<p>A <a href="lib-vectors.html"><code>vec.Vec</code></a> does this for you.</p>
+
+<h2>Copying and filling</h2>
+<pre data-run><code>
+import mem;
+
+void main()
+{
+  u8 a[8], b[8];
+  mem.set(a, 'x', 8);
+  mem.copy(b, "abcdefg", 8);    // 7 letters and the NUL
+  a[7] = 0;
+  printf("%s %s\n", a, b);
+
+  i64 src[3] = {1, 2, 3}, dst[3];
+  mem.copy(dst, src, sizeof(src));
+  printf("%d %d %d\n", dst[0], dst[1], dst[2]);
+}
+</code></pre>
+<pre class="output">
+xxxxxxx abcdefg
+1 2 3
+</pre>
+<div class="warn"><p><code>mem.copy</code> copies front to back. For overlapping buffers use <code>libc.memmove</code>.</p></div>
+
+<h2>Where it differs from C</h2>
+<ul class="rules">
+  <li><code>mem.allocZero</code> takes one argument, the total size, unlike <code>calloc(count, size)</code>.</li>
+  <li>All three allocators return <code>null</code> when out of memory or when the size is absurd (a negative size passed as a <code>u64</code>).</li>
+  <li>Each block keeps its size in a hidden header, so only pointers from these functions may go to <code>mem.free</code>, <code>mem.size</code> and <code>mem.realloc</code>. Memory from C's <code>malloc</code> goes back to C's <code>free</code>.</li>
+</ul>
+
+<h2>Owning memory</h2>
+<p>The usual pattern: free in the same scope with <code>defer</code>, or give the value a
+<code>free()</code> method and declare it with <code>ad</code>.</p>
+<pre data-run><code>
+import mem;
+
+struct Grid { i64 w, h; u8 *cells; };
+
+Grid gridNew(i64 w, i64 h)
+{
+  Grid g = {w, h, mem.allocZero(w * h)};
+  return g;
+}
+void Grid.free() { mem.free(self.cells); }
+void Grid.set(i64 x, i64 y) { self.cells[y * self.w + x] = 1; }
+
+void main()
+{
+  ad Grid g = gridNew(4, 3);
+  g.set(1, 2);
+  printf("%d %d\n", g.cells[2 * 4 + 1], g.cells[0]);
+}
+</code></pre>
+<pre class="output">
+1 0
+</pre>
+
+<h2>Finding memory bugs</h2>
+<p>Run with <code>-jit -Memsafe</code>: double frees and wild frees are reported (and skipped) as they
+happen, and leaks at exit, each with the line that allocated or freed the block.</p>
+<pre><code>import mem;
+
+void main()
+{
+  u8 *a = mem.alloc(16);
+  u8 *b = mem.alloc(32);
+  mem.free(a);
+  mem.free(a);      // double free
+}                   // b leaks</code></pre>
+<pre class="shell"><code>$ ktm -jit -Memsafe leaky.ktm
+Free: double free of 0x559df8f63ca8 (16 bytes)
+  allocated   in `main`+23, line 5
+  first freed in `main`+55, line 7
+  this free   in `main`+64, line 8 - ignored, heap unharmed
+memsafe: 1 allocation(s) (32 bytes) never freed
+  0x559df8f63df8        32 bytes  in `main`+42, line 6</code></pre>
+<ul class="rules">
+  <li>Only blocks from <code>mem.alloc</code>, <code>mem.allocZero</code> and <code>mem.realloc</code> are tracked.</li>
+  <li>Strings and containers the library allocates for you are not, so leaking one goes unreported.</li>
+</ul>

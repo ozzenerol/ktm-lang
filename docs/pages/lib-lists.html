@@ -1,0 +1,132 @@
+<!-- title: Lists -->
+<!-- ref: list -->
+<h1>Lists</h1>
+<p class="lede"><code>list.List&lt;T&gt;</code> is a doubly linked list. Keep the node an insert gives you, and remove it later in O(1).</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad list.List<i64> l = list.new<i64>();
+list.Node<i64> *n = l.append(5);      // or prepend, insertBefore, insertAfter
+l.remove(n);                          // O(1), returns the value
+l.shift();  l.pop();                  // from the front / the back
+for (auto n = l.head; n; n = n.next) { n.value; }</code></pre>
+</div>
+
+<h2>Adding and walking</h2>
+<pre data-run><code>
+import list;
+
+void main()
+{
+  ad list.List<u8 *> todo = list.new<u8 *>();
+  todo.append("write");
+  todo.append("ship");
+  todo.prepend("plan");
+  list.Node<u8 *> *w = todo.head.next;
+  todo.insertAfter(w, "test");
+
+  for (auto n = todo.head; n; n = n.next) { printf("%s,", n.value); }
+  printf(" %d items\n", todo.len);
+  for (auto n = todo.tail; n; n = n.prev) { printf("%s,", n.value); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+plan,write,test,ship, 4 items
+ship,test,write,plan,
+</pre>
+<p><code>head</code> and <code>tail</code> are <code>null</code> when the list is empty. A node has <code>value</code>, <code>next</code> and <code>prev</code>.</p>
+
+<h2>Removing a node you kept</h2>
+<p>Keep the node <code>append</code> returned (a timer, a client) and remove it later without searching.</p>
+<pre data-run><code>
+import list;
+
+void main()
+{
+  ad list.List<i64> clients = list.new<i64>();
+  clients.append(10);
+  list.Node<i64> *mine = clients.append(20);
+  clients.append(30);
+
+  i64 v = clients.remove(mine);
+  printf("removed %d, %d left: %d %d\n", v, clients.len, clients.first(), clients.last());
+}
+</code></pre>
+<pre class="output">
+removed 20, 2 left: 10 30
+</pre>
+<p>While walking, read <code>n.next</code> before removing <code>n</code>:</p>
+<pre data-run><code>
+import list;
+
+void main()
+{
+  ad list.List<i64> l = list.new<i64>();
+  for (i64 i = 1; i <= 6; i++) { l.append(i); }
+  auto n = l.head;
+  while (n) {
+    auto next = n.next;
+    if (n.value % 2 == 0) { l.remove(n); }
+    n = next;
+  }
+  for (auto m = l.head; m; m = m.next) { printf("%d,", m.value); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+1,3,5,
+</pre>
+
+<h2>Queues and stacks</h2>
+<p><code>append</code> with <code>shift</code> is a first-in first-out queue; <code>append</code> with <code>pop</code> is a stack.</p>
+<pre data-run><code>
+import list;
+
+void main()
+{
+  ad list.List<i64> q = list.new<i64>();
+  q.append(1);
+  q.append(2);
+  q.append(3);
+  printf("queue: %d %d\n", q.shift(), q.shift());
+  printf("stack: %d\n", q.pop());
+
+  bool ok;
+  i64 v = q.shift(&ok);
+  printf("empty: %d, ok %d\n", v, ok);
+}
+</code></pre>
+<pre class="output">
+queue: 1 2
+stack: 3
+empty: 0, ok 0
+</pre>
+<p>On an empty list, <code>shift</code>, <code>pop</code>, <code>first</code> and <code>last</code> return a zeroed value and set the optional <code>ok</code> to false.</p>
+
+<h2>Joining and emptying</h2>
+<pre data-run><code>
+import list;
+
+void main()
+{
+  ad list.List<i64> a = list.new<i64>();
+  ad list.List<i64> b = list.new<i64>();
+  a.append(1);
+  b.append(2);
+  b.append(3);
+  a.mergeAppend(&b);          // b's nodes move to the end of a
+  printf("%d %d\n", a.len, b.len);
+  a.clear();
+  printf("%d %d\n", a.len, a.head == null);
+}
+</code></pre>
+<pre class="output">
+3 0
+0 1
+</pre>
+<ul class="rules">
+  <li><code>mergeAppend(&amp;other)</code> and <code>mergePrepend(&amp;other)</code> move every node and leave <code>other</code> empty.</li>
+  <li><code>clear()</code> frees every node and leaves the list usable. <code>free()</code> does the same, for <code>ad</code>.</li>
+  <li>Neither frees what the values point to: that is yours.</li>
+</ul>

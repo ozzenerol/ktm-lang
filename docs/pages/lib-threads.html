@@ -1,0 +1,176 @@
+<!-- title: Threads and atomics -->
+<!-- ref: thread atomic -->
+<h1>Threads and atomics</h1>
+<p class="lede">POSIX threads straight from <code>libc</code>, a thread pool in <code>thread</code>, and lock-free integers in <code>atomic</code>.</p>
+
+<h2>Starting threads</h2>
+<p><code>libc.pthread_create</code> takes a <code>void *f(void *arg)</code>. Pass <code>&amp;th</code> to create and <code>th</code> to join.</p>
+<pre data-run><code>
+import libc;
+
+i64 sums[4];
+
+void *sum(void *arg)
+{
+  i64 part = (i64)arg, total = 0;
+  for (i64 i = part * 250 + 1; i <= (part + 1) * 250; i++) { total += i; }
+  sums[part] = total;          // each thread writes its own slot
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &sum, (void *)i); }
+  i64 total = 0;
+  for (i64 i = 0; i < 4; i++) {
+    libc.pthread_join(th[i]);
+    total += sums[i];
+  }
+  printf("1 + 2 + ... + 1000 = %d\n", total);
+}
+</code></pre>
+<pre class="output">
+1 + 2 + ... + 1000 = 500500
+</pre>
+
+<h2>A mutex</h2>
+<pre data-run><code>
+import libc, map;
+
+libc.pthread_mutex_t gLock;
+map.Map<i64, i64> gCounts;
+
+void *work(void *arg)
+{
+  for (i64 i = 0; i < 1000; i++) {
+    libc.pthread_mutex_lock(&gLock);
+    i64 *c = gCounts.ref(i % 10);
+    if (c) { *c += 1; } else { gCounts.set(i % 10, 1); }
+    libc.pthread_mutex_unlock(&gLock);
+  }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_mutex_init(&gLock, null);
+  gCounts = map.new<i64, i64>();
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &work, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d keys, key 3 counted %d times\n", gCounts.len, gCounts.getOr(3, 0));
+  gCounts.free();
+}
+</code></pre>
+<pre class="output">
+10 keys, key 3 counted 400 times
+</pre>
+<p>Condition variables (<code>pthread_cond_*</code>) are declared too.</p>
+
+<h2>A thread pool</h2>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>thread.poolNew(n)</code></td><td>Starts <code>n</code> workers (<code>null</code> if <code>n</code> &lt;= 0 or a thread can't start)</td></tr>
+    <tr><td><code>thread.poolEnqueue(pool, argv, &amp;fn)</code></td><td>Runs <code>fn(pool.privData, argv)</code> on a worker</td></tr>
+    <tr><td><code>thread.poolWait(pool)</code></td><td>Waits until the queue is empty (never from inside a job)</td></tr>
+    <tr><td><code>thread.poolRelease(pool)</code></td><td>Runs what is left and frees the pool</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import atomic, thread;
+
+i64 gDone = 0;
+
+void square(void *priv, i64 *n)
+{
+  *n = *n * *n;
+  atomic.add(&gDone, 1);
+}
+
+void main()
+{
+  thread.Pool *pool = thread.poolNew(3);
+  i64 nums[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+  for (i64 i = 0; i < 8; i++) { thread.poolEnqueue(pool, &nums[i], &square); }
+  thread.poolWait(pool);
+  thread.poolRelease(pool);
+  printf("%d jobs: %d %d %d\n", atomic.load(&gDone), nums[0], nums[3], nums[7]);
+}
+</code></pre>
+<pre class="output">
+8 jobs: 1 16 64
+</pre>
+
+<h2 id="atomics">Atomics</h2>
+<p>Change an integer several threads share, without a mutex: a counter, a flag, a lock-free swap.</p>
+<pre data-run><code>
+import atomic, libc;
+
+i64 gHits = 0;
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i < 100000; i++) { atomic.add(&gHits, 1); }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &worker, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&gHits));
+}
+</code></pre>
+<pre class="output">
+400000 hits
+</pre>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>atomic.add(&amp;n, v)</code>, <code>sub</code></td><td>Adds or subtracts; returns the value before</td></tr>
+    <tr><td><code>atomic.and</code>, <code>or</code>, <code>xor</code></td><td>A bit operation; returns the value before</td></tr>
+    <tr><td><code>atomic.swap(&amp;n, v)</code></td><td>Stores; returns the old value</td></tr>
+    <tr><td><code>atomic.load(&amp;n)</code>, <code>store(&amp;n, v)</code></td><td>Reads, writes</td></tr>
+    <tr><td><code>atomic.cas(&amp;n, expected, desired)</code></td><td>Stores <code>desired</code> only if <code>n</code> is <code>expected</code>; says whether it did</td></tr>
+    <tr><td><code>loadPtr</code>, <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code></td><td>The same for a <code>void *</code></td></tr>
+    <tr><td><code>atomic.fence()</code></td><td>A full memory barrier</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import atomic;
+
+void main()
+{
+  i64 flags = 0b0101;
+  i64 before = atomic.or(&flags, 0b0010);
+  printf("or: %d -> %d\n", before, flags);
+  bool swapped = atomic.cas(&flags, 7, 0);    // flags is 7: now 0
+  bool again = atomic.cas(&flags, 7, 1);      // flags isn't 7 any more
+  printf("cas: %d %d, flags %d\n", swapped, again, flags);
+
+  u32 small = 10;
+  atomic.sub(&small, 3);                      // the pointer picks the width
+  printf("%d\n", small);
+}
+</code></pre>
+<pre class="output">
+or: 5 -> 7
+cas: 1 0, flags 0
+7
+</pre>
+<ul class="rules">
+  <li>Each takes an <code>i64 *</code>, <code>i32 *</code>, <code>u64 *</code> or <code>u32 *</code>; values are passed as <code>i64</code>.</li>
+  <li>Every operation is sequentially consistent: all threads see them in one order.</li>
+  <li>The integer must be aligned to its size, as variables, fields and <code>mem.alloc</code>'d memory are.</li>
+  <li>For anything bigger than one integer, a mutex is simpler.</li>
+</ul>
+
+<h2>Threads and the rest of ktm</h2>
+<ul class="rules">
+  <li>Each thread has its own <code>try</code>/<code>catch</code> chain and its own coroutines.</li>
+  <li>An uncaught error in any thread ends the program with exit code 1.</li>
+  <li>For a server, <a href="lib-serve.html"><code>coro.serve</code></a> runs a coroutine loop per core and is usually simpler than threads by hand.</li>
+</ul>

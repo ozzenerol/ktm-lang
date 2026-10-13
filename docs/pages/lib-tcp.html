@@ -1,0 +1,231 @@
+<!-- title: TCP sockets -->
+<!-- ref: net -->
+<h1>TCP sockets</h1>
+<p class="lede">Listen, accept, dial, send. Sockets are plain <code>i32</code> file descriptors; the helpers in <code>net</code> do the
+address work, and every POSIX socket call is in <code>libc</code>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>i32 srv  = net.listen(8080, "127.0.0.1", 16);   // -1 on failure
+i32 conn = net.accept(srv);                     // waits for a client
+i32 cli  = net.dial("example.com", 80);         // a connected socket
+net.send(conn, "hello\n");                      // never raises SIGPIPE
+i64 n = libc.recv(conn, buf, sizeof(buf), 0);
+libc.close(conn);</code></pre>
+</div>
+
+<h2>A server and a client</h2>
+<p>Both ends in one program, over loopback. Port 0 lets the kernel pick a free port; <code>net.localPort</code> says which.</p>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  i32 srv = net.listen(0, "127.0.0.1", 4);
+  i32 cli = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+
+  net.send(cli, "ping");
+  u8 buf[64];
+  i64 n = libc.recv(conn, buf, sizeof(buf), 0);
+  printf("server got %s\n", buf[0:n]);
+
+  net.send(conn, "pong");
+  n = libc.recv(cli, buf, sizeof(buf), 0);
+  printf("client got %s\n", buf[0:n]);
+
+  libc.close(conn);
+  libc.close(cli);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">
+server got ping
+client got pong
+</pre>
+
+<h2>The calls</h2>
+<table>
+  <thead><tr><th>Call</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>net.listen(port, bindaddr, backlog)</code></td><td>A listening socket</td></tr>
+    <tr><td><code>net.accept(server)</code></td><td>The next connection</td></tr>
+    <tr><td><code>net.dial(addr, port, nonBlocking, timeoutMs)</code></td><td>A connected socket</td></tr>
+    <tr><td><code>net.send(sock, data, flags)</code></td><td>Bytes sent, or -1 (never <code>SIGPIPE</code>)</td></tr>
+    <tr><td><code>net.peerAddr(sock)</code></td><td>The peer's address as a String</td></tr>
+    <tr><td><code>net.localPort(sock)</code></td><td>The port a socket is bound to</td></tr>
+    <tr><td><code>net.setNonBlocking</code>, <code>setBlocking</code>, <code>setNoDelay</code>, <code>setReuseAddr</code></td><td><code>bool</code></td></tr>
+    <tr><td><code>net.setRecvTimeout(sock, ms)</code>, <code>setSendTimeout</code></td><td><code>bool</code></td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li>Sockets are returned as <code>i32</code>, or -1 on failure (0 is a valid socket).</li>
+  <li>Addresses are a <code>u8[]</code>: a literal, a slice or a String.</li>
+  <li><code>dial</code> takes a host name or an IPv4/IPv6 address, and tries every address the name resolves to.</li>
+  <li>A bind address must be numeric (<code>"127.0.0.1"</code>, <code>"::1"</code>), <code>"*"</code> for any IPv4 address or <code>"::*"</code> for any IPv6.</li>
+  <li>Ports outside 0..65535 give -1. The sockets <code>net</code> makes are close-on-exec.</li>
+</ul>
+
+<h2>A tiny HTTP exchange</h2>
+<pre data-run><code>
+import libc, net, str;
+
+void main()
+{
+  i32 srv = net.listen(0, "127.0.0.1", 4);
+  i32 cli = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  u8 buf[256];
+
+  net.send(cli, "GET /hello HTTP/1.0\r\n\r\n");
+
+  i64 n = libc.recv(conn, buf, sizeof(buf), 0);           // the server side
+  u8[] line, rest, path, version;
+  str.splitFirst(buf[0:n], "\r\n", &line, &rest);
+  str.splitFirst(line[4:], " ", &path, &version);          // after "GET "
+  ad String reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  net.send(conn, reply);
+  libc.close(conn);
+
+  n = libc.recv(cli, buf, sizeof(buf), libc.MSG_WAITALL);  // the client side
+  u8[] head, body;
+  str.splitFirst(buf[0:n], "\r\n\r\n", &head, &body);
+  printf("%s", body);
+  libc.close(cli);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">
+you asked for /hello
+</pre>
+
+<h2>A serving loop</h2>
+<p>The shape of a blocking server. One client at a time; for many at once, use <a href="lib-event-loop.html">coroutines</a>.</p>
+<pre><code>import libc, net;
+
+void main()
+{
+  i32 srv = net.listen(8080, "*", 16);
+  if (srv == -1) {
+    printf("can't listen on 8080\n");
+    return;
+  }
+  while (true) {
+    i32 conn = net.accept(srv);          // waits for a client
+    if (conn == -1) { continue; }
+    ad String peer = net.peerAddr(conn);
+    printf("client from %s\n", peer);
+    net.send(conn, "hello\n");           // -1 if the client already left
+    libc.close(conn);
+  }
+}</code></pre>
+
+<h2>Timeouts</h2>
+<ul class="rules">
+  <li><code>net.dial(addr, port, false, ms)</code> gives up after <code>ms</code> milliseconds with -1 and <code>ETIMEDOUT</code>. 0, the default, waits as long as the system does.</li>
+  <li><code>net.setRecvTimeout(sock, ms)</code> makes a read give up with -1 and <code>EAGAIN</code>; <code>setSendTimeout</code> the same for writes.</li>
+  <li><code>dial</code> blocks in <code>connect</code> either way. In a coroutine, use <code>coro.dial</code>, which pauses only the coroutine.</li>
+</ul>
+<pre data-run><code>
+import libc, net, os;
+
+void main()
+{
+  i32 srv = net.listen(0, "127.0.0.1", 4);
+  i32 cli = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  net.setRecvTimeout(cli, 50);
+  u8 buf[16];
+  i64 n = libc.recv(cli, buf, sizeof(buf), 0);      // nothing comes
+  printf("%d, EAGAIN: %d\n", n, os.errno() == libc.EAGAIN);
+  libc.close(conn);
+  libc.close(cli);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">
+-1, EAGAIN: 1
+</pre>
+
+<h2>A peer that went away</h2>
+<p>Writing to a socket whose peer has closed raises <code>SIGPIPE</code>, which ends the program, as in C. Two ways out:</p>
+<ul class="rules">
+  <li><code>net.send</code> adds <code>MSG_NOSIGNAL</code>: it returns -1 with <code>EPIPE</code> (or <code>ECONNRESET</code>) instead.</li>
+  <li><code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> does the same for every <code>write</code> and <code>send</code> in the program.</li>
+</ul>
+<pre data-run><code>
+import date, libc, net, os;
+
+void main()
+{
+  i32 srv = net.listen(0, "127.0.0.1", 1);
+  i32 client = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  libc.close(conn);                               // the peer goes away
+
+  i64 r = 0;
+  i32 err = 0;
+  for (i64 i = 0; i < 50; i++) {
+    r = net.send(client, "ping");
+    if (r < 0) { err = os.errno(); break; }
+    date.sleepMs(10);
+  }
+  printf("send: %d, EPIPE or ECONNRESET: %d\n", r, err == libc.EPIPE || err == libc.ECONNRESET);
+  printf("still running\n");
+  libc.close(client);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">
+send: -1, EPIPE or ECONNRESET: 1
+still running
+</pre>
+
+<h2>Unix domain sockets</h2>
+<p><code>net.unixListen(path, backlog)</code> and <code>net.unixDial(path)</code>. They return -1 on failure, also for a
+path longer than 107 bytes (103 on macOS).</p>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  u8[] path = "/tmp/ktm_docs.sock";
+  libc.unlink("/tmp/ktm_docs.sock");
+  i32 srv = net.unixListen(path, 4);
+  i32 cli = net.unixDial(path);
+  i32 conn = net.accept(srv);
+  net.send(cli, "over a unix socket");
+  u8 buf[64];
+  i64 n = libc.recv(conn, buf, sizeof(buf), 0);
+  printf("%s\n", buf[0:n]);
+  libc.close(conn);
+  libc.close(cli);
+  libc.close(srv);
+  libc.unlink("/tmp/ktm_docs.sock");
+}
+</code></pre>
+<pre class="output">
+over a unix socket
+</pre>
+
+<h2>The raw calls</h2>
+<p><code>libc</code> declares <code>socket</code>, <code>bind</code>, <code>connect</code>, <code>getsockopt</code>, <code>poll</code>,
+<code>getaddrinfo</code> and the rest, with the platform's structs and constants
+(<code>AF_*</code>, <code>SOCK_*</code>, <code>SO_*</code>, <code>MSG_*</code>, <code>POLL*</code>, the <code>errno</code> codes).</p>
+<ul class="rules">
+  <li>Address lengths are C's <code>socklen_t</code>, a <code>u32</code>: declare the ones you pass by address as <code>u32</code>.</li>
+  <li><code>net.htons</code>, <code>ntohs</code>, <code>htonl</code>, <code>ntohl</code> convert to and from network byte order.</li>
+</ul>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  printf("%X %X\n", net.htons(0x1F90), net.htonl(0x7F000001));
+  printf("%d\n", libc.inet_addr("127.0.0.1") == net.htonl(0x7F000001));
+}
+</code></pre>
+<pre class="output">
+901F 100007F
+1
+</pre>

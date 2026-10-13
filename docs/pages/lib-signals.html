@@ -1,0 +1,88 @@
+<!-- title: Signals -->
+<!-- ref: signal -->
+<h1>Signals</h1>
+<p class="lede">Handle a signal with <code>signal.handle</code>, or let a <code>poll()</code> loop stop cleanly on Ctrl-C and SIGTERM with <code>signal.stopInit</code>.</p>
+
+<h2>Handling a signal</h2>
+<p><code>signal.handle(sig, handler, flags, mask, &amp;old)</code>. The handler is <code>SIG_DFL</code>, <code>SIG_IGN</code>,
+or a <code>void f(i32 sig)</code> passed as <code>(i64)(&amp;f)</code>.</p>
+<pre data-run><code>
+import libc, signal;
+
+i64 hits = 0;
+
+void onUsr1(i32 sig)
+{
+  hits++;
+}
+
+void main()
+{
+  signal.Action old;
+  signal.handle(libc.SIGUSR1, (i64)(&onUsr1), libc.SA_RESTART, 0, &old);
+  libc.raise(libc.SIGUSR1);
+  libc.raise(libc.SIGUSR1);
+  signal.action(libc.SIGUSR1, &old);      // put the old one back
+  printf("%d signals, the old handler was SIG_DFL: %d\n", hits, old.handler == libc.SIG_DFL);
+}
+</code></pre>
+<pre class="output">
+2 signals, the old handler was SIG_DFL: 1
+</pre>
+<ul class="rules">
+  <li><code>flags</code> defaults to <code>SA_RESTART</code>: a blocking <code>read</code>, <code>write</code> or <code>accept</code> carries on after the handler. With 0 it returns -1 and <code>EINTR</code> (<code>poll</code> always does).</li>
+  <li><code>mask</code> (<code>signal.bit(SIGUSR2) | ...</code>) holds other signals back while the handler runs.</li>
+  <li><code>old</code>, if given, receives the previous action, for <code>signal.action(sig, &amp;old)</code>.</li>
+  <li><code>libc.signal(sig, handler)</code>, C's own, is the same with <code>SA_RESTART</code>.</li>
+</ul>
+
+<h2>Ignoring SIGPIPE</h2>
+<p>Writing to a socket whose peer has gone raises <code>SIGPIPE</code>, which ends the program. Ignore it to get an error instead:</p>
+<pre><code>signal.handle(libc.SIGPIPE, libc.SIG_IGN);   // now write() returns -1 with EPIPE</code></pre>
+<p>Or use <a href="lib-tcp.html"><code>net.send</code></a>, which never raises it.</p>
+
+<div class="warn"><p><strong>What a handler may do.</strong> It interrupts the program anywhere, on any thread. It may
+set a global, call <code>write</code>, <code>_exit</code>, <code>kill</code> or <code>raise</code>, and must leave
+<code>errno</code> as it found it. Allocating, printing, <code>throw</code> or taking a lock there can deadlock or
+corrupt memory.</p></div>
+
+<h2>Stopping a server cleanly</h2>
+<p><code>signal.stopInit()</code> handles SIGINT and SIGTERM for a <code>poll()</code> loop: it returns an fd that becomes
+readable when either arrives. From then on <code>signal.stopRequested()</code> is true and <code>signal.stopSignal()</code> says which came.</p>
+<pre data-run><code>
+import libc, signal;
+
+void main()
+{
+  i32 fd = signal.stopInit();
+  libc.pollfd p;
+  p.fd = fd;
+  p.events = libc.POLLIN;
+  libc.raise(libc.SIGTERM);                // as if `kill` had been run on us
+  if (libc.poll(&p, 1, 1000) == 1 && signal.stopRequested()) {
+    printf("stopping cleanly after signal %d\n", signal.stopSignal());
+  }
+}
+</code></pre>
+<pre class="output">
+stopping cleanly after signal 15
+</pre>
+<p>The loop finishes what it is doing and returns. A second Ctrl-C ends the program at once, in case the loop never gets there.
+In a coroutine loop, wait on the same fd: see <a href="lib-event-loop.html#stopping">the coroutine loop</a>.</p>
+
+<h2>Signal numbers</h2>
+<p><code>libc</code> defines <code>SIGHUP</code>, <code>SIGINT</code>, <code>SIGQUIT</code>, <code>SIGKILL</code>, <code>SIGUSR1</code>,
+<code>SIGUSR2</code>, <code>SIGPIPE</code>, <code>SIGALRM</code>, <code>SIGTERM</code>, <code>SIGCHLD</code> and the job-control
+signals <code>SIGCONT</code>, <code>SIGSTOP</code>, <code>SIGTSTP</code>, <code>SIGTTIN</code>, <code>SIGTTOU</code>, with each platform's numbers.</p>
+<pre data-run><code>
+import libc;
+
+void main()
+{
+  printf("INT %d, KILL %d, TERM %d\n", libc.SIGINT, libc.SIGKILL, libc.SIGTERM);
+}
+</code></pre>
+<pre class="output">
+INT 2, KILL 9, TERM 15
+</pre>
+<p>Signal actions are shared by all threads; a signal sent to the process goes to one thread that doesn't block it.</p>

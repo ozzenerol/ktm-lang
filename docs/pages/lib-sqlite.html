@@ -1,0 +1,96 @@
+<!-- title: SQLite -->
+<!-- ref: sql -->
+<h1>SQLite</h1>
+<p class="lede">The <code>sql</code> module wraps SQLite: open a database, run statements with <code>?</code> parameters, step through rows.</p>
+
+<div class="note"><p><strong>Build with SQLite.</strong> The module exists when ktm is built with <code>./build.sh --sqlite</code>
+(it needs the SQLite development package). Code can check <code>#ifdef __KTM_LINK_SQLITE3__</code>.</p></div>
+
+<h2>A first database</h2>
+<pre><code>import sql;
+
+void main()
+{
+  sql.Db *db = sql.open(":memory:");
+  defer sql.close(db);
+
+  ad String err = sql.execRaw(db, "CREATE TABLE users(id INTEGER, name TEXT);");
+  if (err.len) { printf("%s\n", err); return; }
+
+  sql.Param p[2];
+  p[0].type = sql.INT;   p[0].intVal = 1;
+  p[1].type = sql.TEXT;  p[1].str = "ann";
+  sql.exec(db, "INSERT INTO users VALUES(?, ?);", p, 2);
+
+  sql.Row row;
+  if (sql.select(db, &row, "SELECT id, name FROM users;")) {
+    while (sql.next(&row)) { printf("%d %s\n", row.col[0].intVal, row.col[1].str); }
+  }
+}</code></pre>
+<pre class="output">
+1 ann
+</pre>
+
+<h2>The calls</h2>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>sql.open(path)</code></td><td>Opens a database; <code>":memory:"</code> for a private one</td></tr>
+    <tr><td><code>sql.close(db)</code></td><td>Closes it</td></tr>
+    <tr><td><code>sql.execRaw(db, script)</code></td><td>Runs a script of statements; returns the error as a String, empty when it ran</td></tr>
+    <tr><td><code>sql.exec(db, sql, params, n)</code></td><td>Runs one statement whose rows you don't need</td></tr>
+    <tr><td><code>sql.select(db, &amp;row, sql, params, n)</code></td><td>Runs one statement; read rows with <code>sql.next</code></td></tr>
+    <tr><td><code>sql.next(&amp;row)</code></td><td>The next row; frees it after the last</td></tr>
+    <tr><td><code>sql.rowRelease(&amp;row)</code></td><td>Frees a row when you stop early</td></tr>
+  </tbody>
+</table>
+
+<h2>Parameters</h2>
+<p>An <code>sql.Param</code> has a <code>type</code> and the value in the matching field:</p>
+<table>
+  <thead><tr><th><code>type</code></th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td><code>sql.INT</code></td><td><code>intVal</code></td></tr>
+    <tr><td><code>sql.FLOAT</code></td><td><code>floatVal</code></td></tr>
+    <tr><td><code>sql.TEXT</code></td><td><code>str</code>, a <code>u8[]</code></td></tr>
+    <tr><td><code>sql.BLOB</code></td><td><code>blob</code> and <code>blobLen</code></td></tr>
+    <tr><td><code>sql.NULL_TYPE</code></td><td>(nothing)</td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li>Text and blobs are copied, so they can be freed right after the call. An empty text binds <code>''</code>.</li>
+  <li>The SQL is a <code>u8[]</code>: <code>script[0:n]</code> runs part of a buffer.</li>
+  <li>Text with a second statement is an error, rather than half-run.</li>
+  <li>Always use parameters for values: never format user input into SQL.</li>
+</ul>
+
+<h2>Rows</h2>
+<p>A row has <code>cols</code> and <code>col[i]</code>, each with a <code>type</code> and <code>intVal</code>, <code>floatVal</code>, <code>str</code> or <code>blob</code>.
+A column's <code>str</code> and <code>blob</code> are valid only until the next row.</p>
+<pre><code>sql.Row row;
+sql.Param min[1];
+min[0].type = sql.INT;
+min[0].intVal = 18;
+if (sql.select(db, &row, "SELECT name, age FROM users WHERE age >= ?;", min, 1)) {
+  while (sql.next(&row)) {
+    ad String name = str.from(row.col[0].str);    // keep a copy past this row
+    printf("%s is %d\n", name, row.col[1].intVal);
+  }
+}</code></pre>
+
+<h2>Prepared statements</h2>
+<p>Compile a statement once and run it many times with new parameters.</p>
+<pre><code>sql.Stmt *ins = sql.prepare(db, "INSERT INTO users VALUES(?, ?);");   // null on an error
+defer sql.finalize(ins);
+sql.Row row;
+for (i64 i = 0; i < 3; i++) {
+  sql.Param p[2];
+  p[0].type = sql.INT;   p[0].intVal = i;
+  p[1].type = sql.TEXT;  p[1].str = "user";
+  i32 rc = sql.execPrepared(ins, &row, p);         // SQLITE_DONE, SQLITE_ROW or an error
+}</code></pre>
+<ul class="rules">
+  <li><code>sql.execPrepared</code> returns <code>sql.SQLITE_ROW</code>, <code>sql.SQLITE_DONE</code> or an error code; read rows with <code>sql.nextPrepared</code>.</li>
+  <li>A parameter it can't bind returns that error without running the statement (<code>SQLITE_MISMATCH</code>, <code>SQLITE_TOOBIG</code>).</li>
+  <li>The row belongs to the statement, which <code>sql.finalize</code> frees.</li>
+</ul>

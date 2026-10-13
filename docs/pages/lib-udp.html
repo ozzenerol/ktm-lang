@@ -1,0 +1,104 @@
+<!-- title: UDP sockets -->
+<!-- ref: net -->
+<h1>UDP sockets</h1>
+<p class="lede">Datagrams: <code>net.udpSocket</code> to bind, <code>net.sendTo</code> and <code>net.recvFrom</code> to talk.
+<code>net.Addr</code> keeps a sender's address without text in between.</p>
+
+<h2>Send and answer</h2>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  u8 buf[64];
+  ad String from;
+  i32 port;
+
+  net.sendTo(cli, "ping", "127.0.0.1", net.localPort(srv));
+  i64 n = net.recvFrom(srv, buf, &from, &port);
+  printf("server got %s from %s\n", buf[0:n], from);
+  net.sendTo(srv, "pong", from, port);       // answer the sender
+
+  net.setRecvTimeout(cli, 1000);
+  n = net.recvFrom(cli, buf);
+  printf("client got %s\n", buf[0:n]);
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">
+server got ping from 127.0.0.1
+client got pong
+</pre>
+<ul class="rules">
+  <li><code>net.udpSocket(port, bindaddr)</code> takes the same bind addresses as <code>net.listen</code>; port 0 picks one.</li>
+  <li><code>recvFrom</code> receives one datagram into a <code>u8[]</code>; one longer than the buffer is cut.</li>
+  <li>Both work with IPv4 and IPv6 and return -1 on failure.</li>
+  <li><code>net.setRecvTimeout(sock, ms)</code> makes reads give up with -1 after <code>ms</code>.</li>
+</ul>
+
+<h2>net.Addr: answering many clients</h2>
+<p>A server that answers many senders keeps each address as the kernel gives it: no text, no name lookup.</p>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  i32 srv = net.udpSocket(0, "127.0.0.1");
+  i32 cli = net.udpSocket(0, "127.0.0.1");
+  net.setRecvTimeout(srv, 1000);
+  net.setRecvTimeout(cli, 1000);
+
+  net.Addr server;
+  net.makeAddr("127.0.0.1", net.localPort(srv), &server);
+  net.sendToAddr(cli, "\x00\x2Aquery", &server);     // a 2-byte id, then the question
+
+  u8 buf[512];
+  net.Addr from;
+  i64 n = net.recvFromAddr(srv, buf, &from);
+  ad String ip = from.ip();
+  printf("%d bytes from %s, the client's port: %d\n", n, ip, from.port() == net.localPort(cli));
+  buf[2] = '!';
+  net.sendToAddr(srv, buf[0:3], &from);              // the id and the answer, straight back
+
+  net.Addr back;
+  n = net.recvFromAddr(cli, buf, &back);
+  printf("answer to id %d: %c, from the server: %d\n", buf[1], buf[2], back.equals(&server));
+  libc.close(srv);
+  libc.close(cli);
+}
+</code></pre>
+<pre class="output">
+7 bytes from 127.0.0.1, the client's port: 1
+answer to id 42: !, from the server: 1
+</pre>
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>net.makeAddr(ip, port, &amp;a)</code></td><td>Makes one from a numeric address (false for anything else)</td></tr>
+    <tr><td><code>a.ip()</code>, <code>a.port()</code>, <code>a.family()</code></td><td>Its parts (<code>libc.AF_INET</code>, <code>AF_INET6</code>, or 0 when empty)</td></tr>
+    <tr><td><code>a.equals(&amp;b)</code>, <code>a.sameIp(&amp;b)</code></td><td>Compare address and port, or just the address</td></tr>
+    <tr><td><code>net.localAddr(sock, &amp;a)</code>, <code>net.remoteAddr(sock, &amp;a)</code></td><td>A socket's own end and its peer's</td></tr>
+  </tbody>
+</table>
+
+<h2>IPv6</h2>
+<pre data-run><code>
+import libc, net;
+
+void main()
+{
+  net.Addr a;
+  printf("%d %d\n", net.makeAddr("::1", 53, &a), a.family() == libc.AF_INET6);
+  ad String ip = a.ip();
+  printf("%s port %d\n", ip, a.port());
+  printf("host names aren't addresses: %d\n", net.makeAddr("localhost", 53, &a));
+}
+</code></pre>
+<pre class="output">
+1 1
+::1 port 53
+host names aren't addresses: 0
+</pre>

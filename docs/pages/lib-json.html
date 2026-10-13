@@ -1,0 +1,278 @@
+<!-- title: JSON: reading -->
+<!-- ref: json -->
+<h1>JSON: reading</h1>
+<p class="lede">Three ways to read JSON. Pick by what you need:</p>
+<table>
+  <thead><tr><th>Way</th><th>Use it when</th><th>Page</th></tr></thead>
+  <tbody>
+    <tr><td><code>json.decode&lt;T&gt;(text)</code></td><td>The JSON has a known shape: fill a struct</td><td><a href="lib-json-structs.html">JSON: structs</a></td></tr>
+    <tr><td><code>json.parse</code> + <code>json.select</code></td><td>You want a few values from a document, or its shape varies</td><td>This page</td></tr>
+    <tr><td><code>json.Reader</code></td><td>Large input, or you want full control with no tree</td><td><a href="#reader">This page</a></td></tr>
+  </tbody>
+</table>
+
+<h2>Parsing and selecting</h2>
+<p><code>json.parse(text)</code> builds a tree and returns its root. Check <code>json.ok</code>, and free it with <code>json.release</code> either way.
+<code>json.select(node, path)</code> walks a path from any node.</p>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  u8[] text = "{\"name\": \"ktm\", \"version\": 14, \"tags\": [\"jit\", \"repl\"],"
+              " \"stable\": false, \"owner\": null}";
+  json.Value *doc = json.parse(text);
+  defer json.release(doc);
+  if (!json.ok(doc)) {
+    json.printError(doc);
+    return;
+  }
+  printf("%s v%d\n", json.select(doc, ".name:s").str, json.select(doc, ".version:i").intVal);
+  printf("second tag: %s\n", json.select(doc, ".tags[1]:s").str);
+  printf("stable: %d, owner is null: %d\n", json.select(doc, ".stable:b").boolean,
+         json.select(doc, ".owner:!") != null);
+  printf("missing: %d, wrong type: %d\n", json.select(doc, ".author") == null,
+         json.select(doc, ".version:s") == null);
+}
+</code></pre>
+<pre class="output">
+ktm v14
+second tag: repl
+stable: 0, owner is null: 1
+missing: 1, wrong type: 1
+</pre>
+
+<h3>Paths</h3>
+<table>
+  <thead><tr><th>In a path</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>.key</code></td><td>An object member</td></tr>
+    <tr><td><code>[n]</code></td><td>An array item</td></tr>
+    <tr><td><code>:s</code> <code>:i</code> <code>:f</code> <code>:b</code></td><td>Must be a string, integer, float, boolean</td></tr>
+    <tr><td><code>:a</code> <code>:o</code> <code>:!</code></td><td>Must be an array, object, null</td></tr>
+    <tr><td><code>*</code></td><td>Takes the next argument: an <code>i64</code> in <code>[]</code>, a string after <code>.</code></td></tr>
+  </tbody>
+</table>
+<p><code>select</code> returns <code>null</code> when the path doesn't match or is malformed.</p>
+
+<h2>Nodes</h2>
+<p>Each node has a <code>type</code> and its value in the matching field.</p>
+<table>
+  <thead><tr><th><code>type</code></th><th>Value in</th></tr></thead>
+  <tbody>
+    <tr><td><code>json.STRING</code></td><td><code>str</code>, a <code>u8[]</code></td></tr>
+    <tr><td><code>json.INT</code> / <code>json.FLOAT</code></td><td><code>intVal</code> / <code>floatVal</code></td></tr>
+    <tr><td><code>json.BOOL</code></td><td><code>boolean</code></td></tr>
+    <tr><td><code>json.NULL</code></td><td>(nothing)</td></tr>
+    <tr><td><code>json.ARRAY</code> / <code>json.OBJECT</code></td><td><code>array</code> / <code>object</code>: the first child, or <code>null</code></td></tr>
+    <tr><td><code>json.STRNUM</code></td><td><code>strnum</code>, the number as written (see <a href="#numbers">Numbers</a>)</td></tr>
+  </tbody>
+</table>
+<p>Children are linked by <code>next</code>; an object member has its name in <code>key</code>. That is how you iterate:</p>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  json.Value *doc = json.parse("{\"prices\": {\"eur\": 9.5, \"usd\": 10.25}, \"tags\": [\"a\", \"b\"]}");
+  defer json.release(doc);
+
+  for (json.Value *t = json.select(doc, ".tags:a").array; t; t = t.next) {
+    printf("tag %s\n", t.str);
+  }
+  for (json.Value *p = json.select(doc, ".prices:o").object; p; p = p.next) {
+    printf("%s = %.2f\n", p.key, p.floatVal);
+  }
+}
+</code></pre>
+<pre class="output">
+tag a
+tag b
+eur = 9.50
+usd = 10.25
+</pre>
+<p>Nodes are views into the document: don't keep them after the root is released.</p>
+
+<h2 id="wildcards">Wildcards and getters</h2>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  json.Value *doc = json.parse("{\"prices\": {\"eur\": 9.5, \"usd\": 10.25}, \"rows\": [[1, 2], [3]],"
+                               " \"a.b\": \"dotted\", \"dup\": 1, \"dup\": 2}");
+  defer json.release(doc);
+  for (i64 i = 0; i < 2; i++) {
+    printf("row %d has %d items\n", i, json.len(json.select(doc, ".rows[*]", i)));
+  }
+  u8 *currency = "usd";
+  printf("%s: %.2f\n", currency, json.select(doc, ".prices.*:f", currency).floatVal);
+
+  printf("%s, dup = %d, members %d\n", json.objectGet(doc, "a.b").str,
+         json.objectGet(doc, "dup").intVal, json.len(doc));
+  json.Value *rows = json.objectGet(doc, "rows");
+  printf("rows[1][0] = %d, rows[5] missing: %d\n", json.arrayGet(json.arrayGet(rows, 1), 0).intVal,
+         json.arrayGet(rows, 5) == null);
+}
+</code></pre>
+<pre class="output">
+row 0 has 2 items
+row 1 has 1 items
+usd: 10.25
+dotted, dup = 1, members 5
+rows[1][0] = 3, rows[5] missing: 1
+</pre>
+<ul class="rules">
+  <li><code>json.objectGet(obj, key)</code> takes any key, even one with <code>.</code> or <code>[</code> in it.</li>
+  <li><code>json.arrayGet(arr, i)</code> takes an index. Both return <code>null</code> when it isn't there.</li>
+  <li><code>json.len</code> counts an array's or object's children (0 for anything else).</li>
+  <li>A key that appears twice is kept twice; selecting it finds the first.</li>
+  <li><code>json.isInt</code>, <code>isFloat</code>, <code>isString</code>, <code>isBool</code>, <code>isNull</code>, <code>isArray</code>, <code>isObject</code> test a node's type.</li>
+</ul>
+
+<h2 id="errors">Errors</h2>
+<p>The parser follows RFC 8259 strictly. On an error, <code>json.errorStr(root)</code> is the message and
+<code>root.state</code> has the code, line and column.</p>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  json.Value *doc = json.parse("{\n  \"a\": [1, 2],\n  \"b\" 3\n}");
+  if (!json.ok(doc)) {
+    ad String msg = json.errorStr(doc);
+    printf("%s\n", msg);
+    printf("code %d, line %d, column %d\n", doc.state.error, doc.state.line, doc.state.col);
+  }
+  json.release(doc);
+
+  u8[] bad[] = {"[1, 2,]", "[1] x", "[01]", "{\"a\": tru}", "[\"tab\there\"]", ""};
+  for (auto b : bad) {
+    doc = json.parse(b);
+    printf("%d,", doc.state.error);
+    json.release(doc);
+  }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+Expected ':' after an object key, got '3' at line 3, column 7
+code 14, line 3, column 7
+8,8,5,18,19,12,
+</pre>
+<p>It rejects trailing commas, anything after the value, numbers like <code>01</code>, <code>+1</code>, <code>.5</code>,
+raw control characters in strings, bytes that aren't UTF-8, and nesting deeper than <code>json.MAX_DEPTH</code> (512).</p>
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>json.INVALID_UTF16_SURROGATE</code> (2)</td><td>A <code>\u</code> escape with a bad surrogate</td></tr>
+    <tr><td><code>json.INVALID_HEX</code> (3)</td><td><code>\u</code> not followed by 4 hex digits</td></tr>
+    <tr><td><code>json.INVALID_STRING_NOT_TERMINATED</code> (4)</td><td>A string with no closing quote</td></tr>
+    <tr><td><code>json.INVALID_NUMBER</code> (5)</td><td>A malformed number</td></tr>
+    <tr><td><code>json.INVALID_JSON_TYPE_CHAR</code> (8)</td><td>No value where one was expected, or something after one</td></tr>
+    <tr><td><code>json.CANNOT_START_PARSE</code> (12)</td><td>Empty input, or it doesn't start with a value</td></tr>
+    <tr><td><code>json.INVALID_KEY_TERMINATOR_CHARACTER</code> (13)</td><td>A member that doesn't start with a quoted key</td></tr>
+    <tr><td><code>json.INVALID_KEY_VALUE_SEPARATOR</code> (14)</td><td>No <code>:</code> after a key</td></tr>
+    <tr><td><code>json.INVALID_ARRAY_CHARACTER</code> (15)</td><td>No <code>,</code> or <code>]</code> after an item</td></tr>
+    <tr><td><code>json.INVALID_ESCAPE_CHARACTER</code> (16)</td><td>An unknown escape like <code>\q</code></td></tr>
+    <tr><td><code>json.INVALID_LITERAL</code> (18)</td><td>Not <code>true</code>, <code>false</code> or <code>null</code></td></tr>
+    <tr><td><code>json.INVALID_CONTROL_CHARACTER</code> (19)</td><td>A raw byte below 0x20 in a string</td></tr>
+    <tr><td><code>json.NESTING_TOO_DEEP</code> (20)</td><td>Deeper than <code>json.MAX_DEPTH</code></td></tr>
+    <tr><td><code>json.INVALID_UTF8</code> (21)</td><td>Bytes in a string that aren't UTF-8</td></tr>
+  </tbody>
+</table>
+
+<h2 id="numbers">Numbers</h2>
+<p>An integer that fits an <code>i64</code> is <code>json.INT</code>; a larger one, or one with a fraction or exponent, is <code>json.FLOAT</code>.
+With <code>json.STRNUM_FLAG</code>, numbers are kept as written, every digit.</p>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  json.Value *doc = json.parse("[9007199254740993, 99999999999999999999, 2.50]");
+  printf("%d %d\n", json.isInt(json.arrayGet(doc, 0)), json.isFloat(json.arrayGet(doc, 1)));
+  ad String s = json.toStr(doc);
+  printf("%s\n", s);
+  json.release(doc);
+
+  doc = json.parse("{\"id\": 123456789012345678901234567890, \"price\": 9.90}", json.STRNUM_FLAG);
+  printf("id %s, price %s\n", json.select(doc, ".id").strnum, json.select(doc, ".price").strnum);
+  json.release(doc);
+}
+</code></pre>
+<pre class="output">
+1 1
+[9007199254740993,1.0e+20,2.5]
+id 123456789012345678901234567890, price 9.90
+</pre>
+<ul class="rules">
+  <li>A STRNUM is still checked against the JSON grammar; <code>json.toStr</code> writes it back unchanged.</li>
+  <li>The <code>:i</code> and <code>:f</code> checks don't match STRNUM nodes: select them without one.</li>
+  <li>Strings are decoded, <code>\uXXXX</code> and surrogate pairs to UTF-8. <code>\u0000</code> is kept and counted in <code>str.len</code>.</li>
+</ul>
+
+<h2 id="reader">Streaming: json.Reader</h2>
+<p>A Reader reads the text front to back and builds no tree. Open an object and loop on <code>nextKey()</code>;
+open an array and loop on <code>nextItem()</code>. Errors throw <code>json.ERR_DECODE</code> with the line and column.</p>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  u8[] text = "{\"service\": \"api\", \"ports\": [80, 443], \"debug\": true, \"extra\": {\"x\": 1}}";
+  json.Reader r = json.readerNew(text);
+  defer r.free();
+  r.beginObject();
+  while (r.nextKey()) {
+    u8[] k = r.key();
+    if (k.equals("service")) {
+      printf("service %s\n", r.readStr());
+    } else if (k.equals("ports")) {
+      r.beginArray();
+      while (r.nextItem()) { printf("port %d\n", r.readInt()); }
+    } else if (k.equals("debug")) {
+      printf("debug %d\n", r.readBool());
+    } else {
+      r.skipValue();                  // anything we don't know
+    }
+  }
+  r.finish();                         // nothing left over
+}
+</code></pre>
+<pre class="output">
+service api
+port 80
+port 443
+debug 1
+</pre>
+<table>
+  <thead><tr><th>Reader call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>readStr()</code>, <code>readString(&amp;s)</code></td><td>A string as a view, or into a String</td></tr>
+    <tr><td><code>readInt()</code>, <code>readUint()</code>, <code>readFloat()</code>, <code>readBool()</code></td><td>A value of that type, or an error</td></tr>
+    <tr><td><code>isNull()</code></td><td>Reads a <code>null</code> if there is one</td></tr>
+    <tr><td><code>peek()</code></td><td>What comes next: <code>json.STRING</code>, <code>INT</code>, <code>ARRAY</code>, ...</td></tr>
+    <tr><td><code>skipValue()</code>, <code>finish()</code></td><td>Skip one value; check the text was all read</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import json;
+
+void main()
+{
+  json.Reader r = json.readerNew("{\"n\": \"seven\"}");
+  defer r.free();
+  try {
+    r.beginObject();
+    r.nextKey();
+    r.readInt();
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+1:7: n: expected an integer, got a string
+</pre>
+<p><a href="lib-yaml.html"><code>yaml.Reader</code></a> has the same calls, so one decoder can read both formats.</p>

@@ -1,0 +1,126 @@
+<!-- title: Ordered maps -->
+<!-- ref: map -->
+<h1>Ordered maps</h1>
+<p class="lede"><code>map.Tree&lt;K, V&gt;</code> keeps its keys sorted (a red-black tree). Use it to walk keys in order, or to find the neighbours of a key.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>ad map.Tree<u8[], i64> t = map.treeNew<u8[], i64>();
+t.set(k, v)  t.get(k, &v)  t.getOr(k, def)  t.has(k)  t.delete(k)  t.len
+for (auto n = t.first(); n; n = t.after(n)) { n.key; n.value; }
+for (auto n = t.last(); n; n = t.before(n)) { ... }   // backwards</code></pre>
+</div>
+
+<h2>In key order</h2>
+<pre data-run><code>
+import map;
+
+void main()
+{
+  ad map.Tree<u8[], i64> ages = map.treeNew<u8[], i64>();
+  ages.set("linus", 55);
+  ages.set("ada", 36);
+  ages.set("grace", 85);
+  ages.set("ada", 37);           // replaces
+  ages.delete("grace");
+
+  i64 ada;
+  ages.get("ada", &ada);
+  printf("ada %d, has grace: %d, %d entries, bob %d\n",
+         ada, ages.has("grace"), ages.len, ages.getOr("bob", -1));
+  for (auto n = ages.first(); n; n = ages.after(n)) { printf("%s = %d\n", n.key, n.value); }
+}
+</code></pre>
+<pre class="output">
+ada 37, has grace: 0, 2 entries, bob -1
+ada = 37
+linus = 55
+</pre>
+
+<h2>Backwards, and top N</h2>
+<pre data-run><code>
+import map;
+
+void main()
+{
+  ad map.Tree<i64, u8 *> scores = map.treeNew<i64, u8 *>();
+  scores.set(72, "bob");
+  scores.set(95, "ann");
+  scores.set(88, "cy");
+  scores.set(60, "dan");
+
+  i64 shown = 0;
+  for (auto n = scores.last(); n && shown < 3; n = scores.before(n)) {
+    printf("%d. %s (%d)\n", ++shown, n.value, n.key);
+  }
+}
+</code></pre>
+<pre class="output">
+1. ann (95)
+2. cy (88)
+3. bob (72)
+</pre>
+
+<h2>Deleting while walking</h2>
+<p>A delete leaves the other nodes where they are: take <code>after(n)</code> before deleting <code>n</code>.</p>
+<pre data-run><code>
+import map;
+
+void main()
+{
+  ad map.Tree<i64, bool> t = map.treeNew<i64, bool>();
+  for (i64 i = 1; i <= 8; i++) { t.set(i, true); }
+  auto n = t.first();
+  while (n) {
+    auto next = t.after(n);
+    if (n.key % 3 == 0) { t.delete(n.key); }
+    n = next;
+  }
+  for (auto m = t.first(); m; m = t.after(m)) { printf("%d,", m.key); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+1,2,4,5,7,8,
+</pre>
+
+<h2>Your own key type</h2>
+<p>Keys are ordered by <code>map.compare(a, b)</code>, an overloaded function returning less than 0, 0 or more than 0.
+There are overloads for the integer types, <code>f64</code> and <code>u8[]</code> (which covers <code>String</code>).
+For your own type, add one:</p>
+<pre data-run><code>
+import map;
+
+struct Version { i64 major, minor; };
+
+i64 map.compare(Version a, Version b)
+{
+  if (a.major != b.major) { return a.major - b.major; }
+  return a.minor - b.minor;
+}
+
+void main()
+{
+  ad map.Tree<Version, u8 *> notes = map.treeNew<Version, u8 *>();
+  Version v1 = {1, 10}, v2 = {1, 2}, v3 = {0, 9};
+  notes.set(v1, "generics");
+  notes.set(v2, "slices");
+  notes.set(v3, "first");
+  for (auto n = notes.first(); n; n = notes.after(n)) {
+    printf("%d.%d %s\n", n.key.major, n.key.minor, n.value);
+  }
+}
+</code></pre>
+<pre class="output">
+0.9 first
+1.2 slices
+1.10 generics
+</pre>
+
+<h2>Memory</h2>
+<ul class="rules">
+  <li><code>u8[]</code> and <code>String</code> keys are copied in and freed with the tree, so the key you pass can be a reused buffer.</li>
+  <li>Other keys and every value are stored as they are: what a value points to is yours to free.</li>
+  <li><code>clear()</code> empties the tree; <code>free()</code> does the same, for <code>ad</code>.</li>
+</ul>
+<p>A tree with <code>bool</code> values is an ordered set.</p>
