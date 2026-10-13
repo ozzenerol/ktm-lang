@@ -1,4 +1,4 @@
-import cstr, fs, libc, mem, proc, reflect, test;
+import cstr, fs, json, libc, mem, proc, reflect, test;
 
 /* Attributes (v0.14.0): @json and @yaml on a struct, @key("..."), @skip
  * and @omitEmpty on its fields. reflect shows them (Type.json/.yaml,
@@ -18,7 +18,7 @@ struct User {
     @key("e-mail") u8[] email;
     @skip i64 hits;
     @omitEmpty i64 age;
-    struct { i64 a; } inner;
+    @skip struct { i64 a; } inner;
 };
 
 @json

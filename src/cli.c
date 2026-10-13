@@ -124,6 +124,7 @@ static CliParser parsers[] = {
     {str_lit("--install-dir"), 1, CLI_INSTALL_DIR, "--install-dir <path>", "Override the install prefix (header dir = <path>/include, lib dir = <path>/lib). Defaults to /usr/local.", &cliParseString},
     {str_lit("-D"),         0, CLI_DEFINES_LIST, "-D<VAR>", "Set a compiler #define (does not accept a value)", &cliParseDefine},
     {str_lit("--dump-ir"),  0, CLI_DUMP_IR, "--dump-ir", "Dump ir to stdout" , &cliParseNop},
+    {str_lit("--expand"),  0, CLI_EXPAND, "--expand", "Print the code @json makes for each struct to stderr" , &cliParseNop},
     {str_lit("--mem-stats"),  0, CLI_MEM_STATS, "--mem-stats", "Stats about memory usage when compiling" , &cliParseNop},
     CliNopParser("-v", CLI_VERBOSE, "-v print the commands that build a library (-lib)"),
     {str_lit("--version"),  0, CLI_VERSION, "--version", "Print the version of the compiler", &cliParseNop},
@@ -525,6 +526,7 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             }
             case CLI_INSTALL_DIR: args->install_dir = value.str; break;
             case CLI_DUMP_IR:   args->dump_ir = 1; break;
+            case CLI_EXPAND:    args->expand = 1; break;
             case CLI_MEM_STATS: args->print_mem_stats = 1; break;
             case CLI_HELP:    cliPrintUsage(); break;
             case CLI_VERSION: cliVersionPrint(args); break;

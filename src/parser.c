@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <setjmp.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -591,6 +592,9 @@ ClsField *clsFieldNew(AstType *type, AoStr *field_name) {
     return f;
 }
 
+int parse_expand_generated = 0;
+static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at);
+
 /* ---- attributes (v0.14.0) ----
  * `@json @yaml struct User { @key("e-mail") String email; ... };`: a
  * struct's come before its declaration (and before `pub`), a field's
@@ -1164,6 +1168,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     /* Provenance of the tag token, for jump-to-definition. */
     int tag_line = 0, tag_col = 0;
     u32 tag_file = 0;
+    Lexeme *tag_tok = tok;
     if (tok->tk_type == TK_IDENT) {
         /* A module's type is named `a.b.Name` */
         char *qual = cctrlDeclName(cc, tok->start, tok->len);
@@ -1301,6 +1306,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
             prev->col = tag_col;
             prev->file_id = tag_file;
         }
+        if (astAttrGet(attrs, "json")) parseJsonGenerate(cc, prev, tag_tok);
         return prev;
     }
 
@@ -1324,6 +1330,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     if (tag) {
         mapAdd(env,tag->data,ref);
     }
+    if (astAttrGet(attrs, "json")) parseJsonGenerate(cc, ref, tag_tok);
     return ref;
 }
 
@@ -6329,6 +6336,532 @@ static void parseGenericReplayGuarded(Cctrl *cc, GenericInst *in) {
 
 /* The method and function bodies of every instance, after the file; an
  * instance made by one of them is added to the end and parsed too */
+/* ---- @json: generated encoders and decoders (v0.14.0) ----
+ * A @json struct gets, as if written after it in its own module:
+ *
+ *   void S.toJson(json.Writer *__w);     // its fields, keys pre-escaped
+ *   void S.fromJson(json.Reader *__r);   // keys matched by length, then bytes
+ *   void S.freeDecoded();                // what fromJson allocated
+ *
+ * The text is made here from the struct's type, lexed into tokens and
+ * replayed like a generic method: the prototypes now, the bodies with
+ * the generic instances' at the end of the file (parseGenericFlush), so
+ * a struct's methods can call those of a struct declared after it. */
+
+enum {
+    JG_NONE, JG_INT, JG_U64, JG_BOOL, JG_FLOAT, JG_STRING, JG_BYTES, JG_CSTR,
+    JG_ENUM, JG_STRUCT, JG_PTR_STRUCT, JG_VEC, JG_SLICE, JG_ARRAY
+};
+
+static int parseJsonIsVec(AstType *t) {
+    return t->kind == AST_TYPE_CLASS && t->clsname && t->generic_args &&
+           !strncmp(t->clsname->data, "vec.Vec<", 8);
+}
+
+static int parseJsonKind(AstType *t) {
+    if (!t) return JG_NONE;
+    if (astTypeIsString(t)) return JG_STRING;
+    if (astTypeIsSlice(t)) {
+        AstType *e = t->elem;
+        if (e && e->kind == AST_TYPE_CHAR && e->size == 1 && !e->is_bool) return JG_BYTES;
+        return JG_SLICE;
+    }
+    if (t->is_enum) return JG_ENUM;
+    if (t->is_bool) return JG_BOOL;
+    switch (t->kind) {
+        case AST_TYPE_INT:
+        case AST_TYPE_CHAR:
+            return t->size == 8 && !t->issigned ? JG_U64 : JG_INT;
+        case AST_TYPE_FLOAT:
+            return JG_FLOAT;
+        case AST_TYPE_POINTER: {
+            AstType *p = t->ptr;
+            if (p && p->kind == AST_TYPE_CHAR && p->size == 1 && !p->is_bool) return JG_CSTR;
+            if (p && p->kind == AST_TYPE_CLASS && !p->is_intrinsic) return JG_PTR_STRUCT;
+            return JG_NONE;
+        }
+        case AST_TYPE_ARRAY:
+            return JG_ARRAY;
+        case AST_TYPE_CLASS:
+            if (t->is_intrinsic) return JG_INT;
+            if (parseJsonIsVec(t)) return JG_VEC;
+            return JG_STRUCT;
+        default:
+            return JG_NONE;
+    }
+}
+
+static AstType *parseJsonElem(AstType *t, int kind) {
+    switch (kind) {
+        case JG_VEC:   return t->generic_args->entries[0];
+        case JG_SLICE: return t->elem;
+        case JG_ARRAY: return t->ptr;
+        default:       return NULL;
+    }
+}
+
+/* The struct `t` (or what a pointer field points to) has @json */
+static AstType *parseJsonStructOf(AstType *t, int kind) {
+    return kind == JG_PTR_STRUCT ? t->ptr : t;
+}
+
+/* Why `t` can't be JSON, NULL if it can */
+static char *parseJsonUnsupported(AstType *t) {
+    int k = parseJsonKind(t);
+    if (k == JG_NONE) {
+        return mprintf("a %s can't be JSON", astTypeToString(t));
+    }
+    if (k == JG_STRUCT || k == JG_PTR_STRUCT) {
+        AstType *s = parseJsonStructOf(t, k);
+        if (s->kind == AST_TYPE_UNION) return mprintf("a union can't be JSON");
+        /* a pointer to a struct only declared so far (`struct Note;`):
+         * its @json comes with its body, before the bodies are made */
+        if (k == JG_PTR_STRUCT && !s->fields) return NULL;
+        if (!astAttrGet(s->attrs, "json")) {
+            return mprintf("it is a %s, which has no @json: add @json to %s",
+                           astTypeToString(s), s->clsname ? s->clsname->data : "it");
+        }
+        return NULL;
+    }
+    AstType *e = parseJsonElem(t, k);
+    if (e) return parseJsonUnsupported(e);
+    return NULL;
+}
+
+/* The type as written in the generated text; a module's names are
+ * recorded so the lexed text gets them as one token (`shop.Line`) */
+static char *parseJsonTypeText(Set *quals, AstType *t) {
+    char *s = astTypeToString(t);
+    if (strchr(s, '.')) {
+        /* `shop.Line *`, `vec.Vec<shop.Line>`: each dotted name */
+        char *p = s;
+        while (*p) {
+            if (isalpha((unsigned char)*p) || *p == '_') {
+                char *b = p;
+                while (isalnum((unsigned char)*p) || *p == '_' || *p == '.') p++;
+                if (memchr(b, '.', p - b)) setAdd(quals, mprintf("%.*s", (int)(p - b), b));
+            } else {
+                p++;
+            }
+        }
+    }
+    return s;
+}
+
+static void parseJsonEncode(AoStr *o, Set *quals, char *expr, AstType *t, int depth);
+static void parseJsonDecode(AoStr *o, Set *quals, char *lv, AstType *t, int depth);
+static void parseJsonFree(AoStr *o, Set *quals, char *lv, AstType *t, int depth);
+
+static void parseJsonEncode(AoStr *o, Set *quals, char *expr, AstType *t, int depth) {
+    int k = parseJsonKind(t);
+    switch (k) {
+        case JG_INT:    aoStrCatPrintf(o, "__w.int(%s);\n", expr); break;
+        case JG_U64:    aoStrCatPrintf(o, "__w.uint(%s);\n", expr); break;
+        case JG_BOOL:   aoStrCatPrintf(o, "__w.bool(%s);\n", expr); break;
+        case JG_FLOAT:  aoStrCatPrintf(o, "__w.float(%s);\n", expr); break;
+        case JG_STRING:
+        case JG_BYTES:  aoStrCatPrintf(o, "__w.str(%s);\n", expr); break;
+        case JG_CSTR:
+            aoStrCatPrintf(o, "if (%s) { __w.cstr(%s); } else { __w.nil(); }\n", expr, expr);
+            break;
+        case JG_ENUM: {
+            /* by its member's name, its number when it has none */
+            Map *m = t->enum_members;
+            aoStrCatPrintf(o, "switch ((i64)%s) {\n", expr);
+            for (u64 i = 0; m && m->indexes && i < m->indexes->size; ++i) {
+                u64 mi = (u64)(uintptr_t)m->indexes->entries[i];
+                Ast *v = (Ast *)m->entries[mi].value;
+                char *name = (char *)m->entries[mi].key;
+                char *dot = strrchr(name, '.');
+                aoStrCatPrintf(o, "case %lld: __w.str(\"%s\"); break;\n",
+                            (long long)v->i64, dot ? dot + 1 : name);
+            }
+            aoStrCatPrintf(o, "default: __w.int((i64)%s); break;\n}\n", expr);
+            break;
+        }
+        case JG_STRUCT:
+            aoStrCatPrintf(o, "%s.toJson(__w);\n", expr);
+            break;
+        case JG_PTR_STRUCT:
+            aoStrCatPrintf(o, "if (%s) { %s.toJson(__w); } else { __w.nil(); }\n", expr, expr);
+            break;
+        case JG_VEC:
+        case JG_SLICE:
+        case JG_ARRAY: {
+            AstType *e = parseJsonElem(t, k);
+            if (k == JG_ARRAY && e->kind == AST_TYPE_CHAR && e->size == 1 && !e->is_bool) {
+                /* a u8 array: the C string in it */
+                aoStrCatPrintf(o, "__w.cstr(&%s[0]);\n", expr);
+                break;
+            }
+            char *len = k == JG_ARRAY ? mprintf("%d", t->len) : mprintf("%s.len", expr);
+            char *item = mprintf(k == JG_VEC ? "%s.data[__i%d]" : k == JG_SLICE ? "%s.ptr[__i%d]"
+                                 : "%s[__i%d]", expr, depth);
+            aoStrCatPrintf(o, "__w.beginArray();\nfor (i64 __i%d = 0; __i%d < %s; __i%d++) {\n",
+                        depth, depth, len, depth);
+            parseJsonEncode(o, quals, item, e, depth + 1);
+            aoStrCatPrintf(o, "}\n__w.end();\n");
+            break;
+        }
+    }
+}
+
+/* An integer read into `lv`, checked against its type's range */
+static void parseJsonDecodeInt(AoStr *o, char *lv, AstType *t) {
+    if (t->size >= 8) {
+        aoStrCatPrintf(o, "%s = __r.readInt();\n", lv);
+        return;
+    }
+    s64 lo, hi;
+    if (t->issigned) {
+        lo = -(1LL << (t->size * 8 - 1));
+        hi = (1LL << (t->size * 8 - 1)) - 1;
+    } else {
+        lo = 0;
+        hi = (1LL << (t->size * 8)) - 1;
+    }
+    aoStrCatPrintf(o, "{ i64 __v = __r.readInt();\n"
+                   "if (__v < %lld || __v > %lld) { __r.fail(\"out of range for a %s\"); }\n"
+                   "%s = __v; }\n", (long long)lo, (long long)hi, astTypeToString(t), lv);
+}
+
+static void parseJsonDecode(AoStr *o, Set *quals, char *lv, AstType *t, int depth) {
+    int k = parseJsonKind(t);
+    switch (k) {
+        case JG_INT:
+            if (t->is_intrinsic) {
+                aoStrCatPrintf(o, "%s = __r.readInt();\n", lv);
+            } else {
+                parseJsonDecodeInt(o, lv, t);
+            }
+            break;
+        case JG_U64:    aoStrCatPrintf(o, "%s = __r.readUint();\n", lv); break;
+        case JG_BOOL:   aoStrCatPrintf(o, "%s = __r.readBool();\n", lv); break;
+        case JG_FLOAT:  aoStrCatPrintf(o, "%s = __r.readFloat();\n", lv); break;
+        case JG_STRING: aoStrCatPrintf(o, "__r.readString(&%s);\n", lv); break;
+        case JG_BYTES:
+            aoStrCatPrintf(o, "{ i64 __n = 0; u8 *__p = __r.readBytes(&__n);\n"
+                           "%s = __p[0:__n]; }\n", lv);
+            break;
+        case JG_CSTR:
+            aoStrCatPrintf(o, "if (__r.isNull()) { %s = null; } else { %s = __r.readBytes(); }\n",
+                        lv, lv);
+            break;
+        case JG_ENUM: {
+            /* by a member's name, or its number */
+            Map *m = t->enum_members;
+            char *it = t->size == 1 ? "u8" : t->size == 2 ? "u16" : t->size == 4 ? "i32" : "i64";
+            aoStrCatPrintf(o, "if (__r.peek() == json.INT) { *(%s *)&%s = __r.readInt(); } else {\n"
+                           "u8[] __s = __r.readStr();\n", it, lv);
+            for (u64 i = 0; m && m->indexes && i < m->indexes->size; ++i) {
+                u64 mi = (u64)(uintptr_t)m->indexes->entries[i];
+                Ast *v = (Ast *)m->entries[mi].value;
+                char *name = (char *)m->entries[mi].key;
+                char *dot = strrchr(name, '.');
+                char *mn = dot ? dot + 1 : name;
+                aoStrCatPrintf(o, "%sif (json.__keyIs(__s, \"%s\", %d)) { *(%s *)&%s = %lld; }\n",
+                            i ? "else " : "", mn, (int)strlen(mn), it, lv, (long long)v->i64);
+            }
+            aoStrCatPrintf(o, "%s{ __r.fail(\"not a member of %s\"); }\n}\n",
+                        m && m->indexes && m->indexes->size ? "else " : "",
+                        astTypeToString(t));
+            break;
+        }
+        case JG_STRUCT:
+            aoStrCatPrintf(o, "%s.fromJson(__r);\n", lv);
+            break;
+        case JG_PTR_STRUCT:
+            aoStrCatPrintf(o, "if (__r.isNull()) { %s = null; } else {\n"
+                           "if (!%s) { %s = json.__alloc(sizeof(*%s)); }\n"
+                           "%s.fromJson(__r); }\n", lv, lv, lv, lv, lv);
+            break;
+        case JG_VEC: {
+            AstType *e = parseJsonElem(t, k);
+            char *et = parseJsonTypeText(quals, e);
+            char *tmp = mprintf("__t%d", depth);
+            aoStrCatPrintf(o, "__r.beginArray();\nwhile (__r.nextItem()) {\n"
+                           "%s %s;\njson.__zero(&%s, sizeof(%s));\n", et, tmp, tmp, tmp);
+            parseJsonDecode(o, quals, tmp, e, depth + 1);
+            aoStrCatPrintf(o, "%s.push(%s);\n}\n", lv, tmp);
+            break;
+        }
+        case JG_SLICE: {
+            /* grown in a pointer of its own, the slice made at the end */
+            AstType *e = parseJsonElem(t, k);
+            char *et = parseJsonTypeText(quals, e);
+            int d = depth;
+            char *item = mprintf("__p%d[__n%d]", d, d);
+            aoStrCatPrintf(o, "{ i64 __c%d = 0; i64 __n%d = 0; %s *__p%d = null;\n"
+                           "__r.beginArray();\nwhile (__r.nextItem()) {\n"
+                           "if (__n%d == __c%d) { __c%d = __c%d ? __c%d * 2 : 4;\n"
+                           "__p%d = json.__grow(__p%d, __c%d * sizeof(%s)); }\n"
+                           "json.__zero(&%s, sizeof(%s));\n",
+                           d, d, et, d, d, d, d, d, d, d, d, d, et, item, et);
+            parseJsonDecode(o, quals, item, e, depth + 1);
+            aoStrCatPrintf(o, "__n%d++;\n}\n%s = __p%d[0:__n%d]; }\n", d, lv, d, d);
+            break;
+        }
+        case JG_ARRAY: {
+            AstType *e = parseJsonElem(t, k);
+            if (e->kind == AST_TYPE_CHAR && e->size == 1 && !e->is_bool) {
+                aoStrCatPrintf(o, "json.__intoChars(__r, &%s[0], %d);\n", lv, t->len);
+                break;
+            }
+            char *item = mprintf("%s[__i%d]", lv, depth);
+            aoStrCatPrintf(o, "{ i64 __i%d = 0;\n__r.beginArray();\nwhile (__r.nextItem()) {\n"
+                           "if (__i%d >= %d) { __r.fail(\"more than %d items\"); }\n",
+                        depth, depth, t->len, t->len);
+            parseJsonDecode(o, quals, item, e, depth + 1);
+            aoStrCatPrintf(o, "__i%d++;\n}\n}\n", depth);
+            break;
+        }
+    }
+}
+
+static void parseJsonFree(AoStr *o, Set *quals, char *lv, AstType *t, int depth) {
+    int k = parseJsonKind(t);
+    switch (k) {
+        case JG_STRING:
+            aoStrCatPrintf(o, "%s.free();\n", lv);
+            break;
+        case JG_BYTES:
+            aoStrCatPrintf(o, "json.__free(%s.ptr); json.__zero(&%s, sizeof(%s));\n", lv, lv, lv);
+            break;
+        case JG_CSTR:
+            aoStrCatPrintf(o, "json.__free(%s); %s = null;\n", lv, lv);
+            break;
+        case JG_STRUCT:
+            aoStrCatPrintf(o, "%s.freeDecoded();\n", lv);
+            break;
+        case JG_PTR_STRUCT:
+            aoStrCatPrintf(o, "if (%s) { %s.freeDecoded(); json.__free(%s); %s = null; }\n",
+                        lv, lv, lv, lv);
+            break;
+        case JG_VEC:
+        case JG_SLICE:
+        case JG_ARRAY: {
+            AstType *e = parseJsonElem(t, k);
+            int ek = parseJsonKind(e);
+            int owns = ek == JG_STRING || ek == JG_BYTES || ek == JG_CSTR || ek == JG_STRUCT ||
+                       ek == JG_PTR_STRUCT || ek == JG_VEC || ek == JG_SLICE || ek == JG_ARRAY;
+            if (owns) {
+                char *len = k == JG_ARRAY ? mprintf("%d", t->len) : mprintf("%s.len", lv);
+                char *item = mprintf(k == JG_VEC ? "%s.data[__i%d]" : k == JG_SLICE ? "%s.ptr[__i%d]"
+                                     : "%s[__i%d]", lv, depth);
+                aoStrCatPrintf(o, "for (i64 __i%d = 0; __i%d < %s; __i%d++) {\n",
+                            depth, depth, len, depth);
+                parseJsonFree(o, quals, item, e, depth + 1);
+                aoStrCatPrintf(o, "}\n");
+            }
+            if (k == JG_VEC) aoStrCatPrintf(o, "%s.free();\n", lv);
+            if (k == JG_SLICE) {
+                aoStrCatPrintf(o, "json.__free(%s.ptr); json.__zero(&%s, sizeof(%s));\n", lv, lv, lv);
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+/* The fields a @json struct writes and reads: not @skip, not private */
+static int parseJsonFieldUsed(AstType *ft) {
+    return ft && !ft->private_module && !astAttrGet(ft->field_attrs, "skip");
+}
+
+/* An expression true when field `e` (of type t) is empty: 0, empty,
+ * null; NULL for a type that is never empty (a struct) */
+static char *parseJsonNonEmpty(char *e, AstType *t) {
+    switch (parseJsonKind(t)) {
+        case JG_INT: case JG_U64: case JG_BOOL: case JG_FLOAT: case JG_ENUM:
+            return mprintf("%s != 0", e);
+        case JG_STRING: case JG_BYTES: case JG_VEC: case JG_SLICE:
+            return mprintf("%s.len != 0", e);
+        case JG_CSTR: case JG_PTR_STRUCT:
+            return mprintf("%s != null", e);
+        default:
+            return NULL;
+    }
+}
+
+/* The source of S.toJson, S.fromJson and S.freeDecoded */
+static AoStr *parseJsonSource(Cctrl *cc, AstType *cls, char *tname, Set *quals) {
+    AoStr *o = aoStrNew();
+    Map *fields = cls->fields;
+    char *pub = cc->cur_module ? "pub " : "";
+
+    aoStrCatPrintf(o, "%svoid %s.toJson(json.Writer *__w) {\n__w.beginObject();\n", pub, tname);
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        AstType *ft = fields->entries[fi].value;
+        char *fname = (char *)fields->entries[fi].key;
+        if (!parseJsonFieldUsed(ft)) continue;
+        AstAttr *key = astAttrGet(ft->field_attrs, "key");
+        char *e = mprintf("self.%s", fname);
+        char *cond = astAttrGet(ft->field_attrs, "omitEmpty") ? parseJsonNonEmpty(e, ft) : NULL;
+        if (cond) aoStrCatPrintf(o, "if (%s) {\n", cond);
+        aoStrCatPrintf(o, "__w.rawKey(\"%s\");\n", key ? key->arg->data : fname);
+        parseJsonEncode(o, quals, e, ft, 0);
+        if (cond) aoStrCatPrintf(o, "}\n");
+    }
+    aoStrCatPrintf(o, "__w.end();\n}\n");
+
+    aoStrCatPrintf(o, "%svoid %s.fromJson(json.Reader *__r) {\n__r.beginObject();\n"
+                   "while (__r.nextKey()) {\nu8[] __k = __r.key();\n", pub, tname);
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        AstType *ft = fields->entries[fi].value;
+        char *fname = (char *)fields->entries[fi].key;
+        if (!parseJsonFieldUsed(ft)) continue;
+        AstAttr *key = astAttrGet(ft->field_attrs, "key");
+        char *kt = key ? key->arg->data : fname;
+        aoStrCatPrintf(o, "if (__k.len == %d && json.__keyIs(__k, \"%s\", %d)) {\n",
+                    (int)strlen(kt), kt, (int)strlen(kt));
+        parseJsonDecode(o, quals, mprintf("self.%s", fname), ft, 0);
+        aoStrCatPrintf(o, "continue;\n}\n");
+    }
+    aoStrCatPrintf(o, "__r.skipValue();\n}\n}\n");
+
+    aoStrCatPrintf(o, "%svoid %s.freeDecoded() {\n", pub, tname);
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        AstType *ft = fields->entries[fi].value;
+        char *fname = (char *)fields->entries[fi].key;
+        if (!parseJsonFieldUsed(ft)) continue;
+        parseJsonFree(o, quals, mprintf("self.%s", fname), ft, 0);
+    }
+    aoStrCatPrintf(o, "}\n");
+    return o;
+}
+
+/* `src` as tokens that read as if they were at `at` (its file, module
+ * and line): a module's names in `quals` (and json's) one token each,
+ * as the lexer makes them after an import */
+static Vec *parseJsonLex(Cctrl *cc, char *src, Lexeme *at, Set *quals) {
+    Lexer l;
+    Lexeme tok;
+    Vec *raw = vecNew(&vec_unsigned_long_type);
+    lexInit(&l, src, CCF_PRE_PROC);
+    l.cc = cc;
+    while (lex(&l, &tok)) {
+        Lexeme *t = lexemeCopy(&tok);
+        t->file = at->file;
+        t->module_id = at->module_id;
+        t->in_std = at->in_std;
+        t->mod_pass = LEX_PASS_NONE;
+        t->line = at->line;
+        t->col = at->col;
+        t->qual_prefix = NULL;
+        t->qual_prefix_len = 0;
+        t->is_prefix = 0;
+        vecPush(raw, t);
+    }
+    Vec *toks = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; i < raw->size; ++i) {
+        Lexeme *t = raw->entries[i];
+        int after_member = i > 0 && (tokenPunctIs(raw->entries[i - 1], '.') ||
+                                     ((Lexeme *)raw->entries[i - 1])->tk_type == TK_DEREFERENCE);
+        if (t->tk_type == TK_IDENT && !after_member) {
+            /* the longest `a.b.c` here that is a module's name */
+            u64 best = 0;
+            AoStr *name = aoStrDupRaw(t->start, t->len);
+            for (u64 j = i + 2; j < raw->size; j += 2) {
+                Lexeme *d = raw->entries[j - 1], *n = raw->entries[j];
+                if (!tokenPunctIs(d, '.') || n->tk_type != TK_IDENT) break;
+                aoStrCatPrintf(name, ".%.*s", n->len, n->start);
+                int is_json = !strncmp(name->data, "json.", 5) &&
+                              !strchr(name->data + 5, '.');
+                if (is_json || setHas(quals, name->data)) best = j;
+            }
+            if (best) {
+                Lexeme *q = lexemeCopy(t);
+                AoStr *text = aoStrDupRaw(t->start, t->len);
+                for (u64 j = i + 2; j <= best; j += 2) {
+                    Lexeme *n = raw->entries[j];
+                    aoStrCatPrintf(text, ".%.*s", n->len, n->start);
+                }
+                q->qual_prefix = t->start;
+                q->qual_prefix_len = t->len;
+                q->start = text->data;
+                q->len = text->len;
+                vecPush(toks, q);
+                i = best;
+                continue;
+            }
+        }
+        vecPush(toks, t);
+    }
+    return toks;
+}
+
+/* @json struct `cls` (complete, at `at`): its methods, made once */
+static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at) {
+    if (!cls->clsname || !cls->fields) return;
+    if (!cc->json_done) cc->json_done = setNew(16, &set_cstring_type);
+    if (setHas(cc->json_done, cls->clsname->data)) return;
+    setAdd(cc->json_done, cls->clsname->data);
+
+    /* its file imports json (and the generated code uses it) */
+    LexImport *imp = at->file ? at->file->imports : NULL;
+    for (; imp; imp = imp->next) {
+        if (!strcmp(imp->module->path->data, "json")) break;
+    }
+    if (!imp || !mapGet(cc->clsdefs, "json.Writer")) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "`@json` on %s needs `import json;` in its file", cls->clsname->data);
+    }
+    imp->used = 1;
+    Map *fields = cls->fields;
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        AstType *ft = fields->entries[fi].value;
+        if (!parseJsonFieldUsed(ft)) continue;
+        char *why = parseJsonUnsupported(ft);
+        if (why) {
+            cctrlRaiseExceptionAt(cc, ft->line ? ft->line : at->line,
+                    ft->line ? ft->col : at->col, (int)strlen((char *)fields->entries[fi].key),
+                    "field `%s` of @json %s: %s (mark it @skip to leave it out)",
+                    (char *)fields->entries[fi].key, cls->clsname->data, why);
+        }
+    }
+
+    /* `Order` in module shop, `Box` for `Box<i64>`: the method's struct
+     * comes from the instance (parseMethodDef) */
+    char *full = cls->clsname->data;
+    int top = astLastTopDot(full, (int)cls->clsname->len);
+    char *tname = top >= 0 ? full + top + 1 : full;
+    char *lt = strchr(tname, '<');
+    if (lt) tname = mprintf("%.*s", (int)(lt - tname), tname);
+
+    Set *quals = setNew(8, &set_cstring_type);
+    AoStr *src = parseJsonSource(cc, cls, tname, quals);
+    if (parse_expand_generated) {
+        fprintf(stderr, "// @json %s\n%s\n", full, src->data);
+    }
+
+    GenericDef *d = calloc(1, sizeof(GenericDef));
+    d->kind = GEN_METHOD;
+    d->name = cls->clsname;
+    d->params = vecNew(&vec_unsigned_long_type);
+    d->toks = parseJsonLex(cc, src->data, at, quals);
+    d->module_id = at->module_id;
+    d->at = at;
+    d->file_id = ast_file_hint;
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = d;
+    in->args = vecNew(&vec_unsigned_long_type);
+    in->name = cls->clsname;
+    in->cls = cls;
+    in->at = at;
+    in->proto_only = 1;
+    parseGenericReplay(cc, d, in);
+    GenericInst *body = calloc(1, sizeof(GenericInst));
+    *body = *in;
+    body->proto_only = 0;
+    if (!cc->generic_pending) cc->generic_pending = vecNew(&vec_unsigned_long_type);
+    vecPush(cc->generic_pending, body);
+}
+
 void parseGenericFlush(Cctrl *cc) {
     for (u64 i = 0; cc->generic_pending && i < cc->generic_pending->size; ++i) {
         parseGenericReplayGuarded(cc, cc->generic_pending->entries[i]);
