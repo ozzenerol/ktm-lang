@@ -1,5 +1,5 @@
 module map;
-import libc, mem, rt, str, vec;
+import libc, mem, str, vec;
 
 /* A hash map from K to V, held by value (like String): make one with
  * map.new<K, V>(), free it with free() (or declare it with `ad`).

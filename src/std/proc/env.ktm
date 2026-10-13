@@ -1,5 +1,5 @@
 module proc;
-import libc, mem, os, str;
+import libc, str;
 
 /* The environment, this program's own path, the CPU count, and what a
  * wait status from libc.waitpid means */
