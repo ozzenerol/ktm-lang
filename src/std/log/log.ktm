@@ -219,3 +219,77 @@ pub void Logger.close()
     if (self.opts.path) { mem.free(self.opts.path); }
     mem.free(self);
 }
+
+/* The default logger, for log.info(...) and the others from anywhere in
+ * the program: stderr at INFO until log.setup gives it Options. */
+Logger gLogStderr;
+Logger *gLogDefault = null;
+
+static Logger *logDefault()
+{
+    if (gLogDefault) { return gLogDefault; }
+    gLogStderr.fd = 2;
+    gLogStderr.opts.level = Level.info;
+    gLogStderr.level = Level.info;
+    gLogDefault = &gLogStderr;
+    return gLogDefault;
+}
+
+/* Sets the default logger up from `o`, as log.open does (throws
+ * log.ERR_LOG the same way, and the old one is then kept). A default set
+ * up before is closed. */
+pub void setup(Options *o)
+{
+    Logger *lg = open(o);
+    shutdown();
+    gLogDefault = lg;
+}
+
+/* Closes the default logger; later calls write to stderr at INFO again */
+pub void shutdown()
+{
+    if (gLogDefault && gLogDefault != &gLogStderr) { gLogDefault.close(); }
+    gLogDefault = null;
+}
+
+/* The default logger's level, for the calls from now on */
+pub void setLevel(Level level)
+{
+    logDefault().level = level;
+}
+
+/* The default Logger itself, for code that takes a Logger * */
+pub Logger *logger()
+{
+    return logDefault();
+}
+
+pub void debug(@caller("file") u8 *file, @caller("line") i64 line,
+               @caller("func") u8 *func, u8 *fmt, ...args)
+{
+    Logger *lg = logDefault();
+    if (lg.level > Level.debug) { return; }
+    logWrite(lg, Level.debug, file, line, func, fmt, args);
+}
+
+pub void info(@caller("file") u8 *file, @caller("line") i64 line,
+              @caller("func") u8 *func, u8 *fmt, ...args)
+{
+    Logger *lg = logDefault();
+    if (lg.level > Level.info) { return; }
+    logWrite(lg, Level.info, file, line, func, fmt, args);
+}
+
+pub void warn(@caller("file") u8 *file, @caller("line") i64 line,
+              @caller("func") u8 *func, u8 *fmt, ...args)
+{
+    Logger *lg = logDefault();
+    if (lg.level > Level.warn) { return; }
+    logWrite(lg, Level.warn, file, line, func, fmt, args);
+}
+
+pub void error(@caller("file") u8 *file, @caller("line") i64 line,
+               @caller("func") u8 *func, u8 *fmt, ...args)
+{
+    logWrite(logDefault(), Level.error, file, line, func, fmt, args);
+}

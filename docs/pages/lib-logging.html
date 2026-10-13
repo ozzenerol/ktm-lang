@@ -2,7 +2,7 @@
 <!-- ref: log -->
 <h1>Logging</h1>
 <p class="lede"><code>log</code> writes one short line per call to stderr or a file: the time, the level, and optionally where the call is.
-Files rotate by size, and a Logger can be shared by threads.</p>
+Files rotate by size, a Logger can be shared by threads, and the default logger is there from anywhere in the program.</p>
 
 <h2>A first log</h2>
 <pre><code>
@@ -29,6 +29,56 @@ void main()
   <li>Each line is the time in UTC with milliseconds, the level's name, then the message.</li>
   <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments.</li>
   <li>A newline in a message is written as <code>\n</code>, so one call is always one line.</li>
+</ul>
+
+<h2>One logger for the whole program</h2>
+<p>The default logger needs no Logger passed around: set it up once in <code>main</code> with <code>log.setup</code>,
+then call <code>log.info(...)</code> and the others from any function in any module.</p>
+<pre><code>
+// cli/cli.ktm
+module cli;
+
+import log;
+
+pub void run()
+{
+  log.debug("args: %d", 0);
+  log.warn("no args given");
+}
+</code></pre>
+<pre><code>
+// main.ktm
+import log, cli;
+
+void main()
+{
+  log.Options o = log.options();
+  o.path = "app.log";
+  o.showFile = true;
+  o.showFunc = true;
+  log.setup(&o);
+  defer log.shutdown();
+
+  log.info("starting");
+  cli.run();
+  log.setLevel(log.Level.debug);
+  cli.run();
+}
+</code></pre>
+<pre class="output">
+app.log:
+2026-10-13T14:02:11.482Z INFO main.ktm:13 main: starting
+2026-10-13T14:02:11.482Z WARN cli.ktm:9 cli.run: no args given
+2026-10-13T14:02:11.483Z DEBUG cli.ktm:8 cli.run: args: 0
+2026-10-13T14:02:11.483Z WARN cli.ktm:9 cli.run: no args given
+</pre>
+<ul class="rules">
+  <li>Until <code>log.setup</code> is called, <code>log.info(...)</code> and the others write to stderr at INFO, so a small program needs no setup at all.</li>
+  <li><code>log.setup(&amp;o)</code> takes the same Options as <code>log.open</code> and throws <code>log.ERR_LOG</code> the same way; the logger it had is then kept. Calling it again closes the old one.</li>
+  <li><code>log.setLevel(level)</code> changes the level for the calls from then on.</li>
+  <li><code>log.shutdown()</code> closes the file; later calls go to stderr at INFO again.</li>
+  <li><code>log.logger()</code> is the default Logger itself, for code that takes a <code>log.Logger *</code> or to read <code>failed</code>.</li>
+  <li>With <code>threadSafe</code> set, threads can share it; call <code>log.setup</code> and <code>log.shutdown</code> while no other thread logs.</li>
 </ul>
 
 <h2>Options</h2>
