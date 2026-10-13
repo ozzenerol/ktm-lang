@@ -77,7 +77,8 @@ void main()
 </pre>
 <ul class="rules">
   <li>Each line is the time in UTC with milliseconds, the level's name, then the message.</li>
-  <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments.</li>
+  <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments,
+  checked as <code>printf</code>'s are; <code>%s</code> takes a C string, a String or a <code>u8[]</code>.</li>
   <li>A newline in a message is written as <code>\n</code>, so one call is always one line.</li>
 </ul>
 
