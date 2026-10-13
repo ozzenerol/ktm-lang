@@ -181,6 +181,9 @@ i32 main() {
                        "field `l` of @json U: it is a L, which has no @json"), "a struct field without @json");
     check(compileFails("import json;\n@json struct U { fn(i64) i64 f; };\ni32 main() { return 0; }\n",
                        "can't be JSON (mark it @skip"), "a field that can't be JSON");
+    check(compileFails("import json;\nstruct N;\n@json struct U { i64 a; N *n; };\nstruct N { i64 b; };\ni32 main() { U u; return 0; }\n",
+                       "field `n` of @json U: it points to a N, which has no @json"),
+          "a pointer to a struct declared later without @json: an error at the field");
 
     text.free();
     l.sku.free();

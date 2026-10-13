@@ -6427,8 +6427,9 @@ static char *parseJsonUnsupported(AstType *t) {
         AstType *s = parseJsonStructOf(t, k);
         if (s->kind == AST_TYPE_UNION) return mprintf("a union can't be %s", jg_mod[0] == 'j' ? "JSON" : "YAML");
         /* a pointer to a struct only declared so far (`struct Note;`):
-         * its @json comes with its body, before the bodies are made */
-        if (k == JG_PTR_STRUCT && !s->fields) return NULL;
+         * its @json comes with its body, checked before the bodies are
+         * made (parseJsonCheckDeferred) */
+        if (k == JG_PTR_STRUCT && !s->fields) return "";
         if (!astAttrGet(s->attrs, jg_mod)) {
             return mprintf("it is a %s, which has no @%s: add @%s to %s",
                            astTypeToString(s), jg_mod, jg_mod,
@@ -6838,6 +6839,21 @@ static void parseFormatGenerate(Cctrl *cc, AstType *cls, Lexeme *at, const char 
         AstType *ft = fields->entries[fi].value;
         if (!parseJsonFieldUsed(ft)) continue;
         char *why = parseJsonUnsupported(ft);
+        if (why && !*why && parseJsonKind(ft) != JG_PTR_STRUCT) continue;
+        if (why && !*why) {
+            /* checked when the bodies are made */
+            JsonDeferred *jd = calloc(1, sizeof(JsonDeferred));
+            jd->pointee = ft->ptr;
+            jd->cls = cls;
+            jd->field = (char *)fields->entries[fi].key;
+            jd->mod = mod;
+            jd->line = ft->line ? ft->line : at->line;
+            jd->col = ft->line ? ft->col : at->col;
+            jd->file = at->file;
+            if (!cc->json_deferred) cc->json_deferred = vecNew(&vec_unsigned_long_type);
+            vecPush(cc->json_deferred, jd);
+            continue;
+        }
         if (why) {
             cctrlRaiseExceptionAt(cc, ft->line ? ft->line : at->line,
                     ft->line ? ft->col : at->col, (int)strlen((char *)fields->entries[fi].key),
@@ -6883,14 +6899,42 @@ static void parseFormatGenerate(Cctrl *cc, AstType *cls, Lexeme *at, const char 
     vecPush(cc->generic_pending, body);
 }
 
+/* The pointer fields whose struct had no body yet when their struct's
+ * methods were made: an error at the field when that struct never got
+ * the attribute. The structs with one don't get their bodies made (they
+ * would only fail again, less clearly). */
+static Set *parseJsonCheckDeferred(Cctrl *cc) {
+    Set *failed = NULL;
+    for (u64 i = 0; cc->json_deferred && i < cc->json_deferred->size; ++i) {
+        JsonDeferred *jd = cc->json_deferred->entries[i];
+        AstType *p = jd->pointee;
+        if (p->fields && astAttrGet(p->attrs, jd->mod)) continue;
+        LexFile *saved = cc->tok_file;
+        cc->tok_file = jd->file;
+        cctrlErrorAt(cc, jd->line, jd->col, (int)strlen(jd->field),
+                "field `%s` of @%s %s: it points to a %s, which has no @%s: add @%s to %s "
+                "(mark it @skip to leave it out)", jd->field, jd->mod, jd->cls->clsname->data,
+                astTypeToString(p), jd->mod, jd->mod,
+                p->clsname ? p->clsname->data : "it");
+        cc->tok_file = saved;
+        if (!failed) failed = setNew(8, &set_cstring_type);
+        setAdd(failed, jd->cls->clsname->data);
+    }
+    return failed;
+}
+
 static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at) {
     if (astAttrGet(cls->attrs, "json")) parseFormatGenerate(cc, cls, at, "json");
     if (astAttrGet(cls->attrs, "yaml")) parseFormatGenerate(cc, cls, at, "yaml");
 }
 
 void parseGenericFlush(Cctrl *cc) {
+    Set *json_failed = parseJsonCheckDeferred(cc);
     for (u64 i = 0; cc->generic_pending && i < cc->generic_pending->size; ++i) {
-        parseGenericReplayGuarded(cc, cc->generic_pending->entries[i]);
+        GenericInst *in = cc->generic_pending->entries[i];
+        if (json_failed && in->cls && in->cls->clsname &&
+            setHas(json_failed, in->cls->clsname->data)) continue;
+        parseGenericReplayGuarded(cc, in);
     }
 }
 
