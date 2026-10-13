@@ -1,5 +1,5 @@
 module str;
-import cstr, libc, mem;
+import cstr, libc, mem, vec;
 
 /* The String type is the prelude's (every file sees it); its constructors
  * and methods are here. A String you get from one of these is yours:
@@ -303,6 +303,39 @@ pub u8[][] split(u8[] s, u8[] sep)
     }
     out[n - 1] = rest;
     return out;
+}
+
+/* The parts with sep between them, as a new String (yours):
+ * `String line = str.join(words, " "); defer line.free();` */
+pub String join(u8[][] parts, u8[] sep)
+{
+    i64 n = 0;
+    for (i64 i = 0; i < parts.len; ++i) { n += parts[i].len + (i ? sep.len : 0); }
+    String out = withCap(n);
+    for (i64 i = 0; i < parts.len; ++i) {
+        if (i) { out.append(sep); }
+        out.append(parts[i]);
+    }
+    return out;
+}
+
+/* The same for the Strings of a Vec: str.join(&names, ", ") */
+pub String join(vec.Vec<String> *parts, u8[] sep)
+{
+    i64 n = 0;
+    for (i64 i = 0; i < parts.len; ++i) { n += parts.get(i).len + (i ? sep.len : 0); }
+    String out = withCap(n);
+    for (i64 i = 0; i < parts.len; ++i) {
+        if (i) { out.append(sep); }
+        out.append(parts.get(i));
+    }
+    return out;
+}
+
+/* The same for the views of a Vec */
+pub String join(vec.Vec<u8[]> *parts, u8[] sep)
+{
+    return join(parts.items(), sep);
 }
 
 /* Every old in it replaced by new (an empty old changes nothing) */

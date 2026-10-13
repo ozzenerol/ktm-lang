@@ -137,6 +137,7 @@ void main()
     <tr><td><code>trim(s)</code>, <code>trimStart(s)</code>, <code>trimEnd(s, chars)</code></td><td>A view without the whitespace (or the given bytes)</td></tr>
     <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after</td></tr>
     <tr><td><code>split(s, sep)</code></td><td>A <code>u8[][]</code> of views, allocated: free it</td></tr>
+    <tr><td><code>join(parts, sep)</code></td><td>A new String: the parts (a <code>u8[][]</code>, or a <code>vec.Vec&lt;String&gt; *</code> or <code>vec.Vec&lt;u8[]&gt; *</code>) with sep between them</td></tr>
   </tbody>
 </table></div>
 <pre data-run><code>import str;
@@ -185,6 +186,26 @@ void main()
 }
 </code></pre>
 <pre class="output">[a][b][][c] 4 parts
+</pre>
+<p><code>join</code> puts them back together, from a slice or a Vec:</p>
+<pre data-run><code>import str, vec;
+
+void main()
+{
+  ad u8[][] parts = str.split("a,b,,c", ",");
+  ad String line = str.join(parts, " | ");
+  printf("%s\n", line);
+
+  ad vec.Vec&lt;String&gt; words = vec.new&lt;String&gt;();
+  words.push(str.format("users_%d", 2));
+  words.push(str.format("orders_%d", 7));
+  ad String list = str.join(&amp;words, ", ");
+  printf("%s\n", list);
+  for (i64 i = 0; i &lt; words.len; i++) { words.at(i).free(); }
+}
+</code></pre>
+<pre class="output">a | b |  | c
+users_2, orders_7
 </pre>
 
 <h3 id="parsing-a-line">Parsing a line<a class="anchor" href="#parsing-a-line" aria-label="Link to this section">#</a></h3>
