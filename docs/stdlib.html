@@ -691,9 +691,9 @@ of file or when the peer closed, -1 on an error or the timeout
 (os.errno() ETIMEDOUT). It reads at once when the last read filled
 its buffer (more is likely waiting, as in a stream), and waits first
 otherwise (the next request isn&#x27;t there yet): either way a coroutine
-per connection costs no more system calls than it must. A few reads
-in a row at most skip the wait, so the loop&#x27;s other coroutines get
-their turn.</p></div><div class="decl" id="coro.write"><div class="decl-head"><a class="decl-name" href="#coro.write">coro.write</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 write(i32 fd, u8[] data, i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: write all of data to the non-blocking fd, pausing
+per connection costs no more system calls than it must. Reads skip
+the wait for 4 ms at most (LOOP_READ_BUDGET_NS), then wait once, so the
+loop&#x27;s other coroutines get their turn.</p></div><div class="decl" id="coro.write"><div class="decl-head"><a class="decl-name" href="#coro.write">coro.write</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 write(i32 fd, u8[] data, i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: write all of data to the non-blocking fd, pausing
 the coroutine while the fd is full (until ms passed; ms &lt; 0: no
 limit): first for a turn or two of the loop (the peer is usually
 reading already), then until the fd is writable. Returns data.len, or

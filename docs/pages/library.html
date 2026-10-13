@@ -2446,7 +2446,10 @@ writes all of <code>data</code>, pausing while the fd is full, and returns <code
 or -1 (<code>EPIPE</code> for a peer that closed, never a <code>SIGPIPE</code>). Both work on
 sockets and pipes, and they are the fastest way to talk to a connection: a read waits first
 only when nothing is likely to be there yet, and goes straight on while a stream keeps
-coming.</li>
+coming, for 4 ms at most before it lets the loop's other coroutines have a turn. So a
+coroutine that shares its loop with a saturating stream waits about 8 ms at worst, less
+than Go's 10 ms preemption tick, while the stream moves 12-14% more data than Go's
+(measured on 64 KiB streams; a shorter bound cost up to a third of that).</li>
 <li><code>coro.sleep(ms)</code> lets the others run for <code>ms</code> milliseconds; a plain
 <code>coro.yield()</code> lets them have a turn.</li>
 <li><code>coro.dial(addr, port, ms)</code> connects to <code>addr</code> (a host name or an
