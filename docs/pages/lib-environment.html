@@ -10,7 +10,7 @@
     <tr><td><code>proc.getenv(name)</code></td><td>The value as a String; empty when unset</td></tr>
     <tr><td><code>proc.hasEnv(name)</code></td><td>Tells an empty value from a missing one</td></tr>
     <tr><td><code>proc.setenv(name, value)</code>, <code>proc.unsetenv(name)</code></td><td>Change it for this program and the ones it starts</td></tr>
-    <tr><td><code>proc.expandEnv(text)</code></td><td>A copy of the text with <code>${NAME}</code> and <code>${NAME:-fallback}</code> filled in</td></tr>
+    <tr><td><code>proc.expandEnv(text)</code></td><td>A copy of the text with <code>${NAME}</code> and <code>${NAME:fallback}</code> filled in</td></tr>
   </tbody>
 </table>
 <pre data-run><code>
@@ -38,7 +38,7 @@ default port: 8080
 
 <h3>Variables in a config file</h3>
 <p><code>proc.expandEnv</code> fills in <code>${NAME}</code> (empty when unset) and
-<code>${NAME:-fallback}</code> (the fallback when unset or empty). Run it on a file's text before
+<code>${NAME:fallback}</code> (the fallback when unset or empty). Run it on a file's text before
 parsing it. <code>$${</code> writes a literal <code>${</code>; a bare <code>$NAME</code> is left alone.</p>
 <pre data-run><code>
 import proc, yaml;
@@ -51,7 +51,7 @@ void main()
   proc.setenv("DB_PASSWORD", "s3cret");
 
   u8[] text = "host: ${DB_HOST}\n"
-              "port: ${DB_PORT:-5432}\n"
+              "port: ${DB_PORT:5432}\n"
               "password: ${DB_PASSWORD}\n";
   ad String filled = proc.expandEnv(text);
 

@@ -40,7 +40,7 @@ pub bool unsetenv(u8[] name)
 }
 
 /* text with each ${NAME} replaced by that environment variable (empty
- * when unset) and ${NAME:-fallback} by the variable, or fallback when it
+ * when unset) and ${NAME:fallback} by the variable, or fallback when it
  * is unset or empty. $${ writes a literal ${; a bare $NAME and an
  * unterminated ${ stay as they are */
 pub String expandEnv(u8[] text)
@@ -69,10 +69,10 @@ pub String expandEnv(u8[] text)
         u8[] name = inner;
         u8[] fallback = "";
         bool hasFallback = false;
-        for (i64 j = 0; j + 1 < inner.len; j++) {
-            if (inner[j] == ':' && inner[j + 1] == '-') {
+        for (i64 j = 0; j < inner.len; j++) {
+            if (inner[j] == ':') {
                 name = inner[0:j];
-                fallback = inner[j + 2:inner.len];
+                fallback = inner[j + 1:inner.len];
                 hasFallback = true;
                 break;
             }
