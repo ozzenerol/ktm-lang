@@ -1,0 +1,207 @@
+<!-- title: A quick tour -->
+<h1>A quick tour</h1>
+<p class="lede">The language in ten short programs. Each one links to the page that explains it.</p>
+
+<h2>1. Hello</h2>
+<pre data-run><code>
+void main()
+{
+  printf("Hello, %s! %d + %d = %d\n", "ktm", 2, 3, 2 + 3);
+}
+</code></pre>
+<pre class="output">
+Hello, ktm! 2 + 3 = 5
+</pre>
+<p><a href="lang-basics.html">Program basics</a></p>
+
+<h2>2. Types and variables</h2>
+<pre data-run><code>
+const i64 LIMIT = 3;
+
+void main()
+{
+  i64 count = 0;
+  f64 ratio = 0.5;
+  u8 letter = 'k';
+  bool ready = true;
+  auto name = "ktm";            // u8[4]
+  for (i64 i = 0; i < LIMIT; i++) { count += i; }
+  printf("%d %.1f %c %d %s\n", count, ratio, letter, ready, name);
+}
+</code></pre>
+<pre class="output">
+3 0.5 k 1 ktm
+</pre>
+<p><a href="lang-types.html">Types and literals</a>, <a href="lang-variables.html">Variables</a></p>
+
+<h2>3. Functions with defaults</h2>
+<pre data-run><code>
+u8 *greet(u8 *who = "world", bool loud = false)
+{
+  if (loud) { printf("HELLO, %s!\n", who); } else { printf("hello, %s\n", who); }
+  return who;
+}
+
+void main()
+{
+  greet();
+  greet("ada");
+  greet(, true);
+}
+</code></pre>
+<pre class="output">
+hello, world
+hello, ada
+HELLO, world!
+</pre>
+<p><a href="lang-functions.html">Functions</a></p>
+
+<h2>4. Slices</h2>
+<pre data-run><code>
+f64 mean(f64[] xs)
+{
+  f64 total = 0;
+  for (auto x : xs) { total += x; }
+  return total / xs.len;
+}
+
+void main()
+{
+  f64 temps[] = {18.5, 21.0, 16.5, 20.0};
+  printf("%.2f %.2f\n", mean(temps), mean(temps[1:3]));
+}
+</code></pre>
+<pre class="output">
+19.00 18.75
+</pre>
+<p><a href="lang-slices.html">Slices</a></p>
+
+<h2>5. Strings</h2>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String s = str.format("%s-%d", "build", 42);
+  s.append(".log");
+  ad u8[][] parts = str.split(s, "-");
+  printf("%s has %d bytes, %d parts, ends with .log: %d\n",
+         s, s.len, parts.len, s.endsWith(".log"));
+}
+</code></pre>
+<pre class="output">
+build-42.log has 12 bytes, 2 parts, ends with .log: 1
+</pre>
+<p><a href="lang-strings.html">Strings</a>, <a href="lib-strings.html">the str module</a></p>
+
+<h2>6. Structs and methods</h2>
+<pre data-run><code>
+struct Rect { f64 w, h; };
+
+f64 Rect.area() { return self.w * self.h; }
+void Rect.scale(f64 k) { self.w *= k; self.h *= k; }
+
+void main()
+{
+  Rect r = {2, 3};
+  r.scale(2);
+  printf("%.0f x %.0f = %.0f\n", r.w, r.h, r.area());
+}
+</code></pre>
+<pre class="output">
+4 x 6 = 24
+</pre>
+<p><a href="lang-structs.html">Structs</a>, <a href="lang-methods.html">Methods</a></p>
+
+<h2>7. Errors and clean-up</h2>
+<pre data-run><code>
+enum Err { tooBig };
+
+i64 checked(i64 n)
+{
+  defer printf("checked %d\n", n);
+  if (n > 100) { throw(Err.tooBig, "%d is over 100", n); }
+  return n;
+}
+
+void main()
+{
+  try {
+    checked(5);
+    checked(500);
+  } catch (Error e) {
+    printf("error: %s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+checked 5
+checked 500
+error: 500 is over 100
+</pre>
+<p><a href="lang-exceptions.html">Exceptions</a>, <a href="lang-defer.html">defer</a></p>
+
+<h2>8. Containers</h2>
+<pre data-run><code>
+import map, vec;
+
+void main()
+{
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+  u8[] words[] = {"a", "b", "a", "c", "a"};
+  for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
+
+  ad vec.Vec<i64> sizes = counts.values();
+  sizes.sortAsc();
+  printf("a=%d, %d distinct, smallest count %d\n", counts.getOr("a", 0), counts.len, sizes.get(0));
+}
+</code></pre>
+<pre class="output">
+a=3, 3 distinct, smallest count 1
+</pre>
+<p><a href="lib-maps.html">Hash maps</a>, <a href="lib-vectors.html">Vectors</a></p>
+
+<h2>9. Generics</h2>
+<pre data-run><code>
+struct Pair<A, B> { A first; B second; };
+
+T clamp<T>(T v, T lo, T hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+void main()
+{
+  Pair<u8 *, i64> p = {"port", clamp(70000, 1, 65535)};
+  printf("%s %d %.1f\n", p.first, p.second, clamp(1.5, 0.0, 1.0));
+}
+</code></pre>
+<pre class="output">
+port 65535 1.0
+</pre>
+<p><a href="lang-generics.html">Generics</a></p>
+
+<h2>10. JSON in and out</h2>
+<pre data-run><code>
+import json, reflect;
+
+@json
+struct Server { String host; i64 port; bool tls; };
+
+void main()
+{
+  Server s = json.decode<Server>("{\"host\": \"example.com\", \"port\": 443, \"tls\": true}");
+  defer s.freeDecoded();
+  s.port = 8443;
+  ad String out = json.encode(reflect.of(s));
+  printf("%s\n", out);
+}
+</code></pre>
+<pre class="output">
+{"host":"example.com","port":8443,"tls":true}
+</pre>
+<p><a href="lib-json-structs.html">JSON: structs</a></p>
+
+<h2>Where next</h2>
+<div class="cards">
+  <a class="card" href="language.html"><strong>The language</strong><span>Every topic, one page each.</span></a>
+  <a class="card" href="library.html"><strong>The library</strong><span>Files, processes, sockets, JSON and more.</span></a>
+  <a class="card" href="from-c.html"><strong>Coming from C</strong><span>The differences, side by side.</span></a>
+</div>

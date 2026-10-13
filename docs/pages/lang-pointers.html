@@ -1,0 +1,204 @@
+<!-- title: Pointers and arrays -->
+<h1>Pointers and arrays</h1>
+<p class="lede">C's pointers and fixed-size arrays, with initialiser lists and heap memory.
+For a pointer that knows its length, see <a href="lang-slices.html">Slices</a>.</p>
+
+<h2>Pointers</h2>
+<pre data-run><code>
+void main()
+{
+  i64 x = 5;
+  i64 *p = &x;      // the address of x
+  *p = 10;          // write through it
+  printf("%d %d\n", x, *p);
+
+  i64 **pp = &p;
+  **pp = 20;
+  printf("%d\n", x);
+}
+</code></pre>
+<pre class="output">
+10 10
+20
+</pre>
+
+<h3>Pointers to structs</h3>
+<p><code>.</code> works through one pointer, so <code>p.x</code> on a <code>Point *</code> is <code>p-&gt;x</code>.</p>
+<pre data-run><code>
+struct Point { i64 x, y; };
+
+void move(Point *p, i64 dx)
+{
+  p.x += dx;        // the same as p->x += dx
+}
+
+void main()
+{
+  Point a = {1, 2};
+  move(&a, 10);
+  Point *p = &a;
+  printf("%d %d %d\n", a.x, p.x, p->y);
+}
+</code></pre>
+<pre class="output">
+11 11 2
+</pre>
+<p>Only one level: on a <code>Point **pp</code>, write <code>(*pp).x</code>.</p>
+
+<h2>Arrays</h2>
+<pre data-run><code>
+void main()
+{
+  i64 squares[5];
+  for (i64 i = 0; i < 5; i++) { squares[i] = i * i; }
+
+  i64 *q = squares;              // an array decays to a pointer
+  printf("%d %d %d\n", q[3], *(q + 4), &squares[4] - &squares[1]);
+
+  i64 grid[3][4];
+  grid[2][3] = 7;
+  printf("%d %d %d\n", grid[2][3], sizeof(grid), sizeof(grid[0]));
+}
+</code></pre>
+<pre class="output">
+9 16 3
+7 96 32
+</pre>
+<ul class="rules">
+  <li>An array can't be assigned as a whole (<code>a = b;</code> is an error): copy it with <code>mem.copy</code>.</li>
+  <li>An array converts to a <a href="lang-slices.html">slice</a> wherever one is expected: that is the safe way to pass it.</li>
+  <li>Array indexes are not checked. Slice indexes are.</li>
+</ul>
+
+<h2>Initialiser lists</h2>
+<p>Elements left out are zero, for locals and globals alike.</p>
+<pre data-run><code>
+i64 counts[4] = {1, 2};
+
+void main()
+{
+  i64 grid[2][3] = {{1}, {4, 5}};
+  i64 days[] = {31, 28, 31};       // the size comes from the list
+  printf("%d %d %d %d\n", counts[0], counts[1], counts[2], counts[3]);
+  printf("%d %d %d | %d %d %d\n", grid[0][0], grid[0][1], grid[0][2],
+                                 grid[1][0], grid[1][1], grid[1][2]);
+  printf("%d days in %d months\n", days[0] + days[1] + days[2], sizeof(days) / sizeof(i64));
+}
+</code></pre>
+<pre class="output">
+1 2 0 0
+1 0 0 | 4 5 0
+90 days in 3 months
+</pre>
+
+<h3>Leaving out inner braces</h3>
+<p>As in C, the items fill the inner arrays and structs in order.</p>
+<pre data-run><code>
+struct Point { i64 x, y; };
+
+Point pts[] = {1, 2, 3};            // (1, 2) and (3, 0)
+
+void main()
+{
+  i64 m[2][2] = {1, 2, 3};
+  printf("%d %d %d %d\n", m[0][0], m[0][1], m[1][0], m[1][1]);
+  printf("%d points: (%d %d) (%d %d)\n", sizeof(pts) / sizeof(Point),
+         pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+}
+</code></pre>
+<pre class="output">
+1 2 3 0
+2 points: (1 2) (3 0)
+</pre>
+
+<h3>Globals built at start-up</h3>
+<p>A global's initialiser items need not be constants: they are computed before <code>main</code>, in order.</p>
+<pre data-run><code>
+i64 dbl(i64 v) { return v * 2; }
+i64 sq(i64 v)  { return v * v; }
+
+struct Op { u8 *name; fn(i64) i64 run; };
+
+i64 base = 10;
+i64 limits[3] = {base, base * 2, 99};
+Op ops[2] = {{"double", &dbl}, {"square", &sq}};
+
+void main()
+{
+  printf("%d %d %d\n", limits[0], limits[1], limits[2]);
+  for (i64 i = 0; i < 2; i++) { printf("%s %d\n", ops[i].name, ops[i].run(7)); }
+}
+</code></pre>
+<pre class="output">
+10 20 99
+double 14
+square 49
+</pre>
+
+<div class="warn"><p><strong>Braces only around aggregates.</strong> <code>i64 x = {1};</code> and
+<code>i64 a[2] = {1, {2}};</code> are compile errors: a scalar takes a plain value.</p></div>
+
+<h2>Pointer arithmetic</h2>
+<pre data-run><code>
+void main()
+{
+  u8 *s = "hello";
+  u8 *end = s;
+  while (*end) { end++; }
+  printf("%d bytes, last is %c\n", end - s, *(end - 1));
+  printf("%c %c\n", *(2 + s), s[4]);   // n + p is p + n
+}
+</code></pre>
+<pre class="output">
+5 bytes, last is o
+l o
+</pre>
+<ul class="rules">
+  <li><code>n - p</code> is an error; <code>p - q</code> of two pointers is the number of elements between them.</li>
+  <li>A pointer compares with an integer on either side.</li>
+</ul>
+
+<h2>Pointer conversions</h2>
+<ul class="rules">
+  <li><code>void *</code> and the byte pointers (<code>u8 *</code>, <code>i8 *</code>, <code>bool *</code>) convert to and from any pointer without a cast.</li>
+  <li>A pointer to a derived struct converts to a pointer to its base (see <a href="lang-methods.html#inheritance">inheritance</a>).</li>
+  <li>Any other pointer-to-pointer conversion is a warning, as in C: cast it.</li>
+  <li>A pointer passed for an integer, or an integer (other than 0) for a pointer, is a warning.</li>
+  <li>A struct passed where a number or another struct is expected is an error.</li>
+</ul>
+<pre data-run><code>
+void main()
+{
+  f64 f = 1.5;
+  void *any = &f;          // fine
+  f64 *back = any;         // fine
+  u8 *bytes = &f;          // fine: a byte pointer
+  i64 *bits = (i64 *)&f;   // a cast: an f64 * isn't an i64 *
+  printf("%.1f %d %d\n", *back, bytes != null, *bits != 0);
+}
+</code></pre>
+<pre class="output">
+1.5 1 1
+</pre>
+
+<h2 id="heap-memory">Heap memory</h2>
+<p><code>mem.alloc</code>, <code>mem.allocZero</code>, <code>mem.realloc</code> and <code>mem.free</code>.
+Nothing is garbage collected.</p>
+<pre data-run><code>
+import mem;
+
+void main()
+{
+  i64 n = 4;
+  i64 *nums = mem.allocZero(n * sizeof(i64));
+  nums[2] = 7;
+  nums = mem.realloc(nums, 8 * sizeof(i64));   // the first 4 are kept
+  printf("%d %d\n", nums[0], nums[2]);
+  mem.free(nums);
+}
+</code></pre>
+<pre class="output">
+0 7
+</pre>
+<p>More on the allocator, and finding leaks: <a href="lib-memory.html">Memory</a>. For growable arrays use
+<a href="lib-vectors.html"><code>vec.Vec</code></a> instead of <code>realloc</code> by hand.</p>

@@ -1,0 +1,207 @@
+<!-- title: Exceptions -->
+<h1>Exceptions</h1>
+<p class="lede"><code>throw</code> an error, <code>catch</code> it any number of calls up. Every throw carries an <code>Error</code>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>throw(MyErr.full);                          // a code, empty message
+throw(MyErr.full, "need %d bytes", n);      // a code and a formatted message
+try { ... } catch (Error e) { e.code; e.message; e.file; e.line; }
+try { ... } catch { ... }                   // without the error
+throw(e);                                   // rethrow, unchanged</code></pre>
+</div>
+
+<h2>The Error struct</h2>
+<p>Every program has it, from the prelude:</p>
+<pre><code>struct Error { i64 code; u8 *message; u8 *file; i32 line; };</code></pre>
+<p>The code is usually an enum member. The compiler fills in the file and line of the <code>throw</code>.</p>
+
+<h2>Throwing and catching</h2>
+<pre data-run><code>
+enum BankError { funds, locked };
+
+void withdraw(i64 balance, i64 amount)
+{
+  if (amount > balance) {
+    throw(BankError.funds, "need %d, have %d", amount, balance);
+  }
+  printf("withdrew %d\n", amount);
+}
+
+void main()
+{
+  try {
+    withdraw(100, 30);
+    withdraw(100, 500);
+    printf("never printed\n");
+  } catch (Error e) {
+    if (e.code == BankError.funds) {
+      printf("insufficient funds: %s\n", e.message);
+    }
+  }
+  printf("carrying on\n");
+}
+</code></pre>
+<pre class="output">
+withdrew 30
+insufficient funds: need 500, have 100
+carrying on
+</pre>
+<ul class="rules">
+  <li>The message format and its arguments are checked like <code>printf</code>'s.</li>
+  <li><code>e.message</code> is never <code>null</code>: it is <code>""</code> without a message.</li>
+  <li><code>e.message</code> is freed when the catch block ends. Keep it with <code>cstr.dup(e.message)</code>.</li>
+</ul>
+
+<h2>Through any number of calls</h2>
+<p>A throw unwinds to the nearest enclosing <code>try</code>, running the <a href="lang-defer.html">defers</a> on the way.</p>
+<pre data-run><code>
+enum Err { bad };
+
+void level3() { throw(Err.bad, "deep down"); }
+void level2() { defer printf("level2 cleans up\n"); level3(); }
+void level1() { level2(); printf("not printed\n"); }
+
+void main()
+{
+  try {
+    level1();
+  } catch (Error e) {
+    printf("caught: %s (line %d)\n", e.message, e.line);
+  }
+}
+</code></pre>
+<pre class="output">
+level2 cleans up
+caught: deep down (line 3)
+</pre>
+
+<h2>Rethrowing</h2>
+<p><code>throw(e)</code> throws the same error again, with its original message, file and line.</p>
+<pre data-run><code>
+enum Err { notFound, denied };
+
+void open(u8 *path)
+{
+  if (path[0] != '/') { throw(Err.notFound, "%s: no such file", path); }
+  throw(Err.denied, "%s: permission denied", path);
+}
+
+void openOrSkip(u8 *path)
+{
+  try {
+    open(path);
+  } catch (Error e) {
+    if (e.code == Err.notFound) {
+      printf("skipping: %s\n", e.message);
+      return;
+    }
+    throw(e);           // not ours to handle
+  }
+}
+
+void main()
+{
+  try {
+    openOrSkip("notes.txt");
+    openOrSkip("/etc/shadow");
+  } catch (Error e) {
+    printf("fatal: %s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+skipping: notes.txt: no such file
+fatal: /etc/shadow: permission denied
+</pre>
+
+<h2>Catching without the error</h2>
+<pre data-run><code>
+enum Err { any };
+
+void main()
+{
+  try {
+    throw(Err.any);
+  } catch {
+    printf("something went wrong\n");
+  }
+}
+</code></pre>
+<pre class="output">
+something went wrong
+</pre>
+
+<h2>Leaving a try early</h2>
+<p><code>return</code>, <code>break</code>, <code>continue</code> and <code>goto</code> may leave a
+<code>try</code> at any depth. The tries left behind stop catching.</p>
+<pre data-run><code>
+enum Err { late };
+
+i64 find(i64[] items, i64 want)
+{
+  for (i64 i = 0; i < items.len; i++) {
+    try {
+      if (items[i] == want) { return i; }
+      if (items[i] < 0) { break; }
+    } catch {
+    }
+  }
+  return -1;
+}
+
+void main()
+{
+  i64 items[4] = {3, 7, -1, 9};
+  try {
+    printf("%d %d\n", find(items, 7), find(items, 9));
+    throw(Err.late);
+  } catch {
+    printf("caught here, not in find\n");
+  }
+}
+</code></pre>
+<pre class="output">
+1 -1
+caught here, not in find
+</pre>
+
+<h2>The library throws too</h2>
+<p>Bounds checks, JSON decoding and others throw. <code>ERR_BOUNDS</code> is in the prelude; the others are module constants.</p>
+<pre data-run><code>
+import json, vec;
+
+struct Config { i64 port; };
+
+void main()
+{
+  ad vec.Vec<i64> v = vec.new<i64>();
+  try {
+    v.get(5);
+  } catch (Error e) {
+    printf("%d: %s\n", e.code == ERR_BOUNDS, e.message);
+  }
+  try {
+    Config c = json.decode<Config>("{\"port\": \"eighty\"}");
+  } catch (Error e) {
+    printf("%d: %s\n", e.code == json.ERR_DECODE, e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+1: vec.Vec.get: index 5 of 0
+1: 1:10: port: expected an integer, got a string
+</pre>
+
+<h2>Uncaught errors</h2>
+<p>An error no <code>try</code> catches, in any thread, is printed on stderr and ends the program with exit code 1:</p>
+<pre class="shell"><code>uncaught error 0: need 500, have 100 (bank.ktm:5)</code></pre>
+
+<h2>Details</h2>
+<ul class="rules">
+  <li>The code converts like an argument to an integer parameter: <code>throw(42.75)</code> throws 42.</li>
+  <li>A <code>throw</code> inside a catch block goes to the next enclosing <code>try</code>.</li>
+  <li>Each thread has its own chain: a throw is caught only by a <code>try</code> of its own thread.</li>
+  <li>A <code>try</code> may span a coroutine's <code>yield</code>.</li>
+  <li>A <code>try</code> costs no system call: it saves registers, not the signal mask. So a throw out of a signal handler leaves that signal blocked.</li>
+</ul>

@@ -1,0 +1,230 @@
+<!-- title: Functions -->
+<h1>Functions</h1>
+<p class="lede">Defining and calling functions, prototypes, default arguments, and how names stay out of each other's way.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>i64 square(i64 n) { return n * n; }
+i64 later(i64 x);                       // a prototype
+void box(i64 w = 2, i64 h = 3);         // defaults, on any parameter
+box(, 9);                               // skip an argument: w is 2
+i64 sum(i64 ...nums);                   // variable arguments
+inline i64 twice(i64 x);                // a hint only</code></pre>
+</div>
+
+<h2>Defining and calling</h2>
+<pre data-run><code>
+i64 square(i64 n)
+{
+  return n * n;
+}
+
+f64 average(f64 a, f64 b)
+{
+  return (a + b) / 2;
+}
+
+void greet(u8 *who)
+{
+  printf("hello, %s\n", who);
+}
+
+void main()
+{
+  printf("%d %.1f\n", square(12), average(3, 4));
+  greet("ktm");
+}
+</code></pre>
+<pre class="output">
+144 3.5
+hello, ktm
+</pre>
+<p>Arguments are converted to the parameter types: <code>average(3, 4)</code> passes two <code>f64</code>s.
+The return value is converted to the return type the same way.</p>
+
+<h2>Prototypes</h2>
+<p>Declare a function before its definition to call it earlier in the file.</p>
+<pre data-run><code>
+bool isEven(i64 n);   // a prototype: defined below
+
+bool isOdd(i64 n)
+{
+  if (n == 0) { return false; }
+  return isEven(n - 1);
+}
+
+bool isEven(i64 n)
+{
+  if (n == 0) { return true; }
+  return isOdd(n - 1);
+}
+
+void main()
+{
+  printf("%d %d\n", isEven(10), isOdd(7));
+}
+</code></pre>
+<pre class="output">
+1 1
+</pre>
+<ul class="rules">
+  <li>Every prototype and the definition must have the same return and parameter types: a mismatch is the error <code>conflicting types</code>.</li>
+  <li>A prototype that is never defined is a link error. A C function is declared with <a href="lang-calling-c.html"><code>extern "c"</code></a> instead.</li>
+  <li>Functions in a <a href="lang-modules.html">module</a> need no prototypes at all: they see each other in any order.</li>
+</ul>
+
+<h2>Default arguments</h2>
+<p>Any parameter can have a default, not only the last ones. Leave an argument empty to use it.</p>
+<pre data-run><code>
+void box(i64 w = 2, i64 h = 3, u8 *fill = "#")
+{
+  printf("%dx%d of %s\n", w, h, fill);
+}
+
+void main()
+{
+  box(5, 1, "*");
+  box(5);          // h and fill default
+  box(, 9);        // w defaults
+  box(, , "@");    // only fill given
+  box();
+}
+</code></pre>
+<pre class="output">
+5x1 of *
+5x3 of #
+2x9 of #
+2x3 of @
+2x3 of #
+</pre>
+<p>Defaults given on a prototype carry over to the definition:</p>
+<pre data-run><code>
+void connect(u8 *host, i64 port = 80);
+
+void main()
+{
+  connect("example.com");
+  connect("example.com", 8080);
+}
+
+void connect(u8 *host, i64 port)    // no need to repeat = 80
+{
+  printf("%s:%d\n", host, port);
+}
+</code></pre>
+<pre class="output">
+example.com:80
+example.com:8080
+</pre>
+<p>Repeating a default with the same value is fine. A different value is an error.</p>
+
+<h2>Returning values</h2>
+<pre data-run><code>
+struct Point { i64 x, y; };
+
+Point origin() { Point p = {0, 0}; return p; }   // structs return by value
+
+f64 half(i64 n) { return n; }                    // the i64 becomes an f64
+
+void main()
+{
+  Point p = origin();
+  printf("%d %d %.1f\n", p.x, p.y, half(3) / 2);
+}
+</code></pre>
+<pre class="output">
+0 0 1.5
+</pre>
+<p>In a <code>void</code> function, <code>return expr;</code> is a warning. The expression still runs.</p>
+
+<h3>Several results</h3>
+<p>Return a struct, or write through pointer parameters:</p>
+<pre data-run><code>
+bool divide(i64 a, i64 b, i64 *quot, i64 *rem)
+{
+  if (b == 0) { return false; }
+  *quot = a / b;
+  *rem = a % b;
+  return true;
+}
+
+void main()
+{
+  i64 q, r;
+  if (divide(17, 5, &q, &r)) {
+    printf("17 = 5 * %d + %d\n", q, r);
+  }
+  printf("ok: %d\n", divide(1, 0, &q, &r));
+}
+</code></pre>
+<pre class="output">
+17 = 5 * 3 + 2
+ok: 0
+</pre>
+
+<h2>Recursion</h2>
+<pre data-run><code>
+i64 fib(i64 n)
+{
+  if (n < 2) { return n; }
+  return fib(n - 1) + fib(n - 2);
+}
+
+void main()
+{
+  for (i64 i = 0; i < 10; i++) { printf("%d,", fib(i)); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+0,1,1,2,3,5,8,13,21,34,
+</pre>
+
+<h2>Inlining</h2>
+<p>The compiler inlines small functions by itself, with exactly the behaviour of a call.
+<code>inline</code> is accepted as a hint only: an <code>inline</code> function is still an
+ordinary function that can recurse and have its address taken.</p>
+<pre data-run><code>
+inline i64 twice(i64 x)
+{
+  return x * 2;
+}
+
+void main()
+{
+  fn(i64 x) i64 fp = &twice;
+  printf("%d %d\n", twice(21), fp(4));
+}
+</code></pre>
+<pre class="output">
+42 8
+</pre>
+
+<h2>Names don't clash with libraries</h2>
+<p>Your functions can use any name. The standard library lives in modules, and the C library's
+symbols are separate from yours.</p>
+<pre data-run><code>
+import date;
+
+i64 now() { return 42; }          // yours
+void free(u8 *what) { printf("my free(%s)\n", what); }
+
+void main()
+{
+  printf("%d %d\n", now(), date.now() > 0);   // date.now() is the library's
+  free("thing");                                // the library keeps using C's free
+}
+</code></pre>
+<pre class="output">
+42 1
+my free(thing)
+</pre>
+
+<h2>More on functions</h2>
+<div class="cards">
+  <a class="card" href="lang-varargs.html"><strong>Variable arguments</strong><span><code>i64 ...nums</code>: any number of arguments as a slice.</span></a>
+  <a class="card" href="lang-overloading.html"><strong>Overloading</strong><span>Several functions with one name and different parameters.</span></a>
+  <a class="card" href="lang-function-pointers.html"><strong>Function pointers</strong><span><code>fn(i64) i64</code> types, callbacks, tables.</span></a>
+  <a class="card" href="lang-methods.html"><strong>Methods</strong><span>Functions that belong to a struct.</span></a>
+  <a class="card" href="lang-generics.html"><strong>Generics</strong><span>Functions with type parameters.</span></a>
+</div>

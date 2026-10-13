@@ -1,0 +1,259 @@
+<!-- title: Structs and unions -->
+<h1>Structs and unions</h1>
+<p class="lede">A <code>struct</code> is a C struct whose name is a type straight away: no <code>typedef</code>.
+Methods and inheritance have <a href="lang-methods.html">their own page</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>struct Point { i64 x, y; };     // a type named Point
+Point a = {1, 2};               // fields in order
+Point *p = &a;  p.x = 5;        // . also works through a pointer
+struct Node;                    // declared ahead, defined later
+union Bits { i64 i; f64 f; };   // fields share memory</code></pre>
+</div>
+
+<h2>Defining and using</h2>
+<pre data-run><code>
+struct Point
+{
+  i64 x, y;
+};
+
+struct Player
+{
+  u8 *name;
+  Point pos;
+  i64 score;
+};
+
+void main()
+{
+  Point origin = {0, 0};
+  Player p = {"ada", {3, 4}, 0};
+  p.score += 10;
+  p.pos.x = origin.x;
+  printf("%s at (%d, %d) with %d\n", p.name, p.pos.x, p.pos.y, p.score);
+}
+</code></pre>
+<pre class="output">
+ada at (0, 4) with 10
+</pre>
+
+<h2>Values are copied</h2>
+<p>Structs are passed, returned and assigned by value.</p>
+<pre data-run><code>
+struct Point { i64 x, y; };
+
+Point make(i64 x, i64 y)
+{
+  Point r = {x, y};
+  return r;
+}
+
+i64 sum(Point p)
+{
+  p.x = 1000;          // changes the copy only
+  return p.x + p.y;
+}
+
+void main()
+{
+  Point a = make(1, 2);
+  Point b = a;         // a copy
+  b.x = 9;
+  printf("%d %d %d\n", a.x, b.x, sum(a));
+  printf("%d\n", a.x);
+}
+</code></pre>
+<pre class="output">
+1 9 1002
+1
+</pre>
+<p>To change the caller's struct, pass a pointer:</p>
+<pre data-run><code>
+struct Counter { i64 n; };
+
+void bump(Counter *c) { c.n++; }   // c.n is c->n
+
+void main()
+{
+  Counter c = {0};
+  bump(&c);
+  bump(&c);
+  printf("%d\n", c.n);
+}
+</code></pre>
+<pre class="output">
+2
+</pre>
+
+<h2>Initialising</h2>
+<p>A list fills the fields in order; the rest are zero. Inner structs and arrays take nested lists.</p>
+<pre data-run><code>
+struct Point { i64 x, y; };
+struct Line  { Point from, to; i64 tags[2]; };
+
+Line g = {{0, 0}, {3, 4}, {7, 8}};
+
+void main()
+{
+  Line m = {{1, 2}, {5, 6}};       // tags are zero
+  Point p = {7};                   // y is zero
+  printf("%d %d %d\n", g.to.x, g.to.y, g.tags[1]);
+  printf("%d %d %d | %d %d\n", m.from.y, m.to.x, m.tags[0], p.x, p.y);
+}
+</code></pre>
+<pre class="output">
+3 4 8
+2 5 0 | 7 0
+</pre>
+<div class="warn"><p><strong>A declared struct is not zeroed.</strong> <code>Point p;</code> holds whatever was there.
+Write <code>Point p = {0};</code> or set every field.</p></div>
+
+<h3>Strings in fields</h3>
+<p>A string for a <code>u8</code> array field is copied in and must fit with its NUL.
+A <code>u8 *</code> field points at the string instead.</p>
+<pre data-run><code>
+struct Item { i64 id; u8 name[8]; u8 *note; };
+
+u8 days[3][4] = {"Mon", "Tue", "Wed"};
+
+void main()
+{
+  Item it = {1, "pen", "blue ink"};
+  it.name[0] = 'P';             // our own copy: writable
+  printf("%s %s %s %d\n", it.name, it.note, days[2], sizeof(Item));
+}
+</code></pre>
+<pre class="output">
+Pen blue ink Wed 24
+</pre>
+
+<h2>Size and layout</h2>
+<p>The same layout as C: fields in order, each aligned to its size.</p>
+<pre data-run><code>
+struct A { u8 tag; i64 value; };    // 7 bytes of padding after tag
+struct B { i64 value; u8 tag; };    // padded at the end
+
+void main()
+{
+  printf("%d %d %d\n", sizeof(A), sizeof(B), alignof(A));
+}
+</code></pre>
+<pre class="output">
+16 16 8
+</pre>
+
+<h2>Declaring ahead</h2>
+<p><code>struct Node;</code> declares a struct defined later. It can be pointed to at once; it can be
+held by value only after its definition.</p>
+<pre data-run><code>
+struct Node;
+
+struct List { Node *head; i64 len; };
+
+struct Node { i64 value; Node *next; };
+
+void main()
+{
+  Node b = {2, null};
+  Node a = {1, &b};
+  List l = {&a, 2};
+  for (Node *n = l.head; n; n = n.next) { printf("%d,", n.value); }
+  printf(" len %d\n", l.len);
+}
+</code></pre>
+<pre class="output">
+1,2, len 2
+</pre>
+<p>Holding it by value too early is the error <code>field `b` of A holds a B, which is not complete here: use a pointer</code>.</p>
+
+<h2 id="unions">Unions</h2>
+<p>All fields of a <code>union</code> share the same memory.</p>
+<pre data-run><code>
+union Bits
+{
+  i64 i;
+  f64 f;
+  u8 bytes[8];
+};
+
+void main()
+{
+  Bits b;
+  b.i = 0x41;
+  printf("%c %d\n", b.bytes[0], sizeof(Bits));
+  b.f = 1.0;
+  printf("%x\n", b.i);
+}
+</code></pre>
+<pre class="output">
+A 8
+3ff0000000000000
+</pre>
+<p>An initialiser list gives a union one item, for its first field.</p>
+
+<h3>Anonymous unions in a struct</h3>
+<p>Its fields are used as the struct's own. A tagged value is the classic use:</p>
+<pre data-run><code>
+enum Kind { num, text };
+
+struct Value
+{
+  Kind kind;
+  union { i64 n; u8 *s; };
+};
+
+void show(Value v)
+{
+  switch (v.kind) {
+    case Kind.num:  printf("number %d\n", v.n);
+    case Kind.text: printf("text %s\n", v.s);
+  }
+}
+
+void main()
+{
+  Value a = {Kind.num, 42};
+  Value b;
+  b.kind = Kind.text;
+  b.s = "hi";
+  show(a);
+  show(b);
+}
+</code></pre>
+<pre class="output">
+number 42
+text hi
+</pre>
+
+<h3>Named inner types</h3>
+<p>A struct or union defined inside a struct can have a tag and be used elsewhere:</p>
+<pre data-run><code>
+struct Shape
+{
+  u8 kind;
+  union Size { i32 side; f32 radius; };    // fields are Shape's own
+  struct Pos { i32 x, y; } at;             // a field named at
+};
+
+void main()
+{
+  Shape s;
+  s.side = 3;
+  s.at.x = 10;
+  Size z;
+  z.radius = 1.5;
+  printf("%d %d %d %d\n", s.side, s.at.x, sizeof(Size), sizeof(Shape));
+}
+</code></pre>
+<pre class="output">
+3 10 4 16
+</pre>
+
+<h2>Next</h2>
+<div class="cards">
+  <a class="card" href="lang-methods.html"><strong>Methods and inheritance</strong><span><code>void User.greet()</code>, <code>struct Admin : User</code>.</span></a>
+  <a class="card" href="lang-generics.html"><strong>Generics</strong><span><code>struct Stack&lt;T&gt;</code>.</span></a>
+  <a class="card" href="lang-reflection.html"><strong>Reflection</strong><span>A struct's fields at run time.</span></a>
+</div>

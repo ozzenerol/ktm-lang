@@ -1,0 +1,215 @@
+<!-- title: Strings -->
+<!-- ref: str cstr -->
+<h1>Strings</h1>
+<p class="lede">Text you own is a <code>String</code>. Text you only read is a <code>u8[]</code>.
+C strings (<code>u8 *</code>) are there for C.</p>
+
+<table>
+  <thead><tr><th>Type</th><th>What it is</th><th>Use it for</th></tr></thead>
+  <tbody>
+    <tr><td><code>String</code></td><td>Pointer, length, capacity (24 bytes). Owned, growable, always NUL-terminated</td><td>Text you build or keep</td></tr>
+    <tr><td><code>u8[]</code></td><td>Pointer and length (16 bytes). A view</td><td>Parameters, parts of text, literals</td></tr>
+    <tr><td><code>u8 *</code></td><td>A pointer to NUL-terminated bytes</td><td>C functions</td></tr>
+  </tbody>
+</table>
+
+<h2>String: make it, free it</h2>
+<p>A String you get is yours. Free it where you made it, with <code>defer</code>:</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  String s = str.from("Hello");
+  defer s.free();
+  s.append(", world");
+  s.appendFormat(" %d", 2026);
+  printf("%s (%d bytes)\n", s, s.len);
+}
+</code></pre>
+<pre class="output">
+Hello, world 2026 (17 bytes)
+</pre>
+<p>Or declare it with <a href="lang-defer.html#ad"><code>ad</code></a>, which frees it at the end of the scope:</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String name = str.format("user-%03d", 7);
+  name.toUpper();
+  printf("%s\n", name);
+}
+</code></pre>
+<pre class="output">
+USER-007
+</pre>
+
+<h2>Ways to make one</h2>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String a = str.new();             // empty, nothing allocated yet
+  ad String b = str.from("copied");    // a copy of any u8[]
+  ad String c = str.withCap(64);       // empty, room for 64 bytes
+  ad String d = str.format("%d-%s", 42, "x");
+  String e;                            // a declared String is empty too
+  a.append("grown");
+  printf("[%s] [%s] [%s] [%s] [%d]\n", a, b, c, d, e.len);
+}
+</code></pre>
+<pre class="output">
+[grown] [copied] [] [42-x] [0]
+</pre>
+
+<h2>Changing it</h2>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String s = str.from("found 3 files");
+  s.insert(0, "> ");
+  s.replace("files", "logs");
+  s.append(" in /tmp");
+  s.appendByte('!');
+  printf("%s\n", s);
+  s.remove(0, 2);                // bytes 0 up to 2
+  s.toUpper();
+  printf("%s\n", s);
+  s.reverse();
+  printf("%s\n", s);
+  s.clear();
+  printf("[%s] %d\n", s, s.len);
+}
+</code></pre>
+<pre class="output">
+> found 3 logs in /tmp!
+FOUND 3 LOGS IN /TMP!
+!PMT/ NI SGOL 3 DNUOF
+[] 0
+</pre>
+
+<h2>Reading it</h2>
+<p>A String converts to a <code>u8[]</code>, so every function that reads text takes a literal, a slice or a String.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String s = str.from("Hello, world");
+  u8[] hello = s[0:5];           // a view into s
+  printf("%s %c %d\n", hello, s[7], s.len);
+  printf("%d %d %d\n", s.startsWith("Hell"), s.find("world"), s.contains("xyz"));
+  printf("%d\n", s.equals("Hello, world"));
+}
+</code></pre>
+<pre class="output">
+Hello w 12
+1 7 0
+1
+</pre>
+<p>All the reading functions (<code>find</code>, <code>trim</code>, <code>split</code>, ...) are on <a href="lib-strings.html">the Strings library page</a>.</p>
+
+<h2>Copies share bytes</h2>
+<p>Assigning a String copies its three fields, so both names point at the same bytes.
+Only one of them may free it. Use <code>clone()</code> for a copy of its own.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String a = str.from("shared");
+  String alias = a;           // the same bytes: don't free both
+  ad String own = a.clone();  // a copy of its own
+  own.toUpper();
+  printf("%s %s %s\n", a, alias, own);
+}
+</code></pre>
+<pre class="output">
+shared shared SHARED
+</pre>
+<ul class="rules">
+  <li><code>free()</code> empties the String it is called on, so freeing the same variable twice does nothing.</li>
+  <li>A double free through a copy is caught by <a href="tools-debugging.html"><code>-Memsafe</code></a>.</li>
+  <li>A view (<code>s[a:b]</code>) is valid until the String changes or is freed.</li>
+  <li>A String's fields are read-only outside the <code>str</code> module.</li>
+</ul>
+
+<h2>Bytes, not characters</h2>
+<p><code>s.len</code> and <code>s[i]</code> count bytes. The bytes are UTF-8 by convention.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] word = "naïve";
+  printf("%d bytes, %d characters\n", word.len, str.runeCount(word));
+}
+</code></pre>
+<pre class="output">
+6 bytes, 5 characters
+</pre>
+
+<h2>Literals are read-only</h2>
+<p>A write the compiler can see is an error. One it can't see crashes at run time. Copy first:</p>
+<div class="compare">
+<div><p class="label">Error</p>
+<pre><code>u8[] a = "abc";
+a[0] = 'x';</code></pre></div>
+<div><p class="label">Fine</p>
+<pre><code>String a = str.from("abc");
+a[0] = 'x';</code></pre></div>
+</div>
+<p>The message says it: "`a` is a string literal, which is read-only: copy it with str.from(...)".</p>
+
+<h2 id="c-strings">C strings</h2>
+<p>A NUL-terminated <code>u8 *</code> is what C functions take and return.</p>
+<pre data-run><code>
+import cstr, str;
+
+void main()
+{
+  ad String s = str.from("for C");
+  u8 *c = s.cstr();               // a String as a C string: free
+  u8[] back = cstr.view(c);       // a C string as a u8[]: measured once
+  printf("%s %d\n", c, back.len);
+}
+</code></pre>
+<pre class="output">
+for C 5
+</pre>
+<p>A <code>u8</code> array initialised from a string gets its own writable copy:</p>
+<pre data-run><code>
+void main()
+{
+  u8 buf[] = "abc";        // 4 bytes: a, b, c, NUL
+  u8 name[8] = "hi";       // the 6 bytes after "hi" are zero
+  buf[0] = 'X';
+  printf("%s %d %s %d\n", buf, sizeof(buf), name, sizeof(name));
+}
+</code></pre>
+<pre class="output">
+Xbc 4 hi 8
+</pre>
+<p>The <code>cstr</code> module has the classic C string helpers: <a href="lib-cstrings.html">C strings</a>.</p>
+
+<h2>printf and %s</h2>
+<p>In a literal format, <code>%s</code> takes a C string, a slice or a String. A width works
+(<code>%-10s</code>); a precision doesn't (the length is the slice's).</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  ad String s = str.from("ktm");
+  u8[] part = "language"[0:4];
+  printf("[%-6s][%6s][%s]\n", s, part, "c string");
+}
+</code></pre>
+<pre class="output">
+[ktm   ][  lang][c string]
+</pre>
+<p>A format that isn't a literal can't take a slice: pass <code>s.cstr()</code>.</p>

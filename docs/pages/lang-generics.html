@@ -1,0 +1,193 @@
+<!-- title: Generics -->
+<h1>Generics</h1>
+<p class="lede">Structs, methods and functions can take type parameters. Each use is compiled for its
+types: the same code you would write by hand, with no <code>void *</code> and no casts.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>T max<T>(T a, T b) { return a > b ? a : b; }
+max(3, 7);  max<f64>(1, 2.5);        // inferred, or written
+struct Pair<K, V> { K key; V value; };
+Pair<u8 *, f64> p;
+void Stack<T>.push(T x) { ... }       // a method of a generic struct
+type Ints = Stack<i64>;              // name an instance</code></pre>
+</div>
+
+<h2>Generic functions</h2>
+<pre data-run><code>
+T max<T>(T a, T b)
+{
+  return a > b ? a : b;
+}
+
+void swap<T>(T *a, T *b)
+{
+  T t = *a;
+  *a = *b;
+  *b = t;
+}
+
+void main()
+{
+  printf("%d %.1f %c\n", max(3, 7), max(1.5, 0.5), max('a', 'z'));
+  i64 x = 1, y = 2;
+  swap(&x, &y);
+  printf("%d %d\n", x, y);
+  printf("%.1f\n", max<f64>(1, 2.5));     // written out: 1 becomes 1.0
+}
+</code></pre>
+<pre class="output">
+7 1.5 z
+2 1
+2.5
+</pre>
+<p>A call works the types out from the arguments, through pointers, slices, <code>fn</code> types
+and generic structs. When nothing says what a parameter is, write it: <code>make&lt;i64&gt;()</code>.</p>
+
+<h2>Generic structs</h2>
+<pre data-run><code>
+struct Pair<K, V> { K key; V value; };
+
+Pair<K, V> pairOf<K, V>(K k, V v)
+{
+  Pair<K, V> p = {k, v};
+  return p;
+}
+
+void main()
+{
+  Pair<u8 *, f64> pi = {"pi", 3.14};
+  auto e = pairOf("e", 2.72);
+  Pair<i64, bool> flag = pairOf(7, true);
+  printf("%s=%.2f %s=%.2f %d=%d\n", pi.key, pi.value, e.key, e.value, flag.key, flag.value);
+  printf("%s\n", typeof(e));
+}
+</code></pre>
+<pre class="output">
+pi=3.14 e=2.72 7=1
+Pair<u8 *, f64>
+</pre>
+<p>A type is always written with its arguments, nested ones too: <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>.</p>
+
+<h2>Methods of a generic struct</h2>
+<pre data-run><code>
+import mem;
+
+struct Stack<T> { T *items; i64 len; i64 cap; };
+
+void Stack<T>.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack<T>.pop() { return self.items[--self.len]; }
+bool Stack<T>.empty() { return self.len == 0; }
+void Stack<T>.free() { mem.free(self.items); }
+
+void main()
+{
+  ad Stack<i64> nums = {null, 0, 0};
+  for (i64 i = 1; i <= 5; i++) { nums.push(i * i); }
+  while (!nums.empty()) { printf("%d,", nums.pop()); }
+  printf("\n");
+
+  ad Stack<u8 *> words = {null, 0, 0};
+  words.push("first");
+  words.push("second");
+  printf("%s\n", words.pop());
+}
+</code></pre>
+<pre class="output">
+25,16,9,4,1,
+second
+</pre>
+
+<h2>Generic functions over generic structs</h2>
+<pre data-run><code>
+struct Box<T> { T value; };
+
+T unbox<T>(Box<T> *b) { return b.value; }
+
+T sum<T>(T[] xs)
+{
+  T total = 0;
+  for (auto x : xs) { total += x; }
+  return total;
+}
+
+void main()
+{
+  Box<f64> b = {2.5};
+  i64 ints[] = {1, 2, 3};
+  f64 floats[] = {0.5, 0.25};
+  printf("%.1f %d %.2f\n", unbox(&b), sum(ints), sum(floats));
+}
+</code></pre>
+<pre class="output">
+2.5 6 0.75
+</pre>
+
+<h2>A generic base</h2>
+<pre data-run><code>
+struct List<T> { T items[4]; i64 len; };
+struct Counted<T> : List<T> { i64 adds; };
+
+void List<T>.add(T x) { self.items[self.len++] = x; }
+
+void main()
+{
+  Counted<i64> c;
+  c.len = 0;
+  c.adds = 0;
+  c.add(10);
+  c.adds++;
+  printf("%d %d %d\n", c.len, c.items[0], c.adds);
+}
+</code></pre>
+<pre class="output">
+1 10 1
+</pre>
+
+<h2>The library's generics</h2>
+<p>The containers are generic: <a href="lib-vectors.html"><code>vec.Vec&lt;T&gt;</code></a>,
+<a href="lib-maps.html"><code>map.Map&lt;K, V&gt;</code></a>, <a href="lib-sets.html"><code>set.Set&lt;T&gt;</code></a>,
+<a href="lib-lists.html"><code>list.List&lt;T&gt;</code></a>.</p>
+<pre data-run><code>
+import map, vec;
+
+void main()
+{
+  ad vec.Vec<u8[]> names = vec.new<u8[]>();
+  names.push("ann");
+  names.push("bob");
+  ad map.Map<u8[], i64> ages = map.new<u8[], i64>();
+  ages.set("ann", 41);
+  for (auto n : names) { printf("%s %d\n", n, ages.getOr(n, -1)); }
+}
+</code></pre>
+<pre class="output">
+ann 41
+bob -1
+</pre>
+
+<h2>Errors are checked per instance</h2>
+<p>The body is checked for each type it is used with. <code>max</code> of two structs is an error at the
+<code>&gt;</code>, with a note naming the instance (<code>max&lt;Point&gt;</code>) and the call that asked for it.</p>
+
+<h2>In modules and libraries</h2>
+<ul class="rules">
+  <li><code>pub</code> works as for any declaration; outside, write <code>coll.Vec&lt;i64&gt;</code> and <code>coll.vecNew&lt;i64&gt;()</code>.</li>
+  <li>A library built with <code>-lib</code> keeps its generics as source, and each program makes the instances it uses.</li>
+</ul>
+
+<h2>Not yet</h2>
+<ul class="rules">
+  <li>Constraints on type parameters.</li>
+  <li>Generic enums.</li>
+  <li>Number parameters (<code>Array&lt;T, 16&gt;</code>).</li>
+  <li>A different body for one type (specialisation).</li>
+</ul>

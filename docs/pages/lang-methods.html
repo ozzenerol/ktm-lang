@@ -1,0 +1,228 @@
+<!-- title: Methods and inheritance -->
+<h1>Methods and inheritance</h1>
+<p class="lede">A method is a function named <code>Type.name</code>. A struct can extend one other struct.
+There are no classes, no constructors and no virtual dispatch.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>struct User { u8 *name; i64 age; };
+void User.greet() { printf("hi %s\n", self.name); }  // self is a User *
+u.greet();  p.greet();                                // on a value or a pointer
+struct Admin : User { i64 level; };                   // Admin has User's fields and methods
+User.greet(self);                                     // call the base's explicitly
+fn(User *) void f = &User.greet;                      // a method is a function</code></pre>
+</div>
+
+<h2>Methods</h2>
+<p>Write the method outside the struct. Inside, <code>self</code> is a pointer to the object it was called on.</p>
+<pre data-run><code>
+struct Account
+{
+  u8 *owner;
+  i64 balance;
+};
+
+void Account.deposit(i64 amount)
+{
+  self.balance += amount;        // changes the caller's object
+}
+
+bool Account.withdraw(i64 amount)
+{
+  if (amount > self.balance) { return false; }
+  self.balance -= amount;
+  return true;
+}
+
+void Account.print()
+{
+  printf("%s: %d\n", self.owner, self.balance);
+}
+
+void main()
+{
+  Account a = {"ann", 0};
+  a.deposit(100);
+  a.withdraw(30);
+  printf("too much: %d\n", a.withdraw(500));
+  a.print();
+
+  Account *p = &a;
+  p.deposit(5);                  // the same on a pointer
+  p->print();
+}
+</code></pre>
+<pre class="output">
+too much: 0
+ann: 70
+ann: 75
+</pre>
+<ul class="rules">
+  <li><code>self</code> can't be assigned, and no parameter may be called <code>self</code>.</li>
+  <li>Default arguments, <code>T ...name</code> and <a href="lang-overloading.html">overloading</a> work as for functions.</li>
+  <li>A prototype, <code>void Account.print();</code>, declares a method defined later.</li>
+  <li>A union can have methods too.</li>
+</ul>
+
+<h2>A constructor is just a function</h2>
+<p>By convention, a module's <code>new</code> or <code>open</code> function makes the value; a <code>free()</code> method releases it.</p>
+<pre data-run><code>
+import mem;
+
+struct Buffer { u8 *data; i64 len; };
+
+Buffer bufferNew(i64 size)
+{
+  Buffer b = {mem.allocZero(size), size};
+  return b;
+}
+
+void Buffer.free()
+{
+  mem.free(self.data);
+  self.data = null;
+  printf("freed %d bytes\n", self.len);
+}
+
+void main()
+{
+  ad Buffer b = bufferNew(64);     // ad calls b.free() at the end
+  b.data[0] = 'x';
+  printf("%c\n", b.data[0]);
+}
+</code></pre>
+<pre class="output">
+x
+freed 64 bytes
+</pre>
+
+<h2 id="inheritance">Inheritance</h2>
+<p><code>struct Admin : User</code> starts with all of <code>User</code>'s fields, so an <code>Admin *</code>
+can be used wherever a <code>User *</code> is expected. It also has <code>User</code>'s methods.</p>
+<pre data-run><code>
+struct User  { u8 *name; i64 age; };
+struct Admin : User { i64 level; };
+
+void User.describe() { printf("%s is %d\n", self.name, self.age); }
+void User.birthday() { self.age++; }
+
+void greet(User *u) { printf("hello %s\n", u.name); }
+
+void main()
+{
+  Admin a;
+  a.name = "bob";
+  a.age = 40;
+  a.level = 2;
+  a.birthday();          // inherited
+  a.describe();          // inherited
+  greet(&a);             // an Admin * is a User *
+  printf("%d\n", sizeof(Admin));
+}
+</code></pre>
+<pre class="output">
+bob is 41
+hello bob
+24
+</pre>
+
+<h3>Hiding a base method</h3>
+<p>A method of the same name on the derived struct hides the base's. <code>Base.name(self)</code> still calls the base's.</p>
+<pre data-run><code>
+struct User  { u8 *name; };
+struct Admin : User { i64 level; };
+
+void User.describe()  { printf("user %s\n", self.name); }
+void Admin.describe()
+{
+  printf("admin %d, ", self.level);
+  User.describe(self);
+}
+
+void main()
+{
+  Admin a;
+  a.name = "bob";
+  a.level = 2;
+  a.describe();
+
+  User *u = &a;
+  u.describe();      // the pointer's type decides: User.describe
+}
+</code></pre>
+<pre class="output">
+admin 2, user bob
+user bob
+</pre>
+<div class="note"><p><strong>No virtual dispatch.</strong> Which method runs is decided by the type the compiler
+sees, never at run time. For behaviour chosen at run time, store a function pointer in the struct.</p></div>
+
+<h3>Run-time dispatch with a function pointer</h3>
+<pre data-run><code>
+struct Shape
+{
+  u8 *name;
+  fn(Shape *) f64 area;
+};
+
+struct Circle : Shape { f64 r; };
+struct Rect : Shape { f64 w, h; };
+
+f64 circleArea(Shape *s) { Circle *c = s; return 3.14159 * c.r * c.r; }
+f64 rectArea(Shape *s)   { Rect *r = s; return r.w * r.h; }
+
+void main()
+{
+  Circle c;
+  c.name = "circle";
+  c.area = &circleArea;
+  c.r = 1.0;
+
+  Rect r;
+  r.name = "rect";
+  r.area = &rectArea;
+  r.w = 2.0;
+  r.h = 3.0;
+
+  Shape *shapes[2] = {&c, &r};
+  for (auto s : shapes) {
+    printf("%s: %.2f\n", s.name, s.area(s));
+  }
+}
+</code></pre>
+<pre class="output">
+circle: 3.14
+rect: 6.00
+</pre>
+
+<h2>Methods as function pointers</h2>
+<p><code>&amp;User.describe</code> is an ordinary function whose first parameter is <code>self</code>.</p>
+<pre data-run><code>
+struct User { u8 *name; };
+void User.hello() { printf("hello %s\n", self.name); }
+
+void each(User[] users, fn(User *) void f)
+{
+  for (i64 i = 0; i < users.len; i++) { f(&users[i]); }
+}
+
+void main()
+{
+  User all[2] = {{"ann"}, {"bob"}};
+  each(all, &User.hello);
+}
+</code></pre>
+<pre class="output">
+hello ann
+hello bob
+</pre>
+<p><code>u.hello</code> without <code>()</code> is an error: there are no bound methods.</p>
+
+<h2>Errors</h2>
+<ul class="rules">
+  <li>A method with the name of a field, inherited fields included.</li>
+  <li>The same method defined twice (with the same parameter types).</li>
+  <li>A method of something that isn't a struct or union.</li>
+  <li>A method added to a type of the standard library or another module: only the module that defines a type can add methods.</li>
+  <li>Calling a field as a method: <code>s.len()</code> says "`len` is a field, not a method: read it without `()`".</li>
+</ul>

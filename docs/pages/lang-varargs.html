@@ -1,0 +1,156 @@
+<!-- title: Variable arguments -->
+<h1>Variable arguments</h1>
+<p class="lede">A function can take any number of extra arguments. Inside, they are a slice: no <code>va_list</code>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>i64 sum(i64 ...nums)         // typed: nums is an i64[]
+{ for (auto n : nums) ... }
+sum();  sum(1, 2, 3);        // zero or more
+f(...nums);                  // pass them all on
+void log(u8 *fmt, ...args)   // untyped: 64-bit slots, for formats</code></pre>
+</div>
+
+<h2>Typed extras</h2>
+<p><code>T ...name</code> as the last parameter takes any number of <code>T</code>s, each checked and
+converted like a normal argument. Inside, <code>name</code> is a <code>T[]</code>.</p>
+<pre data-run><code>
+i64 sum(i64 ...nums)
+{
+  i64 total = 0;
+  for (auto n : nums) { total += n; }
+  return total;
+}
+
+void main()
+{
+  printf("%d %d %d\n", sum(), sum(5), sum(1, 2, 3, 4));
+}
+</code></pre>
+<pre class="output">
+0 5 10
+</pre>
+
+<h2>Using the slice</h2>
+<ul class="rules">
+  <li><code>name.len</code> is how many were passed, <code>name[i]</code> is one of them (bounds-checked).</li>
+  <li>It can be sliced and passed to a <code>T[]</code> parameter.</li>
+  <li><code>name</code> itself can't be assigned.</li>
+</ul>
+<pre data-run><code>
+f64 avg(f64 ...xs)
+{
+  if (!xs.len) { return 0; }
+  f64 total = 0;
+  for (i64 i = 0; i < xs.len; i++) { total += xs[i]; }
+  return total / xs.len;
+}
+
+f64 first(f64[] xs) { return xs[0]; }
+
+f64 restAvg(f64 ...xs)
+{
+  return avg(...xs[1:]);    // everything but the first
+}
+
+void main()
+{
+  printf("%.2f %.2f\n", avg(1, 2, 4), avg());   // 1, 2 and 4 become f64
+  printf("%.2f\n", restAvg(100, 1, 2));
+}
+</code></pre>
+<pre class="output">
+2.33 0.00
+1.50
+</pre>
+
+<h2>Fixed and default parameters first</h2>
+<pre data-run><code>
+void tag(u8 *label, u8 *sep = ", ", u8 * ...items)
+{
+  printf("%s:", label);
+  for (i64 i = 0; i < items.len; i++) {
+    printf("%s", i ? sep : " ");
+    printf("%s", items[i]);
+  }
+  printf("\n");
+}
+
+void main()
+{
+  tag("fruit", , "apple", "pear");
+  tag("path", "/", "usr", "lib", "ktm");
+  tag("empty");
+}
+</code></pre>
+<pre class="output">
+fruit: apple, pear
+path: usr/lib/ktm
+empty:
+</pre>
+
+<h2>Passing them on</h2>
+<p><code>...name</code> as the last argument of a call passes the extras on, to a function that
+takes the same kind. It must be the only extra argument.</p>
+<pre data-run><code>
+i64 sum(i64 ...nums)
+{
+  i64 t = 0;
+  for (auto n : nums) { t += n; }
+  return t;
+}
+
+i64 sumTwice(i64 ...nums)
+{
+  return 2 * sum(...nums);
+}
+
+void main()
+{
+  printf("%d\n", sumTwice(1, 2, 3));
+}
+</code></pre>
+<pre class="output">
+12
+</pre>
+<p>Spreading costs nothing: the extras are passed as a count and a pointer to an array the caller built.</p>
+
+<h2>Untyped extras, for formats</h2>
+<p><code>...name</code> without a type takes each extra as a 64-bit slot, the way format functions
+want them. <code>name</code> is a <code>u64[]</code>: a number as is, a float as its bits, a pointer as its address.</p>
+<pre data-run><code>
+import cstr, mem;
+
+void logf(u8 *fmt, ...args)
+{
+  u8 *msg = cstr.formatArgs(null, fmt, args);   // format the extras
+  printf("[log] %s\n", msg);
+  mem.free(msg);
+}
+
+void main()
+{
+  logf("%d files in %s, %.1f%% full", 3, "/tmp", 42.5);
+}
+</code></pre>
+<pre class="output">
+[log] 3 files in /tmp, 42.5% full
+</pre>
+<p>Read a float back from a slot with <code>*(f64 *)&amp;args[i]</code>:</p>
+<pre data-run><code>
+void show(...args)
+{
+  printf("%d slots: %d and %.2f\n", args.len, args[0], *(f64 *)&args[1]);
+}
+
+void main()
+{
+  show(7, 2.5);
+}
+</code></pre>
+<pre class="output">
+2 slots: 7 and 2.50
+</pre>
+
+<div class="note"><p>A plain <code>...</code> with no name, as in <code>extern "c" i32 printf(u8 *fmt, ...);</code>,
+is C's variadic convention, for declaring C functions.</p></div>

@@ -1,0 +1,96 @@
+<!-- title: Type aliases -->
+<h1>Type aliases</h1>
+<p class="lede"><code>type Name = T;</code> gives a type a second name. The alias is the type itself, not a new one.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>type Text = u8[];
+type Handler = fn(i64, Text) bool;
+type Buf = u8[64];
+type Ints = vec.Vec<i64>;
+pub type Port = u16;          // in a module: exported</code></pre>
+</div>
+
+<h2>Naming long types</h2>
+<pre data-run><code>
+type Text = u8[];
+type Handler = fn(i64, Text) bool;
+type Celsius = f64;
+struct Reading { Text place; Celsius temp; };
+type Readings = Reading[];
+
+bool show(i64 i, Text place) { printf("%d: %s\n", i, place); return true; }
+
+Celsius warmest(Readings all, Handler each)
+{
+  Celsius best = -273.15;
+  for (i64 i = 0; i < all.len; i++) {
+    each(i, all[i].place);
+    if (all[i].temp > best) { best = all[i].temp; }
+  }
+  return best;
+}
+
+void main()
+{
+  Reading r[3] = {{"Iasi", 18.5}, {"Cluj", 21.0}, {"Sibiu", 16.25}};
+  printf("warmest %.1f\n", warmest(r, &show));
+}
+</code></pre>
+<pre class="output">
+0: Iasi
+1: Cluj
+2: Sibiu
+warmest 21.0
+</pre>
+
+<h2>An alias is the same type</h2>
+<p>A <code>Celsius</code> and an <code>f64</code> pass to each other with no conversion.
+<code>sizeof</code>, <code>typeof</code> and error messages see the real type.</p>
+<pre data-run><code>
+type Celsius = f64;
+type Text = u8[];
+
+void main()
+{
+  Celsius c = 21.5;
+  f64 f = c;
+  Text t = "hello";
+  u8[] s = t;
+  printf("%.1f %s %d %s\n", f, s, sizeof(Text), typeof(c));
+}
+</code></pre>
+<pre class="output">
+21.5 hello 16 f64
+</pre>
+<div class="note"><p>Because an alias is not a new type, it doesn't stop you mixing
+<code>Celsius</code> and <code>Fahrenheit</code>. For that, wrap the value in a struct.</p></div>
+
+<h2>Fixed arrays and generics</h2>
+<pre data-run><code>
+import vec;
+
+type Buf = u8[8];
+type Ints = vec.Vec<i64>;
+
+void main()
+{
+  Buf b;
+  b[0] = 'k';
+  ad Ints nums = vec.new<i64>();
+  nums.push(3);
+  printf("%d %c %d\n", sizeof(Buf), b[0], nums.len);
+}
+</code></pre>
+<pre class="output">
+8 k 1
+</pre>
+
+<h2>Rules</h2>
+<ul class="rules">
+  <li>Aliases are declared at file scope, not inside a function.</li>
+  <li>In a program, an alias can only name types declared above it. In a module, any order works.</li>
+  <li>Two aliases that name each other are an error.</li>
+  <li>In a module an alias is private unless <code>pub</code>, and is <code>mod.Name</code> outside it.</li>
+  <li><code>type</code> is a keyword only at the start of such a declaration: a variable or field can still be called <code>type</code>.</li>
+</ul>

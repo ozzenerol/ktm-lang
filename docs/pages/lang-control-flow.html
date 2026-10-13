@@ -1,0 +1,195 @@
+<!-- title: Control flow -->
+<h1>Control flow</h1>
+<p class="lede"><code>if</code>, loops, range-based <code>for</code> and <code>goto</code>.
+<code>switch</code> has <a href="lang-switch.html">its own page</a>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>if (x > 0) { ... } else if (x < 0) { ... } else { ... }
+if (i64 n = count(); n > 5) { ... }    // n lives only in the if
+while (cond) { ... }
+do { ... } while (cond);
+for (i64 i = 0; i < n; i++) { ... }
+for (auto x : items) { ... }           // arrays, slices, vectors</code></pre>
+</div>
+
+<h2>Braces are required</h2>
+<p>The body of <code>if</code>, <code>else</code>, <code>for</code>, <code>while</code> and
+<code>do</code> is always a <code>{ }</code> block. <code>else if</code> is the one exception.</p>
+<div class="compare">
+<div><p class="label">Error</p>
+<pre><code>if (x) y = 1;</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>if (x) { y = 1; }</code></pre></div>
+</div>
+
+<h2>if and else</h2>
+<pre data-run><code>
+void main()
+{
+  i64 tests[] = {9, 10, 15};
+  for (auto n : tests) {
+    if (n % 15 == 0) {
+      printf("FizzBuzz\n");
+    } else if (n % 3 == 0) {
+      printf("Fizz\n");
+    } else {
+      printf("%d\n", n);
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+Fizz
+10
+FizzBuzz
+</pre>
+
+<h3>An initialiser in the if</h3>
+<p>A declaration can come before the condition. It is visible only in the <code>if</code> and its <code>else</code>.</p>
+<pre data-run><code>
+i64 lookup(u8 *key) { return key[0] == 'a' ? 42 : -1; }
+
+void main()
+{
+  if (i64 v = lookup("apple"); v >= 0) {
+    printf("found %d\n", v);
+  } else {
+    printf("missing\n");
+  }
+  if (i64 v = lookup("kiwi"); v >= 0) {
+    printf("found %d\n", v);
+  } else {
+    printf("missing (v is %d)\n", v);
+  }
+}
+</code></pre>
+<pre class="output">
+found 42
+missing (v is -1)
+</pre>
+
+<h2>Loops</h2>
+<pre data-run><code>
+void main()
+{
+  i64 i = 0;
+  while (i < 3) {
+    printf("w%d,", i);
+    i++;
+  }
+  do {
+    printf("d%d,", i);
+    i--;
+  } while (i > 0);
+  printf("\n");
+
+  for (i64 j = 0; j < 10; j++) {
+    if (j == 2) { continue; }   // skip 2
+    if (j == 5) { break; }      // stop at 5
+    printf("f%d,", j);
+  }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+w0,w1,w2,d3,d2,d1,
+f0,f1,f3,f4,
+</pre>
+
+<h3>Nested loops</h3>
+<p><code>break</code> and <code>continue</code> act on the innermost loop. To leave several at once, use <code>goto</code> or a function and <code>return</code>.</p>
+<pre data-run><code>
+void main()
+{
+  for (i64 row = 0; row < 3; row++) {
+    for (i64 col = 0; col < 3; col++) {
+      if (col > row) { break; }
+      printf("(%d,%d)", row, col);
+    }
+  }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+(0,0)(1,0)(1,1)(2,0)(2,1)(2,2)
+</pre>
+
+<h2>Range-based for</h2>
+<p><code>for (T x : items)</code> runs once per element. It works on:</p>
+<ul class="rules">
+  <li>fixed-size arrays,</li>
+  <li><a href="lang-slices.html">slices</a> (<code>T[]</code>), Strings included,</li>
+  <li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <code>vec.Vec</code>.</li>
+</ul>
+<pre data-run><code>
+import vec;
+
+void main()
+{
+  i64 primes[] = {2, 3, 5, 7, 11};
+  i64 sum = 0;
+  for (auto p : primes) { sum += p; }
+  printf("sum = %d\n", sum);
+
+  u8[] word = "ktm";
+  for (u8 c : word) { printf("[%c]", c); }
+  printf("\n");
+
+  ad vec.Vec<f64> v = vec.new<f64>();
+  v.push(1.5);
+  v.push(2.5);
+  for (f64 x : v) { printf("<%.1f>", x); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+sum = 28
+[k][t][m]
+<1.5><2.5>
+</pre>
+<p>The loop variable is a copy. To change the elements, loop over the index:</p>
+<pre data-run><code>
+void main()
+{
+  i64 nums[] = {1, 2, 3};
+  for (auto n : nums) { n *= 10; }          // changes the copy only
+  printf("%d %d %d\n", nums[0], nums[1], nums[2]);
+  for (i64 i = 0; i < 3; i++) { nums[i] *= 10; }
+  printf("%d %d %d\n", nums[0], nums[1], nums[2]);
+}
+</code></pre>
+<pre class="output">
+1 2 3
+10 20 30
+</pre>
+
+<h2>goto</h2>
+<p>Labels end with <code>:</code>. Useful for retry loops and leaving nested loops.</p>
+<pre data-run><code>
+void main()
+{
+  i64 tries = 0;
+retry:
+  tries++;
+  if (tries < 3) { goto retry; }
+  printf("gave up after %d tries\n", tries);
+
+  for (i64 i = 0; i < 10; i++) {
+    for (i64 j = 0; j < 10; j++) {
+      if (i * j == 12) {
+        printf("found %d x %d\n", i, j);
+        goto done;
+      }
+    }
+  }
+done:
+  printf("out of both loops\n");
+}
+</code></pre>
+<pre class="output">
+gave up after 3 tries
+found 2 x 6
+out of both loops
+</pre>
+<p>A <code>goto</code> can't jump past a <a href="lang-defer.html"><code>defer</code></a> into the rest of its block.</p>

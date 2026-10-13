@@ -1,0 +1,133 @@
+<!-- title: The preprocessor -->
+<h1>The preprocessor</h1>
+<p class="lede">C's <code>#define</code>, <code>#if</code> and <code>#include</code>, simplified: a macro
+names one value, and there are no function-like macros.</p>
+
+<h2 id="define">#define</h2>
+<p>A macro names a number, a string, or an expression of other macros.</p>
+<pre data-run><code>
+#define APP_NAME "demo"
+#define VERSION  3
+#define BUFFER   (VERSION * 1024)
+#define RATIO    (VERSION / 2.0)
+
+void main()
+{
+  printf("%s v%d, %d bytes, %.1f\n", APP_NAME, VERSION, BUFFER, RATIO);
+  printf("%s %s\n", typeof(BUFFER), typeof(RATIO));
+}
+</code></pre>
+<pre class="output">
+demo v3, 3072 bytes, 1.5
+i64 f64
+</pre>
+<ul class="rules">
+  <li>A macro has the type of its value: <code>f64</code> if any operand is a float, otherwise <code>i64</code>.</li>
+  <li>Comparisons and <code>&amp;&amp;</code>, <code>||</code>, <code>!</code> give an <code>i64</code> 0 or 1.</li>
+  <li>A cast to a built-in type works and sets the type: <code>#define HALF ((f64)5 / 2)</code> is 2.5.</li>
+  <li>Names in a macro's value must be other macros (structs are unknown to it).</li>
+  <li>End a line with <code>\</code> to go on to the next.</li>
+</ul>
+<div class="warn"><p><strong>No function-like macros.</strong> <code>#define SQ(x) ((x) * (x))</code> is the error
+"function-like macros are not supported": write a function, which the compiler inlines.
+With a space, <code>#define CALC (2 * 21)</code> is an ordinary macro.</p></div>
+<div class="tip"><p>For numbers, a <a href="lang-variables.html#const"><code>const</code></a> is usually better: it is typed and scoped.</p></div>
+
+<h2 id="conditional-compilation">Conditional compilation</h2>
+<p><code>#if</code>, <code>#ifdef</code>, <code>#ifndef</code>, <code>#elif</code>, <code>#else</code>,
+<code>#endif</code>, <code>#undef</code> and <code>#error</code>, as in C.</p>
+<pre data-run><code>
+#define LEVEL 2
+
+void main()
+{
+#if LEVEL > 2
+  printf("high\n");
+#elif LEVEL == 2 && !defined(QUIET)
+  printf("level two\n");
+#else
+  printf("low\n");
+#endif
+}
+</code></pre>
+<pre class="output">
+level two
+</pre>
+
+<h3>From the command line</h3>
+<p><code>-DNAME</code> defines a macro (with no value). This example is built with <code>ktm -DVERBOSE</code>:</p>
+<pre data-run data-args="-DVERBOSE"><code>
+void main()
+{
+#ifdef VERBOSE
+  printf("verbose mode\n");
+#else
+  printf("quiet mode\n");
+#endif
+}
+</code></pre>
+<pre class="output">
+verbose mode
+</pre>
+
+<h3>Per platform</h3>
+<pre><code>
+#ifdef IS_LINUX
+  u8 *os = "Linux";
+#elif defined(IS_MACOS)
+  u8 *os = "macOS";
+#else
+#error "unsupported platform"
+#endif
+</code></pre>
+
+<h2>Predefined macros</h2>
+<table>
+  <thead><tr><th>Macro</th><th>Defined when</th></tr></thead>
+  <tbody>
+    <tr><td><code>IS_LINUX</code>, <code>__linux__</code></td><td>Compiling for Linux</td></tr>
+    <tr><td><code>IS_MACOS</code>, <code>__macos__</code></td><td>Compiling for macOS</td></tr>
+    <tr><td><code>IS_X86_64</code>, <code>__x86_64__</code></td><td>Targeting x86_64</td></tr>
+    <tr><td><code>IS_ARM_64</code>, <code>__aarch64__</code></td><td>Targeting arm64</td></tr>
+    <tr><td><code>__ARCH__</code></td><td>Always: the architecture name as a string</td></tr>
+    <tr><td><code>__KTM_JIT__</code> / <code>__KTM_AOT__</code></td><td>Running in the JIT or REPL / compiling a binary</td></tr>
+    <tr><td><code>__KTM_VERSION__</code>, <code>__DATE__</code>, <code>__TIME__</code>, <code>__TIMESTAMP__</code></td><td>Always</td></tr>
+    <tr><td><code>__KTM_LINK_SQLITE3__</code></td><td>ktm was built with SQLite</td></tr>
+  </tbody>
+</table>
+<p>To check another platform's branches without its machine: <code>ktm -S --target=aarch64-apple-darwin file.ktm</code>.</p>
+
+<h3>#ifjit and #ifaot</h3>
+<p>Short for <code>#ifdef __KTM_JIT__</code> and <code>#ifdef __KTM_AOT__</code>.</p>
+<pre data-run data-mode="aot"><code>
+void main()
+{
+#ifjit
+  printf("running in the JIT\n");
+#else
+  printf("running as a compiled binary\n");
+#endif
+}
+</code></pre>
+<pre class="output">
+running as a compiled binary
+</pre>
+
+<h3>Errors</h3>
+<ul class="rules">
+  <li><code>#error message</code> stops the build and prints the message.</li>
+  <li>An <code>#else</code> or <code>#endif</code> with no <code>#if</code>, a second <code>#else</code>, or an <code>#if</code> never closed, is an error.</li>
+  <li>Extra tokens after an <code>#if</code> condition are an error.</li>
+  <li><code>#undef</code> takes effect where it is: code above it keeps the old value.</li>
+</ul>
+
+<h2 id="include-and-link">#include and #link</h2>
+<pre><code>#include "util.ktm"       // relative to this file: pasted in
+#include <thing.ktmh>     // from the installed include directory
+#link <sqlite3>           // link a C library, like -lsqlite3
+#link "./libmine.so"      // a path, relative to the working directory</code></pre>
+<ul class="rules">
+  <li>For ktm code, prefer <a href="lang-modules.html">modules</a> to <code>#include</code>.</li>
+  <li><code>#link</code> works for compiled programs, the JIT and the REPL alike. See <a href="lang-calling-c.html">Calling C</a>.</li>
+  <li>A file that can't be read is an error at the <code>#include</code>, and the rest of the file is still checked.</li>
+</ul>

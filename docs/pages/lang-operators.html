@@ -1,0 +1,208 @@
+<!-- title: Operators and casts -->
+<h1>Operators and casts</h1>
+<p class="lede">The C operators, with a few additions: chained comparisons, <code>typeof</code>, and stricter rules for unary operators.</p>
+
+<h2>Arithmetic and bits</h2>
+<pre data-run><code>
+void main()
+{
+  i64 a = 7, b = 2;
+  printf("%d %d %d %d %d\n", a + b, a - b, a * b, a / b, a % b);
+  printf("%d %d %d %d %d %d\n", a & b, a | b, a ^ b, ~a, a << 2, a >> 1);
+  printf("%.2f\n", 7.0 / 2);
+}
+</code></pre>
+<pre class="output">
+9 5 14 3 1
+2 7 5 -8 28 3
+3.50
+</pre>
+
+<h2>Assignment, increment</h2>
+<pre data-run><code>
+void main()
+{
+  i64 n = 10;
+  n += 5;      // 15
+  n *= 2;      // 30
+  n <<= 1;     // 60
+  n %= 7;      // 4
+  i64 before = n++;
+  i64 after = ++n;
+  printf("%d %d %d\n", before, after, n);
+}
+</code></pre>
+<pre class="output">
+4 6 6
+</pre>
+<p>An assignment used as a value has the type of its left side, so the value is truncated to fit:</p>
+<pre data-run><code>
+void main()
+{
+  u8 c;
+  i64 v = (c = 300);   // 300 doesn't fit in a u8
+  printf("%d\n", v);
+}
+</code></pre>
+<pre class="output">
+44
+</pre>
+
+<h2>Comparisons and logic</h2>
+<p><code>==</code>, <code>&lt;</code>, <code>&amp;&amp;</code>, <code>!</code> and the rest always give 0 or 1.</p>
+<pre data-run><code>
+void main()
+{
+  f64 half = 0.5;
+  u8 *none = null;
+  printf("%d %d %d %d\n", half && 1, !half, none || 0, !none);
+  printf("%d\n", 2 < 2.5);              // an int and a float compare as floats
+}
+</code></pre>
+<pre class="output">
+1 0 0 1
+1
+</pre>
+<ul class="rules">
+  <li>A float is true when it isn't 0.0, a pointer when it isn't <code>null</code>.</li>
+  <li><code>&amp;&amp;</code> and <code>||</code> stop as soon as the answer is known, as in C.</li>
+  <li>On <code>u64</code> values, <code>&gt;&gt;</code>, <code>/</code>, <code>%</code> and comparisons are unsigned.</li>
+</ul>
+<pre data-run><code>
+void main()
+{
+  u64 big = 0xFFFFFFFFFFFFFFFF;
+  i64 neg = -1;
+  printf("%d %d\n", big > 1, big >> 60);
+  printf("%d %d\n", neg > 1, neg >> 60);
+}
+</code></pre>
+<pre class="output">
+1 15
+0 -1
+</pre>
+
+<h2>Chained comparisons</h2>
+<p>As in maths: <code>lo &lt; x &lt; hi</code> means <code>lo &lt; x &amp;&amp; x &lt; hi</code>.</p>
+<pre data-run><code>
+void main()
+{
+  i64 x = 5;
+  printf("%d %d %d\n", 1 < x < 10, 1 < x < 3, 0 <= x <= 5);
+}
+</code></pre>
+<pre class="output">
+1 0 1
+</pre>
+
+<h2>The conditional operator</h2>
+<pre data-run><code>
+void main()
+{
+  for (i64 n = 0; n < 3; n++) {
+    printf("%d item%s\n", n, n == 1 ? "" : "s");
+  }
+  i64 x = -4;
+  printf("%d\n", x < 0 ? -x : x);
+}
+</code></pre>
+<pre class="output">
+0 items
+1 item
+2 items
+4
+</pre>
+
+<h2>Unary minus and complement</h2>
+<p>Unary <code>-</code> and <code>+</code> need a number, <code>~</code> needs an integer. A
+narrower integer is widened to <code>i64</code> first.</p>
+<pre data-run><code>
+void main()
+{
+  u8 small = 200;
+  printf("%d %d\n", -small, ~small);   // widened before
+}
+</code></pre>
+<pre class="output">
+-200 -201
+</pre>
+<p><code>-p</code> on a pointer and <code>~f</code> on an <code>f64</code> are compile errors.</p>
+
+<h2>sizeof, alignof, typeof</h2>
+<pre data-run><code>
+struct Pair { i32 a; i64 b; };
+
+void main()
+{
+  i64 arr[10];
+  printf("%d %d\n", sizeof(arr), sizeof(arr) / sizeof(arr[0]));
+  printf("%d %d\n", sizeof(Pair), alignof(Pair));
+  printf("%s | %s | %s\n", typeof(1 + 1), typeof(&arr[0]), typeof(arr));
+}
+</code></pre>
+<pre class="output">
+80 10
+16 8
+i64 | i64 * | i64[10]
+</pre>
+<p><code>typeof</code> becomes a string at compile time. Its operand is never evaluated:</p>
+<pre data-run><code>
+i64 noisy() { printf("called!\n"); return 1; }
+
+void main()
+{
+  printf("%s\n", typeof(noisy()));
+}
+</code></pre>
+<pre class="output">
+i64
+</pre>
+
+<h2 id="casts">Casts</h2>
+<p>As in C: the type in parentheses before the value. A cast binds tighter than any binary operator.</p>
+<pre data-run><code>
+void main()
+{
+  f64 f = 3.9;
+  i64 i = (i64)f;                  // truncates
+  printf("%d\n", i);
+  printf("%.1f %.1f\n", (f64)(7 / 2), (f64)7 / 2);
+  printf("%.1f\n", (f64)-i / 2);   // ((f64)-i) / 2
+
+  u8 *s = "hey";
+  i64 address = (i64)s;
+  printf("%c\n", *(u8 *)address);
+}
+</code></pre>
+<pre class="output">
+3
+3.0 3.5
+-1.5
+h
+</pre>
+<ul class="rules">
+  <li>A cast applies to the whole postfix expression after it: <code>(i64)p.n</code> casts <code>p.n</code>.</li>
+  <li>Any type works, function pointers included: <code>(fn(i64) i64)p</code>.</li>
+  <li>A variable hides a type of the same name, so <code>(x)</code> stays a value in parentheses.</li>
+</ul>
+
+<h2>Precedence</h2>
+<p>The same as C, from tightest to loosest:</p>
+<table>
+  <thead><tr><th>Operators</th><th>Kind</th></tr></thead>
+  <tbody>
+    <tr><td><code>a[i]</code> <code>f()</code> <code>a.b</code> <code>a-&gt;b</code> <code>x++</code> <code>x--</code></td><td>Postfix</td></tr>
+    <tr><td><code>-</code> <code>!</code> <code>~</code> <code>*p</code> <code>&amp;x</code> <code>++x</code> <code>(T)x</code> <code>sizeof</code></td><td>Unary</td></tr>
+    <tr><td><code>*</code> <code>/</code> <code>%</code></td><td>Multiplicative</td></tr>
+    <tr><td><code>+</code> <code>-</code></td><td>Additive</td></tr>
+    <tr><td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td><td>Shifts</td></tr>
+    <tr><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Relational (chain)</td></tr>
+    <tr><td><code>==</code> <code>!=</code></td><td>Equality</td></tr>
+    <tr><td><code>&amp;</code>, then <code>^</code>, then <code>|</code></td><td>Bitwise</td></tr>
+    <tr><td><code>&amp;&amp;</code>, then <code>||</code></td><td>Logical</td></tr>
+    <tr><td><code>?:</code></td><td>Conditional</td></tr>
+    <tr><td><code>=</code> <code>+=</code> <code>-=</code> ...</td><td>Assignment</td></tr>
+  </tbody>
+</table>
+<div class="note"><p>There is no exponent operator: use <code>math.power(x, y)</code> or <code>libc.pow</code>.
+See <a href="lib-maths.html">Maths</a>.</p></div>

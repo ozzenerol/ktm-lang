@@ -1,0 +1,185 @@
+<!-- title: Reflection -->
+<!-- ref: reflect -->
+<h1>Reflection</h1>
+<p class="lede">The <code>reflect</code> module tells a program about its own types at run time:
+a struct's fields, an enum's members, a value's type.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>reflect.Type *t = reflect.typeOf(User);   // a type, or any expression
+t.name  t.size  t.kind  t.fields  t.members  t.elem
+reflect.Value v = reflect.of(x);          // a value of any type: address + type
+reflect.field(v, "name")                  // one field of a struct value
+reflect.getInt(v)  reflect.setFloat(v, 1.5)
+reflect.name(Role.admin)                  // "admin"</code></pre>
+</div>
+
+<h2>Describing a type</h2>
+<pre data-run><code>
+import reflect;
+
+enum Role { guest, admin = 10 };
+struct User { i64 id; u8[] name; Role role; User *boss; };
+
+void main()
+{
+  reflect.Type *t = reflect.typeOf(User);
+  printf("%s, %d bytes, %d fields\n", t.name, t.size, t.fields.len);
+  for (auto f : t.fields) {
+    printf("  %-5s at %2d: %s\n", f.name, f.offset, f.type.name);
+  }
+  reflect.Type *boss = t.fields[3].type;
+  printf("%s points to %s\n", boss.name, boss.elem.name);
+}
+</code></pre>
+<pre class="output">
+User, 40 bytes, 4 fields
+  id    at  0: i64
+  name  at  8: u8[]
+  role  at 24: Role
+  boss  at 32: User *
+User * points to User
+</pre>
+
+<h2>What a Type has</h2>
+<table>
+  <thead><tr><th>Field</th><th>Holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>kind</code></td><td>A <code>reflect.Kind</code>: <code>int</code>, <code>float</code>, <code>boolean</code>, <code>enumType</code>, <code>pointer</code>, <code>array</code>, <code>slice</code>, <code>string</code>, <code>structType</code>, <code>unionType</code>, <code>fnType</code>, <code>none</code></td></tr>
+    <tr><td><code>name</code></td><td>As <code>typeof</code> prints it</td></tr>
+    <tr><td><code>size</code>, <code>isSigned</code></td><td>Size in bytes; signedness of an integer</td></tr>
+    <tr><td><code>elem</code>, <code>len</code></td><td>Element type and length of a pointer, array or slice</td></tr>
+    <tr><td><code>fields</code></td><td>A struct's fields (name, type, offset, <code>isPrivate</code>), inherited ones first</td></tr>
+    <tr><td><code>members</code></td><td>An enum's members</td></tr>
+  </tbody>
+</table>
+<pre data-run><code>
+import reflect;
+
+void describe(reflect.Type *t)
+{
+  switch (t.kind) {
+    case reflect.Kind.int:     printf("%s: integer, %d bytes, signed %d\n", t.name, t.size, t.isSigned);
+    case reflect.Kind.float:   printf("%s: float\n", t.name);
+    case reflect.Kind.array:   printf("%s: %d x %s\n", t.name, t.len, t.elem.name);
+    case reflect.Kind.slice:   printf("%s: slice of %s\n", t.name, t.elem.name);
+    case reflect.Kind.string:  printf("%s: String\n", t.name);
+    default:                   printf("%s: something else\n", t.name);
+  }
+}
+
+void main()
+{
+  i64 grid[4];
+  describe(reflect.typeOf(u16));
+  describe(reflect.typeOf(f64));
+  describe(reflect.typeOf(grid));
+  describe(reflect.typeOf(u8[]));
+  describe(reflect.typeOf(String));
+}
+</code></pre>
+<pre class="output">
+u16: integer, 2 bytes, signed 0
+f64: float
+i64[4]: 4 x i64
+u8[]: slice of u8
+String: String
+</pre>
+
+<h2>Values of any type</h2>
+<p><code>reflect.of(x)</code>, for a variable, field or element, gives a <code>reflect.Value</code>:
+its address and its type. One function can then take a value of any type.</p>
+<pre data-run><code>
+import reflect;
+
+struct Point { i32 x; i32 y; };
+struct Stats { i64 hits; f64 ratio; };
+
+void bump(reflect.Value v, u8[] field)
+{
+  reflect.Value f = reflect.field(v, field);
+  if (!f.type) { printf("no field %s\n", field); return; }
+  reflect.setInt(f, reflect.getInt(f) + 1);
+}
+
+void main()
+{
+  Point p = {3, 4};
+  Stats s = {10, 0.5};
+  bump(reflect.of(p), "y");
+  bump(reflect.of(s), "hits");
+  bump(reflect.of(s), "misses");
+  reflect.setFloat(reflect.field(reflect.of(s), "ratio"), 0.75);
+  printf("%d %d | %d %.2f\n", p.x, p.y, s.hits, s.ratio);
+}
+</code></pre>
+<pre class="output">
+no field misses
+3 5 | 11 0.75
+</pre>
+<p><code>getInt</code>/<code>setInt</code> and <code>getFloat</code>/<code>setFloat</code> read and write
+integers, bools, enums and floats of any size.</p>
+
+<h2>A generic printer</h2>
+<pre data-run><code>
+import reflect;
+
+struct Server { u8[] host; i64 port; bool tls; f64 timeout; };
+
+void dump(reflect.Value v)
+{
+  for (auto f : v.type.fields) {
+    reflect.Value fv = reflect.field(v, f.name);
+    printf("%s = ", f.name);
+    switch (f.type.kind) {
+      case reflect.Kind.int:
+      case reflect.Kind.boolean: printf("%d\n", reflect.getInt(fv));
+      case reflect.Kind.float: printf("%.1f\n", reflect.getFloat(fv));
+      case reflect.Kind.slice: printf("%s\n", *(u8[] *)fv.ptr);
+      default: printf("?\n");
+    }
+  }
+}
+
+void main()
+{
+  Server s = {"localhost", 8080, true, 2.5};
+  dump(reflect.of(s));
+}
+</code></pre>
+<pre class="output">
+host = localhost
+port = 8080
+tls = 1
+timeout = 2.5
+</pre>
+
+<h2>Enum names</h2>
+<pre data-run><code>
+import reflect;
+
+enum Level { debug, info, warn };
+
+void main()
+{
+  Level l = Level.warn;
+  printf("%s\n", reflect.name(l));
+  printf("%s\n", reflect.nameOf(reflect.typeOf(Level), 1));
+  i64 v;
+  if (reflect.enumValue(reflect.typeOf(Level), "debug", &v)) { printf("debug is %d\n", v); }
+}
+</code></pre>
+<pre class="output">
+warn
+info
+debug is 0
+</pre>
+
+<h2>Notes</h2>
+<ul class="rules">
+  <li>A type's description is made at compile time, as read-only data, only for the types a program asks about and the types they lead to.</li>
+  <li>A library and a program each have their own copy: compare types with <code>reflect.same(a, b)</code>, not <code>==</code>.</li>
+  <li><code>reflect.name(e)</code> is <code>""</code> for a value that isn't a member.</li>
+  <li><a href="lang-attributes.html">Attributes</a> show up too: <code>Type.json</code>, <code>Field.key</code>, <code>Field.skip</code>, <code>Field.omitEmpty</code>.</li>
+  <li><code>json.encode</code> and <code>json.decode</code> are built on this: see <a href="lib-json-structs.html">JSON: structs</a>.</li>
+</ul>

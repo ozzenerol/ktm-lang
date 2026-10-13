@@ -1,0 +1,170 @@
+<!-- title: Calling C and assembly -->
+<!-- ref: libc -->
+<h1>Calling C and assembly</h1>
+<p class="lede">Declare a C function with <code>extern "c"</code> and call it. Most of the C library is already declared in the <code>libc</code> module.</p>
+
+<h2>The libc module</h2>
+<p>libc is always linked, and <code>import libc;</code> gives its functions, structs and constants by their C names.</p>
+<pre data-run><code>
+import libc;
+
+void main()
+{
+  printf("%.4f %.0f\n", libc.sqrt(2.0), libc.pow(2.0, 10.0));
+  printf("%d\n", libc.getenv("PATH") != null);
+  printf("%d\n", libc.getpid() > 0);
+}
+</code></pre>
+<pre class="output">
+1.4142 1024
+1
+1
+</pre>
+
+<h2>Declaring a C function</h2>
+<p>For anything libc doesn't declare, write the prototype yourself with <code>extern "c"</code>.</p>
+<pre data-run><code>
+extern "c" i32 abs(i32 x);
+extern "c" i64 strtol(u8 *s, u8 **end, i32 base);
+
+void main()
+{
+  u8 *end;
+  printf("%d %d\n", abs(-5), strtol("ff zz", &end, 16));
+  printf("[%s]\n", end);
+}
+</code></pre>
+<pre class="output">
+5 255
+[ zz]
+</pre>
+
+<h3>C types in ktm</h3>
+<table>
+  <thead><tr><th>C</th><th>ktm</th></tr></thead>
+  <tbody>
+    <tr><td><code>char</code> / <code>unsigned char</code></td><td><code>i8</code> / <code>u8</code></td></tr>
+    <tr><td><code>char *</code></td><td><code>u8 *</code></td></tr>
+    <tr><td><code>short</code> / <code>int</code></td><td><code>i16</code> / <code>i32</code></td></tr>
+    <tr><td><code>long</code>, <code>size_t</code>, <code>ssize_t</code></td><td><code>i64</code> / <code>u64</code></td></tr>
+    <tr><td><code>socklen_t</code></td><td><code>u32</code></td></tr>
+    <tr><td><code>float</code> / <code>double</code></td><td><code>f32</code> / <code>f64</code></td></tr>
+    <tr><td><code>void *</code></td><td><code>void *</code></td></tr>
+    <tr><td><code>int (*)(int)</code></td><td><code>fn(i32) i32</code></td></tr>
+    <tr><td><code>printf(const char *, ...)</code></td><td><code>printf(u8 *, ...)</code></td></tr>
+  </tbody>
+</table>
+
+<h2>C data</h2>
+<p>A C global is declared the same way, by its C name:</p>
+<pre data-run><code>
+extern "c" u8 **environ;
+
+void main()
+{
+  i64 n = 0;
+  while (environ[n]) { n++; }
+  printf("%d\n", n > 0);
+}
+</code></pre>
+<pre class="output">
+1
+</pre>
+
+<h2>C structs</h2>
+<p>Declare the struct with the same fields in the same order: the layout is C's.</p>
+<pre data-run><code>
+struct tm
+{
+  i32 tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst;
+  i64 tm_gmtoff;
+  u8 *tm_zone;
+};
+
+extern "c" tm *gmtime_r(i64 *t, tm *out);
+
+void main()
+{
+  i64 t = 0;
+  tm out;
+  gmtime_r(&t, &out);
+  printf("%d-%02d-%02d\n", out.tm_year + 1900, out.tm_mon + 1, out.tm_mday);
+}
+</code></pre>
+<pre class="output">
+1970-01-01
+</pre>
+
+<h2>Callbacks into ktm</h2>
+<p>A ktm function can be passed where C wants a function pointer: the calling convention is C's.</p>
+<pre data-run><code>
+extern "c" void qsort(void *base, u64 n, u64 size, fn(void *, void *) i32 cmp);
+
+i32 byValue(i64 *a, i64 *b) { return (i32)(*a - *b); }
+
+void main()
+{
+  i64 nums[] = {42, 7, 19, 3};
+  qsort(nums, 4, sizeof(i64), &byValue);
+  for (auto n : nums) { printf("%d,", n); }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">
+3,7,19,42,
+</pre>
+<p>To sort in ktm, <a href="lib-vectors.html"><code>sort.slice</code></a> and <code>vec.Vec.sort</code> are simpler.</p>
+
+<h2>Other C libraries</h2>
+<p>Name the library in the source with <code>#link</code>, or on the command line with <code>-clibs</code>:</p>
+<pre><code>#link <sqlite3>          // like -lsqlite3
+#link "./libmine.so"     // a path, relative to the working directory
+
+extern "c" i32 sqlite3_libversion_number();
+
+void main()
+{
+  printf("%d\n", sqlite3_libversion_number());
+}</code></pre>
+<pre class="shell"><code>ktm app.ktm -clibs="-lcurl -lm" -o app</code></pre>
+<p><code>#link</code> works for compiled programs, the JIT and the REPL alike.</p>
+
+<h2>Names stay apart</h2>
+<ul class="rules">
+  <li>Your functions and globals have symbols of their own: your <code>read()</code> or <code>free()</code> doesn't replace C's.</li>
+  <li>A prototype without <code>extern "c"</code> is a ktm function, which must be defined in the program or a ktm library.</li>
+  <li>In a module, an <code>extern "c"</code> declaration is the module's name (private unless <code>pub</code>) but keeps its C symbol.</li>
+  <li>An <code>extern "c"</code> function can't be overloaded.</li>
+</ul>
+
+<h2 id="inline-assembly">Inline assembly</h2>
+<p>An <code>asm</code> block defines labelled routines; <code>_extern</code> binds one to a ktm prototype.
+Arguments arrive in the platform's C calling convention.</p>
+<pre data-run><code>
+#ifdef IS_X86_64
+asm {
+_ADD_ONE::
+  MOV RAX, RDI
+  INC RAX
+  RET
+}
+#endif
+
+#ifdef IS_ARM_64
+asm {
+_ADD_ONE::
+  ADD X0, X0, 1
+  RET
+}
+#endif
+
+_extern _ADD_ONE i64 addOne(i64 x);
+
+void main()
+{
+  printf("%d\n", addOne(41));
+}
+</code></pre>
+<pre class="output">
+42
+</pre>

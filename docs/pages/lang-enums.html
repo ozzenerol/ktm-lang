@@ -1,0 +1,161 @@
+<!-- title: Enums -->
+<h1>Enums</h1>
+<p class="lede">A scoped set of named integer constants. Members are always written with the enum's name: <code>Color.red</code>.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>enum Color { red, green, blue };              // 0, 1, 2
+enum Status : u16 { ok = 200, notFound = 404 };  // another integer type
+enum Mode { read = 1, write = 2, both = read | write };
+Color c = Color.green;
+i64 n = c;                 // to an integer: implicit
+Color d = (Color)2;        // from an integer: a cast</code></pre>
+</div>
+
+<h2>Values</h2>
+<p>The first member is 0, each next one the previous plus 1, unless it has its own value.</p>
+<pre data-run><code>
+enum Color { red, green, blue };
+enum Status : u16 { ok = 200, created, notFound = 404, gone };
+
+void main()
+{
+  printf("%d %d %d\n", Color.red, Color.green, Color.blue);
+  printf("%d %d %d %d\n", Status.ok, Status.created, Status.notFound, Status.gone);
+  printf("%d %d\n", sizeof(Color), sizeof(Status));
+}
+</code></pre>
+<pre class="output">
+0 1 2
+200 201 404 405
+4 2
+</pre>
+<ul class="rules">
+  <li>The underlying type is <code>i32</code> unless <code>: Type</code> picks another integer type.</li>
+  <li>Inside the braces, earlier members can be used without the prefix.</li>
+  <li>Enums are declared at file scope only.</li>
+</ul>
+
+<h2>Members as constants</h2>
+<p><code>Name.member</code> is a constant expression: an array size, a <code>case</code> label, a <code>const</code>.</p>
+<pre data-run><code>
+enum Color { red, green, blue, count };
+
+u8 *names[Color.count] = {"red", "green", "blue"};
+const i64 LAST = Color.blue;
+
+void main()
+{
+  Color c = Color.green;
+  switch (c) {
+    case Color.red:   printf("warm\n");
+    case Color.green: printf("calm\n");
+    case Color.blue:  printf("cool\n");
+  }
+  printf("%s, %d names, last %d\n", names[c], sizeof(names) / sizeof(u8 *), LAST);
+}
+</code></pre>
+<pre class="output">
+calm
+green, 3 names, last 2
+</pre>
+
+<h2>Flags</h2>
+<pre data-run><code>
+enum Perm { read = 1, write = 2, exec = 4, all = read | write | exec };
+
+void main()
+{
+  i64 p = Perm.read | Perm.write;
+  printf("can write: %d, can exec: %d, all: %d\n",
+         (p & Perm.write) != 0, (p & Perm.exec) != 0, Perm.all);
+}
+</code></pre>
+<pre class="output">
+can write: 1, can exec: 0, all: 7
+</pre>
+
+<h2>Conversions</h2>
+<ul class="rules">
+  <li>An enum value converts to any integer type implicitly, in arithmetic and comparisons too.</li>
+  <li>An integer, or a value of another enum, needs a cast to become one: <code>(Color)2</code>.</li>
+  <li>Two different enums never mix without a cast.</li>
+</ul>
+<pre data-run><code>
+enum Color { red, green, blue };
+
+Color next(Color c)
+{
+  return (Color)((c + 1) % 3);
+}
+
+void main()
+{
+  Color c = Color.blue;
+  i64 asInt = c;
+  printf("%d %d %d\n", asInt, next(c), c > Color.red);
+}
+</code></pre>
+<pre class="output">
+2 0 1
+</pre>
+
+<h2>Names at run time</h2>
+<p><code>printf</code> of an enum prints its number. <a href="lang-reflection.html"><code>reflect</code></a> gives the member's name, and the value back from a name:</p>
+<pre data-run><code>
+import reflect;
+
+enum Role { guest, member, admin = 10 };
+
+void main()
+{
+  Role r = Role.admin;
+  printf("%d %s\n", r, reflect.name(r));
+
+  i64 v;
+  if (reflect.enumValue(reflect.typeOf(Role), "member", &v)) {
+    printf("member is %d\n", v);
+  }
+  printf("[%s]\n", reflect.name((Role)7));   // not a member
+}
+</code></pre>
+<pre class="output">
+10 admin
+member is 1
+[]
+</pre>
+<p>JSON and YAML write an enum as its member's name: see <a href="lib-json-structs.html">JSON: structs</a>.</p>
+
+<h2>Errors in your own code</h2>
+<p>An enum is the usual <code>code</code> of an <a href="lang-exceptions.html">exception</a>:</p>
+<pre data-run><code>
+enum ParseError { empty, notNumber };
+
+i64 parse(u8[] s)
+{
+  if (!s.len) { throw(ParseError.empty, "empty input"); }
+  i64 n = 0;
+  for (u8 c : s) {
+    if (c < '0' || c > '9') { throw(ParseError.notNumber, "bad digit '%c'", c); }
+    n = n * 10 + c - '0';
+  }
+  return n;
+}
+
+void main()
+{
+  u8[] inputs[] = {"42", "", "4x"};
+  for (auto in : inputs) {
+    try {
+      printf("%d\n", parse(in));
+    } catch (Error e) {
+      printf("error %d: %s\n", e.code, e.message);
+    }
+  }
+}
+</code></pre>
+<pre class="output">
+42
+error 0: empty input
+error 1: bad digit 'x'
+</pre>

@@ -1,0 +1,204 @@
+<!-- title: Modules -->
+<h1>Modules</h1>
+<p class="lede">A module is a directory of <code>.ktm</code> files. You <code>import</code> it and use its
+<code>pub</code> names with the module's name in front.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>// geo/shapes.ktm             // main.ktm
+module geo;                   import geo;
+pub i64 area(i64 s) {...}     geo.area(5);
+
+import fs, str;               // several at once
+import h = net.http;          // the directory net/http, named h
+pub   private                 // exported; a field only the module sees</code></pre>
+</div>
+
+<h2>A first module</h2>
+<p>Each file of the module starts with <code>module</code> and the directory's name.</p>
+<pre class="shell"><code>shapes/
+├── main.ktm
+└── geo/
+    ├── shapes.ktm
+    └── helpers.ktm</code></pre>
+<pre><code>// geo/shapes.ktm
+module geo;
+
+pub struct Point { i64 x, y; };
+pub enum Kind { square, circle };
+pub const i64 SIZE = 4;
+
+pub i64 area(Kind k, i64 side)
+{
+  if (k == Kind.square) { return square(side); }   // in another file of geo
+  return 3 * square(side);
+}</code></pre>
+<pre><code>// geo/helpers.ktm
+module geo;
+
+i64 square(i64 n) { return n * n; }   // not pub: private to geo</code></pre>
+<pre><code>// main.ktm
+import geo;
+
+void main()
+{
+  geo.Point p = {1, 2};
+  i64 cells[geo.SIZE];               // a module's const works in constant expressions
+  printf("%d %d %d\n", geo.area(geo.Kind.square, 5), p.y, sizeof(cells));
+}</code></pre>
+<pre class="shell"><code>$ ktm main.ktm -o shapes && ./shapes
+25 2 32</code></pre>
+
+<h2>Inside and outside</h2>
+<table>
+  <thead><tr><th></th><th>Inside the module</th><th>Outside</th></tr></thead>
+  <tbody>
+    <tr><td>Which names</td><td>Every name of every file</td><td>Only <code>pub</code> names</td></tr>
+    <tr><td>Order</td><td>Any: no prototypes needed, a struct can hold a later file's struct</td><td>-</td></tr>
+    <tr><td>How</td><td><code>area(...)</code>, <code>Point</code></td><td><code>geo.area(...)</code>, <code>geo.Point</code>, <code>geo.Kind.square</code></td></tr>
+  </tbody>
+</table>
+<p>Using a private name from outside is an error: <code>`square` is private to module geo</code>.</p>
+
+<h2>Methods across modules</h2>
+<p>Only the module that defines a type can define its methods. Outside, its <code>pub</code> methods are
+called on the object with no prefix.</p>
+<pre><code>// bank/account.ktm
+module bank;
+
+import mem;
+
+pub struct Account { u8 *owner; i64 balance; };
+
+pub Account *open(u8 *owner)
+{
+  Account *a = mem.allocZero(sizeof(Account));
+  a.owner = owner;
+  return a;
+}
+
+pub void Account.deposit(i64 x) { self.balance += x; self.audit(); }
+void Account.audit() { }                 // private to bank
+pub void Account.close() { mem.free(self); }</code></pre>
+<pre><code>// main.ktm
+import bank;
+
+void main()
+{
+  bank.Account *a = bank.open("ann");
+  a.deposit(5);                          // no prefix on a method
+  printf("%s %d\n", a.owner, a.balance);
+  a.close();
+}</code></pre>
+<p><code>&amp;bank.Account.deposit</code> is the method as a function pointer.</p>
+
+<h2>Private fields</h2>
+<p>A field marked <code>private</code> can only be used inside the module that defines the struct.</p>
+<pre><code>// chat/conn.ktm
+module chat;
+
+pub struct Conn {
+  i32 fd;              // public, as in C
+  private u8 *buf;     // only chat uses it
+};
+
+pub void reset(Conn *c) { c.buf = null; }</code></pre>
+<pre><code>// main.ktm
+import chat;
+
+void main()
+{
+  chat.Conn c;
+  c.fd = 3;                // fine
+  chat.Conn copy = c;      // fine: only the name is hidden
+  c.buf = null;            // error: `buf` is a private field of chat.Conn
+}</code></pre>
+<ul class="rules">
+  <li>Outside the module, reading, writing or taking the address of a private field is an error, and so is an initialiser list or a <code>for</code> that reaches it, or a struct inheriting it.</li>
+  <li><code>sizeof</code>, copying and passing by value still work: the layout isn't hidden.</li>
+  <li><code>private</code> fields exist only in modules. In the main program they are an error.</li>
+  <li><code>pub</code> on a field is an error (fields are public unless marked).</li>
+  <li>The editor's completion leaves private fields out.</li>
+</ul>
+
+<h2>Imports</h2>
+<table>
+  <thead><tr><th>Write</th><th>Loads</th><th>Use as</th></tr></thead>
+  <tbody>
+    <tr><td><code>import geo;</code></td><td>the directory <code>geo</code></td><td><code>geo.area</code></td></tr>
+    <tr><td><code>import fs, str;</code></td><td>two modules</td><td><code>fs.readAll</code>, <code>str.from</code></td></tr>
+    <tr><td><code>import net.http;</code></td><td>the directory <code>net/http</code> (its files say <code>module http;</code>)</td><td><code>http.get</code></td></tr>
+    <tr><td><code>import h = net.http;</code></td><td>the same</td><td><code>h.get</code></td></tr>
+  </tbody>
+</table>
+<ul class="rules">
+  <li>Imports come first in a file, before any declaration.</li>
+  <li>A module is looked for next to the main file, then in the standard library, then in each directory of <code>KTM_PATH</code> (separated by <code>:</code>).</li>
+  <li>Found in two places is an error: name your modules differently from the standard library's.</li>
+  <li>An import that is never used is a warning.</li>
+</ul>
+
+<h2>Order of start-up</h2>
+<p>Each module is compiled once, before the code that imports it. A module's globals are set up
+before its importers' globals and before <code>main</code>; a module's files in name order.</p>
+
+<h2>Two special modules</h2>
+<h3>The prelude</h3>
+<p>Its <code>pub</code> names are seen by every file with no import and no prefix:</p>
+<ul class="rules">
+  <li><code>Error</code>, the struct a <code>catch</code> binds;</li>
+  <li><code>EXIT_OK</code> and <code>EXIT_FAIL</code>;</li>
+  <li>the integer limits <code>I8_MIN</code>, <code>I8_MAX</code>, <code>U8_MAX</code> ... <code>I64_MIN</code>, <code>I64_MAX</code>, <code>U64_MAX</code>;</li>
+  <li><code>ERR_BOUNDS</code>, the code of an out-of-range index.</li>
+</ul>
+<pre data-run><code>
+void main()
+{
+  printf("%d %d %u\n", I32_MAX, I8_MIN, U16_MAX);
+  printf("%d %d\n", EXIT_OK, EXIT_FAIL);
+}
+</code></pre>
+<pre class="output">
+2147483647 -128 65535
+0 1
+</pre>
+<h3>The runtime</h3>
+<p><code>rt</code> is part of every program but is internal: <code>import rt;</code> outside the
+standard library is an error.</p>
+
+<h2>Shadowing a module</h2>
+<p>A local or a parameter may have an import's name; for its scope the name is the local.</p>
+<pre data-run><code>
+import str;
+
+i64 count(u8[] str)          // the parameter hides the module here
+{
+  return str.len;
+}
+
+void main()
+{
+  ad String s = str.from("module again");   // and here it's the module
+  printf("%d %s\n", count("four"), s);
+}
+</code></pre>
+<pre class="output">
+4 module again
+</pre>
+<p>A member the local doesn't have is an error that says so: <code>u8 * has no member `len` (note: the local `str` hides the module str)</code>.</p>
+
+<h2>Errors</h2>
+<ul class="rules">
+  <li>Using a name that isn't <code>pub</code> from outside its module.</li>
+  <li>A module not found, or found twice.</li>
+  <li>An import cycle: the message shows it, <code>a -&gt; b -&gt; a</code>.</li>
+  <li>A file whose <code>module</code> line is missing or doesn't match its directory.</li>
+  <li>A global with an import's name (<code>i64 geo;</code> would hide the module).</li>
+  <li>A cycle of structs that hold each other by value: one of them needs a pointer.</li>
+</ul>
+
+<h2>Symbols</h2>
+<p>A module's names get symbols of their own (<code>geo.area</code> is <code>_K3geo4area</code>), so they
+never clash with C functions or the program's names. A C function a module declares with
+<code>extern "c"</code> keeps its C symbol.</p>
+<p>To compile a module once and link it as a library, see <a href="tools-libraries.html">Building libraries</a>.</p>

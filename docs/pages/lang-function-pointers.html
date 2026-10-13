@@ -1,0 +1,224 @@
+<!-- title: Function pointers -->
+<h1>Function pointers</h1>
+<p class="lede">A function pointer type is written <code>fn(params) Ret</code>. No C declarator puzzles.</p>
+
+<div class="glance">
+<p>At a glance</p>
+<pre><code>fn(i64) i64 f = &twice;          // a variable
+f(5);                            // call it
+fn(i64) i64 ops[] = {&a, &b};    // an array of them
+fn(i64) i64 pick(bool b);        // a function returning one
+(fn(i64) i64) *pf = &f;          // a pointer to one: parentheses
+type Handler = fn(u8[]) bool;    // give it a name</code></pre>
+</div>
+
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>int (*op)(int, int) = &add;
+int (*ops[2])(int) = {...};
+int (*pick(int))(int);</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>fn(i32, i32) i32 op = &add;
+fn(i32) i32 ops[2] = {...};
+fn(i32) i32 pick(i32);</code></pre></div>
+</div>
+
+<h2>Passing a function</h2>
+<pre data-run><code>
+i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
+
+i64 fold(fn(i64, i64) i64 op, i64[] nums)
+{
+  i64 acc = nums[0];
+  for (i64 i = 1; i < nums.len; i++) { acc = op(acc, nums[i]); }
+  return acc;
+}
+
+void main()
+{
+  i64 nums[] = {1, 2, 3, 4};
+  printf("%d %d\n", fold(&add, nums), fold(&mul, nums));
+}
+</code></pre>
+<pre class="output">
+10 24
+</pre>
+<ul class="rules">
+  <li>Parameter names are optional and ignored: <code>fn(i64 a, i64 b) i64</code> is <code>fn(i64, i64) i64</code>.</li>
+  <li><code>(*f)(x)</code> calls it too, as in C.</li>
+  <li>The arguments are checked against the pointer's parameter types, like a direct call.</li>
+</ul>
+
+<h2>Tables of functions</h2>
+<p>The array size goes after the name, as in C. Locals, globals, fields and parameters all work.</p>
+<pre data-run><code>
+i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+i64 neg(i64 x) { return -x; }
+
+fn(i64) i64 ops[] = {&dbl, &sq, &neg};
+u8 *names[] = {"double", "square", "negate"};
+
+void main()
+{
+  for (i64 i = 0; i < 3; i++) {
+    printf("%s(5) = %d\n", names[i], ops[i](5));
+  }
+}
+</code></pre>
+<pre class="output">
+double(5) = 10
+square(5) = 25
+negate(5) = -5
+</pre>
+
+<h2>In a struct</h2>
+<p>A field can be a function pointer. A default in its parameter list fills a left-out argument.</p>
+<pre data-run><code>
+i64 dbl(i64 x) { return x * 2; }
+
+struct Calc { u8 *name; fn(i64 x = 21) i64 op; };
+
+void main()
+{
+  Calc c = {"doubler", &dbl};
+  printf("%s: %d %d\n", c.name, c.op(5), c.op());
+}
+</code></pre>
+<pre class="output">
+doubler: 10 42
+</pre>
+
+<h2>Returning a function</h2>
+<pre data-run><code>
+i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+
+fn(i64) i64 choose(bool square)
+{
+  if (square) { return &sq; }
+  return &dbl;
+}
+
+void main()
+{
+  fn(i64) i64 f = choose(true);
+  printf("%d %d\n", f(5), choose(false)(5));
+}
+</code></pre>
+<pre class="output">
+25 10
+</pre>
+<p>A <code>*</code> after the return type belongs to it: <code>fn(u8 *) u8 *</code> returns a <code>u8 *</code>.</p>
+
+<h2>A pointer to a function pointer</h2>
+<p>Put the <code>fn</code> type in parentheses: <code>(fn(i64) i64) *</code>.</p>
+<pre data-run><code>
+i64 dbl(i64 x) { return x * 2; }
+i64 sq(i64 x)  { return x * x; }
+
+void swapIn((fn(i64) i64) *slot, fn(i64) i64 g) { *slot = g; }
+
+void main()
+{
+  fn(i64) i64 f = &sq;
+  printf("%d ", f(5));
+  swapIn(&f, &dbl);            // changes f through the pointer
+  printf("%d %s\n", f(5), typeof(&f));
+}
+</code></pre>
+<pre class="output">
+25 10 (fn(i64) i64) *
+</pre>
+
+<h2>Calling any expression</h2>
+<p>Anything whose type is a function pointer can be called: a cast, a call's result, an assignment.</p>
+<pre data-run><code>
+import cstr;
+
+i64 add(i64 a, i64 b) { return a + b; }
+i64 mul(i64 a, i64 b) { return a * b; }
+
+void *lookup(u8 *name)
+{
+  if (!cstr.cmp(name, "add")) { return &add; }
+  return &mul;
+}
+
+void main()
+{
+  fn(i64, i64) i64 f;
+  printf("%d\n", ((fn(i64, i64) i64)lookup("add"))(2, 3));
+  printf("%d\n", (f = &mul)(4, 5));
+}
+</code></pre>
+<pre class="output">
+5
+20
+</pre>
+
+<h2>Defaults and varargs</h2>
+<p>A function pointer's parameters can have defaults and take extras in every form a function does.</p>
+<pre data-run><code>
+i64 add(i64 a, i64 b) { return a + b; }
+i64 count(...args) { return args.len; }
+
+void main()
+{
+  fn(i64 a, i64 b = 10) i64 k = &add;
+  fn(...args) i64 c = &count;
+  printf("%d %d %d\n", k(1), k(1, 2), c(4, 5, 6));
+}
+</code></pre>
+<pre class="output">
+11 3 3
+</pre>
+
+<h2>Callbacks with real types</h2>
+<p>A <code>void *</code> parameter on one side matches any pointer parameter on the other. So a
+comparator takes the types it really gets, and is passed where <code>fn(void *, void *) i64</code>
+is expected, without a cast.</p>
+<pre data-run><code>
+struct Item { i64 key; };
+
+i64 itemLess(Item *a, Item *b) { return a.key < b.key; }
+
+void main()
+{
+  Item a = {1}, b = {2};
+  fn(void *, void *) i64 cmp = &itemLess;
+  printf("%d %d\n", cmp(&a, &b), cmp(&b, &a));
+}
+</code></pre>
+<pre class="output">
+1 0
+</pre>
+<p>A <code>void *</code> and <code>null</code> convert to and from a function pointer without a cast:</p>
+<pre data-run><code>
+i64 dbl(i64 x) { return x * 2; }
+
+void main()
+{
+  void *raw = &dbl;
+  fn(i64) i64 back = raw;
+  fn(i64) i64 none = null;
+  printf("%d %d %d\n", back(4), raw == &dbl, none == null);
+}
+</code></pre>
+<pre class="output">
+8 1 1
+</pre>
+
+<h2>What doesn't convert</h2>
+<p>Anything else is an error that names both types:</p>
+<pre><code>i64 t(i64 x) { return x; }
+fn(u8 *) i64 op = &t;    // error: cannot convert fn(i64) i64 to fn(u8*) i64</code></pre>
+<p>These need a cast:</p>
+<ul class="rules">
+  <li>a different return type (returning <code>Item *</code> is not <code>fn(void *) void *</code>);</li>
+  <li>different integer, struct, slice or function pointer parameters;</li>
+  <li>a pointer to a function pointer: <code>(fn(Item *) i64) *</code> is not <code>(fn(void *) i64) *</code>.</li>
+</ul>
+<div class="note"><p>C's form, <code>i64 (*f)(i64)</code>, is an error that shows the <code>fn(...)</code> spelling to use.
+<code>fn</code> is a keyword.</p></div>

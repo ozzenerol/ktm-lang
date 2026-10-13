@@ -1,0 +1,160 @@
+<!-- title: Coming from C -->
+<h1>Coming from C</h1>
+<p class="lede">ktm reads like C. This page lists every place where it doesn't, side by side.</p>
+
+<h2>Types</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>int n; long big; unsigned char c;
+double d; float f; _Bool b;
+typedef struct Point { int x, y; } Point;
+int (*cmp)(const void *, const void *);</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>i32 n; i64 big; u8 c;
+f64 d; f32 f; bool b;
+struct Point { i32 x, y; };     // a type at once
+fn(void *, void *) i32 cmp;</code></pre></div>
+</div>
+<ul class="rules">
+  <li>The default integer is <code>i64</code>; integer literals are <code>i64</code>.</li>
+  <li><code>0644</code> is decimal: there are no octal literals (the compiler warns). Write <code>0x1A4</code>.</li>
+  <li><code>_</code> groups digits: <code>1_000_000</code>. <code>0b1010</code> is binary.</li>
+</ul>
+
+<h2>Strings and arrays</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>char *s = strdup("hi");
+size_t n = strlen(s);
+void sum(int *xs, size_t n);
+free(s);</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>String s = str.from("hi");
+i64 n = s.len;
+void sum(i64[] xs);          // a slice knows its length
+s.free();                    // or: ad String s = ...</code></pre></div>
+</div>
+<ul class="rules">
+  <li><a href="lang-slices.html">Slices</a> (<code>T[]</code>) carry their length, and every index is checked.</li>
+  <li>An array or a string literal converts to a slice where one is expected.</li>
+  <li><a href="lang-strings.html"><code>String</code></a> is an owned, growable string. <code>%s</code> prints it.</li>
+</ul>
+
+<h2>Statements</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>if (x) y = 1;
+switch (c) {
+  case 1: a(); break;
+  case 2: case 3: b(); break;
+}</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>if (x) { y = 1; }            // braces required
+switch (c) {
+  case 1: a();               // no break: no fall-through
+  case 2 ... 3: b();         // ranges
+}</code></pre></div>
+</div>
+<ul class="rules">
+  <li>A <code>switch</code> case doesn't fall through; write <code>fallthrough;</code> to.</li>
+  <li><code>for (auto x : items)</code> loops over arrays, slices and vectors.</li>
+  <li><code>if (i64 v = f(); v &gt; 0)</code> declares a variable for the <code>if</code>.</li>
+  <li><code>1 &lt; x &lt; 10</code> is a chained comparison, not <code>(1 &lt; x) &lt; 10</code>.</li>
+</ul>
+
+<h2>Functions</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>void box(int w, int h);
+box(2, 9);   /* no defaults */
+int sum(int n, ...);   /* va_list */
+#define SQ(x) ((x)*(x))</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>void box(i64 w = 2, i64 h = 3);
+box(, 9);                    // skip an argument
+i64 sum(i64 ...nums);        // nums is an i64[]
+i64 sq(i64 x) { return x * x; }   // no function macros</code></pre></div>
+</div>
+<ul class="rules">
+  <li><a href="lang-overloading.html">Overloading</a> by parameter types.</li>
+  <li><a href="lang-generics.html">Generics</a>: <code>T max&lt;T&gt;(T a, T b)</code>.</li>
+  <li>Your functions never clash with C's: your <code>free()</code> is yours.</li>
+</ul>
+
+<h2>Structs</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>void user_greet(User *u);
+user_greet(&u);
+p->x = 1;
+struct Admin { User base; int level; };</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>void User.greet();           // self is a User *
+u.greet();
+p.x = 1;                     // . works through a pointer
+struct Admin : User { i64 level; };</code></pre></div>
+</div>
+<ul class="rules">
+  <li><a href="lang-methods.html">Methods</a> are dispatched by the static type: no virtual calls.</li>
+  <li>Enum members are scoped: <code>Color.red</code>, never <code>red</code>.</li>
+</ul>
+
+<h2>Errors and clean-up</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>FILE *f = fopen(p, "r");
+if (!f) goto fail;
+...
+fclose(f);
+return 0;
+fail: return -1;</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>i32 fd = libc.open(p, libc.O_RDONLY);
+if (fd < 0) { throw(Err.open, "%s", p); }
+defer libc.close(fd);        // on every way out
+...
+return 0;</code></pre></div>
+</div>
+<p><a href="lang-exceptions.html">Exceptions</a> unwind through calls and run <a href="lang-defer.html"><code>defer</code></a>s on the way.</p>
+
+<h2>Code organisation</h2>
+<div class="compare">
+<div><p class="label">C</p>
+<pre><code>#include "geo.h"
+static int helper(void);
+geo_area(5);</code></pre></div>
+<div><p class="label">ktm</p>
+<pre><code>import geo;                  // a directory of files
+i64 helper();                // private unless pub
+geo.area(5);</code></pre></div>
+</div>
+<p>No headers: a <a href="lang-modules.html">module</a> is a directory, and its files see each other in any order.</p>
+
+<h2>Things that are gone</h2>
+<table>
+  <thead><tr><th>C</th><th>ktm instead</th></tr></thead>
+  <tbody>
+    <tr><td><code>typedef</code></td><td><code>type Name = T;</code>, and structs are types already</td></tr>
+    <tr><td>Function-like macros</td><td>Functions (small ones are inlined) and generics</td></tr>
+    <tr><td><code>const</code> as a type qualifier</td><td><code>const</code> on a declaration only</td></tr>
+    <tr><td>Octal literals</td><td>Hex</td></tr>
+    <tr><td>Bodies without braces</td><td>Always <code>{ }</code></td></tr>
+    <tr><td><code>int (*f)(int)</code> declarators</td><td><code>fn(i32) i32 f</code></td></tr>
+    <tr><td>Compound literals <code>(T){...}</code></td><td>A named variable</td></tr>
+  </tbody>
+</table>
+
+<h2>Things that are new</h2>
+<div class="cards">
+  <a class="card" href="lang-slices.html"><strong>Slices</strong><span>Checked views with a length.</span></a>
+  <a class="card" href="lang-defer.html"><strong>defer and ad</strong><span>Clean-up that always runs.</span></a>
+  <a class="card" href="lang-exceptions.html"><strong>Exceptions</strong><span>try, catch, throw.</span></a>
+  <a class="card" href="lang-generics.html"><strong>Generics</strong><span>Types and functions with type parameters.</span></a>
+  <a class="card" href="lang-reflection.html"><strong>Reflection</strong><span>Types at run time.</span></a>
+  <a class="card" href="tools-jit-repl.html"><strong>JIT and REPL</strong><span>Run without a build step.</span></a>
+</div>
+
+<h2>Where it comes from</h2>
+<p>ktm started as a fork of a HolyC compiler (see <a href="index.html#history">History</a>) and
+has since replaced that syntax with its own. HolyC's sub-integer access (<code>x.u8[1]</code>),
+its exponent operator and the TempleOS system calls are not part of ktm.</p>
