@@ -1981,6 +1981,64 @@ static int lspImportCompletion(LspCtx *ctx, Json *id, const char *uri,
     return 1;
 }
 
+/* Whether the document is a file of generic `d`'s own module */
+static int lspInModuleOf(LspCtx *ctx, GenericDef *d, AoStr *text) {
+    (void)ctx;
+    char *mod = lspDocModule(text);
+    const char *dot = strrchr(d->name->data, '.');
+    if (!mod || !dot) return !mod && !dot;
+    return (int)strlen(mod) == (int)(dot - d->name->data) &&
+           !strncmp(mod, d->name->data, dot - d->name->data);
+}
+
+/* Generic method `d` as declared, for a completion's detail, with the
+ * instance's name for its struct: `bool vec.Vec<String>.contains(T x)` */
+static char *lspGenericMethodString(GenericDef *d, AstType *inst) {
+    AoStr *out = aoStrNew();
+    Lexeme *prev = NULL;
+    int depth = 0, at_name = 0;
+    for (u64 i = 0; i < d->toks->size; ++i) {
+        Lexeme *t = d->toks->entries[i];
+        if (tokenPunctIs(t, '{') || tokenPunctIs(t, ';')) break;
+        if (!prev && t->tk_type == TK_KEYWORD && t->len == 3 && !memcmp(t->start, "pub", 3)) continue;
+        /* `Vec<T>.` before the method's name: the instance instead */
+        if (!at_name && t->tk_type == TK_IDENT && i + 1 < d->toks->size &&
+            tokenPunctIs((Lexeme *)d->toks->entries[i + 1], '<') && prev) {
+            if (out->len) aoStrPutChar(out, ' ');
+            aoStrCat(out, inst->clsname->data);
+            for (++i; i < d->toks->size; ++i) {
+                Lexeme *g = d->toks->entries[i];
+                if (tokenPunctIs(g, '<')) depth++;
+                else if (tokenPunctIs(g, '>') && --depth == 0) break;
+            }
+            at_name = 1;
+            prev = d->toks->entries[i];
+            continue;
+        }
+        int tight = prev && (tokenPunctIs(t, '(') || tokenPunctIs(t, ')') ||
+                             tokenPunctIs(t, ',') || tokenPunctIs(t, '.') ||
+                             tokenPunctIs(t, '[') || tokenPunctIs(t, ']') ||
+                             tokenPunctIs(prev, '(') || tokenPunctIs(prev, '.') ||
+                             tokenPunctIs(prev, '[') || tokenPunctIs(t, '<') ||
+                             tokenPunctIs(t, '>') || tokenPunctIs(prev, '<'));
+        if (out->len && !tight) aoStrPutChar(out, ' ');
+        /* a type parameter: the instance's argument */
+        AstType *arg = NULL;
+        for (u64 k = 0; t->tk_type == TK_IDENT && d->of && d->of->params &&
+                        inst->generic_args && k < d->of->params->size &&
+                        k < inst->generic_args->size; ++k) {
+            AoStr *pn = d->of->params->entries[k];
+            if ((int)pn->len == t->len && !memcmp(pn->data, t->start, t->len)) {
+                arg = inst->generic_args->entries[k];
+            }
+        }
+        if (arg) aoStrCat(out, astTypeToString(arg));
+        else aoStrCatLen(out, t->start, t->len);
+        prev = t;
+    }
+    return aoStrMove(out);
+}
+
 static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -2088,6 +2146,7 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
         }
         /* then its methods and the ones it inherits (a hidden base
          * method is listed once, as the derived one) */
+        Set *listed = setNew(16, &set_cstring_type);
         for (AstType *t = mcls; t; t = t->base_cls) {
             if (!t->clsname) continue;
             size_t clen = t->clsname->len;
@@ -2106,6 +2165,22 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
                 }
                 lspCatCompletion(mbody, &memitted, mname, KTM_LSP_FUNCTION,
                                  lspMethodString(fn, owner, mname));
+                setAdd(listed, (char *)mname);
+            }
+        }
+        /* a generic struct's instance (`vec.Vec<String>`): its methods
+         * exist only once something calls them, so list the definitions */
+        if (mcls && mcls->generic && ctx->cc->generic_methods) {
+            Vec *gm = ctx->cc->generic_methods;
+            for (u64 i = 0; i < gm->size; ++i) {
+                GenericDef *d = gm->entries[i];
+                if (d->of != mcls->generic || !d->method) continue;
+                if (strncmp(d->method->data, prefix, plen)) continue;
+                if (setHas(listed, d->method->data)) continue;
+                if (!d->is_pub && !lspInModuleOf(ctx, d, text)) continue;
+                setAdd(listed, d->method->data);
+                lspCatCompletion(mbody, &memitted, d->method->data, KTM_LSP_FUNCTION,
+                                 lspGenericMethodString(d, mcls));
             }
         }
         aoStrCatPrintf(mbody, "]}");
@@ -2326,6 +2401,12 @@ static AstType *lspMemberClassAt(LspCtx *ctx, AoStr *text, u32 doc_id,
     int in_doc = 0;
     Ast *r = lspResolveValue(ctx, doc_id, line + 1, chain[0],
                              (s64)strlen(chain[0]), &in_doc);
+    if (!r) {
+        /* a global of the document's own module (`cli.gArgs`) */
+        char *qual = lspOwnModuleQual(ctx, text, doc_id, line + 1, chain[0],
+                                      (s64)strlen(chain[0]));
+        if (qual) r = mapGet(ctx->cc->global_env, qual);
+    }
     AstType *ty = NULL;
     if (r) {
         /* `Foo()->x`: the head is a call - hop via the return type.
