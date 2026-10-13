@@ -24,6 +24,7 @@ Ast *parseResolveOverloadRef(Cctrl *cc, AstType *want, Ast *expr);
 void parseCheckOverloadRefs(Cctrl *cc);
 Ast *parseReflectCall(Cctrl *cc, char *name, int len);
 Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
+Ast *parseStringCPtr(Cctrl *cc, Ast *expr);
 AstType *parseBaseDeclSpec(Cctrl *cc);
 AstType *parseDeclSpec(Cctrl *cc);
 AstType *parseFullType(Cctrl *cc);

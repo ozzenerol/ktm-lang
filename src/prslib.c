@@ -135,6 +135,33 @@ Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type) {
     return var;
 }
 
+/* A String `expr` as a C string: its ptr, which is NUL-terminated, or ""
+ * for an empty String (whose ptr is null), as s.cstr() gives. `expr` is
+ * evaluated once: a variable or a field of one is read as is, anything
+ * else is assigned to a hidden variable first. */
+Ast *parseStringCPtr(Cctrl *cc, Ast *expr) {
+    AstType *ptr_t = mapGetLen(expr->type->fields, str_lit("ptr"));
+    AstType *u8_ptr = astMakePointerType(ast_u8_type);
+    Ast *root = expr;
+    while (root->kind == AST_CLASS_REF) root = root->cls;
+    if (astIsUnOpKind(root, AST_UN_OP_DEREF) && root->operand->kind == AST_LVAR) {
+        root = root->operand;
+    }
+    Ast *first, *again;
+    if (root->kind == AST_LVAR || root->kind == AST_GVAR) {
+        first = astClassRef(ptr_t, expr, "ptr");
+        again = astClassRef(ptr_t, expr, "ptr");
+    } else {
+        Ast *var = parseHiddenSliceVar(cc, expr->type);
+        int is_err = 0;
+        Ast *assign = astBinaryOp(AST_BIN_OP_ASSIGN, var, expr, &is_err);
+        first = astClassRef(ptr_t, assign, "ptr");
+        again = astClassRef(ptr_t, var, "ptr");
+    }
+    Ast *empty = astCast(cctrlGetOrSetString(cc, "", 0, 0), u8_ptr);
+    return astTernary(u8_ptr, first, astCast(again, u8_ptr), empty);
+}
+
 /* Words that are keywords though the lexer gives them as identifiers
  * (they mean something only where the parser looks for them): none of
  * them can name a variable, parameter or declaration */
@@ -1607,6 +1634,11 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
             ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, i);
             AstType *at_type = arg->type;
             if (untyped) {
+                if (at_type && astTypeIsString(at_type)) {
+                    /* a String goes as its C string, as s.cstr() */
+                    vecPush(converted, parseStringCPtr(cc, arg));
+                    continue;
+                }
                 if (at_type && (parseIsAggregateType(at_type))) {
                     cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
                         "argument %d of `%.*s`: a %s can't be passed as an untyped extra argument",
@@ -2002,9 +2034,32 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
             vecPush(argv_vec, astMakePlaceHolder());
             if (spans) vecPush(spans, NULL);
         }
+        /* a function of the program's `u8 *fmt, ...args`: printf's format
+         * (a spread `...slots` passes its slots on as they are) */
+        int own_fmt = 0;
+        if (fmt_idx < 0 && va_elem->has_var_args && va_at >= 1 && !va_spread) {
+            Ast *p = params->entries[va_at - 1];
+            if (p && p->kind == AST_LVAR && p->type && p->type->kind == AST_TYPE_POINTER &&
+                p->type->ptr && p->type->ptr->size == 1 &&
+                (p->type->ptr->kind == AST_TYPE_CHAR || p->type->ptr->kind == AST_TYPE_INT) &&
+                p->lname && p->lname->len == 3 && !memcmp(p->lname->data, "fmt", 3)) {
+                fmt_idx = va_at - 1;
+                own_fmt = 1;
+            }
+        }
         if (fmt_idx >= 0 && fmt_idx < (int)argv_vec->size) {
-            parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], va_items,
-                                  0, va_spans, fname, len);
+            Ast *fmt = argv_vec->entries[fmt_idx];
+            /* with a computed format a String still goes, as its C string */
+            int literal = fmt && fmt->kind == AST_STRING && fmt->sval;
+            int only_strings = 1;
+            for (u64 i = 0; i < va_items->size; ++i) {
+                Ast *a = va_items->entries[i];
+                if (a && a->type && astTypeIsSlice(a->type)) only_strings = 0;
+            }
+            if (literal || !only_strings || !own_fmt) {
+                parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], va_items,
+                                      0, va_spans, fname, len);
+            }
         }
         parseVarArgsPack(cc, argv_vec, spans, va_elem, va_items, va_spans,
                          va_spread, va_spread_idx, va_at, fname, len);
