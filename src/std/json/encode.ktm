@@ -9,7 +9,8 @@ import cstr, reflect, str;
  * ints, floats and bools as numbers and true/false; an enum by its
  * member's name (its number when it has none); String, u8[] and u8 * as
  * strings (a null pointer as null); a u8 array as the C string in it;
- * other arrays and slices as arrays; a struct as an object of its fields in
+ * other arrays and slices as arrays, and a vec.Vec<T> as one too, of its
+ * items (like a T[]: a Vec<u8> is a string); a struct as an object of its fields in
  * order (private ones skipped); a pointer as what it points to. A union, a
  * function or a void * can't be JSON: that throws ERR_ENCODE with where it
  * is ("user.avatar: a fn(i64) i64 can't be JSON"). */
@@ -31,6 +32,23 @@ static bool encodeIsByte(reflect.Type *t)
 }
 
 static void encodeInto(Writer *w, reflect.Value v, String *path);
+
+/* Is t an instance of the vec module's generic struct Vec? By the type,
+ * not by its fields: a struct of your own with data/len/cap stays an
+ * object */
+static bool encodeIsVec(reflect.Type *t)
+{
+    return t.kind == reflect.Kind.structType && str.startsWith(t.name, "vec.Vec<");
+}
+
+/* The field of t named `name`, null if it has none */
+static reflect.Field *encodeField(reflect.Type *t, u8[] name)
+{
+    for (i64 i = 0; i < t.fields.len; i++) {
+        if (str.equals(t.fields[i].name, name)) { return &t.fields[i]; }
+    }
+    return null;
+}
 
 static void encodeItems(Writer *w, u8 *p, i64 count, reflect.Type *elem, String *path)
 {
@@ -93,6 +111,19 @@ static void encodeInto(Writer *w, reflect.Value v, String *path)
                 encodeInto(w, reflect.__value(p, t.elem), path);
             }
         case reflect.Kind.structType:
+            if (encodeIsVec(t)) {
+                /* its items, as a T[] slice of them would be */
+                reflect.Field *data = encodeField(t, "data");
+                reflect.Field *len = encodeField(t, "len");
+                u8 *items = *(u8 **)((u8 *)v.ptr + data.offset);
+                i64 count = *(i64 *)((u8 *)v.ptr + len.offset);
+                if (encodeIsByte(data.type.elem)) {
+                    w.str(items ? items[0:count] : "");
+                } else {
+                    encodeItems(w, items, count, data.type.elem, path);
+                }
+                break;
+            }
             i64 mark = path.len;
             w.beginObject();
             for (auto f : t.fields) {
