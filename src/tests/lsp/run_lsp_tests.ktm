@@ -1823,6 +1823,15 @@ void testSemanticTokens() {
     check("keywords and builtin types are left to the grammar",
                 semIs(r, SEM_HC, "i32 main", 0, 0, 0) == false &&
                 semAt(r, 6, 0) == -1);
+    /* no token to emit: the reply is still valid JSON (it used to carry a
+     * reused buffer's old bytes) */
+    u8 *bare = uriOf("bare.ktm");
+    lspDidOpen(l, bare, "module bare;\n");
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", bare);
+    json.Value *e = lspRequest(l, "textDocument/semanticTokens/full", params);
+    json.Value *data = e != null ? json.select(e, ".result.data") : null;
+    check("a file with no tokens answers an empty data array",
+                data != null && jsonArrayCount(data) == 0);
     check("clean shutdown", lspClose(l) == 0);
 }
 
