@@ -6720,8 +6720,16 @@ static AoStr *parseJsonSource(Cctrl *cc, AstType *cls, char *tname, Set *quals, 
     }
     aoStrCatPrintf(o, "__w.end();\n}\n");
 
-    aoStrCatPrintf(o, "%svoid %s.from%s(%s.Reader *__r) {\n__r.beginObject();\n"
-                   "while (__r.nextKey()) {\nu8[] __k = __r.key();\n", pub, tname, jg_Fmt, jg_mod);
+    /* With the Reader's strict flag (json.STRICT / yaml.STRICT) a key with
+     * no field and a missing key are errors, as json.decode's reflection
+     * path reports them: each field's key is noted as it is seen (__sN) */
+    aoStrCatPrintf(o, "%svoid %s.from%s(%s.Reader *__r) {\n", pub, tname, jg_Fmt, jg_mod);
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        if (!parseJsonFieldUsed(fields->entries[fi].value)) continue;
+        aoStrCatPrintf(o, "bool __s%d = false;\n", (int)i);
+    }
+    aoStrCatPrintf(o, "__r.beginObject();\nwhile (__r.nextKey()) {\nu8[] __k = __r.key();\n");
     for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
         u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
         AstType *ft = fields->entries[fi].value;
@@ -6729,12 +6737,23 @@ static AoStr *parseJsonSource(Cctrl *cc, AstType *cls, char *tname, Set *quals, 
         if (!parseJsonFieldUsed(ft)) continue;
         AstAttr *key = astAttrGet(ft->field_attrs, "key");
         char *kt = key ? key->arg->data : fname;
-        aoStrCatPrintf(o, "if (__k.len == %d && %s.__keyIs(__k, \"%s\", %d)) {\n",
-                    (int)strlen(kt), jg_mod, kt, (int)strlen(kt));
+        aoStrCatPrintf(o, "if (__k.len == %d && %s.__keyIs(__k, \"%s\", %d)) {\n__s%d = true;\n",
+                    (int)strlen(kt), jg_mod, kt, (int)strlen(kt), (int)i);
         parseJsonDecode(o, quals, mprintf("self.%s", fname), ft, 0);
         aoStrCatPrintf(o, "continue;\n}\n");
     }
-    aoStrCatPrintf(o, "__r.skipValue();\n}\n}\n");
+    aoStrCatPrintf(o, "if (__r.strict) { __r.fail(\"no such field in %s\"); }\n"
+                   "__r.skipValue();\n}\nif (__r.strict) {\n", cls->clsname->data);
+    for (u64 i = 0; fields && fields->indexes && i < fields->indexes->size; ++i) {
+        u64 fi = (u64)(uintptr_t)fields->indexes->entries[i];
+        AstType *ft = fields->entries[fi].value;
+        char *fname = (char *)fields->entries[fi].key;
+        if (!parseJsonFieldUsed(ft)) continue;
+        AstAttr *key = astAttrGet(ft->field_attrs, "key");
+        aoStrCatPrintf(o, "if (!__s%d) { __r.fail(\"missing\", \"%s\"); }\n",
+                    (int)i, key ? key->arg->data : fname);
+    }
+    aoStrCatPrintf(o, "}\n}\n");
 
     if (!with_free) return o;
     aoStrCatPrintf(o, "%svoid %s.freeDecoded() {\n", pub, tname);
