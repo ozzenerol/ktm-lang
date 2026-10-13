@@ -46,6 +46,9 @@ i32 main()
     check(compileFailsWith("void main() { i64 n = vec.len; }\n",
                            "module `vec` is not imported: add `import vec;`"),
           "an expression with it");
+    check(compileFailsWith("i32 main() { return rt.started(); }\n",
+                           "Variable or function `rt` has not been defined"),
+          "rt, which can't be imported, gets no import hint");
     check(compileFailsWith("void main() { ad Nope x; }\n",
                            "Type `Nope` has not been declared"),
           "ad with an unknown type names the type");
