@@ -802,9 +802,11 @@ void memsafeReportLeaks(FILE *f) {
     memsafeMarkReachable(&m);
 
     Vec *lost = vecNew(&vec_unsigned_long_type);
+    Vec *held = vecNew(&vec_unsigned_long_type);
     u64 lost_bytes = 0, kept = 0, kept_bytes = 0;
     for (u64 i = 0; i < m.n; ++i) {
         if (m.marked[i]) {
+            vecPush(held, m.e[i]);
             kept++;
             kept_bytes += m.e[i]->size;
         } else {
@@ -821,7 +823,9 @@ void memsafeReportLeaks(FILE *f) {
         fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) still in use at "
                 "exit (held by globals or live variables): not leaks\n",
                 (unsigned long long)kept, (unsigned long long)kept_bytes);
+        memsafeList(f, held);
     }
+    vecRelease(held);
     vecRelease(lost);
     free(m.e);
     free(m.marked);

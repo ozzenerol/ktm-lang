@@ -22,7 +22,7 @@ Free: double free of 0x559df8f63ca8 (16 bytes)
 memsafe: 1 allocation(s) (32 bytes) never freed
   0x559df8f63df8        32 bytes  at leaky.ktm:6 in main</code></pre>
 <ul class="rules">
-  <li>A leak is a block nothing points to any more. What a global, the library or (when the program calls <code>exit()</code>) a live variable still holds at exit is in use, not a leak: it gets one summary line, <code>still in use at exit ... not leaks</code>. So a program that ends while it still holds its data needs no frees just for the report.</li>
+  <li>A leak is a block nothing points to any more. What a global, the library or (when the program calls <code>exit()</code>) a live variable still holds at exit is in use, not a leak: it is listed apart, under <code>still in use at exit ... not leaks</code>. So a program that ends while it still holds its data needs no frees just for the report.</li>
   <li>The check is conservative: a word that looks like a pointer keeps a block alive. A small function inlined into its caller leaves its variables in the caller's frame, so what it dropped can count as in use.</li>
   <li>It works in any thread.</li>
   <li>Every heap block is tracked: <code>mem.alloc</code> and friends, and what the library allocates for you (a <code>String</code>, a <code>vec.Vec</code>), reported at your line with <code>via str.from</code>, <code>via vec.new&lt;String&gt;</code> and so on. A module's global initialisers show as <code>in &lt;module&gt;'s globals</code>.</li>

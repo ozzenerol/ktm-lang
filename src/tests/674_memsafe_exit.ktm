@@ -40,8 +40,9 @@ i32 main() {
     out = memsafe("import libc, str;\nString gKept;\nvoid main() {\n    gKept = str.from(\"global\");\n"
                   "    String s = str.from(\"held\");\n    libc.exit(0);\n}\n");
     check(out && !libc.strstr(out, "never freed") &&
-          count(out, "memsafe: 2 allocation(s) (34 bytes) still in use at exit") == 1,
-          "held by a global and a variable at exit: in use, not leaks", out);
+          count(out, "memsafe: 2 allocation(s) (34 bytes) still in use at exit") == 1 &&
+          libc.strstr(out, ".ktm:4 in main, via str.from") && libc.strstr(out, ".ktm:5 in main, via str.from"),
+          "held by a global and a variable at exit: in use, not leaks, each listed", out);
 
     out = memsafe("import libc, str;\nvoid main() {\n    String s = str.from(\"freed\");\n"
                   "    s.free();\n    printf(\"end\");\n    libc.exit(0);\n}\n");
