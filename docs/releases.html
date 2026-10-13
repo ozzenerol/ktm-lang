@@ -98,6 +98,11 @@ a round of stdlib additions.</p>
   <code>v.get(i).free()</code>, or freeing a value from <code>map.next()</code>, before <code>v.free()</code> or
   <code>m.free()</code>. <code>v.at(i).free()</code> is still safe (it clears the String in place).
   <code>fs.freeList(&amp;names)</code> is now the same as <code>names.free()</code>.</li>
+  <li><code>fs.makeDir</code>, <code>makeDirAll</code>, <code>remove</code>, <code>removeDir</code>, <code>rename</code>,
+  <code>move</code>, <code>copyFile</code> and <code>changeDir</code> return a <code>bool</code>, true when it worked (false with
+  <code>os.errno()</code> set), as <code>fs.writeAll</code> and <code>fs.exists</code> already did. They returned 0 on success, so
+  <code>if (!fs.makeDir(d))</code> failed when it worked. A check written as <code>fs.remove(p) == 0</code> now means it failed:
+  write <code>if (fs.remove(p))</code>.</li>
   <li>Log lines have more spaces: the level and the file:line part are padded.</li>
   <li><code>-Memsafe</code> no longer calls what a global holds at exit a leak.</li>
 </ul>
