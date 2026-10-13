@@ -257,8 +257,9 @@ static void cctrlAddBuiltinTypes(Map *symbol_table) {
     /* The C-like names (ktm syntax v0.2) for the same types. They are type
      * names, not keywords, so a struct field can still be called `i64`. */
     for (int i = 0; i < (int)static_size(type_aliases); ++i) {
-        AstType *type = mapGet(symbol_table, type_aliases[i].old_name);
-        mapAdd(symbol_table, type_aliases[i].name, type);
+        /* the map only reads its keys: the names stay const */
+        AstType *type = mapGet(symbol_table, (void *)type_aliases[i].old_name);
+        mapAdd(symbol_table, (void *)type_aliases[i].name, type);
     }
 }
 
