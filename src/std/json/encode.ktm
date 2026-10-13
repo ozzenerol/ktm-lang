@@ -111,6 +111,12 @@ static void encodeInto(Writer *w, reflect.Value v, String *path)
                 encodeInto(w, reflect.__value(p, t.elem), path);
             }
         case reflect.Kind.structType:
+            if (t.toJson) {
+                /* @json: its generated method */
+                fn(void *, Writer *) void toJson = t.toJson;
+                toJson(v.ptr, w);
+                break;
+            }
             if (encodeIsVec(t)) {
                 /* its items, as a T[] slice of them would be */
                 reflect.Field *data = encodeField(t, "data");
@@ -127,10 +133,10 @@ static void encodeInto(Writer *w, reflect.Value v, String *path)
             i64 mark = path.len;
             w.beginObject();
             for (auto f : t.fields) {
-                if (f.isPrivate) { continue; }
+                if (f.isPrivate || f.skip) { continue; }
                 if (mark) { path.append("."); }
-                path.append(f.name);
-                w.key(f.name);
+                path.append(f.key);
+                w.key(f.key);
                 encodeInto(w, reflect.__value((u8 *)v.ptr + f.offset, f.type), path);
                 path.remove(mark, path.len);
             }

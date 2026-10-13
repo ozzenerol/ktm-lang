@@ -1882,6 +1882,13 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
                              astAttrGet(t->attrs, "json") ? 1 : 0);
         parseReflectStoreBool(cc, g, parseReflectOffset(rtype, "yaml"),
                              astAttrGet(t->attrs, "yaml") ? 1 : 0);
+        static char *methods[] = {"toJson", "fromJson", "freeDecoded"};
+        for (int m = 0; t->clsname && astAttrGet(t->attrs, "json") && m < 3; ++m) {
+            Ast *fn = mapGet(cc->global_env, mprintf("%s.%s", t->clsname->data, methods[m]));
+            if (fn && (fn->kind == AST_FUNC || fn->kind == AST_FUN_PROTO)) {
+                parseReflectStoreAddr(cc, g, parseReflectOffset(rtype, methods[m]), fn);
+            }
+        }
     }
 
     if (kind == REFLECT_ENUM && t->enum_members && t->enum_members->indexes &&

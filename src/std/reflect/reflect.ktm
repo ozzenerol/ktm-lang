@@ -42,6 +42,13 @@ pub struct Type {
     EnumMember[] members;
     bool json;          /* a struct marked @json (v0.14.0) */
     bool yaml;          /* a struct marked @yaml */
+    /* @json's methods (null without @json): json.encode and json.decode
+     * call them instead of walking the fields. Each takes the struct's
+     * address first: fn(void *, json.Writer *) void, fn(void *,
+     * json.Reader *) void, fn(void *) void. */
+    void *toJson;
+    void *fromJson;
+    void *freeDecoded;
 };
 
 /* A field of a struct or union */
