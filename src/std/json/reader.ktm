@@ -1,5 +1,5 @@
 module json;
-import libc, mem, str;
+import cstr, libc, mem, str;
 
 /* What a Reader remembers about each array or object it has open */
 struct ReaderLevel
@@ -27,14 +27,17 @@ pub struct Reader
     ReaderLevel *levels;
     u8[] k;                    /* the current key */
     String buf;                /* a key or string with escapes, decoded */
+    bool strict;               /* json.STRICT: generated decoders reject missing and unknown keys */
 };
 
-/* A Reader at the start of text */
-pub Reader readerNew(u8[] text)
+/* A Reader at the start of text. With json.STRICT in flags, generated
+ * fromJson methods throw on a key with no field and on a missing key. */
+pub Reader readerNew(u8[] text, i64 flags = 0)
 {
     Reader r;
     libc.memset(&r, 0, sizeof(Reader));
     r.text = text;
+    r.strict = (flags & STRICT) != 0;
     return r;
 }
 
@@ -73,8 +76,9 @@ static u8[] readerRawKey(Reader *r, i64 at)
     return b[at + 1:i];
 }
 
-/* Throws ERR_DECODE: "line:col: path: what" (no path at the top level) */
-pub void Reader.fail(u8 *what)
+/* Throws ERR_DECODE: "line:col: path: what" (no path at the top level);
+ * with `field`, the path goes on to it ("ship.zip: missing") */
+pub void Reader.fail(u8 *what, u8 *field = null)
 {
     u8 *b = self.text.ptr;
     i64 at = self.pos;
@@ -94,6 +98,10 @@ pub void Reader.fail(u8 *what)
         } else {
             path.appendFormat("[%d]", l.at);
         }
+    }
+    if (field) {
+        if (path.len) { path.appendByte('.'); }
+        path.append(cstr.view(field));
     }
     if (path.len) {
         throw(ERR_DECODE, "%d:%d: %s: %s", line, col, path, what);

@@ -1,5 +1,5 @@
 module yaml;
-import libc, mem, str;
+import cstr, libc, mem, str;
 
 /* A Reader parses the document's structure on its first call into a flat
  * list of events (a mapping or sequence opens, one closes, a scalar),
@@ -75,14 +75,17 @@ pub struct Reader
     ParseLevel *plevels;
     u8[] k;                    /* the current key */
     String buf;                /* a scalar that needed decoding */
+    bool strict;               /* yaml.STRICT: generated decoders reject missing and unknown keys */
 };
 
-/* A Reader at the start of text */
-pub Reader readerNew(u8[] text)
+/* A Reader at the start of text. With yaml.STRICT in flags, generated
+ * fromYaml methods throw on a key with no field and on a missing key. */
+pub Reader readerNew(u8[] text, i64 flags = 0)
 {
     Reader r;
     libc.memset(&r, 0, sizeof(Reader));
     r.text = text;
+    r.strict = (flags & STRICT) != 0;
     return r;
 }
 
@@ -352,8 +355,9 @@ static Event *readerCur(Reader *r)
     return &r.evs[r.ev];
 }
 
-/* Throws ERR_DECODE: "line:col: path: what" (no path at the top level) */
-pub void Reader.fail(u8 *what)
+/* Throws ERR_DECODE: "line:col: path: what" (no path at the top level);
+ * with `field`, the path goes on to it ("ship.zip: missing") */
+pub void Reader.fail(u8 *what, u8 *field = null)
 {
     i64 at = self.text.len;
     if (self.ev < self.nev) { at = self.evs[self.ev].start; }
@@ -362,6 +366,10 @@ pub void Reader.fail(u8 *what)
     for (i64 i = 0; i < self.depth; i++) {
         ReaderLevel *l = &self.levels[i];
         if (!l.first) { pathAppend(self, &path, l.object, l.at); }
+    }
+    if (field) {
+        if (path.len) { path.appendByte('.'); }
+        path.append(cstr.view(field));
     }
     throwAt(self, at, &path, what);
 }
