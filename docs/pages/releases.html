@@ -4,6 +4,45 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.13.0 <small>(2026-10-13)</small></h2>
+<p>Ahead of Go on every load. On Linux the coroutine loop now runs on io_uring, and a
+coroutine-per-connection server written the plain way (<code>coro.serve</code>,
+<code>coro.read</code>, <code>coro.write</code>) does more work per CPU-second than Go 1.27's
+goroutine-per-connection server in every scenario of the echo benchmark, with less memory
+(server on 2 cores, client on 6, so the client is never the limit):</p>
+<table>
+  <thead><tr><th>Scenario</th><th>ktm</th><th>Go</th><th>per server CPU-second</th></tr></thead>
+  <tbody>
+    <tr><td>64 B request/response, 64 clients</td><td>368k req/s</td><td>168k req/s</td><td>+45%</td></tr>
+    <tr><td>64 B request/response, 1024 clients</td><td>379k req/s</td><td>133k req/s</td><td>+54%</td></tr>
+    <tr><td>4 KiB request/response, 64 clients</td><td>267k req/s</td><td>157k req/s</td><td>+45%</td></tr>
+    <tr><td>64 KiB streams, 16 connections</td><td>7.5 GB/s</td><td>6.6 GB/s</td><td>+12%</td></tr>
+    <tr><td>64 KiB streams, 64 connections</td><td>7.4 GB/s</td><td>6.5 GB/s</td><td>+9%</td></tr>
+  </tbody>
+</table>
+
+<h3>Coroutines and networking</h3>
+<ul>
+  <li>The coroutine loop runs on io_uring on Linux 6.1 and later: reads, writes and accepts go
+  to the kernel directly, all of a turn in one system call. It falls back to epoll (an older
+  kernel, a container that forbids io_uring) and then to <code>poll</code>; macOS uses kqueue.
+  <code>coro.backend()</code> says which one a thread runs, and
+  <code>KTM_CORO_BACKEND=uring|epoll|kqueue|poll</code> picks one.</li>
+  <li><code>coro.read</code> keeps reading a busy stream for up to 4 ms before it lets the
+  loop's other coroutines run, instead of 32 reads: bulk transfers over many connections move
+  about a third more per CPU-second, and another coroutine on the same loop waits at most about
+  8 ms (Go preempts a busy goroutine every 10 ms).</li>
+  <li><code>coro.dial(addr, port, ms)</code>: connect from a loop coroutine without blocking the
+  loop's thread. <code>net.dial</code> waits in <code>connect</code> and stops every coroutine of
+  its loop meanwhile; its docs now say so.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>On Linux, programs using the coroutine loop run on io_uring by default. Set
+  <code>KTM_CORO_BACKEND=epoll</code> to keep the previous loop.</li>
+</ul>
+
 <h2>v0.12.0 <small>(2026-10-12)</small></h2>
 <p>Memory. A coroutine-per-connection server now uses less memory than Go's
 goroutine-per-connection server at every load of the echo benchmark: with 1024 clients,
