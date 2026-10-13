@@ -8,7 +8,7 @@ import cstr, fs, libc, mem, proc, test;
 #define CLS_ERR_FILE "__121_class_body_error.ktm"
 #define CLS_ERR_OUT  "__121_class_body_error.out"
 
-#define MSG_TOKEN_C   "Unexpected token 'c' while parsing class Foo, perhaps you meant to terminate the field with `;`?"
+#define MSG_TOKEN_C   "Unexpected token 'c' while parsing struct Foo, perhaps you meant to terminate the field with `;`?"
 #define MSG_NO_C      "Property: c does not exist on class"
 
 void cleanupClassErrTest(void) {
@@ -94,7 +94,7 @@ bool testUnion(void) {
     return compileFailsExactly(
 "union U { i64 a; i64 b c; };
 void main() { U u; u.a = 1; }
-", 1, "Unexpected token 'c' while parsing class U", null);
+", 1, "Unexpected token 'c' while parsing union U", null);
 }
 
 /* The anonymous nested class has no name; this used to crash in the
@@ -103,14 +103,14 @@ bool testNestedAnonymousClass(void) {
     return compileFailsExactly(
 "struct Foo { i64 x; struct { i64 a; i64 b c; }; i64 y; };
 void main() { Foo f; f.a = 1; f.x = 2; f.y = 3; }
-", 1, "Unexpected token 'c' while parsing class <anonymous>", null);
+", 1, "Unexpected token 'c' while parsing struct <anonymous>", null);
 }
 
 bool testNestedAnonymousUnion(void) {
     return compileFailsExactly(
 "struct Foo { i64 x; union { i64 a; i64 5; }; i64 y; };
 void main() { Foo f; f.a = 1; f.y = 2; }
-", 1, "Unexpected character `5` while parsing class <anonymous>", null);
+", 1, "Unexpected character `5` while parsing union <anonymous>", null);
 }
 
 bool testAsFieldOfAnotherClass(void) {
@@ -133,7 +133,7 @@ bool testUnknownFieldType(void) {
     return compileFailsExactly(
 "struct Foo { i64 a; Nope b; i64 c; };
 void main() { Foo f; f.c = 1; }
-", 1, "Unexpected type `Nope` while parsing class Foo", null);
+", 1, "Unexpected type `Nope` while parsing struct Foo", null);
 }
 
 /* No body at all: the member access is an error, not a crash */

@@ -4363,6 +4363,12 @@ static Ast *parsePostFixOps(Cctrl *cc, Ast *ast) {
                 continue;
             } else if (ast->kind == AST_CLASS_REF ||
                        parseIsCallableFnPtr(ast)) {
+                /* `s.len()` with `len` a plain field */
+                if (!parseIsCallableFnPtr(ast)) {
+                    cctrlTokenRewind(cc);
+                    cctrlRaiseException(cc, "`%s` is a field, not a method: "
+                            "read it without `()`", ast->field);
+                }
                 ast = parseClassFnPtrCall(cc,ast);
                 continue;
             }

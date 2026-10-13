@@ -2479,9 +2479,18 @@ static char *astParamsToString(Vec *params) {
                 if (param->kind == AST_DEFAULT_PARAM) {
                     /* `I64 level=2`: name, then the default value. */
                     AoStr *name = astLValueToAoStr(param->declvar,0);
-                    AoStr *init = astLValueToAoStr(param->declinit,0);
-                    if (init->len) aoStrCatPrintf(name,"=%s",init->data);
-                    aoStrRelease(init);
+                    Ast *dv = param->declinit;
+                    if (dv && dv->kind == AST_CAST && astTypeIsPtr(dv->type) &&
+                        dv->operand && dv->operand->kind == AST_LITERAL &&
+                        dv->operand->i64 == 0)
+                    {
+                        /* `null` is parsed as (void *)0: show it as written */
+                        aoStrCatPrintf(name,"=null");
+                    } else {
+                        AoStr *init = astLValueToAoStr(dv,0);
+                        if (init->len) aoStrCatPrintf(name,"=%s",init->data);
+                        aoStrRelease(init);
+                    }
                     label = aoStrMove(name);
                 } else {
                     label = astLValueToString(param,0);

@@ -4,6 +4,25 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.13.3 <small>(2026-10-13)</small></h2>
+<p>Fixes for struct values passed by value, and clearer errors.</p>
+<ul>
+  <li>Passing <code>*p</code> (a struct, by value) to a function no longer breaks the other
+  uses of <code>p</code> in the same function. Calls like <code>f(p)</code> elsewhere in it got a
+  copy of the struct instead of the pointer, even when the <code>*p</code> call never ran.</li>
+  <li>Reading a <code>String</code> field straight off a call result works:
+  <code>mk().name</code>, <code>v.get(0).name</code>, <code>(a = b).name</code>. The compiler used
+  to stop with "Slice AST_CLASS_REF assign: unsupported cls kind AST_FUNCALL", and
+  <code>(a = b).name</code> passed to a function crashed at run time.</li>
+  <li>Calling a field as if it were a method (<code>s.len()</code> where <code>len</code> is a
+  field) is a compile error, "`len` is a field, not a method: read it without `()`". The
+  compiler used to crash. Function-pointer fields are still called as before.</li>
+  <li><code>ad</code> on a struct field says that <code>ad</code> goes on a local variable, and
+  errors inside a struct or union body say "struct" or "union" instead of "class".</li>
+  <li>Hover in the language server shows a <code>null</code> default parameter as
+  <code>null</code>, not <code>0(void *)</code>.</li>
+</ul>
+
 <h2>v0.13.2 <small>(2026-10-13)</small></h2>
 <p>A <code>vec.Vec</code> is a JSON array.</p>
 <ul>
