@@ -2738,8 +2738,20 @@ Ast *parseCreateForRange(Cctrl *cc, Ast *iteratee,
 }
 
 Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
-    cctrlTokenGet(cc);
+    Lexeme *colon = cctrlTokenGet(cc);
+    Lexeme *next = cctrlTokenPeek(cc);
+    if (next && tokenPunctIs(next, '[')) {
+        cctrlRaiseExceptionAt(cc, next->line, next->col, 1,
+            "ktm has no array literals: declare the array first, as in "
+            "`u8 *names[2] = { \"a\", \"b\" };` and `for (auto %s : names)`",
+            iteratee->lname->data);
+    }
     Ast *container = parseExpr(cc,16);
+    if (!container) {
+        cctrlRaiseExceptionAt(cc, colon->line, colon->col, 1,
+            "expected what to range over after `:`, as in `for (auto %s : items)`",
+            iteratee->lname->data);
+    }
 
     /* `for (auto v : s)` over a slice: its ptr[0] to ptr[len - 1]. A slice
      * that is not a variable or field (`str.split(...)`) is computed once,

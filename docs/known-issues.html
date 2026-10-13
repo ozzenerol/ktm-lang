@@ -58,14 +58,7 @@ each with a way to reproduce it and a workaround. The other pages avoid them, so
 there works as shown.</p>
 
 <h2 id="compiler">Compiler<a class="anchor" href="#compiler" aria-label="Link to this section">#</a></h2>
-<div class="table-wrap"><table>
-  <thead><tr><th>Issue</th><th>Reproduce</th><th>Workaround</th></tr></thead>
-  <tbody>
-    <tr><td>A range-for over an array literal crashes the compiler (planned for v0.15.1).</td>
-    <td><code>for (auto name : ["a", "b"]) { printf("%s\n", name); }</code></td>
-    <td>Name the array first: <code>u8 *names[2] = { "a", "b" }; for (auto name : names) { ... }</code></td></tr>
-  </tbody>
-</table></div>
+<p>No known issues: everything found while writing these docs has been fixed.</p>
 
 <h3 id="diagnostics">Diagnostics<a class="anchor" href="#diagnostics" aria-label="Link to this section">#</a></h3>
 <div class="table-wrap"><table>
