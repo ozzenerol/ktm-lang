@@ -3956,6 +3956,8 @@ static s64 astBinOpToTokenPunct(AstBinOp op) {
  * `at` (NULL: where the parser is). Returns when there is no such module. */
 void parseRaiseIfNotImported(Cctrl *cc, Lexeme *at, char *name, int len) {
     if (!cc->lexer_ || !lexModuleExists(cc->lexer_, name, len)) return;
+    /* the runtime and the prelude can't be imported */
+    if ((len == 2 && !memcmp(name, "rt", 2)) || (len == 7 && !memcmp(name, "prelude", 7))) return;
     if (at) {
         cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
             "module `%.*s` is not imported: add `import %.*s;`", len, name, len, name);

@@ -56,7 +56,7 @@ i32 main() {
                   "    printf(\"%s\", s);\n    return 0;\n}\n");
     check(out && !cstr.cmp(out, "no import"), "String methods without import str");
     out = run("i32 main() {\n    return str.len(\"x\");\n}\n");
-    check(out && libc.strstr(out, "error: Variable or function `str` has not been defined"),
+    check(out && libc.strstr(out, "error: module `str` is not imported: add `import str;`"),
           "str. needs its import");
     out = run("import str;\ni32 main() {\n    return str.cmp(\"a\", \"b\");\n}\n");
     check(out && libc.strstr(out, "str.cmp"), "the C functions are cstr's");
