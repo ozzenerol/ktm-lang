@@ -57,7 +57,8 @@
 
 <h2 id="memory-bugs-memsafe">Memory bugs: -Memsafe<a class="anchor" href="#memory-bugs-memsafe" aria-label="Link to this section">#</a></h2>
 <p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks when <code>main</code> returns or the program calls <code>exit()</code>.
-Each report names the file and line in your code that allocated or freed the block, and the library function it went through (<code>via str.from</code>).</p>
+Each report names the file and line in your code that allocated or freed the block, and the library function it went through (<code>via str.from</code>): the one your code called, never a private helper
+of it, since with <code>-Memsafe</code> a library function isn't inlined into your code.</p>
 <pre><code>import mem;
 
 void main()
