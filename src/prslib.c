@@ -2203,6 +2203,18 @@ static int parseIsCFormatFunction(char *fname, int len) {
            (len == 12 && !strncmp(fname, str_lit("libc.fprintf")));
 }
 
+/* log.info(...) and the others, the default logger's or a Logger's */
+static int parseIsLogCall(char *fname, int len) {
+    static const char *names[] = {
+        "log.debug", "log.info", "log.warn", "log.error",
+        "log.Logger.debug", "log.Logger.info", "log.Logger.warn", "log.Logger.error",
+    };
+    for (u64 i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        if ((int)strlen(names[i]) == len && !strncmp(fname, names[i], len)) return 1;
+    }
+    return 0;
+}
+
 /* Position of the format string within a known printf-style call's argument
  * list. -1 means this isn't one of the format-checked functions. Single
  * source of truth shared by the pre-parse position snapshot and the
@@ -2232,6 +2244,8 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 16 && !strncmp(fname, str_lit("proc.shellOutput"))) return 0;
     /* printf to stderr */
     else if (len == 10 && !strncmp(fname, str_lit("os.eprintf"))) return 0;
+    /* log's calls: after the @caller file, line and function */
+    else if (parseIsLogCall(fname, len)) return 3;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
