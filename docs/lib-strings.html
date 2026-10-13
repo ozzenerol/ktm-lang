@@ -135,7 +135,7 @@ void main()
     <tr><td><code>equals(a, b)</code></td><td><code>bool</code>: the same bytes</td></tr>
     <tr><td><code>compare(a, b)</code></td><td>Negative, 0 or positive, for sorting</td></tr>
     <tr><td><code>trim(s)</code>, <code>trimStart(s)</code>, <code>trimEnd(s, chars)</code></td><td>A view without the whitespace (or the given bytes)</td></tr>
-    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after</td></tr>
+    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after. With no sep, a is all of s and b is empty (Go's <code>strings.Cut</code>)</td></tr>
     <tr><td><code>split(s, sep)</code></td><td>A <code>u8[][]</code> of views, allocated: free it</td></tr>
     <tr><td><code>join(parts, sep)</code></td><td>A new String: the parts (a <code>u8[][]</code>, or a <code>vec.Vec&lt;String&gt; *</code> or <code>vec.Vec&lt;u8[]&gt; *</code>) with sep between them</td></tr>
   </tbody>
