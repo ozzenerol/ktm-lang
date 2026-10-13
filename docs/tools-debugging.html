@@ -56,7 +56,7 @@
 <p class="lede">Find memory bugs with <code>-Memsafe</code>, and look at every stage of the compiler: tokens, syntax tree, IR, assembly.</p>
 
 <h2 id="memory-bugs-memsafe">Memory bugs: -Memsafe<a class="anchor" href="#memory-bugs-memsafe" aria-label="Link to this section">#</a></h2>
-<p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks at exit.
+<p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks when <code>main</code> returns or the program calls <code>exit()</code>.
 Each report names the line that allocated or freed the block.</p>
 <pre><code>import mem;
 

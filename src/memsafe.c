@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 #if defined(__APPLE__)
 #include <malloc/malloc.h> /* malloc_zone_from_ptr */
 #endif
@@ -433,7 +434,11 @@ void memsafeDumpLive(FILE *f) {
     memsafeUnlock();
 }
 
+static int memsafe_reported = 0;
+static pid_t memsafe_exit_pid = 0;
+
 void memsafeReportLeaks(FILE *f) {
+    memsafe_reported = 1;
     if (memsafe_live == NULL) return;
     memsafeLock();
     if (memsafe_live->size == 0) {
@@ -450,6 +455,18 @@ void memsafeReportLeaks(FILE *f) {
     vecRelease(v);
     fflush(f);
     memsafeUnlock();
+}
+
+/* A program that ends with exit() never returns from main: report then,
+ * once, from the process that ran it (not a forked child) */
+static void memsafeExitReport(void) {
+    if (memsafe_reported || getpid() != memsafe_exit_pid) return;
+    memsafeReportLeaks(stderr);
+}
+
+void memsafeReportAtExit(void) {
+    memsafe_exit_pid = getpid();
+    atexit(memsafeExitReport);
 }
 
 /* libktm's hook `name` (a module global, by its symbol) set to `fn`; the

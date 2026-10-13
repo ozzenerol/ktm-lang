@@ -32,5 +32,7 @@ void memsafeDumpLive(FILE *f);
 
 /* End-of-run leak summary: silent when nothing is live. */
 void memsafeReportLeaks(FILE *f);
+/* Also report the leaks when the program calls exit() */
+void memsafeReportAtExit(void);
 
 #endif
