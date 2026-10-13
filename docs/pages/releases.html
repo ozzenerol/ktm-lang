@@ -4,6 +4,16 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.17.1 <small>(2026-10-13)</small></h2>
+<p>Program arguments, and a flaky test.</p>
+<ul>
+  <li>With <code>-run</code> or <code>-jit</code>, everything after the source file goes to the program, even
+  words that look like ktm's options: <code>ktm -run app.ktm -v</code> gives the program <code>-v</code>
+  (ktm took it before). <code>--</code> ends ktm's options and is no longer passed on.</li>
+  <li>The <code>coro.serve</code> test could end itself with SIGTERM when its signal coroutine ran late; it
+  now installs the handler first, as <code>signal.stopInit</code> asks.</li>
+</ul>
+
 <h2>v0.17.0 <small>(2026-10-13)</small></h2>
 <p>C's stdio in libc, and logging to stdout.</p>
 <ul>
