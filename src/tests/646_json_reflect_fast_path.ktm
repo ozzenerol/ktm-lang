@@ -2,8 +2,9 @@ import json, libc, mem, reflect, str, test;
 
 /* json.encode, json.decode and json.free on a @json struct call its
  * generated methods (v0.14.0): reflect.Type.toJson / fromJson /
- * freeDecoded, also for a @json struct inside one without @json. With
- * json.STRICT, decode keeps the reflection path. */
+ * freeDecoded, also for a @json struct inside one without @json (decode
+ * reads with a json.Reader since v0.14.0, so a nested one is read by its
+ * fromJson too). json.STRICT goes to the Reader, which fromJson obeys. */
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -50,6 +51,19 @@ i32 main() {
     json.free(reflect.of(l));
     check(l.sku.len == 0, "free uses freeDecoded");
 
+    Plain q = json.decode<Plain>("{\"id\":3,\"line\":{\"sku\":\"D\",\"n\":5}}");
+    check(q.id == 3 && same(q.line.sku, "D") && q.line.qty == 5, "decode of a @json struct inside a plain one");
+    json.free(reflect.of(q));
+
+    bool nested = false;
+    try {
+        Plain bad = json.decode<Plain>("{\"id\":3,\"line\":{\"n\":\"x\"}}");
+    } catch (Error e) {
+        nested = libc.strstr(e.message, "line.n: expected an integer") != null;
+        if (!nested) { printf("\n    error: %s\n", e.message); }
+    }
+    check(nested, "an error inside it has the whole path");
+
     bool threw = false;
     try {
         Line bad = json.decode<Line>("{\"n\":\"x\"}");
@@ -59,7 +73,7 @@ i32 main() {
     }
     check(threw, "a decode error from the Reader says where");
 
-    /* STRICT: the reflection path, which reports the missing field */
+    /* STRICT: fromJson reports the missing field */
     bool strict = false;
     Line m;
     mem.set(&m, 0, sizeof(Line));
@@ -69,7 +83,7 @@ i32 main() {
         strict = e.code == json.ERR_DECODE;
     }
     json.free(reflect.of(m));
-    check(strict, "STRICT keeps the reflection path: a missing key is an error");
+    check(strict, "STRICT: a missing key is an error");
     bool ok = true;
     try {
         json.decode("{\"sku\":\"C\",\"n\":1}", reflect.of(m), json.STRICT);
@@ -77,7 +91,7 @@ i32 main() {
         ok = false;
         printf("\n    error: %s\n", e.message);
     }
-    check(ok && m.qty == 1 && same(m.sku, "C"), "the reflection path reads @key and leaves @skip out");
+    check(ok && m.qty == 1 && same(m.sku, "C"), "STRICT reads @key and doesn't require @skip");
     json.free(reflect.of(m));
 
     test.printResult(gCorrect, gTests);

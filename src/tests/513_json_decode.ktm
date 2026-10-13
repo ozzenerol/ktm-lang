@@ -96,7 +96,7 @@ i32 main() {
     check(fails("{\"tag\": \"much too long\"}", "tag: expected at most 7 bytes, got 13"), "a long string");
     check(fails("[1]", "expected an object, got an array"), "the root");
     check(fails("{\"id\": ", "id: expected a value, got the end of the input"), "not JSON");
-    check(fails("{\"id\": 1}", "missing who", json.STRICT), "STRICT: a missing field");
+    check(fails("{\"id\": 1}", "who: missing", json.STRICT), "STRICT: a missing field");
     check(fails("{\"id\":1,\"who\":\"\",\"role\":0,\"paid\":false,\"ship\":{\"city\":\"\",\"zip\":0},"
                 "\"bill\":null,\"items\":[],\"codes\":[],\"tag\":\"\",\"note\":null,\"small\":0,\"x\":1}",
                 "x: no such field in Order", json.STRICT), "STRICT: an unknown key");

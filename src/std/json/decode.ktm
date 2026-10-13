@@ -90,8 +90,8 @@ static void decodeGrow(Reader *r, u8 **block, i64 *count, i64 *room, reflect.Typ
 static void decodeStruct(Reader *r, reflect.Value v, i64 flags)
 {
     reflect.Type *t = v.type;
-    if (t.fromJson && !(flags & STRICT)) {
-        /* @json: its generated method */
+    if (t.fromJson) {
+        /* @json: its generated method (STRICT through the Reader) */
         fn(void *, Reader *) void fromJson = t.fromJson;
         fromJson(v.ptr, r);
         return;
@@ -124,9 +124,7 @@ static void decodeStruct(Reader *r, reflect.Value v, i64 flags)
     for (i64 i = 0; i < t.fields.len; i++) {
         reflect.Field *f = &t.fields[i];
         if (f.isPrivate || f.skip || seen[i]) { continue; }
-        String what = str.format("missing %s", f.key);
-        defer what.free();
-        r.fail(what.cstr());
+        r.fail("missing", f.key.ptr);
     }
 }
 
@@ -289,7 +287,7 @@ pub void decode(u8[] text, reflect.Value v, i64 flags = 0)
     if (!v.type || !v.ptr) {
         throw(ERR_DECODE, "decode: the value has no type (use reflect.of(x))");
     }
-    Reader r = readerNew(text);
+    Reader r = readerNew(text, flags);
     defer r.free();
     decodeInto(&r, v, flags);
     r.finish();
