@@ -591,6 +591,8 @@ ClsField *clsFieldNew(AstType *type, AoStr *field_name) {
     return f;
 }
 
+u32 CalcUnionSize(List *fields);
+
 List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
         u32 (*computeSize)(List *), u32 *_size)
 {
@@ -612,6 +614,7 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
     fields_list = listNew();
     /* For the diagnostics; an anonymous class/union has no tag. */
     char *cls_str = name ? name->data : "<anonymous>";
+    char *kind_str = computeSize == CalcUnionSize ? "union" : "struct";
 
     /* Per-field recovery point, like the per-statement one in
      * parseCompoundStatementInternal: a bad field is reported, the
@@ -659,6 +662,18 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                         "Unexpected end of input in class/union body");
             }
         }
+        /* `ad T name;`: autodefer frees a local at the end of its scope; a
+         * field has no scope of its own to end */
+        if (tok_name->tk_type == TK_IDENT && tok_name->len == 2 &&
+            !memcmp(tok_name->start, "ad", 2))
+        {
+            Lexeme *next = cctrlTokenPeekBy(cc, 1);
+            if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
+                cctrlRaiseExceptionAt(cc, tok_name->line, tok_name->col, tok_name->len,
+                        "`ad` goes on a local variable, not a %s field: free "
+                        "the field where the %s is freed", kind_str, kind_str);
+            }
+        }
         if (tokenPunctIs(tok_name,'}')) {
             break;
         } else if (cctrlTokIsKeyword(cc, tok_name)) {
@@ -684,10 +699,10 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                                                : parseClassDef(cc,NULL);
                     if (tokenPunctIs(cctrlTokenPeek(cc),';')) {
                         if (!nested->fields) {
-                            cctrlRaiseException(cc,"%s %s has no fields, expected a body or a field name in class %s",
-                                    is_union ? "union" : "class",
+                            cctrlRaiseException(cc,"%s %s has no fields, expected a body or a field name in %s %s",
+                                    is_union ? "union" : "struct",
                                     nested->clsname ? nested->clsname->data : "<anonymous>",
-                                    cls_str);
+                                    kind_str, cls_str);
                         }
                         cctrlTokenGet(cc);
                         listAppend(fields_list, clsFieldNew(nested,NULL));
@@ -699,14 +714,14 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                 case KW_CONST:
                     cctrlRaiseException(cc,"const is only allowed on declarations");
                 default:
-                    cctrlRaiseException(cc,"Unexpected keyword: `%.*s` while parsing class %s",
+                    cctrlRaiseException(cc,"Unexpected keyword: `%.*s` while parsing %s %s",
                             tok_name->len,
                             tok_name->start,
-                            cls_str);
+                            kind_str, cls_str);
             }
         } else {
-            cctrlRaiseException(cc,"Unexpected type `%.*s` while parsing class %s",
-                    tok_name->len, tok_name->start, cls_str);
+            cctrlRaiseException(cc,"Unexpected type `%.*s` while parsing %s %s",
+                    tok_name->len, tok_name->start, kind_str, cls_str);
         }
 
         while (1) {
@@ -715,15 +730,15 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             if (!tok_name) {
                 /* Nothing left to recover into; report it once. */
                 cc->current_recovery = outer_recovery;
-                cctrlRaiseException(cc, "Unexpected end of input while parsing class %s",
-                        cls_str);
+                cctrlRaiseException(cc, "Unexpected end of input while parsing %s %s",
+                        kind_str, cls_str);
             }
             if (tok_name->tk_type != TK_IDENT && !tokenPunctIs(tok_name, '(')) {
                 /* Back onto the bad token so the diagnostic points at it
                  * and the recovery skips from there. */
                 cctrlTokenRewind(cc);
-                cctrlRaiseException(cc, "Unexpected character `%.*s` while parsing class %s",
-                        tok_name->len,tok_name->start,cls_str);
+                cctrlRaiseException(cc, "Unexpected character `%.*s` while parsing %s %s",
+                        tok_name->len,tok_name->start,kind_str,cls_str);
             } else if (tokenPunctIs(tok_name, '(')) {
                 next_type = parseFunctionPointerType(cc,&fnptr_name,&fnptr_name_len,next_type);
                 field_name = aoStrDupRaw(fnptr_name,fnptr_name_len);
@@ -776,12 +791,12 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                 break;
             } else if (!tok) {
                 cc->current_recovery = outer_recovery;
-                cctrlRaiseException(cc, "Unexpected end of input while parsing class %s",
-                        cls_str);
+                cctrlRaiseException(cc, "Unexpected end of input while parsing %s %s",
+                        kind_str, cls_str);
             } else {
                 cctrlTokenRewind(cc);
-                cctrlRaiseException(cc, "Unexpected token '%.*s' while parsing class %s, perhaps you meant to terminate the field with `;`?",
-                        tok->len, tok->start, cls_str);
+                cctrlRaiseException(cc, "Unexpected token '%.*s' while parsing %s %s, perhaps you meant to terminate the field with `;`?",
+                        tok->len, tok->start, kind_str, cls_str);
            }
         }
     }
