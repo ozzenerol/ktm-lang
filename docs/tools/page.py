@@ -60,6 +60,7 @@ NAV = [
         ("lib-processes.html", "Processes"),
         ("lib-environment.html", "Environment and exit"),
         ("lib-signals.html", "Signals"),
+        ("lib-logging.html", "Logging"),
         ("lib-vectors.html", "Vectors and sorting"),
         ("lib-lists.html", "Lists"),
         ("lib-maps.html", "Hash maps"),
