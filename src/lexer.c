@@ -3809,6 +3809,13 @@ Lexeme *lexToken(Map *macro_defs, Lexer *l) {
             int member = l->after_member;
             l->after_member = tok->tk_type == TK_PUNCT &&
                               (tok->i64 == '.' || tok->i64 == TK_ARROW);
+            /* `throw` with a message calls rt.__ktmThrowFmt: a use of the
+             * file's `import rt`, though the source never names it */
+            if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_THROW) {
+                for (LexImport *imp = file->imports; imp; imp = imp->next) {
+                    if (!strcmp(imp->module->path->data, "rt")) imp->used = 1;
+                }
+            }
             if (tok->tk_type == TK_IDENT) {
                 char *before = tok->start;
                 int saved = l->after_member;
