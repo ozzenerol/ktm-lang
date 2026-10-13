@@ -1,0 +1,45 @@
+<!-- title: Building libraries -->
+<h1>Building libraries</h1>
+<p class="lede"><code>ktm -lib</code> compiles code once into a static and a shared library, so programs that use it don't recompile it.</p>
+
+<h2>A module as a library</h2>
+<p>Given the <code>geo</code> module from <a href="lang-modules.html">Modules</a>:</p>
+<pre class="shell"><code>$ ktm -lib geo geo
+$ ls -a geo
+.  ..  .ktmlib  helpers.ktm  libgeo.a  libgeo.so  shapes.ktm
+$ ktm main.ktm -o shapes && ./shapes        # main.ktm does import geo;
+25</code></pre>
+<ul class="rules">
+  <li><code>ktm -lib name dir</code> writes <code>libname.a</code>, its shared object and a <code>.ktmlib</code> file into <code>dir</code>.</li>
+  <li>A program importing the module then reads only its declarations (the sources stay, as headers would) and links the library: the archive when compiled, the shared object in the JIT.</li>
+  <li>A module's globals that run code are set by its init function, called once before the program's own globals: imports first.</li>
+  <li>Generics are kept as source: each program makes the instances it uses.</li>
+</ul>
+
+<h2>Several modules in one library</h2>
+<p>When <code>dir</code> isn't the module <code>name</code>'s own directory, every module under it is built into one library:</p>
+<pre class="shell"><code>$ ls mylib
+geo/  util/  web/http/
+$ ktm -lib mylib mylib              # mylib/libmylib.a, each module gets a .ktmlib</code></pre>
+<ul class="rules">
+  <li><code>mylib/web/http</code> is the module <code>web.http</code>.</li>
+  <li>Files at the top of <code>dir</code>, and a <code>prelude</code> directory there, are not built.</li>
+  <li>A <code>.ktmlib</code> names its library relative to itself, so a built tree can be moved.</li>
+  <li><code>-v</code> prints the commands that build it.</li>
+</ul>
+
+<h2>Where modules are found</h2>
+<p>An import is looked for next to the main file, then in the standard library, then in each directory of <code>KTM_PATH</code>:</p>
+<pre class="shell"><code>export KTM_PATH=$HOME/ktm-libs:/opt/team/ktm
+ktm main.ktm -o app</code></pre>
+
+<h2>A library for C-style use</h2>
+<p>Code that isn't a module can be built into a library and installed next to the standard one:</p>
+<pre class="shell"><code>ktm -lib mylib --install-dir=$HOME/.local mylib.ktm</code></pre>
+<p>Mark what it exports <code>pub</code>. To use it, declare its functions (and its globals with <code>extern</code>) in a
+<code>.ktmh</code> header you <code>#include</code>, and add <code>#link &lt;mylib&gt;</code>:</p>
+<pre><code>// mylib.ktmh
+i64 mylibVersion();
+extern i64 mylibCount;
+#link <mylib></code></pre>
+<p>For ktm code, a module is simpler: no header to keep in step.</p>

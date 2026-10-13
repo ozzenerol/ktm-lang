@@ -1,44 +1,38 @@
 <!-- title: Getting started -->
 <h1>Getting started</h1>
-<p class="lede">Build ktm from source, then compile and run your first programs.</p>
+<p class="lede">Build ktm, compile your first program, and set up a project with a module.</p>
 
-<h2>Requirements</h2>
-<ul>
-  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon (arm64); macOS on Intel is not supported. On Windows, use WSL2.</li>
-  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>. ktm uses the C compiler to assemble and link the code it generates.</li>
-  <li>Optional: the SQLite development package, for the SQLite bindings.</li>
+<h2>1. Requirements</h2>
+<ul class="rules">
+  <li>Linux on x86_64 or arm64, or macOS on Apple Silicon. On Windows, use WSL2.</li>
+  <li>A C compiler (gcc or clang), <code>make</code> and <code>cmake</code>: ktm uses the C compiler to assemble and link.</li>
+  <li>Optional: the SQLite development package, for the <a href="lib-sqlite.html"><code>sql</code></a> module.</li>
 </ul>
 
-<h2>Build</h2>
-<p>From the repository root, run as your normal user (not with <code>sudo</code>):</p>
-<pre><code>./build.sh</code></pre>
-<p>This builds the compiler as <code>./ktm</code> and the standard library into
-<code>build/prefix</code>. Useful options:</p>
+<h2>2. Build and install</h2>
+<p>From the repository root, as your normal user:</p>
+<pre class="shell"><code>./build.sh             # builds ./ktm and the library into build/prefix
+./build.sh --install   # also installs to /usr/local (asks for sudo for the copy)</code></pre>
 <table>
-  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <thead><tr><th>Option</th><th>Does</th></tr></thead>
   <tbody>
-    <tr><td><code>./build.sh --test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
-    <tr><td><code>./build.sh --install</code></td><td>Also install <code>ktm</code> and the library to <code>/usr/local</code> (asks for sudo only for the copy)</td></tr>
-    <tr><td><code>./build.sh --sqlite</code></td><td>Include the SQLite bindings</td></tr>
-    <tr><td><code>./build.sh --debug</code></td><td>Debug build with AddressSanitizer</td></tr>
-    <tr><td><code>./build.sh --clean</code></td><td>Start from scratch</td></tr>
+    <tr><td><code>--test</code></td><td>Build, then run the unit, JIT and LSP test suites</td></tr>
+    <tr><td><code>--install</code></td><td>Install <code>ktm</code> and the library</td></tr>
+    <tr><td><code>--sqlite</code></td><td>Include the SQLite bindings</td></tr>
+    <tr><td><code>--debug</code></td><td>A debug build with AddressSanitizer</td></tr>
+    <tr><td><code>--clean</code></td><td>Start from scratch</td></tr>
   </tbody>
 </table>
-<p>Set <code>INSTALL_PREFIX=$HOME/.local</code> to install somewhere else, and
-<code>CC=clang</code> to choose the C compiler, and <code>JOBS=4</code> to build and
-run the tests 4 at a time instead of one per CPU. A test that runs longer than
-<code>KTM_TEST_TIMEOUT</code> seconds (default 60, <code>0</code> for no limit) is
-stopped and reported as failed. The classic route also works:
-<code>make &amp;&amp; sudo make install</code>.</p>
+<p>Environment: <code>INSTALL_PREFIX=$HOME/.local</code> installs elsewhere, <code>CC=clang</code> picks the C compiler,
+<code>JOBS=4</code> limits parallel jobs, <code>KTM_TEST_TIMEOUT</code> (seconds, default 60) limits each test.</p>
+<div class="note"><p><strong>Without installing</strong>, point ktm at the local build:
+<code>./ktm --install-dir=build/prefix hello.ktm -o hello</code>. These docs assume <code>ktm</code> is on your <code>PATH</code>.</p></div>
+<p>Check it:</p>
+<pre class="shell"><code>$ ktm --version
+ktm v0.14.0</code></pre>
 
-<div class="note"><p><strong>Without installing.</strong> A program needs the standard library to
-compile. If you haven't installed ktm, point it at the local build with
-<code>--install-dir</code>:</p>
-<pre><code>./ktm --install-dir=build/prefix hello.ktm -o hello</code></pre>
-<p>The rest of these docs assume ktm is installed and on your <code>PATH</code>.</p></div>
-
-<h2>Your first program</h2>
-<p>Create <code>hello.ktm</code>:</p>
+<h2>3. Hello, world</h2>
+<p>Save this as <code>hello.ktm</code>:</p>
 <pre data-run><code>
 void main()
 {
@@ -48,81 +42,111 @@ void main()
 <pre class="output">
 Hello, world!
 </pre>
-<p>Compile and run it:</p>
-<pre><code>ktm hello.ktm -o hello
-./hello</code></pre>
-<p>Without <code>-o</code> the binary is called <code>a.out</code>.</p>
+<p>Run it three ways:</p>
+<pre class="shell"><code>ktm hello.ktm -o hello && ./hello   # compile to a native binary
+ktm -jit hello.ktm                    # compile in memory and run
+ktm -run hello.ktm                    # compile to a temporary binary and run</code></pre>
 
-<h2>Run without compiling a binary</h2>
-<p>The JIT compiles into memory and runs immediately, which is handy while developing:</p>
-<pre><code>ktm -jit hello.ktm</code></pre>
-<p>Make a file executable as a script with a shebang line. ktm skips a first line that
-starts with <code>#!</code>:</p>
-<pre><code>#!/usr/bin/env -S ktm -jit
-void main() { printf("Hello from a script\n"); }</code></pre>
-<pre><code>chmod +x hello.ktm
-./hello.ktm</code></pre>
+<h2>4. Something real</h2>
+<p>A word counter: read a file named on the command line, count the words, print the top three.</p>
+<pre><code>import cstr, fs, map, os, str, vec;
 
-<h2>How a program runs</h2>
-<p>A program starts at <code>main</code>. The file scope holds declarations (types,
-functions, globals, constants, imports); globals with an initialiser that runs code are set
-up in order before <code>main</code>.</p>
-<p>Return a value from <code>main</code> to set the exit code:</p>
-<pre><code>i32 main()
+struct Count { u8[] word; i64 n; };
+
+i64 byCount(Count *a, Count *b) { return b.n - a.n; }
+
+i32 main(i32 argc, u8 **argv)
 {
-  return 3;   // ./a.out; echo $? prints 3
+  if (argc < 2) {
+    os.eprintf("usage: %s FILE\n", argv[0]);
+    return EXIT_FAIL;
+  }
+  ad String text = fs.readAll(cstr.view(argv[1]));
+  if (!text.ptr) {
+    os.eprintf("can't read %s\n", argv[1]);
+    return EXIT_FAIL;
+  }
+
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+  ad u8[][] words = str.split(text, " ");
+  for (auto w : words) {
+    u8[] t = w.trim();
+    if (t.len) { counts.set(t, counts.getOr(t, 0) + 1); }
+  }
+
+  ad vec.Vec<Count> top = vec.new<Count>();
+  i64 it = 0;
+  Count c;
+  while (counts.next(&it, &c.word, &c.n)) { top.push(c); }
+  top.sort(&byCount);
+  for (i64 i = 0; i < top.len && i < 3; i++) { printf("%d %s\n", top.get(i).n, top.get(i).word); }
+  return EXIT_OK;
 }</code></pre>
-
-<h2>The standard library</h2>
-<p>The standard library is a set of modules: import the ones a file uses and call their
-names with the module in front (<code>import str, fs;</code> then <code>str.format(...)</code>,
-<code>fs.readAll(path)</code>). C's own functions are in <code>libc</code>. The compiler links
-<code>libktm</code> automatically. See the <a href="library.html">library guide</a>.</p>
-
-<h2>Text</h2>
-<p>A <code>String</code> is text you own: make it, free it where you made it with
-<code>defer</code>, and change it with its methods. Text you only read is a <code>u8[]</code>,
-a slice: a literal, part of a String or of a buffer, with its length, so nothing is
-copied.</p>
+<pre class="shell"><code>$ ktm wc.ktm -o wc
+$ echo "the cat and the dog and the bird the end" > words.txt
+$ ./wc words.txt
+4 the
+2 and
+1 cat</code></pre>
+<p>The same program, checked here with a fixed text instead of a file:</p>
 <pre data-run><code>
-import str;
+import map, str, vec;
+
+struct Count { u8[] word; i64 n; };
+
+i64 byCount(Count *a, Count *b) { return b.n - a.n; }
 
 void main()
 {
-  String greeting = str.format("Hello, %s", "world");
-  defer greeting.free();
-  greeting.append("!");
-  u8[] word = greeting[7:12];
-  printf("%s (%d bytes), the word is %s\n", greeting, greeting.len, word);
+  u8[] text = "the cat and the dog and the bird";
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+  ad u8[][] words = str.split(text, " ");
+  for (auto w : words) {
+    u8[] t = w.trim();
+    if (t.len) { counts.set(t, counts.getOr(t, 0) + 1); }
+  }
+
+  ad vec.Vec<Count> top = vec.new<Count>();
+  i64 it = 0;
+  Count c;
+  while (counts.next(&it, &c.word, &c.n)) { top.push(c); }
+  top.sort(&byCount);
+  for (i64 i = 0; i < top.len && i < 2; i++) { printf("%d %s\n", top.get(i).n, top.get(i).word); }
 }
 </code></pre>
 <pre class="output">
-Hello, world! (13 bytes), the word is world
+3 the
+2 and
 </pre>
 
-<h2>Several files</h2>
-<p>Put related code in a module: a directory whose files start with <code>module</code> and
-the directory's name. Mark what other code may use with <code>pub</code>:</p>
+<h2>5. A project with a module</h2>
+<p>Put related code in a directory whose files start with <code>module</code> and its name. Mark what others may use <code>pub</code>.</p>
+<pre class="shell"><code>shapes/
+├── main.ktm
+└── geometry/
+    └── area.ktm</code></pre>
 <pre><code>// geometry/area.ktm
 module geometry;
 
-pub i64 area(i64 w, i64 h)
-{
-    return w * h;
-}</code></pre>
+pub i64 rect(i64 w, i64 h) { return w * h; }</code></pre>
 <pre><code>// main.ktm
 import geometry;
 
 void main()
 {
-    printf("%d\n", geometry.area(3, 4));
+  printf("%d\n", geometry.rect(3, 4));
 }</code></pre>
-<pre><code>ktm main.ktm -o shapes</code></pre>
-<p>See <a href="language.html#modules">Modules</a> for the rest.</p>
+<pre class="shell"><code>cd shapes && ktm main.ktm -o shapes && ./shapes
+12</code></pre>
+<p>Only the main file is named: ktm finds <code>geometry</code> by the import. More on <a href="lang-modules.html">Modules</a>.</p>
 
-<h2>Next steps</h2>
-<ul>
-  <li><a href="language.html">The language</a>: types, structs, control flow, functions and more.</li>
-  <li><a href="tools.html">Tools</a>: every compiler flag, the REPL and editor setup.</li>
-  <li><a href="examples.html">Examples</a>: complete projects to read and run.</li>
-</ul>
+<h2>6. Your editor</h2>
+<p>Install the syntax files and the language server: see <a href="tools-editors.html">Editors</a>.</p>
+
+<h2>Next</h2>
+<div class="cards">
+  <a class="card" href="tour.html"><strong>A quick tour</strong><span>The language in ten short programs.</span></a>
+  <a class="card" href="from-c.html"><strong>Coming from C</strong><span>The differences, side by side.</span></a>
+  <a class="card" href="language.html"><strong>The language</strong><span>One page per topic.</span></a>
+  <a class="card" href="library.html"><strong>The library</strong><span>Files, processes, sockets, JSON.</span></a>
+</div>

@@ -1,0 +1,84 @@
+<!-- title: JIT and REPL -->
+<h1>JIT and REPL</h1>
+<p class="lede">Run code without a build step: <code>ktm -jit</code> for files and scripts, <code>ktm -repl</code> to type it in.</p>
+
+<h2>The JIT</h2>
+<p><code>ktm -jit file.ktm</code> assembles machine code into memory with ktm's own assembler and runs it.
+No C compiler, linker or files are involved, so it starts fast. Arguments after the file go to the program.</p>
+<pre class="shell"><code>$ cat args.ktm
+i32 main(i32 argc, u8 **argv)
+{
+  printf("%d %s\n", argc, argv[argc - 1]);
+  return 3;
+}
+$ ktm -jit args.ktm x y; echo "exit $?"
+3 y
+exit 3</code></pre>
+<ul class="rules">
+  <li>Programs behave the same compiled and in the JIT: every example in these docs is checked both ways.</li>
+  <li>A file with no <code>main</code> has nothing to run: <code>-jit</code> says so and exits with 1.</li>
+  <li><code>#link</code> libraries are loaded as shared objects.</li>
+</ul>
+
+<h3>Telling them apart</h3>
+<p>Compiled, this prints the lines below; in the JIT, <code>JIT</code> instead of <code>compiled</code>.</p>
+<pre data-run data-mode="aot"><code>
+void main()
+{
+#ifjit
+  printf("JIT\n");
+#endif
+#ifaot
+  printf("compiled\n");
+#endif
+  printf("either way\n");
+}
+</code></pre>
+<pre class="output">
+compiled
+either way
+</pre>
+
+<h2>Scripts</h2>
+<p>ktm skips a first line that starts with <code>#!</code>:</p>
+<pre><code>#!/usr/bin/env -S ktm -jit
+import proc;
+
+void main()
+{
+  ad String user = proc.getenv("USER");
+  printf("hello, %s\n", user);
+}</code></pre>
+<pre class="shell"><code>chmod +x hello.ktm
+./hello.ktm</code></pre>
+
+<h2 id="the-repl">The REPL</h2>
+<pre class="shell"><code>$ ktm -repl
+&gt; i64 sq(i64 x) { return x * x; }
+&gt; sq(7);
+49
+&gt; printf("hello %d\n", sq(3));
+hello 9</code></pre>
+<ul class="rules">
+  <li>Functions, structs, globals and <code>#define</code>s accumulate across the session.</li>
+  <li>The value of a trailing expression is printed.</li>
+  <li>Line editing, history (<code>~/.ktm_repl_history</code>) and tab completion are built in.</li>
+  <li>Allocations are tracked, so leaks and bad frees are reported.</li>
+  <li><code>~/.ktm_rc.ktm</code> is included at start-up; <code>#define KTM_NO_REPL_HELLO</code> there hides the welcome message.</li>
+</ul>
+
+<h3>REPL commands</h3>
+<table>
+  <thead><tr><th>Command</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>replDisasm("name");</code></td><td>Disassembles a function</td></tr>
+    <tr><td><code>replDel("name");</code></td><td>Forgets a definition so you can redefine it</td></tr>
+    <tr><td><code>replListFn();</code>, <code>replFindFn("part");</code></td><td>Lists functions, all or by name</td></tr>
+    <tr><td><code>replListGVars();</code></td><td>Lists the globals</td></tr>
+    <tr><td><code>replClassRep("name");</code></td><td>Prints a struct or union</td></tr>
+    <tr><td><code>replHeap();</code></td><td>The live allocations, biggest first</td></tr>
+    <tr><td><code>replEval("code");</code></td><td>Runs a string as REPL input</td></tr>
+    <tr><td><code>replReloadRc();</code></td><td>Reads <code>~/.ktm_rc.ktm</code> again</td></tr>
+    <tr><td><code>@ ls -la</code></td><td>Runs a shell command (through <code>system()</code>: <code>@ cd</code> doesn't move the REPL)</td></tr>
+  </tbody>
+</table>

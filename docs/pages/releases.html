@@ -277,32 +277,32 @@ i64 byX(Point *a, Point *b) { return a.x - b.x; }
 
 void main()
 {
-  ad vec.Vec&lt;Point&gt; pts = vec.new&lt;Point&gt;();
+  ad vec.Vec<Point> pts = vec.new<Point>();
   Point a = {3, 1}, b = {1, 2};
   pts.push(a);
   pts.push(b);
-  pts.sort(&amp;byX);
+  pts.sort(&byX);
   for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
   printf("\n");
 
-  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
   u8[] words[] = {"to", "be", "or", "not", "to", "be"};
   for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
   i64 it = 0, n;
   u8[] word;
-  while (counts.next(&amp;it, &amp;word, &amp;n)) { printf("%s=%d ", word, n); }
+  while (counts.next(&it, &word, &n)) { printf("%s=%d ", word, n); }
   printf("\n");
 
-  ad set.Set&lt;i64&gt; seen = set.new&lt;i64&gt;();
+  ad set.Set<i64> seen = set.new<i64>();
   printf("%d %d\n", seen.add(4), seen.add(4));
 
-  ad list.List&lt;u8 *&gt; jobs = list.new&lt;u8 *&gt;();
+  ad list.List<u8 *> jobs = list.new<u8 *>();
   auto build = jobs.append("build");
   jobs.append("test");
   jobs.remove(build);
   for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
 
-  Point p = json.decode&lt;Point&gt;("{\"x\": 5, \"y\": 6}");
+  Point p = json.decode<Point>("{\"x\": 5, \"y\": 6}");
   printf("%d %d\n", p.x, p.y);
 }
 </code></pre>
@@ -416,9 +416,9 @@ hand, with no <code>void *</code> and no casts.</p>
 
 <pre><code>import mem;
 
-struct Stack&lt;T&gt; { T *items; i64 len; i64 cap; };
+struct Stack<T> { T *items; i64 len; i64 cap; };
 
-void Stack&lt;T&gt;.push(T x)
+void Stack<T>.push(T x)
 {
   if (self.len == self.cap) {
     self.cap = self.cap ? self.cap * 2 : 4;
@@ -427,19 +427,19 @@ void Stack&lt;T&gt;.push(T x)
   self.items[self.len++] = x;
 }
 
-T Stack&lt;T&gt;.pop() { return self.items[--self.len]; }
-void Stack&lt;T&gt;.free() { mem.free(self.items); }
+T Stack<T>.pop() { return self.items[--self.len]; }
+void Stack<T>.free() { mem.free(self.items); }
 
-T max&lt;T&gt;(T a, T b) { return a &gt; b ? a : b; }
+T max<T>(T a, T b) { return a > b ? a : b; }
 
-type Ints = Stack&lt;i64&gt;;
+type Ints = Stack<i64>;
 
 void main()
 {
   ad Ints nums = {null, 0, 0};
   nums.push(1);
   nums.push(2);
-  ad Stack&lt;u8 *&gt; words = {null, 0, 0};
+  ad Stack<u8 *> words = {null, 0, 0};
   words.push("hello");
   printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
 }
@@ -543,16 +543,16 @@ i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
 
 void *worker(void *unused)
 {
-  for (i64 i = 0; i &lt; 100000; i = next(i)) { atomic.add(&amp;gHits, 1); }
+  for (i64 i = 0; i < 100000; i = next(i)) { atomic.add(&gHits, 1); }
   return null;
 }
 
 void main()
 {
   libc.pthread_t *th[4];
-  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;worker, null); }
-  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
-  printf("%d hits\n", atomic.load(&amp;gHits));
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &worker, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&gHits));
 }
 </code></pre>
 
@@ -610,7 +610,7 @@ void main()
   hash.sha256("abc", digest);
   String hex = hash.hex(digest);
   defer hex.free();
-  String q = str.urlEncode("a b&amp;c");
+  String q = str.urlEncode("a b&c");
   defer q.free();
   printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
 }
@@ -687,8 +687,8 @@ void *client(void *arg)
   i32 fd = (i32)(i64)arg;
   bytes.Buffer in = bytes.bufferNew();
   defer in.free();
-  while (coro.waitIdle(fd, libc.POLLIN, 5000) &gt; 0 &amp;&amp; in.readFrom(fd) &gt; 0) {
-    while (in.len &gt;= 4 &amp;&amp; in.len &gt;= 4 + bytes.be32(in.data())) {
+  while (coro.waitIdle(fd, libc.POLLIN, 5000) > 0 && in.readFrom(fd) > 0) {
+    while (in.len >= 4 && in.len >= 4 + bytes.be32(in.data())) {
       in.consume(4 + bytes.be32(in.data()));
       String now = date.httpDate(date.unixNow());
       net.send(fd, now);
@@ -702,13 +702,13 @@ void *client(void *arg)
 void *acceptor(void *arg)
 {
   i32 lfd = (i32)(i64)arg, fd;
-  while ((fd = coro.accept(lfd)) != -1) { coro.go(&amp;client, (void *)(i64)fd); }
+  while ((fd = coro.accept(lfd)) != -1) { coro.go(&client, (void *)(i64)fd); }
   return null;
 }
 
 void main()
 {
-  coro.go(&amp;acceptor, (void *)(i64)net.listen(9000, "*", 64));
+  coro.go(&acceptor, (void *)(i64)net.listen(9000, "*", 64));
   coro.run();
 }
 </code></pre>
@@ -773,7 +773,7 @@ struct User { i64 id; String name; Role role; u8[][] tags; };
 void main()
 {
     User u;
-    mem.set(&amp;u, 0, sizeof(User));
+    mem.set(&u, 0, sizeof(User));
     json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
                 reflect.of(u));
     defer json.free(reflect.of(u));

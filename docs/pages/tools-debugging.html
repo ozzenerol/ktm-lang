@@ -1,0 +1,64 @@
+<!-- title: Debugging -->
+<h1>Debugging</h1>
+<p class="lede">Find memory bugs with <code>-Memsafe</code>, and look at every stage of the compiler: tokens, syntax tree, IR, assembly.</p>
+
+<h2>Memory bugs: -Memsafe</h2>
+<p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks at exit.
+Each report names the line that allocated or freed the block.</p>
+<pre><code>import mem;
+
+void main()
+{
+  u8 *a = mem.alloc(16);
+  u8 *b = mem.alloc(32);
+  mem.free(a);
+  mem.free(a);      // double free
+}                   // b leaks</code></pre>
+<pre class="shell"><code>$ ktm -jit -Memsafe leaky.ktm
+Free: double free of 0x559df8f63ca8 (16 bytes)
+  allocated   in `main`+23, line 5
+  first freed in `main`+55, line 7
+  this free   in `main`+64, line 8 - ignored, heap unharmed
+memsafe: 1 allocation(s) (32 bytes) never freed
+  0x559df8f63df8        32 bytes  in `main`+42, line 6</code></pre>
+<ul class="rules">
+  <li>It works in any thread.</li>
+  <li>Only blocks from <code>mem.alloc</code>, <code>mem.allocZero</code> and <code>mem.realloc</code> are tracked; what the library allocates for you is not.</li>
+  <li>The REPL always tracks allocations: <code>replHeap();</code> lists the live ones.</li>
+</ul>
+
+<h2>Errors at run time</h2>
+<ul class="rules">
+  <li>An out-of-range slice index throws <code>ERR_BOUNDS</code> with the index, the length and where.</li>
+  <li>An uncaught error prints its code, message, file and line, and exits with 1.</li>
+  <li>Writing to a string literal faults: copy it with <code>str.from</code> first.</li>
+</ul>
+<pre data-run><code>
+void main()
+{
+  i64 nums[3] = {1, 2, 3};
+  i64[] s = nums;
+  i64 i = 3;
+  try {
+    printf("%d\n", s[i]);
+  } catch (Error e) {
+    printf("%s (%s:%d)\n", e.message, e.file, e.line);
+  }
+}
+</code></pre>
+<pre class="output">
+index 3 out of range for length 3 (example.ktm:7)
+</pre>
+
+<h2>Looking under the hood</h2>
+<pre class="shell"><code>ktm -tokens main.ktm         # what the lexer sees
+ktm -ast main.ktm            # the parsed program
+ktm --dump-ir main.ktm       # the SSA intermediate representation
+ktm -S -o- main.ktm          # the generated assembly
+ktm --expand main.ktm        # the code @json and @yaml wrote
+ktm -cfg main.ktm && dot -Tpng main.dot -o main.png   # a control flow graph</code></pre>
+<p><code>-cfg-png</code> and <code>-cfg-svg</code> write the image directly (they need Graphviz).</p>
+
+<h2>Native debuggers</h2>
+<p>A compiled ktm program is a normal executable: gdb and lldb can run it, set breakpoints on function names
+(<code>break main</code>) and show registers and memory.</p>

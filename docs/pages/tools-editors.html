@@ -1,0 +1,59 @@
+<!-- title: Editors -->
+<h1>Editors</h1>
+<p class="lede"><code>ktm -lsp</code> is a language server: any editor that speaks LSP gets errors as you type, completion, hover and navigation.</p>
+
+<h2>What the server gives</h2>
+<ul class="rules">
+  <li><strong>Diagnostics</strong> as you type; a module's files are checked as the module they belong to.</li>
+  <li><strong>Hover</strong>: the declaration and its doc comment, for functions, methods, fields, enums, modules, aliases and generics, the standard library's included.</li>
+  <li><strong>Completion</strong>: names in scope, fields and methods after <code>.</code>, a module's names after its prefix, enum members, the modules an <code>import</code> can name.</li>
+  <li><strong>Signature help</strong>, with the parameter you are on and every overload.</li>
+  <li><strong>Go to definition</strong>, find references, highlight uses, rename.</li>
+  <li><strong>Outline</strong> and workspace symbol search.</li>
+  <li><strong>Semantic highlighting</strong>: modules, types, enum members, functions, fields, parameters, locals, constants, macros.</li>
+  <li><strong>Folding</strong> and <strong>inlay hints</strong> with the type of each <code>auto</code> variable.</li>
+</ul>
+<p>A doc comment is the comment right above a declaration, or after it on its line.</p>
+
+<h2 id="neovim">Neovim</h2>
+<p>The syntax, filetype and indent files install into <code>&lt;prefix&gt;/share/ktm/vim</code>
+(in a checkout: <code>src/syntax-highlighting/vim</code>).</p>
+<h3>With lazy.nvim (Neovim 0.11+)</h3>
+<p>lazy.nvim resets the runtime path when it starts, so add the directory through its own setting:</p>
+<pre><code class="language-lua">require("lazy").setup({
+  -- your plugins ...
+  performance = { rtp = { paths = { "/usr/local/share/ktm/vim" } } },
+})
+
+vim.lsp.config("ktm", { cmd = { "ktm", "-lsp" }, filetypes = { "ktm" }, root_markers = { ".git" } })
+vim.lsp.enable("ktm")</code></pre>
+
+<h3>Without a plugin manager</h3>
+<pre><code class="language-lua">vim.opt.rtp:append("/usr/local/share/ktm/vim")
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "ktm",
+  callback = function(ev)
+    vim.lsp.start({
+      name = "ktm",
+      cmd = { "ktm", "-lsp" },
+      root_dir = vim.fs.root(ev.buf, { ".git" })
+                 or vim.fs.dirname(vim.api.nvim_buf_get_name(ev.buf)),
+    })
+    vim.lsp.inlay_hint.enable(true, { bufnr = ev.buf })
+  end,
+})</code></pre>
+<p>Semantic highlighting needs nothing more: Neovim colours the tokens with its <code>@lsp.type.*</code> groups
+(link <code>@lsp.type.namespace.ktm</code> and the others to change them).</p>
+
+<h2 id="vim">Vim</h2>
+<pre><code class="language-vim">set runtimepath+=/usr/local/share/ktm/vim
+filetype plugin indent on
+syntax on</code></pre>
+
+<h2 id="other-editors">Other editors</h2>
+<ul class="rules">
+  <li>Point the editor's generic LSP client at <code>ktm -lsp</code> for <code>.ktm</code> and <code>.ktmh</code> files.</li>
+  <li>If ktm isn't installed, add <code>--install-dir=/path/to/build/prefix</code> so it finds the standard library.</li>
+  <li>Set <code>KTM_LSP_LOG=1</code> in the server's environment to log its traffic to stderr.</li>
+</ul>
