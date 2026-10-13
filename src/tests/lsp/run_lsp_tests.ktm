@@ -1202,6 +1202,23 @@ void testRegressions() {
     lspDidOpen(l, uri, REG_HC);
     check("regression fixture is clean", lastPublishClean(l));
 
+    /* generics of modules the server reads at startup (str, with rt and
+     * the prelude) and of vec: once false errors from module numbers
+     * the startup parse gave ("Type `Vec` has not been declared") */
+    u8 *genUri = uriOf("std_generics.ktm");
+    lspDidOpen(l, genUri,
+        "import str, vec;\n"
+        "vec.Vec<String> gNames = vec.new<String>();\n"
+        "void main() {\n"
+        "  ad vec.Vec<u8[]> v = vec.new<u8[]>();\n"
+        "  v.push(\"a\");\n"
+        "  gNames.push(str.from(\"b\"));\n"
+        "  ad String s = str.join(&v, \" \");\n"
+        "  ad String t = str.join(&gNames, \", \");\n"
+        "  printf(\"%s %s\\n\", s, t);\n"
+        "}\n");
+    check("stdlib generics (vec, str.join) give no false errors", lastPublishClean(l));
+
     i64 line;
     i64 chr;
     posOf(REG_HC, "Square(counter)", 1, &line, &chr);

@@ -1,5 +1,5 @@
 module str;
-import cstr, libc, mem, vec;
+import cstr, libc, mem;
 
 /* The String type is the prelude's (every file sees it); its constructors
  * and methods are here. A String you get from one of these is yours:
@@ -319,8 +319,9 @@ pub String join(u8[][] parts, u8[] sep)
     return out;
 }
 
-/* The same for the Strings of a Vec: str.join(&names, ", ") */
-pub String join(vec.Vec<String> *parts, u8[] sep)
+/* The same for a Vec of Strings or of views (anything with .len and
+ * .get(i)): str.join(&names, ", "). Generic, so str needn't import vec. */
+pub String join<V>(V *parts, u8[] sep)
 {
     i64 n = 0;
     for (i64 i = 0; i < parts.len; ++i) { n += parts.get(i).len + (i ? sep.len : 0); }
@@ -330,12 +331,6 @@ pub String join(vec.Vec<String> *parts, u8[] sep)
         out.append(parts.get(i));
     }
     return out;
-}
-
-/* The same for the views of a Vec */
-pub String join(vec.Vec<u8[]> *parts, u8[] sep)
-{
-    return join(parts.items(), sep);
 }
 
 /* Every old in it replaced by new (an empty old changes nothing) */

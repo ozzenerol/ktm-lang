@@ -116,6 +116,7 @@ typedef struct GenericDef {
     Vec *params;         /* AoStr *: T, K, V */
     Vec *toks;           /* Lexeme *: the whole declaration */
     u32 module_id;
+    AoStr *module_path;          /* its module's name, for another lexer's ids */
     int is_pub;
     struct AstType *tmpl;        /* GEN_STRUCT: the type `Vec` names */
     struct GenericDef *of;       /* GEN_METHOD: its struct's definition */
