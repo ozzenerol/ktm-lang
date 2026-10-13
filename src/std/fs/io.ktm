@@ -412,10 +412,10 @@ pub i64 pwrite(i32 fd, u8[] data, i64 off)
 }
 
 /* The working directory changed to path (`~` and `~/...` are under
- * $HOME): 0, or -1 with errno set */
-pub i32 changeDir(u8[] path)
+ * $HOME): true, or false with os.errno() set */
+pub bool changeDir(u8[] path)
 {
     u8 cpath[FS_PATH_MAX];
-    if (!fsPath(path, cpath)) { return -1; }
-    return changeDirC(cpath);
+    if (!fsPath(path, cpath)) { return false; }
+    return changeDirC(cpath) == 0;
 }

@@ -56,7 +56,7 @@ bool captured(u8 *want, u8 *path=null) {
 i32 main() {
     i64 correct = 0, tests = 0;
     u8 root[64], *full;
-    i32 r;
+    bool r;
     printf("Test - Rm flags: ");
 
     cstr.copy(root, "./ktm-test-306-XXXXXX");
@@ -82,47 +82,47 @@ i32 main() {
     /* A file goes with any flags, quietly unless RM_VERBOSE */
     capture();
     r = fs.remove(cstr.view(P("w/a")));
-    tests++; if (captured("") && r == 0 && !exists("w/a")) { correct++; }
+    tests++; if (captured("") && r && !exists("w/a")) { correct++; }
     capture();
     r = fs.remove(cstr.view(P("w/b")), fs.REMOVE_FORCE);
-    tests++; if (captured("") && r == 0 && !exists("w/b")) { correct++; }
+    tests++; if (captured("") && r && !exists("w/b")) { correct++; }
     capture();
     r = fs.remove(cstr.view(P("w/c")), fs.REMOVE_RECURSE);
-    tests++; if (captured("") && r == 0 && !exists("w/c")) { correct++; }
+    tests++; if (captured("") && r && !exists("w/c")) { correct++; }
     full = cstr.dup(P("w/d"));
     capture();
     r = fs.remove(cstr.view(full));
-    tests++; if (captured("") && r == 0 && !exists("w/d")) { correct++; }
+    tests++; if (captured("") && r && !exists("w/d")) { correct++; }
     mem.free(full);
 
     /* A missing file: an error, unless RM_FORCE */
-    tests++; if (fs.remove(cstr.view(P("w/zz"))) == -1) { correct++; }
+    tests++; if (!fs.remove(cstr.view(P("w/zz")))) { correct++; }
     capture();
     r = fs.remove(cstr.view(P("w/zz")), fs.REMOVE_FORCE);
-    tests++; if (captured("") && r == 0) { correct++; }
-    tests++; if (fs.remove(cstr.view(P("w/zz")), fs.REMOVE_FORCE|fs.REMOVE_RECURSE) == 0) { correct++; }
-    tests++; if (fs.remove(cstr.view(null)) == -1) { correct++; }
+    tests++; if (captured("") && r) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/zz")), fs.REMOVE_FORCE|fs.REMOVE_RECURSE)) { correct++; }
+    tests++; if (!fs.remove(cstr.view(null))) { correct++; }
 
     /* An empty directory goes quietly; with RM_VERBOSE it says so */
     capture();
     r = fs.remove(cstr.view(P("w/empty")));
-    tests++; if (captured("") && r == 0 && !exists("w/empty")) { correct++; }
+    tests++; if (captured("") && r && !exists("w/empty")) { correct++; }
     full = cstr.dup(P("w/empty2"));
     capture();
     r = fs.remove(cstr.view(full));
-    tests++; if (captured("") && r == 0 &&
+    tests++; if (captured("") && r &&
                              !exists("w/empty2")) { correct++; }
     mem.free(full);
 
     /* A full directory needs RM_RECURSE */
     capture();
     r = fs.remove(cstr.view(P("w/full")));
-    tests++; if (captured("") && r == -1 && exists("w/full/f")) { correct++; }
-    tests++; if (fs.remove(cstr.view(P("w/full")), fs.REMOVE_FORCE) == -1 && exists("w/full/f")) { correct++; }
-    tests++; if (fs.remove(cstr.view(P("w/full")), fs.REMOVE_RECURSE) == 0 && !exists("w/full")) { correct++; }
+    tests++; if (captured("") && !r && exists("w/full/f")) { correct++; }
+    tests++; if (!fs.remove(cstr.view(P("w/full")), fs.REMOVE_FORCE) && exists("w/full/f")) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w/full")), fs.REMOVE_RECURSE) && !exists("w/full")) { correct++; }
 
     fs.remove(gOut);
-    tests++; if (fs.remove(cstr.view(P("w")), fs.REMOVE_RECURSE) == 0 && !exists("w")) { correct++; }
+    tests++; if (fs.remove(cstr.view(P("w")), fs.REMOVE_RECURSE) && !exists("w")) { correct++; }
     full = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cstr.view(full));
     mem.free(full);

@@ -17,7 +17,7 @@ i32 main() {
 
     String dir = str.format("./ktm-533-%d", libc.getpid());
     defer dir.free();
-    check(fs.makeDir(dir) == 0, "makeDir");
+    check(fs.makeDir(dir), "makeDir");
     String file = str.format("%s/data.bin", dir);
     String link = str.format("%s/link", dir);
     String dangling = str.format("%s/dangling", dir);
@@ -82,7 +82,7 @@ i32 main() {
     String none = fs.realPath(dangling);
     check(none.ptr == null && os.errno() == 2, "realPath of a dangling link: null, ENOENT");
 
-    check(fs.remove(dir, fs.REMOVE_RECURSE) == 0, "remove");
+    check(fs.remove(dir, fs.REMOVE_RECURSE), "remove");
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

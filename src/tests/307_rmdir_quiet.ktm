@@ -64,7 +64,7 @@ bool hasLine(u8 *out, u8 *fmt, u8 *name) {
 i32 main() {
     i64 correct = 0, tests = 2;
     u8 root[64], *out;
-    i32 r;
+    bool r;
     printf("Test - removeDir is quiet: ");
 
     cstr.copy(root, "./ktm-test-307-XXXXXX");
@@ -80,7 +80,7 @@ i32 main() {
     capture();
     r = fs.removeDir(cstr.view(P("q")), fs.REMOVE_RECURSE);
     out = captured();
-    if (r == 0 && !exists("q")) { correct++; }
+    if (r && !exists("q")) { correct++; }
     if (out && !cstr.cmp(out, "")) { correct++; }
     else { printf("printed '%s'\n", out); }
     mem.free(out);

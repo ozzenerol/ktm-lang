@@ -70,7 +70,7 @@ i32 main() {
             correct++;
         }
         out = fs.readAll(cstr.view(cstr.formatTo(tree, "%s/out", root))).take();
-        if (out && libc.strstr(out, "result=0\n")) { correct++; }
+        if (out && libc.strstr(out, "result=1\n")) { correct++; }
         else if (out) { printf("%s\n", out); }
         if (out) { mem.free(out); }
         if (!exists(cstr.formatTo(tree, "%s/t", root))) { correct++; }

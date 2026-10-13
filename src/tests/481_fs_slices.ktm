@@ -21,7 +21,7 @@ i32 main() {
     printf("Test - fs with String and u8[]: ");
     String dir = str.format("./ktm-481-%d", getpid());
     defer dir.free();
-    check(fs.makeDir(dir) == 0, "makeDir of a String");
+    check(fs.makeDir(dir), "makeDir of a String");
     String path = str.format("%s/notes.txt", dir);
     defer path.free();
 
@@ -57,10 +57,10 @@ i32 main() {
     defer huge.free();
     for (i64 i = 0; i < 5000; i++) { huge.appendByte('a'); }
     os.setErrno(0);
-    check(!fs.writeAll(huge, "x") && os.errno() != 0 && fs.makeDir(huge) == -1, "a path too long");
+    check(!fs.writeAll(huge, "x") && os.errno() != 0 && !fs.makeDir(huge), "a path too long");
 
     fs.FileStat st;
-    check(fs.stat(&st, path) == 0 && fs.remove(dir, fs.REMOVE_RECURSE) == 0 &&
+    check(fs.stat(&st, path) == 0 && fs.remove(dir, fs.REMOVE_RECURSE) &&
           fs.stat(&st, path) == -1, "stat, remove of a String");
 
     test.printResult(gCorrect, gTests);

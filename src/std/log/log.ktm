@@ -114,7 +114,7 @@ static void logRotate(Logger *lg)
             to.free();
         }
         String first = logRotatedName(path, 1);
-        if (fs.rename(cstr.view(path), first) != 0) { truncate = true; }
+        if (!fs.rename(cstr.view(path), first)) { truncate = true; }
         first.free();
     }
     lg.fd = logOpenFile(path, truncate);
