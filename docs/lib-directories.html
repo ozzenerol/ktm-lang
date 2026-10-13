@@ -63,7 +63,7 @@ mem.copy(dir, "/tmp/ktm_docs_XXXXXX", 21);
 mkdtemp(dir);</code></pre>
 
 <h2 id="listing-names">Listing names<a class="anchor" href="#listing-names" aria-label="Link to this section">#</a></h2>
-<p><code>fs.list(path)</code> is the names in a directory, sorted, as a <code>vec.Vec&lt;String&gt;</code>. Free it with <code>fs.freeList</code>.</p>
+<p><code>fs.list(path)</code> is the names in a directory, sorted, as a <code>vec.Vec&lt;String&gt;</code>. Free it with <code>free()</code>, which frees the names too.</p>
 <pre data-run><code>import cstr, fs, mem, vec;
 
 extern "c" u8 *mkdtemp(u8 *template);
@@ -85,7 +85,7 @@ void main()
   printf("ok %d:", ok);
   for (auto name : list) { printf(" %s", name); }
   printf("\n");
-  fs.freeList(&amp;list);
+  list.free();
   fs.remove(root, fs.REMOVE_RECURSE);
 }
 </code></pre>

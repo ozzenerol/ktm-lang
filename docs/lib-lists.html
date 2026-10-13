@@ -170,7 +170,7 @@ void main()
 <ul class="rules">
   <li><code>mergeAppend(&amp;other)</code> and <code>mergePrepend(&amp;other)</code> move every node and leave <code>other</code> empty.</li>
   <li><code>clear()</code> frees every node and leaves the list usable. <code>free()</code> does the same, for <code>ad</code>.</li>
-  <li>Neither frees what the values point to: that is yours.</li>
+  <li>Both free <code>String</code> values; <code>remove</code>, <code>shift</code> and <code>pop</code> hand a value back to you. Other values are yours: neither frees what they point to.</li>
 </ul>
 
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-vectors.html"><span>Previous</span>Vectors and sorting</a><a class="next" href="lib-maps.html"><span>Next</span>Hash maps</a></nav>

@@ -143,7 +143,7 @@ void main()
   <li><code>i64</code>, <code>u64</code>, <code>i32</code>, <code>u32</code>, pointers, <code>u8[]</code> and <code>String</code> have their own hash and compare.</li>
   <li>Any other type (a struct) is hashed and compared by its bytes: set every field of a struct key, padding included (start from <code>{0}</code>).</li>
   <li>A <code>u8[]</code> or <code>String</code> key is copied: you can pass a reused buffer, and the map frees its copies.</li>
-  <li>Values are stored as they are: free what they point to yourself before <code>free()</code>.</li>
+  <li>A <code>String</code> value is the map's: freed with the map, by <code>delete</code>, and when <code>set</code> replaces it. Other values are stored as they are: free what they point to yourself before <code>free()</code>.</li>
 </ul>
 <pre data-run><code>import map;
 
@@ -168,7 +168,8 @@ treasure
 </pre>
 
 <h2 id="a-cache-of-strings">A cache of Strings<a class="anchor" href="#a-cache-of-strings" aria-label="Link to this section">#</a></h2>
-<p>When the values are Strings you made, free them before the map goes:</p>
+<p>String values belong to the map: <code>free()</code>, <code>clear()</code>, <code>delete</code> and a
+<code>set</code> that replaces one free them. <code>keys()</code> and <code>values()</code> give copies of their own.</p>
 <pre data-run><code>import map, str;
 
 void main()
@@ -176,11 +177,8 @@ void main()
   map.Map&lt;i64, String&gt; cache = map.new&lt;i64, String&gt;();
   for (i64 i = 1; i &lt;= 3; i++) { cache.set(i, str.format("value %d", i * i)); }
   printf("%s\n", cache.getOr(3, str.new()));
-
-  i64 it = 0;
-  String v;
-  while (cache.next(&amp;it, null, &amp;v)) { v.free(); }
-  cache.free();
+  cache.set(3, str.from("replaced"));   // the old "value 9" is freed
+  cache.free();                         // and every value with it
 }
 </code></pre>
 <pre class="output">value 9

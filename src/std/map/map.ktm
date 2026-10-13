@@ -7,8 +7,9 @@ import libc, mem, str, vec;
  * hashed with map.hashOf and compared with map.keyEq: i64, u64, i32,
  * u32, any pointer, u8[] and String have their own; any other type is
  * hashed and compared by its bytes (initialise a struct key fully). A
- * u8[] or String key is copied, and the map frees its copy; values are
- * yours. */
+ * u8[] or String key is copied, and the map frees its copy. A String
+ * value is the map's too: freed by delete, clear, free and a set that
+ * replaces it; other values are yours. */
 
 const i64 EMPTY = -1;
 const i64 GONE = -2;
@@ -121,6 +122,7 @@ pub void Map<K, V>.set(K k, V v) {
     u64 h = hashOf(k);
     i64 at = self.find(k, h);
     if (at >= 0) {
+        valueReplaced(self.entries[self.slots[at]].value, v);
         self.entries[self.slots[at]].value = v;
         return;
     }
@@ -171,6 +173,7 @@ pub bool Map<K, V>.delete(K k) {
     if (at < 0) { return false; }
     i64 e = self.slots[at];
     keyFree(self.entries[e].key);
+    valueFree(self.entries[e].value);
     self.entries[e].live = false;
     self.slots[at] = GONE;
     self.len--;
@@ -194,12 +197,13 @@ pub bool Map<K, V>.next(i64 *it, K *k, V *v) {
     return false;
 }
 
-/* The keys (views of the map's own copies) and the values, in insertion
- * order, as a new Vec */
+/* The keys and the values, in insertion order, as a new Vec: String
+ * keys and values as copies of their own (the Vec frees them), u8[] keys
+ * as views of the map's copies */
 pub vec.Vec<K> Map<K, V>.keys() {
     vec.Vec<K> out = vec.new<K>(self.len + 1);
     for (i64 e = 0; e < self.nentries; e++) {
-        if (self.entries[e].live) { out.push(self.entries[e].key); }
+        if (self.entries[e].live) { out.push(ownCopy(self.entries[e].key)); }
     }
     return out;
 }
@@ -207,7 +211,7 @@ pub vec.Vec<K> Map<K, V>.keys() {
 pub vec.Vec<V> Map<K, V>.values() {
     vec.Vec<V> out = vec.new<V>(self.len + 1);
     for (i64 e = 0; e < self.nentries; e++) {
-        if (self.entries[e].live) { out.push(self.entries[e].value); }
+        if (self.entries[e].live) { out.push(ownCopy(self.entries[e].value)); }
     }
     return out;
 }
@@ -215,7 +219,10 @@ pub vec.Vec<V> Map<K, V>.values() {
 /* Empty again, keeping its room */
 pub void Map<K, V>.clear() {
     for (i64 e = 0; e < self.nentries; e++) {
-        if (self.entries[e].live) { keyFree(self.entries[e].key); }
+        if (self.entries[e].live) {
+            keyFree(self.entries[e].key);
+            valueFree(self.entries[e].value);
+        }
     }
     for (i64 i = 0; i < self.nslots; i++) { self.slots[i] = EMPTY; }
     self.nentries = 0;
