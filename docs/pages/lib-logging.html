@@ -1,0 +1,182 @@
+<!-- title: Logging -->
+<!-- ref: log -->
+<h1>Logging</h1>
+<p class="lede"><code>log</code> writes one short line per call to stderr or a file: the time, the level, and optionally where the call is.
+Files rotate by size, and a Logger can be shared by threads.</p>
+
+<h2>A first log</h2>
+<pre><code>
+import log;
+
+void main()
+{
+  log.Options o = log.options();   // stderr, INFO and up
+  log.Logger *lg = log.open(&o);
+  defer lg.close();
+
+  lg.info("listening on :%d", 8080);
+  lg.warn("slow request: %d ms", 950);
+  lg.error("db: %s", "connection refused");
+  lg.debug("not written: below INFO");
+}
+</code></pre>
+<pre class="output">
+2026-10-13T14:02:11.482Z INFO listening on :8080
+2026-10-13T14:02:11.483Z WARN slow request: 950 ms
+2026-10-13T14:02:11.483Z ERROR db: connection refused
+</pre>
+<ul class="rules">
+  <li>Each line is the time in UTC with milliseconds, the level's name, then the message.</li>
+  <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments.</li>
+  <li>A newline in a message is written as <code>\n</code>, so one call is always one line.</li>
+</ul>
+
+<h2>Options</h2>
+<p>Start from <code>log.options()</code> and change the fields you need. <code>log.open</code> copies them.</p>
+<table>
+  <thead><tr><th>Field</th><th>Default</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>path</code></td><td><code>null</code></td><td>The file to append to; <code>null</code> writes to stderr</td></tr>
+    <tr><td><code>threadSafe</code></td><td><code>false</code></td><td>A mutex around each line, for a Logger several threads share</td></tr>
+    <tr><td><code>maxBytes</code></td><td>0</td><td>Rotate before a line would take the file past this size; 0 never rotates</td></tr>
+    <tr><td><code>keep</code></td><td>0</td><td>How many rotated files to keep: <code>path.1</code> (newest) to <code>path.&lt;keep&gt;</code></td></tr>
+    <tr><td><code>showFile</code></td><td><code>false</code></td><td>The call's file name and line</td></tr>
+    <tr><td><code>showFunc</code></td><td><code>false</code></td><td>The function the call is in</td></tr>
+    <tr><td><code>level</code></td><td><code>log.Level.info</code></td><td>The least important level written</td></tr>
+  </tbody>
+</table>
+
+<h2>Where a line comes from</h2>
+<pre><code>
+import log;
+
+void serve(log.Logger *lg)
+{
+  lg.warn("slow request: %d ms", 950);
+}
+
+void main()
+{
+  log.Options o = log.options();
+  o.path = "app.log";
+  o.showFile = true;
+  o.showFunc = true;
+  log.Logger *lg = log.open(&o);
+  defer lg.close();
+
+  lg.info("listening on :%d", 8080);
+  serve(lg);
+}
+</code></pre>
+<p><code>app.log</code>:</p>
+<pre class="output">
+2026-10-13T14:02:11.482Z INFO main.ktm:17 main: listening on :8080
+2026-10-13T14:02:11.483Z WARN main.ktm:5 serve: slow request: 950 ms
+</pre>
+<p>The compiler fills in the file, line and function at each call, with
+<a href="lang-functions.html#where-a-call-comes-from"><code>@caller</code> parameters</a>. Nothing is looked up while the program runs.</p>
+
+<h2>Levels</h2>
+<table>
+  <thead><tr><th>Level</th><th>Written as</th></tr></thead>
+  <tbody>
+    <tr><td><code>log.Level.debug</code></td><td><code>DEBUG</code></td></tr>
+    <tr><td><code>log.Level.info</code></td><td><code>INFO</code></td></tr>
+    <tr><td><code>log.Level.warn</code></td><td><code>WARN</code></td></tr>
+    <tr><td><code>log.Level.error</code></td><td><code>ERROR</code></td></tr>
+  </tbody>
+</table>
+<p>A Logger writes its <code>level</code> and everything after it. <code>lg.level</code> can be changed at any time,
+for example to <code>log.Level.debug</code> while chasing a bug. A call below the level returns before it formats anything.</p>
+
+<h2>Rotating a file</h2>
+<p>With <code>maxBytes</code> set, the file is rotated before a line would take it past that size:
+<code>app.log</code> becomes <code>app.log.1</code>, <code>app.log.1</code> becomes <code>app.log.2</code>, and so on up to <code>keep</code>,
+and the oldest is dropped.</p>
+<pre data-run><code>
+import fs, log;
+
+void report(u8[] name)
+{
+  printf("%s: %s\n", name, fs.exists(name) ? "kept" : "none");
+  fs.remove(name);
+}
+
+void main()
+{
+  log.Options o = log.options();
+  o.path = "app.log";
+  o.maxBytes = 200;     // about four lines
+  o.keep = 2;
+  log.Logger *lg = log.open(&o);
+  for (i64 i = 1; i <= 20; i++) {
+    lg.info("request number %d", i);
+  }
+  lg.close();
+
+  report("app.log");
+  report("app.log.1");
+  report("app.log.2");
+  report("app.log.3");
+}
+</code></pre>
+<pre class="output">
+app.log: kept
+app.log.1: kept
+app.log.2: kept
+app.log.3: none
+</pre>
+<ul class="rules">
+  <li>A line is never split: if one line is bigger than <code>maxBytes</code>, it gets a file of its own.</li>
+  <li>With <code>keep</code> 0 the file is emptied and started again.</li>
+  <li>Reopening an existing file appends to it and counts its size towards <code>maxBytes</code>.</li>
+  <li>Rotation is for one process. Several programs writing to one file should each have their own.</li>
+</ul>
+
+<h2>Threads</h2>
+<p>With <code>threadSafe</code>, one mutex covers taking the time, rotating and writing, so the lines of different
+threads never mix and come out in time order. Without it there is no locking at all, which suits a single-threaded
+program or one Logger per thread.</p>
+<pre data-run><code>
+import fs, libc, log;
+
+log.Logger *gLog;
+
+void *work(void *arg)
+{
+  for (i64 i = 0; i < 100; i++) {
+    gLog.info("worker %d step %d", (i64)arg, i);
+  }
+  return null;
+}
+
+void main()
+{
+  log.Options o = log.options();
+  o.path = "threads.log";
+  o.threadSafe = true;
+  gLog = log.open(&o);
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &work, (void *)i); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  gLog.close();
+
+  String text = fs.readAll("threads.log");
+  i64 lines = 0;
+  for (i64 i = 0; i < text.len; i++) { if (text.ptr[i] == '\n') { lines++; } }
+  printf("%d lines\n", lines);
+  text.free();
+  fs.remove("threads.log");
+}
+</code></pre>
+<pre class="output">
+400 lines
+</pre>
+
+<h2>Errors</h2>
+<ul class="rules">
+  <li><code>log.open</code> throws <code>log.ERR_LOG</code> when the file can't be opened. The message says why.</li>
+  <li>After that, a log call never throws. A line a failed write drops (a full disk, say) is counted in <code>lg.failed</code>.</li>
+  <li>Each line is one <code>write</code> to a file opened for appending, with nothing buffered, so a crash loses nothing already logged.</li>
+  <li><code>lg.close()</code> closes the file (never stderr) and frees the Logger.</li>
+</ul>
