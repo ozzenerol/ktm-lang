@@ -1,7 +1,7 @@
 <!-- title: Logging -->
 <!-- ref: log -->
 <h1>Logging</h1>
-<p class="lede"><code>log</code> writes one short line per call to stderr or a file: the time, the level, and optionally where the call is.
+<p class="lede"><code>log</code> writes one short line per call to stderr, stdout or a file: the time, the level, and optionally where the call is.
 Files rotate by size, a Logger can be shared by threads, and the default logger is there from anywhere in the program.</p>
 
 <h2>A first log</h2>
@@ -87,6 +87,7 @@ app.log:
   <thead><tr><th>Field</th><th>Default</th><th>Does</th></tr></thead>
   <tbody>
     <tr><td><code>path</code></td><td><code>null</code></td><td>The file to append to; <code>null</code> writes to stderr</td></tr>
+    <tr><td><code>toStdout</code></td><td><code>false</code></td><td>With no <code>path</code>, write to stdout instead of stderr, in order with <code>printf</code></td></tr>
     <tr><td><code>threadSafe</code></td><td><code>false</code></td><td>A mutex around each line, for a Logger several threads share</td></tr>
     <tr><td><code>maxBytes</code></td><td>0</td><td>Rotate before a line would take the file past this size; 0 never rotates</td></tr>
     <tr><td><code>keep</code></td><td>0</td><td>How many rotated files to keep: <code>path.1</code> (newest) to <code>path.&lt;keep&gt;</code></td></tr>

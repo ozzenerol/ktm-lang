@@ -22,6 +22,7 @@ pub enum Level { debug, info, warn, error };
  * Options isn't zeroed), then change what you need. */
 pub struct Options {
     u8 *path;          /* the file, appended to; null for stderr */
+    bool toStdout;     /* with no path: stdout instead of stderr */
     bool threadSafe;   /* a mutex around each line, for loggers threads share */
     i64 maxBytes;      /* rotate before a line would take the file past it; 0 never */
     i64 keep;          /* rotated files kept: path.1 (newest) to path.<keep> */
@@ -73,7 +74,7 @@ pub Logger *open(Options *o)
     if (lg.opts.maxBytes < 0) { lg.opts.maxBytes = 0; }
     if (lg.opts.keep < 0) { lg.opts.keep = 0; }
     if (!o.path) {
-        lg.fd = 2;
+        lg.fd = o.toStdout ? 1 : 2;
     } else {
         lg.opts.path = cstr.dup(o.path);
         lg.fd = logOpenFile(lg.opts.path, false);
@@ -169,6 +170,8 @@ static void logWrite(Logger *lg, Level level, u8 *file, i64 line, u8 *func,
     {
         logRotate(lg);
     }
+    /* what printf holds comes first, so the two stay in order */
+    if (lg.fd == 1) { libc.fflush(libc.stdout); }
     i64 done = 0;
     while (lg.fd >= 0 && done < full.len) {
         i64 n = libc.write(lg.fd, full.ptr + done, full.len - done);
