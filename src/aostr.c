@@ -142,6 +142,9 @@ AoStr *aoStrAlloc(u64 capacity) {
     buf->data = aoStrBufferAlloc(capacity, &actual);
     buf->capacity = actual;
     buf->len = 0;
+    /* a pooled buffer still holds its old bytes: an empty string must read
+     * as "" */
+    buf->data[0] = '\0';
     return buf;
 }
 
