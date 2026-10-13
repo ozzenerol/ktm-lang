@@ -4,6 +4,15 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.15.2 <small>(2026-10-13)</small></h2>
+<p>One fix for the language server.</p>
+<ul>
+  <li>The language server could send a semantic-tokens reply with stray bytes in it when a file had
+  nothing to highlight (a file that is only <code>module cli;</code>, say). Neovim then reported
+  <code>INVALID_SERVER_JSON: Expected value but found invalid token</code>. The reply is now an empty
+  list. The cause was in the compiler's string buffers, which now always start empty.</li>
+</ul>
+
 <h2>v0.15.1 <small>(2026-10-13)</small></h2>
 <p>Two fixes for compile errors.</p>
 <ul>
