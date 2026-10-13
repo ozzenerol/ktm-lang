@@ -2486,6 +2486,11 @@ static char *astParamsToString(Vec *params) {
                 else          aoStrCatFmt(str,"..."); 
             } else {
                 char *label;
+                if (param->flags & AST_FLAG_CALLER) {
+                    aoStrCatPrintf(str, "@caller(\"%s\") ",
+                        param->flags & AST_FLAG_CALLER_FILE ? "file" :
+                        param->flags & AST_FLAG_CALLER_LINE ? "line" : "func");
+                }
                 if (param->kind == AST_DEFAULT_PARAM) {
                     /* `I64 level=2`: name, then the default value. */
                     AoStr *name = astLValueToAoStr(param->declvar,0);

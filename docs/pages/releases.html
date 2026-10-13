@@ -4,6 +4,25 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.15.0 <small>(2026-10-13)</small></h2>
+<p>Logging, and functions that know where they were called from.</p>
+<ul>
+  <li>A new <code>log</code> module: <code>lg.debug</code>, <code>info</code>, <code>warn</code>
+  and <code>error</code> write one short line each, to stderr or a file:
+  <code>2026-10-13T14:02:11.482Z INFO listening on :8080</code>. <code>showFile</code> and
+  <code>showFunc</code> add the call's <code>main.ktm:42</code> and function. A file rotates by
+  size (<code>maxBytes</code>, <code>keep</code>), and <code>threadSafe</code> lets several threads
+  share one Logger without their lines mixing. See <a href="lib-logging.html">Logging</a>.</li>
+  <li><code>@caller("file")</code>, <code>@caller("line")</code> and <code>@caller("func")</code>
+  before a parameter: every call fills it with where the call is written, and callers never pass
+  it. They work in methods, before <code>...args</code>, next to defaults and through
+  <code>auto</code> function pointers. Signature help in the language server skips them. See
+  <a href="lang-functions.html#where-a-call-comes-from">Where a call comes from</a>.</li>
+  <li>Known issues lists two bugs found along the way, both planned for v0.15.1: a range-for over
+  an array literal crashes the compiler, and a confusing error for an <code>ad</code> declaration
+  whose module isn't imported.</li>
+</ul>
+
 <h2>v0.14.0 <small>(2026-10-13)</small></h2>
 <p>JSON and YAML without reflection. Mark a struct <code>@json</code> or <code>@yaml</code> and
 the compiler writes its encoder and decoder.</p>

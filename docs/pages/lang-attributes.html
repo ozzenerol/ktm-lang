@@ -1,6 +1,6 @@
 <!-- title: Attributes -->
 <h1>Attributes</h1>
-<p class="lede">An attribute, <code>@name</code> or <code>@name("text")</code>, before a struct or a field tells the compiler to write code for it.</p>
+<p class="lede">An attribute, <code>@name</code> or <code>@name("text")</code>, before a struct, a field or a parameter tells the compiler to write code for it.</p>
 
 <table>
   <thead><tr><th>Attribute</th><th>Goes before</th><th>Does</th></tr></thead>
@@ -10,6 +10,7 @@
     <tr><td><code>@key("name")</code></td><td>a field</td><td>The field's key in the text</td></tr>
     <tr><td><code>@skip</code></td><td>a field</td><td>Leaves it out</td></tr>
     <tr><td><code>@omitEmpty</code></td><td>a field</td><td>Leaves it out when it is 0, empty or null</td></tr>
+    <tr><td><code>@caller("file")</code>, <code>("line")</code>, <code>("func")</code></td><td>a parameter</td><td>Every call fills it with where the call is written: <a href="lang-functions.html#where-a-call-comes-from">Where a call comes from</a></td></tr>
   </tbody>
 </table>
 

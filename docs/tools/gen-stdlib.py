@@ -45,6 +45,7 @@ MODULES = [
     ("atomic",  "Atomics",           "Atomic operations on integers and pointers shared between threads."),
     ("net",     "Networking",        "Sockets and address resolution."),
     ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
+    ("log",     "Logging",           "Leveled logging to stderr or a file, with size rotation and thread safety."),
     ("coro",    "Coroutines",        "Functions that pause and resume on their own stacks."),
     ("sql",     "SQLite",            "SQLite bindings, available when ktm is built with sqlite."),
     ("libc",    "C library",         "The C functions, structs and constants ktm programs call by their C names."),
@@ -65,6 +66,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
+    "log": "lib-logging.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }
