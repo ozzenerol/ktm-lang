@@ -933,6 +933,11 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         if (st && st->kind == AST_RETURN && st->retval) only_ret = st;
     }
 
+    int saved_lock = ir_line_lock;
+    if (!ir_line_lock && call->line && callee->file_id && call->file_id &&
+        callee->file_id != call->file_id)
+        ir_line_lock = call->line;
+
     IrInline frame;
     frame.callee = callee;
     frame.cont = irBlockNew();
@@ -969,6 +974,7 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         func->variables = saved_vars;
         ctx->loop_depth = saved_loops;
         ctx->inl = frame.outer;
+        ir_line_lock = saved_lock;
         return v;
     }
 
@@ -988,6 +994,7 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     func->exit_block = saved_exit;
     ctx->loop_depth = saved_loops;
     ctx->inl = frame.outer;
+    ir_line_lock = saved_lock;
 
     IrValue *result = irTmp(frame.ret_slot ? irConvertType(rt) : IR_TYPE_I64,
                             frame.ret_slot ? rt->size : 8);
