@@ -225,6 +225,11 @@ static void decodeInto(Value *n, reflect.Value v, String *path, i64 flags)
                 *data = null;
                 *vlen = 0;
                 *vcap = 0;
+            } else if (decodeIsByte(elem) && n.type == STRING) {
+                /* a vec.Vec<u8> from a string, as a u8[]: NUL past len */
+                *data = decodeBytes(n.str);
+                *vlen = n.str.len;
+                *vcap = n.str.len + 1;
             } else if (n.type == ARRAY) {
                 i64 vcount = len(n);
                 i64 room = vcount > 0 ? vcount : 1;
@@ -234,7 +239,7 @@ static void decodeInto(Value *n, reflect.Value v, String *path, i64 flags)
                 *vcap = room;
                 decodeItems(n, block, elem, path, flags);
             } else {
-                decodeFail(path, "an array", n);
+                decodeFail(path, decodeIsByte(elem) ? "a string" : "an array", n);
             }
         default:
             String what = str.format("a %s can't be JSON", t.name);

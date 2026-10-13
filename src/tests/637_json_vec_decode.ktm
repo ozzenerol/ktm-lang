@@ -14,6 +14,7 @@ struct Release {
     vec.Vec<String> tags;
     vec.Vec<vec.Vec<i64>> grid;
 };
+struct Bytes { u8[] s; vec.Vec<u8> v; };
 struct LookAlike { i64 *data; i64 len; i64 cap; };
 struct HasLookAlike { LookAlike v; };
 
@@ -96,6 +97,29 @@ i32 main() {
     check(fails("{\"nums\": [1, \"two\"]}", "nums[1]"), "a wrong item type names nums[1]");
     check(fails("{\"nums\": {\"data\": 1}}", "an array"), "an object for a Vec is an error");
     check(fails("{\"grid\": [[1], [2, true]]}", "grid[1][1]"), "nested paths name both indexes");
+
+    /* a vec.Vec<u8> is a string, as a u8[] (and an array of numbers too) */
+    Bytes b = json.decode<Bytes>("{\"s\": \"ok\", \"v\": \"hi\"}");
+    check(b.v.len == 2 && b.v.get(0) == 'h' && b.v.get(1) == 'i' && b.v.data[2] == 0 && b.v.cap >= 3,
+          "a Vec<u8> from a string, NUL past len");
+    String bt = json.encode(reflect.of(b));
+    check(bt.equals("{\"s\":\"ok\",\"v\":\"hi\"}"), "a Vec<u8> encodes back as a string");
+    Bytes b2 = json.decode<Bytes>(bt);
+    check(b2.v.len == 2 && b2.v.get(1) == 'i', "a Vec<u8> round trips");
+    json.free(reflect.of(b2));
+    bt.free();
+    json.free(reflect.of(b));
+    check(b.v.data == null && b.v.len == 0, "json.free on a Vec<u8>");
+    Bytes be = json.decode<Bytes>("{\"v\": \"\"}");
+    check(be.v.len == 0 && be.v.data != null && be.v.data[0] == 0, "an empty string gives an empty Vec<u8>");
+    json.free(reflect.of(be));
+    Bytes bn = json.decode<Bytes>("{\"v\": [104, 105]}");
+    check(bn.v.len == 2 && bn.v.get(0) == 'h', "a Vec<u8> from an array of numbers");
+    json.free(reflect.of(bn));
+    bool byteErr = false;
+    try { Bytes bx = json.decode<Bytes>("{\"v\": true}"); }
+    catch (Error x) { byteErr = str.contains(cstr.view(x.message), "a string"); }
+    check(byteErr, "a Vec<u8> error asks for a string");
 
     /* a struct of one's own with the same fields stays an object */
     HasLookAlike h = json.decode<HasLookAlike>("{\"v\": {\"len\": 2, \"cap\": 3}}");
