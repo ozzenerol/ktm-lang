@@ -3235,6 +3235,7 @@ static Ast *parseIdentifierOrFunction(Cctrl *cc,
                     len, name);
         }
         if (tok->tk_type == TK_PUNCT) {
+            if (tok->i64 == '.') parseRaiseIfNotImported(cc, NULL, name, len);
             switch (tok->i64) {
                 case '(': {
                     char *msg = mprintf("Try defining function `%.*s()`?",len,name);
@@ -3951,6 +3952,18 @@ static s64 astBinOpToTokenPunct(AstBinOp op) {
 /* A function pointer given one with a different signature: an error
  * naming both, wherever the conversion happens (assignment,
  * initialiser, argument, return, conditional) */
+/* `name.` where name is a module the file doesn't import: say so, at
+ * `at` (NULL: where the parser is). Returns when there is no such module. */
+void parseRaiseIfNotImported(Cctrl *cc, Lexeme *at, char *name, int len) {
+    if (!cc->lexer_ || !lexModuleExists(cc->lexer_, name, len)) return;
+    if (at) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+            "module `%.*s` is not imported: add `import %.*s;`", len, name, len, name);
+    }
+    cctrlRaiseException(cc, "module `%.*s` is not imported: add `import %.*s;`",
+                        len, name, len, name);
+}
+
 void parseRaiseFnConvert(Cctrl *cc, AstType *expected, AstType *actual) {
     cctrlRaiseException(cc, "cannot convert %s to %s%s",
             astTypeToString(actual), astTypeToString(expected),

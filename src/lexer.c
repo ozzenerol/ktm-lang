@@ -3286,6 +3286,23 @@ static char *lexModuleDir(Lexer *l, AoStr *path, Lexeme *at) {
     return found;
 }
 
+/* Is there a module `name` (len bytes, dots as slashes) where import
+ * looks: for "module vec is not imported" hints, so nothing is reported */
+int lexModuleExists(Lexer *l, const char *name, int len) {
+    char *rel = mprintf("%.*s", len, name);
+    for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
+    if (lexIsDir(mprintf("%s/%s", l->program_root ? l->program_root : ".", rel))) return 1;
+    if (l->builtin_root && lexIsDir(mprintf("%s/%s", lexInstallModules(l), rel))) return 1;
+    char *ktm_path = getenv("KTM_PATH");
+    if (ktm_path && *ktm_path) {
+        char *copy = mprintf("%s", ktm_path), *save = NULL;
+        for (char *dir = strtok_r(copy, ":", &save); dir; dir = strtok_r(NULL, ":", &save)) {
+            if (lexIsDir(mprintf("%s/%s", dir, rel))) return 1;
+        }
+    }
+    return 0;
+}
+
 /* `ktm -lib a.b dir/a/b`: modules are found from dir. 0 when the
  * directory doesn't end in a/b. */
 int lexSetModuleLibRoot(Lexer *l, char *dir, char *path) {
