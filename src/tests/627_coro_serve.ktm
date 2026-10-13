@@ -203,8 +203,12 @@ i32 main() {
     check(gStopOk, "the STOP handler answered");
     check(gSlowOk, "a handler in flight finished after the stop");
 
-    /* phase 3: SIGTERM stops it through a coroutine started before serve */
+    /* phase 3: SIGTERM stops it through a coroutine started before serve.
+     * The handler goes in before any thread, as stopInit asks: the
+     * coroutine may run only after a client on another loop sent SIGTERM,
+     * which then ended the test (seen once on arm64). */
     gPort = freePort();
+    signal.stopInit();
     coro.go(&onSignal);
     libc.pthread_create(&drv, null, &driveSignal, null);
     r = coro.serve(gPort, &echo, null, 2, "127.0.0.1");
