@@ -4,6 +4,19 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.15.1 <small>(2026-10-13)</small></h2>
+<p>Two fixes for compile errors.</p>
+<ul>
+  <li>A range-for with nothing to range over crashed the compiler. An array literal,
+  <code>for (auto name : ["a", "b"])</code>, now says ktm has no array literals and shows how to
+  declare the array first; <code>for (auto x : )</code> says what is missing.</li>
+  <li>A type or name from a module the file doesn't import, as in
+  <code>ad vec.Vec&lt;i64&gt; v = m.values();</code> or <code>vec.Vec&lt;i64&gt; v;</code> without
+  <code>import vec</code>, says <code>module `vec` is not imported: add `import vec;`</code>. An
+  <code>ad</code> declaration with an unknown type names that type instead of
+  "Type `ad` has not been declared".</li>
+</ul>
+
 <h2>v0.15.0 <small>(2026-10-13)</small></h2>
 <p>Logging, and functions that know where they were called from.</p>
 <ul>
