@@ -1811,7 +1811,7 @@ void main()
 </code></pre>
 <pre class="output">7 Ada admin math
 {"id":8,"name":"Ada","role":"admin","tags":[{"name":"math","weight":3}]}
-tags[0].weight: expected an integer, got a string
+1:22: tags[0].weight: expected an integer, got a string
 </pre>
 <ul>
   <li>A key the struct has no field for is ignored (<code>"since"</code> above).</li>
@@ -1819,8 +1819,10 @@ tags[0].weight: expected an integer, got a string
   it had with the <code>reflect.of(x)</code> form, so zero the value first there. With
   <code>json.STRICT</code> as the flags argument
   (<code>json.decode&lt;User&gt;(text, json.STRICT)</code>) both are errors.</li>
-  <li>Anything that doesn't fit throws <code>json.ERR_DECODE</code> with where it is
-  (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. When
+  <li>Anything that doesn't fit throws <code>json.ERR_DECODE</code> with where it is, as
+  line and column and as a path (<code>json.ERR_ENCODE</code> for encode); text that isn't
+  JSON says so. Decode reads the text front to back with a <code>json.Reader</code> and builds
+  no tree. When
   <code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in.</li>
   <li>Decode allocates the Strings, slices, Vecs, <code>u8 *</code> strings and pointed-to
   structs it fills in (a decoded Vec is an ordinary one: <code>push</code> grows it);
@@ -1839,8 +1841,8 @@ file has to <code>import json</code> (or <code>yaml</code>).</p>
   <code>@yaml</code> adds <code>toYaml</code> and <code>fromYaml</code> the same way.</li>
   <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> call these
   methods by themselves for a <code>@json</code> struct, also one nested in a struct without
-  <code>@json</code>, so code that uses them gets faster without changes. With
-  <code>json.STRICT</code>, decode keeps the reflection path.</li>
+  <code>@json</code>, so code that uses them gets faster without changes.
+  <code>json.STRICT</code> works the same way with them.</li>
   <li>A Reader made with <code>json.readerNew(text, json.STRICT)</code> (or
   <code>yaml.readerNew(text, yaml.STRICT)</code>) makes <code>fromJson</code> and
   <code>fromYaml</code> strict: a key with no field and a missing key are errors

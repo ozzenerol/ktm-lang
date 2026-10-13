@@ -108,12 +108,12 @@ void is(String got, u8 *want, u8 *what) {
     got.free();
 }
 
-/* got is "line:col: " then what reflection says */
+/* got is what reflection says, which starts with "line:col: " too (decode
+ * reads with a json.Reader) */
 void likeReflection(u8 *text, u8 *pos) {
     String got = jsonError(text, json.STRICT);
     String want = plainError(text);
-    want.insert(0, cstr.view(pos));
-    bool ok = want.len > libc.strlen(pos) && str.equals(got, want);
+    bool ok = want.len > libc.strlen(pos) && str.startsWith(want, cstr.view(pos)) && str.equals(got, want);
     check(ok, text);
     if (!ok) { printf("    got \"%s\", want \"%s\"\n", got, want); }
     got.free();
