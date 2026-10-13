@@ -179,9 +179,11 @@ void initFixtures() {
         "i64 total(i64 ...nums) { return nums.len; }\n"
         "struct User { i64 age; };\n"
         "i64 User.older(i64 years, bool loud) { return self.age + years; }\n"
+        "i64 note(@caller(\"line\") i64 line, i64 code, bool loud) { return line + code; }\n"
         "i32 main() {\n"
         "  User u;\n"
         "  i64 r = add(1, add(2, 3));\n"
+        "  r = note(4, false);\n"
         "  show(\"hi\");\n"
         "  u.older(3, true);\n"
         "  r = total(1, 2, 3);\n"
@@ -1751,6 +1753,10 @@ void testSignatureHelp() {
     resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
     check("a method call: its signature without self",
                 sigIs(resp, "i64 User.older(i64 years, bool loud)", "bool loud"));
+    posOf(SIG_HC, "note(4, ", 8, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
+    check("a @caller parameter: skipped by the argument written",
+                sigIs(resp, "i64 note(@caller(\"line\") i64 line, i64 code, bool loud)", "bool loud"));
     posOf(SIG_HC, "total(1, 2, ", 12, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/signatureHelp", uri, line, chr);
     check("past a variadic's last parameter: still the variadic one",

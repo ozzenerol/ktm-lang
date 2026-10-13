@@ -308,6 +308,13 @@ typedef struct AstType {
 #define AST_FLAG_PUB (1<<17)
 /* A local declared with `ad` (autodefer): freed at the end of its scope */
 #define AST_FLAG_AUTODEFER (1<<18)
+/* A parameter declared `@caller("file")`, `("line")` or `("func")`: every
+ * call fills it with where the call is written (parseArgv); a caller
+ * never passes it */
+#define AST_FLAG_CALLER_FILE (1<<19)
+#define AST_FLAG_CALLER_LINE (1<<20)
+#define AST_FLAG_CALLER_FUNC (1<<21)
+#define AST_FLAG_CALLER (AST_FLAG_CALLER_FILE | AST_FLAG_CALLER_LINE | AST_FLAG_CALLER_FUNC)
 
 /* AST_LVAR.pinned_kind values. */
 #define LVAR_AUTO  0  /* compiler chooses storage (default) */
