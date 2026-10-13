@@ -3578,6 +3578,40 @@ static void parseCaseArm(Cctrl *cc, Ast *arm) {
     cc->fallthrough_col = ft_col;
 }
 
+/* The index of case string `str` in the switch's strings, added when it
+ * is new; a string already there is an error (case-sensitive, by bytes) */
+static int parseCaseStringIndex(Cctrl *cc, Ast *str, Lexeme *case_tok) {
+    Vec *strings = cc->tmp_case_strings;
+    char *bytes = malloc(str->sval->len + 1);
+    char *other = NULL;
+    astStringDecode(str, bytes);
+    int n = (int)str->real_len - 1;
+    for (u64 i = 0; i < strings->size; ++i) {
+        Ast *cur = vecGet(Ast *, strings, i);
+        other = realloc(other, cur->sval->len + 1);
+        astStringDecode(cur, other);
+        int m = (int)cur->real_len - 1;
+        if (m != n || memcmp(bytes, other, n)) continue;
+        char *msg = mprintf("duplicate case value \"%s\"", str->sval->data);
+        AoStr *bold = aoStrNew();
+        aoStrCatColoured(bold, ESC_BOLD, msg);
+        AoStr *buf = cctrlCreateErrorLineAt(cc, case_tok->line, case_tok->col,
+                                            case_tok->len, bold->data,
+                                            CCTRL_ERROR, NULL);
+        aoStrRelease(bold);
+        CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+        d->line = d->end_line = case_tok->line;
+        d->col = case_tok->col;
+        d->end_col = case_tok->col + case_tok->len;
+        cctrlDiagPush(cc, d);
+        break;
+    }
+    free(bytes);
+    free(other);
+    vecPush(strings, str);
+    return (int)strings->size - 1;
+}
+
 Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
@@ -3591,6 +3625,28 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     int ok = 1;
 
     peek = cctrlTokenPeek(cc);
+    if (cc->tmp_case_strings) {
+        /* a switch on strings: the case's number is its string's index */
+        case_expr = parseRequiredExpr(cc, "a `case` string");
+        value_expr = case_expr;
+        if (case_expr->kind != AST_STRING) {
+            cctrlRewindUntilStrMatch(cc,str_lit("case"),NULL);
+            cctrlRaiseExceptionFromTo(cc, NULL, 'c', ':',
+                    "a switch on a u8[] or String takes a string literal after `case`, got - %s",
+                    astLValueToString(case_expr,0));
+        }
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            cctrlRaiseException(cc,"a `case` range can't be used in a switch on strings");
+        }
+        cctrlTokenExpect(cc,':');
+        begining = parseCaseStringIndex(cc, case_expr, case_tok);
+        label = astMakeLabel();
+        List *stmts = listNew();
+        case_ = astCase(label,begining,begining,stmts);
+        vecPush(cc->tmp_case_list,case_);
+        parseCaseArm(cc, case_);
+        return case_;
+    }
     if (tokenPunctIs(peek,':')) {
         if (vecEmpty(cc->tmp_case_list)) {
             begining = 0;
@@ -3656,6 +3712,62 @@ Ast *parseDefaultStatement(Cctrl *cc) {
     return cc->tmp_default_case;
 }
 
+/* A switch on strings (L7): its value is a u8[] (bytes) or a String */
+static int parseIsStringSwitch(AstType *t) {
+    if (astTypeIsString(t)) return 1;
+    return astTypeIsSlice(t) && t->elem && t->elem->size == 1 &&
+           (t->elem->kind == AST_TYPE_CHAR || t->elem->kind == AST_TYPE_INT);
+}
+
+/* The case number a switch on strings switches on: the index in
+ * `strings` of the case equal to `value` (same length, then the same
+ * bytes, case-sensitive), or -1. `value` is read once, into a hidden
+ * u8[], by the first length compare. */
+static Ast *parseStringSwitchIndex(Cctrl *cc, Ast *value, Vec *strings) {
+    AstType *slice_t = astTypeIsString(value->type) ? astMakeSliceType(ast_u8_type)
+                                                     : value->type;
+    value = parseSliceFrom(cc, slice_t, value);
+    Ast *var = parseHiddenSliceVar(cc, slice_t);
+    AstType *len_t = mapGetLen(slice_t->fields, str_lit("len"));
+    AstType *ptr_t = mapGetLen(slice_t->fields, str_lit("ptr"));
+    AstType *elem_t = slice_t->elem;
+    int is_err = 0;
+    Ast *assign = astBinaryOp(AST_BIN_OP_ASSIGN, var, value, &is_err);
+    Ast *read = astClassRef(len_t, assign, "len");
+
+    /* built from the last case back: c0 ? 0 : (c1 ? 1 : ... -1) */
+    Ast *index = astI64Type(-1);
+    char *bytes = NULL;
+    for (s64 i = (s64)strings->size - 1; i >= -1; --i) {
+        if (i < 0) {
+            /* no case at all: still read the value once */
+            if (strings->size == 0) {
+                Ast *never = astBinaryOp(AST_BIN_OP_LT, read, astI64Type(0), &is_err);
+                index = astTernary(ast_int_type, never, astI64Type(-1), index);
+            }
+            break;
+        }
+        Ast *str = vecGet(Ast *, strings, i);
+        bytes = realloc(bytes, str->sval->len + 1);
+        /* its bytes; an empty literal is kept as "\\0" */
+        astStringDecode(str, bytes);
+        int n = (int)str->real_len - 1;
+        Ast *len = i == 0 ? read : astClassRef(len_t, var, "len");
+        Ast *test = astBinaryOp(AST_BIN_OP_EQ, len, astI64Type(n), &is_err);
+        for (int b = 0; b < n; ++b) {
+            Ast *ptr = astClassRef(ptr_t, var, "ptr");
+            Ast *at = astBinaryOp(AST_BIN_OP_ADD, ptr, astI64Type(b), &is_err);
+            Ast *byte = astUnaryOperator(elem_t, AST_UN_OP_DEREF, at);
+            s64 want = elem_t->issigned ? (s64)(s8)bytes[b] : (s64)(u8)bytes[b];
+            Ast *same = astBinaryOp(AST_BIN_OP_EQ, byte, astI64Type(want), &is_err);
+            test = astBinaryOp(AST_BIN_OP_LOG_AND, test, same, &is_err);
+        }
+        index = astTernary(ast_int_type, test, astI64Type(i), index);
+    }
+    free(bytes);
+    return index;
+}
+
 Ast *parseSwitchStatement(Cctrl *cc) {
     Ast *volatile cond;
     Ast *tmp, *original_default_label;
@@ -3664,6 +3776,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     AoStr *end_label,*tmp_name,*original_break;
     volatile int switch_bounds_checked = 1;
     volatile char terminating_char = ')';
+    volatile int is_strings = 0;
 
     peek = cctrlTokenPeek(cc);
 
@@ -3689,8 +3802,10 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         cond = parseRequiredExpr(cc, "the `switch` value");
-        if (!astIsIntOrIntrinsic(cond->type)) {
-            cctrlRaiseException(cc,"Switch can only have int's at this time");
+        if (parseIsStringSwitch(cond->type)) {
+            is_strings = 1;
+        } else if (!astIsIntOrIntrinsic(cond->type)) {
+            cctrlRaiseException(cc,"Switch can only have an integer, a u8[] or a String value");
         }
         cctrlTokenExpect(cc,terminating_char);
         parseCondGuardDone(cc, &guard);
@@ -3700,9 +3815,11 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     original_default_label = cc->tmp_default_case;
     original_cases = cc->tmp_case_list;
     int original_default_at = cc->tmp_default_at;
+    Vec *original_strings = cc->tmp_case_strings;
 
     cc->tmp_case_list = astVecNew();
     cc->tmp_default_case = NULL;
+    cc->tmp_case_strings = is_strings ? astVecNew() : NULL;
 
     end_label = astMakeLabel();
 
@@ -3711,7 +3828,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
 
     tmp_name = astMakeTmpName();
 
-    tmp = astLVar(cond->type, tmp_name->data, tmp_name->len);
+    tmp = astLVar(is_strings ? ast_int_type : cond->type, tmp_name->data, tmp_name->len);
     listAppend(cc->tmp_locals,tmp);
 
     int outer_fallthrough = cc->fallthrough_pending;
@@ -3724,6 +3841,14 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     cc->fallthrough_pending = outer_fallthrough;
     cc->fallthrough_line = outer_ft_line;
     cc->fallthrough_col = outer_ft_col;
+
+    if (is_strings) {
+        cond = parseStringSwitchIndex(cc, cond, cc->tmp_case_strings);
+        /* the index is -1 when no case matches: never a `switch [...]`
+         * jump without its bounds check */
+        switch_bounds_checked = 1;
+    }
+    cc->tmp_case_strings = original_strings;
 
     Ast *switch_ast = astSwitch(
         cond,
@@ -6141,6 +6266,7 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     List *saved_lit_writes = cc->lit_writes;
     List *saved_elide_open = cc->elide_open, *saved_elide_done = cc->elide_done;
     Vec *saved_case_list = cc->tmp_case_list;
+    Vec *saved_case_strings = cc->tmp_case_strings;
     Ast *saved_default_case = cc->tmp_default_case;
     AstType *saved_method_self = cc->method_self;
     Vec *saved_overload_set = cc->tmp_overload_set;
@@ -6211,6 +6337,7 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     cc->elide_open = saved_elide_open;
     cc->elide_done = saved_elide_done;
     cc->tmp_case_list = saved_case_list;
+    cc->tmp_case_strings = saved_case_strings;
     cc->tmp_default_case = saved_default_case;
     cc->method_self = saved_method_self;
     cc->tmp_overload_set = saved_overload_set;
