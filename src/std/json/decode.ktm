@@ -256,10 +256,10 @@ pub void decode(u8[] text, reflect.Value v, i64 flags = 0)
     if (!v.type || !v.ptr) {
         throw(ERR_DECODE, "decode: the value has no type (use reflect.of(x))");
     }
-    if (v.type.fromJson && !(flags & STRICT)) {
+    if (v.type.fromJson) {
         /* @json: its generated method reads the text itself, no tree */
         fn(void *, Reader *) void fromJson = v.type.fromJson;
-        Reader r = readerNew(text);
+        Reader r = readerNew(text, flags);
         defer r.free();
         fromJson(v.ptr, &r);
         r.finish();

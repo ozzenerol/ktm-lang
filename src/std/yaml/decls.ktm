@@ -20,6 +20,10 @@ pub const i64 BOOL = 6;
 
 pub const i64 NULL = 7;
 
+/* yaml.readerNew flag: generated fromYaml methods throw on a key with no
+ * field and on a missing key (as json.STRICT) */
+pub const i64 STRICT = 0x2;
+
 /* The code a Reader throws for text that isn't YAML (or uses a part of it
  * yaml doesn't support) and for a value of the wrong kind. The message
  * says where: "3:14: items[2].price: expected a number, got a string". */
