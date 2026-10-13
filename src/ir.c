@@ -1654,6 +1654,39 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
             return out;
         }
 
+        if (cls && (cls->kind == AST_FUNCALL || cls->kind == AST_FUNPTR_CALL ||
+                    cls->kind == AST_ASM_FUNCALL ||
+                    astIsBinOpKind(cls, AST_BIN_OP_ASSIGN)))
+        {
+            /* Field of a struct-returning call result, `mk().name`: reached
+             * when the field's address is needed (a String field is copied
+             * by address). The call writes its result into a buffer of
+             * ours: its own result value is tagged as a by-value struct
+             * (irFnCallTo), so handing that on to memcpy as an address
+             * would pass the whole struct instead of the pointer. */
+            IrValue *base;
+            if (astIsBinOpKind(cls, AST_BIN_OP_ASSIGN)) {
+                base = irExpr(ctx, cls);
+            } else {
+                IrInstr *buf_alloca = irAlloca(cls->type);
+                irAddStackSpace(ctx, cls->type->size);
+                irBlockAddInstr(ctx, buf_alloca);
+                base = irTmp(IR_TYPE_PTR, 8);
+                irBlockAddInstr(ctx,
+                        irInstrNew(IR_LEA, base, buf_alloca->dst, NULL));
+                irFnCallTo(ctx, cls, base);
+            }
+            IrValue *addr = base;
+            if (offset != 0) {
+                addr = irTmp(IR_TYPE_PTR, 8);
+                IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
+                irBlockAddInstr(ctx, irInstrNew(IR_IADD, addr, base, off_const));
+            }
+            out.target = addr;
+            out.indirect = 1;
+            return out;
+        }
+
         if (!cls || cls->kind != AST_LVAR) {
             loggerPanic("Slice AST_CLASS_REF assign: unsupported cls kind %s\n",
                         astKindToString(cls->kind));
@@ -2281,7 +2314,12 @@ IrValue *irLowerClassRef(IrCtx *ctx, Ast *ast) {
          * assignment `(a = b).y` likewise yields the address of `a`. */
         IrValue *base = irExpr(ctx, cls);
         IrValue *addr = base;
-        if (offset != 0) {
+        /* A field address handed on gets a tmp of its own, even at
+         * offset 0 (an explicit add #0, which irEvalCanFold keeps only
+         * when tagged): passed as a by-value struct argument it is
+         * tagged, and `base` is the call's own result (tagged with the
+         * call's type) or `a` of `(a = b)`, also the copy's target. */
+        if (offset != 0 || field_decays) {
             addr = irTmp(IR_TYPE_PTR, 8);
             IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
             irBlockAddInstr(ctx, irInstrNew(IR_IADD, addr, base, off_const));
