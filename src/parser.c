@@ -3990,6 +3990,17 @@ Ast *parseStatement(Cctrl *cc) {
          * empty statement) */
         cctrlRaiseException(cc, "Expected an expression between `(` and `)`");
     }
+    if (ast && ast->kind == AST_CLASS_REF) {
+        /* `self.port;`: read and dropped, most likely a slip */
+        /* written as ktm does: `self.port`, not `self->port` */
+        AoStr *shown = aoStrNew();
+        for (char *c = astLValueToString(ast, 0); *c; ++c) {
+            if (c[0] == '-' && c[1] == '>') { aoStrPutChar(shown, '.'); c++; }
+            else aoStrPutChar(shown, *c);
+        }
+        cctrlWarningAt(cc, tok->line, tok->col, tok->len,
+                       "`%s` on its own does nothing", shown->data);
+    }
     tok = cctrlTokenGet(cc);
     assertTokenIsTerminator(cc,tok,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
     return ast;
