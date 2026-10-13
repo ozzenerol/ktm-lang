@@ -1856,6 +1856,81 @@ tags[0].weight: expected an integer, got a string
   threw half way, so use it only on values decode filled.</li>
 </ul>
 
+<h3 id="json-generated">Faster: <code>@json</code> and <code>@yaml</code></h3>
+<p>Mark a struct <code>@json</code> (or <code>@yaml</code>, or both) and the compiler writes
+its encoder and decoder as ordinary methods, so nothing is looked up at run time. The struct's
+file has to <code>import json</code> (or <code>yaml</code>).</p>
+<ul>
+  <li><code>u.toJson(&amp;w)</code> writes it to a <code>json.Writer</code>,
+  <code>u.fromJson(&amp;r)</code> reads it from a <code>json.Reader</code>, and
+  <code>u.freeDecoded()</code> frees what <code>fromJson</code> allocated.
+  <code>@yaml</code> adds <code>toYaml</code> and <code>fromYaml</code> the same way.</li>
+  <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> call these
+  methods by themselves for a <code>@json</code> struct, also one nested in a struct without
+  <code>@json</code>, so code that uses them gets faster without changes. With
+  <code>json.STRICT</code>, decode keeps the reflection path.</li>
+  <li>On a field: <code>@key("e-mail")</code> gives its key in the text,
+  <code>@skip</code> leaves it out, and <code>@omitEmpty</code> leaves it out when it is 0,
+  empty or null.</li>
+  <li>A field that can't be written, such as a union, a function or a struct without
+  <code>@json</code>, is a compile error at that field. Mark it <code>@skip</code> to leave
+  it out.</li>
+  <li><code>ktm --expand file.ktm</code> prints the methods the compiler made.</li>
+</ul>
+<pre data-run><code>
+import json, reflect, yaml;
+
+enum Role { guest, admin };
+
+@json @yaml
+struct Tag {
+  String name;
+  @omitEmpty i64 weight;
+};
+
+@json @yaml
+struct User {
+  i64 id;
+  @key("display-name") String name;
+  Role role;
+  Tag[] tags;
+  @skip i64 visits;
+};
+
+void main()
+{
+  User u = json.decode&lt;User&gt;("{\"id\": 7, \"display-name\": \"Ada\", \"role\": \"admin\",
+    \"tags\": [{\"name\": \"math\", \"weight\": 3}, {\"name\": \"poetry\"}]}");
+  defer u.freeDecoded();
+  printf("%d %s %s %d tags\n", u.id, u.name, reflect.name(u.role), u.tags.len);
+
+  json.Writer w = json.writerNew();
+  u.toJson(&amp;w);
+  String text = w.take();
+  defer text.free();
+  printf("%s\n", text);
+
+  yaml.Writer y = yaml.writerNew();
+  u.toYaml(&amp;y);
+  String doc = y.take();
+  defer doc.free();
+  printf("%s", doc);
+}
+</code></pre>
+<pre class="output">
+7 Ada admin 2 tags
+{"id":7,"display-name":"Ada","role":"admin","tags":[{"name":"math","weight":3},{"name":"poetry"}]}
+id: 7
+display-name: Ada
+role: admin
+tags:
+  - name: math
+    weight: 3
+  - name: poetry
+</pre>
+<p>On a 1 KB order with nested structs, a slice and Vecs, <code>@json</code> decodes about
+3 times as fast as the reflection path and encodes about 1.5 times as fast.</p>
+
 <h2 id="yaml">YAML</h2>
 <p><code>yaml.Reader</code> reads a YAML document front to back and <code>yaml.Writer</code>
 writes one in block style. The Reader has the same calls as <code>json.Reader</code>, so one

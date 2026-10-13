@@ -1749,6 +1749,22 @@ void main()
 warmest 21.0, in Cluj (16 bytes)
 </pre>
 
+<h3 id="attributes">Attributes</h3>
+<p>An attribute is written <code>@name</code> or <code>@name("text")</code> right before a
+struct or one of its fields. They tell the compiler to write code for the struct:</p>
+<ul>
+  <li><code>@json</code> and <code>@yaml</code> go before a struct (and before
+  <code>pub</code>): the compiler writes its <code>toJson</code>/<code>fromJson</code> or
+  <code>toYaml</code>/<code>fromYaml</code> methods, see
+  <a href="library.html#json-generated">the library guide</a>.</li>
+  <li><code>@key("name")</code>, <code>@skip</code> and <code>@omitEmpty</code> go before a
+  field of such a struct.</li>
+  <li><code>reflect</code> shows them: <code>Type.json</code> and <code>Type.yaml</code>,
+  <code>Field.key</code>, <code>Field.skip</code> and <code>Field.omitEmpty</code>.</li>
+  <li>An unknown attribute, one in the wrong place, or one on a struct's declaration
+  (<code>struct User;</code>) instead of its definition is a compile error.</li>
+</ul>
+
 <h2 id="generics">Generics</h2>
 <p>A struct, its methods and a function can take type parameters, written in angle brackets
 after the name. Each use with other types (<code>Box&lt;i64&gt;</code>,
