@@ -30,7 +30,7 @@ REFERENCE = {
     "csv": ["csv"], "system": ["proc", "os"], "signals": ["signal"],
     "lists": ["list"], "vectors": ["vec", "sort"], "sets": ["set"],
     "hash-tables": ["map"], "bit-vectors": ["vec"], "bytes": ["bytes"],
-    "hashing": ["hash"], "json": ["json"], "dates": ["date"],
+    "hashing": ["hash"], "json": ["json"], "yaml": ["yaml"], "dates": ["date"],
     "maths": ["math"], "net": ["net"], "coroutines": ["coro"],
     "fzf": ["fzf"], "sqlite": ["sql"], "atomics": ["atomic"],
 }
