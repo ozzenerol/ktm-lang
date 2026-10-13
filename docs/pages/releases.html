@@ -4,6 +4,20 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.13.2 <small>(2026-10-13)</small></h2>
+<p>A <code>vec.Vec</code> is a JSON array.</p>
+<ul>
+  <li><code>json.decode</code> fills a <code>vec.Vec&lt;T&gt;</code> field (or a top-level
+  <code>vec.Vec&lt;T&gt;</code>) from a JSON array, the same way it fills a <code>T[]</code>
+  slice. It used to throw "expected an object, got an array". The Vec it makes is an ordinary
+  one: <code>push</code> grows it and <code>json.free</code> frees its items and its block.</li>
+  <li><code>json.encode</code> writes a <code>vec.Vec&lt;T&gt;</code> as an array of its items.
+  It used to write the Vec's own fields, <code>{"data":5,"len":2,"cap":8}</code>.</li>
+  <li>A <code>vec.Vec&lt;u8&gt;</code> is a string both ways, as a <code>u8[]</code> is, so
+  what encode writes decodes back. A struct of your own with <code>data</code>, <code>len</code>
+  and <code>cap</code> fields is still an object: a Vec is known by its type.</li>
+</ul>
+
 <h2>v0.13.1 <small>(2026-10-13)</small></h2>
 <p>A clean build and a tidier library reference.</p>
 <ul>

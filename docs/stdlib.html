@@ -422,10 +422,11 @@ structs pointers point to are allocated: json.free(v) frees them. Throws
 ERR_DECODE when text isn&#x27;t JSON or doesn&#x27;t fit v&#x27;s type.</p><p class="doc">The JSON in text as a T: <code>User u = json.decode&lt;User&gt;(text);</code>, freed
 with <code>json.free(reflect.of(u))</code>. Fields missing from the text are zero.
 Throws ERR_DECODE as decode does; what was filled in by then is freed
-first, so there is nothing to clean up after a throw.</p></div><div class="decl" id="json.free"><div class="decl-head"><a class="decl-name" href="#json.free">json.free</a> <span class="kind">function</span></div><pre><code class="language-ktm">void free(reflect.Value v);</code></pre><p class="doc">Free what decode allocated in v: its Strings, the items of its slices,
-its u8 * strings and what its other pointers point to, through nested
-structs and arrays; they are zeroed. Only for values decode filled (or
-that own those the same way). Private fields are left alone.</p></div><div class="decl" id="json.encode"><div class="decl-head"><a class="decl-name" href="#json.encode">json.encode</a> <span class="kind">function</span></div><pre><code class="language-ktm">String encode(reflect.Value v, i64 indent = 0);</code></pre><p class="doc">v (reflect.of(x)) as JSON, a new String (yours); compact, or with
+first, so there is nothing to clean up after a throw.</p></div><div class="decl" id="json.free"><div class="decl-head"><a class="decl-name" href="#json.free">json.free</a> <span class="kind">function</span></div><pre><code class="language-ktm">void free(reflect.Value v);</code></pre><p class="doc">Free what decode allocated in v: its Strings, the items of its slices
+and vec.Vecs, its u8 * strings and what its other pointers point to,
+through nested structs and arrays; they are zeroed. Only for values
+decode filled (or that own those the same way). Private fields are left
+alone.</p></div><div class="decl" id="json.encode"><div class="decl-head"><a class="decl-name" href="#json.encode">json.encode</a> <span class="kind">function</span></div><pre><code class="language-ktm">String encode(reflect.Value v, i64 indent = 0);</code></pre><p class="doc">v (reflect.of(x)) as JSON, a new String (yours); compact, or with
 <code>indent</code> spaces per level. Throws ERR_ENCODE for what JSON can&#x27;t hold
 and ERR_WRITER for text that isn&#x27;t UTF-8 or a NaN/infinite float.</p></div><div class="decl" id="json.State"><div class="decl-head"><a class="decl-name" href="#json.State">json.State</a> <span class="kind">struct</span></div><pre><code class="language-ktm">struct State {
         u8 ch;

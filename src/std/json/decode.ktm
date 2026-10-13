@@ -66,6 +66,16 @@ static bool decodeIsByte(reflect.Type *t)
 
 static void decodeInto(Value *n, reflect.Value v, String *path, i64 flags);
 
+/* Is t a vec.Vec<T> (any instance of the vec module's generic struct)?
+ * By its type, not by its fields: a struct of one's own with data, len
+ * and cap fields stays an object. */
+static bool decodeIsVec(reflect.Type *t)
+{
+    return t && t.kind == reflect.Kind.structType && str.startsWith(t.name, "vec.Vec<") &&
+           t.name.len > 9 && t.name[t.name.len - 1] == '>' && t.fields.len == 3 &&
+           t.fields[0].type.kind == reflect.Kind.pointer;
+}
+
 /* Item i of array n into elem at p */
 static void decodeItems(Value *n, u8 *p, reflect.Type *elem, String *path, i64 flags)
 {
@@ -201,7 +211,36 @@ static void decodeInto(Value *n, reflect.Value v, String *path, i64 flags)
                 decodeInto(n, reflect.__value(*slot, t.elem), path, flags);
             }
         case reflect.Kind.structType:
-            decodeStruct(n, v, path, flags);
+            if (!decodeIsVec(t)) {
+                decodeStruct(n, v, path, flags);
+                return;
+            }
+            /* a vec.Vec<T>: an array, as a slice is; its items in a block
+             * mem.alloc made, so its own methods can grow and free it */
+            reflect.Type *elem = t.fields[0].type.elem;
+            void **data = (void **)((u8 *)v.ptr + t.fields[0].offset);
+            i64 *vlen = (i64 *)((u8 *)v.ptr + t.fields[1].offset);
+            i64 *vcap = (i64 *)((u8 *)v.ptr + t.fields[2].offset);
+            if (n.type == NULL) {
+                *data = null;
+                *vlen = 0;
+                *vcap = 0;
+            } else if (decodeIsByte(elem) && n.type == STRING) {
+                /* a vec.Vec<u8> from a string, as a u8[]: NUL past len */
+                *data = decodeBytes(n.str);
+                *vlen = n.str.len;
+                *vcap = n.str.len + 1;
+            } else if (n.type == ARRAY) {
+                i64 vcount = len(n);
+                i64 room = vcount > 0 ? vcount : 1;
+                u8 *block = mem.allocZero(room * elem.size);
+                *data = block;              /* set first: json.free finds it */
+                *vlen = vcount;
+                *vcap = room;
+                decodeItems(n, block, elem, path, flags);
+            } else {
+                decodeFail(path, decodeIsByte(elem) ? "a string" : "an array", n);
+            }
         default:
             String what = str.format("a %s can't be JSON", t.name);
             defer what.free();
@@ -246,10 +285,11 @@ pub T decode<T>(u8[] text, i64 flags = 0)
     return out;
 }
 
-/* Free what decode allocated in v: its Strings, the items of its slices,
- * its u8 * strings and what its other pointers point to, through nested
- * structs and arrays; they are zeroed. Only for values decode filled (or
- * that own those the same way). Private fields are left alone. */
+/* Free what decode allocated in v: its Strings, the items of its slices
+ * and vec.Vecs, its u8 * strings and what its other pointers point to,
+ * through nested structs and arrays; they are zeroed. Only for values
+ * decode filled (or that own those the same way). Private fields are left
+ * alone. */
 pub void free(reflect.Value v)
 {
     reflect.Type *t = v.type;
@@ -278,6 +318,21 @@ pub void free(reflect.Value v)
             mem.free(*slot);
             *slot = null;
         case reflect.Kind.structType:
+            if (decodeIsVec(t)) {
+                /* each item's, then the Vec's block; the Vec is zeroed */
+                reflect.Type *elem = t.fields[0].type.elem;
+                void **data = (void **)((u8 *)v.ptr + t.fields[0].offset);
+                i64 *vlen = (i64 *)((u8 *)v.ptr + t.fields[1].offset);
+                i64 *vcap = (i64 *)((u8 *)v.ptr + t.fields[2].offset);
+                for (i64 i = 0; *data && i < *vlen; i++) {
+                    free(reflect.__value((u8 *)*data + i * elem.size, elem));
+                }
+                mem.free(*data);
+                *data = null;
+                *vlen = 0;
+                *vcap = 0;
+                return;
+            }
             for (auto f : t.fields) {
                 if (!f.isPrivate) {
                     free(reflect.__value((u8 *)v.ptr + f.offset, f.type));

@@ -1767,7 +1767,7 @@ price 9.90
   <a href="language.html#reflection">reflect description</a>, into a new String (pass an indent
   as the second argument for one member per line).</li>
   <li><code>json.decode&lt;T&gt;(text)</code> returns the JSON as a <code>T</code> (a struct, a
-  pointer to one, a slice, a String, a number), with the fields the JSON leaves out zero.
+  pointer to one, a slice, a <code>vec.Vec</code>, a String, a number), with the fields the JSON leaves out zero.
   <code>json.decode(text, reflect.of(x))</code> fills a value you already have instead.</li>
   <li><code>json.free(reflect.of(x))</code> gives back what decode allocated.</li>
 </ul>
@@ -1779,6 +1779,7 @@ price 9.90
     <tr><td>An enum</td><td>Its member's name</td></tr>
     <tr><td>A <code>String</code>, <code>u8[]</code>, <code>u8 *</code> or <code>u8</code> array</td><td>A string</td></tr>
     <tr><td>Other arrays and slices</td><td>Arrays</td></tr>
+    <tr><td>A <code>vec.Vec&lt;T&gt;</code></td><td>An array of its items</td></tr>
     <tr><td>A pointer</td><td>What it points to, or <code>null</code></td></tr>
   </tbody>
 </table></div>
@@ -1821,8 +1822,9 @@ tags[0].weight: expected an integer, got a string
   <li>Anything that doesn't fit throws <code>json.ERR_DECODE</code> with where it is
   (<code>json.ERR_ENCODE</code> for encode); text that isn't JSON says so. When
   <code>json.decode&lt;T&gt;</code> throws, it has already freed what it filled in.</li>
-  <li>Decode allocates the Strings, slices, <code>u8 *</code> strings and pointed-to structs it
-  fills in; <code>json.free</code> frees them all and zeroes them, also after a decode that
+  <li>Decode allocates the Strings, slices, Vecs, <code>u8 *</code> strings and pointed-to
+  structs it fills in (a decoded Vec is an ordinary one: <code>push</code> grows it);
+  <code>json.free</code> frees them all and zeroes them, also after a decode that
   threw half way, so use it only on values decode filled.</li>
 </ul>
 
