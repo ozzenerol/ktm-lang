@@ -4,6 +4,25 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.17.0 <small>(2026-10-13)</small></h2>
+<p>C's stdio in libc, and logging to stdout.</p>
+<ul>
+  <li><code>libc.fprintf(stream, fmt, ...)</code> with <code>libc.stdin</code>, <code>libc.stdout</code> and
+  <code>libc.stderr</code>, and <code>libc.EXIT_SUCCESS</code> / <code>libc.EXIT_FAILURE</code> for
+  <code>libc.exit</code>. <code>fprintf(libc.stdout, ...)</code> stays in order with <code>printf</code>.</li>
+  <li><code>log.Options.toStdout</code>: with no <code>path</code>, a Logger or the default logger writes to
+  stdout instead of stderr, in order with <code>printf</code>.</li>
+  <li><code>_extern</code> binds C data by its symbol too: <code>_extern ___stderrp FILE *stderr;</code>,
+  and in a module it has the module's name.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The format strings of <code>libc.printf</code>, <code>libc.snprintf</code> and <code>libc.fprintf</code>
+  are now checked against their arguments, as <code>printf</code>'s always was, so a wrong count is now
+  a compile error. A bare <code>snprintf</code> or <code>sprintf</code> declared with <code>extern "c"</code>
+  is checked too (its format was looked for in the wrong argument before).</li>
+</ul>
+
 <h2>v0.16.0 <small>(2026-10-13)</small></h2>
 <p>A default logger, so a program logs from anywhere without passing a Logger around.</p>
 <ul>
