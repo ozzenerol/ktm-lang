@@ -84,7 +84,7 @@ popped 50, len 4
 15,20,30,40,
 </pre>
 <p>A Vec is a value with <code>data</code>, <code>len</code> and <code>cap</code> fields. <code>free()</code> frees its
-array, not what the items point to.</p>
+array and the Strings in it (a <code>vec.Vec&lt;String&gt;</code> owns its Strings; <code>clear()</code> and a <code>set</code> that replaces one free them too, and <code>pop</code> and <code>removeAt</code> hand one back to you). Other items are yours: it doesn't free what they point to.</p>
 
 <h2 id="methods">Methods<a class="anchor" href="#methods" aria-label="Link to this section">#</a></h2>
 <div class="table-wrap"><table>

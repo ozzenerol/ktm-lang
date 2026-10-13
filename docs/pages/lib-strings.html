@@ -160,7 +160,6 @@ void main()
   words.push(str.format("orders_%d", 7));
   ad String list = str.join(&words, ", ");
   printf("%s\n", list);
-  for (i64 i = 0; i < words.len; i++) { words.at(i).free(); }
 }
 </code></pre>
 <pre class="output">

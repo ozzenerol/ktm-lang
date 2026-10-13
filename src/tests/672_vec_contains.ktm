@@ -44,7 +44,6 @@ i32 main()
     ad vec.Vec<i64> none = vec.new<i64>();
     tests++; if (!none.contains(0)) { correct++; }
 
-    for (i64 i = 0; i < names.len; i++) { names.at(i).free(); }
     test.printResult(correct, tests);
     printf("====\n");
     return 0;

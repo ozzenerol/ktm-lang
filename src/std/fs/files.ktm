@@ -90,7 +90,7 @@ static i64 compareNames(String *a, String *b) {
 }
 
 /* The names in the directory at `path`, sorted; *ok (when given) is
- * false when it can't be read. Yours: free it with fs.freeList(&names). */
+ * false when it can't be read. Yours: free it with names.free(). */
 pub vec.Vec<String> list(u8[] path, bool *ok = null) {
     vec.Vec<String> names = vec.new<String>();
     Dir d = openDir(path);
@@ -104,11 +104,9 @@ pub vec.Vec<String> list(u8[] path, bool *ok = null) {
     return names;
 }
 
-/* Frees what list() gave: each name, then the vector */
+/* Frees what list() gave: the same as names.free(), which frees the
+ * names too */
 pub void freeList(vec.Vec<String> *names) {
-    for (i64 i = 0; i < names.len; i++) {
-        names.at(i).free();
-    }
     names.free();
 }
 

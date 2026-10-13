@@ -42,7 +42,6 @@ i32 main()
     /* a String for printf: NUL-terminated */
     tests++; if (s4.ptr[s4.len] == 0) { correct++; }
 
-    for (i64 i = 0; i < words.len; i++) { words.at(i).free(); }
     test.printResult(correct, tests);
     printf("====\n");
     return 0;
