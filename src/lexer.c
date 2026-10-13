@@ -1964,8 +1964,13 @@ static int lexCore(Lexer *l, Lexeme *le) {
                 }
                 return 1;
 
-            case '$':
             case '@':
+                /* `@json`, `@key("x")`: an attribute (v0.14.0); the
+                 * parser says where one can go */
+                lexemeAssignOp(le,start,1,ch,l->lineno);
+                return 1;
+
+            case '$':
                 if (l->flags & CCF_ASM_BLOCK) {
                     lexemeAssignOp(le,start,1,ch,l->lineno);
                     return 1;

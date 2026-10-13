@@ -299,6 +299,9 @@ typedef struct Cctrl {
     /* `((fn(i64) i64)raw + 1)`: the cast already parsed, handed back
      * by the next parseUnaryExpr as the start of the expression */
     Ast *pending_unary;
+    /* `@json @yaml` read before a declaration (AstAttr *), for the struct
+     * it must be (parseAttrs) */
+    Vec *pending_attrs;
     int quiet_errors;
     /* The declaration being parsed is `pub`; it comes from the main
      * program (not a module, not a stdlib header) */

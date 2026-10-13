@@ -591,6 +591,105 @@ ClsField *clsFieldNew(AstType *type, AoStr *field_name) {
     return f;
 }
 
+/* ---- attributes (v0.14.0) ----
+ * `@json @yaml struct User { @key("e-mail") String email; ... };`: a
+ * struct's come before its declaration (and before `pub`), a field's
+ * before the field. Which ones there are and where they go: */
+static const char *parse_struct_attrs[] = {"json", "yaml", NULL};
+static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", NULL};
+
+static int parseAttrIn(const char **names, AoStr *name) {
+    for (int i = 0; names[i]; ++i) {
+        if (!strcmp(names[i], name->data)) return 1;
+    }
+    return 0;
+}
+
+/* The attributes from `at` (the `@`, taken) on: `@name` or
+ * `@name("text")`, any number of them. Each is checked for where it is,
+ * a struct's (on_field 0) or a field's (1). */
+Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
+    Vec *attrs = vecNew(&vec_unsigned_long_type);
+    while (1) {
+        Lexeme *name = cctrlTokenGet(cc);
+        if (!name || name->tk_type != TK_IDENT) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, 1,
+                    "expected an attribute name after `@`, as in @json");
+        }
+        AstAttr *a = calloc(1, sizeof(AstAttr));
+        a->name = aoStrDupRaw(name->start, name->len);
+        a->line = at->line;
+        a->col = at->col;
+        int len = name->len + 1;
+        if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+            cctrlTokenGet(cc);
+            Lexeme *arg = cctrlTokenGet(cc);
+            if (!arg || arg->tk_type != TK_STR || !tokenPunctIs(cctrlTokenPeek(cc), ')')) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@%s(...)` takes one string: @%s(\"text\")",
+                        a->name->data, a->name->data);
+            }
+            cctrlTokenGet(cc);
+            a->arg = aoStrDupRaw(arg->start, arg->len);
+        }
+
+        const char **here = on_field ? parse_field_attrs : parse_struct_attrs;
+        const char **there = on_field ? parse_struct_attrs : parse_field_attrs;
+        if (!parseAttrIn(here, a->name)) {
+            if (parseAttrIn(there, a->name)) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@%s` goes on a %s, not a %s", a->name->data,
+                        on_field ? "struct" : "field", on_field ? "field" : "struct");
+            }
+            cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                    "unknown attribute `@%s`: a struct takes @json and @yaml, "
+                    "a field @key, @skip and @omitEmpty", a->name->data);
+        }
+        int wants_arg = !strcmp(a->name->data, "key");
+        if (wants_arg && (!a->arg || a->arg->len == 0)) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                    "`@key` takes the field's key as a string: @key(\"e-mail\")");
+        }
+        if (wants_arg && memchr(a->arg->data, '\\', a->arg->len)) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                    "`@key`: write the key without escapes");
+        }
+        if (!wants_arg && a->arg) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                    "`@%s` takes no arguments", a->name->data);
+        }
+        if (astAttrGet(attrs, a->name->data)) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                    "`@%s` is here twice", a->name->data);
+        }
+        vecPush(attrs, a);
+
+        if (!tokenPunctIs(cctrlTokenPeek(cc), '@')) break;
+        at = cctrlTokenGet(cc);
+    }
+    if (on_field && astAttrGet(attrs, "skip") && attrs->size > 1) {
+        AstAttr *a = astAttrGet(attrs, "skip");
+        cctrlRaiseExceptionAt(cc, a->line, a->col, 5,
+                "a `@skip` field is never written or read: it takes no other attribute");
+    }
+    return attrs;
+}
+
+/* A field's attribute `a` on a struct without @json or @yaml does nothing:
+ * an error, at the attribute */
+static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fields) {
+    if (cls_attrs && cls_attrs->size) return;
+    listForEach(fields) {
+        ClsField *f = it->value;
+        if (f->type && f->type->field_attrs && f->type->field_attrs->size) {
+            AstAttr *a = f->type->field_attrs->entries[0];
+            cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
+                    "`@%s` on a field of %s, which has neither @json nor @yaml",
+                    a->name->data, tag ? tag->data : "an anonymous struct");
+        }
+    }
+}
+
 u32 CalcUnionSize(List *fields);
 
 List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
@@ -638,6 +737,22 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             cc->current_recovery = outer_recovery;
             cctrlRaiseException(cc,
                     "Unexpected end of input in class/union body");
+        }
+        /* `@key("x") T name;`: the field's attributes */
+        Vec *field_attrs = NULL;
+        if (tokenPunctIs(tok_name, '@')) {
+            Lexeme *at = cctrlTokenGet(cc);
+            if (computeSize == CalcUnionSize) {
+                cctrlRaiseExceptionAt(cc, at->line, at->col, 1,
+                        "attributes go on the fields of a struct, not a union");
+            }
+            field_attrs = parseAttrs(cc, at, 1);
+            tok_name = cctrlTokenPeek(cc);
+            if (tok_name == NULL) {
+                cc->current_recovery = outer_recovery;
+                cctrlRaiseException(cc,
+                        "Unexpected end of input in class/union body");
+            }
         }
         /* `private T name;`: only the class's module can use the field */
         int is_private = 0;
@@ -778,6 +893,21 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             if (is_private) {
                 field_type->private_module = cc->cur_module;
                 field_type->private_of = name;
+            }
+            if (field_attrs) {
+                AstAttr *a = field_attrs->entries[0];
+                if (is_private) {
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
+                            "`@%s` on a private field: json and yaml never write "
+                            "or read private fields", a->name->data);
+                }
+                if (astAttrGet(field_attrs, "key") &&
+                    tokenPunctIs(cctrlTokenPeek(cc), ','))
+                {
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
+                            "`@key` names one field: give each field its own declaration");
+                }
+                field_type->field_attrs = field_attrs;
             }
             /* The list is here to ease calculating the offset of the class 
              * fields as they have been defined by the programmer... Hashing 
@@ -1021,6 +1151,10 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     AstType *prev = NULL, *ref = NULL, *base_class = NULL;
     List *fields = NULL;
     Map *fields_dict;
+    /* `@json @yaml` before this declaration are its own; a struct nested
+     * in its body has none */
+    Vec *attrs = cc->pending_attrs;
+    cc->pending_attrs = NULL;
     cc->localenv = cctrlCreateAstMap(cc->localenv);
 
     if (tok == NULL) {
@@ -1128,6 +1262,20 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         cctrlRaiseException(cc, "a field of %s failed", tag ? tag->data : "a class");
     }
 
+    if (attrs) {
+        AstAttr *a = attrs->entries[0];
+        if (!is_class || is_intrinsic) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
+                    "`@%s` goes on a struct", a->name->data);
+        }
+        if (!fields) {
+            cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
+                    "`@%s` goes on the struct's definition (with its body), "
+                    "not on `struct %s;`", a->name->data, tag ? tag->data : "");
+        }
+    }
+    if (fields) parseCheckFieldAttrs(cc, attrs, tag, fields);
+
     if (prev && !fields) {
         return prev;
     }
@@ -1141,6 +1289,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
 
     if (prev && fields_dict) {
         prev->fields = fields_dict;
+        prev->attrs = attrs;
         prev->base_cls = base_class;
         prev->size = aligned_size;
         prev->alignment = (u32)aligned;
@@ -1165,6 +1314,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     }
     ref->alignment = (u32)aligned;
     ref->base_cls = base_class;
+    ref->attrs = attrs;
     if (intrinsic_base) ref->issigned = intrinsic_base->issigned;
     if (!is_class) ref->kind = AST_TYPE_UNION;
     ref->line = tag_line;
@@ -1592,6 +1742,11 @@ static void parseReflectStoreInt(Cctrl *cc, Ast *var, int off, s64 n) {
     if (n) parseReflectStore(cc, var, off, ast_int_type, astI64Type(n));
 }
 
+/* A bool at `off`: one byte, so the next field is untouched */
+static void parseReflectStoreBool(Cctrl *cc, Ast *var, int off, int b) {
+    if (b) parseReflectStore(cc, var, off, ast_u8_type, astI64Type(1));
+}
+
 /* A u8[] at `off`: the bytes of `s` (read-only data) */
 static void parseReflectStoreText(Cctrl *cc, Ast *var, int off, char *s, int len) {
     AstType *u8p = astMakePointerType(ast_u8_type);
@@ -1695,13 +1850,31 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
                                   parseReflectDescribe(cc, ft));
             parseReflectStoreInt(cc, arr, at + parseReflectOffset(rfield, "offset"),
                                  ft->offset);
-            parseReflectStoreInt(cc, arr, at + parseReflectOffset(rfield, "isPrivate"),
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "isPrivate"),
                                  ft->private_module ? 1 : 0);
+            AstAttr *key = astAttrGet(ft->field_attrs, "key");
+            if (key) {
+                parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "key"),
+                                      key->arg->data, key->arg->len);
+            } else {
+                parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "key"),
+                                      fname, strlen(fname));
+            }
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "skip"),
+                                 astAttrGet(ft->field_attrs, "skip") ? 1 : 0);
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "omitEmpty"),
+                                 astAttrGet(ft->field_attrs, "omitEmpty") ? 1 : 0);
             j++;
         }
         int off = parseReflectOffset(rtype, "fields");
         parseReflectStoreAddr(cc, g, off, arr);
         parseReflectStoreInt(cc, g, off + 8, n);
+    }
+    if (kind == REFLECT_STRUCT) {
+        parseReflectStoreBool(cc, g, parseReflectOffset(rtype, "json"),
+                             astAttrGet(t->attrs, "json") ? 1 : 0);
+        parseReflectStoreBool(cc, g, parseReflectOffset(rtype, "yaml"),
+                             astAttrGet(t->attrs, "yaml") ? 1 : 0);
     }
 
     if (kind == REFLECT_ENUM && t->enum_members && t->enum_members->indexes &&
@@ -3499,6 +3672,10 @@ Ast *parseStatement(Cctrl *cc) {
     if (tok == NULL) {
         cctrlRaiseException(cc, "Unexpected end of input, expected a "
                 "statement");
+    }
+    if (tokenPunctIs(tok, '@')) {
+        cctrlRaiseExceptionAt(cc, tok->line, tok->col, 1,
+                "attributes go on a struct or on a struct's field, not inside a function");
     }
     if (tok->tk_type == TK_KEYWORD) {
         switch (tok->i64) {
@@ -6233,6 +6410,16 @@ static int parseModReplay(Cctrl *cc, Vec *toks) {
     return ok;
 }
 
+/* The index after the attribute at toks[i] (`@name` or `@name("x")`) */
+static u64 parseSkipAttrToks(Vec *toks, u64 i) {
+    i += 2;
+    if (i < toks->size && tokenPunctIs(toks->entries[i], '(')) {
+        while (i < toks->size && !tokenPunctIs(toks->entries[i], ')')) i++;
+        i++;
+    }
+    return i < toks->size ? i : toks->size;
+}
+
 /* The names pass: record the declaration starting with `first`, and
  * declare the struct/union/class it defines (`pub struct Box;`) */
 static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
@@ -6250,6 +6437,10 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
     u64 i = 0;
     while (i < d->toks->size) {
         Lexeme *t = d->toks->entries[i];
+        if (tokenPunctIs(t, '@')) {
+            i = parseSkipAttrToks(d->toks, i);
+            continue;
+        }
         if (t->tk_type != TK_KEYWORD ||
             (t->i64 != KW_PUBLIC && t->i64 != KW_PRIVATE &&
              t->i64 != KW_STATIC)) break;
@@ -6261,9 +6452,16 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
         i + 1 < d->toks->size &&
         ((Lexeme *)d->toks->entries[i + 1])->tk_type == TK_IDENT)
     {
-        /* `[pub] struct Name;`: the name now, the body later */
+        /* `[pub] struct Name;`: the name now, the body later (and its
+         * attributes with the body) */
         Vec *fwd = vecNew(&vec_unsigned_long_type);
-        for (u64 j = 0; j <= i + 1; ++j) vecPush(fwd, d->toks->entries[j]);
+        for (u64 j = 0; j <= i + 1; ++j) {
+            if (tokenPunctIs(d->toks->entries[j], '@')) {
+                j = parseSkipAttrToks(d->toks, j) - 1;
+                continue;
+            }
+            vecPush(fwd, d->toks->entries[j]);
+        }
         Lexeme *semi = lexemeCopy(d->toks->entries[i + 1]);
         semi->tk_type = TK_PUNCT;
         semi->i64 = ';';
@@ -6378,6 +6576,32 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
          * `U0 F() {};`. Skip it, it would be taken for the type of the
          * next declaration and swallow it. */
         if (tokenPunctIs(tok, ';') && !cc->tmp_gvar_base_type) {
+            continue;
+        }
+
+        /* `@json @yaml [pub] struct Name { ... };`: the struct's
+         * attributes, taken by parseClassOrUnion */
+        if (tokenPunctIs(tok, '@') && !cc->tmp_gvar_base_type) {
+            if (cc->pending_attrs || is_static || is_const || cc->decl_pub || saw_private) {
+                cctrlRaiseExceptionAt(cc, tok->line, tok->col, 1,
+                        "a struct's attributes come first, together: "
+                        "@json @yaml pub struct Name { ... };");
+            }
+            Lexeme *at = tok;
+            Vec *attrs = parseAttrs(cc, tok, 0);
+            int k = 0;
+            Lexeme *next = cctrlTokenPeekBy(cc, k);
+            while (next && next->tk_type == TK_KEYWORD &&
+                   (next->i64 == KW_PUBLIC || next->i64 == KW_PRIVATE)) {
+                next = cctrlTokenPeekBy(cc, ++k);
+            }
+            if (!next || next->tk_type != TK_KEYWORD || next->i64 != KW_CLASS) {
+                AstAttr *a = attrs->entries[0];
+                cctrlRaiseExceptionAt(cc, at->line, at->col, a->name->len + 1,
+                        "`@%s` goes on a struct: @%s struct Name { ... };",
+                        a->name->data, a->name->data);
+            }
+            cc->pending_attrs = attrs;
             continue;
         }
 
