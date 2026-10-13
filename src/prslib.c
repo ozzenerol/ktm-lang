@@ -80,11 +80,29 @@ Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
 static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
                             int ptr_first);
 
+/* A byte pointer type (u8 *, i8 *), which a String converts to */
+static int parseIsBytePtr(AstType *t) {
+    return t && t->kind == AST_TYPE_POINTER && t->ptr && t->ptr->size == 1 &&
+           !t->ptr->is_bool &&
+           (t->ptr->kind == AST_TYPE_CHAR || t->ptr->kind == AST_TYPE_INT);
+}
+
 /* `expr` where a `want` is expected: a String (or a String *) is a view
- * of its bytes where a u8[] is; an array of want's element type
- * becomes a slice of it (its address and length, in a hidden variable),
- * anything else is returned as is for the type checks */
+ * of its bytes where a u8[] is, and a String variable or field its C
+ * string (s.cstr()) where a u8 * is; an array of want's element type becomes a slice of
+ * it (its address and length, in a hidden variable), anything else is
+ * returned as is for the type checks */
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
+    /* only a String that lives in a variable or a field: a call's String
+     * would have nobody to free it */
+    if (parseIsBytePtr(want) && expr && astTypeIsString(expr->type)) {
+        Ast *root = expr;
+        while (root->kind == AST_CLASS_REF) root = root->cls;
+        if (astIsUnOpKind(root, AST_UN_OP_DEREF)) root = root->operand;
+        if (root->kind == AST_LVAR || root->kind == AST_GVAR) {
+            return parseStringCPtr(cc, expr);
+        }
+    }
     if (astTypeIsSlice(want) && expr && expr->type && want->elem->size == 1 &&
         (want->elem->kind == AST_TYPE_CHAR || want->elem->kind == AST_TYPE_INT)) {
         AstType *t = expr->type;
@@ -1652,6 +1670,7 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
                     arg = astCast(arg, ast_int_type);
                 }
             } else {
+                arg = parseSliceFrom(cc, elem, arg);
                 if (parseArgCompat(elem, arg) != ARG_OK) {
                     cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
                         "argument %d of `%.*s`: expected %s, got %s",
@@ -2545,6 +2564,8 @@ static int parseOverloadArgRank(AstType *p, Ast *arg) {
         }
         return OVL_NONE;
     }
+    /* a String to a u8 *: a worse fit than to a u8[] */
+    if (parseIsBytePtr(p) && astTypeIsString(a)) return OVL_INT_FLOAT;
     if (parseArgCompat(p, arg) != ARG_OK) return OVL_NONE;
     if (a->kind == AST_TYPE_ARRAY && p->kind == AST_TYPE_POINTER) return OVL_CONVERT;
     if (p->kind == AST_TYPE_CHAR && a->kind == AST_TYPE_CHAR && p->is_bool != a->is_bool) {

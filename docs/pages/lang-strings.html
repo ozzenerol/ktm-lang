@@ -166,20 +166,25 @@ a[0] = 'x';</code></pre></div>
 <p>The message says it: "`a` is a string literal, which is read-only: copy it with str.from(...)".</p>
 
 <h2 id="c-strings">C strings</h2>
-<p>A NUL-terminated <code>u8 *</code> is what C functions take and return.</p>
+<p>A NUL-terminated <code>u8 *</code> is what C functions take and return. A String's bytes always
+end in a NUL, so a String variable or field goes where a <code>u8 *</code> is expected as it is (an
+argument, an assignment, a return, a field), the same as <code>s.cstr()</code>: no copy, and
+<code>""</code> for an empty String. The pointer is the String's own buffer: it is valid until the
+String changes or is freed. A String a call returns doesn't convert (nothing would free it): keep it
+in a variable first.</p>
 <pre data-run><code>
-import cstr, str;
+import cstr, libc, str;
 
 void main()
 {
   ad String s = str.from("for C");
-  u8 *c = s.cstr();               // a String as a C string: free
+  u8 *c = s;                      // a String as a C string: free
   u8[] back = cstr.view(c);       // a C string as a u8[]: measured once
-  printf("%s %d\n", c, back.len);
+  printf("%s %d %d\n", c, back.len, libc.strlen(s));
 }
 </code></pre>
 <pre class="output">
-for C 5
+for C 5 5
 </pre>
 <p>A <code>u8</code> array initialised from a string gets its own writable copy:</p>
 <pre data-run><code>
