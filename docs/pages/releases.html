@@ -4,6 +4,43 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.14.0 <small>(2026-10-13)</small></h2>
+<p>JSON and YAML without reflection. Mark a struct <code>@json</code> or <code>@yaml</code> and
+the compiler writes its encoder and decoder.</p>
+<ul>
+  <li>Attributes: <code>@json</code> and <code>@yaml</code> before a struct, and
+  <code>@key("e-mail")</code>, <code>@skip</code> and <code>@omitEmpty</code> before its
+  fields. An unknown or misplaced one is a compile error, <code>reflect</code> shows them, and
+  hover in the language server shows them too.</li>
+  <li>A <code>@json</code> struct gets <code>toJson</code>, <code>fromJson</code> and
+  <code>freeDecoded</code> methods; <code>@yaml</code> adds <code>toYaml</code> and
+  <code>fromYaml</code>. A field type that can't be written is a compile error at that field.
+  <code>ktm --expand</code> prints the generated code.</li>
+  <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> use those
+  methods by themselves, at any depth, so existing code gets faster by adding
+  <code>@json</code>. On a 1 KB order, decode takes 6.6 us instead of 20.6 us and encode
+  10.5 us instead of 15.4 us.</li>
+  <li><code>json.decode</code> reads the text with the new <code>json.Reader</code> and builds
+  no tree, which also makes it about twice as fast for structs without <code>@json</code>.</li>
+  <li><code>json.Reader</code>, a streaming reader for JSON text, and <code>json.Writer</code>
+  gains <code>rawKey</code> and <code>uint</code>.</li>
+  <li>A new <code>yaml</code> module: <code>yaml.Reader</code> and <code>yaml.Writer</code> for
+  block and flow mappings and sequences, plain and quoted scalars, block scalars and comments.
+  Anchors, tags, merge keys and more than one document are reported as not supported.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Decode errors start with the line and column in the text:
+  <code>1:22: tags[0].weight: expected an integer, got a string</code>. The rest of each
+  message is the same as before.</li>
+  <li>JSON text that ends too early says <code>expected a value, got the end of the
+  input</code> instead of <code>not JSON: ...</code>.</li>
+  <li>With <code>json.STRICT</code>, an unknown key is reported before a missing one, since the
+  text is read in order.</li>
+  <li><code>@</code> outside an <code>asm</code> block starts an attribute, so it is no longer
+  an "unexpected character".</li>
+</ul>
+
 <h2>v0.13.3 <small>(2026-10-13)</small></h2>
 <p>Fixes for struct values passed by value, and clearer errors.</p>
 <ul>
