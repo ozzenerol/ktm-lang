@@ -45,7 +45,7 @@ type 8: hi
 0 bytes left
 </pre>
 <ul class="rules">
-  <li>Make one with <code>bytes.bufferNew()</code>: a declared Buffer isn't zeroed.</li>
+  <li>Make one with <code>bytes.bufferNew()</code>, or declare one: <code>bytes.Buffer b;</code> starts empty too.</li>
   <li>The space in front is reused, so a buffer filled and drained all the time doesn't keep growing.</li>
   <li><code>b.take()</code> gives the unread bytes as a String that is yours.</li>
 </ul>

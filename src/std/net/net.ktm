@@ -770,7 +770,7 @@ pub i64 recvFrom(i32 sockfd, u8[] buf, String *fromAddr=null, i32 *fromPort=null
 
 /* An IPv4 or IPv6 address and port, as a sockaddr (ss, len bytes of it).
  * Fill one with net.makeAddr, recvFromAddr, localAddr or remoteAddr; a
- * declared Addr is not zeroed. */
+ * declared Addr is all zero (no address). */
 pub struct Addr {
         libc.sockaddr_storage ss;
         u32 len;

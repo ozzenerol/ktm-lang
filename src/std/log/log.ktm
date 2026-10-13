@@ -19,7 +19,7 @@ pub const i64 ERR_LOG = 0x6B746D16;
 pub enum Level { debug, info, warn, error };
 
 /* How log.open sets a Logger up. Start from log.options() (a declared
- * Options isn't zeroed), then change what you need. */
+ * Options is all zero, without the defaults), then change what you need. */
 pub struct Options {
     u8 *path;          /* the file, appended to; null for stderr */
     bool toStdout;     /* stdout: instead of stderr, or as well as the file */

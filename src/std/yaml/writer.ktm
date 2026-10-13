@@ -17,7 +17,7 @@ const u8 WRITER_INLINE = 16;   /* an item of a sequence: its first entry follows
  * level is indented two spaces, a sequence item starts with "- ", and a
  * string is quoted only when it would otherwise read back as something
  * else. An empty mapping or sequence is written {} or []. Make one with
- * yaml.writerNew() (a declared Writer isn't zeroed), free it with
+ * yaml.writerNew() (a declared Writer is all zero, not set up), free it with
  * w.free(), and take the text with w.take(). Its fields are read-only
  * outside module yaml. */
 pub struct Writer

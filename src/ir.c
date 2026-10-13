@@ -3492,11 +3492,16 @@ void irLowerDecl(IrCtx *ctx, Ast *ast) {
     }
     (void)var_id;
 
-    /* a slice without an initialiser is empty ({null, 0}), never
-     * whatever the slot held: its len guards its accesses. So is one in
-     * a struct or an array. */
-    if (!init && astTypeHasSlice(var->type)) {
-        int n = var->type->size;
+    /* a local without an initialiser starts zeroed (L12), never
+     * whatever the slot held: a slice is empty ({null, 0}), a pointer
+     * null, a struct or an array all zero, each time the declaration
+     * runs. Not an array over 4 KiB with no slice in it: a buffer to be
+     * filled, whose pages (a coroutine's stack) stay untouched. */
+    int n = var->kind == AST_FUNPTR ? 8 : var->type->size;
+    int is_buffer = var->kind != AST_FUNPTR &&
+                    var->type->kind == AST_TYPE_ARRAY && n > 4096 &&
+                    !astTypeHasSlice(var->type);
+    if (!init && n > 0 && !is_buffer) {
         if (n <= 64) {
             irStoreConstBytes(ctx, local, 0, n, NULL, 0);
         } else {

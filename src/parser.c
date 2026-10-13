@@ -4267,7 +4267,7 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
                     listAppend(body->stms,stmt);
                 }
                 if (ad_tok) {
-                    /* without a value only a String starts empty (zeroed) */
+                    /* without a value only a String is ready to free (empty) */
                     if ((!stmt || stmt->kind != AST_DECL || !stmt->declinit) &&
                         !astTypeIsString(var->type)) {
                         cctrlRaiseExceptionAt(cc, var->line, var->col, var->lname->len,
