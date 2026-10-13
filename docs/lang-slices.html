@@ -63,8 +63,31 @@ i64[] mid = all[1:4];      // elements 1, 2, 3: a view, nothing copied
 all[:2]   all[4:]          // from the start, to the end
 s.len   s.ptr   s[i]       // length, pointer, an element (checked)
 u8[] word = "hello";       // a literal is a u8[] of its bytes
+i64[] xs = {1, 2, 3};      // a list: a hidden array it views
 p[0:n]                     // a raw pointer becomes a slice: you vouch for n</code></pre>
 </div>
+
+<h2 id="a-slice-from-a-list">A slice from a list<a class="anchor" href="#a-slice-from-a-list" aria-label="Link to this section">#</a></h2>
+<p><code>T[] s = { ... }</code> with a list of Ts keeps them in a hidden array the slice views, for as long as the
+function runs (or the program, for a global). Two items that are a <code>T *</code> and a length set the slice's own pointer and length instead.</p>
+<pre data-run><code>import mem, str;
+
+String[] gNames = {str.from("ada"), str.from("linus")};
+
+void main()
+{
+  i64[] xs = {4, 8, 15};
+  u8[][] words = {"red", "green"};
+  i64 *raw = mem.alloc(sizeof(i64) * 2);
+  raw[0] = 1;
+  raw[1] = 2;
+  i64[] view = {raw, 2};    // a pointer and a length
+  printf("%d %d %s %s %d\n", xs.len, xs[2], words[1], gNames[1], view[1]);
+  mem.free(raw);
+}
+</code></pre>
+<pre class="output">3 15 green linus 2
+</pre>
 
 <h2 id="making-and-viewing">Making and viewing<a class="anchor" href="#making-and-viewing" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>void main()
@@ -249,7 +272,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#making-and-viewing">Making and viewing</a></li><li><a href="#a-view-writes-into-what-it-views">A view writes into what it views</a></li><li><a href="#passing-arrays-as-slices">Passing arrays as slices</a></li><li><a href="#text-is-a-u8">Text is a u8[]</a></li><li><a href="#bounds-checks">Bounds checks</a></li><li><a href="#from-a-pointer">From a pointer</a></li><li><a href="#comparing-and-freeing">Comparing and freeing</a></li><li><a href="#slices-of-anything">Slices of anything</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-slice-from-a-list">A slice from a list</a></li><li><a href="#making-and-viewing">Making and viewing</a></li><li><a href="#a-view-writes-into-what-it-views">A view writes into what it views</a></li><li><a href="#passing-arrays-as-slices">Passing arrays as slices</a></li><li><a href="#text-is-a-u8">Text is a u8[]</a></li><li><a href="#bounds-checks">Bounds checks</a></li><li><a href="#from-a-pointer">From a pointer</a></li><li><a href="#comparing-and-freeing">Comparing and freeing</a></li><li><a href="#slices-of-anything">Slices of anything</a></li></ul></nav>
 </div>
 </body>
 </html>

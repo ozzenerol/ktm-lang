@@ -2025,6 +2025,108 @@ static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
     }
 }
 
+/* `T[] s = { ... }`. Two items, a T * and a length, are the slice's own
+ * fields as before (`i64[] s = {ptr, n};`); anything else is a list of
+ * Ts, kept in a hidden array the slice views, as `T arr[] = {...};
+ * T[] s = arr;` would (it lives as long as the function, or the
+ * program for a global). The `{` is the next token. */
+static Ast *parseSliceInit(Cctrl *cc, Ast *var, s64 terminator_flags) {
+    AstType *st = var->type;
+    AstType *elem = st->elem;
+    AstType *arr_t = astMakeArrayType(elem, -1);
+    volatile int depth = 0;
+    List *items = listNew();
+    Vec *starts = vecNew(&vec_unsigned_long_type);
+    int nested = 0;
+
+    cctrlTokenGetRequired(cc); /* { */
+    depth++;
+    u64 i = 0;
+    while (1) {
+        Lexeme *tok = cctrlTokenGetRequired(cc);
+        if (tokenPunctIs(tok, '}')) {
+            depth--;
+            break;
+        }
+        cctrlTokenRewind(cc);
+        Ast *item;
+        Lexeme *start = malloc(sizeof(Lexeme));
+        if (tokenPunctIs(tok, '{')) {
+            item = parseDeclNestedInit(cc, arr_t, 0, i, &depth);
+            nested = 1;
+            *start = *tok;
+        } else {
+            item = parseDeclInitExpr(cc, start);
+        }
+        listAppend(items, item);
+        vecPush(starts, start);
+        i++;
+        tok = cctrlTokenGet(cc);
+        if (!tokenPunctIs(tok, ',')) cctrlTokenRewind(cc);
+    }
+    Lexeme *end = cctrlTokenGet(cc);
+    assertTokenIsTerminator(cc, end, terminator_flags);
+
+    u64 n = listCount(items);
+    Ast *first = n == 2 ? (Ast *)items->next->value : NULL;
+    Ast *second = n == 2 ? (Ast *)items->next->next->value : NULL;
+    int fields = !nested && first && second && first->type && second->type &&
+                 first->type->kind == AST_TYPE_POINTER &&
+                 astIsIntType(second->type) &&
+                 !(elem->kind == AST_TYPE_POINTER &&
+                   !strcmp(astTypeToString(first->type), astTypeToString(elem)));
+    List *inits = listNew();
+    i = 0;
+    listForEach(items) {
+        Ast *item = it->value;
+        Lexeme *start = vecGet(Lexeme *, starts, i);
+        if (fields) {
+            item = parseDeclScalarInit(cc, st, 1, i, &depth, item, start);
+        } else if (item->kind != AST_ARRAY_INIT) {
+            item = parseDeclScalarInit(cc, arr_t, 0, i, &depth, item, start);
+        }
+        listAppend(inits, item);
+        free(start);
+        i++;
+    }
+    vecRelease(starts);
+    Ast *list = astArrayInit(inits);
+    if (fields) {
+        if (var->kind == AST_GVAR) parseGlobalInitRuntimeItems(cc, var, list, st, 0);
+        return astDecl(var, list);
+    }
+
+    arr_t->len = (int)n;
+    arr_t->size = (int)n * elem->size;
+    static int arr_id = 0;
+    AoStr *name = aoStrPrintf("#slicearr%d", arr_id++);
+    Ast *arr;
+    Ast *arr_decl;
+    if (var->kind == AST_LVAR) {
+        arr = astLVar(arr_t, name->data, name->len);
+        if (cc->tmp_locals) listAppend(cc->tmp_locals, arr);
+        arr_decl = astDecl(arr, list);
+    } else {
+        arr = astGVar(arr_t, name->data, name->len, 1);
+        listAppend(cc->ast_list, astDecl(arr, list));
+        parseGlobalInitRuntimeItems(cc, arr, list, arr_t, 0);
+        arr_decl = NULL;
+    }
+    if (!arr_decl) {
+        /* a global: the view is set when the program starts, after the
+         * array's own run-time items */
+        int is_err = 0;
+        parseAddInitialiser(cc, astBinaryOp(AST_BIN_OP_ASSIGN, var,
+                                            parseSliceFrom(cc, st, arr), &is_err));
+        return astDecl(var, NULL);
+    }
+    Ast *decl = astDecl(var, parseSliceFrom(cc, st, arr));
+    List *both = listNew();
+    listAppend(both, arr_decl);
+    listAppend(both, decl);
+    return astCompountStatement(both);
+}
+
 /* `eq_line`:`eq_col` is where the `=` is, for the type check warning. */
 Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
                              int eq_line, int eq_col)
@@ -2062,6 +2164,8 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
             parseGlobalInitRuntimeItems(cc,var,init,var->type,0);
         }
         return astDecl(var,init);
+    } else if (astTypeIsSlice(var->type) && tokenPunctIs(peek,'{')) {
+        return parseSliceInit(cc, var, terminator_flags);
     } else if ((var->type->kind == AST_TYPE_CLASS ||
                 var->type->kind == AST_TYPE_UNION) &&
                !var->type->is_intrinsic && tokenPunctIs(peek,'{')) {
