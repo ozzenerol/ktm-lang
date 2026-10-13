@@ -88,6 +88,9 @@ $ ./wc words.txt
 4 the
 2 and
 1 cat</code></pre>
+<p>With <code>-run</code> or <code>-jit</code>, everything after the source file goes to the program, even words
+that look like ktm's own options: <code>ktm -run wc.ktm -v words.txt</code> gives the program <code>-v</code>.
+Anywhere else, <code>--</code> ends ktm's options the same way.</p>
 <p>The same program, checked here with a fixed text instead of a file:</p>
 <pre data-run><code>
 import map, str, vec;

@@ -414,6 +414,17 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
         char *next_arg = i + 1 < argc ? argv[i+1] : NULL;
         char *arg_to_parse = NULL;
 
+        /* `--` ends ktm's options; with -run or -jit, so does the source
+         * file: what follows is the program's, `-v` included */
+        int dashdash = arg_len == 2 && !strcmp(arg, "--");
+        if (dashdash || (args->infile && (args->run || args->jit))) {
+            for (int j = dashdash ? i + 1 : i; j < argc; j++) {
+                args->argc++;
+                listAppend(args->argv, strdup(argv[j]));
+            }
+            break;
+        }
+
         if ((parser = cliParserFind(arg, arg_len)) == NULL) {
             /* Are we looking at a source file? */
             enum CliFileType file_type = cliGetFileType(arg, arg_len);
