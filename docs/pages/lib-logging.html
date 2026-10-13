@@ -77,7 +77,7 @@ app.log:
   <li>Until <code>log.setup</code> is called, <code>log.info(...)</code> and the others write to stderr at INFO, so a small program needs no setup at all.</li>
   <li><code>log.setup(&amp;o)</code> takes the same Options as <code>log.open</code> and throws <code>log.ERR_LOG</code> the same way; the logger it had is then kept. Calling it again closes the old one.</li>
   <li><code>log.setLevel(level)</code> changes the level for the calls from then on.</li>
-  <li><code>log.shutdown()</code> closes the file; later calls go to stderr at INFO again.</li>
+  <li><code>log.shutdown()</code> closes the file; later calls go to stderr (stdout with <code>toStdout</code>) at the level it had, and the first one says once on stderr where it came from: usually a <code>defer log.shutdown();</code> inside a <code>try</code> or another inner block, which runs when that block ends.</li>
   <li><code>log.logger()</code> is the default Logger itself, for code that takes a <code>log.Logger *</code> or to read <code>failed</code>.</li>
   <li>With <code>threadSafe</code> set, threads can share it; call <code>log.setup</code> and <code>log.shutdown</code> while no other thread logs.</li>
 </ul>
