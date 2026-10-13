@@ -322,6 +322,7 @@ void initFixtures() {
     /* Regressions: hover/completion of locals, fields, macros and
      * default params; stale symbols across edits and files. */
     REG_HC =
+        "import json, yaml;\n"
         "#include \"lib.ktm\"\n"
         "#define REG_LIMIT 8\n"
         "i64 Square(i64 n, i64 scale=2)\n"
@@ -342,6 +343,17 @@ void initFixtures() {
         "void *Use()\n"
         "{\n"
         "  return Keep();\n"
+        "}\n"
+        "@json @yaml\n"
+        "struct RegUser\n"
+        "{\n"
+        "  @key(\"e-mail\") String email;\n"
+        "  @skip i64 hits;\n"
+        "  @omitEmpty i64 age;\n"
+        "};\n"
+        "i64 RegHits(RegUser *u)\n"
+        "{\n"
+        "  return u.hits + u.age;\n"
         "}\n";
     /* A non-ASCII line: utf-16 columns differ from byte columns. */
     UTF_HC =
@@ -1208,6 +1220,26 @@ void testRegressions() {
     resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
     check("hover on a field shows class and type",
                 hoverContains(resp, "i64 LibPoint.x"));
+
+    posOf(REG_HC, "RegUser *u", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a struct shows its attributes",
+                hoverContains(resp, "@json @yaml\nstruct RegUser"));
+
+    posOf(REG_HC, "email;", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field's declaration shows its attributes",
+                hoverContains(resp, "@key(\"e-mail\") String RegUser.email"));
+
+    posOf(REG_HC, "hits +", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field access shows @skip",
+                hoverContains(resp, "@skip i64 RegUser.hits"));
+
+    posOf(REG_HC, "age;\n}", 1, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover on a field access shows @omitEmpty",
+                hoverContains(resp, "@omitEmpty i64 RegUser.age"));
 
     posOf(REG_HC, "REG_LIMIT;", 1, &line, &chr);
     resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
