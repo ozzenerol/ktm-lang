@@ -72,7 +72,7 @@ i32 main() {
     makeSocket(P("t/sub/s2"));
     if (isSocket("t/s") && isSocket("t/sub/s2")) { correct++; }
 
-    if (fs.removeDir(cstr.view(P("t")), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.removeDir(cstr.view(P("t")), fs.REMOVE_RECURSE)) { correct++; }
     if (!exists("t")) { correct++; }
 
     cmd = cstr.formatTo(null, "rm -rf '%s'", root);

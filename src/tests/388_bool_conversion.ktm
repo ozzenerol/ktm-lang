@@ -141,9 +141,9 @@ void library() {
     /* RM_VERBOSE alone must not act like RM_RECURSE (2 as a bool is 1) */
     fs.makeDir("./ktm-388/sub", fs.MAKE_DIR_DEFAULT, true);
     fs.writeAll("./ktm-388/sub/f", "x");
-    check(fs.removeDir("./ktm-388", 0) != 0 && exists("./ktm-388/sub/f"),
+    check(!fs.removeDir("./ktm-388", 0) && exists("./ktm-388/sub/f"),
             "removeDir without REMOVE_RECURSE doesn't recurse");
-    check(fs.removeDir("./ktm-388", fs.REMOVE_RECURSE) == 0 && !exists("./ktm-388"),
+    check(fs.removeDir("./ktm-388", fs.REMOVE_RECURSE) && !exists("./ktm-388"),
             "RmDir with RM_RECURSE");
 
     /* JsonParseBool reports a bad literal (it returned -1 through a bool) */
