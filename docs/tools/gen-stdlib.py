@@ -50,23 +50,23 @@ MODULES = [
     ("libc",    "C library",         "The C functions, structs and constants ktm programs call by their C names."),
 ]
 
-# Module -> where the guides explain it (library.html unless the link says
-# otherwise); each module's section in the reference links there.
+# Module -> the page that explains it; each module's section in the reference links there.
 GUIDE = {
-    "mem": "library.html#memory", "str": "library.html#strings",
-    "cstr": "library.html#c-strings", "fs": "library.html#files",
-    "os": "library.html#system", "proc": "library.html#system",
-    "list": "library.html#lists", "vec": "library.html#vectors",
-    "sort": "library.html#vectors", "map": "library.html#hash-tables",
-    "set": "library.html#sets", "bytes": "library.html#bytes",
-    "hash": "library.html#hashing", "math": "library.html#maths",
-    "date": "library.html#dates", "json": "library.html#json",
-    "yaml": "library.html#yaml",
-    "csv": "library.html#csv", "fzf": "library.html#fzf",
-    "reflect": "language.html#reflection", "thread": "library.html#more-modules",
-    "atomic": "library.html#atomics", "net": "library.html#net",
-    "signal": "library.html#signals", "coro": "library.html#coroutines",
-    "sql": "library.html#sqlite",
+    "mem": "lib-memory.html", "str": "lib-strings.html",
+    "cstr": "lib-cstrings.html", "fs": "lib-files.html",
+    "os": "lib-environment.html", "proc": "lib-processes.html",
+    "list": "lib-lists.html", "vec": "lib-vectors.html",
+    "sort": "lib-vectors.html", "map": "lib-maps.html",
+    "set": "lib-sets.html", "bytes": "lib-bytes.html",
+    "hash": "lib-hashing.html", "math": "lib-maths.html",
+    "date": "lib-dates.html", "json": "lib-json.html",
+    "yaml": "lib-yaml.html",
+    "csv": "lib-csv.html", "fzf": "lib-fzf.html",
+    "reflect": "lang-reflection.html", "thread": "lib-threads.html",
+    "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
+    "signal": "lib-signals.html", "coro": "lib-coroutines.html",
+    "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
+    "prelude": "lang-modules.html#the-prelude",
 }
 
 

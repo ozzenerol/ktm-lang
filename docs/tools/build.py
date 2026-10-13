@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build docs/*.html from the page sources in docs/pages/.
 
-Each page source starts with `<!-- title: Page title -->` followed by the
-page body; this wraps it in the shared layout (tools/page.py), regenerates
+Each page source starts with `<!-- title: Page title -->`, optionally
+`<!-- ref: mod1 mod2 -->` (the library reference modules it covers),
+followed by the page body; this wraps it in the shared layout (tools/page.py), regenerates
 the library reference (tools/gen-stdlib.py) and writes the search index
 (assets/search-index.js) from what the pages recorded.
 
@@ -54,9 +55,15 @@ def main():
         m = re.match(r"\s*<!--\s*title:\s*(.*?)\s*-->\s*", src)
         if not m:
             sys.exit(f"{name}: missing <!-- title: ... --> header")
-        body = include_files(src[m.end():])
+        rest = src[m.end():]
+        refs = None
+        r = re.match(r"<!--\s*ref:\s*(.*?)\s*-->\s*", rest)
+        if r:
+            refs = r.group(1).split()
+            rest = rest[r.end():]
+        body = include_files(rest)
         out = os.path.join(DOCS, name)
-        open(out, "w").write(page(m.group(1), name, escape_code(body)))
+        open(out, "w").write(page(m.group(1), name, escape_code(body), refs))
         print(f"wrote docs/{name}")
     runpy.run_path(os.path.join(TOOLS, "gen-stdlib.py"), run_name="__main__")
     write_search_index()

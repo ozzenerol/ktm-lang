@@ -56,6 +56,8 @@ def main():
         for i, m in enumerate(EXAMPLE.finditer(src), 1):
             # Page sources hold code raw; build.py does the escaping.
             code = m.group("code")
+            if code.startswith("\n"):  # as build.py shows it: line numbers match the page
+                code = code[1:]
             want = m.group("out") or ""
             if want.startswith("\n"):  # matches build.py's leading-newline rule
                 want = want[1:]

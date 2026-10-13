@@ -1,39 +1,107 @@
 """Shared page layout for the generated docs.
 
 page() wraps a page body in the layout: the header (wordmark, search,
-theme toggle), the sidebar (every page, and the current page's headings)
-and the footer. It gives each h2/h3 an id and an anchor link, wraps tables
-so they scroll on narrow screens, and records the page, its headings and
-(for the library reference) its declarations in SEARCH for build.py to
-write out as the search index."""
+theme toggle), the sidebar (every page, grouped by section), the page's
+own table of contents and the footer. It gives each h2/h3 an id and an
+anchor link, wraps tables so they scroll on narrow screens, and records
+the page, its headings and (for the library reference) its declarations
+in SEARCH for build.py to write out as the search index."""
 import html
 import re
 
+# The sidebar, in reading order: (section, [(file, title), ...]). Previous
+# and next links follow this order too.
 NAV = [
-    ("index.html", "Home"),
-    ("getting-started.html", "Getting started"),
-    ("language.html", "Language"),
-    ("library.html", "Library guide"),
-    ("stdlib.html", "Library reference"),
-    ("tools.html", "Tools"),
-    ("examples.html", "Examples"),
-    ("known-issues.html", "Known issues"),
-    ("releases.html", "Releases"),
+    ("Start", [
+        ("index.html", "Home"),
+        ("getting-started.html", "Getting started"),
+        ("tour.html", "A quick tour"),
+        ("from-c.html", "Coming from C"),
+    ]),
+    ("Language", [
+        ("language.html", "Overview"),
+        ("lang-basics.html", "Program basics"),
+        ("lang-types.html", "Types and literals"),
+        ("lang-variables.html", "Variables and constants"),
+        ("lang-operators.html", "Operators and casts"),
+        ("lang-control-flow.html", "Control flow"),
+        ("lang-switch.html", "switch"),
+        ("lang-functions.html", "Functions"),
+        ("lang-varargs.html", "Variable arguments"),
+        ("lang-overloading.html", "Overloading"),
+        ("lang-function-pointers.html", "Function pointers"),
+        ("lang-pointers.html", "Pointers and arrays"),
+        ("lang-slices.html", "Slices"),
+        ("lang-strings.html", "Strings"),
+        ("lang-structs.html", "Structs and unions"),
+        ("lang-methods.html", "Methods and inheritance"),
+        ("lang-enums.html", "Enums"),
+        ("lang-type-aliases.html", "Type aliases"),
+        ("lang-generics.html", "Generics"),
+        ("lang-modules.html", "Modules"),
+        ("lang-exceptions.html", "Exceptions"),
+        ("lang-defer.html", "defer and ad"),
+        ("lang-reflection.html", "Reflection"),
+        ("lang-attributes.html", "Attributes"),
+        ("lang-preprocessor.html", "The preprocessor"),
+        ("lang-calling-c.html", "Calling C and assembly"),
+    ]),
+    ("Library", [
+        ("library.html", "Overview"),
+        ("lib-memory.html", "Memory"),
+        ("lib-strings.html", "Strings"),
+        ("lib-text.html", "Text helpers"),
+        ("lib-formatting.html", "Format strings"),
+        ("lib-cstrings.html", "C strings"),
+        ("lib-files.html", "Files"),
+        ("lib-directories.html", "Directories and file status"),
+        ("lib-csv.html", "CSV"),
+        ("lib-shell.html", "Shell commands"),
+        ("lib-processes.html", "Processes"),
+        ("lib-environment.html", "Environment and exit"),
+        ("lib-signals.html", "Signals"),
+        ("lib-vectors.html", "Vectors and sorting"),
+        ("lib-lists.html", "Lists"),
+        ("lib-maps.html", "Hash maps"),
+        ("lib-trees.html", "Ordered maps"),
+        ("lib-sets.html", "Sets"),
+        ("lib-bytes.html", "Byte buffers"),
+        ("lib-hashing.html", "Hashing"),
+        ("lib-json.html", "JSON: reading"),
+        ("lib-json-writer.html", "JSON: writing"),
+        ("lib-json-structs.html", "JSON: structs"),
+        ("lib-yaml.html", "YAML"),
+        ("lib-dates.html", "Dates"),
+        ("lib-time.html", "Clocks and sleeping"),
+        ("lib-maths.html", "Maths"),
+        ("lib-tcp.html", "TCP sockets"),
+        ("lib-udp.html", "UDP sockets"),
+        ("lib-coroutines.html", "Coroutines"),
+        ("lib-event-loop.html", "The coroutine loop"),
+        ("lib-serve.html", "Serving on every core"),
+        ("lib-threads.html", "Threads and atomics"),
+        ("lib-fzf.html", "Fuzzy matching"),
+        ("lib-sqlite.html", "SQLite"),
+    ]),
+    ("Tools", [
+        ("tools.html", "The compiler"),
+        ("tools-jit-repl.html", "JIT and REPL"),
+        ("tools-editors.html", "Editors"),
+        ("tools-libraries.html", "Building libraries"),
+        ("tools-debugging.html", "Debugging"),
+    ]),
+    ("Reference", [
+        ("stdlib.html", "Library reference"),
+        ("examples.html", "Example projects"),
+        ("known-issues.html", "Known issues"),
+        ("releases.html", "Releases"),
+    ]),
 ]
 
-REPO = "https://github.com/ozzenerol/ktm-lang"
+ORDER = [item for _, items in NAV for item in items]
+SECTION = {f: s for s, items in NAV for f, _ in items}
 
-# Library guide section -> its module(s) in the library reference: the
-# section's heading links there.
-REFERENCE = {
-    "memory": ["mem"], "strings": ["str", "cstr"], "files": ["fs"],
-    "csv": ["csv"], "system": ["proc", "os"], "signals": ["signal"],
-    "lists": ["list"], "vectors": ["vec", "sort"], "sets": ["set"],
-    "hash-tables": ["map"], "bit-vectors": ["vec"], "bytes": ["bytes"],
-    "hashing": ["hash"], "json": ["json"], "yaml": ["yaml"], "dates": ["date"],
-    "maths": ["math"], "net": ["net"], "coroutines": ["coro"],
-    "fzf": ["fzf"], "sqlite": ["sql"], "atomics": ["atomic"],
-}
+REPO = "https://github.com/ozzenerol/ktm-lang"
 
 # Filled by page(): [title, href, kind] rows for the search index.
 SEARCH = []
@@ -50,10 +118,9 @@ def text_of(fragment):
     return html.unescape(TAG.sub("", fragment)).strip()
 
 
-def headings(content, refs=None):
-    """Give every h2/h3 an id and an anchor (and an h2 in refs a link to
-    its modules' reference); return the new content and the (tag, id,
-    text) list."""
+def headings(content):
+    """Give every h2/h3 an id and an anchor; return the new content and
+    the (tag, id, text) list."""
     found = []
     # ids already in the page (the reference's <section id>s) aren't reused
     seen = set(re.findall(r'\sid="([^"]+)"', content))
@@ -73,12 +140,8 @@ def headings(content, refs=None):
             seen.add(hid)
             attrs += f' id="{hid}"'
         found.append((tag, hid, text))
-        ref = ""
-        if refs and tag == "h2" and hid in refs:
-            ref = '<span class="ref">' + " ".join(
-                f'<a href="stdlib.html#{m}">{m} reference</a>' for m in refs[hid]) + "</span>"
         return (f'<{tag}{attrs}>{inner}<a class="anchor" href="#{hid}" '
-                f'aria-label="Link to this section">#</a>{ref}</{tag}>')
+                f'aria-label="Link to this section">#</a></{tag}>')
 
     return HEADING.sub(one, content), found
 
@@ -88,60 +151,62 @@ def wrap_tables(content):
                   content, flags=re.S)
 
 
-def sidebar(filename, heads):
-    items = []
-    for href, label in NAV:
-        if href != filename:
-            items.append(f'<li><a href="{href}">{html.escape(label)}</a></li>')
-            continue
-        sub = ""
-        if any(h[0] == "h2" for h in heads):
-            sub = '<ul class="toc">' + toc_items(heads) + "</ul>"
-        items.append(f'<li class="current"><a href="{href}" aria-current="page">'
-                     f'{html.escape(label)}</a>{sub}</li>')
-    return '<ul class="pages">' + "".join(items) + "</ul>"
-
-
-def toc_items(heads):
-    """The page's h2s, each with its h3s in a nested list (shown for the
-    section being read; see docs.js)."""
-    out, h3s = [], []
-
-    def close():
-        if h3s:
-            out.append('<ul class="sub">' + "".join(h3s) + "</ul>")
-            h3s.clear()
-        out.append("</li>")
-
-    started = False
-    for tag, hid, text in heads:
-        link = f'<li><a href="#{hid}">{html.escape(text)}</a>'
-        if tag == "h2":
-            if started:
-                close()
-            out.append(link)
-            started = True
-        elif started:
-            h3s.append(link + "</li>")
-    if started:
-        close()
+def sidebar(filename):
+    out = []
+    for section, items in NAV:
+        here = SECTION.get(filename) == section
+        links = []
+        for href, label in items:
+            if href == filename:
+                links.append(f'<li class="current"><a href="{href}" aria-current="page">'
+                             f'{html.escape(label)}</a></li>')
+            else:
+                links.append(f'<li><a href="{href}">{html.escape(label)}</a></li>')
+        out.append(f'<details class="group"{" open" if here else ""}>'
+                   f'<summary>{html.escape(section)}</summary>'
+                   f'<ul>{"".join(links)}</ul></details>')
     return "".join(out)
+
+
+def toc(heads):
+    """The page's h2s, for the "On this page" column."""
+    items = [f'<li><a href="#{hid}">{html.escape(text)}</a></li>'
+             for tag, hid, text in heads if tag == "h2"]
+    if len(items) < 2:
+        return ""
+    return ('<nav class="onpage" aria-label="On this page"><p>On this page</p><ul>'
+            + "".join(items) + "</ul></nav>")
 
 
 def prev_next(filename):
     """Links to the pages before and after this one in the sidebar's order."""
-    names = [href for href, _ in NAV]
+    names = [href for href, _ in ORDER]
     if filename not in names:
         return ""
     i = names.index(filename)
     links = []
     if i > 0:
-        links.append(f'<a class="prev" href="{NAV[i - 1][0]}"><span>Previous</span>'
-                     f'{html.escape(NAV[i - 1][1])}</a>')
-    if i + 1 < len(NAV):
-        links.append(f'<a class="next" href="{NAV[i + 1][0]}"><span>Next</span>'
-                     f'{html.escape(NAV[i + 1][1])}</a>')
+        links.append(f'<a class="prev" href="{ORDER[i - 1][0]}"><span>Previous</span>'
+                     f'{html.escape(ORDER[i - 1][1])}</a>')
+    if i + 1 < len(ORDER):
+        links.append(f'<a class="next" href="{ORDER[i + 1][0]}"><span>Next</span>'
+                     f'{html.escape(ORDER[i + 1][1])}</a>')
     return '<nav class="prev-next" aria-label="Previous and next page">' + "".join(links) + "</nav>"
+
+
+def crumbs(filename, refs):
+    """The section the page is in, and the reference modules it covers."""
+    section = SECTION.get(filename)
+    if not section or filename == "index.html":
+        return ""
+    first = next(f for s, items in NAV if s == section for f, _ in items[:1])
+    trail = (f'<a href="{first}">{html.escape(section)}</a>'
+             if first != filename else html.escape(section))
+    ref = ""
+    if refs:
+        ref = ('<span class="refs">Reference: ' + " ".join(
+            f'<a href="stdlib.html#{m}"><code>{m}</code></a>' for m in refs) + "</span>")
+    return f'<div class="crumbs"><span>{trail}</span>{ref}</div>'
 
 
 def record(title, filename, heads, content):
@@ -158,8 +223,8 @@ def record(title, filename, heads, content):
             SEARCH.append([m.group(1), f"stdlib.html#{m.group(1)}", "Constant"])
 
 
-def page(title, filename, content):
-    content, heads = headings(content, REFERENCE if filename == "library.html" else None)
+def page(title, filename, content, refs=None):
+    content, heads = headings(content)
     content = wrap_tables(content)
     record(title, filename, heads, content)
     full_title = "ktm" if filename == "index.html" else f"{title} - ktm"
@@ -169,6 +234,7 @@ def page(title, filename, content):
     else:
         edit = f'<a href="{REPO}/edit/main/docs/pages/{filename}">Edit this page</a>'
     body_class = ' class="home"' if filename == "index.html" else ""
+    onpage = "" if filename in ("index.html", "stdlib.html") else toc(heads)
     return f'''<!doctype html>
 <html lang="en">
 <head>
@@ -182,7 +248,8 @@ def page(title, filename, content):
 (function () {{
   var t = new URLSearchParams(location.search).get("theme");
   try {{ if (!t) t = localStorage.getItem("ktm-theme"); }} catch (e) {{}}
-  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
 }})();
 </script>
 <script src="assets/search-index.js" defer></script>
@@ -195,6 +262,13 @@ def page(title, filename, content):
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
   <div class="search" role="search">
     <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
            aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
@@ -208,12 +282,13 @@ def page(title, filename, content):
     <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
   </button>
 </header>
-<div class="layout">
+<div class="layout{' wide' if not onpage else ''}">
   <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-{sidebar(filename, heads)}
+{sidebar(filename)}
   </nav>
   <div class="scrim" hidden></div>
   <main id="content">
+{crumbs(filename, refs)}
 {content}
     {prev_next(filename)}
     <footer class="page-foot">
@@ -221,6 +296,7 @@ def page(title, filename, content):
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
+  {onpage}
 </div>
 </body>
 </html>

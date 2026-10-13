@@ -103,7 +103,11 @@
   function setupCode() {
     document.querySelectorAll("pre").forEach(function (pre) {
       var code = pre.querySelector("code");
-      if (code && (code.classList.contains("language-ktm") || pre.hasAttribute("data-run"))) {
+      /* ktm unless the block says otherwise: output, a shell session, or
+       * a language-* class naming another language */
+      var other = pre.classList.contains("output") || pre.classList.contains("shell") ||
+                  (code && /\blanguage-(?!ktm\b)/.test(code.className));
+      if (code && !other) {
         code.innerHTML = highlight(code.textContent);
       }
       if (pre.classList.contains("output")) return;
@@ -144,34 +148,101 @@
     if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
   }
 
-  /* ---- the current section in the sidebar ----
-   * The section being read is marked, and only its subsections are
-   * listed under it. */
+  /* ---- the section being read, in "On this page" ---- */
   function setupScrollSpy() {
-    var links = document.querySelectorAll(".sidebar .toc a");
+    var links = document.querySelectorAll(".onpage a");
     if (!links.length) return;
     var byId = {};
-    links.forEach(function (a) { byId[a.getAttribute("href").replace(/\?.*?#|^#/, "")] = a; });
+    links.forEach(function (a) { byId[a.getAttribute("href").replace(/^.*#/, "")] = a; });
     function mark(id) {
       var a = byId[id];
       if (!a) return;
       links.forEach(function (l) { l.classList.remove("active"); });
-      document.querySelectorAll(".sidebar .toc > li.open").forEach(function (li) { li.classList.remove("open"); });
       a.classList.add("active");
-      var top = a.closest(".toc > li");
-      if (top) {
-        top.classList.add("open");
-        var h2 = top.querySelector("a");
-        if (h2 !== a) h2.classList.add("active");
-      }
     }
     if (location.hash) mark(decodeURIComponent(location.hash.slice(1)));
     if (!("IntersectionObserver" in window)) return;
-    var heads = document.querySelectorAll("main h2[id], main h3[id]");
+    var heads = document.querySelectorAll("main h2[id]");
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) { if (e.isIntersecting) mark(e.target.id); });
     }, { rootMargin: "-60px 0px -70% 0px" });
     heads.forEach(function (h) { observer.observe(h); });
+  }
+
+  /* ---- links to the old one-page sections ----
+   * language.html, library.html and tools.html used to hold every topic
+   * on one long page; a link to one of their old sections goes to the
+   * topic's own page now. */
+  var MOVED = {
+    "language.html": {
+      "program-structure": "lang-basics.html", "printing": "lang-basics.html#printing",
+      "types": "lang-types.html", "literals": "lang-types.html#literals",
+      "variables": "lang-variables.html", "auto": "lang-variables.html#auto",
+      "static": "lang-variables.html#static", "const": "lang-variables.html#const",
+      "operators": "lang-operators.html", "sizeof-alignof-typeof": "lang-operators.html#sizeof-alignof-typeof",
+      "type-casts": "lang-operators.html#casts", "control-flow": "lang-control-flow.html",
+      "if-and-else": "lang-control-flow.html#if-and-else", "switch": "lang-switch.html",
+      "loops": "lang-control-flow.html#loops", "range-based-for": "lang-control-flow.html#range-based-for",
+      "goto": "lang-control-flow.html#goto", "functions": "lang-functions.html",
+      "default-arguments": "lang-functions.html#default-arguments", "variable-arguments": "lang-varargs.html",
+      "overloading": "lang-overloading.html", "function-pointers": "lang-function-pointers.html",
+      "fn-types": "lang-function-pointers.html", "pointers-and-arrays": "lang-pointers.html",
+      "heap-memory": "lang-pointers.html#heap-memory", "slices": "lang-slices.html",
+      "strings": "lang-strings.html", "c-strings": "lang-strings.html#c-strings",
+      "structs": "lang-structs.html", "inheritance": "lang-methods.html#inheritance",
+      "methods": "lang-methods.html", "unions": "lang-structs.html#unions", "enums": "lang-enums.html",
+      "type-aliases": "lang-type-aliases.html", "attributes": "lang-attributes.html",
+      "generics": "lang-generics.html", "modules": "lang-modules.html",
+      "preprocessor": "lang-preprocessor.html", "define": "lang-preprocessor.html#define",
+      "conditional-compilation": "lang-preprocessor.html#conditional-compilation",
+      "include-and-link": "lang-preprocessor.html#include-and-link", "exceptions": "lang-exceptions.html",
+      "reflection": "lang-reflection.html", "defer": "lang-defer.html", "autodefer": "lang-defer.html#ad",
+      "calling-c": "lang-calling-c.html", "inline-assembly": "lang-calling-c.html#inline-assembly",
+      "differences-from-its-origins": "from-c.html"
+    },
+    "library.html": {
+      "memory": "lib-memory.html", "strings": "lib-strings.html", "string": "lib-strings.html",
+      "reading-text": "lib-strings.html#reading-text", "case-folding": "lib-text.html#ignoring-case",
+      "url-html": "lib-text.html#urls-and-html", "format-conversions": "lib-formatting.html",
+      "c-strings": "lib-cstrings.html", "building-c-strings": "lib-cstrings.html",
+      "inspecting-c-strings": "lib-cstrings.html", "copying-c-strings": "lib-cstrings.html",
+      "splitting-paths-and-names": "lib-text.html#paths-and-file-names", "files": "lib-files.html",
+      "directories": "lib-directories.html", "file-status": "lib-directories.html#file-status",
+      "csv": "lib-csv.html", "system": "lib-shell.html", "processes": "lib-processes.html",
+      "pipelines": "lib-processes.html#pipelines", "environment": "lib-environment.html",
+      "signals": "lib-signals.html", "lists": "lib-lists.html", "vectors": "lib-vectors.html",
+      "sets": "lib-sets.html", "tree": "lib-trees.html", "hash-tables": "lib-maps.html",
+      "bit-vectors": "lib-vectors.html#bit-vectors", "bytes": "lib-bytes.html",
+      "hashing": "lib-hashing.html", "json": "lib-json.html", "parsing-and-selecting": "lib-json.html",
+      "wildcards-and-getters": "lib-json.html#wildcards", "writing-json-and-freeing": "lib-json-writer.html",
+      "building-json-with-a-writer": "lib-json-writer.html", "errors-and-strictness": "lib-json.html#errors",
+      "numbers-and-strings": "lib-json.html#numbers", "json-structs": "lib-json-structs.html",
+      "json-generated": "lib-json-structs.html#json-and-yaml-attributes", "yaml": "lib-yaml.html",
+      "dates": "lib-dates.html", "clocks": "lib-time.html", "maths": "lib-maths.html",
+      "net": "lib-tcp.html", "coroutines": "lib-coroutines.html", "coroutine-loop": "lib-event-loop.html",
+      "serve": "lib-serve.html", "fzf": "lib-fzf.html", "sqlite": "lib-sqlite.html",
+      "atomics": "lib-threads.html#atomics", "more-modules": "lib-threads.html"
+    },
+    "tools.html": {
+      "the-jit": "tools-jit-repl.html", "the-repl": "tools-jit-repl.html#the-repl",
+      "editor-support": "tools-editors.html", "neovim": "tools-editors.html#neovim",
+      "vim": "tools-editors.html#vim", "other-editors": "tools-editors.html#other-editors",
+      "libraries": "tools-libraries.html", "looking-under-the-hood": "tools-debugging.html"
+    }
+  };
+
+  function followMoved() {
+    var id = decodeURIComponent(location.hash.slice(1));
+    if (!id) return;
+    var page = location.pathname.replace(/^.*\//, "") || "index.html";
+    var to = MOVED[page] && MOVED[page][id];
+    if (!to || document.getElementById(id)) return;
+    var t = root.getAttribute("data-theme");
+    if (t) {
+      var i = to.indexOf("#");
+      to = i < 0 ? to + "?theme=" + t : to.slice(0, i) + "?theme=" + t + to.slice(i);
+    }
+    location.replace(to);
   }
 
   /* ---- search ----
@@ -276,6 +347,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    followMoved();
     var themeBtn = document.querySelector(".theme");
     if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
     carryTheme();
