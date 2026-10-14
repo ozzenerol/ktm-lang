@@ -103,7 +103,9 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
         lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
     }
     /* the runtime, after the header and before the program */
+    l->no_crash = args->emit_object || args->emit_dylib;
     lexPushRuntime(l);
+    cc->crash_report = l->with_crash;
     /* the prelude, read first (the stdlib is modules, read when imported) */
     lexPushPrelude(l);
 

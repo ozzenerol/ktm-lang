@@ -408,6 +408,8 @@ typedef struct Cctrl {
     int is_library;
     /* Building the standard library itself (`-lib ktm`) */
     int is_libktm;
+    /* rt.crash is compiled in: a main installs the crash report */
+    int crash_report;
     /* The builtin header (std.ktmh) as read: a name whose declaring token
      * lies in this buffer is part of the library's public API */
     char *header_src;

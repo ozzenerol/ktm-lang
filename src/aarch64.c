@@ -2225,6 +2225,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         (fn->stack_space == 0) && !irFnHasCalls(fn) && (ast->loff == 0) &&
         !is_variadic;
 
+    asmLinesBegin(ctx->cc, ast, ctx->omit_frame);
     aarch64EmitFunctionPrologue(ctx->cc, buf, ast, fn->stack_space,
                                 ctx->omit_frame);
     A64ParamEmitter pe;
@@ -2247,6 +2248,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         }
         listForEach(block->instructions) {
             IrInstr *instr = (IrInstr *)it->value;
+            asmLinesNote(buf, instr->line, instr->site);
             aarch64EmitInstr(ctx, instr);
         }
     }
@@ -2260,6 +2262,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         aoStrRemovePreviousChar(buf, '\t');
         aarch64Epilogue(ctx, (int)aligned, ctx->omit_frame);
     }
+    asmLinesEnd(buf);
 }
 
 void aarch64InitialiseEmptyGlobal(Cctrl *cc, AoStr *buf, Ast *global,
@@ -2431,6 +2434,7 @@ static void aarch64PasteAsmBlocks(AoStr *buf, Cctrl *cc) {
 AoStr *aarch64AsmGenerate(Cctrl *cc) {
     AoStr *buf = aoStrAlloc(2048);
     aarch64InitRegPool();
+    asmLinesReset();
     aarch64PasteDataSection(cc, buf);
     aarch64PasteAsmBlocks(buf, cc);
 
@@ -2461,6 +2465,9 @@ AoStr *aarch64AsmGenerate(Cctrl *cc) {
         aarch64GenerateFunction(&ctx, synth_main);
     }
 
+    Ast *user_main = (Ast *)mapGetLen(cc->global_env, str_lit("main"));
+    asmLinesEmit(cc, buf, cc->crash_report &&
+                 (synth_main != NULL || (user_main && user_main->kind == AST_FUNC)));
     asmEmitAsmInfo(cc, buf);
     setRelease(seen_globals);
     return buf;

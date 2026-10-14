@@ -1,5 +1,5 @@
 module coro;
-import atomic, cstr, libc, mem, net, os;
+import atomic, cstr, libc, mem, net, os, rt;
 
 /* coro.serve: a TCP server on every core in one call. Each thread runs a
  * coroutine loop of its own (coro.go, coro.run) with an acceptor that
@@ -233,6 +233,7 @@ static void serveRun(ServeLoop *l) {
 }
 
 static void *serveThread(void *p) {
+    rt.__ktmCrashThread();
     serveRun(p);
     return null;
 }

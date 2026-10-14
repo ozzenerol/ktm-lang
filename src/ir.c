@@ -957,6 +957,15 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     if (!ir_line_lock && call->line && callee->file_id && call->file_id &&
         callee->file_id != call->file_id)
         ir_line_lock = call->line;
+    int saved_hint = ir_line_hint;
+    IrInlineSite *saved_site = ir_site_hint;
+    if (!ir_line_lock) {
+        IrInlineSite *site = irAlloc(sizeof(IrInlineSite));
+        site->callee = callee;
+        site->call_line = call->line ? call->line : ir_line_hint;
+        site->outer = ir_site_hint;
+        ir_site_hint = site;
+    }
 
     IrInline frame;
     frame.callee = callee;
@@ -995,6 +1004,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         ctx->loop_depth = saved_loops;
         ctx->inl = frame.outer;
         ir_line_lock = saved_lock;
+        ir_line_hint = saved_hint;
+        ir_site_hint = saved_site;
         return v;
     }
 
@@ -1015,6 +1026,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     ctx->loop_depth = saved_loops;
     ctx->inl = frame.outer;
     ir_line_lock = saved_lock;
+    ir_line_hint = saved_hint;
+    ir_site_hint = saved_site;
 
     IrValue *result = irTmp(frame.ret_slot ? irConvertType(rt) : IR_TYPE_I64,
                             frame.ret_slot ? rt->size : 8);
@@ -4358,6 +4371,7 @@ IrFunction *irLowerFunction(IrCtx *ctx, Ast *ast_func) {
     /* Prologue instructions attribute to the definition, not to
      * whatever line the previous function ended on. */
     ir_line_hint = ast_func->line;
+    ir_site_hint = NULL;
 
     IrFunction *func = irFunctionNew(ast_func->fname);
     IrBlock *entry = irBlockNew();

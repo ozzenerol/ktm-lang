@@ -30,6 +30,7 @@ pub struct HCFs {
     fn(void *loop) void coroLoopFree;  /* frees it when the thread ends */
     u64 stackLo, stackHi;    /* the running coroutine's stack (coroutines.ktm) */
     u64 threadLo, threadHi;  /* the thread's own stack, 0 until looked up */
+    u8 *crashStack;          /* the thread's signal stack (__ktmCrashThread) */
 };
 
 /* The "" of an Error without a message (or file): never freed. */
@@ -57,6 +58,7 @@ static void fsFree(void *p) {
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     if (fs.coroLoop) { fs.coroLoopFree(fs.coroLoop); }
     coroStacksFree(fs);
+    crashThreadEnd(fs);
     libc.free(fs.coroRoot);
     libc.free(fs);
 }
@@ -275,6 +277,49 @@ static void stackThreadBounds(HCFs *fs) {
      * it a few pages short of what the C library reports; the reserve
      * also leaves the overflow report room to run. */
     fs.threadLo += STACK_RESERVE;
+}
+
+/* ---- signal stacks ----
+ * A thread the stdlib starts (a thread pool's, a server's) gets a stack
+ * for signal handlers, so the crash report (rt/crash) can tell of its
+ * stack overflow too: a handler can't run on the stack that overflowed. */
+
+const i64 CRASH_STACK_BYTES = 65536;
+
+#ifdef IS_MACOS
+const i32 CRASH_SS_DISABLE = 4;
+#else
+const i32 CRASH_SS_DISABLE = 2;
+#endif
+
+/* Set the calling thread's signal stack (a stack_t: ss_sp, then
+ * ss_flags and ss_size, whose order differs, at 8 or 16) */
+static void crashAltStack(u8 *stack, i32 flags) {
+    u64 ss[3];
+    ss[0] = (u64)stack;
+#ifdef IS_MACOS
+    ss[1] = CRASH_STACK_BYTES;
+    ss[2] = flags;
+#else
+    ss[1] = flags;
+    ss[2] = CRASH_STACK_BYTES;
+#endif
+    libc.sigaltstack(ss, null);
+}
+
+pub void __ktmCrashThread() {
+    HCFs *fs = Fs();
+    if (fs.crashStack) { return; }
+    fs.crashStack = libc.malloc(CRASH_STACK_BYTES);
+    if (fs.crashStack) { crashAltStack(fs.crashStack, 0); }
+}
+
+/* The thread ends (its HCFs is freed) */
+static void crashThreadEnd(HCFs *fs) {
+    if (!fs.crashStack) { return; }
+    crashAltStack(null, CRASH_SS_DISABLE);
+    libc.free(fs.crashStack);
+    fs.crashStack = null;
 }
 
 pub void __ktmStackCheck(u64 low) {
