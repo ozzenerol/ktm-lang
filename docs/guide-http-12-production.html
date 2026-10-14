@@ -101,12 +101,16 @@ void health(http.Writer *w, http.Request *r)
 }</code></pre>
 <pre><code>    pg.Options po;
     po.queryTimeoutMs = 5000;           /* no request waits on a query for more than 5 s */
+    po.acquireTimeoutMs = 2000;         /* nor 2 s for a connection (the default is 30) */
     pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;amp;po);</code></pre>
 <ul class="rules">
   <li><code>GET /health</code> is for the load balancer and the monitoring: 200 while the database answers, 503 when it
   doesn't, so traffic goes to instances that can serve it.</li>
   <li>Every query has a time limit: a slow query is cancelled on the server and the request gets a 500, instead of
   waiting forever and holding a connection. The health check's is tighter.</li>
+  <li>So does getting a connection: when the database stops answering (a hung machine, a network split), requests and
+  the health check give up after 2 s instead of piling up. With the database frozen, <code>/health</code> answers
+  <code>503</code> within those 2 s, and <code>200</code> again once it is back.</li>
   <li>The server has its own limits for slow clients: a request must arrive within 30 s, an idle kept-alive connection
   closes after 120 s (<code>http.Options</code>' <code>readTimeoutMs</code>, <code>idleTimeoutMs</code>).</li>
 </ul>
