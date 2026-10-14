@@ -5953,7 +5953,11 @@ static void parseTypeAlias(Cctrl *cc) {
     TypeAlias *had = mapGet(cc->type_aliases, key);
     if (had) {
         /* a module's declarations are parsed again in its full pass */
-        if (had->type == type && cc->cur_module) return;
+        if (cc->cur_module && (had->type == type ||
+                (had->line == name->line && had->col == name->col &&
+                 had->file_id == ast_file_hint))) {
+            return;
+        }
         cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
                 "type `%s` has already been defined", key);
     }
