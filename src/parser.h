@@ -29,6 +29,10 @@ GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len);
 Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at);
 Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why);
 Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len);
+GenericDef *parseFindGenericOwnMethod(Cctrl *cc, AstType *cls, char *name, int len,
+                                      AstType **owner);
+Ast *parseGenericOwnMethodInstance(Cctrl *cc, GenericDef *d, AstType *cls, Vec *own, Lexeme *at);
+Vec *parseGenericOwnMethodInfer(Cctrl *cc, GenericDef *d, AstType *cls, Vec *argv, char **why);
 /* --expand: print the code @json makes (parseJsonGenerate) */
 extern int parse_expand_generated;
 #endif // !PARSER_H
