@@ -288,8 +288,21 @@ requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno
   <code>GET /users/7?full=1 200 41 0.120ms</code> (method, target, status, body bytes, time)</td></tr>
 </table>
 <p>HTTP/1.1 with keep-alive and pipelining, chunked request bodies, <code>Expect: 100-continue</code>, and HTTP/1.0. A
-request with both <code>Content-Length</code> and chunked encoding is refused (<code>400</code>). There is no TLS: put the server
-behind a proxy such as nginx or Caddy for HTTPS.</p>
+request with both <code>Content-Length</code> and chunked encoding is refused (<code>400</code>). For HTTPS, see
+<a href="#https">below</a>, or put the server behind a proxy such as nginx or Caddy.</p>
+
+<h2 id="https">HTTPS</h2>
+<p><code>net.https</code> serves the same mux over TLS (<a href="lib-tls.html">net.tls</a>, mbedTLS inside ktm):</p>
+<pre><code>
+import net.http, net.https;
+...
+return https.listen(8443, &amp;mux, "server.pem", "server.key");   // app and opts as for http.listen
+</code></pre>
+<p>The certificate chain and the private key are PEM files; a key that doesn't belong to the certificate throws
+<code>tls.ERR_TLS</code> at start. <code>https.listenConfig(port, &amp;mux, &amp;cfg)</code> takes a whole
+<code>tls.Config</code> instead (client certificates through <code>caFile</code>, a key password). Only programs that import
+<code>net.https</code> carry TLS. A server behind a proxy that ends TLS (nginx, Caddy) needs neither: use
+<code>http.listen</code>.</p>
 
 <h2>Testing handlers</h2>
 <p><code>http.testRequest</code> and <code>http.recorder()</code> run a handler or a whole mux without a socket.</p>
