@@ -78,8 +78,8 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>ktm get</code>, <code>ktm mod download</code>, the cache, <code>ktm.sum</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td>Version selection (the highest a dependency asks for), <code>ktm mod tidy</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td><code>ktm build</code>, <code>ktm run .</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
-  <tr><td>Dependencies built once as libraries</td><td><span class="tag">planned</span> 0.20.0</td></tr>
-  <tr><td>End to end with ktm-pg on Linux and macOS</td><td><span class="tag">planned</span> 0.20.0</td></tr>
+  <tr><td>Dependencies built once as libraries</td><td><span class="tag">later</span> (ktm-pg builds from source in 0.2 s)</td></tr>
+  <tr><td>End to end with ktm-pg on Linux and macOS</td><td><span class="tag done">done</span> rc/0.20.0 (ktm-pg v0.1.0-rc.1)</td></tr>
 </table></div>
 
 <h2 id="tier-1-needed-for-any-production-api">Tier 1: needed for any production API<a class="anchor" href="#tier-1-needed-for-any-production-api" aria-label="Link to this section">#</a></h2>
@@ -95,7 +95,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>url</code></td><td>stdlib</td><td>Parse and build URLs and query strings</td><td><span class="tag">planned</span></td></tr>
   <tr><td><code>flag</code></td><td>stdlib</td><td>Command-line flags and subcommands</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Env config</td><td>stdlib</td><td>Environment variables and <code>.env</code> into a <code>@json</code>/<code>@yaml</code> struct</td><td><span class="tag">planned</span></td></tr>
-  <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, exact numerics; TLS, types and hardening in progress</td><td><span class="tag wip">in progress</span></td></tr>
+  <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, TLS, LISTEN/NOTIFY, COPY, arrays, fuzzed; v0.1.0-rc.1 tagged, benchmark and soak test left</td><td><span class="tag wip">in progress</span></td></tr>
   <tr><td>ktm-jwt</td><td>package</td><td>Sign and verify JWTs (HS256, RS256, ES256, EdDSA), JWKS</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Validation</td><td>stdlib or package</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@required</code>) with readable errors, next to <code>http.decode</code></td><td><span class="tag">planned</span></td></tr>
   <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag">planned</span></td></tr>
