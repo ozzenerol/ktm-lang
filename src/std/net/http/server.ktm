@@ -37,6 +37,8 @@ struct Conn {
     i64 dateSec;
     u8 date[40];
     i64 dateLen;
+    u8 pre200[96];   /* "HTTP/1.1 200 OK\r\nDate: <date>\r\nContent-Length: " */
+    i64 pre200Len;
     bool sentContinue;
 };
 
@@ -50,17 +52,13 @@ const i64 PARSE_MORE = 0;
 
 static bool sameFold(u8 *a, i64 alen, u8 *lower)
 {
-    for (i64 i = 0; i < alen; i++) {
-        u8 c = a[i];
-        if (c >= 'A' && c <= 'Z') { c += 32; }
-        if (c != lower[i]) { return false; }
-    }
-    return true;
+    return libc.strncasecmp(a, lower, alen) == 0;
 }
 
 /* A token of a header value list ("keep-alive, Upgrade") equal to want */
 static bool listHas(u8[] v, u8 *want, i64 wlen)
 {
+    if (v.len == wlen) { return sameFold(v.ptr, wlen, want); }   /* the usual: just the one */
     i64 i = 0;
     while (i < v.len) {
         while (i < v.len && (v.ptr[i] == ' ' || v.ptr[i] == '\t' || v.ptr[i] == ',')) { i++; }
@@ -255,11 +253,15 @@ static void connDate(Conn *c)
 {
     i64 now = date.unixNow();
     if (now == c.dateSec && c.dateLen) { return; }
-    String d = date.httpDate(now);
-    c.dateLen = d.len < 39 ? d.len : 39;
-    mem.copy(c.date, d.ptr, c.dateLen);
-    d.free();
+    c.dateLen = date.httpDateTo(now, c.date);
     c.dateSec = now;
+    /* the start of most replies, with this Date */
+    u8[] a = "HTTP/1.1 200 OK\r\nDate: ";
+    u8[] b = "\r\nContent-Length: ";
+    mem.copy(c.pre200, a.ptr, a.len);
+    mem.copy(c.pre200 + a.len, c.date, c.dateLen);
+    mem.copy(c.pre200 + a.len + c.dateLen, b.ptr, b.len);
+    c.pre200Len = a.len + c.dateLen + b.len;
 }
 
 static void appendInt(String *s, i64 v)
@@ -280,18 +282,21 @@ static void writeReply(Conn *c, Writer *w)
 {
     String *o = &c.out;
     i32 code = w.code ? w.code : 200;
-    u8[] reason = statusText(code);
-    o.reserve(o.len + 128 + w.headers.len + w.body.len);
-    o.append("HTTP/1.1 ");
-    appendInt(o, code);
-    o.appendByte(' ');
-    o.append(reason);
-    o.append("\r\nDate: ");
-    connDate(c);
-    o.append(c.date[0:c.dateLen]);
     bool noBody = code == 204 || code == 304 || (code >= 100 && code < 200);
+    o.reserve(160 + w.headers.len + w.body.len);
+    connDate(c);
+    if (code == 200) {
+        o.append(c.pre200[0:c.pre200Len]);
+    } else {
+        o.append("HTTP/1.1 ");
+        appendInt(o, code);
+        o.appendByte(' ');
+        o.append(statusText(code));
+        o.append("\r\nDate: ");
+        o.append(c.date[0:c.dateLen]);
+        if (!noBody) { o.append("\r\nContent-Length: "); }
+    }
     if (!noBody) {
-        o.append("\r\nContent-Length: ");
         appendInt(o, w.body.len);
         if (!w.hasType && w.body.len) { o.append("\r\nContent-Type: text/plain; charset=utf-8"); }
     }
@@ -372,10 +377,14 @@ static void dispatch(Conn *c, Request *r, Writer *w)
         }
     }
     if (c.srv.accessLog) { accessLine(r, w, t0); }
-    try {
-        requestDone(r);
-    } catch (Error e) {
-        log.error("http: freeing the request's values threw at %s:%d: %s", e.file, e.line, e.message);
+    if (r.ncleanups) {
+        try {
+            requestDone(r);
+        } catch (Error e) {
+            log.error("http: freeing the request's values threw at %s:%d: %s", e.file, e.line, e.message);
+        }
+    } else {
+        requestDone(r);   /* only the arena: nothing that throws */
     }
     writeReply(c, w);
 }
