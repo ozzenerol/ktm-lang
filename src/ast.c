@@ -1907,6 +1907,13 @@ check_type:
         goto out;
     }
 
+    /* `void *` converts to and from any pointer, an enum's too (the enum
+     * rule below would refuse `Color *c = mem.alloc(8)`) */
+    if (pointee && (e->kind == AST_TYPE_VOID || a->kind == AST_TYPE_VOID)) {
+        ret = e;
+        goto out;
+    }
+
     /* Below a pointer the scalar conversions don't apply: `I64 *q = &f`
      * with `F64 f` reinterprets the F64's bits, as C warns. A byte
      * pointer (U8 *, I8 *, Bool *) stays interchangeable with the others,
