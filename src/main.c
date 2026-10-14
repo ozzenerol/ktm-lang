@@ -16,6 +16,7 @@
 #include "cfg-print.h"
 #include "cfg.h"
 #include "cli.h"
+#include "pkg.h"
 #include "compile.h"
 #include "config.h"
 #include "ir.h"
@@ -736,6 +737,13 @@ int main(int argc, char **argv) {
     int lexer_flags = CCF_PRE_PROC;
     AoStr *asmbuf;
     Cctrl *cc;
+
+    /* `ktm mod ...` and the other package commands */
+    int pkg_rc = pkgMain(argc, argv);
+    if (pkg_rc >= 0) {
+        memoryRelease();
+        return pkg_rc;
+    }
 
     CliArgs args;
     cliArgsInit(&args);
