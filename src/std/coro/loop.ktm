@@ -238,7 +238,17 @@ struct Loop {
     u32 sqMask, cqMask, sqEntries;
     u32 sqLocal;         /* the SQ tail as filled so far */
     u8 *cqes;
+    /* the mailbox: coroutines another thread unparked (coro.unpark),
+     * queued under mailLock; one byte in the pipe wakes the loop, whose
+     * own thread applies them. Made at the loop's first coro.park. */
+    i32 mailR, mailW;
+    i64 mailLock;
+    LoopTask **mail;
+    i64 nmail, mailCap;
+    LoopTask *mailTask;  /* the pipe's waiter: not a coroutine */
 };
+
+extern "c" i32 pipe(i32 *fds);
 
 static void loopOom() {
     u8 *msg = "out of memory for the coroutine loop\n";
@@ -286,6 +296,12 @@ static void loopFree(void *p) {
     libc.free(lp.ev);
     libc.free(lp.pfds);
     if (lp.q >= 0) { libc.close(lp.q); }
+    if (lp.mailR >= 0) {
+        libc.close(lp.mailR);
+        libc.close(lp.mailW);
+    }
+    libc.free(lp.mail);
+    libc.free(lp.mailTask);
     libc.free(lp);
 }
 
@@ -299,6 +315,8 @@ static Loop *loopGet(bool make) {
         lp = libc.calloc(1, sizeof(Loop));
         if (!lp) { loopOom(); }
         lp.q = -1;
+        lp.mailR = -1;
+        lp.mailW = -1;
         fs.coroLoop = lp;
         fs.coroLoopFree = &loopFree;
         /* now, not at the first wait: a program may use up its fds first,
@@ -446,12 +464,20 @@ pub u8[] backend() {
 /* Every waiter of fd that `revents` answers, ready with it. Not the ones
  * waiting for something else (a writer when only reading is possible).
  * How many it readied. */
+static void loopMailTake(Loop *lp);
+
 static i64 loopFire(Loop *lp, i32 fd, i64 revents) {
     if (fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { return 0; }
     LoopFd *f = lp.fdw[fd];
     i64 i = 0, woken = 0;
     while (i < f.n) {
         LoopTask *t = f.w[i];
+        if (t == lp.mailTask) {         /* the mailbox: applied, still waited on */
+            loopMailTake(lp);
+            i++;
+            woken++;
+            continue;
+        }
         i64 r = revents & (t.events | libc.POLLERR | libc.POLLHUP | libc.POLLNVAL);
         if (r && !t.ready) {
             loopReady(lp, t, r);     /* takes it out of f.w: same i again */
@@ -633,7 +659,11 @@ pub i64 wait(i32 fd, i16 events, i64 ms=-1) {
     return loopPark(t, fd, events, loopDeadline(ms), false, false);
 }
 
-/* In a loop coroutine: pause until another coroutine of this loop calls
+static void loopMailOpen(Loop *lp);
+static void loopMailTake(Loop *lp);
+
+/* In a loop coroutine: pause until another coroutine (of this loop, or of
+ * another thread's: see coro.unpark) calls
  * coro.unpark(this one), or ms milliseconds pass (ms < 0: no limit).
  * Returns 1 when unparked, 0 on the time limit, -1 when coro.stop() was
  * called (before or during the wait). An unpark that came while this
@@ -642,11 +672,14 @@ pub i64 wait(i32 fd, i16 events, i64 ms=-1) {
  * handing work or a resource from one coroutine to another. */
 pub i64 park(i64 ms=-1) {
     LoopTask *t = loopSelf("coro.park");
+    Loop *lp = loopGet(true);
+    if (lp.mailR < 0) { loopMailOpen(lp); }
+    if (atomic.load(&lp.nmail)) { loopMailTake(lp); }   /* an unpark from another thread */
     if (t.unparked) {
         t.unparked = false;
         return 1;
     }
-    if (loopGet(true).stopping) { return -1; }
+    if (lp.stopping) { return -1; }
     t.parked = true;
     i64 r = loopPark(t, -1, 0, loopDeadline(ms), true, false);
     t.parked = false;
@@ -659,20 +692,98 @@ pub i64 park(i64 ms=-1) {
     return r;
 }
 
-/* Wake c, a coroutine of this thread's loop, from coro.park (it returns
- * 1); if it isn't parked, its next coro.park returns 1 at once. c must
- * not have ended (its Coroutine is freed then). Throws
- * ERR_LOOP for a coroutine coro.go didn't start or one of another
- * thread's loop. */
-pub void unpark(Coroutine *c) {
-    LoopTask *t = c ? c.loopTask : null;
-    if (!t) { throw(ERR_LOOP, "coro.unpark: not a coroutine that coro.go started"); }
-    Loop *lp = loopGet(false);
-    if (t.lp != lp) { throw(ERR_LOOP, "coro.unpark: a coroutine of another thread's loop"); }
+/* The unpark itself, on t's own loop */
+static void loopUnparkHere(Loop *lp, LoopTask *t) {
     if (t.parked && t.waiting && !t.ready) {
         loopReady(lp, t, 1);
     } else {
         t.unparked = true;
+    }
+}
+
+/* Wake c from coro.park (it returns 1); if it isn't parked, its next
+ * coro.park returns 1 at once. c is a coro.go coroutine of this thread's
+ * loop or of another thread's: from another thread the unpark goes
+ * through that loop's mailbox and its thread applies it (a write(2) to
+ * wake it; the same loop needs no syscall). c must not have ended (its
+ * Coroutine is freed then). Throws ERR_LOOP for a coroutine coro.go
+ * didn't start. */
+pub void unpark(Coroutine *c) {
+    LoopTask *t = c ? c.loopTask : null;
+    if (!t) { throw(ERR_LOOP, "coro.unpark: not a coroutine that coro.go started"); }
+    Loop *here = loopGet(false);
+    if (t.lp == here) {
+        loopUnparkHere(here, t);
+        return;
+    }
+    Loop *lp = t.lp;
+    while (!atomic.cas(&lp.mailLock, 0, 1)) { }
+    if (lp.nmail == lp.mailCap) {
+        lp.mailCap = lp.mailCap ? lp.mailCap * 2 : 16;
+        lp.mail = loopGrow(lp.mail, lp.mailCap, sizeof(LoopTask *));
+    }
+    lp.mail[lp.nmail] = t;
+    atomic.store(&lp.nmail, lp.nmail + 1);
+    i32 w = lp.mailW;
+    atomic.store(&lp.mailLock, 0);
+    if (w >= 0) {
+        u8 one = 1;
+        libc.write(w, &one, 1);         /* full: it's awake already */
+    }
+}
+
+/* The loop's mailbox, made on its own thread: a non-blocking pipe and a
+ * waiter on it that every backend watches */
+static void loopMailOpen(Loop *lp) {
+    i32 fds[2];
+    if (pipe(fds) != 0) { throw(ERR_LOOP, "coro.park: no pipe for the mailbox (errno %d)", os.errno()); }
+    for (i64 i = 0; i < 2; i++) {
+        libc.fcntl(fds[i], libc.F_SETFL, libc.fcntl(fds[i], libc.F_GETFL, 0) | libc.O_NONBLOCK);
+        libc.fcntl(fds[i], libc.F_SETFD, libc.FD_CLOEXEC);
+    }
+    LoopTask *m = libc.calloc(1, sizeof(LoopTask));
+    if (!m) { loopOom(); }
+    m.fd = fds[0];
+    m.events = libc.POLLIN;
+    m.deadline = -1;
+    m.lp = lp;
+    lp.mailTask = m;
+    while (!atomic.cas(&lp.mailLock, 0, 1)) { }
+    lp.mailR = fds[0];
+    lp.mailW = fds[1];
+    atomic.store(&lp.mailLock, 0);
+#ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING) {
+        loopAddWaiter(lp, m, fds[0]);   /* counted, as an operation's fd is */
+        loopMailPoll(lp);
+        return;
+    }
+#endif
+    loopWaitFd(lp, m, fds[0]);
+}
+
+#ifdef IS_LINUX
+/* io_uring: a POLL_ADD on the pipe, its completion handled by the reap */
+static void loopMailPoll(Loop *lp) {
+    u8 *e = loopSqe(lp);
+    loopSqePut(lp, e, LOOP_OP_POLL_ADD, lp.mailR, 0, 0, (u16)libc.POLLIN, 0, (u64)lp.mailTask);
+}
+#endif
+
+/* Applies the mailbox: drains the pipe, then each coroutine queued */
+static void loopMailTake(Loop *lp) {
+    u8 buf[64];
+    while (lp.mailR >= 0 && libc.read(lp.mailR, buf, 64) > 0) { }
+    while (atomic.load(&lp.nmail)) {
+        while (!atomic.cas(&lp.mailLock, 0, 1)) { }
+        i64 n = lp.nmail;
+        LoopTask *got[64];
+        if (n > 64) { n = 64; }
+        for (i64 i = 0; i < n; i++) { got[i] = lp.mail[i]; }
+        for (i64 i = n; i < lp.nmail; i++) { lp.mail[i - n] = lp.mail[i]; }
+        atomic.store(&lp.nmail, lp.nmail - n);
+        atomic.store(&lp.mailLock, 0);
+        for (i64 i = 0; i < n; i++) { loopUnparkHere(lp, got[i]); }
     }
 }
 
@@ -831,6 +942,8 @@ static void loopSqePut(Loop *lp, u8 *e, i64 opcode, i32 fd, u64 addr, i64 len, i
 
 /* Every completion there is: each resumes its operation's task with the
  * CQE's res. A cancel's own completion (user_data 0) is dropped. */
+static void loopMailPoll(Loop *lp);
+
 static void loopUringReap(Loop *lp) {
     u32 head = *lp.cqHead, tail = atomic.load(lp.cqTail);
     while (head != tail) {
@@ -839,7 +952,10 @@ static void loopUringReap(Loop *lp) {
         i32 res = *(i32 *)(c + 8);
         u32 cflags = *(u32 *)(c + 12);
         head++;
-        if (ud) {
+        if (ud && (LoopTask *)ud == lp.mailTask) {
+            loopMailTake(lp);
+            loopMailPoll(lp);           /* and watch the pipe again */
+        } else if (ud) {
             LoopTask *t = (LoopTask *)ud;
             t.op = false;
             t.cqeFlags = cflags;
@@ -1429,6 +1545,7 @@ static void loopPollFallback(Loop *lp, i64 timeout) {
 static void loopTurn(Loop *lp) {
     i64 now = date.monoMs(), timeout = -1, i, j, d, first, nd;
     LoopTask *t;
+    if (atomic.load(&lp.nmail)) { loopMailTake(lp); }
     if (lp.ndeadline > 0) {
         nd = 0;
         for (i = 0; i < lp.n; i++) {
