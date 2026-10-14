@@ -114,10 +114,14 @@ for d in bin lib modules; do
     fi
 done
 
+# A new file renamed over the old one: a running ktm, or a JIT run that
+# mapped the old shared library, keeps its copy (rewriting the file in
+# place crashed them)
 install_file() {
     src=$1 dst=$2 mode=$3
-    cp -f "$src" "$dst"
-    chmod "$mode" "$dst"
+    cp "$src" "$dst.new.$$"
+    chmod "$mode" "$dst.new.$$"
+    mv -f "$dst.new.$$" "$dst"
     echo "installed $dst"
 }
 
