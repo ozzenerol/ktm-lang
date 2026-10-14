@@ -380,6 +380,13 @@ pub u8[] Conn.peerCert(i32 *sigHash = null) {
     return p[0:(i64)len];
 }
 
+/* Tells the peer the session ends (close_notify) and frees it; the
+ * socket stays open, for its owner to close */
+pub void Conn.finish() {
+    ktm_tls_close_notify(self.native);
+    self.free();
+}
+
 /* Ends the session (tells the peer), frees it, closes the socket */
 pub void Conn.close() {
     ktm_tls_close_notify(self.native);

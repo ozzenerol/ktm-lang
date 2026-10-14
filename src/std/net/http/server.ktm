@@ -12,6 +12,21 @@ pub struct Options {
     i64 idleTimeoutMs;    /* a kept-alive connection with no request is closed after (0: 120 s) */
     bool noSignals;       /* don't make SIGINT and SIGTERM stop the server */
     bool accessLog;       /* a log.info line per request: method target status bytes time */
+    Transport *transport; /* what carries the bytes (null: the socket itself); net.https sets TLS */
+};
+
+/* A layer over each connection's socket, as TLS: start makes it for an
+ * accepted fd (null: drop the connection), read and write move bytes
+ * (as coro.read and coro.write: > 0, 0 at the end, -1 on an error or
+ * the time limit), end finishes it (the fd is closed after). ctx is
+ * start's first argument. net.https makes one over net.tls, which keeps
+ * mbedTLS out of programs that don't use it. */
+pub struct Transport {
+    void *ctx;
+    fn(void *ctx, i32 fd, i64 ms) void * start;
+    fn(void *conn, u8[] buf, i64 ms) i64 read;
+    fn(void *conn, u8[] data, i64 ms) i64 write;
+    fn(void *conn) void end;
 };
 
 /* A running server: what every connection reads */
@@ -23,6 +38,7 @@ struct Server {
     i64 readMs;
     i64 idleMs;
     bool accessLog;
+    Transport *tr;
 };
 
 /* One connection: its buffers live as long as it does */
@@ -40,6 +56,7 @@ struct Conn {
     u8 pre200[96];   /* "HTTP/1.1 200 OK\r\nDate: <date>\r\nContent-Length: " */
     i64 pre200Len;
     bool sentContinue;
+    void *tc;        /* the transport's connection, null for the plain socket */
 };
 
 const i64 CONN_IN_FIRST = 8192;
@@ -321,7 +338,8 @@ static void writeBadRequest(Conn *c, Writer *w, i64 code)
 static bool connFlush(Conn *c)
 {
     if (!c.out.len) { return true; }
-    i64 n = coro.write(c.fd, c.out[0:c.out.len], c.srv.readMs);
+    i64 n = c.tc ? c.srv.tr.write(c.tc, c.out[0:c.out.len], c.srv.readMs)
+                 : coro.write(c.fd, c.out[0:c.out.len], c.srv.readMs);
     c.out.clear();
     return n >= 0;
 }
@@ -347,7 +365,7 @@ static bool connRead(Conn *c, i64 ms)
         c.in = in;
         c.cap = cap;
     }
-    i64 n = coro.read(c.fd, c.in[c.end:c.cap], ms);
+    i64 n = c.tc ? c.srv.tr.read(c.tc, c.in[c.end:c.cap], ms) : coro.read(c.fd, c.in[c.end:c.cap], ms);
     if (n <= 0) { return false; }
     c.end += n;
     return true;
@@ -404,8 +422,15 @@ static void serveConn(i32 fd, void *arg)
     Conn c;
     c.fd = fd;
     c.srv = arg;
+    if (c.srv.tr) {
+        c.tc = c.srv.tr.start(c.srv.tr.ctx, fd, c.srv.readMs);
+        if (!c.tc) { return; }
+    }
     c.in = mem.alloc(CONN_IN_FIRST);
-    if (!c.in) { return; }
+    if (!c.in) {
+        if (c.tc) { c.srv.tr.end(c.tc); }
+        return;
+    }
     c.cap = CONN_IN_FIRST;
     Request r;
     Writer w;
@@ -414,6 +439,7 @@ static void serveConn(i32 fd, void *arg)
         c.out.free();
         r.free();
         w.free();
+        if (c.tc) { c.srv.tr.end(c.tc); }
     }
     Server *s = c.srv;
     while (true) {
@@ -451,7 +477,8 @@ static void serveConn(i32 fd, void *arg)
             if (!connFlush(&c)) { return; }
             if (head > 0 && r.expectContinue && !c.sentContinue) {
                 c.sentContinue = true;
-                if (coro.write(fd, "HTTP/1.1 100 Continue\r\n\r\n", s.readMs) < 0) { return; }
+                u8[] cont = "HTTP/1.1 100 Continue\r\n\r\n";
+                if ((c.tc ? s.tr.write(c.tc, cont, s.readMs) : coro.write(fd, cont, s.readMs)) < 0) { return; }
             }
             if (!connRead(&c, avail ? s.readMs : s.idleMs)) { return; }
             continue;
@@ -497,6 +524,7 @@ pub i32 listen(i32 port, Mux *mux, void *app = null, Options *opts = null)
     s.readMs = o.readTimeoutMs > 0 ? o.readTimeoutMs : 30000;
     s.idleMs = o.idleTimeoutMs > 0 ? o.idleTimeoutMs : 120000;
     s.accessLog = o.accessLog;
+    s.tr = o.transport;
     u8[] bind = o.bindaddr.len ? o.bindaddr : "*";
     signal.handle(libc.SIGPIPE, libc.SIG_IGN);
     if (!o.noSignals) {

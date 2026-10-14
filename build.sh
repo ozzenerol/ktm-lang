@@ -126,7 +126,7 @@ cp -R "$ROOT/src/std/." "$PREFIX/modules/"
 # compile it and link libktmtls (#link <ktmtls>), so every other program
 # stays as small as before
 # (crypto, the same: it calls into libktmtls)
-SOURCE_MODULES="net/tls crypto"
+SOURCE_MODULES="net/tls net/https crypto"
 for m in $SOURCE_MODULES; do rm -rf "$PREFIX/modules/$m"; done
 "$KTM" -fPIC -lib ktm --install-dir="$PREFIX" "$PREFIX/modules"
 for m in $SOURCE_MODULES; do cp -R "$ROOT/src/std/$m" "$PREFIX/modules/$m"; done
