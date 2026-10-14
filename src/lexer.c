@@ -3768,6 +3768,7 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
         m = (LexModule *)calloc(1, sizeof(LexModule));
         m->path = path;
         m->package = pkg;
+        m->foreign = pkg && !pkgIsProjectPath(l->program_root ? l->program_root : ".", pkg);
         m->dir = aoStrDupRaw(dir, strlen(dir));
         if (l->modules_len == l->modules_cap) {
             l->modules_cap = l->modules_cap ? l->modules_cap * 2 : 8;

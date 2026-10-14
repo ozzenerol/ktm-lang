@@ -1249,7 +1249,22 @@ static void cctrlDiagPackageNames(Cctrl *cc, CctrlDiagnostic *d) {
     }
 }
 
+/* A warning or a note in another project's package (a dependency): the
+ * user can't change that code, so it isn't shown; its errors are */
+static int cctrlDiagInDependency(Cctrl *cc, CctrlDiagnostic *d) {
+    Lexer *l = cc ? cc->lexer_ : NULL;
+    if (!l || !d || d->severity == CCTRL_ERROR || !d->file || !d->file->module_id) return 0;
+    if ((int)d->file->module_id > l->modules_len) return 0;
+    return l->modules[d->file->module_id - 1]->foreign;
+}
+
 void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
+    if (cctrlDiagInDependency(cc, d)) {
+        if (d->message) aoStrRelease(d->message);
+        if (d->suggestion) aoStrRelease(d->suggestion);
+        free(d);
+        return;
+    }
     cctrlDiagPackageNames(cc, d);
     if (!cc || !cc->diagnostics) {
         /* No accumulation storage (e.g. macro-processor stub).

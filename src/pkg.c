@@ -674,6 +674,12 @@ char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
     return dir;
 }
 
+int pkgIsProjectPath(const char *program_dir, const char *path) {
+    char *err = NULL;
+    PkgMod *m = pkgModFor(program_dir, &err);
+    return m && pkgUnder(path, m->path) != NULL;
+}
+
 /* skips blanks and comments */
 static const char *pkgSkipSpace(const char *p) {
     for (;;) {

@@ -236,6 +236,7 @@ typedef struct LexModule {
     AoStr *path;   /* "a.b" */
     AoStr *dir;    /* the directory it was found in */
     char *package; /* `import "github.com/x/y";`: that path, for messages */
+    int foreign;   /* a package of another project: its warnings aren't shown */
     u32 id;        /* index in Lexer.modules + 1 */
     int loaded;    /* all of its files have been lexed */
     /* Run-time initialisers of its globals (M2): the parser collects
