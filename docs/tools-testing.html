@@ -173,7 +173,8 @@ ok  	.	0.00s  (1 passed)</code></pre>
     (a place for the files tests read).</li>
   <li>Tests compile ahead of time, as <code>ktm -run</code>; <code>-jit</code> runs them with the JIT. Other flags go to the
     compiler: <code>-Werror</code>, <code>-DNAME</code>, <code>--install-dir=...</code>.</li>
-  <li>Tests run in the directory <code>ktm test</code> was started in.</li>
+  <li>Each directory's tests run in that directory, as in Go: a test opens <code>"testdata/users.json"</code> or
+    <code>"../migrations"</code> from where its file is, whether <code>ktm test</code> was started there or at the project's root.</li>
 </ul>
 
 <h2 id="in-a-project">In a project<a class="anchor" href="#in-a-project" aria-label="Link to this section">#</a></h2>
