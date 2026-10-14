@@ -69,6 +69,7 @@ NAV = [
         ("lib-bytes.html", "Byte buffers"),
         ("lib-hashing.html", "Hashing"),
         ("lib-encoding.html", "Base64 and hex"),
+        ("lib-crypto.html", "Cryptography"),
         ("lib-json.html", "JSON: reading"),
         ("lib-json-writer.html", "JSON: writing"),
         ("lib-json-structs.html", "JSON: structs"),

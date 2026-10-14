@@ -125,9 +125,11 @@ cp -R "$ROOT/src/std/." "$PREFIX/modules/"
 # net.tls stays source (no .ktmlib): only the programs that import it
 # compile it and link libktmtls (#link <ktmtls>), so every other program
 # stays as small as before
-rm -rf "$PREFIX/modules/net/tls"
+# (crypto, the same: it calls into libktmtls)
+SOURCE_MODULES="net/tls crypto"
+for m in $SOURCE_MODULES; do rm -rf "$PREFIX/modules/$m"; done
 "$KTM" -fPIC -lib ktm --install-dir="$PREFIX" "$PREFIX/modules"
-cp -R "$ROOT/src/std/net/tls" "$PREFIX/modules/net/tls"
+for m in $SOURCE_MODULES; do cp -R "$ROOT/src/std/$m" "$PREFIX/modules/$m"; done
 # libktmtls (mbedTLS and ktm's layer over it), built by cmake: the
 # archive for compiled programs, the shared object for the JIT. The
 # shared one gets only its versioned name, so `-lktmtls` always takes
