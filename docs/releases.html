@@ -58,6 +58,36 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-21-0-2026-10-14">v0.21.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-21-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<p>Everything a REST API needs, and a guide that builds one: <a href="guide-http.html">HTTP programming</a> takes a
+bookmarks service from ten lines to PostgreSQL, accounts, tests and production.</p>
+<ul>
+  <li>Guides: a new section, starting with <a href="guide-http.html">HTTP programming</a>, twelve chapters on one
+  project, every listing run for real.</li>
+  <li><code>ktm test</code> and the <code>testing</code> module: <code>void testXxx(testing.T *t)</code> in
+  <code>*_test.ktm</code> files, <code>t.check</code>, <code>t.equal</code>, <code>t.fatal</code>, <code>t.skip</code>,
+  <code>-run</code>, <code>-v</code>, <code>./...</code>, <code>-jit -Memsafe</code>; each directory's tests run in that
+  directory. See <a href="tools-testing.html">Testing</a>.</li>
+  <li><code>validate</code>: <code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>,
+  <code>@url</code>, <code>@oneOf</code> on fields, with readable errors; <code>http.decodeValid&lt;T&gt;(r)</code>
+  answers 422 with every bad field. <code>config.fromEnv</code> checks the same rules and names the variable.</li>
+  <li><code>net.http.middleware</code>: request IDs, the real client address behind trusted proxies, CORS, rate limits
+  shared by every thread, bearer tokens; <code>mux.useWith</code> for middleware with settings of its own.</li>
+  <li><code>net.http</code>: <code>r.remoteAddr()</code> and <code>remotePort()</code>; <code>r.set</code>/<code>r.get</code>
+  to hand values from middleware to handlers; cookies (<code>r.cookie</code>, <code>w.setCookie</code>,
+  <code>w.deleteCookie</code>); a group's route for its exact prefix (<code>handle("GET", h)</code> in group
+  <code>"/bookmarks"</code>); a throw in a handler is the same 400, 422 or 500 under test as on the server; background
+  work with <code>coro.go</code> in a handler is documented and tested.</li>
+  <li>Generics: methods with type parameters of their own (<code>U Pair&lt;T&gt;.fold&lt;U&gt;(...)</code>); a library's
+  generic used from inside a package; inference with <code>@caller</code> parameters; overloads by arity with string
+  arguments.</li>
+  <li>Packages: <code>ktm get</code> and <code>ktm build</code> fetch only the modules that imported packages need (as
+  Go 1.17). New packages: <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a> v0.1.0 (SQL migrations for
+  PostgreSQL and SQLite) and <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.1.1 (time limits that hold
+  when the server freezes).</li>
+  <li><code>@key</code> and <code>@skip</code> go on any struct (ktm-pg reads them for columns).</li>
+</ul>
+
 <h2 id="v0-20-1-2026-10-14">v0.20.1 <small>(2026-10-14)</small><a class="anchor" href="#v0-20-1-2026-10-14" aria-label="Link to this section">#</a></h2>
 <p>A fix for the release downloads.</p>
 <ul>
@@ -1428,7 +1458,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-21-0-2026-10-14">v0.21.0 (2026-10-14)</a></li><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>
