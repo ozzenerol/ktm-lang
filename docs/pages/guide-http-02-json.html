@@ -1,0 +1,143 @@
+<!-- title: 2. JSON in and out -->
+<h1>2. JSON in and out</h1>
+<p class="lede">Shelf gets its first real routes: save a bookmark, list them, read one, delete one. Requests and replies
+are JSON, made from structs by the compiler. The bookmarks live in memory for now; chapter 5 moves them to
+PostgreSQL.</p>
+
+<h2>main.ktm</h2>
+<pre><code>import date, json, net.http, reflect, str, uuid, vec;
+
+/* A saved link */
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+/* What a client sends to save one */
+@json struct NewBookmark {
+    u8[] url;
+    u8[] title;
+};
+
+/* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
+vec.Vec&lt;Bookmark&gt; gBookmarks;
+
+/* The index of the bookmark with this id, or -1 */
+i64 find(u8[] id)
+{
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
+    }
+    return -1;
+}
+
+void list(http.Writer *w, http.Request *r)
+{
+    w.json(200, reflect.of(gBookmarks));
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.json(200, reflect.of(gBookmarks.data[i]));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decode&lt;NewBookmark&gt;(r);
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title);
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    Bookmark b = gBookmarks.removeAt(i);
+    b.id.free();
+    b.url.free();
+    b.title.free();
+    b.createdAt.free();
+    w.status(204);
+}
+
+i32 main()
+{
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+
+    http.Options o;
+    o.threads = 1;      /* one loop: the list in memory isn't shared between threads */
+    printf("Shelf listening on http://localhost:8080\n");
+    return http.listen(8080, &amp;mux, null, &amp;o);
+}</code></pre>
+
+<h2>Structs as JSON</h2>
+<ul class="rules">
+  <li><code>@json</code> before a struct makes the compiler write its JSON code: <code>w.json(201, reflect.of(b))</code>
+  encodes it, <code>http.decode&lt;NewBookmark&gt;(r)</code> reads the request body into one. The file must
+  <code>import json;</code>.</li>
+  <li>The keys are the field names (<code>createdAt</code>); <code>@key("created_at")</code> on a field picks another,
+  <code>@skip</code> leaves one out (<a href="lib-json-structs.html">JSON: structs</a>).</li>
+  <li><code>Bookmark</code> owns its texts (<code>String</code>, freed with <code>.free()</code>);
+  <code>NewBookmark</code> only views the request's (<code>u8[]</code>), which is all a request's data needs: what
+  <code>http.decode</code> made is freed when the handler returns. That's why <code>create</code> copies the url and
+  title with <code>str.from</code> before keeping them.</li>
+  <li>A vector of structs encodes as an array: <code>w.json(200, reflect.of(gBookmarks))</code>.</li>
+</ul>
+
+<h2>Routes with parameters</h2>
+<p><code>"GET /bookmarks/{id}"</code> matches <code>/bookmarks/</code> and one more segment, which the handler reads with
+<code>r.param("id")</code>. <code>GET</code> and <code>DELETE</code> on the same path are two routes, two handlers.
+IDs are <a href="lib-uuid.html">UUIDv7</a>s: unique without a counter, and in the order they were made, which chapter 7
+uses for paging.</p>
+
+<h2>Status codes</h2>
+<table>
+  <tr><th>Code</th><th>When</th><th>How</th></tr>
+  <tr><td>200</td><td>Here is what you asked for</td><td><code>w.json(200, ...)</code></td></tr>
+  <tr><td>201</td><td>Created: the new bookmark is the body</td><td><code>w.json(201, ...)</code></td></tr>
+  <tr><td>204</td><td>Done, nothing to send back</td><td><code>w.status(204)</code></td></tr>
+  <tr><td>400</td><td>The body isn't the JSON we expect</td><td>by itself, from <code>http.decode</code></td></tr>
+  <tr><td>404</td><td>No such bookmark</td><td><code>w.error(404, "no such bookmark")</code>: <code>{"error": "..."}</code></td></tr>
+</table>
+
+<h2>Try it</h2>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm"}'
+{"id":"01a13b02-5800-7000-bb5e-cd97023e29c5","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:22:51Z"}
+
+$ curl localhost:8080/bookmarks
+[{"id":"01a13b02-5800-7000-bb5e-cd97023e29c5","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:22:51Z"}]
+
+$ curl -i -X DELETE localhost:8080/bookmarks/01a13b02-5800-7000-bb5e-cd97023e29c5
+HTTP/1.1 204 No Content
+
+$ curl localhost:8080/bookmarks/01a13b02-5800-7000-bb5e-cd97023e29c5
+{"error":"no such bookmark"}
+
+$ curl -X POST localhost:8080/bookmarks -d '{"url":'
+{"error":"1:8: url: expected a string, got the end of the input"}</code></pre>
+
+<h2>One loop, for now</h2>
+<p><code>o.threads = 1</code> runs the server on one event loop. By default it runs one per core, and they would all
+touch <code>gBookmarks</code> at once. With one loop, handlers run one at a time (each runs until it waits for
+something), so the list needs no lock. From chapter 5 the data is in PostgreSQL, which handles that, and this line
+goes.</p>
+<p>Next: <a href="guide-http-03-validation.html">Validation and errors</a>.</p>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3. Validation and errors - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li class="current"><a href="guide-http-03-validation.html" aria-current="page">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>3. Validation and errors</h1>
+<p class="lede">So far Shelf saves anything: an empty url, <code>"not a link"</code>, the same link twice. Rules on the
+request's fields fix the first two, and a check in the handler the third.</p>
+
+<h2 id="rules-on-fields">Rules on fields<a class="anchor" href="#rules-on-fields" aria-label="Link to this section">#</a></h2>
+<p>Only <code>NewBookmark</code> and one line of <code>create</code> change:</p>
+<pre><code>@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};</code></pre>
+<pre><code>    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);    /* a 422 by itself when a rule fails */</code></pre>
+<p><code>http.decodeValid</code> decodes as <code>http.decode</code> does, then checks the rules. When one fails, the
+handler stops there and the client gets a 422 that names each field and what is wrong with it:</p>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "not a link", "title": "x"}'
+{"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}
+
+$ curl -X POST localhost:8080/bookmarks -d '{}'
+{"error":"invalid request","fields":[{"field":"url","message":"is required"}]}</code></pre>
+<div class="table-wrap"><table>
+  <tr><th>Rule</th><th>Holds when</th></tr>
+  <tr><td><code>@required</code></td><td>The field has a value (not empty, not 0, not null)</td></tr>
+  <tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>A number is at least / at most n; a text has at least / at most n characters</td></tr>
+  <tr><td><code>@url</code>, <code>@email</code></td><td>The text is an absolute URL / looks like an email address</td></tr>
+  <tr><td><code>@oneOf("a", "b")</code></td><td>The text is one of those</td></tr>
+</table></div>
+<p>A field that is empty and not <code>@required</code> passes its other rules, so <code>title</code> may be left out.
+The full list is in <a href="lib-validate.html">Validation</a>.</p>
+
+<h2 id="rules-that-need-the-data">Rules that need the data<a class="anchor" href="#rules-that-need-the-data" aria-label="Link to this section">#</a></h2>
+<p>"Already saved" isn't a property of the request: the handler checks it and answers 409 Conflict itself.</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i &amp;lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}</code></pre>
+
+<h2 id="the-error-format">The error format<a class="anchor" href="#the-error-format" aria-label="Link to this section">#</a></h2>
+<p>Every error Shelf sends has the same shape, <code>{"error": "..."}</code>, plus <code>fields</code> for a 422, so a
+client handles them in one place:</p>
+<div class="table-wrap"><table>
+  <tr><th>Code</th><th>Meaning</th><th>Who sends it</th></tr>
+  <tr><td>400</td><td>Not the JSON we expect</td><td><code>http.decode</code>, <code>http.decodeValid</code></td></tr>
+  <tr><td>404</td><td>No such thing</td><td>a handler, <code>w.error(404, ...)</code>; the mux for unknown paths</td></tr>
+  <tr><td>405</td><td>Wrong method for this path</td><td>the mux</td></tr>
+  <tr><td>409</td><td>It conflicts with what is there</td><td>a handler</td></tr>
+  <tr><td>422</td><td>Well-formed, but a rule fails</td><td><code>http.decodeValid</code></td></tr>
+  <tr><td>500</td><td>A bug: the handler threw</td><td>the server, which logs where</td></tr>
+</table></div>
+<p>The last row is worth knowing: a handler that throws doesn't take the server down. The request gets a 500, the log
+gets the error and the line it came from, and the next request is served as usual.</p>
+<p>Next: <a href="guide-http-04-config.html">Configuration</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-02-json.html"><span>Previous</span>2. JSON in and out</a><a class="next" href="guide-http-04-config.html"><span>Next</span>4. Configuration</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-03-validation.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#rules-on-fields">Rules on fields</a></li><li><a href="#rules-that-need-the-data">Rules that need the data</a></li><li><a href="#the-error-format">The error format</a></li></ul></nav>
+</div>
+</body>
+</html>

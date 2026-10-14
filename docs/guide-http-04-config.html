@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. Configuration - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li class="current"><a href="guide-http-04-config.html" aria-current="page">4. Configuration</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>4. Configuration</h1>
+<p class="lede">The port is written in the code, and so will the database's address be. A server reads such things
+from its environment: variables and a <code>.env</code> file for development, flags on the command line to override
+them.</p>
+
+<h2 id="settings">Settings<a class="anchor" href="#settings" aria-label="Link to this section">#</a></h2>
+<pre><code>/* Settings: SHELF_PORT, SHELF_ACCESS_LOG, SHELF_MAX_BOOKMARKS from the
+ * environment or .env, flags over them */
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @min(1) i64 maxBookmarks;
+};
+
+Settings gSettings;</code></pre>
+<p>The settings are a struct, with the same rules as a request. Each field's variable is the prefix and its name in
+capitals: <code>maxBookmarks</code> with <code>"SHELF_"</code> is <code>SHELF_MAX_BOOKMARKS</code>
+(<code>@env("NAME")</code> picks another). <code>maxBookmarks</code> is new: <code>create</code> answers 507 once
+that many are saved.</p>
+
+<h2 id="main">main<a class="anchor" href="#main" aria-label="Link to this section">#</a></h2>
+<pre><code>i32 main(i32 argc, u8 **argv)
+{
+    /* defaults, then .env and the environment, then the command line */
+    gSettings.port = 8080;
+    gSettings.maxBookmarks = 10000;
+    config.loadDotenv(".env");
+    config.fromEnv(reflect.of(gSettings), "SHELF_");
+    validate.Errors errs;
+    if (!validate.check(reflect.of(gSettings), &amp;amp;errs)) {
+        String msg = errs.message();
+        log.error("bad settings: %s", msg);
+        msg.free();
+        os.exit(2);
+    }
+    errs.free();
+
+    flag.Set *fs = flag.new("shelf", "a bookmarks API");
+    defer fs.free();
+    i64 *port = fs.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = fs.boolean("access-log", gSettings.accessLog, "log every request");
+    fs.parseOrExit(argc, argv);
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;amp;list);
+    mux.handle("POST /bookmarks", &amp;amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;amp;remove);
+
+    http.Options o;
+    o.threads = 1;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;amp;mux, null, &amp;amp;o);
+}</code></pre>
+<ol>
+  <li>The defaults are what the struct holds before anything is read.</li>
+  <li><code>config.loadDotenv(".env")</code> sets the variables in <code>.env</code>, but never one the real environment
+  already has. Then <code>config.fromEnv</code> reads them into the struct, throwing (with every bad variable named)
+  when one isn't a number where a number goes.</li>
+  <li><code>validate.check</code> applies the rules: a server that can't run says why and stops at once, not at the
+  first request.</li>
+  <li><code>flag</code> takes the command line: <code>--port 9000</code>, <code>-p 9000</code>,
+  <code>--access-log</code>, and <code>-h</code> for a help text made from them.</li>
+</ol>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ cat .env
+SHELF_PORT=8080
+SHELF_ACCESS_LOG=yes
+SHELF_MAX_BOOKMARKS=2
+
+$ ktm run .
+2026-10-14T15:23:14.892Z INFO  Shelf listening on http://localhost:8080
+2026-10-14T15:23:15.038Z INFO  POST /bookmarks 201 134 0.044ms
+2026-10-14T15:23:15.043Z INFO  POST /bookmarks 201 134 0.016ms
+2026-10-14T15:23:15.048Z INFO  POST /bookmarks 507 29 0.011ms
+
+$ ktm run . -- -h
+usage: shelf [flags] [arguments]
+
+a bookmarks API
+
+flags:
+  -p, --port int    the port to listen on (default 8080)
+      --access-log  log every request (default true)
+  -h, --help        show this help
+
+$ SHELF_MAX_BOOKMARKS=0 ktm run .
+2026-10-14T15:23:45.263Z ERROR bad settings: maxBookmarks: must be at least 1</code></pre>
+<ul class="rules">
+  <li><code>log.info</code> and <code>log.error</code> write timestamped lines to stderr
+  (<a href="lib-logging.html">Logging</a>); <code>o.accessLog</code> adds a line per request with its status, size and
+  time.</li>
+  <li>Don't commit <code>.env</code> (it ends up holding passwords): commit a <code>.env.example</code> instead.</li>
+  <li>In production the same variables come from the service manager or the container, and <code>.env</code> isn't
+  there: <code>loadDotenv</code> then sets nothing.</li>
+</ul>
+<p>Next: PostgreSQL (coming).</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-03-validation.html"><span>Previous</span>3. Validation and errors</a><a class="next" href="stdlib.html"><span>Next</span>Library reference</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-04-config.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#settings">Settings</a></li><li><a href="#main">main</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+</div>
+</body>
+</html>
