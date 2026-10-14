@@ -83,7 +83,7 @@ both). It is imported by its path; its name in the code is <code>pg</code>
 
 <h2 id="main-ktm">main.ktm<a class="anchor" href="#main-ktm" aria-label="Link to this section">#</a></h2>
 <pre><code>import "github.com/ozzenerol/ktm-pg";
-import config, flag, fs, json, log, net.http, os, reflect, uuid, validate, vec;
+import config, flag, fs, json, log, net.http, os, reflect, uuid, vec;
 
 @json struct Bookmark {
     String id;
@@ -176,14 +176,12 @@ i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");
-    config.fromEnv(reflect.of(gSettings), "SHELF_");
-    validate.Errors errs;
-    if (!validate.check(reflect.of(gSettings), &amp;amp;errs)) {
-        String msg = errs.message();
-        log.error("bad settings: %s", msg);
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
         os.exit(2);
     }
-    errs.free();
 
     flag.Set *flags = flag.new("shelf", "a bookmarks API");
     defer flags.free();

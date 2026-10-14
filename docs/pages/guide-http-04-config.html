@@ -26,15 +26,12 @@ that many are saved.</p>
     gSettings.port = 8080;
     gSettings.maxBookmarks = 10000;
     config.loadDotenv(".env");
-    config.fromEnv(reflect.of(gSettings), "SHELF_");
-    validate.Errors errs;
-    if (!validate.check(reflect.of(gSettings), &amp;errs)) {
-        String msg = errs.message();
-        log.error("bad settings: %s", msg);
-        msg.free();
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
         os.exit(2);
     }
-    errs.free();
 
     flag.Set *fs = flag.new("shelf", "a bookmarks API");
     defer fs.free();
@@ -57,10 +54,9 @@ that many are saved.</p>
 <ol>
   <li>The defaults are what the struct holds before anything is read.</li>
   <li><code>config.loadDotenv(".env")</code> sets the variables in <code>.env</code>, but never one the real environment
-  already has. Then <code>config.fromEnv</code> reads them into the struct, throwing (with every bad variable named)
-  when one isn't a number where a number goes.</li>
-  <li><code>validate.check</code> applies the rules: a server that can't run says why and stops at once, not at the
-  first request.</li>
+  already has. Then <code>config.fromEnv</code> reads them into the struct and checks the rules. When a variable isn't
+  a number where a number goes, or breaks a rule, it throws one error naming every bad variable: a server that can't
+  run says why and stops at once, not at the first request.</li>
   <li><code>flag</code> takes the command line: <code>--port 9000</code>, <code>-p 9000</code>,
   <code>--access-log</code>, and <code>-h</code> for a help text made from them.</li>
 </ol>
@@ -88,7 +84,7 @@ flags:
   -h, --help        show this help
 
 $ SHELF_MAX_BOOKMARKS=0 ktm run .
-2026-10-14T15:23:45.263Z ERROR bad settings: maxBookmarks: must be at least 1</code></pre>
+2026-10-14T15:35:27.194Z ERROR config: SHELF_MAX_BOOKMARKS: must be at least 1</code></pre>
 <ul class="rules">
   <li><code>log.info</code> and <code>log.error</code> write timestamped lines to stderr
   (<a href="lib-logging.html">Logging</a>); <code>o.accessLog</code> adds a line per request with its status, size and

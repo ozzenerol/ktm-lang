@@ -27,14 +27,12 @@ ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</cod
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");
-    config.fromEnv(reflect.of(gSettings), "SHELF_");
-    validate.Errors errs;
-    if (!validate.check(reflect.of(gSettings), &amp;errs)) {
-        String msg = errs.message();
-        log.error("bad settings: %s", msg);
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
         os.exit(2);
     }
-    errs.free();
 
     flag.Set *flags = flag.new("shelf", "a bookmarks API");
     defer flags.free();
