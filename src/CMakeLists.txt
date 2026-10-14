@@ -148,7 +148,7 @@ target_link_libraries(ktm m)
 # net.tls link, and a shared one the JIT loads. build.sh puts both next to
 # libktm.
 file(GLOB KTMTLS_MBEDTLS_SOURCES ${CMAKE_SOURCE_DIR}/vendor/mbedtls/library/*.c)
-add_library(ktmtls_obj OBJECT ${KTMTLS_MBEDTLS_SOURCES} vendor/ktmtls/ktmtls.c vendor/ktmtls/ktmcrypto.c)
+add_library(ktmtls_obj OBJECT ${KTMTLS_MBEDTLS_SOURCES} vendor/ktmtls/ktmtls.c vendor/ktmtls/ktmcrypto.c vendor/ktmtls/ktmpassword.c)
 set_target_properties(ktmtls_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(ktmtls_obj PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/mbedtls/include

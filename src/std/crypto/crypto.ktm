@@ -1,11 +1,12 @@
 module crypto;
 #link <ktmtls>
-import mem, str;
+import encoding.base64, mem, str;
 
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
  * libktmtls, as net.tls is): secure random bytes, SHA-256/512, HMAC,
  * HKDF and PBKDF2, a constant-time compare, authenticated encryption
- * (AES-256-GCM, ChaCha20-Poly1305) and ECDSA P-256 signatures.
+ * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256 signatures, and
+ * password hashing (Argon2id, bcrypt; ktm's own C, beside mbedTLS).
  *
  *   u8 key[32];
  *   crypto.random(key[0:]);
@@ -56,6 +57,10 @@ extern "c" i64 ktm_crypto_key_pem(void *key, i32 priv, u8 *out, u64 outlen);
 extern "c" i32 ktm_crypto_sign(void *key, u8 *data, u64 len, u8 *sig);
 extern "c" i32 ktm_crypto_verify(void *key, u8 *data, u64 len, u8 *sig, u64 slen);
 extern "c" void ktm_crypto_key_free(void *key);
+extern "c" i32 ktm_crypto_blake2b(u8 *in, u64 len, u8 *out, u64 outlen);
+extern "c" i32 ktm_crypto_argon2id(u8 *pw, u64 plen, u8 *salt, u64 slen, u32 t, u32 m, u32 p, u8 *out, u64 olen);
+extern "c" i32 ktm_crypto_bcrypt(u8 *pw, u64 plen, i32 cost, u8 *salt, u8 *out);
+extern "c" i32 ktm_crypto_bcrypt_check(u8 *pw, u64 plen, u8 *hash, u64 hlen);
 
 static void fail(u8 *what, i32 code) {
     u8 msg[160];
@@ -87,6 +92,13 @@ pub String randomBytes(i64 n) {
 }
 
 /* ---- hashes and MACs ---- */
+
+/* BLAKE2b of data into out (1 to 64 bytes: the digest's size) */
+pub void blake2b(u8[] data, u8[] out) {
+    if (ktm_crypto_blake2b(data.ptr, data.len, out.ptr, out.len) != 0) {
+        throw(ERR_CRYPTO, "crypto: a BLAKE2b digest is 1 to 64 bytes, not %d", out.len);
+    }
+}
 
 /* SHA-256 of data into out (32 bytes) */
 pub void sha256(u8[] data, u8[] out) {
@@ -121,8 +133,8 @@ pub void hkdfSha256(u8[] secret, u8[] salt, u8[] info, u8[] out) {
     if (r != 0) { fail("HKDF", r); }
 }
 
-/* PBKDF2-HMAC-SHA256: a key of out.len bytes from a password (for
- * passwords prefer a slow, salted hash: iterations in the 600000s) */
+/* PBKDF2-HMAC-SHA256: a key of out.len bytes from a password (to store
+ * passwords, hashPassword) */
 pub void pbkdf2Sha256(u8[] password, u8[] salt, i64 iterations, u8[] out) {
     if (iterations < 1 || iterations > 0xFFFFFFFF) { throw(ERR_CRYPTO, "crypto: PBKDF2 iterations out of range"); }
     i32 r = ktm_crypto_pbkdf2(256, password.ptr, password.len, salt.ptr, salt.len, (u32)iterations,
@@ -245,4 +257,134 @@ pub bool Key.verify(u8[] data, u8[] sig) {
 pub void Key.free() {
     ktm_crypto_key_free(self.native);
     mem.free(self);
+}
+
+/* ---- passwords ---- */
+
+/* hashPassword's Argon2id cost (OWASP's: 19 MiB, 2 passes, 1 lane):
+ * about 20 ms on a laptop core */
+pub const i64 ARGON2_MEMORY_KIB = 19456;
+pub const i64 ARGON2_ITERATIONS = 2;
+pub const i64 ARGON2_PARALLELISM = 1;
+pub const i64 BCRYPT_COST = 12;
+
+/* Argon2id as a key derivation: out.len bytes (4 or more) from password
+ * and salt (8 bytes or more), memoryKiB of memory, iterations passes */
+pub void argon2idKey(u8[] password, u8[] salt, i64 memoryKiB, i64 iterations, i64 parallelism, u8[] out) {
+    if (memoryKiB < 8 * parallelism || memoryKiB > 0xFFFFFFFF || iterations < 1 || iterations > 0xFFFFFFFF ||
+        parallelism < 1 || parallelism > 0xFFFFFF || salt.len < 8 || out.len < 4) {
+        throw(ERR_CRYPTO, "crypto: Argon2id needs memory >= 8 KiB per lane, 1+ iterations, a salt of 8+ bytes "
+                          "and 4+ bytes out");
+    }
+    i32 r = ktm_crypto_argon2id(password.ptr, password.len, salt.ptr, salt.len, (u32)iterations, (u32)memoryKiB,
+                                (u32)parallelism, out.ptr, out.len);
+    if (r == -2) { throw(ERR_CRYPTO, "crypto: Argon2id: out of memory (%d KiB)", memoryKiB); }
+    if (r != 0) { throw(ERR_CRYPTO, "crypto: Argon2id: bad parameters"); }
+}
+
+static void b64raw(String *o, u8[] data) {
+    String b = base64.encode(data);
+    o.append(str.trimEnd(b[0:], "="));
+    b.free();
+}
+
+/* password's Argon2id hash as a PHC string, with a new random salt:
+ * $argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash> (yours). Store it whole:
+ * verifyPassword reads the cost from it. */
+pub String argon2id(u8[] password, i64 memoryKiB = ARGON2_MEMORY_KIB, i64 iterations = ARGON2_ITERATIONS,
+                    i64 parallelism = ARGON2_PARALLELISM) {
+    u8 salt[16];
+    random(salt[0:]);
+    u8 hash[32];
+    argon2idKey(password, salt[0:], memoryKiB, iterations, parallelism, hash[0:]);
+    String o = str.format("$argon2id$v=19$m=%d,t=%d,p=%d$", memoryKiB, iterations, parallelism);
+    b64raw(&o, salt[0:]);
+    o.appendByte('$');
+    b64raw(&o, hash[0:]);
+    mem.set(hash, 0, 32);
+    return o;
+}
+
+/* password's bcrypt hash, $2b$<cost>$... (60 characters, yours). bcrypt
+ * reads 72 bytes at most: a longer password throws. */
+pub String bcrypt(u8[] password, i64 cost = BCRYPT_COST) {
+    if (password.len > 72) { throw(ERR_CRYPTO, "crypto: bcrypt takes 72 bytes of password at most, not %d", password.len); }
+    if (cost < 4 || cost > 31) { throw(ERR_CRYPTO, "crypto: a bcrypt cost is 4 to 31, not %d", cost); }
+    u8 salt[16];
+    random(salt[0:]);
+    u8 out[61];
+    ktm_crypto_bcrypt(password.ptr, password.len, (i32)cost, salt, out);
+    return str.from(out[0:60]);
+}
+
+/* A password to store: Argon2id at the default cost (see argon2id) */
+pub String hashPassword(u8[] password) {
+    return argon2id(password);
+}
+
+/* A number after `name=` up to `,` or the end; -1 when there isn't one */
+static i64 phcParam(u8[] params, u8[] name) {
+    u8[] rest = params;
+    while (rest.len) {
+        i64 c = str.find(rest, ",");
+        u8[] part = c < 0 ? rest : rest[0:c];
+        rest = c < 0 ? rest[rest.len:] : rest[c + 1:];
+        if (part.len > name.len + 1 && str.startsWith(part, name) && part[name.len] == '=') {
+            i64 v;
+            if (str.toInt(part[name.len + 1:], &v) && v >= 0) { return v; }
+            return -1;
+        }
+    }
+    return -1;
+}
+
+/* A PHC Argon2id string's parts: false when it isn't one */
+static bool parseArgon2(u8[] hash, i64 *m, i64 *t, i64 *p, String *salt, String *want) {
+    if (!str.startsWith(hash, "$argon2id$v=19$")) { return false; }
+    u8[] rest = hash[15:];
+    i64 d1 = str.find(rest, "$");
+    if (d1 < 0) { return false; }
+    u8[] params = rest[0:d1];
+    rest = rest[d1 + 1:];
+    i64 d2 = str.find(rest, "$");
+    if (d2 < 0) { return false; }
+    *m = phcParam(params, "m");
+    *t = phcParam(params, "t");
+    *p = phcParam(params, "p");
+    if (*m < 0 || *t < 1 || *p < 1 || *m > 4194304 || *t > 100000) { return false; }
+    if (!base64.decode(rest[0:d2], salt) || !base64.decode(rest[d2 + 1:], want)) { return false; }
+    return salt.len >= 8 && want.len >= 4 && want.len <= 1024;
+}
+
+/* Does password match hash, an Argon2id PHC string or a bcrypt one
+ * ($2a$, $2b$, $2y$)? false for a wrong password and for a hash it can't
+ * read. The compare takes the same time wherever they differ. */
+pub bool verifyPassword(u8[] password, u8[] hash) {
+    if (str.startsWith(hash, "$2")) {
+        return ktm_crypto_bcrypt_check(password.ptr, password.len, hash.ptr, hash.len) == 1;
+    }
+    i64 m, t, p;
+    String salt, want;
+    defer salt.free();
+    defer want.free();
+    if (!parseArgon2(hash, &m, &t, &p, &salt, &want)) { return false; }
+    String got = str.from(want[0:]);
+    defer got.free();
+    i32 r = ktm_crypto_argon2id(password.ptr, password.len, salt.ptr, salt.len, (u32)t, (u32)m, (u32)p,
+                                got.ptr, got.len);
+    bool ok = r == 0 && equal(got[0:], want[0:]);
+    mem.set(got.ptr, 0, got.len);
+    return ok;
+}
+
+/* Should a hash that verified be replaced by hashPassword's (after the
+ * user logs in, while the password is at hand)? true for bcrypt, for a
+ * hash it can't read, and for Argon2id at another cost than the default */
+pub bool needsRehash(u8[] hash) {
+    i64 m, t, p;
+    String salt, want;
+    defer salt.free();
+    defer want.free();
+    if (!parseArgon2(hash, &m, &t, &p, &salt, &want)) { return true; }
+    return m != ARGON2_MEMORY_KIB || t != ARGON2_ITERATIONS || p != ARGON2_PARALLELISM;
 }

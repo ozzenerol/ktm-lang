@@ -70,7 +70,7 @@ String token = crypto.randomBytes(24);   // a session token's bytes (base64.enco
   <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256)</td></tr>
   <tr><td><code>crypto.equal(a, b)</code></td><td>Compares in constant time: use it for MACs, tokens and hashes, never <code>str.equals</code></td></tr>
   <tr><td><code>crypto.hkdfSha256(secret, salt, info, out)</code></td><td>Keys of <code>out.len</code> bytes from one secret (RFC 5869)</td></tr>
-  <tr><td><code>crypto.pbkdf2Sha256(password, salt, iterations, out)</code></td><td>A key from a password; for stored passwords use 600000 iterations or more</td></tr>
+  <tr><td><code>crypto.pbkdf2Sha256(password, salt, iterations, out)</code></td><td>A key from a password; to store passwords use <code>hashPassword</code> (below)</td></tr>
 </table></div>
 
 <h2 id="encrypting">Encrypting<a class="anchor" href="#encrypting" aria-label="Link to this section">#</a></h2>
@@ -99,6 +99,40 @@ crypto.Key *pub = crypto.publicKey(pem);          // and back (privateKey(pem) f
 <p>Keys are P-256, readable and writable as PEM, so they work with OpenSSL and other languages. (Ed25519 isn't there:
 mbedTLS 3.6 doesn't have it.)</p>
 
+<h2 id="passwords">Passwords<a class="anchor" href="#passwords" aria-label="Link to this section">#</a></h2>
+<pre data-run><code>import crypto;
+
+void main()
+{
+  String stored = crypto.hashPassword("hunter2");   /* save this whole string */
+  printf("%.31s...\n", stored.ptr);
+  printf("%d %d\n", crypto.verifyPassword("hunter2", stored), crypto.verifyPassword("hunter3", stored));
+  printf("%d\n", crypto.needsRehash(stored));
+  stored.free();
+}
+</code></pre>
+<pre class="output">$argon2id$v=19$m=19456,t=2,p=1$...
+1 0
+0
+</pre>
+<p><code>hashPassword</code> is Argon2id with a random salt, at OWASP's cost (19 MiB, 2 passes, about 20 ms), written
+as a PHC string that carries its own cost and salt, so other languages' libraries read it too.
+<code>verifyPassword</code> also reads bcrypt hashes (<code>$2a$</code>, <code>$2b$</code>, <code>$2y$</code>), so
+users moved from another system keep their passwords; <code>needsRehash</code> says when a hash that just verified
+should be replaced by a new one.</p>
+<div class="table-wrap"><table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>crypto.hashPassword(pw)</code></td><td>Argon2id at the default cost, a new String</td></tr>
+  <tr><td><code>crypto.argon2id(pw, memoryKiB, iterations, parallelism)</code></td><td>The same at a cost of your own</td></tr>
+  <tr><td><code>crypto.bcrypt(pw, cost)</code></td><td><code>$2b$</code>, cost 12 unless given; throws for a password over 72 bytes</td></tr>
+  <tr><td><code>crypto.verifyPassword(pw, hash)</code></td><td>Either kind; <code>false</code> for a wrong password or a hash it can't read</td></tr>
+  <tr><td><code>crypto.needsRehash(hash)</code></td><td><code>true</code> for bcrypt and Argon2id at another cost</td></tr>
+  <tr><td><code>crypto.argon2idKey(pw, salt, memoryKiB, iterations, parallelism, out)</code></td><td>Argon2id as a key derivation, into out</td></tr>
+  <tr><td><code>crypto.blake2b(data, out)</code></td><td>BLAKE2b, a 1 to 64 byte digest</td></tr>
+</table></div>
+<p>Hashing a password takes the time and memory it does on purpose, and it holds the thread: in a server, a login
+handler blocks its loop for those 20 ms.</p>
+
 <h2 id="notes">Notes<a class="anchor" href="#notes" aria-label="Link to this section">#</a></h2>
 <ul class="rules">
   <li>What <code>randomBytes</code>, <code>seal</code>, <code>sign</code> and the PEM calls return is yours to free;
@@ -113,7 +147,7 @@ mbedTLS 3.6 doesn't have it.)</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#random-bytes">Random bytes</a></li><li><a href="#hashes-macs-keys-from-secrets">Hashes, MACs, keys from secrets</a></li><li><a href="#encrypting">Encrypting</a></li><li><a href="#signatures">Signatures</a></li><li><a href="#notes">Notes</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#random-bytes">Random bytes</a></li><li><a href="#hashes-macs-keys-from-secrets">Hashes, MACs, keys from secrets</a></li><li><a href="#encrypting">Encrypting</a></li><li><a href="#signatures">Signatures</a></li><li><a href="#passwords">Passwords</a></li><li><a href="#notes">Notes</a></li></ul></nav>
 </div>
 </body>
 </html>
