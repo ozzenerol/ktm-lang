@@ -154,6 +154,60 @@ void main()
 second
 </pre>
 
+<h2 id="methods-with-type-parameters-of-their-own">Methods with type parameters of their own<a class="anchor" href="#methods-with-type-parameters-of-their-own" aria-label="Link to this section">#</a></h2>
+<p>A method can have type parameters of its own, written after its name as for a function. It works on a plain
+struct, and on a generic one next to the struct's parameters.</p>
+<pre data-run><code>struct Counter { i64 n; };
+
+i64 Counter.addAll&lt;V&gt;(V[] xs)
+{
+  for (auto x : xs) { self.n += (i64)x; }
+  return self.n;
+}
+
+V Counter.zero&lt;V&gt;() { V z; return z; }
+
+struct Pair&lt;T&gt; { T a; T b; };
+
+Pair&lt;U&gt; Pair&lt;T&gt;.map&lt;U&gt;(fn(T) U f)
+{
+  Pair&lt;U&gt; p = {f(self.a), f(self.b)};
+  return p;
+}
+
+f64 half(i64 x) { return (f64)x / 2.0; }
+u8 *sign(f64 x) { return x &gt;= 1.0 ? "big" : "small"; }
+
+void main()
+{
+  Counter c = {0};
+  u8 bytes[] = {1, 2, 3};
+  f64 floats[] = {1.5, 2.5};
+  printf("%d %d\n", c.addAll(bytes), c.addAll(floats));
+  printf("%d\n", c.zero&lt;i64&gt;());
+
+  Pair&lt;i64&gt; p = {1, 5};
+  Pair&lt;u8 *&gt; s = p.map(&amp;half).map(&amp;sign);
+  printf("%s %s\n", s.a, s.b);
+}
+</code></pre>
+<pre class="output">6 9
+0
+small big
+</pre>
+<ul class="rules">
+  <li>A call works out the method's own parameters from its arguments, as for a generic function: <code>self</code>
+  takes no part, and the struct's parameters come from the receiver (a <code>Pair&lt;i64&gt;</code> gives
+  <code>T</code> = <code>i64</code>). Write them when nothing says what they are, as for <code>c.zero&lt;i64&gt;()</code>
+  whose <code>V</code> is only in the return type.</li>
+  <li>Each set of type arguments makes its own instance, <code>Counter.addAll&lt;u8&gt;</code>, the first time it is
+  called.</li>
+  <li>The method is found on a pointer, on a call's result (<code>p.map(...).map(...)</code>) and on a struct that
+  derives from its struct, as any method is. <code>pub</code> works as for any method.</li>
+  <li>Its own parameter names can't be the struct's: <code>Pair&lt;T&gt;.f&lt;T&gt;</code> is an error.</li>
+  <li>It shares its name with nothing: not a field, not a plain method, not another generic method of the struct.</li>
+</ul>
+
 <h2 id="generic-functions-over-generic-structs">Generic functions over generic structs<a class="anchor" href="#generic-functions-over-generic-structs" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>struct Box&lt;T&gt; { T value; };
 
@@ -232,7 +286,8 @@ bob -1
   <li>Generic enums.</li>
   <li>Number parameters (<code>Array&lt;T, 16&gt;</code>).</li>
   <li>A different body for one type (specialisation).</li>
-  <li>Methods with type parameters of their own, <code>void S.f&lt;V&gt;(V x)</code> (an error that says so): a generic struct's methods use its parameters; otherwise write a generic function that takes the struct.</li>
+  <li>Several generic methods of one name, or a generic method next to a plain one of its name.</li>
+  <li>The address of a generic method (<code>&amp;s.f</code>): wrap the call in a function.</li>
 </ul>
 
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lang-type-aliases.html"><span>Previous</span>Type aliases</a><a class="next" href="lang-modules.html"><span>Next</span>Modules</a></nav>
@@ -241,7 +296,7 @@ bob -1
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#generic-functions">Generic functions</a></li><li><a href="#generic-structs">Generic structs</a></li><li><a href="#methods-of-a-generic-struct">Methods of a generic struct</a></li><li><a href="#generic-functions-over-generic-structs">Generic functions over generic structs</a></li><li><a href="#a-generic-base">A generic base</a></li><li><a href="#the-library-s-generics">The library&#x27;s generics</a></li><li><a href="#errors-are-checked-per-instance">Errors are checked per instance</a></li><li><a href="#in-modules-and-libraries">In modules and libraries</a></li><li><a href="#not-yet">Not yet</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#generic-functions">Generic functions</a></li><li><a href="#generic-structs">Generic structs</a></li><li><a href="#methods-of-a-generic-struct">Methods of a generic struct</a></li><li><a href="#methods-with-type-parameters-of-their-own">Methods with type parameters of their own</a></li><li><a href="#generic-functions-over-generic-structs">Generic functions over generic structs</a></li><li><a href="#a-generic-base">A generic base</a></li><li><a href="#the-library-s-generics">The library&#x27;s generics</a></li><li><a href="#errors-are-checked-per-instance">Errors are checked per instance</a></li><li><a href="#in-modules-and-libraries">In modules and libraries</a></li><li><a href="#not-yet">Not yet</a></li></ul></nav>
 </div>
 </body>
 </html>
