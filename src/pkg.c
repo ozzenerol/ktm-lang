@@ -141,6 +141,12 @@ int pkgVersionCmp(const char *a, const char *b) {
     return (*pa != 0) - (*pb != 0);
 }
 
+/* The major version of v ("v1" of v1.2.3) */
+static char *pkgMajor(const char *v) {
+    const char *dot = strchr(v, '.');
+    return dot ? pkgDup(v, dot - v) : strdup(v);
+}
+
 /* "0.20" from "v0.20.3" */
 static char *pkgCompilerKtm(void) {
     const char *v = cctrlGetVersion();
@@ -661,11 +667,199 @@ static int pkgModFmt(int argc) {
     return 0;
 }
 
+/* ---- ktm get, ktm mod download ---- */
+
+static PkgSum *pkgSumLoad(PkgMod *m, char **err) {
+    char *file = mprintf("%s/ktm.sum", m->dir);
+    FILE *fp = fopen(file, "r");
+    if (!fp) return calloc(1, sizeof(PkgSum));
+    AoStr *buf = aoStrNew();
+    char chunk[4096];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) aoStrCatLen(buf, chunk, n);
+    fclose(fp);
+    return pkgSumParse(file, buf->data, err);
+}
+
+static int pkgSumWrite(PkgMod *m, PkgSum *s) {
+    return pkgWriteFile(mprintf("%s/ktm.sum", m->dir), pkgSumFormat(s));
+}
+
+/* Records path@version's hash; 0 (reported) when ktm.sum has another */
+static int pkgSumCheck(PkgSum *s, const char *path, const char *version, const char *hash) {
+    for (int i = 0; i < s->len; ++i) {
+        PkgSumLine *l = &s->lines[i];
+        if (strcmp(l->path, path) || strcmp(l->version, version)) continue;
+        if (!strcmp(l->hash, hash)) return 1;
+        pkgFail("%s %s doesn't match ktm.sum: downloaded %s, ktm.sum has %s.\n"
+                "  The version's files changed since it was recorded (a moved tag, or someone\n"
+                "  tampering): refused. Check the repository; delete the line to accept it.",
+                path, version, hash, l->hash);
+        return 0;
+    }
+    s->lines = realloc(s->lines, sizeof(PkgSumLine) * (s->len + 1));
+    PkgSumLine *l = &s->lines[s->len++];
+    l->path = strdup(path);
+    l->version = strdup(version);
+    l->hash = strdup(hash);
+    return 1;
+}
+
+static PkgReq *pkgModReq(PkgMod *m, const char *path) {
+    for (int i = 0; i < m->req_len; ++i) {
+        if (!strcmp(m->req[i].path, path)) return &m->req[i];
+    }
+    return NULL;
+}
+
+/* Sets path's version in ktm.mod (added when new) */
+static void pkgModSetReq(PkgMod *m, const char *path, const char *version, int indirect) {
+    PkgReq *r = pkgModReq(m, path);
+    if (!r) {
+        m->req = realloc(m->req, sizeof(PkgReq) * (m->req_len + 1));
+        r = &m->req[m->req_len++];
+        memset(r, 0, sizeof(*r));
+        r->path = strdup(path);
+    }
+    r->version = strdup(version);
+    r->indirect = indirect;
+}
+
+static void pkgModDropReq(PkgMod *m, const char *path) {
+    for (int i = 0; i < m->req_len; ++i) {
+        if (strcmp(m->req[i].path, path)) continue;
+        memmove(&m->req[i], &m->req[i + 1], sizeof(PkgReq) * (m->req_len - i - 1));
+        m->req_len--;
+        return;
+    }
+}
+
+/* Is path replaced by a local directory (nothing to download)? */
+static PkgReplace *pkgModReplaceOf(PkgMod *m, const char *path, const char *version) {
+    PkgReplace *rep = NULL;
+    for (int i = 0; i < m->rep_len; ++i) {
+        PkgReplace *r = &m->rep[i];
+        if (strcmp(r->path, path)) continue;
+        if (r->version && strcmp(r->version, version)) continue;
+        if (!rep || r->version) rep = r;
+    }
+    return rep;
+}
+
+/* Downloads path@version (or what replaces it) and checks its hash, then
+ * the same for what it requires: a requirement newer than ktm.mod's goes
+ * into ktm.mod, marked indirect. 0 on an error (reported). */
+static int pkgFetchTree(PkgMod *m, PkgSum *s, const char *path, const char *version, int depth) {
+    if (depth > 64) return pkgFail("requirements nest too deep at %s", path) == 0;
+    PkgReplace *rep = pkgModReplaceOf(m, path, version);
+    if (rep && !rep->new_version) return 1;           /* a local directory */
+    const char *from = rep ? rep->new_path : path;
+    const char *ver = rep ? rep->new_version : version;
+    char *err = NULL;
+    char *hash = pkgDownload(from, ver, &err);
+    if (!hash) {
+        pkgFail("%s", err);
+        return 0;
+    }
+    if (!pkgSumCheck(s, from, ver, hash)) return 0;
+    char *dep_file = mprintf("%s/%s@%s/ktm.mod", pkgCacheDir(), from, ver);
+    struct stat st;
+    if (stat(dep_file, &st) != 0) return 1;
+    PkgMod *dep = pkgModLoad(dep_file, &err);
+    if (!dep) {
+        pkgFail("%s", err);
+        return 0;
+    }
+    for (int i = 0; i < dep->req_len; ++i) {
+        PkgReq *want = &dep->req[i];
+        if (!strcmp(want->path, m->path)) continue;
+        PkgReq *have = pkgModReq(m, want->path);
+        if (have) {
+            int c = pkgVersionCmp(have->version, want->version);
+            if (c >= 0) continue;
+            if (strcmp(pkgMajor(have->version), pkgMajor(want->version))) {
+                pkgFail("%s needs %s %s, but this project uses %s: one major version per package",
+                        path, want->path, want->version, have->version);
+                return 0;
+            }
+        }
+        pkgModSetReq(m, want->path, want->version, have ? have->indirect : 1);
+        if (!pkgFetchTree(m, s, want->path, want->version, depth + 1)) return 0;
+    }
+    return 1;
+}
+
+static int pkgGet(int argc, char **argv) {
+    if (argc < 1) return pkgFail("usage: ktm get <path>[@version|@latest|@none] ...");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgSum *s = pkgSumLoad(m, &err);
+    if (!s) return pkgFail("%s", err);
+    for (int i = 0; i < argc; ++i) {
+        char *arg = mprintf("%s", argv[i]);
+        char *at = strchr(arg, '@');
+        char *want = at ? at + 1 : "latest";
+        if (at) *at = '\0';
+        if (!pkgValidPath(arg, 1)) {
+            return pkgFail("`%s` is not a package path: it starts with a host, as in github.com/user/repo", arg);
+        }
+        char *path = pkgRepoRoot(arg);
+        PkgReq *had = pkgModReq(m, path);
+        char *old = had ? strdup(had->version) : NULL;
+        if (!strcmp(want, "none")) {
+            if (!had) return pkgFail("%s is not in ktm.mod", path);
+            pkgModDropReq(m, path);
+            fprintf(stderr, "ktm: removed %s %s\n", path, old);
+            continue;
+        }
+        char *version = want;
+        if (!strcmp(want, "latest")) {
+            version = pkgLatest(path, &err);
+            if (!version) return pkgFail("%s", err);
+        } else if (!pkgValidVersion(want)) {
+            return pkgFail("`%s` is not a version: vMAJOR.MINOR.PATCH, latest or none", want);
+        }
+        if (old && strcmp(pkgMajor(old), pkgMajor(version))) {
+            fprintf(stderr, "ktm: %s goes from %s to %s, a new major version: its API may have changed\n",
+                    path, old, version);
+        }
+        pkgModSetReq(m, path, version, 0);
+        if (!pkgFetchTree(m, s, path, version, 0)) return 1;
+        if (!old) fprintf(stderr, "ktm: added %s %s\n", path, version);
+        else if (strcmp(old, version)) fprintf(stderr, "ktm: %s %s -> %s\n", path, old, version);
+    }
+    if (!pkgModWrite(m)) return pkgFail("can't write %s: %s", m->file, strerror(errno));
+    if (!pkgSumWrite(m, s)) return pkgFail("can't write ktm.sum: %s", strerror(errno));
+    return 0;
+}
+
+/* Every requirement of ktm.mod into the cache, each checked against ktm.sum */
+static int pkgModDownload(int argc) {
+    if (argc) return pkgFail("usage: ktm mod download");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgSum *s = pkgSumLoad(m, &err);
+    if (!s) return pkgFail("%s", err);
+    int n = m->req_len;
+    for (int i = 0; i < n && i < m->req_len; ++i) {
+        PkgReq r = m->req[i];
+        if (!pkgFetchTree(m, s, r.path, r.version, 0)) return 1;
+    }
+    if (m->req_len != n && !pkgModWrite(m)) return pkgFail("can't write %s: %s", m->file, strerror(errno));
+    if (!pkgSumWrite(m, s)) return pkgFail("can't write ktm.sum: %s", strerror(errno));
+    return 0;
+}
+
 static int pkgModUsage(void) {
     fprintf(stderr,
             "usage: ktm mod <command>\n"
             "  init [path]   create ktm.mod for a new project in this directory\n"
-            "  fmt           check ktm.mod and rewrite it in the standard layout\n");
+            "  fmt           check ktm.mod and rewrite it in the standard layout\n"
+            "  download      fetch every package ktm.mod requires into the cache\n");
     return 2;
 }
 
@@ -673,6 +867,7 @@ static int pkgModCommand(int argc, char **argv) {
     if (argc < 1) return pkgModUsage();
     if (!strcmp(argv[0], "init")) return pkgModInit(argc - 1, argv + 1);
     if (!strcmp(argv[0], "fmt")) return pkgModFmt(argc - 1);
+    if (!strcmp(argv[0], "download")) return pkgModDownload(argc - 1);
     if (!strcmp(argv[0], "help") || !strcmp(argv[0], "--help")) {
         pkgModUsage();
         return 0;
@@ -684,5 +879,6 @@ static int pkgModCommand(int argc, char **argv) {
 int pkgMain(int argc, char **argv) {
     if (argc < 2) return -1;
     if (!strcmp(argv[1], "mod")) return pkgModCommand(argc - 2, argv + 2);
+    if (!strcmp(argv[1], "get")) return pkgGet(argc - 2, argv + 2);
     return -1;
 }

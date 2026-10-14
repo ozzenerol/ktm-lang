@@ -75,6 +75,13 @@ char *pkgResolveImport(const char *program_dir, const char *path, char **err);
 /* The name on the `module` line of the package in dir, NULL if none */
 char *pkgModuleName(const char *dir);
 
+/* Downloading (pkgfetch.c) */
+char *pkgDirHash(const char *root);
+char *pkgRepoRoot(const char *path);
+char **pkgVersions(const char *root, int *count, char **err);
+char *pkgLatest(const char *root, char **err);
+char *pkgDownload(const char *path, const char *version, char **err);
+
 /* `ktm mod ...` and the other package commands: the exit code, or -1
  * when argv[1] isn't one (a file to compile) */
 int pkgMain(int argc, char **argv);
