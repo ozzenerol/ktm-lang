@@ -234,6 +234,8 @@ int parseFnLooksLikeType(Cctrl *cc) {
 }
 
 static int parseIsVarArgElemType(AstType *t);
+AstType *parseReflectValueType(Cctrl *cc);
+Ast *parseReflectTypeAddr(Cctrl *cc, AstType *t);
 Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var);
 
 /* The two hidden parameters of `T ...name` (elem NULL: `...name`, 64-bit
@@ -519,7 +521,8 @@ static int parseIsVarArgElemType(AstType *t) {
  * the extras (see parseVarArgsPack). Untyped elements are 64-bit slots
  * like the old argv. Must be the last parameter. */
 static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
-                              Lexeme *ellipsis, s64 terminator, int store)
+                              Lexeme *ellipsis, s64 terminator, int store,
+                              int any)
 {
     int line = ellipsis->line, col = ellipsis->col;
     Lexeme *name = cctrlTokenGet(cc);
@@ -527,13 +530,15 @@ static void parseNamedVarArgs(Cctrl *cc, Vec *params, AstType *elem,
         cctrlRaiseExceptionAt(cc, line, col, 3,
             "a variadic parameter needs a name, as in `i64 ...nums` or `...args`");
     }
-    if (elem && !parseIsVarArgElemType(elem)) {
+    if (elem && !any && !parseIsVarArgElemType(elem)) {
         cctrlRaiseExceptionAt(cc, name->line, name->col, name->len,
-            "the elements of `...%.*s` must be numbers or pointers, got %s",
+            "the elements of `...%.*s` must be numbers or pointers (or `any ...%.*s`), got %s",
+            name->len, name->start,
             name->len, name->start, astTypeToString(elem));
     }
     Ast *count, *data;
     parseVarArgsPair(params, elem, name->start, name->len, &count, &data);
+    if (any) data->flags |= AST_FLAG_VARARGS_ANY;
     count->line = data->line = name->line;
     count->col = data->col = name->col;
     if (store) {
@@ -628,7 +633,7 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             Lexeme ellipsis = *cctrlTokenGet(cc);
             Lexeme *after = cctrlTokenPeek(cc);
             if (after && after->tk_type == TK_IDENT) {
-                parseNamedVarArgs(cc, params, NULL, &ellipsis, terminator, store);
+                parseNamedVarArgs(cc, params, NULL, &ellipsis, terminator, store, 0);
                 return params;
             }
             var = astVarArgs();
@@ -661,6 +666,24 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
             cctrlTokenGet(cc);
             param_is_const = 1;
         }
+        /* `any ...name`: extras of any type, each a reflect.Value */
+        Lexeme *any_tok = cctrlTokenPeek(cc);
+        if (!param_is_const && !caller_flag && any_tok && any_tok->tk_type == TK_IDENT &&
+            any_tok->len == 3 && !memcmp(any_tok->start, "any", 3)) {
+            cctrlTokenGet(cc);
+            Lexeme *after = cctrlTokenPeek(cc);
+            if (tokenPunctIs(after, TK_ELLIPSIS)) {
+                Lexeme ellipsis = *cctrlTokenGet(cc);
+                AstType *value = parseReflectValueType(cc);
+                if (!value) {
+                    cctrlRaiseExceptionAt(cc, any_tok->line, any_tok->col, 3,
+                        "`any ...` needs `import reflect;`: each extra is a reflect.Value");
+                }
+                parseNamedVarArgs(cc, params, value, &ellipsis, terminator, store, 1);
+                return params;
+            }
+            cctrlTokenRewind(cc);
+        }
         type = parseDeclSpec(cc);
         int pinned_kind;
         AoStr *pinned_reg;
@@ -677,7 +700,7 @@ Vec *parseParams(Cctrl *cc, s64 terminator, int *has_var_args, int store) {
         }
         if (tokenPunctIs(pname, TK_ELLIPSIS)) {
             Lexeme ellipsis = *pname;
-            parseNamedVarArgs(cc, params, type, &ellipsis, terminator, store);
+            parseNamedVarArgs(cc, params, type, &ellipsis, terminator, store, 0);
             return params;
         }
 
@@ -1614,10 +1637,57 @@ static void parseCallLocFreeArgs(ParseCallLoc *loc) {
  * argv's: floats as f64 bits, narrower integers widened. */
 static void parseSliceLenPtr(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr);
 
+/* The extras of an `any ...name` call: each copied into a hidden variable
+ * (an array as a slice of it), and the array holds a reflect.Value per
+ * extra, its two words (the copy's address, the reflect.Type) stored as
+ * 64-bit slots. */
+static Ast *parseVarArgsAny(Cctrl *cc, Vec *items, Vec *item_spans,
+                            int first_arg, char *fname, int len)
+{
+    static int va_any_id = 0;
+    Vec *converted = astVecNew();
+    for (u64 i = 0; i < items->size; ++i) {
+        Ast *arg = vecGet(Ast *, items, i);
+        ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, i);
+        AstType *t = arg->type;
+        if (t && t->kind == AST_TYPE_ARRAY) {
+            arg = parseSliceFrom(cc, astMakeSliceType(t->ptr), arg);
+            t = arg->type;
+        }
+        if (!t || t->kind == AST_TYPE_VOID) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "argument %d of `%.*s` has no value",
+                first_arg + (int)i + 1, len, fname);
+        }
+        if (astTypeIsString(t) && (arg->kind == AST_FUNCALL || arg->kind == AST_FUNPTR_CALL ||
+                                   arg->kind == AST_ASM_FUNCALL)) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                "argument %d of `%.*s`: a String from a call would never be freed; "
+                "put it in a variable first",
+                first_arg + (int)i + 1, len, fname);
+        }
+        Ast *copy = parseHiddenSliceVar(cc, t);
+        AstType *u64_t = ast_uint_type;
+        vecPush(converted, astCast(astTempAddr(copy, arg), u64_t));
+        vecPush(converted, astCast(parseReflectTypeAddr(cc, t), u64_t));
+    }
+    AoStr *arr_name = aoStrPrintf("#vany%d", va_any_id++);
+    AstType *arr_type = astMakeArrayType(ast_uint_type, (int)converted->size);
+    Ast *array;
+    if (cc->tmp_fname) {
+        array = astLVar(arr_type, arr_name->data, arr_name->len);
+        if (cc->tmp_locals) listAppend(cc->tmp_locals, array);
+    } else {
+        array = astGVar(arr_type, arr_name->data, arr_name->len, 1);
+        listAppend(cc->ast_list, astDecl(array, NULL));
+    }
+    return astVaPack(array, converted, 1);
+}
+
 static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
                              AstType *elem, Vec *items, Vec *item_spans,
                              Ast *spread, int spread_idx,
-                             int first_arg, char *fname, int len)
+                             int first_arg, char *fname, int len, int any)
 {
     static int va_array_id = 0;
     int untyped = elem->has_var_args;
@@ -1645,6 +1715,9 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
     } else if (items->size == 0) {
         count = astI64Type(0);
         data = astCast(astI64Type(0), data_type);
+    } else if (any) {
+        data = parseVarArgsAny(cc, items, item_spans, first_arg, fname, len);
+        count = astI64Type((s64)items->size);
     } else {
         Vec *converted = astVecNew();
         for (u64 i = 0; i < items->size; ++i) {
@@ -1867,7 +1940,7 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
     /* A `T ...name` callee: its last two parameters are the count and the
      * data pointer, every argument from the count's position on is an
      * extra (parseVarArgsPack) */
-    int va_at = -1;
+    int va_at = -1, va_any = 0;
     AstType *va_elem = NULL;
     Vec *va_items = NULL, *va_spans = NULL;
     Ast *va_spread = NULL;
@@ -1877,6 +1950,7 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
         if (last && last->kind == AST_LVAR && (last->flags & AST_FLAG_VARARGS)) {
             va_at = (int)params->size - 2;
             va_elem = last->type->ptr;
+            va_any = (last->flags & AST_FLAG_VARARGS_ANY) != 0;
             va_items = astVecNew();
             va_spans = vecNew(&vec_unsigned_long_type);
         }
@@ -2081,7 +2155,7 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
             }
         }
         parseVarArgsPack(cc, argv_vec, spans, va_elem, va_items, va_spans,
-                         va_spread, va_spread_idx, va_at, fname, len);
+                         va_spread, va_spread_idx, va_at, fname, len, va_any);
         /* With no argument at all the `)` is still there */
         if (!saw_args) {
             cctrlTokenGet(cc);
@@ -2787,7 +2861,8 @@ static void parseOverloadPackVarArgs(Cctrl *cc, Ast *decl, Vec *argv, Vec *spans
         if (spans) vecPush(spans, NULL);
     }
     parseVarArgsPack(cc, argv, spans, last->type->ptr, items, item_spans,
-                     NULL, -1, va_at, fname, len);
+                     NULL, -1, va_at, fname, len,
+                     (last->flags & AST_FLAG_VARARGS_ANY) != 0);
 }
 
 /* `&f` of an overloaded f going where a `want` is expected: the overload
