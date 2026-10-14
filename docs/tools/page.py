@@ -80,6 +80,7 @@ NAV = [
         ("lib-coroutines.html", "Coroutines"),
         ("lib-event-loop.html", "The coroutine loop"),
         ("lib-serve.html", "Serving on every core"),
+        ("lib-http.html", "HTTP servers"),
         ("lib-threads.html", "Threads and atomics"),
         ("lib-fzf.html", "Fuzzy matching"),
         ("lib-sqlite.html", "SQLite"),

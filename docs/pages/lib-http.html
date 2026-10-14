@@ -1,0 +1,122 @@
+<!-- title: HTTP servers -->
+<!-- ref: net.http -->
+<h1>HTTP servers</h1>
+<p class="lede"><code>net.http</code> serves REST APIs the way Go's <code>net/http</code> does: a <code>Mux</code> sends each request to a
+handler by method and path, and a handler writes the reply. It runs on <a href="lib-serve.html"><code>coro.serve</code></a>, a
+coroutine per connection on every core.</p>
+
+<h2>A first API</h2>
+<pre><code>
+import json, net.http, reflect;
+
+@json struct User { i64 id; String name; };
+
+void getUser(http.Writer *w, http.Request *r)
+{
+  User u = {7, str.from(r.param("id"))};
+  defer u.name.free();
+  w.json(200, reflect.of(u));
+}
+
+void createUser(http.Writer *w, http.Request *r)
+{
+  User u = http.decode<User>(r);    // bad JSON: the server answers 400 itself
+  u.id = 42;
+  w.json(201, reflect.of(u));        // u is freed when the handler returns
+}
+
+i32 main()
+{
+  http.Mux mux;
+  mux.handle("GET /users/{id}", &getUser);
+  mux.handle("POST /users", &createUser);
+  return http.listen(8080, &mux);    // Ctrl-C: finishes the requests in progress, returns 0
+}
+</code></pre>
+<pre><code>$ curl -d '{"name":"Ada"}' localhost:8080/users
+{"id":42,"name":"Ada"}
+$ curl -d '{"name":' localhost:8080/users
+{"error":"1:9: name: expected a string, got the end of the input"}</code></pre>
+
+<h2>Handlers</h2>
+<p>A handler is <code>void name(http.Writer *w, http.Request *r)</code> (the type <code>http.Handler</code>). What the request hands
+it is valid until it returns, and the module frees it then: the path, headers, query values, path parameters, the body
+and what <code>http.decode</code> made. Copy what must live longer (<code>str.from</code>). Only what the handler allocates
+itself is its own to free.</p>
+<ul class="rules">
+  <li>A handler that throws gets a <code>500</code> reply with <code>{"error":"internal server error"}</code>, and the error goes
+  to the log with its file and line. The server carries on.</li>
+  <li>A <code>json.ERR_DECODE</code> (bad JSON in <code>http.decode</code>) gets a <code>400</code> with the decode message.</li>
+  <li>Handlers run on several threads at once: what they share needs the <code>atomic</code> module or a lock.</li>
+</ul>
+
+<h2>The request</h2>
+<table>
+  <tr><th>Field or method</th><th>What it is</th></tr>
+  <tr><td><code>r.method</code>, <code>r.path</code></td><td><code>"GET"</code>, <code>"/users/7"</code> (the path before the <code>?</code>, as sent)</td></tr>
+  <tr><td><code>r.rawQuery</code>, <code>r.body</code></td><td>after the <code>?</code>, not unescaped; the whole body (a chunked one already joined)</td></tr>
+  <tr><td><code>r.param("id")</code></td><td>a path parameter of the pattern, unescaped; <code>""</code> if none</td></tr>
+  <tr><td><code>r.query("page")</code>, <code>r.hasQuery("x")</code></td><td>the first value of a query parameter, unescaped (<code>+</code> is a space)</td></tr>
+  <tr><td><code>r.header("Authorization")</code>, <code>r.hasHeader(name)</code></td><td>a header by name, any case</td></tr>
+  <tr><td><code>http.decode&lt;T&gt;(r)</code></td><td>the body as JSON in a <code>T</code>, freed after the reply</td></tr>
+  <tr><td><code>r.app</code></td><td>what <code>http.listen</code> was given as <code>app</code>: the program's own state</td></tr>
+  <tr><td><code>r.alloc(n)</code>, <code>r.unescape(s)</code></td><td>memory that lives until the reply; <code>%XX</code> decoding</td></tr>
+</table>
+
+<h2>The reply</h2>
+<p>The reply is sent in one piece when the handler returns, with <code>Date</code> and <code>Content-Length</code>. A handler
+that writes nothing sends <code>200</code> with an empty body.</p>
+<table>
+  <tr><th>Method</th><th>What it does</th></tr>
+  <tr><td><code>w.json(code, reflect.of(x))</code></td><td>x as JSON, <code>Content-Type: application/json</code></td></tr>
+  <tr><td><code>w.text(code, "fmt %s", ...)</code></td><td>formatted text, <code>text/plain; charset=utf-8</code></td></tr>
+  <tr><td><code>w.error(code, "msg")</code></td><td><code>{"error":"msg"}</code>, replacing a body already started</td></tr>
+  <tr><td><code>w.status(code)</code>, <code>w.write(bytes)</code></td><td>the status (200 by default) and raw body bytes</td></tr>
+  <tr><td><code>w.header(name, value)</code></td><td>adds a header; a <code>Content-Type</code> replaces the default one</td></tr>
+  <tr><td><code>w.jsonText(code, text)</code>, <code>w.redirect(url, 302)</code></td><td>JSON that is text already; a redirect</td></tr>
+</table>
+
+<h2>Running the server</h2>
+<p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the
+requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno()</code> set when the port can't be used.
+<code>app</code> and <code>opts</code> are optional. Every <code>http.Options</code> field left 0 means its default:</p>
+<table>
+  <tr><th>Field</th><th>Default</th></tr>
+  <tr><td><code>threads</code></td><td>a coroutine loop per CPU</td></tr>
+  <tr><td><code>bindaddr</code></td><td>every IPv4 address (<code>"::*"</code> for IPv6, or a numeric address)</td></tr>
+  <tr><td><code>maxHeaderBytes</code></td><td>64 KiB for the request line and headers, else <code>431</code></td></tr>
+  <tr><td><code>maxBodyBytes</code></td><td>10 MiB, else <code>413</code></td></tr>
+  <tr><td><code>readTimeoutMs</code>, <code>idleTimeoutMs</code></td><td>30 s for a request that started, 120 s idle between requests</td></tr>
+  <tr><td><code>noSignals</code></td><td>false: SIGINT and SIGTERM stop the server</td></tr>
+</table>
+<p>HTTP/1.1 with keep-alive and pipelining, chunked request bodies, <code>Expect: 100-continue</code>, and HTTP/1.0. A
+request with both <code>Content-Length</code> and chunked encoding is refused (<code>400</code>). There is no TLS: put the server
+behind a proxy such as nginx or Caddy for HTTPS.</p>
+
+<h2>Testing handlers</h2>
+<p><code>http.testRequest</code> and <code>http.recorder()</code> run a handler or a whole mux without a socket.</p>
+<pre data-run><code>
+import net.http;
+
+void hello(http.Writer *w, http.Request *r)
+{
+  w.text(200, "hello %s", r.query("name"));
+}
+
+void main()
+{
+  http.Mux mux;
+  defer mux.free();
+  mux.handle("GET /hello", &hello);
+
+  http.Request r = http.testRequest("GET", "/hello?name=Ada%20L");
+  defer r.free();
+  http.Writer w = http.recorder();
+  defer w.free();
+  mux.serve(&w, &r);
+  printf("%d %s: %s\n", w.code, w.getHeader("Content-Type"), w.body);
+}
+</code></pre>
+<pre class="output">
+200 text/plain; charset=utf-8: hello Ada L
+</pre>

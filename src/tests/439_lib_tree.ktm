@@ -1,7 +1,7 @@
 import cstr, fs, mem, proc, test;
 
 /* `ktm -lib name dir`, dir not module name's directory: every module
- * under dir (net/http is net.http) goes into one library, dir/libname.a
+ * under dir (web/route is web.route) goes into one library, dir/libname.a
  * and its shared object, and each module's directory gets a .ktmlib
  * marker naming them relative to it, so the tree can move. The top's
  * own files and a top-level prelude/ are not built. The object file is
@@ -41,7 +41,7 @@ i32 main() {
     tests++;
     if (output(KTM "-lib tree " TREE " > " OUT " 2>&1", "")) { correct++; }
     tests++;
-    if (output("cat " TREE "/geo/.ktmlib " TREE "/net/http/.ktmlib | grep static > " OUT,
+    if (output("cat " TREE "/geo/.ktmlib " TREE "/web/route/.ktmlib | grep static > " OUT,
                          "static ../libtree.a\nstatic ../../libtree.a\n")) {
         correct++;
                          }
@@ -74,7 +74,7 @@ i32 main() {
     if (output(KTM "-jit " MOVED "/main.ktm > " OUT " 2>&1", gWant)) { correct++; }
 
     /* -v prints the commands; one module's library, relative too */
-    proc.shell("rm -f " MOVED "/geo/.ktmlib " MOVED "/net/http/.ktmlib " MOVED "/libtree.*");
+    proc.shell("rm -f " MOVED "/geo/.ktmlib " MOVED "/web/route/.ktmlib " MOVED "/libtree.*");
     tests++;
     if (output(KTM "-v -lib geo " MOVED "/geo 2>&1 | grep -c 'ar rcs' > " OUT, "1\n")) { correct++; }
     tests++;

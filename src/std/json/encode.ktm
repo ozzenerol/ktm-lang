@@ -161,3 +161,35 @@ pub String encode(reflect.Value v, i64 indent = 0)
     encodeInto(&w, v, &path);
     return w.take();
 }
+
+/* v (reflect.of(x)) as JSON added to the end of *out: encode without a
+ * new String each time. On a throw *out may hold part of the text. */
+pub void encodeTo(String *out, reflect.Value v, i64 indent = 0)
+{
+    if (!v.type || !v.ptr) {
+        throw(ERR_ENCODE, "encode: the value has no type (use reflect.of(x))");
+    }
+    Writer w = writerNew(indent);
+    w.out = *out;
+    String path;
+    try {
+        encodeInto(&w, v, &path);
+    } catch (Error e) {
+        *out = w.out;
+        path.free();
+        throw(e);
+    }
+    *out = w.out;
+    path.free();
+}
+
+/* s as a quoted JSON string ("a\"b") added to the end of *out. Throws
+ * ERR_WRITER when s isn't UTF-8. */
+pub void quoteTo(String *out, u8[] s)
+{
+    if (!str.validUtf8(s)) { throw(ERR_WRITER, "quoteTo: the string isn't UTF-8"); }
+    Writer w;
+    w.out = *out;
+    writerQuote(&w, s);
+    *out = w.out;
+}
