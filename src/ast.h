@@ -163,6 +163,7 @@ typedef struct AstType AstType;
 typedef struct AstAttr {
     AoStr *name;
     AoStr *arg;
+    double num;     /* @min(n) and @max(n)'s n */
     int line;
     int col;
 } AstAttr;
