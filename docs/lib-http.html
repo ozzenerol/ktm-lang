@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTP servers - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 10 250 100" aria-hidden="true"><g class="logo-acc"><path d="M10 52L34 72L10 92"/></g><g class="logo-txt" transform="translate(48 0)"><path d="M10 20V100M10 74L44 50M24 64L46 100"/><path d="M66 28V86Q66 100 80 100M56 50H82"/><path d="M96 100V50M96 64Q96 50 111 50Q125 50 125 64V100M125 64Q125 50 140 50Q154 50 154 64V100"/></g><rect class="logo-cur" x="212" y="94" width="34" height="12" rx="3"/></svg></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li class="current"><a href="lib-http.html" aria-current="page">HTTP servers</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#net.http"><code>net.http</code></a></span></div>
+<h1>HTTP servers</h1>
+<p class="lede"><code>net.http</code> serves REST APIs the way Go's <code>net/http</code> does: a <code>Mux</code> sends each request to a
+handler by method and path, and a handler writes the reply. It runs on <a href="lib-serve.html"><code>coro.serve</code></a>, a
+coroutine per connection on every core.</p>
+
+<h2 id="a-first-api">A first API<a class="anchor" href="#a-first-api" aria-label="Link to this section">#</a></h2>
+<pre><code>import json, net.http, reflect, str;
+
+@json struct User { i64 id; String name; };
+
+void getUser(http.Writer *w, http.Request *r)
+{
+  User u = {7, str.from(r.param("id"))};
+  defer u.name.free();
+  w.json(200, reflect.of(u));
+}
+
+void createUser(http.Writer *w, http.Request *r)
+{
+  User u = http.decode&lt;User&gt;(r);    // bad JSON: the server answers 400 itself
+  u.id = 42;
+  w.json(201, reflect.of(u));        // u is freed when the handler returns
+}
+
+i32 main()
+{
+  http.Mux mux;
+  mux.handle("GET /users/{id}", &amp;getUser);
+  mux.handle("POST /users", &amp;createUser);
+  return http.listen(8080, &amp;mux);    // Ctrl-C: finishes the requests in progress, returns 0
+}
+</code></pre>
+<pre><code>$ curl -d '{"name":"Ada"}' localhost:8080/users
+{"id":42,"name":"Ada"}
+$ curl -d '{"name":' localhost:8080/users
+{"error":"1:9: name: expected a string, got the end of the input"}</code></pre>
+
+<h2 id="routing">Routing<a class="anchor" href="#routing" aria-label="Link to this section">#</a></h2>
+<p>An <code>http.Mux</code> sends each request to the handler of the pattern that matches it, the way
+Go 1.22's <code>ServeMux</code> does. Declare one (<code>http.Mux mux;</code>: no setup call) and add
+routes with <code>mux.handle(pattern, &amp;handler)</code>. A pattern is <code>[METHOD ]/path</code>:</p>
+<div class="table-wrap"><table>
+<tr><th>Pattern</th><th>Matches</th></tr>
+<tr><td><code>/health</code></td><td><code>/health</code>, any method</td></tr>
+<tr><td><code>GET /users/{id}</code></td><td><code>/users/7</code> by GET or HEAD; <code>r.param("id")</code> is <code>"7"</code></td></tr>
+<tr><td><code>/files/{path...}</code></td><td><code>/files/a/b.txt</code>: <code>path</code> is the rest, <code>"a/b.txt"</code> (it may be empty)</td></tr>
+<tr><td><code>/static/</code></td><td>a trailing slash: <code>/static/</code> and everything under it</td></tr>
+<tr><td><code>/{$}</code></td><td>only <code>/</code> (<code>/</code> alone matches every path)</td></tr>
+</table></div>
+<pre data-run><code>import net.http;
+
+void user(http.Writer *w, http.Request *r)  { w.text(200, "user %s", r.param("id")); }
+void me(http.Writer *w, http.Request *r)    { w.text(200, "it's you"); }
+void file(http.Writer *w, http.Request *r)  { w.text(200, "file %s", r.param("path")); }
+void create(http.Writer *w, http.Request *r) { w.text(201, "created"); }
+void home(http.Writer *w, http.Request *r)  { w.text(200, "home"); }
+
+void show(http.Mux *mux, u8[] method, u8[] target)
+{
+  http.Request r = http.testRequest(method, target);
+  http.Writer w = http.recorder();
+  mux.serve(&amp;w, &amp;r);
+  printf("%-6s %-18s %d %s%s\n", method, target, w.code, w.body, w.getHeader("Location"));
+  w.free();
+  r.free();
+}
+
+void main()
+{
+  http.Mux mux;
+  mux.handle("GET /users/{id}", &amp;user);
+  mux.handle("GET /users/me", &amp;me);       // more specific: wins for /users/me
+  mux.handle("POST /users", &amp;create);
+  mux.handle("/files/{path...}", &amp;file);
+  mux.handle("/{$}", &amp;home);
+
+  show(&amp;mux, "GET", "/users/42");
+  show(&amp;mux, "GET", "/users/me");
+  show(&amp;mux, "GET", "/files/a%20b/c.txt");
+  show(&amp;mux, "GET", "/");
+  show(&amp;mux, "GET", "/files");
+  show(&amp;mux, "DELETE", "/users/42");
+  show(&amp;mux, "GET", "/nope");
+  mux.free();
+}
+</code></pre>
+<pre class="output">GET    /users/42          200 user 42
+GET    /users/me          200 it's you
+GET    /files/a%20b/c.txt 200 file a b/c.txt
+GET    /                  200 home
+GET    /files             301 /files/
+DELETE /users/42          405 {"error":"method not allowed"}
+GET    /nope              404 {"error":"not found"}
+</pre>
+
+<h3 id="which-pattern-wins">Which pattern wins<a class="anchor" href="#which-pattern-wins" aria-label="Link to this section">#</a></h3>
+<p>When several patterns match, the <em>most specific</em> one wins, whatever order they were added in:
+one pattern is more specific than another when it matches a strict subset of its requests. So a literal
+segment beats <code>{name}</code>, <code>{name}</code> beats <code>{name...}</code>, a longer subtree beats
+a shorter one, and <code>GET /x</code> beats <code>/x</code>.</p>
+<p>Two patterns that both match some request where neither is more specific are refused at
+<code>handle()</code>, and so is the same pattern twice: it throws <code>http.ERR_PATTERN</code> with both patterns
+in the message. For example <code>/users/{id}</code> and <code>/{kind}/new</code> both match <code>/users/new</code>,
+and <code>GET /</code> and <code>/health</code> both match <code>GET /health</code> (the first takes fewer methods, the
+second fewer paths). A pattern that isn't one (no leading <code>/</code>, a host, <code>{</code> inside a
+segment, <code>{name...}</code> or <code>{$}</code> not at the end, a name used twice) throws the same.</p>
+<pre data-run><code>import net.http;
+
+void h(http.Writer *w, http.Request *r) { }
+
+void main()
+{
+  http.Mux mux;
+  mux.handle("/users/{id}", &amp;h);
+  try {
+    mux.handle("/{kind}/new", &amp;h);
+  } catch (Error e) {
+    printf("%d: %s\n", e.code == http.ERR_PATTERN, e.message);
+  }
+  mux.free();
+}
+</code></pre>
+<pre class="output">1: http.Mux.handle: pattern "/{kind}/new" conflicts with pattern "/users/{id}": some requests match both and neither is more specific
+</pre>
+
+<h3 id="the-details">The details<a class="anchor" href="#the-details" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><b>Methods</b>: a pattern without one takes every method; <code>GET</code> takes <code>HEAD</code> too (the server
+sends no body for HEAD). <code>HEAD /x</code> is more specific than <code>GET /x</code>.</li>
+<li><b>No route</b>: 404 <code>{"error":"not found"}</code>. A path that a route for other methods matches gets
+405 <code>{"error":"method not allowed"}</code> with an <code>Allow</code> header listing them
+(<code>DELETE, GET, HEAD</code>).</li>
+<li><b>Escapes</b>: the path is split at its <code>/</code>s first, then each segment is unescaped, so
+<code>/a%2Fb</code> is one segment, <code>a/b</code>. Literal segments of a pattern are unescaped too, and
+<code>r.param</code> gives values unescaped (a segment with a bad <code>%</code> escape is used as it is).</li>
+<li><b>Redirects</b> (301, the query kept): <code>/dir</code> goes to <code>/dir/</code> when it doesn't match a route
+itself but <code>/dir/</code> matches a subtree <code>/dir/</code> (or <code>/dir/{rest...}</code>); a path with
+<code>//</code>, <code>/./</code> or <code>/../</code> goes to its clean form (<code>/a/../b</code> to <code>/b</code>).</li>
+<li><b>Speed</b>: patterns are parsed once, at <code>handle()</code>. Matching allocates nothing (a parameter
+that needs unescaping is copied into the request's arena) and rejects most routes by their segment count and first byte.</li>
+<li><code>mux.free()</code> frees the routes and leaves the Mux empty; <code>http.listen</code> calls it when it returns.</li>
+</ul>
+
+<h2 id="middleware">Middleware and groups<a class="anchor" href="#middleware" aria-label="Link to this section">#</a></h2>
+<p>A middleware is a <code>bool fn(http.Writer *w, http.Request *r)</code> that runs before the handler: return
+<code>true</code> to go on, or write a reply and return <code>false</code> to stop there.
+<code>mux.use(&amp;fn)</code> adds one; they run in the order they were added, for every request the mux serves,
+404s and 405s included.</p>
+<p><code>mux.group(prefix)</code> gives a <code>http.Mux *</code> whose patterns get the prefix in front
+(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A group's own
+<code>use()</code> runs only for its routes, after the middlewares of the mux (and of the groups) it was made from.
+Groups can have groups. A group belongs to its mux: <code>mux.free()</code> frees it, and so does <code>http.listen</code>.</p>
+<pre data-run><code>import net.http, str;
+
+bool logged(http.Writer *w, http.Request *r)
+{
+  printf("  -&gt; %s %s\n", r.method, r.path);
+  return true;
+}
+
+bool auth(http.Writer *w, http.Request *r)
+{
+  if (str.equals(r.header("Authorization"), "Bearer secret")) { return true; }
+  w.error(401, "unauthorized");
+  return false;                     // the handler doesn't run
+}
+
+void health(http.Writer *w, http.Request *r) { w.text(200, "ok"); }
+void user(http.Writer *w, http.Request *r)   { w.text(200, "user %s", r.param("id")); }
+
+void show(http.Mux *mux, u8[] target, u8[] token)
+{
+  http.Request r = http.testRequest("GET", target);
+  if (token.len) { r.addHeader("Authorization", token); }
+  http.Writer w = http.recorder();
+  mux.serve(&amp;w, &amp;r);
+  printf("%s: %d %s\n", target, w.code, w.body);
+  w.free();
+  r.free();
+}
+
+void main()
+{
+  http.Mux mux;
+  mux.use(&amp;logged);                 // every request
+  mux.handle("GET /health", &amp;health);
+
+  http.Mux *api = mux.group("/api");
+  api.use(&amp;auth);                   // only /api routes
+  api.handle("GET /users/{id}", &amp;user);
+
+  show(&amp;mux, "/health", "");
+  show(&amp;mux, "/api/users/7", "");
+  show(&amp;mux, "/api/users/7", "Bearer secret");
+  mux.free();
+}
+</code></pre>
+<pre class="output">  -&gt; GET /health
+/health: 200 ok
+  -&gt; GET /api/users/7
+/api/users/7: 401 {"error":"unauthorized"}
+  -&gt; GET /api/users/7
+/api/users/7: 200 user 7
+</pre>
+
+<h3 id="files">Static files<a class="anchor" href="#files" aria-label="Link to this section">#</a></h3>
+<p><code>mux.files(prefix, dir)</code> serves the files under <code>dir</code> at <code>prefix</code>, which must end in
+<code>/</code>: it adds the route <code>GET prefix{path...}</code> (on a group, under the group's prefix).</p>
+<pre><code>http.Mux mux;
+mux.files("/static/", "./public");   // GET /static/css/site.css -&gt; ./public/css/site.css
+mux.handle("GET /api/items", &amp;items);
+return http.listen(8080, &amp;mux);
+</code></pre>
+<ul>
+<li>A directory serves its <code>index.html</code> (no listings: without one it is a 404); <code>/static/docs</code> redirects to
+<code>/static/docs/</code>.</li>
+<li>The <code>Content-Type</code> comes from the extension (<code>http.contentType(name)</code>: html, css, js, json, svg,
+png, jpeg, woff2, wasm, pdf and more; anything else is <code>application/octet-stream</code>).</li>
+<li><code>Last-Modified</code> is the file's time; a request with <code>If-Modified-Since</code> at or after it gets
+<code>304</code> and no body.</li>
+<li>Nothing outside <code>dir</code>: the mux already sends <code>/../</code> to the clean path, and an escaped
+<code>..</code> (<code>%2e%2e</code>) or a NUL gets <code>400</code>. Symlinks inside <code>dir</code> are followed.</li>
+<li>A missing file is <code>404</code>, one that can't be read <code>403</code>. The file is read whole for each request:
+it is meant for a site's assets, not for large downloads.</li>
+</ul>
+
+<h2 id="handlers">Handlers<a class="anchor" href="#handlers" aria-label="Link to this section">#</a></h2>
+<p>A handler is <code>void name(http.Writer *w, http.Request *r)</code> (the type <code>http.Handler</code>). What the request hands
+it is valid until it returns, and the module frees it then: the path, headers, query values, path parameters, the body
+and what <code>http.decode</code> made. Copy what must live longer (<code>str.from</code>). Only what the handler allocates
+itself is its own to free.</p>
+<ul class="rules">
+  <li>A handler that throws gets a <code>500</code> reply with <code>{"error":"internal server error"}</code>, and the error goes
+  to the log with its file and line. The server carries on.</li>
+  <li>A <code>json.ERR_DECODE</code> (bad JSON in <code>http.decode</code>) gets a <code>400</code> with the decode message.</li>
+  <li>Handlers run on several threads at once: what they share needs the <code>atomic</code> module or a lock.</li>
+</ul>
+
+<h2 id="the-request">The request<a class="anchor" href="#the-request" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Field or method</th><th>What it is</th></tr>
+  <tr><td><code>r.method</code>, <code>r.path</code></td><td><code>"GET"</code>, <code>"/users/7"</code> (the path before the <code>?</code>, as sent)</td></tr>
+  <tr><td><code>r.rawQuery</code>, <code>r.body</code></td><td>after the <code>?</code>, not unescaped; the whole body (a chunked one already joined)</td></tr>
+  <tr><td><code>r.param("id")</code></td><td>a path parameter of the pattern, unescaped; <code>""</code> if none</td></tr>
+  <tr><td><code>r.query("page")</code>, <code>r.hasQuery("x")</code></td><td>the first value of a query parameter, unescaped (<code>+</code> is a space)</td></tr>
+  <tr><td><code>r.header("Authorization")</code>, <code>r.hasHeader(name)</code></td><td>a header by name, any case</td></tr>
+  <tr><td><code>http.decode&lt;T&gt;(r)</code></td><td>the body as JSON in a <code>T</code>, freed after the reply</td></tr>
+  <tr><td><code>r.app</code></td><td>what <code>http.listen</code> was given as <code>app</code>: the program's own state</td></tr>
+  <tr><td><code>r.alloc(n)</code>, <code>r.unescape(s)</code></td><td>memory that lives until the reply; <code>%XX</code> decoding</td></tr>
+</table></div>
+
+<h2 id="the-reply">The reply<a class="anchor" href="#the-reply" aria-label="Link to this section">#</a></h2>
+<p>The reply is sent in one piece when the handler returns, with <code>Date</code> and <code>Content-Length</code>. A handler
+that writes nothing sends <code>200</code> with an empty body.</p>
+<div class="table-wrap"><table>
+  <tr><th>Method</th><th>What it does</th></tr>
+  <tr><td><code>w.json(code, reflect.of(x))</code></td><td>x as JSON, <code>Content-Type: application/json</code></td></tr>
+  <tr><td><code>w.text(code, "fmt %s", ...)</code></td><td>formatted text, <code>text/plain; charset=utf-8</code></td></tr>
+  <tr><td><code>w.error(code, "msg")</code></td><td><code>{"error":"msg"}</code>, replacing a body already started</td></tr>
+  <tr><td><code>w.status(code)</code>, <code>w.write(bytes)</code></td><td>the status (200 by default) and raw body bytes</td></tr>
+  <tr><td><code>w.header(name, value)</code></td><td>adds a header; a <code>Content-Type</code> replaces the default one</td></tr>
+  <tr><td><code>w.jsonText(code, text)</code>, <code>w.redirect(url, 302)</code></td><td>JSON that is text already; a redirect</td></tr>
+</table></div>
+
+<h2 id="running-the-server">Running the server<a class="anchor" href="#running-the-server" aria-label="Link to this section">#</a></h2>
+<p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the
+requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno()</code> set when the port can't be used.
+<code>app</code> and <code>opts</code> are optional. Every <code>http.Options</code> field left 0 means its default:</p>
+<div class="table-wrap"><table>
+  <tr><th>Field</th><th>Default</th></tr>
+  <tr><td><code>threads</code></td><td>a coroutine loop per CPU</td></tr>
+  <tr><td><code>bindaddr</code></td><td>every IPv4 address (<code>"::*"</code> for IPv6, or a numeric address)</td></tr>
+  <tr><td><code>maxHeaderBytes</code></td><td>64 KiB for the request line and headers, else <code>431</code></td></tr>
+  <tr><td><code>maxBodyBytes</code></td><td>10 MiB, else <code>413</code></td></tr>
+  <tr><td><code>readTimeoutMs</code>, <code>idleTimeoutMs</code></td><td>30 s for a request that started, 120 s idle between requests</td></tr>
+  <tr><td><code>noSignals</code></td><td>false: SIGINT and SIGTERM stop the server</td></tr>
+  <tr><td><code>accessLog</code></td><td>false; true: a <a href="lib-logging.html"><code>log.info</code></a> line per request,
+  <code>GET /users/7?full=1 200 41 0.120ms</code> (method, target, status, body bytes, time)</td></tr>
+</table></div>
+<p>HTTP/1.1 with keep-alive and pipelining, chunked request bodies, <code>Expect: 100-continue</code>, and HTTP/1.0. A
+request with both <code>Content-Length</code> and chunked encoding is refused (<code>400</code>). There is no TLS: put the server
+behind a proxy such as nginx or Caddy for HTTPS.</p>
+
+<h2 id="testing-handlers">Testing handlers<a class="anchor" href="#testing-handlers" aria-label="Link to this section">#</a></h2>
+<p><code>http.testRequest</code> and <code>http.recorder()</code> run a handler or a whole mux without a socket.</p>
+<pre data-run><code>import net.http;
+
+void hello(http.Writer *w, http.Request *r)
+{
+  w.text(200, "hello %s", r.query("name"));
+}
+
+void main()
+{
+  http.Mux mux;
+  defer mux.free();
+  mux.handle("GET /hello", &amp;hello);
+
+  http.Request r = http.testRequest("GET", "/hello?name=Ada%20L");
+  defer r.free();
+  http.Writer w = http.recorder();
+  defer w.free();
+  mux.serve(&amp;w, &amp;r);
+  printf("%d %s: %s\n", w.code, w.getHeader("Content-Type"), w.body);
+}
+</code></pre>
+<pre class="output">200 text/plain; charset=utf-8: hello Ada L
+</pre>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-serve.html"><span>Previous</span>Serving on every core</a><a class="next" href="lib-threads.html"><span>Next</span>Threads and atomics</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-http.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-api">A first API</a></li><li><a href="#routing">Routing</a></li><li><a href="#middleware">Middleware and groups</a></li><li><a href="#handlers">Handlers</a></li><li><a href="#the-request">The request</a></li><li><a href="#the-reply">The reply</a></li><li><a href="#running-the-server">Running the server</a></li><li><a href="#testing-handlers">Testing handlers</a></li></ul></nav>
+</div>
+</body>
+</html>

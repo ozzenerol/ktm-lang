@@ -80,7 +80,17 @@ static void writerQuote(Writer *w, u8[] s)
     w.out.reserve(s.len + 2);
     w.out.appendByte('"');
     i64 from = 0;   /* bytes from here to i need no escape: copied at once */
+    u64 ones = 0x0101010101010101, high = 0x8080808080808080;
+    u64 quotes = ones * '"', slashes = ones * '\\', ctl = ones * 0x20;
     for (i64 i = 0; i < s.len; i++) {
+        /* 8 bytes with nothing to escape (no control byte, '"' or '\\') at once */
+        while (s.len >= 8 && i + 8 <= s.len) {
+            u64 x = *(u64 *)(s.ptr + i);
+            u64 q = x ^ quotes, b = x ^ slashes;
+            if ((((x - ctl) & ~x) | ((q - ones) & ~q) | ((b - ones) & ~b)) & high) { break; }
+            i += 8;
+        }
+        if (i >= s.len) { break; }
         u8 ch = s.ptr[i];
         if (ch >= 0x20 && ch != '"' && ch != '\\') { continue; }
         w.out.append(s[from:i]);
@@ -179,7 +189,15 @@ pub void Writer.rawKey(u8[] k)
 pub void Writer.int(i64 v)
 {
     writerValue(self, "int()");
-    self.out.appendFormat("%d", v);
+    u8 digits[24];
+    i64 at = 24;
+    u64 u = v < 0 ? -(u64)v : (u64)v;   /* as a u64: right for I64_MIN too */
+    do {
+        digits[--at] = '0' + u % 10;
+        u /= 10;
+    } while (u);
+    if (v < 0) { digits[--at] = '-'; }
+    self.out.append(digits[at:24]);
     writerValueDone(self);
 }
 

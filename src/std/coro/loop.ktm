@@ -100,6 +100,7 @@ const i64 LOOP_WHY_CLOSE = 3;
 /* io_uring through raw system calls (the same numbers on x86_64 and
  * arm64) and its mmap'd rings: no liburing */
 extern "c" i64 syscall(i64 nr, i64 a, i64 b, i64 c, i64 d, i64 e, i64 f);
+extern "c" i32 accept4(i32 fd, void *addr, void *addrLen, i32 flags);
 const i64 LOOP_SYS_URING_SETUP = 425;
 const i64 LOOP_SYS_URING_ENTER = 426;
 const i64 LOOP_SYS_URING_REGISTER = 427;
@@ -130,6 +131,21 @@ const i64 LOOP_ECANCELED = 125;
 const i64 LOOP_ETIME = 62;
 const i64 LOOP_EBUSY = 16;
 const i64 LOOP_MSG_WAITALL = 0x100;
+const i64 LOOP_CQE_F_SOCK_NONEMPTY = 0x4;
+const i64 LOOP_TCP_INFO = 11;
+/* coro.accept with io_uring takes one client per ACCEPT, a turn of the loop
+ * each. A queue of clients that stays (a new connection per request) is
+ * fine that way: each ACCEPT completes at once, and taking them faster
+ * costs 20% of the requests per CPU-second (the empty queue's wake-ups).
+ * A burst is not (1024 clients connecting at once: the last one waited
+ * over a second, bench/http). So after this many ACCEPTs in a row that
+ * left clients queued (kernel 6.10+ says so), it asks the queue's length
+ * (TCP_INFO), and from this many it takes them with plain accepts until
+ * none is left. Measured on bench/http: new connection per request, 64
+ * clients: 47.6k requests per CPU-second, as before (taking every queue
+ * at once: 37.9k); keep-alive, 1024 clients: p99 5.8 ms (before: 43 ms) */
+const i64 LOOP_ACCEPT_RUN = 8;
+const i64 LOOP_ACCEPT_QUEUE = 64;
 const i64 LOOP_MSG_NOSIGNAL = 0x4000;
 const i64 LOOP_SOCK_NONBLOCK = 0x800;
 const i64 LOOP_SOCK_CLOEXEC = 0x80000;
@@ -169,6 +185,8 @@ struct LoopFd {
     bool big;            /* and was at least LOOP_READ_BIG */
     i64 burstNs;         /* when the reads that didn't wait began */
     bool notSock;        /* io_uring: not a socket, so READ/WRITE, not RECV/SEND */
+    bool more;           /* io_uring: a listener with a burst queued: plain accepts */
+    i64 queuedRun;       /* io_uring: ACCEPTs in a row that left clients queued */
 };
 
 struct LoopTask {
@@ -186,6 +204,7 @@ struct LoopTask {
     bool op;             /* io_uring: its operation is in flight */
     bool cancelled;      /* io_uring: and an ASYNC_CANCEL was sent for it */
     i64 why;             /* io_uring: LOOP_WHY_* of that cancel */
+    i64 cqeFlags;        /* io_uring: the flags of its operation's completion */
 };
 
 struct Loop {
@@ -523,6 +542,7 @@ static void loopForget(Loop *lp, i32 fd) {
         lp.fdw[fd].armed = 0;
         lp.fdw[fd].full = false;
         lp.fdw[fd].notSock = false;
+        lp.fdw[fd].more = false;
     }
 }
 
@@ -762,10 +782,12 @@ static void loopUringReap(Loop *lp) {
         u8 *c = lp.cqes + (i64)(head & lp.cqMask) * 16;
         u64 ud = *(u64 *)c;
         i32 res = *(i32 *)(c + 8);
+        u32 cflags = *(u32 *)(c + 12);
         head++;
         if (ud) {
             LoopTask *t = (LoopTask *)ud;
             t.op = false;
+            t.cqeFlags = cflags;
             loopReady(lp, t, res);
         }
     }
@@ -1062,6 +1084,26 @@ static void loopFdsOut(Loop *lp) {
     lp.fdsTightUntil = now + LOOP_TIGHT_MS;
 }
 
+#ifdef IS_LINUX
+/* io_uring: an ACCEPT on lfd completed, leaving clients queued or not;
+ * a long enough queue makes the next accepts plain ones
+ * (LOOP_ACCEPT_QUEUE) */
+static void loopAcceptQueued(Loop *lp, i32 lfd, bool queued) {
+    LoopFd *f = lp.fdw[lfd];
+    if (!queued) {
+        f.queuedRun = 0;
+        return;
+    }
+    if (++f.queuedRun < LOOP_ACCEPT_RUN) { return; }
+    f.queuedRun = 0;
+    u32 info[64];        /* struct tcp_info; tcpi_unacked: a listener's queue */
+    u32 len = sizeof(info);
+    if (libc.getsockopt(lfd, libc.IPPROTO_TCP, LOOP_TCP_INFO, info, &len) == 0 && len > 28) {
+        f.more = info[6] >= LOOP_ACCEPT_QUEUE;
+    }
+}
+#endif
+
 /* In a loop coroutine: the next client of listening socket lfd, as a
  * non-blocking fd (lfd is made non-blocking too); -1 when ms passed
  * (ms < 0: no limit), on coro.stop(), or when lfd can't accept (EBADF,
@@ -1094,20 +1136,38 @@ pub i32 accept(i32 lfd, i64 ms=-1) {
         lp.fdsOut = false;
 #ifdef IS_LINUX
         if (lp.backend == LOOP_BK_URING) {
-            /* ACCEPT: the client as a non-blocking, close-on-exec fd, as
-             * net.accept gives it; coro.stop cancels it */
-            r = loopOp(lp, t, LOOP_OP_ACCEPT, lfd, 0, 0, LOOP_SOCK_NONBLOCK | LOOP_SOCK_CLOEXEC, 0,
-                       until, true);
-            if (r >= 0) {
-                fd = (i32)r;
-                loopForget(lp, fd);
-                return fd;
+            LoopFd *lf = loopFdOf(lp, lfd);
+            if (lf.more) {
+                /* a burst: take it with plain accepts until none is left
+                 * (LOOP_ACCEPT_QUEUE) */
+                fd = accept4(lfd, null, null, (i32)(LOOP_SOCK_NONBLOCK | LOOP_SOCK_CLOEXEC));
+                if (fd >= 0) {
+                    loopForget(lp, fd);
+                    return fd;
+                }
+                lf.more = false;
+                err = os.errno();
+                if (err == libc.EAGAIN || err == libc.EWOULDBLOCK || err == libc.EINTR ||
+                    err == LOOP_ECONNABORTED) {
+                    continue;
+                }
+            } else {
+                /* ACCEPT: the client as a non-blocking, close-on-exec fd,
+                 * as net.accept gives it; coro.stop cancels it */
+                r = loopOp(lp, t, LOOP_OP_ACCEPT, lfd, 0, 0, LOOP_SOCK_NONBLOCK | LOOP_SOCK_CLOEXEC, 0,
+                           until, true);
+                if (r >= 0) {
+                    fd = (i32)r;
+                    loopAcceptQueued(lp, lfd, (t.cqeFlags & LOOP_CQE_F_SOCK_NONEMPTY) != 0);
+                    loopForget(lp, fd);
+                    return fd;
+                }
+                if (r == -LOOP_ECANCELED) {
+                    if (t.why == LOOP_WHY_CLOSE) { os.setErrno(libc.EBADF); }
+                    return -1;
+                }
+                err = (i32)(-r);
             }
-            if (r == -LOOP_ECANCELED) {
-                if (t.why == LOOP_WHY_CLOSE) { os.setErrno(libc.EBADF); }
-                return -1;
-            }
-            err = (i32)(-r);
             os.setErrno(err);
             if (err == libc.EMFILE || err == libc.ENFILE || err == LOOP_ENOBUFS || err == libc.ENOMEM) {
                 loopFdsOut(lp);

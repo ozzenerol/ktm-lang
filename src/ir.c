@@ -126,6 +126,11 @@ static void irCollapseClassRefChain(Ast **cls, int *offset) {
         *offset += (*cls)->type->offset;
         *cls = (*cls)->cls;
     }
+    /* a field of a parameter with a default value (`b.len` of
+     * `u8[] b = ""`): the parameter itself */
+    if (*cls && (*cls)->kind == AST_DEFAULT_PARAM && (*cls)->declvar) {
+        *cls = (*cls)->declvar;
+    }
 }
 
 void irBlockAddInstr(IrCtx *ctx, IrInstr *instr) {
