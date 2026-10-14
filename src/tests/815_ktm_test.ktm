@@ -149,11 +149,24 @@ i32 main() {
     put("proj/api/v1/v1.ktm",
         "module v1;\nimport \"example.com/lib/color\";\npub u8 *paint() { return color.red(); }\n");
     put("proj/api/v1/v1_test.ktm",
-        "module v1;\nimport testing;\nvoid testPaint(testing.T *t) { t.equal(paint(), \"red\"); }\n");
+        "module v1;\nimport fs, testing;\nvoid testPaint(testing.T *t) { t.equal(paint(), \"red\"); }\n"
+        "void testFiles(testing.T *t) {\n"
+        "    String a = fs.readAll(\"testdata/x.txt\");\n"
+        "    String b = fs.readAll(\"../../top.txt\");\n"
+        "    t.equal(a, \"in testdata\\n\");\n"
+        "    t.equal(b, \"at the root\\n\");\n"
+        "    a.free();\n"
+        "    b.free();\n"
+        "}\n");
+    /* each directory's tests run in it, wherever ktm test starts */
+    put("proj/api/v1/testdata/x.txt", "in testdata\n");
+    put("proj/top.txt", "at the root\n");
     sh("cd proj && $K mod init example.com/me/proj && "
        "printf 'require example.com/lib/color v1.0.0\\nreplace example.com/lib/color => ../color\\n' >> ktm.mod").free();
     has("cd proj && $K test $I ./...", "ok  \tapi/v1\t", "a ktm.mod project: its packages");
-    has("cd proj/api/v1 && $K test $I -jit", "ok  \t.\t", "from inside the project");
+    has("cd proj/api/v1 && $K test $I -jit", "(2 passed)\nrc=0", "from inside the project");
+    has("cd proj && $K test $I -v ./...", "--- PASS: testFiles", "testdata/ and ../ found from the root");
+    has("cd proj/api && $K test $I ./...", "ok  \tv1\t", "and from a directory above");
 
     sh("rm -rf $(pwd)").free();
     gDir.free();
