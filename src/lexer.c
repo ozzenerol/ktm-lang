@@ -761,6 +761,9 @@ static void lexFileEnded(Lexer *l, LexFile *file) {
     file->ended = 1;
     if (LEX_PASS_QUIET(file->mod_pass)) return;
     for (LexImport *imp = file->imports; imp; imp = imp->next) {
+        /* `import _ = m;`: imported for what it does when the program
+         * starts (net.https gives net.http's client https://) */
+        if (imp->prefix && imp->prefix->len == 1 && imp->prefix->data[0] == '_') continue;
         if (!imp->used) {
             lexWarningAt(l, imp->line, imp->col, imp->len,
                          imp->module->package ? "package \"%s\" is imported but not used"
