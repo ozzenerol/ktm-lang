@@ -312,6 +312,31 @@ w.deleteCookie("session");             // Max-Age=0
 </code></pre>
 <p><code>setCookie</code> throws <code>http.ERR_HTTP</code> for a name or value a browser would refuse, rather than
 send one it would drop.</p>
+<h2 id="background">Background work</h2>
+<p>A handler can start work that goes on after the reply (an email, a webhook, a cache refresh) with
+<code>coro.go</code>: the coroutine runs on the handler's loop, beside the requests, and the reply doesn't wait for
+it.</p>
+<pre><code>
+void *sendWelcome(void *arg)
+{
+  Welcome *m = arg;
+  ...                                    // slow: coro.sleep, the http client, ktm-pg all wait without blocking the loop
+  m.email.free();
+  mem.free(m);
+  return null;
+}
+
+void signup(http.Writer *w, http.Request *r)
+{
+  Welcome *m = mem.allocZero(sizeof(Welcome));
+  m.email = str.from(r.query("email"));  // a copy: the request's memory is gone after the reply
+  coro.go(&amp;sendWelcome, m);
+  w.text(202, "welcome!");
+}
+</code></pre>
+<p>Give the work memory of its own, never pointers into the request. <code>http.shutdown()</code> (and SIGTERM) waits
+for work in flight before <code>listen</code> returns. For CPU-heavy work (hashing, compressing) use
+<a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a> instead, so the loop stays free.</p>
 
 <h2>Running the server</h2>
 <p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the
