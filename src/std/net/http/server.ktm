@@ -378,6 +378,7 @@ static void dispatch(Conn *c, Request *r, Writer *w)
     w.head = r.method.len == 4 && libc.memcmp(r.method.ptr, "HEAD", 4) == 0;
     w.close = !r.keepAlive;
     r.app = c.srv.app;
+    r.nvalues = 0;              /* each request starts with none */
     i64 t0 = c.srv.accessLog ? date.monoNs() : 0;
     try {
         c.srv.mux.serve(w, r);

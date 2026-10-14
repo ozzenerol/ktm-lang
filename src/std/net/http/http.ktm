@@ -25,6 +25,15 @@ pub const i64 MAX_HEADERS = 64;
 /* Path parameters ({name}) a pattern may have */
 pub const i64 MAX_PARAMS = 16;
 
+/* Values a request carries from middleware to its handler (r.set) */
+pub const i64 MAX_VALUES = 8;
+
+struct RequestValue {
+    u8[] key;
+    void *ptr;
+    i64 n;
+};
+
 /* A request header or a path parameter: views into the request */
 pub struct Header {
     u8[] name;
@@ -122,6 +131,8 @@ pub struct Request {
     Header headers[MAX_HEADERS];
     i64 nparams;
     Header params[MAX_PARAMS];
+    i64 nvalues;
+    RequestValue values[MAX_VALUES];
     i64 contentLength; /* -1 when not given */
     bool chunked;
     bool expectContinue;
@@ -341,6 +352,63 @@ pub void Request.setRemoteAddr(u8[] ip, i32 port = 0)
     if (n) { mem.copy(self.peerIp, ip.ptr, n); }
     self.peerLen = n ? n : -1;
     self.peerPort = port;
+}
+
+static RequestValue *findValue(Request *r, u8[] key)
+{
+    for (i64 i = 0; i < r.nvalues; i++) {
+        if (r.values[i].key.len == key.len && libc.memcmp(r.values[i].key.ptr, key.ptr, key.len) == 0) {
+            return &r.values[i];
+        }
+    }
+    return null;
+}
+
+static RequestValue *slotFor(Request *r, u8[] key)
+{
+    RequestValue *v = findValue(r, key);
+    if (v) { return v; }
+    if (r.nvalues == MAX_VALUES) { throw(ERR_HTTP, "http: more than %d request values", MAX_VALUES); }
+    v = &r.values[r.nvalues++];
+    v.key = key;
+    v.ptr = null;
+    v.n = 0;
+    return v;
+}
+
+/* Keeps v under key for the rest of this request, so middleware can hand
+ * a handler what it found (the signed-in user, a request ID): a later set
+ * of the same key replaces it. The key must outlive the request (a
+ * literal); v too: r.alloc(n) gives memory that lives exactly as long. */
+pub void Request.set(u8[] key, void *v)
+{
+    slotFor(self, key).ptr = v;
+}
+
+/* What set kept under key, or null */
+pub void *Request.get(u8[] key)
+{
+    RequestValue *v = findValue(self, key);
+    return v ? v.ptr : null;
+}
+
+/* A number under key (an id, a count): no memory to manage */
+pub void Request.setInt(u8[] key, i64 n)
+{
+    slotFor(self, key).n = n;
+}
+
+/* The number setInt kept under key, or def */
+pub i64 Request.getInt(u8[] key, i64 def = 0)
+{
+    RequestValue *v = findValue(self, key);
+    return v ? v.n : def;
+}
+
+/* Was key set (by set or setInt) on this request? */
+pub bool Request.has(u8[] key)
+{
+    return findValue(self, key) != null;
 }
 
 /* A request for tests: method and target ("/users/7?full=1") with a body,
