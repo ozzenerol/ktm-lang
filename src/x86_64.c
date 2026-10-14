@@ -300,9 +300,10 @@ static void x86_64DerefStoreWidth(AoStr *buf,
 }
 
 static void x86_64DerefStoreGlobal(AoStr *buf, u32 size, const char *reg, const char *sym) {
-    char fmt[32];
-    snprintf(fmt, sizeof(fmt), "%s(%%rip)", sym);
-    x86_64GenericStoreWidth(buf, size, reg, fmt);
+    /* sized by the name: a module's global's symbol is long
+     * (_K3net5https16gClientTransport), and a fixed buffer cut it short
+     * into `sym(`, which the assembler refused */
+    x86_64GenericStoreWidth(buf, size, reg, mprintf("%s(%%rip)", sym));
 }
 
 /* x86 mnemonic suffix for an N-byte operation. */
@@ -1558,18 +1559,20 @@ static void x86_64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
              * %reg, mem` based on r1. */
             u32 sz = irValueByteSize(instr->r1);
             IrOp rop = instr->extra.rmw_op;
-            char mem[64];
+            char mem_buf[64];
+            char *mem = mem_buf;
             const char *val_reg = "rax";
 
             if (instr->dst && instr->dst->kind == IR_VAL_GLOBAL) {
-                snprintf(mem, sizeof(mem), "%s(%%rip)",
-                         asmNormaliseGlobalLabel(ctx->cc,
-                                 instr->dst->as.global.name)->data);
+                /* any length of name (see x86_64DerefStoreGlobal) */
+                mem = mprintf("%s(%%rip)",
+                              asmNormaliseGlobalLabel(ctx->cc,
+                                      instr->dst->as.global.name)->data);
             } else {
                 int addr_in_reg = x86_64HomeReg(instr->dst) != NULL;
                 const char *base_reg, *idx_reg;
                 x86_64AddrRegs(ctx, instr, instr->dst, &base_reg, &idx_reg);
-                x86_64FmtMemOperand(mem, sizeof(mem), instr->disp,
+                x86_64FmtMemOperand(mem_buf, sizeof(mem_buf), instr->disp,
                                     base_reg, idx_reg, instr->scale);
                 /* Pick a val_reg not aliased with base/idx. */
                 val_reg = x86_64ValReg(addr_in_reg ? "rcx" : "rax",
