@@ -82,7 +82,9 @@ now is after 2024: 1
 
 <h2>HTTP dates</h2>
 <p><code>date.httpDate(t)</code> is the form HTTP headers use (<code>Date</code>, <code>Last-Modified</code>), always English and UTC.
-<code>date.parseHttpDate(text, &amp;t)</code> reads it back, and the two older forms clients may still send.</p>
+<code>date.parseHttpDate(text, &amp;t)</code> reads it back, and the two older forms clients may still send.
+<code>date.httpDateTo(t, buf)</code> writes the same text into a buffer of <code>date.HTTP_DATE_LEN</code> (29) bytes, with no
+allocation and no NUL, and returns its length: for a server writing one per reply.</p>
 <pre data-run><code>
 import date;
 
@@ -90,6 +92,8 @@ void main()
 {
   ad String h = date.httpDate(784111777);
   printf("%s\n", h);
+  u8 buf[date.HTTP_DATE_LEN];
+  printf("%s\n", buf[0:date.httpDateTo(784111777, buf)]);
 
   u8[] forms[] = {"Sun, 06 Nov 1994 08:49:37 GMT", "Sunday, 06-Nov-94 08:49:37 GMT",
                   "Sun Nov  6 08:49:37 1994", "yesterday"};
@@ -101,6 +105,7 @@ void main()
 }
 </code></pre>
 <pre class="output">
+Sun, 06 Nov 1994 08:49:37 GMT
 Sun, 06 Nov 1994 08:49:37 GMT
 1 784111777
 1 784111777
