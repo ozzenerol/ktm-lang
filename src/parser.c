@@ -6502,8 +6502,13 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     ast_file_hint = saved_file_hint;
     astSetLVarId(saved_lvar_id);
     if ((failed || parseErrorCount(cc) > errors_before) && in->at) {
+        /* where the use is: maybe another module's file than the one
+         * being read when the body is made (the main file's end) */
+        LexFile *here = cc->tok_file;
+        if (in->at_file) cc->tok_file = in->at_file;
         cctrlInfoAt(cc, in->at->line, in->at->col, in->at->len,
                     "in `%s`, made here", in->name->data);
+        cc->tok_file = here;
     }
     if (failed) longjmp(*saved_recovery, 1);
 }
@@ -6517,6 +6522,7 @@ static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *s
     in->name = si->name;
     in->cls = si->cls;
     in->at = si->at;
+    in->at_file = si->at_file;
     in->proto_only = 1;
     parseGenericReplay(cc, md, in);
     GenericInst *body = calloc(1, sizeof(GenericInst));
@@ -6586,6 +6592,7 @@ AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme 
     in->args = args;
     in->name = name;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     parseGenericReplay(cc, d, in);
     cls = mapGet(cc->clsdefs, name->data);
     if (!cls) {
@@ -6707,6 +6714,7 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
     in->args = args;
     in->name = name;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     in->proto_only = 1;
     parseGenericReplay(cc, d, in);
     fn = mapGet(cc->global_env, full->data);
@@ -7450,6 +7458,7 @@ static void parseFormatGenerate(Cctrl *cc, AstType *cls, Lexeme *at, const char 
     in->name = cls->clsname;
     in->cls = cls;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     in->proto_only = 1;
     parseGenericReplay(cc, d, in);
     GenericInst *body = calloc(1, sizeof(GenericInst));

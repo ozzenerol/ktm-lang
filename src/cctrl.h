@@ -136,6 +136,7 @@ typedef struct GenericInst {
     struct AstType *cls;         /* a struct's instance type (methods: their struct's) */
     int proto_only;              /* the declaration only, its body later */
     Lexeme *at;                  /* the use that asked for it */
+    struct LexFile *at_file;     /* and its file */
     struct GenericInst *outer;
     struct Ast *fn;              /* the instance's function, once made */
 } GenericInst;
