@@ -1,0 +1,105 @@
+<!-- title: Roadmap -->
+<h1>Roadmap</h1>
+<p class="lede">The libraries ktm needs so a production REST API or network service can be written and run without
+leaving the ecosystem, the way it is in Go. Each row says where it stands; the page is updated as they land.</p>
+
+<h2>How they are built</h2>
+<ul class="rules">
+  <li>Protocols, formats and glue are written in ktm, from scratch.</li>
+  <li>Only security-critical cryptography comes from a vetted C library, mbedTLS, compiled into ktm itself: nothing
+  ever has to be installed.</li>
+  <li>A <b>stdlib</b> library ships with ktm, as Go's standard library does. A <b>package</b> has its own repository and
+  is fetched with <code>ktm get</code>: <code>import "github.com/ozzenerol/ktm-xxx";</code>.</li>
+</ul>
+<p>ktm already has: <code>net</code>, <a href="lib-http.html"><code>net.http</code></a> (server, mux, middleware, static
+files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code>, <code>sql</code> (SQLite), <code>log</code>,
+<code>date</code>, <code>fs</code>, <code>proc</code>, <code>hash</code> (SHA-256, CRC-32, FNV), <code>str</code> and
+<code>String</code>, <code>vec</code>, <code>list</code>, <code>map</code>, <code>set</code>, <code>sort</code>,
+<code>reflect</code>, <code>signal</code>, <code>thread</code>, <code>atomic</code>.</p>
+
+<h2>The package manager</h2>
+<table>
+  <tr><th>Part</th><th>Status</th></tr>
+  <tr><td><code>ktm.mod</code>, <code>ktm mod init</code>, <code>ktm mod fmt</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>import "github.com/user/repo";</code>, <code>replace</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>ktm get</code>, <code>ktm mod download</code>, the cache, <code>ktm.sum</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>Version selection (the highest a dependency asks for), <code>ktm mod tidy</code></td><td><span class="tag">planned</span> 0.20.0</td></tr>
+  <tr><td><code>ktm build</code>, <code>ktm run .</code></td><td><span class="tag">planned</span> 0.20.0</td></tr>
+  <tr><td>Dependencies built once as libraries</td><td><span class="tag">planned</span> 0.20.0</td></tr>
+  <tr><td>End to end with ktm-pg on Linux and macOS</td><td><span class="tag">planned</span> 0.20.0</td></tr>
+</table>
+
+<h2>Tier 1: needed for any production API</h2>
+<table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th><th>Status</th></tr>
+  <tr><td><code>net.tls</code></td><td>stdlib</td><td>TLS client and server (mbedTLS inside)</td><td><span class="tag">planned</span> 0.20.0</td></tr>
+  <tr><td><code>net.http</code> client</td><td>stdlib</td><td><code>http.get</code>, <code>http.post</code>, keep-alive pool, timeouts, redirects, JSON helpers</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>net.http</code> HTTPS</td><td>stdlib</td><td><code>http.listenTLS(port, cert, key, &amp;mux)</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>crypto</code></td><td>stdlib</td><td>Secure random bytes, HMAC-SHA256/512, SHA-512, constant-time compare, AES-GCM, ChaCha20-Poly1305, Ed25519</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Passwords</td><td>stdlib</td><td>bcrypt and argon2id hash and verify</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>base64, hex</td><td>stdlib</td><td>Standard and URL-safe encodings</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>uuid</code></td><td>stdlib</td><td>v4 and v7 (time-ordered, good primary keys)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>url</code></td><td>stdlib</td><td>Parse and build URLs and query strings</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>flag</code></td><td>stdlib</td><td>Command-line flags and subcommands</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Env config</td><td>stdlib</td><td>Environment variables and <code>.env</code> into a <code>@json</code>/<code>@yaml</code> struct</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq)</td><td><span class="tag wip">in progress</span></td></tr>
+  <tr><td>ktm-jwt</td><td>package</td><td>Sign and verify JWTs (HS256, RS256, ES256, EdDSA), JWKS</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Validation</td><td>stdlib or package</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@required</code>) with readable errors, next to <code>http.decode</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag">planned</span></td></tr>
+</table>
+
+<h2>Tier 2: what most services reach for soon</h2>
+<table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th><th>Status</th></tr>
+  <tr><td>ktm-redis</td><td>package</td><td>Redis client (RESP3, pipelining, pub/sub, pool): caching, sessions, rate limits</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-mysql</td><td>package</td><td>MySQL and MariaDB client, the same API shape as ktm-pg</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>SQL interface</td><td>stdlib</td><td>One small interface for PostgreSQL, MySQL and SQLite (query, exec, scan, transactions)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>WebSocket</td><td>stdlib</td><td>Server and client in <code>net.http</code>, on coroutines</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>compress</code></td><td>stdlib</td><td>gzip and deflate (zstd later) for responses and files</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Middleware pack</td><td>package or stdlib</td><td>CORS, request IDs, recovery, rate limiting, real IP, timeouts, auth hooks</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Metrics</td><td>package</td><td>Prometheus metrics and a <code>/metrics</code> handler</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Tracing</td><td>package</td><td>OpenTelemetry traces (OTLP over HTTP)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>regex</code></td><td>stdlib</td><td>Regular expressions in linear time (RE2 style)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Templates</td><td>stdlib</td><td>Text and HTML templates with escaping</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>toml</code></td><td>stdlib</td><td>Config files, next to JSON and YAML</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Time zones</td><td>stdlib</td><td>The IANA zone database in <code>date</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>decimal</code></td><td>stdlib</td><td>Exact decimal numbers for money (PostgreSQL <code>numeric</code>)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Testing helpers</td><td>stdlib</td><td>Assertions, table tests, golden files, benchmarks, <code>ktm test</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-smtp</td><td>package</td><td>Sending email, with TLS</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-s3</td><td>package</td><td>S3-compatible storage (AWS, MinIO, R2): put, get, list, presigned URLs</td><td><span class="tag">planned</span></td></tr>
+</table>
+
+<h2>Tier 3: growth and specific needs</h2>
+<table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th></tr>
+  <tr><td>HTTP/2</td><td>stdlib</td><td>For the server and the client (gRPC, browsers)</td></tr>
+  <tr><td>gRPC and protobuf</td><td>package</td><td>Code generation and a gRPC server and client</td></tr>
+  <tr><td>ktm-nats, ktm-kafka</td><td>package</td><td>Messaging and event streams</td></tr>
+  <tr><td>ktm-mongo</td><td>package</td><td>MongoDB client</td></tr>
+  <tr><td>msgpack, CBOR</td><td>package</td><td>Compact binary encodings</td></tr>
+  <tr><td>OpenAPI</td><td>package</td><td>Docs from the mux's routes and <code>@json</code> structs, clients from specs</td></tr>
+  <tr><td>GraphQL</td><td>package</td><td>A GraphQL server</td></tr>
+  <tr><td>OAuth2, OIDC</td><td>package</td><td>Login with Google, GitHub and others</td></tr>
+  <tr><td>i18n</td><td>package</td><td>Translations and plural rules</td></tr>
+  <tr><td>Images</td><td>package</td><td>PNG and JPEG, resizing</td></tr>
+  <tr><td>CLI and TUI</td><td>package</td><td>Prompts, colours, progress bars, tables</td></tr>
+</table>
+
+<h2>Order</h2>
+<ol>
+  <li><code>net.tls</code>, <code>crypto</code>, base64 and hex, <code>url</code>, <code>uuid</code>: everything else builds on them.</li>
+  <li>The <code>net.http</code> client and HTTPS, ktm-pg finished, <code>flag</code>, env config.</li>
+  <li>Passwords, ktm-jwt, validation, migrations: a whole API with logins and a database.</li>
+  <li>ktm-redis, the SQL interface, ktm-mysql, WebSocket, <code>compress</code>, the middleware pack.</li>
+  <li>Metrics, tracing, <code>regex</code>, templates, <code>toml</code>, <code>decimal</code>, time zones, testing helpers.</li>
+  <li>Tier 3, as people ask for it.</li>
+</ol>
+
+<h2>When one counts as done</h2>
+<ul class="rules">
+  <li>Tests pass on Linux x86_64, Linux arm64 and macOS, and under <code>-Memsafe</code>, with a docs page whose examples run.</li>
+  <li>A protocol client is tested against the real server, in several versions, and measured against the Go equivalent.</li>
+  <li>A package's tests fetch it with <code>ktm get</code>, so every package also tests the package manager.</li>
+  <li>One reference application (a REST API with logins, PostgreSQL, Redis, migrations and metrics) uses Tiers 1 and 2
+  together and runs under load as a long test.</li>
+</ul>

@@ -96,6 +96,7 @@ NAV = [
         ("stdlib.html", "Library reference"),
         ("examples.html", "Example projects"),
         ("known-issues.html", "Known issues"),
+        ("roadmap.html", "Roadmap"),
         ("releases.html", "Releases"),
     ]),
 ]

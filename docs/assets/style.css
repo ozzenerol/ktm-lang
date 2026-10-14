@@ -684,6 +684,8 @@ ul.rules > li::before {
   border: 1px solid var(--border);
   color: var(--muted);
 }
+.tag.done { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
+.tag.wip { border-color: var(--accent); color: var(--accent-text); }
 .decl pre { margin-bottom: 0.5rem; }
 .decl .doc { margin: 0; color: var(--text); }
 .consts td:first-child code { font-weight: 600; }
