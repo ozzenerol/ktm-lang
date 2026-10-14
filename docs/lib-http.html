@@ -58,7 +58,7 @@ handler by method and path, and a handler writes the reply. It runs on <a href="
 coroutine per connection on every core.</p>
 
 <h2 id="a-first-api">A first API<a class="anchor" href="#a-first-api" aria-label="Link to this section">#</a></h2>
-<pre><code>import json, net.http, reflect;
+<pre><code>import json, net.http, reflect, str;
 
 @json struct User { i64 id; String name; };
 
