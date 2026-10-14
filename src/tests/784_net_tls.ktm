@@ -193,6 +193,16 @@ i32 main() {
         threw = str.contains(cstr.view(e.message), "needs a certificate");
     }
     check(threw, "a server without a certificate");
+    threw = false;
+    try {
+        tls.Config wrong;
+        wrong.certFile = at("ca.pem");       /* a certificate whose key isn't this one */
+        wrong.keyFile = at("server.key");
+        tls.server(&wrong);
+    } catch (Error e) {
+        threw = str.contains(cstr.view(e.message), "doesn't belong to the certificate");
+    }
+    check(threw, "a key that doesn't match its certificate");
 
     /* the rest of the server's 9 connections, then a coroutine loop */
     for (i64 i = atomic.load(&gAccepted); i < 9; i++) {
