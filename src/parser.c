@@ -1916,6 +1916,18 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
     return g;
 }
 
+/* reflect.Value, for `any ...name`; NULL when reflect isn't loaded */
+AstType *parseReflectValueType(Cctrl *cc) {
+    Ast *fn = findFunctionDecl(cc, str_lit("reflect.__value"));
+    return fn ? fn->type->rettype : NULL;
+}
+
+/* The address of the reflect.Type describing t */
+Ast *parseReflectTypeAddr(Cctrl *cc, AstType *t) {
+    Ast *g = parseReflectDescribe(cc, t);
+    return astUnaryOperator(astMakePointerType(g->type), AST_UN_OP_ADDR_OF, g);
+}
+
 /* `reflect.typeOf(T or expr)` (a reflect.Type *) and `reflect.of(x)` (a
  * reflect.Value, x's address and type), the `(` read; NULL for any other
  * call */

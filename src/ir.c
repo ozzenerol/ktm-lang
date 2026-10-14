@@ -2618,6 +2618,14 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
 
         case AST_TEMP_ADDR: {
             /* the value into its hidden variable, whose address it is */
+            if (!irIsByValAggregate(ast->slice_var->type)) {
+                /* a number or pointer (`any ...` extras): a plain store */
+                int is_err = 0;
+                Ast *set = astBinaryOp(AST_BIN_OP_ASSIGN, ast->slice_var,
+                                       ast->slice_ptr, &is_err);
+                irExpr(ctx, set);
+                return irLValueAddr(ctx, ast->slice_var);
+            }
             IrValue *addr = irLValueAddr(ctx, ast->slice_var);
             irCopyAggregateTo(ctx, addr, ast->slice_ptr, ast->slice_var->type->size);
             return addr;
