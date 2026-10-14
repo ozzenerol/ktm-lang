@@ -1,0 +1,1 @@
+mbedTLS 3.6.2 (https://github.com/Mbed-TLS/mbedtls/releases/tag/mbedtls-3.6.2, sha256 8b54fb9bcf4d5a7078028e0520acddefb7900b3e66fec7f7175bb5b7d85ccdca): library/, include/ and LICENSE, unchanged. Apache-2.0 OR GPL-2.0-or-later; ktm uses it under Apache-2.0. Built into libktmtls with ../ktmtls/ktm_mbedtls_config.h.

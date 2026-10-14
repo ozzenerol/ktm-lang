@@ -143,6 +143,27 @@ add_custom_target(unit-test
 
 target_link_libraries(ktm m)
 
+# net.tls: mbedTLS (vendor/mbedtls, unchanged) and ktm's layer over it
+# (vendor/ktmtls), as libktmtls: the static library programs that import
+# net.tls link, and a shared one the JIT loads. build.sh puts both next to
+# libktm.
+file(GLOB KTMTLS_MBEDTLS_SOURCES ${CMAKE_SOURCE_DIR}/vendor/mbedtls/library/*.c)
+add_library(ktmtls_obj OBJECT ${KTMTLS_MBEDTLS_SOURCES} vendor/ktmtls/ktmtls.c)
+set_target_properties(ktmtls_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(ktmtls_obj PRIVATE
+    ${CMAKE_SOURCE_DIR}/vendor/mbedtls/include
+    ${CMAKE_SOURCE_DIR}/vendor/mbedtls/library
+    ${CMAKE_SOURCE_DIR}/vendor/ktmtls)
+target_compile_definitions(ktmtls_obj PRIVATE
+    MBEDTLS_USER_CONFIG_FILE="ktm_mbedtls_config.h")
+# Vendored: not held to our warning bar, always optimised
+target_compile_options(ktmtls_obj PRIVATE -w -O2)
+add_library(ktmtls STATIC $<TARGET_OBJECTS:ktmtls_obj>)
+add_library(ktmtls_shared SHARED $<TARGET_OBJECTS:ktmtls_obj>)
+set_target_properties(ktmtls_shared PROPERTIES OUTPUT_NAME ktmtls)
+find_package(Threads REQUIRED)
+target_link_libraries(ktmtls_shared Threads::Threads)
+
 # Install the executable
 install(TARGETS ktm DESTINATION bin)
 

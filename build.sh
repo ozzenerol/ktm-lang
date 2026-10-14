@@ -122,7 +122,22 @@ mkdir -p "$PREFIX/lib" "$PREFIX/modules"
 # as one tree into lib/libktm.a and the shared object the JIT loads; each
 # module directory gets a .ktmlib marker pointing at them
 cp -R "$ROOT/src/std/." "$PREFIX/modules/"
+# net.tls stays source (no .ktmlib): only the programs that import it
+# compile it and link libktmtls (#link <ktmtls>), so every other program
+# stays as small as before
+rm -rf "$PREFIX/modules/net/tls"
 "$KTM" -fPIC -lib ktm --install-dir="$PREFIX" "$PREFIX/modules"
+cp -R "$ROOT/src/std/net/tls" "$PREFIX/modules/net/tls"
+# libktmtls (mbedTLS and ktm's layer over it), built by cmake: the
+# archive for compiled programs, the shared object for the JIT. The
+# shared one gets only its versioned name, so `-lktmtls` always takes
+# the archive and a program needs no libktmtls at run time.
+cp "$BUILD_DIR/libktmtls.a" "$PREFIX/lib/libktmtls.a"
+if [ "$(uname -s)" = Darwin ]; then
+    cp "$BUILD_DIR/libktmtls.dylib" "$PREFIX/lib/libktmtls.0.0.1.dylib"
+else
+    cp "$BUILD_DIR/libktmtls.so" "$PREFIX/lib/libktmtls.so.0.0.1"
+fi
 
 if [ "$RUN_TESTS" = 1 ]; then
     # The test runners otherwise compile each test against /usr/local.

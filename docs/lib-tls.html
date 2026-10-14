@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TLS - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li class="current"><a href="lib-tls.html" aria-current="page">TLS</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#net.tls"><code>net.tls</code></a></span></div>
+<h1>TLS</h1>
+<p class="lede"><code>net.tls</code> encrypts a connection, as a client or a server. It is built on mbedTLS, which ships inside
+ktm: nothing has to be installed, and only programs that <code>import net.tls;</code> carry it. TLS 1.2 and 1.3.</p>
+
+<h2 id="a-client">A client<a class="anchor" href="#a-client" aria-label="Link to this section">#</a></h2>
+<pre><code>import net.tls;
+
+void main()
+{
+  tls.Conn *c = tls.dial("example.com", 443);     // checks the certificate against the system's CAs
+  defer c.close();
+  c.write("HEAD / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n");
+  u8 buf[4096];
+  i64 n = c.read(buf[0:], 5000);
+  printf("%s %s\n%.*s", c.version(), c.cipher(), n, buf);
+}
+</code></pre>
+<pre class="output">TLSv1.3 TLS1-3-CHACHA20-POLY1305-SHA256
+HTTP/1.1 200 OK
+...</pre>
+<p><code>tls.dial</code> throws <code>tls.ERR_TLS</code> when it can't connect or the server's certificate isn't trusted, with
+the reason: <code>the server's certificate isn't trusted: The certificate Common Name (CN) does not match with the
+expected CN</code>.</p>
+
+<h2 id="connections">Connections<a class="anchor" href="#connections" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>c.read(buf, ms)</code></td><td>Bytes read, 0 once the peer closed, -1 on an error or after <code>ms</code> (-1: no limit); <code>c.error()</code> says why</td></tr>
+  <tr><td><code>c.write(data, ms)</code></td><td>Writes all of <code>data</code>: <code>data.len</code>, or -1</td></tr>
+  <tr><td><code>c.close()</code></td><td>Tells the peer, frees the connection, closes the socket</td></tr>
+  <tr><td><code>c.version()</code>, <code>c.cipher()</code>, <code>c.alpn()</code></td><td><code>"TLSv1.3"</code>, the cipher suite, the protocol ALPN chose</td></tr>
+  <tr><td><code>c.peerCert(&amp;sigHash)</code></td><td>The peer's certificate (DER), for channel binding</td></tr>
+  <tr><td><code>c.pending()</code></td><td>Decrypted bytes a read gets without the socket</td></tr>
+</table></div>
+<p>In a loop coroutine (<code>coro.go</code>, <code>coro.serve</code>, <code>net.http</code> handlers) every wait pauses only the
+coroutine; anywhere else it blocks the thread.</p>
+
+<h2 id="contexts">Contexts<a class="anchor" href="#contexts" aria-label="Link to this section">#</a></h2>
+<p>A <code>tls.Context</code> is a configuration: the trusted CAs, a certificate, how to verify. Make one and use it for
+every connection, from any thread; <code>tls.dial(host, port)</code> uses a shared one with the system's CAs.</p>
+<pre><code>tls.Config cfg;
+cfg.caFile = "/etc/app/ca.pem";            // trust this CA instead of the system's
+tls.Context *ctx = tls.client(&amp;amp;cfg);
+
+i32 fd = net.dial("db.internal", 5432);
+// ... a protocol's own start, then:
+tls.Conn *c = ctx.connect(fd, "db.internal");   // TLS over a socket you already have
+</code></pre>
+<div class="table-wrap"><table>
+  <tr><th><code>tls.Config</code> field</th><th>Meaning</th></tr>
+  <tr><td><code>verify</code></td><td><code>Verify.full</code> (the chain and the name, the default), <code>Verify.chain</code> (any name), <code>Verify.none</code> (no checks)</td></tr>
+  <tr><td><code>caFile</code>, <code>caPem</code></td><td>Trusted CAs; neither: the system's (<code>SSL_CERT_FILE</code> picks a file)</td></tr>
+  <tr><td><code>certFile</code>, <code>keyFile</code> (or <code>certPem</code>, <code>keyPem</code>)</td><td>This side's certificate and key: a server's, or a client certificate</td></tr>
+  <tr><td><code>keyPassword</code></td><td>For an encrypted key</td></tr>
+  <tr><td><code>alpn</code></td><td>Protocols to offer or accept, <code>"h2,http/1.1"</code></td></tr>
+  <tr><td><code>handshakeMs</code></td><td>The handshake's limit (30 s)</td></tr>
+</table></div>
+
+<h2 id="a-server">A server<a class="anchor" href="#a-server" aria-label="Link to this section">#</a></h2>
+<pre><code>tls.Config cfg;
+cfg.certFile = "server.pem";
+cfg.keyFile = "server.key";
+tls.Context *ctx = tls.server(&amp;amp;cfg);
+
+i32 fd = net.accept(listener);
+tls.Conn *c = ctx.accept(fd);
+u8 buf[4096];
+i64 n = c.read(buf[0:]);
+c.write(buf[0:n]);
+c.close();
+</code></pre>
+<p>A server given CAs (<code>caFile</code>) asks clients for a certificate and checks it.</p>
+
+<h2 id="notes">Notes<a class="anchor" href="#notes" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>A context outlives its connections: close them before <code>ctx.free()</code>.</li>
+  <li>TLS 1.0 and 1.1, and renegotiation, are off.</li>
+  <li>mbedTLS 3.6 (Apache-2.0), in <code>src/vendor/mbedtls</code>, unchanged.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-http.html"><span>Previous</span>HTTP servers</a><a class="next" href="lib-threads.html"><span>Next</span>Threads and atomics</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-tls.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-client">A client</a></li><li><a href="#connections">Connections</a></li><li><a href="#contexts">Contexts</a></li><li><a href="#a-server">A server</a></li><li><a href="#notes">Notes</a></li></ul></nav>
+</div>
+</body>
+</html>
