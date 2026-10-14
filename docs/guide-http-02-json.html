@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. JSON in and out - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li class="current"><a href="guide-http-02-json.html" aria-current="page">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>2. JSON in and out</h1>
+<p class="lede">Shelf gets its first real routes: save a bookmark, list them, read one, delete one. Requests and replies
+are JSON, made from structs by the compiler. The bookmarks live in memory for now; chapter 5 moves them to
+PostgreSQL.</p>
+
+<h2 id="main-ktm">main.ktm<a class="anchor" href="#main-ktm" aria-label="Link to this section">#</a></h2>
+<pre><code>import date, json, net.http, reflect, str, uuid, vec;
+
+/* A saved link */
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+/* What a client sends to save one */
+@json struct NewBookmark {
+    u8[] url;
+    u8[] title;
+};
+
+/* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
+vec.Vec&amp;lt;Bookmark&amp;gt; gBookmarks;
+
+/* The index of the bookmark with this id, or -1 */
+i64 find(u8[] id)
+{
+    for (i64 i = 0; i &amp;lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
+    }
+    return -1;
+}
+
+void list(http.Writer *w, http.Request *r)
+{
+    w.json(200, reflect.of(gBookmarks));
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &amp;lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.json(200, reflect.of(gBookmarks.data[i]));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decode&amp;lt;NewBookmark&amp;gt;(r);
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title);
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &amp;lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    Bookmark b = gBookmarks.removeAt(i);
+    b.id.free();
+    b.url.free();
+    b.title.free();
+    b.createdAt.free();
+    w.status(204);
+}
+
+i32 main()
+{
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;amp;list);
+    mux.handle("POST /bookmarks", &amp;amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;amp;remove);
+
+    http.Options o;
+    o.threads = 1;      /* one loop: the list in memory isn't shared between threads */
+    printf("Shelf listening on http://localhost:8080\n");
+    return http.listen(8080, &amp;amp;mux, null, &amp;amp;o);
+}</code></pre>
+
+<h2 id="structs-as-json">Structs as JSON<a class="anchor" href="#structs-as-json" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>@json</code> before a struct makes the compiler write its JSON code: <code>w.json(201, reflect.of(b))</code>
+  encodes it, <code>http.decode&lt;NewBookmark&gt;(r)</code> reads the request body into one. The file must
+  <code>import json;</code>.</li>
+  <li>The keys are the field names (<code>createdAt</code>); <code>@key("created_at")</code> on a field picks another,
+  <code>@skip</code> leaves one out (<a href="lib-json-structs.html">JSON: structs</a>).</li>
+  <li><code>Bookmark</code> owns its texts (<code>String</code>, freed with <code>.free()</code>);
+  <code>NewBookmark</code> only views the request's (<code>u8[]</code>), which is all a request's data needs: what
+  <code>http.decode</code> made is freed when the handler returns. That's why <code>create</code> copies the url and
+  title with <code>str.from</code> before keeping them.</li>
+  <li>A vector of structs encodes as an array: <code>w.json(200, reflect.of(gBookmarks))</code>.</li>
+</ul>
+
+<h2 id="routes-with-parameters">Routes with parameters<a class="anchor" href="#routes-with-parameters" aria-label="Link to this section">#</a></h2>
+<p><code>"GET /bookmarks/{id}"</code> matches <code>/bookmarks/</code> and one more segment, which the handler reads with
+<code>r.param("id")</code>. <code>GET</code> and <code>DELETE</code> on the same path are two routes, two handlers.
+IDs are <a href="lib-uuid.html">UUIDv7</a>s: unique without a counter, and in the order they were made, which chapter 7
+uses for paging.</p>
+
+<h2 id="status-codes">Status codes<a class="anchor" href="#status-codes" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Code</th><th>When</th><th>How</th></tr>
+  <tr><td>200</td><td>Here is what you asked for</td><td><code>w.json(200, ...)</code></td></tr>
+  <tr><td>201</td><td>Created: the new bookmark is the body</td><td><code>w.json(201, ...)</code></td></tr>
+  <tr><td>204</td><td>Done, nothing to send back</td><td><code>w.status(204)</code></td></tr>
+  <tr><td>400</td><td>The body isn't the JSON we expect</td><td>by itself, from <code>http.decode</code></td></tr>
+  <tr><td>404</td><td>No such bookmark</td><td><code>w.error(404, "no such bookmark")</code>: <code>{"error": "..."}</code></td></tr>
+</table></div>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm"}'
+{"id":"01a13b02-5800-7000-bb5e-cd97023e29c5","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:22:51Z"}
+
+$ curl localhost:8080/bookmarks
+[{"id":"01a13b02-5800-7000-bb5e-cd97023e29c5","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:22:51Z"}]
+
+$ curl -i -X DELETE localhost:8080/bookmarks/01a13b02-5800-7000-bb5e-cd97023e29c5
+HTTP/1.1 204 No Content
+
+$ curl localhost:8080/bookmarks/01a13b02-5800-7000-bb5e-cd97023e29c5
+{"error":"no such bookmark"}
+
+$ curl -X POST localhost:8080/bookmarks -d '{"url":'
+{"error":"1:8: url: expected a string, got the end of the input"}</code></pre>
+
+<h2 id="one-loop-for-now">One loop, for now<a class="anchor" href="#one-loop-for-now" aria-label="Link to this section">#</a></h2>
+<p><code>o.threads = 1</code> runs the server on one event loop. By default it runs one per core, and they would all
+touch <code>gBookmarks</code> at once. With one loop, handlers run one at a time (each runs until it waits for
+something), so the list needs no lock. From chapter 5 the data is in PostgreSQL, which handles that, and this line
+goes.</p>
+<p>Next: <a href="guide-http-03-validation.html">Validation and errors</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-01-hello.html"><span>Previous</span>1. Hello, Shelf</a><a class="next" href="guide-http-03-validation.html"><span>Next</span>3. Validation and errors</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-02-json.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#main-ktm">main.ktm</a></li><li><a href="#structs-as-json">Structs as JSON</a></li><li><a href="#routes-with-parameters">Routes with parameters</a></li><li><a href="#status-codes">Status codes</a></li><li><a href="#try-it">Try it</a></li><li><a href="#one-loop-for-now">One loop, for now</a></li></ul></nav>
+</div>
+</body>
+</html>

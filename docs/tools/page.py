@@ -103,6 +103,14 @@ NAV = [
         ("tools-libraries.html", "Building libraries"),
         ("tools-debugging.html", "Debugging"),
     ]),
+    ("Guides", [
+        ("guides.html", "All guides"),
+        ("guide-http.html", "HTTP programming"),
+        ("guide-http-01-hello.html", "1. Hello, Shelf"),
+        ("guide-http-02-json.html", "2. JSON in and out"),
+        ("guide-http-03-validation.html", "3. Validation and errors"),
+        ("guide-http-04-config.html", "4. Configuration"),
+    ]),
     ("Reference", [
         ("stdlib.html", "Library reference"),
         ("examples.html", "Example projects"),
@@ -281,6 +289,7 @@ def page(title, filename, content, refs=None):
     <a href="language.html">Language</a>
     <a href="library.html">Library</a>
     <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
     <a href="stdlib.html">Reference</a>
   </nav>
   <div class="search" role="search">
