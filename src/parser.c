@@ -6747,7 +6747,8 @@ static const char *jg_Fmt = "Json";
 
 enum {
     JG_NONE, JG_INT, JG_U64, JG_BOOL, JG_FLOAT, JG_STRING, JG_BYTES, JG_CSTR,
-    JG_ENUM, JG_STRUCT, JG_PTR_STRUCT, JG_VEC, JG_SLICE, JG_ARRAY
+    JG_ENUM, JG_STRUCT, JG_PTR_STRUCT, JG_VEC, JG_SLICE, JG_ARRAY,
+    JG_PTR_VAL      /* a pointer to a number, bool, enum, String...: it or null */
 };
 
 static int parseJsonIsVec(AstType *t) {
@@ -6774,7 +6775,11 @@ static int parseJsonKind(AstType *t) {
         case AST_TYPE_POINTER: {
             AstType *p = t->ptr;
             if (p && p->kind == AST_TYPE_CHAR && p->size == 1 && !p->is_bool) return JG_CSTR;
-            if (p && p->kind == AST_TYPE_CLASS && !p->is_intrinsic) return JG_PTR_STRUCT;
+            if (p && (astTypeIsString(p) || astTypeIsSlice(p) || p->is_enum || p->is_intrinsic ||
+                      parseJsonIsVec(p))) return JG_PTR_VAL;
+            if (p && p->kind == AST_TYPE_CLASS) return JG_PTR_STRUCT;
+            if (p && (p->kind == AST_TYPE_INT || p->kind == AST_TYPE_CHAR ||
+                      p->kind == AST_TYPE_FLOAT)) return JG_PTR_VAL;
             return JG_NONE;
         }
         case AST_TYPE_ARRAY:
@@ -6822,6 +6827,7 @@ static char *parseJsonUnsupported(AstType *t) {
         }
         return NULL;
     }
+    if (k == JG_PTR_VAL) return parseJsonUnsupported(t->ptr);
     AstType *e = parseJsonElem(t, k);
     if (e) return parseJsonUnsupported(e);
     return NULL;
@@ -6883,6 +6889,11 @@ static void parseJsonEncode(AoStr *o, Set *quals, char *expr, AstType *t, int de
             break;
         case JG_PTR_STRUCT:
             aoStrCatPrintf(o, "if (%s) { %s.to%s(__w); } else { __w.nil(); }\n", expr, expr, jg_Fmt);
+            break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (%s) {\n", expr);
+            parseJsonEncode(o, quals, mprintf("(*%s)", expr), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "} else { __w.nil(); }\n");
             break;
         case JG_VEC:
         case JG_SLICE:
@@ -6974,6 +6985,13 @@ static void parseJsonDecode(AoStr *o, Set *quals, char *lv, AstType *t, int dept
                            "if (!%s) { %s = %s.__alloc(sizeof(*%s)); }\n"
                            "%s.from%s(__r); }\n", lv, lv, lv, jg_mod, lv, lv, jg_Fmt);
             break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (__r.isNull()) { %s = null; } else {\n"
+                           "if (!%s) { %s = (%s)%s.__alloc(sizeof(*%s)); %s.__zero(%s, sizeof(*%s)); }\n",
+                           lv, lv, lv, parseJsonTypeText(quals, t), jg_mod, lv, jg_mod, lv, lv);
+            parseJsonDecode(o, quals, mprintf("(*%s)", lv), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "}\n");
+            break;
         case JG_VEC: {
             AstType *e = parseJsonElem(t, k);
             char *et = parseJsonTypeText(quals, e);
@@ -7036,13 +7054,19 @@ static void parseJsonFree(AoStr *o, Set *quals, char *lv, AstType *t, int depth)
             aoStrCatPrintf(o, "if (%s) { %s.freeDecoded(); %s.__free(%s); %s = null; }\n",
                         lv, lv, jg_mod, lv, lv);
             break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (%s) {\n", lv);
+            parseJsonFree(o, quals, mprintf("(*%s)", lv), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "%s.__free(%s); %s = null; }\n", jg_mod, lv, lv);
+            break;
         case JG_VEC:
         case JG_SLICE:
         case JG_ARRAY: {
             AstType *e = parseJsonElem(t, k);
             int ek = parseJsonKind(e);
             int owns = ek == JG_STRING || ek == JG_BYTES || ek == JG_CSTR || ek == JG_STRUCT ||
-                       ek == JG_PTR_STRUCT || ek == JG_VEC || ek == JG_SLICE || ek == JG_ARRAY;
+                       ek == JG_PTR_STRUCT || ek == JG_VEC || ek == JG_SLICE || ek == JG_ARRAY ||
+                       ek == JG_PTR_VAL;
             if (owns) {
                 char *len = k == JG_ARRAY ? mprintf("%d", t->len) : mprintf("%s.len", lv);
                 char *item = mprintf(k == JG_VEC ? "%s.data[__i%d]" : k == JG_SLICE ? "%s.ptr[__i%d]"
@@ -7076,7 +7100,7 @@ static char *parseJsonNonEmpty(char *e, AstType *t) {
             return mprintf("%s != 0", e);
         case JG_STRING: case JG_BYTES: case JG_VEC: case JG_SLICE:
             return mprintf("%s.len != 0", e);
-        case JG_CSTR: case JG_PTR_STRUCT:
+        case JG_CSTR: case JG_PTR_STRUCT: case JG_PTR_VAL:
             return mprintf("%s != null", e);
         default:
             return NULL;
