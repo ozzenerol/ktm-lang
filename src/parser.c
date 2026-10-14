@@ -604,8 +604,8 @@ static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "re
         "min", "max", "email", "url", "oneOf", NULL};
 
 /* Attributes config and validate read: on a field of any struct */
-static const char *parse_any_struct_attrs[] = {"env", "required", "min", "max", "email",
-        "url", "oneOf", NULL};
+static const char *parse_any_struct_attrs[] = {"key", "skip", "env", "required", "min", "max",
+        "email", "url", "oneOf", NULL};
 
 static int parseAttrIn(const char **names, AoStr *name) {
     for (int i = 0; names[i]; ++i) {
@@ -742,7 +742,8 @@ static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fi
     listForEach(fields) {
         ClsField *f = it->value;
         if (!f->type || !f->type->field_attrs) continue;
-        /* config's and validate's go on any struct */
+        /* config's, validate's and @key/@skip (reflect reads them: ktm-pg's
+         * columns) go on any struct; only @omitEmpty needs @json or @yaml */
         for (u64 i = 0; i < f->type->field_attrs->size; ++i) {
             AstAttr *a = f->type->field_attrs->entries[i];
             if (parseAttrIn(parse_any_struct_attrs, a->name)) continue;

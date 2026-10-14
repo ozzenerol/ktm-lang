@@ -78,8 +78,8 @@ i32 main() {
                 "`@key` goes on a field, not a struct"), "a field's attribute on a struct");
     check(fails("@json struct U { @json i64 a; };\ni32 main() { return 0; }\n",
                 "`@json` goes on a struct, not a field"), "a struct's attribute on a field");
-    check(fails("struct U { @key(\"x\") i64 a; };\ni32 main() { return 0; }\n",
-                "which has neither @json nor @yaml"), "a field attribute needs @json or @yaml");
+    check(fails("struct U { @omitEmpty i64 a; };\ni32 main() { return 0; }\n",
+                "which has neither @json nor @yaml"), "@omitEmpty needs @json or @yaml");
     check(fails("@json i32 main() { return 0; }\n",
                 "`@json` goes on a struct"), "on a function");
     check(fails("@json union V { i64 a; };\ni32 main() { return 0; }\n",
