@@ -349,13 +349,30 @@ pub void Writer.status(i32 code)
     self.code = code;
 }
 
+/* no CR, LF or NUL in s (libc's memchr: a byte loop costs more here) */
 static bool headerSafe(u8[] s)
 {
-    for (i64 i = 0; i < s.len; i++) {
-        u8 c = s.ptr[i];
-        if (c == '\r' || c == '\n' || c == 0) { return false; }
-    }
-    return true;
+    if (!s.len) { return true; }
+    return !libc.memchr(s.ptr, '\r', s.len) && !libc.memchr(s.ptr, '\n', s.len) &&
+           !libc.memchr(s.ptr, 0, s.len);
+}
+
+/* "name: value\r\n" into w's headers, unchecked: the library's own */
+static void writerHeader(Writer *w, u8[] name, u8[] value)
+{
+    w.headers.reserve(name.len + value.len + 4);
+    w.headers.append(name);
+    w.headers.append(": ");
+    w.headers.append(value);
+    w.headers.append("\r\n");
+}
+
+/* the library's Content-Type, unless the handler set one */
+static void writerType(Writer *w, u8[] value)
+{
+    if (w.hasType) { return; }
+    w.hasType = true;
+    writerHeader(w, "Content-Type", value);
 }
 
 /* Adds a header to the reply. A Content-Type replaces the one text, json
@@ -366,11 +383,8 @@ pub void Writer.header(u8[] name, u8[] value)
     if (!headerSafe(name) || !headerSafe(value) || name.len == 0) {
         throw(ERR_HTTP, "http: header %s: a name or value with a line break", name);
     }
-    if (str.equalsFold(name, "content-type")) { self.hasType = true; }
-    self.headers.append(name);
-    self.headers.append(": ");
-    self.headers.append(value);
-    self.headers.append("\r\n");
+    if (name.len == 12 && libc.strncasecmp(name.ptr, "content-type", 12) == 0) { self.hasType = true; }
+    writerHeader(self, name, value);
 }
 
 /* The value of a reply header the handler set, "" if none (for tests and
@@ -404,7 +418,7 @@ pub void Writer.write(u8[] data)
 pub void Writer.text(i32 code, u8 *fmt, ...args)
 {
     self.code = code;
-    if (!self.hasType) { self.header("Content-Type", "text/plain; charset=utf-8"); }
+    writerType(self, "text/plain; charset=utf-8");
     u8 *text = cstr.formatArgs(null, fmt, args);
     self.body.append(text[0:cstr.len(text)]);
     mem.free(text);
@@ -414,7 +428,7 @@ pub void Writer.text(i32 code, u8 *fmt, ...args)
 pub void Writer.json(i32 code, reflect.Value v)
 {
     self.code = code;
-    if (!self.hasType) { self.header("Content-Type", "application/json"); }
+    writerType(self, "application/json");
     json.encodeTo(&self.body, v);
 }
 
@@ -422,7 +436,7 @@ pub void Writer.json(i32 code, reflect.Value v)
 pub void Writer.jsonText(i32 code, u8[] text)
 {
     self.code = code;
-    if (!self.hasType) { self.header("Content-Type", "application/json"); }
+    writerType(self, "application/json");
     self.body.append(text);
 }
 
@@ -432,7 +446,7 @@ pub void Writer.error(i32 code, u8[] msg)
 {
     self.code = code;
     self.body.clear();
-    if (!self.hasType) { self.header("Content-Type", "application/json"); }
+    writerType(self, "application/json");
     self.body.append("{\"error\":");
     if (str.validUtf8(msg)) {
         json.quoteTo(&self.body, msg);

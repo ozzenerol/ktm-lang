@@ -103,9 +103,8 @@ static void fileServe(Writer *w, Request *r, u8[] dir)
     }
 
     i64 mtime = st.st_mtim.tv_sec;
-    String lm = date.httpDate(mtime);
-    w.header("Last-Modified", lm);
-    lm.free();
+    u8 lm[date.HTTP_DATE_LEN];
+    w.header("Last-Modified", lm[0:date.httpDateTo(mtime, lm)]);
     u8[] ims = r.header("If-Modified-Since");
     i64 since = 0;
     if (ims.len && date.parseHttpDate(ims, &since) && mtime <= since) {

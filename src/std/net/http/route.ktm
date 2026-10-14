@@ -274,41 +274,48 @@ bool Pattern.takesMethod(u8[] m, i64 mid) {
  * path, in order (2 * nwild i64s). Segments are split at the raw '/'s
  * and compared unescaped, as Go does. */
 bool Pattern.matchPath(u8[] path, i64 *spans) {
-    if (path.len == 0 || path[0] != '/') { return false; }
-    i64 at = 0;              /* path[at] is a '/' */
+    u8 *base = path.ptr;
+    u8 *end = base + path.len;
+    if (base == end || *base != '/') { return false; }
+    u8 *at = base;           /* *at is a '/' */
     i64 w = 0;
+    Seg *sg = self.segs;
     for (i64 k = 0; k < self.nsegs; k++) {
-        Seg *sg = &self.segs[k];
-        if (at >= path.len) { return false; }
+        if (at >= end) { return false; }
         if (sg.kind == SegKind.multi) {
             if (sg.text.len > 0 && spans) {
-                spans[w] = at + 1;
+                spans[w] = at + 1 - base;
                 spans[w + 1] = path.len;
             }
             return true;
         }
-        if (at == path.len - 1) {        /* only the trailing "/" left */
+        u8 *b = at + 1;
+        if (b == end) {          /* only the trailing "/" left */
             if (sg.kind != SegKind.end) { return false; }
-            at = path.len;
+            at = end;
+            sg++;
             continue;
         }
-        i64 b = at + 1;
-        i64 e = b;
-        while (e < path.len && path.ptr[e] != '/') { e++; }
+        u8 *e = libc.memchr(b, '/', end - b);
+        if (!e) { e = end; }
         if (sg.kind == SegKind.lit) {
-            if (!segEq(path.ptr[b:e], sg.text)) { return false; }
+            i64 n = e - b;
+            if (n != sg.text.len || libc.memcmp(b, sg.text.ptr, n) != 0) {
+                if (!segEq(b[0:n], sg.text)) { return false; }
+            }
         } else if (sg.kind == SegKind.wild) {
             if (spans) {
-                spans[w] = b;
-                spans[w + 1] = e;
+                spans[w] = b - base;
+                spans[w + 1] = e - base;
             }
             w += 2;
         } else {
-            return false;                /* {$} before the end */
+            return false;        /* {$} before the end */
         }
         at = e;
+        sg++;
     }
-    return at == path.len;
+    return at == end;
 }
 
 /* the match of path is exact: not through a trailing multi, unless that
@@ -390,16 +397,19 @@ static Rel comparePatterns(Pattern *p1, Pattern *p2) {
 static bool needsClean(u8[] path, i64 *slashes) {
     i64 n = 0;
     u8 *p = path.ptr;
-    i64 len = path.len;
-    for (i64 i = 0; i < len; i++) {
-        if (p[i] != '/') { continue; }
+    u8 *end = p + path.len;
+    while (p < end) {
+        u8 *q = libc.memchr(p, '/', end - p);
+        if (!q) { break; }
         n++;
-        if (i + 1 == len) { break; }
-        u8 c = p[i + 1];
+        p = q + 1;
+        if (p == end) { break; }
+        u8 c = *p;
         if (c == '/') { return true; }
-        if (c != '.') { continue; }
-        if (i + 2 == len || p[i + 2] == '/') { return true; }
-        if (p[i + 2] == '.' && (i + 3 == len || p[i + 3] == '/')) { return true; }
+        if (c == '.') {
+            if (p + 1 == end || p[1] == '/') { return true; }
+            if (p[1] == '.' && (p + 2 == end || p[2] == '/')) { return true; }
+        }
     }
     *slashes = n;
     return false;

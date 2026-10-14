@@ -81,18 +81,24 @@ static i64 stringOwnOffset(String *s, u8[] t)
 /* t's bytes at the end (t may be a view of this String itself) */
 pub void String.append(u8[] t)
 {
-    if (!t.len) { return; }
-    i64 own = stringOwnOffset(self, t);
-    self.reserve(t.len);
-    u8 *from = own >= 0 ? self.ptr + own : t.ptr;
-    libc.memmove(self.ptr + self.len, from, t.len);
-    self.len += t.len;
+    i64 n = t.len;
+    if (!n) { return; }
+    u8 *from = t.ptr;
+    if (n > self.cap - self.len) {
+        /* growing moves the buffer: a view of this String moves with it */
+        u8 *old = self.ptr;
+        bool own = old && from >= old && from <= old + self.len;
+        self.reserve(n);
+        if (own) { from = self.ptr + (from - old); }
+    }
+    libc.memmove(self.ptr + self.len, from, n);
+    self.len += n;
     self.ptr[self.len] = 0;
 }
 
 pub void String.appendByte(u8 b)
 {
-    self.reserve(1);
+    if (self.len >= self.cap) { self.reserve(1); }
     self.ptr[self.len++] = b;
     self.ptr[self.len] = 0;
 }
@@ -465,11 +471,17 @@ pub i64 runeCount(u8[] s)
 /* Whether all of s is UTF-8 */
 pub bool validUtf8(u8[] s)
 {
+    u8 *p = s.ptr;
+    i64 n = s.len;
     i64 at = 0;
-    while (at < s.len) {
+    while (true) {
+        /* ASCII runs: 8 bytes at a time */
+        while (at + 8 <= n && !(*(u64 *)(p + at) & 0x8080808080808080)) { at += 8; }
+        while (at < n && p[at] < 0x80) { at++; }
+        if (at >= n) { return true; }
         i64 before = at;
         i32 cp = decodeRune(s, &at);
-        if (cp == 0xFFFD && !(at - before == 3 && s.ptr[before] == 0xEF)) { return false; }
+        if (cp == 0xFFFD && !(at - before == 3 && p[before] == 0xEF)) { return false; }
     }
     return true;
 }

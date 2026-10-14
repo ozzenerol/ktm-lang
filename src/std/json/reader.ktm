@@ -291,29 +291,42 @@ static u8[] readerString(Reader *r)
     u8 *b = r.text.ptr;
     i64 n = r.text.len;
     if (r.pos >= n || b[r.pos] != '"') { readerExpected(r, "a string"); }
-    i64 from = r.pos + 1, i = from;
+    i64 from = r.pos + 1;
+    /* the first '"' ends it, unless a '\\' comes first (readerEscaped then
+     * reads it to its real end) */
+    u8 *q = from < n ? libc.memchr(b + from, '"', n - from) : null;
+    if (!q) {
+        r.pos = n;
+        r.fail("a string with no closing quote");
+    }
+    i64 end = q - b, i = from;
     bool ascii = true;
-    while (i < n) {
+    if (end - from >= 8) {
+        /* 8 plain ASCII bytes (no '\\', control byte or byte >= 0x80) at once */
+        u64 ones = 0x0101010101010101, high = 0x8080808080808080;
+        u64 slashes = ones * '\\', ctl = ones * 0x20;
+        while (i + 8 <= end) {
+            u64 x = *(u64 *)(b + i);
+            u64 s8 = x ^ slashes;
+            if ((x | ((x - ctl) & ~x) | ((s8 - ones) & ~s8)) & high) { break; }
+            i += 8;
+        }
+    }
+    for (; i < end; i++) {
         u8 ch = b[i];
-        if (ch == '"') { break; }
         if (ch == '\\') { return readerEscaped(r, from, i, ascii); }
         if (ch < 0x20) {
             r.pos = i;
             r.fail("a control character in a string (write \\n, \\t, \\u0001 ...)");
         }
         if (ch >= 0x80) { ascii = false; }
-        i++;
     }
-    if (i >= n) {
-        r.pos = n;
-        r.fail("a string with no closing quote");
-    }
-    u8[] s = b[from:i];
+    u8[] s = b[from:end];
     if (!ascii && !str.validUtf8(s)) {
         r.pos = from - 1;
         r.fail("a string that isn't UTF-8");
     }
-    r.pos = i + 1;
+    r.pos = end + 1;
     return s;
 }
 
