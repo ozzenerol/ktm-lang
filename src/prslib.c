@@ -2930,8 +2930,24 @@ void parseCheckOverloadRefs(Cctrl *cc) {
 
 /* A call to instance `fn` of a generic function with `argv` parsed
  * without a target: checked, completed and converted as any call */
+/* argv was parsed before the generic's instance was known: the arguments
+ * of fn's @caller parameters, put in their places; how many */
+static int parseGenericFillCallers(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *loc) {
+    Vec *params = parseGetFunctionParams(fn);
+    int n = 0;
+    for (u64 i = 0; params && i < params->size && i <= argv->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p || !(p->flags & AST_FLAG_CALLER)) continue;
+        vecInsertAt(argv, parseCallerArg(cc, p, loc->line), i);
+        if (loc->args) vecInsertAt(loc->args, NULL, i);
+        n++;
+    }
+    return n;
+}
+
 static Ast *parseGenericCallWith(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *loc,
                                  char *fname, int len) {
+    parseGenericFillCallers(cc, fn, argv, loc);
     parseOverloadPackVarArgs(cc, fn, argv, loc->args, fname, len);
     parseFunctionArgumentCheck(cc, fn, argv, fname, len, loc);
     parseFlattenDefaultArgs(fn, argv);
@@ -2973,8 +2989,19 @@ static Ast *parseGenericOverloadPick(Cctrl *cc, GenericDef *head, Vec *targs, Ve
                             why ? why : "no definition fits", len, fname);
     }
     if (set->size == 1) return set->entries[0];
+    /* picked with the @caller arguments (overloads start with the same
+     * ones), which parseGenericCallWith puts back for the one picked */
     Ast *decl = NULL;
-    return parseResolveOverload(cc, set, argv, 0, fname, len, loc, &decl);
+    Vec *params = parseGetFunctionParams(set->entries[0]);
+    int filled = parseGenericFillCallers(cc, set->entries[0], argv, loc);
+    Ast *pick = parseResolveOverload(cc, set, argv, 0, fname, len, loc, &decl);
+    for (u64 i = params ? params->size : 0; filled && i-- > 0;) {
+        Ast *p = params->entries[i];
+        if (i >= argv->size || !p || !(p->flags & AST_FLAG_CALLER)) continue;
+        vecRemoveAt(argv, i);
+        if (loc->args) vecRemoveAt(loc->args, i);
+    }
+    return pick;
 }
 
 /* `name<T, U>(args)`, the `<` next: the call of that instance */
