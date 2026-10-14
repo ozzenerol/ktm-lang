@@ -148,6 +148,92 @@ that needs unescaping is copied into the request's arena) and rejects most route
 <li><code>mux.free()</code> frees the routes and leaves the Mux empty; <code>http.listen</code> calls it when it returns.</li>
 </ul>
 
+<h2 id="middleware">Middleware and groups</h2>
+<p>A middleware is a <code>bool fn(http.Writer *w, http.Request *r)</code> that runs before the handler: return
+<code>true</code> to go on, or write a reply and return <code>false</code> to stop there.
+<code>mux.use(&amp;fn)</code> adds one; they run in the order they were added, for every request the mux serves,
+404s and 405s included.</p>
+<p><code>mux.group(prefix)</code> gives a <code>http.Mux *</code> whose patterns get the prefix in front
+(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A group's own
+<code>use()</code> runs only for its routes, after the middlewares of the mux (and of the groups) it was made from.
+Groups can have groups. A group belongs to its mux: <code>mux.free()</code> frees it, and so does <code>http.listen</code>.</p>
+<pre data-run><code>
+import net.http, str;
+
+bool logged(http.Writer *w, http.Request *r)
+{
+  printf("  -> %s %s\n", r.method, r.path);
+  return true;
+}
+
+bool auth(http.Writer *w, http.Request *r)
+{
+  if (str.equals(r.header("Authorization"), "Bearer secret")) { return true; }
+  w.error(401, "unauthorized");
+  return false;                     // the handler doesn't run
+}
+
+void health(http.Writer *w, http.Request *r) { w.text(200, "ok"); }
+void user(http.Writer *w, http.Request *r)   { w.text(200, "user %s", r.param("id")); }
+
+void show(http.Mux *mux, u8[] target, u8[] token)
+{
+  http.Request r = http.testRequest("GET", target);
+  if (token.len) { r.addHeader("Authorization", token); }
+  http.Writer w = http.recorder();
+  mux.serve(&w, &r);
+  printf("%s: %d %s\n", target, w.code, w.body);
+  w.free();
+  r.free();
+}
+
+void main()
+{
+  http.Mux mux;
+  mux.use(&logged);                 // every request
+  mux.handle("GET /health", &health);
+
+  http.Mux *api = mux.group("/api");
+  api.use(&auth);                   // only /api routes
+  api.handle("GET /users/{id}", &user);
+
+  show(&mux, "/health", "");
+  show(&mux, "/api/users/7", "");
+  show(&mux, "/api/users/7", "Bearer secret");
+  mux.free();
+}
+</code></pre>
+<pre class="output">
+  -> GET /health
+/health: 200 ok
+  -> GET /api/users/7
+/api/users/7: 401 {"error":"unauthorized"}
+  -> GET /api/users/7
+/api/users/7: 200 user 7
+</pre>
+
+<h3 id="files">Static files</h3>
+<p><code>mux.files(prefix, dir)</code> serves the files under <code>dir</code> at <code>prefix</code>, which must end in
+<code>/</code>: it adds the route <code>GET prefix{path...}</code> (on a group, under the group's prefix).</p>
+<pre><code>
+http.Mux mux;
+mux.files("/static/", "./public");   // GET /static/css/site.css -> ./public/css/site.css
+mux.handle("GET /api/items", &items);
+return http.listen(8080, &mux);
+</code></pre>
+<ul>
+<li>A directory serves its <code>index.html</code> (no listings: without one it is a 404); <code>/static/docs</code> redirects to
+<code>/static/docs/</code>.</li>
+<li>The <code>Content-Type</code> comes from the extension (<code>http.contentType(name)</code>: html, css, js, json, svg,
+png, jpeg, woff2, wasm, pdf and more; anything else is <code>application/octet-stream</code>).</li>
+<li><code>Last-Modified</code> is the file's time; a request with <code>If-Modified-Since</code> at or after it gets
+<code>304</code> and no body.</li>
+<li>Nothing outside <code>dir</code>: the mux already sends <code>/../</code> to the clean path, and an escaped
+<code>..</code> (<code>%2e%2e</code>) or a NUL gets <code>400</code>. Symlinks inside <code>dir</code> are followed.</li>
+<li>A missing file is <code>404</code>, one that can't be read <code>403</code>. The file is read whole for each request:
+it is meant for a site's assets, not for large downloads.</li>
+</ul>
+
 <h2>Handlers</h2>
 <p>A handler is <code>void name(http.Writer *w, http.Request *r)</code> (the type <code>http.Handler</code>). What the request hands
 it is valid until it returns, and the module frees it then: the path, headers, query values, path parameters, the body
@@ -198,6 +284,8 @@ requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno
   <tr><td><code>maxBodyBytes</code></td><td>10 MiB, else <code>413</code></td></tr>
   <tr><td><code>readTimeoutMs</code>, <code>idleTimeoutMs</code></td><td>30 s for a request that started, 120 s idle between requests</td></tr>
   <tr><td><code>noSignals</code></td><td>false: SIGINT and SIGTERM stop the server</td></tr>
+  <tr><td><code>accessLog</code></td><td>false; true: a <a href="lib-logging.html"><code>log.info</code></a> line per request,
+  <code>GET /users/7?full=1 200 41 0.120ms</code> (method, target, status, body bytes, time)</td></tr>
 </table>
 <p>HTTP/1.1 with keep-alive and pipelining, chunked request bodies, <code>Expect: 100-continue</code>, and HTTP/1.0. A
 request with both <code>Content-Length</code> and chunked encoding is refused (<code>400</code>). There is no TLS: put the server

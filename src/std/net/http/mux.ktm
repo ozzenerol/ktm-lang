@@ -1,6 +1,10 @@
 module http;
 import libc, mem, str;
 
+/* Middleware: runs before a handler (mux.use); false stops the request
+ * there, with the reply the middleware wrote in w. */
+pub type Middleware = fn(Writer *w, Request *r) bool;
+
 /* Routes requests to handlers by method and path, as Go 1.22's
  * ServeMux does. Declare one (`http.Mux mux;`: no init call), add
  * routes with mux.handle, give it to http.listen. Patterns are in
@@ -13,11 +17,23 @@ pub struct Mux {
     private i64 len;
     private i64 cap;
     private u64 subtrees;   /* bit n: a route ending in {...} has n segments (63: 63 or more) */
+    private Middleware *mws;  /* mux.use, in order */
+    private i64 nmws;
+    private i64 mwcap;
+    private Mux *parent;    /* a group's parent; null for the Mux the server serves */
+    private u8 *prefix;     /* a group's whole prefix ("/api/v1", no trailing '/'), NUL-ended */
+    private i64 prefixLen;
+    private Mux **groups;   /* the groups made from this Mux: freed with it */
+    private i64 ngroups;
+    private i64 gcap;
 };
 
 struct MuxRoute {
     Pattern p;
     Handler h;
+    Mux *group;    /* the group it was added through, null if none */
+    u8 *dir;       /* mux.files: the directory (own copy, NUL-ended); else null */
+    i64 dirLen;
 };
 
 /* Adds a route. pattern is "[METHOD ]/path": "GET /users/{id}",
@@ -27,10 +43,42 @@ struct MuxRoute {
 pub void Mux.handle(u8[] pattern, Handler h)
 {
     if (!h) { throw(ERR_PATTERN, "http.Mux.handle: \"%s\": the handler is null", pattern); }
+    muxAdd(self, pattern, h, "", false);
+}
+
+/* The Mux at the top of a group's chain: the one that holds the routes */
+static Mux *muxRoot(Mux *m)
+{
+    while (m.parent) { m = m.parent; }
+    return m;
+}
+
+/* pattern added through m (a group's prefix put in front of its path),
+ * to the routes of m's root; dir: a mux.files route */
+static void muxAdd(Mux *m, u8[] pattern, Handler h, u8[] dir, bool isFiles)
+{
+    if (!m.parent) {
+        muxInsert(m, pattern, h, null, dir, isFiles);
+        return;
+    }
+    /* "[METHOD ]/path" -> "[METHOD ]<prefix>/path" */
+    i64 at = 0;
+    while (at < pattern.len && pattern[at] != '/') { at++; }
+    i64 n = pattern.len + m.prefixLen;
+    u8 *full = mem.alloc(n);
+    defer mem.free(full);
+    mem.copy(full, pattern.ptr, at);
+    mem.copy(full + at, m.prefix, m.prefixLen);
+    mem.copy(full + at + m.prefixLen, pattern.ptr + at, pattern.len - at);
+    muxInsert(muxRoot(m), full[0:n], h, m, dir, isFiles);
+}
+
+static void muxInsert(Mux *m, u8[] pattern, Handler h, Mux *group, u8[] dir, bool isFiles)
+{
     Pattern p = parsePattern(pattern);
-    i64 at = self.len;
-    for (i64 i = 0; i < self.len; i++) {
-        Pattern *q = &self.routes[i].p;
+    i64 at = m.len;
+    for (i64 i = 0; i < m.len; i++) {
+        Pattern *q = &m.routes[i].p;
         Rel rel = comparePatterns(&p, q);
         if (rel == Rel.equivalent || rel == Rel.overlaps) {
             p.free();
@@ -38,18 +86,107 @@ pub void Mux.handle(u8[] pattern, Handler h)
                   pattern, q.text, rel == Rel.equivalent ? "they match the same requests"
                   : "some requests match both and neither is more specific");
         }
-        if (rel == Rel.moreSpecific && at == self.len) { at = i; }
+        if (rel == Rel.moreSpecific && at == m.len) { at = i; }
     }
-    if (self.len == self.cap) {
-        i64 cap = self.cap ? self.cap * 2 : 8;
-        self.routes = mem.realloc(self.routes, cap * sizeof(MuxRoute));
-        self.cap = cap;
+    if (m.len == m.cap) {
+        i64 cap = m.cap ? m.cap * 2 : 8;
+        m.routes = mem.realloc(m.routes, cap * sizeof(MuxRoute));
+        m.cap = cap;
     }
-    libc.memmove(&self.routes[at + 1], &self.routes[at], (self.len - at) * sizeof(MuxRoute));
-    self.routes[at].p = p;
-    self.routes[at].h = h;
-    self.len++;
-    if (p.multi) { self.subtrees |= (u64)1 << (p.nsegs < 63 ? p.nsegs : 63); }
+    libc.memmove(&m.routes[at + 1], &m.routes[at], (m.len - at) * sizeof(MuxRoute));
+    MuxRoute *rt = &m.routes[at];
+    mem.set(rt, 0, sizeof(MuxRoute));
+    rt.p = p;
+    rt.h = h;
+    rt.group = group;
+    if (isFiles) {
+        rt.dir = mem.alloc(dir.len + 1);
+        mem.copy(rt.dir, dir.ptr, dir.len);
+        rt.dir[dir.len] = 0;
+        rt.dirLen = dir.len;
+    }
+    m.len++;
+    if (p.multi) { m.subtrees |= (u64)1 << (p.nsegs < 63 ? p.nsegs : 63); }
+}
+
+/* Adds a middleware: every request the Mux serves (404s and 405s too)
+ * goes through its middlewares in the order they were added, then the
+ * route's handler. On a group: only the group's routes, after the
+ * middlewares of the Mux (and the groups) it was made from. */
+pub void Mux.use(Middleware f)
+{
+    if (!f) { throw(ERR_PATTERN, "http.Mux.use: the middleware is null"); }
+    if (self.nmws == self.mwcap) {
+        self.mwcap = self.mwcap ? self.mwcap * 2 : 4;
+        self.mws = mem.realloc(self.mws, self.mwcap * sizeof(Middleware));
+    }
+    self.mws[self.nmws] = f;
+    self.nmws++;
+}
+
+/* A group of routes under prefix ("/api"): its handle("GET /users", h)
+ * adds "GET /api/users" to this Mux, and its use() is for its routes
+ * only. A group can have groups. It belongs to the Mux: freed by its
+ * free(), never by you. */
+pub Mux *Mux.group(u8[] prefix)
+{
+    if (prefix.len == 0 || prefix[0] != '/') {
+        throw(ERR_PATTERN, "http.Mux.group: prefix \"%s\" must start with '/'", prefix);
+    }
+    if (str.contains(prefix, " ") || str.contains(prefix, "\t")) {
+        throw(ERR_PATTERN, "http.Mux.group: prefix \"%s\" has a space", prefix);
+    }
+    i64 n = prefix.len;
+    while (n > 0 && prefix[n - 1] == '/') { n--; }
+    Mux *g = mem.allocZero(sizeof(Mux));
+    g.parent = self;
+    g.prefixLen = self.prefixLen + n;
+    g.prefix = mem.alloc(g.prefixLen + 1);
+    if (self.prefixLen) { mem.copy(g.prefix, self.prefix, self.prefixLen); }
+    mem.copy(g.prefix + self.prefixLen, prefix.ptr, n);
+    g.prefix[g.prefixLen] = 0;
+    if (self.ngroups == self.gcap) {
+        self.gcap = self.gcap ? self.gcap * 2 : 4;
+        self.groups = mem.realloc(self.groups, self.gcap * sizeof(Mux *));
+    }
+    self.groups[self.ngroups] = g;
+    self.ngroups++;
+    return g;
+}
+
+/* Never called: mux.files routes are served by fileServe */
+static void filesRoute(Writer *w, Request *r) { }
+
+/* Serves the files under dir at prefix ("/static/", which must end in
+ * '/'): GET prefix{path...}. See fileServe (files.ktm) for what it does. */
+pub void Mux.files(u8[] prefix, u8[] dir)
+{
+    if (prefix.len == 0 || prefix[0] != '/' || prefix[prefix.len - 1] != '/') {
+        throw(ERR_PATTERN, "http.Mux.files: prefix \"%s\" must start and end with '/'", prefix);
+    }
+    if (dir.len == 0) { throw(ERR_PATTERN, "http.Mux.files: the directory is empty"); }
+    i64 dl = dir.len;
+    while (dl > 1 && dir[dl - 1] == '/') { dl--; }
+    u8[] tail = "{path...}";
+    i64 n = 4 + prefix.len + tail.len;
+    u8 *pat = mem.alloc(n);
+    defer mem.free(pat);
+    mem.copy(pat, "GET ", 4);
+    mem.copy(pat + 4, prefix.ptr, prefix.len);
+    mem.copy(pat + 4 + prefix.len, tail.ptr, tail.len);
+    muxAdd(self, pat[0:n], &filesRoute, dir[0:dl], true);
+}
+
+/* The middlewares of g's chain, outermost group first (the top Mux's
+ * already ran); false if one stopped the request */
+static bool groupMws(Mux *g, Writer *w, Request *r)
+{
+    if (!g.parent) { return true; }
+    if (!groupMws(g.parent, w, r)) { return false; }
+    for (i64 i = 0; i < g.nmws; i++) {
+        if (!g.mws[i](w, r)) { return false; }
+    }
+    return true;
 }
 
 static i64 slashCount(u8[] path)
@@ -161,6 +298,13 @@ static void muxNoRoute(Mux *m, Writer *w, Request *r, u8[] path)
  * match it; no route 404, a route for other methods only 405 + Allow. */
 pub void Mux.serve(Writer *w, Request *r)
 {
+    if (self.parent) {
+        muxRoot(self).serve(w, r);
+        return;
+    }
+    for (i64 i = 0; i < self.nmws; i++) {
+        if (!self.mws[i](w, r)) { return; }
+    }
     u8[] path = r.path;
     i64 slashes = 0;
     bool unclean = needsClean(path, &slashes);
@@ -206,16 +350,36 @@ pub void Mux.serve(Writer *w, Request *r)
         r.setParam(sg.text, v);
         k += 2;
     }
+    if (rt.group && !groupMws(rt.group, w, r)) { return; }
+    if (rt.dir) {
+        fileServe(w, r, rt.dir[0:rt.dirLen]);
+        return;
+    }
     rt.h(w, r);
 }
 
-/* Frees the routes; the Mux is empty again */
+/* Everything m allocated: its routes, middlewares, groups and prefix */
+static void muxFree(Mux *m)
+{
+    for (i64 i = 0; i < m.len; i++) {
+        m.routes[i].p.free();
+        mem.free(m.routes[i].dir);
+    }
+    mem.free(m.routes);
+    for (i64 i = 0; i < m.ngroups; i++) {
+        muxFree(m.groups[i]);
+        mem.free(m.groups[i]);
+    }
+    mem.free(m.groups);
+    mem.free(m.mws);
+    mem.free(m.prefix);
+    mem.set(m, 0, sizeof(Mux));
+}
+
+/* Frees the routes, middlewares and groups; the Mux is empty again.
+ * Nothing on a group: it is freed with the Mux it was made from. */
 pub void Mux.free()
 {
-    for (i64 i = 0; i < self.len; i++) { self.routes[i].p.free(); }
-    mem.free(self.routes);
-    self.routes = null;
-    self.len = 0;
-    self.cap = 0;
-    self.subtrees = 0;
+    if (self.parent) { return; }
+    muxFree(self);
 }
