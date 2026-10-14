@@ -7934,7 +7934,13 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
         }
         if (tok->mod_pass == LEX_PASS_DECLS && !cc->replaying && !cc->inst &&
             !cc->tmp_gvar_base_type) {
-            char *mod_key = mprintf("%u", tok->module_id);
+            /* by the module's path, not its id: ids are the lexer's, and
+             * the LSP parses with a new lexer in a Cctrl that already
+             * read the stdlib, so an id there can be another module's */
+            Lexer *lx = cc->lexer_;
+            char *mod_key = lx && tok->module_id <= (u32)lx->modules_len
+                ? lx->modules[tok->module_id - 1]->path->data
+                : mprintf("%u", tok->module_id);
             if (!setHas(cc->mod_types_done, mod_key)) {
                 setAdd(cc->mod_types_done, mod_key);
                 parseModuleTypes(cc, tok->module_id);
