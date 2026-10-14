@@ -34,6 +34,7 @@ struct Conn {
     i64 start;
     i64 end;
     String out;      /* replies not sent yet */
+    String sent;     /* replies handed to coro.writeQueued: kept until coro.writeDone */
     i64 dateSec;
     u8 date[40];
     i64 dateLen;
@@ -321,9 +322,15 @@ static void writeBadRequest(Conn *c, Writer *w, i64 code)
 static bool connFlush(Conn *c)
 {
     if (!c.out.len) { return true; }
-    i64 n = coro.write(c.fd, c.out[0:c.out.len], c.srv.readMs);
+    /* the replies queued before are sent: their buffer is free again */
+    if (coro.writeDone(c.fd, c.srv.readMs) < 0) { return false; }
+    String t = c.sent;
+    c.sent = c.out;
+    c.out = t;
     c.out.clear();
-    return n >= 0;
+    /* io_uring: goes to the kernel with the loop's next wait (the read of
+     * the next request), one system call for both */
+    return coro.writeQueued(c.fd, c.sent[0:c.sent.len], c.srv.readMs) >= 0;
 }
 
 /* Reads more into c.in, making room first; false at end of input, an
@@ -409,9 +416,12 @@ static void serveConn(i32 fd, void *arg)
     c.cap = CONN_IN_FIRST;
     Request r;
     Writer w;
+    Server *s0 = c.srv;
     defer {
+        coro.writeDone(fd, s0.readMs);   /* the kernel may read c.sent until then */
         mem.free(c.in);
         c.out.free();
+        c.sent.free();
         r.free();
         w.free();
     }
@@ -451,6 +461,7 @@ static void serveConn(i32 fd, void *arg)
             if (!connFlush(&c)) { return; }
             if (head > 0 && r.expectContinue && !c.sentContinue) {
                 c.sentContinue = true;
+                if (coro.writeDone(fd, s.readMs) < 0) { return; }
                 if (coro.write(fd, "HTTP/1.1 100 Continue\r\n\r\n", s.readMs) < 0) { return; }
             }
             if (!connRead(&c, avail ? s.readMs : s.idleMs)) { return; }

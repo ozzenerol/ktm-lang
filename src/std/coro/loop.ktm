@@ -187,6 +187,17 @@ struct LoopFd {
     bool notSock;        /* io_uring: not a socket, so READ/WRITE, not RECV/SEND */
     bool more;           /* io_uring: a listener with a burst queued: plain accepts */
     i64 queuedRun;       /* io_uring: ACCEPTs in a row that left clients queued */
+    LoopSend *send;      /* io_uring: coro.writeQueued's SEND not waited for yet */
+};
+
+/* A SEND coro.writeQueued submitted: its completion's user_data is this
+ * with the low bit set (a LoopTask's has it clear) */
+struct LoopSend {
+    bool done;           /* its completion came */
+    i64 res;             /* and said this (bytes, or -errno) */
+    LoopTask *waiter;    /* coro.writeDone waiting for it */
+    bool abandoned;      /* coro.close let it go: freed when it completes */
+    bool cancelled;      /* writeDone's deadline cancelled it */
 };
 
 struct LoopTask {
@@ -784,7 +795,20 @@ static void loopUringReap(Loop *lp) {
         i32 res = *(i32 *)(c + 8);
         u32 cflags = *(u32 *)(c + 12);
         head++;
-        if (ud) {
+        if (ud & 1) {
+            LoopSend *sd = (LoopSend *)(ud & ~(u64)1);
+            if (sd.abandoned) {
+                libc.free(sd);
+            } else {
+                sd.done = true;
+                sd.res = res;
+                if (sd.waiter) {
+                    LoopTask *wt = sd.waiter;
+                    sd.waiter = null;
+                    if (wt.waiting && !wt.ready) { loopReady(lp, wt, res); }
+                }
+            }
+        } else if (ud) {
             LoopTask *t = (LoopTask *)ud;
             t.op = false;
             t.cqeFlags = cflags;
@@ -1050,6 +1074,85 @@ pub i64 write(i32 fd, u8[] data, i64 ms=-1) {
     return data.len;
 }
 
+/* data sent on fd without waiting for it, where the loop can (io_uring:
+ * a SEND that goes to the kernel with the loop's next wait, in the same
+ * system call); elsewhere it is coro.write. data must stay as it is until
+ * coro.writeDone(fd) returns. Returns data.len, or -1 with errno set
+ * (only from coro.write's way). One at a time per fd: a second one first
+ * waits for the one before. */
+pub i64 writeQueued(i32 fd, u8[] data, i64 ms=-1) {
+#ifdef IS_LINUX
+    Loop *lp = loopGet(true);
+    if (lp.backend == LOOP_BK_URING && fd >= 0 && data.len > 0 && data.len <= 0x7FFFFFFF) {
+        LoopFd *f = loopFdOf(lp, fd);
+        if (!f.notSock) {
+            if (f.send && writeDone(fd, ms) < 0) { return -1; }
+            f = lp.fdw[fd];
+            LoopSend *sd = libc.calloc(1, sizeof(LoopSend));
+            if (!sd) { loopOom(); }
+            f.send = sd;
+            u8 *e = loopSqe(lp);
+            loopSqePut(lp, e, LOOP_OP_SEND, fd, (u64)data.ptr, data.len,
+                       LOOP_MSG_NOSIGNAL | LOOP_MSG_WAITALL, 0, (u64)sd | 1);
+            return data.len;
+        }
+    }
+#endif
+    return write(fd, data, ms);
+}
+
+/* Waits (ms at most) for coro.writeQueued's data on fd to be sent: its
+ * length, -1 with errno set (ETIMEDOUT: not all sent in time, and the
+ * rest never will be), or 0 when nothing is queued. */
+pub i64 writeDone(i32 fd, i64 ms=-1) {
+#ifdef IS_LINUX
+    Loop *lp = loopGet(false);
+    if (!lp || fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd] || !lp.fdw[fd].send) { return 0; }
+    LoopFd *f = lp.fdw[fd];
+    LoopSend *sd = f.send;
+    if (!sd.done) {
+        LoopTask *t = loopSelf("coro.writeDone");
+        i64 until = loopDeadline(ms);
+        while (!sd.done) {
+            sd.waiter = t;
+            t.fd = -1;
+            t.events = 0;
+            t.deadline = until;
+            t.idle = false;
+            t.paused = false;
+            t.result = 0;
+            t.waiting = true;
+            t.op = false;           /* the deadline readies it: the SEND is cancelled below */
+            t.cancelled = false;
+            t.why = 0;
+            if (until >= 0) { lp.ndeadline++; }
+            yield();
+            if (!sd.done && !sd.cancelled) {
+                /* the deadline: cancel it, then wait for its completion
+                 * (the kernel may still read data until then) */
+                sd.cancelled = true;
+                u8 *e = loopSqe(lp);
+                loopSqePut(lp, e, LOOP_OP_ASYNC_CANCEL, -1, (u64)sd | 1, 0, 0, 0, 0);
+                until = -1;
+            }
+        }
+        sd.waiter = null;
+        t.op = false;
+    }
+    i64 res = sd.res;
+    bool timedOut = sd.cancelled;
+    lp.fdw[fd].send = null;
+    libc.free(sd);
+    if (res < 0) {
+        os.setErrno(timedOut && res == -LOOP_ECANCELED ? libc.ETIMEDOUT : (i32)(-res));
+        return -1;
+    }
+    return res;
+#else
+    return 0;
+#endif
+}
+
 /* In a loop coroutine: pause for ms milliseconds while the others run
  * (0: just let them have a turn). */
 pub void sleep(i64 ms) {
@@ -1211,6 +1314,15 @@ pub i32 close(i32 fd) {
         if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
             LoopFd *f = lp.fdw[fd];
             for (i64 i = 0; i < f.n; i++) { loopCancel(lp, f.w[i], LOOP_WHY_CLOSE); }
+            if (f.send) {
+                /* nobody waits for it now: freed when its completion comes */
+                if (f.send.done) {
+                    libc.free(f.send);
+                } else {
+                    f.send.abandoned = true;
+                }
+                f.send = null;
+            }
         }
         loopForget(lp, fd);
 #endif
