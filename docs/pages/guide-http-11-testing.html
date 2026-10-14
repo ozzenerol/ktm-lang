@@ -1,0 +1,228 @@
+<!-- title: 11. Testing -->
+<h1>11. Testing</h1>
+<p class="lede">Shelf has grown past what curl can keep checking. Its tests send requests through the real routes and
+middleware to a real database, with <code>ktm test</code>, and run in a fraction of a second.</p>
+
+<h2>A package for the API</h2>
+<p>Tests call the code they test, and a test can't call into <code>main.ktm</code>. So the handlers, the middleware and
+the routes move to a package of the project, <code>api/</code>, and <code>main.ktm</code> keeps what a program does at
+start: settings, the database, migrations, listening.</p>
+<pre><code>shelf/
+  ktm.mod
+  main.ktm              settings, database, migrations, http.listen
+  api/
+    api.ktm             module api; handlers, middleware, routes()
+    api_test.ktm        module api; the tests
+  migrations/</code></pre>
+<p><code>api.ktm</code> starts with <code>module api;</code> and everything the handlers used. It is imported by the
+project's path and its directory:</p>
+<pre><code>import "example.com/shelf/api";</code></pre>
+<p>Everything in it can stay private except the one function <code>main</code> needs:</p>
+<pre><code>/* Shelf's routes and middleware on mux. webOrigin: the web app that may
+ * call it from a browser ("": none); trustedProxies: the load balancer's
+ * addresses ("": none). */
+pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
+{
+    if (!gNoUser.len) {
+        String noise = uuid.v4().string();
+        gNoUser = crypto.hashPassword(noise[0:]);
+        noise.free();
+    }
+
+    if (trustedProxies.len) { middleware.realIp(mux, trustedProxies); }
+    middleware.requestId(mux);
+    if (webOrigin.len) {
+        middleware.CorsOptions cors;
+        cors.origins = webOrigin;
+        cors.expose = "X-Request-Id";
+        middleware.cors(mux, &amp;cors);
+    }
+    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
+
+    mux.handle("POST /users", &amp;signup);
+    http.Mux *logins = mux.group("/sessions");
+    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
+    logins.handle("POST", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
+
+    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;checkToken);
+    collections.handle("POST", &amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
+}</code></pre>
+<p>and <code>main</code> shrinks to:</p>
+<pre><code>    http.Mux mux;
+    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);</code></pre>
+
+<h2>The tests</h2>
+<p>A test file is named <code>*_test.ktm</code> and starts with the same <code>module api;</code> line, so its tests see
+every function of the package, private ones too. Each <code>void testXxx(testing.T *t)</code> is a test.</p>
+<pre><code>module api;
+import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import net.http, proc, str, testing;
+
+/* The API's tests, through the real routes and middleware, against a
+ * database of their own: SHELF_TEST_DATABASE_URL (they are skipped
+ * without it). Every test starts from empty tables. */
+
+http.Mux gMux;
+pg.Pool *gDb;
+i64 gClient = 0;        /* each test is another client, with its own rate limits */
+
+/* The mux and the database, once; empty tables for every test */
+bool setup(testing.T *t)
+{
+    if (!gDb) {
+        String url = proc.getenv("SHELF_TEST_DATABASE_URL");
+        defer url.free();
+        if (!url.len) { t.skip("SHELF_TEST_DATABASE_URL isn't set"); }
+        gDb = pg.open(url[0:]);
+        migrate.Migrations ms = migrate.load("../migrations");
+        migrate.Driver d = postgres.driverPool(gDb);
+        ms.up(&amp;d);
+        ms.free();
+        routes(&amp;gMux, "", "");
+    }
+    gDb.exec("TRUNCATE users, bookmarks CASCADE");
+    gClient++;
+    return true;
+}
+
+/* A request through the routes: the reply, yours to free */
+http.Writer send(u8[] method, u8[] target, u8[] body = "", u8[] token = "")
+{
+    http.Request r = http.testRequest(method, target, body);
+    r.app = gDb;
+    String addr = str.format("192.0.2.%d", gClient);
+    r.setRemoteAddr(addr[0:]);
+    addr.free();
+    String auth = str.format("Bearer %s", token);
+    if (token.len) { r.addHeader("Authorization", auth[0:]); }
+    http.Writer w = http.recorder();
+    gMux.serve(&amp;w, &amp;r);
+    r.free();
+    auth.free();
+    return w;
+}
+
+/* A new user's session token (yours to free) */
+String signIn(testing.T *t, u8[] email)
+{
+    String body = str.format("{\"email\": \"%s\", \"password\": \"a long password\"}", email);
+    defer body.free();
+    http.Writer w = send("POST", "/users", body[0:]);
+    t.equal(w.code, 201);
+    w.free();
+    w = send("POST", "/sessions", body[0:]);
+    t.equal(w.code, 201);
+    i64 at = str.find(w.body[0:], "\"token\":\"") + 9;
+    String token = str.from(w.body[at:at + 43]);
+    w.free();
+    return token;
+}
+
+void testSignupRules(testing.T *t)
+{
+    setup(t);
+    http.Writer w = send("POST", "/users", "{\"email\": \"not an email\", \"password\": \"short\"}");
+    t.equal(w.code, 422);
+    t.check(str.find(w.body[0:], "\"field\":\"email\"") &gt; 0 &amp;&amp; str.find(w.body[0:], "\"field\":\"password\"") &gt; 0,
+            "both fields named: %s", w.body);
+    w.free();
+}
+
+void testLogin(testing.T *t)
+{
+    setup(t);
+    String token = signIn(t, "ada@example.com");
+    defer token.free();
+    t.equal(token.len, 43);
+    http.Writer w = send("POST", "/sessions", "{\"email\": \"ada@example.com\", \"password\": \"wrong one\"}");
+    t.equal(w.code, 401);
+    w.free();
+}
+
+void testBookmarksNeedAToken(testing.T *t)
+{
+    setup(t);
+    http.Writer w = send("GET", "/bookmarks");
+    t.equal(w.code, 401);
+    w.free();
+}
+
+void testUsersSeeOnlyTheirOwn(testing.T *t)
+{
+    setup(t);
+    String ada = signIn(t, "ada@example.com");
+    String bob = signIn(t, "bob@example.com");
+    defer ada.free();
+    defer bob.free();
+    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\", \"tags\": [\"go\"]}", ada[0:]);
+    t.equal(w.code, 201);
+    w.free();
+    w = send("GET", "/bookmarks", "", bob[0:]);
+    t.equal(w.body, "{\"items\":[]}");
+    w.free();
+    w = send("GET", "/bookmarks?tag=go", "", ada[0:]);
+    t.check(str.find(w.body[0:], "https://go.dev") &gt; 0, "ada's list: %s", w.body);
+    w.free();
+}
+
+void testDuplicateLink(testing.T *t)
+{
+    setup(t);
+    String ada = signIn(t, "ada@example.com");
+    defer ada.free();
+    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
+    w.free();
+    w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
+    t.equal(w.code, 409);
+    w.free();
+}</code></pre>
+<ul class="rules">
+  <li><code>http.testRequest</code> and <code>http.recorder()</code> make a request and catch the reply without a
+  socket; <code>gMux.serve</code> runs them through the same routes and middleware as the server. <code>r.app</code> is
+  what <code>http.listen</code> would have set.</li>
+  <li>The tests use a database of their own, named by <code>SHELF_TEST_DATABASE_URL</code>, migrated once and emptied
+  before every test. Without it they are skipped, not failed, so <code>ktm test</code> works on a machine with no
+  database.</li>
+  <li>Each test is another client address (<code>setRemoteAddr</code>), so the login rate limit of chapter 10 doesn't
+  carry over from one test to the next.</li>
+  <li><code>t.equal(got, want)</code> compares numbers and texts and says both when they differ; <code>t.check(ok,
+  "...")</code> takes any condition and a message. A failed check doesn't stop the test: every failure is listed.</li>
+</ul>
+
+<h2>Run them</h2>
+<pre><code>$ docker exec shelf-db createdb -U postgres shelf_test
+$ export SHELF_TEST_DATABASE_URL=postgres://postgres:shelf@localhost:5432/shelf_test
+$ ktm test ./...
+ok  	api	0.21s  (5 passed)
+
+$ ktm test -v ./api
+=== RUN   testSignupRules
+--- PASS: testSignupRules (0.04s)
+=== RUN   testLogin
+--- PASS: testLogin (0.05s)
+...</code></pre>
+<p>When one fails, the line says where and what:</p>
+<pre><code>--- FAIL: testDuplicateLink (0.03s)
+    api_test.ktm:122: got 409, want 400
+FAIL
+FAIL	api	0.19s  (4 passed, 1 failed)</code></pre>
+<p><code>ktm test</code> exits with 1 when any test failed, so it works as a CI step as it is.
+<code>-run Login</code> runs only the tests whose names contain <code>Login</code>; <code>-jit -Memsafe</code> runs them
+in the JIT and reports memory leaks and bad frees (<a href="tools-testing.html">Testing</a>).</p>
+<p>Next: <a href="guide-http-12-production.html">Production</a>.</p>

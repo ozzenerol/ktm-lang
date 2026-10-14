@@ -1,0 +1,115 @@
+<!-- title: 12. Production -->
+<h1>12. Production</h1>
+<p class="lede">The last steps from a program on your laptop to a service: HTTPS, a health check for whatever watches
+it, time limits, and a way to ship and run it that survives restarts and deploys.</p>
+
+<h2>One binary</h2>
+<pre><code>$ ktm build
+$ ls -l shelf
+-rwxrwxr-x 1 ada ada 2014504 Oct 14 15:49 shelf
+$ ldd shelf
+	linux-vdso.so.1
+	libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6
+	libm.so.6 =&gt; /lib/x86_64-linux-gnu/libm.so.6
+	/lib64/ld-linux-x86-64.so.2</code></pre>
+<p>Two megabytes, needing only the C library: the standard library, ktm-pg and ktm-migrate are compiled in, and so is
+TLS. Copy it with the <code>migrations</code> directory and it runs.</p>
+
+<h2>HTTPS</h2>
+<p>Two more settings, the certificate chain and its key as PEM files, and <code>main</code> serves over TLS when they
+are set:</p>
+<pre><code>    if (gSettings.tlsCert.len) {
+        log.info("Shelf listening on https://localhost:%d", *port);
+        return https.listen((i32)*port, &amp;mux, gSettings.tlsCert, gSettings.tlsKey, db, &amp;o);
+    }</code></pre>
+<pre><code>SHELF_TLS_CERT=/etc/letsencrypt/live/shelf.example.com/fullchain.pem
+SHELF_TLS_KEY=/etc/letsencrypt/live/shelf.example.com/privkey.pem</code></pre>
+<p>Behind a load balancer or a proxy that ends TLS (nginx, Caddy, a cloud load balancer), leave them unset: the proxy
+speaks HTTPS to the world, Shelf plain HTTP to the proxy, and <code>SHELF_TRUSTED_PROXIES</code> (chapter 10) gives
+the real client addresses back.</p>
+
+<h2>Health and time limits</h2>
+<pre><code>/* GET /health: for the load balancer and the monitoring. 200 while the
+ * database answers, 503 when it doesn't (the instance takes no traffic) */
+void health(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    try {
+        pg.Conn *c = db.acquire();
+        defer c.release();
+        c.setQueryTimeout(1000);        /* a database that doesn't answer in a second is down */
+        c.ping();
+    } catch (Error e) {
+        w.error(503, "the database doesn't answer");
+        return;
+    }
+    w.text(200, "ok");
+}</code></pre>
+<pre><code>    pg.Options po;
+    po.queryTimeoutMs = 5000;           /* no request waits on a query for more than 5 s */
+    pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;po);</code></pre>
+<ul class="rules">
+  <li><code>GET /health</code> is for the load balancer and the monitoring: 200 while the database answers, 503 when it
+  doesn't, so traffic goes to instances that can serve it.</li>
+  <li>Every query has a time limit: a slow query is cancelled on the server and the request gets a 500, instead of
+  waiting forever and holding a connection. The health check's is tighter.</li>
+  <li>The server has its own limits for slow clients: a request must arrive within 30 s, an idle kept-alive connection
+  closes after 120 s (<code>http.Options</code>' <code>readTimeoutMs</code>, <code>idleTimeoutMs</code>).</li>
+</ul>
+
+<h2>Stopping cleanly</h2>
+<p>On SIGTERM (what systemd, Docker and Kubernetes send) and Ctrl-C, <code>http.listen</code> stops taking connections,
+lets the requests in flight finish, waits for background work, and returns; the <code>defer</code>s in
+<code>main</code> close the pool. A deploy that replaces one instance at a time drops no request.</p>
+
+<h2>Running it with systemd</h2>
+<pre><code>[Unit]
+Description=Shelf, a bookmarks API
+After=network-online.target postgresql.service
+
+[Service]
+User=shelf
+WorkingDirectory=/opt/shelf
+EnvironmentFile=/etc/shelf.env
+ExecStart=/opt/shelf/shelf
+Restart=on-failure
+# SIGTERM: Shelf finishes the requests in flight, then exits
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+<pre><code>$ sudo cp shelf /opt/shelf/ &amp;&amp; sudo cp -r migrations /opt/shelf/
+$ sudo systemctl enable --now shelf
+$ journalctl -u shelf -f</code></pre>
+<p><code>/etc/shelf.env</code> holds the same <code>SHELF_*</code> variables as <code>.env</code>, readable only by root and
+the <code>shelf</code> user. The server migrates the database at start, so a deploy is: copy the new binary and
+migrations, <code>systemctl restart shelf</code>.</p>
+
+<h2>Or in a container</h2>
+<pre><code># Build with ktm (it assembles and links with gcc), run on a slim image: the binary needs only libc
+FROM debian:trixie AS build
+RUN apt-get update &amp;&amp; apt-get install -y --no-install-recommends ca-certificates curl unzip git gcc libc6-dev \
+ &amp;&amp; curl -fsSL https://github.com/ozzenerol/ktm-lang/releases/download/v0.21.0/ktm-v0.21.0-linux-x86_64.zip -o /tmp/ktm.zip \
+ &amp;&amp; unzip -q /tmp/ktm.zip -d /opt &amp;&amp; /opt/ktm-v0.21.0-linux-x86_64/install.sh
+WORKDIR /src
+COPY . .
+RUN ktm build
+
+FROM debian:trixie-slim
+COPY --from=build /src/shelf /usr/local/bin/shelf
+COPY migrations /app/migrations
+WORKDIR /app
+USER nobody
+EXPOSE 8080
+CMD ["shelf"]</code></pre>
+<p>ktm compiles to assembly and links with the system's C compiler, so the build stage has <code>gcc</code>; the image
+that runs has only the binary and the migrations.</p>
+<pre><code>$ docker build -t shelf .
+$ docker run -p 8080:8080 --env-file .env shelf</code></pre>
+
+<h2>Where to go from here</h2>
+<p>Shelf now has everything a real API has: validated input, a database with migrations, accounts, permissions,
+middleware, tests and a deployment. The <a href="lib-http.html">HTTP</a>,
+<a href="lib-http-middleware.html">middleware</a> and <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> pages
+go deeper into each part.</p>
