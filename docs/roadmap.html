@@ -97,8 +97,8 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>config</code></td><td>stdlib</td><td>Environment variables and <code>.env</code> into a struct (<code>@env</code>, <code>@required</code>)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, TLS, LISTEN/NOTIFY, COPY, arrays, fuzzed, a 1-hour soak test clean</td><td><span class="tag done">done</span> v0.1.0</td></tr>
   <tr><td>ktm-jwt</td><td>package</td><td>Sign and verify JWTs (HS256, RS256, ES256, EdDSA), JWKS</td><td><span class="tag">planned</span></td></tr>
-  <tr><td>Validation</td><td>stdlib</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@required</code>) with readable errors, next to <code>http.decode</code></td><td><span class="tag">planned</span></td></tr>
-  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Validation</td><td>stdlib</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code>, <code>@oneOf</code>, <code>@required</code>) with readable errors; <code>http.decodeValid</code> answers 422</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
+  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag wip">in progress</span> (ktm-migrate)</td></tr>
 </table></div>
 
 <h2 id="tier-2-what-most-services-reach-for-soon">Tier 2: what most services reach for soon<a class="anchor" href="#tier-2-what-most-services-reach-for-soon" aria-label="Link to this section">#</a></h2>
@@ -109,7 +109,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td>SQL interface</td><td>stdlib</td><td>One small interface for PostgreSQL, MySQL and SQLite (query, exec, scan, transactions)</td><td><span class="tag">planned</span></td></tr>
   <tr><td>WebSocket</td><td>stdlib</td><td>Server and client in <code>net.http</code>, on coroutines</td><td><span class="tag">planned</span></td></tr>
   <tr><td><code>compress</code></td><td>stdlib</td><td>gzip and deflate (zstd later) for responses and files</td><td><span class="tag">planned</span></td></tr>
-  <tr><td>Middleware pack</td><td>stdlib</td><td>CORS, request IDs, recovery, rate limiting, real IP, timeouts, auth hooks</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Middleware pack</td><td>stdlib</td><td><code>net.http.middleware</code>: CORS, request IDs, rate limiting, real IP, bearer tokens (a throw is already a 500; time limits are per operation)</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
   <tr><td>Metrics</td><td>package</td><td>Prometheus metrics and a <code>/metrics</code> handler</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Tracing</td><td>package</td><td>OpenTelemetry traces (OTLP over HTTP)</td><td><span class="tag">planned</span></td></tr>
   <tr><td><code>regex</code></td><td>stdlib</td><td>Regular expressions in linear time (RE2 style)</td><td><span class="tag">planned</span></td></tr>
@@ -117,7 +117,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>toml</code></td><td>stdlib</td><td>Config files, next to JSON and YAML</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Time zones</td><td>stdlib</td><td>The IANA zone database in <code>date</code></td><td><span class="tag">planned</span></td></tr>
   <tr><td><code>decimal</code></td><td>stdlib</td><td>Exact decimal numbers for money (PostgreSQL <code>numeric</code>)</td><td><span class="tag">planned</span></td></tr>
-  <tr><td>Testing helpers</td><td>stdlib</td><td>Assertions, table tests, golden files, benchmarks, <code>ktm test</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Testing helpers</td><td>stdlib</td><td>Assertions, table tests, golden files, benchmarks, <code>ktm test</code></td><td><span class="tag wip">in progress</span></td></tr>
   <tr><td>ktm-smtp</td><td>package</td><td>Sending email, with TLS</td><td><span class="tag">planned</span></td></tr>
   <tr><td>ktm-s3</td><td>package</td><td>S3-compatible storage (AWS, MinIO, R2): put, get, list, presigned URLs</td><td><span class="tag">planned</span></td></tr>
 </table></div>
