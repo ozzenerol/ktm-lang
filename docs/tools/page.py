@@ -61,6 +61,7 @@ NAV = [
         ("lib-flags.html", "Command-line flags"),
         ("lib-environment.html", "Environment and exit"),
         ("lib-config.html", "Settings from the environment"),
+        ("lib-validate.html", "Validation"),
         ("lib-signals.html", "Signals"),
         ("lib-logging.html", "Logging"),
         ("lib-vectors.html", "Vectors and sorting"),

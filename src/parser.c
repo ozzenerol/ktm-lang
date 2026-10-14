@@ -600,7 +600,12 @@ static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at);
  * struct's come before its declaration (and before `pub`), a field's
  * before the field. Which ones there are and where they go: */
 static const char *parse_struct_attrs[] = {"json", "yaml", NULL};
-static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "required", NULL};
+static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "required",
+        "min", "max", "email", "url", "oneOf", NULL};
+
+/* Attributes config and validate read: on a field of any struct */
+static const char *parse_any_struct_attrs[] = {"env", "required", "min", "max", "email",
+        "url", "oneOf", NULL};
 
 static int parseAttrIn(const char **names, AoStr *name) {
     for (int i = 0; names[i]; ++i) {
@@ -625,16 +630,52 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
         a->line = at->line;
         a->col = at->col;
         int len = name->len + 1;
-        if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+        int is_num = !strcmp(a->name->data, "min") || !strcmp(a->name->data, "max");
+        int is_list = !strcmp(a->name->data, "oneOf");
+        if (tokenPunctIs(cctrlTokenPeek(cc), '(') && is_num) {
+            /* @min(n), @max(n): a number, maybe negative */
             cctrlTokenGet(cc);
             Lexeme *arg = cctrlTokenGet(cc);
-            if (!arg || arg->tk_type != TK_STR || !tokenPunctIs(cctrlTokenPeek(cc), ')')) {
+            int neg = arg && tokenPunctIs(arg, '-');
+            if (neg) arg = cctrlTokenGet(cc);
+            if (!arg || (arg->tk_type != TK_I64 && arg->tk_type != TK_F64) ||
+                !tokenPunctIs(cctrlTokenPeek(cc), ')')) {
                 cctrlRaiseExceptionAt(cc, a->line, a->col, len,
-                        "`@%s(...)` takes one string: @%s(\"text\")",
-                        a->name->data, a->name->data);
+                        "`@%s(...)` takes a number: @%s(1)", a->name->data, a->name->data);
             }
             cctrlTokenGet(cc);
-            a->arg = aoStrDupRaw(arg->start, arg->len);
+            a->num = arg->tk_type == TK_I64 ? (double)arg->i64 : arg->f64;
+            if (neg) a->num = -a->num;
+            a->arg = aoStrPrintf("%s%.*s", neg ? "-" : "", arg->len, arg->start);
+        } else if (tokenPunctIs(cctrlTokenPeek(cc), '(')) {
+            /* @name("text"); @oneOf("a", "b", ...) takes several, kept
+             * joined by '|' */
+            cctrlTokenGet(cc);
+            while (1) {
+                Lexeme *arg = cctrlTokenGet(cc);
+                if (!arg || arg->tk_type != TK_STR ||
+                    !(tokenPunctIs(cctrlTokenPeek(cc), ')') ||
+                      (is_list && tokenPunctIs(cctrlTokenPeek(cc), ',')))) {
+                    if (is_list) {
+                        cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                                "`@oneOf(...)` takes strings: @oneOf(\"draft\", \"published\")");
+                    }
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                            "`@%s(...)` takes one string: @%s(\"text\")",
+                            a->name->data, a->name->data);
+                }
+                if (is_list && (arg->len == 0 || memchr(arg->start, '|', arg->len))) {
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                            "`@oneOf`: each value is a non-empty string without '|'");
+                }
+                if (!a->arg) {
+                    a->arg = aoStrDupRaw(arg->start, arg->len);
+                } else {
+                    aoStrPutChar(a->arg, '|');
+                    aoStrCatLen(a->arg, arg->start, arg->len);
+                }
+                if (tokenPunctIs(cctrlTokenGet(cc), ')')) break;
+            }
         }
 
         const char **here = on_field ? parse_field_attrs : parse_struct_attrs;
@@ -647,11 +688,20 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
             }
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "unknown attribute `@%s`: a struct takes @json and @yaml, "
-                    "a field @key, @skip, @omitEmpty, @env and @required", a->name->data);
+                    "a field @key, @skip, @omitEmpty, @env, @required, @min, @max, "
+                    "@email, @url and @oneOf", a->name->data);
         }
         int is_env = !strcmp(a->name->data, "env");
-        int wants_arg = !strcmp(a->name->data, "key") || is_env;
+        int wants_arg = !strcmp(a->name->data, "key") || is_env || is_num || is_list;
         if (wants_arg && (!a->arg || a->arg->len == 0)) {
+            if (is_num) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@%s` takes a number: @%s(1)", a->name->data, a->name->data);
+            }
+            if (is_list) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@oneOf` takes the allowed values: @oneOf(\"draft\", \"published\")");
+            }
             if (is_env) {
                 cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                         "`@env` takes the variable's name as a string: @env(\"PORT\")");
@@ -659,10 +709,10 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "`@key` takes the field's key as a string: @key(\"e-mail\")");
         }
-        if (wants_arg && memchr(a->arg->data, '\\', a->arg->len)) {
+        if (wants_arg && !is_num && memchr(a->arg->data, '\\', a->arg->len)) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "`@%s`: write the %s without escapes", a->name->data,
-                    is_env ? "name" : "key");
+                    is_env ? "name" : is_list ? "values" : "key");
         }
         if (!wants_arg && a->arg) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
@@ -686,16 +736,16 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
 }
 
 /* A field's attribute on a struct without @json or @yaml does nothing
- * (but config's @env and @required): an error, at the attribute */
+ * (but config's and validate's): an error, at the attribute */
 static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fields) {
     if (cls_attrs && cls_attrs->size) return;
     listForEach(fields) {
         ClsField *f = it->value;
         if (!f->type || !f->type->field_attrs) continue;
-        /* @env and @required are config's: on any struct */
+        /* config's and validate's go on any struct */
         for (u64 i = 0; i < f->type->field_attrs->size; ++i) {
             AstAttr *a = f->type->field_attrs->entries[i];
-            if (!strcmp(a->name->data, "env") || !strcmp(a->name->data, "required")) continue;
+            if (parseAttrIn(parse_any_struct_attrs, a->name)) continue;
             cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
                     "`@%s` on a field of %s, which has neither @json nor @yaml",
                     a->name->data, tag ? tag->data : "an anonymous struct");
@@ -910,9 +960,9 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             if (field_attrs) {
                 AstAttr *a = field_attrs->entries[0];
                 if (is_private) {
-                    int cfg = !strcmp(a->name->data, "env") || !strcmp(a->name->data, "required");
+                    int cfg = parseAttrIn(parse_any_struct_attrs, a->name);
                     cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1, cfg
-                            ? "`@%s` on a private field: config never reads private fields"
+                            ? "`@%s` on a private field: config and validate never read private fields"
                             : "`@%s` on a private field: json and yaml never write "
                               "or read private fields", a->name->data);
                 }
@@ -1889,6 +1939,24 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
             }
             parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "required"),
                                  astAttrGet(ft->field_attrs, "required") ? 1 : 0);
+            static char *bounds[] = {"min", "max"};
+            for (int b = 0; b < 2; ++b) {
+                AstAttr *lim = astAttrGet(ft->field_attrs, bounds[b]);
+                if (!lim) continue;
+                parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield,
+                                      b ? "hasMax" : "hasMin"), 1);
+                parseReflectStore(cc, arr, at + parseReflectOffset(rfield, bounds[b]),
+                                  ast_float_type, astF64Type(lim->num));
+            }
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "email"),
+                                 astAttrGet(ft->field_attrs, "email") ? 1 : 0);
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "url"),
+                                 astAttrGet(ft->field_attrs, "url") ? 1 : 0);
+            AstAttr *one = astAttrGet(ft->field_attrs, "oneOf");
+            if (one) {
+                parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "oneOf"),
+                                      one->arg->data, one->arg->len);
+            }
             j++;
         }
         int off = parseReflectOffset(rtype, "fields");

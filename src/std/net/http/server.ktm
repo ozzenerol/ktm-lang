@@ -380,21 +380,7 @@ static void dispatch(Conn *c, Request *r, Writer *w)
     r.app = c.srv.app;
     r.nvalues = 0;              /* each request starts with none */
     i64 t0 = c.srv.accessLog ? date.monoNs() : 0;
-    try {
-        c.srv.mux.serve(w, r);
-    } catch (Error e) {
-        bool close = w.close, head = w.head;
-        writerReset(w);
-        w.close = close;
-        w.head = head;
-        if (e.code == json.ERR_DECODE) {
-            w.error(400, cstr.view(e.message));
-        } else {
-            log.error("http: %s %s: the handler threw 0x%x at %s:%d: %s",
-                      r.method, r.path, e.code, e.file, e.line, e.message);
-            w.error(500, "internal server error");
-        }
-    }
+    c.srv.mux.serve(w, r);   /* answers a handler's throw itself */
     if (c.srv.accessLog) { accessLine(r, w, t0); }
     if (r.ncleanups) {
         try {

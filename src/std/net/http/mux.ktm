@@ -302,8 +302,19 @@ pub void Mux.serve(Writer *w, Request *r)
         muxRoot(self).serve(w, r);
         return;
     }
-    for (i64 i = 0; i < self.nmws; i++) {
-        if (!self.mws[i](w, r)) { return; }
+    /* a throw is answered here as the server would (400, 422, 500), so a
+     * test through a Mux sees the same reply */
+    try {
+        muxServe(self, w, r);
+    } catch (Error e) {
+        answerThrow(w, r, e);
+    }
+}
+
+static void muxServe(Mux *m, Writer *w, Request *r)
+{
+    for (i64 i = 0; i < m.nmws; i++) {
+        if (!m.mws[i](w, r)) { return; }
     }
     u8[] path = r.path;
     i64 slashes = 0;
@@ -315,16 +326,16 @@ pub void Mux.serve(Writer *w, Request *r)
     }
     i64 mid = methodId(r.method);
     i64 spans[2 * MAX_WILD];
-    MuxRoute *rt = muxFind(self, r.method, mid, path, slashes, spans);
+    MuxRoute *rt = muxFind(m, r.method, mid, path, slashes, spans);
     i64 want = slashes + 1;
     if ((!rt || !rt.p.exactFor(path, slashes)) && path.len && path.ptr[path.len - 1] != '/' &&
-        (self.subtrees & ((u64)1 << (want < 63 ? want : 63)))) {
+        (m.subtrees & ((u64)1 << (want < 63 ? want : 63)))) {
         /* a subtree route that path + "/" matches exactly: redirect there */
         u8 *b = r.alloc(path.len + 1);
         mem.copy(b, path.ptr, path.len);
         b[path.len] = '/';
         u8[] slashed = b[0:path.len + 1];
-        MuxRoute *sub = muxFind(self, r.method, mid, slashed, want, null);
+        MuxRoute *sub = muxFind(m, r.method, mid, slashed, want, null);
         if (sub && sub.p.exactFor(slashed, want)) {
             muxRedirect(w, r, slashed);
             return;
@@ -335,7 +346,7 @@ pub void Mux.serve(Writer *w, Request *r)
         return;
     }
     if (!rt) {
-        muxNoRoute(self, w, r, path);
+        muxNoRoute(m, w, r, path);
         return;
     }
     i64 k = 0;

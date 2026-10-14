@@ -61,7 +61,17 @@ pub struct Field {
     bool skip;          /* @skip: never written or read */
     bool omitEmpty;     /* @omitEmpty: not written when 0, empty or null */
     u8[] env;           /* @env("NAME")'s, else "": config's variable (v0.20.0) */
-    bool required;      /* @required: config fails without its variable */
+    bool required;      /* @required: config fails without its variable,
+                         * validate.check without a value (not 0, "" or null) */
+    /* validate's rules (v0.21.0): @min(n) and @max(n) bound a number's
+     * value, a text's length or a slice's; @email, @url; @oneOf("a", "b") */
+    bool hasMin;
+    bool hasMax;
+    f64 min;
+    f64 max;
+    bool email;
+    bool url;
+    u8[] oneOf;         /* @oneOf's values joined by '|', else "" */
 };
 
 /* A member of an enum: its name and value */
