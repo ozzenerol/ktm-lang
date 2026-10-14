@@ -1,0 +1,39 @@
+<!-- title: Base64 and hex -->
+<!-- ref: encoding.base64 -->
+<h1>Base64 and hex</h1>
+<p class="lede"><code>encoding.base64</code> and <code>encoding.hex</code> turn bytes into text and back, as Go's packages of the same
+names do. Decoding answers <code>false</code> on bad input instead of throwing.</p>
+
+<pre data-run><code>
+import encoding.base64, encoding.hex;
+
+void main()
+{
+  String b = base64.encode("hello, ktm");
+  String u = base64.encodeUrl("\xfb\xff\xbf");
+  String h = hex.encode("ktm");
+  printf("%s %s %s\n", b, u, h);
+
+  String raw;
+  if (base64.decode(b, &raw)) { printf("%s\n", raw); }
+  printf("%d\n", hex.decode("not hex", &raw));
+  b.free(); u.free(); h.free(); raw.free();
+}
+</code></pre>
+<pre class="output">
+aGVsbG8sIGt0bQ== -_-_ 6b746d
+hello, ktm
+0
+</pre>
+
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>base64.encode(data)</code></td><td>The standard alphabet (<code>+ /</code>), padded with <code>=</code>: MIME, Basic auth, PEM</td></tr>
+  <tr><td><code>base64.encodeUrl(data)</code></td><td>The URL-safe alphabet (<code>- _</code>), no padding: JWTs, tokens, URLs</td></tr>
+  <tr><td><code>base64.decode(text, &amp;out)</code></td><td>Either alphabet, padded or not, skipping blanks and line breaks; <code>false</code> (and <code>out</code> empty) on anything else</td></tr>
+  <tr><td><code>base64.encodedLen(n)</code></td><td>The length <code>encode</code> gives <code>n</code> bytes</td></tr>
+  <tr><td><code>hex.encode(data)</code></td><td>Two lowercase digits a byte</td></tr>
+  <tr><td><code>hex.decode(text, &amp;out)</code></td><td>Digits in either case, an even number of them; <code>false</code> otherwise</td></tr>
+</table>
+<p>What <code>encode</code> returns and what <code>decode</code> fills in are yours to free; <code>decode</code> replaces what <code>out</code>
+held.</p>
