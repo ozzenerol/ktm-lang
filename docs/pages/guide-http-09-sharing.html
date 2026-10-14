@@ -1,0 +1,110 @@
+<!-- title: 9. Sharing -->
+<h1>9. Sharing</h1>
+<p class="lede">Users group bookmarks into collections, and a public collection can be read by anyone with its link,
+signed in or not. That needs a route with two audiences, and permission checks that don't leak what exists.</p>
+
+<h2>The migration</h2>
+<pre><code>CREATE TABLE collections (
+    id         uuid PRIMARY KEY,
+    user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name       text NOT NULL,
+    public     boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE collection_items (
+    collection_id uuid NOT NULL REFERENCES collections (id) ON DELETE CASCADE,
+    bookmark_id   uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
+    PRIMARY KEY (collection_id, bookmark_id)
+);</code></pre>
+
+<h2>Routes for owners, a route for everyone</h2>
+<pre><code>    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;checkToken);
+    collections.handle("POST", &amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */</code></pre>
+<p>Creating and filling collections is in the group, behind the token check. Reading one is outside it: the handler
+looks at the token itself, when there is one.</p>
+<pre><code>/* The signed-in user if the request has a good token, else "": for the
+ * routes anyone may call */
+u8[] maybeUser(http.Request *r)
+{
+    u8[] auth = str.trim(r.header("Authorization"));
+    if (auth.len &gt; 7 &amp;&amp; checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
+    return "";
+}</code></pre>
+
+<h2>Permissions in the query</h2>
+<pre><code>/* GET /collections/{id}: its owner, or anyone when it is public */
+void showCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!uuid.parse(r.param("id"), &amp;id)) {
+        w.error(404, "no such collection");
+        return;
+    }
+    /* someone else's private collection is a 404, not a 403: it doesn't
+     * say that it exists */
+    vec.Vec&lt;Collection&gt; found = pg.queryAll&lt;Collection&gt;(db,
+        "SELECT id, name, public FROM collections WHERE id = $1 AND (public OR user_id::text = $2)",
+        r.param("id"), maybeUser(r));
+    defer pg.free(reflect.of(found));
+    if (!found.len) {
+        w.error(404, "no such collection");
+        return;
+    }
+    Collection *c = &amp;found.data[0];
+    c.bookmarks = pg.queryAll&lt;Bookmark&gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks WHERE id IN"
+        " (SELECT bookmark_id FROM collection_items WHERE collection_id = $1) ORDER BY id DESC", r.param("id"));
+    w.json(200, reflect.of(*c));
+}</code></pre>
+<ul class="rules">
+  <li>The permission rule is part of the <code>WHERE</code>: <code>public OR user_id = me</code>. There is no "load it,
+  then check" step to forget.</li>
+  <li>Someone else's private collection gets the same 404 as one that doesn't exist. A 403 would confirm it exists.</li>
+  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
+  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
+</ul>
+<pre><code>/* PUT /collections/{id}/bookmarks/{bookmark}: both must be the user's */
+void addToCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID a, b;
+    if (!uuid.parse(r.param("id"), &amp;a) || !uuid.parse(r.param("bookmark"), &amp;b)) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    i64 mine = pg.queryOne&lt;i64&gt;(db, "SELECT count(*) FROM collections c, bookmarks b"
+                                    " WHERE c.id = $1 AND b.id = $2 AND c.user_id = $3 AND b.user_id = $3",
+                                r.param("id"), r.param("bookmark"), userOf(r));
+    if (!mine) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    db.exec("INSERT INTO collection_items (collection_id, bookmark_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            r.param("id"), r.param("bookmark"));
+    w.status(204);
+}</code></pre>
+<p>Adding checks that the collection <b>and</b> the bookmark are the user's in one query: otherwise Bob could put Ada's
+private bookmark in his public collection and read it there.</p>
+
+<h2>Try it</h2>
+<pre><code>$ curl -H "Authorization: Bearer $ADA" -X POST localhost:8080/collections -d '{"name": "Languages", "public": true}'
+{"id":"01a13b12-4fa1-7000-a05c-59ef2ad5674d","name":"Languages","public":true,"bookmarks":[]}
+$ curl -H "Authorization: Bearer $ADA" -X PUT localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d/bookmarks/$BOOKMARK
+$ curl -H "Authorization: Bearer $BOB" -X PUT localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d/bookmarks/$BOOKMARK
+{"error":"no such collection or bookmark"}
+
+$ curl localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d
+{"id":"01a13b12-4fa1-7000-a05c-59ef2ad5674d","name":"Languages","public":true,"bookmarks":[{"id":"01a13b12-4f99-7000-b0bd-c1a927ce94ac","url":"https://go.dev","title":"Go","notes":"","tags":[],"createdAt":"2026-10-14T15:40:18Z"}]}
+
+$ curl localhost:8080/collections/$SECRET                          # Ada's private one, no token
+{"error":"no such collection"}
+$ curl -H "Authorization: Bearer $BOB" localhost:8080/collections/$SECRET
+{"error":"no such collection"}
+$ curl -H "Authorization: Bearer $ADA" localhost:8080/collections/$SECRET
+{"id":"01a13b12-4fb0-7000-adfa-f1f869a79e4e","name":"Secret","public":false,"bookmarks":[]}</code></pre>
+<p>Next: middleware (coming).</p>

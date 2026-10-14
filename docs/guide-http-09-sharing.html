@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9. Sharing - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li class="current"><a href="guide-http-09-sharing.html" aria-current="page">9. Sharing</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>9. Sharing</h1>
+<p class="lede">Users group bookmarks into collections, and a public collection can be read by anyone with its link,
+signed in or not. That needs a route with two audiences, and permission checks that don't leak what exists.</p>
+
+<h2 id="the-migration">The migration<a class="anchor" href="#the-migration" aria-label="Link to this section">#</a></h2>
+<pre><code>CREATE TABLE collections (
+    id         uuid PRIMARY KEY,
+    user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name       text NOT NULL,
+    public     boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE collection_items (
+    collection_id uuid NOT NULL REFERENCES collections (id) ON DELETE CASCADE,
+    bookmark_id   uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
+    PRIMARY KEY (collection_id, bookmark_id)
+);</code></pre>
+
+<h2 id="routes-for-owners-a-route-for-everyone">Routes for owners, a route for everyone<a class="anchor" href="#routes-for-owners-a-route-for-everyone" aria-label="Link to this section">#</a></h2>
+<pre><code>    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;amp;checkToken);
+    collections.handle("POST", &amp;amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;amp;showCollection);      /* outside the group: anyone may ask */</code></pre>
+<p>Creating and filling collections is in the group, behind the token check. Reading one is outside it: the handler
+looks at the token itself, when there is one.</p>
+<pre><code>/* The signed-in user if the request has a good token, else "": for the
+ * routes anyone may call */
+u8[] maybeUser(http.Request *r)
+{
+    u8[] auth = str.trim(r.header("Authorization"));
+    if (auth.len &amp;gt; 7 &amp;amp;&amp;amp; checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
+    return "";
+}</code></pre>
+
+<h2 id="permissions-in-the-query">Permissions in the query<a class="anchor" href="#permissions-in-the-query" aria-label="Link to this section">#</a></h2>
+<pre><code>/* GET /collections/{id}: its owner, or anyone when it is public */
+void showCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!uuid.parse(r.param("id"), &amp;amp;id)) {
+        w.error(404, "no such collection");
+        return;
+    }
+    /* someone else's private collection is a 404, not a 403: it doesn't
+     * say that it exists */
+    vec.Vec&amp;lt;Collection&amp;gt; found = pg.queryAll&amp;lt;Collection&amp;gt;(db,
+        "SELECT id, name, public FROM collections WHERE id = $1 AND (public OR user_id::text = $2)",
+        r.param("id"), maybeUser(r));
+    defer pg.free(reflect.of(found));
+    if (!found.len) {
+        w.error(404, "no such collection");
+        return;
+    }
+    Collection *c = &amp;amp;found.data[0];
+    c.bookmarks = pg.queryAll&amp;lt;Bookmark&amp;gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks WHERE id IN"
+        " (SELECT bookmark_id FROM collection_items WHERE collection_id = $1) ORDER BY id DESC", r.param("id"));
+    w.json(200, reflect.of(*c));
+}</code></pre>
+<ul class="rules">
+  <li>The permission rule is part of the <code>WHERE</code>: <code>public OR user_id = me</code>. There is no "load it,
+  then check" step to forget.</li>
+  <li>Someone else's private collection gets the same 404 as one that doesn't exist. A 403 would confirm it exists.</li>
+  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
+  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
+</ul>
+<pre><code>/* PUT /collections/{id}/bookmarks/{bookmark}: both must be the user's */
+void addToCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID a, b;
+    if (!uuid.parse(r.param("id"), &amp;amp;a) || !uuid.parse(r.param("bookmark"), &amp;amp;b)) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    i64 mine = pg.queryOne&amp;lt;i64&amp;gt;(db, "SELECT count(*) FROM collections c, bookmarks b"
+                                    " WHERE c.id = $1 AND b.id = $2 AND c.user_id = $3 AND b.user_id = $3",
+                                r.param("id"), r.param("bookmark"), userOf(r));
+    if (!mine) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    db.exec("INSERT INTO collection_items (collection_id, bookmark_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            r.param("id"), r.param("bookmark"));
+    w.status(204);
+}</code></pre>
+<p>Adding checks that the collection <b>and</b> the bookmark are the user's in one query: otherwise Bob could put Ada's
+private bookmark in his public collection and read it there.</p>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ curl -H "Authorization: Bearer $ADA" -X POST localhost:8080/collections -d '{"name": "Languages", "public": true}'
+{"id":"01a13b12-4fa1-7000-a05c-59ef2ad5674d","name":"Languages","public":true,"bookmarks":[]}
+$ curl -H "Authorization: Bearer $ADA" -X PUT localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d/bookmarks/$BOOKMARK
+$ curl -H "Authorization: Bearer $BOB" -X PUT localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d/bookmarks/$BOOKMARK
+{"error":"no such collection or bookmark"}
+
+$ curl localhost:8080/collections/01a13b12-4fa1-7000-a05c-59ef2ad5674d
+{"id":"01a13b12-4fa1-7000-a05c-59ef2ad5674d","name":"Languages","public":true,"bookmarks":[{"id":"01a13b12-4f99-7000-b0bd-c1a927ce94ac","url":"https://go.dev","title":"Go","notes":"","tags":[],"createdAt":"2026-10-14T15:40:18Z"}]}
+
+$ curl localhost:8080/collections/$SECRET                          # Ada's private one, no token
+{"error":"no such collection"}
+$ curl -H "Authorization: Bearer $BOB" localhost:8080/collections/$SECRET
+{"error":"no such collection"}
+$ curl -H "Authorization: Bearer $ADA" localhost:8080/collections/$SECRET
+{"id":"01a13b12-4fb0-7000-adfa-f1f869a79e4e","name":"Secret","public":false,"bookmarks":[]}</code></pre>
+<p>Next: middleware (coming).</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-08-users.html"><span>Previous</span>8. Users and sessions</a><a class="next" href="stdlib.html"><span>Next</span>Library reference</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-09-sharing.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-migration">The migration</a></li><li><a href="#routes-for-owners-a-route-for-everyone">Routes for owners, a route for everyone</a></li><li><a href="#permissions-in-the-query">Permissions in the query</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+</div>
+</body>
+</html>
