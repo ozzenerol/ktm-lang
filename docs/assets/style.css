@@ -164,8 +164,9 @@ a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
   border-bottom: 1px solid var(--border-soft);
 }
 
-.wordmark { display: inline-flex; align-items: center; flex-shrink: 0; margin-right: 0.5rem; }
-.wordmark .logo { height: 1.55rem; }
+.wordmark { display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0; margin-right: 0.5rem; color: var(--text); }
+.wordmark .logo { height: 1.7rem; }
+.wordmark .logo-name { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; line-height: 1; }
 .wordmark:hover { text-decoration: none; }
 
 .toplinks { display: flex; gap: 0.25rem; }
@@ -621,7 +622,9 @@ ul.rules > li::before {
 .hero { padding: 2.5rem 0 1rem; }
 .hero .name { margin: 0; line-height: 1; }
 .hero .name::before { display: none; }
-.hero .name .logo { height: clamp(3.2rem, 12vw, 5.4rem); }
+.hero .name { display: flex; align-items: center; gap: 0.6rem; }
+.hero .name .logo { height: clamp(3.4rem, 13vw, 5.8rem); }
+.hero .name .logo-name { font-size: clamp(3rem, 11vw, 5rem); font-weight: 800; letter-spacing: -0.04em; }
 .hero .pitch { font-size: clamp(1.2rem, 3vw, 1.55rem); line-height: 1.45; margin: 1.2rem 0 0.5rem; max-width: 42rem; font-weight: 600; letter-spacing: -0.01em; }
 .hero .sub { color: var(--muted); max-width: 42rem; font-size: 1.05rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.5rem 0 0; }
@@ -754,8 +757,4 @@ ul.rules > li::before {
 }
 
 .logo { display: block; width: auto; }
-.logo-acc, .logo-txt { fill: none; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
-.logo-acc { stroke: var(--accent); }
-.logo-txt { stroke: var(--text); }
-.logo-cur { fill: var(--accent); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
