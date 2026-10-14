@@ -82,8 +82,10 @@ char **pkgVersions(const char *root, int *count, char **err);
 char *pkgLatest(const char *root, char **err);
 char *pkgDownload(const char *path, const char *version, char **err);
 
-/* `ktm mod ...` and the other package commands: the exit code, or -1
- * when argv[1] isn't one (a file to compile) */
-int pkgMain(int argc, char **argv);
+/* `ktm mod ...` and the other package commands: the exit code, -1 when
+ * argv[1] isn't one (a file to compile), or -2 for `ktm build` and
+ * `ktm run`, which become an ordinary compile: *new_argc and *new_argv
+ * are its command line */
+int pkgMain(int argc, char **argv, int *new_argc, char ***new_argv);
 
 #endif

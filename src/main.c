@@ -739,10 +739,17 @@ int main(int argc, char **argv) {
     Cctrl *cc;
 
     /* `ktm mod ...` and the other package commands */
-    int pkg_rc = pkgMain(argc, argv);
+    int pkg_argc = 0;
+    char **pkg_argv = NULL;
+    int pkg_rc = pkgMain(argc, argv, &pkg_argc, &pkg_argv);
     if (pkg_rc >= 0) {
         memoryRelease();
         return pkg_rc;
+    }
+    if (pkg_rc == -2) {
+        /* `ktm build` / `ktm run`: the compile they stand for */
+        argc = pkg_argc;
+        argv = pkg_argv;
     }
 
     CliArgs args;
