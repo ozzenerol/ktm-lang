@@ -1,0 +1,129 @@
+<!-- title: 7. Tags, search and pages -->
+<h1>7. Tags, search and pages</h1>
+<p class="lede">A shelf with a thousand links needs three things: tags to group them, a search box, and a list that
+comes a page at a time. All three are SQL; the handlers stay small.</p>
+
+<h2>The migration</h2>
+<pre><code>CREATE TABLE tags (
+    bookmark_id uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
+    tag         text NOT NULL,
+    PRIMARY KEY (bookmark_id, tag)
+);
+CREATE INDEX tags_tag ON tags (tag);
+
+ALTER TABLE bookmarks ADD search tsvector
+    GENERATED ALWAYS AS (to_tsvector('simple', title || ' ' || notes || ' ' || url)) STORED;
+CREATE INDEX bookmarks_search ON bookmarks USING gin (search);</code></pre>
+<ul class="rules">
+  <li>Tags are a table of their own, one row per bookmark and tag, deleted with their bookmark (<code>ON DELETE
+  CASCADE</code>).</li>
+  <li><code>search</code> is a column PostgreSQL computes from the title, notes and url, kept up to date by itself, with
+  an index that makes full-text search fast.</li>
+</ul>
+
+<h2>Tags in, tags out</h2>
+<p><code>Bookmark</code> and <code>NewBookmark</code> get a <code>vec.Vec&lt;String&gt; tags</code>: a JSON array, and a
+PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one:</p>
+<pre><code>(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags</code></pre>
+<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither.</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);
+    if (in.tags.len &gt; 10) {
+        w.error(422, "at most 10 tags");
+        return;
+    }
+    for (auto t : in.tags) {
+        if (!goodTag(t[0:])) {
+            w.error(422, "a tag is 1 to 30 lowercase letters, digits and dashes");
+            return;
+        }
+    }
+    String id = uuid.v7().string();
+    defer id.free();
+    /* the bookmark and its tags together, or neither */
+    pg.Tx tx = db.begin();
+    defer tx.rollback();
+    try {
+        tx.exec("INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4)",
+                id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
+    Bookmark b = pg.queryOne&lt;Bookmark&gt;(&amp;tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    defer b.freeDecoded();
+    tx.commit();
+    w.json(201, reflect.of(b));
+}</code></pre>
+<ul class="rules">
+  <li><code>db.begin()</code> takes a connection from the pool for the transaction; <code>defer tx.rollback()</code>
+  undoes it on any way out except after <code>tx.commit()</code>, a 409 included.</li>
+  <li><code>unnest($2::text[])</code> turns the array parameter (the vector, sent as one value) into rows.</li>
+  <li><code>goodTag</code> checks each tag by hand: the rules of chapter 3 check fields, and this is about each
+  element of one.</li>
+</ul>
+
+<h2>Filtering, search and pages</h2>
+<pre><code>/* GET /bookmarks?tag=go&amp;q=fast+servers&amp;limit=20&amp;after=&lt;cursor&gt;: newest first */
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    i64 limit = 20;
+    if (r.hasQuery("limit") &amp;&amp; (!str.toInt(r.query("limit"), &amp;limit) || limit &lt; 1 || limit &gt; 100)) {
+        w.error(400, "limit is 1 to 100");
+        return;
+    }
+    uuid.UUID after;
+    u8[] cursor = r.query("after");
+    if (cursor.len &amp;&amp; !uuid.parse(cursor, &amp;after)) {
+        w.error(400, "after isn't a cursor from this API");
+        return;
+    }
+    Page page;
+    defer page.freeDecoded();
+    /* one more than asked for: if it comes back, there is a next page */
+    page.items = pg.queryAll&lt;Bookmark&gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks"
+        " WHERE ($1 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $1))"
+        "   AND ($2 = '' OR search @@ websearch_to_tsquery('simple', $2))"
+        "   AND ($3 = '' OR id &lt; $3::uuid)"
+        " ORDER BY id DESC LIMIT $4",
+        r.query("tag"), r.query("q"), cursor, limit + 1);
+    if (page.items.len &gt; limit) {
+        Bookmark extra = page.items.removeAt(limit);
+        pg.free(reflect.of(extra));
+        page.next = str.from(page.items.data[limit - 1].id[0:]);
+    }
+    w.json(200, reflect.of(page));
+}</code></pre>
+<ul class="rules">
+  <li>One query serves every combination: <code>$1 = '' OR ...</code> turns a filter off when its parameter is empty,
+  and the parameters are still never part of the SQL text.</li>
+  <li><code>websearch_to_tsquery</code> reads what people type in search boxes: words, <code>"exact phrases"</code>,
+  <code>-not</code>.</li>
+  <li>Pages use a <b>cursor</b>, not an offset: <code>next</code> is the id of the last item, and the next page is
+  what is older than it (<code>id &lt; $3</code>, fast with the primary key). Bookmarks saved or deleted meanwhile
+  don't shift the pages, as they would with <code>OFFSET</code>.</li>
+  <li>Asking for one row more than the page tells whether there is a next page without counting.</li>
+  <li><code>@omitEmpty</code> leaves <code>next</code> out of the last page.</li>
+</ul>
+
+<h2>Try it</h2>
+<pre><code>$ curl localhost:8080/bookmarks?tag=lang
+{"items":[{"id":"01a13b0c-c310-7000-9e76-a5045a4305f6","url":"https://ktm-lang.org","title":"ktm, fast servers","notes":"faster than Go","tags":["ktm","lang"],"createdAt":"2026-10-14T15:34:14Z"},{"id":"01a13b0c-c2ff-7000-ba84-9449fa20b4a4","url":"https://go.dev","title":"The Go programming language","notes":"","tags":["go","lang"],"createdAt":"2026-10-14T15:34:14Z"}]}
+
+$ curl localhost:8080/bookmarks?q=fast
+{"items":[{"id":"01a13b0c-c310-7000-9e76-a5045a4305f6","url":"https://ktm-lang.org","title":"ktm, fast servers","notes":"faster than Go","tags":["ktm","lang"],"createdAt":"2026-10-14T15:34:14Z"}]}
+
+$ curl 'localhost:8080/bookmarks?limit=2'
+{"items":[...two bookmarks...],"next":"01a13b0c-c310-7000-9e76-a5045a4305f6"}
+$ curl 'localhost:8080/bookmarks?limit=2&amp;after=01a13b0c-c310-7000-9e76-a5045a4305f6'
+{"items":[{"id":"01a13b0c-c2ff-7000-ba84-9449fa20b4a4","url":"https://go.dev",...}]}
+
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://x.org", "tags": ["Bad Tag"]}'
+{"error":"a tag is 1 to 30 lowercase letters, digits and dashes"}</code></pre>
+<p>Next: users and passwords (coming).</p>
