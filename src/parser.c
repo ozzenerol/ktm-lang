@@ -604,8 +604,8 @@ static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "re
         "min", "max", "email", "url", "oneOf", NULL};
 
 /* Attributes config and validate read: on a field of any struct */
-static const char *parse_any_struct_attrs[] = {"env", "required", "min", "max", "email",
-        "url", "oneOf", NULL};
+static const char *parse_any_struct_attrs[] = {"key", "skip", "env", "required", "min", "max",
+        "email", "url", "oneOf", NULL};
 
 static int parseAttrIn(const char **names, AoStr *name) {
     for (int i = 0; names[i]; ++i) {
@@ -742,7 +742,8 @@ static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fi
     listForEach(fields) {
         ClsField *f = it->value;
         if (!f->type || !f->type->field_attrs) continue;
-        /* config's and validate's go on any struct */
+        /* config's, validate's and @key/@skip (reflect reads them: ktm-pg's
+         * columns) go on any struct; only @omitEmpty needs @json or @yaml */
         for (u64 i = 0; i < f->type->field_attrs->size; ++i) {
             AstAttr *a = f->type->field_attrs->entries[i];
             if (parseAttrIn(parse_any_struct_attrs, a->name)) continue;
@@ -5929,6 +5930,22 @@ static void parseGlobalDeclListNextPrev(Cctrl *cc, AstType *base_type) {
     parseGlobalDeclListNext(cc,cctrlTokenGet(cc),base_type);
 }
 
+/* A plain method `mtok` of cls, next to its generic methods with type
+ * parameters of their own: they share a name with nothing */
+static void parseCheckGenericMethodName(Cctrl *cc, AstType *cls, Lexeme *mtok) {
+    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
+        GenericDef *d = cc->generic_methods->entries[i];
+        if (!d->nown || d->owner != cls || (int)d->method->len != mtok->len ||
+            memcmp(d->method->data, mtok->start, mtok->len)) {
+            continue;
+        }
+        cctrlRaiseExceptionAt(cc, mtok->line, mtok->col, mtok->len,
+                              "`%s.%.*s` is already a method of %s: a method with type parameters "
+                              "of its own can't share its name", cls->clsname->data,
+                              mtok->len, mtok->start, cls->clsname->data);
+    }
+}
+
 /* `T User.name(params)`, a method of the class or union `User`: a
  * definition or a prototype. `type_tok` is `User`, the `.` was taken. It
  * is the function `User.name` with a `User *self` first parameter, and
@@ -5989,6 +6006,16 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
         cctrlRaiseException(cc, "`%s` has a field named `%.*s`: a method "
                             "cannot have the same name",
                             cls->clsname->data, mtok->len, mtok->start);
+    }
+    /* an instance of a method with type parameters of its own: its
+     * parameters bound, it takes the instance's name, `map<f64>` */
+    if (cc->inst && cc->inst->mname && tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+        parseGenericSkipParams(cc);
+        mtok = lexemeCopy(mtok);
+        mtok->start = cc->inst->mname->data;
+        mtok->len = cc->inst->mname->len;
+    } else if (!cc->inst) {
+        parseCheckGenericMethodName(cc, cls, mtok);
     }
     if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
         cctrlRaiseException(cc, "Expected `(` after the method name `%.*s.%.*s`",
@@ -6166,7 +6193,8 @@ typedef struct GenericHead {
     Lexeme *method;
     Vec *params;     /* AoStr * */
     int is_pub;
-    Lexeme *owner;      /* GEN_FUNC written as `Owner.name<...>(` */
+    Lexeme *owner;      /* `Owner.name<...>(`: a method of a plain struct */
+    Vec *own;           /* `Vec<T>.map<U>(`: the method's own parameters */
 } GenericHead;
 
 /* Does the declaration starting at `first` (taken) declare a generic:
@@ -6223,6 +6251,26 @@ static int parseGenericHead(Cctrl *cc, Lexeme *first, GenericHead *h) {
             h->method = L[j + 2];
             return 1;
         }
+        /* `Vec<T>.map<U>(`: a generic struct's method with parameters of its own */
+        if (tokenPunctIs(after, '.') && j + 4 < n && L[j + 2]->tk_type == TK_IDENT &&
+            tokenPunctIs(L[j + 3], '<')) {
+            Vec *own = vecNew(&vec_unsigned_long_type);
+            int k = j + 4, closed = 0;
+            while (k + 1 < n) {
+                Lexeme *p = L[k];
+                if (p->tk_type != TK_IDENT || cctrlTokIsKeyword(cc, p)) break;
+                vecPush(own, aoStrDupRaw(p->start, p->len));
+                if (tokenPunctIs(L[k + 1], ',')) { k += 2; continue; }
+                if (tokenPunctIs(L[k + 1], '>')) closed = 1;
+                break;
+            }
+            if (closed && k + 2 < n && tokenPunctIs(L[k + 2], '(')) {
+                h->kind = GEN_METHOD;
+                h->method = L[j + 2];
+                h->own = own;
+                return 1;
+            }
+        }
         if ((tokenPunctIs(after, '{') || tokenPunctIs(after, ':')) && i > 0 &&
             L[i - 1]->tk_type == TK_KEYWORD && L[i - 1]->i64 == KW_CLASS) {
             h->kind = GEN_STRUCT;
@@ -6234,6 +6282,33 @@ static int parseGenericHead(Cctrl *cc, Lexeme *first, GenericHead *h) {
 
 static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *si);
 static int parseTypeHasParam(AstType *t);
+
+/* Generic method `d` (just declared, at `at`) next to the struct's
+ * other methods and fields: a generic method with type parameters of
+ * its own shares its name with nothing (v1: no overloads of them) */
+static void parseGenericMethodClash(Cctrl *cc, GenericDef *d, Lexeme *at) {
+    AstType *cls = d->owner;
+    char *cname = d->name->data;
+    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
+        GenericDef *o = cc->generic_methods->entries[i];
+        if (o->of != d->of || o->owner != d->owner || !aoStrCmp(o->method, d->method)) continue;
+        if (!o->nown && !d->nown) continue;     /* a plain generic struct's methods: as before */
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                              "`%s.%s` is already a method of %s: a method with type parameters "
+                              "of its own can't share its name", cname, d->method->data, cname);
+    }
+    if (!cls || !d->nown) return;
+    if (cls->fields && mapGet(cls->fields, d->method->data)) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                              "`%s` has a field named `%s`: a method cannot have the same name",
+                              cname, d->method->data);
+    }
+    if (mapGet(cc->global_env, mprintf("%s.%s", cname, d->method->data))) {
+        cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
+                              "`%s.%s` is already a method of %s: a method with type parameters "
+                              "of its own can't share its name", cname, d->method->data, cname);
+    }
+}
 
 /* A generic declaration starting at `first` (taken): recorded, not
  * parsed. 1 if it was one (all of it is then taken). */
@@ -6264,11 +6339,29 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
     if (!cc->generic_methods) cc->generic_methods = vecNew(&vec_unsigned_long_type);
 
     if (h.owner) {
-        cctrlRaiseExceptionAt(cc, h.name->line, h.name->col, h.name->len,
-                              "`%.*s.%.*s<...>`: a method can't have type parameters of its "
-                            "own yet; write a generic function, as in `void %.*s<...>(%.*s *s, ...)`",
-                            h.owner->len, h.owner->start, h.name->len, h.name->start,
-                            h.name->len, h.name->start, h.owner->len, h.owner->start);
+        /* `S.f<V>(...)`: a plain struct's method with type parameters */
+        char *oq = cctrlQualifyName(cc, h.owner->start, h.owner->len);
+        AstType *cls = oq ? mapGet(cc->clsdefs, oq) : NULL;
+        if (!cls) cls = mapGetLen(cc->clsdefs, h.owner->start, h.owner->len);
+        if (!cls || cls->kind != AST_TYPE_CLASS || cls->is_enum || cls->is_intrinsic) {
+            cctrlRaiseExceptionAt(cc, h.owner->line, h.owner->col, h.owner->len,
+                                  "`%.*s` is not a struct: only a struct can have methods",
+                                  h.owner->len, h.owner->start);
+        }
+        if (cls->generic && !cls->generic_args) {
+            cctrlRaiseExceptionAt(cc, h.owner->line, h.owner->col, h.owner->len,
+                                  "`%.*s` is generic: write its parameters, as in `%.*s<T>.%.*s<...>(...)`",
+                                  h.owner->len, h.owner->start, h.owner->len, h.owner->start,
+                                  h.name->len, h.name->start);
+        }
+        d->kind = GEN_METHOD;
+        d->owner = cls;
+        d->name = cls->clsname;
+        d->method = aoStrDupRaw(h.name->start, h.name->len);
+        d->nown = (int)d->params->size;
+        parseGenericMethodClash(cc, d, h.name);
+        vecPush(cc->generic_methods, d);
+        return 1;
     }
     if (h.kind == GEN_METHOD) {
         AstType *tmpl = cctrlGetKeyWord(cc, h.name->start, h.name->len);
@@ -6281,6 +6374,25 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         d->of = tmpl->generic;
         d->name = d->of->name;
         d->method = aoStrDupRaw(h.method->start, h.method->len);
+        if (h.own) {
+            /* bound after the struct's: `Vec<T>.map<U>` binds T, then U */
+            for (u64 i = 0; i < h.own->size; ++i) {
+                AoStr *o = h.own->entries[i];
+                for (u64 k = 0; k < d->params->size; ++k) {
+                    if (aoStrCmp(o, d->params->entries[k])) {
+                        cctrlRaiseExceptionAt(cc, h.method->line, h.method->col, h.method->len,
+                                              "`%s` is already a type parameter of `%s`: "
+                                              "give the method's parameter another name", o->data,
+                                              d->name->data);
+                    }
+                }
+            }
+            d->params = vecNew(&vec_unsigned_long_type);
+            for (u64 i = 0; i < h.params->size; ++i) vecPush(d->params, h.params->entries[i]);
+            for (u64 i = 0; i < h.own->size; ++i) vecPush(d->params, h.own->entries[i]);
+            d->nown = (int)h.own->size;
+        }
+        parseGenericMethodClash(cc, d, h.method);
         vecPush(cc->generic_methods, d);
         return 1;
     }
@@ -6502,8 +6614,13 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     ast_file_hint = saved_file_hint;
     astSetLVarId(saved_lvar_id);
     if ((failed || parseErrorCount(cc) > errors_before) && in->at) {
+        /* where the use is: maybe another module's file than the one
+         * being read when the body is made (the main file's end) */
+        LexFile *here = cc->tok_file;
+        if (in->at_file) cc->tok_file = in->at_file;
         cctrlInfoAt(cc, in->at->line, in->at->col, in->at->len,
                     "in `%s`, made here", in->name->data);
+        cc->tok_file = here;
     }
     if (failed) longjmp(*saved_recovery, 1);
 }
@@ -6517,6 +6634,7 @@ static void parseGenericMethodInstance(Cctrl *cc, GenericDef *md, GenericInst *s
     in->name = si->name;
     in->cls = si->cls;
     in->at = si->at;
+    in->at_file = si->at_file;
     in->proto_only = 1;
     parseGenericReplay(cc, md, in);
     GenericInst *body = calloc(1, sizeof(GenericInst));
@@ -6543,7 +6661,8 @@ Ast *parseGenericMethod(Cctrl *cc, AstType *cls, char *name, int len) {
     if (!si) return NULL;
     for (u64 i = 0; i < cc->generic_methods->size; ++i) {
         GenericDef *md = cc->generic_methods->entries[i];
-        if (md->of != d || (int)md->method->len != len || memcmp(md->method->data, name, len)) {
+        if (md->of != d || md->nown || (int)md->method->len != len ||
+            memcmp(md->method->data, name, len)) {
             continue;
         }
         char *key = mprintf("%s.%.*s", cls->clsname->data, len, name);
@@ -6586,6 +6705,7 @@ AstType *parseGenericStructInstance(Cctrl *cc, AstType *tmpl, Vec *args, Lexeme 
     in->args = args;
     in->name = name;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     parseGenericReplay(cc, d, in);
     cls = mapGet(cc->clsdefs, name->data);
     if (!cls) {
@@ -6707,6 +6827,7 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
     in->args = args;
     in->name = name;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     in->proto_only = 1;
     parseGenericReplay(cc, d, in);
     fn = mapGet(cc->global_env, full->data);
@@ -6791,6 +6912,23 @@ static int parseGenericUnify(AstType *pat, AstType *arg, Map *b, char **why) {
     }
 }
 
+/* Parameters `params` from `start` against the arguments argv (parsed
+ * without a target), binding the stand-ins in `b`; 0 on a conflict. argv
+ * has no arguments for @caller parameters: they are filled in once the
+ * instance is known (parseGenericCallWith) */
+static int parseGenericUnifyArgs(Vec *params, u64 start, Vec *argv, Map *b, char **why) {
+    for (u64 i = start, j = 0; params && i < params->size && argv && j < argv->size; ++i) {
+        Ast *p = params->entries[i];
+        if (p && (p->flags & AST_FLAG_CALLER)) continue;
+        Ast *arg = argv->entries[j++];
+        if (!p || !arg || arg->kind == AST_PLACEHOLDER || !arg->type) continue;
+        if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) break;
+        AstType *pt = p->kind == AST_DEFAULT_PARAM ? p->declvar->type : p->type;
+        if (!parseGenericUnify(pt, arg->type, b, why)) return 0;
+    }
+    return 1;
+}
+
 /* The type arguments of a call to generic function `d` with `argv`
  * (parsed without a target), from the argument types; NULL with *why
  * when they can't all be found */
@@ -6821,19 +6959,107 @@ Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
         return NULL;
     }
     Map *b = mapNew(8, &map_asttype_type);
-    /* argv has no arguments for @caller parameters: they are filled in
-     * once the instance is known (parseGenericCallWith) */
-    for (u64 i = 0, j = 0; params && i < params->size && argv && j < argv->size; ++i) {
-        Ast *p = params->entries[i];
-        if (p && (p->flags & AST_FLAG_CALLER)) continue;
-        Ast *arg = argv->entries[j++];
-        if (!p || !arg || arg->kind == AST_PLACEHOLDER || !arg->type) continue;
-        if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) break;
-        AstType *pt = p->kind == AST_DEFAULT_PARAM ? p->declvar->type : p->type;
-        if (!parseGenericUnify(pt, arg->type, b, why)) return NULL;
-    }
+    if (!parseGenericUnifyArgs(params, 0, argv, b, why)) return NULL;
     Vec *args = vecNew(&vec_unsigned_long_type);
     for (u64 i = 0; i < d->params->size; ++i) {
+        AoStr *pname = d->params->entries[i];
+        AstType *t = mapGet(b, pname->data);
+        if (!t) {
+            *why = mprintf("nothing says what `%s` is", pname->data);
+            return NULL;
+        }
+        vecPush(args, t);
+    }
+    return args;
+}
+
+/* The generic method with type parameters of its own named `name` of
+ * struct `cls` or a struct it derives from, with *owner the struct that
+ * has it; NULL if there is none */
+GenericDef *parseFindGenericOwnMethod(Cctrl *cc, AstType *cls, char *name, int len,
+                                      AstType **owner) {
+    for (AstType *t = cls; t && cc->generic_methods; t = t->base_cls) {
+        for (u64 i = 0; i < cc->generic_methods->size; ++i) {
+            GenericDef *d = cc->generic_methods->entries[i];
+            if (!d->nown || (int)d->method->len != len || memcmp(d->method->data, name, len)) {
+                continue;
+            }
+            int mine = d->of ? (t->generic == d->of && t->generic_args != NULL)
+                             : (d->owner == t || (t->clsname && d->owner->clsname &&
+                                                  aoStrCmp(t->clsname, d->owner->clsname)));
+            if (mine) {
+                *owner = t;
+                return d;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* Method `d` of struct `cls` (an instance of d's generic struct, or d's
+ * plain struct) with its own type arguments `own`: its prototype (made
+ * the first time, its body at the end of the file) */
+Ast *parseGenericOwnMethodInstance(Cctrl *cc, GenericDef *d, AstType *cls, Vec *own, Lexeme *at) {
+    if ((int)own->size != d->nown) {
+        cctrlRaiseException(cc, "`%s.%s` takes %d type argument%s, got %d", cls->clsname->data,
+                            d->method->data, d->nown, d->nown == 1 ? "" : "s", (int)own->size);
+    }
+    Vec *args = vecNew(&vec_unsigned_long_type);
+    for (u64 i = 0; d->of && cls->generic_args && i < cls->generic_args->size; ++i) {
+        vecPush(args, cls->generic_args->entries[i]);
+    }
+    for (u64 i = 0; i < own->size; ++i) vecPush(args, own->entries[i]);
+    AoStr *mname = parseGenericInstName(d->method, own);
+    char *key = mprintf("%s.%s", cls->clsname->data, mname->data);
+    Ast *fn = mapGet(cc->global_env, key);
+    if (!fn) fn = mapGet(cc->global_env, astModuleMangle(key, strlen(key)));
+    if (fn) return fn;
+    GenericInst *in = calloc(1, sizeof(GenericInst));
+    in->def = d;
+    in->args = args;
+    in->name = parseGenericInstName(cls->clsname, own);
+    in->mname = mname;
+    in->cls = cls;
+    in->at = at;
+    in->proto_only = 1;
+    parseGenericReplay(cc, d, in);
+    fn = mapGet(cc->global_env, key);
+    if (!fn) fn = mapGet(cc->global_env, astModuleMangle(key, strlen(key)));
+    if (!fn) cctrlRaiseException(cc, "could not make `%s`", key);
+    in->fn = fn;
+    int pattern = 0;
+    for (u64 i = 0; i < own->size; ++i) pattern |= parseTypeHasParam(own->entries[i]);
+    if (!pattern) {
+        GenericInst *body = calloc(1, sizeof(GenericInst));
+        *body = *in;
+        body->proto_only = 0;
+        if (!cc->generic_pending) cc->generic_pending = vecNew(&vec_unsigned_long_type);
+        vecPush(cc->generic_pending, body);
+    }
+    return fn;
+}
+
+/* The own type arguments of a call of method `d` on a `cls` with `argv`
+ * (parsed without a target, self not in it), from the argument types;
+ * NULL with *why when they can't all be found */
+Vec *parseGenericOwnMethodInfer(Cctrl *cc, GenericDef *d, AstType *cls, Vec *argv, char **why) {
+    Vec *stand = vecNew(&vec_unsigned_long_type);
+    u64 first = d->params->size - d->nown;
+    for (u64 i = first; i < d->params->size; ++i) {
+        AstType *t = calloc(1, sizeof(AstType));
+        t->kind = AST_TYPE_CLASS;
+        t->clsname = d->params->entries[i];
+        t->is_type_param = 1;
+        t->size = 8;
+        t->alignment = 8;
+        vecPush(stand, t);
+    }
+    Ast *pattern = parseGenericOwnMethodInstance(cc, d, cls, stand, NULL);
+    Map *b = mapNew(8, &map_asttype_type);
+    /* params[0] is self: the receiver, already known */
+    if (!parseGenericUnifyArgs(pattern->params, 1, argv, b, why)) return NULL;
+    Vec *args = vecNew(&vec_unsigned_long_type);
+    for (u64 i = first; i < d->params->size; ++i) {
         AoStr *pname = d->params->entries[i];
         AstType *t = mapGet(b, pname->data);
         if (!t) {
@@ -7450,6 +7676,7 @@ static void parseFormatGenerate(Cctrl *cc, AstType *cls, Lexeme *at, const char 
     in->name = cls->clsname;
     in->cls = cls;
     in->at = at;
+    in->at_file = cctrlCurFile(cc);
     in->proto_only = 1;
     parseGenericReplay(cc, d, in);
     GenericInst *body = calloc(1, sizeof(GenericInst));

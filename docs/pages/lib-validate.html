@@ -115,3 +115,8 @@ POST /bookmarks {"url":"nope","title":"ktm"}
 <code>http.recorder()</code>), so the 422 can be checked without a server. For a check of your own on top of the
 rules, call <code>validate.check</code> yourself, <code>errs.add</code> what else is wrong, and reply with
 <code>w.jsonText(422, ...)</code> of <code>errs.toJson()</code>.</p>
+
+<h2>In settings</h2>
+<p><a href="lib-config.html#rules">config.fromEnv</a> checks the same rules on a settings struct and names the environment
+variable in each error: <code>SHELF_MAX_BOOKMARKS: must be at least 1</code>. <code>validate.checkRules(p, &amp;field, name, &amp;errs)</code>
+is the one-field check it uses, for a loader of your own.</p>

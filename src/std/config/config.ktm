@@ -1,5 +1,5 @@
 module config;
-import cstr, fs, libc, mem, proc, reflect, str;
+import cstr, fs, libc, mem, proc, reflect, str, validate;
 
 /* A program's settings from environment variables and a .env file
  * (v0.20.0), into a struct:
@@ -19,7 +19,9 @@ import cstr, fs, libc, mem, proc, reflect, str;
  *
  * A field's variable is the prefix and its name in SNAKE_CASE, or
  * @env("NAME")'s exactly. A nested struct's fields add its name:
- * APP_DB_HOST for s.db.host. A variable set to "" counts as not set. */
+ * APP_DB_HOST for s.db.host. A variable set to "" counts as not set.
+ * validate's rules on a field are checked too, set or not:
+ * `@min(1) i64 maxBookmarks;` gives "APP_MAX_BOOKMARKS: must be at least 1". */
 
 /* What fromEnv and loadDotenv throw: the message names every variable
  * that is missing or wrong */
@@ -177,10 +179,22 @@ static void fill(void *base, reflect.Type *t, u8[] prefix, String *errs)
             continue;
         }
         u8[] text;
+        bool ok = true;
         if (lookup(name[0:], &text)) {
-            setField(p, f.type, text, name[0:], errs);
+            ok = setField(p, f.type, text, name[0:], errs);
         } else if (f.required) {
             problem(errs, "%.*s is required", name.len, name.ptr);
+            ok = false;
+        }
+        /* validate's rules (@min, @max, @oneOf...) on the value it has
+         * now, set or the default */
+        if (ok) {
+            validate.Errors broken;
+            validate.checkRules(p, &f, name[0:], &broken);
+            for (auto e : broken.items) {
+                problem(errs, "%.*s: %.*s", e.field.len, e.field.ptr, e.message.len, e.message.ptr);
+            }
+            broken.free();
         }
         name.free();
     }
@@ -188,9 +202,10 @@ static void fill(void *base, reflect.Type *t, u8[] prefix, String *errs)
 
 /* Fills the struct v (reflect.of(settings)) from the environment: each
  * field whose variable is set; the others keep what they hold (a default).
- * Throws ERR_CONFIG naming every variable that is missing (@required) or
- * can't be read, after setting the rest. u8[] fields are views of the
- * environment's values, String fields copies (config.free frees them). */
+ * Throws ERR_CONFIG naming every variable that is missing (@required),
+ * can't be read or breaks a rule of validate's, after setting the rest.
+ * u8[] fields are views of the environment's values, String fields copies
+ * (config.free frees them). */
 pub void fromEnv(reflect.Value v, u8[] prefix = "")
 {
     if (!v.type || v.type.kind != reflect.Kind.structType) {

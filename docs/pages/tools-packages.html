@@ -40,7 +40,8 @@ replace github.com/someone/color => ../color</code></pre>
   (<code>import "github.com/you/users-api/store";</code> is its directory <code>store</code>).</li>
   <li><code>ktm</code> is the ktm version it needs; an older compiler refuses it.</li>
   <li><code>require</code> lists every package the build uses and the version; <code>// indirect</code> marks one only another
-  package needs.</li>
+  package needs. A package that is only required by a dependency, for code the project never imports, isn't listed
+  (see <a href="#needs">Only what the code needs</a>).</li>
   <li><code>replace</code> uses a local copy (<code>=&gt; ../color</code>, a path starting with <code>./</code>, <code>../</code> or
   <code>/</code>) or another repository's version (<code>=&gt; github.com/fork/color v1.1.2</code>).</li>
   <li><code>ktm.sum</code> holds a hash of each version's files. A download that doesn't match is refused, so a version can't
@@ -67,6 +68,30 @@ someone asked for. The same <code>ktm.mod</code> gives the same build, with no l
   <li>A private repository works like any other: git uses your SSH key or credential helper (ktm never asks for a password).</li>
 </ul>
 
+<h2 id="needs">Only what the code needs</h2>
+<p>A package is downloaded only when the project imports one of its directories, directly or through another package's
+imports. <code>github.com/ozzenerol/ktm-migrate</code> requires <code>ktm-pg</code> for its <code>postgres</code> directory;
+a project that imports only <code>ktm-migrate</code> (or its <code>sqlite</code> directory) never downloads <code>ktm-pg</code>,
+and its <code>ktm.mod</code> doesn't list it.</p>
+<pre><code>$ ktm get github.com/ozzenerol/ktm-migrate
+ktm: downloading github.com/ozzenerol/ktm-migrate v0.1.0
+ktm: added github.com/ozzenerol/ktm-migrate v0.1.0
+$ ktm mod why github.com/ozzenerol/ktm-pg
+github.com/ozzenerol/ktm-pg v0.1.0 &lt;- github.com/ozzenerol/ktm-migrate v0.1.0 &lt;- example.com/me/app (ktm.mod)
+but no package the project imports needs it: it isn't downloaded or built</code></pre>
+<p>Import <code>"github.com/ozzenerol/ktm-migrate/postgres"</code> and the next <code>ktm build</code> downloads
+<code>ktm-pg</code> (its hash goes into <code>ktm.sum</code>); <code>ktm mod tidy</code> adds its <code>// indirect</code> line.</p>
+<ul class="rules">
+  <li>A package's requirements count only when it is needed: its own <code>ktm.mod</code> is read then, and may raise the version
+  of something else the build uses. A package nothing imports can't raise anything (as in Go since 1.17).</li>
+  <li><code>ktm get path</code> counts <code>path</code> as imported: <code>ktm get github.com/ozzenerol/ktm-migrate/postgres</code>
+  fetches <code>ktm-pg</code> too.</li>
+  <li>Imports in a dependency's <code>*_test.ktm</code> files don't count; the project's own tests do.</li>
+  <li><code>ktm mod tidy</code> drops a line nothing needs any more (an <code>// indirect</code> line older ktm versions wrote
+  for every requirement of a dependency); it never lowers a version.</li>
+  <li><code>ktm mod list</code>, <code>verify</code> and <code>download</code> work on what the build needs.</li>
+</ul>
+
 <h2>Commands</h2>
 <table>
   <tr><th>Command</th><th>What it does</th></tr>
@@ -75,7 +100,7 @@ someone asked for. The same <code>ktm.mod</code> gives the same build, with no l
   <tr><td><code>ktm mod tidy</code></td><td>Makes <code>ktm.mod</code> and <code>ktm.sum</code> match the imports: adds what is imported, drops what isn't</td></tr>
   <tr><td><code>ktm build [dir]</code>, <code>ktm run [dir] [args]</code></td><td>Builds (or runs) <code>main.ktm</code>, fetching what is missing; the binary is named after the module path</td></tr>
   <tr><td><code>ktm test [dir | ./...]</code></td><td>Runs the tests in <code>*_test.ktm</code> files, with the project's packages: see <a href="tools-testing.html">Testing</a></td></tr>
-  <tr><td><code>ktm mod download</code></td><td>Fetches every requirement into the cache</td></tr>
+  <tr><td><code>ktm mod download</code></td><td>Fetches what the build needs into the cache</td></tr>
   <tr><td><code>ktm mod list</code></td><td>The packages and versions a build uses</td></tr>
   <tr><td><code>ktm mod why path</code></td><td>Who imports a package, and the chain of requirements down to it</td></tr>
   <tr><td><code>ktm mod verify</code></td><td>Checks the cached files against <code>ktm.sum</code></td></tr>

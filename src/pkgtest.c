@@ -200,7 +200,8 @@ static char *pkgTestSelf(const char *argv0) {
         return mprintf("%s", buf);
     }
 #endif
-    return mprintf("%s", argv0);
+    char *real = strchr(argv0, '/') ? realpath(argv0, NULL) : NULL;
+    return real ? real : mprintf("%s", argv0);
 }
 
 static int pkgTestUsage(void) {
@@ -307,6 +308,12 @@ static int pkgTestDir(char *self, PkgTestDir *td, char **cflags, int ncflags,
     pid_t pid = fork();
     if (pid == -1) return pkgFail("can't fork: %s", strerror(errno));
     if (pid == 0) {
+        /* in the package's directory, as go test: a test opens
+         * "testdata/x" or "../migrations" from where it is */
+        if (chdir(real) != 0) {
+            fprintf(stderr, "ktm: can't enter %s: %s\n", real, strerror(errno));
+            _exit(127);
+        }
         execv(self, args);
         fprintf(stderr, "ktm: can't run %s: %s\n", self, strerror(errno));
         _exit(127);
@@ -349,9 +356,17 @@ int pkgTest(int argc, char **argv, char *argv0) {
                 !strcmp(a, "-lsp") || !strcmp(a, "-S") || !strcmp(a, "-c")) {
                 return pkgFail("`ktm test` doesn't take %s", a);
             }
+            /* the tests run in their own directory: a relative
+             * --install-dir is made absolute here */
+            if (!strncmp(a, "--install-dir=", 14)) {
+                char *real = realpath(a + 14, NULL);
+                if (real) a = mprintf("--install-dir=%s", real);
+            }
             cflags[ncflags++] = a;
             if ((!strcmp(a, "--install-dir") || !strcmp(a, "-clibs")) && i + 1 < argc) {
-                cflags[ncflags++] = argv[++i];
+                char *v = argv[++i];
+                char *real = !strcmp(a, "--install-dir") ? realpath(v, NULL) : NULL;
+                cflags[ncflags++] = real ? real : v;
             }
         } else {
             pats[npats++] = a;

@@ -3962,7 +3962,12 @@ static void lspCollectSymbols(LspCtx *ctx, u32 file_id, const char *mod,
             /* the method's name token: the first one spelled so after
              * the struct's name */
             Lexeme *at = NULL;
-            for (u64 k = 0; k < d->toks->size; ++k) {
+            /* `S.f<V>(...)`: d->at is the method's name itself */
+            if (!d->of && d->at && (size_t)d->at->len == d->method->len &&
+                !memcmp(d->at->start, d->method->data, d->at->len)) {
+                at = d->at;
+            }
+            for (u64 k = 0; !at && k < d->toks->size; ++k) {
                 Lexeme *t = d->toks->entries[k];
                 if (t->tk_type == TK_IDENT && (size_t)t->len == d->method->len &&
                     !memcmp(t->start, d->method->data, t->len) &&
@@ -3978,12 +3983,17 @@ static void lspCollectSymbols(LspCtx *ctx, u32 file_id, const char *mod,
             LspSym *m = lspSymNew(out, d->method->data, LSP_SK_METHOD, head->data,
                                   file_id, at->line, at->col, at->len);
             AoStr *owner = aoStrNew();
-            aoStrCatPrintf(owner, "%s<", lspLocalName(d->of->name->data, mod));
-            for (u64 k = 0; k < d->of->params->size; ++k) {
-                aoStrCatPrintf(owner, "%s%s", k ? ", " : "",
-                               ((AoStr *)d->of->params->entries[k])->data);
+            if (!d->of) {
+                /* a plain struct's method with type parameters of its own */
+                aoStrCat(owner, lspLocalName(d->name->data, mod));
+            } else {
+                aoStrCatPrintf(owner, "%s<", lspLocalName(d->of->name->data, mod));
+                for (u64 k = 0; k < d->of->params->size; ++k) {
+                    aoStrCatPrintf(owner, "%s%s", k ? ", " : "",
+                                   ((AoStr *)d->of->params->entries[k])->data);
+                }
+                aoStrPutChar(owner, '>');
             }
-            aoStrPutChar(owner, '>');
             m->owner = owner->data;
         }
     }

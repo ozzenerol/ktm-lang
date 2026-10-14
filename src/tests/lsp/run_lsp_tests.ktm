@@ -108,6 +108,7 @@ u8 *BAG_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
 u8 *GEN_HC;
+u8 *GENM_HC;
 u8 *ALIAS_HC;
 
 void initFixtures() {
@@ -268,6 +269,17 @@ void initFixtures() {
         "  Box<i64> b = {41};\n"
         "  i64 m = maxOf(b.get(), 2);\n"
         "  return (i32)m;\n"
+        "}\n";
+    /* Methods with type parameters of their own (v0.21.0) */
+    GENM_HC =
+        "struct Box { i64 n; };\n"
+        "i64 Box.add<V>(V x) { return self.n + (i64)x; }\n"
+        "struct Pair<T> { T a; };\n"
+        "U Pair<T>.fold<U>(U init) { return init; }\n"
+        "i32 main() {\n"
+        "  Box b = {1};\n"
+        "  Pair<i64> p = {2};\n"
+        "  return (i32)(b.add(2) + p.fold(3));\n"
         "}\n";
     /* Overloads: a call shows and jumps to the one it picks */
     OVL_HC =
@@ -1740,6 +1752,23 @@ void testSymbols() {
     check("clean shutdown", lspClose(l) == 0);
 }
 
+void testGenericMethods() {
+    printf("generic methods\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("genmethods.ktm");
+    lspDidOpen(l, uri, GENM_HC);
+    check("generic methods give no false errors", lastPublishClean(l));
+    u8 params[512];
+    libc.snprintf(params, 512, "{\"textDocument\":{\"uri\":\"%s\"}}", uri);
+    json.Value *resp = lspRequest(l, "textDocument/documentSymbol", params);
+    json.Value *top = json.select(resp, ".result:a");
+    json.Value *box = symNamed(top, "Box");
+    json.Value *bk = box ? json.select(box, ".children:a") : null;
+    check("the outline lists a plain struct's generic method under it",
+                symNamed(bk, "add") != null && symNamed(top, "main") != null);
+    check("clean shutdown", lspClose(l) == 0);
+}
+
 /* The active signature's label and its active parameter's text */
 bool sigIs(json.Value *resp, u8 *label, u8 *param) {
     json.Value *as = json.select(resp, ".result.activeSignature:i");
@@ -1995,7 +2024,7 @@ void runGroup(i64 group) {
         case 10: testMethods();
         case 11: testOverloads();
         case 12: testTypeAlias();
-        case 13: testGenerics();
+        case 13: testGenerics(); testGenericMethods();
         case 14: testEnums();
         case 15: testDocs();
         case 16: testSymbols();

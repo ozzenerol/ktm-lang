@@ -2,9 +2,8 @@ import cstr, fs, libc, mem, proc, test;
 
 /* A generic function with @caller parameters: its type arguments are
  * worked out from the arguments written (the @caller ones are filled in,
- * not written), anywhere in the list and across generic overloads. A
- * method with type parameters of its own (`void S.f<V>(V x)`) is a clear
- * error, not a free function `f`. */
+ * not written), anywhere in the list and across generic overloads, and
+ * for a method with type parameters of its own (`i64 Box.at<V>(...)`). */
 
 #define GCI_TEST_FILE "__819_gci_fail.ktm"
 #define GCI_TEST_OUT  "__819_gci_fail.out"
@@ -38,6 +37,7 @@ T pick<T>(@caller("file") u8 *file, T a, @caller("line") i64 line, T b) {
 
 /* generic overloads */
 i64 count<T>(@caller("line") i64 line, T x) { gLine = line; return 1; }
+i64 Box.at<V>(@caller("line") i64 line, V x) { gLine = line; return (i64)x + self.n; }
 i64 count<T>(@caller("line") i64 line, T x, T y) { gLine = line; return 2; }
 
 bool compileFailsWith(u8 *source, u8 *expected) {
@@ -69,9 +69,7 @@ i32 main()
     check(pick(4, 5) == 4 && gLine == 69, "@caller parameters in the middle");
     check(count(1) == 1 && gLine == 70, "generic overloads: one argument");
     check(count(3, 4) == 2 && gLine == 71, "generic overloads: two");
-    check(compileFailsWith("struct S { i64 n; };\nvoid S.f<V>(V x) { }\nvoid main() { }\n",
-                           "`S.f<...>`: a method can't have type parameters of its own yet"),
-          "a method with type parameters of its own");
+    check(b.at(4) == 7 && gLine == 72, "a generic method with a @caller parameter");
     check(compileFailsWith("bool eq<V>(@caller(\"line\") i64 line, V a, V b) { return a == b; }\n"
                            "void main() { eq(1); }\n",
                            "Unexpected number of arguments"),
