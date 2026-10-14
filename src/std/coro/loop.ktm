@@ -574,6 +574,14 @@ static LoopTask *loopSelf(u8 *what) {
     return c.loopTask;
 }
 
+/* Is the caller a loop coroutine (coro.go, coro.serve)? Then coro.read,
+ * coro.write and coro.wait park it instead of blocking the thread:
+ * libraries use it to pick their I/O. */
+pub bool inLoop() {
+    Coroutine *c = rt.Fs().coroCur;
+    return c && c.loopTask;
+}
+
 /* Pause t until fd (if >= 0) is ready for events, the deadline (if >= 0)
  * passes, or stop() (idle) or close() (paused) ends the wait. */
 #ifdef IS_LINUX

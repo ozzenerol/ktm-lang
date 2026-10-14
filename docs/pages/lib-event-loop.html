@@ -195,6 +195,8 @@ coro.go(&onSignal);</code></pre>
 
 <h2>Errors</h2>
 <ul class="rules">
+  <li><code>coro.inLoop()</code> is true in a coroutine of a loop (<code>coro.go</code>, <code>coro.serve</code>): a library uses it to
+  choose <code>coro.read</code> or a blocking read.</li>
   <li>The loop calls throw <code>coro.ERR_LOOP</code> when they can't work: <code>coro.run</code> inside a coroutine, <code>coro.read</code> outside one, a loop where every coroutine waits forever with no fd.</li>
   <li>When a loop coroutine throws, the loop releases it and <code>coro.run</code> throws the error on. The other coroutines stay; calling <code>coro.run</code> again carries on with them.</li>
 </ul>
