@@ -1,0 +1,37 @@
+<!-- title: UUIDs -->
+<!-- ref: uuid -->
+<h1>UUIDs</h1>
+<p class="lede"><code>uuid</code> makes and reads UUIDs (RFC 9562). <code>uuid.v7()</code> starts with the time in
+milliseconds, so v7s sort by when they were made: as a database's primary key they keep its index compact, unlike random
+ones. <code>uuid.v4()</code> is 122 random bits.</p>
+
+<pre data-run><code>
+import uuid;
+
+void main()
+{
+  uuid.UUID a = uuid.v7();
+  uuid.UUID b = uuid.v7();
+  String s = a.string();
+  printf("%d %d %d %d\n", s.len, a.version(), b.compare(a) > 0, uuid.v4().version());
+
+  uuid.UUID back;
+  printf("%d %d\n", uuid.parse(s, &back) && back.equals(a), uuid.parse("nope", &back));
+  s.free();
+}
+</code></pre>
+<pre class="output">
+36 7 1 4
+1 0
+</pre>
+
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>uuid.v7()</code>, <code>uuid.v4()</code></td><td>A new UUID; v7s from any thread are strictly increasing</td></tr>
+  <tr><td><code>u.string()</code>, <code>u.format(buf)</code></td><td>The 36-character form, as a new String or into a 37-byte buffer</td></tr>
+  <tr><td><code>uuid.parse(text, &amp;u)</code></td><td>The canonical form in either case, 32 digits without hyphens, <code>{...}</code> or <code>urn:uuid:...</code>; <code>false</code> otherwise</td></tr>
+  <tr><td><code>u.version()</code>, <code>u.unixMs()</code></td><td>4 or 7; a v7's time in Unix milliseconds</td></tr>
+  <tr><td><code>u.equals(o)</code>, <code>u.compare(o)</code>, <code>u.isNil()</code>, <code>uuid.nil()</code></td><td>Comparing: v7s compare by time</td></tr>
+</table>
+<p>A <code>uuid.UUID</code> is 16 bytes held by value, nothing to free. Its random bits come from the operating system
+(<code>getrandom</code>, <code>arc4random</code>).</p>
