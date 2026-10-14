@@ -31,7 +31,23 @@ void *pong(void *arg) {
     return null;
 }
 
-i64 gTimeout = -9, gEarly = -9, gElapsed = 0, gStopped = -9;
+i64 gTimeout = -9, gEarly = -9, gElapsed = 0, gStopped = -9, gLate = -9;
+coro.Coroutine *gLateC;
+
+/* parks 1 ms; lateWaker unparks it after the time limit made it ready,
+ * before it ran: the unpark still counts */
+void *latePark(void *arg) {
+    gLate = coro.park(1);
+    return null;
+}
+
+void *lateWaker(void *arg) {
+    i64 t0 = date.monoMs();
+    while (date.monoMs() - t0 < 10) { }      /* past latePark's limit, no yield */
+    coro.yield();                            /* the turn readies latePark (0) */
+    coro.unpark(gLateC);                     /* runs before it resumes */
+    return null;
+}
 
 void *timesOut(void *arg) {
     i64 t0 = date.monoMs();
@@ -69,6 +85,11 @@ i32 main() {
     coro.run();
     check(gTimeout == 0 && gElapsed >= 25, "the time limit returns 0");
     check(gEarly == 1, "an unpark before the park returns at once");
+
+    gLateC = coro.go(&latePark);
+    coro.go(&lateWaker);
+    coro.run();
+    check(gLate == 1, "an unpark after the time limit, before the resume, still counts");
 
     coro.go(&parksForever);
     coro.go(&stopper);

@@ -650,7 +650,12 @@ pub i64 park(i64 ms=-1) {
     t.parked = true;
     i64 r = loopPark(t, -1, 0, loopDeadline(ms), true, false);
     t.parked = false;
-    t.unparked = false;
+    /* an unpark that came after the time limit made it ready, before it
+     * ran: it still counts (after a stop it waits for the next park) */
+    if (r == 0 && t.unparked) {
+        t.unparked = false;
+        return 1;
+    }
     return r;
 }
 
