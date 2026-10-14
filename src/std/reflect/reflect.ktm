@@ -60,6 +60,8 @@ pub struct Field {
     u8[] key;           /* its key in JSON and YAML: @key("...")'s, else its name */
     bool skip;          /* @skip: never written or read */
     bool omitEmpty;     /* @omitEmpty: not written when 0, empty or null */
+    u8[] env;           /* @env("NAME")'s, else "": config's variable (v0.20.0) */
+    bool required;      /* @required: config fails without its variable */
 };
 
 /* A member of an enum: its name and value */

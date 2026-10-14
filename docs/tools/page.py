@@ -59,6 +59,7 @@ NAV = [
         ("lib-shell.html", "Shell commands"),
         ("lib-processes.html", "Processes"),
         ("lib-environment.html", "Environment and exit"),
+        ("lib-config.html", "Settings from the environment"),
         ("lib-signals.html", "Signals"),
         ("lib-logging.html", "Logging"),
         ("lib-vectors.html", "Vectors and sorting"),

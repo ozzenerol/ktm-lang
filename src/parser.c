@@ -600,7 +600,7 @@ static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at);
  * struct's come before its declaration (and before `pub`), a field's
  * before the field. Which ones there are and where they go: */
 static const char *parse_struct_attrs[] = {"json", "yaml", NULL};
-static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", NULL};
+static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "required", NULL};
 
 static int parseAttrIn(const char **names, AoStr *name) {
     for (int i = 0; names[i]; ++i) {
@@ -647,16 +647,22 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
             }
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "unknown attribute `@%s`: a struct takes @json and @yaml, "
-                    "a field @key, @skip and @omitEmpty", a->name->data);
+                    "a field @key, @skip, @omitEmpty, @env and @required", a->name->data);
         }
-        int wants_arg = !strcmp(a->name->data, "key");
+        int is_env = !strcmp(a->name->data, "env");
+        int wants_arg = !strcmp(a->name->data, "key") || is_env;
         if (wants_arg && (!a->arg || a->arg->len == 0)) {
+            if (is_env) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@env` takes the variable's name as a string: @env(\"PORT\")");
+            }
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "`@key` takes the field's key as a string: @key(\"e-mail\")");
         }
         if (wants_arg && memchr(a->arg->data, '\\', a->arg->len)) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
-                    "`@key`: write the key without escapes");
+                    "`@%s`: write the %s without escapes", a->name->data,
+                    is_env ? "name" : "key");
         }
         if (!wants_arg && a->arg) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
@@ -679,14 +685,17 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
     return attrs;
 }
 
-/* A field's attribute `a` on a struct without @json or @yaml does nothing:
- * an error, at the attribute */
+/* A field's attribute on a struct without @json or @yaml does nothing
+ * (but config's @env and @required): an error, at the attribute */
 static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fields) {
     if (cls_attrs && cls_attrs->size) return;
     listForEach(fields) {
         ClsField *f = it->value;
-        if (f->type && f->type->field_attrs && f->type->field_attrs->size) {
-            AstAttr *a = f->type->field_attrs->entries[0];
+        if (!f->type || !f->type->field_attrs) continue;
+        /* @env and @required are config's: on any struct */
+        for (u64 i = 0; i < f->type->field_attrs->size; ++i) {
+            AstAttr *a = f->type->field_attrs->entries[i];
+            if (!strcmp(a->name->data, "env") || !strcmp(a->name->data, "required")) continue;
             cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
                     "`@%s` on a field of %s, which has neither @json nor @yaml",
                     a->name->data, tag ? tag->data : "an anonymous struct");
@@ -901,9 +910,11 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             if (field_attrs) {
                 AstAttr *a = field_attrs->entries[0];
                 if (is_private) {
-                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
-                            "`@%s` on a private field: json and yaml never write "
-                            "or read private fields", a->name->data);
+                    int cfg = !strcmp(a->name->data, "env") || !strcmp(a->name->data, "required");
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1, cfg
+                            ? "`@%s` on a private field: config never reads private fields"
+                            : "`@%s` on a private field: json and yaml never write "
+                              "or read private fields", a->name->data);
                 }
                 if (astAttrGet(field_attrs, "key") &&
                     tokenPunctIs(cctrlTokenPeek(cc), ','))
@@ -1871,6 +1882,13 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
                                  astAttrGet(ft->field_attrs, "skip") ? 1 : 0);
             parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "omitEmpty"),
                                  astAttrGet(ft->field_attrs, "omitEmpty") ? 1 : 0);
+            AstAttr *env = astAttrGet(ft->field_attrs, "env");
+            if (env) {
+                parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "env"),
+                                      env->arg->data, env->arg->len);
+            }
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "required"),
+                                 astAttrGet(ft->field_attrs, "required") ? 1 : 0);
             j++;
         }
         int off = parseReflectOffset(rtype, "fields");
