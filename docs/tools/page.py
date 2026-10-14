@@ -86,6 +86,7 @@ NAV = [
         ("lib-event-loop.html", "The coroutine loop"),
         ("lib-serve.html", "Serving on every core"),
         ("lib-http.html", "HTTP servers"),
+        ("lib-http-middleware.html", "HTTP middleware"),
         ("lib-tls.html", "TLS"),
         ("lib-url.html", "URLs"),
         ("lib-threads.html", "Threads and atomics"),

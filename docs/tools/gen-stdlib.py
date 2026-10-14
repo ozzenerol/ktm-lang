@@ -44,6 +44,7 @@ MODULES = [
     ("thread",  "Threads",           "pthreads helpers."),
     ("atomic",  "Atomics",           "Atomic operations on integers and pointers shared between threads."),
     ("net",     "Networking",        "Sockets and address resolution."),
+    ("net.http.middleware", "HTTP middleware", "Request IDs, the real client address, CORS, rate limiting, bearer tokens for net.http."),
     ("net.http", "HTTP",             "HTTP/1.1 servers: a Mux of Go-style patterns, handlers, JSON replies."),
     ("encoding.base64", "Base64",    "Base64, the standard and the URL-safe alphabet."),
     ("encoding.hex", "Hex",          "Hexadecimal encoding and decoding."),
@@ -75,7 +76,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
-    "log": "lib-logging.html", "net.http": "lib-http.html", "net.tls": "lib-tls.html", "net.url": "lib-url.html", "uuid": "lib-uuid.html", "flag": "lib-flags.html", "config": "lib-config.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
+    "log": "lib-logging.html", "net.http": "lib-http.html", "net.http.middleware": "lib-http-middleware.html", "net.tls": "lib-tls.html", "net.url": "lib-url.html", "uuid": "lib-uuid.html", "flag": "lib-flags.html", "config": "lib-config.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }

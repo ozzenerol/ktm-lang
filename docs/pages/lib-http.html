@@ -234,6 +234,9 @@ void bookmarks(http.Writer *w, http.Request *r)
 }
 </code></pre>
 
+<p>Ready-made middleware (CORS, request IDs, rate limiting, bearer tokens, the real client address) is in
+<a href="lib-http-middleware.html"><code>net.http.middleware</code></a>.</p>
+
 <h3 id="files">Static files</h3>
 <p><code>mux.files(prefix, dir)</code> serves the files under <code>dir</code> at <code>prefix</code>, which must end in
 <code>/</code>: it adds the route <code>GET prefix{path...}</code> (on a group, under the group's prefix).</p>
