@@ -1,0 +1,203 @@
+<!-- title: 8. Users and sessions -->
+<h1>8. Users and sessions</h1>
+<p class="lede">Shelf becomes a service for many people: they sign up with an email and a password, log in to get a
+token, and send it with every request. Each bookmark has an owner, and nobody sees anybody else's.</p>
+
+<h2>The migration</h2>
+<pre><code>CREATE TABLE users (
+    id            uuid PRIMARY KEY,
+    email         text NOT NULL UNIQUE,
+    password_hash text NOT NULL,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE sessions (
+    token_hash bytea PRIMARY KEY,      -- SHA-256 of the token: a stolen table holds no tokens
+    user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    expires_at timestamptz NOT NULL
+);
+
+-- every bookmark has an owner now; the ones from earlier chapters had none
+DELETE FROM bookmarks;
+ALTER TABLE bookmarks ADD user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE;
+ALTER TABLE bookmarks DROP CONSTRAINT bookmarks_url_key;
+CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
+<ul class="rules">
+  <li>Passwords are stored as <b>hashes</b>, never as text: Argon2id, slow on purpose, so a stolen table is expensive to
+  guess from.</li>
+  <li>Sessions are stored by the <b>SHA-256 of the token</b>: the table doesn't hold anything a thief could send back.</li>
+  <li>A url is now unique per user, not in the whole table.</li>
+</ul>
+
+<h2>Signing up</h2>
+<pre><code>void signup(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewUser in = http.decodeValid&lt;NewUser&gt;(r);
+    String hash = crypto.hashPassword(in.password);     /* Argon2id, on a worker thread */
+    defer hash.free();
+    String id = uuid.v7().string();
+    defer id.free();
+    User u;
+    try {
+        u = pg.queryOne&lt;User&gt;(db, "INSERT INTO users (id, email, password_hash) VALUES ($1, lower($2), $3) RETURNING id, email",
+                              id, in.email, hash);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that email has an account");
+        return;
+    }
+    defer u.freeDecoded();
+    w.json(201, reflect.of(u));
+}</code></pre>
+<ul class="rules">
+  <li><code>crypto.hashPassword</code> takes about 20 ms of CPU by design. In a handler it runs on a worker thread
+  (<a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a>, by itself), so the server goes on answering
+  other requests meanwhile.</li>
+  <li><code>lower($2)</code>: emails are compared without case, <code>Ada@Example.com</code> is
+  <code>ada@example.com</code>.</li>
+</ul>
+
+<h2>Logging in</h2>
+<pre><code>void login(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    Login in = http.decodeValid&lt;Login&gt;(r);
+    vec.Vec&lt;Credentials&gt; found = pg.queryAll&lt;Credentials&gt;(db,
+        "SELECT id, password_hash AS \"passwordHash\" FROM users WHERE email = lower($1)", in.email);
+    defer pg.free(reflect.of(found));
+    u8[] hash = found.len ? found.data[0].passwordHash[0:] : gNoUser[0:];
+    if (!crypto.verifyPassword(in.password, hash) || !found.len) {
+        w.error(401, "wrong email or password");
+        return;
+    }
+    /* 32 random bytes are the token; the database keeps only their hash */
+    String raw = crypto.randomBytes(32);
+    defer raw.free();
+    Session s;
+    defer s.freeDecoded();
+    s.token = base64.encodeUrl(raw[0:]);
+    u8 h[32];
+    tokenHash(s.token[0:], h);
+    s.expiresAt = pg.queryOne&lt;String&gt;(db,
+        "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '30 days')"
+        " RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+        h[0:32], found.data[0].id);
+    w.json(201, reflect.of(s));
+}</code></pre>
+<ul class="rules">
+  <li>A wrong password and an unknown email get the same answer, and take the same time: for an unknown email the
+  password is still checked, against <code>gNoUser</code>, a hash nothing matches. Otherwise the time would tell an
+  attacker which emails have accounts.</li>
+  <li>The token is 32 random bytes from the operating system (<code>crypto.randomBytes</code>), in URL-safe base64.
+  The client keeps it; the database keeps its hash, with an expiry.</li>
+</ul>
+
+<h2>Who is asking</h2>
+<pre><code>/* Is token a live session? Then the handlers get its user (userOf) */
+bool checkToken(u8[] token, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    u8 h[32];
+    tokenHash(token, h);
+    vec.Vec&lt;String&gt; ids = pg.queryAll&lt;String&gt;(db,
+        "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &gt; now()", h[0:32]);
+    defer pg.free(reflect.of(ids));
+    if (!ids.len) { return false; }
+    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
+    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
+    u8[] *id = r.alloc(sizeof(u8[]));
+    *id = keep[0:ids.data[0].len];
+    r.set("userId", id);
+    return true;
+}
+
+/* The signed-in user's id (behind middleware.bearer) */
+u8[] userOf(http.Request *r)
+{
+    u8[] *id = r.get("userId");
+    return *id;
+}</code></pre>
+<p><a href="lib-http-middleware.html"><code>middleware.bearer</code></a> reads
+<code>Authorization: Bearer &lt;token&gt;</code>, calls <code>checkToken</code> and answers 401 when it says no.
+<code>checkToken</code> keeps the user's id in the request (memory from <code>r.alloc</code> lives exactly as long), and
+handlers read it with <code>userOf(r)</code>. Every bookmark query gets <code>AND user_id = $n</code>.</p>
+<pre><code>i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
+
+    String noise = uuid.v4().string();
+    gNoUser = crypto.hashPassword(noise[0:]);
+    noise.free();
+
+    http.Mux mux;
+    mux.handle("POST /users", &amp;signup);
+    mux.handle("POST /sessions", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}</code></pre>
+<p><code>bookmarks.handle("GET", &amp;list)</code> is <code>GET /bookmarks</code> itself: a pattern without a path
+is the group's prefix, so the whole resource is behind the group's middleware.</p>
+
+<h2>Try it</h2>
+<pre><code>$ curl -X POST localhost:8080/users -d '{"email": "Ada@Example.com", "password": "correct horse battery"}'
+{"id":"01a13b10-d568-7000-b8b5-ca7711cd4b3b","email":"ada@example.com"}
+$ curl -X POST localhost:8080/users -d '{"email": "bob@example.com", "password": "short"}'
+{"error":"invalid request","fields":[{"field":"password","message":"must have at least 10 characters"}]}
+
+$ curl -X POST localhost:8080/sessions -d '{"email": "ada@example.com", "password": "wrong password"}'
+{"error":"wrong email or password"}
+$ curl -X POST localhost:8080/sessions -d '{"email": "ada@example.com", "password": "correct horse battery"}'
+{"token":"Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o","expiresAt":"2026-11-13T15:38:41Z"}
+
+$ curl localhost:8080/bookmarks
+{"error":"unauthorized"}
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' -X POST localhost:8080/bookmarks \
+       -d '{"url": "https://go.dev", "tags": ["go"]}'
+{"id":"01a13b10-d600-7000-973f-c1aa83cfa146","url":"https://go.dev","title":"https://go.dev","notes":"","tags":["go"],"createdAt":"2026-10-14T15:38:41Z"}
+
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' -X DELETE localhost:8080/sessions
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' localhost:8080/bookmarks
+{"error":"unauthorized"}</code></pre>
+<p>Bob, signed in with his own token, sees an empty list, and can save <code>https://go.dev</code> too.</p>
+<p>Next: <a href="guide-http-09-sharing.html">Sharing</a>.</p>
