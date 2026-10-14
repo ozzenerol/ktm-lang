@@ -38,6 +38,116 @@ i32 main()
 $ curl -d '{"name":' localhost:8080/users
 {"error":"1:9: name: expected a string, got the end of the input"}</code></pre>
 
+<h2 id="routing">Routing</h2>
+<p>An <code>http.Mux</code> sends each request to the handler of the pattern that matches it, the way
+Go 1.22's <code>ServeMux</code> does. Declare one (<code>http.Mux mux;</code>: no setup call) and add
+routes with <code>mux.handle(pattern, &amp;handler)</code>. A pattern is <code>[METHOD ]/path</code>:</p>
+<table>
+<tr><th>Pattern</th><th>Matches</th></tr>
+<tr><td><code>/health</code></td><td><code>/health</code>, any method</td></tr>
+<tr><td><code>GET /users/{id}</code></td><td><code>/users/7</code> by GET or HEAD; <code>r.param("id")</code> is <code>"7"</code></td></tr>
+<tr><td><code>/files/{path...}</code></td><td><code>/files/a/b.txt</code>: <code>path</code> is the rest, <code>"a/b.txt"</code> (it may be empty)</td></tr>
+<tr><td><code>/static/</code></td><td>a trailing slash: <code>/static/</code> and everything under it</td></tr>
+<tr><td><code>/{$}</code></td><td>only <code>/</code> (<code>/</code> alone matches every path)</td></tr>
+</table>
+<pre data-run><code>
+import net.http;
+
+void user(http.Writer *w, http.Request *r)  { w.text(200, "user %s", r.param("id")); }
+void me(http.Writer *w, http.Request *r)    { w.text(200, "it's you"); }
+void file(http.Writer *w, http.Request *r)  { w.text(200, "file %s", r.param("path")); }
+void create(http.Writer *w, http.Request *r) { w.text(201, "created"); }
+void home(http.Writer *w, http.Request *r)  { w.text(200, "home"); }
+
+void show(http.Mux *mux, u8[] method, u8[] target)
+{
+  http.Request r = http.testRequest(method, target);
+  http.Writer w = http.recorder();
+  mux.serve(&w, &r);
+  printf("%-6s %-18s %d %s%s\n", method, target, w.code, w.body, w.getHeader("Location"));
+  w.free();
+  r.free();
+}
+
+void main()
+{
+  http.Mux mux;
+  mux.handle("GET /users/{id}", &user);
+  mux.handle("GET /users/me", &me);       // more specific: wins for /users/me
+  mux.handle("POST /users", &create);
+  mux.handle("/files/{path...}", &file);
+  mux.handle("/{$}", &home);
+
+  show(&mux, "GET", "/users/42");
+  show(&mux, "GET", "/users/me");
+  show(&mux, "GET", "/files/a%20b/c.txt");
+  show(&mux, "GET", "/");
+  show(&mux, "GET", "/files");
+  show(&mux, "DELETE", "/users/42");
+  show(&mux, "GET", "/nope");
+  mux.free();
+}
+</code></pre>
+<pre class="output">
+GET    /users/42          200 user 42
+GET    /users/me          200 it's you
+GET    /files/a%20b/c.txt 200 file a b/c.txt
+GET    /                  200 home
+GET    /files             301 /files/
+DELETE /users/42          405 {"error":"method not allowed"}
+GET    /nope              404 {"error":"not found"}
+</pre>
+
+<h3>Which pattern wins</h3>
+<p>When several patterns match, the <em>most specific</em> one wins, whatever order they were added in:
+one pattern is more specific than another when it matches a strict subset of its requests. So a literal
+segment beats <code>{name}</code>, <code>{name}</code> beats <code>{name...}</code>, a longer subtree beats
+a shorter one, and <code>GET /x</code> beats <code>/x</code>.</p>
+<p>Two patterns that both match some request where neither is more specific are refused at
+<code>handle()</code>, and so is the same pattern twice: it throws <code>http.ERR_PATTERN</code> with both patterns
+in the message. For example <code>/users/{id}</code> and <code>/{kind}/new</code> both match <code>/users/new</code>,
+and <code>GET /</code> and <code>/health</code> both match <code>GET /health</code> (the first takes fewer methods, the
+second fewer paths). A pattern that isn't one (no leading <code>/</code>, a host, <code>{</code> inside a
+segment, <code>{name...}</code> or <code>{$}</code> not at the end, a name used twice) throws the same.</p>
+<pre data-run><code>
+import net.http;
+
+void h(http.Writer *w, http.Request *r) { }
+
+void main()
+{
+  http.Mux mux;
+  mux.handle("/users/{id}", &h);
+  try {
+    mux.handle("/{kind}/new", &h);
+  } catch (Error e) {
+    printf("%d: %s\n", e.code == http.ERR_PATTERN, e.message);
+  }
+  mux.free();
+}
+</code></pre>
+<pre class="output">
+1: http.Mux.handle: pattern "/{kind}/new" conflicts with pattern "/users/{id}": some requests match both and neither is more specific
+</pre>
+
+<h3>The details</h3>
+<ul>
+<li><b>Methods</b>: a pattern without one takes every method; <code>GET</code> takes <code>HEAD</code> too (the server
+sends no body for HEAD). <code>HEAD /x</code> is more specific than <code>GET /x</code>.</li>
+<li><b>No route</b>: 404 <code>{"error":"not found"}</code>. A path that a route for other methods matches gets
+405 <code>{"error":"method not allowed"}</code> with an <code>Allow</code> header listing them
+(<code>DELETE, GET, HEAD</code>).</li>
+<li><b>Escapes</b>: the path is split at its <code>/</code>s first, then each segment is unescaped, so
+<code>/a%2Fb</code> is one segment, <code>a/b</code>. Literal segments of a pattern are unescaped too, and
+<code>r.param</code> gives values unescaped (a segment with a bad <code>%</code> escape is used as it is).</li>
+<li><b>Redirects</b> (301, the query kept): <code>/dir</code> goes to <code>/dir/</code> when it doesn't match a route
+itself but <code>/dir/</code> matches a subtree <code>/dir/</code> (or <code>/dir/{rest...}</code>); a path with
+<code>//</code>, <code>/./</code> or <code>/../</code> goes to its clean form (<code>/a/../b</code> to <code>/b</code>).</li>
+<li><b>Speed</b>: patterns are parsed once, at <code>handle()</code>. Matching allocates nothing (a parameter
+that needs unescaping is copied into the request's arena) and rejects most routes by their segment count and first byte.</li>
+<li><code>mux.free()</code> frees the routes and leaves the Mux empty; <code>http.listen</code> calls it when it returns.</li>
+</ul>
+
 <h2>Handlers</h2>
 <p>A handler is <code>void name(http.Writer *w, http.Request *r)</code> (the type <code>http.Handler</code>). What the request hands
 it is valid until it returns, and the module frees it then: the path, headers, query values, path parameters, the body
