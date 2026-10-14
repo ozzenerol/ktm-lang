@@ -1,0 +1,139 @@
+<!-- title: Testing -->
+<h1>Testing</h1>
+<p class="lede">Tests live next to the code in files named <code>*_test.ktm</code>. Each <code>void testXxx(testing.T *t)</code>
+in them is a test; <code>ktm test</code> finds them, compiles them with the code they test and runs them, as <code>go test</code> does.</p>
+
+<h2>A first test</h2>
+<pre><code>
+// geo/area.ktm
+module geo;
+
+pub i64 area(i64 w, i64 h) { return w * h; }
+
+pub u8 *kind(i64 w, i64 h) { return w == h ? "square" : "rect"; }
+
+i64 clamp(i64 n) { return n &lt; 0 ? 0 : n; }
+</code></pre>
+<pre><code>
+// geo/area_test.ktm: in the module, so it sees clamp too
+module geo;
+import testing;
+
+void testArea(testing.T *t) {
+    t.equal(area(3, 4), 12);
+    t.equal(area(0, 9), 0);
+}
+
+void testKind(testing.T *t) {
+    t.equal(kind(2, 2), "square");
+    t.equal(kind(2, 3), "square");
+}
+
+void testClamp(testing.T *t) {
+    t.check(clamp(-5) == 0, "clamp(-5) is %d", clamp(-5));
+}
+</code></pre>
+<pre><code>$ ktm test ./geo
+--- FAIL: testKind (0.00s)
+    area_test.ktm:11: got "rect", want "square"
+FAIL
+FAIL	./geo	0.00s  (2 passed, 1 failed)
+$ echo $?
+1</code></pre>
+<p>A failed check doesn't stop its test: every failure is listed, with its file and line. Passing tests print nothing
+but the summary line; <code>-v</code> shows each one.</p>
+
+<h2>Where tests go</h2>
+<ul class="rules">
+  <li><b>In a module's directory</b>, starting with the module's line (<code>module geo;</code>): the test is part of the
+    module and uses every name in it, <code>pub</code> or not.</li>
+  <li><b>Next to <code>main.ktm</code></b>, with no module line: the test imports modules as the program does and sees
+    their <code>pub</code> names. It can't call the functions of <code>main.ktm</code> itself: put what you want to test in a module.</li>
+  <li><code>*_test.ktm</code> files are left out of everything else: <code>ktm build</code>, <code>ktm run</code>,
+    <code>ktm -lib</code> and an <code>import</code> never read them.</li>
+  <li>A test is a top-level <code>void testXxx(testing.T *t)</code>: <code>test</code>, then nothing or a name that doesn't
+    start with a lower-case letter (<code>testParse</code>, <code>test2</code>; not <code>testing</code> or <code>tester</code>).
+    Other functions in the file are helpers.</li>
+  <li>Tests run in the order they are written, file by file in name order, one directory at a time.</li>
+</ul>
+
+<h2>testing.T</h2>
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>t.check(ok)</code>, <code>t.check(ok, "fmt", ...)</code></td><td>Fails the test when <code>ok</code> is false, with the message (printf's format)</td></tr>
+  <tr><td><code>t.equal(got, want)</code></td><td>Fails with <code>got X, want Y</code> unless they are equal: integers (bools, chars, enums: <code>t.equal(n &gt; 0, true)</code> shows <code>got 0, want 1</code>),
+    <code>f64</code>, and text as <code>u8 *</code>, <code>u8[]</code> or <code>String</code> (the bytes are compared; <code>null</code> only equals <code>null</code>)</td></tr>
+  <tr><td><code>t.fail("fmt", ...)</code></td><td>Fails the test with a message; it goes on</td></tr>
+  <tr><td><code>t.fatal("fmt", ...)</code></td><td>Fails the test and ends it (the rest of the test would make no sense)</td></tr>
+  <tr><td><code>t.skip("fmt", ...)</code></td><td>Ends the test, counted as skipped: no database, wrong platform</td></tr>
+  <tr><td><code>t.log("fmt", ...)</code></td><td>A message, printed when the test fails or with <code>-v</code></td></tr>
+  <tr><td><code>t.hasFailed()</code></td><td>Has it failed so far?</td></tr>
+  <tr><td><code>t.name</code></td><td>The test's name, as <code>"testKind"</code></td></tr>
+</table>
+<ul class="rules">
+  <li>Every message starts with the file and line of the call (the methods take <code>@caller</code> parameters).</li>
+  <li>A test that throws and doesn't catch fails with the error's message, file and line; the next test runs.
+    <code>fatal</code> and <code>skip</code> end a test by throwing too, so a <code>try</code> around them in the test catches them.</li>
+  <li>A crash (a segmentation fault) ends the directory's run: <code>FAIL dir [crashed: -v shows in which test]</code>.</li>
+</ul>
+
+<h2>Table tests</h2>
+<p>Many cases, one test: an array of structs and a loop. The message says which case failed.</p>
+<pre><code>
+module geo;
+import testing;
+
+struct AreaCase { i64 w, h, want; };
+
+void testAreaTable(testing.T *t) {
+    AreaCase cases[] = {
+        {1, 1, 1},
+        {2, 5, 10},
+        {7, 0, 0},
+    };
+    for (auto c : cases) {
+        t.check(area(c.w, c.h) == c.want, "area(%d, %d) = %d, want %d",
+                c.w, c.h, area(c.w, c.h), c.want);
+    }
+}
+</code></pre>
+
+<h2>Running tests</h2>
+<pre><code>$ ktm test                 # the tests in this directory
+$ ktm test ./geo           # in one directory
+$ ktm test ./...           # in this one and every one under it
+$ ktm test -run Area ./... # only the tests whose name contains Area
+$ ktm test -v              # every test, and its log messages
+$ ktm test -jit -Memsafe   # with the JIT, reporting leaks and bad frees</code></pre>
+<pre><code>$ ktm test ./...
+ok  	.	0.00s  (1 passed)
+ok  	geo	0.00s  (4 passed)
+$ ktm test -jit -v .
+=== RUN   testFromOutside
+--- PASS: testFromOutside (0.00s)
+PASS
+ok  	.	0.00s  (1 passed)</code></pre>
+<ul class="rules">
+  <li>One line per directory: <code>ok</code> or <code>FAIL</code>, the time, and how many tests passed, failed and were skipped.
+    A directory without test files says <code>[no test files]</code>; one that doesn't compile prints the errors and
+    <code>FAIL dir [build failed or exited early]</code>.</li>
+  <li>The exit code is 0 when every test passed, 1 otherwise: <code>ktm test ./...</code> works as a CI step.</li>
+  <li><code>./...</code> leaves out directories starting with <code>.</code> or <code>_</code>, and <code>testdata</code>
+    (a place for the files tests read).</li>
+  <li>Tests compile ahead of time, as <code>ktm -run</code>; <code>-jit</code> runs them with the JIT. Other flags go to the
+    compiler: <code>-Werror</code>, <code>-DNAME</code>, <code>--install-dir=...</code>.</li>
+  <li>Tests run in the directory <code>ktm test</code> was started in.</li>
+</ul>
+
+<h2>In a project</h2>
+<p>In a project with a <code>ktm.mod</code> (see <a href="tools-packages.html">Packages</a>), <code>ktm test</code> finds
+modules and packages as <code>ktm build</code> does: from the project's root, with the versions in <code>ktm.mod</code>,
+downloading the ones that are missing. Run it from the root or any directory under it.</p>
+<pre><code>shapes/
+├── ktm.mod          // module example.com/you/shapes
+├── main.ktm
+├── main_test.ktm    // import geo, testing;
+└── geo/
+    ├── area.ktm
+    ├── area_test.ktm
+    └── table_test.ktm</code></pre>

@@ -730,7 +730,7 @@ char *pkgModuleName(const char *dir) {
 
 /* ---- commands ---- */
 
-static int pkgFail(const char *fmt, ...) {
+int pkgFail(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     fprintf(stderr, "ktm: ");
@@ -1323,7 +1323,7 @@ static int pkgModCommand(int argc, char **argv) {
 /* Every package the build list needs, downloaded (and checked against
  * ktm.sum) when it isn't yet; quiet when there's nothing to do. 0 on an
  * error (reported). */
-static int pkgEnsureDownloaded(PkgMod *m) {
+int pkgEnsureDownloaded(PkgMod *m) {
     char *err = NULL;
     PkgList *l = pkgBuildList(m, &err);
     if (!l) return pkgFail("%s", err) == 0;
@@ -1422,5 +1422,6 @@ int pkgMain(int argc, char **argv, int *new_argc, char ***new_argv) {
     if (!strcmp(argv[1], "run")) return pkgBuildOrRun(1, argc - 2, argv + 2, new_argc, new_argv);
     if (!strcmp(argv[1], "mod")) return pkgModCommand(argc - 2, argv + 2);
     if (!strcmp(argv[1], "get")) return pkgGet(argc - 2, argv + 2);
+    if (!strcmp(argv[1], "test")) return pkgTest(argc - 2, argv + 2, argv[0]);
     return -1;
 }

@@ -113,9 +113,9 @@ i32 main()
     check(compileFailsWith("void f(@caller(\"line\") i64 x = 3) {}\nvoid main() {}\n",
                            "a `@caller` parameter has no default"),
           "a default on a @caller parameter");
-    check(compileFailsWith("void f(@caller(\"line\") i64 x, u8 *a) {}\nvoid f(@caller(\"line\") i64 x, i64 a) {}\nvoid main() {}\n",
-                           "`f` has a @caller parameter, so it can't be overloaded"),
-          "overloading");
+    check(compileFailsWith("void f(@caller(\"line\") i64 x, u8 *a) {}\nvoid f(i64 a) {}\nvoid main() {}\n",
+                           "`f` has a @caller parameter, so its overloads must all start with the same @caller parameters"),
+          "overloads without the same @caller parameters");
     check(compileFailsWith("void f(@caller(\"line\") i64 x, u8 *a) {}\nvoid main() { f(); }\n",
                            "Unexpected number of arguments 0 in call to f(), expected 1 args"),
           "the count leaves @caller out");

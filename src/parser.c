@@ -5529,6 +5529,24 @@ static Lexeme *parseFnPtrDeclName(Cctrl *cc) {
     return name;
 }
 
+/* The @caller parameters params starts with (from `from` on, after a
+ * method's self), as "fl" for (file, line): "" for none, NULL when one
+ * comes later */
+static char *parseCallerPrefixSig(Vec *params, int from) {
+    char sig[16];
+    int n = 0, i = from;
+    for (; params && i < (int)params->size && n < 15; ++i) {
+        Ast *p = params->entries[i];
+        if (!p || !(p->flags & AST_FLAG_CALLER)) break;
+        sig[n++] = p->flags & AST_FLAG_CALLER_FILE ? 'f' : p->flags & AST_FLAG_CALLER_LINE ? 'l' : 'u';
+    }
+    for (; params && i < (int)params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (p && (p->flags & AST_FLAG_CALLER)) return NULL;
+    }
+    return mprintf("%.*s", n, sig);
+}
+
 /* Do two parameter lists take the same types (names and defaults aside)?
  * As overloads tell them apart: an enum is not its integer, bool not u8 */
 static int parseSameParamTypes(Vec *a, Vec *b) {
@@ -5568,13 +5586,14 @@ static char *parseOverloadDecl(Cctrl *cc, char *fname, int len, Vec *params,
         return fname;
     }
 
-    for (u64 i = 0; i < params->size + (prev->params ? prev->params->size : 0); ++i) {
-        Ast *p = i < params->size ? params->entries[i]
-                                  : prev->params->entries[i - params->size];
-        if (p && (p->flags & AST_FLAG_CALLER)) {
-            cctrlRaiseException(cc, "`%s` has a @caller parameter, so it can't be overloaded",
-                                astModuleDemangle(fname, len));
-        }
+    /* @caller parameters: the same ones first in every overload (a call
+     * fills them in before it picks one, parseArgv) */
+    char *callers = parseCallerPrefixSig(params, from);
+    char *prev_callers = parseCallerPrefixSig(prev->params, from);
+    if (!callers || !prev_callers || strcmp(callers, prev_callers)) {
+        cctrlRaiseException(cc, "`%s` has a @caller parameter, so its overloads must all "
+                            "start with the same @caller parameters",
+                            astModuleDemangle(fname, len));
     }
 
     if (!prev->overloads) {

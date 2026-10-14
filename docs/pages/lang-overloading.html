@@ -140,6 +140,7 @@ void main()
   <li>A derived struct's method hides every overload of that name in its base.</li>
   <li><code>...s</code> can't be spread into an overloaded function.</li>
   <li>An <code>extern "c"</code> function has one C symbol and can't be overloaded.</li>
+  <li>Overloads with <code>@caller</code> parameters must all start with the same ones; a call fills them in, then picks the overload.</li>
   <li>A function with no overloads keeps its plain symbol. Overloaded ones carry their parameter
   types in the symbol, shown in messages as <code>show(u8[])</code>.</li>
 </ul>

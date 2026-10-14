@@ -74,6 +74,7 @@ someone asked for. The same <code>ktm.mod</code> gives the same build, with no l
   <tr><td><code>ktm get path[@v1.2.0|@latest|@none]</code></td><td>Adds or changes a requirement, fetches it and what it needs; <code>@none</code> removes it</td></tr>
   <tr><td><code>ktm mod tidy</code></td><td>Makes <code>ktm.mod</code> and <code>ktm.sum</code> match the imports: adds what is imported, drops what isn't</td></tr>
   <tr><td><code>ktm build [dir]</code>, <code>ktm run [dir] [args]</code></td><td>Builds (or runs) <code>main.ktm</code>, fetching what is missing; the binary is named after the module path</td></tr>
+  <tr><td><code>ktm test [dir | ./...]</code></td><td>Runs the tests in <code>*_test.ktm</code> files, with the project's packages: see <a href="tools-testing.html">Testing</a></td></tr>
   <tr><td><code>ktm mod download</code></td><td>Fetches every requirement into the cache</td></tr>
   <tr><td><code>ktm mod list</code></td><td>The packages and versions a build uses</td></tr>
   <tr><td><code>ktm mod why path</code></td><td>Who imports a package, and the chain of requirements down to it</td></tr>

@@ -50,6 +50,7 @@ MODULES = [
     ("encoding.hex", "Hex",          "Hexadecimal encoding and decoding."),
     ("crypto", "Cryptography",       "Random bytes, hashes, HMAC, HKDF, PBKDF2, AES-GCM and ChaCha20-Poly1305, ECDSA P-256."),
     ("flag", "Flags",                "Command-line flags as Go's flag package, with GNU's forms, subcommands and a help text."),
+    ("testing", "Testing",           "Tests run by `ktm test`: testing.T with check, equal, fail, fatal, skip and log."),
     ("config", "Settings",           "Environment variables and a .env file into a struct: @env, @required, defaults."),
     ("validate", "Validation",       "Rules on struct fields (@required, @min, @max, @email, @url, @oneOf), errors per field."),
     ("uuid", "UUIDs",                "UUIDs, v4 and time-ordered v7: make, format, parse."),
@@ -77,7 +78,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
-    "log": "lib-logging.html", "net.http": "lib-http.html", "net.http.middleware": "lib-http-middleware.html", "net.tls": "lib-tls.html", "net.url": "lib-url.html", "uuid": "lib-uuid.html", "flag": "lib-flags.html", "config": "lib-config.html", "validate": "lib-validate.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
+    "log": "lib-logging.html", "net.http": "lib-http.html", "net.http.middleware": "lib-http-middleware.html", "net.tls": "lib-tls.html", "net.url": "lib-url.html", "uuid": "lib-uuid.html", "flag": "lib-flags.html", "testing": "tools-testing.html", "config": "lib-config.html", "validate": "lib-validate.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }

@@ -281,6 +281,13 @@ static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
     ctx->module_doc = root != NULL;
     if (root) {
         char *src = mprintf("import %s;\n", mod);
+        /* a module's *_test.ktm is read only when its tests are: as
+         * `ktm test` reads them */
+        size_t plen = strlen(path);
+        if (plen > 9 && !strcmp(path + plen - 9, "_test.ktm")) {
+            char *dir = mprintf("%.*s", (int)(strrchr(path, '/') - path), path);
+            l->test_dir = realpath(dir, NULL);
+        }
         lexPushString(l, mprintf("%s/%s", root, KTM_LSP_MODULE_FILE), src,
                       strlen(src));
         /* A tree with rt and prelude is a standard library's source: it

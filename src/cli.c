@@ -126,6 +126,8 @@ static CliParser parsers[] = {
     {str_lit("--dump-ir"),  0, CLI_DUMP_IR, "--dump-ir", "Dump ir to stdout" , &cliParseNop},
     {str_lit("--expand"),  0, CLI_EXPAND, "--expand", "Print the code @json makes for each struct to stderr" , &cliParseNop},
     {str_lit("--mem-stats"),  0, CLI_MEM_STATS, "--mem-stats", "Stats about memory usage when compiling" , &cliParseNop},
+    {str_lit("--test-dir"), 1, CLI_TEST_DIR, "--test-dir <dir>", "Used by `ktm test`: also read the *_test.ktm files of the module in <dir>", &cliParseString},
+    {str_lit("--test-root"), 1, CLI_TEST_ROOT, "--test-root <dir>", "Used by `ktm test`: find modules from <dir>, not the file's directory", &cliParseString},
     CliNopParser("-v", CLI_VERBOSE, "-v print the commands that build a library (-lib)"),
     {str_lit("--version"),  0, CLI_VERSION, "--version", "Print the version of the compiler", &cliParseNop},
     {str_lit("--help"),     0, CLI_HELP, "--help", "Print this message", &cliParseNop},
@@ -539,6 +541,8 @@ int cliParseArgs(CliArgs *args, int argc, char **argv) {
             case CLI_DUMP_IR:   args->dump_ir = 1; break;
             case CLI_EXPAND:    args->expand = 1; break;
             case CLI_MEM_STATS: args->print_mem_stats = 1; break;
+            case CLI_TEST_DIR:  args->test_dir = value.str; break;
+            case CLI_TEST_ROOT: args->test_root = value.str; break;
             case CLI_HELP:    cliPrintUsage(); break;
             case CLI_VERSION: cliVersionPrint(args); break;
             case CLI_USE_LEGACY_X86: args->use_legacy_x86 = 1; break;

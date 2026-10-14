@@ -88,6 +88,13 @@ char *pkgDownload(const char *path, const char *version, char **err);
  * argv[1] isn't one (a file to compile), or -2 for `ktm build` and
  * `ktm run`, which become an ordinary compile: *new_argc and *new_argv
  * are its command line */
+/* Every package the project needs downloaded (and checked against
+ * ktm.sum); 0 on an error (reported) */
+int pkgEnsureDownloaded(PkgMod *m);
+/* "ktm: <message>" on stderr; returns 1 */
+int pkgFail(const char *fmt, ...);
+/* `ktm test [flags] [dirs]` (pkgtest.c); the exit code */
+int pkgTest(int argc, char **argv, char *argv0);
 int pkgMain(int argc, char **argv, int *new_argc, char ***new_argv);
 
 #endif

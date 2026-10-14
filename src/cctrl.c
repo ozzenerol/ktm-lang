@@ -1708,6 +1708,16 @@ int cctrlModuleHides(Cctrl *cc, char *name, int len) {
     return setHas(cc->main_names, flat);
 }
 
+/* `ktm test`: the runner it writes (the main program) calls the tested
+ * module's test functions, which aren't pub. Is module `name` (mod_len
+ * bytes) that module, seen from the main program? */
+int cctrlTestSees(Cctrl *cc, char *name, int mod_len) {
+    Lexer *l = cc->lexer_;
+    if (!l || !l->test_module_id || cc->cur_module) return 0;
+    AoStr *path = cctrlModulePath(cc, l->test_module_id);
+    return path && (int)path->len == mod_len && !memcmp(path->data, name, mod_len);
+}
+
 /* `a.b.name` found: an error unless it is pub or used inside a.b */
 void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
     int at = astLastTopDot(name, len);
@@ -1720,6 +1730,7 @@ void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
     }
     char *full = mprintf("%.*s", len, name);
     if (setHas(cc->pub_names, full)) return;
+    if (cctrlTestSees(cc, name, mod_len)) return;
     cctrlRaiseException(cc, "`%.*s` is private to module %.*s",
                         len - mod_len - 1, dot + 1, mod_len, name);
 }

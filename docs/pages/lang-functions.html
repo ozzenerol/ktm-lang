@@ -150,7 +150,7 @@ example.ktm:9 in load: loading
     Both are <code>u8 *</code>. <code>"line"</code> is an integer.</li>
   <li>They can go anywhere in the list, before <code>...args</code> too, as in
     <code>void info(@caller("line") i64 line, u8 *fmt, ...args)</code>.</li>
-  <li>A <code>@caller</code> parameter has no default, and a function with one can't be overloaded.</li>
+  <li>A <code>@caller</code> parameter has no default. A function with one can be overloaded when every overload starts with the same <code>@caller</code> parameters (as <code>testing.T.equal</code> does).</li>
   <li>A call through <code>auto p = &amp;trace</code> fills them in too. A call through an <code>fn(...)</code> type
     passes them like any other argument.</li>
 </ul>
