@@ -1,13 +1,11 @@
-import coro, cstr, fs, libc, str, test;
+import coro, libc, test;
 
 /* A released coroutine stack in the thread's cache gives its pages back
  * (v0.12.0) once it is behind the 4 newest cached stacks: Linux
- * madvise(MADV_DONTNEED), macOS a fresh mapping. The resident size falls
- * by about what the coroutine had touched, and the stack, taken from the
+ * madvise(MADV_DONTNEED), macOS a fresh mapping. Its pages stop being
+ * resident (mincore), and the stack, taken from the
  * cache again, still runs a coroutine correctly. The 4 newest keep their
  * pages, so a spawn/release churn doesn't pay for it. */
-
-extern "c" i32 getpid();
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -16,36 +14,7 @@ void check(bool ok, u8 *what) {
     else { printf("\n  failed: %s\n", what); }
 }
 
-#ifdef IS_MACOS
-/* task_info(MACH_TASK_BASIC_INFO): no fork, unlike ps */
-struct TaskBasicInfo {
-    u64 virtualSize, residentSize, residentSizeMax;
-    i32 rest[6];
-};
-extern "c" u32 mach_task_self_;
-extern "c" i32 task_info(u32 task, i32 flavor, TaskBasicInfo *info, u32 *count);
-#endif
-
 extern "c" i32 mincore(void *addr, u64 len, u8 *vec);
-
-/* The resident size of this process in KiB, exact */
-i64 rssKiB() {
-#ifdef IS_MACOS
-    TaskBasicInfo info;
-    u32 count = sizeof(TaskBasicInfo) / 4;
-    if (task_info(mach_task_self_, 20, &info, &count) != 0) { return -1; }
-    return (i64)(info.residentSize / 1024);
-#else
-    /* smaps_rollup, not statm: since Linux 6.2 statm reads per-CPU
-     * counters roughly (a few hundred KiB off on 8 CPUs, more when the
-     * thread moved between CPUs), smaps_rollup counts the page tables */
-    String s = fs.readAll("/proc/self/smaps_rollup");
-    defer s.free();
-    i64 at = s.ptr ? str.find(s, "\nRss:") : -1;
-    if (at < 0) { return -1; }
-    return cstr.toInt(str.trimStart(s[at + 5:s.len]).ptr);
-#endif
-}
 
 /* KiB of a stack mapping that are resident, by mincore(2) */
 i64 residentKiB(void *base, i64 len) {
@@ -99,16 +68,14 @@ i32 main() {
     i64 len = c.stackLen;
     i64 used = residentKiB(base, len);
     check(used >= 200, "the deep coroutine's stack is resident");
-    i64 before = rssKiB();
     coro.release(c);
     check(residentKiB(base, len) == used, "the newest cached stack keeps its pages");
 
     /* releasing the four shallow ones pushes it behind the 4 newest */
     for (i64 i = 0; i < 4; i++) { coro.release(s[i]); }
-    i64 trimmed = rssKiB();
     i64 kept = residentKiB(base, len);
     check(kept >= 0 && kept <= 2 * libc.getpagesize() / 1024, "behind the 4 newest, only its top 2 pages stay");
-    check(before - trimmed >= 100, "the resident size fell by at least half of what it had touched");
+    check(used - kept >= 100, "its stack gave back at least half of what it had touched");
 
     /* the trimmed stack, from the cache again, still works */
     c = coro.spawn(&deep, (void *)7, BIG);
@@ -118,14 +85,25 @@ i32 main() {
 
     /* a burst of 8 deep ones: the 4 oldest give their pages back */
     coro.Coroutine *b[8];
+    void *bb[8];
+    i64 bl[8];
     for (i64 i = 0; i < 8; i++) {
         b[i] = coro.spawn(&deep, (void *)(i + 10), BIG);
         check((i64)coro.next(b[i]) == expected(i + 10), "a deep coroutine of the burst");
+        bb[i] = b[i].stackBase;
+        bl[i] = b[i].stackLen;
     }
-    i64 held = rssKiB();
     for (i64 i = 0; i < 8; i++) { coro.release(b[i]); }
-    i64 after = rssKiB();
-    check(held - after >= 4 * 100, "a burst gives back the pages of all but the 4 newest");
+    /* each stack's own pages (mincore), not the process's resident size,
+     * which other memory moves (reclaim and swap under load made it
+     * flaky) */
+    i64 oldest = 0, newest = 0;
+    for (i64 i = 0; i < 4; i++) {
+        oldest += residentKiB(bb[i], bl[i]);
+        newest += residentKiB(bb[i + 4], bl[i + 4]);
+    }
+    check(oldest <= 4 * 2 * libc.getpagesize() / 1024 && newest >= 4 * 100,
+          "a burst gives back the pages of all but the 4 newest");
     for (i64 i = 0; i < 8; i++) {
         b[i] = coro.spawn(&deep, (void *)(i + 20), BIG);
         check((i64)coro.next(b[i]) == expected(i + 20), "reused stacks of the burst work");
