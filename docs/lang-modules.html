@@ -187,6 +187,9 @@ void main()
 <ul class="rules">
   <li>Imports come first in a file, before any declaration.</li>
   <li>A module is looked for next to the main file, then in the standard library, then in each directory of <code>KTM_PATH</code> (separated by <code>:</code>).</li>
+  <li>A package from another repository is imported by its path in quotes, as in Go: <code>import "github.com/user/repo";</code>
+  (<code>import p = "github.com/user/repo/sub";</code> for an alias). Its name is its <code>module</code> line. The project's
+  <code>ktm.mod</code> says which version, and <code>replace github.com/user/repo =&gt; ../repo</code> uses a local copy.</li>
   <li>Found in two places is an error: name your modules differently from the standard library's.</li>
   <li>An import that is never used is a warning.</li>
 </ul>

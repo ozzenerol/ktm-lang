@@ -67,6 +67,14 @@ int pkgVersionCmp(const char *a, const char *b);
 /* Is "major.minor" newer than this compiler? */
 int pkgKtmTooNew(const char *ktm);
 
+/* The module cache: $KTM_CACHE, else ~/.cache/ktm/mod */
+char *pkgCacheDir(void);
+/* Where `import "path";` in a program under program_dir is: a directory,
+ * or NULL with *err set (what to run to fix it) */
+char *pkgResolveImport(const char *program_dir, const char *path, char **err);
+/* The name on the `module` line of the package in dir, NULL if none */
+char *pkgModuleName(const char *dir);
+
 /* `ktm mod ...` and the other package commands: the exit code, or -1
  * when argv[1] isn't one (a file to compile) */
 int pkgMain(int argc, char **argv);

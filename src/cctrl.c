@@ -1221,7 +1221,36 @@ CctrlDiagnostic *cctrlMakeDiag(Cctrl *cc,
     return d;
 }
 
+/* A package's module path inside the compiler (github_com.x.ktm_pg.pg)
+ * in a message reads as its name (pg), as the program writes it */
+static void cctrlDiagPackageNames(Cctrl *cc, CctrlDiagnostic *d) {
+    Lexer *l = cc ? cc->lexer_ : NULL;
+    if (!l || !d || !d->message) return;
+    for (int i = 0; i < l->modules_len; ++i) {
+        LexModule *m = l->modules[i];
+        if (!m->package) continue;
+        char *path = m->path->data;
+        char *name = strrchr(path, '.');
+        name = name ? name + 1 : path;
+        size_t plen = strlen(path);
+        char *at = strstr(d->message->data, path);
+        if (!at) continue;
+        AoStr *out = aoStrNew();
+        char *p = d->message->data;
+        while (at) {
+            aoStrCatLen(out, p, at - p);
+            aoStrCat(out, name);
+            p = at + plen;
+            at = strstr(p, path);
+        }
+        aoStrCat(out, p);
+        aoStrRelease(d->message);
+        d->message = out;
+    }
+}
+
 void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
+    cctrlDiagPackageNames(cc, d);
     if (!cc || !cc->diagnostics) {
         /* No accumulation storage (e.g. macro-processor stub).
          * Print immediately so the message isn't lost. */
