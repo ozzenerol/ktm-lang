@@ -1,0 +1,192 @@
+<!-- title: 5. PostgreSQL -->
+<h1>5. PostgreSQL</h1>
+<p class="lede">Bookmarks move from a list in memory to a table in PostgreSQL. Shelf gets its first package,
+<a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>, a client written in ktm, and the server goes back to one
+event loop per core.</p>
+
+<h2>A database</h2>
+<pre><code>$ docker run -d --name shelf-db -p 5432:5432 -e POSTGRES_PASSWORD=shelf postgres:17
+$ docker exec shelf-db createdb -U postgres shelf</code></pre>
+<p>Its address goes in <code>.env</code>:</p>
+<pre><code>SHELF_DATABASE_URL=postgres://postgres:shelf@localhost:5432/shelf
+SHELF_ACCESS_LOG=yes</code></pre>
+
+<h2>The package</h2>
+<pre><code>$ ktm get github.com/ozzenerol/ktm-pg
+ktm: added github.com/ozzenerol/ktm-pg v0.1.0</code></pre>
+<p><code>ktm get</code> downloads it, writes it in <code>ktm.mod</code> and its hash in <code>ktm.sum</code> (commit
+both). It is imported by its path; its name in the code is <code>pg</code>
+(<a href="tools-packages.html">Packages</a>).</p>
+
+<h2>The table</h2>
+<p><code>schema.sql</code>, run at every start (chapter 6 replaces it with migrations):</p>
+<pre><code>CREATE TABLE IF NOT EXISTS bookmarks (
+    id         uuid PRIMARY KEY,
+    url        text NOT NULL UNIQUE,
+    title      text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+
+<h2>main.ktm</h2>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import config, flag, fs, json, log, net.http, os, reflect, uuid, validate, vec;
+
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""
+
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    vec.Vec&lt;Bookmark&gt; all = pg.queryAll&lt;Bookmark&gt;(db, "SELECT " COLUMNS " FROM bookmarks ORDER BY id DESC");
+    defer pg.free(reflect.of(all));
+    w.json(200, reflect.of(all));
+}
+
+/* The id in the path, or false (and a 404) when it isn't a UUID */
+bool pathId(http.Writer *w, http.Request *r, uuid.UUID *id)
+{
+    if (uuid.parse(r.param("id"), id)) { return true; }
+    w.error(404, "no such bookmark");
+    return false;
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne&lt;Bookmark&gt;(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    Bookmark b;
+    try {
+        b = pg.queryOne&lt;Bookmark&gt;(db, "INSERT INTO bookmarks (id, url, title) VALUES ($1, $2, $3) RETURNING " COLUMNS,
+                                  id, in.url, in.title.len ? in.title : in.url);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1", r.param("id")) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    config.fromEnv(reflect.of(gSettings), "SHELF_");
+    validate.Errors errs;
+    if (!validate.check(reflect.of(gSettings), &amp;errs)) {
+        String msg = errs.message();
+        log.error("bad settings: %s", msg);
+        os.exit(2);
+    }
+    errs.free();
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    String schema = fs.readAll("schema.sql");
+    db.execScript(schema[0:]);
+    schema.free();
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}</code></pre>
+
+<h2>What changed</h2>
+<ul class="rules">
+  <li><code>pg.open(url)</code> makes a <b>pool</b> of connections that every thread of the server shares. It goes to
+  <code>http.listen</code> as the app's state, and each handler gets it back with <code>pg.Pool *db = r.app;</code>.
+  Since the data lives in the database, <code>o.threads = 1</code> is gone: one loop per core again.</li>
+  <li>A query waits for PostgreSQL without blocking its thread: the loop serves other requests meanwhile, so a few
+  connections serve thousands of clients.</li>
+  <li><code>pg.queryAll&lt;Bookmark&gt;</code> and <code>pg.queryOne&lt;Bookmark&gt;</code> fill structs from the rows,
+  column by field name. <code>COLUMNS</code> names the columns as the fields (<code>"createdAt"</code>) and formats the
+  time as the API shows it.</li>
+  <li><code>$1</code>, <code>$2</code> are parameters: the values travel apart from the SQL, so a url can't change
+  the query (no SQL injection).</li>
+  <li>Errors come back as exceptions. <code>queryOne</code> throws <code>pg.ERR_NO_ROWS</code> when nothing matches:
+  that is a 404. A duplicate url breaks the table's <code>UNIQUE</code> rule and PostgreSQL says so with
+  <code>pg.UNIQUE_VIOLATION</code>: that is a 409, decided by the database, so two requests at once can't both
+  win. Any other error is thrown on (<code>throw(e)</code>) and the server answers 500.</li>
+  <li>An id that isn't a UUID can't be in the table: <code>pathId</code> answers 404 before asking PostgreSQL, which
+  would otherwise refuse the text as a uuid.</li>
+  <li><code>ORDER BY id DESC</code> is newest first: UUIDv7s sort by the time they were made.</li>
+  <li>What the queries allocate is freed with <code>defer pg.free(...)</code> and <code>defer b.freeDecoded()</code>
+  once the reply is written.</li>
+</ul>
+
+<h2>Try it</h2>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm"}'
+{"id":"01a13b07-f202-7000-9a79-fc49558bf2b6","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:28:58Z"}
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://go.dev"}'
+{"id":"01a13b07-f212-7000-803c-2c195f155756","url":"https://go.dev","title":"https://go.dev","createdAt":"2026-10-14T15:28:58Z"}
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://go.dev"}'
+{"error":"that link is already on the shelf"}
+$ curl localhost:8080/bookmarks/nope
+{"error":"no such bookmark"}</code></pre>
+<p>Stop the server and start it again: the bookmarks are still there.</p>
+<p>Next: <a href="guide-http-06-migrations.html">Migrations</a>.</p>

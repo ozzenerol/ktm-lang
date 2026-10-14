@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5. PostgreSQL - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li class="current"><a href="guide-http-05-postgres.html" aria-current="page">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>5. PostgreSQL</h1>
+<p class="lede">Bookmarks move from a list in memory to a table in PostgreSQL. Shelf gets its first package,
+<a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>, a client written in ktm, and the server goes back to one
+event loop per core.</p>
+
+<h2 id="a-database">A database<a class="anchor" href="#a-database" aria-label="Link to this section">#</a></h2>
+<pre><code>$ docker run -d --name shelf-db -p 5432:5432 -e POSTGRES_PASSWORD=shelf postgres:17
+$ docker exec shelf-db createdb -U postgres shelf</code></pre>
+<p>Its address goes in <code>.env</code>:</p>
+<pre><code>SHELF_DATABASE_URL=postgres://postgres:shelf@localhost:5432/shelf
+SHELF_ACCESS_LOG=yes</code></pre>
+
+<h2 id="the-package">The package<a class="anchor" href="#the-package" aria-label="Link to this section">#</a></h2>
+<pre><code>$ ktm get github.com/ozzenerol/ktm-pg
+ktm: added github.com/ozzenerol/ktm-pg v0.1.0</code></pre>
+<p><code>ktm get</code> downloads it, writes it in <code>ktm.mod</code> and its hash in <code>ktm.sum</code> (commit
+both). It is imported by its path; its name in the code is <code>pg</code>
+(<a href="tools-packages.html">Packages</a>).</p>
+
+<h2 id="the-table">The table<a class="anchor" href="#the-table" aria-label="Link to this section">#</a></h2>
+<p><code>schema.sql</code>, run at every start (chapter 6 replaces it with migrations):</p>
+<pre><code>CREATE TABLE IF NOT EXISTS bookmarks (
+    id         uuid PRIMARY KEY,
+    url        text NOT NULL UNIQUE,
+    title      text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+
+<h2 id="main-ktm">main.ktm<a class="anchor" href="#main-ktm" aria-label="Link to this section">#</a></h2>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import config, flag, fs, json, log, net.http, os, reflect, uuid, validate, vec;
+
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""
+
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    vec.Vec&amp;lt;Bookmark&amp;gt; all = pg.queryAll&amp;lt;Bookmark&amp;gt;(db, "SELECT " COLUMNS " FROM bookmarks ORDER BY id DESC");
+    defer pg.free(reflect.of(all));
+    w.json(200, reflect.of(all));
+}
+
+/* The id in the path, or false (and a 404) when it isn't a UUID */
+bool pathId(http.Writer *w, http.Request *r, uuid.UUID *id)
+{
+    if (uuid.parse(r.param("id"), id)) { return true; }
+    w.error(404, "no such bookmark");
+    return false;
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;amp;id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne&amp;lt;Bookmark&amp;gt;(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    Bookmark b;
+    try {
+        b = pg.queryOne&amp;lt;Bookmark&amp;gt;(db, "INSERT INTO bookmarks (id, url, title) VALUES ($1, $2, $3) RETURNING " COLUMNS,
+                                  id, in.url, in.title.len ? in.title : in.url);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;amp;id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1", r.param("id")) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    config.fromEnv(reflect.of(gSettings), "SHELF_");
+    validate.Errors errs;
+    if (!validate.check(reflect.of(gSettings), &amp;amp;errs)) {
+        String msg = errs.message();
+        log.error("bad settings: %s", msg);
+        os.exit(2);
+    }
+    errs.free();
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    String schema = fs.readAll("schema.sql");
+    db.execScript(schema[0:]);
+    schema.free();
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;amp;list);
+    mux.handle("POST /bookmarks", &amp;amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;amp;remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;amp;mux, db, &amp;amp;o);
+}</code></pre>
+
+<h2 id="what-changed">What changed<a class="anchor" href="#what-changed" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li><code>pg.open(url)</code> makes a <b>pool</b> of connections that every thread of the server shares. It goes to
+  <code>http.listen</code> as the app's state, and each handler gets it back with <code>pg.Pool *db = r.app;</code>.
+  Since the data lives in the database, <code>o.threads = 1</code> is gone: one loop per core again.</li>
+  <li>A query waits for PostgreSQL without blocking its thread: the loop serves other requests meanwhile, so a few
+  connections serve thousands of clients.</li>
+  <li><code>pg.queryAll&lt;Bookmark&gt;</code> and <code>pg.queryOne&lt;Bookmark&gt;</code> fill structs from the rows,
+  column by field name. <code>COLUMNS</code> names the columns as the fields (<code>"createdAt"</code>) and formats the
+  time as the API shows it.</li>
+  <li><code>$1</code>, <code>$2</code> are parameters: the values travel apart from the SQL, so a url can't change
+  the query (no SQL injection).</li>
+  <li>Errors come back as exceptions. <code>queryOne</code> throws <code>pg.ERR_NO_ROWS</code> when nothing matches:
+  that is a 404. A duplicate url breaks the table's <code>UNIQUE</code> rule and PostgreSQL says so with
+  <code>pg.UNIQUE_VIOLATION</code>: that is a 409, decided by the database, so two requests at once can't both
+  win. Any other error is thrown on (<code>throw(e)</code>) and the server answers 500.</li>
+  <li>An id that isn't a UUID can't be in the table: <code>pathId</code> answers 404 before asking PostgreSQL, which
+  would otherwise refuse the text as a uuid.</li>
+  <li><code>ORDER BY id DESC</code> is newest first: UUIDv7s sort by the time they were made.</li>
+  <li>What the queries allocate is freed with <code>defer pg.free(...)</code> and <code>defer b.freeDecoded()</code>
+  once the reply is written.</li>
+</ul>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm"}'
+{"id":"01a13b07-f202-7000-9a79-fc49558bf2b6","url":"https://ktm-lang.org","title":"ktm","createdAt":"2026-10-14T15:28:58Z"}
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://go.dev"}'
+{"id":"01a13b07-f212-7000-803c-2c195f155756","url":"https://go.dev","title":"https://go.dev","createdAt":"2026-10-14T15:28:58Z"}
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://go.dev"}'
+{"error":"that link is already on the shelf"}
+$ curl localhost:8080/bookmarks/nope
+{"error":"no such bookmark"}</code></pre>
+<p>Stop the server and start it again: the bookmarks are still there.</p>
+<p>Next: <a href="guide-http-06-migrations.html">Migrations</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-04-config.html"><span>Previous</span>4. Configuration</a><a class="next" href="guide-http-06-migrations.html"><span>Next</span>6. Migrations</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-05-postgres.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-database">A database</a></li><li><a href="#the-package">The package</a></li><li><a href="#the-table">The table</a></li><li><a href="#main-ktm">main.ktm</a></li><li><a href="#what-changed">What changed</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+</div>
+</body>
+</html>

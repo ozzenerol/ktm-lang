@@ -110,6 +110,8 @@ NAV = [
         ("guide-http-02-json.html", "2. JSON in and out"),
         ("guide-http-03-validation.html", "3. Validation and errors"),
         ("guide-http-04-config.html", "4. Configuration"),
+        ("guide-http-05-postgres.html", "5. PostgreSQL"),
+        ("guide-http-06-migrations.html", "6. Migrations"),
     ]),
     ("Reference", [
         ("stdlib.html", "Library reference"),
