@@ -1314,8 +1314,106 @@ static int pkgModCommand(int argc, char **argv) {
     return pkgModUsage();
 }
 
-int pkgMain(int argc, char **argv) {
+/* Every package the build list needs, downloaded (and checked against
+ * ktm.sum) when it isn't yet; quiet when there's nothing to do. 0 on an
+ * error (reported). */
+static int pkgEnsureDownloaded(PkgMod *m) {
+    char *err = NULL;
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err) == 0;
+    PkgSum *s = NULL;
+    int changed = 0;
+    for (int i = 0; i < l->n; ++i) {
+        PkgReplace *rep = pkgReplaceFor(m, l->sel[i].path, l->sel[i].version);
+        if (rep && !rep->new_version) continue;
+        const char *path = rep ? rep->new_path : l->sel[i].path;
+        const char *ver = rep ? rep->new_version : l->sel[i].version;
+        if (pkgIsDir(mprintf("%s/%s@%s", pkgCacheDir(), path, ver))) continue;
+        if (!s && !(s = pkgSumLoad(m, &err))) return pkgFail("%s", err) == 0;
+        fprintf(stderr, "ktm: downloading %s %s\n", path, ver);
+        if (!pkgFetchTree(m, s, l->sel[i].path, l->sel[i].version, 0)) return 0;
+        changed = 1;
+    }
+    if (changed && !pkgSumWrite(m, s)) return pkgFail("can't write ktm.sum: %s", strerror(errno)) == 0;
+    return 1;
+}
+
+/* `ktm build [flags] [dir] [flags]` and `ktm run [flags] [dir] [args]`
+ * (flags: the compiler's, as -Werror, -o name, --install-dir=...): dir (default the
+ * current one) holds main.ktm; its project's packages are downloaded if
+ * they aren't, then it compiles as `ktm dir/main.ktm -o dir/<name> [flags]`
+ * (name: the module path's last element, or the directory's) or runs as
+ * `ktm -run dir/main.ktm [args]`. */
+static int pkgBuildOrRun(int run, int argc, char **argv, int *new_argc, char ***new_argv) {
+    const char *dir = ".";
+    struct stat st;
+    /* compiler flags first (-o takes a value), then the directory */
+    int nflags = 0;
+    while (nflags < argc && argv[nflags][0] == '-') {
+        if ((!strcmp(argv[nflags], "-o") || !strcmp(argv[nflags], "-lib")) && nflags + 1 < argc) nflags++;
+        nflags++;
+    }
+    int at = nflags;
+    if (at < argc && stat(argv[at], &st) == 0 && S_ISDIR(st.st_mode)) {
+        dir = argv[at];
+        at++;
+    }
+    char *main_file = mprintf("%s/main.ktm", dir);
+    if (stat(main_file, &st) != 0) {
+        return pkgFail("no main.ktm in %s: `ktm %s` builds the program whose main.ktm is there",
+                       dir, run ? "run" : "build");
+    }
+    char *mod_file = pkgModFind(dir);
+    char *name = NULL;
+    if (mod_file) {
+        char *err = NULL;
+        PkgMod *m = pkgModLoad(mod_file, &err);
+        if (!m) return pkgFail("%s", err);
+        if (!pkgEnsureDownloaded(m)) return 1;
+        char *real_dir = realpath(dir, NULL), *real_mod = realpath(m->dir, NULL);
+        if (real_dir && real_mod && !strcmp(real_dir, real_mod)) {
+            const char *slash = strrchr(m->path, '/');
+            name = mprintf("%s", slash ? slash + 1 : m->path);
+        }
+        free(real_dir);
+        free(real_mod);
+    }
+    if (!name) {
+        char *real_dir = realpath(dir, NULL);
+        const char *slash = real_dir ? strrchr(real_dir, '/') : NULL;
+        name = mprintf("%s", slash && slash[1] ? slash + 1 : "a.out");
+        free(real_dir);
+    }
+    char **out = calloc(argc + 8, sizeof(char *));
+    int n = 0;
+    out[n++] = "ktm";
+    for (int i = 0; i < nflags; ++i) out[n++] = argv[i];
+    if (run) {
+        /* what follows the directory is the program's */
+        out[n++] = "-run";
+        out[n++] = main_file;
+        for (int i = at; i < argc; ++i) out[n++] = argv[i];
+    } else {
+        int has_o = 0;
+        for (int i = 0; i < argc; ++i) has_o |= !strcmp(argv[i], "-o");
+        for (int i = at; i < argc; ++i) out[n++] = argv[i];
+        out[n++] = main_file;
+        if (!has_o) {
+            /* next to main.ktm, where `ktm build` in that directory puts it */
+            out[n++] = "-o";
+            out[n++] = strcmp(dir, ".") ? mprintf("%s/%s", dir, name) : name;
+        }
+    }
+    out[n] = NULL;
+    *new_argc = n;
+    *new_argv = out;
+    return -2;
+}
+
+int pkgMain(int argc, char **argv, int *new_argc, char ***new_argv) {
     if (argc < 2) return -1;
+    if (!strcmp(argv[1], "build")) return pkgBuildOrRun(0, argc - 2, argv + 2, new_argc, new_argv);
+    if (!strcmp(argv[1], "run")) return pkgBuildOrRun(1, argc - 2, argv + 2, new_argc, new_argv);
     if (!strcmp(argv[1], "mod")) return pkgModCommand(argc - 2, argv + 2);
     if (!strcmp(argv[1], "get")) return pkgGet(argc - 2, argv + 2);
     return -1;
