@@ -270,6 +270,15 @@ static void checkField(void *p, reflect.Field *f, u8[] path, Errors *out) {
     }
 }
 
+/* The rules of one field f (not @required) on the value at p, an error
+ * per broken rule named name: config.fromEnv checks its settings so,
+ * naming their variables */
+pub void checkRules(void *p, reflect.Field *f, u8[] name, Errors *out) {
+    reflect.Field rules = *f;
+    rules.required = false;
+    checkField(p, &rules, name, out);
+}
+
 /* Checks the struct v (reflect.of(x)) into *out (replaced): true when
  * every rule holds, else false with one error per broken rule */
 pub bool check(reflect.Value v, Errors *out) {

@@ -165,13 +165,18 @@ void createBookmark(http.Writer *w, http.Request *r)
 rules, call <code>validate.check</code> yourself, <code>errs.add</code> what else is wrong, and reply with
 <code>w.jsonText(422, ...)</code> of <code>errs.toJson()</code>.</p>
 
+<h2 id="in-settings">In settings<a class="anchor" href="#in-settings" aria-label="Link to this section">#</a></h2>
+<p><a href="lib-config.html#rules">config.fromEnv</a> checks the same rules on a settings struct and names the environment
+variable in each error: <code>SHELF_MAX_BOOKMARKS: must be at least 1</code>. <code>validate.checkRules(p, &amp;field, name, &amp;errs)</code>
+is the one-field check it uses, for a loader of your own.</p>
+
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-config.html"><span>Previous</span>Settings from the environment</a><a class="next" href="lib-signals.html"><span>Next</span>Signals</a></nav>
     <footer class="page-foot">
       <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-validate.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-rules">The rules</a></li><li><a href="#errors">Errors</a></li><li><a href="#in-an-http-handler">In an HTTP handler</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-rules">The rules</a></li><li><a href="#errors">Errors</a></li><li><a href="#in-an-http-handler">In an HTTP handler</a></li><li><a href="#in-settings">In settings</a></li></ul></nav>
 </div>
 </body>
 </html>
