@@ -222,8 +222,6 @@ struct Loop {
     i64 fdwCap;
     i64 nonFd;           /* tasks waiting on an fd */
     i64 ndeadline;       /* waits with a deadline (at least; a turn recounts) */
-    i64 nextDeadline;    /* no wait's deadline is before this (a lower bound:
-                            a turn scans the waits only once it has passed) */
     bool running, stopping;
     bool fdsOut;         /* accept ran out of fds (or memory) */
     i64 fdsOutUntil;     /* and rests until then (or a close()) */
@@ -606,10 +604,7 @@ static i64 loopPark(LoopTask *t, i32 fd, i16 events, i64 deadline, bool idle, bo
     t.paused = paused;
     t.result = 0;
     t.waiting = true;
-    if (deadline >= 0) {
-        lp.ndeadline++;
-        if (deadline < lp.nextDeadline) { lp.nextDeadline = deadline; }
-    }
+    if (deadline >= 0) { lp.ndeadline++; }
     if (fd >= 0) {
         loopWaitFd(lp, t, fd);      /* may answer at once (ready below) */
     }
@@ -817,10 +812,7 @@ static i64 loopOp(Loop *lp, LoopTask *t, i64 opcode, i32 fd, u64 addr, i64 len, 
     t.op = true;
     t.cancelled = false;
     t.why = 0;
-    if (deadline >= 0) {
-        lp.ndeadline++;
-        if (deadline < lp.nextDeadline) { lp.nextDeadline = deadline; }
-    }
+    if (deadline >= 0) { lp.ndeadline++; }
     loopAddWaiter(lp, t, fd);       /* so coro.close finds it */
     yield();
     return t.result;
@@ -1380,28 +1372,19 @@ static void loopPollFallback(Loop *lp, i64 timeout) {
  * an fd that answered at once), then the fired fds, then the waits that
  * timed out, earliest deadline first. */
 static void loopTurn(Loop *lp) {
-    i64 now = date.monoMs(), timeout = -1, i, j, d, first, nd, next;
+    i64 now = date.monoMs(), timeout = -1, i, j, d, first, nd;
     LoopTask *t;
     if (lp.ndeadline > 0) {
-        /* the waits are scanned only when the earliest deadline may have
-         * come: with many connections each holding a long read timeout,
-         * a scan per turn was most of the loop's own work */
-        if (now >= lp.nextDeadline) {
-            nd = 0;
-            next = I64_MAX;
-            for (i = 0; i < lp.n; i++) {
-                t = lp.tasks[i];
-                if (!t.waiting || t.ready || t.deadline < 0 || t.cancelled) { continue; }
-                nd++;
-                if (t.deadline < next) { next = t.deadline; }
-            }
-            lp.ndeadline = nd;
-            lp.nextDeadline = next;
+        nd = 0;
+        for (i = 0; i < lp.n; i++) {
+            t = lp.tasks[i];
+            if (!t.waiting || t.ready || t.deadline < 0 || t.cancelled) { continue; }
+            nd++;
+            d = t.deadline - now;
+            if (d < 0) { d = 0; }
+            if (timeout < 0 || d < timeout) { timeout = d; }
         }
-        if (lp.ndeadline > 0) {
-            d = lp.nextDeadline - now;
-            timeout = d < 0 ? 0 : d;
-        }
+        lp.ndeadline = nd;
     }
     if (lp.nready > 0) { timeout = 0; }
     if (lp.nonFd == 0 && timeout < 0) {
@@ -1411,9 +1394,8 @@ static void loopTurn(Loop *lp) {
     if (lp.nonFd > 0 || timeout > 0) {
         loopPoll(lp, timeout);
     }
-    if (lp.ndeadline > 0 && date.monoMs() >= lp.nextDeadline) {
+    if (lp.ndeadline > 0) {
         now = date.monoMs();
-        lp.nextDeadline = now;      /* the next turn finds the new earliest */
         first = lp.nready;
         for (i = 0; i < lp.n; i++) {
             t = lp.tasks[i];
