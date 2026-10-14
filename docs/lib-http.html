@@ -257,6 +257,27 @@ void main()
 /api/users/7: 200 user 7
 </pre>
 
+<p>Middleware hands a handler what it found with <code>r.set(key, ptr)</code> and <code>r.setInt(key, n)</code>; the
+handler reads them with <code>r.get(key)</code>, <code>r.getInt(key)</code> and <code>r.has(key)</code>. They last until
+the reply, and every request starts with none:</p>
+<pre><code>bool auth(http.Writer *w, http.Request *r)
+{
+  User *u = r.alloc(sizeof(User));      // freed with the request
+  if (!findUser(r.header("Authorization"), u)) {
+    w.error(401, "unauthorized");
+    return false;
+  }
+  r.set("user", u);
+  return true;
+}
+
+void bookmarks(http.Writer *w, http.Request *r)
+{
+  User *u = r.get("user");
+  ...
+}
+</code></pre>
+
 <h3 id="files">Static files<a class="anchor" href="#files" aria-label="Link to this section">#</a></h3>
 <p><code>mux.files(prefix, dir)</code> serves the files under <code>dir</code> at <code>prefix</code>, which must end in
 <code>/</code>: it adds the route <code>GET prefix{path...}</code> (on a group, under the group's prefix).</p>
