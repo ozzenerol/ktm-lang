@@ -1,4 +1,4 @@
-import crypto, encoding.hex, str, test;
+import coro, crypto, encoding.hex, str, test;
 
 /* Password hashing (v0.20.0): Argon2id and BLAKE2b against
  * golang.org/x/crypto's and Python's outputs (several lanes, odd memory
@@ -30,6 +30,34 @@ bool throws(u8[] pw, i64 cost) {
         return e.code == crypto.ERR_CRYPTO;
     }
     return false;
+}
+
+/* inside a loop: hashing runs on coro.offload's threads, the loop ticks on */
+i64 gTicks = 0, gTicksDuring = -1;
+bool gDone = false, gLoopOk = false;
+void *ticker(void *arg) {
+    while (!gDone) {
+        coro.sleep(2);
+        gTicks++;
+    }
+    return null;
+}
+void *hasher(void *arg) {
+    coro.sleep(5);
+    i64 before = gTicks;
+    bool ok = true;
+    for (i64 i = 0; i < 4; i++) {
+        String h = crypto.argon2id("pw", 65536, 3, 1);
+        ok = ok && crypto.verifyPassword("pw", h[0:]);
+        h.free();
+    }
+    String b = crypto.bcrypt("pw", 8);
+    ok = ok && crypto.verifyPassword("pw", b[0:]) && !crypto.verifyPassword("px", b[0:]);
+    b.free();
+    gTicksDuring = gTicks - before;
+    gLoopOk = ok;
+    gDone = true;
+    return null;
 }
 
 i32 main() {
@@ -103,6 +131,11 @@ i32 main() {
         crypto.argon2idKey("pw", "short", 64, 1, 1, o[0:32]);
     } catch (Error e) { threw = e.code == crypto.ERR_CRYPTO; }
     check(threw, "argon2idKey: a salt under 8 bytes throws");
+    coro.go(&ticker);
+    coro.go(&hasher);
+    coro.run();
+    check(gLoopOk && gTicksDuring >= 10, "in a coroutine: the loop keeps running while passwords hash");
+    if (gTicksDuring < 10) { printf("  ticks: %d\n", gTicksDuring); }
     test.printResult(gCorrect, gTests);
     printf("====\n");
     return 0;

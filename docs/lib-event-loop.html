@@ -226,6 +226,30 @@ still working
 [sleep 0.5; exit 3] exit 3
 </pre>
 
+<h2 id="heavy-work">Heavy work<a class="anchor" href="#heavy-work" aria-label="Link to this section">#</a></h2>
+<p>A loop runs one coroutine at a time and switches only when one waits, so a coroutine that computes for 20 ms
+holds every other coroutine of its loop for 20 ms. <code>coro.offload(fn, arg)</code> runs <code>fn(arg)</code> on a
+worker thread instead (a pool with a thread per core, started on first use) and the coroutine waits for it as it
+waits for I/O:</p>
+<pre><code>struct Resize { Image *in; Image *out; };
+
+void resize(void *arg) {
+  Resize *r = arg;
+  r.out = scale(r.in, 0.5);          // seconds of computing
+}
+
+void handler(http.Writer *w, http.Request *r) {
+  Resize job;
+  job.in = load(r);
+  coro.offload(&amp;amp;resize, &amp;amp;job);    // the loop serves other requests meanwhile
+  send(w, job.out);
+}
+</code></pre>
+<p>What <code>fn</code> throws is thrown again in the caller. <code>fn</code> runs on another thread, so it must not
+use the loop (<code>coro.read</code>, <code>coro.park</code>, ...); <code>arg</code> is its link to the caller. Outside
+a loop coroutine <code>offload</code> just calls <code>fn(arg)</code>. <code>crypto</code>'s password hashing uses it
+by itself.</p>
+
 <h2 id="stopping">Stopping<a class="anchor" href="#stopping" aria-label="Link to this section">#</a></h2>
 <p><code>coro.stop()</code> winds the loop down: <code>coro.accept</code> and <code>coro.waitIdle</code> return -1 from then on,
 while other waits go on, so the work in flight finishes and <code>coro.run</code> returns.
@@ -281,7 +305,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#an-echo-server">An echo server</a></li><li><a href="#the-calls">The calls</a></li><li><a href="#timers-alongside-i-o">Timers alongside I/O</a></li><li><a href="#waiting-for-child-processes">Waiting for child processes</a></li><li><a href="#stopping">Stopping</a></li><li><a href="#errors">Errors</a></li><li><a href="#backends">Backends</a></li><li><a href="#on-every-core">On every core</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#an-echo-server">An echo server</a></li><li><a href="#the-calls">The calls</a></li><li><a href="#timers-alongside-i-o">Timers alongside I/O</a></li><li><a href="#waiting-for-child-processes">Waiting for child processes</a></li><li><a href="#heavy-work">Heavy work</a></li><li><a href="#stopping">Stopping</a></li><li><a href="#errors">Errors</a></li><li><a href="#backends">Backends</a></li><li><a href="#on-every-core">On every core</a></li></ul></nav>
 </div>
 </body>
 </html>

@@ -130,8 +130,9 @@ should be replaced by a new one.</p>
   <tr><td><code>crypto.argon2idKey(pw, salt, memoryKiB, iterations, parallelism, out)</code></td><td>Argon2id as a key derivation, into out</td></tr>
   <tr><td><code>crypto.blake2b(data, out)</code></td><td>BLAKE2b, a 1 to 64 byte digest</td></tr>
 </table></div>
-<p>Hashing a password takes the time and memory it does on purpose, and it holds the thread: in a server, a login
-handler blocks its loop for those 20 ms.</p>
+<p>Hashing a password takes the time and memory it does on purpose. Inside a coroutine (a <code>net.http</code>
+handler, say) the hashing calls run on <a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a>'s worker
+threads, so the loop goes on serving other requests meanwhile.</p>
 
 <h2 id="notes">Notes<a class="anchor" href="#notes" aria-label="Link to this section">#</a></h2>
 <ul class="rules">

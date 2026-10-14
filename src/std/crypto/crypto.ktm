@@ -1,6 +1,6 @@
 module crypto;
 #link <ktmtls>
-import encoding.base64, mem, str;
+import coro, encoding.base64, mem, str;
 
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
  * libktmtls, as net.tls is): secure random bytes, SHA-256/512, HMAC,
@@ -261,6 +261,49 @@ pub void Key.free() {
 
 /* ---- passwords ---- */
 
+/* The slow calls: inside a loop coroutine they run on coro.offload's
+ * worker threads, so the loop keeps serving while a password hashes */
+struct SlowCall {
+    i32 kind;           /* 0: argon2id, 1: bcrypt, 2: bcrypt check */
+    u8[] pw;
+    u8[] salt;
+    u8[] hash;
+    u32 t, m, p;
+    i32 cost;
+    u8 *out;
+    u64 outlen;
+    i32 r;
+};
+
+static void slowRun(void *arg) {
+    SlowCall *c = arg;
+    if (c.kind == 0) {
+        c.r = ktm_crypto_argon2id(c.pw.ptr, c.pw.len, c.salt.ptr, c.salt.len, c.t, c.m, c.p, c.out, c.outlen);
+    } else if (c.kind == 1) {
+        c.r = ktm_crypto_bcrypt(c.pw.ptr, c.pw.len, c.cost, c.salt.ptr, c.out);
+    } else {
+        c.r = ktm_crypto_bcrypt_check(c.pw.ptr, c.pw.len, c.hash.ptr, c.hash.len);
+    }
+}
+
+static i32 slow(SlowCall *c) {
+    coro.offload(&slowRun, c);     /* inline outside a loop */
+    return c.r;
+}
+
+static i32 argon2Call(u8[] pw, u8[] salt, u32 t, u32 m, u32 p, u8 *out, u64 outlen) {
+    SlowCall c;
+    c.kind = 0;
+    c.pw = pw;
+    c.salt = salt;
+    c.t = t;
+    c.m = m;
+    c.p = p;
+    c.out = out;
+    c.outlen = outlen;
+    return slow(&c);
+}
+
 /* hashPassword's Argon2id cost (OWASP's: 19 MiB, 2 passes, 1 lane):
  * about 20 ms on a laptop core */
 pub const i64 ARGON2_MEMORY_KIB = 19456;
@@ -276,8 +319,7 @@ pub void argon2idKey(u8[] password, u8[] salt, i64 memoryKiB, i64 iterations, i6
         throw(ERR_CRYPTO, "crypto: Argon2id needs memory >= 8 KiB per lane, 1+ iterations, a salt of 8+ bytes "
                           "and 4+ bytes out");
     }
-    i32 r = ktm_crypto_argon2id(password.ptr, password.len, salt.ptr, salt.len, (u32)iterations, (u32)memoryKiB,
-                                (u32)parallelism, out.ptr, out.len);
+    i32 r = argon2Call(password, salt, (u32)iterations, (u32)memoryKiB, (u32)parallelism, out.ptr, out.len);
     if (r == -2) { throw(ERR_CRYPTO, "crypto: Argon2id: out of memory (%d KiB)", memoryKiB); }
     if (r != 0) { throw(ERR_CRYPTO, "crypto: Argon2id: bad parameters"); }
 }
@@ -313,7 +355,13 @@ pub String bcrypt(u8[] password, i64 cost = BCRYPT_COST) {
     u8 salt[16];
     random(salt[0:]);
     u8 out[61];
-    ktm_crypto_bcrypt(password.ptr, password.len, (i32)cost, salt, out);
+    SlowCall c;
+    c.kind = 1;
+    c.pw = password;
+    c.salt = salt[0:16];
+    c.cost = (i32)cost;
+    c.out = out;
+    slow(&c);
     return str.from(out[0:60]);
 }
 
@@ -361,7 +409,11 @@ static bool parseArgon2(u8[] hash, i64 *m, i64 *t, i64 *p, String *salt, String 
  * read. The compare takes the same time wherever they differ. */
 pub bool verifyPassword(u8[] password, u8[] hash) {
     if (str.startsWith(hash, "$2")) {
-        return ktm_crypto_bcrypt_check(password.ptr, password.len, hash.ptr, hash.len) == 1;
+        SlowCall c;
+        c.kind = 2;
+        c.pw = password;
+        c.hash = hash;
+        return slow(&c) == 1;
     }
     i64 m, t, p;
     String salt, want;
@@ -370,8 +422,7 @@ pub bool verifyPassword(u8[] password, u8[] hash) {
     if (!parseArgon2(hash, &m, &t, &p, &salt, &want)) { return false; }
     String got = str.from(want[0:]);
     defer got.free();
-    i32 r = ktm_crypto_argon2id(password.ptr, password.len, salt.ptr, salt.len, (u32)t, (u32)m, (u32)p,
-                                got.ptr, got.len);
+    i32 r = argon2Call(password, salt[0:], (u32)t, (u32)m, (u32)p, got.ptr, got.len);
     bool ok = r == 0 && equal(got[0:], want[0:]);
     mem.set(got.ptr, 0, got.len);
     return ok;
