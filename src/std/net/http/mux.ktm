@@ -5,6 +5,23 @@ import libc, mem, str;
  * there, with the reply the middleware wrote in w. */
 pub type Middleware = fn(Writer *w, Request *r) bool;
 
+/* A middleware with settings of its own (mux.useWith): ctx is what it
+ * was added with, so one function serves several configurations (a
+ * strict rate limit on /login, a looser one elsewhere) */
+pub type MiddlewareWith = fn(Writer *w, Request *r, void *ctx) bool;
+
+struct MuxMw {
+    Middleware f;
+    MiddlewareWith g;
+    void *ctx;
+    bool owns;      /* the Mux frees ctx */
+};
+
+static bool runMw(MuxMw *m, Writer *w, Request *r)
+{
+    return m.f ? m.f(w, r) : m.g(w, r, m.ctx);
+}
+
 /* Routes requests to handlers by method and path, as Go 1.22's
  * ServeMux does. Declare one (`http.Mux mux;`: no init call), add
  * routes with mux.handle, give it to http.listen. Patterns are in
@@ -17,7 +34,7 @@ pub struct Mux {
     private i64 len;
     private i64 cap;
     private u64 subtrees;   /* bit n: a route ending in {...} has n segments (63: 63 or more) */
-    private Middleware *mws;  /* mux.use, in order */
+    private MuxMw *mws;     /* mux.use and useWith, in order */
     private i64 nmws;
     private i64 mwcap;
     private Mux *parent;    /* a group's parent; null for the Mux the server serves */
@@ -116,12 +133,30 @@ static void muxInsert(Mux *m, u8[] pattern, Handler h, Mux *group, u8[] dir, boo
 pub void Mux.use(Middleware f)
 {
     if (!f) { throw(ERR_PATTERN, "http.Mux.use: the middleware is null"); }
-    if (self.nmws == self.mwcap) {
-        self.mwcap = self.mwcap ? self.mwcap * 2 : 4;
-        self.mws = mem.realloc(self.mws, self.mwcap * sizeof(Middleware));
+    muxAddMw(self, f, null, null);
+}
+
+/* Adds a middleware with settings: f(w, r, ctx) for every request, as
+ * use(). ctx must outlive the Mux; with owns, the Mux frees it (one
+ * mem.alloc'd block) when it is freed. */
+pub void Mux.useWith(MiddlewareWith f, void *ctx, bool owns = false)
+{
+    if (!f) { throw(ERR_PATTERN, "http.Mux.useWith: the middleware is null"); }
+    muxAddMw(self, null, f, ctx);
+    self.mws[self.nmws - 1].owns = owns;
+}
+
+static void muxAddMw(Mux *m, Middleware f, MiddlewareWith g, void *ctx)
+{
+    if (m.nmws == m.mwcap) {
+        m.mwcap = m.mwcap ? m.mwcap * 2 : 4;
+        m.mws = mem.realloc(m.mws, m.mwcap * sizeof(MuxMw));
     }
-    self.mws[self.nmws] = f;
-    self.nmws++;
+    m.mws[m.nmws].f = f;
+    m.mws[m.nmws].g = g;
+    m.mws[m.nmws].ctx = ctx;
+    m.mws[m.nmws].owns = false;
+    m.nmws++;
 }
 
 /* A group of routes under prefix ("/api"): its handle("GET /users", h)
@@ -184,7 +219,7 @@ static bool groupMws(Mux *g, Writer *w, Request *r)
     if (!g.parent) { return true; }
     if (!groupMws(g.parent, w, r)) { return false; }
     for (i64 i = 0; i < g.nmws; i++) {
-        if (!g.mws[i](w, r)) { return false; }
+        if (!runMw(&g.mws[i], w, r)) { return false; }
     }
     return true;
 }
@@ -314,7 +349,7 @@ pub void Mux.serve(Writer *w, Request *r)
 static void muxServe(Mux *m, Writer *w, Request *r)
 {
     for (i64 i = 0; i < m.nmws; i++) {
-        if (!m.mws[i](w, r)) { return; }
+        if (!runMw(&m.mws[i], w, r)) { return; }
     }
     u8[] path = r.path;
     i64 slashes = 0;
@@ -382,6 +417,9 @@ static void muxFree(Mux *m)
         mem.free(m.groups[i]);
     }
     mem.free(m.groups);
+    for (i64 i = 0; i < m.nmws; i++) {
+        if (m.mws[i].owns) { mem.free(m.mws[i].ctx); }
+    }
     mem.free(m.mws);
     mem.free(m.prefix);
     mem.set(m, 0, sizeof(Mux));
