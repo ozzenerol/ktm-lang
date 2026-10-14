@@ -241,6 +241,14 @@ int ktm_tls_ctx_cert(ktm_tls_ctx *ctx, const char *cert, size_t clen, const char
         if (r < 0) ktmTlsSetErr(ctx->err, "tls: reading the private key", r);
     }
     if (r >= 0) {
+        r = mbedtls_pk_check_pair(&ctx->cert.pk, &ctx->key, mbedtls_ctr_drbg_random, &ctx->drbg);
+        if (r != 0) {
+            snprintf(ctx->err, sizeof(ctx->err),
+                     "tls: the private key doesn't belong to the certificate");
+            r = -1;
+        }
+    }
+    if (r >= 0) {
         r = mbedtls_ssl_conf_own_cert(&ctx->conf, &ctx->cert, &ctx->key);
         if (r < 0) ktmTlsSetErr(ctx->err, "tls: the certificate and the key", r);
     }
