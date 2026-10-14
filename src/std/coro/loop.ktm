@@ -205,6 +205,9 @@ struct LoopTask {
     bool cancelled;      /* io_uring: and an ASYNC_CANCEL was sent for it */
     i64 why;             /* io_uring: LOOP_WHY_* of that cancel */
     i64 cqeFlags;        /* io_uring: the flags of its operation's completion */
+    Loop *lp;            /* its loop */
+    bool parked;         /* in coro.park */
+    bool unparked;       /* coro.unpark came before its coro.park */
 };
 
 struct Loop {
@@ -373,6 +376,7 @@ pub Coroutine *go(fn(void *arg) void *body, void *arg=null, i64 stackSize=0) {
     t.co = c;
     t.fd = -1;
     t.deadline = -1;
+    t.lp = lp;
     c.loopTask = t;
     loopAdd(lp, t);
     loopReady(lp, t, 0);
@@ -627,6 +631,44 @@ static i64 loopPark(LoopTask *t, i32 fd, i16 events, i64 deadline, bool idle, bo
 pub i64 wait(i32 fd, i16 events, i64 ms=-1) {
     LoopTask *t = loopSelf("coro.wait");
     return loopPark(t, fd, events, loopDeadline(ms), false, false);
+}
+
+/* In a loop coroutine: pause until another coroutine of this loop calls
+ * coro.unpark(this one), or ms milliseconds pass (ms < 0: no limit).
+ * Returns 1 when unparked, 0 on the time limit, -1 when coro.stop() was
+ * called (before or during the wait). An unpark that came while this
+ * coroutine wasn't parked makes its next park return 1 at once, so a
+ * wake-up between "nothing to do" and park isn't lost. No syscall: for
+ * handing work or a resource from one coroutine to another. */
+pub i64 park(i64 ms=-1) {
+    LoopTask *t = loopSelf("coro.park");
+    if (t.unparked) {
+        t.unparked = false;
+        return 1;
+    }
+    if (loopGet(true).stopping) { return -1; }
+    t.parked = true;
+    i64 r = loopPark(t, -1, 0, loopDeadline(ms), true, false);
+    t.parked = false;
+    t.unparked = false;
+    return r;
+}
+
+/* Wake c, a coroutine of this thread's loop, from coro.park (it returns
+ * 1); if it isn't parked, its next coro.park returns 1 at once. c must
+ * not have ended (its Coroutine is freed then). Throws
+ * ERR_LOOP for a coroutine coro.go didn't start or one of another
+ * thread's loop. */
+pub void unpark(Coroutine *c) {
+    LoopTask *t = c ? c.loopTask : null;
+    if (!t) { throw(ERR_LOOP, "coro.unpark: not a coroutine that coro.go started"); }
+    Loop *lp = loopGet(false);
+    if (t.lp != lp) { throw(ERR_LOOP, "coro.unpark: a coroutine of another thread's loop"); }
+    if (t.parked && t.waiting && !t.ready) {
+        loopReady(lp, t, 1);
+    } else {
+        t.unparked = true;
+    }
 }
 
 /* coro.wait for "waiting for more work" (the next request, the next

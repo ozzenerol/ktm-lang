@@ -63,6 +63,7 @@ coro.run();                    // until every one has ended
 // inside a loop coroutine:
 coro.accept(listener)   coro.read(fd, buf)   coro.write(fd, data)   coro.dial(host, port)
 coro.wait(fd, events, ms)   coro.sleep(ms)   coro.waitChild(pid)   coro.close(fd)
+coro.park(ms)   coro.unpark(c)
 coro.stop();                   // stop taking work; finish what is in flight</code></pre>
 </div>
 
@@ -136,6 +137,7 @@ stopped
     <tr><td><code>coro.wait(fd, events, ms)</code></td><td><code>fd</code> is ready for <code>events</code></td><td>Its <code>revents</code> (above 0), or 0 on timeout</td></tr>
     <tr><td><code>coro.waitIdle(fd, events, ms)</code></td><td>The same, for waiting on more work</td><td>Also -1 once <code>coro.stop()</code> is called</td></tr>
     <tr><td><code>coro.sleep(ms)</code>, <code>coro.yield()</code></td><td>Time passes / the others had a turn</td><td></td></tr>
+    <tr><td><code>coro.park(ms)</code></td><td>Another coroutine of the loop calls <code>coro.unpark(c)</code></td><td>1, or 0 on timeout, -1 on <code>coro.stop()</code>; an unpark before the park makes it return at once. No syscall: for handing work or a resource over</td></tr>
     <tr><td><code>coro.waitChild(pid, ms)</code></td><td>A child process exits</td><td>Its wait status, or -1</td></tr>
     <tr><td><code>coro.close(fd)</code></td><td></td><td>Closes the fd and tells the loop</td></tr>
   </tbody>
