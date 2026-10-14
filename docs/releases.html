@@ -57,6 +57,19 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-20-1-2026-10-14">v0.20.1 <small>(2026-10-14)</small><a class="anchor" href="#v0-20-1-2026-10-14" aria-label="Link to this section">#</a></h2>
+<p>A fix for the release downloads.</p>
+<ul>
+  <li>The Linux and macOS zips of v0.19.0 and v0.20.0 couldn't build programs that import <code>net.http</code>,
+  <code>net.url</code>, <code>encoding.base64</code> or <code>encoding.hex</code>: the link failed with "multiple
+  definition of <code>net.http.CONN_OUT_FLUSH</code>". Their prebuilt-module markers were written one directory deep,
+  so nested modules were compiled into every program again, and <code>log</code> and <code>net.http</code> lacked
+  their start-up line. The release build now makes the library as <code>./build.sh</code> does, checks every module's
+  marker, and smoke-tests such a program, compiled and in the JIT. ktm built from source was never affected.</li>
+  <li>A timing test (<code>coro.read</code> gives way) failed once on a machine running other test suites; its margin is
+  wider.</li>
+</ul>
+
 <h2 id="v0-20-0-2026-10-14">v0.20.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-20-0-2026-10-14" aria-label="Link to this section">#</a></h2>
 <p>Packages, as Go has them, and the libraries a web service needs: TLS, HTTPS, an HTTP client, cryptography and
 password hashing, URLs, UUIDs, base64, command-line flags and settings from the environment.</p>
@@ -1414,7 +1427,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>
