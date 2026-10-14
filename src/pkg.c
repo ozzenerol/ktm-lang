@@ -1,5 +1,6 @@
 /* Packages: ktm.mod and ktm.sum, and `ktm mod ...`. See pkg.h. */
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -444,6 +445,162 @@ char *pkgSumFormat(PkgSum *s) {
         aoStrCatPrintf(b, "%s %s %s\n", s->lines[i].path, s->lines[i].version, s->lines[i].hash);
     }
     return aoStrMove(b);
+}
+
+/* ---- imports ---- */
+
+char *pkgCacheDir(void) {
+    char *env = getenv("KTM_CACHE");
+    if (env && *env) return mprintf("%s", env);
+    char *home = getenv("HOME");
+    return mprintf("%s/.cache/ktm/mod", home && *home ? home : "/tmp");
+}
+
+static int pkgIsDir(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* path is prefix or below it: the rest ("" or "/sub"), else NULL */
+static const char *pkgUnder(const char *path, const char *prefix) {
+    size_t n = strlen(prefix);
+    if (strncmp(path, prefix, n)) return NULL;
+    if (path[n] == '\0' || path[n] == '/') return path + n;
+    return NULL;
+}
+
+/* ktm.mod of the project, read once per directory */
+static PkgMod *pkgModFor(const char *dir, char **err) {
+    static char *last_dir = NULL;
+    static PkgMod *last_mod = NULL;
+    static char *last_err = NULL;
+    if (last_dir && !strcmp(last_dir, dir)) {
+        if (!last_mod) *err = last_err;
+        return last_mod;
+    }
+    free(last_dir);
+    last_dir = strdup(dir);
+    last_mod = NULL;
+    last_err = NULL;
+    char *file = pkgModFind(dir);
+    if (!file) {
+        last_err = mprintf("no ktm.mod: `ktm mod init <path>` in the project's directory makes one");
+    } else {
+        last_mod = pkgModLoad(file, &last_err);
+    }
+    if (!last_mod) *err = last_err;
+    return last_mod;
+}
+
+/* a directory of a replace: relative to ktm.mod's */
+static char *pkgReplaceDir(PkgMod *m, const char *dir) {
+    if (dir[0] == '/') return mprintf("%s", dir);
+    return mprintf("%s/%s", m->dir, dir);
+}
+
+char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
+    if (!pkgValidPath(path, 0)) {
+        *err = mprintf("\"%s\" is not a package path, as in \"github.com/user/repo\"", path);
+        return NULL;
+    }
+    PkgMod *m = pkgModFor(program_dir, err);
+    if (!m) return NULL;
+    if (m->ktm && pkgKtmTooNew(m->ktm)) {
+        *err = mprintf("%s needs ktm %s or newer; this is ktm %s", m->file, m->ktm, cctrlGetVersion());
+        return NULL;
+    }
+    char *dir = NULL;
+    const char *rest;
+    /* a package of the project itself */
+    if ((rest = pkgUnder(path, m->path))) {
+        dir = mprintf("%s%s", m->dir, rest);
+    } else {
+        PkgReq *best = NULL;
+        for (int i = 0; i < m->req_len; ++i) {
+            if (pkgUnder(path, m->req[i].path) &&
+                (!best || strlen(m->req[i].path) > strlen(best->path))) {
+                best = &m->req[i];
+            }
+        }
+        if (!best) {
+            *err = mprintf("\"%s\" is not in ktm.mod: `ktm get %s` adds it", path, path);
+            return NULL;
+        }
+        rest = path + strlen(best->path);
+        PkgReplace *rep = NULL;
+        for (int i = 0; i < m->rep_len; ++i) {
+            PkgReplace *r = &m->rep[i];
+            if (strcmp(r->path, best->path)) continue;
+            if (r->version && strcmp(r->version, best->version)) continue;
+            /* a replace of this version wins over one of every version */
+            if (!rep || r->version) rep = r;
+        }
+        if (rep && !rep->new_version) {
+            dir = mprintf("%s%s", pkgReplaceDir(m, rep->new_path), rest);
+        } else {
+            const char *from = rep ? rep->new_path : best->path;
+            const char *version = rep ? rep->new_version : best->version;
+            char *root = mprintf("%s/%s@%s", pkgCacheDir(), from, version);
+            if (!pkgIsDir(root)) {
+                *err = mprintf("%s %s is not downloaded: `ktm mod download` fetches it", from, version);
+                return NULL;
+            }
+            dir = mprintf("%s%s", root, rest);
+        }
+    }
+    if (!pkgIsDir(dir)) {
+        *err = mprintf("\"%s\" is not a package: no directory %s", path, dir);
+        return NULL;
+    }
+    return dir;
+}
+
+/* skips blanks and comments */
+static const char *pkgSkipSpace(const char *p) {
+    for (;;) {
+        while (isspace((unsigned char)*p)) p++;
+        if (p[0] == '/' && p[1] == '/') {
+            while (*p && *p != '\n') p++;
+        } else if (p[0] == '/' && p[1] == '*') {
+            const char *e = strstr(p + 2, "*/");
+            p = e ? e + 2 : p + strlen(p);
+        } else {
+            return p;
+        }
+    }
+}
+
+char *pkgModuleName(const char *dir) {
+    DIR *d = opendir(dir);
+    if (!d) return NULL;
+    char *first = NULL;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        size_t n = strlen(e->d_name);
+        if (n > 4 && !strcmp(e->d_name + n - 4, ".ktm") && e->d_name[0] != '.') {
+            if (!first || strcmp(e->d_name, first) < 0) {
+                free(first);
+                first = strdup(e->d_name);
+            }
+        }
+    }
+    closedir(d);
+    if (!first) return NULL;
+    char *file = mprintf("%s/%s", dir, first);
+    free(first);
+    FILE *fp = fopen(file, "r");
+    if (!fp) return NULL;
+    char buf[4096];
+    size_t len = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[len] = '\0';
+    const char *p = pkgSkipSpace(buf);
+    if (strncmp(p, "module", 6) || !isspace((unsigned char)p[6])) return NULL;
+    p = pkgSkipSpace(p + 6);
+    const char *start = p;
+    while (isalnum((unsigned char)*p) || *p == '_') p++;
+    if (p == start || isdigit((unsigned char)*start)) return NULL;
+    return pkgDup(start, p - start);
 }
 
 /* ---- commands ---- */
