@@ -273,6 +273,24 @@ that writes nothing sends <code>200</code> with an empty body.</p>
   <tr><td><code>w.jsonText(code, text)</code>, <code>w.redirect(url, 302)</code></td><td>JSON that is text already; a redirect</td></tr>
 </table>
 
+<h2 id="cookies">Cookies</h2>
+<pre><code>
+u8[] token = r.cookie("session");      // "" when the client sent none; r.hasCookie("session")
+
+http.Cookie c;
+c.name = "session";
+c.value = token;                       // no spaces, quotes, commas, semicolons: encode (base64url) first
+c.maxAge = 30 * 24 * 3600;             // seconds; 0 until the browser closes
+c.httpOnly = true;                     // JavaScript can't read it
+c.secure = true;                       // sent over HTTPS only
+c.sameSite = http.SameSite.lax;        // .strict, .none (which adds Secure)
+w.setCookie(&amp;c);                      // one Set-Cookie header per call; Path defaults to "/"
+
+w.deleteCookie("session");             // Max-Age=0
+</code></pre>
+<p><code>setCookie</code> throws <code>http.ERR_HTTP</code> for a name or value a browser would refuse, rather than
+send one it would drop.</p>
+
 <h2>Running the server</h2>
 <p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the
 requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno()</code> set when the port can't be used.

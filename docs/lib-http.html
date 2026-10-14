@@ -317,6 +317,23 @@ that writes nothing sends <code>200</code> with an empty body.</p>
   <tr><td><code>w.jsonText(code, text)</code>, <code>w.redirect(url, 302)</code></td><td>JSON that is text already; a redirect</td></tr>
 </table></div>
 
+<h2 id="cookies">Cookies<a class="anchor" href="#cookies" aria-label="Link to this section">#</a></h2>
+<pre><code>u8[] token = r.cookie("session");      // "" when the client sent none; r.hasCookie("session")
+
+http.Cookie c;
+c.name = "session";
+c.value = token;                       // no spaces, quotes, commas, semicolons: encode (base64url) first
+c.maxAge = 30 * 24 * 3600;             // seconds; 0 until the browser closes
+c.httpOnly = true;                     // JavaScript can't read it
+c.secure = true;                       // sent over HTTPS only
+c.sameSite = http.SameSite.lax;        // .strict, .none (which adds Secure)
+w.setCookie(&amp;amp;c);                      // one Set-Cookie header per call; Path defaults to "/"
+
+w.deleteCookie("session");             // Max-Age=0
+</code></pre>
+<p><code>setCookie</code> throws <code>http.ERR_HTTP</code> for a name or value a browser would refuse, rather than
+send one it would drop.</p>
+
 <h2 id="running-the-server">Running the server<a class="anchor" href="#running-the-server" aria-label="Link to this section">#</a></h2>
 <p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the
 requests in progress finish, frees the mux and returns 0; -1 with <code>os.errno()</code> set when the port can't be used.
@@ -421,7 +438,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-api">A first API</a></li><li><a href="#routing">Routing</a></li><li><a href="#middleware">Middleware and groups</a></li><li><a href="#handlers">Handlers</a></li><li><a href="#the-request">The request</a></li><li><a href="#the-reply">The reply</a></li><li><a href="#running-the-server">Running the server</a></li><li><a href="#https">HTTPS</a></li><li><a href="#client">The client</a></li><li><a href="#testing-handlers">Testing handlers</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-api">A first API</a></li><li><a href="#routing">Routing</a></li><li><a href="#middleware">Middleware and groups</a></li><li><a href="#handlers">Handlers</a></li><li><a href="#the-request">The request</a></li><li><a href="#the-reply">The reply</a></li><li><a href="#cookies">Cookies</a></li><li><a href="#running-the-server">Running the server</a></li><li><a href="#https">HTTPS</a></li><li><a href="#client">The client</a></li><li><a href="#testing-handlers">Testing handlers</a></li></ul></nav>
 </div>
 </body>
 </html>
