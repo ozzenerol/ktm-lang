@@ -88,7 +88,7 @@ jobs:
           # does, through -S so the target is the triple's.
           cp -R ./src/std/. "$stage/modules/"
           # net.tls stays source, outside libktm (see build.sh)
-          rm -rf "$stage/modules/net/tls"
+          rm -rf "$stage/modules/net/tls" "$stage/modules/crypto"
           "$GITHUB_WORKSPACE/ktm-native" \
             --target=${{ matrix.triple }} \
             --install-dir="$stage" \
@@ -125,6 +125,7 @@ jobs:
           # build made: the archive, and the shared object by its
           # versioned name only, as for libktm
           cp -R ./src/std/net/tls "$stage/modules/net/tls"
+          cp -R ./src/std/crypto "$stage/modules/crypto"
           cp ./build/libktmtls.a "$stage/lib/libktmtls.a"
           if [ "${{ matrix.os_name }}" = "linux" ]; then
             cp ./build/libktmtls.so "$stage/lib/libktmtls.so.0.0.1"
