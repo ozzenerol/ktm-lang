@@ -72,6 +72,8 @@ char *pkgCacheDir(void);
 /* Where `import "path";` in a program under program_dir is: a directory,
  * or NULL with *err set (what to run to fix it) */
 char *pkgResolveImport(const char *program_dir, const char *path, char **err);
+/* Is path one of the project's own packages (under its module path)? */
+int pkgIsProjectPath(const char *program_dir, const char *path);
 /* The name on the `module` line of the package in dir, NULL if none */
 char *pkgModuleName(const char *dir);
 
