@@ -21,7 +21,11 @@ void check(bool ok, u8 *what) {
 }
 
 const i64 RUN_MS = 1500;
-const i64 MARGIN_MS = 50;        /* the budget is 4 ms: a wait of about 8 ms */
+/* The budget is 4 ms: a wait of about 8 ms. A machine running other test
+ * suites at once preempted the loop for 67 ms once, so the margin is wide;
+ * a stream that never gave way would hold the client for the whole run
+ * (1.5 s), far past it. */
+const i64 MARGIN_MS = 250;
 
 i32 gStream[2];                  /* [0] the loop reads, [1] the writer thread writes */
 i32 gPing[2];                    /* [0] the loop's client, [1] the echo thread */
