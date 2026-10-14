@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8. Users and sessions - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li class="current"><a href="guide-http-08-users.html" aria-current="page">8. Users and sessions</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>8. Users and sessions</h1>
+<p class="lede">Shelf becomes a service for many people: they sign up with an email and a password, log in to get a
+token, and send it with every request. Each bookmark has an owner, and nobody sees anybody else's.</p>
+
+<h2 id="the-migration">The migration<a class="anchor" href="#the-migration" aria-label="Link to this section">#</a></h2>
+<pre><code>CREATE TABLE users (
+    id            uuid PRIMARY KEY,
+    email         text NOT NULL UNIQUE,
+    password_hash text NOT NULL,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE sessions (
+    token_hash bytea PRIMARY KEY,      -- SHA-256 of the token: a stolen table holds no tokens
+    user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    expires_at timestamptz NOT NULL
+);
+
+-- every bookmark has an owner now; the ones from earlier chapters had none
+DELETE FROM bookmarks;
+ALTER TABLE bookmarks ADD user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE;
+ALTER TABLE bookmarks DROP CONSTRAINT bookmarks_url_key;
+CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
+<ul class="rules">
+  <li>Passwords are stored as <b>hashes</b>, never as text: Argon2id, slow on purpose, so a stolen table is expensive to
+  guess from.</li>
+  <li>Sessions are stored by the <b>SHA-256 of the token</b>: the table doesn't hold anything a thief could send back.</li>
+  <li>A url is now unique per user, not in the whole table.</li>
+</ul>
+
+<h2 id="signing-up">Signing up<a class="anchor" href="#signing-up" aria-label="Link to this section">#</a></h2>
+<pre><code>void signup(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewUser in = http.decodeValid&amp;lt;NewUser&amp;gt;(r);
+    String hash = crypto.hashPassword(in.password);     /* Argon2id, on a worker thread */
+    defer hash.free();
+    String id = uuid.v7().string();
+    defer id.free();
+    User u;
+    try {
+        u = pg.queryOne&amp;lt;User&amp;gt;(db, "INSERT INTO users (id, email, password_hash) VALUES ($1, lower($2), $3) RETURNING id, email",
+                              id, in.email, hash);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that email has an account");
+        return;
+    }
+    defer u.freeDecoded();
+    w.json(201, reflect.of(u));
+}</code></pre>
+<ul class="rules">
+  <li><code>crypto.hashPassword</code> takes about 20 ms of CPU by design. In a handler it runs on a worker thread
+  (<a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a>, by itself), so the server goes on answering
+  other requests meanwhile.</li>
+  <li><code>lower($2)</code>: emails are compared without case, <code>Ada@Example.com</code> is
+  <code>ada@example.com</code>.</li>
+</ul>
+
+<h2 id="logging-in">Logging in<a class="anchor" href="#logging-in" aria-label="Link to this section">#</a></h2>
+<pre><code>void login(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    Login in = http.decodeValid&amp;lt;Login&amp;gt;(r);
+    vec.Vec&amp;lt;Credentials&amp;gt; found = pg.queryAll&amp;lt;Credentials&amp;gt;(db,
+        "SELECT id, password_hash AS \"passwordHash\" FROM users WHERE email = lower($1)", in.email);
+    defer pg.free(reflect.of(found));
+    u8[] hash = found.len ? found.data[0].passwordHash[0:] : gNoUser[0:];
+    if (!crypto.verifyPassword(in.password, hash) || !found.len) {
+        w.error(401, "wrong email or password");
+        return;
+    }
+    /* 32 random bytes are the token; the database keeps only their hash */
+    String raw = crypto.randomBytes(32);
+    defer raw.free();
+    Session s;
+    defer s.freeDecoded();
+    s.token = base64.encodeUrl(raw[0:]);
+    u8 h[32];
+    tokenHash(s.token[0:], h);
+    s.expiresAt = pg.queryOne&amp;lt;String&amp;gt;(db,
+        "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '30 days')"
+        " RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+        h[0:32], found.data[0].id);
+    w.json(201, reflect.of(s));
+}</code></pre>
+<ul class="rules">
+  <li>A wrong password and an unknown email get the same answer, and take the same time: for an unknown email the
+  password is still checked, against <code>gNoUser</code>, a hash nothing matches. Otherwise the time would tell an
+  attacker which emails have accounts.</li>
+  <li>The token is 32 random bytes from the operating system (<code>crypto.randomBytes</code>), in URL-safe base64.
+  The client keeps it; the database keeps its hash, with an expiry.</li>
+</ul>
+
+<h2 id="who-is-asking">Who is asking<a class="anchor" href="#who-is-asking" aria-label="Link to this section">#</a></h2>
+<pre><code>/* Is token a live session? Then the handlers get its user (userOf) */
+bool checkToken(u8[] token, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    u8 h[32];
+    tokenHash(token, h);
+    vec.Vec&amp;lt;String&amp;gt; ids = pg.queryAll&amp;lt;String&amp;gt;(db,
+        "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &amp;gt; now()", h[0:32]);
+    defer pg.free(reflect.of(ids));
+    if (!ids.len) { return false; }
+    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
+    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
+    u8[] *id = r.alloc(sizeof(u8[]));
+    *id = keep[0:ids.data[0].len];
+    r.set("userId", id);
+    return true;
+}
+
+/* The signed-in user's id (behind middleware.bearer) */
+u8[] userOf(http.Request *r)
+{
+    u8[] *id = r.get("userId");
+    return *id;
+}</code></pre>
+<p><a href="lib-http-middleware.html"><code>middleware.bearer</code></a> reads
+<code>Authorization: Bearer &lt;token&gt;</code>, calls <code>checkToken</code> and answers 401 when it says no.
+<code>checkToken</code> keeps the user's id in the request (memory from <code>r.alloc</code> lives exactly as long), and
+handlers read it with <code>userOf(r)</code>. Every bookmark query gets <code>AND user_id = $n</code>.</p>
+<pre><code>i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&amp;amp;ms, &amp;amp;d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&amp;amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;amp;d), ran);
+
+    String noise = uuid.v4().string();
+    gNoUser = crypto.hashPassword(noise[0:]);
+    noise.free();
+
+    http.Mux mux;
+    mux.handle("POST /users", &amp;amp;signup);
+    mux.handle("POST /sessions", &amp;amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;amp;checkToken);
+    session.handle("DELETE", &amp;amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;amp;checkToken);
+    bookmarks.handle("GET", &amp;amp;list);
+    bookmarks.handle("POST", &amp;amp;create);
+    bookmarks.handle("GET /{id}", &amp;amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;amp;remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;amp;mux, db, &amp;amp;o);
+}</code></pre>
+<p><code>bookmarks.handle("GET", &amp;list)</code> is <code>GET /bookmarks</code> itself: a pattern without a path
+is the group's prefix, so the whole resource is behind the group's middleware.</p>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ curl -X POST localhost:8080/users -d '{"email": "Ada@Example.com", "password": "correct horse battery"}'
+{"id":"01a13b10-d568-7000-b8b5-ca7711cd4b3b","email":"ada@example.com"}
+$ curl -X POST localhost:8080/users -d '{"email": "bob@example.com", "password": "short"}'
+{"error":"invalid request","fields":[{"field":"password","message":"must have at least 10 characters"}]}
+
+$ curl -X POST localhost:8080/sessions -d '{"email": "ada@example.com", "password": "wrong password"}'
+{"error":"wrong email or password"}
+$ curl -X POST localhost:8080/sessions -d '{"email": "ada@example.com", "password": "correct horse battery"}'
+{"token":"Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o","expiresAt":"2026-11-13T15:38:41Z"}
+
+$ curl localhost:8080/bookmarks
+{"error":"unauthorized"}
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' -X POST localhost:8080/bookmarks \
+       -d '{"url": "https://go.dev", "tags": ["go"]}'
+{"id":"01a13b10-d600-7000-973f-c1aa83cfa146","url":"https://go.dev","title":"https://go.dev","notes":"","tags":["go"],"createdAt":"2026-10-14T15:38:41Z"}
+
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' -X DELETE localhost:8080/sessions
+$ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' localhost:8080/bookmarks
+{"error":"unauthorized"}</code></pre>
+<p>Bob, signed in with his own token, sees an empty list, and can save <code>https://go.dev</code> too.</p>
+<p>Next: sharing collections (coming).</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-07-search.html"><span>Previous</span>7. Tags, search and pages</a><a class="next" href="stdlib.html"><span>Next</span>Library reference</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-08-users.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-migration">The migration</a></li><li><a href="#signing-up">Signing up</a></li><li><a href="#logging-in">Logging in</a></li><li><a href="#who-is-asking">Who is asking</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+</div>
+</body>
+</html>

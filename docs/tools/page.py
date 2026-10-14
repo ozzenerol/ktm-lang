@@ -113,6 +113,7 @@ NAV = [
         ("guide-http-05-postgres.html", "5. PostgreSQL"),
         ("guide-http-06-migrations.html", "6. Migrations"),
         ("guide-http-07-search.html", "7. Tags, search and pages"),
+        ("guide-http-08-users.html", "8. Users and sessions"),
     ]),
     ("Reference", [
         ("stdlib.html", "Library reference"),
