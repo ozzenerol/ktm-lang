@@ -56,6 +56,7 @@ pub struct Coroutine {
     bool failed;          /* fn threw; Next rethrows `thrown` */
     bool isRoot;         /* the save slot of a thread's own stack */
     void *loopTask;      /* its LoopTask when coro.go started it (loop.ktm) */
+    rt.HCFs *home;        /* the thread state its catch frames point at */
     u64 stackLo;          /* the lowest usable address, above the guard */
 };
 
@@ -230,6 +231,12 @@ static void *coroSwitch(rt.HCFs *fs, Coroutine *from, Coroutine *to, void *value
     fs.catchTop = to.catchTop;
     fs.exceptCh = to.exceptCh;
     fs.error = to.error;
+    if (to.home != fs) {
+        /* it last ran on another thread (or never ran): its frames
+         * point at that thread's state, which rt.__ktmTryLeave uses */
+        for (rt.CatchFrame *f = to.catchTop; f; f = f.prev) { f.fs = fs; }
+        to.home = fs;
+    }
     if (to.isRoot) {
         fs.coroCur = null;
     } else {

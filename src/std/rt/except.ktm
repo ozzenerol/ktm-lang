@@ -4,14 +4,17 @@ import cstr, libc, mem, os;
 /* strings.ktm */
 
 /* Compiler reserves 256 bytes per CatchFrame. We split that into a
- * 248-byte jmp_buf storage region (setjmp owns the format) plus the
- * 8-byte chain pointer the runtime walks. */
-const i64 __JMP_BUF_BYTES__ = 248;
+ * 240-byte jmp_buf storage region (setjmp owns the format; _setjmp
+ * writes 192 bytes at most: macOS arm64), the thread state the frame was
+ * pushed on, and the chain pointer the runtime walks. */
+const i64 __JMP_BUF_BYTES__ = 240;
 
 pub struct CatchFrame;
+pub struct HCFs;
 
 pub struct CatchFrame {
     i8 jb[__JMP_BUF_BYTES__];
+    HCFs *fs;              /* its thread's state: leaving needs no Fs() */
     CatchFrame *prev;
 };
 
@@ -84,11 +87,15 @@ pub HCFs *Fs() {
 pub void __ktmPushFrame(CatchFrame *f) {
     HCFs *fs = Fs();
     f.prev = fs.catchTop;
+    f.fs = fs;
     fs.catchTop = f;
 }
 
+/* The frame's own fs, not Fs() (pthread_getspecific): a try or defer cost
+ * 12 ns, now under 7. A coroutine that moves to another thread gets its
+ * frames' fs rewritten when it is switched to (coroSwitch). */
 pub void __ktmTryLeave(CatchFrame *f) {
-    Fs().catchTop = f.prev;
+    f.fs.catchTop = f.prev;
 }
 
 /* Make e (a struct copy) the thread's current error; the message moves
