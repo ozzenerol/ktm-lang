@@ -45,7 +45,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, TLS, LISTEN/NOTIFY, COPY, arrays, fuzzed, a 1-hour soak test clean</td><td><span class="tag done">done</span> v0.1.0</td></tr>
   <tr><td>ktm-jwt</td><td>package</td><td>Sign and verify JWTs (HS256, RS256, ES256, EdDSA), JWKS</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Validation</td><td>stdlib</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code>, <code>@oneOf</code>, <code>@required</code>) with readable errors; <code>http.decodeValid</code> answers 422</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
-  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag wip">in progress</span> (ktm-migrate)</td></tr>
+  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag done">done</span> ktm-migrate v0.1.0</td></tr>
 </table>
 
 <h2>Tier 2: what most services reach for soon</h2>
@@ -64,7 +64,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>toml</code></td><td>stdlib</td><td>Config files, next to JSON and YAML</td><td><span class="tag">planned</span></td></tr>
   <tr><td>Time zones</td><td>stdlib</td><td>The IANA zone database in <code>date</code></td><td><span class="tag">planned</span></td></tr>
   <tr><td><code>decimal</code></td><td>stdlib</td><td>Exact decimal numbers for money (PostgreSQL <code>numeric</code>)</td><td><span class="tag">planned</span></td></tr>
-  <tr><td>Testing helpers</td><td>stdlib</td><td>Assertions, table tests, golden files, benchmarks, <code>ktm test</code></td><td><span class="tag wip">in progress</span></td></tr>
+  <tr><td>Testing helpers</td><td>stdlib</td><td><code>ktm test</code> and <code>testing</code>: assertions, table tests (golden files and benchmarks later)</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
   <tr><td>ktm-smtp</td><td>package</td><td>Sending email, with TLS</td><td><span class="tag">planned</span></td></tr>
   <tr><td>ktm-s3</td><td>package</td><td>S3-compatible storage (AWS, MinIO, R2): put, get, list, presigned URLs</td><td><span class="tag">planned</span></td></tr>
 </table>
