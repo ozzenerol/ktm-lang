@@ -6746,9 +6746,9 @@ static int parseGenericUnify(AstType *pat, AstType *arg, Map *b, char **why) {
     if (!pat || !arg) return 1;
     if (pat->is_type_param) {
         AstType *cur = mapGet(b, pat->clsname->data);
+        /* an array argument is its pointer, as a call passes it */
+        if (arg->kind == AST_TYPE_ARRAY) arg = astMakePointerType(arg->ptr);
         if (!cur) {
-            /* an array argument is its pointer, as a call passes it */
-            if (arg->kind == AST_TYPE_ARRAY) arg = astMakePointerType(arg->ptr);
             mapAdd(b, pat->clsname->data, arg);
             return 1;
         }
@@ -6808,6 +6808,18 @@ Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
     }
     Ast *pattern = parseGenericFuncInstance(cc, d, stand, NULL);
     Vec *params = pattern->params;
+    /* an overload given more arguments than it takes: not this one */
+    int takes = 0, varargs = 0;
+    for (u64 i = 0; params && i < params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p) continue;
+        if ((p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) || p->kind == AST_VAR_ARGS) varargs = 1;
+        else if (!(p->flags & AST_FLAG_CALLER)) takes++;
+    }
+    if (d->overloaded && !varargs && argv && (int)argv->size > takes) {
+        *why = mprintf("it takes %d argument%s, not %d", takes, takes == 1 ? "" : "s", (int)argv->size);
+        return NULL;
+    }
     Map *b = mapNew(8, &map_asttype_type);
     /* argv has no arguments for @caller parameters: they are filled in
      * once the instance is known (parseGenericCallWith) */
