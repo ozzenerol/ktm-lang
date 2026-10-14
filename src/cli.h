@@ -42,6 +42,8 @@ enum CliArgType {
     CLI_LSP,
     CLI_MEMSAFE,
     CLI_MEM_STATS,
+    CLI_TEST_DIR,
+    CLI_TEST_ROOT,
     CLI_OUTPUT_FILENAME,
     CLI_PRINT_AST,
     CLI_PRINT_TOKENS,
@@ -106,6 +108,10 @@ typedef struct CliArgs {
     /* `ktm -lib a.b dir/a/b`: build the module in dir/a/b into a library
      * there, with a .ktmlib marker importers link it by */
     char *module_dir;
+    /* `ktm test` compiles its runner with these: the module whose
+     * *_test.ktm files are read, and where modules are found from */
+    char *test_dir;
+    char *test_root;
     char *output_filename;
     char *clibs;
     char *install_dir;

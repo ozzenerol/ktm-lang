@@ -97,6 +97,7 @@ NAV = [
         ("tools-jit-repl.html", "JIT and REPL"),
         ("tools-editors.html", "Editors"),
         ("tools-packages.html", "Packages"),
+        ("tools-testing.html", "Testing"),
         ("tools-libraries.html", "Building libraries"),
         ("tools-debugging.html", "Debugging"),
     ]),

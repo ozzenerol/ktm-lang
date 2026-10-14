@@ -1927,6 +1927,29 @@ static int parseFillCallerArgs(Cctrl *cc, Vec *params, int idx, Vec *argv,
     return idx;
 }
 
+/* An overloaded callee's @caller parameters, which every overload starts
+ * with (parseOverloadDecl): set just before parseArgv, which fills them in
+ * as for a single function. A method called as `Type.name(obj, ...)` has
+ * its self first. */
+static Vec *parse_overload_callers;
+
+static void parseSetOverloadCallers(Vec *overloads, int is_method, int with_self) {
+    Ast *fn = overloads->entries[0];
+    Vec *params = fn ? fn->params : NULL;
+    Vec *out = NULL;
+    int from = is_method ? 1 : 0;
+    for (int i = from; params && i < (int)params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p || !(p->flags & AST_FLAG_CALLER)) break;
+        if (!out) {
+            out = astVecNew();
+            if (with_self) vecPush(out, params->entries[0]);
+        }
+        vecPush(out, p);
+    }
+    parse_overload_callers = out;
+}
+
 Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                Vec *spans) {
     List *var_args = NULL;
@@ -1936,6 +1959,8 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
     int param_idx = 0;
 
     if (decl) params = parseGetFunctionParams(decl);
+    else params = parse_overload_callers;
+    parse_overload_callers = NULL;
 
     /* A `T ...name` callee: its last two parameters are the count and the
      * data pointer, every argument from the count's position on is an
@@ -2822,6 +2847,7 @@ static void parseCheckOverloadAccess(Cctrl *cc, Ast *fn, char *fname, int len,
     if (mod_len < 0 || (fn->flags & AST_FLAG_PUB)) return;
     AoStr *here = cctrlModulePath(cc, cc->cur_module);
     if (here && (int)here->len == mod_len && !memcmp(here->data, fname, mod_len)) return;
+    if (cctrlTestSees(cc, fname, mod_len)) return;
     parseRaiseCallError(cc, loc, "`%s` is private to module %.*s",
                         parseOverloadName(fn), mod_len, fname);
 }
@@ -3026,6 +3052,7 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     ParseCallLoc loc = parseCallLocStart(cc, fname, len);
     loc.args = vecNew(&vec_unsigned_long_type);
     /* an overloaded name: the arguments first, then the one they fit */
+    if (overloads) parseSetOverloadCallers(overloads, 0, 0);
     Vec *argv = parseArgv(cc,overloads ? NULL : maybe_fn,terminator,fname,len,loc.args);
     parseCallLocEnd(cc, &loc);
     if (overloads) {
@@ -3236,6 +3263,7 @@ static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
 
     ParseCallLoc loc = parseCallLocStart(cc, name, len);
     loc.args = vecNew(&vec_unsigned_long_type);
+    if (fn->overloads) parseSetOverloadCallers(fn->overloads, 1, recv == NULL);
     Vec *argv = parseArgv(cc, fn->overloads ? NULL : decl, ')', fname, flen, loc.args);
     parseCallLocEnd(cc, &loc);
     if (fn->overloads) {

@@ -457,6 +457,7 @@ int cctrlInCModule(Cctrl *cc);
 char *cctrlDeclName(Cctrl *cc, char *name, int len);
 int cctrlModuleHides(Cctrl *cc, char *name, int len);
 LexFile *cctrlCurFile(Cctrl *cc);
+int cctrlTestSees(Cctrl *cc, char *name, int mod_len);
 void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len);
 void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name);
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len);
