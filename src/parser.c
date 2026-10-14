@@ -6181,7 +6181,17 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         mapAdd(cc->generic_structs, d->name->data, (void *)d);
         mapAdd(cc->clsdefs, d->name->data, t);
     } else {
-        mapAdd(cc->generic_funcs, d->name->data, (void *)d);
+        /* another generic function of the name: an overload, picked by
+         * the arguments at each call (parseGenericOverloadCall) */
+        GenericDef *head = mapGet(cc->generic_funcs, d->name->data);
+        if (head) {
+            GenericDef *tail = head;
+            while (tail->next) tail = tail->next;
+            tail->next = d;
+            head->overloaded = d->overloaded = 1;
+        } else {
+            mapAdd(cc->generic_funcs, d->name->data, (void *)d);
+        }
     }
     return 1;
 }
@@ -6536,6 +6546,8 @@ GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len) {
     return d;
 }
 
+static int parseTypesSame(AstType *a, AstType *b);
+
 /* Function `d` with type arguments `args`: its prototype (made the first
  * time, its body at the end of the file) */
 Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
@@ -6552,9 +6564,27 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
                                                      : d->name);
     AoStr *name = parseGenericInstName(short_name, args);
     AoStr *full = parseGenericInstName(d->name, args);
-    Ast *fn = mapGet(cc->global_env, full->data);
-    if (!fn) fn = mapGet(cc->global_env, name->data);
-    if (fn) return fn;
+    Ast *fn = NULL, *before = NULL;
+    u64 before_n = 0;
+    if (d->overloaded) {
+        /* the instances of the overloads share a name: each definition
+         * keeps its own */
+        for (u64 i = 0; d->made && i < d->made->size; ++i) {
+            GenericInst *m = d->made->entries[i];
+            int same = m->args->size == args->size;
+            for (u64 j = 0; same && j < args->size; ++j) {
+                same = parseTypesSame(m->args->entries[j], args->entries[j]);
+            }
+            if (same && m->fn) return m->fn;
+        }
+        before = mapGet(cc->global_env, full->data);
+        if (!before) before = mapGet(cc->global_env, name->data);
+        before_n = before && before->overloads ? before->overloads->size : 0;
+    } else {
+        fn = mapGet(cc->global_env, full->data);
+        if (!fn) fn = mapGet(cc->global_env, name->data);
+        if (fn) return fn;
+    }
     GenericInst *in = calloc(1, sizeof(GenericInst));
     in->def = d;
     in->args = args;
@@ -6564,7 +6594,18 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
     parseGenericReplay(cc, d, in);
     fn = mapGet(cc->global_env, full->data);
     if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (d->overloaded && before && fn) {
+        /* this definition's function joined the name's overloads last */
+        if (fn->overloads && fn->overloads->size > before_n) {
+            fn = fn->overloads->entries[fn->overloads->size - 1];
+        }
+    }
     if (!fn) cctrlRaiseException(cc, "could not make `%s`", full->data);
+    in->fn = fn;
+    if (d->overloaded) {
+        if (!d->made) d->made = vecNew(&vec_unsigned_long_type);
+        vecPush(d->made, in);
+    }
     int pattern = 0;
     for (u64 i = 0; i < args->size; ++i) pattern |= parseTypeHasParam(args->entries[i]);
     if (!pattern) {

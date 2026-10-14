@@ -123,6 +123,9 @@ typedef struct GenericDef {
     Vec *insts;                  /* GEN_STRUCT/FUNC: GenericInst * made */
     Lexeme *at;                  /* its name where it is declared */
     u32 file_id;                 /* and that file */
+    struct GenericDef *next;     /* GEN_FUNC: the next overload of the name */
+    int overloaded;              /* one of several generic functions of the name */
+    Vec *made;                   /* overloaded: GenericInst * of every instance */
 } GenericDef;
 
 /* One instance being made (or made): the definition and its arguments */
@@ -134,6 +137,7 @@ typedef struct GenericInst {
     int proto_only;              /* the declaration only, its body later */
     Lexeme *at;                  /* the use that asked for it */
     struct GenericInst *outer;
+    struct Ast *fn;              /* the instance's function, once made */
 } GenericInst;
 
 /* A @json/@yaml struct's pointer field whose struct had no body yet

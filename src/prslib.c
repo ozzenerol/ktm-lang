@@ -2915,10 +2915,55 @@ static Ast *parseGenericCallWith(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *lo
     return astFunctionCall(fn->type->rettype, fn->fname->data, fn->fname->len, argv);
 }
 
+/* A generic name with several definitions: an instance of each one the
+ * type arguments fit (targs, or inferred from argv when NULL), then the
+ * one the arguments fit, as for plain overloads */
+static Ast *parseGenericOverloadPick(Cctrl *cc, GenericDef *head, Vec *targs, Vec *argv,
+                                     ParseCallLoc *loc, char *fname, int len, Lexeme *at)
+{
+    Vec *set = astVecNew();
+    char *why = NULL;
+    for (GenericDef *d = head; d; d = d->next) {
+        Vec *a = targs;
+        if (!a) {
+            char *w = NULL;
+            a = parseGenericInfer(cc, d, argv, &w);
+            if (!a) { why = w; continue; }
+        } else if (a->size != d->params->size) {
+            continue;
+        }
+        Ast *inst = parseGenericFuncInstance(cc, d, a, at);
+        int dup = 0;
+        for (u64 i = 0; i < set->size; ++i) dup |= set->entries[i] == inst;
+        if (!dup) vecPush(set, inst);
+    }
+    if (!set->size) {
+        if (targs) {
+            parseRaiseCallError(cc, loc, "no `%.*s` takes %d type argument%s", len, fname,
+                                (int)targs->size, targs->size == 1 ? "" : "s");
+        }
+        parseRaiseCallError(cc, loc, "can't work out the type arguments of `%.*s`: %s; "
+                            "write them, as in `%.*s<i64>(...)`", len, fname,
+                            why ? why : "no definition fits", len, fname);
+    }
+    if (set->size == 1) return set->entries[0];
+    Ast *decl = NULL;
+    return parseResolveOverload(cc, set, argv, 0, fname, len, loc, &decl);
+}
+
 /* `name<T, U>(args)`, the `<` next: the call of that instance */
 Ast *parseGenericExplicitCall(Cctrl *cc, GenericDef *d, char *fname, int len) {
     Lexeme *at = parseLastToken(cc);
     Vec *targs = parseGenericArgs(cc);
+    if (d->overloaded) {
+        cctrlTokenExpect(cc, '(');
+        ParseCallLoc oloc = parseCallLocStart(cc, fname, len);
+        oloc.args = vecNew(&vec_unsigned_long_type);
+        Vec *oargv = parseArgv(cc, NULL, ')', fname, len, oloc.args);
+        parseCallLocEnd(cc, &oloc);
+        Ast *pick = parseGenericOverloadPick(cc, d, targs, oargv, &oloc, fname, len, at);
+        return parseGenericCallWith(cc, pick, oargv, &oloc, fname, len);
+    }
     Ast *inst = parseGenericFuncInstance(cc, d, targs, at);
     cctrlTokenExpect(cc, '(');
     ParseCallLoc loc = parseCallLocStart(cc, fname, len);
@@ -2961,6 +3006,10 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
                 if (pick->flags & AST_FLAG_OVERLOAD) parseCheckOverloadAccess(cc, pick, fname, len, &gloc);
                 return parseGenericCallWith(cc, pick, gargv, &gloc, fname, len);
             }
+        }
+        if (generic->overloaded) {
+            Ast *pick = parseGenericOverloadPick(cc, generic, NULL, gargv, &gloc, fname, len, at);
+            return parseGenericCallWith(cc, pick, gargv, &gloc, fname, len);
         }
         char *why = NULL;
         Vec *targs = parseGenericInfer(cc, generic, gargv, &why);
