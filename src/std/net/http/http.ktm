@@ -1,5 +1,5 @@
 module http;
-import cstr, json, libc, mem, net, reflect, str;
+import cstr, json, libc, log, mem, net, reflect, str, validate;
 
 /* HTTP/1.1 servers for REST APIs, the Go way:
  *
@@ -14,7 +14,8 @@ import cstr, json, libc, mem, net, reflect, str;
  * body, values from http.decode) is freed by the module when the handler
  * returns: nothing in a handler needs freeing unless the handler itself
  * allocated it. A handler that throws gets a 500 reply (and a log line), a
- * json.ERR_DECODE gets a 400 with the decode message. */
+ * json.ERR_DECODE gets a 400 with the decode message, and http.decodeValid's
+ * validate.ERR_INVALID a 422 with the field errors as JSON. */
 
 /* A function that answers one request */
 pub type Handler = fn(Writer *w, Request *r) void;
@@ -139,6 +140,7 @@ pub struct Request {
     Arena arena;
     i64 ncleanups;
     reflect.Value cleanups[MAX_CLEANUPS];
+    u8[] invalid;      /* decodeValid's 422 body, in the arena */
 };
 
 /* n bytes that live until the request is answered (zeroed) */
@@ -295,6 +297,7 @@ static void requestDone(Request *r)
         json.free(r.cleanups[i]);
     }
     r.ncleanups = 0;
+    r.invalid = "";
     arenaReset(&r.arena);
 }
 
@@ -409,6 +412,48 @@ pub i64 Request.getInt(u8[] key, i64 def = 0)
 pub bool Request.has(u8[] key)
 {
     return findValue(self, key) != null;
+}
+
+/* The body as JSON in a T, checked with validate.check: `Bookmark b =
+ * http.decodeValid<Bookmark>(r);`. Bad JSON is a 400 as with decode; a
+ * value that breaks its fields' rules throws validate.ERR_INVALID, which
+ * the server (and a Mux in a test) answers with a 422 and
+ * {"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}. */
+pub T decodeValid<T>(Request *r, i64 flags = 0)
+{
+    T out = decode<T>(r, flags);
+    validate.Errors errs;
+    defer errs.free();
+    if (!validate.check(reflect.of(out), &errs)) {
+        String body = errs.toJson();
+        u8 *keep = r.alloc(body.len);
+        mem.copy(keep, body.ptr, body.len);
+        r.invalid = keep[0:body.len];
+        body.free();
+        String msg = errs.message();
+        defer msg.free();
+        throw(validate.ERR_INVALID, "%s", msg.cstr());
+    }
+    return out;
+}
+
+/* The reply to a handler's throw e, replacing what it had started:
+ * ERR_DECODE 400, ERR_INVALID 422, anything else a log line and a 500 */
+static void answerThrow(Writer *w, Request *r, Error e)
+{
+    bool close = w.close, head = w.head;
+    writerReset(w);
+    w.close = close;
+    w.head = head;
+    if (e.code == json.ERR_DECODE) {
+        w.error(400, cstr.view(e.message));
+    } else if (e.code == validate.ERR_INVALID && r.invalid.len) {
+        w.jsonText(422, r.invalid);
+    } else {
+        log.error("http: %s %s: the handler threw 0x%x at %s:%d: %s",
+                  r.method, r.path, e.code, e.file, e.line, e.message);
+        w.error(500, "internal server error");
+    }
 }
 
 /* A request for tests: method and target ("/users/7?full=1") with a body,

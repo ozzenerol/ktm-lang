@@ -265,6 +265,9 @@ itself is its own to free.</p>
   <li>A handler that throws gets a <code>500</code> reply with <code>{"error":"internal server error"}</code>, and the error goes
   to the log with its file and line. The server carries on.</li>
   <li>A <code>json.ERR_DECODE</code> (bad JSON in <code>http.decode</code>) gets a <code>400</code> with the decode message.</li>
+  <li>A body <code>http.decodeValid</code> rejects gets a <code>422</code> with the field errors as JSON.</li>
+  <li>A <code>Mux</code> answers these itself, so a test through <code>mux.serve</code> with <code>http.testRequest</code>
+  and <code>http.recorder()</code> sees the same <code>400</code>, <code>422</code> and <code>500</code> as a client.</li>
   <li>Handlers run on several threads at once: what they share needs the <code>atomic</code> module or a lock.</li>
 </ul>
 
@@ -278,6 +281,7 @@ itself is its own to free.</p>
   <tr><td><code>r.header("Authorization")</code>, <code>r.hasHeader(name)</code></td><td>a header by name, any case</td></tr>
   <tr><td><code>r.remoteAddr()</code>, <code>r.remotePort()</code></td><td>the client's IP address (<code>"203.0.113.9"</code>, <code>"::1"</code>) and port; behind a proxy, the proxy's. A test request's are <code>192.0.2.1</code> and <code>1234</code>; <code>r.setRemoteAddr(ip, port)</code> changes them</td></tr>
   <tr><td><code>http.decode&lt;T&gt;(r)</code></td><td>the body as JSON in a <code>T</code>, freed after the reply</td></tr>
+  <tr><td><code>http.decodeValid&lt;T&gt;(r)</code></td><td>the same, then checked with <a href="lib-validate.html"><code>validate</code></a>'s field rules: a body that breaks one is answered <code>422</code> with <code>{"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}</code></td></tr>
   <tr><td><code>r.app</code></td><td>what <code>http.listen</code> was given as <code>app</code>: the program's own state</td></tr>
   <tr><td><code>r.alloc(n)</code>, <code>r.unescape(s)</code></td><td>memory that lives until the reply; <code>%XX</code> decoding</td></tr>
 </table>
