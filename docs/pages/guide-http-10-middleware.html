@@ -1,0 +1,78 @@
+<!-- title: 10. Middleware -->
+<h1>10. Middleware</h1>
+<p class="lede">Shelf is safe in the ways chapters 8 and 9 cover, but anyone can still try a million passwords, a
+browser app on another origin can't call it, and logs can't follow one request through the system. Middleware fixes
+all three without touching a handler.</p>
+
+<h2>Settings</h2>
+<pre><code>struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
+    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
+};
+
+Settings gSettings;</code></pre>
+<pre><code>SHELF_WEB_ORIGIN=http://localhost:5173</code></pre>
+
+<h2>The middleware</h2>
+<pre><code>    http.Mux mux;
+    if (gSettings.trustedProxies.len) { middleware.realIp(&amp;mux, gSettings.trustedProxies); }
+    middleware.requestId(&amp;mux);
+    if (gSettings.webOrigin.len) {
+        middleware.CorsOptions cors;
+        cors.origins = gSettings.webOrigin;
+        cors.expose = "X-Request-Id";
+        middleware.cors(&amp;mux, &amp;cors);
+    }
+    middleware.rateLimit(&amp;mux, 300, 60);            /* any client: 300 requests a minute */
+
+    mux.handle("POST /users", &amp;signup);
+    http.Mux *logins = mux.group("/sessions");
+    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
+    logins.handle("POST", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);</code></pre>
+<ul class="rules">
+  <li><b>Real IP</b> comes first, so the rest see the client and not the load balancer. It only believes
+  <code>X-Forwarded-For</code> from the proxies you name: anyone else could write anything in it.</li>
+  <li><b>Request IDs</b>: each request gets one (or keeps the client's <code>X-Request-Id</code>), sent back in the reply.
+  Put it in your log lines and a user's bug report leads straight to them.</li>
+  <li><b>CORS</b> tells browsers which other sites' pages may call the API. A browser asks first with an
+  <code>OPTIONS</code> request, which the middleware answers itself.</li>
+  <li><b>Rate limits</b> are per client address. The whole API allows 300 requests a minute; logging in, 5. The login
+  limit is a group of its own on <code>/sessions</code>, next to the group for logging out: two groups may share a
+  prefix, each with its own routes and middleware.</li>
+</ul>
+<p>Everything else stays: a handler that throws is still a logged 500, and the access log still writes one line per
+request (<a href="lib-http-middleware.html">HTTP middleware</a> lists what each one does).</p>
+
+<h2>Try it</h2>
+<pre><code>$ for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code} " -X POST localhost:8080/sessions \
+      -d '{"email": "ada@example.com", "password": "guess"}'; done
+401 401 401 401 401 429
+
+$ curl -i -X POST localhost:8080/sessions -d '{}'
+HTTP/1.1 429 Too Many Requests
+RateLimit-Limit: 5
+RateLimit-Remaining: 0
+Retry-After: 12
+...
+
+$ curl -i -X OPTIONS localhost:8080/bookmarks -H 'Origin: http://localhost:5173' \
+       -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: authorization, content-type'
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: http://localhost:5173
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, HEAD
+Access-Control-Allow-Headers: authorization, content-type
+Access-Control-Max-Age: 600
+
+$ curl -i -H 'X-Request-Id: trace-42' localhost:8080/bookmarks
+HTTP/1.1 401 Unauthorized
+X-Request-Id: trace-42
+...</code></pre>
+<p>A 429 reply carries both limits' <code>RateLimit-*</code> headers, the API's and the login's; the stricter one
+answered.</p>
+<p>Next: testing (coming).</p>

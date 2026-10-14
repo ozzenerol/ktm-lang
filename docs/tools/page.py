@@ -115,6 +115,7 @@ NAV = [
         ("guide-http-07-search.html", "7. Tags, search and pages"),
         ("guide-http-08-users.html", "8. Users and sessions"),
         ("guide-http-09-sharing.html", "9. Sharing"),
+        ("guide-http-10-middleware.html", "10. Middleware"),
     ]),
     ("Reference", [
         ("stdlib.html", "Library reference"),
