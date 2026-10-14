@@ -11,6 +11,7 @@ pub struct Options {
     i64 readTimeoutMs;    /* a request that started must arrive within this (0: 30 s) */
     i64 idleTimeoutMs;    /* a kept-alive connection with no request is closed after (0: 120 s) */
     bool noSignals;       /* don't make SIGINT and SIGTERM stop the server */
+    bool accessLog;       /* a log.info line per request: method target status bytes time */
 };
 
 /* A running server: what every connection reads */
@@ -21,6 +22,7 @@ struct Server {
     i64 maxBody;
     i64 readMs;
     i64 idleMs;
+    bool accessLog;
 };
 
 /* One connection: its buffers live as long as it does */
@@ -353,6 +355,7 @@ static void dispatch(Conn *c, Request *r, Writer *w)
     w.head = r.method.len == 4 && libc.memcmp(r.method.ptr, "HEAD", 4) == 0;
     w.close = !r.keepAlive;
     r.app = c.srv.app;
+    i64 t0 = c.srv.accessLog ? date.monoNs() : 0;
     try {
         c.srv.mux.serve(w, r);
     } catch (Error e) {
@@ -368,12 +371,22 @@ static void dispatch(Conn *c, Request *r, Writer *w)
             w.error(500, "internal server error");
         }
     }
+    if (c.srv.accessLog) { accessLine(r, w, t0); }
     try {
         requestDone(r);
     } catch (Error e) {
         log.error("http: freeing the request's values threw at %s:%d: %s", e.file, e.line, e.message);
     }
     writeReply(c, w);
+}
+
+/* The access log's line for r: "GET /users/7?full=1 200 41 0.120ms" */
+static void accessLine(Request *r, Writer *w, i64 t0)
+{
+    f64 ms = (f64)(date.monoNs() - t0) / 1000000.0;
+    i64 bytes = w.head ? 0 : w.body.len;
+    log.info("%s %s%s%s %d %d %.3fms", r.method, r.path, r.rawQuery.len ? "?" : "", r.rawQuery,
+             w.code ? w.code : 200, bytes, ms);
 }
 
 /* One connection: read requests, answer each, until it closes */
@@ -474,6 +487,7 @@ pub i32 listen(i32 port, Mux *mux, void *app = null, Options *opts = null)
     s.maxBody = o.maxBodyBytes > 0 ? o.maxBodyBytes : 10 * 1024 * 1024;
     s.readMs = o.readTimeoutMs > 0 ? o.readTimeoutMs : 30000;
     s.idleMs = o.idleTimeoutMs > 0 ? o.idleTimeoutMs : 120000;
+    s.accessLog = o.accessLog;
     u8[] bind = o.bindaddr.len ? o.bindaddr : "*";
     signal.handle(libc.SIGPIPE, libc.SIG_IGN);
     if (!o.noSignals) {
