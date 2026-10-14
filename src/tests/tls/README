@@ -1,0 +1,3 @@
+Certificates for test 784 (net.tls) only: a CA, a server certificate it signed for
+localhost and 127.0.0.1, and an unrelated CA. Valid for 100 years. The keys are
+public test keys: never use them for anything else.

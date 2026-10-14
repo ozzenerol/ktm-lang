@@ -10,6 +10,9 @@
 #   <prefix>/lib/libktm.a
 #   <prefix>/lib/libktm.so.0.0.1   (Linux)
 #   <prefix>/lib/libktm.0.0.1.dylib (macOS)
+#   <prefix>/lib/libktmtls.a, libktmtls.so.0.0.1 / libktmtls.0.0.1.dylib
+#                                    (net.tls: mbedTLS, for the programs
+#                                     that import it)
 #   <prefix>/share/ktm/vim/         (Vim/Neovim syntax, filetype, ftplugin)
 #
 # Two deliberate details, both load-bearing:
@@ -58,10 +61,13 @@ SRC=$(cd -- "$(dirname -- "$0")" && pwd)
 # contains.
 if [ -f "$SRC/lib/libktm.so.0.0.1" ]; then
     SHLIB=libktm.so.0.0.1
+    TLSLIB=libktmtls.so.0.0.1
 elif [ -f "$SRC/lib/libktm.0.0.1.dylib" ]; then
     SHLIB=libktm.0.0.1.dylib
+    TLSLIB=libktmtls.0.0.1.dylib
 elif [ "$UNINSTALL" -eq 1 ]; then
     SHLIB=
+    TLSLIB=
 else
     echo "install.sh: no libktm shared library in $SRC/lib - is this archive complete?" >&2
     exit 1
@@ -72,7 +78,10 @@ if [ "$UNINSTALL" -eq 1 ]; then
              "$PREFIX/include/std.ktmh" \
              "$PREFIX/lib/libktm.a" \
              "$PREFIX/lib/libktm.so.0.0.1" \
-             "$PREFIX/lib/libktm.0.0.1.dylib"; do
+             "$PREFIX/lib/libktm.0.0.1.dylib" \
+             "$PREFIX/lib/libktmtls.a" \
+             "$PREFIX/lib/libktmtls.so.0.0.1" \
+             "$PREFIX/lib/libktmtls.0.0.1.dylib"; do
         if [ -e "$f" ]; then
             rm -f "$f" && echo "removed $f"
         fi
@@ -128,6 +137,8 @@ for d in "$SRC"/modules/*/; do
 done
 install_file "$SRC/lib/libktm.a"    "$PREFIX/lib/libktm.a"      644
 install_file "$SRC/lib/$SHLIB"      "$PREFIX/lib/$SHLIB"        755
+install_file "$SRC/lib/libktmtls.a" "$PREFIX/lib/libktmtls.a"   644
+install_file "$SRC/lib/$TLSLIB"     "$PREFIX/lib/$TLSLIB"       755
 if [ -d "$SRC/vim" ] && mkdir -p "$PREFIX/share/ktm" 2>/dev/null; then
     rm -rf "$PREFIX/share/ktm/vim"
     cp -R "$SRC/vim" "$PREFIX/share/ktm/vim"
@@ -141,6 +152,7 @@ fi
 if [ "$SHLIB" != "${SHLIB%.dylib}" ] && command -v xattr >/dev/null 2>&1; then
     xattr -d com.apple.quarantine "$PREFIX/bin/ktm" 2>/dev/null || true
     xattr -d com.apple.quarantine "$PREFIX/lib/$SHLIB" 2>/dev/null || true
+    xattr -d com.apple.quarantine "$PREFIX/lib/$TLSLIB" 2>/dev/null || true
 fi
 
 echo

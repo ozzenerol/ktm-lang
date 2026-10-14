@@ -45,6 +45,7 @@ MODULES = [
     ("atomic",  "Atomics",           "Atomic operations on integers and pointers shared between threads."),
     ("net",     "Networking",        "Sockets and address resolution."),
     ("net.http", "HTTP",             "HTTP/1.1 servers: a Mux of Go-style patterns, handlers, JSON replies."),
+    ("net.tls", "TLS",               "TLS connections, client and server (mbedTLS inside): dial, verify, read, write."),
     ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
     ("log",     "Logging",           "Leveled logging to stderr or a file, with size rotation and thread safety."),
     ("coro",    "Coroutines",        "Functions that pause and resume on their own stacks."),
@@ -67,7 +68,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
-    "log": "lib-logging.html", "net.http": "lib-http.html",
+    "log": "lib-logging.html", "net.http": "lib-http.html", "net.tls": "lib-tls.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }
