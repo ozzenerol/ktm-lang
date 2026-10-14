@@ -6166,6 +6166,7 @@ typedef struct GenericHead {
     Lexeme *method;
     Vec *params;     /* AoStr * */
     int is_pub;
+    Lexeme *owner;      /* GEN_FUNC written as `Owner.name<...>(` */
 } GenericHead;
 
 /* Does the declaration starting at `first` (taken) declare a generic:
@@ -6209,6 +6210,10 @@ static int parseGenericHead(Cctrl *cc, Lexeme *first, GenericHead *h) {
         h->params = params;
         h->name = t;
         if (tokenPunctIs(after, '(')) {
+            /* `S.f<V>(...)`: a method with type parameters of its own */
+            if (i >= 2 && tokenPunctIs(L[i - 1], '.') && L[i - 2]->tk_type == TK_IDENT) {
+                h->owner = L[i - 2];
+            }
             h->kind = GEN_FUNC;
             return 1;
         }
@@ -6258,6 +6263,13 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
     if (!cc->generic_funcs) cc->generic_funcs = mapNew(16, &map_asttype_type);
     if (!cc->generic_methods) cc->generic_methods = vecNew(&vec_unsigned_long_type);
 
+    if (h.owner) {
+        cctrlRaiseExceptionAt(cc, h.name->line, h.name->col, h.name->len,
+                              "`%.*s.%.*s<...>`: a method can't have type parameters of its "
+                            "own yet; write a generic function, as in `void %.*s<...>(%.*s *s, ...)`",
+                            h.owner->len, h.owner->start, h.name->len, h.name->start,
+                            h.name->len, h.name->start, h.owner->len, h.owner->start);
+    }
     if (h.kind == GEN_METHOD) {
         AstType *tmpl = cctrlGetKeyWord(cc, h.name->start, h.name->len);
         if (!tmpl || !tmpl->generic || tmpl->generic_args) {
@@ -6797,9 +6809,12 @@ Vec *parseGenericInfer(Cctrl *cc, GenericDef *d, Vec *argv, char **why) {
     Ast *pattern = parseGenericFuncInstance(cc, d, stand, NULL);
     Vec *params = pattern->params;
     Map *b = mapNew(8, &map_asttype_type);
-    for (u64 i = 0; params && i < params->size && argv && i < argv->size; ++i) {
+    /* argv has no arguments for @caller parameters: they are filled in
+     * once the instance is known (parseGenericCallWith) */
+    for (u64 i = 0, j = 0; params && i < params->size && argv && j < argv->size; ++i) {
         Ast *p = params->entries[i];
-        Ast *arg = argv->entries[i];
+        if (p && (p->flags & AST_FLAG_CALLER)) continue;
+        Ast *arg = argv->entries[j++];
         if (!p || !arg || arg->kind == AST_PLACEHOLDER || !arg->type) continue;
         if (p->kind == AST_LVAR && (p->flags & AST_FLAG_VARARGS)) break;
         AstType *pt = p->kind == AST_DEFAULT_PARAM ? p->declvar->type : p->type;
