@@ -49,6 +49,7 @@ MODULES = [
     ("encoding.hex", "Hex",          "Hexadecimal encoding and decoding."),
     ("crypto", "Cryptography",       "Random bytes, hashes, HMAC, HKDF, PBKDF2, AES-GCM and ChaCha20-Poly1305, ECDSA P-256."),
     ("uuid", "UUIDs",                "UUIDs, v4 and time-ordered v7: make, format, parse."),
+    ("net.url", "URLs",              "URLs: parse, build, query strings, resolving links (RFC 3986)."),
     ("net.tls", "TLS",               "TLS connections, client and server (mbedTLS inside): dial, verify, read, write."),
     ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
     ("log",     "Logging",           "Leveled logging to stderr or a file, with size rotation and thread safety."),
@@ -72,7 +73,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
-    "log": "lib-logging.html", "net.http": "lib-http.html", "net.tls": "lib-tls.html", "uuid": "lib-uuid.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
+    "log": "lib-logging.html", "net.http": "lib-http.html", "net.tls": "lib-tls.html", "net.url": "lib-url.html", "uuid": "lib-uuid.html", "crypto": "lib-crypto.html", "encoding.base64": "lib-encoding.html", "encoding.hex": "lib-encoding.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }
