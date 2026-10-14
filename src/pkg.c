@@ -504,6 +504,124 @@ static char *pkgReplaceDir(PkgMod *m, const char *dir) {
     return mprintf("%s/%s", m->dir, dir);
 }
 
+/* ---- the build list (minimal version selection, as Go's) ----
+ * Every requirement reachable from the project's ktm.mod through its
+ * dependencies' ktm.mod files, the highest version of each path: a
+ * dependency always gets at least what it asked for, and nothing newer
+ * than someone asked for. One major version per path. */
+
+typedef struct PkgSel {
+    char *path;
+    char *version;
+    char *by;           /* who requires that version: the project, or "path version" */
+} PkgSel;
+
+typedef struct PkgList {
+    PkgSel *sel;
+    int n;
+} PkgList;
+
+static PkgReplace *pkgReplaceFor(PkgMod *m, const char *path, const char *version) {
+    PkgReplace *rep = NULL;
+    for (int i = 0; i < m->rep_len; ++i) {
+        PkgReplace *r = &m->rep[i];
+        if (strcmp(r->path, path)) continue;
+        if (r->version && strcmp(r->version, version)) continue;
+        /* a replace of this version wins over one of every version */
+        if (!rep || r->version) rep = r;
+    }
+    return rep;
+}
+
+/* Where path@version's files are, as the project sees them: a replace's
+ * directory or the cache's (which may not be downloaded yet) */
+static char *pkgModuleRoot(PkgMod *m, const char *path, const char *version) {
+    PkgReplace *rep = pkgReplaceFor(m, path, version);
+    if (rep && !rep->new_version) return pkgReplaceDir(m, rep->new_path);
+    if (rep) return mprintf("%s/%s@%s", pkgCacheDir(), rep->new_path, rep->new_version);
+    return mprintf("%s/%s@%s", pkgCacheDir(), path, version);
+}
+
+static PkgSel *pkgListFind(PkgList *l, const char *path) {
+    for (int i = 0; i < l->n; ++i) {
+        if (!strcmp(l->sel[i].path, path)) return &l->sel[i];
+    }
+    return NULL;
+}
+
+/* The build list from roots (path, version pairs, required by `by`):
+ * NULL with *err on two majors of one path. A dependency not downloaded
+ * yet adds nothing (its own requirements are unknown). */
+static PkgList *pkgBuildListFrom(PkgMod *m, PkgReq *roots, int nroots, char **err) {
+    PkgList *l = calloc(1, sizeof(PkgList));
+    typedef struct { char *path, *version, *by; } Node;
+    Node *q = NULL;
+    int qn = 0, qcap = 0, qi = 0;
+    char **seen = NULL;
+    int nseen = 0;
+#define PKG_PUSH(P, V, B) do { \
+        if (qn == qcap) { qcap = qcap ? qcap * 2 : 16; q = realloc(q, sizeof(Node) * qcap); } \
+        q[qn].path = (P); q[qn].version = (V); q[qn].by = (B); qn++; } while (0)
+    for (int i = 0; i < nroots; ++i) PKG_PUSH(roots[i].path, roots[i].version, m->path);
+    while (qi < qn) {
+        Node nd = q[qi++];
+        if (!strcmp(nd.path, m->path)) continue;
+        PkgSel *sel = pkgListFind(l, nd.path);
+        if (!sel) {
+            l->sel = realloc(l->sel, sizeof(PkgSel) * (l->n + 1));
+            sel = &l->sel[l->n++];
+            sel->path = nd.path;
+            sel->version = nd.version;
+            sel->by = nd.by;
+        } else if (strcmp(pkgMajor(sel->version), pkgMajor(nd.version))) {
+            *err = mprintf("one major version per package: %s requires %s %s, %s requires %s %s",
+                           sel->by, sel->path, sel->version, nd.by, nd.path, nd.version);
+            return NULL;
+        } else if (pkgVersionCmp(nd.version, sel->version) > 0) {
+            sel->version = nd.version;
+            sel->by = nd.by;
+        }
+        char *key = mprintf("%s@%s", nd.path, nd.version);
+        int done = 0;
+        for (int i = 0; i < nseen && !done; ++i) done = !strcmp(seen[i], key);
+        if (done) continue;
+        seen = realloc(seen, sizeof(char *) * (nseen + 1));
+        seen[nseen++] = key;
+        char *file = mprintf("%s/ktm.mod", pkgModuleRoot(m, nd.path, nd.version));
+        struct stat st;
+        if (stat(file, &st) != 0) continue;
+        char *derr = NULL;
+        PkgMod *dep = pkgModLoad(file, &derr);
+        if (!dep) {
+            *err = derr;
+            return NULL;
+        }
+        char *by = mprintf("%s %s", nd.path, nd.version);
+        for (int i = 0; i < dep->req_len; ++i) PKG_PUSH(dep->req[i].path, dep->req[i].version, by);
+    }
+#undef PKG_PUSH
+    free(q);
+    return l;
+}
+
+static PkgList *pkgBuildList(PkgMod *m, char **err) {
+    return pkgBuildListFrom(m, m->req, m->req_len, err);
+}
+
+/* The build list of the project in dir, made once per program */
+static PkgList *pkgBuildListFor(PkgMod *m, char **err) {
+    static PkgMod *last_mod = NULL;
+    static PkgList *last = NULL;
+    static char *last_err = NULL;
+    if (last_mod != m) {
+        last_mod = m;
+        last_err = NULL;
+        last = pkgBuildList(m, &last_err);
+    }
+    if (!last) *err = last_err;
+    return last;
+}
+
 char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
     if (!pkgValidPath(path, 0)) {
         *err = mprintf("\"%s\" is not a package path, as in \"github.com/user/repo\"", path);
@@ -521,11 +639,13 @@ char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
     if ((rest = pkgUnder(path, m->path))) {
         dir = mprintf("%s%s", m->dir, rest);
     } else {
-        PkgReq *best = NULL;
-        for (int i = 0; i < m->req_len; ++i) {
-            if (pkgUnder(path, m->req[i].path) &&
-                (!best || strlen(m->req[i].path) > strlen(best->path))) {
-                best = &m->req[i];
+        PkgList *l = pkgBuildListFor(m, err);
+        if (!l) return NULL;
+        PkgSel *best = NULL;
+        for (int i = 0; i < l->n; ++i) {
+            if (pkgUnder(path, l->sel[i].path) &&
+                (!best || strlen(l->sel[i].path) > strlen(best->path))) {
+                best = &l->sel[i];
             }
         }
         if (!best) {
@@ -533,14 +653,7 @@ char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
             return NULL;
         }
         rest = path + strlen(best->path);
-        PkgReplace *rep = NULL;
-        for (int i = 0; i < m->rep_len; ++i) {
-            PkgReplace *r = &m->rep[i];
-            if (strcmp(r->path, best->path)) continue;
-            if (r->version && strcmp(r->version, best->version)) continue;
-            /* a replace of this version wins over one of every version */
-            if (!rep || r->version) rep = r;
-        }
+        PkgReplace *rep = pkgReplaceFor(m, best->path, best->version);
         if (rep && !rep->new_version) {
             dir = mprintf("%s%s", pkgReplaceDir(m, rep->new_path), rest);
         } else {
@@ -736,14 +849,7 @@ static void pkgModDropReq(PkgMod *m, const char *path) {
 
 /* Is path replaced by a local directory (nothing to download)? */
 static PkgReplace *pkgModReplaceOf(PkgMod *m, const char *path, const char *version) {
-    PkgReplace *rep = NULL;
-    for (int i = 0; i < m->rep_len; ++i) {
-        PkgReplace *r = &m->rep[i];
-        if (strcmp(r->path, path)) continue;
-        if (r->version && strcmp(r->version, version)) continue;
-        if (!rep || r->version) rep = r;
-    }
-    return rep;
+    return pkgReplaceFor(m, path, version);
 }
 
 /* Downloads path@version (or what replaces it) and checks its hash, then
@@ -789,6 +895,8 @@ static int pkgFetchTree(PkgMod *m, PkgSum *s, const char *path, const char *vers
     return 1;
 }
 
+static int pkgSyncReqs(PkgMod *m);
+
 static int pkgGet(int argc, char **argv) {
     if (argc < 1) return pkgFail("usage: ktm get <path>[@version|@latest|@none] ...");
     int rc = 0;
@@ -797,6 +905,8 @@ static int pkgGet(int argc, char **argv) {
     char *err = NULL;
     PkgSum *s = pkgSumLoad(m, &err);
     if (!s) return pkgFail("%s", err);
+    PkgReq *done = NULL;
+    int ndone = 0;
     for (int i = 0; i < argc; ++i) {
         char *arg = mprintf("%s", argv[i]);
         char *at = strchr(arg, '@');
@@ -827,8 +937,20 @@ static int pkgGet(int argc, char **argv) {
         }
         pkgModSetReq(m, path, version, 0);
         if (!pkgFetchTree(m, s, path, version, 0)) return 1;
-        if (!old) fprintf(stderr, "ktm: added %s %s\n", path, version);
-        else if (strcmp(old, version)) fprintf(stderr, "ktm: %s %s -> %s\n", path, old, version);
+        done = realloc(done, sizeof(PkgReq) * (ndone + 1));
+        done[ndone].path = path;
+        done[ndone].version = old;      /* what it was */
+        ndone++;
+    }
+    if (!pkgSyncReqs(m)) return 1;
+    /* what changed, as the build will use it */
+    for (int i = 0; i < ndone; ++i) {
+        PkgReq *now = pkgModReq(m, done[i].path);
+        if (!now) continue;
+        if (!done[i].version) fprintf(stderr, "ktm: added %s %s\n", now->path, now->version);
+        else if (strcmp(done[i].version, now->version)) {
+            fprintf(stderr, "ktm: %s %s -> %s\n", now->path, done[i].version, now->version);
+        }
     }
     if (!pkgModWrite(m)) return pkgFail("can't write %s: %s", m->file, strerror(errno));
     if (!pkgSumWrite(m, s)) return pkgFail("can't write ktm.sum: %s", strerror(errno));
@@ -854,12 +976,324 @@ static int pkgModDownload(int argc) {
     return 0;
 }
 
+/* ktm.mod's requirements raised to what the build uses: a dependency
+ * that needs a newer version of something gets it (a downgrade below
+ * that is noted, not done). 0 on an error (reported). */
+static int pkgSyncReqs(PkgMod *m) {
+    char *err = NULL;
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err) == 0;
+    for (int i = 0; i < m->req_len; ++i) {
+        PkgSel *sel = pkgListFind(l, m->req[i].path);
+        if (sel && pkgVersionCmp(sel->version, m->req[i].version) > 0) {
+            fprintf(stderr, "ktm: %s stays at %s: %s requires it\n", m->req[i].path, sel->version, sel->by);
+            m->req[i].version = strdup(sel->version);
+        }
+    }
+    for (int i = 0; i < l->n; ++i) {
+        if (!pkgModReq(m, l->sel[i].path)) pkgModSetReq(m, l->sel[i].path, l->sel[i].version, 1);
+    }
+    return 1;
+}
+
+/* ---- ktm mod tidy, why, list, verify ---- */
+
+typedef struct PkgImport {
+    char *path;
+    char *file;
+    int line;
+} PkgImport;
+
+/* The quoted imports of a ktm source: `import "a/b";`, `import x = "a";`,
+ * lists. Comments and other strings are skipped. */
+static void pkgScanImports(const char *file, PkgImport **out, int *n) {
+    FILE *fp = fopen(file, "r");
+    if (!fp) return;
+    AoStr *b = aoStrNew();
+    char chunk[4096];
+    size_t k;
+    while ((k = fread(chunk, 1, sizeof(chunk), fp)) > 0) aoStrCatLen(b, chunk, k);
+    fclose(fp);
+    const char *p = b->data;
+    int line = 1, in_import = 0, stmt_start = 1;
+    while (*p) {
+        if (*p == '\n') { line++; p++; continue; }
+        if (p[0] == '/' && p[1] == '/') { while (*p && *p != '\n') p++; continue; }
+        if (p[0] == '/' && p[1] == '*') {
+            p += 2;
+            while (*p && !(p[0] == '*' && p[1] == '/')) { if (*p == '\n') line++; p++; }
+            if (*p) p += 2;
+            continue;
+        }
+        if (*p == '"' || *p == '\'') {
+            char q = *p++;
+            const char *st = p;
+            while (*p && *p != q) { if (*p == '\\' && p[1]) p++; if (*p == '\n') line++; p++; }
+            if (in_import && q == '"') {
+                *out = realloc(*out, sizeof(PkgImport) * (*n + 1));
+                (*out)[*n].path = pkgDup(st, (int)(p - st));
+                (*out)[*n].file = strdup(file);
+                (*out)[*n].line = line;
+                (*n)++;
+            }
+            if (*p) p++;
+            stmt_start = 0;
+            continue;
+        }
+        if (isspace((unsigned char)*p)) { p++; continue; }
+        if (stmt_start && !strncmp(p, "import", 6) && !isalnum((unsigned char)p[6]) && p[6] != '_') {
+            in_import = 1;
+            p += 6;
+            stmt_start = 0;
+            continue;
+        }
+        if (*p == ';' || *p == '{' || *p == '}') {
+            in_import = 0;
+            stmt_start = 1;
+            p++;
+            continue;
+        }
+        if (*p == '#') {           /* a directive: to the end of the line */
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        stmt_start = 0;
+        p++;
+    }
+    aoStrRelease(b);
+}
+
+/* Every .ktm file under dir (not hidden ones, nor another project's: a
+ * directory with its own ktm.mod) */
+static void pkgScanTree(const char *dir, int top, PkgImport **out, int *n) {
+    if (!top) {
+        struct stat st;
+        if (stat(mprintf("%s/ktm.mod", dir), &st) == 0) return;
+    }
+    DIR *d = opendir(dir);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        char *path = mprintf("%s/%s", dir, e->d_name);
+        struct stat st;
+        if (stat(path, &st) != 0) continue;
+        if (S_ISDIR(st.st_mode)) {
+            pkgScanTree(path, 0, out, n);
+        } else {
+            size_t len = strlen(e->d_name);
+            if (len > 4 && !strcmp(e->d_name + len - 4, ".ktm")) pkgScanImports(path, out, n);
+        }
+    }
+    closedir(d);
+}
+
+/* The requirement (from the build list) a package path falls under */
+static PkgSel *pkgSelFor(PkgList *l, const char *path) {
+    PkgSel *best = NULL;
+    for (int i = 0; l && i < l->n; ++i) {
+        if (pkgUnder(path, l->sel[i].path) && (!best || strlen(l->sel[i].path) > strlen(best->path))) {
+            best = &l->sel[i];
+        }
+    }
+    return best;
+}
+
+static int pkgReqCmp(const void *a, const void *b) {
+    const PkgReq *x = a, *y = b;
+    if (x->indirect != y->indirect) return x->indirect - y->indirect;
+    return strcmp(x->path, y->path);
+}
+
+/* Makes ktm.mod and ktm.sum match the code: requires what it imports
+ * (fetching the newest version of a new one), marks what only
+ * dependencies need indirect, drops what nothing needs */
+static int pkgModTidy(int argc) {
+    if (argc) return pkgFail("usage: ktm mod tidy");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgSum *s = pkgSumLoad(m, &err);
+    if (!s) return pkgFail("%s", err);
+    PkgImport *imps = NULL;
+    int nimp = 0;
+    pkgScanTree(m->dir, 1, &imps, &nimp);
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err);
+    /* the modules the code imports directly */
+    PkgReq *direct = NULL;
+    int ndirect = 0;
+    for (int i = 0; i < nimp; ++i) {
+        const char *path = imps[i].path;
+        if (!pkgValidPath(path, 0) || pkgUnder(path, m->path)) continue;
+        if (!pkgValidPath(path, 1)) {
+            fprintf(stderr, "ktm: %s:%d: \"%s\" is not a package path\n", imps[i].file, imps[i].line, path);
+            continue;
+        }
+        PkgSel *sel = pkgSelFor(l, path);
+        char *mod = sel ? sel->path : pkgRepoRoot(path);
+        char *ver = sel ? sel->version : NULL;
+        int dup = 0;
+        for (int j = 0; j < ndirect && !dup; ++j) dup = !strcmp(direct[j].path, mod);
+        if (dup) continue;
+        if (!ver) {
+            ver = pkgLatest(mod, &err);
+            if (!ver) return pkgFail("%s:%d: %s", imps[i].file, imps[i].line, err);
+            fprintf(stderr, "ktm: added %s %s\n", mod, ver);
+        }
+        direct = realloc(direct, sizeof(PkgReq) * (ndirect + 1));
+        memset(&direct[ndirect], 0, sizeof(PkgReq));
+        direct[ndirect].path = mod;
+        direct[ndirect].version = ver;
+        ndirect++;
+    }
+    /* download them (and what they need), then the list they make */
+    PkgMod tmp = *m;
+    tmp.req = NULL;
+    tmp.req_len = 0;
+    for (int j = 0; j < ndirect; ++j) pkgModSetReq(&tmp, direct[j].path, direct[j].version, 0);
+    for (int j = 0; j < ndirect; ++j) {
+        if (!pkgFetchTree(&tmp, s, direct[j].path, direct[j].version, 0)) return 1;
+    }
+    PkgList *nl = pkgBuildListFrom(&tmp, direct, ndirect, &err);
+    if (!nl) return pkgFail("%s", err);
+    for (int i = 0; i < m->req_len; ++i) {
+        if (!pkgListFind(nl, m->req[i].path)) fprintf(stderr, "ktm: dropped %s %s (nothing imports it)\n",
+                                                      m->req[i].path, m->req[i].version);
+    }
+    m->req = NULL;
+    m->req_len = 0;
+    for (int i = 0; i < nl->n; ++i) {
+        int is_direct = 0;
+        for (int j = 0; j < ndirect && !is_direct; ++j) is_direct = !strcmp(direct[j].path, nl->sel[i].path);
+        pkgModSetReq(m, nl->sel[i].path, nl->sel[i].version, !is_direct);
+    }
+    /* what the code imports first, then the indirect ones, each by path */
+    qsort(m->req, m->req_len, sizeof(PkgReq), pkgReqCmp);
+    /* ktm.sum: the versions in use */
+    PkgSum kept = {0};
+    for (int i = 0; i < s->len; ++i) {
+        PkgSel *sel = pkgListFind(nl, s->lines[i].path);
+        int used = sel && !strcmp(sel->version, s->lines[i].version);
+        for (int r = 0; !used && r < m->rep_len; ++r) {
+            PkgReplace *rp = &m->rep[r];
+            used = rp->new_version && !strcmp(rp->new_path, s->lines[i].path) &&
+                   !strcmp(rp->new_version, s->lines[i].version);
+        }
+        if (!used) continue;
+        kept.lines = realloc(kept.lines, sizeof(PkgSumLine) * (kept.len + 1));
+        kept.lines[kept.len++] = s->lines[i];
+    }
+    if (!pkgModWrite(m)) return pkgFail("can't write %s: %s", m->file, strerror(errno));
+    if (!pkgSumWrite(m, &kept)) return pkgFail("can't write ktm.sum: %s", strerror(errno));
+    return 0;
+}
+
+/* Why the project needs path: who imports it, who requires it */
+static int pkgModWhy(int argc, char **argv) {
+    if (argc != 1) return pkgFail("usage: ktm mod why <path>");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err);
+    const char *path = argv[0];
+    PkgImport *imps = NULL;
+    int nimp = 0, found = 0;
+    pkgScanTree(m->dir, 1, &imps, &nimp);
+    for (int i = 0; i < nimp; ++i) {
+        PkgSel *sel = pkgSelFor(l, imps[i].path);
+        if (!strcmp(imps[i].path, path) || (sel && !strcmp(sel->path, path))) {
+            printf("%s:%d imports \"%s\"\n", pkgShortPath(imps[i].file), imps[i].line, imps[i].path);
+            found = 1;
+        }
+    }
+    PkgSel *sel = pkgListFind(l, path);
+    if (sel) {
+        /* the chain of requirements down from the project */
+        printf("%s %s", sel->path, sel->version);
+        PkgSel *at = sel;
+        for (int hops = 0; hops < 64 && strcmp(at->by, m->path); ++hops) {
+            printf(" <- %s", at->by);
+            char *by = strdup(at->by);
+            char *sp = strchr(by, ' ');
+            if (sp) *sp = '\0';
+            at = pkgListFind(l, by);
+            if (!at) break;
+        }
+        printf(" <- %s (ktm.mod)\n", m->path);
+        found = 1;
+    }
+    if (!found) printf("%s isn't needed: nothing imports or requires it\n", path);
+    return 0;
+}
+
+/* The build list: what a build of the project uses */
+static int pkgModList(int argc) {
+    if (argc) return pkgFail("usage: ktm mod list");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err);
+    printf("%s\n", m->path);
+    for (int i = 0; i < l->n; ++i) {
+        PkgReplace *rep = pkgReplaceFor(m, l->sel[i].path, l->sel[i].version);
+        printf("%s %s", l->sel[i].path, l->sel[i].version);
+        if (rep) printf(" => %s%s%s", rep->new_path, rep->new_version ? " " : "", rep->new_version ? rep->new_version : "");
+        printf("\n");
+    }
+    return 0;
+}
+
+/* Checks every downloaded package in use against ktm.sum */
+static int pkgModVerify(int argc) {
+    if (argc) return pkgFail("usage: ktm mod verify");
+    int rc = 0;
+    PkgMod *m = pkgModHere(&rc);
+    if (!m) return rc;
+    char *err = NULL;
+    PkgSum *s = pkgSumLoad(m, &err);
+    if (!s) return pkgFail("%s", err);
+    PkgList *l = pkgBuildList(m, &err);
+    if (!l) return pkgFail("%s", err);
+    int bad = 0;
+    for (int i = 0; i < l->n; ++i) {
+        PkgReplace *rep = pkgReplaceFor(m, l->sel[i].path, l->sel[i].version);
+        if (rep && !rep->new_version) continue;          /* a local directory */
+        const char *path = rep ? rep->new_path : l->sel[i].path;
+        const char *ver = rep ? rep->new_version : l->sel[i].version;
+        char *dir = mprintf("%s/%s@%s", pkgCacheDir(), path, ver);
+        if (!pkgIsDir(dir)) {
+            printf("%s %s: not downloaded\n", path, ver);
+            bad = 1;
+            continue;
+        }
+        char *h = pkgDirHash(dir);
+        const char *want = NULL;
+        for (int j = 0; j < s->len; ++j) {
+            if (!strcmp(s->lines[j].path, path) && !strcmp(s->lines[j].version, ver)) want = s->lines[j].hash;
+        }
+        if (!want) { printf("%s %s: not in ktm.sum\n", path, ver); bad = 1; }
+        else if (!h || strcmp(h, want)) { printf("%s %s: CHANGED since it was downloaded\n", path, ver); bad = 1; }
+    }
+    if (!bad) printf("all packages verified\n");
+    return bad;
+}
+
 static int pkgModUsage(void) {
     fprintf(stderr,
             "usage: ktm mod <command>\n"
             "  init [path]   create ktm.mod for a new project in this directory\n"
             "  fmt           check ktm.mod and rewrite it in the standard layout\n"
-            "  download      fetch every package ktm.mod requires into the cache\n");
+            "  download      fetch every package ktm.mod requires into the cache\n"
+            "  tidy          make ktm.mod and ktm.sum match the imports\n"
+            "  why <path>    who imports and who requires a package\n"
+            "  list          the packages and versions a build uses\n"
+            "  verify        check the downloaded packages against ktm.sum\n");
     return 2;
 }
 
@@ -868,6 +1302,10 @@ static int pkgModCommand(int argc, char **argv) {
     if (!strcmp(argv[0], "init")) return pkgModInit(argc - 1, argv + 1);
     if (!strcmp(argv[0], "fmt")) return pkgModFmt(argc - 1);
     if (!strcmp(argv[0], "download")) return pkgModDownload(argc - 1);
+    if (!strcmp(argv[0], "tidy")) return pkgModTidy(argc - 1);
+    if (!strcmp(argv[0], "why")) return pkgModWhy(argc - 1, argv + 1);
+    if (!strcmp(argv[0], "list")) return pkgModList(argc - 1);
+    if (!strcmp(argv[0], "verify")) return pkgModVerify(argc - 1);
     if (!strcmp(argv[0], "help") || !strcmp(argv[0], "--help")) {
         pkgModUsage();
         return 0;

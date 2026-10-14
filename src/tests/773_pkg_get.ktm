@@ -92,8 +92,9 @@ i32 main() {
     line.free();
     want.free();
 
-    has("cd app && $K get example.com/lib/color@v1.0.0", "example.com/lib/color v1.1.0 -> v1.0.0", "a downgrade");
-    has("cd app && $K get example.com/lib/color@v1.2.0-rc.1", "v1.0.0 -> v1.2.0-rc.1", "a prerelease, asked for");
+    has("cd app && $K get example.com/lib/color@v1.0.0", "example.com/lib/color stays at v1.1.0: example.com/lib/paint v0.1.0 requires it",
+        "a downgrade below what a dependency needs stays (test 774 has more)");
+    has("cd app && $K get example.com/lib/color@v1.2.0-rc.1", "v1.1.0 -> v1.2.0-rc.1", "a prerelease, asked for");
     has("cd app && $K get example.com/lib/color@none", "removed example.com/lib/color v1.2.0-rc.1", "@none");
     has("cd app && $K get example.com/lib/nope", "can't read https://example.com/lib/nope", "no such repository");
     has("cd app && $K get example.com/lib/color@v9.9.9", "can't fetch example.com/lib/color v9.9.9", "no such version");
