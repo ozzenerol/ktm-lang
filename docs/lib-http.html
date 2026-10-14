@@ -202,7 +202,9 @@ that needs unescaping is copied into the request's arena) and rejects most route
 <code>mux.use(&amp;fn)</code> adds one; they run in the order they were added, for every request the mux serves,
 404s and 405s included.</p>
 <p><code>mux.group(prefix)</code> gives a <code>http.Mux *</code> whose patterns get the prefix in front
-(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A group's own
+(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A pattern with no path is
+the prefix itself: <code>"GET"</code> in group <code>"/bookmarks"</code> is <code>"GET /bookmarks"</code>, so a whole
+resource can sit behind the group's middleware. A group's own
 <code>use()</code> runs only for its routes, after the middlewares of the mux (and of the groups) it was made from.
 Groups can have groups. A group belongs to its mux: <code>mux.free()</code> frees it, and so does <code>http.listen</code>.</p>
 <pre data-run><code>import net.http, str;

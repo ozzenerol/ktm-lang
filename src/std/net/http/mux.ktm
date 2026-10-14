@@ -81,6 +81,23 @@ static void muxAdd(Mux *m, u8[] pattern, Handler h, u8[] dir, bool isFiles)
     /* "[METHOD ]/path" -> "[METHOD ]<prefix>/path" */
     i64 at = 0;
     while (at < pattern.len && pattern[at] != '/') { at++; }
+    if (at == pattern.len) {
+        /* no path: exactly the group's prefix ("GET" in group "/bookmarks"
+         * is "GET /bookmarks") */
+        u8[] method = str.trim(pattern);
+        i64 n = method.len + 1 + m.prefixLen;
+        u8 *full = mem.alloc(n);
+        defer mem.free(full);
+        i64 k = 0;
+        if (method.len) {
+            mem.copy(full, method.ptr, method.len);
+            full[method.len] = ' ';
+            k = method.len + 1;
+        }
+        mem.copy(full + k, m.prefix, m.prefixLen);
+        muxInsert(muxRoot(m), full[0:k + m.prefixLen], h, m, dir, isFiles);
+        return;
+    }
     i64 n = pattern.len + m.prefixLen;
     u8 *full = mem.alloc(n);
     defer mem.free(full);

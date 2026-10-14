@@ -1,5 +1,5 @@
 module http;
-import coro, cstr, date, json, libc, log, mem, signal;
+import coro, date, libc, log, mem, signal;
 
 /* How http.listen runs. A declared Options is all zero: every 0 means the
  * default in the comment. */
