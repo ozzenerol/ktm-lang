@@ -78,10 +78,54 @@ void asmEmitFunctionGlobal(Cctrl *cc, AoStr *buf, char *label) {
     }
 }
 
+/* Does generic definition d name the function whose (mangled) symbol is
+ * `sym`: a name in its tokens that, qualified with d's module, mangles
+ * to sym? */
+static int asmGenericNames(GenericDef *d, char *sym) {
+    AoStr *path = d->module_path;
+    if (!path || !d->toks) return 0;
+    for (u64 j = 0; j < d->toks->size; ++j) {
+        Lexeme *t = d->toks->entries[j];
+        if (t->tk_type != TK_IDENT) continue;
+        char *qual = mprintf("%s.%.*s", path->data, t->len, t->start);
+        char *mangled = astModuleMangle(qual, (int)strlen(qual));
+        int same = mangled && !strcmp(mangled, sym);
+        if (same) return 1;
+    }
+    return 0;
+}
+
+/* A `static` function of a module, in a library build, that one of the
+ * module's generics calls: the generic's instances are made in the
+ * programs that use it, which then call the function by its symbol, so
+ * it can't stay local to the library (the link failed with "undefined
+ * reference to net.http.arenaAlloc"). */
+static int asmStaticUsedByGeneric(Cctrl *cc, AoStr *fname) {
+    if (!cc->is_library || !fname) return 0;
+    MapIter it;
+    if (cc->generic_funcs) {
+        mapIterInit(cc->generic_funcs, &it);
+        while (mapIterNext(&it)) {
+            if (asmGenericNames(it.node->value, fname->data)) return 1;
+        }
+    }
+    if (cc->generic_structs) {
+        mapIterInit(cc->generic_structs, &it);
+        while (mapIterNext(&it)) {
+            if (asmGenericNames(it.node->value, fname->data)) return 1;
+        }
+    }
+    for (u64 i = 0; cc->generic_methods && i < cc->generic_methods->size; ++i) {
+        if (asmGenericNames(cc->generic_methods->entries[i], fname->data)) return 1;
+    }
+    return 0;
+}
+
 /* The symbol of a function about to be emitted: a `static` one stays
  * local to the object (no .globl / .weak), anything else is global. */
 void asmEmitFunctionSymbol(Cctrl *cc, AoStr *buf, char *label, Ast *func) {
-    if (func && (func->flags & AST_FLAG_STATIC)) {
+    if (func && (func->flags & AST_FLAG_STATIC) &&
+        !asmStaticUsedByGeneric(cc, func->fname)) {
         return;
     }
     /* A library function the header doesn't declare is internal */
