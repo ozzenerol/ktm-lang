@@ -71,7 +71,7 @@ pub void offload(fn(void *arg) void body, void *arg = null) {
         if (n == 1) { break; }
         if (n < 0 && os.errno() != libc.EINTR && os.errno() != libc.EAGAIN) { break; }
     }
-    libc.close(fds[0]);
+    close(fds[0]);      /* coro.close: the loop forgets the fd (its number comes back) */
     libc.close(fds[1]);
     i64 code = j.code;
     u8 *msg = j.message;
