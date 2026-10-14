@@ -66,6 +66,7 @@ set(SOURCES
     mempool.c
     parser.c
     pkg.c
+    pkgfetch.c
     prsasm.c
     prslib.c
     prsutil.c
