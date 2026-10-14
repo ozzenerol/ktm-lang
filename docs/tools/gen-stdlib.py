@@ -44,6 +44,7 @@ MODULES = [
     ("thread",  "Threads",           "pthreads helpers."),
     ("atomic",  "Atomics",           "Atomic operations on integers and pointers shared between threads."),
     ("net",     "Networking",        "Sockets and address resolution."),
+    ("net.http", "HTTP",             "HTTP/1.1 servers: a Mux of Go-style patterns, handlers, JSON replies."),
     ("signal",  "Signals",           "sigaction-based handlers and a clean-shutdown helper for poll loops."),
     ("log",     "Logging",           "Leveled logging to stderr or a file, with size rotation and thread safety."),
     ("coro",    "Coroutines",        "Functions that pause and resume on their own stacks."),
@@ -66,7 +67,7 @@ GUIDE = {
     "reflect": "lang-reflection.html", "thread": "lib-threads.html",
     "atomic": "lib-threads.html#atomics", "net": "lib-tcp.html",
     "signal": "lib-signals.html", "coro": "lib-coroutines.html",
-    "log": "lib-logging.html",
+    "log": "lib-logging.html", "net.http": "lib-http.html",
     "sql": "lib-sqlite.html", "libc": "lang-calling-c.html",
     "prelude": "lang-modules.html#the-prelude",
 }
@@ -145,7 +146,7 @@ def comment_inside(lines, idx):
 def parse_module(mod):
     """The `pub` declarations of one module, in file order."""
     decls, order = {}, []
-    d = os.path.join(LIB, mod)
+    d = os.path.join(LIB, mod.replace(".", "/"))   # net.http: the directory net/http
     for fname in sorted(f for f in os.listdir(d) if f.endswith(".ktm")):
         raw = open(os.path.join(d, fname)).read()
         lines = raw.split("\n")
@@ -237,7 +238,7 @@ def param_types(sig):
 
 
 def add(decls, order, mod, name, kind, sig, doc, line, cond):
-    key = name if mod == "prelude" else f"{mod}.{name}"
+    key = name if mod == "prelude" else f"{mod.split('.')[-1]}.{name}"
     if key in decls:
         d = decls[key]
         if kind == d["kind"] and kind in ("struct", "union") and "{" not in d["sig"]:
