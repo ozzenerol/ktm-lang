@@ -600,7 +600,7 @@ static void parseJsonGenerate(Cctrl *cc, AstType *cls, Lexeme *at);
  * struct's come before its declaration (and before `pub`), a field's
  * before the field. Which ones there are and where they go: */
 static const char *parse_struct_attrs[] = {"json", "yaml", NULL};
-static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", NULL};
+static const char *parse_field_attrs[] = {"key", "skip", "omitEmpty", "env", "required", NULL};
 
 static int parseAttrIn(const char **names, AoStr *name) {
     for (int i = 0; names[i]; ++i) {
@@ -647,16 +647,22 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
             }
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "unknown attribute `@%s`: a struct takes @json and @yaml, "
-                    "a field @key, @skip and @omitEmpty", a->name->data);
+                    "a field @key, @skip, @omitEmpty, @env and @required", a->name->data);
         }
-        int wants_arg = !strcmp(a->name->data, "key");
+        int is_env = !strcmp(a->name->data, "env");
+        int wants_arg = !strcmp(a->name->data, "key") || is_env;
         if (wants_arg && (!a->arg || a->arg->len == 0)) {
+            if (is_env) {
+                cctrlRaiseExceptionAt(cc, a->line, a->col, len,
+                        "`@env` takes the variable's name as a string: @env(\"PORT\")");
+            }
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
                     "`@key` takes the field's key as a string: @key(\"e-mail\")");
         }
         if (wants_arg && memchr(a->arg->data, '\\', a->arg->len)) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
-                    "`@key`: write the key without escapes");
+                    "`@%s`: write the %s without escapes", a->name->data,
+                    is_env ? "name" : "key");
         }
         if (!wants_arg && a->arg) {
             cctrlRaiseExceptionAt(cc, a->line, a->col, len,
@@ -679,14 +685,17 @@ Vec *parseAttrs(Cctrl *cc, Lexeme *at, int on_field) {
     return attrs;
 }
 
-/* A field's attribute `a` on a struct without @json or @yaml does nothing:
- * an error, at the attribute */
+/* A field's attribute on a struct without @json or @yaml does nothing
+ * (but config's @env and @required): an error, at the attribute */
 static void parseCheckFieldAttrs(Cctrl *cc, Vec *cls_attrs, AoStr *tag, List *fields) {
     if (cls_attrs && cls_attrs->size) return;
     listForEach(fields) {
         ClsField *f = it->value;
-        if (f->type && f->type->field_attrs && f->type->field_attrs->size) {
-            AstAttr *a = f->type->field_attrs->entries[0];
+        if (!f->type || !f->type->field_attrs) continue;
+        /* @env and @required are config's: on any struct */
+        for (u64 i = 0; i < f->type->field_attrs->size; ++i) {
+            AstAttr *a = f->type->field_attrs->entries[i];
+            if (!strcmp(a->name->data, "env") || !strcmp(a->name->data, "required")) continue;
             cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
                     "`@%s` on a field of %s, which has neither @json nor @yaml",
                     a->name->data, tag ? tag->data : "an anonymous struct");
@@ -901,9 +910,11 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
             if (field_attrs) {
                 AstAttr *a = field_attrs->entries[0];
                 if (is_private) {
-                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1,
-                            "`@%s` on a private field: json and yaml never write "
-                            "or read private fields", a->name->data);
+                    int cfg = !strcmp(a->name->data, "env") || !strcmp(a->name->data, "required");
+                    cctrlRaiseExceptionAt(cc, a->line, a->col, a->name->len + 1, cfg
+                            ? "`@%s` on a private field: config never reads private fields"
+                            : "`@%s` on a private field: json and yaml never write "
+                              "or read private fields", a->name->data);
                 }
                 if (astAttrGet(field_attrs, "key") &&
                     tokenPunctIs(cctrlTokenPeek(cc), ','))
@@ -1871,6 +1882,13 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
                                  astAttrGet(ft->field_attrs, "skip") ? 1 : 0);
             parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "omitEmpty"),
                                  astAttrGet(ft->field_attrs, "omitEmpty") ? 1 : 0);
+            AstAttr *env = astAttrGet(ft->field_attrs, "env");
+            if (env) {
+                parseReflectStoreText(cc, arr, at + parseReflectOffset(rfield, "env"),
+                                      env->arg->data, env->arg->len);
+            }
+            parseReflectStoreBool(cc, arr, at + parseReflectOffset(rfield, "required"),
+                                 astAttrGet(ft->field_attrs, "required") ? 1 : 0);
             j++;
         }
         int off = parseReflectOffset(rtype, "fields");
@@ -1914,6 +1932,18 @@ static Ast *parseReflectDescribe(Cctrl *cc, AstType *t) {
     }
     aoStrRelease(key);
     return g;
+}
+
+/* reflect.Value, for `any ...name`; NULL when reflect isn't loaded */
+AstType *parseReflectValueType(Cctrl *cc) {
+    Ast *fn = findFunctionDecl(cc, str_lit("reflect.__value"));
+    return fn ? fn->type->rettype : NULL;
+}
+
+/* The address of the reflect.Type describing t */
+Ast *parseReflectTypeAddr(Cctrl *cc, AstType *t) {
+    Ast *g = parseReflectDescribe(cc, t);
+    return astUnaryOperator(astMakePointerType(g->type), AST_UN_OP_ADDR_OF, g);
 }
 
 /* `reflect.typeOf(T or expr)` (a reflect.Type *) and `reflect.of(x)` (a
@@ -6169,7 +6199,17 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         mapAdd(cc->generic_structs, d->name->data, (void *)d);
         mapAdd(cc->clsdefs, d->name->data, t);
     } else {
-        mapAdd(cc->generic_funcs, d->name->data, (void *)d);
+        /* another generic function of the name: an overload, picked by
+         * the arguments at each call (parseGenericOverloadCall) */
+        GenericDef *head = mapGet(cc->generic_funcs, d->name->data);
+        if (head) {
+            GenericDef *tail = head;
+            while (tail->next) tail = tail->next;
+            tail->next = d;
+            head->overloaded = d->overloaded = 1;
+        } else {
+            mapAdd(cc->generic_funcs, d->name->data, (void *)d);
+        }
     }
     return 1;
 }
@@ -6524,6 +6564,8 @@ GenericDef *parseFindGenericFunc(Cctrl *cc, char *name, int len) {
     return d;
 }
 
+static int parseTypesSame(AstType *a, AstType *b);
+
 /* Function `d` with type arguments `args`: its prototype (made the first
  * time, its body at the end of the file) */
 Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
@@ -6540,9 +6582,27 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
                                                      : d->name);
     AoStr *name = parseGenericInstName(short_name, args);
     AoStr *full = parseGenericInstName(d->name, args);
-    Ast *fn = mapGet(cc->global_env, full->data);
-    if (!fn) fn = mapGet(cc->global_env, name->data);
-    if (fn) return fn;
+    Ast *fn = NULL, *before = NULL;
+    u64 before_n = 0;
+    if (d->overloaded) {
+        /* the instances of the overloads share a name: each definition
+         * keeps its own */
+        for (u64 i = 0; d->made && i < d->made->size; ++i) {
+            GenericInst *m = d->made->entries[i];
+            int same = m->args->size == args->size;
+            for (u64 j = 0; same && j < args->size; ++j) {
+                same = parseTypesSame(m->args->entries[j], args->entries[j]);
+            }
+            if (same && m->fn) return m->fn;
+        }
+        before = mapGet(cc->global_env, full->data);
+        if (!before) before = mapGet(cc->global_env, name->data);
+        before_n = before && before->overloads ? before->overloads->size : 0;
+    } else {
+        fn = mapGet(cc->global_env, full->data);
+        if (!fn) fn = mapGet(cc->global_env, name->data);
+        if (fn) return fn;
+    }
     GenericInst *in = calloc(1, sizeof(GenericInst));
     in->def = d;
     in->args = args;
@@ -6552,7 +6612,18 @@ Ast *parseGenericFuncInstance(Cctrl *cc, GenericDef *d, Vec *args, Lexeme *at) {
     parseGenericReplay(cc, d, in);
     fn = mapGet(cc->global_env, full->data);
     if (!fn) fn = mapGet(cc->global_env, name->data);
+    if (d->overloaded && before && fn) {
+        /* this definition's function joined the name's overloads last */
+        if (fn->overloads && fn->overloads->size > before_n) {
+            fn = fn->overloads->entries[fn->overloads->size - 1];
+        }
+    }
     if (!fn) cctrlRaiseException(cc, "could not make `%s`", full->data);
+    in->fn = fn;
+    if (d->overloaded) {
+        if (!d->made) d->made = vecNew(&vec_unsigned_long_type);
+        vecPush(d->made, in);
+    }
     int pattern = 0;
     for (u64 i = 0; i < args->size; ++i) pattern |= parseTypeHasParam(args->entries[i]);
     if (!pattern) {
@@ -6694,7 +6765,8 @@ static const char *jg_Fmt = "Json";
 
 enum {
     JG_NONE, JG_INT, JG_U64, JG_BOOL, JG_FLOAT, JG_STRING, JG_BYTES, JG_CSTR,
-    JG_ENUM, JG_STRUCT, JG_PTR_STRUCT, JG_VEC, JG_SLICE, JG_ARRAY
+    JG_ENUM, JG_STRUCT, JG_PTR_STRUCT, JG_VEC, JG_SLICE, JG_ARRAY,
+    JG_PTR_VAL      /* a pointer to a number, bool, enum, String...: it or null */
 };
 
 static int parseJsonIsVec(AstType *t) {
@@ -6721,7 +6793,11 @@ static int parseJsonKind(AstType *t) {
         case AST_TYPE_POINTER: {
             AstType *p = t->ptr;
             if (p && p->kind == AST_TYPE_CHAR && p->size == 1 && !p->is_bool) return JG_CSTR;
-            if (p && p->kind == AST_TYPE_CLASS && !p->is_intrinsic) return JG_PTR_STRUCT;
+            if (p && (astTypeIsString(p) || astTypeIsSlice(p) || p->is_enum || p->is_intrinsic ||
+                      parseJsonIsVec(p))) return JG_PTR_VAL;
+            if (p && p->kind == AST_TYPE_CLASS) return JG_PTR_STRUCT;
+            if (p && (p->kind == AST_TYPE_INT || p->kind == AST_TYPE_CHAR ||
+                      p->kind == AST_TYPE_FLOAT)) return JG_PTR_VAL;
             return JG_NONE;
         }
         case AST_TYPE_ARRAY:
@@ -6769,6 +6845,7 @@ static char *parseJsonUnsupported(AstType *t) {
         }
         return NULL;
     }
+    if (k == JG_PTR_VAL) return parseJsonUnsupported(t->ptr);
     AstType *e = parseJsonElem(t, k);
     if (e) return parseJsonUnsupported(e);
     return NULL;
@@ -6830,6 +6907,11 @@ static void parseJsonEncode(AoStr *o, Set *quals, char *expr, AstType *t, int de
             break;
         case JG_PTR_STRUCT:
             aoStrCatPrintf(o, "if (%s) { %s.to%s(__w); } else { __w.nil(); }\n", expr, expr, jg_Fmt);
+            break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (%s) {\n", expr);
+            parseJsonEncode(o, quals, mprintf("(*%s)", expr), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "} else { __w.nil(); }\n");
             break;
         case JG_VEC:
         case JG_SLICE:
@@ -6921,6 +7003,13 @@ static void parseJsonDecode(AoStr *o, Set *quals, char *lv, AstType *t, int dept
                            "if (!%s) { %s = %s.__alloc(sizeof(*%s)); }\n"
                            "%s.from%s(__r); }\n", lv, lv, lv, jg_mod, lv, lv, jg_Fmt);
             break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (__r.isNull()) { %s = null; } else {\n"
+                           "if (!%s) { %s = (%s)%s.__alloc(sizeof(*%s)); %s.__zero(%s, sizeof(*%s)); }\n",
+                           lv, lv, lv, parseJsonTypeText(quals, t), jg_mod, lv, jg_mod, lv, lv);
+            parseJsonDecode(o, quals, mprintf("(*%s)", lv), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "}\n");
+            break;
         case JG_VEC: {
             AstType *e = parseJsonElem(t, k);
             char *et = parseJsonTypeText(quals, e);
@@ -6983,13 +7072,19 @@ static void parseJsonFree(AoStr *o, Set *quals, char *lv, AstType *t, int depth)
             aoStrCatPrintf(o, "if (%s) { %s.freeDecoded(); %s.__free(%s); %s = null; }\n",
                         lv, lv, jg_mod, lv, lv);
             break;
+        case JG_PTR_VAL:
+            aoStrCatPrintf(o, "if (%s) {\n", lv);
+            parseJsonFree(o, quals, mprintf("(*%s)", lv), t->ptr, depth + 1);
+            aoStrCatPrintf(o, "%s.__free(%s); %s = null; }\n", jg_mod, lv, lv);
+            break;
         case JG_VEC:
         case JG_SLICE:
         case JG_ARRAY: {
             AstType *e = parseJsonElem(t, k);
             int ek = parseJsonKind(e);
             int owns = ek == JG_STRING || ek == JG_BYTES || ek == JG_CSTR || ek == JG_STRUCT ||
-                       ek == JG_PTR_STRUCT || ek == JG_VEC || ek == JG_SLICE || ek == JG_ARRAY;
+                       ek == JG_PTR_STRUCT || ek == JG_VEC || ek == JG_SLICE || ek == JG_ARRAY ||
+                       ek == JG_PTR_VAL;
             if (owns) {
                 char *len = k == JG_ARRAY ? mprintf("%d", t->len) : mprintf("%s.len", lv);
                 char *item = mprintf(k == JG_VEC ? "%s.data[__i%d]" : k == JG_SLICE ? "%s.ptr[__i%d]"
@@ -7023,7 +7118,7 @@ static char *parseJsonNonEmpty(char *e, AstType *t) {
             return mprintf("%s != 0", e);
         case JG_STRING: case JG_BYTES: case JG_VEC: case JG_SLICE:
             return mprintf("%s.len != 0", e);
-        case JG_CSTR: case JG_PTR_STRUCT:
+        case JG_CSTR: case JG_PTR_STRUCT: case JG_PTR_VAL:
             return mprintf("%s != null", e);
         default:
             return NULL;

@@ -314,6 +314,9 @@ typedef struct AstType {
 #define AST_FLAG_CALLER_FILE (1<<19)
 #define AST_FLAG_CALLER_LINE (1<<20)
 #define AST_FLAG_CALLER_FUNC (1<<21)
+/* the data parameter of `any ...name`: each extra arrives as a
+ * reflect.Value of a hidden copy (parseVarArgsPack) */
+#define AST_FLAG_VARARGS_ANY (1<<22)
 #define AST_FLAG_CALLER (AST_FLAG_CALLER_FILE | AST_FLAG_CALLER_LINE | AST_FLAG_CALLER_FUNC)
 
 /* AST_LVAR.pinned_kind values. */

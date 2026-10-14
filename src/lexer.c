@@ -17,6 +17,7 @@
 #include "containers.h"
 #include "lexer.h"
 #include "list.h"
+#include "pkg.h"
 #include "prslib.h"
 #include "prsutil.h"
 #include "util.h"
@@ -760,10 +761,15 @@ static void lexFileEnded(Lexer *l, LexFile *file) {
     file->ended = 1;
     if (LEX_PASS_QUIET(file->mod_pass)) return;
     for (LexImport *imp = file->imports; imp; imp = imp->next) {
+        /* `import _ = m;`: imported for what it does when the program
+         * starts (net.https gives net.http's client https://) */
+        if (imp->prefix && imp->prefix->len == 1 && imp->prefix->data[0] == '_') continue;
         if (!imp->used) {
             lexWarningAt(l, imp->line, imp->col, imp->len,
-                         "module %s is imported but not used",
-                         imp->module->path->data);
+                         imp->module->package ? "package \"%s\" is imported but not used"
+                                              : "module %s is imported but not used",
+                         imp->module->package ? imp->module->package
+                                              : imp->module->path->data);
         }
     }
 }
@@ -3534,7 +3540,55 @@ static AoStr *lexModulePath(Map *macro_defs, Lexer *l, Lexeme *first,
 }
 
 static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
-                         AoStr *path, Lexeme *first, Lexeme *last);
+                         AoStr *path, Lexeme *first, Lexeme *last,
+                         char *pkg, char *pkg_dir);
+
+/* The module path a package gets inside the compiler: its import path's
+ * elements as names, then its `module` name ("github.com/x/ktm-pg" with
+ * `module pg;`: github_com.x.ktm_pg.pg) */
+static AoStr *lexPackageModulePath(const char *pkg, const char *name) {
+    AoStr *out = aoStrNew();
+    int at_start = 1;
+    for (const char *p = pkg; *p; ++p) {
+        if (*p == '/') {
+            aoStrPutChar(out, '.');
+            at_start = 1;
+            continue;
+        }
+        if (at_start && isdigit((unsigned char)*p)) aoStrPutChar(out, '_');
+        aoStrPutChar(out, isalnum((unsigned char)*p) || *p == '_' ? *p : '_');
+        at_start = 0;
+    }
+    aoStrCatPrintf(out, ".%s", name);
+    return out;
+}
+
+/* `import [alias =] "path"`, the string just read: the package's
+ * directory, its module path and, without an alias, its module name as
+ * the prefix. 0 (reported) when it can't be used. */
+static int lexPackageImport(Lexer *l, Lexeme *str, AoStr **_alias, AoStr **_path,
+                            char **_pkg, char **_dir)
+{
+    char *pkg = mprintf("%.*s", (int)str->len, str->start);
+    char *err = NULL;
+    char *dir = pkgResolveImport(l->program_root ? l->program_root : ".", pkg, &err);
+    if (!dir) {
+        lexReportAt(l, str->line, str->col, str->len + 2, "%s", err);
+        return 0;
+    }
+    char *name = pkgModuleName(dir);
+    if (!name) {
+        lexReportAt(l, str->line, str->col, str->len + 2,
+                    "package \"%s\" has no .ktm file starting with `module <name>;` in %s",
+                    pkg, dir);
+        return 0;
+    }
+    if (!*_alias) *_alias = aoStrDupRaw(name, strlen(name));
+    *_path = lexPackageModulePath(pkg, name);
+    *_pkg = pkg;
+    *_dir = dir;
+    return 1;
+}
 
 /* `import [alias =] a.b {, [alias =] c};`, the `import` just lexed. The
  * whole list is read first: importing a module pushes its files, which
@@ -3550,11 +3604,16 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
     }
     AoStr *aliases[64], *paths[64];
     Lexeme *firsts[64], *lasts[64];
-    char *item_starts[64];
+    char *item_starts[64], *pkgs[64], *pkg_dirs[64];
     int n = 0, more = 1;
     while (more) {
+        /* where the item starts in the source (a string token's start
+         * is its decoded copy) */
+        char *item_start = l->ptr;
+        while (*item_start == ' ' || *item_start == '\t' || *item_start == '\n' ||
+               *item_start == '\r') item_start++;
         Lexeme *first = lexTokenRaw(macro_defs, l);
-        char *item_start = first ? first->start : NULL;
+        if (first && first->tk_type != TK_STR) item_start = first->start;
         AoStr *alias = NULL;
         if (first && first->tk_type == TK_IDENT) {
             Lexeme *eq = lexTokenRaw(macro_defs, l);
@@ -3567,9 +3626,26 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
             }
         }
         Lexeme *last = first;
-        AoStr *path = lexModulePath(macro_defs, l, first, &last, &more);
+        AoStr *path = NULL;
+        char *pkg = NULL, *pkg_dir = NULL;
+        if (first && first->tk_type == TK_STR) {
+            /* `import "github.com/x/y";`: a package */
+            Lexeme *after = lexTokenRaw(macro_defs, l);
+            more = tokenPunctIs(after, ',');
+            if (!more && !tokenPunctIs(after, ';')) {
+                Lexeme *at = after ? after : first;
+                lexReportAt(l, at->line, at->col, at->len,
+                            "expected `;` or `,` after the package path");
+                break;
+            }
+            if (!lexPackageImport(l, first, &alias, &path, &pkg, &pkg_dir)) continue;
+        } else {
+            path = lexModulePath(macro_defs, l, first, &last, &more);
+        }
         if (!path) break;
         if (n < 64) {
+            pkgs[n] = pkg;
+            pkg_dirs[n] = pkg_dir;
             aliases[n] = alias;
             paths[n] = path;
             firsts[n] = first;
@@ -3609,7 +3685,8 @@ static void lexImport(Map *macro_defs, Lexer *l, Lexeme *kw) {
         more->is_std = cur->is_std;
         more->file_id = cur->file_id;
     }
-    lexImportOne(l, file, kw, aliases[0], paths[0], firsts[0], lasts[0]);
+    lexImportOne(l, file, kw, aliases[0], paths[0], firsts[0], lasts[0],
+                 pkgs[0], pkg_dirs[0]);
 }
 
 /* How many columns `import ... last` takes, for an underline. By the
@@ -3625,7 +3702,8 @@ static s64 lexImportSpan(Lexeme *kw, Lexeme *last) {
 
 /* One module of an `import` line of `file` */
 static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
-                         AoStr *path, Lexeme *first, Lexeme *last)
+                         AoStr *path, Lexeme *first, Lexeme *last,
+                         char *pkg, char *pkg_dir)
 {
     AoStr *prefix = alias ? alias : aoStrDupRaw(last->start, last->len);
     int auto_prelude = file && file->filename &&
@@ -3677,7 +3755,8 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
     if (!m) {
         /* the prelude is the install's, whatever else is called that */
         /* and the runtime's (rt, str): the install's too */
-        char *dir = auto_prelude
+        char *dir = pkg_dir ? pkg_dir
+                  : auto_prelude
                   ? mprintf("%s/prelude", lexInstallModules(l))
                   : auto_rt ? mprintf("%s/%s", lexInstallModules(l), path->data)
                   : lexModuleDir(l, path, first);
@@ -3691,6 +3770,8 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
         }
         m = (LexModule *)calloc(1, sizeof(LexModule));
         m->path = path;
+        m->package = pkg;
+        m->foreign = pkg && !pkgIsProjectPath(l->program_root ? l->program_root : ".", pkg);
         m->dir = aoStrDupRaw(dir, strlen(dir));
         if (l->modules_len == l->modules_cap) {
             l->modules_cap = l->modules_cap ? l->modules_cap * 2 : 8;

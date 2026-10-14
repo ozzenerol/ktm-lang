@@ -8,7 +8,8 @@
 { for (auto n : nums) ... }
 sum();  sum(1, 2, 3);        // zero or more
 f(...nums);                  // pass them all on
-void log(u8 *fmt, ...args)   // untyped: 64-bit slots, for formats</code></pre>
+void log(u8 *fmt, ...args)   // untyped: 64-bit slots, for formats
+void exec(u8 *sql, any ...args)  // any type: each a reflect.Value</code></pre>
 </div>
 
 <h2>Typed extras</h2>
@@ -114,6 +115,43 @@ void main()
 12
 </pre>
 <p>Spreading costs nothing: the extras are passed as a count and a pointer to an array the caller built.</p>
+
+<h2>Extras of any type</h2>
+<p><code>any ...name</code> takes extras of any type, as Go's <code>...any</code>. Inside, <code>name</code> is a
+<code>reflect.Value[]</code>: each extra's type, and the address of a copy made at the call (it lives until the calling
+function returns). A string literal or another array comes as a slice. It needs <code>import reflect;</code>.</p>
+<pre data-run><code>
+import reflect;
+
+struct Point { i64 x, y; };
+
+void show(any ...args)
+{
+  for (auto v : args) {
+    printf("%.*s", v.type.name.len, v.type.name.ptr);
+    if (v.type.kind == reflect.Kind.int) { printf(" %d", *(i64 *)v.ptr); }
+    printf("\n");
+  }
+}
+
+void main()
+{
+  Point p = {1, 2};
+  show(42, "text", 2.5, p, &p);
+}
+</code></pre>
+<pre class="output">
+i64 42
+u8[]
+f64
+Point
+Point *
+</pre>
+<ul class="rules">
+  <li><code>...args</code> passes them on to another <code>any</code> function.</li>
+  <li>A String from a call is refused (nobody would free it): put it in a variable first.</li>
+  <li>Libraries take it where Go takes <code>...any</code>: SQL parameters, log fields.</li>
+</ul>
 
 <h2>Untyped extras, for formats</h2>
 <p><code>...name</code> without a type takes each extra as a 64-bit slot, the way format functions

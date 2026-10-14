@@ -1,0 +1,96 @@
+<!-- title: Cryptography -->
+<!-- ref: crypto -->
+<h1>Cryptography</h1>
+<p class="lede"><code>crypto</code> has what applications need, built on mbedTLS's vetted code (inside ktm, as for
+<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption and ECDSA
+signatures. Only programs that import it carry it.</p>
+
+<h2>Random bytes</h2>
+<pre><code>
+u8 key[32];
+crypto.random(key[0:]);                  // keys, nonces, salts
+String token = crypto.randomBytes(24);   // a session token's bytes (base64.encodeUrl for text)
+</code></pre>
+
+<h2>Hashes, MACs, keys from secrets</h2>
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>crypto.sha256(data, out)</code>, <code>crypto.sha512(data, out)</code></td><td>Into a 32- or 64-byte <code>out</code></td></tr>
+  <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256)</td></tr>
+  <tr><td><code>crypto.equal(a, b)</code></td><td>Compares in constant time: use it for MACs, tokens and hashes, never <code>str.equals</code></td></tr>
+  <tr><td><code>crypto.hkdfSha256(secret, salt, info, out)</code></td><td>Keys of <code>out.len</code> bytes from one secret (RFC 5869)</td></tr>
+  <tr><td><code>crypto.pbkdf2Sha256(password, salt, iterations, out)</code></td><td>A key from a password; to store passwords use <code>hashPassword</code> (below)</td></tr>
+</table>
+
+<h2>Encrypting</h2>
+<p><code>seal</code> encrypts and authenticates: <code>open</code> refuses anything altered, and anything sealed with
+another key, nonce or <code>aad</code> (data sent in the clear but bound to it, as a header). A key is 32 bytes, a nonce 12:
+never use one nonce twice with a key, so make it with <code>crypto.random</code> and send it along.</p>
+<pre><code>
+u8 key[32], nonce[12];
+crypto.random(key[0:]);
+crypto.random(nonce[0:]);
+String box = crypto.seal(crypto.Aead.aesGcm, key[0:], nonce[0:], "attack at dawn", "msg-7");
+String plain;
+if (!crypto.open(crypto.Aead.aesGcm, key[0:], nonce[0:], box, &amp;plain, "msg-7")) {
+  // altered, or not ours
+}
+</code></pre>
+<p><code>Aead.aesGcm</code> is AES-256-GCM (fastest where the CPU has AES instructions), <code>Aead.chacha20Poly1305</code>
+is ChaCha20-Poly1305 (fast everywhere). <code>seal</code> adds <code>crypto.TAG_SIZE</code> (16) bytes.</p>
+
+<h2>Signatures</h2>
+<pre><code>
+crypto.Key *k = crypto.generateKey();             // ECDSA P-256
+String sig = k.sign("payload");                   // 64 bytes r||s (JWT's ES256), deterministic
+bool ok = k.verify("payload", sig);              // also takes a DER signature
+String pem = k.publicPem();                       // to share; privatePem() to keep
+crypto.Key *pub = crypto.publicKey(pem);          // and back (privateKey(pem) for a private one)
+</code></pre>
+<p>Keys are P-256, readable and writable as PEM, so they work with OpenSSL and other languages. (Ed25519 isn't there:
+mbedTLS 3.6 doesn't have it.)</p>
+
+<h2>Passwords</h2>
+<pre data-run><code>
+import crypto;
+
+void main()
+{
+  String stored = crypto.hashPassword("hunter2");   /* save this whole string */
+  printf("%.31s...\n", stored.ptr);
+  printf("%d %d\n", crypto.verifyPassword("hunter2", stored), crypto.verifyPassword("hunter3", stored));
+  printf("%d\n", crypto.needsRehash(stored));
+  stored.free();
+}
+</code></pre>
+<pre class="output">
+$argon2id$v=19$m=19456,t=2,p=1$...
+1 0
+0
+</pre>
+<p><code>hashPassword</code> is Argon2id with a random salt, at OWASP's cost (19 MiB, 2 passes, about 20 ms), written
+as a PHC string that carries its own cost and salt, so other languages' libraries read it too.
+<code>verifyPassword</code> also reads bcrypt hashes (<code>$2a$</code>, <code>$2b$</code>, <code>$2y$</code>), so
+users moved from another system keep their passwords; <code>needsRehash</code> says when a hash that just verified
+should be replaced by a new one.</p>
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>crypto.hashPassword(pw)</code></td><td>Argon2id at the default cost, a new String</td></tr>
+  <tr><td><code>crypto.argon2id(pw, memoryKiB, iterations, parallelism)</code></td><td>The same at a cost of your own</td></tr>
+  <tr><td><code>crypto.bcrypt(pw, cost)</code></td><td><code>$2b$</code>, cost 12 unless given; throws for a password over 72 bytes</td></tr>
+  <tr><td><code>crypto.verifyPassword(pw, hash)</code></td><td>Either kind; <code>false</code> for a wrong password or a hash it can't read</td></tr>
+  <tr><td><code>crypto.needsRehash(hash)</code></td><td><code>true</code> for bcrypt and Argon2id at another cost</td></tr>
+  <tr><td><code>crypto.argon2idKey(pw, salt, memoryKiB, iterations, parallelism, out)</code></td><td>Argon2id as a key derivation, into out</td></tr>
+  <tr><td><code>crypto.blake2b(data, out)</code></td><td>BLAKE2b, a 1 to 64 byte digest</td></tr>
+</table>
+<p>Hashing a password takes the time and memory it does on purpose. Inside a coroutine (a <code>net.http</code>
+handler, say) the hashing calls run on <a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a>'s worker
+threads, so the loop goes on serving other requests meanwhile.</p>
+
+<h2>Notes</h2>
+<ul class="rules">
+  <li>What <code>randomBytes</code>, <code>seal</code>, <code>sign</code> and the PEM calls return is yours to free;
+  <code>open</code> replaces what <code>plain</code> held. Free keys with <code>k.free()</code>.</li>
+  <li>Errors (a key of the wrong size, a bad PEM) throw <code>crypto.ERR_CRYPTO</code>; a failed <code>open</code> or
+  <code>verify</code> is just <code>false</code>.</li>
+</ul>

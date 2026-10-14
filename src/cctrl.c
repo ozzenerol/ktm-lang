@@ -592,6 +592,15 @@ static s64 cctrlTokenSourceLen(Cctrl *cc, Lexeme *tok) {
     if (tok->tk_type == TK_STR || tok->tk_type == TK_CHAR_CONST) {
         return tok->len + 2;
     }
+    /* `http.nope` is the token `net.http.nope` (a package's is longer
+     * still): the source has the prefix as written, a dot and the name */
+    if (tok->qual_prefix && tok->len > 0) {
+        const char *dot = NULL;
+        for (s64 i = tok->len - 1; i >= 0 && !dot; --i) {
+            if (tok->start[i] == '.') dot = tok->start + i;
+        }
+        if (dot) return tok->qual_prefix_len + 1 + (tok->start + tok->len - dot - 1);
+    }
     return tok->len;
 }
 
@@ -1221,7 +1230,51 @@ CctrlDiagnostic *cctrlMakeDiag(Cctrl *cc,
     return d;
 }
 
+/* A package's module path inside the compiler (github_com.x.ktm_pg.pg)
+ * in a message reads as its name (pg), as the program writes it */
+static void cctrlDiagPackageNames(Cctrl *cc, CctrlDiagnostic *d) {
+    Lexer *l = cc ? cc->lexer_ : NULL;
+    if (!l || !d || !d->message) return;
+    for (int i = 0; i < l->modules_len; ++i) {
+        LexModule *m = l->modules[i];
+        if (!m->package) continue;
+        char *path = m->path->data;
+        char *name = strrchr(path, '.');
+        name = name ? name + 1 : path;
+        size_t plen = strlen(path);
+        char *at = strstr(d->message->data, path);
+        if (!at) continue;
+        AoStr *out = aoStrNew();
+        char *p = d->message->data;
+        while (at) {
+            aoStrCatLen(out, p, at - p);
+            aoStrCat(out, name);
+            p = at + plen;
+            at = strstr(p, path);
+        }
+        aoStrCat(out, p);
+        aoStrRelease(d->message);
+        d->message = out;
+    }
+}
+
+/* A warning or a note in another project's package (a dependency): the
+ * user can't change that code, so it isn't shown; its errors are */
+static int cctrlDiagInDependency(Cctrl *cc, CctrlDiagnostic *d) {
+    Lexer *l = cc ? cc->lexer_ : NULL;
+    if (!l || !d || d->severity == CCTRL_ERROR || !d->file || !d->file->module_id) return 0;
+    if ((int)d->file->module_id > l->modules_len) return 0;
+    return l->modules[d->file->module_id - 1]->foreign;
+}
+
 void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
+    if (cctrlDiagInDependency(cc, d)) {
+        if (d->message) aoStrRelease(d->message);
+        if (d->suggestion) aoStrRelease(d->suggestion);
+        free(d);
+        return;
+    }
+    cctrlDiagPackageNames(cc, d);
     if (!cc || !cc->diagnostics) {
         /* No accumulation storage (e.g. macro-processor stub).
          * Print immediately so the message isn't lost. */

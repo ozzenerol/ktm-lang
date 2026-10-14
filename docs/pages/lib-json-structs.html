@@ -52,7 +52,7 @@ void main()
     <tr><td>An enum</td><td>Its member's name</td></tr>
     <tr><td><code>String</code>, <code>u8[]</code>, <code>u8 *</code>, a <code>u8</code> array</td><td>A string</td></tr>
     <tr><td>Other arrays and slices, <code>vec.Vec&lt;T&gt;</code></td><td>Arrays</td></tr>
-    <tr><td>A pointer</td><td>What it points to, or <code>null</code></td></tr>
+    <tr><td>A pointer (to a struct, a number, a <code>bool</code>, an enum, a <code>String</code>...)</td><td>What it points to, or <code>null</code>; decoding allocates it, <code>freeDecoded</code> frees it</td></tr>
   </tbody>
 </table>
 <p>A union, a function pointer or a <code>void *</code> can't be JSON.</p>

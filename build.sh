@@ -122,7 +122,24 @@ mkdir -p "$PREFIX/lib" "$PREFIX/modules"
 # as one tree into lib/libktm.a and the shared object the JIT loads; each
 # module directory gets a .ktmlib marker pointing at them
 cp -R "$ROOT/src/std/." "$PREFIX/modules/"
+# net.tls stays source (no .ktmlib): only the programs that import it
+# compile it and link libktmtls (#link <ktmtls>), so every other program
+# stays as small as before
+# (crypto, the same: it calls into libktmtls)
+SOURCE_MODULES="net/tls net/https crypto"
+for m in $SOURCE_MODULES; do rm -rf "$PREFIX/modules/$m"; done
 "$KTM" -fPIC -lib ktm --install-dir="$PREFIX" "$PREFIX/modules"
+for m in $SOURCE_MODULES; do cp -R "$ROOT/src/std/$m" "$PREFIX/modules/$m"; done
+# libktmtls (mbedTLS and ktm's layer over it), built by cmake: the
+# archive for compiled programs, the shared object for the JIT. The
+# shared one gets only its versioned name, so `-lktmtls` always takes
+# the archive and a program needs no libktmtls at run time.
+cp "$BUILD_DIR/libktmtls.a" "$PREFIX/lib/libktmtls.a"
+if [ "$(uname -s)" = Darwin ]; then
+    cp "$BUILD_DIR/libktmtls.dylib" "$PREFIX/lib/libktmtls.0.0.1.dylib"
+else
+    cp "$BUILD_DIR/libktmtls.so" "$PREFIX/lib/libktmtls.so.0.0.1"
+fi
 
 if [ "$RUN_TESTS" = 1 ]; then
     # The test runners otherwise compile each test against /usr/local.
@@ -164,7 +181,15 @@ if [ "$DO_INSTALL" = 1 ]; then
         fi
     done
     ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/lib"
-    ${as[@]+"${as[@]}"} cp -f "$KTM" "$INSTALL_PREFIX/bin/ktm"
+    # A new file renamed over the old one, never the old file rewritten:
+    # running programs (a JIT run maps libktm.so, and the compiler is a
+    # running binary) keep the copy they mapped. Rewriting it in place
+    # crashed them, at random spots, whenever an install landed mid-run.
+    put() {
+        ${as[@]+"${as[@]}"} cp -PR "$1" "$2.new.$$" &&
+        ${as[@]+"${as[@]}"} mv -f "$2.new.$$" "$2"
+    }
+    put "$KTM" "$INSTALL_PREFIX/bin/ktm"
     # the old header-based stdlib, which an earlier install left
     ${as[@]+"${as[@]}"} rm -f "$INSTALL_PREFIX/include/std.ktmh"
     # the stdlib's modules, replaced whole (other modules there stay)
@@ -175,7 +200,7 @@ if [ "$DO_INSTALL" = 1 ]; then
         ${as[@]+"${as[@]}"} cp -R "$PREFIX/modules/$d" "$INSTALL_PREFIX/modules/$d"
     done
     for f in "$PREFIX"/lib/*; do
-        ${as[@]+"${as[@]}"} cp -fPR "$f" "$INSTALL_PREFIX/lib/"
+        put "$f" "$INSTALL_PREFIX/lib/$(basename "$f")"
     done
     # Vim/Neovim support: `set rtp+=$INSTALL_PREFIX/share/ktm/vim`
     ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/share/ktm/vim"

@@ -1,0 +1,2 @@
+Files for test 793 (crypto): a P-256 key made by openssl (test only, public), its
+public key, and openssl's DER signature (hex) of msg.txt, which ktm verifies.

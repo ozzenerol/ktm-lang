@@ -1,0 +1,77 @@
+<!-- title: Command-line flags -->
+<!-- ref: flag -->
+<h1>Command-line flags</h1>
+<p class="lede"><code>flag</code> reads a program's flags as Go's flag package does, with the GNU forms people type
+too: <code>--port=80</code>, <code>--port 80</code>, <code>-p 80</code>, <code>-p80</code>, <code>-vq</code> for two
+booleans, Go's <code>-port 80</code>, and <code>--</code> to end the flags. Flags and arguments may come in any
+order, and <code>-h</code> prints a help text made from what you declared.</p>
+
+<pre data-run><code>
+import flag;
+
+void main()
+{
+  flag.Set *fs = flag.new("server", "serves the API");
+  defer fs.free();
+  i64 *port = fs.integer("port", 8080, "the port to listen on", 'p');
+  bool *verbose = fs.boolean("verbose", false, "log every request", 'v');
+  u8[] *db = fs.string("db", "postgres://localhost/app", "the database");
+
+  /* a real program passes main's argc and argv: fs.parseOrExit(argc, argv); */
+  u8 *argv[5] = {"server", "-v", "--port=9000", "data.csv", "--db=postgres://db/prod"};
+  if (!fs.parse(5, argv)) { return; }
+  printf("%d %d %.*s %.*s\n", *port, *verbose, db.len, db.ptr, fs.arg(0).len, fs.arg(0).ptr);
+
+  String help = fs.usage();
+  printf("%.*s", help.len, help.ptr);
+  help.free();
+}
+</code></pre>
+<pre class="output">
+9000 1 postgres://db/prod data.csv
+usage: server [flags] [arguments]
+
+serves the API
+
+flags:
+  -p, --port int  the port to listen on (default 8080)
+  -v, --verbose   log every request
+      --db text   the database (default "postgres://localhost/app")
+  -h, --help      show this help
+</pre>
+
+<p>Each declaration gives a pointer to the flag's value, which holds the default until <code>parse</code> sets it.
+The last argument, a character, is the flag's short form (leave it out for none). <code>parseOrExit</code> is what
+most programs want: <code>-h</code> prints the help and exits 0; a mistake prints what was wrong and the help to
+stderr and exits 2.</p>
+
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>flag.new(name, about)</code></td><td>A set of flags for a program; <code>fs.free()</code> frees it, its subcommands and the values</td></tr>
+  <tr><td><code>fs.boolean</code>, <code>fs.integer</code>, <code>fs.number</code>, <code>fs.string</code></td><td><code>(name, default, help, short)</code>: a <code>bool *</code>, <code>i64 *</code>, <code>f64 *</code> or <code>u8[] *</code></td></tr>
+  <tr><td><code>fs.parseOrExit(argc, argv)</code></td><td>Parse, or print and exit (0 for <code>-h</code>, 2 for a mistake)</td></tr>
+  <tr><td><code>fs.parse(argc, argv)</code></td><td><code>true</code>, or <code>false</code> with <code>fs.error()</code> and <code>fs.helpAsked()</code></td></tr>
+  <tr><td><code>fs.nargs()</code>, <code>fs.arg(i)</code></td><td>The arguments that aren't flags (<code>""</code> past the end)</td></tr>
+  <tr><td><code>fs.given(name)</code></td><td>Was the flag on the command line (as opposed to its default)?</td></tr>
+  <tr><td><code>fs.usage()</code></td><td>The help text, a new String</td></tr>
+  <tr><td><code>fs.command(name, about)</code>, <code>fs.chosen()</code></td><td>A subcommand with flags of its own; the one on the command line, or <code>null</code></td></tr>
+</table>
+
+<h2>Booleans</h2>
+<p><code>--verbose</code> turns a boolean on; <code>--verbose=false</code> (or <code>0</code>, <code>no</code>) turns
+one off, which is how a flag that defaults to <code>true</code> is cleared. A boolean never takes the next word as its
+value, so <code>-v file</code> is the flag and an argument.</p>
+
+<h2>Subcommands</h2>
+<pre><code>
+flag.Set *app = flag.new("app");
+bool *dry = app.boolean("dry-run", false, "change nothing", 'n');
+flag.Set *serve = app.command("serve", "serves the API");
+i64 *port = serve.integer("port", 80, "the port");
+flag.Set *migrate = app.command("migrate", "runs the migrations");
+app.parseOrExit(argc, argv);         // app -n serve --port 81
+if (app.chosen() == serve) { ... *port ... serve.arg(0) ... }
+</code></pre>
+<p>The flags before the subcommand's name are the program's, the ones after it the subcommand's. <code>-h</code> after
+the name prints the subcommand's help.</p>
+<p>Text values are views of <code>argv</code> (or of the default), so there is nothing to free.</p>

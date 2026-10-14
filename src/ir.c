@@ -1572,7 +1572,12 @@ static IrValue *irLowerCast(IrCtx *ctx,
     if (from_int && to_int) {
         int from_size = from_type->size ? from_type->size : 8;
         int to_size = to_type->size ? to_type->size : 8;
-        if (to_size < from_size && to_size < 8) {
+        /* the same width with the other signedness ((i32) of a u32) is
+         * re-extended too: its 64 bits change, (i64)(i32)0xFFFFFFFEu is -2 */
+        int resign = to_size == from_size && from_type->kind != AST_TYPE_POINTER &&
+                     !to_type->is_bool && !from_type->is_bool &&
+                     !to_type->issigned != !from_type->issigned;
+        if ((to_size < from_size || resign) && to_size < 8) {
             /* Narrow to the destination's bytes, then re-extend to full
              * width by the destination's signedness, so the value is
              * canonical (`200(I8)` is the i64 -56, not the raw byte 0xC8)
@@ -2618,6 +2623,14 @@ IrValue *irExpr(IrCtx *ctx, Ast *ast) {
 
         case AST_TEMP_ADDR: {
             /* the value into its hidden variable, whose address it is */
+            if (!irIsByValAggregate(ast->slice_var->type)) {
+                /* a number or pointer (`any ...` extras): a plain store */
+                int is_err = 0;
+                Ast *set = astBinaryOp(AST_BIN_OP_ASSIGN, ast->slice_var,
+                                       ast->slice_ptr, &is_err);
+                irExpr(ctx, set);
+                return irLValueAddr(ctx, ast->slice_var);
+            }
             IrValue *addr = irLValueAddr(ctx, ast->slice_var);
             irCopyAggregateTo(ctx, addr, ast->slice_ptr, ast->slice_var->type->size);
             return addr;

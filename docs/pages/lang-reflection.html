@@ -180,6 +180,6 @@ debug is 0
   <li>A type's description is made at compile time, as read-only data, only for the types a program asks about and the types they lead to.</li>
   <li>A library and a program each have their own copy: compare types with <code>reflect.same(a, b)</code>, not <code>==</code>.</li>
   <li><code>reflect.name(e)</code> is <code>""</code> for a value that isn't a member.</li>
-  <li><a href="lang-attributes.html">Attributes</a> show up too: <code>Type.json</code>, <code>Field.key</code>, <code>Field.skip</code>, <code>Field.omitEmpty</code>.</li>
+  <li><a href="lang-attributes.html">Attributes</a> show up too: <code>Type.json</code>, <code>Field.key</code>, <code>Field.skip</code>, <code>Field.omitEmpty</code>, <code>Field.env</code>, <code>Field.required</code>.</li>
   <li><code>json.encode</code> and <code>json.decode</code> are built on this: see <a href="lib-json-structs.html">JSON: structs</a>.</li>
 </ul>
