@@ -57,8 +57,8 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
-<h2 id="v0-19-0-not-released-yet">v0.19.0 <small>(not released yet)</small><a class="anchor" href="#v0-19-0-not-released-yet" aria-label="Link to this section">#</a></h2>
-<p>HTTP servers: <code>net.http</code>, Go's <code>net/http</code> and <code>ServeMux</code> for ktm, about 2.5 times as fast.</p>
+<h2 id="v0-19-0-2026-10-14">v0.19.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-19-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<p>HTTP servers: <code>net.http</code>, Go's <code>net/http</code> and <code>ServeMux</code> for ktm, about 3 times as fast.</p>
 <ul>
   <li><code>import net.http;</code>: <code>http.Mux</code> routes by Go 1.22 patterns (<code>"GET /users/{id}"</code>,
   <code>{rest...}</code>, <code>{$}</code>, subtrees; the most specific wins, conflicting patterns are refused, 404 and 405
@@ -70,8 +70,10 @@ macOS are attached to each release on
   <li>Middleware (<code>mux.use</code>), groups with a prefix (<code>mux.group</code>), static files (<code>mux.files</code>),
   an access log (<code>http.Options.accessLog</code>), and <code>http.testRequest</code> / <code>http.recorder()</code> to test
   handlers without a socket. See <a href="lib-http.html">HTTP servers</a>.</li>
-  <li>Measured against Go 1.22 <code>net/http</code> on 2 cores: 2.5 to 3.5 times the requests per second with 16 or more
-  connections, 2.1 to 2.5 times the requests per CPU-second, a quarter of the memory.</li>
+  <li>Measured against Go 1.27 <code>net/http</code> on the same 2 cores: 2.7 to 3.75 times the requests per second with 16 or
+  more connections, 2.2 to 2.6 times the requests per CPU-second, lower median and p99 latency everywhere (p99 at 1024
+  connections: 4.5 to 6 ms against Go's 21 to 25 ms), a quarter of the memory.</li>
+  <li><code>try</code> and <code>defer</code> cost less: 5 ns and 9 ns, from 12 and 13.</li>
   <li><code>json.encodeTo(&amp;s, v)</code> and <code>json.quoteTo(&amp;s, text)</code> add JSON to a String you have.</li>
   <li>Fixes: a type alias to a function type in a module (<code>pub type H = fn(...) void;</code>) was "already defined";
   <code>b.len</code> of a parameter with a default (<code>u8[] b = ""</code>) stopped the compiler; a library's generic that
@@ -1375,7 +1377,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-19-0-not-released-yet">v0.19.0 (not released yet)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>
