@@ -5,8 +5,15 @@ import mem;
  * list.new<Job *>();`. append/prepend return the node, so remove(node)
  * takes it out later in O(1) (a timer, a client to drop). Walk it with
  * `for (auto n = l.head; n; n = n.next)` (n.value); head and tail are
- * null for an empty list. free() frees the nodes, not what the values
- * point to. */
+ * null for an empty list. A List of String owns its Strings: free() and
+ * clear() free them; remove, shift and pop hand the value back to you.
+ * Other values are yours: free() frees the nodes, not what they point
+ * to. */
+/* Freeing a value the List owns: a String; anything else is the
+ * caller's */
+void listValueFree(String s) { mem.free(s.ptr); }
+void listValueFree<T>(T x) {}
+
 pub struct Node<T> {
         T value;
         Node<T> *next, *prev;
@@ -129,6 +136,7 @@ pub void List<T>.clear() {
         Node<T> *n = self.head;
         while (n) {
                 Node<T> *next = n.next;
+                listValueFree(n.value);
                 mem.free(n);
                 n = next;
         }

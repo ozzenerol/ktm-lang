@@ -21,13 +21,14 @@ void main()
 }
 </code></pre>
 <pre class="output">
-2026-10-13T14:02:11.482Z INFO listening on :8080
-2026-10-13T14:02:11.483Z WARN slow request: 950 ms
+2026-10-13T14:02:11.482Z INFO  listening on :8080
+2026-10-13T14:02:11.483Z WARN  slow request: 950 ms
 2026-10-13T14:02:11.483Z ERROR db: connection refused
 </pre>
 <ul class="rules">
-  <li>Each line is the time in UTC with milliseconds, the level's name, then the message.</li>
-  <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments.</li>
+  <li>Each line is the time in UTC with milliseconds, the level's name, then the message. The level, and the file:line and function part when shown, are padded so the messages line up in one column.</li>
+  <li><code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code> take a printf format and its arguments,
+  checked as <code>printf</code>'s are; <code>%s</code> takes a C string, a String or a <code>u8[]</code>.</li>
   <li>A newline in a message is written as <code>\n</code>, so one call is always one line.</li>
 </ul>
 
@@ -67,16 +68,16 @@ void main()
 </code></pre>
 <pre class="output">
 app.log:
-2026-10-13T14:02:11.482Z INFO main.ktm:13 main: starting
-2026-10-13T14:02:11.482Z WARN cli.ktm:9 cli.run: no args given
-2026-10-13T14:02:11.483Z DEBUG cli.ktm:8 cli.run: args: 0
-2026-10-13T14:02:11.483Z WARN cli.ktm:9 cli.run: no args given
+2026-10-13T14:02:11.482Z INFO  main.ktm:13 main:        starting
+2026-10-13T14:02:11.482Z WARN  cli.ktm:9 cli.run:      no args given
+2026-10-13T14:02:11.483Z DEBUG cli.ktm:8 cli.run:      args: 0
+2026-10-13T14:02:11.483Z WARN  cli.ktm:9 cli.run:      no args given
 </pre>
 <ul class="rules">
   <li>Until <code>log.setup</code> is called, <code>log.info(...)</code> and the others write to stderr at INFO, so a small program needs no setup at all.</li>
   <li><code>log.setup(&amp;o)</code> takes the same Options as <code>log.open</code> and throws <code>log.ERR_LOG</code> the same way; the logger it had is then kept. Calling it again closes the old one.</li>
   <li><code>log.setLevel(level)</code> changes the level for the calls from then on.</li>
-  <li><code>log.shutdown()</code> closes the file; later calls go to stderr at INFO again.</li>
+  <li><code>log.shutdown()</code> closes the file; later calls go to stderr (stdout with <code>toStdout</code>) at the level it had, and the first one says once on stderr where it came from: usually a <code>defer log.shutdown();</code> inside a <code>try</code> or another inner block, which runs when that block ends.</li>
   <li><code>log.logger()</code> is the default Logger itself, for code that takes a <code>log.Logger *</code> or to read <code>failed</code>.</li>
   <li>With <code>threadSafe</code> set, threads can share it; call <code>log.setup</code> and <code>log.shutdown</code> while no other thread logs.</li>
 </ul>
@@ -121,7 +122,7 @@ void main()
 </code></pre>
 <p><code>app.log</code>:</p>
 <pre class="output">
-2026-10-13T14:02:11.482Z INFO main.ktm:17 main: listening on :8080
+2026-10-13T14:02:11.482Z INFO  main.ktm:17 main:        listening on :8080
 2026-10-13T14:02:11.483Z WARN main.ktm:5 serve: slow request: 950 ms
 </pre>
 <p>The compiler fills in the file, line and function at each call, with

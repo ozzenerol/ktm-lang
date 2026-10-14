@@ -19,7 +19,7 @@ pub const i64 ERR_LOG = 0x6B746D16;
 pub enum Level { debug, info, warn, error };
 
 /* How log.open sets a Logger up. Start from log.options() (a declared
- * Options isn't zeroed), then change what you need. */
+ * Options is all zero, without the defaults), then change what you need. */
 pub struct Options {
     u8 *path;          /* the file, appended to; null for stderr */
     bool toStdout;     /* stdout: instead of stderr, or as well as the file */
@@ -40,6 +40,7 @@ pub struct Logger {
     i32 fd;
     i64 size;          /* bytes in the file now */
     i64 failed;        /* lines a failed write or rotation dropped */
+    i64 whereWidth;    /* the widest file:line / function part so far */
     libc.pthread_mutex_t lock;
 };
 
@@ -113,7 +114,7 @@ static void logRotate(Logger *lg)
             to.free();
         }
         String first = logRotatedName(path, 1);
-        if (fs.rename(cstr.view(path), first) != 0) { truncate = true; }
+        if (!fs.rename(cstr.view(path), first)) { truncate = true; }
         first.free();
     }
     lg.fd = logOpenFile(path, truncate);
@@ -163,11 +164,18 @@ static void logWrite(Logger *lg, Level level, u8 *file, i64 line, u8 *func,
     u8 *msg = cstr.formatArgs(null, fmt, args);
     String rest = str.new();
     defer rest.free();
-    rest.appendByte(' ');
-    rest.append(cstr.view(gLogLevelNames[level]));
-    rest.appendByte(' ');
+    /* the messages in one column: the level as wide as the widest name,
+     * the file:line and function part as wide as the widest one so far
+     * (at least 20) */
+    rest.appendFormat(" %-5s ", gLogLevelNames[level]);
+    i64 whereStart = rest.len;
     if (lg.opts.showFile) { rest.appendFormat("%s:%d ", logBaseName(file), line); }
     if (lg.opts.showFunc && func[0]) { rest.appendFormat("%s: ", func); }
+    i64 whereLen = rest.len - whereStart;
+    if (whereLen > 0) {
+        if (whereLen > lg.whereWidth) { lg.whereWidth = whereLen < 20 ? 20 : whereLen; }
+        for (i64 i = whereLen; i < lg.whereWidth; i++) { rest.appendByte(' '); }
+    }
     for (u8 *p = msg; p && *p; p++) {
         if (*p == '\n') { rest.append("\\n"); }
         else if (*p == '\r') { rest.append("\\r"); }
@@ -239,9 +247,23 @@ pub void Logger.close()
 Logger gLogStderr;
 Logger *gLogDefault = null;
 
+/* Set by shutdown(): a line logged after it is reported once, as that
+ * is usually a `defer log.shutdown();` that ran too early */
+bool gLogWasShut = false;
+Level gLogShutLevel = Level.info;
+Options gLogShutOpts;
+
 static Logger *logDefault()
 {
     if (gLogDefault) { return gLogDefault; }
+    if (gLogWasShut) {
+        /* as the closed one wrote, without its file */
+        gLogStderr.opts = gLogShutOpts;
+        gLogStderr.fd = gLogShutOpts.toStdout ? 1 : 2;
+        gLogStderr.level = gLogShutLevel;
+        gLogDefault = &gLogStderr;
+        return gLogDefault;
+    }
     gLogStderr.fd = 2;
     gLogStderr.opts.level = Level.info;
     gLogStderr.level = Level.info;
@@ -256,14 +278,33 @@ pub void setup(Options *o)
 {
     Logger *lg = open(o);
     shutdown();
+    gLogWasShut = false;
     gLogDefault = lg;
 }
 
-/* Closes the default logger; later calls write to stderr at INFO again */
+/* Closes the default logger; later calls write to stderr again, at the
+ * level the closed one had */
 pub void shutdown()
 {
-    if (gLogDefault && gLogDefault != &gLogStderr) { gLogDefault.close(); }
+    if (gLogDefault && gLogDefault != &gLogStderr) {
+        gLogShutLevel = gLogDefault.level;
+        gLogShutOpts = gLogDefault.opts;
+        gLogShutOpts.path = null;
+        gLogShutOpts.threadSafe = false;
+        gLogWasShut = true;
+        gLogDefault.close();
+    }
     gLogDefault = null;
+}
+
+/* A line after shutdown(): say so once, with where it came from */
+static void logAfterShutdown(u8 *file, i64 line)
+{
+    if (!gLogWasShut || gLogDefault != &gLogStderr) { return; }
+    gLogWasShut = false;
+    libc.fprintf(libc.stderr, "log: a line logged after log.shutdown() at %s:%lld goes to %s "
+                 "(was the shutdown deferred in an inner block?)\n", logBaseName(file), line,
+                 gLogShutOpts.toStdout ? "stdout" : "stderr");
 }
 
 /* The default logger's level, for the calls from now on */
@@ -283,6 +324,7 @@ pub void debug(@caller("file") u8 *file, @caller("line") i64 line,
 {
     Logger *lg = logDefault();
     if (lg.level > Level.debug) { return; }
+    logAfterShutdown(file, line);
     logWrite(lg, Level.debug, file, line, func, fmt, args);
 }
 
@@ -291,6 +333,7 @@ pub void info(@caller("file") u8 *file, @caller("line") i64 line,
 {
     Logger *lg = logDefault();
     if (lg.level > Level.info) { return; }
+    logAfterShutdown(file, line);
     logWrite(lg, Level.info, file, line, func, fmt, args);
 }
 
@@ -299,11 +342,14 @@ pub void warn(@caller("file") u8 *file, @caller("line") i64 line,
 {
     Logger *lg = logDefault();
     if (lg.level > Level.warn) { return; }
+    logAfterShutdown(file, line);
     logWrite(lg, Level.warn, file, line, func, fmt, args);
 }
 
 pub void error(@caller("file") u8 *file, @caller("line") i64 line,
                @caller("func") u8 *func, u8 *fmt, ...args)
 {
-    logWrite(logDefault(), Level.error, file, line, func, fmt, args);
+    Logger *lg = logDefault();
+    logAfterShutdown(file, line);
+    logWrite(lg, Level.error, file, line, func, fmt, args);
 }

@@ -95,8 +95,29 @@ void main()
 <pre class="output">server: 2 of 100
 </pre>
 
-<div class="warn"><p><strong>Locals are not zeroed.</strong> Only <code>String</code> locals start
-empty. Give every other local a value before you read it.</p></div>
+<h2 id="locals-start-zeroed">Locals start zeroed<a class="anchor" href="#locals-start-zeroed" aria-label="Link to this section">#</a></h2>
+<p>A local declared without a value is zero: <code>0</code>, <code>0.0</code>, <code>false</code>,
+<code>null</code>, an empty <code>String</code> or slice, a struct or array with every byte 0. It is zero
+again each time its declaration runs, as in a loop.</p>
+<pre data-run><code>struct Report { i64 lines; f64 ratio; u8 *name; };
+
+void main()
+{
+  for (i64 i = 0; i &lt; 2; i++) {
+    i64 n;
+    Report rep;
+    printf("%d %d %.1f %d\n", n, rep.lines, rep.ratio, rep.name == null);
+    n = 5;
+    rep.lines = 9;
+  }
+}
+</code></pre>
+<pre class="output">0 0 0.0 1
+0 0 0.0 1
+</pre>
+<p>One exception: an array over 4 KiB with no <code>String</code> or slice in it, such as
+<code>u8 buf[65536];</code>, is a buffer you fill, and is left as it is so its memory isn't touched
+for nothing. Write <code>u8 buf[65536] = {0};</code> when you need it zeroed.</p>
 
 <h2 id="auto">auto<a class="anchor" href="#auto" aria-label="Link to this section">#</a></h2>
 <p><code>auto</code> takes its type from the initialiser.</p>
@@ -216,7 +237,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#declaring-variables">Declaring variables</a></li><li><a href="#globals">Globals</a></li><li><a href="#auto">auto</a></li><li><a href="#static">static</a></li><li><a href="#const">const</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#declaring-variables">Declaring variables</a></li><li><a href="#globals">Globals</a></li><li><a href="#locals-start-zeroed">Locals start zeroed</a></li><li><a href="#auto">auto</a></li><li><a href="#static">static</a></li><li><a href="#const">const</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li></ul></nav>
 </div>
 </body>
 </html>

@@ -39,6 +39,56 @@ pub bool unsetenv(u8[] name)
     return libc.unsetenv(n.cstr()) == 0;
 }
 
+/* text with each ${NAME} replaced by that environment variable (empty
+ * when unset) and ${NAME:fallback} by the variable, or fallback when it
+ * is unset or empty. $${ writes a literal ${; a bare $NAME and an
+ * unterminated ${ stay as they are */
+pub String expandEnv(u8[] text)
+{
+    String out;
+    i64 i = 0;
+    while (i < text.len) {
+        u8 c = text[i];
+        if (c == '$' && i + 2 < text.len && text[i + 1] == '$' && text[i + 2] == '{') {
+            out.append("${");
+            i += 3;
+            continue;
+        }
+        if (c != '$' || i + 1 >= text.len || text[i + 1] != '{') {
+            out.appendByte(c);
+            i++;
+            continue;
+        }
+        i64 end = i + 2;
+        while (end < text.len && text[end] != '}') { end++; }
+        if (end >= text.len) {
+            out.append(text[i:text.len]);
+            break;
+        }
+        u8[] inner = text[i + 2:end];
+        u8[] name = inner;
+        u8[] fallback = "";
+        bool hasFallback = false;
+        for (i64 j = 0; j < inner.len; j++) {
+            if (inner[j] == ':') {
+                name = inner[0:j];
+                fallback = inner[j + 1:inner.len];
+                hasFallback = true;
+                break;
+            }
+        }
+        String v = getenv(name);
+        if (v.len == 0 && hasFallback) {
+            out.append(fallback);
+        } else {
+            out.append(v[0:v.len]);
+        }
+        v.free();
+        i = end + 1;
+    }
+    return out;
+}
+
 #ifdef IS_MACOS
 /* the raw Mach-O name: ktm doesn't prefix names starting with _ */
 _extern __NSGetExecutablePath i32 procExecutablePath(u8 *buf, u32 *size);

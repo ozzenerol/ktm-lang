@@ -146,23 +146,30 @@ static i32 makeDirC(u8 *path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
     return result;
 }
 
-pub i32 removeDir(u8[] path, i64 flags=0)
+/* The directory `path` removed (with REMOVE_RECURSIVE, everything in
+ * it too): true, or false with os.errno() set */
+pub bool removeDir(u8[] path, i64 flags=0)
 {
     u8 cpath[FS_PATH_MAX];
-    if (!fsPath(path, cpath)) { return -1; }
-    return removeDirC(cpath, flags);
+    if (!fsPath(path, cpath)) { return false; }
+    return removeDirC(cpath, flags) == 0;
 }
 
-pub i32 remove(u8[] path, i64 flags=0)
+/* The file (or, with REMOVE_RECURSIVE, the directory) `path` removed:
+ * true, or false with os.errno() set */
+pub bool remove(u8[] path, i64 flags=0)
 {
     u8 cpath[FS_PATH_MAX];
-    if (!fsPath(path, cpath)) { return -1; }
-    return removeC(cpath, flags);
+    if (!fsPath(path, cpath)) { return false; }
+    return removeC(cpath, flags) == 0;
 }
 
-pub i32 makeDir(u8[] path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
+/* The directory `path` made (with recurse, every missing parent too):
+ * true when it is a directory afterwards (also when it already was),
+ * false with os.errno() set when not */
+pub bool makeDir(u8[] path, i32 mode=MAKE_DIR_DEFAULT, bool recurse=false)
 {
     u8 cpath[FS_PATH_MAX];
-    if (!fsPath(path, cpath)) { return -1; }
-    return makeDirC(cpath, mode, recurse);
+    if (!fsPath(path, cpath)) { return false; }
+    return makeDirC(cpath, mode, recurse) == 0;
 }

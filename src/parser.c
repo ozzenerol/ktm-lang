@@ -2025,6 +2025,108 @@ static void parseGlobalInitRuntimeItems(Cctrl *cc, Ast *var, Ast *init,
     }
 }
 
+/* `T[] s = { ... }`. Two items, a T * and a length, are the slice's own
+ * fields as before (`i64[] s = {ptr, n};`); anything else is a list of
+ * Ts, kept in a hidden array the slice views, as `T arr[] = {...};
+ * T[] s = arr;` would (it lives as long as the function, or the
+ * program for a global). The `{` is the next token. */
+static Ast *parseSliceInit(Cctrl *cc, Ast *var, s64 terminator_flags) {
+    AstType *st = var->type;
+    AstType *elem = st->elem;
+    AstType *arr_t = astMakeArrayType(elem, -1);
+    volatile int depth = 0;
+    List *items = listNew();
+    Vec *starts = vecNew(&vec_unsigned_long_type);
+    int nested = 0;
+
+    cctrlTokenGetRequired(cc); /* { */
+    depth++;
+    u64 i = 0;
+    while (1) {
+        Lexeme *tok = cctrlTokenGetRequired(cc);
+        if (tokenPunctIs(tok, '}')) {
+            depth--;
+            break;
+        }
+        cctrlTokenRewind(cc);
+        Ast *item;
+        Lexeme *start = malloc(sizeof(Lexeme));
+        if (tokenPunctIs(tok, '{')) {
+            item = parseDeclNestedInit(cc, arr_t, 0, i, &depth);
+            nested = 1;
+            *start = *tok;
+        } else {
+            item = parseDeclInitExpr(cc, start);
+        }
+        listAppend(items, item);
+        vecPush(starts, start);
+        i++;
+        tok = cctrlTokenGet(cc);
+        if (!tokenPunctIs(tok, ',')) cctrlTokenRewind(cc);
+    }
+    Lexeme *end = cctrlTokenGet(cc);
+    assertTokenIsTerminator(cc, end, terminator_flags);
+
+    u64 n = listCount(items);
+    Ast *first = n == 2 ? (Ast *)items->next->value : NULL;
+    Ast *second = n == 2 ? (Ast *)items->next->next->value : NULL;
+    int fields = !nested && first && second && first->type && second->type &&
+                 first->type->kind == AST_TYPE_POINTER &&
+                 astIsIntType(second->type) &&
+                 !(elem->kind == AST_TYPE_POINTER &&
+                   !strcmp(astTypeToString(first->type), astTypeToString(elem)));
+    List *inits = listNew();
+    i = 0;
+    listForEach(items) {
+        Ast *item = it->value;
+        Lexeme *start = vecGet(Lexeme *, starts, i);
+        if (fields) {
+            item = parseDeclScalarInit(cc, st, 1, i, &depth, item, start);
+        } else if (item->kind != AST_ARRAY_INIT) {
+            item = parseDeclScalarInit(cc, arr_t, 0, i, &depth, item, start);
+        }
+        listAppend(inits, item);
+        free(start);
+        i++;
+    }
+    vecRelease(starts);
+    Ast *list = astArrayInit(inits);
+    if (fields) {
+        if (var->kind == AST_GVAR) parseGlobalInitRuntimeItems(cc, var, list, st, 0);
+        return astDecl(var, list);
+    }
+
+    arr_t->len = (int)n;
+    arr_t->size = (int)n * elem->size;
+    static int arr_id = 0;
+    AoStr *name = aoStrPrintf("#slicearr%d", arr_id++);
+    Ast *arr;
+    Ast *arr_decl;
+    if (var->kind == AST_LVAR) {
+        arr = astLVar(arr_t, name->data, name->len);
+        if (cc->tmp_locals) listAppend(cc->tmp_locals, arr);
+        arr_decl = astDecl(arr, list);
+    } else {
+        arr = astGVar(arr_t, name->data, name->len, 1);
+        listAppend(cc->ast_list, astDecl(arr, list));
+        parseGlobalInitRuntimeItems(cc, arr, list, arr_t, 0);
+        arr_decl = NULL;
+    }
+    if (!arr_decl) {
+        /* a global: the view is set when the program starts, after the
+         * array's own run-time items */
+        int is_err = 0;
+        parseAddInitialiser(cc, astBinaryOp(AST_BIN_OP_ASSIGN, var,
+                                            parseSliceFrom(cc, st, arr), &is_err));
+        return astDecl(var, NULL);
+    }
+    Ast *decl = astDecl(var, parseSliceFrom(cc, st, arr));
+    List *both = listNew();
+    listAppend(both, arr_decl);
+    listAppend(both, decl);
+    return astCompountStatement(both);
+}
+
 /* `eq_line`:`eq_col` is where the `=` is, for the type check warning. */
 Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
                              int eq_line, int eq_col)
@@ -2062,6 +2164,8 @@ Ast *parseVariableAssignment(Cctrl *cc, Ast *var, s64 terminator_flags,
             parseGlobalInitRuntimeItems(cc,var,init,var->type,0);
         }
         return astDecl(var,init);
+    } else if (astTypeIsSlice(var->type) && tokenPunctIs(peek,'{')) {
+        return parseSliceInit(cc, var, terminator_flags);
     } else if ((var->type->kind == AST_TYPE_CLASS ||
                 var->type->kind == AST_TYPE_UNION) &&
                !var->type->is_intrinsic && tokenPunctIs(peek,'{')) {
@@ -3474,6 +3578,40 @@ static void parseCaseArm(Cctrl *cc, Ast *arm) {
     cc->fallthrough_col = ft_col;
 }
 
+/* The index of case string `str` in the switch's strings, added when it
+ * is new; a string already there is an error (case-sensitive, by bytes) */
+static int parseCaseStringIndex(Cctrl *cc, Ast *str, Lexeme *case_tok) {
+    Vec *strings = cc->tmp_case_strings;
+    char *bytes = malloc(str->sval->len + 1);
+    char *other = NULL;
+    astStringDecode(str, bytes);
+    int n = (int)str->real_len - 1;
+    for (u64 i = 0; i < strings->size; ++i) {
+        Ast *cur = vecGet(Ast *, strings, i);
+        other = realloc(other, cur->sval->len + 1);
+        astStringDecode(cur, other);
+        int m = (int)cur->real_len - 1;
+        if (m != n || memcmp(bytes, other, n)) continue;
+        char *msg = mprintf("duplicate case value \"%s\"", str->sval->data);
+        AoStr *bold = aoStrNew();
+        aoStrCatColoured(bold, ESC_BOLD, msg);
+        AoStr *buf = cctrlCreateErrorLineAt(cc, case_tok->line, case_tok->col,
+                                            case_tok->len, bold->data,
+                                            CCTRL_ERROR, NULL);
+        aoStrRelease(bold);
+        CctrlDiagnostic *d = cctrlMakeDiag(cc, CCTRL_ERROR, buf, NULL);
+        d->line = d->end_line = case_tok->line;
+        d->col = case_tok->col;
+        d->end_col = case_tok->col + case_tok->len;
+        cctrlDiagPush(cc, d);
+        break;
+    }
+    free(bytes);
+    free(other);
+    vecPush(strings, str);
+    return (int)strings->size - 1;
+}
+
 Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     if (cc->tmp_case_list == NULL) {
         cctrlRaiseException(cc,"unexpected 'case' found");
@@ -3487,6 +3625,28 @@ Ast *parseCaseLabel(Cctrl *cc, Lexeme *tok) {
     int ok = 1;
 
     peek = cctrlTokenPeek(cc);
+    if (cc->tmp_case_strings) {
+        /* a switch on strings: the case's number is its string's index */
+        case_expr = parseRequiredExpr(cc, "a `case` string");
+        value_expr = case_expr;
+        if (case_expr->kind != AST_STRING) {
+            cctrlRewindUntilStrMatch(cc,str_lit("case"),NULL);
+            cctrlRaiseExceptionFromTo(cc, NULL, 'c', ':',
+                    "a switch on a u8[] or String takes a string literal after `case`, got - %s",
+                    astLValueToString(case_expr,0));
+        }
+        if (tokenPunctIs(cctrlTokenPeek(cc),TK_ELLIPSIS)) {
+            cctrlRaiseException(cc,"a `case` range can't be used in a switch on strings");
+        }
+        cctrlTokenExpect(cc,':');
+        begining = parseCaseStringIndex(cc, case_expr, case_tok);
+        label = astMakeLabel();
+        List *stmts = listNew();
+        case_ = astCase(label,begining,begining,stmts);
+        vecPush(cc->tmp_case_list,case_);
+        parseCaseArm(cc, case_);
+        return case_;
+    }
     if (tokenPunctIs(peek,':')) {
         if (vecEmpty(cc->tmp_case_list)) {
             begining = 0;
@@ -3552,6 +3712,62 @@ Ast *parseDefaultStatement(Cctrl *cc) {
     return cc->tmp_default_case;
 }
 
+/* A switch on strings (L7): its value is a u8[] (bytes) or a String */
+static int parseIsStringSwitch(AstType *t) {
+    if (astTypeIsString(t)) return 1;
+    return astTypeIsSlice(t) && t->elem && t->elem->size == 1 &&
+           (t->elem->kind == AST_TYPE_CHAR || t->elem->kind == AST_TYPE_INT);
+}
+
+/* The case number a switch on strings switches on: the index in
+ * `strings` of the case equal to `value` (same length, then the same
+ * bytes, case-sensitive), or -1. `value` is read once, into a hidden
+ * u8[], by the first length compare. */
+static Ast *parseStringSwitchIndex(Cctrl *cc, Ast *value, Vec *strings) {
+    AstType *slice_t = astTypeIsString(value->type) ? astMakeSliceType(ast_u8_type)
+                                                     : value->type;
+    value = parseSliceFrom(cc, slice_t, value);
+    Ast *var = parseHiddenSliceVar(cc, slice_t);
+    AstType *len_t = mapGetLen(slice_t->fields, str_lit("len"));
+    AstType *ptr_t = mapGetLen(slice_t->fields, str_lit("ptr"));
+    AstType *elem_t = slice_t->elem;
+    int is_err = 0;
+    Ast *assign = astBinaryOp(AST_BIN_OP_ASSIGN, var, value, &is_err);
+    Ast *read = astClassRef(len_t, assign, "len");
+
+    /* built from the last case back: c0 ? 0 : (c1 ? 1 : ... -1) */
+    Ast *index = astI64Type(-1);
+    char *bytes = NULL;
+    for (s64 i = (s64)strings->size - 1; i >= -1; --i) {
+        if (i < 0) {
+            /* no case at all: still read the value once */
+            if (strings->size == 0) {
+                Ast *never = astBinaryOp(AST_BIN_OP_LT, read, astI64Type(0), &is_err);
+                index = astTernary(ast_int_type, never, astI64Type(-1), index);
+            }
+            break;
+        }
+        Ast *str = vecGet(Ast *, strings, i);
+        bytes = realloc(bytes, str->sval->len + 1);
+        /* its bytes; an empty literal is kept as "\\0" */
+        astStringDecode(str, bytes);
+        int n = (int)str->real_len - 1;
+        Ast *len = i == 0 ? read : astClassRef(len_t, var, "len");
+        Ast *test = astBinaryOp(AST_BIN_OP_EQ, len, astI64Type(n), &is_err);
+        for (int b = 0; b < n; ++b) {
+            Ast *ptr = astClassRef(ptr_t, var, "ptr");
+            Ast *at = astBinaryOp(AST_BIN_OP_ADD, ptr, astI64Type(b), &is_err);
+            Ast *byte = astUnaryOperator(elem_t, AST_UN_OP_DEREF, at);
+            s64 want = elem_t->issigned ? (s64)(s8)bytes[b] : (s64)(u8)bytes[b];
+            Ast *same = astBinaryOp(AST_BIN_OP_EQ, byte, astI64Type(want), &is_err);
+            test = astBinaryOp(AST_BIN_OP_LOG_AND, test, same, &is_err);
+        }
+        index = astTernary(ast_int_type, test, astI64Type(i), index);
+    }
+    free(bytes);
+    return index;
+}
+
 Ast *parseSwitchStatement(Cctrl *cc) {
     Ast *volatile cond;
     Ast *tmp, *original_default_label;
@@ -3560,6 +3776,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     AoStr *end_label,*tmp_name,*original_break;
     volatile int switch_bounds_checked = 1;
     volatile char terminating_char = ')';
+    volatile int is_strings = 0;
 
     peek = cctrlTokenPeek(cc);
 
@@ -3585,8 +3802,10 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     } else {
         parseCondGuardArm(cc, &guard, &cond_recovery);
         cond = parseRequiredExpr(cc, "the `switch` value");
-        if (!astIsIntOrIntrinsic(cond->type)) {
-            cctrlRaiseException(cc,"Switch can only have int's at this time");
+        if (parseIsStringSwitch(cond->type)) {
+            is_strings = 1;
+        } else if (!astIsIntOrIntrinsic(cond->type)) {
+            cctrlRaiseException(cc,"Switch can only have an integer, a u8[] or a String value");
         }
         cctrlTokenExpect(cc,terminating_char);
         parseCondGuardDone(cc, &guard);
@@ -3596,9 +3815,11 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     original_default_label = cc->tmp_default_case;
     original_cases = cc->tmp_case_list;
     int original_default_at = cc->tmp_default_at;
+    Vec *original_strings = cc->tmp_case_strings;
 
     cc->tmp_case_list = astVecNew();
     cc->tmp_default_case = NULL;
+    cc->tmp_case_strings = is_strings ? astVecNew() : NULL;
 
     end_label = astMakeLabel();
 
@@ -3607,7 +3828,7 @@ Ast *parseSwitchStatement(Cctrl *cc) {
 
     tmp_name = astMakeTmpName();
 
-    tmp = astLVar(cond->type, tmp_name->data, tmp_name->len);
+    tmp = astLVar(is_strings ? ast_int_type : cond->type, tmp_name->data, tmp_name->len);
     listAppend(cc->tmp_locals,tmp);
 
     int outer_fallthrough = cc->fallthrough_pending;
@@ -3620,6 +3841,14 @@ Ast *parseSwitchStatement(Cctrl *cc) {
     cc->fallthrough_pending = outer_fallthrough;
     cc->fallthrough_line = outer_ft_line;
     cc->fallthrough_col = outer_ft_col;
+
+    if (is_strings) {
+        cond = parseStringSwitchIndex(cc, cond, cc->tmp_case_strings);
+        /* the index is -1 when no case matches: never a `switch [...]`
+         * jump without its bounds check */
+        switch_bounds_checked = 1;
+    }
+    cc->tmp_case_strings = original_strings;
 
     Ast *switch_ast = astSwitch(
         cond,
@@ -3885,6 +4114,17 @@ Ast *parseStatement(Cctrl *cc) {
         /* `();`: empty brackets are no expression (a lone `;` is the
          * empty statement) */
         cctrlRaiseException(cc, "Expected an expression between `(` and `)`");
+    }
+    if (ast && ast->kind == AST_CLASS_REF) {
+        /* `self.port;`: read and dropped, most likely a slip */
+        /* written as ktm does: `self.port`, not `self->port` */
+        AoStr *shown = aoStrNew();
+        for (char *c = astLValueToString(ast, 0); *c; ++c) {
+            if (c[0] == '-' && c[1] == '>') { aoStrPutChar(shown, '.'); c++; }
+            else aoStrPutChar(shown, *c);
+        }
+        cctrlWarningAt(cc, tok->line, tok->col, tok->len,
+                       "`%s` on its own does nothing", shown->data);
     }
     tok = cctrlTokenGet(cc);
     assertTokenIsTerminator(cc,tok,PUNCT_TERM_SEMI|PUNCT_TERM_COMMA);
@@ -4163,7 +4403,7 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
                     listAppend(body->stms,stmt);
                 }
                 if (ad_tok) {
-                    /* without a value only a String starts empty (zeroed) */
+                    /* without a value only a String is ready to free (empty) */
                     if ((!stmt || stmt->kind != AST_DECL || !stmt->declinit) &&
                         !astTypeIsString(var->type)) {
                         cctrlRaiseExceptionAt(cc, var->line, var->col, var->lname->len,
@@ -5887,6 +6127,8 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
     d->params = h.params;
     d->toks = toks;
     d->module_id = first->module_id;
+    AoStr *mpath = cctrlModulePath(cc, first->module_id);
+    d->module_path = mpath ? aoStrDup(mpath) : NULL;
     d->is_pub = h.is_pub;
     d->at = h.name;
     d->file_id = ast_file_hint;
@@ -5963,8 +6205,36 @@ static AoStr *parseGenericInstName(AoStr *name, Vec *args) {
 /* Parse definition `d`'s tokens again as instance `in`: its parameters
  * bound to the arguments, the parser's state saved around it. An error
  * in it is reported where it is and where the instance was asked for. */
+/* `d` was recorded by another parse whose lexer numbered the modules
+ * differently (the LSP's bootstrap, which reads rt and the prelude and
+ * what they import, before each document's parse): its tokens get this
+ * lexer's number for its module */
+static void parseGenericRenumber(Cctrl *cc, GenericDef *d) {
+    if (!d->module_path || !cc->lexer_) return;
+    AoStr *now_path = cctrlModulePath(cc, d->module_id);
+    if (now_path && now_path->len == d->module_path->len &&
+        !memcmp(now_path->data, d->module_path->data, now_path->len)) {
+        return;
+    }
+    for (int i = 0; i < cc->lexer_->modules_len; ++i) {
+        AoStr *p = cc->lexer_->modules[i]->path;
+        if (p->len != d->module_path->len ||
+            memcmp(p->data, d->module_path->data, p->len)) {
+            continue;
+        }
+        u32 old_id = d->module_id, new_id = (u32)i + 1;
+        for (u64 t = 0; t < d->toks->size; ++t) {
+            Lexeme *tok = d->toks->entries[t];
+            if (tok->module_id == old_id) tok->module_id = new_id;
+        }
+        d->module_id = new_id;
+        return;
+    }
+}
+
 static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     Vec *toks = d->toks;
+    parseGenericRenumber(cc, d);
     u64 cap = roundUpToNextPowerOf2(toks->size + 1);
     if (cap < 16) cap = 16;
     Lexeme **ring = (Lexeme **)malloc(cap * sizeof(Lexeme *));
@@ -5996,6 +6266,7 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     List *saved_lit_writes = cc->lit_writes;
     List *saved_elide_open = cc->elide_open, *saved_elide_done = cc->elide_done;
     Vec *saved_case_list = cc->tmp_case_list;
+    Vec *saved_case_strings = cc->tmp_case_strings;
     Ast *saved_default_case = cc->tmp_default_case;
     AstType *saved_method_self = cc->method_self;
     Vec *saved_overload_set = cc->tmp_overload_set;
@@ -6066,6 +6337,7 @@ static void parseGenericReplay(Cctrl *cc, GenericDef *d, GenericInst *in) {
     cc->elide_open = saved_elide_open;
     cc->elide_done = saved_elide_done;
     cc->tmp_case_list = saved_case_list;
+    cc->tmp_case_strings = saved_case_strings;
     cc->tmp_default_case = saved_default_case;
     cc->method_self = saved_method_self;
     cc->tmp_overload_set = saved_overload_set;
@@ -8064,6 +8336,11 @@ static void parseModuleInits(Cctrl *cc) {
             Ast *fn = astFunction(fn_type, sym, strlen(sym), astVecNew(),
                                   astCompountStatement(stmts),
                                   m->init_locals ? m->init_locals : listNew(), 0);
+            /* the module's file, not the one parsed last (reports) */
+            listForEach(m->init_stmts) {
+                Ast *st = it->value;
+                if (st && st->file_id) { fn->file_id = st->file_id; break; }
+            }
             listAppend(cc->ast_list, fn);
             m->has_init = 1;
             char *real = realpath(m->dir->data, NULL);

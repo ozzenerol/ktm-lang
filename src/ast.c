@@ -376,6 +376,10 @@ char *astRuntimeSymbol(const char *name) {
     return astModuleMangle(qual, strlen(qual));
 }
 
+/* Encoded generic parts and the names they stand for (`VecIi64E` ->
+ * `Vec<i64>`), for showing an overload's parameter types */
+static Map *ast_generic_parts = NULL;
+
 /* A name part of a symbol, length-prefixed; a generic instance's
  * `Vec<geo.Point *>` with the characters a symbol can't hold as letters
  * (`<` I, `>` E, `,` _, `*` P, `[` S, `(` F, `)` E, `.` _) */
@@ -399,6 +403,10 @@ static void astMangleCatPart(AoStr *out, const char *s, int n) {
         }
     }
     aoStrCatPrintf(out, "%d%s", (int)enc->len, enc->data);
+    if (!ast_generic_parts) ast_generic_parts = mapNew(32, &map_cstring_opaque_type);
+    if (!mapGet(ast_generic_parts, enc->data)) {
+        mapAdd(ast_generic_parts, mprintf("%s", enc->data), mprintf("%.*s", n, s));
+    }
     aoStrRelease(enc);
 }
 
@@ -539,12 +547,16 @@ static void astOverloadParamsCode(AoStr *out, Vec *params, int from) {
     if (!n) aoStrPutChar(out, 'v');
 }
 
+/* A generic instance's part (`Vec<String>`) is encoded as in a generic's
+ * own symbol, and a `.` inside its <> doesn't split it */
 static void astOverloadNameCode(AoStr *out, AoStr *name) {
     aoStrPutChar(out, 'N');
-    int start = 0;
+    int start = 0, depth = 0;
     for (int i = 0; i <= (int)name->len; ++i) {
-        if (i == (int)name->len || name->data[i] == '.') {
-            aoStrCatPrintf(out, "%d%.*s", i - start, i - start, name->data + start);
+        if (i < (int)name->len && name->data[i] == '<') depth++;
+        if (i < (int)name->len && name->data[i] == '>') depth--;
+        if (i == (int)name->len || (name->data[i] == '.' && depth == 0)) {
+            astMangleCatPart(out, name->data + start, i - start);
             start = i + 1;
         }
     }
@@ -644,7 +656,10 @@ static int astOverloadDecodeType(AoStr *out, const char **p, const char *end) {
                 while (*p < end && isdigit((unsigned char)**p)) n = n * 10 + (*(*p)++ - '0');
                 if (*p + n > end) return 0;
                 if (!first) aoStrPutChar(out, '.');
-                aoStrCatLen(out, *p, n);
+                char *part = mprintf("%.*s", n, *p);
+                char *shown = ast_generic_parts ? mapGet(ast_generic_parts, part) : NULL;
+                if (shown) aoStrCat(out, shown);
+                else aoStrCatLen(out, *p, n);
                 *p += n;
                 first = 0;
             }
@@ -1106,8 +1121,8 @@ int astTypeIsString(AstType *type) {
 }
 
 /* A slice or a String, or a struct, union or array with one in it: what
- * a local starts empty without an initialiser (zeroed), since its len
- * (and a String's ptr) guard its use */
+ * is always zeroed without an initialiser, even in a big array, since
+ * its len (and a String's ptr) guard its use */
 int astTypeHasSlice(AstType *type) {
     if (!type) return 0;
     if (astTypeIsSlice(type) || astTypeIsString(type)) return 1;

@@ -90,7 +90,7 @@ static i64 compareNames(String *a, String *b) {
 }
 
 /* The names in the directory at `path`, sorted; *ok (when given) is
- * false when it can't be read. Yours: free it with fs.freeList(&names). */
+ * false when it can't be read. Yours: free it with names.free(). */
 pub vec.Vec<String> list(u8[] path, bool *ok = null) {
     vec.Vec<String> names = vec.new<String>();
     Dir d = openDir(path);
@@ -104,11 +104,9 @@ pub vec.Vec<String> list(u8[] path, bool *ok = null) {
     return names;
 }
 
-/* Frees what list() gave: each name, then the vector */
+/* Frees what list() gave: the same as names.free(), which frees the
+ * names too */
 pub void freeList(vec.Vec<String> *names) {
-    for (i64 i = 0; i < names.len; i++) {
-        names.at(i).free();
-    }
     names.free();
 }
 
@@ -165,44 +163,44 @@ pub bool exists(u8[] path) {
 }
 
 /* The directory `path` made, with every missing parent, as
- * makeDir(path, mode, true): 0 when `path` is a directory afterwards
- * (also when it already was), -1 when not */
-pub i32 makeDirAll(u8[] path, i32 mode = MAKE_DIR_DEFAULT) {
+ * makeDir(path, mode, true): true when `path` is a directory afterwards
+ * (also when it already was), false with os.errno() set when not */
+pub bool makeDirAll(u8[] path, i32 mode = MAKE_DIR_DEFAULT) {
     return makeDir(path, mode, true);
 }
 
 /* The regular file `from` copied to `to` (made, or emptied first), with
- * from's permission bits. 0, or -1 with os.errno(): `from` isn't a
+ * from's permission bits. true, or false with os.errno(): `from` isn't a
  * regular file, the two are the same file, a read or a write failed
  * (`to` is then removed). */
-pub i32 copyFile(u8[] from, u8[] to) {
+pub bool copyFile(u8[] from, u8[] to) {
     u8 cfrom[FS_PATH_MAX];
     u8 cto[FS_PATH_MAX];
-    if (!fsPath(from, cfrom) || !fsPath(to, cto)) { return -1; }
+    if (!fsPath(from, cfrom) || !fsPath(to, cto)) { return false; }
     i32 in = libc.open(cfrom, libc.O_RDONLY | libc.O_CLOEXEC, 0);
-    if (in == -1) { return -1; }
+    if (in == -1) { return false; }
     FileStat src;
     FileStat dst;
     if (fstat(&src, in) != 0) {
         libc.close(in);
-        return -1;
+        return false;
     }
     if (src.kind() != FileKind.file) {
         libc.close(in);
         os.setErrno(src.kind() == FileKind.dir ? libc.EISDIR : libc.EINVAL);
-        return -1;
+        return false;
     }
     /* copying a file onto itself would empty it */
     if (stat(&dst, to) == 0 && dst.st_dev == src.st_dev && dst.st_ino == src.st_ino) {
         libc.close(in);
         os.setErrno(libc.EINVAL);
-        return -1;
+        return false;
     }
     i32 out = libc.open(cto, libc.O_WRONLY | libc.O_CREAT | libc.O_TRUNC | libc.O_CLOEXEC,
                         (i32)(src.st_mode & 0x1FF));
     if (out == -1) {
         libc.close(in);
-        return -1;
+        return false;
     }
     i64 cap = 65536;
     u8 *buf = mem.alloc(cap);
@@ -233,30 +231,30 @@ pub i32 copyFile(u8[] from, u8[] to) {
         libc.unlink(cto);
         os.setErrno(err);
     }
-    return result;
+    return result == 0;
 }
 
-/* `from` renamed to `to` (replacing a file there), on one filesystem: 0,
- * or -1 with os.errno() (EXDEV across filesystems: see move) */
-pub i32 rename(u8[] from, u8[] to) {
+/* `from` renamed to `to` (replacing a file there), on one filesystem:
+ * true, or false with os.errno() (EXDEV across filesystems: see move) */
+pub bool rename(u8[] from, u8[] to) {
     u8 cfrom[FS_PATH_MAX];
     u8 cto[FS_PATH_MAX];
-    if (!fsPath(from, cfrom) || !fsPath(to, cto)) { return -1; }
-    return libc.rename(cfrom, cto);
+    if (!fsPath(from, cfrom) || !fsPath(to, cto)) { return false; }
+    return libc.rename(cfrom, cto) == 0;
 }
 
 /* As rename(), and across filesystems a regular file is copied, then
- * removed: 0, or -1 with os.errno() (a directory can't move across
- * filesystems) */
-pub i32 move(u8[] from, u8[] to) {
-    if (rename(from, to) == 0) { return 0; }
-    if (os.errno() != libc.EXDEV) { return -1; }
+ * removed: true, or false with os.errno() (a directory can't move
+ * across filesystems) */
+pub bool move(u8[] from, u8[] to) {
+    if (rename(from, to)) { return true; }
+    if (os.errno() != libc.EXDEV) { return false; }
     FileStat st;
-    if (lstat(&st, from) != 0) { return -1; }
+    if (lstat(&st, from) != 0) { return false; }
     if (st.kind() != FileKind.file) {
         os.setErrno(libc.EXDEV);
-        return -1;
+        return false;
     }
-    if (copyFile(from, to) != 0) { return -1; }
+    if (!copyFile(from, to)) { return false; }
     return remove(from);
 }

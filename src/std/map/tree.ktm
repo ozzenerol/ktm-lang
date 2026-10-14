@@ -6,8 +6,9 @@ import mem, str;
  * ordered by map.compare(K, K) (overloads for the integer types, f64 and
  * u8[]/String; a key type of your own adds one), and walked in order with
  * `for (auto n = t.first(); n; n = t.after(n))` (n.key, n.value). u8[] and
- * String keys are copied into the tree and freed with it; values are
- * yours. */
+ * String keys are copied into the tree and freed with it; String values
+ * are the tree's too (freed by delete, clear, free and a set that
+ * replaces them); other values are yours. */
 
 const i64 TREE_RED = 0;
 const i64 TREE_BLACK = 1;
@@ -53,6 +54,21 @@ pub String keyCopy(String k) { return k.clone(); }
 pub void keyFree<K>(K k) {}
 pub void keyFree(u8[] k) { mem.free(k.ptr); }
 pub void keyFree(String k) { k.free(); }
+
+/* A String value is the map's (or tree's) too: freed when its entry is
+ * deleted or the map cleared, and when set() replaces it with another
+ * String; any other value is the caller's */
+/* A String handed out in a Vec (keys(), values()) as its own copy, as
+ * the Vec frees its Strings; anything else as it is */
+pub V ownCopy<V>(V v) { return v; }
+pub String ownCopy(String v) { return v.clone(); }
+
+pub void valueFree<V>(V v) {}
+pub void valueFree(String v) { v.free(); }
+pub void valueReplaced<V>(V old, V v) {}
+pub void valueReplaced(String old, String v) {
+        if (old.ptr != v.ptr) { old.free(); }
+}
 
 /* ---- the tree ---- */
 
@@ -158,6 +174,7 @@ pub void Tree<K, V>.set(K key, V value) {
                 y = x;
                 c = compare(key, x.key);
                 if (c == 0) {
+                        valueReplaced(x.value, value);
                         x.value = value;
                         return;
                 }
@@ -307,6 +324,7 @@ pub bool Tree<K, V>.delete(K key) {
         if (color == TREE_BLACK) { treeFixDelete(self, x); }
         if (self.root == self.nil) { self.root.parent = null; }
         keyFree(z.key);
+        valueFree(z.value);
         mem.free(z);
         self.len--;
         return true;
@@ -351,6 +369,7 @@ static void treeFreeNodes<K, V>(Tree<K, V> *t, TreeNode<K, V> *n) {
                 treeFreeNodes(t, n.left);
                 TreeNode<K, V> *right = n.right;
                 keyFree(n.key);
+                valueFree(n.value);
                 mem.free(n);
                 n = right;
         }

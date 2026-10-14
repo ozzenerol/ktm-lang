@@ -87,8 +87,9 @@ id,square
     <tr><td><code>equals(a, b)</code></td><td><code>bool</code>: the same bytes</td></tr>
     <tr><td><code>compare(a, b)</code></td><td>Negative, 0 or positive, for sorting</td></tr>
     <tr><td><code>trim(s)</code>, <code>trimStart(s)</code>, <code>trimEnd(s, chars)</code></td><td>A view without the whitespace (or the given bytes)</td></tr>
-    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after</td></tr>
+    <tr><td><code>splitFirst(s, sep, &amp;a, &amp;b)</code>, <code>splitLast</code></td><td><code>bool</code>; the views before and after. With no sep, a is all of s and b is empty (Go's <code>strings.Cut</code>)</td></tr>
     <tr><td><code>split(s, sep)</code></td><td>A <code>u8[][]</code> of views, allocated: free it</td></tr>
+    <tr><td><code>join(parts, sep)</code></td><td>A new String: the parts (a <code>u8[][]</code>, or a <code>vec.Vec&lt;String&gt; *</code> or <code>vec.Vec&lt;u8[]&gt; *</code>) with sep between them</td></tr>
   </tbody>
 </table>
 <pre data-run><code>
@@ -144,6 +145,27 @@ void main()
 <pre class="output">
 [a][b][][c] 4 parts
 </pre>
+<p><code>join</code> puts them back together, from a slice or a Vec:</p>
+<pre data-run><code>
+import str, vec;
+
+void main()
+{
+  ad u8[][] parts = str.split("a,b,,c", ",");
+  ad String line = str.join(parts, " | ");
+  printf("%s\n", line);
+
+  ad vec.Vec<String> words = vec.new<String>();
+  words.push(str.format("users_%d", 2));
+  words.push(str.format("orders_%d", 7));
+  ad String list = str.join(&words, ", ");
+  printf("%s\n", list);
+}
+</code></pre>
+<pre class="output">
+a | b |  | c
+users_2, orders_7
+</pre>
 
 <h3>Parsing a line</h3>
 <pre data-run><code>
@@ -162,6 +184,29 @@ void main()
 </code></pre>
 <pre class="output">
 GET | /index.html | HTTP/1.1 | file index.html
+</pre>
+
+<h2>Numbers from text</h2>
+<p><code>str.toInt(s, &amp;n)</code>, <code>str.toUint(s, &amp;u)</code> and <code>str.toFloat(s, &amp;f)</code> read the whole of a
+<code>u8[]</code> (or a String) as a number and return whether it was one: no spaces, nothing after it, and it must fit.
+On false the variable is left as it was. Integers take <code>0x</code> and <code>0b</code> prefixes; they work as methods too.</p>
+<pre data-run><code>
+import str;
+
+void main()
+{
+  u8[] line = "port=8080";
+  i64 port = 80;
+  if (!str.toInt(line[5:], &port)) { printf("bad port\n"); }
+  f64 ratio;
+  bool ok = "0.75".toFloat(&ratio);
+  i64 n = -1;
+  bool bad = str.toInt("12abc", &n);
+  printf("%d %d %.2f %d %d\n", port, ok, ratio, bad, n);
+}
+</code></pre>
+<pre class="output">
+8080 1 0.75 0 -1
 </pre>
 
 <h2>Characters</h2>

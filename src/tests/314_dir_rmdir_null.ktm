@@ -9,9 +9,9 @@ i32 main() {
     i64 correct = 0, tests = 3;
     printf("Test - removeDir and remove with null: ");
 
-    if (fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE) == -1) { correct++; }
-    if (fs.removeDir(cstr.view(null)) == -1 && fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE) == -1) { correct++; }
-    if (fs.remove(cstr.view(null)) == -1) { correct++; }
+    if (!fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE)) { correct++; }
+    if (!fs.removeDir(cstr.view(null)) && !fs.removeDir(cstr.view(null), fs.REMOVE_RECURSE)) { correct++; }
+    if (!fs.remove(cstr.view(null))) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

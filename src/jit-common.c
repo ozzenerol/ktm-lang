@@ -540,6 +540,7 @@ KtmJit *ktmJitNew(Cctrl *cc, const KtmJitBackend *backend) {
     jit->backend        = backend;
     jit->symbols        = mapNew(64, &map_cstring_opaque_type);
     jit->host_symbols   = mapNew(64, &map_cstring_opaque_type);
+    jit->sym_files      = mapNew(64, &map_cstring_cstring_type);
     jit->chunk_fns      = mapNew(64, &map_cstring_opaque_type);
     jit->chunks         = listNew();
     jit->globals_arenas = listNew();
@@ -562,6 +563,15 @@ KtmJit *ktmJitNew(Cctrl *cc, const KtmJitBackend *backend) {
 
 /* Register a chunk-internal function name (emit-time calls/IR_LEA to
  * it route through label fixups instead of host_symbols/dlsym). */
+/* Remember which file the function `fn` came from (for reports). */
+static void jitNoteSymFile(KtmJit *jit, Cctrl *cc, Ast *fn) {
+    AoStr *file = cctrlLookUpFile(cc, fn->file_id);
+    if (file == NULL || jit->sym_files == NULL) return;
+    const char *name = asmNormaliseFunctionName(cc, fn->fname);
+    if (mapGet(jit->sym_files, (void *)name)) return;
+    mapAdd(jit->sym_files, strdup(name), strdup(file->data));
+}
+
 static void jitChunkFnAdd(KtmJit *jit, const char *name) {
     if (!mapHas(jit->chunk_fns, (void *)name)) {
         mapAdd(jit->chunk_fns, strdup(name), (void *)(uintptr_t)1);
@@ -626,9 +636,11 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
     for (List *it = ast_from; it != cc->ast_list; it = it->next) {
         Ast *ast = it->value;
         if (ast->kind != AST_FUNC) continue;
+        jitNoteSymFile(jit, cc, ast);
         if (jit->backend->compile_function(jit, ast, ir_ctx) != 0) return -1;
     }
     if (extra_fn) {
+        jitNoteSymFile(jit, cc, extra_fn);
         if (jit->backend->compile_function(jit, extra_fn, ir_ctx) != 0)
             return -1;
     }
@@ -802,6 +814,13 @@ const char *ktmJitFindSymbolForAddr(KtmJit *jit, void *pc, size_t *off_out) {
     return best;
 }
 
+const char *ktmJitFindFileForSymbol(KtmJit *jit, const char *sym) {
+    if (!jit || !jit->sym_files || !sym) return NULL;
+    const char *f = mapGet(jit->sym_files, (void *)sym);
+    if (f == NULL && sym[0] == '_') f = mapGet(jit->sym_files, (void *)(sym + 1));
+    return f;
+}
+
 void ktmJitNoteLine(KtmJit *jit, int line) {
     if (!jit || line <= 0) return;
     /* Collapse runs: only the line CHANGES matter. */
@@ -893,6 +912,7 @@ void ktmJitFree(KtmJit *jit) {
     if (jit->string_arenas) listRelease(jit->string_arenas, jitStringsFree);
     if (jit->symbols) mapRelease(jit->symbols);
     if (jit->host_symbols) mapRelease(jit->host_symbols);
+    if (jit->sym_files) mapRelease(jit->sym_files);
     if (jit->chunk_fns) mapRelease(jit->chunk_fns);
     if (jit->block_local) mapRelease(jit->block_local);
     if (jit->epi_local) mapRelease(jit->epi_local);

@@ -56,8 +56,9 @@
 <p class="lede">Find memory bugs with <code>-Memsafe</code>, and look at every stage of the compiler: tokens, syntax tree, IR, assembly.</p>
 
 <h2 id="memory-bugs-memsafe">Memory bugs: -Memsafe<a class="anchor" href="#memory-bugs-memsafe" aria-label="Link to this section">#</a></h2>
-<p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks at exit.
-Each report names the line that allocated or freed the block.</p>
+<p>Run with <code>-jit -Memsafe</code>. Double frees and wild frees are reported (and skipped) as they happen; leaks when <code>main</code> returns or the program calls <code>exit()</code>.
+Each report names the file and line in your code that allocated or freed the block, and the library function it went through (<code>via str.from</code>): the one your code called, never a private helper
+of it, since with <code>-Memsafe</code> a library function isn't inlined into your code.</p>
 <pre><code>import mem;
 
 void main()
@@ -69,14 +70,16 @@ void main()
 }                   // b leaks</code></pre>
 <pre class="shell"><code>$ ktm -jit -Memsafe leaky.ktm
 Free: double free of 0x559df8f63ca8 (16 bytes)
-  allocated   in `main`+23, line 5
-  first freed in `main`+55, line 7
-  this free   in `main`+64, line 8 - ignored, heap unharmed
+  allocated   at leaky.ktm:5 in main
+  first freed at leaky.ktm:7 in main
+  this free   at leaky.ktm:8 in main - ignored, heap unharmed
 memsafe: 1 allocation(s) (32 bytes) never freed
-  0x559df8f63df8        32 bytes  in `main`+42, line 6</code></pre>
+  0x559df8f63df8        32 bytes  at leaky.ktm:6 in main</code></pre>
 <ul class="rules">
+  <li>A leak is a block nothing points to any more. What a global, the library or (when the program calls <code>exit()</code>) a live variable still holds at exit is in use, not a leak: it is listed apart, under <code>still in use at exit ... not leaks</code>. So a program that ends while it still holds its data needs no frees just for the report.</li>
+  <li>The check is conservative: a word that looks like a pointer keeps a block alive. A small function inlined into its caller leaves its variables in the caller's frame, so what it dropped can count as in use.</li>
   <li>It works in any thread.</li>
-  <li>Only blocks from <code>mem.alloc</code>, <code>mem.allocZero</code> and <code>mem.realloc</code> are tracked; what the library allocates for you is not.</li>
+  <li>Every heap block is tracked: <code>mem.alloc</code> and friends, and what the library allocates for you (a <code>String</code>, a <code>vec.Vec</code>), reported at your line with <code>via str.from</code>, <code>via vec.new&lt;String&gt;</code> and so on. A module's global initialisers show as <code>in &lt;module&gt;'s globals</code>.</li>
   <li>The REPL always tracks allocations: <code>replHeap();</code> lists the live ones.</li>
 </ul>
 

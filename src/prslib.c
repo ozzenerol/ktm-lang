@@ -80,11 +80,29 @@ Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type);
 static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
                             int ptr_first);
 
+/* A byte pointer type (u8 *, i8 *), which a String converts to */
+static int parseIsBytePtr(AstType *t) {
+    return t && t->kind == AST_TYPE_POINTER && t->ptr && t->ptr->size == 1 &&
+           !t->ptr->is_bool &&
+           (t->ptr->kind == AST_TYPE_CHAR || t->ptr->kind == AST_TYPE_INT);
+}
+
 /* `expr` where a `want` is expected: a String (or a String *) is a view
- * of its bytes where a u8[] is; an array of want's element type
- * becomes a slice of it (its address and length, in a hidden variable),
- * anything else is returned as is for the type checks */
+ * of its bytes where a u8[] is, and a String variable or field its C
+ * string (s.cstr()) where a u8 * is; an array of want's element type becomes a slice of
+ * it (its address and length, in a hidden variable), anything else is
+ * returned as is for the type checks */
 Ast *parseSliceFrom(Cctrl *cc, AstType *want, Ast *expr) {
+    /* only a String that lives in a variable or a field: a call's String
+     * would have nobody to free it */
+    if (parseIsBytePtr(want) && expr && astTypeIsString(expr->type)) {
+        Ast *root = expr;
+        while (root->kind == AST_CLASS_REF) root = root->cls;
+        if (astIsUnOpKind(root, AST_UN_OP_DEREF)) root = root->operand;
+        if (root->kind == AST_LVAR || root->kind == AST_GVAR) {
+            return parseStringCPtr(cc, expr);
+        }
+    }
     if (astTypeIsSlice(want) && expr && expr->type && want->elem->size == 1 &&
         (want->elem->kind == AST_TYPE_CHAR || want->elem->kind == AST_TYPE_INT)) {
         AstType *t = expr->type;
@@ -133,6 +151,33 @@ Ast *parseHiddenSliceVar(Cctrl *cc, AstType *type) {
         listAppend(cc->ast_list, astDecl(var, NULL));
     }
     return var;
+}
+
+/* A String `expr` as a C string: its ptr, which is NUL-terminated, or ""
+ * for an empty String (whose ptr is null), as s.cstr() gives. `expr` is
+ * evaluated once: a variable or a field of one is read as is, anything
+ * else is assigned to a hidden variable first. */
+Ast *parseStringCPtr(Cctrl *cc, Ast *expr) {
+    AstType *ptr_t = mapGetLen(expr->type->fields, str_lit("ptr"));
+    AstType *u8_ptr = astMakePointerType(ast_u8_type);
+    Ast *root = expr;
+    while (root->kind == AST_CLASS_REF) root = root->cls;
+    if (astIsUnOpKind(root, AST_UN_OP_DEREF) && root->operand->kind == AST_LVAR) {
+        root = root->operand;
+    }
+    Ast *first, *again;
+    if (root->kind == AST_LVAR || root->kind == AST_GVAR) {
+        first = astClassRef(ptr_t, expr, "ptr");
+        again = astClassRef(ptr_t, expr, "ptr");
+    } else {
+        Ast *var = parseHiddenSliceVar(cc, expr->type);
+        int is_err = 0;
+        Ast *assign = astBinaryOp(AST_BIN_OP_ASSIGN, var, expr, &is_err);
+        first = astClassRef(ptr_t, assign, "ptr");
+        again = astClassRef(ptr_t, var, "ptr");
+    }
+    Ast *empty = astCast(cctrlGetOrSetString(cc, "", 0, 0), u8_ptr);
+    return astTernary(u8_ptr, first, astCast(again, u8_ptr), empty);
 }
 
 /* Words that are keywords though the lexer gives them as identifiers
@@ -1607,6 +1652,11 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
             ParseCallLoc *at = vecGet(ParseCallLoc *, item_spans, i);
             AstType *at_type = arg->type;
             if (untyped) {
+                if (at_type && astTypeIsString(at_type)) {
+                    /* a String goes as its C string, as s.cstr() */
+                    vecPush(converted, parseStringCPtr(cc, arg));
+                    continue;
+                }
                 if (at_type && (parseIsAggregateType(at_type))) {
                     cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
                         "argument %d of `%.*s`: a %s can't be passed as an untyped extra argument",
@@ -1620,6 +1670,7 @@ static void parseVarArgsPack(Cctrl *cc, Vec *argv_vec, Vec *spans,
                     arg = astCast(arg, ast_int_type);
                 }
             } else {
+                arg = parseSliceFrom(cc, elem, arg);
                 if (parseArgCompat(elem, arg) != ARG_OK) {
                     cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
                         "argument %d of `%.*s`: expected %s, got %s",
@@ -2002,9 +2053,32 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
             vecPush(argv_vec, astMakePlaceHolder());
             if (spans) vecPush(spans, NULL);
         }
+        /* a function of the program's `u8 *fmt, ...args`: printf's format
+         * (a spread `...slots` passes its slots on as they are) */
+        int own_fmt = 0;
+        if (fmt_idx < 0 && va_elem->has_var_args && va_at >= 1 && !va_spread) {
+            Ast *p = params->entries[va_at - 1];
+            if (p && p->kind == AST_LVAR && p->type && p->type->kind == AST_TYPE_POINTER &&
+                p->type->ptr && p->type->ptr->size == 1 &&
+                (p->type->ptr->kind == AST_TYPE_CHAR || p->type->ptr->kind == AST_TYPE_INT) &&
+                p->lname && p->lname->len == 3 && !memcmp(p->lname->data, "fmt", 3)) {
+                fmt_idx = va_at - 1;
+                own_fmt = 1;
+            }
+        }
         if (fmt_idx >= 0 && fmt_idx < (int)argv_vec->size) {
-            parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], va_items,
-                                  0, va_spans, fname, len);
+            Ast *fmt = argv_vec->entries[fmt_idx];
+            /* with a computed format a String still goes, as its C string */
+            int literal = fmt && fmt->kind == AST_STRING && fmt->sval;
+            int only_strings = 1;
+            for (u64 i = 0; i < va_items->size; ++i) {
+                Ast *a = va_items->entries[i];
+                if (a && a->type && astTypeIsSlice(a->type)) only_strings = 0;
+            }
+            if (literal || !only_strings || !own_fmt) {
+                parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], va_items,
+                                      0, va_spans, fname, len);
+            }
         }
         parseVarArgsPack(cc, argv_vec, spans, va_elem, va_items, va_spans,
                          va_spread, va_spread_idx, va_at, fname, len);
@@ -2203,6 +2277,18 @@ static int parseIsCFormatFunction(char *fname, int len) {
            (len == 12 && !strncmp(fname, str_lit("libc.fprintf")));
 }
 
+/* log.info(...) and the others, the default logger's or a Logger's */
+static int parseIsLogCall(char *fname, int len) {
+    static const char *names[] = {
+        "log.debug", "log.info", "log.warn", "log.error",
+        "log.Logger.debug", "log.Logger.info", "log.Logger.warn", "log.Logger.error",
+    };
+    for (u64 i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        if ((int)strlen(names[i]) == len && !strncmp(fname, names[i], len)) return 1;
+    }
+    return 0;
+}
+
 /* Position of the format string within a known printf-style call's argument
  * list. -1 means this isn't one of the format-checked functions. Single
  * source of truth shared by the pre-parse position snapshot and the
@@ -2232,6 +2318,8 @@ static int parseFormatArgIdx(char *fname, int len) {
     else if (len == 16 && !strncmp(fname, str_lit("proc.shellOutput"))) return 0;
     /* printf to stderr */
     else if (len == 10 && !strncmp(fname, str_lit("os.eprintf"))) return 0;
+    /* log's calls: after the @caller file, line and function */
+    else if (parseIsLogCall(fname, len)) return 3;
     /* `throw(code, fmt, ...)`, checked as a call to it */
     else if (len == 16 && !strncmp(fname, str_lit("rt.__ktmThrowFmt"))) return 1;
     return -1;
@@ -2476,6 +2564,8 @@ static int parseOverloadArgRank(AstType *p, Ast *arg) {
         }
         return OVL_NONE;
     }
+    /* a String to a u8 *: a worse fit than to a u8[] */
+    if (parseIsBytePtr(p) && astTypeIsString(a)) return OVL_INT_FLOAT;
     if (parseArgCompat(p, arg) != ARG_OK) return OVL_NONE;
     if (a->kind == AST_TYPE_ARRAY && p->kind == AST_TYPE_POINTER) return OVL_CONVERT;
     if (p->kind == AST_TYPE_CHAR && a->kind == AST_TYPE_CHAR && p->is_bool != a->is_bool) {
@@ -2944,6 +3034,68 @@ static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
                         len, name, cls->data, mod_len, cls->data);
 }
 
+/* `p.push(x)` on a parameter the function got by value (`void f(vec.Vec<T>
+ * p)`): p is a copy of the caller's Vec, Map, List, Tree, Set or String
+ * header, so a method that changes its length or moves its buffer changes
+ * the copy only; the caller keeps the old one (and frees what it held
+ * twice, or loses what was added). Warn, pointing at the method. */
+static void parseWarnByValueChange(Cctrl *cc, AstType *owner, Ast *recv,
+                                   char *name, int len, ParseCallLoc *loc) {
+    if (!recv || !cc->tmp_params || recv->kind != AST_UNOP ||
+        recv->unop != AST_UN_OP_ADDR_OF || !recv->operand ||
+        recv->operand->kind != AST_LVAR) {
+        return;
+    }
+    Ast *var = recv->operand;
+    int is_param = 0;
+    for (u64 i = 0; i < cc->tmp_params->size; ++i) {
+        Ast *p = cc->tmp_params->entries[i];
+        if (p && p->kind == AST_DEFAULT_PARAM) p = p->declvar;
+        if (p && p->kind == AST_LVAR && p->lvar_id == var->lvar_id) {
+            is_param = 1;
+            break;
+        }
+    }
+    if (!is_param || var->type->kind != AST_TYPE_CLASS) return;
+
+    static const char *vec_m[] = {"push", "pop", "insert", "removeAt", "clear", "reserve", NULL};
+    static const char *list_m[] = {"append", "prepend", "insertBefore", "insertAfter", "remove",
+                                   "shift", "pop", "clear", "mergeAppend", "mergePrepend", NULL};
+    static const char *map_m[] = {"set", "delete", "clear", NULL};
+    static const char *set_m[] = {"add", "remove", "delete", "clear", NULL};
+    static const char *str_m[] = {"append", "appendByte", "appendFormat", "reserve", "clear",
+                                  "take", "truncate", "insert", NULL};
+    const char **methods = NULL;
+    const char *what = NULL;
+    GenericDef *g = owner && owner->generic && owner->generic_args ? owner->generic : NULL;
+    if (astTypeIsString(var->type)) {
+        methods = str_m;
+        what = "String";
+    } else if (g && g->name) {
+        if (!strcmp(g->name->data, "vec.Vec")) { methods = vec_m; what = "vec.Vec"; }
+        else if (!strcmp(g->name->data, "list.List")) { methods = list_m; what = "list.List"; }
+        else if (!strcmp(g->name->data, "map.Map") ||
+                 !strcmp(g->name->data, "map.Tree")) { methods = map_m; what = g->name->data; }
+        else if (!strcmp(g->name->data, "set.Set")) { methods = set_m; what = "set.Set"; }
+    }
+    if (!methods) return;
+    int hit = 0;
+    for (int i = 0; methods[i]; ++i) {
+        if ((int)strlen(methods[i]) == len && !memcmp(methods[i], name, len)) {
+            hit = 1;
+            break;
+        }
+    }
+    if (!hit) return;
+    AoStr *tname = astTypeToAoStr(var->type);
+    cctrlWarningAt(cc, loc->line, loc->col, loc->len,
+                   "`%s` is a copy of the caller's %s: `%.*s` changes only the copy "
+                   "(the caller still has the old one); take `%s *%s` "
+                   "and pass `&%s`",
+                   var->lname->data, what, len, name, tname->data,
+                   var->lname->data, var->lname->data);
+}
+
 /* The arguments of a call to the method `fn`, the `(` just taken. With
  * `recv` (`u.name(...)`, a pointer to the object) the arguments are the
  * method's own and `recv` becomes `self`; without (`User.name(p, ...)`)
@@ -2977,6 +3129,7 @@ static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
     parseCoerceArgs(decl, argv);
     parsePrintfFormatCheck(cc, decl, argv, fname, flen, &loc);
     parseCallLocFreeArgs(&loc);
+    parseWarnByValueChange(cc, owner, recv, name, len, &loc);
 
     if (recv) {
         AstType *self_type = ((Ast *)fn->params->entries[0])->type;

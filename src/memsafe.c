@@ -21,11 +21,26 @@
 #endif
 #include <dlfcn.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <mach-o/loader.h>
+#include <mach/vm_prot.h>
+#else
+#include <link.h>
+#endif
+#if defined(__linux__)
+#include <elf.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#endif
 #if defined(__APPLE__)
 #include <malloc/malloc.h> /* malloc_zone_from_ptr */
 #endif
@@ -35,6 +50,10 @@
 #include "jit-common.h"
 #include "memsafe.h"
 
+/* Return addresses kept per allocation and free: enough to walk out of
+ * the stdlib to the caller's own line */
+#define MEMSAFE_SITES 12
+
 typedef struct MemsafeEntry {
     void *ptr;
     u64 size;
@@ -42,8 +61,8 @@ typedef struct MemsafeEntry {
     int free_round;
     /* Raw return addresses into JIT code; symbolised lazily so the
      * alloc hot path never scans the symbol table. */
-    uintptr_t alloc_site[2];
-    uintptr_t free_site[2];
+    uintptr_t alloc_site[MEMSAFE_SITES];
+    uintptr_t free_site[MEMSAFE_SITES];
 } MemsafeEntry;
 
 static KtmJit *memsafe_jit = NULL;
@@ -119,6 +138,82 @@ void memsafeSetRound(int round) {
     memsafe_round = round;
 }
 
+#if defined(__linux__)
+/* libktm's symbols carry no size, so glibc's dladdr only names an exact
+ * start address: read the library's .dynsym once and take the nearest
+ * symbol at or below the address instead. */
+static const Elf64_Sym *memsafe_lib_syms = NULL;
+static const char *memsafe_lib_strs = NULL;
+static size_t memsafe_lib_nsyms = 0;
+static int memsafe_lib_loaded = 0;
+
+static void memsafeLoadLibSyms(const char *path) {
+    memsafe_lib_loaded = 1;
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return;
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size < (off_t)sizeof(Elf64_Ehdr)) {
+        close(fd);
+        return;
+    }
+    u8 *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return;
+    Elf64_Ehdr *eh = (Elf64_Ehdr *)map;
+    if (memcmp(eh->e_ident, ELFMAG, SELFMAG) != 0 ||
+        eh->e_ident[EI_CLASS] != ELFCLASS64 ||
+        eh->e_shoff + (u64)eh->e_shnum * sizeof(Elf64_Shdr) > (u64)st.st_size)
+        return;
+    Elf64_Shdr *sh = (Elf64_Shdr *)(map + eh->e_shoff);
+    for (int i = 0; i < eh->e_shnum; ++i) {
+        if (sh[i].sh_type != SHT_DYNSYM || sh[i].sh_link >= eh->e_shnum) continue;
+        Elf64_Shdr *strs = &sh[sh[i].sh_link];
+        if (sh[i].sh_offset + sh[i].sh_size > (u64)st.st_size ||
+            strs->sh_offset + strs->sh_size > (u64)st.st_size)
+            return;
+        memsafe_lib_syms = (const Elf64_Sym *)(map + sh[i].sh_offset);
+        memsafe_lib_nsyms = sh[i].sh_size / sizeof(Elf64_Sym);
+        memsafe_lib_strs = (const char *)(map + strs->sh_offset);
+        return;
+    }
+}
+
+static const char *memsafeLibSymbol(const char *path, uintptr_t off) {
+    if (!memsafe_lib_loaded) memsafeLoadLibSyms(path);
+    const char *best = NULL;
+    uintptr_t best_at = 0;
+    for (size_t i = 0; i < memsafe_lib_nsyms; ++i) {
+        const Elf64_Sym *sy = &memsafe_lib_syms[i];
+        if (sy->st_shndx == SHN_UNDEF || sy->st_value == 0) continue;
+        if (sy->st_value <= off && sy->st_value >= best_at) {
+            best_at = sy->st_value;
+            best = memsafe_lib_strs + sy->st_name;
+        }
+    }
+    return best;
+}
+#endif
+
+/* Is `pc` in the prebuilt stdlib (libktm)? Its function's symbol in
+ * *sym when asked. */
+static int memsafeInLibktm(uintptr_t pc, const char **sym) {
+    Dl_info info;
+    if (!dladdr((void *)pc, &info) || !info.dli_fname) return 0;
+    const char *base = strrchr(info.dli_fname, '/');
+    base = base ? base + 1 : info.dli_fname;
+    if (strncmp(base, "libktm", 6) != 0) return 0;
+    if (sym) {
+        *sym = info.dli_sname;
+#if defined(__linux__)
+        if (*sym == NULL)
+            *sym = memsafeLibSymbol(info.dli_fname,
+                                    pc - (uintptr_t)info.dli_fbase);
+#endif
+        if (*sym == NULL) return 0;
+    }
+    return 1;
+}
+
 /* First `max` return addresses landing in JIT code, walking this
  * (healthy) C call stack: wrapper <- _FREE/_MALLOC (JIT) <- user fn
  * (JIT) <- entry (C, stops matching). */
@@ -139,7 +234,9 @@ static int memsafeCallSites(uintptr_t *out, int max) {
         if (hi > lo && (fp < lo || fp + 2 * sizeof(uintptr_t) > hi)) break;
         uintptr_t ret = ((uintptr_t *)fp)[1];
         uintptr_t next = ((uintptr_t *)fp)[0];
-        if (ret && ktmJitFindChunk(jit, (void *)ret)) out[n++] = ret;
+        if (ret && (ktmJitFindChunk(jit, (void *)ret) ||
+                    memsafeInLibktm(ret, NULL)))
+            out[n++] = ret;
         prev = fp;
         fp = next;
     }
@@ -158,28 +255,139 @@ static int memsafeIsAllocShim(const char *sym) {
            strcasecmp(sym, "msize") == 0;
 }
 
-static void memsafePrintSite(FILE *f, const uintptr_t *sites, int nsites) {
-    KtmJit *jit = memsafe_jit;
-    for (int i = 0; i < nsites; ++i) {
-        if (sites[i] == 0) continue;
-        size_t off = 0;
-        const char *sym = jit
-            ? ktmJitFindSymbolForAddr(jit, (void *)sites[i], &off)
-            : NULL;
-        if (sym && memsafeIsAllocShim(sym)) continue;
-        if (sym) {
-            /* sites[] are return addresses - the CALL is the
-             * instruction before, so look the line up at addr-1 or
-             * the report reads one statement late. */
-            int line = ktmJitFindLineForAddr(jit, (void *)(sites[i] - 1));
-            fprintf(f, "in `%s`+%zu", astSymbolDisplayName(sym), off);
-            if (line) fprintf(f, ", line %d", line);
-        } else {
-            fprintf(f, "at %p", (void *)sites[i]);
-        }
-        return;
+/* A frame of a report: function, source file and line */
+typedef struct MemsafeFrame {
+    const char *fn;
+    const char *file;
+    int line;
+    int is_lib;
+} MemsafeFrame;
+
+/* The stdlib's directory (<install_dir>/modules/), "" if unknown */
+static const char *memsafeLibDir(void) {
+    static char dir[4096];
+    static int done = 0;
+    if (!done) {
+        done = 1;
+        dir[0] = '\0';
+        if (memsafe_jit && memsafe_jit->cc && memsafe_jit->cc->install_dir)
+            snprintf(dir, sizeof(dir), "%s/modules/",
+                     memsafe_jit->cc->install_dir);
     }
-    fprintf(f, "at an unknown site");
+    return dir;
+}
+
+/* `file` as it is shown: a stdlib file by its module path (vec/vector.ktm),
+ * one under the working directory relative to it */
+static const char *memsafeShownFile(const char *file, int *is_lib) {
+    *is_lib = 0;
+    if (file == NULL) return NULL;
+    const char *lib = memsafeLibDir();
+    size_t n = strlen(lib);
+    if (n && strncmp(file, lib, n) == 0) {
+        *is_lib = 1;
+        return file + n;
+    }
+    static char cwd[4096];
+    if (getcwd(cwd, sizeof(cwd))) {
+        size_t c = strlen(cwd);
+        if (c > 1 && strncmp(file, cwd, c) == 0 && file[c] == '/')
+            return file + c + 1;
+    }
+    if (file[0] == '.' && file[1] == '/') return file + 2;
+    return file;
+}
+
+static int memsafeFrame(uintptr_t site, MemsafeFrame *fr) {
+    KtmJit *jit = memsafe_jit;
+    size_t off = 0;
+    const char *sym = jit
+        ? ktmJitFindSymbolForAddr(jit, (void *)site, &off)
+        : NULL;
+    int in_lib = 0;
+    if (sym == NULL && memsafeInLibktm(site, &sym)) in_lib = 1;
+    if (sym == NULL || memsafeIsAllocShim(sym)) return 0;
+    const char *shown = sym;
+#if defined(__APPLE__)
+    /* The JIT's Mach-O symbols carry an extra leading `_`; dladdr's
+     * don't, so a module symbol from libktm arrives as K3str4from */
+    static char kbuf[512];
+    if (in_lib && shown[0] == 'K' && shown[1] >= '0' && shown[1] <= '9') {
+        snprintf(kbuf, sizeof(kbuf), "_%s", shown);
+        shown = kbuf;
+    } else if (!in_lib && shown[0] == '_' && shown[1] != 'K') {
+        shown++;
+    }
+#endif
+    fr->fn = astSymbolDisplayName(shown);
+    /* mem's own functions are the allocator, not who asked for it */
+    if (!strcmp(fr->fn, "mem.alloc") || !strcmp(fr->fn, "mem.free") ||
+        !strcmp(fr->fn, "mem.allocZero") || !strcmp(fr->fn, "mem.realloc"))
+        return 0;
+    if (in_lib) {
+        fr->file = NULL;
+        fr->line = 0;
+        fr->is_lib = 1;
+        return 1;
+    }
+    if (!strcmp(fr->fn, "MainFn") || !strcmp(fr->fn, "_MainFn") ||
+        !strcmp(fr->fn, "Main") || !strcmp(fr->fn, "_Main"))
+        fr->fn = "main";
+    /* sites[] are return addresses - the CALL is the instruction
+     * before, so look the line up at addr-1 or the report reads one
+     * statement late. */
+    size_t fl = strlen(fr->fn);
+    if (fl > 6 && !strcmp(fr->fn + fl - 6, "._init")) {
+        static char init_name[256];
+        snprintf(init_name, sizeof(init_name), "%.*s's globals",
+                 (int)(fl - 6), fr->fn);
+        fr->fn = init_name;
+    }
+    fr->line = ktmJitFindLineForAddr(jit, (void *)(site - 1));
+    fr->file = memsafeShownFile(ktmJitFindFileForSymbol(jit, sym),
+                                &fr->is_lib);
+    return 1;
+}
+
+static void memsafePrintFrame(FILE *f, MemsafeFrame *fr) {
+    if (fr->file && fr->line) {
+        fprintf(f, "at %s:%d in %s", fr->file, fr->line, fr->fn);
+    } else if (fr->line) {
+        fprintf(f, "in %s, line %d", fr->fn, fr->line);
+    } else {
+        fprintf(f, "in %s", fr->fn);
+    }
+}
+
+/* Where a block was allocated or freed: the first line of the program's
+ * own code on the call stack, and the stdlib function it called when the
+ * block came from there ("at cli.ktm:12 in init, via vec.new<String>") */
+static void memsafePrintSite(FILE *f, const uintptr_t *sites, int nsites) {
+    MemsafeFrame user, lib_called;
+    int have_user = 0, have_lib = 0;
+    uintptr_t unknown = 0;
+    for (int i = 0; i < nsites && !have_user; ++i) {
+        if (sites[i] == 0) continue;
+        MemsafeFrame fr;
+        if (!memsafeFrame(sites[i], &fr)) {
+            if (!unknown) unknown = sites[i];
+            continue;
+        }
+        /* lib_called ends as the outermost stdlib function: the one the
+         * program called */
+        if (fr.is_lib) { lib_called = fr; have_lib = 1; }
+        else { user = fr; have_user = 1; }
+    }
+    if (have_user) {
+        memsafePrintFrame(f, &user);
+        if (have_lib) fprintf(f, ", via %s", lib_called.fn);
+    } else if (have_lib) {
+        memsafePrintFrame(f, &lib_called);
+    } else if (unknown) {
+        fprintf(f, "at %p", (void *)unknown);
+    } else {
+        fprintf(f, "at an unknown site");
+    }
 }
 
 /* "round N " when rounds are in play (the REPL); nothing otherwise. */
@@ -202,7 +410,7 @@ static void memsafeTrack(void *p, u64 size) {
     e->ptr = p;
     e->size = size;
     e->alloc_round = memsafe_round;
-    memsafeCallSites(e->alloc_site, 2);
+    memsafeCallSites(e->alloc_site, MEMSAFE_SITES);
     mapAddIntOrErr(memsafe_live, key, e);
 }
 
@@ -223,7 +431,7 @@ static int memsafeRetire(void *p) {
     mapRemoveInt(memsafe_live, key);
     e->free_round = memsafe_round;
     memset(e->free_site, 0, sizeof(e->free_site));
-    memsafeCallSites(e->free_site, 2);
+    memsafeCallSites(e->free_site, MEMSAFE_SITES);
     MemsafeEntry *slot = &memsafe_ring[memsafe_ring_next];
     if (slot->ptr) free((u8 *)slot->ptr - 8);
     *slot = *e;
@@ -233,29 +441,29 @@ static int memsafeRetire(void *p) {
 }
 
 static void memsafeReportDoubleFree(void *p, MemsafeEntry *r) {
-    uintptr_t here[2] = { 0, 0 };
-    memsafeCallSites(here, 2);
+    uintptr_t here[MEMSAFE_SITES] = { 0 };
+    memsafeCallSites(here, MEMSAFE_SITES);
     fprintf(stderr, "Free: double free of %p (%llu bytes)\n",
                     p, (unsigned long long)r->size);
     fprintf(stderr, "  allocated   ");
     memsafePrintRound(stderr, r->alloc_round);
-    memsafePrintSite(stderr, r->alloc_site, 2);
+    memsafePrintSite(stderr, r->alloc_site, MEMSAFE_SITES);
     fprintf(stderr, "\n  first freed ");
     memsafePrintRound(stderr, r->free_round);
-    memsafePrintSite(stderr, r->free_site, 2);
+    memsafePrintSite(stderr, r->free_site, MEMSAFE_SITES);
     fprintf(stderr, "\n  this free   ");
     memsafePrintRound(stderr, memsafe_round);
-    memsafePrintSite(stderr, here, 2);
+    memsafePrintSite(stderr, here, MEMSAFE_SITES);
     fprintf(stderr, " - ignored, heap unharmed\n");
     fflush(stderr);
 }
 
 static void memsafeReportWildFree(void *p) {
-    uintptr_t here[2] = { 0, 0 };
-    memsafeCallSites(here, 2);
+    uintptr_t here[MEMSAFE_SITES] = { 0 };
+    memsafeCallSites(here, MEMSAFE_SITES);
     fprintf(stderr, "Free: %p was never heap-allocated "
             "(stack, global or interior pointer?) ", p);
-    memsafePrintSite(stderr, here, 2);
+    memsafePrintSite(stderr, here, MEMSAFE_SITES);
     fprintf(stderr, " - ignored\n");
     fflush(stderr);
 }
@@ -412,7 +620,7 @@ static void memsafeList(FILE *f, Vec *v) {
         fprintf(f, "  %p  %8llu bytes  ", e->ptr,
                 (unsigned long long)e->size);
         memsafePrintRound(f, e->alloc_round);
-        memsafePrintSite(f, e->alloc_site, 2);
+        memsafePrintSite(f, e->alloc_site, MEMSAFE_SITES);
         fprintf(f, "\n");
     }
     if (v->size > shown)
@@ -433,7 +641,146 @@ void memsafeDumpLive(FILE *f) {
     memsafeUnlock();
 }
 
+static int memsafe_reported = 0;
+static pid_t memsafe_exit_pid = 0;
+
+/* ---- what is still reachable at exit ----
+ *
+ * Like valgrind's "definitely lost" and "still reachable": a block some
+ * root still points to (a global, libktm's data, or while exit() runs,
+ * the stack and registers of the code that called it) is not a leak, as
+ * the program could still have freed it; only a block nothing points to
+ * is. Pointers are found conservatively: any aligned word holding an
+ * address inside a live block (its start or anywhere in it). */
+
+/* Where the program's code was when it called exit(): the top of the
+ * stack to scan (0 = main returned: its variables are gone) */
+static uintptr_t memsafe_exit_sp = 0;
+static jmp_buf memsafe_exit_regs;
+
+typedef struct MemsafeMark {
+    MemsafeEntry **e;   /* sorted by address */
+    u8 *marked;
+    u64 n;
+    u64 *work;
+    u64 nwork;
+} MemsafeMark;
+
+static int memsafeCmpAddr(const void *a, const void *b) {
+    uintptr_t pa = (uintptr_t)(*(MemsafeEntry *const *)a)->ptr;
+    uintptr_t pb = (uintptr_t)(*(MemsafeEntry *const *)b)->ptr;
+    return pa < pb ? -1 : pa > pb;
+}
+
+/* The block holding address w, -1 for none */
+static s64 memsafeBlockAt(MemsafeMark *m, uintptr_t w) {
+    s64 lo = 0, hi = (s64)m->n - 1, found = -1;
+    while (lo <= hi) {
+        s64 mid = lo + (hi - lo) / 2;
+        if ((uintptr_t)m->e[mid]->ptr <= w) { found = mid; lo = mid + 1; }
+        else hi = mid - 1;
+    }
+    if (found < 0) return -1;
+    MemsafeEntry *e = m->e[found];
+    if (w >= (uintptr_t)e->ptr + (e->size ? e->size : 1)) return -1;
+    return found;
+}
+
+static void memsafeScan(MemsafeMark *m, uintptr_t lo, uintptr_t hi) {
+    lo = (lo + sizeof(uintptr_t) - 1) & ~(uintptr_t)(sizeof(uintptr_t) - 1);
+    for (uintptr_t a = lo; a + sizeof(uintptr_t) <= hi; a += sizeof(uintptr_t)) {
+        uintptr_t w = *(uintptr_t *)a;
+        if (w < 4096) continue;
+        s64 i = memsafeBlockAt(m, w);
+        if (i >= 0 && !m->marked[i]) {
+            m->marked[i] = 1;
+            m->work[m->nwork++] = (u64)i;
+        }
+    }
+}
+
+static size_t memsafeArenaSize(void *p) {
+#if defined(__APPLE__)
+    return malloc_size(p);
+#else
+    return malloc_usable_size(p);
+#endif
+}
+
+/* libktm's writable data (its module globals: the default logger, ...) */
+#if defined(__APPLE__)
+static void memsafeScanLibData(MemsafeMark *m) {
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; ++i) {
+        const char *name = _dyld_get_image_name(i);
+        const char *base = name ? strrchr(name, '/') : NULL;
+        base = base ? base + 1 : name;
+        if (!base || strncmp(base, "libktm", 6) != 0) continue;
+        const struct mach_header_64 *mh =
+            (const struct mach_header_64 *)_dyld_get_image_header(i);
+        intptr_t slide = _dyld_get_image_vmaddr_slide(i);
+        const u8 *lc = (const u8 *)(mh + 1);
+        for (uint32_t c = 0; c < mh->ncmds; ++c) {
+            const struct load_command *cmd = (const struct load_command *)lc;
+            if (cmd->cmd == LC_SEGMENT_64) {
+                const struct segment_command_64 *seg =
+                    (const struct segment_command_64 *)cmd;
+                if ((seg->initprot & VM_PROT_WRITE) && seg->vmsize) {
+                    uintptr_t lo = (uintptr_t)seg->vmaddr + slide;
+                    memsafeScan(m, lo, lo + seg->vmsize);
+                }
+            }
+            lc += cmd->cmdsize;
+        }
+    }
+}
+#else
+static int memsafeLibDataCb(struct dl_phdr_info *info, size_t size, void *arg) {
+    (void)size;
+    const char *base = info->dlpi_name ? strrchr(info->dlpi_name, '/') : NULL;
+    base = base ? base + 1 : info->dlpi_name;
+    if (!base || strncmp(base, "libktm", 6) != 0) return 0;
+    for (int i = 0; i < info->dlpi_phnum; ++i) {
+        const ElfW(Phdr) *ph = &info->dlpi_phdr[i];
+        if (ph->p_type != PT_LOAD || !(ph->p_flags & PF_W)) continue;
+        uintptr_t lo = info->dlpi_addr + ph->p_vaddr;
+        memsafeScan((MemsafeMark *)arg, lo, lo + ph->p_memsz);
+    }
+    return 0;
+}
+
+static void memsafeScanLibData(MemsafeMark *m) {
+    dl_iterate_phdr(memsafeLibDataCb, m);
+}
+#endif
+
+/* Mark every block reachable from the roots; marked[i] for m->e[i] */
+static void memsafeMarkReachable(MemsafeMark *m) {
+    if (memsafe_jit) {
+        listForEach(memsafe_jit->globals_arenas) {
+            uintptr_t lo = (uintptr_t)it->value;
+            memsafeScan(m, lo, lo + memsafeArenaSize(it->value));
+        }
+    }
+    memsafeScanLibData(m);
+    if (memsafe_exit_sp) {
+        uintptr_t lo, hi;
+        memsafeThreadStack(&lo, &hi);
+#if defined(__linux__)
+        if (hi <= lo) hi = memsafe_stack_hi;
+#endif
+        if (hi > memsafe_exit_sp) memsafeScan(m, memsafe_exit_sp, hi);
+        memsafeScan(m, (uintptr_t)&memsafe_exit_regs,
+                    (uintptr_t)&memsafe_exit_regs + sizeof(memsafe_exit_regs));
+    }
+    while (m->nwork) {
+        MemsafeEntry *e = m->e[m->work[--m->nwork]];
+        memsafeScan(m, (uintptr_t)e->ptr, (uintptr_t)e->ptr + e->size);
+    }
+}
+
 void memsafeReportLeaks(FILE *f) {
+    memsafe_reported = 1;
     if (memsafe_live == NULL) return;
     memsafeLock();
     if (memsafe_live->size == 0) {
@@ -444,12 +791,77 @@ void memsafeReportLeaks(FILE *f) {
     fflush(stdout);
     u64 total = 0;
     Vec *v = memsafeCollect(&total);
-    fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) never freed\n",
-            (unsigned long long)v->size, (unsigned long long)total);
-    memsafeList(f, v);
+    MemsafeMark m;
+    m.n = v->size;
+    m.e = malloc(sizeof(MemsafeEntry *) * m.n);
+    m.marked = calloc(m.n, 1);
+    m.work = malloc(sizeof(u64) * m.n);
+    m.nwork = 0;
+    for (u64 i = 0; i < m.n; ++i) m.e[i] = vecGet(MemsafeEntry *, v, i);
+    qsort(m.e, m.n, sizeof(MemsafeEntry *), memsafeCmpAddr);
+    memsafeMarkReachable(&m);
+
+    Vec *lost = vecNew(&vec_unsigned_long_type);
+    Vec *held = vecNew(&vec_unsigned_long_type);
+    u64 lost_bytes = 0, kept = 0, kept_bytes = 0;
+    for (u64 i = 0; i < m.n; ++i) {
+        if (m.marked[i]) {
+            vecPush(held, m.e[i]);
+            kept++;
+            kept_bytes += m.e[i]->size;
+        } else {
+            vecPush(lost, m.e[i]);
+            lost_bytes += m.e[i]->size;
+        }
+    }
+    if (lost->size) {
+        fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) never freed\n",
+                (unsigned long long)lost->size, (unsigned long long)lost_bytes);
+        memsafeList(f, lost);
+    }
+    if (kept) {
+        fprintf(f, "memsafe: %llu allocation(s) (%llu bytes) still in use at "
+                "exit (held by globals or live variables): not leaks\n",
+                (unsigned long long)kept, (unsigned long long)kept_bytes);
+        memsafeList(f, held);
+    }
+    vecRelease(held);
+    vecRelease(lost);
+    free(m.e);
+    free(m.marked);
+    free(m.work);
     vecRelease(v);
     fflush(f);
     memsafeUnlock();
+}
+
+/* A program that ends with exit() never returns from main: report then,
+ * once, from the process that ran it (not a forked child) */
+static void memsafeExitReport(void) {
+    if (memsafe_reported || getpid() != memsafe_exit_pid) return;
+    if (!memsafe_exit_sp) {
+        setjmp(memsafe_exit_regs);
+        memsafe_exit_sp = (uintptr_t)__builtin_frame_address(0);
+    }
+    memsafeReportLeaks(stderr);
+}
+
+/* (memsafe_exit_regs: the registers of the code that called exit(); a
+ * register-allocated variable is as live as one on the stack) */
+
+/* The program's exit(): note its caller's stack and registers, so what
+ * its variables hold is still reachable, then the real exit. The scan
+ * starts at the caller's frame, not below it: a function that returned
+ * before exit() left stale pointers down there. */
+static void memsafeExit(int code) {
+    setjmp(memsafe_exit_regs);
+    memsafe_exit_sp = (uintptr_t)__builtin_frame_address(0) + 2 * sizeof(uintptr_t);
+    exit(code);
+}
+
+void memsafeReportAtExit(void) {
+    memsafe_exit_pid = getpid();
+    atexit(memsafeExitReport);
 }
 
 /* libktm's hook `name` (a module global, by its symbol) set to `fn`; the
@@ -486,6 +898,12 @@ void memsafeInit(KtmJit *jit) {
      * implementations at every JIT'd call site. Both the asm-label
      * spellings (_MALLOC on x86_64) and the compiled-ktm ones (Free
      * on aarch64) are covered; register before any chunk compiles. */
+    /* exact names: "_exit" on Linux is the other function */
+#if defined(__APPLE__)
+    mapAdd(jit->host_symbols, strdup("_exit"), (void *)(uintptr_t)memsafeExit);
+#else
+    mapAdd(jit->host_symbols, strdup("exit"), (void *)(uintptr_t)memsafeExit);
+#endif
     ktmJitDefineSymbol(jit, "_MALLOC",  (void *)(uintptr_t)memsafeMAlloc);
     ktmJitDefineSymbol(jit, "_CALLOC",  (void *)(uintptr_t)memsafeCAlloc);
     ktmJitDefineSymbol(jit, "_REALLOC", (void *)(uintptr_t)memsafeReAlloc);

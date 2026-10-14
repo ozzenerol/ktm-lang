@@ -116,6 +116,7 @@ typedef struct GenericDef {
     Vec *params;         /* AoStr *: T, K, V */
     Vec *toks;           /* Lexeme *: the whole declaration */
     u32 module_id;
+    AoStr *module_path;          /* its module's name, for another lexer's ids */
     int is_pub;
     struct AstType *tmpl;        /* GEN_STRUCT: the type `Vec` names */
     struct GenericDef *of;       /* GEN_METHOD: its struct's definition */
@@ -214,6 +215,9 @@ typedef struct Cctrl {
 
     /* For parsing a switch statement */
     Vec *tmp_case_list;
+    /* The case strings (Ast AST_STRING) of a switch on a u8[] or String,
+     * NULL in an int switch; a case's value is its index here */
+    Vec *tmp_case_strings;
 
     /* function parameters */
     List *func_params;

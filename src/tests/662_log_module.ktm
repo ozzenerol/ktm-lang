@@ -73,9 +73,21 @@ u8[] lineAfterTime(u8[] text, i64 n) {
     return text[0:0];
 }
 
+/* the line with each run of spaces as one: the level and file:line
+ * columns are padded to line the messages up (v0.18.0) */
+String squeeze(u8[] l) {
+    String s = str.new();
+    for (i64 i = 0; i < l.len; i++) {
+        if (l[i] == ' ' && i > 0 && l[i - 1] == ' ') { continue; }
+        s.appendByte(l[i]);
+    }
+    return s;
+}
+
 bool lineIs(u8[] text, i64 n, u8 *want) {
     u8[] got = lineAfterTime(text, n);
-    bool ok = str.equals(got, cstr.view(want));
+    ad String flat = squeeze(got);
+    bool ok = str.equals(flat, cstr.view(want));
     if (!ok) { printf("\n  line %d: got [%.*s]\n          want [%s]", n, got.len, got.ptr, want); }
     return ok;
 }
@@ -135,7 +147,7 @@ i32 main()
     u8 want[128];
     libc.snprintf(want, 128, "INFO 662_log_module.ktm:%d with file", at);
     check(lineIs(text, 3, want), "file:line");
-    check(lineIs(text, 4, "WARN 662_log_module.ktm:86 helper: from helper"), "file:line and the function");
+    check(lineIs(text, 4, "WARN 662_log_module.ktm:98 helper: from helper"), "file:line and the function");
     check(lineIs(text, 5, "INFO main: func only"), "the function only");
     text.free();
     cleanup();

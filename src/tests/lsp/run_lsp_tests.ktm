@@ -104,6 +104,7 @@ u8 *SEM_HC;
 u8 *COMP_HC;
 u8 *FOLD_HC;
 u8 *MOD_GEO2_HC;
+u8 *BAG_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
 u8 *GEN_HC;
@@ -131,6 +132,19 @@ void initFixtures() {
     MOD_GEO2_HC =
         "module geo;\n"
         "i64 cube(i64 n) { return square(n) * n; }\n";
+    /* A module with a global and a local vec.Vec: completion after `.`
+     * offers every method of the instance, called yet or not */
+    BAG_HC =
+        "module bag;\n"
+        "import str, vec;\n"
+        "vec.Vec<String> gItems = vec.new<String>();\n"
+        "pub void fill() {\n"
+        "  ad vec.Vec<i64> local = vec.new<i64>();\n"
+        "  gItems.push(str.from(\"a\"));\n"
+        "  local.push(1);\n"
+        "  gItems.\n"
+        "  local.\n"
+        "}\n";
     MOD_MAIN_HC =
         "import geo;\n"
         "i32 main() {\n"
@@ -1202,6 +1216,23 @@ void testRegressions() {
     lspDidOpen(l, uri, REG_HC);
     check("regression fixture is clean", lastPublishClean(l));
 
+    /* generics of modules the server reads at startup (str, with rt and
+     * the prelude) and of vec: once false errors from module numbers
+     * the startup parse gave ("Type `Vec` has not been declared") */
+    u8 *genUri = uriOf("std_generics.ktm");
+    lspDidOpen(l, genUri,
+        "import str, vec;\n"
+        "vec.Vec<String> gNames = vec.new<String>();\n"
+        "void main() {\n"
+        "  ad vec.Vec<u8[]> v = vec.new<u8[]>();\n"
+        "  v.push(\"a\");\n"
+        "  gNames.push(str.from(\"b\"));\n"
+        "  ad String s = str.join(&v, \" \");\n"
+        "  ad String t = str.join(&gNames, \", \");\n"
+        "  printf(\"%s %s\\n\", s, t);\n"
+        "}\n");
+    check("stdlib generics (vec, str.join) give no false errors", lastPublishClean(l));
+
     i64 line;
     i64 chr;
     posOf(REG_HC, "Square(counter)", 1, &line, &chr);
@@ -1452,6 +1483,16 @@ void testModules() {
     posOf(MOD_GEO_HC, "square(i64", 0, &wantLine, &wantChr);
     check("definition of a module's own bare name from its other file",
                 locEq(resp, geoUri, wantLine, wantChr, false));
+    /* a vec.Vec global of the module (bag.gItems) and a local one */
+    u8 *bagUri = uriOf("bag/bag.ktm");
+    lspDidOpen(l, bagUri, BAG_HC);
+    posOf(BAG_HC, "gItems.\n", 7, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", bagUri, line, chr);
+    check("member completion on a module's vec.Vec global: methods not called yet too",
+                labelsOk(resp, "", "contains", "get"));
+    posOf(BAG_HC, "local.\n", 6, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", bagUri, line, chr);
+    check("member completion on a local vec.Vec<i64>", labelsOk(resp, "", "sortAsc", "pop"));
     check("clean shutdown", lspClose(l) == 0);
 }
 
@@ -2033,7 +2074,7 @@ i32 main() {
     u8 tmp[128];
     libc.snprintf(tmp, 128, "/tmp/ktm_lsp_test_%d", getpid());
     u8 cmd[256];
-    libc.snprintf(cmd, 256, "mkdir -p %s/sub %s/geo", tmp, tmp);
+    libc.snprintf(cmd, 256, "mkdir -p %s/sub %s/geo %s/bag", tmp, tmp, tmp);
     proc.shell(cmd);
     gDir = mem.alloc(1024);
     realpath(tmp, gDir);
@@ -2041,6 +2082,8 @@ i32 main() {
     u8 path[512];
     libc.snprintf(path, 512, "%s/lib.ktm", gDir);
     fs.writeAll(path, cstr.view(LIB_HC));
+    libc.snprintf(path, 512, "%s/bag/bag.ktm", gDir);
+    fs.writeAll(path, cstr.view(BAG_HC));
     libc.snprintf(path, 512, "%s/sub/deep.ktm", gDir);
     fs.writeAll(path, cstr.view(DEEP_HC));
     libc.snprintf(path, 512, "%s/main.ktm", gDir);

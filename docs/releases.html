@@ -57,6 +57,56 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-18-0-2026-10-14">v0.18.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-18-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<p>Memory that frees itself where it should, clearer <code>-Memsafe</code> reports, <code>switch</code> on strings, and
+a round of stdlib additions.</p>
+<ul>
+  <li><code>vec.Vec</code>, <code>list.List</code>, <code>map.Map</code> and <code>map.Tree</code> free the Strings they hold:
+  <code>free()</code> and <code>clear()</code> free them, as do a Map or Tree <code>delete</code> and a <code>set</code> that
+  replaces one. <code>pop</code>, <code>removeAt</code>, <code>shift</code> and <code>remove</code> hand the String back to you.
+  <code>map.keys()</code> and <code>values()</code> give copies of their own.</li>
+  <li><code>-Memsafe</code>: a leak is a block nothing points to any more. What globals or live variables still hold at
+  exit is listed apart as <code>still in use at exit ... not leaks</code>. Every report names the file and line in your
+  code and the public library call it went through (<code>at cli/cli.ktm:16 in cli's globals, via vec.new&lt;String&gt;</code>;
+  under <code>-Memsafe</code> library functions are not inlined into your code, so the name is the one you called),
+  and a program that ends with <code>exit()</code> gets its report too.</li>
+  <li>A warning when a function changes a Vec, List, Map, Tree, Set or String it got by value (<code>push</code>,
+  <code>removeAt</code>, <code>append</code>...): only its copy changes. Take a pointer.</li>
+  <li><code>switch</code> on a <code>u8[]</code> or String with string cases: <code>case "init":</code>. Case-sensitive;
+  a duplicate case is an error.</li>
+  <li>Every local starts zeroed, not only Strings (<code>Config c;</code> no longer holds garbage). Large plain arrays
+  (over 4 KiB, no Strings or slices in them) are left as they are.</li>
+  <li><code>T[] s = {a, b, c};</code> makes a slice of a hidden array; it compiled with warnings and crashed before.
+  <code>{ptr, len}</code> still sets the slice's own fields.</li>
+  <li>A function of your own with <code>u8 *fmt, ...args</code> takes Strings for <code>%s</code> as printf does.</li>
+  <li>A String variable or field converts to <code>u8 *</code> where one is expected (its bytes always end in a NUL):
+  <code>cstr.len(s)</code> and C calls without <code>.cstr()</code>.</li>
+  <li><code>str.join(parts, sep)</code> from a slice or a <code>vec.Vec</code>; <code>vec.Vec.contains(x)</code>;
+  <code>str.toInt</code>, <code>str.toUint</code> and <code>str.toFloat</code> read a whole <code>u8[]</code> as a number;
+  <code>proc.expandEnv(text)</code> fills in <code>${NAME}</code> and <code>${NAME:default}</code>.</li>
+  <li>Logging: the messages line up in one column (the level and the file:line part are padded); lines logged after
+  <code>log.shutdown()</code> keep the level and output they had and say once where they came from; <code>log.info</code>
+  and the others take Strings and <code>u8[]</code> for <code>%s</code>.</li>
+  <li>The language server completes every method of a generic instance (<code>vec.Vec&lt;String&gt;</code>), not only the
+  ones already called, and a module's own globals.</li>
+  <li>Fixes: a statement that is only a field (<code>self.port;</code>) stopped the compiler; code inlined from another
+  file was reported at a line of the wrong file; overloads with a generic parameter gave an assembler error.</li>
+</ul>
+<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<ul>
+  <li>Freeing a String through a copy and then freeing its container is now a double free:
+  <code>v.get(i).free()</code>, or freeing a value from <code>map.next()</code>, before <code>v.free()</code> or
+  <code>m.free()</code>. <code>v.at(i).free()</code> is still safe (it clears the String in place).
+  <code>fs.freeList(&amp;names)</code> is now the same as <code>names.free()</code>.</li>
+  <li><code>fs.makeDir</code>, <code>makeDirAll</code>, <code>remove</code>, <code>removeDir</code>, <code>rename</code>,
+  <code>move</code>, <code>copyFile</code> and <code>changeDir</code> return a <code>bool</code>, true when it worked (false with
+  <code>os.errno()</code> set), as <code>fs.writeAll</code> and <code>fs.exists</code> already did. They returned 0 on success, so
+  <code>if (!fs.makeDir(d))</code> failed when it worked. A check written as <code>fs.remove(p) == 0</code> now means it failed:
+  write <code>if (fs.remove(p))</code>.</li>
+  <li>Log lines have more spaces: the level and the file:line part are padded.</li>
+  <li><code>-Memsafe</code> no longer calls what a global holds at exit a leak.</li>
+</ul>
+
 <h2 id="v0-17-2-2026-10-13">v0.17.2 <small>(2026-10-13)</small><a class="anchor" href="#v0-17-2-2026-10-13" aria-label="Link to this section">#</a></h2>
 <p>One logging fix.</p>
 <ul>
@@ -85,7 +135,7 @@ macOS are attached to each release on
   <li><code>_extern</code> binds C data by its symbol too: <code>_extern ___stderrp FILE *stderr;</code>,
   and in a module it has the module's name.</li>
 </ul>
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The format strings of <code>libc.printf</code>, <code>libc.snprintf</code> and <code>libc.fprintf</code>
   are now checked against their arguments, as <code>printf</code>'s always was, so a wrong count is now
@@ -170,7 +220,7 @@ the compiler writes its encoder and decoder.</p>
   block and flow mappings and sequences, plain and quoted scalars, block scalars and comments.
   Anchors, tags, merge keys and more than one document are reported as not supported.</li>
 </ul>
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Decode errors start with the line and column in the text:
   <code>1:22: tags[0].weight: expected an integer, got a string</code>. The rest of each
@@ -265,7 +315,7 @@ goroutine-per-connection server in every scenario of the echo benchmark, with le
   its loop meanwhile; its docs now say so.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>On Linux, programs using the coroutine loop run on io_uring by default. Set
   <code>KTM_CORO_BACKEND=epoll</code> to keep the previous loop.</li>
@@ -295,7 +345,7 @@ goroutine-per-connection server at every load of the echo benchmark: with 1024 c
   releasing short coroutines costs the same as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>Running off the end of a stack (deep recursion, a frame too big for a thread's stack) now
   prints <code>stack overflow</code> and ends the program with SIGABRT, instead of a bare
@@ -340,7 +390,7 @@ either way, run to run).</p>
   <code>poll</code> as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>An fd waited on with <code>coro.wait</code> stays registered with the kernel between
   waits, so close it with <code>coro.close</code>, as the docs already said for connections: a
@@ -505,7 +555,7 @@ test
   (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-7">Changes you may notice<a class="anchor" href="#changes-you-may-notice-7" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The old containers are removed. They map to the new ones as follows:
   <div class="table-wrap"><table>
@@ -720,7 +770,7 @@ void main()
   sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-7">Changes you may notice<a class="anchor" href="#changes-you-may-notice-7" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-8">Changes you may notice<a class="anchor" href="#changes-you-may-notice-8" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
   <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
@@ -795,7 +845,7 @@ void main()
   that way in a <code>proc.Proc</code>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-8">Changes you may notice<a class="anchor" href="#changes-you-may-notice-8" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-9">Changes you may notice<a class="anchor" href="#changes-you-may-notice-9" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>A second function of a name with other parameter types used to be the error "conflicting
   types"; it is now an overload. The same parameters with another return type is still that
@@ -965,7 +1015,7 @@ more mistakes it used to let through. Code that uses <code>proc</code>, <code>cs
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice-9">Changes you may notice<a class="anchor" href="#changes-you-may-notice-9" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-10">Changes you may notice<a class="anchor" href="#changes-you-may-notice-10" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -1158,7 +1208,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-10">Changes you may notice<a class="anchor" href="#changes-you-may-notice-10" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-11">Changes you may notice<a class="anchor" href="#changes-you-may-notice-11" aria-label="Link to this section">#</a></h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -1283,7 +1333,7 @@ i32 main(i32 argc, u8 **argv) {
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-11">Changes you may notice<a class="anchor" href="#changes-you-may-notice-11" aria-label="Link to this section">#</a></h3>
+<h3 id="changes-you-may-notice-12">Changes you may notice<a class="anchor" href="#changes-you-may-notice-12" aria-label="Link to this section">#</a></h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
@@ -1304,7 +1354,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>

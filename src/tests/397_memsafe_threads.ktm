@@ -100,10 +100,9 @@ i32 main()
   return 0;
 }
 "), "leak and double free in threads run");
-    /* macOS names the functions with a leading `_` */
     check(errHas("memsafe: 1 allocation\\(s\\) \\(48 bytes\\) never freed") &&
-                errHas("in `_?leaker`"), "leak in a thread reported, with its site");
-    check(errHas("double free of") && errHas("this free   in `_?doubleFree`"),
+                errHas(":[0-9]+ in leaker$"), "leak in a thread reported, with its site");
+    check(errHas("double free of") && errHas("this free   at [^ ]*:[0-9]+ in doubleFree "),
                 "double free in a thread caught, with its site");
 
     proc.shell("rm -f " MT_PROG " " MT_OUT " " MT_ERR);

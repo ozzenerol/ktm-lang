@@ -560,6 +560,7 @@ IrValue *irTmp(IrValueType type, u32 size);
 /* Source line currently being lowered - set by ir.c's dispatchers
  * from Ast->line, stamped onto every irInstrNew instruction. */
 extern int ir_line_hint;
+extern int ir_line_lock;
 
 IrInstr *irInstrNew(IrOp op, IrValue *dst, IrValue *r1, IrValue *r2);
 IrFunction *irFunctionNew(AoStr *fname);

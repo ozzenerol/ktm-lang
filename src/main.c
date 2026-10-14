@@ -820,6 +820,7 @@ int main(int argc, char **argv) {
         listForEach(args.argv) {
             jit_argv[i++] = it->value;
         }
+        if (args.memsafe) memsafeReportAtExit();
         int rc = ktmJitRunMain(jit, args.argc, jit_argv);
         if (args.memsafe) memsafeReportLeaks(stderr);
         ktmJitFree(jit);

@@ -32,7 +32,11 @@ String stripTimes(u8[] text) {
         if (text[i] == '\n') {
             u8[] l = text[start:i + 1];
             if (l.len > 25 && l[4] == '-' && l[24] == ' ') { l = l[25:l.len]; }
-            s.append(l);
+            /* the level is padded to line the messages up: one space */
+            for (i64 j = 0; j < l.len; j++) {
+                if (l[j] == ' ' && j > 0 && l[j - 1] == ' ') { continue; }
+                s.appendByte(l[j]);
+            }
             start = i + 1;
         }
     }

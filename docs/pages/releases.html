@@ -4,6 +4,56 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.18.0 <small>(2026-10-14)</small></h2>
+<p>Memory that frees itself where it should, clearer <code>-Memsafe</code> reports, <code>switch</code> on strings, and
+a round of stdlib additions.</p>
+<ul>
+  <li><code>vec.Vec</code>, <code>list.List</code>, <code>map.Map</code> and <code>map.Tree</code> free the Strings they hold:
+  <code>free()</code> and <code>clear()</code> free them, as do a Map or Tree <code>delete</code> and a <code>set</code> that
+  replaces one. <code>pop</code>, <code>removeAt</code>, <code>shift</code> and <code>remove</code> hand the String back to you.
+  <code>map.keys()</code> and <code>values()</code> give copies of their own.</li>
+  <li><code>-Memsafe</code>: a leak is a block nothing points to any more. What globals or live variables still hold at
+  exit is listed apart as <code>still in use at exit ... not leaks</code>. Every report names the file and line in your
+  code and the public library call it went through (<code>at cli/cli.ktm:16 in cli's globals, via vec.new&lt;String&gt;</code>;
+  under <code>-Memsafe</code> library functions are not inlined into your code, so the name is the one you called),
+  and a program that ends with <code>exit()</code> gets its report too.</li>
+  <li>A warning when a function changes a Vec, List, Map, Tree, Set or String it got by value (<code>push</code>,
+  <code>removeAt</code>, <code>append</code>...): only its copy changes. Take a pointer.</li>
+  <li><code>switch</code> on a <code>u8[]</code> or String with string cases: <code>case "init":</code>. Case-sensitive;
+  a duplicate case is an error.</li>
+  <li>Every local starts zeroed, not only Strings (<code>Config c;</code> no longer holds garbage). Large plain arrays
+  (over 4 KiB, no Strings or slices in them) are left as they are.</li>
+  <li><code>T[] s = {a, b, c};</code> makes a slice of a hidden array; it compiled with warnings and crashed before.
+  <code>{ptr, len}</code> still sets the slice's own fields.</li>
+  <li>A function of your own with <code>u8 *fmt, ...args</code> takes Strings for <code>%s</code> as printf does.</li>
+  <li>A String variable or field converts to <code>u8 *</code> where one is expected (its bytes always end in a NUL):
+  <code>cstr.len(s)</code> and C calls without <code>.cstr()</code>.</li>
+  <li><code>str.join(parts, sep)</code> from a slice or a <code>vec.Vec</code>; <code>vec.Vec.contains(x)</code>;
+  <code>str.toInt</code>, <code>str.toUint</code> and <code>str.toFloat</code> read a whole <code>u8[]</code> as a number;
+  <code>proc.expandEnv(text)</code> fills in <code>${NAME}</code> and <code>${NAME:default}</code>.</li>
+  <li>Logging: the messages line up in one column (the level and the file:line part are padded); lines logged after
+  <code>log.shutdown()</code> keep the level and output they had and say once where they came from; <code>log.info</code>
+  and the others take Strings and <code>u8[]</code> for <code>%s</code>.</li>
+  <li>The language server completes every method of a generic instance (<code>vec.Vec&lt;String&gt;</code>), not only the
+  ones already called, and a module's own globals.</li>
+  <li>Fixes: a statement that is only a field (<code>self.port;</code>) stopped the compiler; code inlined from another
+  file was reported at a line of the wrong file; overloads with a generic parameter gave an assembler error.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Freeing a String through a copy and then freeing its container is now a double free:
+  <code>v.get(i).free()</code>, or freeing a value from <code>map.next()</code>, before <code>v.free()</code> or
+  <code>m.free()</code>. <code>v.at(i).free()</code> is still safe (it clears the String in place).
+  <code>fs.freeList(&amp;names)</code> is now the same as <code>names.free()</code>.</li>
+  <li><code>fs.makeDir</code>, <code>makeDirAll</code>, <code>remove</code>, <code>removeDir</code>, <code>rename</code>,
+  <code>move</code>, <code>copyFile</code> and <code>changeDir</code> return a <code>bool</code>, true when it worked (false with
+  <code>os.errno()</code> set), as <code>fs.writeAll</code> and <code>fs.exists</code> already did. They returned 0 on success, so
+  <code>if (!fs.makeDir(d))</code> failed when it worked. A check written as <code>fs.remove(p) == 0</code> now means it failed:
+  write <code>if (fs.remove(p))</code>.</li>
+  <li>Log lines have more spaces: the level and the file:line part are padded.</li>
+  <li><code>-Memsafe</code> no longer calls what a global holds at exit a leak.</li>
+</ul>
+
 <h2>v0.17.2 <small>(2026-10-13)</small></h2>
 <p>One logging fix.</p>
 <ul>

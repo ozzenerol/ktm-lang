@@ -1530,7 +1530,8 @@ int replRun(Cctrl *cc, CliArgs *args) {
 
     /* Tracking allocator (memsafe.c) - always on in the REPL, and
      * registered before the bootstrap so the very first chunk already
-     * binds to it. */
+     * binds to it; its reports want the frames of stdlib calls (ir.c) */
+    jit->cc->flags |= CCTRL_MEMSAFE;
     memsafeInit(jit);
 
     int interactive = isatty(STDIN_FILENO);

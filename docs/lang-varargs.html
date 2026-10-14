@@ -179,6 +179,30 @@ void main()
 </code></pre>
 <pre class="output">[log] 3 files in /tmp, 42.5% full
 </pre>
+<p>A String or a <code>u8[]</code> goes to such a function as it goes to <code>printf</code>, when its
+format parameter is called <code>fmt</code> (right before <code>...args</code>): with a literal format each
+one's <code>%s</code> prints its bytes (a <code>u8[]</code> view only its own, no NUL needed). Anywhere else a
+String is passed as its C string (<code>s.cstr()</code>), so it works with a computed format too;
+a <code>u8[]</code> needs the literal format.</p>
+<pre data-run><code>import cstr, mem, str;
+
+void reply(u8 *fmt, ...args)
+{
+  u8 *msg = cstr.formatArgs(null, fmt, args);
+  printf("&amp;gt; %s\n", msg);
+  mem.free(msg);
+}
+
+void main()
+{
+  String user = str.from("ada");
+  u8[] cmd = "GET key";
+  reply("%s ran %s", user, cmd[0:3]);
+  user.free();
+}
+</code></pre>
+<pre class="output">&amp;gt; ada ran GET
+</pre>
 <p>Read a float back from a slot with <code>*(f64 *)&amp;args[i]</code>:</p>
 <pre data-run><code>void show(...args)
 {

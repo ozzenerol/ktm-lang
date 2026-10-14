@@ -115,7 +115,9 @@ more
     <tr><td><code>fs.changeDir(path)</code>, <code>fs.currentDir()</code></td><td>Change directory (<code>~</code> is <code>$HOME</code>); the working directory as a String</td></tr>
   </tbody>
 </table>
-<p>They return 0 on success and -1 on failure (with <code>os.errno()</code>). <code>makeDir</code> returns 0 if the path is a directory afterwards, made now or already there.</p>
+<p>They return a <code>bool</code>: true when done, false on failure (with <code>os.errno()</code>), as
+<code>fs.writeAll</code> and <code>fs.exists</code> do, so <code>if (!fs.makeDir(dir)) { ... }</code> catches the
+failure. <code>makeDir</code> is true if the path is a directory afterwards, made now or already there.</p>
 <pre data-run><code>
 import cstr, fs, mem;
 
@@ -138,11 +140,11 @@ void main()
 }
 </code></pre>
 <pre class="output">
-makeDir: -1 0
-again: 0, exists: 1
-remove non-empty: -1
-recursive: 0
-missing, forced: 0
+makeDir: 0 1
+again: 1, exists: 1
+remove non-empty: 0
+recursive: 1
+missing, forced: 1
 </pre>
 
 <h2>Copying and moving</h2>
@@ -154,6 +156,7 @@ missing, forced: 0
     <tr><td><code>fs.move(from, to)</code></td><td>Renames, or across filesystems copies and removes the original</td></tr>
   </tbody>
 </table>
+<p>Each returns true when done, false with <code>os.errno()</code> set.</p>
 <pre data-run><code>
 import fs;
 
@@ -171,8 +174,8 @@ void main()
 }
 </code></pre>
 <pre class="output">
-copy 0
-move 0
+copy 1
+move 1
 1 0 1
 payload
 </pre>

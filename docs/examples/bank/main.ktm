@@ -28,7 +28,7 @@ struct Txn {
     i64 amount;
 };
 
-list.List *ledger;
+list.List<Txn *> ledger;
 
 i64 noInterest(Account *a) {
     return 0;
@@ -103,7 +103,7 @@ void statement(Account *a) {
 }
 
 void main() {
-    ledger = list.new();
+    ledger = list.new<Txn *>();
 
     Account alice;
     initAccount(&alice, "alice", 120000);
@@ -141,11 +141,13 @@ void main() {
         statement(a);
     }
 
-    printf("Ledger (%d entries)\n", ledger.count());
-    for (list.List *it = ledger.next; it != ledger; it = it.next) {
-        Txn *t = it.value;
+    printf("Ledger (%d entries)\n", ledger.len);
+    for (auto n = ledger.head; n; n = n.next) {
+        Txn *t = n.value;
         printf("  %-6s %-9s ", t.owner, t.what);
         printMoney(t.amount);
         printf("\n");
     }
+    for (auto n = ledger.head; n; n = n.next) { mem.free(n.value); }
+    ledger.free();
 }

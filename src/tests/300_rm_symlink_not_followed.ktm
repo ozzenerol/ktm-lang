@@ -50,30 +50,30 @@ i32 main() {
     symlink("nowhere", P("dangling"));
 
     /* The link goes, the directory it points to stays full */
-    if (fs.remove(cstr.view(P("link")), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("link")), fs.REMOVE_RECURSE)) { correct++; }
     if (!exists("link")) { correct++; }
     if (exists("target/keep1") && exists("target/keep2")) { correct++; }
 
     /* Without flags too */
-    if (fs.remove(cstr.view(P("link2"))) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("link2")))) { correct++; }
     if (!exists("link2") && exists("target/keep1")) { correct++; }
 
     /* A dangling link can be removed */
-    if (fs.remove(cstr.view(P("dangling"))) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("dangling")))) { correct++; }
     if (!exists("dangling")) { correct++; }
 
     /* A link inside a tree is removed, not followed */
-    if (fs.remove(cstr.view(P("tree")), fs.REMOVE_RECURSE) == 0) { correct++; }
+    if (fs.remove(cstr.view(P("tree")), fs.REMOVE_RECURSE)) { correct++; }
     if (!exists("tree")) { correct++; }
     if (exists("target/keep1") && exists("target/keep2")) { correct++; }
 
     /* fs.removeDir refuses a symlink: it is not a directory */
-    if (fs.removeDir(cstr.view(P("link3")), fs.REMOVE_RECURSE) == -1) { correct++; }
+    if (!fs.removeDir(cstr.view(P("link3")), fs.REMOVE_RECURSE)) { correct++; }
     if (exists("link3") && exists("target/keep1")) { correct++; }
 
     /* The real directory still goes */
     fs.remove(cstr.view(P("link3")));
-    if (fs.remove(cstr.view(P("target")), fs.REMOVE_RECURSE) == 0 && !exists("target")) { correct++; }
+    if (fs.remove(cstr.view(P("target")), fs.REMOVE_RECURSE) && !exists("target")) { correct++; }
 
     u8 *cmd = cstr.formatTo(null, "rm -rf '%s'", root);
     proc.shell(cstr.view(cmd));

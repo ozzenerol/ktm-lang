@@ -34,11 +34,11 @@ i32 main() {
     /* makeDirAll makes the parents, and is fine with what is there */
     String deep = fs.join(dir, "a/b", "c");
     defer deep.free();
-    check(fs.makeDirAll(deep) == 0 && fs.exists(deep), "makeDirAll a/b/c");
-    check(fs.makeDirAll(deep) == 0, "makeDirAll again");
+    check(fs.makeDirAll(deep) && fs.exists(deep), "makeDirAll a/b/c");
+    check(fs.makeDirAll(deep), "makeDirAll again");
     String noParent = fs.join(dir, "x/y");
     defer noParent.free();
-    check(fs.makeDir(noParent) != 0, "makeDir without the parent");
+    check(!fs.makeDir(noParent), "makeDir without the parent");
 
     String f1 = fs.join(dir, "one.txt");
     String f2 = fs.join(dir, "a/two.txt");
@@ -127,34 +127,34 @@ i32 main() {
     String copy = fs.join(dir, "copy.txt");
     defer copy.free();
     chmod(f1.cstr(), 0x1E0);   /* 0740 */
-    check(fs.copyFile(f1, copy) == 0, "copyFile");
+    check(fs.copyFile(f1, copy), "copyFile");
     String got = fs.readAll(copy);
     fs.FileStat st;
     check(str.equals(got, "hello") && fs.stat(&st, copy) == 0 && (st.st_mode & 0x1FF) == 0x1E0,
           "copy has the bytes and the mode");
     got.free();
-    check(fs.writeAll(copy, "longer old content") && fs.copyFile(f1, copy) == 0,
+    check(fs.writeAll(copy, "longer old content") && fs.copyFile(f1, copy),
           "copyFile over a longer file");
     got = fs.readAll(copy);
     check(str.equals(got, "hello"), "copyFile replaces what was there");
     got.free();
-    check(fs.copyFile(f1, f1) == -1 && os.errno() == libc.EINVAL, "copyFile onto itself is refused");
+    check(!fs.copyFile(f1, f1) && os.errno() == libc.EINVAL, "copyFile onto itself is refused");
     got = fs.readAll(f1);
     check(str.equals(got, "hello"), "the file is still whole");
     got.free();
-    check(fs.copyFile(dir, copy) == -1 && os.errno() == libc.EISDIR, "copyFile of a directory");
-    check(fs.copyFile("./ktm-626-no-such-file", copy) == -1 && os.errno() == libc.ENOENT,
+    check(!fs.copyFile(dir, copy) && os.errno() == libc.EISDIR, "copyFile of a directory");
+    check(!fs.copyFile("./ktm-626-no-such-file", copy) && os.errno() == libc.ENOENT,
           "copyFile of a missing file");
 
     /* rename and move */
     String renamed = fs.join(dir, "renamed.txt");
     defer renamed.free();
-    check(fs.rename(copy, renamed) == 0 && !fs.exists(copy) && fs.exists(renamed), "rename");
-    check(fs.rename(copy, renamed) == -1 && os.errno() == libc.ENOENT, "rename of a missing file");
+    check(fs.rename(copy, renamed) && !fs.exists(copy) && fs.exists(renamed), "rename");
+    check(!fs.rename(copy, renamed) && os.errno() == libc.ENOENT, "rename of a missing file");
     String moved = str.format("%s/ktm-626-%d-moved", libc.getenv("TMPDIR") ? libc.getenv("TMPDIR") : "/tmp",
                               libc.getpid());
     defer moved.free();
-    check(fs.move(renamed, moved) == 0 && !fs.exists(renamed) && fs.exists(moved), "move");
+    check(fs.move(renamed, moved) && !fs.exists(renamed) && fs.exists(moved), "move");
     String back = fs.readAll(moved);
     check(str.equals(back, "hello"), "moved file has its bytes");
     back.free();
