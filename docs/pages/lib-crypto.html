@@ -32,7 +32,7 @@ crypto.random(key[0:]);
 crypto.random(nonce[0:]);
 String box = crypto.seal(crypto.Aead.aesGcm, key[0:], nonce[0:], "attack at dawn", "msg-7");
 String plain;
-if (!crypto.open(crypto.Aead.aesGcm, key[0:], nonce[0:], box, &amp;plain, "msg-7")) {
+if (!crypto.open(crypto.Aead.aesGcm, key[0:], nonce[0:], box, &plain, "msg-7")) {
   // altered, or not ours
 }
 </code></pre>

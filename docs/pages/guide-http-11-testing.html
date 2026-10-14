@@ -35,35 +35,35 @@ pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
         middleware.CorsOptions cors;
         cors.origins = webOrigin;
         cors.expose = "X-Request-Id";
-        middleware.cors(mux, &amp;cors);
+        middleware.cors(mux, &cors);
     }
     middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
 
-    mux.handle("POST /users", &amp;signup);
+    mux.handle("POST /users", &signup);
     http.Mux *logins = mux.group("/sessions");
     middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
-    logins.handle("POST", &amp;login);
+    logins.handle("POST", &login);
     http.Mux *session = mux.group("/sessions");
-    middleware.bearer(session, &amp;checkToken);
-    session.handle("DELETE", &amp;logout);
+    middleware.bearer(session, &checkToken);
+    session.handle("DELETE", &logout);
 
     /* every bookmark route needs a signed-in user */
     http.Mux *bookmarks = mux.group("/bookmarks");
-    middleware.bearer(bookmarks, &amp;checkToken);
-    bookmarks.handle("GET", &amp;list);
-    bookmarks.handle("POST", &amp;create);
-    bookmarks.handle("GET /{id}", &amp;get);
-    bookmarks.handle("DELETE /{id}", &amp;remove);
+    middleware.bearer(bookmarks, &checkToken);
+    bookmarks.handle("GET", &list);
+    bookmarks.handle("POST", &create);
+    bookmarks.handle("GET /{id}", &get);
+    bookmarks.handle("DELETE /{id}", &remove);
 
     http.Mux *collections = mux.group("/collections");
-    middleware.bearer(collections, &amp;checkToken);
-    collections.handle("POST", &amp;newCollection);
-    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
-    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
+    middleware.bearer(collections, &checkToken);
+    collections.handle("POST", &newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &addToCollection);
+    mux.handle("GET /collections/{id}", &showCollection);      /* outside the group: anyone may ask */
 }</code></pre>
 <p>and <code>main</code> shrinks to:</p>
 <pre><code>    http.Mux mux;
-    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);</code></pre>
+    api.routes(&mux, gSettings.webOrigin, gSettings.trustedProxies);</code></pre>
 
 <h2>The tests</h2>
 <p>A test file is named <code>*_test.ktm</code> and starts with the same <code>module api;</code> line, so its tests see
@@ -92,9 +92,9 @@ bool setup(testing.T *t)
         gDb = pg.open(url[0:]);
         migrate.Migrations ms = migrate.load("../migrations");
         migrate.Driver d = postgres.driverPool(gDb);
-        ms.up(&amp;d);
+        ms.up(&d);
         ms.free();
-        routes(&amp;gMux, "", "");
+        routes(&gMux, "", "");
     }
     gDb.exec("TRUNCATE users, bookmarks CASCADE");
     gClient++;
@@ -112,7 +112,7 @@ http.Writer send(u8[] method, u8[] target, u8[] body = "", u8[] token = "")
     String auth = str.format("Bearer %s", token);
     if (token.len) { r.addHeader("Authorization", auth[0:]); }
     http.Writer w = http.recorder();
-    gMux.serve(&amp;w, &amp;r);
+    gMux.serve(&w, &r);
     r.free();
     auth.free();
     return w;
@@ -139,7 +139,7 @@ void testSignupRules(testing.T *t)
     setup(t);
     http.Writer w = send("POST", "/users", "{\"email\": \"not an email\", \"password\": \"short\"}");
     t.equal(w.code, 422);
-    t.check(str.find(w.body[0:], "\"field\":\"email\"") &gt; 0 &amp;&amp; str.find(w.body[0:], "\"field\":\"password\"") &gt; 0,
+    t.check(str.find(w.body[0:], "\"field\":\"email\"") > 0 && str.find(w.body[0:], "\"field\":\"password\"") > 0,
             "both fields named: %s", w.body);
     w.free();
 }
@@ -177,7 +177,7 @@ void testUsersSeeOnlyTheirOwn(testing.T *t)
     t.equal(w.body, "{\"items\":[]}");
     w.free();
     w = send("GET", "/bookmarks?tag=go", "", ada[0:]);
-    t.check(str.find(w.body[0:], "https://go.dev") &gt; 0, "ada's list: %s", w.body);
+    t.check(str.find(w.body[0:], "https://go.dev") > 0, "ada's list: %s", w.body);
     w.free();
 }
 

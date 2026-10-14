@@ -58,7 +58,7 @@
 server that uses every core.</p>
 
 <h2 id="the-project">The project<a class="anchor" href="#the-project" aria-label="Link to this section">#</a></h2>
-<pre><code>$ mkdir shelf &amp;amp;&amp;amp; cd shelf
+<pre><code>$ mkdir shelf &amp;&amp; cd shelf
 $ ktm mod init example.com/shelf
 ktm: created ktm.mod for example.com/shelf</code></pre>
 <p><code>ktm.mod</code> names the project and the ktm version it needs. Later chapters add the packages it uses
@@ -75,9 +75,9 @@ void hello(http.Writer *w, http.Request *r)
 i32 main()
 {
     http.Mux mux;
-    mux.handle("GET /{$}", &amp;amp;hello);
+    mux.handle("GET /{$}", &amp;hello);
     printf("Shelf listening on http://localhost:8080\n");
-    return http.listen(8080, &amp;amp;mux);
+    return http.listen(8080, &amp;mux);
 }</code></pre>
 <ul class="rules">
   <li><code>import net.http;</code> brings in the HTTP module; its names are used as <code>http.X</code>.</li>

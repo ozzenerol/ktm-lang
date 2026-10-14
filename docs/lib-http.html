@@ -358,7 +358,7 @@ c.maxAge = 30 * 24 * 3600;             // seconds; 0 until the browser closes
 c.httpOnly = true;                     // JavaScript can't read it
 c.secure = true;                       // sent over HTTPS only
 c.sameSite = http.SameSite.lax;        // .strict, .none (which adds Secure)
-w.setCookie(&amp;amp;c);                      // one Set-Cookie header per call; Path defaults to "/"
+w.setCookie(&amp;c);                      // one Set-Cookie header per call; Path defaults to "/"
 
 w.deleteCookie("session");             // Max-Age=0
 </code></pre>
@@ -381,7 +381,7 @@ void signup(http.Writer *w, http.Request *r)
 {
   Welcome *m = mem.allocZero(sizeof(Welcome));
   m.email = str.from(r.query("email"));  // a copy: the request's memory is gone after the reply
-  coro.go(&amp;amp;sendWelcome, m);
+  coro.go(&amp;sendWelcome, m);
   w.text(202, "welcome!");
 }
 </code></pre>
@@ -412,7 +412,7 @@ request with both <code>Content-Length</code> and chunked encoding is refused (<
 <p><code>net.https</code> serves the same mux over TLS (<a href="lib-tls.html">net.tls</a>, mbedTLS inside ktm):</p>
 <pre><code>import net.http, net.https;
 ...
-return https.listen(8443, &amp;amp;mux, "server.pem", "server.key");   // app and opts as for http.listen
+return https.listen(8443, &amp;mux, "server.pem", "server.key");   // app and opts as for http.listen
 </code></pre>
 <p>The certificate chain and the private key are PEM files; a key that doesn't belong to the certificate throws
 <code>tls.ERR_TLS</code> at start. <code>https.listenConfig(port, &amp;mux, &amp;cfg)</code> takes a whole

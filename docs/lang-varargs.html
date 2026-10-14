@@ -226,7 +226,7 @@ a <code>u8[]</code> needs the literal format.</p>
 void reply(u8 *fmt, ...args)
 {
   u8 *msg = cstr.formatArgs(null, fmt, args);
-  printf("&amp;gt; %s\n", msg);
+  printf("&gt; %s\n", msg);
   mem.free(msg);
 }
 
@@ -238,7 +238,7 @@ void main()
   user.free();
 }
 </code></pre>
-<pre class="output">&amp;gt; ada ran GET
+<pre class="output">&gt; ada ran GET
 </pre>
 <p>Read a float back from a slot with <code>*(f64 *)&amp;args[i]</code>:</p>
 <pre data-run><code>void show(...args)

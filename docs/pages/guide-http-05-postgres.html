@@ -49,7 +49,7 @@ import config, flag, fs, json, log, net.http, os, reflect, uuid, vec;
 void list(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
-    vec.Vec&lt;Bookmark&gt; all = pg.queryAll&lt;Bookmark&gt;(db, "SELECT " COLUMNS " FROM bookmarks ORDER BY id DESC");
+    vec.Vec<Bookmark> all = pg.queryAll<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks ORDER BY id DESC");
     defer pg.free(reflect.of(all));
     w.json(200, reflect.of(all));
 }
@@ -66,10 +66,10 @@ void get(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     uuid.UUID id;
-    if (!pathId(w, r, &amp;id)) { return; }
+    if (!pathId(w, r, &id)) { return; }
     Bookmark b;
     try {
-        b = pg.queryOne&lt;Bookmark&gt;(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
+        b = pg.queryOne<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
     } catch (Error e) {
         if (e.code != pg.ERR_NO_ROWS) { throw(e); }
         w.error(404, "no such bookmark");
@@ -82,12 +82,12 @@ void get(http.Writer *w, http.Request *r)
 void create(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
-    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
     String id = uuid.v7().string();
     defer id.free();
     Bookmark b;
     try {
-        b = pg.queryOne&lt;Bookmark&gt;(db, "INSERT INTO bookmarks (id, url, title) VALUES ($1, $2, $3) RETURNING " COLUMNS,
+        b = pg.queryOne<Bookmark>(db, "INSERT INTO bookmarks (id, url, title) VALUES ($1, $2, $3) RETURNING " COLUMNS,
                                   id, in.url, in.title.len ? in.title : in.url);
     } catch (Error e) {
         if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
@@ -102,7 +102,7 @@ void remove(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     uuid.UUID id;
-    if (!pathId(w, r, &amp;id)) { return; }
+    if (!pathId(w, r, &id)) { return; }
     if (db.exec("DELETE FROM bookmarks WHERE id = $1", r.param("id")) == 0) {
         w.error(404, "no such bookmark");
         return;
@@ -143,15 +143,15 @@ i32 main(i32 argc, u8 **argv)
     schema.free();
 
     http.Mux mux;
-    mux.handle("GET /bookmarks", &amp;list);
-    mux.handle("POST /bookmarks", &amp;create);
-    mux.handle("GET /bookmarks/{id}", &amp;get);
-    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
 
     http.Options o;
     o.accessLog = *accessLog;
     log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+    return http.listen((i32)*port, &mux, db, &o);
 }</code></pre>
 
 <h2>What changed</h2>

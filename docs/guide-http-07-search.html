@@ -83,8 +83,8 @@ PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each
 <pre><code>void create(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
-    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);
-    if (in.tags.len &amp;gt; 10) {
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);
+    if (in.tags.len &gt; 10) {
         w.error(422, "at most 10 tags");
         return;
     }
@@ -108,7 +108,7 @@ PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each
         return;
     }
     tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
-    Bookmark b = pg.queryOne&amp;lt;Bookmark&amp;gt;(&amp;amp;tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    Bookmark b = pg.queryOne&lt;Bookmark&gt;(&amp;tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
     defer b.freeDecoded();
     tx.commit();
     w.json(201, reflect.of(b));
@@ -122,32 +122,32 @@ PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each
 </ul>
 
 <h2 id="filtering-search-and-pages">Filtering, search and pages<a class="anchor" href="#filtering-search-and-pages" aria-label="Link to this section">#</a></h2>
-<pre><code>/* GET /bookmarks?tag=go&amp;amp;q=fast+servers&amp;amp;limit=20&amp;amp;after=&amp;lt;cursor&amp;gt;: newest first */
+<pre><code>/* GET /bookmarks?tag=go&amp;q=fast+servers&amp;limit=20&amp;after=&lt;cursor&gt;: newest first */
 void list(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     i64 limit = 20;
-    if (r.hasQuery("limit") &amp;amp;&amp;amp; (!str.toInt(r.query("limit"), &amp;amp;limit) || limit &amp;lt; 1 || limit &amp;gt; 100)) {
+    if (r.hasQuery("limit") &amp;&amp; (!str.toInt(r.query("limit"), &amp;limit) || limit &lt; 1 || limit &gt; 100)) {
         w.error(400, "limit is 1 to 100");
         return;
     }
     uuid.UUID after;
     u8[] cursor = r.query("after");
-    if (cursor.len &amp;amp;&amp;amp; !uuid.parse(cursor, &amp;amp;after)) {
+    if (cursor.len &amp;&amp; !uuid.parse(cursor, &amp;after)) {
         w.error(400, "after isn't a cursor from this API");
         return;
     }
     Page page;
     defer page.freeDecoded();
     /* one more than asked for: if it comes back, there is a next page */
-    page.items = pg.queryAll&amp;lt;Bookmark&amp;gt;(db,
+    page.items = pg.queryAll&lt;Bookmark&gt;(db,
         "SELECT " COLUMNS " FROM bookmarks"
         " WHERE ($1 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $1))"
         "   AND ($2 = '' OR search @@ websearch_to_tsquery('simple', $2))"
-        "   AND ($3 = '' OR id &amp;lt; $3::uuid)"
+        "   AND ($3 = '' OR id &lt; $3::uuid)"
         " ORDER BY id DESC LIMIT $4",
         r.query("tag"), r.query("q"), cursor, limit + 1);
-    if (page.items.len &amp;gt; limit) {
+    if (page.items.len &gt; limit) {
         Bookmark extra = page.items.removeAt(limit);
         pg.free(reflect.of(extra));
         page.next = str.from(page.items.data[limit - 1].id[0:]);
@@ -175,7 +175,7 @@ $ curl localhost:8080/bookmarks?q=fast
 
 $ curl 'localhost:8080/bookmarks?limit=2'
 {"items":[...two bookmarks...],"next":"01a13b0c-c310-7000-9e76-a5045a4305f6"}
-$ curl 'localhost:8080/bookmarks?limit=2&amp;amp;after=01a13b0c-c310-7000-9e76-a5045a4305f6'
+$ curl 'localhost:8080/bookmarks?limit=2&amp;after=01a13b0c-c310-7000-9e76-a5045a4305f6'
 {"items":[{"id":"01a13b0c-c2ff-7000-ba84-9449fa20b4a4","url":"https://go.dev",...}]}
 
 $ curl -X POST localhost:8080/bookmarks -d '{"url": "https://x.org", "tags": ["Bad Tag"]}'

@@ -18,23 +18,23 @@ Settings gSettings;</code></pre>
 
 <h2>The middleware</h2>
 <pre><code>    http.Mux mux;
-    if (gSettings.trustedProxies.len) { middleware.realIp(&amp;mux, gSettings.trustedProxies); }
-    middleware.requestId(&amp;mux);
+    if (gSettings.trustedProxies.len) { middleware.realIp(&mux, gSettings.trustedProxies); }
+    middleware.requestId(&mux);
     if (gSettings.webOrigin.len) {
         middleware.CorsOptions cors;
         cors.origins = gSettings.webOrigin;
         cors.expose = "X-Request-Id";
-        middleware.cors(&amp;mux, &amp;cors);
+        middleware.cors(&mux, &cors);
     }
-    middleware.rateLimit(&amp;mux, 300, 60);            /* any client: 300 requests a minute */
+    middleware.rateLimit(&mux, 300, 60);            /* any client: 300 requests a minute */
 
-    mux.handle("POST /users", &amp;signup);
+    mux.handle("POST /users", &signup);
     http.Mux *logins = mux.group("/sessions");
     middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
-    logins.handle("POST", &amp;login);
+    logins.handle("POST", &login);
     http.Mux *session = mux.group("/sessions");
-    middleware.bearer(session, &amp;checkToken);
-    session.handle("DELETE", &amp;logout);</code></pre>
+    middleware.bearer(session, &checkToken);
+    session.handle("DELETE", &logout);</code></pre>
 <ul class="rules">
   <li><b>Real IP</b> comes first, so the rest see the client and not the load balancer. It only believes
   <code>X-Forwarded-For</code> from the proxies you name: anyone else could write anything in it.</li>

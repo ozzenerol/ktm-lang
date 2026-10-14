@@ -87,14 +87,14 @@ CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
 <pre><code>void signup(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
-    NewUser in = http.decodeValid&amp;lt;NewUser&amp;gt;(r);
+    NewUser in = http.decodeValid&lt;NewUser&gt;(r);
     String hash = crypto.hashPassword(in.password);     /* Argon2id, on a worker thread */
     defer hash.free();
     String id = uuid.v7().string();
     defer id.free();
     User u;
     try {
-        u = pg.queryOne&amp;lt;User&amp;gt;(db, "INSERT INTO users (id, email, password_hash) VALUES ($1, lower($2), $3) RETURNING id, email",
+        u = pg.queryOne&lt;User&gt;(db, "INSERT INTO users (id, email, password_hash) VALUES ($1, lower($2), $3) RETURNING id, email",
                               id, in.email, hash);
     } catch (Error e) {
         if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
@@ -116,8 +116,8 @@ CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
 <pre><code>void login(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
-    Login in = http.decodeValid&amp;lt;Login&amp;gt;(r);
-    vec.Vec&amp;lt;Credentials&amp;gt; found = pg.queryAll&amp;lt;Credentials&amp;gt;(db,
+    Login in = http.decodeValid&lt;Login&gt;(r);
+    vec.Vec&lt;Credentials&gt; found = pg.queryAll&lt;Credentials&gt;(db,
         "SELECT id, password_hash AS \"passwordHash\" FROM users WHERE email = lower($1)", in.email);
     defer pg.free(reflect.of(found));
     u8[] hash = found.len ? found.data[0].passwordHash[0:] : gNoUser[0:];
@@ -133,7 +133,7 @@ CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
     s.token = base64.encodeUrl(raw[0:]);
     u8 h[32];
     tokenHash(s.token[0:], h);
-    s.expiresAt = pg.queryOne&amp;lt;String&amp;gt;(db,
+    s.expiresAt = pg.queryOne&lt;String&gt;(db,
         "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '30 days')"
         " RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
         h[0:32], found.data[0].id);
@@ -154,8 +154,8 @@ bool checkToken(u8[] token, http.Request *r)
     pg.Pool *db = r.app;
     u8 h[32];
     tokenHash(token, h);
-    vec.Vec&amp;lt;String&amp;gt; ids = pg.queryAll&amp;lt;String&amp;gt;(db,
-        "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &amp;gt; now()", h[0:32]);
+    vec.Vec&lt;String&gt; ids = pg.queryAll&lt;String&gt;(db,
+        "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &gt; now()", h[0:32]);
     defer pg.free(reflect.of(ids));
     if (!ids.len) { return false; }
     u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
@@ -201,34 +201,34 @@ handlers read it with <code>userOf(r)</code>. Every bookmark query gets <code>AN
     defer ms.free();
     migrate.Driver d = postgres.driverPool(db);
     if (flags.chosen() == migrateCmd) {
-        return runMigrate(&amp;amp;ms, &amp;amp;d, migrateCmd.arg(0));
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
     }
-    i64 ran = ms.up(&amp;amp;d);
-    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;amp;d), ran);
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
 
     String noise = uuid.v4().string();
     gNoUser = crypto.hashPassword(noise[0:]);
     noise.free();
 
     http.Mux mux;
-    mux.handle("POST /users", &amp;amp;signup);
-    mux.handle("POST /sessions", &amp;amp;login);
+    mux.handle("POST /users", &amp;signup);
+    mux.handle("POST /sessions", &amp;login);
     http.Mux *session = mux.group("/sessions");
-    middleware.bearer(session, &amp;amp;checkToken);
-    session.handle("DELETE", &amp;amp;logout);
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
 
     /* every bookmark route needs a signed-in user */
     http.Mux *bookmarks = mux.group("/bookmarks");
-    middleware.bearer(bookmarks, &amp;amp;checkToken);
-    bookmarks.handle("GET", &amp;amp;list);
-    bookmarks.handle("POST", &amp;amp;create);
-    bookmarks.handle("GET /{id}", &amp;amp;get);
-    bookmarks.handle("DELETE /{id}", &amp;amp;remove);
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
 
     http.Options o;
     o.accessLog = *accessLog;
     log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;amp;mux, db, &amp;amp;o);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
 }</code></pre>
 <p><code>bookmarks.handle("GET", &amp;list)</code> is <code>GET /bookmarks</code> itself: a pattern without a path
 is the group's prefix, so the whole resource is behind the group's middleware.</p>

@@ -185,7 +185,7 @@ import cstr, mem, str;
 void reply(u8 *fmt, ...args)
 {
   u8 *msg = cstr.formatArgs(null, fmt, args);
-  printf("&gt; %s\n", msg);
+  printf("> %s\n", msg);
   mem.free(msg);
 }
 
@@ -198,7 +198,7 @@ void main()
 }
 </code></pre>
 <pre class="output">
-&gt; ada ran GET
+> ada ran GET
 </pre>
 <p>Read a float back from a slot with <code>*(f64 *)&amp;args[i]</code>:</p>
 <pre data-run><code>

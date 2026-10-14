@@ -94,16 +94,16 @@ that many are saved.</p>
     fs.parseOrExit(argc, argv);
 
     http.Mux mux;
-    mux.handle("GET /bookmarks", &amp;amp;list);
-    mux.handle("POST /bookmarks", &amp;amp;create);
-    mux.handle("GET /bookmarks/{id}", &amp;amp;get);
-    mux.handle("DELETE /bookmarks/{id}", &amp;amp;remove);
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
 
     http.Options o;
     o.threads = 1;
     o.accessLog = *accessLog;
     log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;amp;mux, null, &amp;amp;o);
+    return http.listen((i32)*port, &amp;mux, null, &amp;o);
 }</code></pre>
 <ol>
   <li>The defaults are what the struct holds before anything is read.</li>

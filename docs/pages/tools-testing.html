@@ -12,7 +12,7 @@ pub i64 area(i64 w, i64 h) { return w * h; }
 
 pub u8 *kind(i64 w, i64 h) { return w == h ? "square" : "rect"; }
 
-i64 clamp(i64 n) { return n &lt; 0 ? 0 : n; }
+i64 clamp(i64 n) { return n < 0 ? 0 : n; }
 </code></pre>
 <pre><code>
 // geo/area_test.ktm: in the module, so it sees clamp too

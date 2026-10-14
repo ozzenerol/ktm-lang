@@ -22,12 +22,12 @@ PostgreSQL.</p>
 };
 
 /* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
-vec.Vec&lt;Bookmark&gt; gBookmarks;
+vec.Vec<Bookmark> gBookmarks;
 
 /* The index of the bookmark with this id, or -1 */
 i64 find(u8[] id)
 {
-    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+    for (i64 i = 0; i < gBookmarks.len; i++) {
         if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
     }
     return -1;
@@ -41,7 +41,7 @@ void list(http.Writer *w, http.Request *r)
 void get(http.Writer *w, http.Request *r)
 {
     i64 i = find(r.param("id"));
-    if (i &lt; 0) {
+    if (i < 0) {
         w.error(404, "no such bookmark");
         return;
     }
@@ -50,7 +50,7 @@ void get(http.Writer *w, http.Request *r)
 
 void create(http.Writer *w, http.Request *r)
 {
-    NewBookmark in = http.decode&lt;NewBookmark&gt;(r);
+    NewBookmark in = http.decode<NewBookmark>(r);
     Bookmark b;
     b.id = uuid.v7().string();
     b.url = str.from(in.url);
@@ -63,7 +63,7 @@ void create(http.Writer *w, http.Request *r)
 void remove(http.Writer *w, http.Request *r)
 {
     i64 i = find(r.param("id"));
-    if (i &lt; 0) {
+    if (i < 0) {
         w.error(404, "no such bookmark");
         return;
     }
@@ -78,15 +78,15 @@ void remove(http.Writer *w, http.Request *r)
 i32 main()
 {
     http.Mux mux;
-    mux.handle("GET /bookmarks", &amp;list);
-    mux.handle("POST /bookmarks", &amp;create);
-    mux.handle("GET /bookmarks/{id}", &amp;get);
-    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
 
     http.Options o;
     o.threads = 1;      /* one loop: the list in memory isn't shared between threads */
     printf("Shelf listening on http://localhost:8080\n");
-    return http.listen(8080, &amp;mux, null, &amp;o);
+    return http.listen(8080, &mux, null, &o);
 }</code></pre>
 
 <h2>Structs as JSON</h2>

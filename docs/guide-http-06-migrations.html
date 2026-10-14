@@ -103,21 +103,21 @@ ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</cod
     defer ms.free();
     migrate.Driver d = postgres.driverPool(db);
     if (flags.chosen() == migrateCmd) {
-        return runMigrate(&amp;amp;ms, &amp;amp;d, migrateCmd.arg(0));
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
     }
-    i64 ran = ms.up(&amp;amp;d);
-    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;amp;d), ran);
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
 
     http.Mux mux;
-    mux.handle("GET /bookmarks", &amp;amp;list);
-    mux.handle("POST /bookmarks", &amp;amp;create);
-    mux.handle("GET /bookmarks/{id}", &amp;amp;get);
-    mux.handle("DELETE /bookmarks/{id}", &amp;amp;remove);
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
 
     http.Options o;
     o.accessLog = *accessLog;
     log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;amp;mux, db, &amp;amp;o);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
 }</code></pre>
 <p>At every start the server brings the database up to date before it listens, so a deploy is just "start the new
 binary". A lock in the database keeps two copies starting at once from both migrating. <code>migrate</code> is a
@@ -130,7 +130,7 @@ i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
     } else if (str.equals(what, "down")) {
         printf("%d migration reverted\n", ms.down(d, 1));
     } else if (str.equals(what, "status")) {
-        vec.Vec&amp;lt;migrate.Status&amp;gt; all = ms.status(d);
+        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
         for (auto s : all) {
             printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
         }

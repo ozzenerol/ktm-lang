@@ -20,10 +20,10 @@ CREATE TABLE collection_items (
 
 <h2>Routes for owners, a route for everyone</h2>
 <pre><code>    http.Mux *collections = mux.group("/collections");
-    middleware.bearer(collections, &amp;checkToken);
-    collections.handle("POST", &amp;newCollection);
-    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
-    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */</code></pre>
+    middleware.bearer(collections, &checkToken);
+    collections.handle("POST", &newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &addToCollection);
+    mux.handle("GET /collections/{id}", &showCollection);      /* outside the group: anyone may ask */</code></pre>
 <p>Creating and filling collections is in the group, behind the token check. Reading one is outside it: the handler
 looks at the token itself, when there is one.</p>
 <pre><code>/* The signed-in user if the request has a good token, else "": for the
@@ -31,7 +31,7 @@ looks at the token itself, when there is one.</p>
 u8[] maybeUser(http.Request *r)
 {
     u8[] auth = str.trim(r.header("Authorization"));
-    if (auth.len &gt; 7 &amp;&amp; checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
+    if (auth.len > 7 && checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
     return "";
 }</code></pre>
 
@@ -41,13 +41,13 @@ void showCollection(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     uuid.UUID id;
-    if (!uuid.parse(r.param("id"), &amp;id)) {
+    if (!uuid.parse(r.param("id"), &id)) {
         w.error(404, "no such collection");
         return;
     }
     /* someone else's private collection is a 404, not a 403: it doesn't
      * say that it exists */
-    vec.Vec&lt;Collection&gt; found = pg.queryAll&lt;Collection&gt;(db,
+    vec.Vec<Collection> found = pg.queryAll<Collection>(db,
         "SELECT id, name, public FROM collections WHERE id = $1 AND (public OR user_id::text = $2)",
         r.param("id"), maybeUser(r));
     defer pg.free(reflect.of(found));
@@ -55,8 +55,8 @@ void showCollection(http.Writer *w, http.Request *r)
         w.error(404, "no such collection");
         return;
     }
-    Collection *c = &amp;found.data[0];
-    c.bookmarks = pg.queryAll&lt;Bookmark&gt;(db,
+    Collection *c = &found.data[0];
+    c.bookmarks = pg.queryAll<Bookmark>(db,
         "SELECT " COLUMNS " FROM bookmarks WHERE id IN"
         " (SELECT bookmark_id FROM collection_items WHERE collection_id = $1) ORDER BY id DESC", r.param("id"));
     w.json(200, reflect.of(*c));
@@ -73,11 +73,11 @@ void addToCollection(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     uuid.UUID a, b;
-    if (!uuid.parse(r.param("id"), &amp;a) || !uuid.parse(r.param("bookmark"), &amp;b)) {
+    if (!uuid.parse(r.param("id"), &a) || !uuid.parse(r.param("bookmark"), &b)) {
         w.error(404, "no such collection or bookmark");
         return;
     }
-    i64 mine = pg.queryOne&lt;i64&gt;(db, "SELECT count(*) FROM collections c, bookmarks b"
+    i64 mine = pg.queryOne<i64>(db, "SELECT count(*) FROM collections c, bookmarks b"
                                     " WHERE c.id = $1 AND b.id = $2 AND c.user_id = $3 AND b.user_id = $3",
                                 r.param("id"), r.param("bookmark"), userOf(r));
     if (!mine) {

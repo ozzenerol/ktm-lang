@@ -72,23 +72,23 @@ Settings gSettings;</code></pre>
 
 <h2 id="the-middleware">The middleware<a class="anchor" href="#the-middleware" aria-label="Link to this section">#</a></h2>
 <pre><code>    http.Mux mux;
-    if (gSettings.trustedProxies.len) { middleware.realIp(&amp;amp;mux, gSettings.trustedProxies); }
-    middleware.requestId(&amp;amp;mux);
+    if (gSettings.trustedProxies.len) { middleware.realIp(&amp;mux, gSettings.trustedProxies); }
+    middleware.requestId(&amp;mux);
     if (gSettings.webOrigin.len) {
         middleware.CorsOptions cors;
         cors.origins = gSettings.webOrigin;
         cors.expose = "X-Request-Id";
-        middleware.cors(&amp;amp;mux, &amp;amp;cors);
+        middleware.cors(&amp;mux, &amp;cors);
     }
-    middleware.rateLimit(&amp;amp;mux, 300, 60);            /* any client: 300 requests a minute */
+    middleware.rateLimit(&amp;mux, 300, 60);            /* any client: 300 requests a minute */
 
-    mux.handle("POST /users", &amp;amp;signup);
+    mux.handle("POST /users", &amp;signup);
     http.Mux *logins = mux.group("/sessions");
     middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
-    logins.handle("POST", &amp;amp;login);
+    logins.handle("POST", &amp;login);
     http.Mux *session = mux.group("/sessions");
-    middleware.bearer(session, &amp;amp;checkToken);
-    session.handle("DELETE", &amp;amp;logout);</code></pre>
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);</code></pre>
 <ul class="rules">
   <li><b>Real IP</b> comes first, so the rest see the client and not the load balancer. It only believes
   <code>X-Forwarded-For</code> from the proxies you name: anyone else could write anything in it.</li>

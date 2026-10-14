@@ -44,7 +44,7 @@ every connection, from any thread; <code>tls.dial(host, port)</code> uses a shar
 <pre><code>
 tls.Config cfg;
 cfg.caFile = "/etc/app/ca.pem";            // trust this CA instead of the system's
-tls.Context *ctx = tls.client(&amp;cfg);
+tls.Context *ctx = tls.client(&cfg);
 
 i32 fd = net.dial("db.internal", 5432);
 // ... a protocol's own start, then:
@@ -65,7 +65,7 @@ tls.Conn *c = ctx.connect(fd, "db.internal");   // TLS over a socket you already
 tls.Config cfg;
 cfg.certFile = "server.pem";
 cfg.keyFile = "server.key";
-tls.Context *ctx = tls.server(&amp;cfg);
+tls.Context *ctx = tls.server(&cfg);
 
 i32 fd = net.accept(listener);
 tls.Conn *c = ctx.accept(fd);

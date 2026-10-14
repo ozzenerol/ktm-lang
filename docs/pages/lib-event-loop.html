@@ -196,7 +196,7 @@ void resize(void *arg) {
 void handler(http.Writer *w, http.Request *r) {
   Resize job;
   job.in = load(r);
-  coro.offload(&amp;resize, &amp;job);    // the loop serves other requests meanwhile
+  coro.offload(&resize, &job);    // the loop serves other requests meanwhile
   send(w, job.out);
 }
 </code></pre>

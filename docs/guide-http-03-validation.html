@@ -63,7 +63,7 @@ request's fields fix the first two, and a check in the handler the third.</p>
     @required @url @max(2048) u8[] url;
     @max(200) u8[] title;
 };</code></pre>
-<pre><code>    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);    /* a 422 by itself when a rule fails */</code></pre>
+<pre><code>    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */</code></pre>
 <p><code>http.decodeValid</code> decodes as <code>http.decode</code> does, then checks the rules. When one fails, the
 handler stops there and the client gets a 422 that names each field and what is wrong with it:</p>
 <pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "not a link", "title": "x"}'
@@ -85,8 +85,8 @@ The full list is in <a href="lib-validate.html">Validation</a>.</p>
 <p>"Already saved" isn't a property of the request: the handler checks it and answers 409 Conflict itself.</p>
 <pre><code>void create(http.Writer *w, http.Request *r)
 {
-    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);    /* a 422 by itself when a rule fails */
-    for (i64 i = 0; i &amp;lt; gBookmarks.len; i++) {
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
         if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
             w.error(409, "that link is already on the shelf");
             return;
