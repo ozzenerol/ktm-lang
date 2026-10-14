@@ -963,17 +963,20 @@ coro.write and coro.wait park it instead of blocking the thread:
 libraries use it to pick their I/O.</p></div><div class="decl" id="coro.wait"><div class="decl-head"><a class="decl-name" href="#coro.wait">coro.wait</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 wait(i32 fd, i16 events, i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: pause until fd is ready for events (POLLIN,
 POLLOUT, ...) and return its revents (&gt; 0; POLLHUP, POLLERR and
 POLLNVAL count), or 0 once ms milliseconds passed (ms &lt; 0: no limit).
-stop() doesn&#x27;t end it, so work in flight finishes.</p></div><div class="decl" id="coro.park"><div class="decl-head"><a class="decl-name" href="#coro.park">coro.park</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 park(i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: pause until another coroutine of this loop calls
+stop() doesn&#x27;t end it, so work in flight finishes.</p></div><div class="decl" id="coro.park"><div class="decl-head"><a class="decl-name" href="#coro.park">coro.park</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 park(i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: pause until another coroutine (of this loop, or of
+another thread&#x27;s: see coro.unpark) calls
 coro.unpark(this one), or ms milliseconds pass (ms &lt; 0: no limit).
 Returns 1 when unparked, 0 on the time limit, -1 when coro.stop() was
 called (before or during the wait). An unpark that came while this
 coroutine wasn&#x27;t parked makes its next park return 1 at once, so a
 wake-up between &quot;nothing to do&quot; and park isn&#x27;t lost. No syscall: for
-handing work or a resource from one coroutine to another.</p></div><div class="decl" id="coro.unpark"><div class="decl-head"><a class="decl-name" href="#coro.unpark">coro.unpark</a> <span class="kind">function</span></div><pre><code class="language-ktm">void unpark(Coroutine *c);</code></pre><p class="doc">Wake c, a coroutine of this thread&#x27;s loop, from coro.park (it returns
-1); if it isn&#x27;t parked, its next coro.park returns 1 at once. c must
-not have ended (its Coroutine is freed then). Throws
-ERR_LOOP for a coroutine coro.go didn&#x27;t start or one of another
-thread&#x27;s loop.</p></div><div class="decl" id="coro.waitIdle"><div class="decl-head"><a class="decl-name" href="#coro.waitIdle">coro.waitIdle</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 waitIdle(i32 fd, i16 events, i64 ms=-1);</code></pre><p class="doc">coro.wait for &quot;waiting for more work&quot; (the next request, the next
+handing work or a resource from one coroutine to another.</p></div><div class="decl" id="coro.unpark"><div class="decl-head"><a class="decl-name" href="#coro.unpark">coro.unpark</a> <span class="kind">function</span></div><pre><code class="language-ktm">void unpark(Coroutine *c);</code></pre><p class="doc">Wake c from coro.park (it returns 1); if it isn&#x27;t parked, its next
+coro.park returns 1 at once. c is a coro.go coroutine of this thread&#x27;s
+loop or of another thread&#x27;s: from another thread the unpark goes
+through that loop&#x27;s mailbox and its thread applies it (a write(2) to
+wake it; the same loop needs no syscall). c must not have ended (its
+Coroutine is freed then). Throws ERR_LOOP for a coroutine coro.go
+didn&#x27;t start.</p></div><div class="decl" id="coro.waitIdle"><div class="decl-head"><a class="decl-name" href="#coro.waitIdle">coro.waitIdle</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 waitIdle(i32 fd, i16 events, i64 ms=-1);</code></pre><p class="doc">coro.wait for &quot;waiting for more work&quot; (the next request, the next
 client): the same, but -1 at once when coro.stop() was called, and -1
 when it is called during the wait.</p></div><div class="decl" id="coro.read"><div class="decl-head"><a class="decl-name" href="#coro.read">coro.read</a> <span class="kind">function</span></div><pre><code class="language-ktm">i64 read(i32 fd, u8[] buf, i64 ms=-1);</code></pre><p class="doc">In a loop coroutine: read what is there from the non-blocking fd into
 buf, pausing the coroutine until there is something (or ms passed;
