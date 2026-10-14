@@ -1,0 +1,93 @@
+<!-- title: Packages -->
+<h1>Packages</h1>
+<p class="lede">A package is a module in its own git repository, used by its path, as in Go: <code>import "github.com/user/repo";</code>.
+The project's <code>ktm.mod</code> says which versions; <code>ktm get</code> fetches them, <code>ktm build</code> builds with them.
+There is no registry: a version is a git tag, and any git host works.</p>
+
+<h2>A project that uses one</h2>
+<pre><code>$ mkdir users-api &amp;&amp; cd users-api
+$ ktm mod init github.com/you/users-api
+ktm: created ktm.mod for github.com/you/users-api
+$ ktm get github.com/ozzenerol/ktm-pg
+ktm: added github.com/ozzenerol/ktm-pg v0.1.0</code></pre>
+<pre><code>
+// main.ktm
+import "github.com/ozzenerol/ktm-pg";      // its module line says `module pg;`: used as pg.X
+import net.http;
+
+i32 main()
+{
+  pg.Pool *db = pg.open("postgres://app:secret@localhost/app");
+  ...
+}
+</code></pre>
+<pre><code>$ ktm build            # main.ktm of this directory, into ./users-api
+$ ktm run . --port 8080   # or build and run it, with arguments</code></pre>
+
+<h2>ktm.mod and ktm.sum</h2>
+<pre><code>module github.com/you/users-api
+
+ktm 0.20
+
+require (
+	github.com/ozzenerol/ktm-pg v0.1.0
+	github.com/someone/color v1.1.0 // indirect
+)
+
+replace github.com/someone/color => ../color</code></pre>
+<ul class="rules">
+  <li><code>module</code> is the project's own path: its other packages are imported by it too
+  (<code>import "github.com/you/users-api/store";</code> is its directory <code>store</code>).</li>
+  <li><code>ktm</code> is the ktm version it needs; an older compiler refuses it.</li>
+  <li><code>require</code> lists every package the build uses and the version; <code>// indirect</code> marks one only another
+  package needs.</li>
+  <li><code>replace</code> uses a local copy (<code>=&gt; ../color</code>, a path starting with <code>./</code>, <code>../</code> or
+  <code>/</code>) or another repository's version (<code>=&gt; github.com/fork/color v1.1.2</code>).</li>
+  <li><code>ktm.sum</code> holds a hash of each version's files. A download that doesn't match is refused, so a version can't
+  change under you (a moved tag, a tampered repository). Commit both files.</li>
+</ul>
+
+<h2>Importing</h2>
+<ul class="rules">
+  <li>The path is in quotes; its name in the code is its <code>module</code> line (<code>import "github.com/ozzenerol/ktm-pg";</code> is
+  <code>pg</code>). <code>import p = "...";</code> gives it another name.</li>
+  <li>A directory of a package is a package too: <code>import "github.com/user/repo/sub";</code>.</li>
+  <li>The standard library and the program's own modules keep their plain form: <code>import net.http;</code>.</li>
+  <li>A package from another repository's files are read-only in the cache (<code>~/.cache/ktm/mod</code>, or <code>KTM_CACHE</code>).</li>
+</ul>
+
+<h2>Versions</h2>
+<p>A version is a git tag <code>vMAJOR.MINOR.PATCH</code> (<code>v1.2.0</code>, <code>v0.3.1-rc.1</code>). A build uses, for each
+package, the highest version anything requires: a package always gets at least what it asked for, and nothing newer than
+someone asked for. The same <code>ktm.mod</code> gives the same build, with no lock file.</p>
+<ul class="rules">
+  <li>One major version of a package per build: <code>v1</code> and <code>v2</code> of the same package together are an error naming
+  who wants which.</li>
+  <li>Fetching never runs a package's code: git clones, ktm hashes.</li>
+  <li>A private repository works like any other: git uses your SSH key or credential helper (ktm never asks for a password).</li>
+</ul>
+
+<h2>Commands</h2>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>ktm mod init [path]</code></td><td>A new <code>ktm.mod</code> here (the path defaults to the directory's name)</td></tr>
+  <tr><td><code>ktm get path[@v1.2.0|@latest|@none]</code></td><td>Adds or changes a requirement, fetches it and what it needs; <code>@none</code> removes it</td></tr>
+  <tr><td><code>ktm mod tidy</code></td><td>Makes <code>ktm.mod</code> and <code>ktm.sum</code> match the imports: adds what is imported, drops what isn't</td></tr>
+  <tr><td><code>ktm build [dir]</code>, <code>ktm run [dir] [args]</code></td><td>Builds (or runs) <code>main.ktm</code>, fetching what is missing; the binary is named after the module path</td></tr>
+  <tr><td><code>ktm mod download</code></td><td>Fetches every requirement into the cache</td></tr>
+  <tr><td><code>ktm mod list</code></td><td>The packages and versions a build uses</td></tr>
+  <tr><td><code>ktm mod why path</code></td><td>Who imports a package, and the chain of requirements down to it</td></tr>
+  <tr><td><code>ktm mod verify</code></td><td>Checks the cached files against <code>ktm.sum</code></td></tr>
+  <tr><td><code>ktm mod fmt</code></td><td>Checks <code>ktm.mod</code> and rewrites it in the standard layout</td></tr>
+</table>
+
+<h2>Publishing a package</h2>
+<ol>
+  <li>A repository whose root has <code>ktm.mod</code> (<code>module github.com/you/thing</code>) and the module's <code>.ktm</code>
+  files, each starting with <code>module thing;</code>.</li>
+  <li>Tag a release and push the tag: <code>git tag v0.1.0 &amp;&amp; git push origin v0.1.0</code>. That's it: <code>ktm get
+  github.com/you/thing</code> finds it.</li>
+  <li>Never move a tag: <code>ktm.sum</code> files that recorded it will refuse the new files. Tag a new version instead.</li>
+</ol>
+<p>The repository is the first three elements of the path (<code>host/user/repo</code>), fetched over HTTPS; git's
+<code>url.&lt;base&gt;.insteadOf</code> settings redirect it (a mirror, SSH).</p>
