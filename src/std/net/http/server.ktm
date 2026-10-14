@@ -433,6 +433,7 @@ static void serveConn(i32 fd, void *arg)
     }
     c.cap = CONN_IN_FIRST;
     Request r;
+    r.peerFd = fd + 1;          /* remoteAddr looks it up when asked */
     Writer w;
     defer {
         mem.free(c.in);

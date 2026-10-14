@@ -1,5 +1,5 @@
 module http;
-import cstr, json, libc, mem, reflect, str;
+import cstr, json, libc, mem, net, reflect, str;
 
 /* HTTP/1.1 servers for REST APIs, the Go way:
  *
@@ -112,6 +112,10 @@ pub struct Request {
     u8[] rawQuery;     /* "page=2&q=a%20b": after the '?', not unescaped */
     u8[] body;         /* the whole body (a chunked one already joined) */
     void *app;         /* what http.listen was given: the program's own state */
+    private i32 peerFd;        /* the connection's socket + 1 (0: none) */
+    private i64 peerLen;       /* the client's address in peerIp: -1 not looked up, 0 none */
+    private u8 peerIp[48];
+    private i32 peerPort;
     i64 minor;         /* HTTP/1.minor */
     bool keepAlive;    /* the connection stays open after the reply */
     i64 nheaders;
@@ -297,6 +301,48 @@ pub T decode<T>(Request *r, i64 flags = 0)
     return out;
 }
 
+static void lookupPeer(Request *r)
+{
+    if (r.peerLen) { return; }
+    r.peerLen = -1;
+    net.Addr a;
+    if (r.peerFd <= 0 || !net.remoteAddr(r.peerFd - 1, &a)) { return; }
+    String ip = a.ip();
+    if (ip.len && ip.len < 48) {
+        mem.copy(r.peerIp, ip.ptr, ip.len);
+        r.peerLen = ip.len;
+        r.peerPort = a.port();
+    }
+    ip.free();
+}
+
+/* The client's IP address as text ("203.0.113.9", "::1"); "" when it
+ * isn't known (a Unix socket). The TCP peer: behind a proxy that is the
+ * proxy (the middleware's realIp reads X-Forwarded-For). Looked up once
+ * per connection. */
+pub u8[] Request.remoteAddr()
+{
+    lookupPeer(self);
+    return self.peerLen > 0 ? self.peerIp[0:self.peerLen] : "";
+}
+
+/* The client's port, 0 when it isn't known */
+pub i32 Request.remotePort()
+{
+    lookupPeer(self);
+    return self.peerLen > 0 ? self.peerPort : 0;
+}
+
+/* Sets what remoteAddr and remotePort answer (for tests: testRequest's
+ * are 192.0.2.1 and 1234, as Go's httptest) */
+pub void Request.setRemoteAddr(u8[] ip, i32 port = 0)
+{
+    i64 n = ip.len < 47 ? ip.len : 47;
+    if (n) { mem.copy(self.peerIp, ip.ptr, n); }
+    self.peerLen = n ? n : -1;
+    self.peerPort = port;
+}
+
 /* A request for tests: method and target ("/users/7?full=1") with a body,
  * to hand to a Mux or a handler with an http.recorder() Writer. Free it
  * with r.free(). */
@@ -312,6 +358,7 @@ pub Request testRequest(u8[] method, u8[] target, u8[] body = "")
     r.minor = 1;
     r.keepAlive = true;
     r.contentLength = body.len;
+    r.setRemoteAddr("192.0.2.1", 1234);
     return r;
 }
 
