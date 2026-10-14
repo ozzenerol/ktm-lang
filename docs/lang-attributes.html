@@ -61,7 +61,7 @@
   <tbody>
     <tr><td><code>@json</code></td><td>a struct</td><td>Writes <code>toJson</code>, <code>fromJson</code>, <code>freeDecoded</code></td></tr>
     <tr><td><code>@yaml</code></td><td>a struct</td><td>Writes <code>toYaml</code>, <code>fromYaml</code> (and <code>freeDecoded</code>)</td></tr>
-    <tr><td><code>@key("name")</code></td><td>a field</td><td>The field's key in the text</td></tr>
+    <tr><td><code>@key("name")</code></td><td>a field</td><td>The field's key in the text, and its column for <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> (on any struct)</td></tr>
     <tr><td><code>@skip</code></td><td>a field</td><td>Leaves it out</td></tr>
     <tr><td><code>@omitEmpty</code></td><td>a field</td><td>Leaves it out when it is 0, empty or null</td></tr>
     <tr><td><code>@env("NAME")</code></td><td>a field</td><td>Its environment variable for <a href="lib-config.html"><code>config.fromEnv</code></a></td></tr>
