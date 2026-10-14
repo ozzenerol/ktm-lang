@@ -179,7 +179,15 @@ if [ "$DO_INSTALL" = 1 ]; then
         fi
     done
     ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/bin" "$INSTALL_PREFIX/lib"
-    ${as[@]+"${as[@]}"} cp -f "$KTM" "$INSTALL_PREFIX/bin/ktm"
+    # A new file renamed over the old one, never the old file rewritten:
+    # running programs (a JIT run maps libktm.so, and the compiler is a
+    # running binary) keep the copy they mapped. Rewriting it in place
+    # crashed them, at random spots, whenever an install landed mid-run.
+    put() {
+        ${as[@]+"${as[@]}"} cp -PR "$1" "$2.new.$$" &&
+        ${as[@]+"${as[@]}"} mv -f "$2.new.$$" "$2"
+    }
+    put "$KTM" "$INSTALL_PREFIX/bin/ktm"
     # the old header-based stdlib, which an earlier install left
     ${as[@]+"${as[@]}"} rm -f "$INSTALL_PREFIX/include/std.ktmh"
     # the stdlib's modules, replaced whole (other modules there stay)
@@ -190,7 +198,7 @@ if [ "$DO_INSTALL" = 1 ]; then
         ${as[@]+"${as[@]}"} cp -R "$PREFIX/modules/$d" "$INSTALL_PREFIX/modules/$d"
     done
     for f in "$PREFIX"/lib/*; do
-        ${as[@]+"${as[@]}"} cp -fPR "$f" "$INSTALL_PREFIX/lib/"
+        put "$f" "$INSTALL_PREFIX/lib/$(basename "$f")"
     done
     # Vim/Neovim support: `set rtp+=$INSTALL_PREFIX/share/ktm/vim`
     ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/share/ktm/vim"
