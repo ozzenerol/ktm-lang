@@ -44,7 +44,7 @@
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   --mono: ui-monospace, "SFMono-Regular", "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --top: 3.6rem;
-  --side: 16rem;
+  --side: 15rem;
   --onpage: 13rem;
   --measure: 48rem;
   color-scheme: light;
@@ -194,7 +194,6 @@ a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
 }
 .topbar button:hover { background: var(--bg-soft); border-color: var(--border-soft); }
 
-.menu { display: none !important; }
 
 .gh { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
 .gh:hover { color: var(--text); text-decoration: none; }
@@ -278,10 +277,14 @@ a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
 .layout {
   display: grid;
   grid-template-columns: var(--side) minmax(0, 1fr) var(--onpage);
-  max-width: 92rem;
-  margin: 0 auto;
 }
 .layout.wide { grid-template-columns: var(--side) minmax(0, 1fr); }
+/* the menu button folds the sidebar away on wide screens */
+@media (min-width: 52.0625rem) {
+  .side-closed .sidebar { display: none; }
+  .side-closed .layout { grid-template-columns: minmax(0, 1fr) var(--onpage); }
+  .side-closed .layout.wide { grid-template-columns: minmax(0, 1fr); }
+}
 
 .sidebar {
   position: sticky;
@@ -375,7 +378,7 @@ a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
 
 main {
   min-width: 0;
-  max-width: calc(var(--measure) + 6rem);
+  max-width: 76rem;
   width: 100%;
   margin: 0 auto;
   padding: 2rem 3rem 3rem;
@@ -693,7 +696,8 @@ ul.rules > li::before {
 /* ---- smaller screens ---- */
 
 @media (max-width: 78rem) {
-  .layout, .layout.wide { grid-template-columns: var(--side) minmax(0, 1fr); }
+  .layout, .layout.wide, .side-closed .layout { grid-template-columns: var(--side) minmax(0, 1fr); }
+  .side-closed .layout, .side-closed .layout.wide { grid-template-columns: minmax(0, 1fr); }
   .onpage { display: none; }
 }
 
@@ -702,7 +706,6 @@ ul.rules > li::before {
 }
 
 @media (max-width: 52rem) {
-  .menu { display: inline-flex !important; }
   .gh { display: none; }
   .layout, .layout.wide { display: block; }
   .sidebar {
