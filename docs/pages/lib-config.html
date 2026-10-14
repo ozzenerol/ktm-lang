@@ -1,0 +1,83 @@
+<!-- title: Settings from the environment -->
+<!-- ref: config -->
+<h1>Settings from the environment</h1>
+<p class="lede"><code>config</code> fills a struct of settings from environment variables, and from a
+<code>.env</code> file for development. Each field's variable is a prefix and the field's name in SNAKE_CASE:
+<code>databaseUrl</code> with the prefix <code>APP_</code> reads <code>APP_DATABASE_URL</code>.</p>
+
+<pre data-run><code>
+import config, proc, reflect;
+
+enum Level { debug, info, warn };
+
+struct Settings {
+  i64 port;
+  @required String databaseUrl;
+  @env("LOG_LEVEL") Level level;
+  bool verbose;
+};
+
+void main()
+{
+  proc.setenv("APP_DATABASE_URL", "postgres://localhost/app");
+  proc.setenv("LOG_LEVEL", "warn");
+  proc.setenv("APP_VERBOSE", "yes");
+
+  Settings s;
+  s.port = 8080;                     /* a default: APP_PORT isn't set */
+  config.fromEnv(reflect.of(s), "APP_");
+  printf("%d %s %d %d\n", s.port, s.databaseUrl, s.level == Level.warn, s.verbose);
+  config.free(reflect.of(s));
+
+  proc.unsetenv("APP_DATABASE_URL");
+  proc.setenv("APP_PORT", "80x");
+  try {
+    config.fromEnv(reflect.of(s), "APP_");
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+8080 postgres://localhost/app 1 1
+config: APP_PORT: `80x` isn't a whole number that fits i64; APP_DATABASE_URL is required
+</pre>
+
+<p>A field keeps what it holds when its variable isn't set (or is set to <code>""</code>), so defaults are whatever
+you put in the struct first. <code>fromEnv</code> sets every field it can, then throws
+<code>config.ERR_CONFIG</code> naming every variable that is missing or wrong, so a deploy shows all of its mistakes
+at once.</p>
+
+<table>
+  <tr><th>Field</th><th>The variable's text</th></tr>
+  <tr><td>Integers (<code>i64</code>, <code>i32</code>, <code>u8</code>...)</td><td>A whole number that fits the field</td></tr>
+  <tr><td><code>f64</code>, <code>f32</code></td><td>A number: <code>0.5</code>, <code>2e3</code></td></tr>
+  <tr><td><code>bool</code></td><td><code>true</code>/<code>false</code>, <code>1</code>/<code>0</code>, <code>yes</code>/<code>no</code>, <code>on</code>/<code>off</code>, in any case</td></tr>
+  <tr><td>An enum</td><td>A member's name, in any case</td></tr>
+  <tr><td><code>String</code></td><td>Copied: <code>config.free(reflect.of(s))</code> frees the String fields</td></tr>
+  <tr><td><code>u8[]</code></td><td>A view of the environment's value (valid until that variable changes)</td></tr>
+  <tr><td>A struct</td><td>Its fields, with its name added: <code>APP_DB_HOST</code> for <code>s.db.host</code></td></tr>
+</table>
+
+<h2>Attributes</h2>
+<ul class="rules">
+  <li><code>@env("NAME")</code>: the field's variable is exactly <code>NAME</code>, without the prefix.</li>
+  <li><code>@required</code>: <code>fromEnv</code> fails when the variable isn't set.</li>
+  <li><code>@skip</code> fields and <code>private</code> ones are left alone.</li>
+</ul>
+<p>They sit happily with <code>@json</code> and <code>@yaml</code> on the same struct, which json and yaml read and
+write as before (<code>@required</code> is config's only).</p>
+
+<h2>.env files</h2>
+<pre><code>
+# .env
+export APP_PORT=9000
+APP_DATABASE_URL="postgres://localhost/${USER:app}"
+APP_GREETING='hello ${not expanded}'
+APP_NOTE=plain text  # a comment
+</code></pre>
+<p><code>config.loadDotenv(".env")</code> sets those variables, except ones the real environment already has (pass
+<code>true</code> second to override them). <code>"double quotes"</code> take <code>\n</code>, <code>\t</code>,
+<code>\"</code> and <code>${NAME}</code> / <code>${NAME:fallback}</code>, and may run over lines; <code>'single
+quotes'</code> are as written. It answers how many variables it set, or <code>-1</code> when there is no such file, and
+a line it can't read throws <code>config.ERR_CONFIG</code> with its number. Call it before <code>fromEnv</code>.</p>
