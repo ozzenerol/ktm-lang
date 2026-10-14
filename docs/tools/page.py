@@ -58,6 +58,7 @@ NAV = [
         ("lib-csv.html", "CSV"),
         ("lib-shell.html", "Shell commands"),
         ("lib-processes.html", "Processes"),
+        ("lib-flags.html", "Command-line flags"),
         ("lib-environment.html", "Environment and exit"),
         ("lib-signals.html", "Signals"),
         ("lib-logging.html", "Logging"),
