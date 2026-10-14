@@ -6,7 +6,9 @@ own table of contents and the footer. It gives each h2/h3 an id and an
 anchor link, wraps tables so they scroll on narrow screens, and records
 the page, its headings and (for the library reference) its declarations
 in SEARCH for build.py to write out as the search index."""
+import hashlib
 import html
+import os
 import re
 
 # The sidebar, in reading order: (section, [(file, title), ...]). Previous
@@ -132,6 +134,14 @@ ORDER = [item for _, items in NAV for item in items]
 SECTION = {f: s for s, items in NAV for f, _ in items}
 
 REPO = "https://github.com/ozzenerol/ktm-lang"
+
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
+
+
+def stamp(name):
+    """A content hash for an asset's URL, so browsers drop a cached copy once it changes."""
+    with open(os.path.join(ASSETS, name), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:10]
 
 # Filled by page(): [title, href, kind] rows for the search index.
 SEARCH = []
@@ -273,7 +283,7 @@ def page(title, filename, content, refs=None):
 <title>{html.escape(full_title)}</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v={stamp('style.css')}">
 <script>
 (function () {{
   var t = new URLSearchParams(location.search).get("theme");
@@ -284,7 +294,7 @@ def page(title, filename, content, refs=None):
 }})();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js" defer></script>
+<script src="assets/docs.js?v={stamp('docs.js')}" defer></script>
 </head>
 <body{body_class}>
 <a class="skip" href="#content">Skip to content</a>
