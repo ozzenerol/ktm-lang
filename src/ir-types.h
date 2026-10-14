@@ -308,6 +308,10 @@ struct IrInstr {
      * created (statement-level accuracy). 0 = unknown/synthetic. The
      * JIT backends turn these into per-chunk pc->line tables. */
     int line;
+    /* The inlined call this instruction came from (innermost first),
+     * NULL in the function's own code: crash reports rebuild the calls
+     * the inliner merged. */
+    struct IrInlineSite *site;
 
     union {
         IrBlockPair blocks;
@@ -561,6 +565,17 @@ IrValue *irTmp(IrValueType type, u32 size);
  * from Ast->line, stamped onto every irInstrNew instruction. */
 extern int ir_line_hint;
 extern int ir_line_lock;
+
+/* A call the inliner expanded: the function, the line of the call in
+ * the code around it, and that code's own site (NULL: the function
+ * being compiled). Same-file calls only: a function from another file
+ * has its lines locked to the call's (ir_line_lock). */
+typedef struct IrInlineSite {
+    Ast *callee;
+    int call_line;
+    struct IrInlineSite *outer;
+} IrInlineSite;
+extern IrInlineSite *ir_site_hint;
 
 IrInstr *irInstrNew(IrOp op, IrValue *dst, IrValue *r1, IrValue *r2);
 IrFunction *irFunctionNew(AoStr *fname);

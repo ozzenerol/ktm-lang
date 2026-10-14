@@ -2572,6 +2572,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
                       && (ast->loff == 0)
                       && !has_struct_param;
 
+    asmLinesBegin(ctx->cc, ast, ctx->omit_frame);
     x86_64EmitFunctionPrologue(ctx->cc, buf, ast,
                                fn->stack_space,
                                ctx->pinned_regs,
@@ -2594,6 +2595,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         }
         listForEach(block->instructions) {
             IrInstr *instr = (IrInstr *)it->value;
+            asmLinesNote(buf, instr->line, instr->site);
             x86_64EmitInstr(ctx, instr);
         }
     }
@@ -2605,6 +2607,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         x86_64RestorePinnedRegs(buf, ctx->pinned_regs);
         x86_64Epilogue(ctx);
     }
+    asmLinesEnd(buf);
 }
 
 void x86_64InitialiseEmptyGlobal(Cctrl *cc,
@@ -2790,6 +2793,7 @@ static void x86_64PasteAsmBlocks(AoStr *buf, Cctrl *cc) {
 AoStr *x86_64AsmGenerate(Cctrl *cc) {
     AoStr *buf = aoStrAlloc(2048);
     x86_64InitRegPool();
+    asmLinesReset();
     x86_64PasteDataSection(cc, buf);
     x86_64PasteAsmBlocks(buf, cc);
 
@@ -2825,6 +2829,9 @@ AoStr *x86_64AsmGenerate(Cctrl *cc) {
         x86_64GenerateFunction(&ctx, synth_main);
     }
 
+    Ast *user_main = (Ast *)mapGetLen(cc->global_env, str_lit("main"));
+    asmLinesEmit(cc, buf, cc->crash_report &&
+                 (synth_main != NULL || (user_main && user_main->kind == AST_FUNC)));
     asmEmitAsmInfo(cc, buf);
     setRelease(seen_globals);
     return buf;

@@ -1803,6 +1803,7 @@ static int jitCompileFunction(KtmJit *jit, Ast *ast, IrCtx *ir_ctx) {
     ctx.fn = fn;
     ctx.ast = ast;
     ctx.omit_frame = omit_frame;
+    jit->fn_omit_frame = omit_frame;
 
     /* Publish the function entry as a public label. asmNormaliseFunctionName
      * strips/adds underscores per platform; the resolver uses the same name. */
@@ -1825,7 +1826,7 @@ static int jitCompileFunction(KtmJit *jit, Ast *ast, IrCtx *ir_ctx) {
         }
         listForEach(block->instructions) {
             IrInstr *in = (IrInstr *)it->value;
-            ktmJitNoteLine(jit, in->line);
+            ktmJitNoteLine(jit, in->line, in->site);
             jitEmitInstr(&ctx, in);
         }
     }

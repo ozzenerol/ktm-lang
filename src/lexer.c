@@ -3364,6 +3364,9 @@ static void lexModuleTreeWalk(char *dir, char *rel, Vec *paths, Vec *dirs) {
     for (int i = 0; i < n; ++i) {
         /* the prelude is read by every compile, never a library's */
         if (!*rel && !strcmp(names[i], "prelude")) continue;
+        /* nor the crash handler, compiled into every program
+         * (lexPushRuntime) */
+        if (!strcmp(rel, "rt") && !strcmp(names[i], "crash")) continue;
         char *sub = mprintf("%s/%s", dir, names[i]);
         char *path = *rel ? mprintf("%s.%s", rel, names[i]) : names[i];
         if (lexHasKtmFiles(sub)) {
@@ -3712,6 +3715,16 @@ static s64 lexImportSpan(Lexeme *kw, Lexeme *last) {
     return last->col + last->len - kw->col;
 }
 
+/* <install>/modules/a/b for module a.b */
+static char *lexInstallModuleDir(Lexer *l, const char *path) {
+    char *dir = mprintf("%s/%s", lexInstallModules(l), path);
+    char *rel = dir + strlen(dir) - strlen(path);
+    for (; *rel; ++rel) {
+        if (*rel == '.') *rel = '/';
+    }
+    return dir;
+}
+
 /* One module of an `import` line of `file` */
 static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
                          AoStr *path, Lexeme *first, Lexeme *last,
@@ -3770,7 +3783,7 @@ static void lexImportOne(Lexer *l, LexFile *file, Lexeme *kw, AoStr *alias,
         char *dir = pkg_dir ? pkg_dir
                   : auto_prelude
                   ? mprintf("%s/prelude", lexInstallModules(l))
-                  : auto_rt ? mprintf("%s/%s", lexInstallModules(l), path->data)
+                  : auto_rt ? lexInstallModuleDir(l, path->data)
                   : lexModuleDir(l, path, first);
         if (!dir) {
             lexReportAt(l, first->line, first->col,
@@ -3839,7 +3852,13 @@ void lexPushRuntime(Lexer *l) {
     /* and str, whose String methods every program may call (when the
      * install has it) */
     char *with_str = mprintf("%s/str", lexInstallModules(l));
-    char *src = lexIsDir(with_str) ? "import rt;\nimport str;\n" : "import rt;\n";
+    /* and rt.crash, the crash report's handler: compiled into the
+     * program (it is no library's), it needs only libc */
+    char *with_crash = mprintf("%s/rt/crash", lexInstallModules(l));
+    l->with_crash = !l->no_crash && lexIsDir(with_crash);
+    char *src = mprintf("import rt;\n%s%s",
+                        lexIsDir(with_str) ? "import str;\n" : "",
+                        l->with_crash ? "import rt.crash;\n" : "");
     lexPushString(l, LEX_RT_FILE, src, strlen(src));
 }
 

@@ -367,6 +367,10 @@ typedef struct Lexer {
     /* `ktm -lib name dir` over a tree of modules: dir (a real path),
      * whose modules are all compiled in full */
     char *building_tree;
+    /* the compile makes no program (`-lib`, `-c`): rt.crash, the crash
+     * report's handler, isn't compiled in (a program has it once) */
+    int no_crash;
+    int with_crash;   /* lexPushRuntime imported it */
     /* `ktm test`: the directory (a real path) of the module whose
      * *_test.ktm files are read (every other module leaves its own out),
      * and that module's id once loaded */

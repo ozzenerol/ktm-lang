@@ -86,12 +86,36 @@ typedef struct KtmJit {
     u32 n_lines, cap_lines;
     struct KtmJitLine *pending_lines;
     u32 n_pending, cap_pending;
+    /* Every compiled function's code range, rebased like `lines`, for
+     * the crash report (ktmJitRunMain); the backend sets fn_omit_frame
+     * for the function it is emitting. */
+    struct KtmJitFn *fns;
+    u32 n_fns, cap_fns, n_pending_fns;
+    int fn_omit_frame;
 } KtmJit;
 
 typedef struct KtmJitLine {
     uintptr_t addr; /* absolute pc in `lines`; enc offset in pending */
     int line;
+    struct IrInlineSite *site;  /* the inlined call it is in, or NULL */
 } KtmJitLine;
+
+typedef struct KtmJitFn {
+    uintptr_t addr;  /* absolute once its chunk is final; enc offset before */
+    size_t size;
+    char *name;      /* as a report shows it */
+    char *file;
+    int omit_frame;
+    int32_t *lines;  /* count pairs: offset, line | site << 20 (see asm.c) */
+    int count;
+    struct KtmJitSite *sites;
+    int n_sites;
+} KtmJitFn;
+
+typedef struct KtmJitSite {
+    char *name;
+    int32_t line, outer;
+} KtmJitSite;
 
 /* What a per-arch backend plugs into the shared compile pipeline. */
 typedef struct KtmJitBackend {
@@ -145,7 +169,7 @@ const char *ktmJitFindSymbolForAddr(KtmJit *jit, void *pc, size_t *off_out);
 /* Record "code emitted from enc offset jit->enc.len onward is source
  * line `line`" - called by the backends per IR instruction; consecutive
  * duplicates collapse. line 0 (synthetic) is ignored. */
-void ktmJitNoteLine(KtmJit *jit, int line);
+void ktmJitNoteLine(KtmJit *jit, int line, struct IrInlineSite *site);
 
 /* Source line for a pc inside JIT code, 0 when unknown. */
 int ktmJitFindLineForAddr(KtmJit *jit, void *pc);

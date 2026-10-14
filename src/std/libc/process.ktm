@@ -31,6 +31,10 @@ pub extern "c" i32 posix_spawnattr_setsigmask(void *attr, void *sigset);
 
 pub extern "c" i32 sigemptyset(void *set);
 
+pub extern "c" i32 sigaltstack(void *ss, void *old);
+
+pub extern "c" i32 mincore(void *addr, u64 len, u8 *vec);
+
 pub extern "c" i32 sigfillset(void *set);
 
 pub extern "c" i32 sigaddset(void *set, i32 sig);

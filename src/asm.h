@@ -29,6 +29,25 @@ int asmEmitBlockBytes(Cctrl *cc, AoStr *buf, AoStr *text, int src_line);
 
 void asmEmitAsmInfo(Cctrl *cc, AoStr *buf);
 
+/* The line table a crash report reads (rt.__ktmCrashInstall): each
+ * function gets a record in the ktm_lines section with its address,
+ * size, name, file and the code offset where each source line starts,
+ * with the calls the inliner merged into it (IrInlineSite).
+ * asmLinesReset before a module, asmLinesBegin after a function's
+ * label, asmLinesNote before each instruction, asmLinesEnd after the
+ * function; asmLinesEmit writes the tables, and in a program with a
+ * main the constructor that installs the crash handler. */
+void asmLinesReset(void);
+void asmLinesBegin(Cctrl *cc, Ast *func, int omit_frame);
+struct IrInlineSite;
+void asmLinesNote(AoStr *buf, int line, struct IrInlineSite *site);
+void asmLinesEnd(AoStr *buf);
+void asmLinesEmit(Cctrl *cc, AoStr *buf, int has_main);
+/* A function's name and a file as the report shows them (the JIT
+ * builds the same records) */
+char *asmLinesName(Cctrl *cc, AoStr *fname);
+const char *asmLinesPath(Cctrl *cc, const char *path);
+
 /* Lay out the global initialiser `init` as the `type` object it sits in
  * memory as: class fields at their offsets, array elements at the
  * element stride and zeros everywhere else. `bytes` (type->size long)
