@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group" open><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li class="current"><a href="lib-validate.html" aria-current="page">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li><a href="guide-http-12-production.html">12. Production</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#validate"><code>validate</code></a></span></div>
+<h1>Validation</h1>
+<p class="lede"><code>validate</code> checks a struct's values against rules written on its fields:
+<code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code> and <code>@oneOf</code>.
+Every broken rule is one error naming its field, ready to show a user or send back from an API.</p>
+
+<pre data-run><code>import reflect, str, validate;
+
+struct Signup {
+  @required @email u8[] email;
+  @required @min(3) @max(20) String name;
+  @min(18) i64 age;
+  @oneOf("free", "pro") u8[] plan;
+};
+
+void main()
+{
+  Signup s;
+  s.email = "ann@example";
+  s.name = str.from("an");
+  s.age = 17;
+  s.plan = "gold";
+
+  validate.Errors errs;
+  if (!validate.check(reflect.of(s), &amp;errs)) {
+    for (auto e : errs.items) {
+      printf("%s: %s\n", e.field, e.message);
+    }
+  }
+  errs.free();
+
+  s.email = "ann@example.com";
+  s.name.free();
+  s.name = str.from("Ann");
+  s.age = 30;
+  s.plan = "";                   /* empty and not @required: fine */
+  printf("valid: %d\n", validate.check(reflect.of(s), &amp;errs));
+  errs.free();
+  s.name.free();
+}
+</code></pre>
+<pre class="output">email: not an email address
+name: must have at least 3 characters
+age: must be at least 18
+plan: must be one of free, pro
+valid: 1
+</pre>
+
+<p><code>validate.check(reflect.of(x), &amp;errs)</code> answers <code>true</code> when every rule holds. It replaces what
+<code>errs</code> held, so one <code>Errors</code> can serve several checks; free it once at the end.</p>
+
+<h2 id="the-rules">The rules<a class="anchor" href="#the-rules" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Attribute</th><th>On</th><th>Holds when</th></tr>
+  <tr><td><code>@required</code></td><td>any field</td><td>The value isn't <code>0</code>, <code>false</code>, <code>""</code>, an empty slice or <code>null</code></td></tr>
+  <tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a number</td><td>Its value is at least / at most <code>n</code> (<code>@min(-10)</code>, <code>@max(0.5)</code> work too)</td></tr>
+  <tr><td></td><td><code>String</code>, <code>u8[]</code></td><td>Its length in characters (UTF-8 code points, not bytes) is at least / at most <code>n</code></td></tr>
+  <tr><td></td><td>a slice</td><td>It has at least / at most <code>n</code> items</td></tr>
+  <tr><td><code>@email</code></td><td><code>String</code>, <code>u8[]</code></td><td>It looks like <code>name@example.com</code>: one <code>@</code>, a domain with a dot, no spaces</td></tr>
+  <tr><td><code>@url</code></td><td><code>String</code>, <code>u8[]</code></td><td>It is an absolute URL with a host: <code>https://example.com/a</code></td></tr>
+  <tr><td><code>@oneOf("a", "b")</code></td><td><code>String</code>, <code>u8[]</code></td><td>It is exactly one of the values</td></tr>
+</table></div>
+<ul class="rules">
+  <li>A text or slice that is empty and not <code>@required</code> passes its other rules: they check a value when
+  there is one. A number is always checked (<code>0</code> with <code>@min(1)</code> fails).</li>
+  <li>Nested structs are checked too, and so are the structs a pointer field points to and the items of a slice of
+  structs. A <code>null</code> pointer is skipped unless it is <code>@required</code>.</li>
+  <li><code>@skip</code> fields and <code>private</code> ones are left alone.</li>
+  <li>A rule on a field it can't check (<code>@email</code> on an <code>i64</code>) is a mistake in the program:
+  <code>check</code> throws <code>validate.ERR_VALIDATE</code>.</li>
+  <li>The rules go on any struct, with or without <code>@json</code>; <code>@required</code> is the same attribute
+  <a href="lib-config.html">config</a> reads.</li>
+</ul>
+
+<h2 id="errors">Errors<a class="anchor" href="#errors" aria-label="Link to this section">#</a></h2>
+<p>Each error is a <code>validate.FieldError</code> with a <code>field</code> and a <code>message</code> (both
+<code>String</code>s), in the order of the struct's fields. The field is named the way a client sent it: its JSON key
+(<code>@key("e-mail")</code>'s when it has one), with the path for nested values: <code>address.city</code>,
+<code>tags[2].name</code>.</p>
+<div class="table-wrap"><table>
+  <tr><th>Call</th><th>What it gives</th></tr>
+  <tr><td><code>errs.items</code></td><td>The errors (a <code>vec.Vec</code>: <code>errs.items.len</code>, <code>for (auto e : errs.items)</code>)</td></tr>
+  <tr><td><code>errs.message()</code></td><td>One line: <code>email: not an email address; age: must be at least 18</code> (a String to free)</td></tr>
+  <tr><td><code>errs.toJson()</code></td><td><code>{"error":"invalid request","fields":[{"field":"age","message":"must be at least 18"}]}</code> (a String to free)</td></tr>
+  <tr><td><code>errs.add(field, fmt, ...)</code></td><td>Adds an error of your own, for a check the rules can't express</td></tr>
+  <tr><td><code>errs.free()</code></td><td>Frees them all</td></tr>
+  <tr><td><code>validate.isEmail(s)</code>, <code>validate.isUrl(s)</code></td><td>The <code>@email</code> and <code>@url</code> checks on their own</td></tr>
+</table></div>
+
+<h2 id="in-an-http-handler">In an HTTP handler<a class="anchor" href="#in-an-http-handler" aria-label="Link to this section">#</a></h2>
+<p><code>http.decodeValid&lt;T&gt;(r)</code> decodes the request's body as JSON (as <code>http.decode</code> does) and
+checks it. A body that breaks a rule never reaches the rest of the handler: the server answers <code>422</code> with
+<code>errs.toJson()</code>'s list, and bad JSON gets the usual <code>400</code>.</p>
+<pre><code>@json struct NewBookmark {
+  @required @url String url;
+  @required @max(200) String title;
+  @max(10) u8[][] tags;
+};
+
+void createBookmark(http.Writer *w, http.Request *r)
+{
+  NewBookmark b = http.decodeValid&lt;NewBookmark&gt;(r);
+  ...                                  // b is valid here
+}
+</code></pre>
+<pre class="output">POST /bookmarks {"url":"nope","title":"ktm"}
+422 {"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}
+</pre>
+<p>The same answer comes from a <code>Mux</code> in a test (<code>http.testRequest</code> and
+<code>http.recorder()</code>), so the 422 can be checked without a server. For a check of your own on top of the
+rules, call <code>validate.check</code> yourself, <code>errs.add</code> what else is wrong, and reply with
+<code>w.jsonText(422, ...)</code> of <code>errs.toJson()</code>.</p>
+
+<h2 id="in-settings">In settings<a class="anchor" href="#in-settings" aria-label="Link to this section">#</a></h2>
+<p><a href="lib-config.html#rules">config.fromEnv</a> checks the same rules on a settings struct and names the environment
+variable in each error: <code>SHELF_MAX_BOOKMARKS: must be at least 1</code>. <code>validate.checkRules(p, &amp;field, name, &amp;errs)</code>
+is the one-field check it uses, for a loader of your own.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-config.html"><span>Previous</span>Settings from the environment</a><a class="next" href="lib-signals.html"><span>Next</span>Signals</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/lib-validate.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-rules">The rules</a></li><li><a href="#errors">Errors</a></li><li><a href="#in-an-http-handler">In an HTTP handler</a></li><li><a href="#in-settings">In settings</a></li></ul></nav>
+</div>
+</body>
+</html>

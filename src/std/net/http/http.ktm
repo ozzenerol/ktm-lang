@@ -1,5 +1,5 @@
 module http;
-import cstr, json, libc, mem, reflect, str;
+import cstr, json, libc, log, mem, net, reflect, str, validate;
 
 /* HTTP/1.1 servers for REST APIs, the Go way:
  *
@@ -14,7 +14,8 @@ import cstr, json, libc, mem, reflect, str;
  * body, values from http.decode) is freed by the module when the handler
  * returns: nothing in a handler needs freeing unless the handler itself
  * allocated it. A handler that throws gets a 500 reply (and a log line), a
- * json.ERR_DECODE gets a 400 with the decode message. */
+ * json.ERR_DECODE gets a 400 with the decode message, and http.decodeValid's
+ * validate.ERR_INVALID a 422 with the field errors as JSON. */
 
 /* A function that answers one request */
 pub type Handler = fn(Writer *w, Request *r) void;
@@ -24,6 +25,15 @@ pub const i64 MAX_HEADERS = 64;
 
 /* Path parameters ({name}) a pattern may have */
 pub const i64 MAX_PARAMS = 16;
+
+/* Values a request carries from middleware to its handler (r.set) */
+pub const i64 MAX_VALUES = 8;
+
+struct RequestValue {
+    u8[] key;
+    void *ptr;
+    i64 n;
+};
 
 /* A request header or a path parameter: views into the request */
 pub struct Header {
@@ -112,18 +122,25 @@ pub struct Request {
     u8[] rawQuery;     /* "page=2&q=a%20b": after the '?', not unescaped */
     u8[] body;         /* the whole body (a chunked one already joined) */
     void *app;         /* what http.listen was given: the program's own state */
+    private i32 peerFd;        /* the connection's socket + 1 (0: none) */
+    private i64 peerLen;       /* the client's address in peerIp: -1 not looked up, 0 none */
+    private u8 peerIp[48];
+    private i32 peerPort;
     i64 minor;         /* HTTP/1.minor */
     bool keepAlive;    /* the connection stays open after the reply */
     i64 nheaders;
     Header headers[MAX_HEADERS];
     i64 nparams;
     Header params[MAX_PARAMS];
+    i64 nvalues;
+    RequestValue values[MAX_VALUES];
     i64 contentLength; /* -1 when not given */
     bool chunked;
     bool expectContinue;
     Arena arena;
     i64 ncleanups;
     reflect.Value cleanups[MAX_CLEANUPS];
+    u8[] invalid;      /* decodeValid's 422 body, in the arena */
 };
 
 /* n bytes that live until the request is answered (zeroed) */
@@ -280,6 +297,7 @@ static void requestDone(Request *r)
         json.free(r.cleanups[i]);
     }
     r.ncleanups = 0;
+    r.invalid = "";
     arenaReset(&r.arena);
 }
 
@@ -297,6 +315,147 @@ pub T decode<T>(Request *r, i64 flags = 0)
     return out;
 }
 
+static void lookupPeer(Request *r)
+{
+    if (r.peerLen) { return; }
+    r.peerLen = -1;
+    net.Addr a;
+    if (r.peerFd <= 0 || !net.remoteAddr(r.peerFd - 1, &a)) { return; }
+    String ip = a.ip();
+    if (ip.len && ip.len < 48) {
+        mem.copy(r.peerIp, ip.ptr, ip.len);
+        r.peerLen = ip.len;
+        r.peerPort = a.port();
+    }
+    ip.free();
+}
+
+/* The client's IP address as text ("203.0.113.9", "::1"); "" when it
+ * isn't known (a Unix socket). The TCP peer: behind a proxy that is the
+ * proxy (the middleware's realIp reads X-Forwarded-For). Looked up once
+ * per connection. */
+pub u8[] Request.remoteAddr()
+{
+    lookupPeer(self);
+    return self.peerLen > 0 ? self.peerIp[0:self.peerLen] : "";
+}
+
+/* The client's port, 0 when it isn't known */
+pub i32 Request.remotePort()
+{
+    lookupPeer(self);
+    return self.peerLen > 0 ? self.peerPort : 0;
+}
+
+/* Sets what remoteAddr and remotePort answer (for tests: testRequest's
+ * are 192.0.2.1 and 1234, as Go's httptest) */
+pub void Request.setRemoteAddr(u8[] ip, i32 port = 0)
+{
+    i64 n = ip.len < 47 ? ip.len : 47;
+    if (n) { mem.copy(self.peerIp, ip.ptr, n); }
+    self.peerLen = n ? n : -1;
+    self.peerPort = port;
+}
+
+static RequestValue *findValue(Request *r, u8[] key)
+{
+    for (i64 i = 0; i < r.nvalues; i++) {
+        if (r.values[i].key.len == key.len && libc.memcmp(r.values[i].key.ptr, key.ptr, key.len) == 0) {
+            return &r.values[i];
+        }
+    }
+    return null;
+}
+
+static RequestValue *slotFor(Request *r, u8[] key)
+{
+    RequestValue *v = findValue(r, key);
+    if (v) { return v; }
+    if (r.nvalues == MAX_VALUES) { throw(ERR_HTTP, "http: more than %d request values", MAX_VALUES); }
+    v = &r.values[r.nvalues++];
+    v.key = key;
+    v.ptr = null;
+    v.n = 0;
+    return v;
+}
+
+/* Keeps v under key for the rest of this request, so middleware can hand
+ * a handler what it found (the signed-in user, a request ID): a later set
+ * of the same key replaces it. The key must outlive the request (a
+ * literal); v too: r.alloc(n) gives memory that lives exactly as long. */
+pub void Request.set(u8[] key, void *v)
+{
+    slotFor(self, key).ptr = v;
+}
+
+/* What set kept under key, or null */
+pub void *Request.get(u8[] key)
+{
+    RequestValue *v = findValue(self, key);
+    return v ? v.ptr : null;
+}
+
+/* A number under key (an id, a count): no memory to manage */
+pub void Request.setInt(u8[] key, i64 n)
+{
+    slotFor(self, key).n = n;
+}
+
+/* The number setInt kept under key, or def */
+pub i64 Request.getInt(u8[] key, i64 def = 0)
+{
+    RequestValue *v = findValue(self, key);
+    return v ? v.n : def;
+}
+
+/* Was key set (by set or setInt) on this request? */
+pub bool Request.has(u8[] key)
+{
+    return findValue(self, key) != null;
+}
+
+/* The body as JSON in a T, checked with validate.check: `Bookmark b =
+ * http.decodeValid<Bookmark>(r);`. Bad JSON is a 400 as with decode; a
+ * value that breaks its fields' rules throws validate.ERR_INVALID, which
+ * the server (and a Mux in a test) answers with a 422 and
+ * {"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}. */
+pub T decodeValid<T>(Request *r, i64 flags = 0)
+{
+    T out = decode<T>(r, flags);
+    validate.Errors errs;
+    defer errs.free();
+    if (!validate.check(reflect.of(out), &errs)) {
+        String body = errs.toJson();
+        u8 *keep = r.alloc(body.len);
+        mem.copy(keep, body.ptr, body.len);
+        r.invalid = keep[0:body.len];
+        body.free();
+        String msg = errs.message();
+        defer msg.free();
+        throw(validate.ERR_INVALID, "%s", msg.cstr());
+    }
+    return out;
+}
+
+/* The reply to a handler's throw e, replacing what it had started:
+ * ERR_DECODE 400, ERR_INVALID 422, anything else a log line and a 500 */
+static void answerThrow(Writer *w, Request *r, Error e)
+{
+    bool close = w.close, head = w.head;
+    writerReset(w);
+    w.close = close;
+    w.head = head;
+    if (e.code == json.ERR_DECODE) {
+        w.error(400, cstr.view(e.message));
+    } else if (e.code == validate.ERR_INVALID && r.invalid.len) {
+        w.jsonText(422, r.invalid);
+    } else {
+        log.error("http: %s %s: the handler threw 0x%x at %s:%d: %s",
+                  r.method, r.path, e.code, e.file, e.line, e.message);
+        w.error(500, "internal server error");
+    }
+}
+
 /* A request for tests: method and target ("/users/7?full=1") with a body,
  * to hand to a Mux or a handler with an http.recorder() Writer. Free it
  * with r.free(). */
@@ -312,6 +471,7 @@ pub Request testRequest(u8[] method, u8[] target, u8[] body = "")
     r.minor = 1;
     r.keepAlive = true;
     r.contentLength = body.len;
+    r.setRemoteAddr("192.0.2.1", 1234);
     return r;
 }
 

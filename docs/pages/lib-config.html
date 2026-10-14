@@ -66,7 +66,42 @@ at once.</p>
   <li><code>@skip</code> fields and <code>private</code> ones are left alone.</li>
 </ul>
 <p>They sit happily with <code>@json</code> and <code>@yaml</code> on the same struct, which json and yaml read and
-write as before (<code>@required</code> is config's only).</p>
+write as before.</p>
+
+<h2>Rules</h2>
+<p>The rules of <a href="lib-validate.html">validate</a> (<code>@min</code>, <code>@max</code>, <code>@oneOf</code>,
+<code>@email</code>, <code>@url</code>) work on settings too. <code>fromEnv</code> checks them on every field, set or left at
+its default, and names the variable, so the person starting the program knows what to fix.</p>
+<pre data-run><code>
+import config, proc, reflect;
+
+struct Settings {
+  @min(1) @max(1000) i64 maxBookmarks;
+  @oneOf("dev", "prod") u8[] mode;
+  @url u8[] publicUrl;
+};
+
+void main()
+{
+  proc.setenv("SHELF_MAX_BOOKMARKS", "0");
+  proc.setenv("SHELF_MODE", "staging");
+  Settings s;
+  s.maxBookmarks = 100;
+  try {
+    config.fromEnv(reflect.of(s), "SHELF_");
+  } catch (Error e) {
+    printf("%s\n", e.message);
+  }
+}
+</code></pre>
+<pre class="output">
+config: SHELF_MAX_BOOKMARKS: must be at least 1; SHELF_MODE: must be one of dev, prod
+</pre>
+<ul class="rules">
+  <li>A text that isn't set (and has no default) passes its rules; add <code>@required</code> to make it a must.</li>
+  <li><code>@required</code> keeps config's meaning: the variable must be set (validate's is "not 0 or empty").</li>
+  <li>A value that can't be read (<code>lots</code> for an <code>i64</code>) gets that error, not a rule's as well.</li>
+</ul>
 
 <h2>.env files</h2>
 <pre><code>

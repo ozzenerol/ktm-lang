@@ -126,6 +126,11 @@ typedef struct GenericDef {
     struct GenericDef *next;     /* GEN_FUNC: the next overload of the name */
     int overloaded;              /* one of several generic functions of the name */
     Vec *made;                   /* overloaded: GenericInst * of every instance */
+    /* GEN_METHOD with type parameters of its own (v0.21.0), `S.f<V>` or
+     * `Vec<T>.map<U>`: how many of params are its own (the last ones),
+     * and its struct when that isn't a generic one (`of` is then NULL) */
+    int nown;
+    struct AstType *owner;
 } GenericDef;
 
 /* One instance being made (or made): the definition and its arguments */
@@ -136,8 +141,10 @@ typedef struct GenericInst {
     struct AstType *cls;         /* a struct's instance type (methods: their struct's) */
     int proto_only;              /* the declaration only, its body later */
     Lexeme *at;                  /* the use that asked for it */
+    struct LexFile *at_file;     /* and its file */
     struct GenericInst *outer;
     struct Ast *fn;              /* the instance's function, once made */
+    AoStr *mname;                /* a generic method's: its name with its own arguments, `map<f64>` */
 } GenericInst;
 
 /* A @json/@yaml struct's pointer field whose struct had no body yet
@@ -457,6 +464,7 @@ int cctrlInCModule(Cctrl *cc);
 char *cctrlDeclName(Cctrl *cc, char *name, int len);
 int cctrlModuleHides(Cctrl *cc, char *name, int len);
 LexFile *cctrlCurFile(Cctrl *cc);
+int cctrlTestSees(Cctrl *cc, char *name, int mod_len);
 void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len);
 void cctrlCheckPrefixHidden(Cctrl *cc, Lexeme *name);
 AstType *cctrlGetKeyWord(Cctrl *cc, char *name, int len);

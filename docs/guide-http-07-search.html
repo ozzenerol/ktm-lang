@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7. Tags, search and pages - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li class="current"><a href="guide-http-07-search.html" aria-current="page">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li><a href="guide-http-12-production.html">12. Production</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>7. Tags, search and pages</h1>
+<p class="lede">A shelf with a thousand links needs three things: tags to group them, a search box, and a list that
+comes a page at a time. All three are SQL; the handlers stay small.</p>
+
+<h2 id="the-migration">The migration<a class="anchor" href="#the-migration" aria-label="Link to this section">#</a></h2>
+<pre><code>CREATE TABLE tags (
+    bookmark_id uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
+    tag         text NOT NULL,
+    PRIMARY KEY (bookmark_id, tag)
+);
+CREATE INDEX tags_tag ON tags (tag);
+
+ALTER TABLE bookmarks ADD search tsvector
+    GENERATED ALWAYS AS (to_tsvector('simple', title || ' ' || notes || ' ' || url)) STORED;
+CREATE INDEX bookmarks_search ON bookmarks USING gin (search);</code></pre>
+<ul class="rules">
+  <li>Tags are a table of their own, one row per bookmark and tag, deleted with their bookmark (<code>ON DELETE
+  CASCADE</code>).</li>
+  <li><code>search</code> is a column PostgreSQL computes from the title, notes and url, kept up to date by itself, with
+  an index that makes full-text search fast.</li>
+</ul>
+
+<h2 id="tags-in-tags-out">Tags in, tags out<a class="anchor" href="#tags-in-tags-out" aria-label="Link to this section">#</a></h2>
+<p><code>Bookmark</code> and <code>NewBookmark</code> get a <code>vec.Vec&lt;String&gt; tags</code>: a JSON array, and a
+PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one:</p>
+<pre><code>(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags</code></pre>
+<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither.</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid&amp;lt;NewBookmark&amp;gt;(r);
+    if (in.tags.len &amp;gt; 10) {
+        w.error(422, "at most 10 tags");
+        return;
+    }
+    for (auto t : in.tags) {
+        if (!goodTag(t[0:])) {
+            w.error(422, "a tag is 1 to 30 lowercase letters, digits and dashes");
+            return;
+        }
+    }
+    String id = uuid.v7().string();
+    defer id.free();
+    /* the bookmark and its tags together, or neither */
+    pg.Tx tx = db.begin();
+    defer tx.rollback();
+    try {
+        tx.exec("INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4)",
+                id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
+    Bookmark b = pg.queryOne&amp;lt;Bookmark&amp;gt;(&amp;amp;tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    defer b.freeDecoded();
+    tx.commit();
+    w.json(201, reflect.of(b));
+}</code></pre>
+<ul class="rules">
+  <li><code>db.begin()</code> takes a connection from the pool for the transaction; <code>defer tx.rollback()</code>
+  undoes it on any way out except after <code>tx.commit()</code>, a 409 included.</li>
+  <li><code>unnest($2::text[])</code> turns the array parameter (the vector, sent as one value) into rows.</li>
+  <li><code>goodTag</code> checks each tag by hand: the rules of chapter 3 check fields, and this is about each
+  element of one.</li>
+</ul>
+
+<h2 id="filtering-search-and-pages">Filtering, search and pages<a class="anchor" href="#filtering-search-and-pages" aria-label="Link to this section">#</a></h2>
+<pre><code>/* GET /bookmarks?tag=go&amp;amp;q=fast+servers&amp;amp;limit=20&amp;amp;after=&amp;lt;cursor&amp;gt;: newest first */
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    i64 limit = 20;
+    if (r.hasQuery("limit") &amp;amp;&amp;amp; (!str.toInt(r.query("limit"), &amp;amp;limit) || limit &amp;lt; 1 || limit &amp;gt; 100)) {
+        w.error(400, "limit is 1 to 100");
+        return;
+    }
+    uuid.UUID after;
+    u8[] cursor = r.query("after");
+    if (cursor.len &amp;amp;&amp;amp; !uuid.parse(cursor, &amp;amp;after)) {
+        w.error(400, "after isn't a cursor from this API");
+        return;
+    }
+    Page page;
+    defer page.freeDecoded();
+    /* one more than asked for: if it comes back, there is a next page */
+    page.items = pg.queryAll&amp;lt;Bookmark&amp;gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks"
+        " WHERE ($1 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $1))"
+        "   AND ($2 = '' OR search @@ websearch_to_tsquery('simple', $2))"
+        "   AND ($3 = '' OR id &amp;lt; $3::uuid)"
+        " ORDER BY id DESC LIMIT $4",
+        r.query("tag"), r.query("q"), cursor, limit + 1);
+    if (page.items.len &amp;gt; limit) {
+        Bookmark extra = page.items.removeAt(limit);
+        pg.free(reflect.of(extra));
+        page.next = str.from(page.items.data[limit - 1].id[0:]);
+    }
+    w.json(200, reflect.of(page));
+}</code></pre>
+<ul class="rules">
+  <li>One query serves every combination: <code>$1 = '' OR ...</code> turns a filter off when its parameter is empty,
+  and the parameters are still never part of the SQL text.</li>
+  <li><code>websearch_to_tsquery</code> reads what people type in search boxes: words, <code>"exact phrases"</code>,
+  <code>-not</code>.</li>
+  <li>Pages use a <b>cursor</b>, not an offset: <code>next</code> is the id of the last item, and the next page is
+  what is older than it (<code>id &lt; $3</code>, fast with the primary key). Bookmarks saved or deleted meanwhile
+  don't shift the pages, as they would with <code>OFFSET</code>.</li>
+  <li>Asking for one row more than the page tells whether there is a next page without counting.</li>
+  <li><code>@omitEmpty</code> leaves <code>next</code> out of the last page.</li>
+</ul>
+
+<h2 id="try-it">Try it<a class="anchor" href="#try-it" aria-label="Link to this section">#</a></h2>
+<pre><code>$ curl localhost:8080/bookmarks?tag=lang
+{"items":[{"id":"01a13b0c-c310-7000-9e76-a5045a4305f6","url":"https://ktm-lang.org","title":"ktm, fast servers","notes":"faster than Go","tags":["ktm","lang"],"createdAt":"2026-10-14T15:34:14Z"},{"id":"01a13b0c-c2ff-7000-ba84-9449fa20b4a4","url":"https://go.dev","title":"The Go programming language","notes":"","tags":["go","lang"],"createdAt":"2026-10-14T15:34:14Z"}]}
+
+$ curl localhost:8080/bookmarks?q=fast
+{"items":[{"id":"01a13b0c-c310-7000-9e76-a5045a4305f6","url":"https://ktm-lang.org","title":"ktm, fast servers","notes":"faster than Go","tags":["ktm","lang"],"createdAt":"2026-10-14T15:34:14Z"}]}
+
+$ curl 'localhost:8080/bookmarks?limit=2'
+{"items":[...two bookmarks...],"next":"01a13b0c-c310-7000-9e76-a5045a4305f6"}
+$ curl 'localhost:8080/bookmarks?limit=2&amp;amp;after=01a13b0c-c310-7000-9e76-a5045a4305f6'
+{"items":[{"id":"01a13b0c-c2ff-7000-ba84-9449fa20b4a4","url":"https://go.dev",...}]}
+
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://x.org", "tags": ["Bad Tag"]}'
+{"error":"a tag is 1 to 30 lowercase letters, digits and dashes"}</code></pre>
+<p>Next: <a href="guide-http-08-users.html">Users and sessions</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-06-migrations.html"><span>Previous</span>6. Migrations</a><a class="next" href="guide-http-08-users.html"><span>Next</span>8. Users and sessions</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-07-search.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-migration">The migration</a></li><li><a href="#tags-in-tags-out">Tags in, tags out</a></li><li><a href="#filtering-search-and-pages">Filtering, search and pages</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+</div>
+</body>
+</html>

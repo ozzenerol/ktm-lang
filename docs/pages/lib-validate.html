@@ -1,0 +1,122 @@
+<!-- title: Validation -->
+<!-- ref: validate -->
+<h1>Validation</h1>
+<p class="lede"><code>validate</code> checks a struct's values against rules written on its fields:
+<code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code> and <code>@oneOf</code>.
+Every broken rule is one error naming its field, ready to show a user or send back from an API.</p>
+
+<pre data-run><code>
+import reflect, str, validate;
+
+struct Signup {
+  @required @email u8[] email;
+  @required @min(3) @max(20) String name;
+  @min(18) i64 age;
+  @oneOf("free", "pro") u8[] plan;
+};
+
+void main()
+{
+  Signup s;
+  s.email = "ann@example";
+  s.name = str.from("an");
+  s.age = 17;
+  s.plan = "gold";
+
+  validate.Errors errs;
+  if (!validate.check(reflect.of(s), &errs)) {
+    for (auto e : errs.items) {
+      printf("%s: %s\n", e.field, e.message);
+    }
+  }
+  errs.free();
+
+  s.email = "ann@example.com";
+  s.name.free();
+  s.name = str.from("Ann");
+  s.age = 30;
+  s.plan = "";                   /* empty and not @required: fine */
+  printf("valid: %d\n", validate.check(reflect.of(s), &errs));
+  errs.free();
+  s.name.free();
+}
+</code></pre>
+<pre class="output">
+email: not an email address
+name: must have at least 3 characters
+age: must be at least 18
+plan: must be one of free, pro
+valid: 1
+</pre>
+
+<p><code>validate.check(reflect.of(x), &amp;errs)</code> answers <code>true</code> when every rule holds. It replaces what
+<code>errs</code> held, so one <code>Errors</code> can serve several checks; free it once at the end.</p>
+
+<h2>The rules</h2>
+<table>
+  <tr><th>Attribute</th><th>On</th><th>Holds when</th></tr>
+  <tr><td><code>@required</code></td><td>any field</td><td>The value isn't <code>0</code>, <code>false</code>, <code>""</code>, an empty slice or <code>null</code></td></tr>
+  <tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a number</td><td>Its value is at least / at most <code>n</code> (<code>@min(-10)</code>, <code>@max(0.5)</code> work too)</td></tr>
+  <tr><td></td><td><code>String</code>, <code>u8[]</code></td><td>Its length in characters (UTF-8 code points, not bytes) is at least / at most <code>n</code></td></tr>
+  <tr><td></td><td>a slice</td><td>It has at least / at most <code>n</code> items</td></tr>
+  <tr><td><code>@email</code></td><td><code>String</code>, <code>u8[]</code></td><td>It looks like <code>name@example.com</code>: one <code>@</code>, a domain with a dot, no spaces</td></tr>
+  <tr><td><code>@url</code></td><td><code>String</code>, <code>u8[]</code></td><td>It is an absolute URL with a host: <code>https://example.com/a</code></td></tr>
+  <tr><td><code>@oneOf("a", "b")</code></td><td><code>String</code>, <code>u8[]</code></td><td>It is exactly one of the values</td></tr>
+</table>
+<ul class="rules">
+  <li>A text or slice that is empty and not <code>@required</code> passes its other rules: they check a value when
+  there is one. A number is always checked (<code>0</code> with <code>@min(1)</code> fails).</li>
+  <li>Nested structs are checked too, and so are the structs a pointer field points to and the items of a slice of
+  structs. A <code>null</code> pointer is skipped unless it is <code>@required</code>.</li>
+  <li><code>@skip</code> fields and <code>private</code> ones are left alone.</li>
+  <li>A rule on a field it can't check (<code>@email</code> on an <code>i64</code>) is a mistake in the program:
+  <code>check</code> throws <code>validate.ERR_VALIDATE</code>.</li>
+  <li>The rules go on any struct, with or without <code>@json</code>; <code>@required</code> is the same attribute
+  <a href="lib-config.html">config</a> reads.</li>
+</ul>
+
+<h2>Errors</h2>
+<p>Each error is a <code>validate.FieldError</code> with a <code>field</code> and a <code>message</code> (both
+<code>String</code>s), in the order of the struct's fields. The field is named the way a client sent it: its JSON key
+(<code>@key("e-mail")</code>'s when it has one), with the path for nested values: <code>address.city</code>,
+<code>tags[2].name</code>.</p>
+<table>
+  <tr><th>Call</th><th>What it gives</th></tr>
+  <tr><td><code>errs.items</code></td><td>The errors (a <code>vec.Vec</code>: <code>errs.items.len</code>, <code>for (auto e : errs.items)</code>)</td></tr>
+  <tr><td><code>errs.message()</code></td><td>One line: <code>email: not an email address; age: must be at least 18</code> (a String to free)</td></tr>
+  <tr><td><code>errs.toJson()</code></td><td><code>{"error":"invalid request","fields":[{"field":"age","message":"must be at least 18"}]}</code> (a String to free)</td></tr>
+  <tr><td><code>errs.add(field, fmt, ...)</code></td><td>Adds an error of your own, for a check the rules can't express</td></tr>
+  <tr><td><code>errs.free()</code></td><td>Frees them all</td></tr>
+  <tr><td><code>validate.isEmail(s)</code>, <code>validate.isUrl(s)</code></td><td>The <code>@email</code> and <code>@url</code> checks on their own</td></tr>
+</table>
+
+<h2>In an HTTP handler</h2>
+<p><code>http.decodeValid&lt;T&gt;(r)</code> decodes the request's body as JSON (as <code>http.decode</code> does) and
+checks it. A body that breaks a rule never reaches the rest of the handler: the server answers <code>422</code> with
+<code>errs.toJson()</code>'s list, and bad JSON gets the usual <code>400</code>.</p>
+<pre><code>
+@json struct NewBookmark {
+  @required @url String url;
+  @required @max(200) String title;
+  @max(10) u8[][] tags;
+};
+
+void createBookmark(http.Writer *w, http.Request *r)
+{
+  NewBookmark b = http.decodeValid<NewBookmark>(r);
+  ...                                  // b is valid here
+}
+</code></pre>
+<pre class="output">
+POST /bookmarks {"url":"nope","title":"ktm"}
+422 {"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}
+</pre>
+<p>The same answer comes from a <code>Mux</code> in a test (<code>http.testRequest</code> and
+<code>http.recorder()</code>), so the 422 can be checked without a server. For a check of your own on top of the
+rules, call <code>validate.check</code> yourself, <code>errs.add</code> what else is wrong, and reply with
+<code>w.jsonText(422, ...)</code> of <code>errs.toJson()</code>.</p>
+
+<h2>In settings</h2>
+<p><a href="lib-config.html#rules">config.fromEnv</a> checks the same rules on a settings struct and names the environment
+variable in each error: <code>SHELF_MAX_BOOKMARKS: must be at least 1</code>. <code>validate.checkRules(p, &amp;field, name, &amp;errs)</code>
+is the one-field check it uses, for a loader of your own.</p>

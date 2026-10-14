@@ -1669,7 +1669,9 @@ AoStr *cctrlModulePath(Cctrl *cc, u32 module_id) {
  * main program or for a name that is already qualified */
 char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
-    if (!path || memchr(name, '.', len)) return NULL;
+    /* a generic instance's type arguments may have dots of their own:
+     * `decode<m.In>` isn't qualified yet */
+    if (!path || astLastTopDot(name, len) >= 0) return NULL;
     return mprintf("%s.%.*s", path->data, len, name);
 }
 
@@ -1703,9 +1705,19 @@ LexFile *cctrlCurFile(Cctrl *cc) {
 /* Inside a module, a flat name the main program declared: the module
  * can't depend on the program that uses it */
 int cctrlModuleHides(Cctrl *cc, char *name, int len) {
-    if (!cc->cur_module || memchr(name, '.', len)) return 0;
+    if (!cc->cur_module || astLastTopDot(name, len) >= 0) return 0;
     char *flat = mprintf("%.*s", len, name);
     return setHas(cc->main_names, flat);
+}
+
+/* `ktm test`: the runner it writes (the main program) calls the tested
+ * module's test functions, which aren't pub. Is module `name` (mod_len
+ * bytes) that module, seen from the main program? */
+int cctrlTestSees(Cctrl *cc, char *name, int mod_len) {
+    Lexer *l = cc->lexer_;
+    if (!l || !l->test_module_id || cc->cur_module) return 0;
+    AoStr *path = cctrlModulePath(cc, l->test_module_id);
+    return path && (int)path->len == mod_len && !memcmp(path->data, name, mod_len);
 }
 
 /* `a.b.name` found: an error unless it is pub or used inside a.b */
@@ -1720,6 +1732,7 @@ void cctrlCheckModuleAccess(Cctrl *cc, char *name, int len) {
     }
     char *full = mprintf("%.*s", len, name);
     if (setHas(cc->pub_names, full)) return;
+    if (cctrlTestSees(cc, name, mod_len)) return;
     cctrlRaiseException(cc, "`%.*s` is private to module %.*s",
                         len - mod_len - 1, dot + 1, mod_len, name);
 }

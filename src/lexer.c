@@ -412,6 +412,8 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->program_root = NULL;
     l->building_module = NULL;
     l->building_tree = NULL;
+    l->test_dir = NULL;
+    l->test_module_id = 0;
     l->source_for = NULL;
     l->source_arg = NULL;
     l->std_modules = NULL;
@@ -3406,6 +3408,7 @@ static int lexModulePrebuilt(Lexer *l, LexModule *m) {
     if (l->building_module && !strcmp(l->building_module, m->path->data)) {
         return 0;
     }
+    if (l->test_module_id == m->id) return 0;
     if (l->building_tree) {
         char *dir = realpath(m->dir->data, NULL);
         size_t len = strlen(l->building_tree);
@@ -3466,9 +3469,18 @@ static void lexModuleLoad(Lexer *l, LexModule *m, Lexeme *at) {
     char **names = NULL;
     int n = 0, cap = 0;
     struct dirent *ent;
+    /* its tests (*_test.ktm) only when `ktm test` tests it */
+    int tests = 0;
+    if (l->test_dir) {
+        char *real = realpath(m->dir->data, NULL);
+        tests = real && !strcmp(real, l->test_dir);
+        free(real);
+        if (tests) l->test_module_id = m->id;
+    }
     while (dir && (ent = readdir(dir)) != NULL) {
         int len = strlen(ent->d_name);
         if (len < 5 || strcmp(ent->d_name + len - 4, ".ktm")) continue;
+        if (!tests && len > 9 && !strcmp(ent->d_name + len - 9, "_test.ktm")) continue;
         if (n == cap) {
             cap = cap ? cap * 2 : 8;
             names = realloc(names, sizeof(char *) * cap);

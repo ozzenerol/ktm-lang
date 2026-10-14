@@ -1,0 +1,64 @@
+<!-- title: 3. Validation and errors -->
+<h1>3. Validation and errors</h1>
+<p class="lede">So far Shelf saves anything: an empty url, <code>"not a link"</code>, the same link twice. Rules on the
+request's fields fix the first two, and a check in the handler the third.</p>
+
+<h2>Rules on fields</h2>
+<p>Only <code>NewBookmark</code> and one line of <code>create</code> change:</p>
+<pre><code>@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};</code></pre>
+<pre><code>    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */</code></pre>
+<p><code>http.decodeValid</code> decodes as <code>http.decode</code> does, then checks the rules. When one fails, the
+handler stops there and the client gets a 422 that names each field and what is wrong with it:</p>
+<pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "not a link", "title": "x"}'
+{"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}
+
+$ curl -X POST localhost:8080/bookmarks -d '{}'
+{"error":"invalid request","fields":[{"field":"url","message":"is required"}]}</code></pre>
+<table>
+  <tr><th>Rule</th><th>Holds when</th></tr>
+  <tr><td><code>@required</code></td><td>The field has a value (not empty, not 0, not null)</td></tr>
+  <tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>A number is at least / at most n; a text has at least / at most n characters</td></tr>
+  <tr><td><code>@url</code>, <code>@email</code></td><td>The text is an absolute URL / looks like an email address</td></tr>
+  <tr><td><code>@oneOf("a", "b")</code></td><td>The text is one of those</td></tr>
+</table>
+<p>A field that is empty and not <code>@required</code> passes its other rules, so <code>title</code> may be left out.
+The full list is in <a href="lib-validate.html">Validation</a>.</p>
+
+<h2>Rules that need the data</h2>
+<p>"Already saved" isn't a property of the request: the handler checks it and answers 409 Conflict itself.</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}</code></pre>
+
+<h2>The error format</h2>
+<p>Every error Shelf sends has the same shape, <code>{"error": "..."}</code>, plus <code>fields</code> for a 422, so a
+client handles them in one place:</p>
+<table>
+  <tr><th>Code</th><th>Meaning</th><th>Who sends it</th></tr>
+  <tr><td>400</td><td>Not the JSON we expect</td><td><code>http.decode</code>, <code>http.decodeValid</code></td></tr>
+  <tr><td>404</td><td>No such thing</td><td>a handler, <code>w.error(404, ...)</code>; the mux for unknown paths</td></tr>
+  <tr><td>405</td><td>Wrong method for this path</td><td>the mux</td></tr>
+  <tr><td>409</td><td>It conflicts with what is there</td><td>a handler</td></tr>
+  <tr><td>422</td><td>Well-formed, but a rule fails</td><td><code>http.decodeValid</code></td></tr>
+  <tr><td>500</td><td>A bug: the handler threw</td><td>the server, which logs where</td></tr>
+</table>
+<p>The last row is worth knowing: a handler that throws doesn't take the server down. The request gets a 500, the log
+gets the error and the line it came from, and the next request is served as usual.</p>
+<p>Next: <a href="guide-http-04-config.html">Configuration</a>.</p>

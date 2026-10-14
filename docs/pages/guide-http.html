@@ -1,0 +1,39 @@
+<!-- title: HTTP programming -->
+<h1>HTTP programming</h1>
+<p class="lede">One project, from a ten-line server to an API you could run in production: <strong>Shelf</strong>, a
+bookmarks service. People save links, tag them, search them and share collections. Each chapter adds one thing and
+ends with a program that runs.</p>
+
+<h2>What you build</h2>
+<table>
+  <tr><th>Request</th><th>What it does</th></tr>
+  <tr><td><code>POST /bookmarks</code></td><td>Save a link</td></tr>
+  <tr><td><code>GET /bookmarks</code></td><td>Your links, newest first, a page at a time; <code>?tag=</code>, <code>?q=</code> to filter and search</td></tr>
+  <tr><td><code>GET /bookmarks/{id}</code>, <code>PATCH</code>, <code>DELETE</code></td><td>One link</td></tr>
+  <tr><td><code>POST /users</code>, <code>POST /sessions</code></td><td>Sign up, log in</td></tr>
+  <tr><td><code>GET /collections/{id}</code></td><td>A shared collection, readable by anyone with the link</td></tr>
+</table>
+
+<h2>The chapters</h2>
+<ol>
+  <li><a href="guide-http-01-hello.html">Hello, Shelf</a>: a project, a mux, a handler, <code>curl</code>.</li>
+  <li><a href="guide-http-02-json.html">JSON in and out</a>: <code>@json</code> structs, routes with parameters, status codes.</li>
+  <li><a href="guide-http-03-validation.html">Validation and errors</a>: rules on fields, 400, 409, 422.</li>
+  <li><a href="guide-http-04-config.html">Configuration</a>: flags, environment variables, <code>.env</code>, logging.</li>
+  <li><a href="guide-http-05-postgres.html">PostgreSQL</a>: ktm-pg, a connection pool, queries.</li>
+  <li><a href="guide-http-06-migrations.html">Migrations</a>: the schema in versioned files.</li>
+  <li><a href="guide-http-07-search.html">Tags, search and pages</a>: transactions, full-text search, cursors.</li>
+  <li><a href="guide-http-08-users.html">Users and sessions</a>: passwords, tokens, each user's own bookmarks.</li>
+  <li><a href="guide-http-09-sharing.html">Sharing</a>: collections anyone with the link can read, permissions in SQL.</li>
+  <li><a href="guide-http-10-middleware.html">Middleware</a>: request IDs, CORS, rate limits, the real client address.</li>
+  <li><a href="guide-http-11-testing.html">Testing</a>: a package for the API, <code>ktm test</code>, a test database.</li>
+  <li><a href="guide-http-12-production.html">Production</a>: HTTPS, health, time limits, systemd, containers.</li>
+</ol>
+
+<h2>Before you start</h2>
+<ul class="rules">
+  <li>ktm 0.21 or newer (<a href="getting-started.html">Getting started</a>) and <code>curl</code>.</li>
+  <li>From chapter 5: PostgreSQL. Any recent version; with Docker,
+  <code>docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=shelf postgres:17</code>.</li>
+  <li>You know some C or another C-like language. The guide explains the ktm parts as they come.</li>
+</ul>

@@ -1,0 +1,70 @@
+<!-- title: HTTP middleware -->
+<!-- ref: net.http.middleware -->
+<h1>HTTP middleware</h1>
+<p class="lede"><code>net.http.middleware</code> has the middleware most APIs want: request IDs, the client's real
+address behind a proxy, CORS, rate limiting and bearer tokens. Each is one call that adds it to a
+<a href="lib-http.html#middleware">Mux or a group</a>.</p>
+
+<pre data-run><code>
+import net.http, net.http.middleware;
+
+bool checkToken(u8[] token, http.Request *r)
+{
+  if (!token.equals("s3cret")) { return false; }
+  r.setInt("userId", 42);                // for the handlers
+  return true;
+}
+
+void me(http.Writer *w, http.Request *r) { w.text(200, "user %d", r.getInt("userId")); }
+
+void main()
+{
+  http.Mux mux;
+  middleware.realIp(&mux, "10.0.0.0/8");      // first: the others see the client
+  middleware.requestId(&mux);
+  middleware.rateLimit(&mux, 100, 60);          // 100 requests a minute per client
+
+  http.Mux *api = mux.group("/api");
+  middleware.bearer(api, &checkToken);         // 401 without a good token
+  api.handle("GET /me", &me);
+
+  http.Request r = http.testRequest("GET", "/api/me");
+  r.addHeader("Authorization", "Bearer s3cret");
+  http.Writer w = http.recorder();
+  mux.serve(&w, &r);
+  printf("%d %s\n", w.code, w.body);
+  w.free();
+  r.free();
+  mux.free();
+}
+</code></pre>
+<pre class="output">
+200 user 42
+</pre>
+
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>middleware.requestId(m)</code></td><td>Keeps the client's <code>X-Request-Id</code> when it is sane, else makes a UUIDv7; it goes in the reply's <code>X-Request-Id</code> and <code>middleware.requestIdOf(r)</code>, for logs</td></tr>
+  <tr><td><code>middleware.realIp(m, "10.0.0.0/8, ::1")</code></td><td>For requests from those proxies, <code>r.remoteAddr()</code> becomes the right-most address in <code>X-Forwarded-For</code> that isn't a proxy; from anywhere else the header is ignored, so it can't be faked</td></tr>
+  <tr><td><code>middleware.cors(m, &amp;opts)</code></td><td>CORS for the origins in a <code>middleware.CorsOptions</code> (<code>origins</code>, <code>methods</code>, <code>headers</code>, <code>expose</code>, <code>credentials</code>, <code>maxAge</code>); answers preflights itself. Add it on the Mux the server serves</td></tr>
+  <tr><td><code>middleware.rateLimit(m, requests, seconds)</code></td><td>Per client address, a token bucket shared by all the server's threads; past it 429 with <code>Retry-After</code>, and <code>RateLimit-Limit</code>/<code>-Remaining</code> on every reply</td></tr>
+  <tr><td><code>middleware.bearer(m, &amp;check)</code></td><td><code>Authorization: Bearer &lt;token&gt;</code> that <code>check(token, r)</code> accepts, else 401 with <code>WWW-Authenticate</code>; <code>check</code> can <code>r.set</code> the user</td></tr>
+</table>
+
+<h2>Order and groups</h2>
+<p>Middleware runs in the order it was added, the Mux's before a group's. Put <code>realIp</code> first so the rest
+see the client, and <code>cors</code> on the Mux the server serves (a preflight is answered before routing). A group
+gets its own: a strict <code>rateLimit(login, 5, 60)</code> on a login group beside a looser one for the whole API.</p>
+
+<h2>What isn't here</h2>
+<ul class="rules">
+  <li>Recovery: a throw in a handler is already a logged 500 (a JSON decode error a 400).</li>
+  <li>Timeouts: a running handler can't be stopped from outside. Limits are per operation:
+  <code>http.Options</code>' read and idle limits, the client's <code>timeoutMs</code>, a database's statement timeout.</li>
+  <li>An access log: <code>http.Options.accessLog</code>.</li>
+</ul>
+
+<h2>Your own, with settings</h2>
+<p><code>mux.useWith(f, ctx)</code> adds a middleware <code>bool f(http.Writer *w, http.Request *r, void *ctx)</code>
+that gets <code>ctx</code> on every request, so one function serves several configurations; with <code>true</code>
+third, the Mux frees <code>ctx</code> with itself. That is how this module's are built.</p>

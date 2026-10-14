@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12. Production - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group" open><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li class="current"><a href="guide-http-12-production.html" aria-current="page">12. Production</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="guides.html">Guides</a></span></div>
+<h1>12. Production</h1>
+<p class="lede">The last steps from a program on your laptop to a service: HTTPS, a health check for whatever watches
+it, time limits, and a way to ship and run it that survives restarts and deploys.</p>
+
+<h2 id="one-binary">One binary<a class="anchor" href="#one-binary" aria-label="Link to this section">#</a></h2>
+<pre><code>$ ktm build
+$ ls -l shelf
+-rwxrwxr-x 1 ada ada 2014504 Oct 14 15:49 shelf
+$ ldd shelf
+	linux-vdso.so.1
+	libc.so.6 =&amp;gt; /lib/x86_64-linux-gnu/libc.so.6
+	libm.so.6 =&amp;gt; /lib/x86_64-linux-gnu/libm.so.6
+	/lib64/ld-linux-x86-64.so.2</code></pre>
+<p>Two megabytes, needing only the C library: the standard library, ktm-pg and ktm-migrate are compiled in, and so is
+TLS. Copy it with the <code>migrations</code> directory and it runs.</p>
+
+<h2 id="https">HTTPS<a class="anchor" href="#https" aria-label="Link to this section">#</a></h2>
+<p>Two more settings, the certificate chain and its key as PEM files, and <code>main</code> serves over TLS when they
+are set:</p>
+<pre><code>    if (gSettings.tlsCert.len) {
+        log.info("Shelf listening on https://localhost:%d", *port);
+        return https.listen((i32)*port, &amp;amp;mux, gSettings.tlsCert, gSettings.tlsKey, db, &amp;amp;o);
+    }</code></pre>
+<pre><code>SHELF_TLS_CERT=/etc/letsencrypt/live/shelf.example.com/fullchain.pem
+SHELF_TLS_KEY=/etc/letsencrypt/live/shelf.example.com/privkey.pem</code></pre>
+<p>Behind a load balancer or a proxy that ends TLS (nginx, Caddy, a cloud load balancer), leave them unset: the proxy
+speaks HTTPS to the world, Shelf plain HTTP to the proxy, and <code>SHELF_TRUSTED_PROXIES</code> (chapter 10) gives
+the real client addresses back.</p>
+
+<h2 id="health-and-time-limits">Health and time limits<a class="anchor" href="#health-and-time-limits" aria-label="Link to this section">#</a></h2>
+<pre><code>/* GET /health: for the load balancer and the monitoring. 200 while the
+ * database answers, 503 when it doesn't (the instance takes no traffic) */
+void health(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    try {
+        pg.Conn *c = db.acquire();
+        defer c.release();
+        c.setQueryTimeout(1000);        /* a database that doesn't answer in a second is down */
+        c.ping();
+    } catch (Error e) {
+        w.error(503, "the database doesn't answer");
+        return;
+    }
+    w.text(200, "ok");
+}</code></pre>
+<pre><code>    pg.Options po;
+    po.queryTimeoutMs = 5000;           /* no request waits on a query for more than 5 s */
+    po.acquireTimeoutMs = 2000;         /* nor 2 s for a connection (the default is 30) */
+    pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;amp;po);</code></pre>
+<ul class="rules">
+  <li><code>GET /health</code> is for the load balancer and the monitoring: 200 while the database answers, 503 when it
+  doesn't, so traffic goes to instances that can serve it.</li>
+  <li>Every query has a time limit: a slow query is cancelled on the server and the request gets a 500, instead of
+  waiting forever and holding a connection. The health check's is tighter.</li>
+  <li>So does getting a connection: when the database stops answering (a hung machine, a network split), requests and
+  the health check give up after 2 s instead of piling up. With the database frozen, <code>/health</code> answers
+  <code>503</code> within those 2 s, and <code>200</code> again once it is back.</li>
+  <li>The server has its own limits for slow clients: a request must arrive within 30 s, an idle kept-alive connection
+  closes after 120 s (<code>http.Options</code>' <code>readTimeoutMs</code>, <code>idleTimeoutMs</code>).</li>
+</ul>
+
+<h2 id="stopping-cleanly">Stopping cleanly<a class="anchor" href="#stopping-cleanly" aria-label="Link to this section">#</a></h2>
+<p>On SIGTERM (what systemd, Docker and Kubernetes send) and Ctrl-C, <code>http.listen</code> stops taking connections,
+lets the requests in flight finish, waits for background work, and returns; the <code>defer</code>s in
+<code>main</code> close the pool. A deploy that replaces one instance at a time drops no request.</p>
+
+<h2 id="running-it-with-systemd">Running it with systemd<a class="anchor" href="#running-it-with-systemd" aria-label="Link to this section">#</a></h2>
+<pre><code>[Unit]
+Description=Shelf, a bookmarks API
+After=network-online.target postgresql.service
+
+[Service]
+User=shelf
+WorkingDirectory=/opt/shelf
+EnvironmentFile=/etc/shelf.env
+ExecStart=/opt/shelf/shelf
+Restart=on-failure
+# SIGTERM: Shelf finishes the requests in flight, then exits
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+<pre><code>$ sudo cp shelf /opt/shelf/ &amp;amp;&amp;amp; sudo cp -r migrations /opt/shelf/
+$ sudo systemctl enable --now shelf
+$ journalctl -u shelf -f</code></pre>
+<p><code>/etc/shelf.env</code> holds the same <code>SHELF_*</code> variables as <code>.env</code>, readable only by root and
+the <code>shelf</code> user. The server migrates the database at start, so a deploy is: copy the new binary and
+migrations, <code>systemctl restart shelf</code>.</p>
+
+<h2 id="or-in-a-container">Or in a container<a class="anchor" href="#or-in-a-container" aria-label="Link to this section">#</a></h2>
+<pre><code># Build with ktm (it assembles and links with gcc), run on a slim image: the binary needs only libc
+FROM debian:trixie AS build
+RUN apt-get update &amp;amp;&amp;amp; apt-get install -y --no-install-recommends ca-certificates curl unzip git gcc libc6-dev \
+ &amp;amp;&amp;amp; curl -fsSL https://github.com/ozzenerol/ktm-lang/releases/download/v0.21.0/ktm-v0.21.0-linux-x86_64.zip -o /tmp/ktm.zip \
+ &amp;amp;&amp;amp; unzip -q /tmp/ktm.zip -d /opt &amp;amp;&amp;amp; /opt/ktm-v0.21.0-linux-x86_64/install.sh
+WORKDIR /src
+COPY . .
+RUN ktm build
+
+FROM debian:trixie-slim
+COPY --from=build /src/shelf /usr/local/bin/shelf
+COPY migrations /app/migrations
+WORKDIR /app
+USER nobody
+EXPOSE 8080
+CMD ["shelf"]</code></pre>
+<p>ktm compiles to assembly and links with the system's C compiler, so the build stage has <code>gcc</code>; the image
+that runs has only the binary and the migrations.</p>
+<pre><code>$ docker build -t shelf .
+$ docker run -p 8080:8080 --env-file .env shelf</code></pre>
+
+<h2 id="where-to-go-from-here">Where to go from here<a class="anchor" href="#where-to-go-from-here" aria-label="Link to this section">#</a></h2>
+<p>Shelf now has everything a real API has: validated input, a database with migrations, accounts, permissions,
+middleware, tests and a deployment. The <a href="lib-http.html">HTTP</a>,
+<a href="lib-http-middleware.html">middleware</a> and <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> pages
+go deeper into each part.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-11-testing.html"><span>Previous</span>11. Testing</a><a class="next" href="stdlib.html"><span>Next</span>Library reference</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/guide-http-12-production.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#one-binary">One binary</a></li><li><a href="#https">HTTPS</a></li><li><a href="#health-and-time-limits">Health and time limits</a></li><li><a href="#stopping-cleanly">Stopping cleanly</a></li><li><a href="#running-it-with-systemd">Running it with systemd</a></li><li><a href="#or-in-a-container">Or in a container</a></li><li><a href="#where-to-go-from-here">Where to go from here</a></li></ul></nav>
+</div>
+</body>
+</html>

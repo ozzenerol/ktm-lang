@@ -106,6 +106,62 @@ void main()
 second
 </pre>
 
+<h2>Methods with type parameters of their own</h2>
+<p>A method can have type parameters of its own, written after its name as for a function. It works on a plain
+struct, and on a generic one next to the struct's parameters.</p>
+<pre data-run><code>
+struct Counter { i64 n; };
+
+i64 Counter.addAll<V>(V[] xs)
+{
+  for (auto x : xs) { self.n += (i64)x; }
+  return self.n;
+}
+
+V Counter.zero<V>() { V z; return z; }
+
+struct Pair<T> { T a; T b; };
+
+Pair<U> Pair<T>.map<U>(fn(T) U f)
+{
+  Pair<U> p = {f(self.a), f(self.b)};
+  return p;
+}
+
+f64 half(i64 x) { return (f64)x / 2.0; }
+u8 *sign(f64 x) { return x >= 1.0 ? "big" : "small"; }
+
+void main()
+{
+  Counter c = {0};
+  u8 bytes[] = {1, 2, 3};
+  f64 floats[] = {1.5, 2.5};
+  printf("%d %d\n", c.addAll(bytes), c.addAll(floats));
+  printf("%d\n", c.zero<i64>());
+
+  Pair<i64> p = {1, 5};
+  Pair<u8 *> s = p.map(&half).map(&sign);
+  printf("%s %s\n", s.a, s.b);
+}
+</code></pre>
+<pre class="output">
+6 9
+0
+small big
+</pre>
+<ul class="rules">
+  <li>A call works out the method's own parameters from its arguments, as for a generic function: <code>self</code>
+  takes no part, and the struct's parameters come from the receiver (a <code>Pair&lt;i64&gt;</code> gives
+  <code>T</code> = <code>i64</code>). Write them when nothing says what they are, as for <code>c.zero&lt;i64&gt;()</code>
+  whose <code>V</code> is only in the return type.</li>
+  <li>Each set of type arguments makes its own instance, <code>Counter.addAll&lt;u8&gt;</code>, the first time it is
+  called.</li>
+  <li>The method is found on a pointer, on a call's result (<code>p.map(...).map(...)</code>) and on a struct that
+  derives from its struct, as any method is. <code>pub</code> works as for any method.</li>
+  <li>Its own parameter names can't be the struct's: <code>Pair&lt;T&gt;.f&lt;T&gt;</code> is an error.</li>
+  <li>It shares its name with nothing: not a field, not a plain method, not another generic method of the struct.</li>
+</ul>
+
 <h2>Generic functions over generic structs</h2>
 <pre data-run><code>
 struct Box<T> { T value; };
@@ -190,4 +246,6 @@ bob -1
   <li>Generic enums.</li>
   <li>Number parameters (<code>Array&lt;T, 16&gt;</code>).</li>
   <li>A different body for one type (specialisation).</li>
+  <li>Several generic methods of one name, or a generic method next to a plain one of its name.</li>
+  <li>The address of a generic method (<code>&amp;s.f</code>): wrap the call in a function.</li>
 </ul>

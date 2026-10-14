@@ -281,6 +281,13 @@ static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
     ctx->module_doc = root != NULL;
     if (root) {
         char *src = mprintf("import %s;\n", mod);
+        /* a module's *_test.ktm is read only when its tests are: as
+         * `ktm test` reads them */
+        size_t plen = strlen(path);
+        if (plen > 9 && !strcmp(path + plen - 9, "_test.ktm")) {
+            char *dir = mprintf("%.*s", (int)(strrchr(path, '/') - path), path);
+            l->test_dir = realpath(dir, NULL);
+        }
         lexPushString(l, mprintf("%s/%s", root, KTM_LSP_MODULE_FILE), src,
                       strlen(src));
         /* A tree with rt and prelude is a standard library's source: it
@@ -3955,7 +3962,12 @@ static void lspCollectSymbols(LspCtx *ctx, u32 file_id, const char *mod,
             /* the method's name token: the first one spelled so after
              * the struct's name */
             Lexeme *at = NULL;
-            for (u64 k = 0; k < d->toks->size; ++k) {
+            /* `S.f<V>(...)`: d->at is the method's name itself */
+            if (!d->of && d->at && (size_t)d->at->len == d->method->len &&
+                !memcmp(d->at->start, d->method->data, d->at->len)) {
+                at = d->at;
+            }
+            for (u64 k = 0; !at && k < d->toks->size; ++k) {
                 Lexeme *t = d->toks->entries[k];
                 if (t->tk_type == TK_IDENT && (size_t)t->len == d->method->len &&
                     !memcmp(t->start, d->method->data, t->len) &&
@@ -3971,12 +3983,17 @@ static void lspCollectSymbols(LspCtx *ctx, u32 file_id, const char *mod,
             LspSym *m = lspSymNew(out, d->method->data, LSP_SK_METHOD, head->data,
                                   file_id, at->line, at->col, at->len);
             AoStr *owner = aoStrNew();
-            aoStrCatPrintf(owner, "%s<", lspLocalName(d->of->name->data, mod));
-            for (u64 k = 0; k < d->of->params->size; ++k) {
-                aoStrCatPrintf(owner, "%s%s", k ? ", " : "",
-                               ((AoStr *)d->of->params->entries[k])->data);
+            if (!d->of) {
+                /* a plain struct's method with type parameters of its own */
+                aoStrCat(owner, lspLocalName(d->name->data, mod));
+            } else {
+                aoStrCatPrintf(owner, "%s<", lspLocalName(d->of->name->data, mod));
+                for (u64 k = 0; k < d->of->params->size; ++k) {
+                    aoStrCatPrintf(owner, "%s%s", k ? ", " : "",
+                                   ((AoStr *)d->of->params->entries[k])->data);
+                }
+                aoStrPutChar(owner, '>');
             }
-            aoStrPutChar(owner, '>');
             m->owner = owner->data;
         }
     }

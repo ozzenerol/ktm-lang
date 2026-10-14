@@ -86,8 +86,11 @@ i32 main() {
     coro.go(&worker);
     coro.run();
     check(gBusy.result == 300 && gBusy.thread != gLoopThread, "inside a loop: on a worker thread");
-    check(gTicksDuring >= 20, "the loop keeps running during the work");
-    if (gTicksDuring < 20) { printf("  ticks during 300 ms: %d\n", gTicksDuring); }
+    /* a 5 ms ticker through 300 ms of work: about 60 ticks; a blocked
+     * loop gets 0 or 1. A loaded machine's timers run late, so a few are
+     * enough to show the loop kept going. */
+    check(gTicksDuring >= 5, "the loop keeps running during the work");
+    if (gTicksDuring < 5) { printf("  ticks during 300 ms: %d\n", gTicksDuring); }
     check(gThrew, "what the work throws comes back");
 
     for (i64 i = 0; i < 16; i++) { coro.go(&many, (void *)i); }

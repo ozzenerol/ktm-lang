@@ -1,0 +1,66 @@
+<!-- title: 1. Hello, Shelf -->
+<h1>1. Hello, Shelf</h1>
+<p class="lede">A project with one file and a server that answers on <code>/</code>. Ten lines, and already a real HTTP/1.1
+server that uses every core.</p>
+
+<h2>The project</h2>
+<pre><code>$ mkdir shelf &amp;&amp; cd shelf
+$ ktm mod init example.com/shelf
+ktm: created ktm.mod for example.com/shelf</code></pre>
+<p><code>ktm.mod</code> names the project and the ktm version it needs. Later chapters add the packages it uses
+there.</p>
+
+<h2>main.ktm</h2>
+<pre><code>import net.http;
+
+void hello(http.Writer *w, http.Request *r)
+{
+    w.text(200, "Hello from Shelf!\n");
+}
+
+i32 main()
+{
+    http.Mux mux;
+    mux.handle("GET /{$}", &amp;hello);
+    printf("Shelf listening on http://localhost:8080\n");
+    return http.listen(8080, &amp;mux);
+}</code></pre>
+<ul class="rules">
+  <li><code>import net.http;</code> brings in the HTTP module; its names are used as <code>http.X</code>.</li>
+  <li>A handler is a function that takes the reply being built (<code>http.Writer *w</code>) and the request
+  (<code>http.Request *r</code>). <code>w.text(200, ...)</code> sets the status and a plain-text body, with
+  <code>printf</code>'s formatting.</li>
+  <li><code>http.Mux</code> routes requests to handlers. A pattern is a method and a path, as in Go:
+  <code>"GET /{$}"</code> is <code>GET</code> on exactly <code>/</code> (a plain <code>"GET /"</code> would match every
+  path).</li>
+  <li><code>http.listen</code> serves until the program gets Ctrl-C or SIGTERM, then finishes the requests in flight and
+  returns.</li>
+</ul>
+
+<h2>Run it</h2>
+<pre><code>$ ktm run .
+Shelf listening on http://localhost:8080</code></pre>
+<p>In another terminal:</p>
+<pre><code>$ curl -i localhost:8080/
+HTTP/1.1 200 OK
+Date: Wed, 14 Oct 2026 15:19:45 GMT
+Content-Length: 18
+Content-Type: text/plain; charset=utf-8
+
+Hello from Shelf!
+
+$ curl -i localhost:8080/nope
+HTTP/1.1 404 Not Found
+...
+$ curl -i -X POST localhost:8080/
+HTTP/1.1 405 Method Not Allowed
+Allow: GET, HEAD
+...</code></pre>
+<p>The mux answers what has no route by itself: 404 for a path it doesn't know, 405 (with the methods it would take)
+for a known path with the wrong method. <code>HEAD</code> works wherever <code>GET</code> does.</p>
+
+<h2>What you have</h2>
+<p><code>ktm run .</code> compiles <code>main.ktm</code> and runs it; <code>ktm build</code> makes a binary,
+<code>./shelf</code>, to copy anywhere. The server runs one event loop per CPU core, each handling thousands of
+connections with coroutines, so this is already the server Shelf keeps: the next chapters only add routes.</p>
+<p>Next: <a href="guide-http-02-json.html">JSON in and out</a>.</p>

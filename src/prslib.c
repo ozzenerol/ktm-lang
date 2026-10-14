@@ -1927,6 +1927,29 @@ static int parseFillCallerArgs(Cctrl *cc, Vec *params, int idx, Vec *argv,
     return idx;
 }
 
+/* An overloaded callee's @caller parameters, which every overload starts
+ * with (parseOverloadDecl): set just before parseArgv, which fills them in
+ * as for a single function. A method called as `Type.name(obj, ...)` has
+ * its self first. */
+static Vec *parse_overload_callers;
+
+static void parseSetOverloadCallers(Vec *overloads, int is_method, int with_self) {
+    Ast *fn = overloads->entries[0];
+    Vec *params = fn ? fn->params : NULL;
+    Vec *out = NULL;
+    int from = is_method ? 1 : 0;
+    for (int i = from; params && i < (int)params->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p || !(p->flags & AST_FLAG_CALLER)) break;
+        if (!out) {
+            out = astVecNew();
+            if (with_self) vecPush(out, params->entries[0]);
+        }
+        vecPush(out, p);
+    }
+    parse_overload_callers = out;
+}
+
 Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                Vec *spans) {
     List *var_args = NULL;
@@ -1936,6 +1959,8 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
     int param_idx = 0;
 
     if (decl) params = parseGetFunctionParams(decl);
+    else params = parse_overload_callers;
+    parse_overload_callers = NULL;
 
     /* A `T ...name` callee: its last two parameters are the count and the
      * data pointer, every argument from the count's position on is an
@@ -2822,6 +2847,7 @@ static void parseCheckOverloadAccess(Cctrl *cc, Ast *fn, char *fname, int len,
     if (mod_len < 0 || (fn->flags & AST_FLAG_PUB)) return;
     AoStr *here = cctrlModulePath(cc, cc->cur_module);
     if (here && (int)here->len == mod_len && !memcmp(here->data, fname, mod_len)) return;
+    if (cctrlTestSees(cc, fname, mod_len)) return;
     parseRaiseCallError(cc, loc, "`%s` is private to module %.*s",
                         parseOverloadName(fn), mod_len, fname);
 }
@@ -2904,8 +2930,24 @@ void parseCheckOverloadRefs(Cctrl *cc) {
 
 /* A call to instance `fn` of a generic function with `argv` parsed
  * without a target: checked, completed and converted as any call */
+/* argv was parsed before the generic's instance was known: the arguments
+ * of fn's @caller parameters, put in their places; how many */
+static int parseGenericFillCallers(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *loc) {
+    Vec *params = parseGetFunctionParams(fn);
+    int n = 0;
+    for (u64 i = 0; params && i < params->size && i <= argv->size; ++i) {
+        Ast *p = params->entries[i];
+        if (!p || !(p->flags & AST_FLAG_CALLER)) continue;
+        vecInsertAt(argv, parseCallerArg(cc, p, loc->line), i);
+        if (loc->args) vecInsertAt(loc->args, NULL, i);
+        n++;
+    }
+    return n;
+}
+
 static Ast *parseGenericCallWith(Cctrl *cc, Ast *fn, Vec *argv, ParseCallLoc *loc,
                                  char *fname, int len) {
+    parseGenericFillCallers(cc, fn, argv, loc);
     parseOverloadPackVarArgs(cc, fn, argv, loc->args, fname, len);
     parseFunctionArgumentCheck(cc, fn, argv, fname, len, loc);
     parseFlattenDefaultArgs(fn, argv);
@@ -2947,8 +2989,19 @@ static Ast *parseGenericOverloadPick(Cctrl *cc, GenericDef *head, Vec *targs, Ve
                             why ? why : "no definition fits", len, fname);
     }
     if (set->size == 1) return set->entries[0];
+    /* picked with the @caller arguments (overloads start with the same
+     * ones), which parseGenericCallWith puts back for the one picked */
     Ast *decl = NULL;
-    return parseResolveOverload(cc, set, argv, 0, fname, len, loc, &decl);
+    Vec *params = parseGetFunctionParams(set->entries[0]);
+    int filled = parseGenericFillCallers(cc, set->entries[0], argv, loc);
+    Ast *pick = parseResolveOverload(cc, set, argv, 0, fname, len, loc, &decl);
+    for (u64 i = params ? params->size : 0; filled && i-- > 0;) {
+        Ast *p = params->entries[i];
+        if (i >= argv->size || !p || !(p->flags & AST_FLAG_CALLER)) continue;
+        vecRemoveAt(argv, i);
+        if (loc->args) vecRemoveAt(loc->args, i);
+    }
+    return pick;
 }
 
 /* `name<T, U>(args)`, the `<` next: the call of that instance */
@@ -3026,6 +3079,7 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
     ParseCallLoc loc = parseCallLocStart(cc, fname, len);
     loc.args = vecNew(&vec_unsigned_long_type);
     /* an overloaded name: the arguments first, then the one they fit */
+    if (overloads) parseSetOverloadCallers(overloads, 0, 0);
     Vec *argv = parseArgv(cc,overloads ? NULL : maybe_fn,terminator,fname,len,loc.args);
     parseCallLocEnd(cc, &loc);
     if (overloads) {
@@ -3141,6 +3195,81 @@ static Ast *parseFindMethod(Cctrl *cc, AstType *cls, char *name, int len,
     return NULL;
 }
 
+static Ast *parseMethodCallWith(Cctrl *cc, Ast *fn, Ast *decl, AstType *owner, Ast *recv,
+                                char *name, int len, Vec *argv, ParseCallLoc *lp);
+static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
+                            char *name, int len);
+
+/* The receiver of a method call on `cls`: the address self gets */
+static Ast *parseMethodRecv(Cctrl *cc, Ast *cls) {
+    Ast *recv;
+    if (astIsDeref(cls)) {
+        recv = cls->operand;
+    } else if ((cls->kind == AST_FUNCALL || cls->kind == AST_FUNPTR_CALL ||
+                cls->kind == AST_ASM_FUNCALL) &&
+               (cls->type->kind == AST_TYPE_CLASS || cls->type->kind == AST_TYPE_UNION) &&
+               !cls->type->is_intrinsic) {
+        /* a call's result (`fs.readAll(p).take()`): its value in a
+         * hidden variable, for self to point at */
+        recv = astTempAddr(parseHiddenSliceVar(cc, cls->type), cls);
+    } else {
+        if (!assertLValue(cls)) {
+            cctrlRaiseException(cc, "a method is called on a variable "
+                                    "or a pointer, not on a %s",
+                                astKindToHumanReadable(cls));
+        }
+        recv = astUnaryOperator(astMakePointerType(cls->type),
+                                AST_UN_OP_ADDR_OF, cls);
+    }
+    return recv;
+}
+
+/* `x.f(args)` or `x.f<A>(args)` of generic method `d` (the `(` or `<`
+ * next): the call of its instance for the type arguments, written or
+ * inferred from the arguments as for a generic function */
+static Ast *parseGenericMethodCall(Cctrl *cc, GenericDef *d, AstType *owner, Ast *recv,
+                                   Lexeme *tok) {
+    char *name = tok->start;
+    int len = tok->len;
+    if (tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+        Vec *own = parseGenericArgs(cc);
+        Ast *fn = parseGenericOwnMethodInstance(cc, d, owner, own, tok);
+        cctrlTokenExpect(cc, '(');
+        return parseMethodCall(cc, fn, owner, recv, name, len);
+    }
+    cctrlTokenExpect(cc, '(');
+    char *fname = mprintf("%s.%.*s", owner->clsname->data, len, name);
+    int flen = strlen(fname);
+    ParseCallLoc loc = parseCallLocStart(cc, name, len);
+    loc.args = vecNew(&vec_unsigned_long_type);
+    Vec *argv = parseArgv(cc, NULL, ')', fname, flen, loc.args);
+    parseCallLocEnd(cc, &loc);
+    char *why = NULL;
+    Vec *own = parseGenericOwnMethodInfer(cc, d, owner, argv, &why);
+    if (!own) {
+        parseRaiseCallError(cc, &loc, "can't work out the type arguments of `%s`: %s; "
+                            "write them, as in `x.%.*s<i64>(...)`", fname, why, len, name);
+    }
+    Ast *fn = parseGenericOwnMethodInstance(cc, d, owner, own, tok);
+    Ast *decl = parseMethodWithoutSelf(fn);
+    parseGenericFillCallers(cc, decl, argv, &loc);
+    return parseMethodCallWith(cc, fn, decl, owner, recv, name, len, argv, &loc);
+}
+
+/* A generic method of a module's struct, used outside that module: it
+ * must be pub */
+static void parseCheckGenericMethodAccess(Cctrl *cc, GenericDef *d, AstType *owner, Lexeme *tok) {
+    if (d->is_pub) return;
+    AoStr *cls = owner->clsname;
+    int mod_len = astLastTopDot(cls->data, (int)cls->len);
+    if (mod_len < 0) return;
+    AoStr *here = cctrlModulePath(cc, cc->cur_module);
+    if (here && (int)here->len == mod_len && !memcmp(here->data, cls->data, mod_len)) return;
+    cctrlRewindUntilStrMatch(cc, tok->start, tok->len, NULL);
+    cctrlRaiseException(cc, "the method `%.*s` of `%s` is private to module %.*s",
+                        tok->len, tok->start, cls->data, mod_len, cls->data);
+}
+
 /* A method of a module's type, used outside that module: it must be pub */
 static void parseCheckMethodAccess(Cctrl *cc, AstType *owner, char *name,
                                    int len) {
@@ -3236,8 +3365,18 @@ static Ast *parseMethodCall(Cctrl *cc, Ast *fn, AstType *owner, Ast *recv,
 
     ParseCallLoc loc = parseCallLocStart(cc, name, len);
     loc.args = vecNew(&vec_unsigned_long_type);
+    if (fn->overloads) parseSetOverloadCallers(fn->overloads, 1, recv == NULL);
     Vec *argv = parseArgv(cc, fn->overloads ? NULL : decl, ')', fname, flen, loc.args);
     parseCallLocEnd(cc, &loc);
+    return parseMethodCallWith(cc, fn, decl, owner, recv, name, len, argv, &loc);
+}
+
+/* parseMethodCall with the arguments parsed: argv and its locations */
+static Ast *parseMethodCallWith(Cctrl *cc, Ast *fn, Ast *decl, AstType *owner, Ast *recv,
+                                char *name, int len, Vec *argv, ParseCallLoc *lp) {
+    ParseCallLoc loc = *lp;
+    char *fname = mprintf("%s.%.*s", owner->clsname->data, len, name);
+    int flen = strlen(fname);
     if (fn->overloads) {
         fn = parseResolveOverload(cc, fn->overloads, argv, recv != NULL,
                                   fname, flen, &loc, &decl);
@@ -4064,6 +4203,19 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
     AstType *owner = NULL;
     Ast *method = field ? NULL : parseFindMethod(cc, type, tok->start,
                                                  tok->len, &owner);
+    GenericDef *gmethod = NULL;
+    if (!field && !method) {
+        gmethod = parseFindGenericOwnMethod(cc, type, tok->start, tok->len, &owner);
+    }
+    if (gmethod) {
+        parseCheckGenericMethodAccess(cc, gmethod, owner, tok);
+        if (!tokenPunctIs(cctrlTokenPeek(cc), '(') && !tokenPunctIs(cctrlTokenPeek(cc), '<')) {
+            cctrlRaiseException(cc, "`%s.%.*s` is a generic method: call it with "
+                    "`(...)`; it has no address (wrap the call in a function)",
+                    owner->clsname->data, tok->len, tok->start);
+        }
+        return parseGenericMethodCall(cc, gmethod, owner, parseMethodRecv(cc, cls), tok);
+    }
     if (method) {
         parseCheckMethodAccess(cc, owner, tok->start, tok->len);
         if (!tokenPunctIs(cctrlTokenPeek(cc), '(')) {
@@ -4073,26 +4225,7 @@ Ast *parseGetClassField(Cctrl *cc, Ast *cls) {
                     owner->clsname->data, tok->len, tok->start);
         }
         cctrlTokenGet(cc);
-        Ast *recv;
-        if (astIsDeref(cls)) {
-            recv = cls->operand;
-        } else if ((cls->kind == AST_FUNCALL || cls->kind == AST_FUNPTR_CALL ||
-                    cls->kind == AST_ASM_FUNCALL) &&
-                   (cls->type->kind == AST_TYPE_CLASS || cls->type->kind == AST_TYPE_UNION) &&
-                   !cls->type->is_intrinsic) {
-            /* a call's result (`fs.readAll(p).take()`): its value in a
-             * hidden variable, for self to point at */
-            recv = astTempAddr(parseHiddenSliceVar(cc, cls->type), cls);
-        } else {
-            if (!assertLValue(cls)) {
-                cctrlRaiseException(cc, "a method is called on a variable "
-                                        "or a pointer, not on a %s",
-                                    astKindToHumanReadable(cls));
-            }
-            recv = astUnaryOperator(astMakePointerType(cls->type),
-                                    AST_UN_OP_ADDR_OF, cls);
-        }
-        return parseMethodCall(cc, method, owner, recv, tok->start, tok->len);
+        return parseMethodCall(cc, method, owner, parseMethodRecv(cc, cls), tok->start, tok->len);
     }
     if (!field && tokenPunctIs(cctrlTokenPeek(cc), '(')) {
         Ast *call = parseSliceMethodCall(cc, cls, type, tok);

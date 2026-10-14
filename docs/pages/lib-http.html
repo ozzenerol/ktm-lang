@@ -154,7 +154,9 @@ that needs unescaping is copied into the request's arena) and rejects most route
 <code>mux.use(&amp;fn)</code> adds one; they run in the order they were added, for every request the mux serves,
 404s and 405s included.</p>
 <p><code>mux.group(prefix)</code> gives a <code>http.Mux *</code> whose patterns get the prefix in front
-(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A group's own
+(<code>"GET /users"</code> in group <code>"/api"</code> is <code>"GET /api/users"</code>). A pattern with no path is
+the prefix itself: <code>"GET"</code> in group <code>"/bookmarks"</code> is <code>"GET /bookmarks"</code>, so a whole
+resource can sit behind the group's middleware. A group's own
 <code>use()</code> runs only for its routes, after the middlewares of the mux (and of the groups) it was made from.
 Groups can have groups. A group belongs to its mux: <code>mux.free()</code> frees it, and so does <code>http.listen</code>.</p>
 <pre data-run><code>
@@ -212,6 +214,31 @@ void main()
 /api/users/7: 200 user 7
 </pre>
 
+<p>Middleware hands a handler what it found with <code>r.set(key, ptr)</code> and <code>r.setInt(key, n)</code>; the
+handler reads them with <code>r.get(key)</code>, <code>r.getInt(key)</code> and <code>r.has(key)</code>. They last until
+the reply, and every request starts with none:</p>
+<pre><code>
+bool auth(http.Writer *w, http.Request *r)
+{
+  User *u = r.alloc(sizeof(User));      // freed with the request
+  if (!findUser(r.header("Authorization"), u)) {
+    w.error(401, "unauthorized");
+    return false;
+  }
+  r.set("user", u);
+  return true;
+}
+
+void bookmarks(http.Writer *w, http.Request *r)
+{
+  User *u = r.get("user");
+  ...
+}
+</code></pre>
+
+<p>Ready-made middleware (CORS, request IDs, rate limiting, bearer tokens, the real client address) is in
+<a href="lib-http-middleware.html"><code>net.http.middleware</code></a>.</p>
+
 <h3 id="files">Static files</h3>
 <p><code>mux.files(prefix, dir)</code> serves the files under <code>dir</code> at <code>prefix</code>, which must end in
 <code>/</code>: it adds the route <code>GET prefix{path...}</code> (on a group, under the group's prefix).</p>
@@ -243,6 +270,9 @@ itself is its own to free.</p>
   <li>A handler that throws gets a <code>500</code> reply with <code>{"error":"internal server error"}</code>, and the error goes
   to the log with its file and line. The server carries on.</li>
   <li>A <code>json.ERR_DECODE</code> (bad JSON in <code>http.decode</code>) gets a <code>400</code> with the decode message.</li>
+  <li>A body <code>http.decodeValid</code> rejects gets a <code>422</code> with the field errors as JSON.</li>
+  <li>A <code>Mux</code> answers these itself, so a test through <code>mux.serve</code> with <code>http.testRequest</code>
+  and <code>http.recorder()</code> sees the same <code>400</code>, <code>422</code> and <code>500</code> as a client.</li>
   <li>Handlers run on several threads at once: what they share needs the <code>atomic</code> module or a lock.</li>
 </ul>
 
@@ -254,7 +284,9 @@ itself is its own to free.</p>
   <tr><td><code>r.param("id")</code></td><td>a path parameter of the pattern, unescaped; <code>""</code> if none</td></tr>
   <tr><td><code>r.query("page")</code>, <code>r.hasQuery("x")</code></td><td>the first value of a query parameter, unescaped (<code>+</code> is a space)</td></tr>
   <tr><td><code>r.header("Authorization")</code>, <code>r.hasHeader(name)</code></td><td>a header by name, any case</td></tr>
+  <tr><td><code>r.remoteAddr()</code>, <code>r.remotePort()</code></td><td>the client's IP address (<code>"203.0.113.9"</code>, <code>"::1"</code>) and port; behind a proxy, the proxy's. A test request's are <code>192.0.2.1</code> and <code>1234</code>; <code>r.setRemoteAddr(ip, port)</code> changes them</td></tr>
   <tr><td><code>http.decode&lt;T&gt;(r)</code></td><td>the body as JSON in a <code>T</code>, freed after the reply</td></tr>
+  <tr><td><code>http.decodeValid&lt;T&gt;(r)</code></td><td>the same, then checked with <a href="lib-validate.html"><code>validate</code></a>'s field rules: a body that breaks one is answered <code>422</code> with <code>{"error":"invalid request","fields":[{"field":"url","message":"not a URL"}]}</code></td></tr>
   <tr><td><code>r.app</code></td><td>what <code>http.listen</code> was given as <code>app</code>: the program's own state</td></tr>
   <tr><td><code>r.alloc(n)</code>, <code>r.unescape(s)</code></td><td>memory that lives until the reply; <code>%XX</code> decoding</td></tr>
 </table>
@@ -271,6 +303,49 @@ that writes nothing sends <code>200</code> with an empty body.</p>
   <tr><td><code>w.header(name, value)</code></td><td>adds a header; a <code>Content-Type</code> replaces the default one</td></tr>
   <tr><td><code>w.jsonText(code, text)</code>, <code>w.redirect(url, 302)</code></td><td>JSON that is text already; a redirect</td></tr>
 </table>
+
+<h2 id="cookies">Cookies</h2>
+<pre><code>
+u8[] token = r.cookie("session");      // "" when the client sent none; r.hasCookie("session")
+
+http.Cookie c;
+c.name = "session";
+c.value = token;                       // no spaces, quotes, commas, semicolons: encode (base64url) first
+c.maxAge = 30 * 24 * 3600;             // seconds; 0 until the browser closes
+c.httpOnly = true;                     // JavaScript can't read it
+c.secure = true;                       // sent over HTTPS only
+c.sameSite = http.SameSite.lax;        // .strict, .none (which adds Secure)
+w.setCookie(&amp;c);                      // one Set-Cookie header per call; Path defaults to "/"
+
+w.deleteCookie("session");             // Max-Age=0
+</code></pre>
+<p><code>setCookie</code> throws <code>http.ERR_HTTP</code> for a name or value a browser would refuse, rather than
+send one it would drop.</p>
+<h2 id="background">Background work</h2>
+<p>A handler can start work that goes on after the reply (an email, a webhook, a cache refresh) with
+<code>coro.go</code>: the coroutine runs on the handler's loop, beside the requests, and the reply doesn't wait for
+it.</p>
+<pre><code>
+void *sendWelcome(void *arg)
+{
+  Welcome *m = arg;
+  ...                                    // slow: coro.sleep, the http client, ktm-pg all wait without blocking the loop
+  m.email.free();
+  mem.free(m);
+  return null;
+}
+
+void signup(http.Writer *w, http.Request *r)
+{
+  Welcome *m = mem.allocZero(sizeof(Welcome));
+  m.email = str.from(r.query("email"));  // a copy: the request's memory is gone after the reply
+  coro.go(&amp;sendWelcome, m);
+  w.text(202, "welcome!");
+}
+</code></pre>
+<p>Give the work memory of its own, never pointers into the request. <code>http.shutdown()</code> (and SIGTERM) waits
+for work in flight before <code>listen</code> returns. For CPU-heavy work (hashing, compressing) use
+<a href="lib-event-loop.html#heavy-work"><code>coro.offload</code></a> instead, so the loop stays free.</p>
 
 <h2>Running the server</h2>
 <p><code>http.listen(port, &amp;mux, app, &amp;opts)</code> serves until SIGINT or SIGTERM (or <code>http.shutdown()</code>), lets the

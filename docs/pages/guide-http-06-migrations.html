@@ -1,0 +1,111 @@
+<!-- title: 6. Migrations -->
+<h1>6. Migrations</h1>
+<p class="lede"><code>schema.sql</code> can create a table but not change one that exists. Real schemas change with
+the code, so they live in numbered migration files, and the database remembers which ones it has run.</p>
+
+<h2>The package</h2>
+<pre><code>$ ktm get github.com/ozzenerol/ktm-migrate
+ktm: added github.com/ozzenerol/ktm-migrate v0.1.0</code></pre>
+<p><a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a> works with any SQL engine through a small driver;
+ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</code>.</p>
+
+<h2>The files</h2>
+<p><code>schema.sql</code> becomes the first migration, and a second one adds a field for notes:</p>
+<pre><code>migrations/
+  001_create_bookmarks.up.sql      the CREATE TABLE of chapter 5
+  001_create_bookmarks.down.sql    DROP TABLE bookmarks;
+  002_add_notes.up.sql             ALTER TABLE bookmarks ADD notes text NOT NULL DEFAULT '';
+  002_add_notes.down.sql           ALTER TABLE bookmarks DROP notes;</code></pre>
+<ul class="rules">
+  <li>The number is the version; files run in order, each once. <code>.down.sql</code> undoes its
+  <code>.up.sql</code>.</li>
+  <li>Each migration runs in a transaction with the row that records it, so it happens whole or not at all.</li>
+  <li>Never edit a migration that has run somewhere: add a new one.</li>
+</ul>
+
+<h2>main</h2>
+<pre><code>i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}</code></pre>
+<p>At every start the server brings the database up to date before it listens, so a deploy is just "start the new
+binary". A lock in the database keeps two copies starting at once from both migrating. <code>migrate</code> is a
+subcommand (<a href="lib-flags.html">flag</a>) for doing it by hand:</p>
+<pre><code>/* shelf migrate up | down | status */
+i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
+{
+    if (str.equals(what, "up")) {
+        printf("%d migrations ran\n", ms.up(d));
+    } else if (str.equals(what, "down")) {
+        printf("%d migration reverted\n", ms.down(d, 1));
+    } else if (str.equals(what, "status")) {
+        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
+        for (auto s : all) {
+            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
+        }
+        all.free();
+    } else {
+        log.error("shelf migrate: up, down or status, not `%s`", what);
+        return 2;
+    }
+    return 0;
+}</code></pre>
+
+<h2>Try it</h2>
+<pre><code>$ ktm build
+$ ./shelf migrate status
+   1  create_bookmarks       pending
+   2  add_notes              pending
+$ ./shelf migrate up
+2 migrations ran
+$ ./shelf migrate down
+1 migration reverted
+$ ./shelf migrate status
+   1  create_bookmarks       applied
+   2  add_notes              pending
+$ ./shelf
+2026-10-14T15:33:03.138Z INFO  database at version 2 (1 migrations ran)
+2026-10-14T15:33:03.138Z INFO  Shelf listening on http://localhost:8080
+
+$ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm", "notes": "read the guide"}'
+{"id":"01a13b0b-acf0-7000-b963-567833f2b799","url":"https://ktm-lang.org","title":"ktm","notes":"read the guide","createdAt":"2026-10-14T15:33:03Z"}</code></pre>
+<p>The new field is in <code>Bookmark</code>, <code>NewBookmark</code> (with <code>@max(2000)</code>), the
+<code>COLUMNS</code> list and the <code>INSERT</code>: a migration and the code that uses it go in one commit.</p>
+<p>Next: <a href="guide-http-07-search.html">Tags, search and pages</a>.</p>

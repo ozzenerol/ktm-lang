@@ -75,6 +75,8 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     lexInit(l,NULL,CCF_PRE_PROC|lexer_flags);
     l->lineno = 1;
     lexSetBuiltinRoot(l,root_dir);
+    if (args->test_dir) l->test_dir = realpath(args->test_dir, NULL);
+    if (args->test_root) l->program_root = mprintf("%s", args->test_root);
 
     if (args->module_dir) {
         /* `ktm -lib a.b dir/a/b`: compile the module as a program that

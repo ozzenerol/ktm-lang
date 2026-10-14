@@ -61,6 +61,7 @@ NAV = [
         ("lib-flags.html", "Command-line flags"),
         ("lib-environment.html", "Environment and exit"),
         ("lib-config.html", "Settings from the environment"),
+        ("lib-validate.html", "Validation"),
         ("lib-signals.html", "Signals"),
         ("lib-logging.html", "Logging"),
         ("lib-vectors.html", "Vectors and sorting"),
@@ -86,6 +87,7 @@ NAV = [
         ("lib-event-loop.html", "The coroutine loop"),
         ("lib-serve.html", "Serving on every core"),
         ("lib-http.html", "HTTP servers"),
+        ("lib-http-middleware.html", "HTTP middleware"),
         ("lib-tls.html", "TLS"),
         ("lib-url.html", "URLs"),
         ("lib-threads.html", "Threads and atomics"),
@@ -97,8 +99,25 @@ NAV = [
         ("tools-jit-repl.html", "JIT and REPL"),
         ("tools-editors.html", "Editors"),
         ("tools-packages.html", "Packages"),
+        ("tools-testing.html", "Testing"),
         ("tools-libraries.html", "Building libraries"),
         ("tools-debugging.html", "Debugging"),
+    ]),
+    ("Guides", [
+        ("guides.html", "All guides"),
+        ("guide-http.html", "HTTP programming"),
+        ("guide-http-01-hello.html", "1. Hello, Shelf"),
+        ("guide-http-02-json.html", "2. JSON in and out"),
+        ("guide-http-03-validation.html", "3. Validation and errors"),
+        ("guide-http-04-config.html", "4. Configuration"),
+        ("guide-http-05-postgres.html", "5. PostgreSQL"),
+        ("guide-http-06-migrations.html", "6. Migrations"),
+        ("guide-http-07-search.html", "7. Tags, search and pages"),
+        ("guide-http-08-users.html", "8. Users and sessions"),
+        ("guide-http-09-sharing.html", "9. Sharing"),
+        ("guide-http-10-middleware.html", "10. Middleware"),
+        ("guide-http-11-testing.html", "11. Testing"),
+        ("guide-http-12-production.html", "12. Production"),
     ]),
     ("Reference", [
         ("stdlib.html", "Library reference"),
@@ -278,6 +297,7 @@ def page(title, filename, content, refs=None):
     <a href="language.html">Language</a>
     <a href="library.html">Library</a>
     <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
     <a href="stdlib.html">Reference</a>
   </nav>
   <div class="search" role="search">

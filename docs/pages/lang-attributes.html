@@ -7,11 +7,14 @@
   <tbody>
     <tr><td><code>@json</code></td><td>a struct</td><td>Writes <code>toJson</code>, <code>fromJson</code>, <code>freeDecoded</code></td></tr>
     <tr><td><code>@yaml</code></td><td>a struct</td><td>Writes <code>toYaml</code>, <code>fromYaml</code> (and <code>freeDecoded</code>)</td></tr>
-    <tr><td><code>@key("name")</code></td><td>a field</td><td>The field's key in the text</td></tr>
+    <tr><td><code>@key("name")</code></td><td>a field</td><td>The field's key in the text, and its column for <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> (on any struct)</td></tr>
     <tr><td><code>@skip</code></td><td>a field</td><td>Leaves it out</td></tr>
     <tr><td><code>@omitEmpty</code></td><td>a field</td><td>Leaves it out when it is 0, empty or null</td></tr>
     <tr><td><code>@env("NAME")</code></td><td>a field</td><td>Its environment variable for <a href="lib-config.html"><code>config.fromEnv</code></a></td></tr>
-    <tr><td><code>@required</code></td><td>a field</td><td><code>config.fromEnv</code> fails without its variable</td></tr>
+    <tr><td><code>@required</code></td><td>a field</td><td><code>config.fromEnv</code> fails without its variable; <a href="lib-validate.html"><code>validate.check</code></a> without a value</td></tr>
+    <tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a field</td><td><code>validate.check</code>: a number's bounds, a text's or a slice's length</td></tr>
+    <tr><td><code>@email</code>, <code>@url</code></td><td>a field</td><td><code>validate.check</code>: an email address, an absolute URL</td></tr>
+    <tr><td><code>@oneOf("a", "b")</code></td><td>a field</td><td><code>validate.check</code>: one of the values</td></tr>
     <tr><td><code>@caller("file")</code>, <code>("line")</code>, <code>("func")</code></td><td>a parameter</td><td>Every call fills it with where the call is written: <a href="lang-functions.html#where-a-call-comes-from">Where a call comes from</a></td></tr>
   </tbody>
 </table>
