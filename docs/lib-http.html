@@ -347,6 +347,47 @@ return https.listen(8443, &amp;amp;mux, "server.pem", "server.key");   // app an
 <code>net.https</code> carry TLS. A server behind a proxy that ends TLS (nginx, Caddy) needs neither: use
 <code>http.listen</code>.</p>
 
+<h2 id="client">The client<a class="anchor" href="#client" aria-label="Link to this section">#</a></h2>
+<p>Calling other APIs, as Go's <code>http.Get</code>:</p>
+<pre><code>import net.http;
+import _ = net.https;            // https:// URLs (a blank import: for what it does)
+
+@json struct User { i64 id; String name; };
+
+void main()
+{
+  http.Response r = http.get("https://api.example.com/users/7");
+  defer r.free();
+  if (r.status != 200) { printf("%d: %s\n", r.status, r.body); return; }
+  User u = http.decodeResponse&lt;User&gt;(&amp;r);
+  defer u.freeDecoded();
+
+  http.Response c = http.postJson("https://api.example.com/users", reflect.of(u));
+  c.free();
+}
+</code></pre>
+<div class="table-wrap"><table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>http.get(url, &amp;opts)</code></td><td>A GET; the answer whatever its status</td></tr>
+  <tr><td><code>http.post(url, contentType, body)</code>, <code>http.postJson(url, reflect.of(x))</code></td><td>A POST of bytes, or of a value as JSON</td></tr>
+  <tr><td><code>http.request(method, url, body, &amp;headers, &amp;opts)</code></td><td>Any method, with <code>http.Headers</code> (<code>h.add(name, value)</code>)</td></tr>
+  <tr><td><code>r.status</code>, <code>r.body</code>, <code>r.header(name)</code>, <code>r.url</code></td><td>The answer: its status, its whole body, a header (any case), where it came from after redirects</td></tr>
+  <tr><td><code>http.decodeResponse&lt;T&gt;(&amp;r)</code></td><td>The body as JSON in a <code>T</code> (<code>json.decode</code>'s rules)</td></tr>
+</table></div>
+<ul class="rules">
+  <li>Connections are kept alive and reused, per host and thread; one the server closed meanwhile is retried on a new
+  one. <code>http.closeIdle()</code> closes the thread's idle ones.</li>
+  <li>Redirects are followed as browsers do: a 303, and a 301 or 302 of a POST, become a GET; 307 and 308 keep the method
+  and the body. <code>http.ClientOptions</code>: <code>timeoutMs</code> (the whole request, 30 s), <code>maxRedirects</code> (10;
+  -1 returns the 3xx itself), <code>maxBodyBytes</code> (64 MiB).</li>
+  <li>An answer with any status (404, 500) is a <code>Response</code>; no answer (a bad URL, no connection, the time limit)
+  throws <code>http.ERR_HTTP</code>.</li>
+  <li>In a handler or another loop coroutine a request pauses only that coroutine, so a server can call other services
+  freely.</li>
+  <li><code>https://</code> needs <code>net.https</code> imported somewhere in the program (it carries TLS); its
+  certificates are checked against the system's CAs, or <code>https.setClientConfig(&amp;cfg)</code>'s.</li>
+</ul>
+
 <h2 id="testing-handlers">Testing handlers<a class="anchor" href="#testing-handlers" aria-label="Link to this section">#</a></h2>
 <p><code>http.testRequest</code> and <code>http.recorder()</code> run a handler or a whole mux without a socket.</p>
 <pre data-run><code>import net.http;
@@ -379,7 +420,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-api">A first API</a></li><li><a href="#routing">Routing</a></li><li><a href="#middleware">Middleware and groups</a></li><li><a href="#handlers">Handlers</a></li><li><a href="#the-request">The request</a></li><li><a href="#the-reply">The reply</a></li><li><a href="#running-the-server">Running the server</a></li><li><a href="#https">HTTPS</a></li><li><a href="#testing-handlers">Testing handlers</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-first-api">A first API</a></li><li><a href="#routing">Routing</a></li><li><a href="#middleware">Middleware and groups</a></li><li><a href="#handlers">Handlers</a></li><li><a href="#the-request">The request</a></li><li><a href="#the-reply">The reply</a></li><li><a href="#running-the-server">Running the server</a></li><li><a href="#https">HTTPS</a></li><li><a href="#client">The client</a></li><li><a href="#testing-handlers">Testing handlers</a></li></ul></nav>
 </div>
 </body>
 </html>

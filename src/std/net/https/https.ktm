@@ -1,5 +1,5 @@
 module https;
-import net.http, net.tls;
+import atomic, net.http, net.tls;
 
 /* HTTPS servers (v0.20.0): net.http over TLS, the same Mux and handlers.
  *
@@ -78,4 +78,54 @@ pub i32 listenConfig(i32 port, http.Mux *mux, tls.Config *cfg, void *app = null,
     i32 rc = http.listen(port, mux, app, &o);
     ctx.free();
     return rc;
+}
+
+/* ---- the client's https:// ---- */
+
+i64 gClientCtx;        /* the tls.Context of https:// requests, made on first use */
+
+static tls.Context *clientCtx() {
+    tls.Context *c = (tls.Context *)atomic.load(&gClientCtx);
+    if (c) { return c; }
+    tls.Config cfg;
+    cfg.alpn = "http/1.1";
+    tls.Context *mine = tls.client(&cfg);
+    if (!atomic.cas(&gClientCtx, 0, (i64)mine)) {
+        mine.free();
+        return (tls.Context *)atomic.load(&gClientCtx);
+    }
+    return mine;
+}
+
+static void *clientStart(u8[] host, i32 fd, i64 ms) {
+    return clientCtx().connect(fd, host);
+}
+
+static void clientEnd(void *conn) {
+    tls.Conn *c = conn;
+    c.finish();
+}
+
+http.ClientTransport gClientTransport;
+
+static i64 registerClient() {
+    gClientTransport.start = &clientStart;
+    gClientTransport.read = &read;
+    gClientTransport.write = &write;
+    gClientTransport.end = &clientEnd;
+    http.setTlsClient(&gClientTransport);
+    return 1;
+}
+
+/* importing net.https gives net.http's client https:// */
+i64 gRegistered = registerClient();
+
+/* The TLS settings of https:// requests from now on (a CA of your own,
+ * a client certificate); by default the system's CAs. Call it before
+ * the first request: connections already open keep theirs. */
+pub void setClientConfig(tls.Config *cfg) {
+    tls.Config c = *cfg;
+    if (!c.alpn.len) { c.alpn = "http/1.1"; }
+    tls.Context *mine = tls.client(&c);
+    atomic.store(&gClientCtx, (i64)mine);   /* the old one stays: its sessions may be in use */
 }

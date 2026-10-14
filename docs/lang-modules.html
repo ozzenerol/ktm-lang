@@ -192,7 +192,8 @@ void main()
   <code>ktm.mod</code> says which version, and <code>replace github.com/user/repo =&gt; ../repo</code> uses a local copy.
   See <a href="tools-packages.html">Packages</a>.</li>
   <li>Found in two places is an error: name your modules differently from the standard library's.</li>
-  <li>An import that is never used is a warning.</li>
+  <li>An import that is never used is a warning, except <code>import _ = m;</code>: a blank import, for what the module
+  does when the program starts (<code>import _ = net.https;</code> gives the HTTP client <code>https://</code>).</li>
 </ul>
 
 <h2 id="order-of-start-up">Order of start-up<a class="anchor" href="#order-of-start-up" aria-label="Link to this section">#</a></h2>
