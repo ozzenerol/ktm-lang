@@ -1669,7 +1669,9 @@ AoStr *cctrlModulePath(Cctrl *cc, u32 module_id) {
  * main program or for a name that is already qualified */
 char *cctrlQualifyName(Cctrl *cc, char *name, int len) {
     AoStr *path = cctrlModulePath(cc, cc->cur_module);
-    if (!path || memchr(name, '.', len)) return NULL;
+    /* a generic instance's type arguments may have dots of their own:
+     * `decode<m.In>` isn't qualified yet */
+    if (!path || astLastTopDot(name, len) >= 0) return NULL;
     return mprintf("%s.%.*s", path->data, len, name);
 }
 
@@ -1703,7 +1705,7 @@ LexFile *cctrlCurFile(Cctrl *cc) {
 /* Inside a module, a flat name the main program declared: the module
  * can't depend on the program that uses it */
 int cctrlModuleHides(Cctrl *cc, char *name, int len) {
-    if (!cc->cur_module || memchr(name, '.', len)) return 0;
+    if (!cc->cur_module || astLastTopDot(name, len) >= 0) return 0;
     char *flat = mprintf("%.*s", len, name);
     return setHas(cc->main_names, flat);
 }
