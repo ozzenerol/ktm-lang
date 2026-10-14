@@ -592,6 +592,15 @@ static s64 cctrlTokenSourceLen(Cctrl *cc, Lexeme *tok) {
     if (tok->tk_type == TK_STR || tok->tk_type == TK_CHAR_CONST) {
         return tok->len + 2;
     }
+    /* `http.nope` is the token `net.http.nope` (a package's is longer
+     * still): the source has the prefix as written, a dot and the name */
+    if (tok->qual_prefix && tok->len > 0) {
+        const char *dot = NULL;
+        for (s64 i = tok->len - 1; i >= 0 && !dot; --i) {
+            if (tok->start[i] == '.') dot = tok->start + i;
+        }
+        if (dot) return tok->qual_prefix_len + 1 + (tok->start + tok->len - dot - 1);
+    }
     return tok->len;
 }
 
