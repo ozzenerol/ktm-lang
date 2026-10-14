@@ -85,6 +85,7 @@ NAV = [
         ("lib-serve.html", "Serving on every core"),
         ("lib-http.html", "HTTP servers"),
         ("lib-tls.html", "TLS"),
+        ("lib-url.html", "URLs"),
         ("lib-threads.html", "Threads and atomics"),
         ("lib-fzf.html", "Fuzzy matching"),
         ("lib-sqlite.html", "SQLite"),

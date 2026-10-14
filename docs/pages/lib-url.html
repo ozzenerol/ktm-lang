@@ -1,0 +1,57 @@
+<!-- title: URLs -->
+<!-- ref: net.url -->
+<h1>URLs</h1>
+<p class="lede"><code>net.url</code> parses a URL into its parts and builds one back, reads and writes query strings,
+and resolves a link against the page it was found on, as Go's <code>net/url</code> does.</p>
+
+<pre data-run><code>
+import net.url;
+
+void main()
+{
+  url.URL u;
+  if (!url.parse("https://ann:secret@example.com:8443/docs/a%20b?page=2&q=hi+there#top", &u)) { return; }
+  printf("%s %s %s %d %s\n", u.scheme, u.user, u.host, u.port, u.path);
+
+  url.Values v;
+  url.parseQuery(u.rawQuery, &v);
+  printf("page %s, q %s\n", v.get("page"), v.get("q"));
+
+  url.URL next;
+  u.resolve("../img/logo.png", &next);
+  String s = next.string();
+  printf("%s\n", s);
+  s.free(); next.free(); v.free(); u.free();
+}
+</code></pre>
+<pre class="output">
+https ann example.com 8443 /docs/a%20b
+page 2, q hi there
+https://ann:secret@example.com:8443/img/logo.png
+</pre>
+
+<h2>The parts</h2>
+<table>
+  <tr><th>Field</th><th>Holds</th></tr>
+  <tr><td><code>scheme</code></td><td>In lower case: <code>"https"</code>; empty for a reference such as <code>"/a/b"</code></td></tr>
+  <tr><td><code>user</code>, <code>password</code></td><td>Decoded; <code>hasUser</code> and <code>hasPassword</code> say whether they were there</td></tr>
+  <tr><td><code>host</code>, <code>port</code></td><td>The host in lower case (an IPv6 one without its brackets), the port or 0; <code>u.portOrDefault()</code> gives the scheme's usual one</td></tr>
+  <tr><td><code>path</code>, <code>rawQuery</code>, <code>fragment</code></td><td>As written, percent-encoded: <code>str.urlDecode</code> them for their text</td></tr>
+</table>
+<p><code>url.parse</code> answers <code>false</code> for what isn't a URL: a bad port, a bad <code>%</code> escape, a space or
+a control byte, an unclosed <code>[</code>. <code>u.string()</code> builds the text back, escaping the user and password.</p>
+
+<h2>Query strings</h2>
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>url.parseQuery(raw, &amp;values)</code></td><td><code>a=1&amp;b=two+words</code> into pairs, decoded (<code>+</code> is a space), in order</td></tr>
+  <tr><td><code>values.get(name)</code>, <code>values.has(name)</code></td><td>The first value of a name (<code>""</code> if none)</td></tr>
+  <tr><td><code>values.add(name, value)</code>, <code>values.encode()</code></td><td>Adding a pair; the query string, escaped</td></tr>
+</table>
+
+<h2>Resolving links</h2>
+<p><code>base.resolve(ref, &amp;out)</code> turns a link found at <code>base</code> (<code>"../c"</code>, <code>"/d"</code>,
+<code>"?page=3"</code>, <code>"//cdn.example/x"</code>, an absolute URL) into an absolute URL, as a browser does (RFC 3986
+section 5).</p>
+<p>A <code>url.URL</code> and a <code>url.Values</code> own their Strings: <code>free()</code> them. <code>parse</code>,
+<code>parseQuery</code> and <code>resolve</code> replace what their output held.</p>
