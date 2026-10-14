@@ -254,6 +254,7 @@ itself is its own to free.</p>
   <tr><td><code>r.param("id")</code></td><td>a path parameter of the pattern, unescaped; <code>""</code> if none</td></tr>
   <tr><td><code>r.query("page")</code>, <code>r.hasQuery("x")</code></td><td>the first value of a query parameter, unescaped (<code>+</code> is a space)</td></tr>
   <tr><td><code>r.header("Authorization")</code>, <code>r.hasHeader(name)</code></td><td>a header by name, any case</td></tr>
+  <tr><td><code>r.remoteAddr()</code>, <code>r.remotePort()</code></td><td>the client's IP address (<code>"203.0.113.9"</code>, <code>"::1"</code>) and port; behind a proxy, the proxy's. A test request's are <code>192.0.2.1</code> and <code>1234</code>; <code>r.setRemoteAddr(ip, port)</code> changes them</td></tr>
   <tr><td><code>http.decode&lt;T&gt;(r)</code></td><td>the body as JSON in a <code>T</code>, freed after the reply</td></tr>
   <tr><td><code>r.app</code></td><td>what <code>http.listen</code> was given as <code>app</code>: the program's own state</td></tr>
   <tr><td><code>r.alloc(n)</code>, <code>r.unescape(s)</code></td><td>memory that lives until the reply; <code>%XX</code> decoding</td></tr>
