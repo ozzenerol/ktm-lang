@@ -407,6 +407,7 @@ static void serveConn(i32 fd, void *arg)
     c.in = mem.alloc(CONN_IN_FIRST);
     if (!c.in) { return; }
     c.cap = CONN_IN_FIRST;
+    coro.recvMulti(fd);   /* io_uring: one receive for all of this connection's requests */
     Request r;
     Writer w;
     defer {

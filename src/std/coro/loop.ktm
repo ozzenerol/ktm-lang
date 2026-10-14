@@ -133,6 +133,15 @@ const i64 LOOP_EBUSY = 16;
 const i64 LOOP_MSG_WAITALL = 0x100;
 const i64 LOOP_CQE_F_SOCK_NONEMPTY = 0x4;
 const i64 LOOP_TCP_INFO = 11;
+/* multishot RECV into a ring of provided buffers (coro.recvMulti) */
+const i64 LOOP_URING_REGISTER_PBUF_RING = 22;
+const i64 LOOP_URING_UNREGISTER_PBUF_RING = 23;
+const i64 LOOP_RECV_MULTISHOT = 2;       /* sqe.ioprio */
+const i64 LOOP_IOSQE_BUFFER_SELECT = 32; /* sqe.flags */
+const i64 LOOP_CQE_F_BUFFER = 1;
+const i64 LOOP_CQE_F_MORE = 2;
+const i64 LOOP_PBUF_N = 1024;            /* buffers per loop (a power of two) */
+const i64 LOOP_PBUF_SIZE = 2048;         /* bytes each: requests are small */
 /* coro.accept with io_uring takes one client per ACCEPT, a turn of the loop
  * each. A queue of clients that stays (a new connection per request) is
  * fine that way: each ACCEPT completes at once, and taking them faster
@@ -187,6 +196,7 @@ struct LoopFd {
     bool notSock;        /* io_uring: not a socket, so READ/WRITE, not RECV/SEND */
     bool more;           /* io_uring: a listener with a burst queued: plain accepts */
     i64 queuedRun;       /* io_uring: ACCEPTs in a row that left clients queued */
+    LoopStream *stream;  /* io_uring: coro.recvMulti's RECV, null: none */
 };
 
 struct LoopTask {
@@ -235,6 +245,30 @@ struct Loop {
     u32 sqMask, cqMask, sqEntries;
     u32 sqLocal;         /* the SQ tail as filled so far */
     u8 *cqes;
+    /* coro.recvMulti's provided buffers: LOOP_PBUF_N of LOOP_PBUF_SIZE */
+    u8 *pbRing;          /* the ring the kernel takes them from */
+    u8 *pbMem;
+    u32 pbTail;
+    i64 pbState;         /* 0: not tried yet, 1: registered, -1: unsupported */
+};
+
+/* A queued piece of a multishot RECV: buffer bid, len bytes, off taken */
+struct LoopChunk {
+    i64 bid, len, off;
+};
+
+/* coro.recvMulti on one fd: its RECV's completion's user_data is this
+ * with 2 in the low bits (a LoopTask's are 0) */
+struct LoopStream {
+    LoopChunk *q;        /* received, not read yet: a ring of cap */
+    i64 head, n, cap;
+    bool armed;          /* the RECV is in the kernel */
+    bool eof;
+    bool nobufs;         /* it ended out of buffers: one plain read next */
+    i64 err;             /* -errno it ended with, 0: none */
+    LoopTask *waiter;    /* coro.read waiting for data */
+    bool abandoned;      /* coro.close let it go: freed when it ends */
+    i32 fd;
 };
 
 static void loopOom() {
@@ -784,7 +818,9 @@ static void loopUringReap(Loop *lp) {
         i32 res = *(i32 *)(c + 8);
         u32 cflags = *(u32 *)(c + 12);
         head++;
-        if (ud) {
+        if ((ud & 7) == 2) {
+            loopStreamCqe(lp, (LoopStream *)(ud & ~(u64)7), res, cflags);
+        } else if (ud) {
             LoopTask *t = (LoopTask *)ud;
             t.op = false;
             t.cqeFlags = cflags;
@@ -844,6 +880,13 @@ static void loopUringFree(Loop *lp) {
         loopUringEnter(lp, 50, true);
         loopUringReap(lp);
     }
+    if (lp.pbState == 1) {
+        u64 breg[5];
+        mem.set(breg, 0, sizeof(breg));
+        syscall(LOOP_SYS_URING_REGISTER, lp.ring, LOOP_URING_UNREGISTER_PBUF_RING, (i64)breg, 1, 0, 0);
+        libc.munmap(lp.pbRing, LOOP_PBUF_N * 16);
+        libc.munmap(lp.pbMem, LOOP_PBUF_N * LOOP_PBUF_SIZE);
+    }
     libc.munmap(lp.sqes, lp.sqesLen);
     if (lp.cqMapLen) { libc.munmap(lp.cqMap, lp.cqMapLen); }
     libc.munmap(lp.sqMap, lp.sqMapLen);
@@ -871,6 +914,11 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
     }
     i64 until = loopDeadline(ms);
 #ifdef IS_LINUX
+    if (lp.backend == LOOP_BK_URING && f.stream) {
+        i64 rs = loopStreamRead(lp, t, f, buf, until);
+        if (rs != -2) { return rs; }
+        f = lp.fdw[fd];             /* -2: out of buffers, a plain RECV this time */
+    }
     if (lp.backend == LOOP_BK_URING) {
         /* RECV straight into buf: the kernel reads what is there at once,
          * or when it comes; READ for what isn't a socket (a pipe). After a
@@ -960,6 +1008,212 @@ pub i64 read(i32 fd, u8[] buf, i64 ms=-1) {
         waited = true;
     }
     return -1;
+}
+
+#ifdef IS_LINUX
+/* buffer bid back to the kernel's ring */
+static void loopPbufPut(Loop *lp, i64 bid) {
+    u8 *e = lp.pbRing + (i64)(lp.pbTail & (LOOP_PBUF_N - 1)) * 16;
+    *(u64 *)e = (u64)(lp.pbMem + bid * LOOP_PBUF_SIZE);
+    *(u32 *)(e + 8) = (u32)LOOP_PBUF_SIZE;
+    *(u16 *)(e + 12) = (u16)bid;
+    lp.pbTail++;
+    /* the tail is the u16 at 14, sharing a u32 with entry 0's bid at 12:
+     * one release store of both, that bid as it is */
+    u32 *word = (u32 *)(lp.pbRing + 12);
+    atomic.store(word, (i64)((*word & 0xFFFF) | ((lp.pbTail & 0xFFFF) << 16)));
+}
+
+/* The provided buffers registered (once per loop): false when the kernel
+ * can't (before 5.19) */
+static bool loopPbufSetup(Loop *lp) {
+    if (lp.pbState) { return lp.pbState == 1; }
+    lp.pbState = -1;
+    i32 prot = CORO_PROT_READ | CORO_PROT_WRITE;
+    u8 *ring = libc.mmap(null, LOOP_PBUF_N * 16, prot, CORO_MAP_PRIVATE | CORO_MAP_ANONYMOUS, -1, 0);
+    if ((i64)ring == -1) { return false; }
+    u8 *bufs = libc.mmap(null, LOOP_PBUF_N * LOOP_PBUF_SIZE, prot, CORO_MAP_PRIVATE | CORO_MAP_ANONYMOUS, -1, 0);
+    if ((i64)bufs == -1) {
+        libc.munmap(ring, LOOP_PBUF_N * 16);
+        return false;
+    }
+    u64 breg[5];              /* struct io_uring_buf_reg: group 0 */
+    mem.set(breg, 0, sizeof(breg));
+    breg[0] = (u64)ring;
+    breg[1] = (u64)LOOP_PBUF_N;
+    if (syscall(LOOP_SYS_URING_REGISTER, lp.ring, LOOP_URING_REGISTER_PBUF_RING, (i64)breg, 1, 0, 0) < 0) {
+        libc.munmap(bufs, LOOP_PBUF_N * LOOP_PBUF_SIZE);
+        libc.munmap(ring, LOOP_PBUF_N * 16);
+        return false;
+    }
+    lp.pbRing = ring;
+    lp.pbMem = bufs;
+    lp.pbTail = 0;
+    for (i64 b = 0; b < LOOP_PBUF_N; b++) { loopPbufPut(lp, b); }
+    lp.pbState = 1;
+    return true;
+}
+
+static void loopStreamArm(Loop *lp, i32 fd, LoopStream *st) {
+    u8 *e = loopSqe(lp);
+    e[1] = (u8)LOOP_IOSQE_BUFFER_SELECT;
+    *(u16 *)(e + 2) = (u16)LOOP_RECV_MULTISHOT;
+    *(u16 *)(e + 40) = 0;   /* buffer group 0 */
+    loopSqePut(lp, e, LOOP_OP_RECV, fd, 0, 0, 0, 0, (u64)st | 2);
+    st.armed = true;
+}
+
+/* A completion of a stream's RECV */
+static void loopStreamCqe(Loop *lp, LoopStream *st, i64 res, u32 cflags) {
+    bool more = (cflags & LOOP_CQE_F_MORE) != 0;
+    if (res > 0 && (cflags & LOOP_CQE_F_BUFFER)) {
+        i64 bid = (i64)(cflags >> 16);
+        if (st.abandoned) {
+            loopPbufPut(lp, bid);
+        } else {
+            if (st.n == st.cap) {
+                /* grow the ring, its items in order from 0 */
+                i64 cap = st.cap ? st.cap * 2 : 4;
+                LoopChunk *q = libc.malloc(cap * sizeof(LoopChunk));
+                if (!q) { loopOom(); }
+                for (i64 k = 0; k < st.n; k++) { q[k] = st.q[(st.head + k) % st.cap]; }
+                libc.free(st.q);
+                st.q = q;
+                st.head = 0;
+                st.cap = cap;
+            }
+            LoopChunk *c = &st.q[(st.head + st.n) % st.cap];
+            c.bid = bid;
+            c.len = res;
+            c.off = 0;
+            st.n++;
+        }
+    } else if (res == 0) {
+        st.eof = true;
+    } else if (res == -LOOP_ENOBUFS) {
+        st.nobufs = true;
+    } else if (res < 0 && res != -LOOP_ECANCELED) {
+        st.err = res;
+    }
+    if (!more) {
+        st.armed = false;
+        if (st.abandoned) {
+            libc.free(st.q);
+            libc.free(st);
+            return;
+        }
+    }
+    if (st.waiter && !st.abandoned) {
+        LoopTask *wt = st.waiter;
+        st.waiter = null;
+        if (wt.waiting && !wt.ready) { loopReady(lp, wt, 1); }
+    }
+}
+
+/* coro.read on a stream: what is queued, or wait for it. -2: read this
+ * one with a plain RECV (it ran out of buffers) */
+static i64 loopStreamRead(Loop *lp, LoopTask *t, LoopFd *f, u8[] buf, i64 until) {
+    LoopStream *st = f.stream;
+    while (true) {
+        if (st.n > 0) {
+            i64 got = 0;
+            while (st.n > 0 && got < buf.len) {
+                LoopChunk *c = &st.q[st.head];
+                i64 take = c.len - c.off;
+                if (take > buf.len - got) { take = buf.len - got; }
+                mem.copy(buf.ptr + got, lp.pbMem + c.bid * LOOP_PBUF_SIZE + c.off, take);
+                c.off += take;
+                got += take;
+                if (c.off == c.len) {
+                    loopPbufPut(lp, c.bid);
+                    st.head = (st.head + 1) % st.cap;
+                    st.n--;
+                }
+            }
+            return got;
+        }
+        if (st.err) {
+            os.setErrno((i32)(-st.err));
+            st.err = 0;
+            return -1;
+        }
+        if (st.eof) { return 0; }
+        if (st.nobufs && !st.armed) {
+            st.nobufs = false;
+            return -2;
+        }
+        if (!st.armed) { loopStreamArm(lp, st.fd, st); }
+        st.waiter = t;
+        t.fd = -1;
+        t.events = 0;
+        t.deadline = until;
+        t.idle = false;
+        t.paused = false;
+        t.result = 0;
+        t.waiting = true;
+        t.op = false;
+        t.cancelled = false;
+        t.why = 0;
+        if (until >= 0) { lp.ndeadline++; }
+        yield();
+        if (t.result < 0) {          /* coro.close: st may be gone */
+            os.setErrno(libc.EBADF);
+            return -1;
+        }
+        st.waiter = null;
+        if (t.result == 0) {         /* the deadline */
+            os.setErrno(libc.ETIMEDOUT);
+            return -1;
+        }
+    }
+    return -1;
+}
+
+/* coro.close of a stream's fd: its pieces back, its waiter woken, its
+ * RECV cancelled (freed when that ends) */
+static void loopStreamClose(Loop *lp, LoopFd *f) {
+    LoopStream *st = f.stream;
+    f.stream = null;
+    while (st.n > 0) {
+        loopPbufPut(lp, st.q[st.head].bid);
+        st.head = (st.head + 1) % st.cap;
+        st.n--;
+    }
+    if (st.waiter) {
+        LoopTask *wt = st.waiter;
+        st.waiter = null;
+        if (wt.waiting && !wt.ready) { loopReady(lp, wt, -1); }
+    }
+    if (st.armed) {
+        st.abandoned = true;
+        u8 *e = loopSqe(lp);
+        loopSqePut(lp, e, LOOP_OP_ASYNC_CANCEL, -1, (u64)st | 2, 0, 0, 0, 0);
+    } else {
+        libc.free(st.q);
+        libc.free(st);
+    }
+}
+#endif
+
+/* From now on coro.read on the socket fd takes what the loop's one
+ * long-lived receive collected (io_uring: a multishot RECV into the
+ * loop's shared buffers, no new RECV per read: for connections that
+ * read many small messages, like an HTTP server's). False, and nothing
+ * changes, where the loop can't. coro.close ends it. */
+pub bool recvMulti(i32 fd) {
+#ifdef IS_LINUX
+    Loop *lp = loopGet(true);
+    if (lp.backend != LOOP_BK_URING || fd < 0 || !loopPbufSetup(lp)) { return false; }
+    LoopFd *f = loopFdOf(lp, fd);
+    if (f.stream || f.notSock) { return f.stream != null; }
+    LoopStream *st = libc.calloc(1, sizeof(LoopStream));
+    if (!st) { loopOom(); }
+    st.fd = fd;
+    f.stream = st;
+    return true;
+#else
+    return false;
+#endif
 }
 
 /* In a loop coroutine: write all of data to the non-blocking fd, pausing
@@ -1211,6 +1465,7 @@ pub i32 close(i32 fd) {
         if (fd >= 0 && fd < lp.fdwCap && lp.fdw[fd]) {
             LoopFd *f = lp.fdw[fd];
             for (i64 i = 0; i < f.n; i++) { loopCancel(lp, f.w[i], LOOP_WHY_CLOSE); }
+            if (f.stream) { loopStreamClose(lp, f); }
         }
         loopForget(lp, fd);
 #endif
