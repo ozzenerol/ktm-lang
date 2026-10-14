@@ -28,7 +28,7 @@ extern "c" i32 task_info(u32 task, i32 flavor, TaskBasicInfo *info, u32 *count);
 
 extern "c" i32 mincore(void *addr, u64 len, u8 *vec);
 
-/* The resident size of this process in KiB */
+/* The resident size of this process in KiB, exact */
 i64 rssKiB() {
 #ifdef IS_MACOS
     TaskBasicInfo info;
@@ -36,11 +36,14 @@ i64 rssKiB() {
     if (task_info(mach_task_self_, 20, &info, &count) != 0) { return -1; }
     return (i64)(info.residentSize / 1024);
 #else
-    String s = fs.readAll("/proc/self/statm");
+    /* smaps_rollup, not statm: since Linux 6.2 statm reads per-CPU
+     * counters roughly (a few hundred KiB off on 8 CPUs, more when the
+     * thread moved between CPUs), smaps_rollup counts the page tables */
+    String s = fs.readAll("/proc/self/smaps_rollup");
     defer s.free();
-    u8[] size, rest;
-    if (!s.ptr || !str.splitFirst(s, " ", &size, &rest)) { return -1; }
-    return cstr.toInt(rest.ptr) * libc.getpagesize() / 1024;
+    i64 at = s.ptr ? str.find(s, "\nRss:") : -1;
+    if (at < 0) { return -1; }
+    return cstr.toInt(str.trimStart(s[at + 5:s.len]).ptr);
 #endif
 }
 
