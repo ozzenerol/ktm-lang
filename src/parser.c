@@ -1333,6 +1333,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         prev->col = tag_col;
         prev->file_id = tag_file;
         prev->in_std = !cc->cur_module && !cc->decl_from_main;
+        prev->in_prelude = cctrlInPrelude(cc);
         mapAdd(env, tag->data, prev);
     }
 
@@ -1405,6 +1406,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     ref->col = tag_col;
     ref->file_id = tag_file;
     ref->in_std = !cc->cur_module && !cc->decl_from_main;
+    ref->in_prelude = cctrlInPrelude(cc);
     if (tag) {
         mapAdd(env,tag->data,ref);
     }
@@ -6353,14 +6355,25 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
          * part), from the prelude itself */
         mine = mine && (!path || cctrlInPrelude(cc));
     }
-    /* the prelude's String: its methods are module str's */
-    if (!dot && astTypeIsString(cls) && path && path->len == 3 &&
-        !memcmp(path->data, "str", 3)) {
-        mine = 1;
+    /* a prelude struct looks like the program's own (its name has no
+     * module part): only the prelude adds methods to it, and module str
+     * to String */
+    if (!dot && cls->in_prelude) {
+        mine = cctrlInPrelude(cc) ||
+               (astTypeIsString(cls) && path && path->len == 3 &&
+                !memcmp(path->data, "str", 3));
     }
     /* (reported once, by a module's full pass) */
     if (!mine && !cc->decls_only) {
+        Lexeme *mpeek = cctrlTokenPeek(cc);
+        int mlen = mpeek && mpeek->tk_type == TK_IDENT ? mpeek->len : 1;
+        const char *mname = mpeek && mpeek->tk_type == TK_IDENT ? mpeek->start : "f";
         cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        if (cls->in_prelude) {
+            cctrlRaiseException(cc, "methods of `%s` can only be defined by the standard "
+                    "library: write a function that takes it, as `%.*s(%s *s)`",
+                    cls->clsname->data, mlen, mname, cls->clsname->data);
+        }
         cctrlRaiseException(cc, "methods of `%s` can only be defined %s",
                 cls->clsname->data,
                 cls->in_std ? "by the standard library"
