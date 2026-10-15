@@ -437,6 +437,12 @@ typedef struct Ast {
             /* asm function binding */
             AoStr *asmfname;
             AoStr *fname;
+            /* An `extern "c"` function of a module: the module's name for
+             * it (`libc.strlen`). Its calls and its address go by this
+             * name, which no program function can have, and become the C
+             * symbol in fname at the end (asmNormaliseFunctionName): by
+             * the C name alone, a program's own `strlen` took them. */
+            AoStr *c_qual;
             Vec *args;
             Vec *params;
             u32 fn_ptr_id;

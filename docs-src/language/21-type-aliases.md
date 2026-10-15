@@ -141,7 +141,7 @@ i32 main() {
 2 3
 ```
 
-Methods are defined with the struct's own name: `i64 Point.sum()`, not `Pos.sum()`.
+A method can be defined through the alias too: `i64 Pos.sum()` is the method `Point.sum`.
 
 Because an alias is not a new type, it doesn't stop units from being mixed up:
 

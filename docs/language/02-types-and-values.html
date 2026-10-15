@@ -23,7 +23,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.23.1</span>
+    <span class="ver">v0.23.2</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -67,7 +67,7 @@ i64: -9223372036854775808 .. 9223372036854775807
 u8:  0 .. 255
 u32: 0 .. 4294967295</code></pre>
 <h3 id="overflow-wraps"><a href="#overflow-wraps">Overflow wraps</a></h3>
-<p>Integer arithmetic wraps around at the type's size, as in C on every machine ktm runs on: there is no trap and no undefined behaviour to worry about.</p>
+<p>Integer arithmetic wraps around at the type's size, as in C on every machine ktm runs on: there is no trap and no undefined behaviour to worry about. Division is the exception (below).</p>
 <pre class="code run"><code><span class="t">void</span> main() {
     <span class="t">u8</span> b = <span class="n">255</span>;
     b = b + <span class="n">1</span>;
@@ -79,7 +79,7 @@ u32: 0 .. 4294967295</code></pre>
 }</code></pre>
 <pre class="out"><code>0 -9223372036854775808 -128</code></pre>
 <h3 id="division"><a href="#division">Division</a></h3>
-<p>Integer division rounds towards zero, and <code>%</code> takes the sign of the left side. Dividing an integer by zero is a bug to avoid: on x86_64 it stops the program with a crash report that says where it happened, but on arm64 the processor gives 0 and the program goes on (see <a href="29-safety-and-debugging.html">Safety and debugging</a>).</p>
+<p>Integer division rounds towards zero, and <code>%</code> takes the sign of the left side. Dividing an integer by zero (with <code>/</code> or <code>%</code>) stops the program with a crash report that says where it happened (see <a href="29-safety-and-debugging.html">Safety and debugging</a>). So does the one <code>i64</code> division whose result doesn't fit, <code>I64_MIN / -1</code> (or <code>I64_MIN % -1</code>): its report says <code>integer overflow in division</code>.</p>
 <pre class="code run"><code><span class="t">void</span> main() {
     printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">7</span> / <span class="n">2</span>, -<span class="n">7</span> / <span class="n">2</span>);
     printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">7</span> % <span class="n">3</span>, -<span class="n">7</span> % <span class="n">3</span>);
@@ -301,7 +301,7 @@ f64 i64 *
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.23.1</span>
+    <span>ktm v0.23.2</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>

@@ -5683,6 +5683,7 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
      * pub), still calling the C symbol `open` */
     char *qual = cctrlDeclName(cc, fname, len);
     if (qual) {
+        func->c_qual = aoStrDupRaw(qual, strlen(qual));
         mapAdd(cc->global_env, qual, func);
         mapAdd(cc->c_externs, func->fname->data, func);
         if (cc->decl_pub) setAdd(cc->pub_names, qual);
@@ -6298,6 +6299,12 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
     if (!cls && qual) cls = mapGet(cc->clsdefs, qual);
     if (!cls) cls = mapGetLen(cc->clsdefs, tname, tlen);
     if (!cls) cls = mapGetLen(cc->uniondefs, tname, tlen);
+    if (!cls) {
+        /* `type P = Point;`: P is Point */
+        TypeAlias *alias = qual ? mapGet(cc->type_aliases, qual) : NULL;
+        if (!alias) alias = mapGetLen(cc->type_aliases, tname, tlen);
+        if (alias) cls = alias->type;
+    }
     if (!cls || cls->is_enum || cls->is_intrinsic ||
         (cls->kind != AST_TYPE_CLASS && cls->kind != AST_TYPE_UNION))
     {
@@ -6680,6 +6687,11 @@ static int parseGenericDecl(Cctrl *cc, Lexeme *first) {
         char *oq = cctrlQualifyName(cc, h.owner->start, h.owner->len);
         AstType *cls = oq ? mapGet(cc->clsdefs, oq) : NULL;
         if (!cls) cls = mapGetLen(cc->clsdefs, h.owner->start, h.owner->len);
+        if (!cls) {
+            TypeAlias *alias = oq ? mapGet(cc->type_aliases, oq) : NULL;
+            if (!alias) alias = mapGetLen(cc->type_aliases, h.owner->start, h.owner->len);
+            if (alias) cls = alias->type;
+        }
         if (!cls || cls->kind != AST_TYPE_CLASS || cls->is_enum || cls->is_intrinsic) {
             cctrlRaiseExceptionAt(cc, h.owner->line, h.owner->col, h.owner->len,
                                   "`%.*s` is not a struct: only a struct can have methods",

@@ -221,11 +221,12 @@ Ast *prsAsm(Cctrl *cc, int parse_one) {
                 cc->tmp_asm_fname = curfunc;
                 cur = aoStrNew();
                 prev_cur = 0;
-                /* `cur` collects the body AFTER the `NAME::\n` label,
-                 * so its first line is the one below the label - anchor
+                /* `cur` collects everything after `NAME::`, starting
+                 * with the rest of the label's own line (usually just its
+                 * newline), so its first line is the label's line: anchor
                  * validation there or every asm error reports one line
-                 * high. */
-                func_line = (int)tok->line + 1;
+                 * low. */
+                func_line = (int)tok->line;
                 aoStrCatFmt(block_text, "%S::\n", curfunc);
                 prev_block = 0;
                 tok = cctrlAsmTokenGet(cc);

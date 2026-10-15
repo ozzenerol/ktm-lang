@@ -23,7 +23,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.23.1</span>
+    <span class="ver">v0.23.2</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -32,6 +32,30 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.23.2 <small>(2026-10-15)</small></h2>
+<p>Fixes, most of them to the compiler. Two make programs that were wrong fail loudly: a printf-style format whose
+values don't match it no longer compiles, and an integer division by zero on arm64 crashes as it does on x86_64.</p>
+<ul>
+  <li>An inlined call whose body declares a local from a parameter (<code>i64 *p = (i64 *)w;</code>) kept the
+  argument's value: given an array element, a dereference or a field (<code>f(slot[0])</code>), the parameter read
+  garbage. Wrong code since inlining came in; plain locals as arguments were right.</li>
+  <li>printf-style formats (<code>printf</code>, <code>str.format</code>, <code>appendFormat</code> and your own
+  functions that take one) check each value's type against its conversion, not only their count: <code>%s</code> of
+  a number, <code>%d</code> of text or a float and <code>%f</code> of an integer are compile errors that say which
+  value is wrong.</li>
+  <li>An integer division or <code>%</code> by zero crashes on arm64 with "integer division by zero" and exit status
+  136, as on x86_64, compiled and in the JIT. It gave 0 and the program went on.</li>
+  <li>The smallest <code>i64</code> divided by -1 (and <code>%</code> -1) crashes on every platform with "integer
+  overflow in division"; x86_64 called it a division by zero and arm64 gave the dividend.</li>
+  <li>A crash inside C code (printf given a bad <code>%s</code>) names the ktm line that called it and every caller
+  up to <code>main</code>. x86_64 could name rt.crash or a function that had already returned and lose
+  <code>main</code>; Linux arm64 showed only "in C code".</li>
+  <li>A module's <code>extern "c"</code> function is called by the module's name for it (<code>libc.strlen</code>):
+  a program function with the same C name no longer takes those calls.</li>
+  <li>A method can be defined through a type alias of its struct.</li>
+  <li>An error in an <code>asm</code> function is reported on its instruction's line, not the line after it.</li>
+</ul>
 
 <h2>v0.23.1 <small>(2026-10-15)</small></h2>
 <p>Two fixes to prebuilt packages (v0.22.0), found building <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>
@@ -1499,7 +1523,7 @@ only names are new.</p>
 </main>
 <footer>
   <div class="bar">
-    <span>ktm v0.23.1</span>
+    <span>ktm v0.23.2</span>
     <a href="releases.html">Releases</a>
     <a href="known-issues.html">Known issues</a>
     <a href="roadmap.html">Roadmap</a>

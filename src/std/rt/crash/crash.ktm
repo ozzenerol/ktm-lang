@@ -75,7 +75,18 @@ const i64 CRASH_SI_ADDR_AT = 16;
 #endif
 
 const i32 CRASH_SIGILL = 4;
+const i32 CRASH_SIGTRAP = 5;
 const i32 CRASH_SIGFPE = 8;
+/* `brk #0xd10` (A64_BRK_DIVZERO): arm64's divide gives 0 for a zero
+ * divisor, so the compiler tests it and runs this instead */
+const u32 CRASH_BRK_DIVZERO = 0xd4200000 | (0xd10 << 5);
+/* `brk #0xd11` (A64_BRK_DIVOVF): the smallest i64 divided by -1 */
+const u32 CRASH_BRK_DIVOVF = 0xd4200000 | (0xd11 << 5);
+
+/* What a division fault was (crashDivKind) */
+const i32 CRASH_DIV_NONE = 0;
+const i32 CRASH_DIV_ZERO = 1;
+const i32 CRASH_DIV_OVERFLOW = 2;
 const i32 CRASH_SIGSEGV = 11;
 
 const i64 CRASH_STACK_BYTES = 65536;
@@ -263,33 +274,125 @@ static bool crashReadable(u64 p) {
     return libc.mincore((void *)page, (p + 16 > page + 4096) ? 8192 : 4096, vec) == 0;
 }
 
-/* x86_64 C code keeps no frame pointer we can trust: the first word on
- * the stack that is an address in ktm code is the return into it. Each
- * page is checked when the scan reaches it: the stack can end less than
- * a page above sp (the main thread's, with a small environment). */
-static u64 crashScanStack(u64 sp) {
+/* The frame record of the ktm function whose return into it is at slot:
+ * the first pair of words above it that looks like one, a saved frame
+ * pointer a little higher on the stack and a return into ktm code (its
+ * caller). The walk goes on from there, past the C frames whose frame
+ * pointer the fault left in an unknown state. 0 when there is none: a
+ * function called from C (main, a thread's), where the walk ends. */
+static u64 crashFrameAbove(u64 slot) {
     i64 i;
-    u64 mapped = 0;     /* the end of the pages checked so far */
-    sp &= ~(u64)7;
-    for (i = 0; i < 512; i++) {
-        u64 p = sp + 8 * i;
-        if (p + 8 > mapped) {
-            u8 vec[1];
-            u64 page = p & ~(u64)4095;
-            if (libc.mincore((void *)page, 4096, vec) != 0) { return 0; }
-            mapped = page + 4096;
+    for (i = 1; i < 8192; i++) {
+        u64 q = slot + 8 * i;
+        if (!crashReadable(q)) { return 0; }
+        u64 saved = *(u64 *)q;
+        if (saved > q && saved - q < 0x100000 && !(saved & 7) &&
+            crashFind(((u64 *)q)[1] - 1)) {
+            return q;
         }
-        u64 w = *(u64 *)p;
-        if (crashFind(w - 1)) { return w; }
     }
     return 0;
 }
 
-static void crashHeadline(i32 sig, u8 *info, u64 sp) {
+/* Does w follow a call instruction, as a return address does: on
+ * x86_64 a call rel32, through a register or through [rip + d32], on
+ * arm64 a bl or a blr. A word that points just past a function (a
+ * function pointer, the next one's start) is no return address. */
+static bool crashAfterCall(u64 w) {
+#ifdef IS_ARM_64
+    u32 insn = *(u32 *)(w - 4);
+    return (insn >> 26) == 0x25 || (insn & 0xfffffc1f) == 0xd63f0000;
+#else
+    u8 *c = (u8 *)w;
+    return c[-5] == 0xe8 || (c[-2] == 0xff && (c[-1] & 0xf8) == 0xd0) ||
+           (c[-6] == 0xff && c[-5] == 0x15);
+#endif
+}
+
+/* Where a direct call (call rel32, bl) before w goes, 0 for another */
+static u64 crashCallee(u64 w) {
+#ifdef IS_ARM_64
+    u32 insn = *(u32 *)(w - 4);
+    if ((insn >> 26) != 0x25) { return 0; }
+    i64 imm = insn & 0x3ffffff;
+    if (imm & 0x2000000) { imm -= 0x4000000; }
+    return w - 4 + (u64)(imm * 4);
+#else
+    u8 *c = (u8 *)w;
+    if (c[-5] != 0xe8) { return 0; }
+    i32 *rel = (i32 *)(c - 4);
+    i64 off = *rel;
+    return w + (u64)off;
+#endif
+}
+
+/* Is f one of rt.crash's own functions: they run only to set the
+ * handler up, before main, so a return into one that the stack still
+ * holds is left over from then */
+static bool crashOwn(CrashFn *f) {
+    u8 *n = crashAt(&f.name);
+    return n[0] == 'r' && n[1] == 't' && n[2] == '.' && n[3] == 'c' && n[4] == 'r' &&
+           n[5] == 'a' && n[6] == 's' && n[7] == 'h' && n[8] == '.';
+}
+
+/* The word at p as a code address: C code built with pointer
+ * authentication (Linux arm64) saves return addresses signed, the code
+ * in the bits above the 48 an address uses */
+static u64 crashRetAt(u64 p) {
+    u64 w = *(u64 *)p;
+#ifdef IS_ARM_64
+    w &= 0xffffffffffff;
+#endif
+    return w;
+}
+
+/* The first stack slot from p up that holds a return into ktm code, 0
+ * when there is none in the next 32 KiB */
+static u64 crashNextReturn(u64 p) {
+    i64 i;
+    for (i = 0; i < 4096; i++, p += 8) {
+        if (!crashReadable(p)) { return 0; }
+        u64 w = crashRetAt(p);
+        CrashFn *f = crashFind(w - 1);
+        if (f && !crashOwn(f) && crashAfterCall(w)) { return p; }
+    }
+    return 0;
+}
+
+/* x86_64 C code keeps no frame pointer we can trust: the return into
+ * the ktm code that called it is found on the stack. Deep C code like
+ * printf leaves returns from earlier calls in buffers it didn't fill,
+ * below the live one: a return into f is one of those when the next
+ * return above it comes from a call to another function than f (f's
+ * caller called f). *slot is where it was. */
+static u64 crashScanStack(u64 sp, u64 *slot) {
+    u64 p = crashNextReturn(sp & ~(u64)7);
+    while (p) {
+        u64 w = crashRetAt(p);
+        CrashFn *f = crashFind(w - 1);
+        u64 next = crashNextReturn(p + 8), to = 0;
+        if (next) {
+            u64 ret = crashRetAt(next);
+            to = crashCallee(ret);
+        }
+        if (!to || to == crashStart(f) || (f.flags & 1)) {
+            *slot = p;
+            return w;
+        }
+        p = next;
+    }
+    return 0;
+}
+
+static void crashHeadline(i32 sig, u8 *info, u64 sp, i32 div) {
     u64 addr = *(u64 *)(info + CRASH_SI_ADDR_AT);
     i32 code = *(i32 *)(info + 8);
     crashPut("crash: ");
-    if (sig == CRASH_SIGSEGV || sig == CRASH_SIGBUS) {
+    if (div == CRASH_DIV_ZERO) {
+        crashPut("integer division by zero");
+    } else if (div == CRASH_DIV_OVERFLOW) {
+        crashPut("integer overflow in division (-9223372036854775808 / -1)");
+    } else if (sig == CRASH_SIGSEGV || sig == CRASH_SIGBUS) {
         if (addr < 4096) {
             crashPut("null pointer dereference (address ");
             crashPutHex(addr);
@@ -312,8 +415,29 @@ static void crashHeadline(i32 sig, u8 *info, u64 sp) {
     crashPut("\n");
 }
 
+/* A fault at pc in ktm code: a division by zero or one that overflows
+ * (the smallest i64 divided by -1)? arm64 tests for both and runs a
+ * brk (A64_BRK_DIVZERO, A64_BRK_DIVOVF); x86_64's IDIV traps for both,
+ * and the compiler always divides by rcx: not 0, an overflow. */
+static i32 crashDivKind(i32 sig, u8 *info, u64 pc, u64 rcx) {
+#ifdef IS_ARM_64
+    if (sig != CRASH_SIGTRAP) { return CRASH_DIV_NONE; }
+    u32 insn = *(u32 *)pc;
+    if (insn == CRASH_BRK_DIVZERO) { return CRASH_DIV_ZERO; }
+    if (insn == CRASH_BRK_DIVOVF) { return CRASH_DIV_OVERFLOW; }
+#else
+    u8 *p = (u8 *)pc;
+    /* idivq %rcx */
+    if (sig == CRASH_SIGFPE && *(i32 *)(info + 8) == CRASH_FPE_INTDIV &&
+        p[0] == 0x48 && p[1] == 0xf7 && p[2] == 0xf9) {
+        return rcx ? CRASH_DIV_OVERFLOW : CRASH_DIV_ZERO;
+    }
+#endif
+    return CRASH_DIV_NONE;
+}
+
 static void crashHandler(i32 sig, u8 *info, u8 *uc) {
-    u64 pc, fp, sp, lr = 0;
+    u64 pc, fp, sp, lr = 0, rcx = 0;
 #ifdef IS_MACOS
     u8 *mc = *(u8 **)(uc + 48);
 #ifdef IS_ARM_64
@@ -322,6 +446,7 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     sp = *(u64 *)(mc + 264);
     pc = *(u64 *)(mc + 272);
 #else
+    rcx = *(u64 *)(mc + 32);
     fp = *(u64 *)(mc + 64);
     sp = *(u64 *)(mc + 72);
     pc = *(u64 *)(mc + 144);
@@ -334,6 +459,7 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     pc = *(u64 *)(uc + 440);
 #else
     fp = *(u64 *)(uc + 120);
+    rcx = *(u64 *)(uc + 152);
     sp = *(u64 *)(uc + 160);
     pc = *(u64 *)(uc + 168);
 #endif
@@ -342,7 +468,9 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     /* what the program printed comes first: unless the fault is inside
      * C code, which may hold stdio's lock */
     if (f) { libc.fflush(null); }
-    crashHeadline(sig, info, sp);
+    /* only in ktm code */
+    i32 div = f ? crashDivKind(sig, info, pc, rcx) : CRASH_DIV_NONE;
+    crashHeadline(sig, info, sp, div);
     crashFlush();
 
     crashFrame(pc, true);
@@ -350,8 +478,29 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     if (!crashAtMain && (!f || (f.flags & 1))) {
 #ifdef IS_ARM_64
         first = lr;
+#ifndef IS_MACOS
+        /* glibc's code may have saved lr and used x29 for itself: the
+         * return into ktm code is on the stack, with the frame pointer
+         * of the ktm function it returns into stored below it */
+        if (!f && !crashFind(lr - 1)) {
+            u64 slot = 0;
+            first = crashScanStack(sp, &slot);
+            if (first) {
+                u64 saved = ((u64 *)slot)[-1];
+                fp = saved > slot && saved - slot < 0x100000 && !(saved & 7) ? saved
+                                                                            : crashFrameAbove(slot);
+            }
+        }
+#endif
 #else
-        first = f ? *(u64 *)sp : crashScanStack(sp);
+        if (f) {
+            first = *(u64 *)sp;
+        } else {
+            u64 slot = 0;
+            first = crashScanStack(sp, &slot);
+            /* the frame pointer at the fault is the C code's */
+            if (first) { fp = crashFrameAbove(slot); }
+        }
 #endif
         if (first) { crashFrame(first, false); }
     }
@@ -378,6 +527,11 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
         crashPutDec(crashHidden);
         crashPut(" more\n");
         crashFlush();
+    }
+    /* die of a SIGFPE, as x86_64 does (exit status 136), not of the brk */
+    if (div != CRASH_DIV_NONE && sig != CRASH_SIGFPE) {
+        libc.signal(CRASH_SIGFPE, 0);
+        libc.raise(CRASH_SIGFPE);
     }
 }
 
@@ -492,4 +646,7 @@ pub void __ktmCrashInstall(CrashFn *lo, CrashFn *hi) {
     libc.sigaction(CRASH_SIGBUS, act, null);
     libc.sigaction(CRASH_SIGFPE, act, null);
     libc.sigaction(CRASH_SIGILL, act, null);
+#ifdef IS_ARM_64
+    libc.sigaction(CRASH_SIGTRAP, act, null);   /* CRASH_BRK_DIVZERO */
+#endif
 }

@@ -197,6 +197,12 @@ char *asmNormaliseFunctionName(Cctrl *cc, AoStr *fname) {
     /* A main-program function's symbol is its own (astProgramSymbol), so
      * it can't replace a C or libktm function of the same name */
     Ast *decl = mapGetLen(cc->global_env, fname->data, fname->len);
+    /* a module's C function, named by the module (`libc.strlen`): its C
+     * symbol, whatever function of the program has that name */
+    if (decl && decl->kind == AST_EXTERN_FUNC && decl->c_qual && aoStrCmp(decl->c_qual, fname)) {
+        fname = decl->fname;
+        decl = NULL;
+    }
     /* a call compiled while the function was the only one of its name:
      * the name still leads to it, renamed since (parseOverloadDecl) */
     if (decl && (decl->kind == AST_FUNC || decl->kind == AST_FUN_PROTO) &&

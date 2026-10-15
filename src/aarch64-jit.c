@@ -1246,10 +1246,24 @@ static void a64JitAluReg(void *be, IrOp op, IrInstr *i) {
 static void a64JitMul(void *be) {
     aarch64_enc_mul(&((JitFnCtx *)be)->jit->enc, 1, A_X0, A_X0, A_X1);
 }
-static void a64JitDivRem(void *be, IrOp op) {
+static void a64JitDivRem(void *be, IrOp op, int check_zero, int check_ovf) {
     AsmEnc *enc = &((JitFnCtx *)be)->jit->enc;
     int is_signed = (op == IR_IDIV || op == IR_IREM);
     int is_rem = (op == IR_IREM || op == IR_UREM);
+    if (check_zero) {
+        /* cbnz x1, past the brk; brk #A64_BRK_DIVZERO */
+        aarch64_enc_cbnz(enc, 1, A_X1, 2);
+        aarch64_enc_brk(enc, A64_BRK_DIVZERO);
+    }
+    if (check_ovf) {
+        /* x1 == -1 and x0 the smallest i64 (0 - x0 overflows): past
+         * the brk otherwise */
+        aarch64_enc_add_imm(enc, 1, A_X2, A_X1, 1);
+        aarch64_enc_cbnz(enc, 1, A_X2, 4);
+        aarch64_enc_cmp_reg(enc, 1, A_XZR, A_X0);
+        aarch64_enc_b_cond(enc, A_VC, 2);
+        aarch64_enc_brk(enc, A64_BRK_DIVOVF);
+    }
     if (!is_rem) {
         if (is_signed) aarch64_enc_sdiv(enc, 1, A_X0, A_X0, A_X1);
         else           aarch64_enc_udiv(enc, 1, A_X0, A_X0, A_X1);
