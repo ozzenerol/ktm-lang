@@ -149,12 +149,14 @@ target_link_libraries(ktm m)
 # net.tls link, and a shared one the JIT loads. build.sh puts both next to
 # libktm.
 file(GLOB KTMTLS_MBEDTLS_SOURCES ${CMAKE_SOURCE_DIR}/vendor/mbedtls/library/*.c)
-add_library(ktmtls_obj OBJECT ${KTMTLS_MBEDTLS_SOURCES} vendor/ktmtls/ktmtls.c vendor/ktmtls/ktmcrypto.c vendor/ktmtls/ktmpassword.c)
+add_library(ktmtls_obj OBJECT ${KTMTLS_MBEDTLS_SOURCES} vendor/ktmtls/ktmtls.c vendor/ktmtls/ktmcrypto.c vendor/ktmtls/ktmpassword.c
+            vendor/ktmtls/ktmed25519.c vendor/ktmtls/ktmed25519sig.c)
 set_target_properties(ktmtls_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(ktmtls_obj PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/mbedtls/include
     ${CMAKE_SOURCE_DIR}/vendor/mbedtls/library
-    ${CMAKE_SOURCE_DIR}/vendor/ktmtls)
+    ${CMAKE_SOURCE_DIR}/vendor/ktmtls
+    ${CMAKE_SOURCE_DIR}/vendor/monocypher)
 target_compile_definitions(ktmtls_obj PRIVATE
     MBEDTLS_USER_CONFIG_FILE="ktm_mbedtls_config.h")
 # Vendored: not held to our warning bar, always optimised
