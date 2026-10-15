@@ -72,6 +72,8 @@ extern "c" i64 ktm_crypto_key_pem(void *key, i32 priv, u8 *out, u64 outlen);
 extern "c" i32 ktm_crypto_sign_with(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 cap, u64 *olen);
 extern "c" i32 ktm_crypto_verify_with(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 slen);
 extern "c" void *ktm_crypto_rsa_generate(i32 bits, i32 *err);
+extern "c" void *ktm_crypto_ec_public(u8 *x, u64 xlen, u8 *y, u64 ylen, i32 *err);
+extern "c" void *ktm_crypto_rsa_public(u8 *n, u64 nlen, u8 *e, u64 elen, i32 *err);
 extern "c" i32 ktm_crypto_key_kind(void *key);
 extern "c" i64 ktm_crypto_key_bits(void *key);
 extern "c" void ktm_crypto_key_free(void *key);
@@ -264,6 +266,24 @@ pub Key *publicKey(u8[] pem) {
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 0, &err);
     if (!n) { fail("reading the public key (P-256, or RSA of 2048 bits or more)", err); }
     return keyOf(n, false);
+}
+
+/* A public P-256 key from its point: x and y, 32 bytes each, big-endian
+ * (a JWK's "x" and "y", base64url-decoded) */
+pub Key *ecPublicKey(u8[] x, u8[] y) {
+    i32 err = 0;
+    void *n = ktm_crypto_ec_public(x.ptr, x.len, y.ptr, y.len, &err);
+    if (!n) { fail("making a P-256 key from x and y (32 bytes each, a point on the curve)", err); }
+    return keyOf(n, false);
+}
+
+/* A public RSA key from its modulus n and exponent e, big-endian (a
+ * JWK's "n" and "e", base64url-decoded); 2048 bits or more */
+pub Key *rsaPublicKey(u8[] n, u8[] e) {
+    i32 err = 0;
+    void *k = ktm_crypto_rsa_public(n.ptr, n.len, e.ptr, e.len, &err);
+    if (!k) { fail("making an RSA key from n and e (2048 bits or more)", err); }
+    return keyOf(k, false);
 }
 
 static String pemOf(Key *k, bool priv) {

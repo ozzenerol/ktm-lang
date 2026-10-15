@@ -60,6 +60,8 @@ if (rk.kind() == crypto.KeyKind.rsa) { printf("%d bits\n", rk.bits()); }
   <li><code>sign</code> and <code>verify</code> are <code>signWith</code> and <code>verifyWith</code> with <code>crypto.Hash.sha256</code>:
   ES256 for a P-256 key, RS256 for an RSA one.</li>
   <li>A P-256 signature is 64 bytes r||s; an RSA one is the key's size (256 bytes for 2048 bits).</li>
+  <li>A public key also comes from its parts, as a JWK has them (base64url-decoded):
+  <code>crypto.ecPublicKey(x, y)</code> (32 bytes each) and <code>crypto.rsaPublicKey(n, e)</code> (big-endian).</li>
   <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages. Other kinds of key
   (P-384, RSA under 2048 bits, Ed25519) are refused: mbedTLS 3.6 has no Ed25519.</li>
 </ul>

@@ -190,6 +190,53 @@ void *ktm_crypto_key_load(const unsigned char *pem, size_t len, int priv, int *e
     return pk;
 }
 
+/* A public P-256 key from its point's coordinates (32 bytes each, as a
+ * JWK's x and y). NULL with *err. */
+void *ktm_crypto_ec_public(const unsigned char *x, size_t xlen, const unsigned char *y, size_t ylen,
+                           int *err) {
+    if (!ktmCryptoStart()) { *err = -1; return NULL; }
+    if (xlen != 32 || ylen != 32) { *err = MBEDTLS_ERR_PK_INVALID_PUBKEY; return NULL; }
+    unsigned char pt[65];
+    pt[0] = 0x04;               /* uncompressed */
+    memcpy(pt + 1, x, 32);
+    memcpy(pt + 33, y, 32);
+    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
+    mbedtls_pk_init(pk);
+    int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    mbedtls_ecp_keypair *k = r == 0 ? mbedtls_pk_ec(*pk) : NULL;
+    if (r == 0) r = mbedtls_ecp_group_load(&k->MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP256R1);
+    if (r == 0) r = mbedtls_ecp_point_read_binary(&k->MBEDTLS_PRIVATE(grp), &k->MBEDTLS_PRIVATE(Q), pt, 65);
+    if (r == 0) r = mbedtls_ecp_check_pubkey(&k->MBEDTLS_PRIVATE(grp), &k->MBEDTLS_PRIVATE(Q));
+    if (r != 0) {
+        mbedtls_pk_free(pk);
+        free(pk);
+        *err = r;
+        return NULL;
+    }
+    return pk;
+}
+
+/* A public RSA key from its modulus and exponent (big-endian, as a JWK's
+ * n and e), 2048 bits or more. NULL with *err. */
+void *ktm_crypto_rsa_public(const unsigned char *n, size_t nlen, const unsigned char *e, size_t elen, int *err) {
+    if (!ktmCryptoStart()) { *err = -1; return NULL; }
+    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
+    mbedtls_pk_init(pk);
+    int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+    mbedtls_rsa_context *rsa = r == 0 ? mbedtls_pk_rsa(*pk) : NULL;
+    if (r == 0) r = mbedtls_rsa_import_raw(rsa, n, nlen, NULL, 0, NULL, 0, NULL, 0, e, elen);
+    if (r == 0) r = mbedtls_rsa_complete(rsa);
+    if (r == 0) r = mbedtls_rsa_check_pubkey(rsa);
+    if (r == 0 && !ktmCryptoKeyUsable(pk)) r = MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    if (r != 0) {
+        mbedtls_pk_free(pk);
+        free(pk);
+        *err = r;
+        return NULL;
+    }
+    return pk;
+}
+
 /* A new RSA private key of bits bits (exponent 65537). NULL with *err. */
 void *ktm_crypto_rsa_generate(int bits, int *err) {
     if (!ktmCryptoStart()) { *err = -1; return NULL; }
