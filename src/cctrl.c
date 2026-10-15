@@ -295,6 +295,23 @@ Cctrl *ccMacroProcessor(Map *macro_defs) {
 }
 
 /* Instantiate a new compiler control struct */
+void cctrlAddPackage(Cctrl *cc, const char *module_path, const char *package,
+                     const char *dir)
+{
+    for (int i = 0; i < cc->packages_len; ++i) {
+        if (!strcmp(cc->packages[i].module_path, module_path)) return;
+    }
+    if (cc->packages_len == cc->packages_cap) {
+        cc->packages_cap = cc->packages_cap ? cc->packages_cap * 2 : 4;
+        cc->packages = realloc(cc->packages, sizeof(CctrlPackage) * cc->packages_cap);
+    }
+    char *real = realpath(dir, NULL);
+    CctrlPackage *p = &cc->packages[cc->packages_len++];
+    p->module_path = strdup(module_path);
+    p->package = strdup(package);
+    p->dir = real ? real : strdup(dir);
+}
+
 Cctrl *cctrlNew(enum CliTarget target) {
     /* zeroed: a field nothing sets here (pending_unary) must start NULL */
     Cctrl *cc = (Cctrl *)calloc(1, sizeof(Cctrl));

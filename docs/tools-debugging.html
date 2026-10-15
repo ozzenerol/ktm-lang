@@ -132,6 +132,9 @@ void create(http.Writer *w, http.Request *r)
   <code>(inlined)</code>. A recursion shows once, with how many times it repeated.</li>
   <li>A crash inside C code (<code>libc.strlen(null)</code>) shows <code>in C code</code>,
   then the ktm line that called it.</li>
+  <li>A package's function shows by the name the program calls it by (<code>pg.Pool.exec</code>),
+  its file under the package's path: <code>github.com/x/ktm-pg@v0.2.0/pool.ktm</code> from the
+  package cache, <code>github.com/x/ktm-pg/pool.ktm</code> when <code>ktm.mod</code> replaces it with a directory.</li>
   <li>Programs carry a table of their functions' lines for it, which adds about a quarter to
   their size.</li>
 </ul>
