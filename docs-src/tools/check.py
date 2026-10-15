@@ -53,10 +53,12 @@ def check_one(args, path, ex):
         return where, "a ```ktm run/error block with no ```output block after it"
     ktm = [args.ktm] + ([f"--install-dir={args.install_dir}"] if args.install_dir else [])
     with tempfile.TemporaryDirectory(prefix="ktm-doc-") as tmp:
+        # compiled by its plain name in its directory, so the file names a
+        # program prints (e.file, @caller, uncaught errors) are example.ktm
         src = os.path.join(tmp, "example.ktm")
         open(src, "w").write(code + "\n")
         if kind == "error":
-            rc, out = run(ktm + ["-S", src, "-o", os.devnull], tmp)
+            rc, out = run(ktm + ["-S", "example.ktm", "-o", os.devnull], tmp)
             if rc == 0:
                 return where, "compiled, but it should not"
             if want.strip() not in out:
@@ -64,13 +66,13 @@ def check_one(args, path, ex):
             return where, None
         want = want.rstrip("\n")
         if not args.jit_only:
-            rc, out = run(ktm + [src, "-o", os.path.join(tmp, "example")], tmp)
+            rc, out = run(ktm + ["example.ktm", "-o", os.path.join(tmp, "example")], tmp)
             if rc != 0:
                 return where, f"doesn't compile:\n{out}"
             rc, out = run([os.path.join(tmp, "example")], tmp)
             if out.rstrip("\n") != want:
                 return where, f"compiled, it prints:\n{out}\nbut the page says:\n{want}"
-        rc, out = run(ktm + ["-jit", src], tmp)
+        rc, out = run(ktm + ["-jit", "example.ktm"], tmp)
         if out.rstrip("\n") != want:
             return where, f"in the JIT, it prints:\n{out}\nbut the page says:\n{want}"
     return where, None
