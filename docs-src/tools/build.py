@@ -9,6 +9,7 @@
   docs/releases.html           docs-src/pages/releases.html
   docs/known-issues.html       docs-src/pages/known-issues.html
   docs/assets/                 docs-src/assets/, and search.js (what the search box finds)
+  man/                         the chapters and the library as man pages (man.py)
 
 Usage: python3 docs-src/tools/build.py
 """
@@ -22,6 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_std  # noqa: E402
+import man  # noqa: E402
 import md  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -236,6 +238,10 @@ def main():
     page_from("roadmap.html", "Roadmap", "", "What ktm's standard library and packages have, and what comes next.")
     write("assets/search.js", "window.KTM_SEARCH = " + json.dumps(index, separators=(",", ":")) + ";\n")
     print(f"wrote {OUT}: {len(chs)} chapters, {n} library declarations, {len(index)} search entries")
+    texts = [(stem, title, lede, open(os.path.join(SRC, "language", stem + ".md")).read())
+             for stem, title, lede, _, _ in chs]
+    pages = man.write(ROOT, texts, gen_std.modules(), VERSION)
+    print(f"wrote {os.path.join(ROOT, 'man')}: {pages} man pages")
     broken = broken_links()
     for page, href in broken:
         print(f"broken link: {page} -> {href}")

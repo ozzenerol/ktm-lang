@@ -115,6 +115,8 @@ jobs:
           cp ./ktm "./$PKG/ktm"
           cp ./packaging/install.sh "./$PKG/install.sh"
           cp -R ./src/syntax-highlighting/vim "./$PKG/vim"
+          # the guide and the library as man pages: Linux only for now
+          if [ "${{ matrix.os_name }}" = "linux" ]; then cp -R ./man "./$PKG/man"; fi
           chmod +x "./$PKG/ktm" "./$PKG/install.sh"
           ls -la "./$PKG" "./$PKG/lib" "./$PKG/modules"
           file "./$PKG/ktm" "./$PKG/lib/"*
