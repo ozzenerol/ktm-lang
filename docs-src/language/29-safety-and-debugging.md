@@ -214,7 +214,7 @@ Segmentation fault
 - A package's function shows by the name the program calls it by (`pg.Pool.exec`), its file
   under the package's path.
 - The exit status is still the signal's: 139 for a segmentation fault, 136 for a division by
-  zero, as a shell reports them.
+  zero on x86_64, as a shell reports them.
 - Programs carry a table of their functions' lines for the report, about a quarter of their
   size.
 
