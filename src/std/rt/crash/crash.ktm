@@ -247,12 +247,22 @@ static bool crashReadable(u64 p) {
 }
 
 /* x86_64 C code keeps no frame pointer we can trust: the first word on
- * the stack that is an address in ktm code is the return into it */
+ * the stack that is an address in ktm code is the return into it. Each
+ * page is checked when the scan reaches it: the stack can end less than
+ * a page above sp (the main thread's, with a small environment). */
 static u64 crashScanStack(u64 sp) {
     i64 i;
-    if (!crashReadable(sp) || !crashReadable(sp + 4096 - 16)) { return 0; }
+    u64 mapped = 0;     /* the end of the pages checked so far */
+    sp &= ~(u64)7;
     for (i = 0; i < 512; i++) {
-        u64 w = ((u64 *)sp)[i];
+        u64 p = sp + 8 * i;
+        if (p + 8 > mapped) {
+            u8 vec[1];
+            u64 page = p & ~(u64)4095;
+            if (libc.mincore((void *)page, 4096, vec) != 0) { return 0; }
+            mapped = page + 4096;
+        }
+        u64 w = *(u64 *)p;
         if (crashFind(w - 1)) { return w; }
     }
     return 0;
