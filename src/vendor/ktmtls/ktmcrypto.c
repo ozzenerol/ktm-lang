@@ -416,6 +416,45 @@ int ktm_crypto_verify_with(void *key, int bits, const unsigned char *data, size_
     return e;
 }
 
+/* ---- RSA-PSS (PKCS#1 v2.1): MGF1 with the same hash, salt as long as
+ * the hash, as JWT's PS256/384/512 have it ---- */
+
+/* The PSS signature of the bits-bit SHA-2 digest of data (the key's size) */
+int ktm_crypto_sign_pss(void *key, int bits, const unsigned char *data, size_t len, unsigned char *sig,
+                        size_t cap, size_t *olen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key) || mbedtls_pk_get_type(key) != MBEDTLS_PK_RSA) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(*(mbedtls_pk_context *)key);
+    size_t n = mbedtls_rsa_get_len(rsa);
+    if (cap < n) return MBEDTLS_ERR_PK_BUFFER_TOO_SMALL;
+    size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
+    /* a copy set to PSS: the key's own context stays PKCS#1 v1.5 for
+     * signWith, and other threads may be signing with it */
+    mbedtls_rsa_context tmp;
+    mbedtls_rsa_init(&tmp);
+    int r = mbedtls_rsa_copy(&tmp, rsa);
+    if (r == 0) r = mbedtls_rsa_set_padding(&tmp, MBEDTLS_RSA_PKCS_V21, md);
+    if (r == 0) r = mbedtls_rsa_rsassa_pss_sign_ext(&tmp, mbedtls_ctr_drbg_random, &ktm_crypto_drbg, md,
+                                                    (unsigned int)hlen, h, (int)hlen, sig);
+    mbedtls_rsa_free(&tmp);
+    if (r == 0) *olen = n;
+    return r;
+}
+
+/* 0 when sig is key's PSS signature of the bits-bit SHA-2 digest of data,
+ * with a salt as long as the hash */
+int ktm_crypto_verify_pss(void *key, int bits, const unsigned char *data, size_t len, const unsigned char *sig,
+                          size_t slen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key) || mbedtls_pk_get_type(key) != MBEDTLS_PK_RSA) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(*(mbedtls_pk_context *)key);
+    if (slen != mbedtls_rsa_get_len(rsa)) return MBEDTLS_ERR_RSA_VERIFY_FAILED;
+    size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
+    return mbedtls_rsa_rsassa_pss_verify_ext(rsa, md, (unsigned int)hlen, h, md, (int)hlen, sig);
+}
+
 void ktm_crypto_key_free(void *key) {
     if (!key) return;
     mbedtls_pk_free(key);

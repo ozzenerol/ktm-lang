@@ -14,3 +14,6 @@ key, now.)
 For test 861 (P-384, P-521): p384-key.pem, p521-key.pem and their public PEMs
 (openssl), their points (p384-x.hex ...), and openssl's signatures of msg.txt
 (SHA-384 for P-384, SHA-512 for P-521) as DER and as raw r||s.
+For test 862 (RSA-PSS): openssl's PSS signatures of msg.txt with rsa-key.pem
+(rsa-pss-sha256/384/512.hex, salt as long as the hash, as JWA has it), and one
+with the longest salt (rsa-pss-sha256-maxsalt.hex), which JWA's PS256 refuses.

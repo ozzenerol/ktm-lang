@@ -81,6 +81,8 @@ extern "c" void *ktm_crypto_rsa_public(u8 *n, u64 nlen, u8 *e, u64 elen, i32 *er
 extern "c" i32 ktm_crypto_key_kind(void *key);
 extern "c" void *ktm_crypto_ec_generate(i32 bits, i32 *err);
 extern "c" i32 ktm_crypto_ec_point(void *key, u8 *x, u8 *y, u64 *n);
+extern "c" i32 ktm_crypto_sign_pss(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_verify_pss(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 slen);
 extern "c" void *ktm_crypto_ed25519_generate(i32 *err);
 extern "c" void *ktm_crypto_ed25519_public(u8 *x, u64 len, i32 *err);
 extern "c" i32 ktm_crypto_ed25519_sign(void *key, u8 *data, u64 len, u8 *sig);
@@ -386,6 +388,27 @@ pub String Key.signWith(Hash h, u8[] data) {
 pub bool Key.verifyWith(Hash h, u8[] data, u8[] sig) {
     if (self.kind() == KeyKind.ed25519) { throw(ERR_CRYPTO, "crypto: Ed25519 hashes itself: use verify"); }
     return ktm_crypto_verify_with(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
+}
+
+/* The RSA-PSS signature of data's h digest (MGF1 with h, a salt as long
+ * as the digest: JWT's PS256, PS384, PS512), the key's size in bytes, a
+ * new String (yours). Randomised: two signatures of the same data
+ * differ. Throws ERR_CRYPTO for a key that isn't RSA. */
+pub String Key.signPss(Hash h, u8[] data) {
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-PSS needs an RSA key"); }
+    u8 sig[1024];
+    u64 n = 0;
+    i32 r = ktm_crypto_sign_pss(self.native, hashBits(h), data.ptr, data.len, sig, 1024, &n);
+    if (r != 0) { fail("signing", r); }
+    return str.from(sig[0:n]);
+}
+
+/* Is sig this RSA key's PSS signature of data's h digest (salt as long
+ * as the digest)? Throws ERR_CRYPTO for a key that isn't RSA. */
+pub bool Key.verifyPss(Hash h, u8[] data, u8[] sig) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-PSS needs an RSA key"); }
+    return ktm_crypto_verify_pss(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
 }
 
 /* signWith(Hash.sha256, data): JWT's ES256 for a P-256 key, RS256 for
