@@ -607,6 +607,66 @@ void asmEmitAddrConst(AoStr *buf, AoStr *sym, s64 off) {
     }
 }
 
+/* A threadlocal global's storage, the initial image every thread's copy
+ * starts from: ELF .tdata/.tbss, or on Mach-O the image in __thread_data /
+ * __thread_bss plus the TLV descriptor in __thread_vars that the code
+ * reaches it through (`label` is the descriptor there). Returns 0 when
+ * the global isn't threadlocal. */
+int asmThreadLocalGlobal(Cctrl *cc, AoStr *buf, Ast *declvar, Ast *declinit,
+                         AoStr *label, int local)
+{
+    if (!(declvar->flags & AST_FLAG_TLS)) return 0;
+    int darwin = cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                 cc->target == TARGET_X86_64_APPLE_DARWIN;
+    int size = declvar->type->size;
+    int align_log2 = asmDataAlignLog2(declvar->type);
+    if (align_log2 < 3 && size >= 8) align_log2 = 3;
+    AoStr *addr_sym;
+    s64 addr_off;
+    int is_addr = declinit && asmAddrConst(cc, declinit, &addr_sym, &addr_off, 0);
+    int has_init = is_addr || (declinit &&
+                   (declinit->kind == AST_ARRAY_INIT ||
+                    declinit->kind == AST_LITERAL ||
+                    declinit->kind == AST_STRING));
+
+    if (darwin) {
+        if (has_init) {
+            aoStrCatFmt(buf, ".section __DATA,__thread_data,thread_local_regular\n"
+                        ".p2align %i\n%S$tlv$init:\n\t", align_log2, label);
+        } else {
+            aoStrCatFmt(buf, ".tbss %S$tlv$init, %i, %i\n",
+                        label, size > 0 ? size : 1, align_log2);
+        }
+    } else {
+        if (!local) aoStrCatFmt(buf, ".globl %S\n", label);
+        if (has_init) {
+            aoStrCatPrintf(buf, ".section .tdata,\"awT\",@progbits\n");
+        } else {
+            aoStrCatPrintf(buf, ".section .tbss,\"awT\",@nobits\n");
+        }
+        aoStrCatFmt(buf, ".p2align %i\n.type %S, @object\n.size %S, %i\n%S:\n\t",
+                    align_log2, label, label, size, label);
+    }
+    if (is_addr) {
+        asmEmitAddrConst(buf, addr_sym, addr_off);
+    } else if (declinit && declinit->kind == AST_STRING &&
+               declvar->type->kind == AST_TYPE_POINTER) {
+        aoStrCatFmt(buf, ".quad %S\n\t", declinit->slabel);
+    } else if (has_init) {
+        asmEmitInitData(buf, declinit, declvar->type);
+    } else if (!darwin) {
+        aoStrCatFmt(buf, ".zero %i\n\t", size > 0 ? size : 1);
+    }
+    if (darwin) {
+        aoStrCatPrintf(buf, "\n.section __DATA,__thread_vars,thread_local_variables\n");
+        if (!local) aoStrCatFmt(buf, ".globl %S\n", label);
+        aoStrCatFmt(buf, ".p2align 3\n%S:\n\t.quad __tlv_bootstrap\n\t"
+                    ".quad 0\n\t.quad %S$tlv$init\n\t", label, label);
+    }
+    aoStrCatPrintf(buf, "\n.text\n");
+    return 1;
+}
+
 int asmDataAlignLog2(AstType *type) {
     int align = astTypeAlign(type);
     int log2 = 0;

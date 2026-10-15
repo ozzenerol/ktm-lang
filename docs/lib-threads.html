@@ -17,7 +17,7 @@
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=9467e22335" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -215,6 +215,7 @@ cas: 1 0, flags 0
 <h2 id="threads-and-the-rest-of-ktm">Threads and the rest of ktm<a class="anchor" href="#threads-and-the-rest-of-ktm" aria-label="Link to this section">#</a></h2>
 <ul class="rules">
   <li>Each thread has its own <code>try</code>/<code>catch</code> chain and its own coroutines.</li>
+  <li>A <a href="lang-variables.html#threadlocal"><code>threadlocal</code></a> global has one copy per thread.</li>
   <li>An uncaught error in any thread ends the program with exit code 1.</li>
   <li>For a server, <a href="lib-serve.html"><code>coro.serve</code></a> runs a coroutine loop per core and is usually simpler than threads by hand.</li>
 </ul>

@@ -716,6 +716,7 @@ static Cctrl *mainNewCctrl(CliArgs *args) {
     /* Exactly one of the two is always defined; `#ifjit` / `#ifaot`
      * key off them. The REPL runs on the JIT, so it counts. */
     if (args->jit || args->repl) {
+        cc->flags |= CCTRL_JIT;
         cctrlAddDefine(cc, "__KTM_JIT__");
     } else {
         cctrlAddDefine(cc, "__KTM_AOT__");

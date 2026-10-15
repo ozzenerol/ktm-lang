@@ -158,6 +158,8 @@
 #define KW_ENUM         95
 /* `defer <stmt>` (ktm syntax v0.2): run <stmt> when the block is left. */
 #define KW_DEFER        96
+/* `threadlocal T x;`: a global with one copy per thread */
+#define KW_THREADLOCAL  97
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)

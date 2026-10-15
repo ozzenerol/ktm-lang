@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,24 @@
  * inside asm_jit_finalize via enc->labels by name -- the resolver only
  * sees external symbols. Host overrides win over libc. */
 static void *jitResolveSymbol(void *ud, const char *sym) {
-    KtmJit *jit = ud;
+    return ktmJitSymbolAddr(ud, sym);
+}
+
+/* The address of a symbol JIT code uses: the JIT's own (or a host
+ * override), else what dlsym finds */
+void *ktmJitSymbolAddr(KtmJit *jit, const char *sym) {
     void *p;
     if ((p = mapGet(jit->host_symbols, (void *)sym))) return p;
+    /* A threadlocal of a prebuilt library: dlsym gives this thread's copy
+     * of it, which isn't the storage every thread's JIT code would need */
+    Set *tls = jit->cc->jit_tls_syms;
+    if (tls && (setHas(tls, (char *)sym) ||
+                (sym[0] == '_' && setHas(tls, (char *)sym + 1)))) {
+        fprintf(stderr, "error: threadlocal `%s` is defined in a prebuilt "
+                "library, which JIT code can't reach: read it through a "
+                "function of the library, or compile ahead of time\n", sym);
+        exit(EXIT_FAILURE);
+    }
     return asm_jit_dlsym_resolver(NULL, sym);
 }
 
@@ -55,6 +71,91 @@ int ktmJitIsInternalFunc(KtmJit *jit, const char *sym) {
      * those calls route through label fixups. Functions from earlier
      * chunks resolve through host_symbols like any other host address. */
     return mapGet(jit->chunk_fns, (void *)sym) != NULL;
+}
+
+/* ---------------- threadlocal globals ---------------- */
+
+/* JIT code can't use ELF/Mach-O TLS, so a threadlocal global is laid out
+ * once like any global (holding its initial value) and each thread gets
+ * its own copy of that storage on first use: `image` is the global's
+ * address, the table maps it to this thread's copy. Freed at thread exit. */
+typedef struct JitTlsEnt {
+    void *image;
+    void *copy;
+} JitTlsEnt;
+
+typedef struct JitTlsTab {
+    JitTlsEnt *ents;
+    size_t cap;
+    size_t len;
+} JitTlsTab;
+
+static __thread JitTlsTab *jit_tls_tab = NULL;
+static pthread_key_t jit_tls_key;
+static pthread_once_t jit_tls_once = PTHREAD_ONCE_INIT;
+
+static void jitTlsFree(void *p) {
+    JitTlsTab *tab = p;
+    for (size_t i = 0; i < tab->cap; ++i) free(tab->ents[i].copy);
+    free(tab->ents);
+    free(tab);
+}
+
+static void jitTlsKeyCreate(void) {
+    pthread_key_create(&jit_tls_key, jitTlsFree);
+}
+
+static size_t jitTlsSlot(JitTlsEnt *ents, size_t cap, void *image) {
+    size_t i = (((size_t)image) >> 3) * 0x9E3779B97F4A7C15ULL & (cap - 1);
+    while (ents[i].image && ents[i].image != image) i = (i + 1) & (cap - 1);
+    return i;
+}
+
+static void jitTlsGrow(JitTlsTab *tab) {
+    size_t cap = tab->cap ? tab->cap * 2 : 16;
+    JitTlsEnt *ents = calloc(cap, sizeof(JitTlsEnt));
+    if (!ents) {
+        fprintf(stderr, "out of memory for a threadlocal global\n");
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = 0; i < tab->cap; ++i) {
+        if (!tab->ents[i].image) continue;
+        ents[jitTlsSlot(ents, cap, tab->ents[i].image)] = tab->ents[i];
+    }
+    free(tab->ents);
+    tab->ents = ents;
+    tab->cap = cap;
+}
+
+/* The calling thread's copy of the threadlocal global at `image` */
+static void *ktmJitTls(void *image, long size) {
+    JitTlsTab *tab = jit_tls_tab;
+    if (tab) {
+        size_t i = jitTlsSlot(tab->ents, tab->cap, image);
+        if (tab->ents[i].image) return tab->ents[i].copy;
+    } else {
+        pthread_once(&jit_tls_once, jitTlsKeyCreate);
+        tab = calloc(1, sizeof(JitTlsTab));
+        if (!tab) {
+            fprintf(stderr, "out of memory for a threadlocal global\n");
+            exit(EXIT_FAILURE);
+        }
+        jitTlsGrow(tab);
+        jit_tls_tab = tab;
+        pthread_setspecific(jit_tls_key, tab);
+    }
+    if ((tab->len + 1) * 2 > tab->cap) jitTlsGrow(tab);
+    void *copy = malloc(size > 0 ? (size_t)size : 1);
+    if (!copy) {
+        fprintf(stderr, "out of memory for a threadlocal global\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(copy, image, (size_t)size);
+    size_t i = jitTlsSlot(tab->ents, tab->cap, image);
+    tab->ents[i].image = image;
+    tab->ents[i].copy = copy;
+    tab->len++;
+    return copy;
 }
 
 /* ---------------- fixup helpers ---------------- */
@@ -558,6 +659,8 @@ KtmJit *ktmJitNew(Cctrl *cc, const KtmJitBackend *backend) {
     backend->init_reg_pool();
     jitLoadLibtos(cc);
     jitLoadSharedObjects(cc);
+    /* both spellings: ktmJitDefineSymbol adds or drops one `_` */
+    ktmJitDefineSymbol(jit, "___ktmJitTls", (void *)(uintptr_t)ktmJitTls);
     return jit;
 }
 

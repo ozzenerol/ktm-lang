@@ -461,8 +461,7 @@ static void jitGlobalAddr(KtmJit *jit, A64Reg reg, const char *sym) {
     }
     /* Internal global / string / external function: address is known
      * now (host arena malloc, or dlsym for libc). Materialise it. */
-    void *addr = mapGet(jit->host_symbols, (void *)sym);
-    if (!addr) addr = asm_jit_dlsym_resolver(NULL, sym);
+    void *addr = ktmJitSymbolAddr(jit, sym);
     if (!addr) {
         /* nothing defines it: the chunk fails (it was a null address) */
         asm_jit_unresolved(&jit->enc, sym);

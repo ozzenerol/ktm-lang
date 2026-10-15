@@ -170,7 +170,18 @@ static void x86_64Lea(IrCgCtx *ctx, IrInstr *lea, const char *reg) {
             name = asmNormaliseFunctionName(ctx->cc,
                     lea->r1->as.global.name);
         }
-        if (lea->r1->flags & IR_VAL_FLAG_EXTERN) {
+        if (lea->r1->flags & IR_VAL_FLAG_TLS) {
+            /* A threadlocal: initial-exec, the thread pointer plus the
+             * variable's offset from the GOT. ld relaxes the GOT load to
+             * `movq $x@tpoff` in a program (local-exec); libktm.so keeps
+             * it, its TLS is in the static block (see rt/except.ktm). */
+            if (ctx->cc->target == TARGET_X86_64_APPLE_DARWIN) {
+                loggerPanic("threadlocal globals are not supported on "
+                            "x86_64 macOS\n");
+            }
+            aoStrCatFmt(ctx->buf, "movq    %s@gottpoff(%%rip), %%%s\n\t"
+                        "addq    %%fs:0, %%%s\n\t", name, reg, reg);
+        } else if (lea->r1->flags & IR_VAL_FLAG_EXTERN) {
             /* Possibly in a shared library: through the GOT (ELF and
              * Mach-O spell it the same; the linker relaxes it back to
              * a lea when the symbol turns out to be local) */
@@ -2676,6 +2687,7 @@ void x86_64GlobalVar(Cctrl *cc,
 
     aoStrRemovePreviousChar(buf, '\t');
     setAdd(seen_globals, varname->data);
+    if (asmThreadLocalGlobal(cc, buf, declvar, declinit, label, local)) return;
 
     /* `U8 *p = &g;`, `&arr[2]`, `&Fn`: a relocated pointer */
     AoStr *addr_sym;

@@ -1508,7 +1508,34 @@ static IrValue *irGlobalValue(Ast *gvar_ast) {
      * it may be in a shared library, so its address comes from the GOT
      * (a shared object can't reach it PC-relatively) */
     if (gvar_ast->flags & AST_FLAG_EXTERN) v->flags |= IR_VAL_FLAG_EXTERN;
+    if (gvar_ast->flags & AST_FLAG_TLS) v->flags |= IR_VAL_FLAG_TLS;
     return v;
+}
+
+/* The address of a global. A threadlocal one is the calling thread's
+ * copy: the backends emit the TLS sequence for the LEA, and the JIT,
+ * which can't lay out ELF/Mach-O TLS, asks __ktmJitTls for this
+ * thread's copy of the global's storage (which holds its initial value).
+ * The address is worked out again at every use, never kept across a
+ * call: a coroutine can resume on another thread inside one. */
+static IrValue *irGlobalAddr(IrCtx *ctx, Ast *gvar_ast) {
+    IrValue *gv = irGlobalValue(gvar_ast);
+    IrValue *addr = irTmp(IR_TYPE_PTR, 8);
+    if ((gv->flags & IR_VAL_FLAG_TLS) && (ctx->cc->flags & CCTRL_JIT)) {
+        gv->flags &= ~IR_VAL_FLAG_TLS;
+        if (gv->flags & IR_VAL_FLAG_EXTERN) {
+            Cctrl *cc = ctx->cc;
+            if (!cc->jit_tls_syms) cc->jit_tls_syms = setNew(16, &set_cstring_type);
+            setAdd(cc->jit_tls_syms, gv->as.global.name->data);
+        }
+        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *argv[2] = {
+            addr, irConstInt(IR_TYPE_I64, gvar_ast->type->size)
+        };
+        return irEmitRuntimeCallN(ctx, "__ktmJitTls", IR_TYPE_PTR, 8, 2, argv);
+    }
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+    return addr;
 }
 
 /* A value converted to Bool is 0 or 1, as in C: `value != 0` (a float
@@ -1717,9 +1744,7 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
         if (cls && cls->kind == AST_GVAR) {
             /* Global class field write: lea the global's address, add the
              * field offset, store via STORE_DEREF. */
-            IrValue *gv = irGlobalValue(cls);
-            IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-            irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+            IrValue *addr = irGlobalAddr(ctx, cls);
             if (offset != 0) {
                 IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
                 IrValue *field_addr = irTmp(IR_TYPE_PTR, 8);
@@ -1792,9 +1817,7 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
 
     if (lhs->kind == AST_GVAR) {
         /* `g = ...`: lea g's address, store* through it. */
-        IrValue *gv = irGlobalValue(lhs);
-        IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *addr = irGlobalAddr(ctx, lhs);
         out.target = addr;
         out.type = lhs->type;
         out.indirect = 1;
@@ -2261,9 +2284,7 @@ IrValue *irLowerGlobal(IrCtx *ctx, Ast *ast) {
     /* Global int read: lea its address, then load*. Arrays
      * decay to a pointer to the first element - just return
      * the LEA'd address with no load. */
-    IrValue *gv = irGlobalValue(ast);
-    IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-    irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+    IrValue *addr = irGlobalAddr(ctx, ast);
     /* Arrays and by-value aggregates decay to a pointer to their storage -
      * return the LEA'd address with no load. (Mirrors irLowerLVar; a struct
      * read by value, e.g. as a call argument, needs its address, not a
@@ -2364,9 +2385,7 @@ IrValue *irLowerClassRef(IrCtx *ctx, Ast *ast) {
     if (cls && cls->kind == AST_GVAR) {
         /* Global class: lea the global's address, add the field offset,
          * then load (or return the field address for an array field). */
-        IrValue *gv = irGlobalValue(cls);
-        IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *addr = irGlobalAddr(ctx, cls);
         if (offset != 0) {
             IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
             IrValue *field_addr = irTmp(IR_TYPE_PTR, 8);
@@ -2483,7 +2502,7 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
             src = irFnGetVar(ctx->cur_func, operand->lvar_id);
             if (!src) loggerPanic("&lvar on unknown lvar\n");
         } else if (operand->kind == AST_GVAR) {
-            src = irGlobalValue(operand);
+            return irGlobalAddr(ctx, operand);
         } else if (operand->kind == AST_FUNPTR) {
             /* `&fp` on a local function pointer: its slot, as for an lvar
              * (a pointer to a function pointer, `T (**pp)(...)`) */

@@ -33,6 +33,9 @@
 /* The language server: REPL-style redefinition, but overloads as in a
  * compile (each analysis parses the document afresh) */
 #define CCTRL_LSP                  (1<<9)
+/* Compiling for the JIT (or the REPL): a threadlocal global is reached
+ * through __ktmJitTls, the JIT can't lay out ELF/Mach-O TLS */
+#define CCTRL_JIT                  (1<<10)
 
 /* For messages */
 #define CCTRL_ICE   0
@@ -401,6 +404,9 @@ typedef struct Cctrl {
 
     /* Are we compiling position independent code? */
     int is_pic;
+    /* JIT: the labels of extern threadlocals JIT code uses; one only a
+     * prebuilt library defines can't be reached (jitResolveSymbol) */
+    Set *jit_tls_syms;
 
     /* Building a library (`-lib`): its functions are emitted as weak
      * definitions, so a program that defines a function of the same

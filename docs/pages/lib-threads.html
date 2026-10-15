@@ -171,6 +171,7 @@ cas: 1 0, flags 0
 <h2>Threads and the rest of ktm</h2>
 <ul class="rules">
   <li>Each thread has its own <code>try</code>/<code>catch</code> chain and its own coroutines.</li>
+  <li>A <a href="lang-variables.html#threadlocal"><code>threadlocal</code></a> global has one copy per thread.</li>
   <li>An uncaught error in any thread ends the program with exit code 1.</li>
   <li>For a server, <a href="lib-serve.html"><code>coro.serve</code></a> runs a coroutine loop per core and is usually simpler than threads by hand.</li>
 </ul>

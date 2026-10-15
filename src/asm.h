@@ -69,5 +69,7 @@ void asmEmitAddrConst(AoStr *buf, AoStr *sym, s64 off);
 
 /* Append `init`, laid out by asmInitImage, to `buf` as data directives. */
 void asmEmitInitData(AoStr *buf, Ast *init, AstType *type);
+int asmThreadLocalGlobal(Cctrl *cc, AoStr *buf, Ast *declvar, Ast *declinit,
+                         AoStr *label, int local);
 
 #endif
