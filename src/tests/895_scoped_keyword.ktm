@@ -1,16 +1,13 @@
 import cstr, fs, libc, mem, proc, test;
 
 /* v0.24.0: `ad` is spelled `scoped`. `scoped T name = value;` frees name
- * at the end of its scope (test 580 has the rules). `ad` still works, with
- * a warning at it that says to write `scoped`, except in the files of a
- * package in the module cache, which their authors update. -Werror makes
- * the warning an error. Like `ad`, `scoped` is an ordinary name anywhere
- * but in front of a declaration. */
+ * at the end of its scope (test 580 has the rules). v0.25.0: `ad` is gone.
+ * In front of a declaration it is an error at it that says to write
+ * `scoped`; anywhere else it is an ordinary name, and so is `scoped`. */
 
 #define SC_DIR "./ktm-895-work"
 #define SC_SRC SC_DIR "/prog.ktm"
 #define SC_OUT SC_DIR "/out"
-#define SC_CACHE SC_DIR "/cache"
 
 i64 gCorrect = 0, gTests = 0;
 void check(bool ok, u8 *what) {
@@ -19,9 +16,9 @@ void check(bool ok, u8 *what) {
 }
 
 /* ktm's output (stdout and stderr) running `path` with `flags`, *res its
- * exit status; KTM_CACHE is SC_CACHE */
+ * exit status */
 u8 *ktm(u8 *path, u8 *flags, i64 *res) {
-    u8 *cmd = cstr.format("KTM_CACHE=" SC_CACHE " $(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
+    u8 *cmd = cstr.format("$(command -v timeout >/dev/null 2>&1 && echo timeout 60) "
                           "../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                           "%s %s > " SC_OUT " 2>&1", flags, path);
     *res = proc.shell(cstr.view(cmd));
@@ -49,7 +46,7 @@ i32 main() {
     i64 res;
     u8 *out;
     printf("Test - scoped keyword: ");
-    proc.shell("rm -rf " SC_DIR " && mkdir -p " SC_CACHE "/example.com/pkg@v1.0.0");
+    proc.shell("rm -rf " SC_DIR " && mkdir -p " SC_DIR);
 
     u8 *src = uses("scoped");
     write(SC_SRC, src);
@@ -61,25 +58,17 @@ i32 main() {
     check(res == 0 && out && !cstr.cmp(out, "hi 2\n"), "scoped frees, no warning (AOT)");
     mem.free(out);
 
-    /* the old spelling: works, warns at the word */
+    /* the old spelling: an error at the word, in a local and a field */
     src = uses("ad");
     write(SC_SRC, src);
-    out = ktm(SC_SRC, "-jit", &res);
-    check(res == 0 && out && libc.strstr(out, "hi 2\n") &&
-          libc.strstr(out, "`ad` is now `scoped`: write `scoped` in front of the declaration") &&
-          libc.strstr(out, "prog.ktm:4:9"), "ad warns at its line and column, and still works");
-    mem.free(out);
-    out = ktm(SC_SRC, "-Werror -jit", &res);
-    check(res != 0 && out && libc.strstr(out, "`ad` is now `scoped`") && !libc.strstr(out, "hi 2"),
-          "-Werror makes it an error");
-    mem.free(out);
-
-    /* a package's own file in the module cache: no warning */
-    write(SC_CACHE "/example.com/pkg@v1.0.0/old.ktm", src);
     mem.free(src);
-    out = ktm(SC_CACHE "/example.com/pkg@v1.0.0/old.ktm", "-jit", &res);
-    check(res == 0 && out && !cstr.cmp(out, "hi 2\n"), "no warning in the module cache");
-    mem.free(out);
+    for (i64 k = 0; k < 2; k++) {
+        out = ktm(SC_SRC, k ? "-run" : "-jit", &res);
+        check(res != 0 && out && !libc.strstr(out, "hi 2") &&
+              libc.strstr(out, "`ad` was renamed `scoped` (v0.24.0) and is gone: write `scoped`") &&
+              libc.strstr(out, "prog.ktm:4:9"), k ? "ad is an error at its word (AOT)" : "ad is an error at its word");
+        mem.free(out);
+    }
 
     /* `scoped` (and `ad`) stay ordinary names */
     write(SC_SRC, "i64 scoped(i64 v) { return v + 1; }\n"
@@ -115,8 +104,8 @@ i32 main() {
     mem.free(out);
     write(SC_SRC, "import str;\nstruct R { ad String name; };\nvoid main() {}\n");
     out = ktm(SC_SRC, "-jit", &res);
-    check(res != 0 && out && libc.strstr(out, "`ad` goes on a local variable, not a struct field"),
-          "ad on a field names ad");
+    check(res != 0 && out && libc.strstr(out, "`ad` was renamed `scoped` (v0.24.0) and is gone"),
+          "ad on a field");
     mem.free(out);
 
     proc.shell("rm -rf " SC_DIR);

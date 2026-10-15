@@ -59,10 +59,9 @@ syn keyword ktmOperatorKw  sizeof alignof typeof
 syn keyword ktmBoolean     true false
 syn keyword ktmNull        null
 syn keyword ktmSelf        self
-" `scoped` (and `ad`, its old spelling) is an ordinary name except in front
-" of a declaration
-syn match   ktmDefer       /\<\%(scoped\|ad\)\>\ze\s\+\%(\h\w*\%(\.\h\w*\)*\%(<[^>]*>\)\=\s*\**\s*\)\h\w*\s*[=;]/
-syn match   ktmDefer       /\<\%(scoped\|ad\)\>\ze\s\+\%(\h\w*\%(\.\h\w*\)*\%(<[^>]*>\)\=\s*\**\s*\)\h\w*\s*\[/
+" `scoped` is an ordinary name except in front of a declaration
+syn match   ktmDefer       /\<scoped\>\ze\s\+\%(\h\w*\%(\.\h\w*\)*\%(<[^>]*>\)\=\s*\**\s*\)\h\w*\s*[=;]/
+syn match   ktmDefer       /\<scoped\>\ze\s\+\%(\h\w*\%(\.\h\w*\)*\%(<[^>]*>\)\=\s*\**\s*\)\h\w*\s*\[/
 
 " `extern "c"`
 syn match   ktmExternC     /\<extern\s\+"c"/ contains=ktmStorage

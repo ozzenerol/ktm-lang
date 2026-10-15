@@ -14,7 +14,7 @@ import re
 KEYWORDS = set("""
 if else while for do switch case default break continue return goto
 struct union enum class pub static extern const auto import module
-try catch throw defer scoped ad sizeof typeof asm fallthrough private
+try catch throw defer scoped sizeof typeof asm fallthrough private
 true false null threadlocal
 """.split())
 TYPES = set("""
