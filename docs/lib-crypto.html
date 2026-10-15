@@ -56,7 +56,7 @@
 <div class="crumbs"><span><a href="library.html">Library</a></span><span class="refs">Reference: <a href="stdlib.html#crypto"><code>crypto</code></a></span></div>
 <h1>Cryptography</h1>
 <p class="lede"><code>crypto</code> has what applications need, built on mbedTLS's vetted code (inside ktm, as for
-<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption, and ECDSA and RSA
+<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption, and ECDSA, RSA and Ed25519
 signatures. Only programs that import it carry it.</p>
 
 <h2 id="random-bytes">Random bytes<a class="anchor" href="#random-bytes" aria-label="Link to this section">#</a></h2>
@@ -106,14 +106,23 @@ String rs = rk.signWith(crypto.Hash.sha384, "payload");   // PKCS#1 v1.5 (JWT's 
 bool good = rk.verifyWith(crypto.Hash.sha384, "payload", rs);
 if (rk.kind() == crypto.KeyKind.rsa) { printf("%d bits\n", rk.bits()); }
 </code></pre>
+<p>Ed25519 keys (RFC 8032) sign with <code>sign</code> and check with <code>verify</code>: the algorithm hashes the data itself.</p>
+<pre><code>crypto.Key *ek = crypto.generateKey(crypto.KeyKind.ed25519);
+String es = ek.sign("payload");                  // 64 bytes, deterministic (JWT's EdDSA)
+bool fine = ek.verify("payload", es);
+</code></pre>
 <ul class="rules">
   <li><code>sign</code> and <code>verify</code> are <code>signWith</code> and <code>verifyWith</code> with <code>crypto.Hash.sha256</code>:
-  ES256 for a P-256 key, RS256 for an RSA one.</li>
+  ES256 for a P-256 key, RS256 for an RSA one. For an Ed25519 key they are Ed25519 itself, and
+  <code>signWith</code>/<code>verifyWith</code> throw.</li>
   <li>A P-256 signature is 64 bytes r||s; an RSA one is the key's size (256 bytes for 2048 bits).</li>
   <li>A public key also comes from its parts, as a JWK has them (base64url-decoded):
-  <code>crypto.ecPublicKey(x, y)</code> (32 bytes each) and <code>crypto.rsaPublicKey(n, e)</code> (big-endian).</li>
-  <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages. Other kinds of key
-  (P-384, RSA under 2048 bits, Ed25519) are refused: mbedTLS 3.6 has no Ed25519.</li>
+  <code>crypto.ecPublicKey(x, y)</code> (32 bytes each), <code>crypto.rsaPublicKey(n, e)</code> (big-endian) and
+  <code>crypto.ed25519PublicKey(x)</code> (32 bytes).</li>
+  <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages; an Ed25519 key is read
+  only in the exact form RFC 8410 gives (PKCS#8, or SubjectPublicKeyInfo). Other kinds of key
+  (P-384, secp256k1, RSA under 2048 bits) are refused.</li>
+  <li>Ed25519 is <a href="https://monocypher.org">Monocypher</a>'s (mbedTLS 3.6 has none), inside ktm as mbedTLS is.</li>
 </ul>
 
 <h2 id="passwords">Passwords<a class="anchor" href="#passwords" aria-label="Link to this section">#</a></h2>

@@ -6,3 +6,8 @@ its public key, openssl's PKCS#1 v1.5 signatures of msg.txt with SHA-256/384/512
 For test 846 (keys from JWK parts): rsa-n.hex, the modulus of rsa-pub.pem (its
 exponent is 65537), and ec-x.hex, ec-y.hex, the point of pub.pem, as openssl
 prints them.
+For test 860 (Ed25519): ed-key.pem and ed-pub.pem (openssl), ed-msg.hex (1023
+random bytes) and ed-sig.hex (openssl's signature of them); ed-key-truncated.pem
+and ed-key-trailing.pem must be refused. (ed25519-key.pem reads since 0.23.0, so
+test 845's "a kind of key Key doesn't take" is k256-key.pem, a secp256k1
+key, now.)

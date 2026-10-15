@@ -16,12 +16,15 @@
 #include "mbedtls/gcm.h"
 #include "mbedtls/hkdf.h"
 #include "mbedtls/md.h"
+#include "mbedtls/pem.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/pkcs5.h"
 #include "mbedtls/rsa.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/sha512.h"
 #include "psa/crypto.h"
+#include "ktm_monocypher_names.h"
+#include "monocypher-ed25519.h"
 
 /* ---- random: one generator, seeded from the OS, locked (threading on) ---- */
 
@@ -144,12 +147,34 @@ int ktm_crypto_open(int alg, const unsigned char *key, const unsigned char *nonc
     return r;
 }
 
-/* ---- ECDSA P-256 keys ---- */
+/* ---- keys ---- */
+
+/* What a crypto.Key points at: mbedTLS's key (first, so a KtmKey * is
+ * also its mbedtls_pk_context *), or an Ed25519 key, which mbedTLS
+ * doesn't have (Monocypher's, ktmed25519.c) */
+typedef struct {
+    mbedtls_pk_context pk;
+    int ed;                     /* Ed25519: 1 public, 2 private; 0: pk */
+    unsigned char ed_sk[64];    /* seed || public, as Monocypher has it */
+    unsigned char ed_pub[32];
+} KtmKey;
+
+static mbedtls_pk_context *ktmKeyNew(void) {
+    KtmKey *k = calloc(1, sizeof(KtmKey));
+    mbedtls_pk_init(&k->pk);
+    return &k->pk;
+}
+
+static int ktmKeyIsEd(void *key) {
+    return ((KtmKey *)key)->ed != 0;
+}
+
+static int ktmEdLoad(const unsigned char *z, size_t len, int priv, void **out, int *err);
+
 
 void *ktm_crypto_key_generate(int *err) {
     if (!ktmCryptoStart()) { *err = -1; return NULL; }
-    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
-    mbedtls_pk_init(pk);
+    mbedtls_pk_context *pk = ktmKeyNew();
     int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
     if (r == 0) r = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(*pk),
                                         mbedtls_ctr_drbg_random, &ktm_crypto_drbg);
@@ -175,8 +200,13 @@ void *ktm_crypto_key_load(const unsigned char *pem, size_t len, int priv, int *e
     unsigned char *z = malloc(len + 1);
     memcpy(z, pem, len);
     z[len] = 0;
-    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
-    mbedtls_pk_init(pk);
+    void *ed = NULL;
+    int edr = ktmEdLoad(z, len, priv, &ed, err);
+    if (edr != 0) {
+        free(z);
+        return edr > 0 ? ed : NULL;
+    }
+    mbedtls_pk_context *pk = ktmKeyNew();
     int r = priv ? mbedtls_pk_parse_key(pk, z, len + 1, NULL, 0, mbedtls_ctr_drbg_random, &ktm_crypto_drbg)
                  : mbedtls_pk_parse_public_key(pk, z, len + 1);
     free(z);
@@ -200,8 +230,7 @@ void *ktm_crypto_ec_public(const unsigned char *x, size_t xlen, const unsigned c
     pt[0] = 0x04;               /* uncompressed */
     memcpy(pt + 1, x, 32);
     memcpy(pt + 33, y, 32);
-    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
-    mbedtls_pk_init(pk);
+    mbedtls_pk_context *pk = ktmKeyNew();
     int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
     mbedtls_ecp_keypair *k = r == 0 ? mbedtls_pk_ec(*pk) : NULL;
     if (r == 0) r = mbedtls_ecp_group_load(&k->MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP256R1);
@@ -220,8 +249,7 @@ void *ktm_crypto_ec_public(const unsigned char *x, size_t xlen, const unsigned c
  * n and e), 2048 bits or more. NULL with *err. */
 void *ktm_crypto_rsa_public(const unsigned char *n, size_t nlen, const unsigned char *e, size_t elen, int *err) {
     if (!ktmCryptoStart()) { *err = -1; return NULL; }
-    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
-    mbedtls_pk_init(pk);
+    mbedtls_pk_context *pk = ktmKeyNew();
     int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
     mbedtls_rsa_context *rsa = r == 0 ? mbedtls_pk_rsa(*pk) : NULL;
     if (r == 0) r = mbedtls_rsa_import_raw(rsa, n, nlen, NULL, 0, NULL, 0, NULL, 0, e, elen);
@@ -240,8 +268,7 @@ void *ktm_crypto_rsa_public(const unsigned char *n, size_t nlen, const unsigned 
 /* A new RSA private key of bits bits (exponent 65537). NULL with *err. */
 void *ktm_crypto_rsa_generate(int bits, int *err) {
     if (!ktmCryptoStart()) { *err = -1; return NULL; }
-    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
-    mbedtls_pk_init(pk);
+    mbedtls_pk_context *pk = ktmKeyNew();
     int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
     if (r == 0) r = mbedtls_rsa_gen_key(mbedtls_pk_rsa(*pk), mbedtls_ctr_drbg_random, &ktm_crypto_drbg,
                                         (unsigned int)bits, 65537);
@@ -254,17 +281,25 @@ void *ktm_crypto_rsa_generate(int bits, int *err) {
     return pk;
 }
 
-/* 0: P-256, 1: RSA */
+/* 0: P-256, 1: RSA, 2: Ed25519 */
 int ktm_crypto_key_kind(void *key) {
+    if (ktmKeyIsEd(key)) return 2;
     return mbedtls_pk_get_type(key) == MBEDTLS_PK_RSA ? 1 : 0;
 }
 
 long ktm_crypto_key_bits(void *key) {
+    if (ktmKeyIsEd(key)) return 256;
     return (long)mbedtls_pk_get_bitlen(key);
 }
 
+static int ktmEdPem(KtmKey *k, int priv, unsigned char *out, size_t outlen);
+
 /* The key as PEM into out (outlen bytes): its length, or a negative code */
 long ktm_crypto_key_pem(void *key, int priv, unsigned char *out, size_t outlen) {
+    if (ktmKeyIsEd(key)) {
+        int r = ktmEdPem(key, priv, out, outlen);
+        return r != 0 ? r : (long)strlen((char *)out);
+    }
     int r = priv ? mbedtls_pk_write_key_pem(key, out, outlen) : mbedtls_pk_write_pubkey_pem(key, out, outlen);
     if (r != 0) return r;
     return (long)strlen((char *)out);
@@ -290,6 +325,7 @@ int ktm_crypto_sign_with(void *key, int bits, const unsigned char *data, size_t 
                          size_t cap, size_t *olen) {
     unsigned char h[64];
     mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key)) return MBEDTLS_ERR_PK_TYPE_MISMATCH;     /* Ed25519 hashes itself */
     size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
     mbedtls_pk_context *pk = key;
     if (mbedtls_pk_get_type(pk) == MBEDTLS_PK_RSA) {
@@ -316,6 +352,7 @@ int ktm_crypto_verify_with(void *key, int bits, const unsigned char *data, size_
                            const unsigned char *sig, size_t slen) {
     unsigned char h[64];
     mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key)) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
     size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
     mbedtls_pk_context *pk = key;
     if (mbedtls_pk_get_type(pk) == MBEDTLS_PK_RSA || slen != 64) {
@@ -336,5 +373,126 @@ int ktm_crypto_verify_with(void *key, int bits, const unsigned char *data, size_
 void ktm_crypto_key_free(void *key) {
     if (!key) return;
     mbedtls_pk_free(key);
+    mbedtls_platform_zeroize(key, sizeof(KtmKey));
     free(key);
+}
+
+/* ---- Ed25519 (RFC 8032), Monocypher's ---- */
+
+/* The DER an Ed25519 key is in PEM, before its 32 bytes: PKCS#8 for the
+ * private key's seed (RFC 8410), SubjectPublicKeyInfo for the public key.
+ * Read only exactly so: anything else isn't taken. */
+static const unsigned char ktm_ed_priv_der[16] = {
+    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20 };
+static const unsigned char ktm_ed_pub_der[12] = {
+    0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00 };
+
+static KtmKey *ktmEdNew(const unsigned char *seed, const unsigned char *pub) {
+    KtmKey *k = (KtmKey *)ktmKeyNew();
+    if (seed) {
+        unsigned char s[32];
+        memcpy(s, seed, 32);
+        crypto_ed25519_key_pair(k->ed_sk, k->ed_pub, s);   /* wipes s */
+        k->ed = 2;
+    } else {
+        memcpy(k->ed_pub, pub, 32);
+        k->ed = 1;
+    }
+    return k;
+}
+
+/* A new random private Ed25519 key. NULL with *err. */
+void *ktm_crypto_ed25519_generate(int *err) {
+    if (!ktmCryptoStart()) { *err = -1; return NULL; }
+    unsigned char seed[32];
+    int r = mbedtls_ctr_drbg_random(&ktm_crypto_drbg, seed, 32);
+    if (r != 0) { *err = r; return NULL; }
+    KtmKey *k = ktmEdNew(seed, NULL);
+    mbedtls_platform_zeroize(seed, 32);
+    return k;
+}
+
+/* A public Ed25519 key from its 32 bytes (a JWK's OKP "x") */
+void *ktm_crypto_ed25519_public(const unsigned char *x, size_t len, int *err) {
+    if (len != 32) { *err = MBEDTLS_ERR_PK_INVALID_PUBKEY; return NULL; }
+    return ktmEdNew(NULL, x);
+}
+
+/* Is the PEM text (len bytes, NUL after them) an Ed25519 key? 1 with
+ * *out made, 0 when it is another kind (mbedTLS reads it), -1 with *err
+ * when it says Ed25519 but isn't exactly one */
+static int ktmEdLoad(const unsigned char *z, size_t len, int priv, void **out, int *err) {
+    mbedtls_pem_context pem;
+    size_t used = 0;
+    const char *head = priv ? "-----BEGIN PRIVATE KEY-----" : "-----BEGIN PUBLIC KEY-----";
+    const char *foot = priv ? "-----END PRIVATE KEY-----" : "-----END PUBLIC KEY-----";
+    mbedtls_pem_init(&pem);
+    if (mbedtls_pem_read_buffer(&pem, head, foot, z, NULL, 0, &used) != 0) {
+        mbedtls_pem_free(&pem);
+        return 0;
+    }
+    size_t n;
+    const unsigned char *der = mbedtls_pem_get_buffer(&pem, &n);
+    /* the algorithm's OID (1.3.101.112) where an Ed25519 key has it */
+    static const unsigned char oid[5] = { 0x06, 0x03, 0x2b, 0x65, 0x70 };
+    size_t at = priv ? 7 : 4;
+    if (n < at + 5 || memcmp(der + at, oid, 5) != 0) {
+        mbedtls_pem_free(&pem);
+        return 0;
+    }
+    const unsigned char *want = priv ? ktm_ed_priv_der : ktm_ed_pub_der;
+    size_t wlen = priv ? sizeof(ktm_ed_priv_der) : sizeof(ktm_ed_pub_der);
+    /* nothing but blanks around the PEM block */
+    int ok = n == wlen + 32 && memcmp(der, want, wlen) == 0;
+    const unsigned char *start = (const unsigned char *)strstr((const char *)z, head);
+    for (const unsigned char *p = z; ok && p < start; p++) ok = *p == ' ' || *p == '\n' || *p == '\r' || *p == '\t';
+    for (const unsigned char *p = start + used; ok && p < z + len; p++) {
+        ok = *p == ' ' || *p == '\n' || *p == '\r' || *p == '\t';
+    }
+    if (!ok) {
+        mbedtls_pem_free(&pem);
+        *err = MBEDTLS_ERR_PK_KEY_INVALID_FORMAT;
+        return -1;
+    }
+    *out = priv ? ktmEdNew(der + wlen, NULL) : ktmEdNew(NULL, der + wlen);
+    mbedtls_pem_free(&pem);
+    return 1;
+}
+
+/* An Ed25519 key as PEM into out: 0, or a negative code */
+static int ktmEdPem(KtmKey *k, int priv, unsigned char *out, size_t outlen) {
+    unsigned char der[48];
+    size_t n;
+    if (priv) {
+        if (k->ed != 2) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+        memcpy(der, ktm_ed_priv_der, sizeof(ktm_ed_priv_der));
+        memcpy(der + sizeof(ktm_ed_priv_der), k->ed_sk, 32);       /* the seed */
+        n = sizeof(ktm_ed_priv_der) + 32;
+    } else {
+        memcpy(der, ktm_ed_pub_der, sizeof(ktm_ed_pub_der));
+        memcpy(der + sizeof(ktm_ed_pub_der), k->ed_pub, 32);
+        n = sizeof(ktm_ed_pub_der) + 32;
+    }
+    size_t olen = 0;
+    int r = mbedtls_pem_write_buffer(priv ? "-----BEGIN PRIVATE KEY-----\n" : "-----BEGIN PUBLIC KEY-----\n",
+                                     priv ? "-----END PRIVATE KEY-----\n" : "-----END PUBLIC KEY-----\n",
+                                     der, n, out, outlen, &olen);
+    mbedtls_platform_zeroize(der, sizeof(der));
+    return r;
+}
+
+/* The 64-byte Ed25519 signature of data (a private key's) */
+int ktm_crypto_ed25519_sign(void *key, const unsigned char *data, size_t len, unsigned char *sig) {
+    KtmKey *k = key;
+    if (k->ed != 2) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    crypto_ed25519_sign(sig, k->ed_sk, data, len);
+    return 0;
+}
+
+/* 0 when sig is key's Ed25519 signature of data */
+int ktm_crypto_ed25519_verify(void *key, const unsigned char *data, size_t len, const unsigned char *sig,
+                              size_t slen) {
+    KtmKey *k = key;
+    if (!k->ed || slen != 64) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    return crypto_ed25519_check(sig, k->ed_pub, data, len) == 0 ? 0 : MBEDTLS_ERR_ECP_VERIFY_FAILED;
 }
