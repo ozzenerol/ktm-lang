@@ -127,6 +127,14 @@ static void crashPutHex(u64 v) {
     crashPut(&d[n]);
 }
 
+static bool crashSame(u8 *a, u8 *b) {
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
 /* The ktm function pc is in, null for C code */
 static CrashFn *crashFind(u64 pc) {
     CrashFn *f;
@@ -159,6 +167,7 @@ static i32 crashLine(CrashFn *f, u64 pc, i32 *site) {
 static u64 crashPrevPc = 0;
 static i64 crashRepeat = 0, crashShown = 0, crashHidden = 0;
 static bool crashInC = false, crashAtMain = false;
+static bool crashNextAt = false;   /* the next frame shown is "at" */
 
 static void crashEndRepeat() {
     if (crashRepeat > 1) {
@@ -226,6 +235,10 @@ static void crashFrame(u64 pc, bool first) {
     crashShown++;
     crashPrevPc = pc;
     crashRepeat = 1;
+    if (crashNextAt) {
+        first = true;
+        crashNextAt = false;
+    }
     /* the calls the inliner merged in, innermost first */
     while (site) {
         CrashSite *c = (CrashSite *)crashAt(&f.sites) + (site - 1);
@@ -364,6 +377,45 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     }
 }
 
+/* Is s the name of a function of rt (not rt.crash): the throw's own
+ * calls, left out of an uncaught error's trace */
+static bool crashInRt(u8 *s) {
+    return s[0] == 'r' && s[1] == 't' && s[2] == '.' &&
+           !(s[3] == 'c' && s[4] == 'r' && s[5] == 'a' && s[6] == 's' &&
+             s[7] == 'h' && s[8] == '.');
+}
+
+/* An uncaught error (rt.__ktmUncaught, with its frame pointer): the
+ * calls that led to the throw, as a crash shows them */
+static void crashUncaughtTrace(u64 fp) {
+    u64 prev = 0;
+    i64 depth;
+    bool skipping = true;
+    crashNextAt = true;
+    for (depth = 0; depth < 1000000 && fp; depth++) {
+        if ((fp & 7) || (prev && fp <= prev) || !crashReadable(fp)) { break; }
+        u64 ret = ((u64 *)fp)[1];
+        if (!ret) { break; }
+        if (skipping) {
+            CrashFn *f = crashFind(ret - 1);
+            skipping = f && crashInRt(crashAt(&f.name));
+        }
+        if (!skipping) {
+            crashFrame(ret, false);
+            if (crashAtMain) { break; }
+        }
+        prev = fp;
+        fp = ((u64 *)fp)[0];
+    }
+    crashEndRepeat();
+    if (crashHidden) {
+        crashPut("  ... ");
+        crashPutDec(crashHidden);
+        crashPut(" more\n");
+        crashFlush();
+    }
+}
+
 /* Set the calling thread's signal stack (a stack_t: ss_sp, then
  * ss_flags and ss_size, whose order differs, at 8 or 16) */
 static void crashAltStack(u8 *stack, i32 flags) {
@@ -399,6 +451,16 @@ pub void __ktmCrashAdd(CrashFn *lo, CrashFn *hi) {
     crashLo[crashTables] = lo;
     crashHi[crashTables] = hi;
     crashTables++;
+    /* libktm's records (the program's own when it is linked in): hand
+     * rt the walker for uncaught errors */
+    CrashFn *f;
+    for (f = lo; f < hi; f++) {
+        if (crashSame(crashAt(&f.name), "rt.__ktmUncaughtTraceSet")) {
+            fn(fn(u64 fp) void trace) void set = (void *)crashStart(f);
+            set(&crashUncaughtTrace);
+            return;
+        }
+    }
 }
 
 /* Called before main (asmLinesEmit, or the JIT) with the program's

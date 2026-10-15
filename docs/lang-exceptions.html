@@ -237,8 +237,30 @@ void main()
 </pre>
 
 <h2 id="uncaught-errors">Uncaught errors<a class="anchor" href="#uncaught-errors" aria-label="Link to this section">#</a></h2>
-<p>An error no <code>try</code> catches, in any thread, is printed on stderr and ends the program with exit code 1:</p>
-<pre class="shell"><code>uncaught error 0: need 500, have 100 (bank.ktm:5)</code></pre>
+<p>An error no <code>try</code> catches, in any thread, is printed on stderr with the calls that led to the throw, and ends the program with exit code 1:</p>
+<pre class="shell"><code>i64 balance = 100;
+
+void withdraw(i64 amount)
+{
+  if (amount &amp;gt; balance) {
+    throw(0, "need %d, have %d", amount, balance);
+  }
+  balance -= amount;
+}
+
+void main()
+{
+  withdraw(30);
+  withdraw(500);
+}</code></pre>
+<pre class="output">uncaught error 0: need 500, have 70 (bank.ktm:6)
+  at bank.ktm:6 in withdraw
+  called from bank.ktm:14 in main
+</pre>
+<ul class="rules">
+  <li>The calls are those of the last <code>throw</code>: an error caught and thrown on with <code>throw(e)</code> (a coroutine's, which <code>coro.run</code> throws on) shows where it was thrown on. The first line keeps the file and line of its first throw.</li>
+  <li>The calls are listed as a crash lists them (see <a href="tools-debugging.html#crashes">Crashes</a>), in compiled programs and <code>-jit</code> alike.</li>
+</ul>
 
 <h2 id="details">Details<a class="anchor" href="#details" aria-label="Link to this section">#</a></h2>
 <ul class="rules">

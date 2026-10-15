@@ -33,7 +33,7 @@ memsafe: 1 allocation(s) (32 bytes) never freed
 <h2>Errors at run time</h2>
 <ul class="rules">
   <li>An out-of-range slice index throws <code>ERR_BOUNDS</code> with the index, the length and where.</li>
-  <li>An uncaught error prints its code, message, file and line, and exits with 1.</li>
+  <li>An uncaught error prints its code, message, file and line, and the calls that led to the throw, and exits with 1.</li>
   <li>Writing to a string literal faults: copy it with <code>str.from</code> first.</li>
 </ul>
 <pre data-run><code>
