@@ -128,7 +128,7 @@ type Pos = Point;
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>2 3</code></pre>
-<p>Methods are defined with the struct's own name: <code>i64 Point.sum()</code>, not <code>Pos.sum()</code>.</p>
+<p>A method can be defined through the alias too: <code>i64 Pos.sum()</code> is the method <code>Point.sum</code>.</p>
 <p>Because an alias is not a new type, it doesn't stop units from being mixed up:</p>
 <pre class="code run"><code>type Celsius = <span class="t">f64</span>;
 type Fahrenheit = <span class="t">f64</span>;
