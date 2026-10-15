@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variables - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html" class="on"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <article class="prose">
+<h1>Variables</h1>
+<p>Declaring local and global variables, the zero they start with, letting the compiler pick the type, <code>static</code> locals, constants, and where a name is visible.</p>
+<h2 id="declaring-a-variable"><a href="#declaring-a-variable">Declaring a variable</a></h2>
+<p>A declaration is a type, a name and, optionally, a first value. A local can be declared anywhere in a block, and is visible from there to the end of the block.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> count = <span class="n">3</span>;
+    <span class="t">f64</span> ratio = <span class="n">0.25</span>;
+    <span class="t">u8</span> *name = <span class="s">&quot;ktm&quot;</span>;
+    <span class="t">bool</span> ready = <span class="k">true</span>;
+    printf(<span class="s">&quot;%d %.2f %s %d\n&quot;</span>, count, ratio, name, ready);
+}</code></pre>
+<pre class="out"><code>3 0.25 ktm 1</code></pre>
+<p>Several variables of one type can share a declaration. Each <code>*</code> belongs to the name after it, as in C.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">1</span>, b = <span class="n">2</span>, c;
+    c = a + b;
+    <span class="t">u8</span> *name = <span class="s">&quot;ktm&quot;</span>, letter = <span class="s">&#x27;h&#x27;</span>;    <span class="c">// name is a u8 *, letter a u8</span>
+    printf(<span class="s">&quot;%d %s %c\n&quot;</span>, c, name, letter);
+}</code></pre>
+<pre class="out"><code>3 ktm h</code></pre>
+<h2 id="locals-start-zeroed"><a href="#locals-start-zeroed">Locals start zeroed</a></h2>
+<p>A local declared without a value is zero: <code>0</code>, <code>0.0</code>, <code>false</code>, <code>null</code>, an empty <code>String</code> or slice, a struct or array with every byte 0. You never read garbage left on the stack.</p>
+<pre class="code run"><code><span class="k">struct</span> Report { <span class="t">i64</span> lines; <span class="t">f64</span> ratio; <span class="t">u8</span> *name; };
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> n;
+    <span class="t">f64</span> f;
+    <span class="t">bool</span> b;
+    <span class="t">u8</span> *p;
+    Report r;
+    <span class="t">i64</span> nums[<span class="n">4</span>];
+    printf(<span class="s">&quot;%d %.1f %d %d\n&quot;</span>, n, f, b, p == <span class="k">null</span>);
+    printf(<span class="s">&quot;%d %.1f %d\n&quot;</span>, r.lines, r.ratio, r.name == <span class="k">null</span>);
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">1</span>], nums[<span class="n">2</span>], nums[<span class="n">3</span>]);
+}</code></pre>
+<pre class="out"><code>0 0.0 0 1
+0 0.0 1
+0 0 0 0</code></pre>
+<p>It is zero again each time its declaration runs, so a variable declared inside a loop starts fresh on every pass:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        <span class="t">i64</span> total;
+        total += i;
+        printf(<span class="s">&quot;pass %d: total %d\n&quot;</span>, i, total);
+    }
+}</code></pre>
+<pre class="out"><code>pass 0: total 0
+pass 1: total 1
+pass 2: total 2</code></pre>
+<p>One exception: an array bigger than 4 KiB with no <code>String</code> or slice in it, such as <code>u8 buf[65536];</code>, is a buffer you are about to fill, and is left as it is so that its memory isn't written for nothing. Write <code>u8 buf[65536] = {0};</code> when you need it zeroed.</p>
+<h2 id="global-variables"><a href="#global-variables">Global variables</a></h2>
+<p>A variable declared outside every function is a global: it lives for the whole program, and every function below its declaration sees it. A global without a value is zero.</p>
+<pre class="code run"><code><span class="t">i64</span> gTotal = <span class="n">100</span>, gCount;
+<span class="t">u8</span> *gName = <span class="s">&quot;server&quot;</span>;
+
+<span class="t">void</span> bump() { gCount++; }
+
+<span class="t">void</span> main() {
+    bump();
+    bump();
+    printf(<span class="s">&quot;%s: %d of %d\n&quot;</span>, gName, gCount, gTotal);
+}</code></pre>
+<pre class="out"><code>server: 2 of 100</code></pre>
+<p>A global's first value can be any expression, function calls included. These run in the order the globals are written, before <code>main</code>:</p>
+<pre class="code run"><code><span class="t">i64</span> triple(<span class="t">i64</span> n) {
+    printf(<span class="s">&quot;computing %d\n&quot;</span>, n);
+    <span class="k">return</span> n * <span class="n">3</span>;
+}
+
+<span class="t">i64</span> gA = triple(<span class="n">1</span>);
+<span class="t">i64</span> gB = triple(gA);
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;main sees %d and %d\n&quot;</span>, gA, gB);
+}</code></pre>
+<pre class="out"><code>computing 1
+computing 3
+main sees 3 and 9</code></pre>
+<p>A global can also be one copy per thread: see <a href="27-threads-and-threadlocal.html">threadlocal</a>.</p>
+<h2 id="auto"><a href="#auto">auto</a></h2>
+<p><code>auto</code> takes the type of the first value.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">auto</span> count = <span class="n">3</span>;
+    <span class="k">auto</span> price = <span class="n">9.99</span>;
+    <span class="k">auto</span> label = <span class="s">&quot;total&quot;</span>;
+    <span class="k">auto</span> half = count / <span class="n">2.0</span>;
+    <span class="k">auto</span> big = count * <span class="n">1000000000000</span>;
+    printf(<span class="s">&quot;%s %s %s %s %s\n&quot;</span>, <span class="k">typeof</span>(count), <span class="k">typeof</span>(price), <span class="k">typeof</span>(label), <span class="k">typeof</span>(half), <span class="k">typeof</span>(big));
+}</code></pre>
+<pre class="out"><code>i64 f64 u8[6] f64 i64</code></pre>
+<p>It saves the most typing with long type names, such as generic containers, and in a range-based <code>for</code>:</p>
+<pre class="code run"><code><span class="k">import</span> map;
+
+<span class="t">void</span> main() {
+    <span class="k">auto</span> ages = map.new&lt;<span class="t">u8</span>[], <span class="t">i64</span>&gt;();
+    ages.set(<span class="s">&quot;ada&quot;</span>, <span class="n">36</span>);
+    ages.set(<span class="s">&quot;linus&quot;</span>, <span class="n">54</span>);
+    <span class="t">i64</span> nums[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="k">for</span> (<span class="k">auto</span> x : nums) {
+        printf(<span class="s">&quot;%d &quot;</span>, x);
+    }
+    printf(<span class="s">&quot;| ada is %d\n&quot;</span>, ages.getOr(<span class="s">&quot;ada&quot;</span>, <span class="n">0</span>));
+    ages.free();
+}</code></pre>
+<pre class="out"><code>1 2 3 | ada is 36</code></pre>
+<p>An <code>auto</code> variable needs a first value to take its type from:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="k">auto</span> x;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h2 id="static-locals"><a href="#static-locals">static locals</a></h2>
+<p>A <code>static</code> local keeps its value between calls: it is created once, like a global, but only its function can see it.</p>
+<pre class="code run"><code><span class="t">i64</span> nextId() {
+    <span class="k">static</span> <span class="t">i64</span> id = <span class="n">0</span>;
+    id++;
+    <span class="k">return</span> id;
+}
+
+<span class="t">void</span> main() {
+    nextId();
+    nextId();
+    printf(<span class="s">&quot;%d\n&quot;</span>, nextId());
+}</code></pre>
+<pre class="out"><code>3</code></pre>
+<pre class="code run"><code><span class="t">void</span> report(<span class="t">u8</span> *what) {
+    <span class="k">static</span> <span class="t">i64</span> calls;
+    calls++;
+    printf(<span class="s">&quot;call %d: %s\n&quot;</span>, calls, what);
+}
+
+<span class="t">void</span> main() {
+    report(<span class="s">&quot;start&quot;</span>);
+    report(<span class="s">&quot;middle&quot;</span>);
+    report(<span class="s">&quot;end&quot;</span>);
+}</code></pre>
+<pre class="out"><code>call 1: start
+call 2: middle
+call 3: end</code></pre>
+<p>On a function or a global, <code>static</code> means something else: the name stays private to its file. See <a href="22-modules-and-packages.html">Modules and packages</a>.</p>
+<h2 id="constants"><a href="#constants">Constants</a></h2>
+<p><code>const</code> makes a declaration read-only. With a value known at compile time, it is a compile-time constant: it can size an array, label a <code>case</code>, or build another constant.</p>
+<pre class="code run"><code><span class="k">const</span> <span class="t">i64</span> MAX_USERS = <span class="n">4</span>;
+<span class="k">const</span> <span class="t">i64</span> DOUBLE_MAX = MAX_USERS * <span class="n">2</span>;
+<span class="k">const</span> <span class="t">f64</span> RATE = <span class="n">0.5</span>;
+<span class="k">const</span> <span class="t">u8</span> *GREETING = <span class="s">&quot;hello&quot;</span>;
+
+<span class="t">i64</span> gUsers[MAX_USERS];
+
+<span class="t">i64</span> classify(<span class="t">i64</span> n) {
+    <span class="k">switch</span> (n) {
+        <span class="k">case</span> MAX_USERS: <span class="k">return</span> <span class="n">1</span>;
+        <span class="k">default</span>: <span class="k">return</span> <span class="n">0</span>;
+    }
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d %.1f %s\n&quot;</span>, MAX_USERS, DOUBLE_MAX, RATE, GREETING);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, classify(<span class="n">4</span>), <span class="k">sizeof</span>(gUsers));
+}</code></pre>
+<pre class="out"><code>4 8 0.5 hello
+1 32</code></pre>
+<p>Assigning to a constant is an error, with <code>=</code>, <code>+=</code> or <code>++</code>:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">const</span> <span class="t">i64</span> LIMIT = <span class="n">10</span>;
+
+<span class="t">void</span> main() {
+    LIMIT = <span class="n">11</span>;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<p>A local can be <code>const</code> too, and so can a parameter, which then can't be assigned inside the function:</p>
+<pre class="code run"><code><span class="t">i64</span> twice(<span class="k">const</span> <span class="t">i64</span> n) {
+    <span class="k">return</span> n * <span class="n">2</span>;
+}
+
+<span class="t">void</span> main() {
+    <span class="k">const</span> <span class="t">i64</span> start = <span class="n">21</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, twice(start));
+}</code></pre>
+<pre class="out"><code>42</code></pre>
+<ul><li>A <code>const</code> variable needs a value; a parameter gets its value from the call.</li><li><code>const</code> goes only at the start of a declaration. It isn't part of a type as in C: <code>u8 const *p</code>, a <code>const</code> field, a <code>const</code> return type or a cast to <code>const</code> are errors.</li><li>Prefer <code>const</code> to <code>#define</code> for numbers: it has a type, and editors know what it is.</li></ul>
+<h2 id="scope-and-shadowing"><a href="#scope-and-shadowing">Scope and shadowing</a></h2>
+<p>A name is visible from its declaration to the end of its block. An inner block can declare a name that an outer one has; inside the inner block, the name means the inner variable.</p>
+<pre class="code run"><code><span class="t">i64</span> gLevel = <span class="n">1</span>;
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;global: %d\n&quot;</span>, gLevel);
+    <span class="t">i64</span> gLevel = <span class="n">2</span>;
+    printf(<span class="s">&quot;local: %d\n&quot;</span>, gLevel);
+    {
+        <span class="t">i64</span> gLevel = <span class="n">3</span>;
+        printf(<span class="s">&quot;inner block: %d\n&quot;</span>, gLevel);
+    }
+    printf(<span class="s">&quot;local again: %d\n&quot;</span>, gLevel);
+}</code></pre>
+<pre class="out"><code>global: 1
+local: 2
+inner block: 3
+local again: 2</code></pre>
+<p>Declaring the same name twice in one block is an error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> x = <span class="n">1</span>;
+    <span class="t">i64</span> x = <span class="n">2</span>;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<p>A local may even have the name of an imported module. For its scope, the name means the local:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span>[] str = <span class="s">&quot;a local called str&quot;</span>;
+    printf(<span class="s">&quot;%s, %d bytes\n&quot;</span>, str, str.len);
+}</code></pre>
+<pre class="out"><code>a local called str, 18 bytes</code></pre>
+<p>A global can't: <code>i64 str;</code> at file scope would hide the module for the whole file, and is an error.</p>
+    <nav class="pager"><a class="prev" href="02-types-and-values.html"><span>Previous</span>Types and values</a><a class="next" href="04-operators.html"><span>Next</span>Operators</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#declaring-a-variable">Declaring a variable</a></li><li><a href="#locals-start-zeroed">Locals start zeroed</a></li><li><a href="#global-variables">Global variables</a></li><li><a href="#auto">auto</a></li><li><a href="#static-locals">static locals</a></li><li><a href="#constants">Constants</a></li><li><a href="#scope-and-shadowing">Scope and shadowing</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

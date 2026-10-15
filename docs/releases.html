@@ -4,62 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Releases - ktm</title>
-<meta name="color-scheme" content="light dark">
-<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="assets/style.css?v=c4e8d50ba8">
-<script>
-(function () {
-  var t = new URLSearchParams(location.search).get("theme");
-  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
-  if (t !== "light") t = "dark";   // dark unless light was chosen
-  document.documentElement.setAttribute("data-theme", t);
-  try { if (localStorage.getItem("ktm-side") === "closed") document.documentElement.classList.add("side-closed"); } catch (e) {}
-})();
-</script>
-<script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=d0fee83c85" defer></script>
+<meta name="description" content="What changed in each version of ktm.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
-<a class="skip" href="#content">Skip to content</a>
-<header class="topbar">
-  <button class="menu" type="button" aria-label="Show or hide the page list" aria-expanded="false" aria-controls="sidebar">
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-  </button>
-  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
-  <nav class="toplinks" aria-label="Sections">
-    <a href="getting-started.html">Start</a>
-    <a href="language.html">Language</a>
-    <a href="library.html">Library</a>
-    <a href="tools.html">Tools</a>
-    <a href="guides.html">Guides</a>
-    <a href="stdlib.html">Reference</a>
-  </nav>
-  <div class="search" role="search">
-    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
-           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
-           aria-autocomplete="list" role="combobox">
-    <kbd class="search-key" aria-hidden="true">/</kbd>
-    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="index.html">ktm</a>
+    <nav class="main">
+      <a href="language/index.html">Language</a>
+      <a href="std/index.html">Library</a>
+      <a href="releases.html" class="on">Releases</a>
+    </nav>
+    <div class="search" data-root="">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
-  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
-  <button class="theme" type="button" aria-label="Switch between light and dark">
-    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-  </button>
 </header>
-<div class="layout">
-  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
-<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li><a href="guide-http-12-production.html">12. Production</a></li></ul></details><details class="group" open><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li class="current"><a href="releases.html" aria-current="page">Releases</a></li></ul></details>
-  </nav>
-  <div class="scrim" hidden></div>
-  <main id="content">
-<div class="crumbs"><span><a href="stdlib.html">Reference</a></span></div>
+<main class="narrow prose">
 <h1>Releases</h1>
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
-<h2 id="v0-23-1-2026-10-15">v0.23.1 <small>(2026-10-15)</small><a class="anchor" href="#v0-23-1-2026-10-15" aria-label="Link to this section">#</a></h2>
+<h2>v0.23.1 <small>(2026-10-15)</small></h2>
 <p>Two fixes to prebuilt packages (v0.22.0), found building <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>
 v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 from GitHub. With v0.22.0 or v0.23.0,
 <code>KTM_PREBUILD=0</code> (or <code>-jit</code>) avoids both.</p>
@@ -73,7 +47,7 @@ v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 fro
   of a module or a tree.</li>
 </ul>
 
-<h2 id="v0-23-0-2026-10-15">v0.23.0 <small>(2026-10-15)</small><a class="anchor" href="#v0-23-0-2026-10-15" aria-label="Link to this section">#</a></h2>
+<h2>v0.23.0 <small>(2026-10-15)</small></h2>
 <p>The cryptography that signed and encrypted tokens need, and new versions of two packages.</p>
 <ul>
   <li><code>crypto</code>: Ed25519 keys (<code>generateKey(KeyKind.ed25519)</code>, PEM, <code>ed25519PublicKey</code>;
@@ -81,7 +55,7 @@ v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 fro
   <code>ec521</code>, <code>Key.ecPoint</code>); RSA-PSS (<code>Key.signPss</code>, <code>verifyPss</code>); and the
   building blocks of encrypted tokens: AES-128/192-GCM, AES-CBC, AES key wrap, RSA-OAEP
   (<code>Key.encryptOaep</code>, <code>decryptOaep</code>) and ECDH (<code>Key.ecdh</code>). See
-  <a href="lib-crypto.html">Cryptography</a>.</li>
+  <a href="std/index.html#crypto">Cryptography</a>.</li>
   <li>A function can have 256 <code>try</code> blocks and <code>defer</code>s (each <code>ad</code> variable is one)
   in scope at once, not 32, and going past that says where.</li>
   <li><a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0: EdDSA, ES384/ES512 and PS256/384/512 tokens;
@@ -93,17 +67,17 @@ v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 fro
   text rows).</li>
 </ul>
 
-<h2 id="v0-22-0-2026-10-15">v0.22.0 <small>(2026-10-15)</small><a class="anchor" href="#v0-22-0-2026-10-15" aria-label="Link to this section">#</a></h2>
+<h2>v0.22.0 <small>(2026-10-15)</small></h2>
 <p>Conditions without parentheses, thread-local globals, crash reports that follow packages and inlined calls,
 JWTs, and packages compiled once.</p>
 <ul>
   <li>The condition of <code>if</code>, <code>while</code>, <code>do ... while</code>, <code>for</code> and
   <code>switch</code> can be written without parentheses, as in Go: <code>if x &gt; 0 {</code>,
   <code>for i64 i = 0; i &lt; n; i++ {</code>, plus <code>for cond {</code> and <code>for {</code>. With them works as
-  before, and one program can mix both. See <a href="lang-control-flow.html">Control flow</a>.</li>
+  before, and one program can mix both. See <a href="language/05-control-flow.html">Control flow</a>.</li>
   <li><code>threadlocal</code> globals: <code>threadlocal i64 x;</code> is one variable per thread, one instruction to
   reach in compiled code. The runtime keeps its per-thread state in one, so it no longer calls into pthreads to find
-  it: <code>coro.current()</code> is 2x faster, a <code>try</code> about 15%. See <a href="lang-variables.html">Variables</a>.</li>
+  it: <code>coro.current()</code> is 2x faster, a <code>try</code> about 15%. See <a href="language/03-variables.html">Variables</a>.</li>
   <li><code>ad T x;</code> without a value: it starts empty and is freed at the end of its block (a pointer only if
   set). An <code>@json</code> or <code>@yaml</code> struct with no <code>free()</code> is freed with its
   <code>freeDecoded()</code>, so <code>ad User u = json.decode&lt;User&gt;(...)</code> works.</li>
@@ -114,7 +88,7 @@ JWTs, and packages compiled once.</p>
   names the package's file; a function the compiler inlined from another file shows as <code>(inlined)</code> at
   its own line.</li>
   <li>Packages: a package from the module cache is compiled once into the cache and linked from there by later builds
-  (<a href="tools-packages.html">Prebuilt packages</a>; <code>KTM_PREBUILD=0</code> turns it off). Options can come
+  (Prebuilt packages; <code>KTM_PREBUILD=0</code> turns it off). Options can come
   before a command: <code>ktm --install-dir=X mod init</code>.</li>
   <li>Struct copies of up to 32 bytes (a <code>u8[]</code>, a <code>String</code>) are a few moves instead of a call
   to <code>memcpy</code>: a loop that returns slices runs 2.2x faster.</li>
@@ -127,16 +101,16 @@ JWTs, and packages compiled once.</p>
 </ul>
 <p><b>Changes you may notice:</b> <code>threadlocal</code> is a keyword now, so a variable can't be called that.</p>
 
-<h2 id="v0-21-0-2026-10-14">v0.21.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-21-0-2026-10-14" aria-label="Link to this section">#</a></h2>
-<p>Everything a REST API needs, and a guide that builds one: <a href="guide-http.html">HTTP programming</a> takes a
+<h2>v0.21.0 <small>(2026-10-14)</small></h2>
+<p>Everything a REST API needs, and a guide that builds one: HTTP programming takes a
 bookmarks service from ten lines to PostgreSQL, accounts, tests and production.</p>
 <ul>
-  <li>Guides: a new section, starting with <a href="guide-http.html">HTTP programming</a>, twelve chapters on one
+  <li>Guides: a new section, starting with HTTP programming, twelve chapters on one
   project, every listing run for real.</li>
   <li><code>ktm test</code> and the <code>testing</code> module: <code>void testXxx(testing.T *t)</code> in
   <code>*_test.ktm</code> files, <code>t.check</code>, <code>t.equal</code>, <code>t.fatal</code>, <code>t.skip</code>,
   <code>-run</code>, <code>-v</code>, <code>./...</code>, <code>-jit -Memsafe</code>; each directory's tests run in that
-  directory. See <a href="tools-testing.html">Testing</a>.</li>
+  directory. See Testing.</li>
   <li><code>validate</code>: <code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>,
   <code>@url</code>, <code>@oneOf</code> on fields, with readable errors; <code>http.decodeValid&lt;T&gt;(r)</code>
   answers 422 with every bad field. <code>config.fromEnv</code> checks the same rules and names the variable.</li>
@@ -157,7 +131,7 @@ bookmarks service from ten lines to PostgreSQL, accounts, tests and production.<
   <li><code>@key</code> and <code>@skip</code> go on any struct (ktm-pg reads them for columns).</li>
 </ul>
 
-<h2 id="v0-20-1-2026-10-14">v0.20.1 <small>(2026-10-14)</small><a class="anchor" href="#v0-20-1-2026-10-14" aria-label="Link to this section">#</a></h2>
+<h2>v0.20.1 <small>(2026-10-14)</small></h2>
 <p>A fix for the release downloads.</p>
 <ul>
   <li>The Linux and macOS zips of v0.19.0 and v0.20.0 couldn't build programs that import <code>net.http</code>,
@@ -170,25 +144,25 @@ bookmarks service from ten lines to PostgreSQL, accounts, tests and production.<
   wider.</li>
 </ul>
 
-<h2 id="v0-20-0-2026-10-14">v0.20.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-20-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<h2>v0.20.0 <small>(2026-10-14)</small></h2>
 <p>Packages, as Go has them, and the libraries a web service needs: TLS, HTTPS, an HTTP client, cryptography and
 password hashing, URLs, UUIDs, base64, command-line flags and settings from the environment.</p>
 <ul>
   <li>Packages: <code>import "github.com/ozzenerol/ktm-pg";</code>, a <code>ktm.mod</code> with one major version per
   package, <code>ktm.sum</code> hashes, <code>ktm get</code>, <code>ktm mod init/tidy/download/verify/why/list</code>,
   minimal version selection, a module cache, <code>ktm build</code> and <code>ktm run</code> for a project; warnings from a
-  dependency's code aren't shown. See <a href="tools-packages.html">Packages</a>. The first package is
+  dependency's code aren't shown. See Packages. The first package is
   <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.1.0, a PostgreSQL client written in ktm (no libpq).</li>
   <li><code>net.tls</code>: TLS clients and servers (mbedTLS 3.6 inside, built into <code>libktmtls</code>, so programs need
   nothing installed). <code>net.https</code> serves a <code>net.http</code> mux over TLS and gives the client
-  <code>https://</code>. See <a href="lib-tls.html">TLS</a>.</li>
+  <code>https://</code>. See <a href="std/index.html#net.tls">TLS</a>.</li>
   <li>An HTTP client in <code>net.http</code>: <code>http.get</code>, <code>http.post</code>, <code>http.postJson</code>,
   <code>http.request</code>, <code>http.decodeResponse&lt;T&gt;</code>; kept-alive connections per host, redirects, time
-  limits, a size limit, a retry when a kept-alive connection was closed. See <a href="lib-http.html">HTTP</a>.</li>
+  limits, a size limit, a retry when a kept-alive connection was closed. See <a href="std/index.html#net.http">HTTP</a>.</li>
   <li><code>crypto</code>: secure random bytes, SHA-256/512, BLAKE2b, HMAC, HKDF, PBKDF2, a constant-time compare,
   AES-256-GCM and ChaCha20-Poly1305, ECDSA P-256 keys and signatures; passwords with
   <code>crypto.hashPassword</code> (Argon2id, PHC strings), <code>crypto.bcrypt</code>, <code>crypto.verifyPassword</code>
-  (both kinds) and <code>crypto.needsRehash</code>, as fast as Go's. See <a href="lib-crypto.html">Cryptography</a>.</li>
+  (both kinds) and <code>crypto.needsRehash</code>, as fast as Go's. See <a href="std/index.html#crypto">Cryptography</a>.</li>
   <li><code>coro.offload(fn, arg)</code> runs heavy work on worker threads while the coroutine waits, so its loop keeps
   serving; password hashing uses it by itself (a <code>/ping</code> during logins: 0.3 ms, not 100 ms). Also
   <code>coro.park</code> and <code>coro.unpark</code> (from any thread), and <code>coro.inLoop()</code>.</li>
@@ -207,7 +181,7 @@ password hashing, URLs, UUIDs, base64, command-line flags and settings from the 
   programs running at the time could crash (it now installs new files and renames them over the old ones).</li>
 </ul>
 
-<h2 id="v0-19-0-2026-10-14">v0.19.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-19-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<h2>v0.19.0 <small>(2026-10-14)</small></h2>
 <p>HTTP servers: <code>net.http</code>, Go's <code>net/http</code> and <code>ServeMux</code> for ktm, about 3 times as fast.</p>
 <ul>
   <li><code>import net.http;</code>: <code>http.Mux</code> routes by Go 1.22 patterns (<code>"GET /users/{id}"</code>,
@@ -219,7 +193,7 @@ password hashing, URLs, UUIDs, base64, command-line flags and settings from the 
   finishes the requests in progress.</li>
   <li>Middleware (<code>mux.use</code>), groups with a prefix (<code>mux.group</code>), static files (<code>mux.files</code>),
   an access log (<code>http.Options.accessLog</code>), and <code>http.testRequest</code> / <code>http.recorder()</code> to test
-  handlers without a socket. See <a href="lib-http.html">HTTP servers</a>.</li>
+  handlers without a socket. See <a href="std/index.html#net.http">HTTP servers</a>.</li>
   <li>Measured against Go 1.27 <code>net/http</code> on the same 2 cores: 2.7 to 3.75 times the requests per second with 16 or
   more connections, 2.2 to 2.6 times the requests per CPU-second, lower median and p99 latency everywhere (p99 at 1024
   connections: 4.5 to 6 ms against Go's 21 to 25 ms), a quarter of the memory.</li>
@@ -230,7 +204,7 @@ password hashing, URLs, UUIDs, base64, command-line flags and settings from the 
   calls a <code>static</code> function of its module didn't link in programs.</li>
 </ul>
 
-<h2 id="v0-18-0-2026-10-14">v0.18.0 <small>(2026-10-14)</small><a class="anchor" href="#v0-18-0-2026-10-14" aria-label="Link to this section">#</a></h2>
+<h2>v0.18.0 <small>(2026-10-14)</small></h2>
 <p>Memory that frees itself where it should, clearer <code>-Memsafe</code> reports, <code>switch</code> on strings, and
 a round of stdlib additions.</p>
 <ul>
@@ -265,7 +239,7 @@ a round of stdlib additions.</p>
   <li>Fixes: a statement that is only a field (<code>self.port;</code>) stopped the compiler; code inlined from another
   file was reported at a line of the wrong file; overloads with a generic parameter gave an assembler error.</li>
 </ul>
-<h3 id="changes-you-may-notice">Changes you may notice<a class="anchor" href="#changes-you-may-notice" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>Freeing a String through a copy and then freeing its container is now a double free:
   <code>v.get(i).free()</code>, or freeing a value from <code>map.next()</code>, before <code>v.free()</code> or
@@ -280,14 +254,14 @@ a round of stdlib additions.</p>
   <li><code>-Memsafe</code> no longer calls what a global holds at exit a leak.</li>
 </ul>
 
-<h2 id="v0-17-2-2026-10-13">v0.17.2 <small>(2026-10-13)</small><a class="anchor" href="#v0-17-2-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.17.2 <small>(2026-10-13)</small></h2>
 <p>One logging fix.</p>
 <ul>
   <li><code>log.Options.toStdout</code> with a <code>path</code> writes each line to the file and to stdout.
   Before, the file won and <code>toStdout</code> was ignored without a word.</li>
 </ul>
 
-<h2 id="v0-17-1-2026-10-13">v0.17.1 <small>(2026-10-13)</small><a class="anchor" href="#v0-17-1-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.17.1 <small>(2026-10-13)</small></h2>
 <p>Program arguments, and a flaky test.</p>
 <ul>
   <li>With <code>-run</code> or <code>-jit</code>, everything after the source file goes to the program, even
@@ -297,7 +271,7 @@ a round of stdlib additions.</p>
   now installs the handler first, as <code>signal.stopInit</code> asks.</li>
 </ul>
 
-<h2 id="v0-17-0-2026-10-13">v0.17.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-17-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.17.0 <small>(2026-10-13)</small></h2>
 <p>C's stdio in libc, and logging to stdout.</p>
 <ul>
   <li><code>libc.fprintf(stream, fmt, ...)</code> with <code>libc.stdin</code>, <code>libc.stdout</code> and
@@ -308,7 +282,7 @@ a round of stdlib additions.</p>
   <li><code>_extern</code> binds C data by its symbol too: <code>_extern ___stderrp FILE *stderr;</code>,
   and in a module it has the module's name.</li>
 </ul>
-<h3 id="changes-you-may-notice-2">Changes you may notice<a class="anchor" href="#changes-you-may-notice-2" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>The format strings of <code>libc.printf</code>, <code>libc.snprintf</code> and <code>libc.fprintf</code>
   are now checked against their arguments, as <code>printf</code>'s always was, so a wrong count is now
@@ -316,7 +290,7 @@ a round of stdlib additions.</p>
   is checked too (its format was looked for in the wrong argument before).</li>
 </ul>
 
-<h2 id="v0-16-0-2026-10-13">v0.16.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-16-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.16.0 <small>(2026-10-13)</small></h2>
 <p>A default logger, so a program logs from anywhere without passing a Logger around.</p>
 <ul>
   <li><code>log.setup(&amp;o)</code> once in <code>main</code>, then <code>log.info(...)</code>,
@@ -328,7 +302,7 @@ a round of stdlib additions.</p>
   <li><code>log.open</code> and <code>log.Logger</code> are unchanged.</li>
 </ul>
 
-<h2 id="v0-15-2-2026-10-13">v0.15.2 <small>(2026-10-13)</small><a class="anchor" href="#v0-15-2-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.15.2 <small>(2026-10-13)</small></h2>
 <p>One fix for the language server.</p>
 <ul>
   <li>The language server could send a semantic-tokens reply with stray bytes in it when a file had
@@ -337,7 +311,7 @@ a round of stdlib additions.</p>
   list. The cause was in the compiler's string buffers, which now always start empty.</li>
 </ul>
 
-<h2 id="v0-15-1-2026-10-13">v0.15.1 <small>(2026-10-13)</small><a class="anchor" href="#v0-15-1-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.15.1 <small>(2026-10-13)</small></h2>
 <p>Two fixes for compile errors.</p>
 <ul>
   <li>A range-for with nothing to range over crashed the compiler. An array literal,
@@ -350,7 +324,7 @@ a round of stdlib additions.</p>
   "Type `ad` has not been declared".</li>
 </ul>
 
-<h2 id="v0-15-0-2026-10-13">v0.15.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-15-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.15.0 <small>(2026-10-13)</small></h2>
 <p>Logging, and functions that know where they were called from.</p>
 <ul>
   <li>A new <code>log</code> module: <code>lg.debug</code>, <code>info</code>, <code>warn</code>
@@ -358,18 +332,18 @@ a round of stdlib additions.</p>
   <code>2026-10-13T14:02:11.482Z INFO listening on :8080</code>. <code>showFile</code> and
   <code>showFunc</code> add the call's <code>main.ktm:42</code> and function. A file rotates by
   size (<code>maxBytes</code>, <code>keep</code>), and <code>threadSafe</code> lets several threads
-  share one Logger without their lines mixing. See <a href="lib-logging.html">Logging</a>.</li>
+  share one Logger without their lines mixing. See <a href="std/index.html#log">Logging</a>.</li>
   <li><code>@caller("file")</code>, <code>@caller("line")</code> and <code>@caller("func")</code>
   before a parameter: every call fills it with where the call is written, and callers never pass
   it. They work in methods, before <code>...args</code>, next to defaults and through
   <code>auto</code> function pointers. Signature help in the language server skips them. See
-  <a href="lang-functions.html#where-a-call-comes-from">Where a call comes from</a>.</li>
+  <a href="language/07-functions.html#where-a-call-comes-from">Where a call comes from</a>.</li>
   <li>Known issues lists two bugs found along the way, both planned for v0.15.1: a range-for over
   an array literal crashes the compiler, and a confusing error for an <code>ad</code> declaration
   whose module isn't imported.</li>
 </ul>
 
-<h2 id="v0-14-0-2026-10-13">v0.14.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-14-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.14.0 <small>(2026-10-13)</small></h2>
 <p>JSON and YAML without reflection. Mark a struct <code>@json</code> or <code>@yaml</code> and
 the compiler writes its encoder and decoder.</p>
 <ul>
@@ -393,7 +367,7 @@ the compiler writes its encoder and decoder.</p>
   block and flow mappings and sequences, plain and quoted scalars, block scalars and comments.
   Anchors, tags, merge keys and more than one document are reported as not supported.</li>
 </ul>
-<h3 id="changes-you-may-notice-3">Changes you may notice<a class="anchor" href="#changes-you-may-notice-3" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>Decode errors start with the line and column in the text:
   <code>1:22: tags[0].weight: expected an integer, got a string</code>. The rest of each
@@ -406,7 +380,7 @@ the compiler writes its encoder and decoder.</p>
   an "unexpected character".</li>
 </ul>
 
-<h2 id="v0-13-3-2026-10-13">v0.13.3 <small>(2026-10-13)</small><a class="anchor" href="#v0-13-3-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.13.3 <small>(2026-10-13)</small></h2>
 <p>Fixes for struct values passed by value, and clearer errors.</p>
 <ul>
   <li>Passing <code>*p</code> (a struct, by value) to a function no longer breaks the other
@@ -425,7 +399,7 @@ the compiler writes its encoder and decoder.</p>
   <code>null</code>, not <code>0(void *)</code>.</li>
 </ul>
 
-<h2 id="v0-13-2-2026-10-13">v0.13.2 <small>(2026-10-13)</small><a class="anchor" href="#v0-13-2-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.13.2 <small>(2026-10-13)</small></h2>
 <p>A <code>vec.Vec</code> is a JSON array.</p>
 <ul>
   <li><code>json.decode</code> fills a <code>vec.Vec&lt;T&gt;</code> field (or a top-level
@@ -439,7 +413,7 @@ the compiler writes its encoder and decoder.</p>
   and <code>cap</code> fields is still an object: a Vec is known by its type.</li>
 </ul>
 
-<h2 id="v0-13-1-2026-10-13">v0.13.1 <small>(2026-10-13)</small><a class="anchor" href="#v0-13-1-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.13.1 <small>(2026-10-13)</small></h2>
 <p>A clean build and a tidier library reference.</p>
 <ul>
   <li>Building ktm prints no C compiler warnings. One was a real risk: a loop counter that was
@@ -451,17 +425,17 @@ the compiler writes its encoder and decoder.</p>
   <li><code>fs</code> no longer has its own <code>opendir</code> and <code>readdir</code>
   declarations, which repeated <code>libc</code>'s and showed up in the library reference as
   <code>fs.opendir</code>, <code>fs.readdir</code> and <code>fs.libc.*</code>.</li>
-  <li>The Neovim setup in <a href="tools.html">Tools</a> covers lazy.nvim, which resets the
+  <li>The Neovim setup in Tools covers lazy.nvim, which resets the
   runtime path: list ktm's vim directory in <code>performance.rtp.paths</code>.</li>
 </ul>
 
-<h2 id="v0-13-0-2026-10-13">v0.13.0 <small>(2026-10-13)</small><a class="anchor" href="#v0-13-0-2026-10-13" aria-label="Link to this section">#</a></h2>
+<h2>v0.13.0 <small>(2026-10-13)</small></h2>
 <p>Ahead of Go on every load. On Linux the coroutine loop now runs on io_uring, and a
 coroutine-per-connection server written the plain way (<code>coro.serve</code>,
 <code>coro.read</code>, <code>coro.write</code>) does more work per CPU-second than Go 1.27's
 goroutine-per-connection server in every scenario of the echo benchmark, with less memory
 (server on 2 cores, client on 6, so the client is never the limit):</p>
-<div class="table-wrap"><table>
+<table>
   <thead><tr><th>Scenario</th><th>ktm</th><th>Go</th><th>per server CPU-second</th></tr></thead>
   <tbody>
     <tr><td>64 B request/response, 64 clients</td><td>368k req/s</td><td>168k req/s</td><td>+45%</td></tr>
@@ -470,9 +444,9 @@ goroutine-per-connection server in every scenario of the echo benchmark, with le
     <tr><td>64 KiB streams, 16 connections</td><td>7.5 GB/s</td><td>6.6 GB/s</td><td>+12%</td></tr>
     <tr><td>64 KiB streams, 64 connections</td><td>7.4 GB/s</td><td>6.5 GB/s</td><td>+9%</td></tr>
   </tbody>
-</table></div>
+</table>
 
-<h3 id="coroutines-and-networking">Coroutines and networking<a class="anchor" href="#coroutines-and-networking" aria-label="Link to this section">#</a></h3>
+<h3>Coroutines and networking</h3>
 <ul>
   <li>The coroutine loop runs on io_uring on Linux 6.1 and later: reads, writes and accepts go
   to the kernel directly, all of a turn in one system call. It falls back to epoll (an older
@@ -488,19 +462,19 @@ goroutine-per-connection server in every scenario of the echo benchmark, with le
   its loop meanwhile; its docs now say so.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-4">Changes you may notice<a class="anchor" href="#changes-you-may-notice-4" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>On Linux, programs using the coroutine loop run on io_uring by default. Set
   <code>KTM_CORO_BACKEND=epoll</code> to keep the previous loop.</li>
 </ul>
 
-<h2 id="v0-12-0-2026-10-12">v0.12.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-12-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.12.0 <small>(2026-10-12)</small></h2>
 <p>Memory. A coroutine-per-connection server now uses less memory than Go's
 goroutine-per-connection server at every load of the echo benchmark: with 1024 clients,
 10.7 MB against Go's 11.6 MB (ktm v0.11.0 took 72 MB), and it keeps v0.11.0's speed
 (request/response 3% to 35% ahead of Go, a quarter of Go's p99 latency at 64 clients).</p>
 
-<h3 id="big-stack-frames">Big stack frames<a class="anchor" href="#big-stack-frames" aria-label="Link to this section">#</a></h3>
+<h3>Big stack frames</h3>
 <ul>
   <li>A function whose stack frame is bigger than a page used to touch every page of it on the
   way in, so that a stack overflow couldn't jump over the guard page. That made every page of a
@@ -510,7 +484,7 @@ goroutine-per-connection server at every load of the echo benchmark: with 1024 c
   arm64.</li>
 </ul>
 
-<h3 id="coroutines">Coroutines<a class="anchor" href="#coroutines" aria-label="Link to this section">#</a></h3>
+<h3>Coroutines</h3>
 <ul>
   <li>Released coroutine stacks kept for reuse give their memory back once they are older than
   the four most recently released ones (<code>madvise</code> on Linux, a fresh mapping on
@@ -518,7 +492,7 @@ goroutine-per-connection server at every load of the echo benchmark: with 1024 c
   releasing short coroutines costs the same as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-5">Changes you may notice<a class="anchor" href="#changes-you-may-notice-5" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>Running off the end of a stack (deep recursion, a frame too big for a thread's stack) now
   prints <code>stack overflow</code> and ends the program with SIGABRT, instead of a bare
@@ -527,12 +501,12 @@ goroutine-per-connection server at every load of the echo benchmark: with 1024 c
   stack than before before it is stopped.</li>
 </ul>
 
-<h2 id="v0-11-0-2026-10-12">v0.11.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-11-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.11.0 <small>(2026-10-12)</small></h2>
 <p>Networking that is fast by default. A TCP server written the plain way, a coroutine per
 connection with <code>coro.serve</code>, now uses every core and the kernel's event queue, and
 beats Go 1.27's goroutine-per-connection server on request/response traffic (an echo
 benchmark on one Linux machine, both servers untuned):</p>
-<div class="table-wrap"><table>
+<table>
   <thead><tr><th>64-byte request/response</th><th>ktm</th><th>Go</th></tr></thead>
   <tbody>
     <tr><td>16 clients</td><td>325k req/s</td><td>281k req/s</td></tr>
@@ -540,12 +514,12 @@ benchmark on one Linux machine, both servers untuned):</p>
     <tr><td>256 clients</td><td>365k req/s</td><td>294k req/s</td></tr>
     <tr><td>1024 clients</td><td>333k req/s</td><td>321k req/s</td></tr>
   </tbody>
-</table></div>
+</table>
 <p>With 4 KiB messages ktm serves 32% more requests with a fifth of Go's p99. A single bulk
 stream runs 22% faster; with 16 and 64 streams at once ktm and Go are about even (within 3%
 either way, run to run).</p>
 
-<h3 id="coroutines-and-networking-2">Coroutines and networking<a class="anchor" href="#coroutines-and-networking-2" aria-label="Link to this section">#</a></h3>
+<h3>Coroutines and networking</h3>
 <ul>
   <li><code>coro.serve(port, &amp;handler, arg, threads, bindaddr)</code>: a whole TCP server in
   one call. It runs <code>handler(fd, arg)</code> as a coroutine for each client on one loop per
@@ -563,7 +537,7 @@ either way, run to run).</p>
   <code>poll</code> as before.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-6">Changes you may notice<a class="anchor" href="#changes-you-may-notice-6" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>An fd waited on with <code>coro.wait</code> stays registered with the kernel between
   waits, so close it with <code>coro.close</code>, as the docs already said for connections: a
@@ -572,12 +546,12 @@ either way, run to run).</p>
   <li><code>coro.waitChild</code> closes its exit fd with <code>coro.close</code>.</li>
 </ul>
 
-<h2 id="v0-10-1-2026-10-12">v0.10.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-10-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.10.1 <small>(2026-10-12)</small></h2>
 <p>Editor support, fixed and made rich: the language server understands the whole current
 language and gains the features editors expect, and the Vim syntax is rewritten for today's
 ktm. Also: directories and file operations in <code>fs</code>.</p>
 
-<h3 id="the-language-server">The language server<a class="anchor" href="#the-language-server" aria-label="Link to this section">#</a></h3>
+<h3>The language server</h3>
 <ul>
   <li>Fixed: only the first module of an import list (<code>import mem, str, json;</code>) was
   seen, so hover, definition and completion failed on every stdlib call after it.</li>
@@ -599,7 +573,7 @@ ktm. Also: directories and file operations in <code>fs</code>.</p>
   of the modules an <code>import</code> can name.</li>
 </ul>
 
-<h3 id="vim-and-neovim">Vim and Neovim<a class="anchor" href="#vim-and-neovim" aria-label="Link to this section">#</a></h3>
+<h3>Vim and Neovim</h3>
 <ul>
   <li>The syntax file is rewritten for the current language: lowercase types, <code>fn</code>,
   <code>module</code> and <code>import</code> lists, <code>pub</code>, <code>defer</code>,
@@ -607,10 +581,10 @@ ktm. Also: directories and file operations in <code>fs</code>.</p>
   <code>true</code>/<code>false</code>/<code>null</code>, digit separators, ktm's escapes and
   format conversions. It comes with filetype detection (Neovim took <code>.ktm</code> for
   another language) and an ftplugin, and installs into <code>&lt;prefix&gt;/share/ktm/vim</code>
-  (see <a href="tools.html">Tools</a>).</li>
+  (see Tools).</li>
 </ul>
 
-<h3 id="the-standard-library">The standard library<a class="anchor" href="#the-standard-library" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li><code>fs.openDir(path)</code> and <code>d.next()</code> read a directory: each entry's
   name, kind (a symlink is a link) and joined path, without <code>.</code> and
@@ -621,11 +595,11 @@ ktm. Also: directories and file operations in <code>fs</code>.</p>
   <li><code>fs.join</code>, <code>fs.exists</code>, <code>fs.makeDirAll</code>,
   <code>fs.copyFile</code> (with the permission bits), <code>fs.rename</code>, and
   <code>fs.move</code>, which copies and removes across filesystems. See
-  <a href="library.html#directories">the library guide</a>.</li>
+  <a href="std/index.html#fs">the library guide</a>.</li>
   <li>libc's constants passed its C-only check in a normal build but not in the REPL; fixed.</li>
 </ul>
 
-<h2 id="v0-10-0-2026-10-12">v0.10.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-10-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.10.0 <small>(2026-10-12)</small></h2>
 <p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
 <code>map.Map&lt;K, V&gt;</code>, <code>map.Tree&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code> and
 <code>list.List&lt;T&gt;</code> hold any type with no <code>void *</code> and no casts, are values
@@ -642,32 +616,32 @@ i64 byX(Point *a, Point *b) { return a.x - b.x; }
 
 void main()
 {
-  ad vec.Vec&lt;Point&gt; pts = vec.new&lt;Point&gt;();
+  ad vec.Vec<Point> pts = vec.new<Point>();
   Point a = {3, 1}, b = {1, 2};
   pts.push(a);
   pts.push(b);
-  pts.sort(&amp;byX);
+  pts.sort(&byX);
   for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
   printf("\n");
 
-  ad map.Map&lt;u8[], i64&gt; counts = map.new&lt;u8[], i64&gt;();
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
   u8[] words[] = {"to", "be", "or", "not", "to", "be"};
   for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
   i64 it = 0, n;
   u8[] word;
-  while (counts.next(&amp;it, &amp;word, &amp;n)) { printf("%s=%d ", word, n); }
+  while (counts.next(&it, &word, &n)) { printf("%s=%d ", word, n); }
   printf("\n");
 
-  ad set.Set&lt;i64&gt; seen = set.new&lt;i64&gt;();
+  ad set.Set<i64> seen = set.new<i64>();
   printf("%d %d\n", seen.add(4), seen.add(4));
 
-  ad list.List&lt;u8 *&gt; jobs = list.new&lt;u8 *&gt;();
+  ad list.List<u8 *> jobs = list.new<u8 *>();
   auto build = jobs.append("build");
   jobs.append("test");
   jobs.remove(build);
   for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
 
-  Point p = json.decode&lt;Point&gt;("{\"x\": 5, \"y\": 6}");
+  Point p = json.decode<Point>("{\"x\": 5, \"y\": 6}");
   printf("%d %d\n", p.x, p.y);
 }
 </code></pre>
@@ -678,7 +652,7 @@ test
 5 6
 </pre>
 
-<h3 id="the-standard-library-2">The standard library<a class="anchor" href="#the-standard-library-2" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li><code>vec.Vec&lt;T&gt;</code>: <code>vec.new&lt;T&gt;(cap)</code>, <code>push</code>,
   <code>pop</code>, <code>get</code>, <code>at</code> (a pointer to an item), <code>set</code>,
@@ -716,7 +690,7 @@ test
   <code>Map&lt;i64, i64&gt;</code> about 10% faster than <code>IntMap</code>, in our measurements.</li>
 </ul>
 
-<h3 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li>A generic struct's method is compiled the first time it is called, so a method that only
   works for some types (<code>sortAsc</code> needs <code>&lt;</code>) does not stop
@@ -728,10 +702,10 @@ test
   (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-7">Changes you may notice<a class="anchor" href="#changes-you-may-notice-7" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>The old containers are removed. They map to the new ones as follows:
-  <div class="table-wrap"><table>
+  <table>
     <tr><th>Before</th><th>Now</th></tr>
     <tr><td><code>vec.intNew()</code>, <code>vec.ptrNew()</code>, <code>vec.floatNew()</code></td>
         <td><code>vec.new&lt;i64&gt;()</code>, <code>vec.new&lt;User *&gt;()</code>, <code>vec.new&lt;f64&gt;()</code> (a value, not a pointer)</td></tr>
@@ -756,7 +730,7 @@ test
         <td><code>set.new&lt;i64&gt;()</code>, <code>s.len</code>, <code>s.equals(&amp;o)</code>, <code>s.items()</code> (insertion order: <code>sortAsc()</code> it for the old sorted order)</td></tr>
     <tr><td><code>list.new()</code>, <code>l.count()</code>, <code>l.isEmpty()</code>, the circular walk from <code>l.next</code></td>
         <td><code>list.new&lt;T&gt;()</code>, <code>l.len</code>, <code>!l.len</code>, <code>for (auto n = l.head; n; n = n.next)</code></td></tr>
-  </table></div></li>
+  </table></li>
   <li>An index out of range (<code>get</code>, <code>set</code>, <code>removeAt</code>, ...) throws
   <code>ERR_BOUNDS</code>, which a <code>try</code> can catch; the old vectors printed a message and
   exited.</li>
@@ -765,7 +739,7 @@ test
   as with any other struct.</li>
 </ul>
 
-<h3 id="fixes">Fixes<a class="anchor" href="#fixes" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>A range <code>for</code> over a call that returns a slice (<code>for (auto w : str.split(s, " "))</code>)
   ran the call again for the length and for every element, leaking what each call allocated. It runs
@@ -774,16 +748,16 @@ test
   does) described an empty type unless the program also used <code>reflect.of</code> on that type.</li>
 </ul>
 
-<h2 id="v0-9-0-2026-10-12">v0.9.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-9-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.9.0 <small>(2026-10-12)</small></h2>
 <p>Generics and type aliases. A struct, its methods and a function can take type parameters,
 and each use with other types is compiled for those types: the same code you would write by
 hand, with no <code>void *</code> and no casts.</p>
 
 <pre><code>import mem;
 
-struct Stack&lt;T&gt; { T *items; i64 len; i64 cap; };
+struct Stack<T> { T *items; i64 len; i64 cap; };
 
-void Stack&lt;T&gt;.push(T x)
+void Stack<T>.push(T x)
 {
   if (self.len == self.cap) {
     self.cap = self.cap ? self.cap * 2 : 4;
@@ -792,25 +766,25 @@ void Stack&lt;T&gt;.push(T x)
   self.items[self.len++] = x;
 }
 
-T Stack&lt;T&gt;.pop() { return self.items[--self.len]; }
-void Stack&lt;T&gt;.free() { mem.free(self.items); }
+T Stack<T>.pop() { return self.items[--self.len]; }
+void Stack<T>.free() { mem.free(self.items); }
 
-T max&lt;T&gt;(T a, T b) { return a &gt; b ? a : b; }
+T max<T>(T a, T b) { return a > b ? a : b; }
 
-type Ints = Stack&lt;i64&gt;;
+type Ints = Stack<i64>;
 
 void main()
 {
   ad Ints nums = {null, 0, 0};
   nums.push(1);
   nums.push(2);
-  ad Stack&lt;u8 *&gt; words = {null, 0, 0};
+  ad Stack<u8 *> words = {null, 0, 0};
   words.push("hello");
   printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
 }
 </code></pre>
 
-<h3 id="the-language-2">The language<a class="anchor" href="#the-language-2" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li>Generics: <code>struct Stack&lt;T&gt;</code>, its methods <code>T Stack&lt;T&gt;.pop()</code>,
   and functions <code>T max&lt;T&gt;(T a, T b)</code>, with any number of parameters. A type is
@@ -821,7 +795,7 @@ void main()
   <code>pub</code> as for any declaration) and <code>-lib</code> libraries work with them. An error
   in an instance names it and the use that asked for it. The language server shows instances and
   goes to the generic's definition. A generic <code>Vec&lt;i64&gt;</code> ran faster than
-  <code>vec.IntVec</code> in our measurements. See <a href="language.html#generics">Generics</a>.</li>
+  <code>vec.IntVec</code> in our measurements. See <a href="language/17-generics.html">Generics</a>.</li>
   <li>Type aliases: <code>type Name = T;</code> gives any type a second name (slices, pointers,
   <code>fn</code> types, fixed arrays, structs, generic instances, other aliases). An alias is its
   type, so values pass between them with no conversion; in a module <code>pub type</code> is used
@@ -829,7 +803,7 @@ void main()
   completes and jumps to them.</li>
 </ul>
 
-<h3 id="fixes-2">Fixes<a class="anchor" href="#fixes-2" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li><code>pub</code> or <code>private</code> on an enum, struct or union applied to the next
   declaration of a module as well: a private function after a <code>pub enum</code> could be
@@ -837,7 +811,7 @@ void main()
   error.</li>
 </ul>
 
-<h2 id="v0-8-0-2026-10-12">v0.8.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-8-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.8.0 <small>(2026-10-12)</small></h2>
 <p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
 and UDP with binary addresses in <code>net</code>.</p>
 
@@ -853,17 +827,17 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-3">The language<a class="anchor" href="#the-language-3" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
   end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
   String, any slice, or a struct with a <code>free()</code> method (or a pointer to one). Returning
   an <code>ad</code> variable is an error, and so is a type with no <code>free()</code>.
   <code>ad</code> is not reserved: a variable can still be named <code>ad</code>. See
-  <a href="language.html#autodefer">ad (autodefer)</a>.</li>
+  <a href="language/16-defer-and-ad.html">ad (autodefer)</a>.</li>
 </ul>
 
-<h3 id="the-standard-library-3">The standard library<a class="anchor" href="#the-standard-library-3" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
   and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
@@ -884,7 +858,7 @@ void main()
   <code>net.setBlocking</code> are public.</li>
 </ul>
 
-<h3 id="fixes-3">Fixes<a class="anchor" href="#fixes-3" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>macOS: a string literal with a NUL byte inside (<code>"\x00\x08\x00\x00"</code>) lost
   bytes in a compiled program: the linker splits the section literals went in at each NUL and
@@ -895,7 +869,7 @@ void main()
   after the failed write, which macOS needs).</li>
 </ul>
 
-<h2 id="v0-7-0-2026-10-12">v0.7.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-7-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.7.0 <small>(2026-10-12)</small></h2>
 <p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
 shares counters and flags between threads without a mutex. Locals are now always at their
 type's alignment, which atomics and C code need.</p>
@@ -908,20 +882,20 @@ i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
 
 void *worker(void *unused)
 {
-  for (i64 i = 0; i &lt; 100000; i = next(i)) { atomic.add(&amp;gHits, 1); }
+  for (i64 i = 0; i < 100000; i = next(i)) { atomic.add(&gHits, 1); }
   return null;
 }
 
 void main()
 {
   libc.pthread_t *th[4];
-  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;worker, null); }
-  for (i64 i = 0; i &lt; 4; i++) { libc.pthread_join(th[i]); }
-  printf("%d hits\n", atomic.load(&amp;gHits));
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &worker, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&gHits));
 }
 </code></pre>
 
-<h3 id="the-compiler">The compiler<a class="anchor" href="#the-compiler" aria-label="Link to this section">#</a></h3>
+<h3>The compiler</h3>
 <ul>
   <li>Inlining: a call to a short function of the program whose parameters and result are
   numbers or pointers is compiled as the function's body in the caller, which saves the call.
@@ -933,30 +907,30 @@ void main()
   instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
 </ul>
 
-<h3 id="the-standard-library-4">The standard library<a class="anchor" href="#the-standard-library-4" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
   <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
   <code>cas</code> on <code>i64</code>, <code>i32</code>, <code>u64</code> and <code>u32</code>
   (the pointer type picks the width), pointer versions (<code>loadPtr</code>,
   <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code>) and <code>fence()</code>, all
-  sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
+  sequentially consistent. See <a href="std/index.html#atomic">Atomics</a>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-8">Changes you may notice<a class="anchor" href="#changes-you-may-notice-8" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
   <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
   module.</li>
 </ul>
 
-<h3 id="fixes-4">Fixes<a class="anchor" href="#fixes-4" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
   as a block's first statement it used to point at the block's <code>{</code>.</li>
 </ul>
 
-<h2 id="v0-6-0-2026-10-12">v0.6.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-6-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.6.0 <small>(2026-10-12)</small></h2>
 <p>Function overloading, and the library pieces the example projects still wrote by hand:
 hashing, case-insensitive and URL/HTML text helpers, portable file metadata, and waiting for
 a child process inside the coroutine loop.</p>
@@ -975,13 +949,13 @@ void main()
   hash.sha256("abc", digest);
   String hex = hash.hex(digest);
   defer hex.free();
-  String q = str.urlEncode("a b&amp;c");
+  String q = str.urlEncode("a b&c");
   defer q.free();
   printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
 }
 </code></pre>
 
-<h3 id="the-language-4">The language<a class="anchor" href="#the-language-4" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li>Overloading: functions, methods and a module's functions can share a name when their
   parameter types differ, and a call picks the one its arguments fit best (an exact type over
@@ -989,12 +963,12 @@ void main()
   default and no <code>T ...name</code> extras). An ambiguous call, or one no overload takes, is
   an error that lists the overloads. <code>&amp;f</code> takes the overload of the function type
   it goes to. <code>pub</code> is per overload. The language server shows and jumps to the
-  overload a call picks. See <a href="language.html#overloading">Overloading</a>.</li>
+  overload a call picks. See <a href="language/18-overloading.html">Overloading</a>.</li>
   <li>A function with no overloads keeps its symbol, so existing libraries and C callers see no
   change; once a name has two or more, each one's symbol carries its parameter types.</li>
 </ul>
 
-<h3 id="the-standard-library-5">The standard library<a class="anchor" href="#the-standard-library-5" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
   <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
@@ -1018,18 +992,18 @@ void main()
   that way in a <code>proc.Proc</code>.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-9">Changes you may notice<a class="anchor" href="#changes-you-may-notice-9" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>A second function of a name with other parameter types used to be the error "conflicting
   types"; it is now an overload. The same parameters with another return type is still that
   error.</li>
 </ul>
 
-<h2 id="v0-5-1-2026-10-12">v0.5.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-5-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.5.1 <small>(2026-10-12)</small></h2>
 <p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
 or no longer applies to the frozen syntax).</p>
 
-<h3 id="fixes-5">Fixes<a class="anchor" href="#fixes-5" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>The old C declarator of a function that returns a function pointer,
   <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
@@ -1040,7 +1014,7 @@ or no longer applies to the frozen syntax).</p>
   guaranteed it.</li>
 </ul>
 
-<h2 id="v0-5-0-2026-10-12">v0.5.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-5-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.5.0 <small>(2026-10-12)</small></h2>
 <p>A systems library: what the example servers and tools used to write by hand. A coroutine
 loop for servers, a byte buffer, monotonic clocks and HTTP dates, the OS calls shells and
 daemons need, and small helpers. Nothing that compiled before changes meaning.</p>
@@ -1052,8 +1026,8 @@ void *client(void *arg)
   i32 fd = (i32)(i64)arg;
   bytes.Buffer in = bytes.bufferNew();
   defer in.free();
-  while (coro.waitIdle(fd, libc.POLLIN, 5000) &gt; 0 &amp;&amp; in.readFrom(fd) &gt; 0) {
-    while (in.len &gt;= 4 &amp;&amp; in.len &gt;= 4 + bytes.be32(in.data())) {
+  while (coro.waitIdle(fd, libc.POLLIN, 5000) > 0 && in.readFrom(fd) > 0) {
+    while (in.len >= 4 && in.len >= 4 + bytes.be32(in.data())) {
       in.consume(4 + bytes.be32(in.data()));
       String now = date.httpDate(date.unixNow());
       net.send(fd, now);
@@ -1067,18 +1041,18 @@ void *client(void *arg)
 void *acceptor(void *arg)
 {
   i32 lfd = (i32)(i64)arg, fd;
-  while ((fd = coro.accept(lfd)) != -1) { coro.go(&amp;client, (void *)(i64)fd); }
+  while ((fd = coro.accept(lfd)) != -1) { coro.go(&client, (void *)(i64)fd); }
   return null;
 }
 
 void main()
 {
-  coro.go(&amp;acceptor, (void *)(i64)net.listen(9000, "*", 64));
+  coro.go(&acceptor, (void *)(i64)net.listen(9000, "*", 64));
   coro.run();
 }
 </code></pre>
 
-<h3 id="the-standard-library-6">The standard library<a class="anchor" href="#the-standard-library-6" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
   thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
@@ -1118,14 +1092,14 @@ void main()
   <code>null</code>).</li>
 </ul>
 
-<h3 id="fixes-6">Fixes<a class="anchor" href="#fixes-6" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
   or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
   also keeps the code small.</li>
 </ul>
 
-<h2 id="v0-4-0-2026-10-12">v0.4.0 <small>(2026-10-12)</small><a class="anchor" href="#v0-4-0-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.4.0 <small>(2026-10-12)</small></h2>
 <p>Reflection. A program can ask the compiler about its types at run time, and the
 <code>json</code> module uses that to turn any struct into JSON and back without hand-written
 code. Plus a JSON writer, enum names at run time, and typed comparators and callbacks.</p>
@@ -1138,7 +1112,7 @@ struct User { i64 id; String name; Role role; u8[][] tags; };
 void main()
 {
     User u;
-    mem.set(&amp;u, 0, sizeof(User));
+    mem.set(&u, 0, sizeof(User));
     json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
                 reflect.of(u));
     defer json.free(reflect.of(u));
@@ -1149,7 +1123,7 @@ void main()
 }
 </code></pre>
 
-<h3 id="the-language-5">The language<a class="anchor" href="#the-language-5" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
   kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
@@ -1168,7 +1142,7 @@ void main()
   <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
 </ul>
 
-<h3 id="the-standard-library-7">The standard library<a class="anchor" href="#the-standard-library-7" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
   <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
@@ -1182,13 +1156,13 @@ void main()
   and an optional indent done for you, and misuse throws <code>json.ERR_WRITER</code>.</li>
 </ul>
 
-<h2 id="v0-3-1-2026-10-12">v0.3.1 <small>(2026-10-12)</small><a class="anchor" href="#v0-3-1-2026-10-12" aria-label="Link to this section">#</a></h2>
+<h2>v0.3.1 <small>(2026-10-12)</small></h2>
 <p>The rest of the library on <code>u8[]</code> and <code>String</code>, and the compiler catching
 more mistakes it used to let through. Code that uses <code>proc</code>, <code>csv</code> or
 <code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
 are errors now.</p>
 
-<h3 id="changes-you-may-notice-10">Changes you may notice<a class="anchor" href="#changes-you-may-notice-10" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
   <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
@@ -1211,7 +1185,7 @@ are errors now.</p>
   error. It was a warning, and the caller got garbage.</li>
 </ul>
 
-<h3 id="new">New<a class="anchor" href="#new" aria-label="Link to this section">#</a></h3>
+<h3>New</h3>
 <ul>
   <li>A <code>case</code> is a block of its own: it can declare variables and use
   <code>defer</code> without braces.</li>
@@ -1219,7 +1193,7 @@ are errors now.</p>
   not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
 </ul>
 
-<h3 id="fixes-7">Fixes<a class="anchor" href="#fixes-7" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
   <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
@@ -1232,7 +1206,7 @@ are errors now.</p>
   <li>LSP: hover and go-to-definition find a module's own names from its other files.</li>
 </ul>
 
-<h2 id="v0-3-0-2026-10-11">v0.3.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-3-0-2026-10-11" aria-label="Link to this section">#</a></h2>
+<h2>v0.3.0 <small>(2026-10-11)</small></h2>
 <p>Safe strings and slices. ktm gets a slice type that knows its length, a native <code>String</code>,
 bounds checks that throw, and a standard library that works with both. The old <code>u8 *</code> buffer
 functions are gone or moved to a C-string module, so code written for v0.2 needs updating where it
@@ -1262,7 +1236,7 @@ i32 main() {
 }
 </code></pre>
 
-<h3 id="the-language-6">The language<a class="anchor" href="#the-language-6" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
   <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
@@ -1291,7 +1265,7 @@ i32 main() {
   through a copied String is reported with all three lines.</li>
 </ul>
 
-<h3 id="the-standard-library-8">The standard library<a class="anchor" href="#the-standard-library-8" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
   the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
@@ -1320,14 +1294,14 @@ i32 main() {
   in this release; they move to <code>u8[]</code> and String in v0.3.1.</li>
 </ul>
 
-<h3 id="watch-out">Watch out<a class="anchor" href="#watch-out" aria-label="Link to this section">#</a></h3>
+<h3>Watch out</h3>
 <ul>
   <li>An array becomes a slice of its full length: a <code>u8 buf[64]</code> passed where a
   <code>u8[]</code> is expected is all 64 bytes, not the text up to its NUL. Pass
   <code>cstr.view(buf)</code> for the C string in it.</li>
 </ul>
 
-<h3 id="fixes-8">Fixes<a class="anchor" href="#fixes-8" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>The format engine never checked its argument count: a format asking for more arguments than it got
   now throws instead of reading past them.</li>
@@ -1342,17 +1316,17 @@ i32 main() {
   locals, globals, structs and arrays.</li>
 </ul>
 
-<h3 id="known-issue">Known issue<a class="anchor" href="#known-issue" aria-label="Link to this section">#</a></h3>
+<h3>Known issue</h3>
 <ul>
   <li>A write through a slice of a string literal is not caught at compile time yet (planned for
   v0.3.1): copy the literal with <code>str.from</code> before changing it.</li>
 </ul>
 
-<h2 id="v0-2-1-2026-10-11">v0.2.1 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-1-2026-10-11" aria-label="Link to this section">#</a></h2>
+<h2>v0.2.1 <small>(2026-10-11)</small></h2>
 <p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
 names in every message, and a set of smaller fixes.</p>
 
-<h3 id="fixes-9">Fixes<a class="anchor" href="#fixes-9" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
   after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
@@ -1381,7 +1355,7 @@ names in every message, and a set of smaller fixes.</p>
   the position of the bad byte.</li>
 </ul>
 
-<h3 id="changes-you-may-notice-11">Changes you may notice<a class="anchor" href="#changes-you-may-notice-11" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
   <code>extern T x;</code> is a ktm global defined elsewhere.</li>
@@ -1394,13 +1368,14 @@ names in every message, and a set of smaller fixes.</p>
   <code>replHeap</code> (and <code>replDisasm</code>/<code>replDel</code> from v0.2.0).</li>
 </ul>
 
-<h2 id="v0-2-0-2026-10-11">v0.2.0 <small>(2026-10-11)</small><a class="anchor" href="#v0-2-0-2026-10-11" aria-label="Link to this section">#</a></h2>
+<h2>v0.2.0 <small>(2026-10-11)</small></h2>
 <p>A new language. ktm now has its own C-like syntax, modules, methods and a standard library organised
 into modules. The old HolyC syntax is gone: every program, test, doc page and example in the repository
 was converted once with an internal tool, which was then deleted. Code written for v0.1.0 does not
 compile with v0.2.0.</p>
 
 <pre><code>
+
 enum Kind { circle, rect };
 
 struct Shape { Kind kind; f64 w, h; };
@@ -1422,7 +1397,7 @@ i32 main(i32 argc, u8 **argv) {
 }
 </code></pre>
 
-<h3 id="the-language-7">The language<a class="anchor" href="#the-language-7" aria-label="Link to this section">#</a></h3>
+<h3>The language</h3>
 <ul>
   <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
   <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
@@ -1455,7 +1430,7 @@ i32 main(i32 argc, u8 **argv) {
   link automatically. A local may shadow a module name.</li>
 </ul>
 
-<h3 id="the-standard-library-9">The standard library<a class="anchor" href="#the-standard-library-9" aria-label="Link to this section">#</a></h3>
+<h3>The standard library</h3>
 <ul>
   <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
   <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
@@ -1472,7 +1447,7 @@ i32 main(i32 argc, u8 **argv) {
   <code>Fs</code> task block).</li>
 </ul>
 
-<h3 id="removed">Removed<a class="anchor" href="#removed" aria-label="Link to this section">#</a></h3>
+<h3>Removed</h3>
 <ul>
   <li>The HolyC syntax: <code>U0</code>/<code>I64</code>/<code>F64</code>/<code>Bool</code>,
   <code>class</code>/<code>public</code>, postfix casts, print statements, calls without parentheses,
@@ -1484,7 +1459,7 @@ i32 main(i32 argc, u8 **argv) {
   and <code>replDel("name")</code>.</li>
 </ul>
 
-<h3 id="fixes-10">Fixes<a class="anchor" href="#fixes-10" aria-label="Link to this section">#</a></h3>
+<h3>Fixes</h3>
 <ul>
   <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
   <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
@@ -1497,16 +1472,16 @@ i32 main(i32 argc, u8 **argv) {
   next line's first word; several test races on macOS and the LSP debounce test.</li>
 </ul>
 
-<h3 id="known-issue-2">Known issue<a class="anchor" href="#known-issue-2" aria-label="Link to this section">#</a></h3>
+<h3>Known issue</h3>
 <p>On macOS, a child forked by a program run with <code>-jit</code> can crash right after
 <code>fork()</code>, rarely and under load. Compiled programs are fine; see
 <a href="known-issues.html">Known issues</a> for the workaround.</p>
 
-<h2 id="v0-1-0-2026-10-10">v0.1.0 <small>(2026-10-10)</small><a class="anchor" href="#v0-1-0-2026-10-10" aria-label="Link to this section">#</a></h2>
+<h2>v0.1.0 <small>(2026-10-10)</small></h2>
 <p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
 only names are new.</p>
 
-<h3 id="changes-you-may-notice-12">Changes you may notice<a class="anchor" href="#changes-you-may-notice-12" aria-label="Link to this section">#</a></h3>
+<h3>Changes you may notice</h3>
 <ul>
   <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
   <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
@@ -1521,13 +1496,17 @@ only names are new.</p>
   <li>The <code>--terry</code> option is gone; the history and credits are in the README.</li>
 </ul>
 
-    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="roadmap.html"><span>Previous</span>Roadmap</a></nav>
-    <footer class="page-foot">
-      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/releases.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
-      by <code>docs/tools/check-examples.py</code>.</p>
-    </footer>
-  </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-23-1-2026-10-15">v0.23.1 (2026-10-15)</a></li><li><a href="#v0-23-0-2026-10-15">v0.23.0 (2026-10-15)</a></li><li><a href="#v0-22-0-2026-10-15">v0.22.0 (2026-10-15)</a></li><li><a href="#v0-21-0-2026-10-14">v0.21.0 (2026-10-14)</a></li><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
-</div>
+</main>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="releases.html">Releases</a>
+    <a href="known-issues.html">Known issues</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="assets/search.js"></script>
+<script src="assets/site.js"></script>
 </body>
 </html>

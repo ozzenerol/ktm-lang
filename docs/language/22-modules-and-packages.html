@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modules and packages - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html" class="on"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <article class="prose">
+<h1>Modules and packages</h1>
+<p>A module is a directory of <code>.ktm</code> files with a name. A program imports it and uses the names the module marks <code>pub</code>, with the module's name in front: <code>geo.area(5)</code>. A package is a module that lives in its own git repository and is imported by its path, as in Go. This chapter covers writing a module, what is visible where, methods and private fields across modules, imports and how modules are found, start-up order, the prelude, packages with <code>ktm.mod</code>, <code>ktm get</code>, and the prebuilt package cache.</p>
+<h2 id="importing-a-module"><a href="#importing-a-module">Importing a module</a></h2>
+<p>The standard library is a set of modules. <code>import</code> makes one available by its name:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;modules&quot;</span>);
+    s.append(<span class="s">&quot; and packages&quot;</span>);
+    printf(<span class="s">&quot;%.*s\n&quot;</span>, s.len, s.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>modules and packages</code></pre>
+<p>Several modules are imported in one line, separated by commas:</p>
+<pre class="code run"><code><span class="k">import</span> cstr, mem;
+
+<span class="t">i32</span> main() {
+    <span class="t">u8</span> *copy = cstr.dup(<span class="s">&quot;kept&quot;</span>);
+    printf(<span class="s">&quot;%s %d\n&quot;</span>, copy, cstr.len(copy));
+    mem.free(copy);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>kept 4</code></pre>
+<p>A module in a subdirectory is imported with dots, and used by its last name: <code>import net.http;</code> loads the directory <code>net/http</code>, whose files say <code>module http;</code>, and its names are <code>http.get</code>, <code>http.Request</code>.</p>
+<p><code>import name = path;</code> gives the module another name in this file:</p>
+<pre class="code run"><code><span class="k">import</span> s = str;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> greeting = s.from(<span class="s">&quot;aliased&quot;</span>);
+    printf(<span class="s">&quot;%.*s\n&quot;</span>, greeting.len, greeting.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>aliased</code></pre>
+<p>An import that is never used is a warning, so leftover imports don't pile up.</p>
+<h2 id="writing-a-module"><a href="#writing-a-module">Writing a module</a></h2>
+<p>A module is a directory. Every file in it starts with <code>module</code> and the directory's name. Its <code>pub</code> declarations are what importers see; the rest is private to the module.</p>
+<pre class="code"><code>shapes/
+├── main.ktm
+└── geo/
+    ├── shapes.ktm
+    └── helpers.ktm</code></pre>
+<pre class="code"><code><span class="c">// geo/shapes.ktm</span>
+<span class="k">module</span> geo;
+
+<span class="k">pub</span> <span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+<span class="k">pub</span> <span class="k">enum</span> Kind { square, circle };
+<span class="k">pub</span> <span class="k">const</span> <span class="t">i64</span> SIZE = <span class="n">4</span>;
+
+<span class="k">pub</span> <span class="t">i64</span> area(Kind k, <span class="t">i64</span> side) {
+    <span class="k">if</span> (k == Kind.square) {
+        <span class="k">return</span> square(side);
+    }
+    <span class="k">return</span> <span class="n">3</span> * square(side);
+}</code></pre>
+<pre class="code"><code><span class="c">// geo/helpers.ktm</span>
+<span class="k">module</span> geo;
+
+<span class="t">i64</span> square(<span class="t">i64</span> n) {
+    <span class="k">return</span> n * n;
+}</code></pre>
+<pre class="code"><code><span class="c">// main.ktm</span>
+<span class="k">import</span> geo;
+
+<span class="t">i32</span> main() {
+    geo.Point p = {<span class="n">1</span>, <span class="n">2</span>};
+    <span class="t">i64</span> cells[geo.SIZE];
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, geo.area(geo.Kind.square, <span class="n">5</span>), p.y, <span class="k">sizeof</span>(cells));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm main.ktm -o shapes &amp;&amp; ./shapes
+25 2 32</code></pre>
+<ul><li>Inside the module, every name of every file is visible, in any order: no prototypes, and a struct can hold a struct of a later file.</li><li>Outside, only <code>pub</code> names are, with the module's name in front: <code>geo.area</code>, <code>geo.Point</code>, <code>geo.Kind.square</code>.</li><li>A module's <code>const</code> works in constant expressions outside it too: <code>i64 cells[geo.SIZE]</code>.</li></ul>
+<p>Using a private name from outside is an error:</p>
+<pre class="code"><code>$ cat bad.ktm
+import geo;
+
+i32 main() {
+    return geo.square(3);
+}
+$ ktm bad.ktm -o bad
+error: `square` is private to module geo</code></pre>
+<h2 id="methods-across-modules"><a href="#methods-across-modules">Methods across modules</a></h2>
+<p>Only the module that defines a type can define its methods. Outside, its <code>pub</code> methods are called on a value with no prefix, and its private methods can't be called:</p>
+<pre class="code"><code><span class="c">// bank/account.ktm</span>
+<span class="k">module</span> bank;
+<span class="k">import</span> mem;
+
+<span class="k">pub</span> <span class="k">struct</span> Account {
+    <span class="t">u8</span> *owner;
+    <span class="t">i64</span> balance;
+};
+
+<span class="k">pub</span> Account *open(<span class="t">u8</span> *owner) {
+    Account *a = mem.allocZero(<span class="k">sizeof</span>(Account));
+    a.owner = owner;
+    <span class="k">return</span> a;
+}
+
+<span class="k">pub</span> <span class="t">void</span> Account.deposit(<span class="t">i64</span> x) {
+    self.balance += x;
+    self.audit();
+}
+
+<span class="t">void</span> Account.audit() {
+    printf(<span class="s">&quot;audit: %d\n&quot;</span>, self.balance);
+}
+
+<span class="k">pub</span> <span class="t">void</span> Account.close() {
+    mem.free(self);
+}</code></pre>
+<pre class="code"><code><span class="c">// main.ktm</span>
+<span class="k">import</span> bank;
+
+<span class="t">i32</span> main() {
+    bank.Account *a = bank.open(<span class="s">&quot;ann&quot;</span>);
+    a.deposit(<span class="n">5</span>);
+    printf(<span class="s">&quot;%s %d\n&quot;</span>, a.owner, a.balance);
+    a.close();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm -jit main.ktm
+audit: 5
+ann 5</code></pre>
+<p>Calling <code>a.audit()</code> from <code>main.ktm</code> is an error: "the method <code>audit</code> of <code>bank.Account</code> is private to module bank". <code>&amp;bank.Account.deposit</code> is the method as a function pointer.</p>
+<h2 id="private-fields"><a href="#private-fields">Private fields</a></h2>
+<p>A field marked <code>private</code> can only be used inside the module that defines the struct:</p>
+<pre class="code"><code><span class="c">// chat/conn.ktm</span>
+<span class="k">module</span> chat;
+
+<span class="k">pub</span> <span class="k">struct</span> Conn {
+    <span class="t">i32</span> fd;
+    <span class="k">private</span> <span class="t">u8</span> *buf;
+};
+
+<span class="k">pub</span> <span class="t">void</span> reset(Conn *c) {
+    c.buf = <span class="k">null</span>;
+}</code></pre>
+<pre class="code"><code><span class="c">// main.ktm</span>
+<span class="k">import</span> chat;
+
+<span class="t">i32</span> main() {
+    chat.Conn c;
+    c.fd = <span class="n">3</span>;
+    chat.Conn copy = c;
+    chat.reset(&amp;c);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, copy.fd, <span class="k">sizeof</span>(chat.Conn));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm -jit main.ktm
+3 16</code></pre>
+<p>Writing <code>c.buf = null;</code> in <code>main.ktm</code> is an error: "<code>buf</code> is a private field of chat.Conn".</p>
+<ul><li>Outside the module, reading, writing or taking the address of a private field is an error, and so is an initialiser list or a struct that inherits it.</li><li><code>sizeof</code>, copying and passing by value still work: the layout isn't hidden, only the name.</li><li>Fields are public unless marked; <code>pub</code> on a field is an error. <code>private</code> fields exist only in modules.</li></ul>
+<h2 id="how-modules-are-found"><a href="#how-modules-are-found">How modules are found</a></h2>
+<p><code>import geo;</code> looks for the directory <code>geo</code>:</p>
+<ol><li>next to the main file of the program;</li><li>in the standard library;</li><li>in each directory of the <code>KTM_PATH</code> environment variable, separated by <code>:</code>.</li></ol>
+<pre class="code"><code>$ KTM_PATH=$HOME/ktm-modules ktm main.ktm -o app</code></pre>
+<ul><li>A module found in two places is an error: give your modules names the standard library doesn't use.</li><li>Imports come first in a file, before any declaration.</li><li>A cycle of imports is an error that shows it: "circular import: a -&gt; b -&gt; a".</li><li>A file whose <code>module</code> line is missing or doesn't match its directory is an error.</li></ul>
+<h2 id="start-up-order"><a href="#start-up-order">Start-up order</a></h2>
+<p>Each module is compiled once, before the code that imports it. When the program starts, a module's globals are set up before its importers' globals and before <code>main</code>, and a module's files in the order of their names.</p>
+<p>A blank import, <code>import _ = name;</code>, loads a module only for what it does when the program starts: <code>import _ = net.https;</code> gives the HTTP client <code>https://</code> URLs. It is never reported as unused.</p>
+<h2 id="the-prelude"><a href="#the-prelude">The prelude</a></h2>
+<p>The prelude's names are seen by every file with no import and no prefix:</p>
+<ul><li><code>Error</code>, the struct a <code>catch</code> binds (see <a href="15-errors.html">Errors</a>);</li><li><code>EXIT_OK</code> and <code>EXIT_FAIL</code>;</li><li>the integer limits <code>I8_MIN</code>, <code>I8_MAX</code>, <code>U8_MAX</code> ... <code>I64_MIN</code>, <code>I64_MAX</code>, <code>U64_MAX</code>;</li><li><code>ERR_BOUNDS</code>, the code of an index out of range.</li></ul>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d %u\n&quot;</span>, I32_MAX, I8_MIN, U16_MAX);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, EXIT_OK, EXIT_FAIL);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2147483647 -128 65535
+0 1</code></pre>
+<p>The runtime module <code>rt</code> is part of every program but internal: <code>import rt;</code> outside the standard library is an error.</p>
+<h2 id="a-local-with-a-module-s-name"><a href="#a-local-with-a-module-s-name">A local with a module's name</a></h2>
+<p>A local variable or a parameter may have an import's name; within its scope the name is the local:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">i64</span> count(<span class="t">u8</span>[] str) {
+    <span class="k">return</span> str.len;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;module again&quot;</span>);
+    printf(<span class="s">&quot;%d %.*s\n&quot;</span>, count(<span class="s">&quot;four&quot;</span>), s.len, s.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>4 module again</code></pre>
+<p>A global with an import's name is an error, since it would hide the module everywhere.</p>
+<h2 id="packages"><a href="#packages">Packages</a></h2>
+<p>A package is a module in its own git repository, imported by its path in quotes:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;</code></pre>
+<p>Its name in the code is its <code>module</code> line, so this package is used as <code>pg.connect(...)</code>. <code>import p = &quot;github.com/user/repo&quot;;</code> gives it another name, and a directory of a package is a package too: <code>import &quot;github.com/user/repo/sub&quot;;</code>.</p>
+<h3 id="ktm-mod"><a href="#ktm-mod">ktm.mod</a></h3>
+<p>A project that uses packages has a <code>ktm.mod</code> file at its root. <code>ktm mod init</code> makes one:</p>
+<pre class="code"><code>$ mkdir hello &amp;&amp; cd hello
+$ ktm mod init example.com/me/hello
+ktm: created ktm.mod for example.com/me/hello</code></pre>
+<pre class="code"><code>module github.com/you/users-api
+
+ktm 0.23
+
+require (
+	github.com/ozzenerol/ktm-pg v0.2.0
+	github.com/someone/color v1.1.0 // indirect
+)
+
+replace github.com/someone/color =&gt; ../color</code></pre>
+<ul><li><code>module</code> is the project's own path; its other directories are imported by it too (<code>import &quot;github.com/you/users-api/store&quot;;</code>).</li><li><code>ktm</code> is the ktm version the project needs; an older compiler refuses it.</li><li><code>require</code> lists each package the build uses and its version; <code>// indirect</code> marks one that only another package needs.</li><li><code>replace</code> uses a local copy (a path starting with <code>./</code>, <code>../</code> or <code>/</code>) or another repository's version (<code>=&gt; github.com/fork/color v1.1.2</code>).</li><li><code>ktm.sum</code>, next to it, holds a hash of every version's files: a download that doesn't match is refused, so a version can't change under you. Commit both files.</li></ul>
+<h3 id="getting-building-and-running"><a href="#getting-building-and-running">Getting, building and running</a></h3>
+<pre class="code"><code>$ ktm get github.com/ozzenerol/ktm-pg
+ktm: added github.com/ozzenerol/ktm-pg v0.2.0
+$ ktm build              # main.ktm of this directory, into ./users-api
+$ ktm run . --port 8080  # or build and run it, with its arguments</code></pre>
+<p>A local package through <code>replace</code>, end to end:</p>
+<pre class="code"><code><span class="c">// ../greet/greet.ktm  (its ktm.mod says: module example.com/acme/greet)</span>
+<span class="k">module</span> greet;
+
+<span class="k">pub</span> <span class="t">void</span> hello(<span class="t">u8</span> *who) {
+    printf(<span class="s">&quot;hello, %s\n&quot;</span>, who);
+}</code></pre>
+<pre class="code"><code><span class="c">// main.ktm</span>
+<span class="k">import</span> <span class="s">&quot;example.com/acme/greet&quot;</span>;
+
+<span class="t">i32</span> main() {
+    greet.hello(<span class="s">&quot;world&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ cat ktm.mod
+module example.com/me/hello
+
+ktm 0.23
+
+require example.com/acme/greet v0.0.0
+
+replace example.com/acme/greet =&gt; ../greet
+$ ktm build &amp;&amp; ./hello
+hello, world
+$ ktm mod list
+example.com/me/hello
+example.com/acme/greet v0.0.0 =&gt; ../greet</code></pre>
+<div class="table"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>ktm mod init [path]</code></td><td>a new <code>ktm.mod</code> here</td></tr><tr><td><code>ktm get path@version</code></td><td>adds or changes a requirement and fetches it: <code>@v1.2.0</code>, <code>@latest</code> (the default), <code>@none</code> removes it</td></tr><tr><td><code>ktm mod tidy</code></td><td>makes <code>ktm.mod</code> and <code>ktm.sum</code> match the imports</td></tr><tr><td><code>ktm build [dir]</code>, <code>ktm run [dir] [args]</code></td><td>builds (or runs) <code>main.ktm</code>, fetching what is missing</td></tr><tr><td><code>ktm test [dir]</code>, <code>ktm test ./...</code></td><td>runs the <code>*_test.ktm</code> tests of a directory, or of every one below</td></tr><tr><td><code>ktm mod list</code>, <code>ktm mod why path</code></td><td>the versions a build uses; who needs a package</td></tr><tr><td><code>ktm mod download</code>, <code>ktm mod verify</code></td><td>fetch into the cache; check the cache against <code>ktm.sum</code></td></tr></tbody></table></div>
+<h3 id="versions"><a href="#versions">Versions</a></h3>
+<p>A version is a git tag <code>vMAJOR.MINOR.PATCH</code>. For each package a build uses the highest version anything requires: a package always gets at least what it asked for, and nothing newer than anyone asked for, so the same <code>ktm.mod</code> always gives the same build. One major version of a package per build. A package is downloaded only when the project imports one of its directories, directly or through another package. Fetching never runs a package's code.</p>
+<p>To publish a package: a repository whose root has a <code>ktm.mod</code> and the module's <code>.ktm</code> files; tag a version and push the tag (<code>git tag v0.1.0 &amp;&amp; git push origin v0.1.0</code>). Never move a tag: <code>ktm.sum</code> files that recorded it will refuse the new files.</p>
+<h3 id="prebuilt-packages"><a href="#prebuilt-packages">Prebuilt packages</a></h3>
+<p>A compiled build turns each package from the cache into a library the first time it needs it, and later builds link that library instead of compiling the package again. Nothing has to be done for it.</p>
+<ul><li>The library is made again when anything it depends on changes: the compiler, the versions the program's <code>ktm.mod</code> picks, <code>-D</code> names, <code>-Memsafe</code>.</li><li>A package replaced by a directory is always compiled from source, since it is being edited; so is every package of a program whose <code>ktm.mod</code> has such a replace.</li><li><code>-jit</code>, the REPL and builds for another <code>--target</code> compile packages from source.</li><li><code>KTM_PREBUILD=0</code> turns it off.</li></ul>
+<h2 id="symbols"><a href="#symbols">Symbols</a></h2>
+<p>A module's names get symbols of their own (<code>geo.area</code> is <code>_K3geo4area</code>), so they never clash with C functions or the program's names. A C function a module declares with <code>extern &quot;c&quot;</code> keeps its C symbol (see <a href="26-calling-c.html">Calling C</a>).</p>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li>A module is a directory; each of its files starts with <code>module name;</code>.</li><li><code>pub</code> makes a declaration visible to importers as <code>module.name</code>; a method is called on a value without a prefix. Everything else is private to the module.</li><li>Only the defining module adds methods to a type; <code>private</code> hides a field outside it.</li><li><code>import a, b;</code>, <code>import a.b;</code> (used as <code>b</code>), <code>import x = a.b;</code>, <code>import _ = a;</code> (blank).</li><li>Modules are found next to the program, in the standard library, then on <code>KTM_PATH</code>.</li><li>Import cycles, a module found twice and a global with an import's name are errors.</li><li>Packages are imported by path in quotes; <code>ktm.mod</code> and <code>ktm.sum</code> pin their versions.</li></ul>
+    <nav class="pager"><a class="prev" href="21-type-aliases.html"><span>Previous</span>Type aliases</a><a class="next" href="23-attributes.html"><span>Next</span>Attributes</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#importing-a-module">Importing a module</a></li><li><a href="#writing-a-module">Writing a module</a></li><li><a href="#methods-across-modules">Methods across modules</a></li><li><a href="#private-fields">Private fields</a></li><li><a href="#how-modules-are-found">How modules are found</a></li><li><a href="#start-up-order">Start-up order</a></li><li><a href="#the-prelude">The prelude</a></li><li><a href="#a-local-with-a-module-s-name">A local with a module&#x27;s name</a></li><li><a href="#packages">Packages</a></li><li><a href="#symbols">Symbols</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

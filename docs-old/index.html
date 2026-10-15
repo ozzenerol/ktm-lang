@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css?v=c4e8d50ba8">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+  try { if (localStorage.getItem("ktm-side") === "closed") document.documentElement.classList.add("side-closed"); } catch (e) {}
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
+</head>
+<body class="home">
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show or hide the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout wide">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group" open><summary>Start</summary><ul><li class="current"><a href="index.html" aria-current="page">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li><a href="guide-http-12-production.html">12. Production</a></li></ul></details><details class="group"><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+
+<section class="hero">
+  <h1 class="name"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></h1>
+  <p class="pitch">A compiled language for systems programming and networking: REST microservices,
+  network daemons and system tools, on Linux and macOS.</p>
+  <p class="sub">C-like, with modules, methods, default arguments and exceptions; an ahead-of-time compiler,
+  a JIT, a REPL and a language server in one binary.</p>
+  <div class="actions">
+    <a class="button primary" href="getting-started.html">Get started</a>
+    <a class="button" href="tour.html">A quick tour</a>
+    <a class="button" href="from-c.html">Coming from C</a>
+  </div>
+</section>
+
+<pre data-run><code>void main()
+{
+  printf("Hello world\n");
+}
+</code></pre>
+<pre class="output">Hello world
+</pre>
+<pre class="shell"><code>ktm hello.ktm -o hello &amp;&amp; ./hello   # compile to a native binary
+ktm -jit hello.ktm                  # or compile in memory and run</code></pre>
+
+<h2 id="why-ktm">Why ktm<a class="anchor" href="#why-ktm" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="from-c.html"><strong>C, minus the sharp edges</strong><span>Slices with checked indexes, owned Strings, <code>defer</code>, exceptions, modules. No headers, no macros with arguments.</span></a>
+  <a class="card" href="lib-event-loop.html"><strong>Made for servers</strong><span>Sockets, a coroutine loop on io_uring, epoll or kqueue, and <code>coro.serve</code> on every core.</span></a>
+  <a class="card" href="tools-jit-repl.html"><strong>Fast to try</strong><span>A JIT and a REPL in the same binary as the compiler: run a file or a script with no build step.</span></a>
+  <a class="card" href="lib-json-structs.html"><strong>Batteries included</strong><span>JSON, YAML, CSV, processes, hashing, dates, generic containers.</span></a>
+  <a class="card" href="lang-calling-c.html"><strong>C is one line away</strong><span><code>extern "c"</code> and <code>#link</code>; the C library is already declared.</span></a>
+  <a class="card" href="tools-editors.html"><strong>Editor support</strong><span>A language server with completion, hover, rename and inlay hints.</span></a>
+</div>
+
+<h2 id="what-it-looks-like">What it looks like<a class="anchor" href="#what-it-looks-like" aria-label="Link to this section">#</a></h2>
+<div class="samples">
+<div class="sample">
+<h3 id="a-request-and-a-reply">A request and a reply<a class="anchor" href="#a-request-and-a-reply" aria-label="Link to this section">#</a></h3>
+<p>A server and a client on loopback in one program: the sockets library speaks TCP, UDP and
+Unix sockets, IPv4 and IPv6.</p>
+<pre data-run><code>import libc, net, str;
+
+void main()
+{
+  i32 srv = net.listen(0, "127.0.0.1", 4);
+  i32 cli = net.dial("127.0.0.1", net.localPort(srv));
+  i32 conn = net.accept(srv);
+  u8 buf[256];
+
+  net.send(cli, "GET /hello HTTP/1.0\r\n\r\n");
+
+  i64 n = libc.recv(conn, buf, sizeof(buf), 0);      // the server side
+  u8[] line, rest, path, version;
+  str.splitFirst(buf[0:n], "\r\n", &amp;line, &amp;rest);
+  str.splitFirst(line[4:], " ", &amp;path, &amp;version);     // after "GET "
+  String reply = str.format("HTTP/1.0 200 OK\r\n\r\nyou asked for %s\n", path);
+  defer reply.free();
+  net.send(conn, reply);
+  libc.close(conn);
+
+  n = libc.recv(cli, buf, sizeof(buf), libc.MSG_WAITALL);  // the client side
+  u8[] head, body;
+  str.splitFirst(buf[0:n], "\r\n\r\n", &amp;head, &amp;body);
+  printf("%s", body);
+  libc.close(cli);
+  libc.close(srv);
+}
+</code></pre>
+<pre class="output">you asked for /hello
+</pre>
+</div>
+<div class="sample">
+<h3 id="running-a-program">Running a program<a class="anchor" href="#running-a-program" aria-label="Link to this section">#</a></h3>
+<p><code>proc.run</code> runs a command and returns what it printed; <code>proc.spawn</code> gives
+you its pipes.</p>
+<pre data-run><code>import proc;
+
+void main()
+{
+  u8 *argv[] = {"echo", "hello from a child process", null};
+  i64 code;
+  String out = proc.run(argv, &amp;code);
+  defer out.free();
+  printf("%s\n", out);
+  printf("exit code %d\n", code);
+}
+</code></pre>
+<pre class="output">hello from a child process
+exit code 0
+</pre>
+</div>
+<div class="sample">
+<h3 id="threads">Threads<a class="anchor" href="#threads" aria-label="Link to this section">#</a></h3>
+<p>POSIX threads directly, or a thread pool from the library.</p>
+<pre data-run><code>import libc;
+
+i64 sums[4];
+
+void *sum(void *arg)
+{
+  i64 part = (i64)arg, total = 0;
+  for (i64 i = part * 250 + 1; i &lt;= (part + 1) * 250; i++) { total += i; }
+  sums[part] = total;
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  i64 i, total = 0;
+  for (i = 0; i &lt; 4; i++) { libc.pthread_create(&amp;th[i], null, &amp;sum, (void *)i); }
+  for (i = 0; i &lt; 4; i++) {
+    libc.pthread_join(th[i]);
+    total += sums[i];
+  }
+  printf("1 + 2 + ... + 1000 = %d\n", total);
+}
+</code></pre>
+<pre class="output">1 + 2 + ... + 1000 = 500500
+</pre>
+</div>
+<div class="sample">
+<h3 id="a-taste-of-the-language">A taste of the language<a class="anchor" href="#a-taste-of-the-language" aria-label="Link to this section">#</a></h3>
+<p>Structs with inheritance, default arguments and ranges in <code>case</code>.</p>
+<pre data-run><code>struct Animal
+{
+  u8 *name;
+  i64 legs;
+};
+
+struct Bird : Animal
+{
+  bool canFly;
+};
+
+void describe(Animal *a, u8 *sound = "...")
+{
+  printf("%s has %d legs and says %s\n", a.name, a.legs, sound);
+}
+
+void main()
+{
+  Bird b;
+  b.name = "Tweety";
+  b.legs = 2;
+  b.canFly = true;
+
+  describe(&amp;b, "tweet");   // a Bird is an Animal
+  describe(&amp;b);            // default argument
+
+  for (i64 i = 1; i &lt;= 3; i++) {
+    switch (i) {
+      case 1: printf("one"); break;
+      case 2 ... 3: printf(", more"); break;
+    }
+  }
+  printf("\n");
+}
+</code></pre>
+<pre class="output">Tweety has 2 legs and says tweet
+Tweety has 2 legs and says ...
+one, more, more
+</pre>
+</div>
+</div>
+
+<h2 id="where-to-go-next">Where to go next<a class="anchor" href="#where-to-go-next" aria-label="Link to this section">#</a></h2>
+<div class="cards">
+  <a class="card" href="getting-started.html"><strong>Getting started</strong><span>Build ktm and run your first program.</span></a>
+  <a class="card" href="tour.html"><strong>A quick tour</strong><span>The language in ten short programs.</span></a>
+  <a class="card" href="language.html"><strong>Language</strong><span>One page per topic, with examples.</span></a>
+  <a class="card" href="library.html"><strong>Library</strong><span>Files, processes, sockets, JSON and more.</span></a>
+  <a class="card" href="stdlib.html"><strong>Library reference</strong><span>Every declaration of every module.</span></a>
+  <a class="card" href="examples.html"><strong>Example projects</strong><span>Complete programs with their output.</span></a>
+</div>
+
+<h2 id="what-ktm-is">What ktm is<a class="anchor" href="#what-ktm-is" aria-label="Link to this section">#</a></h2>
+<ul>
+  <li><strong>A native compiler.</strong> ktm is parsed to an AST, lowered to an SSA IR and emitted as x86_64 or AArch64 assembly, which the system C compiler assembles and links.</li>
+  <li><strong>A JIT.</strong> <code>ktm -jit</code> assembles machine code in memory with a built-in assembler and runs it, with no files written.</li>
+  <li><strong>A REPL.</strong> <code>ktm -repl</code> runs ktm interactively.</li>
+  <li><strong>A language server.</strong> <code>ktm -lsp</code> gives editors diagnostics, hover, completion, go-to-definition, references and rename.</li>
+  <li><strong>A standard library.</strong> Strings, files, hash tables, vectors, JSON, dates, threads, sockets and more, in modules you import (<code>import net, str;</code>).</li>
+</ul>
+<p>It runs on Linux on x86_64 and arm64 and on macOS on Apple Silicon. On Windows, use WSL2.</p>
+
+<h2 id="history">History and credits<a class="anchor" href="#history" aria-label="Link to this section">#</a></h2>
+<p>ktm started as a fork of <a href="https://github.com/Jamesbarford/holyc-lang">Jamesbarford/holyc-lang</a>
+(BSD-2-Clause), a compiler for HolyC, the language Terry A. Davis created for TempleOS. Thanks to both:
+to <a href="https://en.wikipedia.org/wiki/Terry_A._Davis">Terry A. Davis</a> for HolyC and
+<a href="https://templeos.org/">TempleOS</a>, and to
+<a href="https://github.com/Jamesbarford">James Barford-Evans</a>, who wrote the compiler ktm grew from.
+The fork was called hcc until v0.19.3, was renamed ktm at v0.1.0 and replaced the HolyC syntax with its own at v0.2.0; the hcc releases are in the
+<a href="https://github.com/ozzenerol/holyc-lang/releases">holyc-lang repository</a>.</p>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="next" href="getting-started.html"><span>Next</span>Getting started</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/index.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  
+</div>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<main class="home">
+  <div>
+    <h1>A compiled systems language for servers and tools.</h1>
+    <p class="lede">Native code, coroutines for networking, a standard library with HTTP, JSON, TLS and
+    cryptography, and no garbage collector.</p>
+  </div>
+
+  <div class="block">
+    <span class="label">Faster than Go at networking, with less memory and less CPU</span>
+    <div class="table"><table>
+      <thead><tr><th>HTTP server, 64 keep-alive connections, 2 cores</th><th>ktm</th><th>Go 1.27 net/http</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Requests per second</td><td>327,612</td><td>126,202</td><td>2.6x</td></tr>
+        <tr><td>Requests per CPU second</td><td>164,008</td><td>70,187</td><td>2.3x</td></tr>
+        <tr><td>Memory (peak RSS)</td><td>3.3 MB</td><td>13.0 MB</td><td>4x less</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block">
+    <span class="label">Install on Linux x86_64 (<a href="https://github.com/ozzenerol/ktm-lang/releases/tag/{VERSION}">other platforms</a>)</span>
+    <div class="install">
+      <pre class="code" id="install-cmd"><code>curl -LO https://github.com/ozzenerol/ktm-lang/releases/download/{VERSION}/ktm-{VERSION}-linux-x86_64.zip
+unzip ktm-{VERSION}-linux-x86_64.zip &amp;&amp; cd ktm-{VERSION}-linux-x86_64 &amp;&amp; sudo ./install.sh</code></pre>
+      <button class="copy" data-copy="install-cmd">Copy</button>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="label">hello.ktm</span>
+<pre class="code"><code><span class="k">import</span> net.http;
+
+<span class="t">void</span> hello(http.Writer *w, http.Request *r) {
+    <span class="t">u8</span>[] name = r.query(<span class="s">"name"</span>);
+    <span class="k">if</span> !name.len { name = <span class="s">"world"</span>; }
+    w.text(<span class="n">200</span>, <span class="s">"hello, %s\n"</span>, name);
+}
+
+<span class="t">i32</span> main() {
+    http.Mux mux;
+    mux.handle(<span class="s">"GET /"</span>, &amp;hello);
+    <span class="k">return</span> http.listen(<span class="n">8080</span>, &amp;mux);
+}</code></pre>
+<pre class="out"><code>$ ktm hello.ktm -o hello &amp;&amp; ./hello &amp;
+$ curl 'localhost:8080/?name=ada'
+hello, ada</code></pre>
+  </div>
+
+  <ul class="paths">
+    <li><a href="language/index.html"><b>Language</b><span>Every part of ktm, one topic per chapter, with many small programs you can run.</span></a></li>
+    <li><a href="std/index.html"><b>Library</b><span>Every module, type and function of the standard library.</span></a></li>
+    <li><a href="releases.html"><b>Releases</b><span>What changed in each version.</span></a></li>
+    <li><a href="known-issues.html"><b>Known issues</b><span>The bugs ktm has today, and how to work around them.</span></a></li>
+  </ul>
+</main>

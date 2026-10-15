@@ -1,0 +1,1467 @@
+<h1>Releases</h1>
+<p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
+macOS are attached to each release on
+<a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.23.1 <small>(2026-10-15)</small></h2>
+<p>Two fixes to prebuilt packages (v0.22.0), found building <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>
+v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 from GitHub. With v0.22.0 or v0.23.0,
+<code>KTM_PREBUILD=0</code> (or <code>-jit</code>) avoids both.</p>
+<ul>
+  <li>A package whose generic code calls its own <code>static</code> functions or methods linked: they stayed local
+  to its library while the generic is made in the program (<code>pg.queryAll</code>, <code>copyInto</code> and
+  <code>queryResult</code> didn't build).</li>
+  <li>A library's own use of a generic on its types (<code>json.decode&lt;Header&gt;</code> inside
+  <code>jwt.header</code>) has its types' descriptions filled in: they were set up only when a program starts, which
+  a library's code never sees, so <code>jwt.header</code> failed for every token. The same for <code>ktm -lib</code>
+  of a module or a tree.</li>
+</ul>
+
+<h2>v0.23.0 <small>(2026-10-15)</small></h2>
+<p>The cryptography that signed and encrypted tokens need, and new versions of two packages.</p>
+<ul>
+  <li><code>crypto</code>: Ed25519 keys (<code>generateKey(KeyKind.ed25519)</code>, PEM, <code>ed25519PublicKey</code>;
+  from <a href="https://monocypher.org">Monocypher</a> 4.0.2); P-384 and P-521 keys (<code>KeyKind.ec384</code>,
+  <code>ec521</code>, <code>Key.ecPoint</code>); RSA-PSS (<code>Key.signPss</code>, <code>verifyPss</code>); and the
+  building blocks of encrypted tokens: AES-128/192-GCM, AES-CBC, AES key wrap, RSA-OAEP
+  (<code>Key.encryptOaep</code>, <code>decryptOaep</code>) and ECDH (<code>Key.ecdh</code>). See
+  <a href="lib-crypto.html">Cryptography</a>.</li>
+  <li>A function can have 256 <code>try</code> blocks and <code>defer</code>s (each <code>ad</code> variable is one)
+  in scope at once, not 32, and going past that says where.</li>
+  <li><a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0: EdDSA, ES384/ES512 and PS256/384/512 tokens;
+  encrypted tokens (JWE: <code>dir</code>, AES key wrap, RSA-OAEP-256 and ECDH-ES with AES-GCM or AES-CBC-HMAC),
+  signed tokens inside encrypted ones; <code>crit</code> headers.</li>
+  <li><a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.2.0: <code>pg.queryResult&lt;T&gt;</code> keeps a big
+  result's text in a few blocks freed at once (about 20% faster than <code>queryAll</code>), and
+  <code>c.copyInto&lt;T&gt;(table)</code> copies structs into a table in PostgreSQL's binary format (2.5x faster than
+  text rows).</li>
+</ul>
+
+<h2>v0.22.0 <small>(2026-10-15)</small></h2>
+<p>Conditions without parentheses, thread-local globals, crash reports that follow packages and inlined calls,
+JWTs, and packages compiled once.</p>
+<ul>
+  <li>The condition of <code>if</code>, <code>while</code>, <code>do ... while</code>, <code>for</code> and
+  <code>switch</code> can be written without parentheses, as in Go: <code>if x &gt; 0 {</code>,
+  <code>for i64 i = 0; i &lt; n; i++ {</code>, plus <code>for cond {</code> and <code>for {</code>. With them works as
+  before, and one program can mix both. See <a href="lang-control-flow.html">Control flow</a>.</li>
+  <li><code>threadlocal</code> globals: <code>threadlocal i64 x;</code> is one variable per thread, one instruction to
+  reach in compiled code. The runtime keeps its per-thread state in one, so it no longer calls into pthreads to find
+  it: <code>coro.current()</code> is 2x faster, a <code>try</code> about 15%. See <a href="lang-variables.html">Variables</a>.</li>
+  <li><code>ad T x;</code> without a value: it starts empty and is freed at the end of its block (a pointer only if
+  set). An <code>@json</code> or <code>@yaml</code> struct with no <code>free()</code> is freed with its
+  <code>freeDecoded()</code>, so <code>ad User u = json.decode&lt;User&gt;(...)</code> works.</li>
+  <li><code>for (k = 0, i = n; ...)</code>: several comma-separated expressions before the first <code>;</code>, not
+  only declarations.</li>
+  <li>Crash reports and uncaught errors: an uncaught error prints the calls that led to the throw; a package's
+  function shows as <code>pg.Pool.exec</code> at <code>github.com/x/ktm-pg/pool.ktm</code>; a throw in a package
+  names the package's file; a function the compiler inlined from another file shows as <code>(inlined)</code> at
+  its own line.</li>
+  <li>Packages: a package from the module cache is compiled once into the cache and linked from there by later builds
+  (<a href="tools-packages.html">Prebuilt packages</a>; <code>KTM_PREBUILD=0</code> turns it off). Options can come
+  before a command: <code>ktm --install-dir=X mod init</code>.</li>
+  <li>Struct copies of up to 32 bytes (a <code>u8[]</code>, a <code>String</code>) are a few moves instead of a call
+  to <code>memcpy</code>: a loop that returns slices runs 2.2x faster.</li>
+  <li><code>crypto</code>: <code>sha384</code>, <code>hmacSha384</code>; RSA keys (<code>generateRsaKey</code>, PEM,
+  <code>Key.signWith</code>/<code>verifyWith</code> with SHA-256/384/512); keys from a JWK's parts
+  (<code>ecPublicKey</code>, <code>rsaPublicKey</code>). <code>coro.detach(fd)</code> hands an fd to another
+  thread's loop.</li>
+  <li>New package: <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.1.0: HS256/384/512, ES256 and
+  RS256/384/512 tokens, claims checks, JWK Sets from text or a URL.</li>
+</ul>
+<p><b>Changes you may notice:</b> <code>threadlocal</code> is a keyword now, so a variable can't be called that.</p>
+
+<h2>v0.21.0 <small>(2026-10-14)</small></h2>
+<p>Everything a REST API needs, and a guide that builds one: <a href="guide-http.html">HTTP programming</a> takes a
+bookmarks service from ten lines to PostgreSQL, accounts, tests and production.</p>
+<ul>
+  <li>Guides: a new section, starting with <a href="guide-http.html">HTTP programming</a>, twelve chapters on one
+  project, every listing run for real.</li>
+  <li><code>ktm test</code> and the <code>testing</code> module: <code>void testXxx(testing.T *t)</code> in
+  <code>*_test.ktm</code> files, <code>t.check</code>, <code>t.equal</code>, <code>t.fatal</code>, <code>t.skip</code>,
+  <code>-run</code>, <code>-v</code>, <code>./...</code>, <code>-jit -Memsafe</code>; each directory's tests run in that
+  directory. See <a href="tools-testing.html">Testing</a>.</li>
+  <li><code>validate</code>: <code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>,
+  <code>@url</code>, <code>@oneOf</code> on fields, with readable errors; <code>http.decodeValid&lt;T&gt;(r)</code>
+  answers 422 with every bad field. <code>config.fromEnv</code> checks the same rules and names the variable.</li>
+  <li><code>net.http.middleware</code>: request IDs, the real client address behind trusted proxies, CORS, rate limits
+  shared by every thread, bearer tokens; <code>mux.useWith</code> for middleware with settings of its own.</li>
+  <li><code>net.http</code>: <code>r.remoteAddr()</code> and <code>remotePort()</code>; <code>r.set</code>/<code>r.get</code>
+  to hand values from middleware to handlers; cookies (<code>r.cookie</code>, <code>w.setCookie</code>,
+  <code>w.deleteCookie</code>); a group's route for its exact prefix (<code>handle("GET", h)</code> in group
+  <code>"/bookmarks"</code>); a throw in a handler is the same 400, 422 or 500 under test as on the server; background
+  work with <code>coro.go</code> in a handler is documented and tested.</li>
+  <li>Generics: methods with type parameters of their own (<code>U Pair&lt;T&gt;.fold&lt;U&gt;(...)</code>); a library's
+  generic used from inside a package; inference with <code>@caller</code> parameters; overloads by arity with string
+  arguments.</li>
+  <li>Packages: <code>ktm get</code> and <code>ktm build</code> fetch only the modules that imported packages need (as
+  Go 1.17). New packages: <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a> v0.1.0 (SQL migrations for
+  PostgreSQL and SQLite) and <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.1.1 (time limits that hold
+  when the server freezes).</li>
+  <li><code>@key</code> and <code>@skip</code> go on any struct (ktm-pg reads them for columns).</li>
+</ul>
+
+<h2>v0.20.1 <small>(2026-10-14)</small></h2>
+<p>A fix for the release downloads.</p>
+<ul>
+  <li>The Linux and macOS zips of v0.19.0 and v0.20.0 couldn't build programs that import <code>net.http</code>,
+  <code>net.url</code>, <code>encoding.base64</code> or <code>encoding.hex</code>: the link failed with "multiple
+  definition of <code>net.http.CONN_OUT_FLUSH</code>". Their prebuilt-module markers were written one directory deep,
+  so nested modules were compiled into every program again, and <code>log</code> and <code>net.http</code> lacked
+  their start-up line. The release build now makes the library as <code>./build.sh</code> does, checks every module's
+  marker, and smoke-tests such a program, compiled and in the JIT. ktm built from source was never affected.</li>
+  <li>A timing test (<code>coro.read</code> gives way) failed once on a machine running other test suites; its margin is
+  wider.</li>
+</ul>
+
+<h2>v0.20.0 <small>(2026-10-14)</small></h2>
+<p>Packages, as Go has them, and the libraries a web service needs: TLS, HTTPS, an HTTP client, cryptography and
+password hashing, URLs, UUIDs, base64, command-line flags and settings from the environment.</p>
+<ul>
+  <li>Packages: <code>import "github.com/ozzenerol/ktm-pg";</code>, a <code>ktm.mod</code> with one major version per
+  package, <code>ktm.sum</code> hashes, <code>ktm get</code>, <code>ktm mod init/tidy/download/verify/why/list</code>,
+  minimal version selection, a module cache, <code>ktm build</code> and <code>ktm run</code> for a project; warnings from a
+  dependency's code aren't shown. See <a href="tools-packages.html">Packages</a>. The first package is
+  <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.1.0, a PostgreSQL client written in ktm (no libpq).</li>
+  <li><code>net.tls</code>: TLS clients and servers (mbedTLS 3.6 inside, built into <code>libktmtls</code>, so programs need
+  nothing installed). <code>net.https</code> serves a <code>net.http</code> mux over TLS and gives the client
+  <code>https://</code>. See <a href="lib-tls.html">TLS</a>.</li>
+  <li>An HTTP client in <code>net.http</code>: <code>http.get</code>, <code>http.post</code>, <code>http.postJson</code>,
+  <code>http.request</code>, <code>http.decodeResponse&lt;T&gt;</code>; kept-alive connections per host, redirects, time
+  limits, a size limit, a retry when a kept-alive connection was closed. See <a href="lib-http.html">HTTP</a>.</li>
+  <li><code>crypto</code>: secure random bytes, SHA-256/512, BLAKE2b, HMAC, HKDF, PBKDF2, a constant-time compare,
+  AES-256-GCM and ChaCha20-Poly1305, ECDSA P-256 keys and signatures; passwords with
+  <code>crypto.hashPassword</code> (Argon2id, PHC strings), <code>crypto.bcrypt</code>, <code>crypto.verifyPassword</code>
+  (both kinds) and <code>crypto.needsRehash</code>, as fast as Go's. See <a href="lib-crypto.html">Cryptography</a>.</li>
+  <li><code>coro.offload(fn, arg)</code> runs heavy work on worker threads while the coroutine waits, so its loop keeps
+  serving; password hashing uses it by itself (a <code>/ping</code> during logins: 0.3 ms, not 100 ms). Also
+  <code>coro.park</code> and <code>coro.unpark</code> (from any thread), and <code>coro.inLoop()</code>.</li>
+  <li><code>net.url</code> (parse, build, query strings, RFC 3986 resolving), <code>uuid</code> (v4 and time-ordered v7),
+  <code>encoding.base64</code> and <code>encoding.hex</code>.</li>
+  <li><code>flag</code>: command-line flags as Go's, with GNU's forms (<code>--port=80</code>, <code>-p 80</code>,
+  <code>-vq</code>), subcommands and a help text. <code>config</code>: environment variables and <code>.env</code> files into
+  a struct, with the new field attributes <code>@env("NAME")</code> and <code>@required</code>.</li>
+  <li>The language: <code>any ...args</code> parameters (each argument a <code>reflect.Value</code>); a blank import
+  <code>import _ = m;</code> for a module's side effects; <code>@json</code> takes pointers to scalars (<code>i64 *</code>:
+  the value or <code>null</code>).</li>
+  <li>Fixes: <code>(i32)</code> of a <code>u32</code> widened to <code>i64</code> didn't sign-extend; overloads of a generic
+  that differed only in a pointer parameter all called the last one; a store to a global with a long name was cut short
+  on x86_64; an error on a module-qualified name underlined too much; a <code>coro.unpark</code> that came as a park's
+  time limit ran out was lost; <code>./build.sh --install</code> rewrote <code>libktm.so</code> in place, so ktm and JIT
+  programs running at the time could crash (it now installs new files and renames them over the old ones).</li>
+</ul>
+
+<h2>v0.19.0 <small>(2026-10-14)</small></h2>
+<p>HTTP servers: <code>net.http</code>, Go's <code>net/http</code> and <code>ServeMux</code> for ktm, about 3 times as fast.</p>
+<ul>
+  <li><code>import net.http;</code>: <code>http.Mux</code> routes by Go 1.22 patterns (<code>"GET /users/{id}"</code>,
+  <code>{rest...}</code>, <code>{$}</code>, subtrees; the most specific wins, conflicting patterns are refused, 404 and 405
+  with <code>Allow</code>). A handler is <code>void h(http.Writer *w, http.Request *r)</code>: <code>r.param</code>,
+  <code>r.query</code>, <code>r.header</code>, <code>r.body</code>, <code>http.decode&lt;T&gt;(r)</code>; <code>w.json</code>,
+  <code>w.text</code>, <code>w.error</code>. What a request hands a handler is freed when it returns. A throw is a 500 (and a
+  log line), bad JSON a 400. <code>http.listen(port, &amp;mux, app)</code> serves on every core until Ctrl-C or SIGTERM and
+  finishes the requests in progress.</li>
+  <li>Middleware (<code>mux.use</code>), groups with a prefix (<code>mux.group</code>), static files (<code>mux.files</code>),
+  an access log (<code>http.Options.accessLog</code>), and <code>http.testRequest</code> / <code>http.recorder()</code> to test
+  handlers without a socket. See <a href="lib-http.html">HTTP servers</a>.</li>
+  <li>Measured against Go 1.27 <code>net/http</code> on the same 2 cores: 2.7 to 3.75 times the requests per second with 16 or
+  more connections, 2.2 to 2.6 times the requests per CPU-second, lower median and p99 latency everywhere (p99 at 1024
+  connections: 4.5 to 6 ms against Go's 21 to 25 ms), a quarter of the memory.</li>
+  <li><code>try</code> and <code>defer</code> cost less: 5 ns and 9 ns, from 12 and 13.</li>
+  <li><code>json.encodeTo(&amp;s, v)</code> and <code>json.quoteTo(&amp;s, text)</code> add JSON to a String you have.</li>
+  <li>Fixes: a type alias to a function type in a module (<code>pub type H = fn(...) void;</code>) was "already defined";
+  <code>b.len</code> of a parameter with a default (<code>u8[] b = ""</code>) stopped the compiler; a library's generic that
+  calls a <code>static</code> function of its module didn't link in programs.</li>
+</ul>
+
+<h2>v0.18.0 <small>(2026-10-14)</small></h2>
+<p>Memory that frees itself where it should, clearer <code>-Memsafe</code> reports, <code>switch</code> on strings, and
+a round of stdlib additions.</p>
+<ul>
+  <li><code>vec.Vec</code>, <code>list.List</code>, <code>map.Map</code> and <code>map.Tree</code> free the Strings they hold:
+  <code>free()</code> and <code>clear()</code> free them, as do a Map or Tree <code>delete</code> and a <code>set</code> that
+  replaces one. <code>pop</code>, <code>removeAt</code>, <code>shift</code> and <code>remove</code> hand the String back to you.
+  <code>map.keys()</code> and <code>values()</code> give copies of their own.</li>
+  <li><code>-Memsafe</code>: a leak is a block nothing points to any more. What globals or live variables still hold at
+  exit is listed apart as <code>still in use at exit ... not leaks</code>. Every report names the file and line in your
+  code and the public library call it went through (<code>at cli/cli.ktm:16 in cli's globals, via vec.new&lt;String&gt;</code>;
+  under <code>-Memsafe</code> library functions are not inlined into your code, so the name is the one you called),
+  and a program that ends with <code>exit()</code> gets its report too.</li>
+  <li>A warning when a function changes a Vec, List, Map, Tree, Set or String it got by value (<code>push</code>,
+  <code>removeAt</code>, <code>append</code>...): only its copy changes. Take a pointer.</li>
+  <li><code>switch</code> on a <code>u8[]</code> or String with string cases: <code>case "init":</code>. Case-sensitive;
+  a duplicate case is an error.</li>
+  <li>Every local starts zeroed, not only Strings (<code>Config c;</code> no longer holds garbage). Large plain arrays
+  (over 4 KiB, no Strings or slices in them) are left as they are.</li>
+  <li><code>T[] s = {a, b, c};</code> makes a slice of a hidden array; it compiled with warnings and crashed before.
+  <code>{ptr, len}</code> still sets the slice's own fields.</li>
+  <li>A function of your own with <code>u8 *fmt, ...args</code> takes Strings for <code>%s</code> as printf does.</li>
+  <li>A String variable or field converts to <code>u8 *</code> where one is expected (its bytes always end in a NUL):
+  <code>cstr.len(s)</code> and C calls without <code>.cstr()</code>.</li>
+  <li><code>str.join(parts, sep)</code> from a slice or a <code>vec.Vec</code>; <code>vec.Vec.contains(x)</code>;
+  <code>str.toInt</code>, <code>str.toUint</code> and <code>str.toFloat</code> read a whole <code>u8[]</code> as a number;
+  <code>proc.expandEnv(text)</code> fills in <code>${NAME}</code> and <code>${NAME:default}</code>.</li>
+  <li>Logging: the messages line up in one column (the level and the file:line part are padded); lines logged after
+  <code>log.shutdown()</code> keep the level and output they had and say once where they came from; <code>log.info</code>
+  and the others take Strings and <code>u8[]</code> for <code>%s</code>.</li>
+  <li>The language server completes every method of a generic instance (<code>vec.Vec&lt;String&gt;</code>), not only the
+  ones already called, and a module's own globals.</li>
+  <li>Fixes: a statement that is only a field (<code>self.port;</code>) stopped the compiler; code inlined from another
+  file was reported at a line of the wrong file; overloads with a generic parameter gave an assembler error.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Freeing a String through a copy and then freeing its container is now a double free:
+  <code>v.get(i).free()</code>, or freeing a value from <code>map.next()</code>, before <code>v.free()</code> or
+  <code>m.free()</code>. <code>v.at(i).free()</code> is still safe (it clears the String in place).
+  <code>fs.freeList(&amp;names)</code> is now the same as <code>names.free()</code>.</li>
+  <li><code>fs.makeDir</code>, <code>makeDirAll</code>, <code>remove</code>, <code>removeDir</code>, <code>rename</code>,
+  <code>move</code>, <code>copyFile</code> and <code>changeDir</code> return a <code>bool</code>, true when it worked (false with
+  <code>os.errno()</code> set), as <code>fs.writeAll</code> and <code>fs.exists</code> already did. They returned 0 on success, so
+  <code>if (!fs.makeDir(d))</code> failed when it worked. A check written as <code>fs.remove(p) == 0</code> now means it failed:
+  write <code>if (fs.remove(p))</code>.</li>
+  <li>Log lines have more spaces: the level and the file:line part are padded.</li>
+  <li><code>-Memsafe</code> no longer calls what a global holds at exit a leak.</li>
+</ul>
+
+<h2>v0.17.2 <small>(2026-10-13)</small></h2>
+<p>One logging fix.</p>
+<ul>
+  <li><code>log.Options.toStdout</code> with a <code>path</code> writes each line to the file and to stdout.
+  Before, the file won and <code>toStdout</code> was ignored without a word.</li>
+</ul>
+
+<h2>v0.17.1 <small>(2026-10-13)</small></h2>
+<p>Program arguments, and a flaky test.</p>
+<ul>
+  <li>With <code>-run</code> or <code>-jit</code>, everything after the source file goes to the program, even
+  words that look like ktm's options: <code>ktm -run app.ktm -v</code> gives the program <code>-v</code>
+  (ktm took it before). <code>--</code> ends ktm's options and is no longer passed on.</li>
+  <li>The <code>coro.serve</code> test could end itself with SIGTERM when its signal coroutine ran late; it
+  now installs the handler first, as <code>signal.stopInit</code> asks.</li>
+</ul>
+
+<h2>v0.17.0 <small>(2026-10-13)</small></h2>
+<p>C's stdio in libc, and logging to stdout.</p>
+<ul>
+  <li><code>libc.fprintf(stream, fmt, ...)</code> with <code>libc.stdin</code>, <code>libc.stdout</code> and
+  <code>libc.stderr</code>, and <code>libc.EXIT_SUCCESS</code> / <code>libc.EXIT_FAILURE</code> for
+  <code>libc.exit</code>. <code>fprintf(libc.stdout, ...)</code> stays in order with <code>printf</code>.</li>
+  <li><code>log.Options.toStdout</code>: with no <code>path</code>, a Logger or the default logger writes to
+  stdout instead of stderr, in order with <code>printf</code>.</li>
+  <li><code>_extern</code> binds C data by its symbol too: <code>_extern ___stderrp FILE *stderr;</code>,
+  and in a module it has the module's name.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The format strings of <code>libc.printf</code>, <code>libc.snprintf</code> and <code>libc.fprintf</code>
+  are now checked against their arguments, as <code>printf</code>'s always was, so a wrong count is now
+  a compile error. A bare <code>snprintf</code> or <code>sprintf</code> declared with <code>extern "c"</code>
+  is checked too (its format was looked for in the wrong argument before).</li>
+</ul>
+
+<h2>v0.16.0 <small>(2026-10-13)</small></h2>
+<p>A default logger, so a program logs from anywhere without passing a Logger around.</p>
+<ul>
+  <li><code>log.setup(&amp;o)</code> once in <code>main</code>, then <code>log.info(...)</code>,
+  <code>log.debug</code>, <code>log.warn</code> and <code>log.error</code> from any function in any
+  module. The file, line and function are still the caller's.</li>
+  <li>Until <code>log.setup</code> is called they write to stderr at INFO, so a small program needs
+  no setup. <code>log.setLevel</code> changes the level, <code>log.shutdown</code> closes the file and
+  <code>log.logger()</code> is the default Logger itself.</li>
+  <li><code>log.open</code> and <code>log.Logger</code> are unchanged.</li>
+</ul>
+
+<h2>v0.15.2 <small>(2026-10-13)</small></h2>
+<p>One fix for the language server.</p>
+<ul>
+  <li>The language server could send a semantic-tokens reply with stray bytes in it when a file had
+  nothing to highlight (a file that is only <code>module cli;</code>, say). Neovim then reported
+  <code>INVALID_SERVER_JSON: Expected value but found invalid token</code>. The reply is now an empty
+  list. The cause was in the compiler's string buffers, which now always start empty.</li>
+</ul>
+
+<h2>v0.15.1 <small>(2026-10-13)</small></h2>
+<p>Two fixes for compile errors.</p>
+<ul>
+  <li>A range-for with nothing to range over crashed the compiler. An array literal,
+  <code>for (auto name : ["a", "b"])</code>, now says ktm has no array literals and shows how to
+  declare the array first; <code>for (auto x : )</code> says what is missing.</li>
+  <li>A type or name from a module the file doesn't import, as in
+  <code>ad vec.Vec&lt;i64&gt; v = m.values();</code> or <code>vec.Vec&lt;i64&gt; v;</code> without
+  <code>import vec</code>, says <code>module `vec` is not imported: add `import vec;`</code>. An
+  <code>ad</code> declaration with an unknown type names that type instead of
+  "Type `ad` has not been declared".</li>
+</ul>
+
+<h2>v0.15.0 <small>(2026-10-13)</small></h2>
+<p>Logging, and functions that know where they were called from.</p>
+<ul>
+  <li>A new <code>log</code> module: <code>lg.debug</code>, <code>info</code>, <code>warn</code>
+  and <code>error</code> write one short line each, to stderr or a file:
+  <code>2026-10-13T14:02:11.482Z INFO listening on :8080</code>. <code>showFile</code> and
+  <code>showFunc</code> add the call's <code>main.ktm:42</code> and function. A file rotates by
+  size (<code>maxBytes</code>, <code>keep</code>), and <code>threadSafe</code> lets several threads
+  share one Logger without their lines mixing. See <a href="lib-logging.html">Logging</a>.</li>
+  <li><code>@caller("file")</code>, <code>@caller("line")</code> and <code>@caller("func")</code>
+  before a parameter: every call fills it with where the call is written, and callers never pass
+  it. They work in methods, before <code>...args</code>, next to defaults and through
+  <code>auto</code> function pointers. Signature help in the language server skips them. See
+  <a href="lang-functions.html#where-a-call-comes-from">Where a call comes from</a>.</li>
+  <li>Known issues lists two bugs found along the way, both planned for v0.15.1: a range-for over
+  an array literal crashes the compiler, and a confusing error for an <code>ad</code> declaration
+  whose module isn't imported.</li>
+</ul>
+
+<h2>v0.14.0 <small>(2026-10-13)</small></h2>
+<p>JSON and YAML without reflection. Mark a struct <code>@json</code> or <code>@yaml</code> and
+the compiler writes its encoder and decoder.</p>
+<ul>
+  <li>Attributes: <code>@json</code> and <code>@yaml</code> before a struct, and
+  <code>@key("e-mail")</code>, <code>@skip</code> and <code>@omitEmpty</code> before its
+  fields. An unknown or misplaced one is a compile error, <code>reflect</code> shows them, and
+  hover in the language server shows them too.</li>
+  <li>A <code>@json</code> struct gets <code>toJson</code>, <code>fromJson</code> and
+  <code>freeDecoded</code> methods; <code>@yaml</code> adds <code>toYaml</code> and
+  <code>fromYaml</code>. A field type that can't be written is a compile error at that field.
+  <code>ktm --expand</code> prints the generated code.</li>
+  <li><code>json.encode</code>, <code>json.decode</code> and <code>json.free</code> use those
+  methods by themselves, at any depth, so existing code gets faster by adding
+  <code>@json</code>. On a 1 KB order, decode takes 6.6 us instead of 20.6 us and encode
+  10.5 us instead of 15.4 us.</li>
+  <li><code>json.decode</code> reads the text with the new <code>json.Reader</code> and builds
+  no tree, which also makes it about twice as fast for structs without <code>@json</code>.</li>
+  <li><code>json.Reader</code>, a streaming reader for JSON text, and <code>json.Writer</code>
+  gains <code>rawKey</code> and <code>uint</code>.</li>
+  <li>A new <code>yaml</code> module: <code>yaml.Reader</code> and <code>yaml.Writer</code> for
+  block and flow mappings and sequences, plain and quoted scalars, block scalars and comments.
+  Anchors, tags, merge keys and more than one document are reported as not supported.</li>
+</ul>
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Decode errors start with the line and column in the text:
+  <code>1:22: tags[0].weight: expected an integer, got a string</code>. The rest of each
+  message is the same as before.</li>
+  <li>JSON text that ends too early says <code>expected a value, got the end of the
+  input</code> instead of <code>not JSON: ...</code>.</li>
+  <li>With <code>json.STRICT</code>, an unknown key is reported before a missing one, since the
+  text is read in order.</li>
+  <li><code>@</code> outside an <code>asm</code> block starts an attribute, so it is no longer
+  an "unexpected character".</li>
+</ul>
+
+<h2>v0.13.3 <small>(2026-10-13)</small></h2>
+<p>Fixes for struct values passed by value, and clearer errors.</p>
+<ul>
+  <li>Passing <code>*p</code> (a struct, by value) to a function no longer breaks the other
+  uses of <code>p</code> in the same function. Calls like <code>f(p)</code> elsewhere in it got a
+  copy of the struct instead of the pointer, even when the <code>*p</code> call never ran.</li>
+  <li>Reading a <code>String</code> field straight off a call result works:
+  <code>mk().name</code>, <code>v.get(0).name</code>, <code>(a = b).name</code>. The compiler used
+  to stop with "Slice AST_CLASS_REF assign: unsupported cls kind AST_FUNCALL", and
+  <code>(a = b).name</code> passed to a function crashed at run time.</li>
+  <li>Calling a field as if it were a method (<code>s.len()</code> where <code>len</code> is a
+  field) is a compile error, "`len` is a field, not a method: read it without `()`". The
+  compiler used to crash. Function-pointer fields are still called as before.</li>
+  <li><code>ad</code> on a struct field says that <code>ad</code> goes on a local variable, and
+  errors inside a struct or union body say "struct" or "union" instead of "class".</li>
+  <li>Hover in the language server shows a <code>null</code> default parameter as
+  <code>null</code>, not <code>0(void *)</code>.</li>
+</ul>
+
+<h2>v0.13.2 <small>(2026-10-13)</small></h2>
+<p>A <code>vec.Vec</code> is a JSON array.</p>
+<ul>
+  <li><code>json.decode</code> fills a <code>vec.Vec&lt;T&gt;</code> field (or a top-level
+  <code>vec.Vec&lt;T&gt;</code>) from a JSON array, the same way it fills a <code>T[]</code>
+  slice. It used to throw "expected an object, got an array". The Vec it makes is an ordinary
+  one: <code>push</code> grows it and <code>json.free</code> frees its items and its block.</li>
+  <li><code>json.encode</code> writes a <code>vec.Vec&lt;T&gt;</code> as an array of its items.
+  It used to write the Vec's own fields, <code>{"data":5,"len":2,"cap":8}</code>.</li>
+  <li>A <code>vec.Vec&lt;u8&gt;</code> is a string both ways, as a <code>u8[]</code> is, so
+  what encode writes decodes back. A struct of your own with <code>data</code>, <code>len</code>
+  and <code>cap</code> fields is still an object: a Vec is known by its type.</li>
+</ul>
+
+<h2>v0.13.1 <small>(2026-10-13)</small></h2>
+<p>A clean build and a tidier library reference.</p>
+<ul>
+  <li>Building ktm prints no C compiler warnings. One was a real risk: a loop counter that was
+  live across a <code>setjmp</code> could come back stale after an error inside a generic
+  instance.</li>
+  <li>Building the standard library prints no warnings either. "module rt is imported but not
+  used" was wrong for files whose only use of <code>rt</code> is a <code>throw</code> with a
+  message, and the imports that really were unused are gone.</li>
+  <li><code>fs</code> no longer has its own <code>opendir</code> and <code>readdir</code>
+  declarations, which repeated <code>libc</code>'s and showed up in the library reference as
+  <code>fs.opendir</code>, <code>fs.readdir</code> and <code>fs.libc.*</code>.</li>
+  <li>The Neovim setup in <a href="tools.html">Tools</a> covers lazy.nvim, which resets the
+  runtime path: list ktm's vim directory in <code>performance.rtp.paths</code>.</li>
+</ul>
+
+<h2>v0.13.0 <small>(2026-10-13)</small></h2>
+<p>Ahead of Go on every load. On Linux the coroutine loop now runs on io_uring, and a
+coroutine-per-connection server written the plain way (<code>coro.serve</code>,
+<code>coro.read</code>, <code>coro.write</code>) does more work per CPU-second than Go 1.27's
+goroutine-per-connection server in every scenario of the echo benchmark, with less memory
+(server on 2 cores, client on 6, so the client is never the limit):</p>
+<table>
+  <thead><tr><th>Scenario</th><th>ktm</th><th>Go</th><th>per server CPU-second</th></tr></thead>
+  <tbody>
+    <tr><td>64 B request/response, 64 clients</td><td>368k req/s</td><td>168k req/s</td><td>+45%</td></tr>
+    <tr><td>64 B request/response, 1024 clients</td><td>379k req/s</td><td>133k req/s</td><td>+54%</td></tr>
+    <tr><td>4 KiB request/response, 64 clients</td><td>267k req/s</td><td>157k req/s</td><td>+45%</td></tr>
+    <tr><td>64 KiB streams, 16 connections</td><td>7.5 GB/s</td><td>6.6 GB/s</td><td>+12%</td></tr>
+    <tr><td>64 KiB streams, 64 connections</td><td>7.4 GB/s</td><td>6.5 GB/s</td><td>+9%</td></tr>
+  </tbody>
+</table>
+
+<h3>Coroutines and networking</h3>
+<ul>
+  <li>The coroutine loop runs on io_uring on Linux 6.1 and later: reads, writes and accepts go
+  to the kernel directly, all of a turn in one system call. It falls back to epoll (an older
+  kernel, a container that forbids io_uring) and then to <code>poll</code>; macOS uses kqueue.
+  <code>coro.backend()</code> says which one a thread runs, and
+  <code>KTM_CORO_BACKEND=uring|epoll|kqueue|poll</code> picks one.</li>
+  <li><code>coro.read</code> keeps reading a busy stream for up to 4 ms before it lets the
+  loop's other coroutines run, instead of 32 reads: bulk transfers over many connections move
+  about a third more per CPU-second, and another coroutine on the same loop waits at most about
+  8 ms (Go preempts a busy goroutine every 10 ms).</li>
+  <li><code>coro.dial(addr, port, ms)</code>: connect from a loop coroutine without blocking the
+  loop's thread. <code>net.dial</code> waits in <code>connect</code> and stops every coroutine of
+  its loop meanwhile; its docs now say so.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>On Linux, programs using the coroutine loop run on io_uring by default. Set
+  <code>KTM_CORO_BACKEND=epoll</code> to keep the previous loop.</li>
+</ul>
+
+<h2>v0.12.0 <small>(2026-10-12)</small></h2>
+<p>Memory. A coroutine-per-connection server now uses less memory than Go's
+goroutine-per-connection server at every load of the echo benchmark: with 1024 clients,
+10.7 MB against Go's 11.6 MB (ktm v0.11.0 took 72 MB), and it keeps v0.11.0's speed
+(request/response 3% to 35% ahead of Go, a quarter of Go's p99 latency at 64 clients).</p>
+
+<h3>Big stack frames</h3>
+<ul>
+  <li>A function whose stack frame is bigger than a page used to touch every page of it on the
+  way in, so that a stack overflow couldn't jump over the guard page. That made every page of a
+  big local buffer real memory, used or not: a handler with <code>u8 buf[65536]</code> cost
+  64 KiB per connection. Now such a function asks the runtime whether the frame fits on its
+  stack, and touches nothing: the buffer costs only the pages it uses. AOT and JIT, x86_64 and
+  arm64.</li>
+</ul>
+
+<h3>Coroutines</h3>
+<ul>
+  <li>Released coroutine stacks kept for reuse give their memory back once they are older than
+  the four most recently released ones (<code>madvise</code> on Linux, a fresh mapping on
+  macOS), so a burst of connections that ends doesn't leave its memory behind. Starting and
+  releasing short coroutines costs the same as before.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>Running off the end of a stack (deep recursion, a frame too big for a thread's stack) now
+  prints <code>stack overflow</code> and ends the program with SIGABRT, instead of a bare
+  SIGSEGV (SIGBUS on macOS).</li>
+  <li>The last 64 KiB of a thread's own stack count as overflow: a thread can use a little less
+  stack than before before it is stopped.</li>
+</ul>
+
+<h2>v0.11.0 <small>(2026-10-12)</small></h2>
+<p>Networking that is fast by default. A TCP server written the plain way, a coroutine per
+connection with <code>coro.serve</code>, now uses every core and the kernel's event queue, and
+beats Go 1.27's goroutine-per-connection server on request/response traffic (an echo
+benchmark on one Linux machine, both servers untuned):</p>
+<table>
+  <thead><tr><th>64-byte request/response</th><th>ktm</th><th>Go</th></tr></thead>
+  <tbody>
+    <tr><td>16 clients</td><td>325k req/s</td><td>281k req/s</td></tr>
+    <tr><td>64 clients</td><td>379k req/s, p99 0.54 ms</td><td>282k req/s, p99 2.63 ms</td></tr>
+    <tr><td>256 clients</td><td>365k req/s</td><td>294k req/s</td></tr>
+    <tr><td>1024 clients</td><td>333k req/s</td><td>321k req/s</td></tr>
+  </tbody>
+</table>
+<p>With 4 KiB messages ktm serves 32% more requests with a fifth of Go's p99. A single bulk
+stream runs 22% faster; with 16 and 64 streams at once ktm and Go are about even (within 3%
+either way, run to run).</p>
+
+<h3>Coroutines and networking</h3>
+<ul>
+  <li><code>coro.serve(port, &amp;handler, arg, threads, bindaddr)</code>: a whole TCP server in
+  one call. It runs <code>handler(fd, arg)</code> as a coroutine for each client on one loop per
+  CPU (<code>SO_REUSEPORT</code> on Linux; on macOS the loops share one listener).
+  <code>coro.serveStop()</code> stops it from any thread or coroutine, and the SIGINT/SIGTERM
+  coroutine of the docs works unchanged. Handlers run on several threads at once: shared globals
+  need the <code>atomic</code> module or a lock.</li>
+  <li><code>coro.read(fd, buf, ms)</code> and <code>coro.write(fd, data, ms)</code>: read what is
+  there and write all of it, pausing the coroutine instead of the thread, on sockets and pipes.
+  A read goes straight on while a stream keeps filling the buffer and waits first otherwise, so a
+  connection costs no more system calls than it must.</li>
+  <li>The coroutine loop waits on epoll (Linux) and kqueue (macOS) instead of
+  <code>poll</code>: a turn costs the fds that are ready, not every fd that is open. Nothing to
+  change in existing programs; a program that has run out of fds when its loop starts gets
+  <code>poll</code> as before.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>An fd waited on with <code>coro.wait</code> stays registered with the kernel between
+  waits, so close it with <code>coro.close</code>, as the docs already said for connections: a
+  plain <code>close(2)</code> of a waited-on fd whose number is then reused for an fd that is not
+  from <code>coro.accept</code> can leave a wait on the new fd unanswered.</li>
+  <li><code>coro.waitChild</code> closes its exit fd with <code>coro.close</code>.</li>
+</ul>
+
+<h2>v0.10.1 <small>(2026-10-12)</small></h2>
+<p>Editor support, fixed and made rich: the language server understands the whole current
+language and gains the features editors expect, and the Vim syntax is rewritten for today's
+ktm. Also: directories and file operations in <code>fs</code>.</p>
+
+<h3>The language server</h3>
+<ul>
+  <li>Fixed: only the first module of an import list (<code>import mem, str, json;</code>) was
+  seen, so hover, definition and completion failed on every stdlib call after it.</li>
+  <li>Fixed: opening one of a module's files (the standard library's too) showed a false
+  "not part of a module" error and more after it. A module's file is now checked as its module,
+  with the unsaved text of its other files.</li>
+  <li>Fixed: enums had no hover (it failed), no definition and no completion; now
+  <code>Color</code>, <code>Color.green</code> and <code>geo.Kind.rect</code> show their members and
+  values, jump to their declaration, and <code>Color.</code> completes the members.</li>
+  <li>Fixed: module names (in imports and as prefixes, aliases too) and fields at their
+  declaration had no hover or definition; a module's name jumps to its files.</li>
+  <li>Fixed: completion gave keywords the "operator" kind and offered internal names
+  (<code>_K3geo4area</code>, <code>Vec&lt;i64&gt;</code>).</li>
+  <li>New: hover shows a declaration's doc comment, the standard library's included.</li>
+  <li>New: signature help in calls (the parameter you are on, every overload), the document
+  outline, workspace symbol search, semantic highlighting (modules, types, enum members,
+  functions and methods, fields, parameters, locals, constants, macros, the stdlib's marked),
+  folding ranges, inlay hints with the type of each <code>auto</code> variable, and completion
+  of the modules an <code>import</code> can name.</li>
+</ul>
+
+<h3>Vim and Neovim</h3>
+<ul>
+  <li>The syntax file is rewritten for the current language: lowercase types, <code>fn</code>,
+  <code>module</code> and <code>import</code> lists, <code>pub</code>, <code>defer</code>,
+  <code>ad</code>, <code>type</code>, enums, generics, <code>String</code>,
+  <code>true</code>/<code>false</code>/<code>null</code>, digit separators, ktm's escapes and
+  format conversions. It comes with filetype detection (Neovim took <code>.ktm</code> for
+  another language) and an ftplugin, and installs into <code>&lt;prefix&gt;/share/ktm/vim</code>
+  (see <a href="tools.html">Tools</a>).</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>fs.openDir(path)</code> and <code>d.next()</code> read a directory: each entry's
+  name, kind (a symlink is a link) and joined path, without <code>.</code> and
+  <code>..</code>; close it with <code>defer d.close();</code> or <code>ad</code>.</li>
+  <li><code>fs.list(path)</code> gives the sorted names as a <code>vec.Vec&lt;String&gt;</code>
+  (<code>fs.freeList</code> frees them), and <code>fs.walk(root, &amp;visit, arg)</code> visits
+  every entry at any depth without following symlinks.</li>
+  <li><code>fs.join</code>, <code>fs.exists</code>, <code>fs.makeDirAll</code>,
+  <code>fs.copyFile</code> (with the permission bits), <code>fs.rename</code>, and
+  <code>fs.move</code>, which copies and removes across filesystems. See
+  <a href="library.html#directories">the library guide</a>.</li>
+  <li>libc's constants passed its C-only check in a normal build but not in the REPL; fixed.</li>
+</ul>
+
+<h2>v0.10.0 <small>(2026-10-12)</small></h2>
+<p>The standard library's containers, rebuilt on generics. <code>vec.Vec&lt;T&gt;</code>,
+<code>map.Map&lt;K, V&gt;</code>, <code>map.Tree&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code> and
+<code>list.List&lt;T&gt;</code> hold any type with no <code>void *</code> and no casts, are values
+(made with <code>mod.new&lt;T&gt;()</code>, freed with <code>free()</code>, so <code>ad</code> works),
+and replace <code>IntVec</code>, <code>PtrVec</code>, <code>FloatVec</code>, <code>IntMap</code>,
+<code>StrMap</code>, <code>RBTree</code>, <code>IntSet</code> and the <code>void *</code> list, which
+are gone. New: module <code>sort</code> and <code>json.decode&lt;T&gt;</code>.</p>
+
+<pre><code>import json, list, map, set, vec;
+
+struct Point { i64 x; i64 y; };
+
+i64 byX(Point *a, Point *b) { return a.x - b.x; }
+
+void main()
+{
+  ad vec.Vec<Point> pts = vec.new<Point>();
+  Point a = {3, 1}, b = {1, 2};
+  pts.push(a);
+  pts.push(b);
+  pts.sort(&byX);
+  for (auto p : pts) { printf("(%d,%d) ", p.x, p.y); }
+  printf("\n");
+
+  ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+  u8[] words[] = {"to", "be", "or", "not", "to", "be"};
+  for (auto w : words) { counts.set(w, counts.getOr(w, 0) + 1); }
+  i64 it = 0, n;
+  u8[] word;
+  while (counts.next(&it, &word, &n)) { printf("%s=%d ", word, n); }
+  printf("\n");
+
+  ad set.Set<i64> seen = set.new<i64>();
+  printf("%d %d\n", seen.add(4), seen.add(4));
+
+  ad list.List<u8 *> jobs = list.new<u8 *>();
+  auto build = jobs.append("build");
+  jobs.append("test");
+  jobs.remove(build);
+  for (auto j = jobs.head; j; j = j.next) { printf("%s\n", j.value); }
+
+  Point p = json.decode<Point>("{\"x\": 5, \"y\": 6}");
+  printf("%d %d\n", p.x, p.y);
+}
+</code></pre>
+<pre class="output">(1,2) (3,1) 
+to=2 be=2 or=1 not=1 
+1 0
+test
+5 6
+</pre>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>vec.Vec&lt;T&gt;</code>: <code>vec.new&lt;T&gt;(cap)</code>, <code>push</code>,
+  <code>pop</code>, <code>get</code>, <code>at</code> (a pointer to an item), <code>set</code>,
+  <code>last</code>, <code>insert</code>, <code>removeAt</code>, <code>reserve</code>,
+  <code>items()</code> (a <code>T[]</code> view), <code>sort(cmp)</code>, <code>sortAsc()</code>,
+  <code>clear</code>, <code>free</code>, and the <code>len</code> field. A range <code>for</code> walks
+  it directly: <code>for (auto x : v)</code>.</li>
+  <li><code>map.Map&lt;K, V&gt;</code>, a hash map that keeps insertion order:
+  <code>map.new&lt;K, V&gt;(cap)</code>, <code>set</code>, <code>get(k, &amp;out)</code>,
+  <code>getOr(k, def)</code>, <code>ref(k)</code> (a pointer to the value), <code>has</code>,
+  <code>delete</code>, <code>next(&amp;it, &amp;k, &amp;v)</code> to walk it, <code>keys()</code> and
+  <code>values()</code> as a <code>vec.Vec</code>, <code>clear</code>, <code>free</code>. Keys of
+  any integer type, pointers, <code>u8[]</code> and <code>String</code> work as they are (the map
+  copies and owns <code>u8[]</code> and <code>String</code> keys); other key types are compared
+  byte by byte, or by your own <code>map.hashOf</code> and <code>map.keyEq</code> overloads.</li>
+  <li><code>map.Tree&lt;K, V&gt;</code>, the ordered map (a red-black tree):
+  <code>map.treeNew&lt;K, V&gt;()</code>, the same <code>set</code>/<code>get</code>/<code>getOr</code>/<code>has</code>/<code>delete</code>,
+  and an in-order walk with <code>first()</code>/<code>after(n)</code> (or <code>last()</code>/<code>before(n)</code>).
+  Keys are ordered by <code>map.compare</code> overloads.</li>
+  <li><code>set.Set&lt;T&gt;</code>, a hash set: <code>add</code> and <code>delete</code> (both say whether
+  they changed it), <code>has</code>, <code>next</code>, <code>items()</code>, and
+  <code>unionWith</code>, <code>diff</code>, <code>intersection</code>, <code>symDiff</code> (new
+  sets), <code>isSubset</code>, <code>equals</code>.</li>
+  <li><code>list.List&lt;T&gt;</code>, a doubly linked list: <code>append</code>,
+  <code>prepend</code>, <code>insertBefore</code> and <code>insertAfter</code> return the node, so
+  <code>remove(node)</code> takes it out in O(1); <code>shift</code>, <code>pop</code>,
+  <code>first</code>, <code>last</code>, <code>mergeAppend</code>, <code>mergePrepend</code>; walk it
+  with <code>for (auto n = l.head; n; n = n.next)</code>.</li>
+  <li>New module <code>sort</code>: <code>sort.slice(s, cmp)</code> sorts any slice in place with a
+  comparator, <code>sort.asc(s)</code> sorts numbers or pointers smallest first.</li>
+  <li><code>json.decode&lt;T&gt;(text)</code> returns the JSON as a <code>T</code> (a struct, a
+  slice, a pointer to a struct, ...). What it filled in is freed again if it throws. The
+  <code>json.decode(text, reflect.of(x))</code> form stays.</li>
+  <li>The new <code>Vec&lt;i64&gt;</code> ran about 14% faster than <code>IntVec</code>, and
+  <code>Map&lt;i64, i64&gt;</code> about 10% faster than <code>IntMap</code>, in our measurements.</li>
+</ul>
+
+<h3>The language</h3>
+<ul>
+  <li>A generic struct's method is compiled the first time it is called, so a method that only
+  works for some types (<code>sortAsc</code> needs <code>&lt;</code>) does not stop
+  <code>Vec&lt;Point&gt;</code> from being used.</li>
+  <li>Generic instances work across modules (<code>list.List&lt;fzf.Term *&gt;</code>, a module's
+  generic used with another module's type), and <code>f&lt;T&gt;(...)</code> can be called when
+  plain overloads of <code>f</code> exist; a plain overload still wins over the generic.</li>
+  <li>A range <code>for</code> walks any struct with <code>len</code> and <code>data</code> fields
+  (a <code>vec.Vec</code>), held in a local, a global, a field or through a pointer.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The old containers are removed. They map to the new ones as follows:
+  <table>
+    <tr><th>Before</th><th>Now</th></tr>
+    <tr><td><code>vec.intNew()</code>, <code>vec.ptrNew()</code>, <code>vec.floatNew()</code></td>
+        <td><code>vec.new&lt;i64&gt;()</code>, <code>vec.new&lt;User *&gt;()</code>, <code>vec.new&lt;f64&gt;()</code> (a value, not a pointer)</td></tr>
+    <tr><td><code>v.size</code>, <code>v.entries</code>, <code>v.capacity()</code></td>
+        <td><code>v.len</code>, <code>v.data</code>, <code>v.cap</code></td></tr>
+    <tr><td><code>v.release()</code>, <code>v.release(&amp;freeItem)</code></td>
+        <td><code>v.free()</code>; free the items yourself first: <code>for (auto u : v) { freeItem(u); }</code></td></tr>
+    <tr><td><code>v.sort()</code> on an <code>IntVec</code></td><td><code>v.sortAsc()</code></td></tr>
+    <tr><td><code>v.sort(&amp;less)</code>, <code>less(a, b)</code> true when a goes first</td>
+        <td><code>v.sort(&amp;cmp)</code>, <code>cmp(T *a, T *b)</code> negative, 0 or positive as C's <code>qsort</code></td></tr>
+    <tr><td><code>map.intNew()</code>, <code>map.strNew()</code></td>
+        <td><code>map.new&lt;i64, V&gt;()</code>, <code>map.new&lt;u8[], V&gt;()</code></td></tr>
+    <tr><td><code>m.get(k)</code> (a <code>void *</code>, null if missing), <code>m.get(k, &amp;ok)</code></td>
+        <td><code>m.getOr(k, def)</code>, <code>m.get(k, &amp;out)</code> (true if found), <code>m.ref(k)</code></td></tr>
+    <tr><td><code>m.setFreeValue(&amp;f)</code>, <code>m.release()</code></td>
+        <td><code>m.free()</code>; values that own memory are freed by you first (walk with <code>next</code>)</td></tr>
+    <tr><td><code>m.iter</code>, <code>m.keyIter</code>, <code>m.valueIter</code></td>
+        <td><code>i64 it = 0; while (m.next(&amp;it, &amp;k, &amp;v))</code> (either pointer may be null), or <code>keys()</code>/<code>values()</code></td></tr>
+    <tr><td><code>map.rbNew(...)</code> (<code>RBTree</code>)</td>
+        <td><code>map.treeNew&lt;K, V&gt;()</code>; <code>iterNew</code>/<code>rbIterNext</code> become <code>first()</code>/<code>after(n)</code></td></tr>
+    <tr><td><code>set.intNew()</code> (<code>IntSet</code>), <code>s.size()</code>, <code>s.eq(o)</code>, <code>s.toVec()</code></td>
+        <td><code>set.new&lt;i64&gt;()</code>, <code>s.len</code>, <code>s.equals(&amp;o)</code>, <code>s.items()</code> (insertion order: <code>sortAsc()</code> it for the old sorted order)</td></tr>
+    <tr><td><code>list.new()</code>, <code>l.count()</code>, <code>l.isEmpty()</code>, the circular walk from <code>l.next</code></td>
+        <td><code>list.new&lt;T&gt;()</code>, <code>l.len</code>, <code>!l.len</code>, <code>for (auto n = l.head; n; n = n.next)</code></td></tr>
+  </table></li>
+  <li>An index out of range (<code>get</code>, <code>set</code>, <code>removeAt</code>, ...) throws
+  <code>ERR_BOUNDS</code>, which a <code>try</code> can catch; the old vectors printed a message and
+  exited.</li>
+  <li>The containers no longer free their values: <code>free()</code> releases the container (and
+  the <code>u8[]</code>/<code>String</code> keys it copied), and what the values point to is yours,
+  as with any other struct.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A range <code>for</code> over a call that returns a slice (<code>for (auto w : str.split(s, " "))</code>)
+  ran the call again for the length and for every element, leaking what each call allocated. It runs
+  once.</li>
+  <li><code>reflect.of</code> inside a generic of a library module (as <code>json.decode&lt;T&gt;</code>
+  does) described an empty type unless the program also used <code>reflect.of</code> on that type.</li>
+</ul>
+
+<h2>v0.9.0 <small>(2026-10-12)</small></h2>
+<p>Generics and type aliases. A struct, its methods and a function can take type parameters,
+and each use with other types is compiled for those types: the same code you would write by
+hand, with no <code>void *</code> and no casts.</p>
+
+<pre><code>import mem;
+
+struct Stack<T> { T *items; i64 len; i64 cap; };
+
+void Stack<T>.push(T x)
+{
+  if (self.len == self.cap) {
+    self.cap = self.cap ? self.cap * 2 : 4;
+    self.items = mem.realloc(self.items, sizeof(T) * self.cap);
+  }
+  self.items[self.len++] = x;
+}
+
+T Stack<T>.pop() { return self.items[--self.len]; }
+void Stack<T>.free() { mem.free(self.items); }
+
+T max<T>(T a, T b) { return a > b ? a : b; }
+
+type Ints = Stack<i64>;
+
+void main()
+{
+  ad Ints nums = {null, 0, 0};
+  nums.push(1);
+  nums.push(2);
+  ad Stack<u8 *> words = {null, 0, 0};
+  words.push("hello");
+  printf("%d %s %d %.1f\n", nums.pop(), words.pop(), max(3, 7), max(1.5, 0.5));
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>Generics: <code>struct Stack&lt;T&gt;</code>, its methods <code>T Stack&lt;T&gt;.pop()</code>,
+  and functions <code>T max&lt;T&gt;(T a, T b)</code>, with any number of parameters. A type is
+  written with its arguments (<code>Stack&lt;i64&gt;</code>, <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>);
+  a call works them out from the arguments (through pointers, slices, <code>fn</code> types and
+  generic structs) or takes them written (<code>max&lt;f64&gt;(1, 2.5)</code>). Generic bases,
+  self-referencing structs, <code>ad</code>, modules (<code>coll.Vec&lt;i64&gt;</code>,
+  <code>pub</code> as for any declaration) and <code>-lib</code> libraries work with them. An error
+  in an instance names it and the use that asked for it. The language server shows instances and
+  goes to the generic's definition. A generic <code>Vec&lt;i64&gt;</code> ran faster than
+  <code>vec.IntVec</code> in our measurements. See <a href="language.html#generics">Generics</a>.</li>
+  <li>Type aliases: <code>type Name = T;</code> gives any type a second name (slices, pointers,
+  <code>fn</code> types, fixed arrays, structs, generic instances, other aliases). An alias is its
+  type, so values pass between them with no conversion; in a module <code>pub type</code> is used
+  as <code>mod.Name</code> and aliases may come in any order. The language server shows,
+  completes and jumps to them.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>pub</code> or <code>private</code> on an enum, struct or union applied to the next
+  declaration of a module as well: a private function after a <code>pub enum</code> could be
+  called from outside, and a <code>pub</code> declaration after a <code>private enum</code> was an
+  error.</li>
+</ul>
+
+<h2>v0.8.0 <small>(2026-10-12)</small></h2>
+<p>Autodefer, one-instruction bit operations, pipelines and process groups in <code>proc</code>,
+and UDP with binary addresses in <code>net</code>.</p>
+
+<pre><code>import math, str;
+
+void main()
+{
+  ad String text = str.from("one two three");
+  ad u8[][] words = str.split(text, " ");     // freed at the end of main
+  u32 h = 0x811C9DC5;
+  for (auto w : words) { h = math.rotl((u32)(h ^ w.len), 5); }
+  printf("%d words, hash %x\n", words.len, h);
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li><code>ad</code> (autodefer): <code>ad T name = value;</code> frees <code>name</code> at the
+  end of its scope, as if <code>defer name.free();</code> followed, on every way out. It takes a
+  String, any slice, or a struct with a <code>free()</code> method (or a pointer to one). Returning
+  an <code>ad</code> variable is an error, and so is a type with no <code>free()</code>.
+  <code>ad</code> is not reserved: a variable can still be named <code>ad</code>. See
+  <a href="language.html#autodefer">ad (autodefer)</a>.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>math.rotl</code>, <code>math.rotr</code>, <code>math.bswap</code>, <code>math.clz</code>
+  and <code>math.ctz</code> on a <code>u32</code> or <code>u64</code> (<code>bswap</code> also on a
+  <code>u16</code>) compile to one instruction where they are called, on x86_64 and arm64, AOT and
+  JIT; <code>math.popcount</code> counts the one bits. <code>hash</code>'s SHA-256 uses them and
+  runs about 17% faster.</li>
+  <li><code>proc</code> can build pipelines: <code>proc.FD</code> gives a program an fd of yours as
+  its stdin, stdout or stderr (<code>Opts</code> <code>inFd</code>/<code>outFd</code>/<code>errFd</code>),
+  <code>Opts.pgid</code> joins an existing process group, <code>Opts.dups</code> maps more fds in
+  order, <code>proc.pipe</code> makes the connecting pipes and <code>proc.disown</code> frees a
+  <code>Proc</code> you reap yourself; <code>proc.kill</code> reaches the group a process
+  joined.</li>
+  <li><code>net.Addr</code> keeps an IPv4 or IPv6 address in binary: <code>net.recvFromAddr</code>
+  and <code>net.sendToAddr</code> let a UDP server answer each datagram without turning the
+  sender into text and back; <code>net.makeAddr</code> builds one from a numeric address, and
+  <code>Addr.ip()</code>, <code>port()</code>, <code>family()</code>, <code>equals()</code> and
+  <code>sameIp()</code> read it. <code>net.localAddr</code>, <code>net.remoteAddr</code> and
+  <code>net.setBlocking</code> are public.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>macOS: a string literal with a NUL byte inside (<code>"\x00\x08\x00\x00"</code>) lost
+  bytes in a compiled program: the linker splits the section literals went in at each NUL and
+  merges the pieces. Such literals now go in a section it leaves alone.</li>
+  <li>Docs: the sockets section showed a bare <code>signal(SIGPIPE, SIG_IGN)</code>, which doesn't
+  compile; it is <code>signal.handle(libc.SIGPIPE, libc.SIG_IGN)</code> or
+  <code>libc.signal(...)</code>, now with a runnable example (it reads <code>errno</code> right
+  after the failed write, which macOS needs).</li>
+</ul>
+
+<h2>v0.7.0 <small>(2026-10-12)</small></h2>
+<p>Code generation: the compiler inlines small functions, and a new module <code>atomic</code>
+shares counters and flags between threads without a mutex. Locals are now always at their
+type's alignment, which atomics and C code need.</p>
+
+<pre><code>import atomic, libc;
+
+i64 gHits = 0;
+
+i64 next(i64 i) { return i + 1; }   // small: compiled into its callers
+
+void *worker(void *unused)
+{
+  for (i64 i = 0; i < 100000; i = next(i)) { atomic.add(&gHits, 1); }
+  return null;
+}
+
+void main()
+{
+  libc.pthread_t *th[4];
+  for (i64 i = 0; i < 4; i++) { libc.pthread_create(&th[i], null, &worker, null); }
+  for (i64 i = 0; i < 4; i++) { libc.pthread_join(th[i]); }
+  printf("%d hits\n", atomic.load(&gHits));
+}
+</code></pre>
+
+<h3>The compiler</h3>
+<ul>
+  <li>Inlining: a call to a short function of the program whose parameters and result are
+  numbers or pointers is compiled as the function's body in the caller, which saves the call.
+  It behaves exactly like the call (arguments convert to the parameter types, a result to the
+  return type, recursion is never inlined), and the function is still compiled on its own.
+  Loops calling small helpers ran 1.2 to 1.8 times as fast in our measurements.</li>
+  <li>Every local is at its type's natural alignment in the frame: an <code>i64</code>,
+  <code>f64</code> or pointer declared after a narrower local was 4-aligned, which atomic
+  instructions fault on (arm64) or split (x86_64), and C code may not expect.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li>New module <code>atomic</code>: <code>load</code>, <code>store</code>, <code>add</code>,
+  <code>sub</code>, <code>swap</code>, <code>and</code>, <code>or</code>, <code>xor</code> and
+  <code>cas</code> on <code>i64</code>, <code>i32</code>, <code>u64</code> and <code>u32</code>
+  (the pointer type picks the width), pointer versions (<code>loadPtr</code>,
+  <code>storePtr</code>, <code>swapPtr</code>, <code>casPtr</code>) and <code>fence()</code>, all
+  sequentially consistent. See <a href="library.html#atomics">Atomics</a>.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>atomic</code> is no longer a keyword: it was accepted and ignored, so
+  <code>atomic i64 n;</code> made an ordinary variable. It is now an error that points to the
+  module.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>An unknown name followed by another word (<code>foo bar;</code>) is reported at the name;
+  as a block's first statement it used to point at the block's <code>{</code>.</li>
+</ul>
+
+<h2>v0.6.0 <small>(2026-10-12)</small></h2>
+<p>Function overloading, and the library pieces the example projects still wrote by hand:
+hashing, case-insensitive and URL/HTML text helpers, portable file metadata, and waiting for
+a child process inside the coroutine loop.</p>
+
+<pre><code>import hash, str;
+
+void send(i64 n) { printf("number %d\n", n); }
+void send(u8[] text) { printf("text %.*s\n", (i32)text.len, text.ptr); }
+
+void main()
+{
+  send(42);
+  send("hello");
+
+  u8 digest[32];
+  hash.sha256("abc", digest);
+  String hex = hash.hex(digest);
+  defer hex.free();
+  String q = str.urlEncode("a b&c");
+  defer q.free();
+  printf("%.8s %s %d\n", hex.cstr(), q.cstr(), str.equalsFold("GET", "get"));
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>Overloading: functions, methods and a module's functions can share a name when their
+  parameter types differ, and a call picks the one its arguments fit best (an exact type over
+  a conversion in the same family over an integer for a float; on a tie, the one that needs no
+  default and no <code>T ...name</code> extras). An ambiguous call, or one no overload takes, is
+  an error that lists the overloads. <code>&amp;f</code> takes the overload of the function type
+  it goes to. <code>pub</code> is per overload. The language server shows and jumps to the
+  overload a call picks. See <a href="language.html#overloading">Overloading</a>.</li>
+  <li>A function with no overloads keeps its symbol, so existing libraries and C callers see no
+  change; once a name has two or more, each one's symbol carries its parameter types.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li>New module <code>hash</code>: SHA-256 (streaming <code>hash.Sha256</code> and one-shot
+  <code>hash.sha256</code>) with <code>hash.hex</code>, the IEEE CRC-32 used by zip, gzip and PNG
+  (chainable), 64-bit FNV-1a for tables, and <code>hash.equalCt</code>, a constant-time compare
+  for digests and tokens (the length is not secret).</li>
+  <li><code>str</code> gets ASCII case-insensitive <code>equalsFold</code>,
+  <code>compareFold</code>, <code>findFold</code>, <code>containsFold</code>,
+  <code>startsWithFold</code> and <code>endsWithFold</code>; URL percent-encoding
+  (<code>urlEncode</code> for a component, <code>urlEncodePath</code> keeping <code>/</code>,
+  <code>formEncode</code> with <code>+</code> for spaces) and decoding (<code>urlDecode</code>,
+  <code>formDecode</code>, false on a bad <code>%XX</code>); and <code>htmlEscape</code>.</li>
+  <li><code>fs</code> gets <code>lstat</code> and <code>fstat</code> next to <code>stat</code>,
+  <code>FileStat.kind()</code> (<code>fs.FileKind</code> file, dir, link, other) with
+  <code>isFile</code>, <code>isDir</code> and <code>isLink</code>, so code never needs
+  <code>libc.cStat</code>'s per-platform layout; plus <code>fs.realPath</code>,
+  <code>fs.pread</code> and <code>fs.pwrite</code>.</li>
+  <li><code>coro.waitChild(pid, ms)</code> waits for a child process inside the coroutine loop
+  without blocking the other coroutines (pidfd on Linux, kqueue on macOS, polling where neither
+  exists), returning its wait status or -1 on timeout. <code>proc.exitFd(pid)</code> gives the
+  pollable fd for your own poll loop, and <code>proc.setStatus(p, st)</code> records a status got
+  that way in a <code>proc.Proc</code>.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>A second function of a name with other parameter types used to be the error "conflicting
+  types"; it is now an overload. The same parameters with another return type is still that
+  error.</li>
+</ul>
+
+<h2>v0.5.1 <small>(2026-10-12)</small></h2>
+<p>Two fixes, and a clean-out of the old bug queue (every other entry in it was already fixed,
+or no longer applies to the frozen syntax).</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>The old C declarator of a function that returns a function pointer,
+  <code>i64 (*getHandler())(i64) { ... }</code>, still compiled; it is now the same error as the
+  variable form, naming the way to write it: <code>fn(i64) i64 getHandler()</code>.</li>
+  <li>A <code>catch</code> block takes its frame's address again after the throw lands, as
+  <code>defer</code> already did, instead of relying on the value staying in place across the try
+  body. It never went wrong in practice (the code layout kept it alive), but nothing
+  guaranteed it.</li>
+</ul>
+
+<h2>v0.5.0 <small>(2026-10-12)</small></h2>
+<p>A systems library: what the example servers and tools used to write by hand. A coroutine
+loop for servers, a byte buffer, monotonic clocks and HTTP dates, the OS calls shells and
+daemons need, and small helpers. Nothing that compiled before changes meaning.</p>
+
+<pre><code>import bytes, coro, date, libc, net;
+
+void *client(void *arg)
+{// reads 4-byte big-endian lengths and their messages, answers with the time
+  i32 fd = (i32)(i64)arg;
+  bytes.Buffer in = bytes.bufferNew();
+  defer in.free();
+  while (coro.waitIdle(fd, libc.POLLIN, 5000) > 0 && in.readFrom(fd) > 0) {
+    while (in.len >= 4 && in.len >= 4 + bytes.be32(in.data())) {
+      in.consume(4 + bytes.be32(in.data()));
+      String now = date.httpDate(date.unixNow());
+      net.send(fd, now);
+      now.free();
+    }
+  }
+  coro.close(fd);
+  return null;
+}
+
+void *acceptor(void *arg)
+{
+  i32 lfd = (i32)(i64)arg, fd;
+  while ((fd = coro.accept(lfd)) != -1) { coro.go(&client, (void *)(i64)fd); }
+  return null;
+}
+
+void main()
+{
+  coro.go(&acceptor, (void *)(i64)net.listen(9000, "*", 64));
+  coro.run();
+}
+</code></pre>
+
+<h3>The standard library</h3>
+<ul>
+  <li>A coroutine loop in <code>coro</code>: <code>coro.go</code> starts a coroutine in the
+  thread's loop and <code>coro.run</code> runs them all over one <code>poll</code> per turn.
+  Inside them <code>coro.wait(fd, events, ms)</code>, <code>coro.waitIdle</code>,
+  <code>coro.sleep</code> and <code>coro.accept</code> pause the coroutine instead of the
+  thread. <code>coro.stop()</code> winds the loop down gracefully, and an accept that runs out
+  of fds neither spins nor drops clients: it rests until <code>coro.close</code> frees one,
+  and for a while after it only accepts when two fds are free (on macOS a failed accept resets
+  the client it took off the queue). Misuse throws <code>coro.ERR_LOOP</code>.</li>
+  <li>Module <code>bytes</code>: a <code>bytes.Buffer</code> that grows at the end and is
+  consumed from the front (<code>append</code>, <code>consume</code>, <code>room</code>/<code>commit</code>,
+  <code>readFrom</code>/<code>writeTo</code>, <code>appendBe32</code> and the other byte orders), and
+  <code>bytes.be16/32/64</code>, <code>le16/32/64</code> and <code>putBe*</code>/<code>putLe*</code> on any
+  <code>u8[]</code>, bounds-checked.</li>
+  <li><code>date.monoMs()</code> and <code>date.monoNs()</code>, a clock that only goes forward,
+  for timeouts; <code>date.sleepMs</code>, <code>date.unixNow</code>;
+  <code>date.formatUnix(t, fmt)</code> (strftime, UTC or local); <code>date.httpDate</code> and
+  <code>date.parseHttpDate</code> (RFC 9110, all three forms).</li>
+  <li>The environment and the process: <code>proc.getenv</code>, <code>hasEnv</code>,
+  <code>setenv</code>, <code>unsetenv</code>; <code>proc.selfPath()</code>,
+  <code>proc.cpuCount()</code>; <code>proc.exited</code>, <code>exitCode</code>,
+  <code>signaled</code>, <code>termSignal</code>, <code>stopped</code>,
+  <code>stopSignal</code> and <code>proc.statusCode</code> (as <code>$?</code>) for wait
+  statuses.</li>
+  <li><code>libc</code> declares <code>dup</code>, <code>dup2</code>, <code>getpid</code>,
+  <code>getppid</code>, <code>getpgrp</code>, <code>setpgid</code>, <code>setsid</code>,
+  <code>tcgetpgrp</code>, <code>tcsetpgrp</code>, <code>pread</code>, <code>pwrite</code>,
+  <code>fsync</code>, <code>ftruncate</code>, <code>readlink</code>, <code>symlink</code>,
+  <code>rename</code>, <code>access</code>, <code>realpath</code>, <code>sysconf</code>,
+  <code>setenv</code>, <code>getrlimit</code>/<code>setrlimit</code> and more <code>errno</code>
+  codes (<code>EEXIST</code>, <code>ENOTEMPTY</code>, <code>ENOSPC</code>, <code>ELOOP</code>, ...),
+  each with its platform's value.</li>
+  <li><code>os.eprintf</code> (printf to stderr, format-checked) and <code>os.flush</code>;
+  <code>math.min</code>, <code>math.max</code>, <code>math.clamp</code>;
+  <code>removeAt(i)</code> on <code>PtrVec</code>, <code>IntVec</code> and
+  <code>FloatVec</code>; <code>json.Writer.cstr(u8 *)</code> for C strings (a null pointer is
+  <code>null</code>).</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>arm64: a struct of 32 KB or more passed or returned by value failed to assemble (AOT)
+  or used wrong addresses (JIT). Structs from 256 bytes up are now copied by a loop, which
+  also keeps the code small.</li>
+</ul>
+
+<h2>v0.4.0 <small>(2026-10-12)</small></h2>
+<p>Reflection. A program can ask the compiler about its types at run time, and the
+<code>json</code> module uses that to turn any struct into JSON and back without hand-written
+code. Plus a JSON writer, enum names at run time, and typed comparators and callbacks.</p>
+
+<pre><code>import json, mem, reflect;
+
+enum Role { guest, admin };
+struct User { i64 id; String name; Role role; u8[][] tags; };
+
+void main()
+{
+    User u;
+    mem.set(&u, 0, sizeof(User));
+    json.decode("{\"id\": 7, \"name\": \"Ada\", \"role\": \"admin\", \"tags\": [\"math\"]}",
+                reflect.of(u));
+    defer json.free(reflect.of(u));
+    u.id++;
+    String text = json.encode(reflect.of(u));
+    defer text.free();
+    printf("%s\n", text);   // {"id":8,"name":"Ada","role":"admin","tags":["math"]}
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li><code>reflect.typeOf(T)</code> (a type or any expression) gives a <code>reflect.Type</code>:
+  kind, name, size, signedness, element and length, a struct's fields (name, type, offset,
+  private or not; inherited ones first) and an enum's members. <code>reflect.of(x)</code> gives a
+  <code>reflect.Value</code>, x's address and type, so one function can take any value;
+  <code>reflect.field</code>, <code>getInt</code>/<code>setInt</code> and
+  <code>getFloat</code>/<code>setFloat</code> read and write through it. A description is made at
+  compile time, only for the types a program asks about; compare two with
+  <code>reflect.same</code>.</li>
+  <li>Enum names at run time: <code>reflect.name(Role.admin)</code> is <code>"admin"</code>,
+  <code>reflect.enumValue(t, "admin", &amp;v)</code> goes the other way. <code>printf</code> of an
+  enum still prints its number.</li>
+  <li>A function whose parameters are typed pointers now converts to a function pointer whose
+  matching parameters are <code>void *</code>, so comparators and callbacks are written with their
+  real types and no casts (<code>i64 byAge(User *a, User *b)</code> goes straight to
+  <code>PtrVec.sort</code>); the return type and every other parameter must still match.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>json.encode(reflect.of(x), indent)</code> writes any value as JSON;
+  <code>json.decode(text, reflect.of(x), flags)</code> fills it in and <code>json.free</code>
+  frees what decode allocated. Fields by name, private ones skipped, enums by name, Strings,
+  slices, arrays, nested structs and pointers. Unknown keys are ignored and missing fields kept,
+  unless <code>json.STRICT</code>. A value that doesn't fit throws <code>json.ERR_DECODE</code>
+  with where it is (<code>items[2].price: expected a number, got a string</code>).</li>
+  <li><code>json.Writer</code> builds JSON into a String: <code>beginObject</code>,
+  <code>key</code>, <code>int</code>/<code>float</code>/<code>bool</code>/<code>str</code>/<code>nil</code>,
+  <code>beginArray</code>, <code>end</code>, <code>raw</code>, <code>take</code>; escapes, commas
+  and an optional indent done for you, and misuse throws <code>json.ERR_WRITER</code>.</li>
+</ul>
+
+<h2>v0.3.1 <small>(2026-10-12)</small></h2>
+<p>The rest of the library on <code>u8[]</code> and <code>String</code>, and the compiler catching
+more mistakes it used to let through. Code that uses <code>proc</code>, <code>csv</code> or
+<code>sql</code> needs updating, and a few things that compiled before (and did the wrong thing)
+are errors now.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>proc</code>: <code>proc.shell</code> takes a <code>u8[]</code>; <code>proc.shellQuote</code>,
+  <code>proc.shellOutput</code> and <code>proc.run</code> return a <code>String</code>;
+  <code>proc.communicate(p, input, &amp;out, &amp;err)</code> takes its input as a <code>u8[]</code> and
+  gives stdout and stderr as Strings. <code>proc.shellf</code> and <code>proc.shellOutput</code> are
+  format-checked like <code>printf</code>, and their <code>%s</code> takes a String or a slice.</li>
+  <li><code>csv</code>: <code>csv.init(&amp;p, text)</code> takes a <code>u8[]</code>, and
+  <code>csv.next</code> fills a <code>csv.Item</code> whose <code>text</code> is a view of the input
+  (it was a <code>csv.Slice</code> of offsets).</li>
+  <li><code>sql</code>: <code>open</code>, <code>prepare</code>, <code>exec</code>, <code>select</code>
+  and <code>execRaw</code> take the SQL as a <code>u8[]</code>; <code>execRaw</code> returns its error
+  as a String (empty when it ran); a text <code>Param</code> and a text <code>Column</code> are
+  <code>u8[]</code>; the <code>Db</code> keeps its own copy of its name.</li>
+  <li>A write through a string literal the compiler can see is an error (the literal itself, or a
+  local initialised from one and never given anything else); other writes fault at run time, in
+  the JIT too, which kept literals writable.</li>
+  <li>A struct (a String, a slice, any struct) used as a condition is an error. It was tested by
+  its address, so <code>if (err)</code> on a String was always true.</li>
+  <li>Returning a struct from a function that returns something else, or another struct, is an
+  error. It was a warning, and the caller got garbage.</li>
+</ul>
+
+<h3>New</h3>
+<ul>
+  <li>A <code>case</code> is a block of its own: it can declare variables and use
+  <code>defer</code> without braces.</li>
+  <li>Bounds-check elision: <code>s[i]</code> in <code>for (i64 i = 0; i &lt; s.len; i++)</code> is
+  not checked when nothing else changes <code>i</code> or <code>s</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A <code>#define</code> of several strings (<code>#define APP PREFIX "/app"</code>) gave a
+  <code>u8[]</code> that was too short, and a <code>u8 b[] = APP;</code> array of 0 bytes.</li>
+  <li>An error on a later module of an import list (<code>import cstr, rt;</code>) printed
+  megabytes of <code>^</code>.</li>
+  <li>arm64: add and subtract with an immediate past 12 bits were truncated instead of split, and
+  two JIT encoders did the wrong thing with <code>sp</code>.</li>
+  <li><code>f + 0</code> on a function pointer crashed the compiler; it is a type error.</li>
+  <li>The test runners only run <code>NN_name.ktm</code> files.</li>
+  <li>LSP: hover and go-to-definition find a module's own names from its other files.</li>
+</ul>
+
+<h2>v0.3.0 <small>(2026-10-11)</small></h2>
+<p>Safe strings and slices. ktm gets a slice type that knows its length, a native <code>String</code>,
+bounds checks that throw, and a standard library that works with both. The old <code>u8 *</code> buffer
+functions are gone or moved to a C-string module, so code written for v0.2 needs updating where it
+uses them.</p>
+
+<pre><code>import fs, str;
+
+i32 main() {
+    String text = fs.readAll("notes.txt");
+    defer text.free();
+
+    u8[][] lines = text.split("\n");
+    defer lines.free();
+    for (auto line : lines) {
+        u8[] t = line.trim();
+        if (t.startsWith("#")) {
+            continue;
+        }
+        printf("%s (%d bytes)\n", t, t.len);
+    }
+
+    String out = str.format("%d lines", lines.len);
+    defer out.free();
+    out.append("!");
+    printf("%s\n", out);
+    return 0;
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>Slices <code>T[]</code>: a pointer and a length (16 bytes, passed in two registers),
+  <code>s.len</code>, <code>s.ptr</code>, <code>s[i]</code> (read and write), views <code>s[a:b]</code>,
+  <code>s[a:]</code>, <code>s[:b]</code> with no copy, range-for, slices of structs, slice fields, nested
+  slices. An array converts to a slice, a string literal converts to a <code>u8[]</code> (no copy), and
+  <code>p[0:n]</code> makes a slice from a raw pointer. <code>==</code> on slices is an error: use
+  <code>a.equals(b)</code> or compare <code>.ptr</code>.</li>
+  <li>Bounds checks on every index and sub-slice, always on: a bad index throws <code>ERR_BOUNDS</code>
+  ("index 5 out of range for length 5", with the file and line in <code>e.file</code> and
+  <code>e.line</code>), which a server can catch. <code>s.ptr[i]</code> is
+  the unchecked way.</li>
+  <li><code>String</code>: an owned, growable, NUL-terminated UTF-8 string (<code>str.new()</code>,
+  <code>str.from(...)</code>, <code>str.format(...)</code>), freed with <code>defer s.free()</code>. Methods:
+  <code>append</code>, <code>appendFormat</code>, <code>insert</code>, <code>remove</code>,
+  <code>replace</code>, <code>clone</code>, <code>toLower</code>/<code>toUpper</code>, <code>cstr()</code>.
+  A String converts to a <code>u8[]</code> view wherever one is expected.</li>
+  <li>Text methods on any <code>u8[]</code>, literal or String: <code>find</code>, <code>contains</code>,
+  <code>startsWith</code>, <code>endsWith</code>, <code>equals</code>, <code>compare</code>,
+  <code>trim</code> (a view), <code>split</code> (views), <code>decodeRune</code>,
+  <code>runeCount</code>.</li>
+  <li><code>%s</code> takes a slice or a String directly in <code>printf</code>, <code>str.format</code> and
+  <code>throw</code>.</li>
+  <li>Named varargs are real slices (<code>i64 ...nums</code> is an <code>i64[]</code>), and
+  <code>...x</code> spreads any slice.</li>
+  <li><code>-Memsafe</code> and the REPL see every allocation, the library's own included: a double free
+  through a copied String is reported with all three lines.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li><code>str</code> is String and <code>u8[]</code> text; the NUL-terminated C-string helpers moved to
+  the new module <code>cstr</code> (<code>cstr.len</code>, <code>cstr.cmp</code>, <code>cstr.dup</code>,
+  <code>cstr.format</code>, ...), with <code>cstr.view(p)</code> to turn a C string into a
+  <code>u8[]</code>.</li>
+  <li><code>fs</code>: paths are <code>u8[]</code>, <code>fs.readAll(path)</code> returns a String,
+  <code>fs.writeAll(path, data)</code> takes a <code>u8[]</code>.</li>
+  <li><code>json</code>: <code>json.parse(u8[] text)</code> (parse part of a text by passing
+  <code>text[0:n]</code>), <code>toStr</code>/<code>errorStr</code> return Strings, a value's
+  <code>str</code> and <code>key</code> are <code>u8[]</code> views the document owns, and
+  <code>objectGet</code> matches the whole key.</li>
+  <li><code>net</code>: addresses and names are <code>u8[]</code> (empty means any),
+  <code>net.send</code>/<code>sendTo</code> take a <code>u8[]</code>, <code>net.recvFrom</code> reads
+  into a <code>u8[]</code> and gives the sender as a String, <code>net.peerAddr</code> and
+  <code>net.addrToStr</code> return Strings.</li>
+  <li><code>date</code>: <code>format</code>, <code>formatDate</code>, <code>formatTime</code>,
+  <code>timestampNow</code> and <code>isoFromTimespec</code> return Strings; <code>date.parse</code>
+  and <code>parseParts</code> take a <code>u8[]</code>.</li>
+  <li><code>map</code>: a <code>StrMap</code> key is a <code>u8[]</code> matched on all its bytes, and
+  the map copies and frees its keys itself (<code>setFreeKey</code>, <code>getLen</code> and
+  <code>hasLen</code> are gone: look up part of a buffer with <code>buf[0:n]</code>);
+  <code>node.key</code> and <code>keyIter</code> give views of the map's copy. <code>toStr</code> and
+  <code>keysToStr</code> of <code>StrMap</code>, <code>IntMap</code> and <code>set.IntSet</code>
+  return Strings.</li>
+  <li><code>proc</code>, <code>csv</code> and <code>sql</code> keep their <code>u8 *</code> functions
+  in this release; they move to <code>u8[]</code> and String in v0.3.1.</li>
+</ul>
+
+<h3>Watch out</h3>
+<ul>
+  <li>An array becomes a slice of its full length: a <code>u8 buf[64]</code> passed where a
+  <code>u8[]</code> is expected is all 64 bytes, not the text up to its NUL. Pass
+  <code>cstr.view(buf)</code> for the C string in it.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>The format engine never checked its argument count: a format asking for more arguments than it got
+  now throws instead of reading past them.</li>
+  <li>A module can call its own global function pointer by name.</li>
+  <li>A method can be called on a call's result (<code>fs.readAll(p).take()</code>).</li>
+  <li><code>return f();</code> of a function returning a struct crashed the compiler; <code>c ? a : b</code>
+  of structs works, and mixing a struct with a pointer in a conditional is an error (it compiled to
+  garbage); a field named like an imported module (<code>v.str</code>) is a field.</li>
+  <li>A vector's index error names the method: <code>IntVec.get: index 5 out of range (size 3)</code>
+  (it said <code>IntVecGet</code>).</li>
+  <li>A slice in an initialiser list takes one item (<code>Path p = {"name", points};</code>), in
+  locals, globals, structs and arrays.</li>
+</ul>
+
+<h3>Known issue</h3>
+<ul>
+  <li>A write through a slice of a string literal is not caught at compile time yet (planned for
+  v0.3.1): copy the literal with <code>str.from</code> before changing it.</li>
+</ul>
+
+<h2>v0.2.1 <small>(2026-10-11)</small></h2>
+<p>A cleanup release: the macOS JIT fork crash, module libraries with run-time initialisers, readable
+names in every message, and a set of smaller fixes.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>On macOS, a child forked by a program run with <code>-jit</code> no longer crashes now and then right
+  after <code>fork()</code> (its thread came back with Apple's JIT write protection off). The known
+  issue is gone.</li>
+  <li>A library that reads or writes another prebuilt library's globals links (they are reached through
+  the GOT).</li>
+  <li>Messages name functions, not their symbols: the JIT's unresolved-symbol errors, the linker's errors
+  and notes, and the REPL say <code>geo.useHelper</code>, never <code>_K3geo9useHelper</code>.</li>
+  <li>A module global whose type doesn't exist is reported once, not twice.</li>
+  <li><code>#define KTM_NO_REPL_HELLO</code> in <code>~/.ktm_rc.ktm</code> hides the REPL greeting, as
+  documented.</li>
+  <li>A program's own global named like a C one (<code>environ</code>, <code>errno</code>) no longer
+  replaces it: program globals get their own symbols, as functions did in v0.2.0. A child started by
+  <code>proc.run</code> from a program that had its own <code>environ</code> got an empty environment.</li>
+  <li>In the JIT, a global declared with <code>extern</code> and never defined is an error instead of a
+  crash at address 0.</li>
+  <li><code>auto s = "x";</code> no longer warns "u8[2] is not assignable to u8[2]".</li>
+  <li><code>&amp;</code> of something without an address (<code>&amp;5</code>, <code>&amp;E.a</code>,
+  <code>&amp;f()</code>) is a parse error instead of a code generator failure.</li>
+  <li>Duplicate <code>case</code> values are reported by value (<code>duplicate case value Color.red</code>),
+  including a value inside an earlier range; integer duplicates were not reported at all.</li>
+  <li><code>argc</code>/<code>argv</code> outside <code>main</code>'s parameters are an error (they were
+  silently 0 and null).</li>
+  <li><code>json.parse</code> rejects invalid UTF-8 in strings (stray continuation bytes, cut-off and
+  overlong sequences, surrogates, values past U+10FFFF) with the new <code>json.INVALID_UTF8</code> and
+  the position of the bad byte.</li>
+</ul>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>extern "c" T x;</code> declares C data (<code>extern "c" u8 **environ;</code>); a plain
+  <code>extern T x;</code> is a ktm global defined elsewhere.</li>
+  <li>A <code>for</code> init can declare several variables (<code>for (i64 i = 0, j = 10; i &lt; j; i++, j--)</code>),
+  and its step can be several expressions.</li>
+  <li>A module built with <code>ktm -lib</code> can have globals with run-time initialisers: each module
+  gets an init function that runs once, its imports first, before the program's own initialisers.</li>
+  <li>All REPL builtins are camelCase: <code>replListFn</code>, <code>replFindFn</code>,
+  <code>replReloadRc</code>, <code>replListGVars</code>, <code>replClassRep</code>, <code>replEval</code>,
+  <code>replHeap</code> (and <code>replDisasm</code>/<code>replDel</code> from v0.2.0).</li>
+</ul>
+
+<h2>v0.2.0 <small>(2026-10-11)</small></h2>
+<p>A new language. ktm now has its own C-like syntax, modules, methods and a standard library organised
+into modules. The old HolyC syntax is gone: every program, test, doc page and example in the repository
+was converted once with an internal tool, which was then deleted. Code written for v0.1.0 does not
+compile with v0.2.0.</p>
+
+<pre><code>
+
+enum Kind { circle, rect };
+
+struct Shape { Kind kind; f64 w, h; };
+
+f64 Shape.area() {
+    switch (self.kind) {
+        case Kind.circle: return 3.14159 * self.w * self.w;
+        case Kind.rect:   return self.w * self.h;
+    }
+    throw(1, "unknown kind %d", self.kind);
+    return 0;
+}
+
+i32 main(i32 argc, u8 **argv) {
+    defer printf("bye\n");
+    Shape s = {Kind.rect, 2, 3};
+    printf("%.1f\n", s.area());
+    return 0;
+}
+</code></pre>
+
+<h3>The language</h3>
+<ul>
+  <li>C types and literals: <code>void</code>, <code>i8</code> to <code>u64</code>, <code>f32</code>,
+  <code>f64</code>, <code>bool</code>, <code>true</code>/<code>false</code>/<code>null</code>; digit
+  separators (<code>1_000_000</code>); a character literal holds one character.</li>
+  <li><code>struct</code>, C prefix casts <code>(T)x</code>, <code>printf</code>, <code>i32 main(...)</code>,
+  calls always with parentheses, file scope holds declarations only.</li>
+  <li>Typed constants: <code>const i64 MAX = 4;</code> (compile-time constants when the value is).</li>
+  <li>Scoped enums: <code>enum Color { red, green };</code> used as <code>Color.red</code>, with an
+  optional integer type (<code>enum Status : u16 { ... }</code>); converting an integer to an enum needs a
+  cast.</li>
+  <li>Function types: <code>fn(i64) i64</code>, <code>fn(u8 *) u8 *</code>, <code>(fn(i64) i64) *</code>
+  for a pointer to one. A function pointer only takes a function with the same signature.</li>
+  <li>Named varargs: <code>i64 sum(i64 ...nums)</code> with <code>nums.len</code>, indexing,
+  range-for and spreading (<code>sum(...nums)</code>).</li>
+  <li><code>defer</code>: block-scoped, runs on every exit (return, break, continue, goto, exceptions).</li>
+  <li>Errors: <code>throw(code)</code> or <code>throw(code, "format", ...)</code>, caught as
+  <code>catch (Error e)</code> with <code>e.code</code>, <code>e.message</code>, <code>e.file</code> and
+  <code>e.line</code>; <code>throw(e)</code> rethrows. <code>try</code> and <code>defer</code> no longer
+  make a system call each (7 to 12 times faster).</li>
+  <li>switch cases end at the next label; <code>fallthrough;</code> continues into the next one.</li>
+  <li>Braces are required on <code>if</code>/<code>else</code>/<code>for</code>/<code>while</code>/<code>do</code>
+  bodies.</li>
+  <li>Methods: <code>f64 Shape.area() { ... self ... }</code>, called <code>s.area()</code>; derived
+  structs inherit methods, a same-named method hides the base one, no virtual dispatch.
+  <code>.</code> works on a value or a pointer (<code>p.x</code> is <code>p-&gt;x</code>).</li>
+  <li>Modules: a directory is a module (<code>module net;</code> in every file),
+  <code>import net, h = net.http;</code>, <code>pub</code> exports, names private by default,
+  <code>private</code> struct fields hidden outside their module, files of a module see each other in
+  any order. <code>ktm -lib</code> builds a module or a tree of modules into a library that importers
+  link automatically. A local may shadow a module name.</li>
+</ul>
+
+<h3>The standard library</h3>
+<ul>
+  <li>Organised into modules: <code>str</code>, <code>mem</code>, <code>fs</code>, <code>os</code>,
+  <code>proc</code>, <code>signal</code>, <code>net</code>, <code>json</code>, <code>csv</code>,
+  <code>sql</code>, <code>date</code>, <code>coro</code>, <code>thread</code>, <code>map</code>,
+  <code>set</code>, <code>vec</code>, <code>list</code>, <code>math</code>, <code>fzf</code>, plus
+  <code>libc</code> for the C and POSIX functions under their C names. Names are camelCase:
+  <code>StrLen(s)</code> is now <code>cstr.len(s)</code>, <code>StrMapSet(m, k, v)</code> is
+  <code>m.set(k, v)</code>.</li>
+  <li>A prelude every file sees without an import: <code>Error</code>, the integer limits
+  (<code>I8_MIN</code> to <code>U64_MAX</code>), <code>EXIT_OK</code>/<code>EXIT_FAIL</code>.</li>
+  <li>Dates are formatted with <code>date.format(d, "%Y-%m-%d")</code>; printf's <code>%D</code>,
+  <code>%T</code> and <code>%F</code> are gone.</li>
+  <li>The TempleOS leftovers are gone (<code>Dir</code>, the directory printer, the verbose remove, the
+  <code>Fs</code> task block).</li>
+</ul>
+
+<h3>Removed</h3>
+<ul>
+  <li>The HolyC syntax: <code>U0</code>/<code>I64</code>/<code>F64</code>/<code>Bool</code>,
+  <code>class</code>/<code>public</code>, postfix casts, print statements, calls without parentheses,
+  <code>Main</code>, code at file scope, <code>(...)</code> with implicit <code>argc</code>/<code>argv</code>,
+  C function-pointer declarators, multi-character literals.</li>
+  <li><code>std.ktmh</code> and <code>defs.ktmh</code> (the library is imported as modules).</li>
+  <li><code>-transpile</code> (it could not read the new syntax).</li>
+  <li>The REPL builtins <code>Uf</code> and <code>ReplDel</code>: they are <code>replDisasm("name")</code>
+  and <code>replDel("name")</code>.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A program's own function named like a C library symbol (<code>read</code>, <code>environ</code>,
+  <code>free</code>) no longer replaces it: program symbols are now named like module symbols.</li>
+  <li>Variadic C calls through a module's <code>extern "c"</code> pass their extra arguments correctly on
+  Apple arm64 (<code>open</code>'s mode was garbage).</li>
+  <li>A struct holding a not-yet-complete struct by value is an error (it compiled with size 0).</li>
+  <li>Statements after a <code>{ }</code> block inside a switch case were dropped.</li>
+  <li>Global <code>= null</code> initialisers are constant data; a field of the compiler state was read
+  uninitialised; narrow literals in untyped varargs filled only one byte; <code>#undef</code> took the
+  next line's first word; several test races on macOS and the LSP debounce test.</li>
+</ul>
+
+<h3>Known issue</h3>
+<p>On macOS, a child forked by a program run with <code>-jit</code> can crash right after
+<code>fork()</code>, rarely and under load. Compiled programs are fine; see
+<a href="known-issues.html">Known issues</a> for the workaround.</p>
+
+<h2>v0.1.0 <small>(2026-10-10)</small></h2>
+<p>Renamed from hcc v0.19.3. The language, the standard library and their behaviour are unchanged;
+only names are new.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li>The compiler is <code>ktm</code> (was <code>hcc</code>). Sources are <code>.ktm</code>, headers
+  <code>.ktmh</code>; <code>.HC</code> and <code>.HH</code> are rejected with a message, on the command line
+  and in <code>#include</code>.</li>
+  <li>The library header is <code>std.ktmh</code> (was <code>tos.HH</code>), the library
+  <code>libktm</code> (was <code>libtos</code>, built with <code>-lib ktm</code>), its sources
+  <code>src/std/</code>.</li>
+  <li>Environment variables, macros and defines are <code>KTM_*</code> (was <code>HCC_*</code>), e.g.
+  <code>KTM_INSTALL_DIR</code>, <code>KTM_TEST_TIMEOUT</code>, <code>__KTM_JIT__</code>; temporary files
+  and the REPL's files are named <code>ktm</code> too (<code>~/.ktm_rc.ktm</code>,
+  <code>~/.ktm_repl_history</code>).</li>
+  <li>The <code>--terry</code> option is gone; the history and credits are in the README.</li>
+</ul>

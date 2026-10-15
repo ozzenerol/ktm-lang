@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reflection - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html" class="on"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <article class="prose">
+<h1>Reflection</h1>
+<p>Reflection lets a program look at its own types while it runs: a struct's fields and where they are, an enum's members and their names, a value's type. The <code>reflect</code> module provides it. This chapter covers describing a type with <code>reflect.typeOf</code>, what a <code>reflect.Type</code> holds, handling a value of any type with <code>reflect.of</code>, reading and writing fields by name, enum names, attributes, and how the library builds on it.</p>
+<h2 id="describing-a-type"><a href="#describing-a-type">Describing a type</a></h2>
+<p><code>reflect.typeOf(T)</code> gives a <code>reflect.Type *</code> for a type, or for the type of an expression:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">enum</span> Role { guest, admin = <span class="n">10</span> };
+
+<span class="k">struct</span> User {
+    <span class="t">i64</span> id;
+    <span class="t">u8</span>[] name;
+    Role role;
+    User *boss;
+};
+
+<span class="t">i32</span> main() {
+    reflect.Type *t = reflect.typeOf(User);
+    printf(<span class="s">&quot;%s, %d bytes, %d fields\n&quot;</span>, t.name, t.size, t.fields.len);
+    <span class="k">for</span> (<span class="k">auto</span> f : t.fields) {
+        printf(<span class="s">&quot;  %-5s at %2d: %s\n&quot;</span>, f.name, f.offset, f.type.name);
+    }
+    reflect.Type *boss = t.fields[<span class="n">3</span>].type;
+    printf(<span class="s">&quot;%s points to %s\n&quot;</span>, boss.name, boss.elem.name);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>User, 40 bytes, 4 fields
+  id    at  0: i64
+  name  at  8: u8[]
+  role  at 24: Role
+  boss  at 32: User *
+User * points to User</code></pre>
+<p><code>f.offset</code> is the field's offset in bytes, which is how a C <code>offsetof</code> is written in ktm.</p>
+<p>The type of an expression works the same way:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> grid[<span class="n">4</span>];
+    <span class="t">f32</span> ratio = <span class="n">0.5</span>;
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, reflect.typeOf(grid).name, reflect.typeOf(ratio).name, reflect.typeOf(&amp;ratio).name);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>i64[4] f32 f32 *</code></pre>
+<h2 id="what-a-type-holds"><a href="#what-a-type-holds">What a Type holds</a></h2>
+<div class="table"><table><thead><tr><th>Field</th><th>Holds</th></tr></thead><tbody><tr><td><code>kind</code></td><td>a <code>reflect.Kind</code>: <code>int</code>, <code>float</code>, <code>boolean</code>, <code>enumType</code>, <code>pointer</code>, <code>array</code>, <code>slice</code>, <code>string</code>, <code>structType</code>, <code>unionType</code>, <code>fnType</code>, <code>none</code></td></tr><tr><td><code>name</code></td><td>the type's name, as <code>typeof</code> prints it</td></tr><tr><td><code>size</code>, <code>isSigned</code></td><td>size in bytes; whether an integer is signed</td></tr><tr><td><code>elem</code>, <code>len</code></td><td>element type and length of a pointer, array or slice</td></tr><tr><td><code>fields</code></td><td>a struct's fields (<code>name</code>, <code>type</code>, <code>offset</code>, <code>isPrivate</code>), inherited ones first</td></tr><tr><td><code>members</code></td><td>an enum's members (<code>name</code>, <code>value</code>)</td></tr></tbody></table></div>
+<p>A function can switch on the kind:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="t">void</span> describe(reflect.Type *t) {
+    <span class="k">switch</span> (t.kind) {
+        <span class="k">case</span> reflect.Kind.int:    printf(<span class="s">&quot;%s: integer, %d bytes, signed %d\n&quot;</span>, t.name, t.size, t.isSigned);
+        <span class="k">case</span> reflect.Kind.float:  printf(<span class="s">&quot;%s: float\n&quot;</span>, t.name);
+        <span class="k">case</span> reflect.Kind.array:  printf(<span class="s">&quot;%s: %d x %s\n&quot;</span>, t.name, t.len, t.elem.name);
+        <span class="k">case</span> reflect.Kind.slice:  printf(<span class="s">&quot;%s: slice of %s\n&quot;</span>, t.name, t.elem.name);
+        <span class="k">case</span> reflect.Kind.string: printf(<span class="s">&quot;%s: String\n&quot;</span>, t.name);
+        <span class="k">default</span>:                  printf(<span class="s">&quot;%s: something else\n&quot;</span>, t.name);
+    }
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> grid[<span class="n">4</span>];
+    describe(reflect.typeOf(<span class="t">u16</span>));
+    describe(reflect.typeOf(<span class="t">f64</span>));
+    describe(reflect.typeOf(grid));
+    describe(reflect.typeOf(<span class="t">u8</span>[]));
+    describe(reflect.typeOf(<span class="t">String</span>));
+    describe(reflect.typeOf(<span class="t">bool</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>u16: integer, 2 bytes, signed 0
+f64: float
+i64[4]: 4 x i64
+u8[]: slice of u8
+String: String
+bool: something else</code></pre>
+<p>An enum's members carry their names and values:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">enum</span> Level { debug, info = <span class="n">5</span>, warn };
+
+<span class="t">i32</span> main() {
+    reflect.Type *t = reflect.typeOf(Level);
+    <span class="k">for</span> (<span class="k">auto</span> m : t.members) {
+        printf(<span class="s">&quot;%s = %d\n&quot;</span>, m.name, m.value);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>debug = 0
+info = 5
+warn = 6</code></pre>
+<p>A derived struct lists its base's fields first:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">struct</span> Base { <span class="t">i64</span> id; };
+<span class="k">struct</span> Item : Base { <span class="t">u8</span> *label; };
+
+<span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="k">auto</span> f : reflect.typeOf(Item).fields) {
+        printf(<span class="s">&quot;%s &quot;</span>, f.name);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>id label </code></pre>
+<h2 id="values-of-any-type"><a href="#values-of-any-type">Values of any type</a></h2>
+<p><code>reflect.of(x)</code>, for a variable, a field or an element, gives a <code>reflect.Value</code>: its address (<code>ptr</code>) and its type (<code>type</code>). One function can then take a value of any type:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="t">void</span> show(reflect.Value v) {
+    printf(<span class="s">&quot;%s at %d bytes: &quot;</span>, v.type.name, v.type.size);
+    <span class="k">if</span> (v.type.kind == reflect.Kind.int) {
+        printf(<span class="s">&quot;%d\n&quot;</span>, reflect.getInt(v));
+    } <span class="k">else</span> <span class="k">if</span> (v.type.kind == reflect.Kind.float) {
+        printf(<span class="s">&quot;%.2f\n&quot;</span>, reflect.getFloat(v));
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;(not a number)\n&quot;</span>);
+    }
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i32</span> a = <span class="n">7</span>;
+    <span class="t">f64</span> b = <span class="n">2.5</span>;
+    <span class="t">u8</span> *c = <span class="s">&quot;x&quot;</span>;
+    show(reflect.of(a));
+    show(reflect.of(b));
+    show(reflect.of(c));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>i32 at 4 bytes: 7
+f64 at 8 bytes: 2.50
+u8 * at 8 bytes: (not a number)</code></pre>
+<p><code>reflect.of</code> needs something with an address; a plain value is an error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">import</span> reflect;
+
+<span class="t">i32</span> main() {
+    reflect.Value v = reflect.of(<span class="n">1</span> + <span class="n">2</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>reflect.of takes a variable, a field or an element</code></pre>
+<h2 id="fields-by-name"><a href="#fields-by-name">Fields by name</a></h2>
+<p><code>reflect.field(v, name)</code> is one field of a struct value, as a <code>reflect.Value</code>; its <code>type</code> is <code>null</code> when there is no such field. <code>getInt</code>/<code>setInt</code> and <code>getFloat</code>/<code>setFloat</code> read and write integers, bools, enums and floats of any size:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">struct</span> Point { <span class="t">i32</span> x; <span class="t">i32</span> y; };
+<span class="k">struct</span> Stats { <span class="t">i64</span> hits; <span class="t">f64</span> ratio; };
+
+<span class="t">void</span> bump(reflect.Value v, <span class="t">u8</span>[] field) {
+    reflect.Value f = reflect.field(v, field);
+    <span class="k">if</span> (!f.type) {
+        printf(<span class="s">&quot;no field %s\n&quot;</span>, field);
+        <span class="k">return</span>;
+    }
+    reflect.setInt(f, reflect.getInt(f) + <span class="n">1</span>);
+}
+
+<span class="t">i32</span> main() {
+    Point p = {<span class="n">3</span>, <span class="n">4</span>};
+    Stats s = {<span class="n">10</span>, <span class="n">0.5</span>};
+    bump(reflect.of(p), <span class="s">&quot;y&quot;</span>);
+    bump(reflect.of(s), <span class="s">&quot;hits&quot;</span>);
+    bump(reflect.of(s), <span class="s">&quot;misses&quot;</span>);
+    reflect.setFloat(reflect.field(reflect.of(s), <span class="s">&quot;ratio&quot;</span>), <span class="n">0.75</span>);
+    printf(<span class="s">&quot;%d %d | %d %.2f\n&quot;</span>, p.x, p.y, s.hits, s.ratio);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>no field misses
+3 5 | 11 0.75</code></pre>
+<p>A generic printer walks a struct's fields:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">struct</span> Server {
+    <span class="t">u8</span>[] host;
+    <span class="t">i64</span> port;
+    <span class="t">bool</span> tls;
+    <span class="t">f64</span> timeout;
+};
+
+<span class="t">void</span> dump(reflect.Value v) {
+    <span class="k">for</span> (<span class="k">auto</span> f : v.type.fields) {
+        reflect.Value fv = reflect.field(v, f.name);
+        printf(<span class="s">&quot;%s = &quot;</span>, f.name);
+        <span class="k">switch</span> (f.type.kind) {
+            <span class="k">case</span> reflect.Kind.int:
+            <span class="k">case</span> reflect.Kind.boolean: printf(<span class="s">&quot;%d\n&quot;</span>, reflect.getInt(fv));
+            <span class="k">case</span> reflect.Kind.float:   printf(<span class="s">&quot;%.1f\n&quot;</span>, reflect.getFloat(fv));
+            <span class="k">case</span> reflect.Kind.slice:   printf(<span class="s">&quot;%s\n&quot;</span>, *(<span class="t">u8</span>[] *)fv.ptr);
+            <span class="k">default</span>:                   printf(<span class="s">&quot;?\n&quot;</span>);
+        }
+    }
+}
+
+<span class="t">i32</span> main() {
+    Server s = {<span class="s">&quot;localhost&quot;</span>, <span class="n">8080</span>, <span class="k">true</span>, <span class="n">2.5</span>};
+    dump(reflect.of(s));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>host = localhost
+port = 8080
+tls = 1
+timeout = 2.5</code></pre>
+<p>The same walk can fill a struct, as a settings loader does:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">struct</span> Limits {
+    <span class="t">i64</span> maxUsers;
+    <span class="t">i64</span> maxFiles;
+    <span class="t">f64</span> ratio;
+};
+
+<span class="t">void</span> setAll(reflect.Value v, <span class="t">i64</span> n) {
+    <span class="k">for</span> (<span class="k">auto</span> f : v.type.fields) {
+        reflect.Value fv = reflect.field(v, f.name);
+        <span class="k">if</span> (f.type.kind == reflect.Kind.int) {
+            reflect.setInt(fv, n);
+        }
+    }
+}
+
+<span class="t">i32</span> main() {
+    Limits l = {<span class="n">0</span>, <span class="n">0</span>, <span class="n">0.5</span>};
+    setAll(reflect.of(l), <span class="n">100</span>);
+    printf(<span class="s">&quot;%d %d %.1f\n&quot;</span>, l.maxUsers, l.maxFiles, l.ratio);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>100 100 0.5</code></pre>
+<h2 id="enum-names"><a href="#enum-names">Enum names</a></h2>
+<p><code>reflect.name(e)</code> is the name of an enum value's member, <code>&quot;&quot;</code> for a value that isn't one. <code>reflect.nameOf(type, n)</code> names a number, and <code>reflect.enumValue(type, name, &amp;v)</code> finds the value of a name:</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">enum</span> Level { debug, info, warn };
+
+<span class="t">i32</span> main() {
+    Level l = Level.warn;
+    printf(<span class="s">&quot;%s\n&quot;</span>, reflect.name(l));
+    printf(<span class="s">&quot;%s\n&quot;</span>, reflect.nameOf(reflect.typeOf(Level), <span class="n">1</span>));
+    <span class="t">i64</span> v;
+    <span class="k">if</span> (reflect.enumValue(reflect.typeOf(Level), <span class="s">&quot;debug&quot;</span>, &amp;v)) {
+        printf(<span class="s">&quot;debug is %d\n&quot;</span>, v);
+    }
+    printf(<span class="s">&quot;[%s]\n&quot;</span>, reflect.name((Level)<span class="n">9</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>warn
+info
+debug is 0
+[]</code></pre>
+<h2 id="attributes"><a href="#attributes">Attributes</a></h2>
+<p>A type's description carries the attributes written on it (see <a href="23-attributes.html">Attributes</a>): <code>Type.json</code>, and for each field <code>key</code>, <code>skip</code>, <code>omitEmpty</code>, <code>env</code>, <code>required</code>, and validation's <code>hasMin</code>/<code>min</code>, <code>hasMax</code>/<code>max</code>, <code>email</code>, <code>url</code> and <code>oneOf</code>:</p>
+<pre class="code run"><code><span class="k">import</span> json, reflect;
+
+<span class="a">@json</span> <span class="k">struct</span> Account {
+    <span class="a">@key</span>(<span class="s">&quot;e-mail&quot;</span>) <span class="a">@required</span> <span class="t">u8</span>[] email;
+    <span class="a">@skip</span> <span class="t">i64</span> cache;
+    <span class="a">@omitEmpty</span> <span class="t">u8</span>[] note;
+};
+
+<span class="t">i32</span> main() {
+    reflect.Type *t = reflect.typeOf(Account);
+    printf(<span class="s">&quot;json %d\n&quot;</span>, t.json);
+    <span class="k">for</span> (<span class="k">auto</span> f : t.fields) {
+        printf(<span class="s">&quot;%s: key %s, skip %d, omitEmpty %d, required %d\n&quot;</span>, f.name, f.key, f.skip, f.omitEmpty, f.required);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>json 1
+email: key e-mail, skip 0, omitEmpty 0, required 1
+cache: key cache, skip 1, omitEmpty 0, required 0
+note: key note, skip 0, omitEmpty 1, required 0</code></pre>
+<h2 id="comparing-types"><a href="#comparing-types">Comparing types</a></h2>
+<p>A type's description is made at compile time, as read-only data, only for the types a program asks about and the types they lead to. A library and a program each have their own copy, so two <code>Type</code> pointers for the same type may differ: compare with <code>reflect.same(a, b)</code>, not <code>==</code>.</p>
+<pre class="code run"><code><span class="k">import</span> reflect;
+
+<span class="k">struct</span> P { <span class="t">i64</span> x; };
+
+<span class="t">i32</span> main() {
+    reflect.Type *a = reflect.typeOf(P);
+    P p;
+    reflect.Type *b = reflect.of(p).type;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, reflect.same(a, b), reflect.same(a, reflect.typeOf(<span class="t">i64</span>)));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 0</code></pre>
+<h2 id="what-the-library-builds-on-it"><a href="#what-the-library-builds-on-it">What the library builds on it</a></h2>
+<p><code>json.encode</code>, <code>json.decode</code>, <code>config.fromEnv</code>, <code>validate.check</code> and <code>any ...</code> extras all work through <code>reflect.of(x)</code> (see <a href="19-varargs.html">Variable arguments</a>): they walk the struct's fields and read or write them with the functions above.</p>
+<pre class="code run"><code><span class="k">import</span> json, reflect;
+
+<span class="k">struct</span> Config {
+    <span class="t">i64</span> port;
+    <span class="t">i64</span> workers;
+    <span class="t">bool</span> debug;
+};
+
+<span class="t">i32</span> main() {
+    Config c = {<span class="n">8080</span>, <span class="n">4</span>, <span class="k">false</span>};
+    json.decode(<span class="s">&quot;{\&quot;workers\&quot;: 16}&quot;</span>, reflect.of(c));
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, c.port, c.workers, c.debug);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>8080 16 0</code></pre>
+<p>Fields the JSON leaves out keep what they had, so defaults survive.</p>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>reflect.typeOf(T)</code> or <code>reflect.typeOf(expr)</code> is a <code>reflect.Type *</code>; <code>reflect.of(x)</code> a <code>reflect.Value</code> (address and type) of something with an address. Both need <code>import reflect;</code>.</li><li><code>Type.fields</code> lists a struct's fields with their offsets, inherited ones first; <code>Type.members</code> an enum's members.</li><li><code>reflect.field</code>, <code>getInt</code>/<code>setInt</code>, <code>getFloat</code>/<code>setFloat</code> read and write fields by name.</li><li><code>reflect.name</code>, <code>nameOf</code> and <code>enumValue</code> map enum values and names.</li><li>Descriptions are compile-time data; compare types with <code>reflect.same</code>.</li></ul>
+    <nav class="pager"><a class="prev" href="23-attributes.html"><span>Previous</span>Attributes</a><a class="next" href="25-preprocessor.html"><span>Next</span>The preprocessor</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#describing-a-type">Describing a type</a></li><li><a href="#what-a-type-holds">What a Type holds</a></li><li><a href="#values-of-any-type">Values of any type</a></li><li><a href="#fields-by-name">Fields by name</a></li><li><a href="#enum-names">Enum names</a></li><li><a href="#attributes">Attributes</a></li><li><a href="#comparing-types">Comparing types</a></li><li><a href="#what-the-library-builds-on-it">What the library builds on it</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

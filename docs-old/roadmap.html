@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap - ktm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/style.css?v=c4e8d50ba8">
+<script>
+(function () {
+  var t = new URLSearchParams(location.search).get("theme");
+  try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
+  if (t !== "light") t = "dark";   // dark unless light was chosen
+  document.documentElement.setAttribute("data-theme", t);
+  try { if (localStorage.getItem("ktm-side") === "closed") document.documentElement.classList.add("side-closed"); } catch (e) {}
+})();
+</script>
+<script src="assets/search-index.js" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu" type="button" aria-label="Show or hide the page list" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
+  <nav class="toplinks" aria-label="Sections">
+    <a href="getting-started.html">Start</a>
+    <a href="language.html">Language</a>
+    <a href="library.html">Library</a>
+    <a href="tools.html">Tools</a>
+    <a href="guides.html">Guides</a>
+    <a href="stdlib.html">Reference</a>
+  </nav>
+  <div class="search" role="search">
+    <input id="search" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+           aria-label="Search the docs" aria-controls="search-results" aria-expanded="false"
+           aria-autocomplete="list" role="combobox">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ul id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </div>
+  <a class="gh" href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  <button class="theme" type="button" aria-label="Switch between light and dark">
+    <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav id="sidebar" class="sidebar" aria-label="Docs pages">
+<details class="group"><summary>Start</summary><ul><li><a href="index.html">Home</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="tour.html">A quick tour</a></li><li><a href="from-c.html">Coming from C</a></li></ul></details><details class="group"><summary>Language</summary><ul><li><a href="language.html">Overview</a></li><li><a href="lang-basics.html">Program basics</a></li><li><a href="lang-types.html">Types and literals</a></li><li><a href="lang-variables.html">Variables and constants</a></li><li><a href="lang-operators.html">Operators and casts</a></li><li><a href="lang-control-flow.html">Control flow</a></li><li><a href="lang-switch.html">switch</a></li><li><a href="lang-functions.html">Functions</a></li><li><a href="lang-varargs.html">Variable arguments</a></li><li><a href="lang-overloading.html">Overloading</a></li><li><a href="lang-function-pointers.html">Function pointers</a></li><li><a href="lang-pointers.html">Pointers and arrays</a></li><li><a href="lang-slices.html">Slices</a></li><li><a href="lang-strings.html">Strings</a></li><li><a href="lang-structs.html">Structs and unions</a></li><li><a href="lang-methods.html">Methods and inheritance</a></li><li><a href="lang-enums.html">Enums</a></li><li><a href="lang-type-aliases.html">Type aliases</a></li><li><a href="lang-generics.html">Generics</a></li><li><a href="lang-modules.html">Modules</a></li><li><a href="lang-exceptions.html">Exceptions</a></li><li><a href="lang-defer.html">defer and ad</a></li><li><a href="lang-reflection.html">Reflection</a></li><li><a href="lang-attributes.html">Attributes</a></li><li><a href="lang-preprocessor.html">The preprocessor</a></li><li><a href="lang-calling-c.html">Calling C and assembly</a></li></ul></details><details class="group"><summary>Library</summary><ul><li><a href="library.html">Overview</a></li><li><a href="lib-memory.html">Memory</a></li><li><a href="lib-strings.html">Strings</a></li><li><a href="lib-text.html">Text helpers</a></li><li><a href="lib-formatting.html">Format strings</a></li><li><a href="lib-cstrings.html">C strings</a></li><li><a href="lib-files.html">Files</a></li><li><a href="lib-directories.html">Directories and file status</a></li><li><a href="lib-csv.html">CSV</a></li><li><a href="lib-shell.html">Shell commands</a></li><li><a href="lib-processes.html">Processes</a></li><li><a href="lib-flags.html">Command-line flags</a></li><li><a href="lib-environment.html">Environment and exit</a></li><li><a href="lib-config.html">Settings from the environment</a></li><li><a href="lib-validate.html">Validation</a></li><li><a href="lib-signals.html">Signals</a></li><li><a href="lib-logging.html">Logging</a></li><li><a href="lib-vectors.html">Vectors and sorting</a></li><li><a href="lib-lists.html">Lists</a></li><li><a href="lib-maps.html">Hash maps</a></li><li><a href="lib-trees.html">Ordered maps</a></li><li><a href="lib-sets.html">Sets</a></li><li><a href="lib-bytes.html">Byte buffers</a></li><li><a href="lib-hashing.html">Hashing</a></li><li><a href="lib-encoding.html">Base64 and hex</a></li><li><a href="lib-crypto.html">Cryptography</a></li><li><a href="lib-uuid.html">UUIDs</a></li><li><a href="lib-json.html">JSON: reading</a></li><li><a href="lib-json-writer.html">JSON: writing</a></li><li><a href="lib-json-structs.html">JSON: structs</a></li><li><a href="lib-yaml.html">YAML</a></li><li><a href="lib-dates.html">Dates</a></li><li><a href="lib-time.html">Clocks and sleeping</a></li><li><a href="lib-maths.html">Maths</a></li><li><a href="lib-tcp.html">TCP sockets</a></li><li><a href="lib-udp.html">UDP sockets</a></li><li><a href="lib-coroutines.html">Coroutines</a></li><li><a href="lib-event-loop.html">The coroutine loop</a></li><li><a href="lib-serve.html">Serving on every core</a></li><li><a href="lib-http.html">HTTP servers</a></li><li><a href="lib-http-middleware.html">HTTP middleware</a></li><li><a href="lib-tls.html">TLS</a></li><li><a href="lib-url.html">URLs</a></li><li><a href="lib-threads.html">Threads and atomics</a></li><li><a href="lib-fzf.html">Fuzzy matching</a></li><li><a href="lib-sqlite.html">SQLite</a></li></ul></details><details class="group"><summary>Tools</summary><ul><li><a href="tools.html">The compiler</a></li><li><a href="tools-jit-repl.html">JIT and REPL</a></li><li><a href="tools-editors.html">Editors</a></li><li><a href="tools-packages.html">Packages</a></li><li><a href="tools-testing.html">Testing</a></li><li><a href="tools-libraries.html">Building libraries</a></li><li><a href="tools-debugging.html">Debugging</a></li></ul></details><details class="group"><summary>Guides</summary><ul><li><a href="guides.html">All guides</a></li><li><a href="guide-http.html">HTTP programming</a></li><li><a href="guide-http-01-hello.html">1. Hello, Shelf</a></li><li><a href="guide-http-02-json.html">2. JSON in and out</a></li><li><a href="guide-http-03-validation.html">3. Validation and errors</a></li><li><a href="guide-http-04-config.html">4. Configuration</a></li><li><a href="guide-http-05-postgres.html">5. PostgreSQL</a></li><li><a href="guide-http-06-migrations.html">6. Migrations</a></li><li><a href="guide-http-07-search.html">7. Tags, search and pages</a></li><li><a href="guide-http-08-users.html">8. Users and sessions</a></li><li><a href="guide-http-09-sharing.html">9. Sharing</a></li><li><a href="guide-http-10-middleware.html">10. Middleware</a></li><li><a href="guide-http-11-testing.html">11. Testing</a></li><li><a href="guide-http-12-production.html">12. Production</a></li></ul></details><details class="group" open><summary>Reference</summary><ul><li><a href="stdlib.html">Library reference</a></li><li><a href="examples.html">Example projects</a></li><li><a href="known-issues.html">Known issues</a></li><li class="current"><a href="roadmap.html" aria-current="page">Roadmap</a></li><li><a href="releases.html">Releases</a></li></ul></details>
+  </nav>
+  <div class="scrim" hidden></div>
+  <main id="content">
+<div class="crumbs"><span><a href="stdlib.html">Reference</a></span></div>
+<h1>Roadmap</h1>
+<p class="lede">The libraries ktm needs so a production REST API or network service can be written and run without
+leaving the ecosystem, the way it is in Go. Each row says where it stands; the page is updated as they land.</p>
+
+<h2 id="how-they-are-built">How they are built<a class="anchor" href="#how-they-are-built" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Protocols, formats and glue are written in ktm, from scratch.</li>
+  <li>Only security-critical cryptography comes from a vetted C library, mbedTLS, compiled into ktm itself: nothing
+  ever has to be installed.</li>
+  <li>A <b>stdlib</b> library ships with ktm, as Go's standard library does. A <b>package</b> has its own repository and
+  is fetched with <code>ktm get</code>: <code>import "github.com/ozzenerol/ktm-xxx";</code>.</li>
+</ul>
+<p>ktm already has: <code>net</code>, <a href="lib-http.html"><code>net.http</code></a> (server, mux, middleware, static
+files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code>, <code>sql</code> (SQLite), <code>log</code>,
+<code>date</code>, <code>fs</code>, <code>proc</code>, <code>hash</code> (SHA-256, CRC-32, FNV), <code>str</code> and
+<code>String</code>, <code>vec</code>, <code>list</code>, <code>map</code>, <code>set</code>, <code>sort</code>,
+<code>reflect</code>, <code>signal</code>, <code>thread</code>, <code>atomic</code>.</p>
+
+<h2 id="the-package-manager">The package manager<a class="anchor" href="#the-package-manager" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Part</th><th>Status</th></tr>
+  <tr><td><code>ktm.mod</code>, <code>ktm mod init</code>, <code>ktm mod fmt</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>import "github.com/user/repo";</code>, <code>replace</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>ktm get</code>, <code>ktm mod download</code>, the cache, <code>ktm.sum</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>Version selection (the highest a dependency asks for), <code>ktm mod tidy</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>ktm build</code>, <code>ktm run .</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>Dependencies built once as libraries</td><td><span class="tag done">done</span> v0.22.0 (prebuilt in the module cache)</td></tr>
+  <tr><td>End to end with ktm-pg on Linux and macOS</td><td><span class="tag done">done</span> rc/0.20.0 (ktm-pg v0.1.0, Linux x86_64 and arm64, macOS)</td></tr>
+</table></div>
+
+<h2 id="tier-1-needed-for-any-production-api">Tier 1: needed for any production API<a class="anchor" href="#tier-1-needed-for-any-production-api" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th><th>Status</th></tr>
+  <tr><td><code>net.tls</code></td><td>stdlib</td><td>TLS client and server (mbedTLS inside)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>net.http</code> client</td><td>stdlib</td><td><code>http.get</code>, <code>http.post</code>, keep-alive pool, timeouts, redirects, JSON helpers</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>net.http</code> HTTPS</td><td>stdlib</td><td><code>net.https</code>: serving over TLS, and <code>https://</code> in the client</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>crypto</code></td><td>stdlib</td><td>Secure random bytes, SHA-256/384/512, HMAC, HKDF, PBKDF2, constant-time compare, AES-256-GCM, ChaCha20-Poly1305, ECDSA P-256, RSA (0.22.0), keys from JWK parts (no Ed25519 in mbedTLS 3.6)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>Passwords</td><td>stdlib</td><td>Argon2id and bcrypt hash and verify, in <code>crypto</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>base64, hex</td><td>stdlib</td><td>Standard and URL-safe encodings (<code>encoding.base64</code>, <code>encoding.hex</code>)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>uuid</code></td><td>stdlib</td><td>v4 and v7 (time-ordered, good primary keys)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>net.url</code></td><td>stdlib</td><td>Parse and build URLs and query strings, resolve links</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>flag</code></td><td>stdlib</td><td>Command-line flags and subcommands</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>config</code></td><td>stdlib</td><td>Environment variables and <code>.env</code> into a struct (<code>@env</code>, <code>@required</code>)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, TLS, LISTEN/NOTIFY, COPY (binary from structs), arrays, big results in one allocation, fuzzed, a 1-hour soak test clean</td><td><span class="tag done">done</span> v0.2.0</td></tr>
+  <tr><td><a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a></td><td>package</td><td>Sign and verify JWTs (HS256/384/512, ES256/384/512, RS256/384/512, PS256/384/512, EdDSA), encrypted tokens (JWE), crit headers, claims checks, JWK Sets from text or a URL</td><td><span class="tag done">done</span> v0.2.0</td></tr>
+  <tr><td>Validation</td><td>stdlib</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code>, <code>@oneOf</code>, <code>@required</code>) with readable errors; <code>http.decodeValid</code> answers 422</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
+  <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag done">done</span> ktm-migrate v0.1.0</td></tr>
+</table></div>
+
+<h2 id="tier-2-what-most-services-reach-for-soon">Tier 2: what most services reach for soon<a class="anchor" href="#tier-2-what-most-services-reach-for-soon" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th><th>Status</th></tr>
+  <tr><td>ktm-redis</td><td>package</td><td>Redis client (RESP3, pipelining, pub/sub, pool): caching, sessions, rate limits</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-mysql</td><td>package</td><td>MySQL and MariaDB client, the same API shape as ktm-pg</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>SQL interface</td><td>stdlib</td><td>One small interface for PostgreSQL, MySQL and SQLite (query, exec, scan, transactions)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>WebSocket</td><td>stdlib</td><td>Server and client in <code>net.http</code>, on coroutines</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>compress</code></td><td>stdlib</td><td>gzip and deflate (zstd later) for responses and files</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Middleware pack</td><td>stdlib</td><td><code>net.http.middleware</code>: CORS, request IDs, rate limiting, real IP, bearer tokens (a throw is already a 500; time limits are per operation)</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
+  <tr><td>Metrics</td><td>package</td><td>Prometheus metrics and a <code>/metrics</code> handler</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Tracing</td><td>package</td><td>OpenTelemetry traces (OTLP over HTTP)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>regex</code></td><td>stdlib</td><td>Regular expressions in linear time (RE2 style)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Templates</td><td>stdlib</td><td>Text and HTML templates with escaping</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>toml</code></td><td>stdlib</td><td>Config files, next to JSON and YAML</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Time zones</td><td>stdlib</td><td>The IANA zone database in <code>date</code></td><td><span class="tag">planned</span></td></tr>
+  <tr><td><code>decimal</code></td><td>stdlib</td><td>Exact decimal numbers for money (PostgreSQL <code>numeric</code>)</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>Testing</td><td>stdlib</td><td><code>ktm test</code> and the <code>testing</code> module: checks, equal, fatal, skip, <code>-run</code>, <code>-v</code></td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
+  <tr><td>Testing helpers</td><td>stdlib</td><td>Golden files, benchmarks, subtests</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-smtp</td><td>package</td><td>Sending email, with TLS</td><td><span class="tag">planned</span></td></tr>
+  <tr><td>ktm-s3</td><td>package</td><td>S3-compatible storage (AWS, MinIO, R2): put, get, list, presigned URLs</td><td><span class="tag">planned</span></td></tr>
+</table></div>
+
+<h2 id="tier-3-growth-and-specific-needs">Tier 3: growth and specific needs<a class="anchor" href="#tier-3-growth-and-specific-needs" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+  <tr><th>Library</th><th>Kind</th><th>What it gives</th></tr>
+  <tr><td>HTTP/2</td><td>stdlib</td><td>For the server and the client (gRPC, browsers)</td></tr>
+  <tr><td>gRPC and protobuf</td><td>package</td><td>Code generation and a gRPC server and client</td></tr>
+  <tr><td>ktm-nats, ktm-kafka</td><td>package</td><td>Messaging and event streams</td></tr>
+  <tr><td>ktm-mongo</td><td>package</td><td>MongoDB client</td></tr>
+  <tr><td>msgpack, CBOR</td><td>package</td><td>Compact binary encodings</td></tr>
+  <tr><td>OpenAPI</td><td>package</td><td>Docs from the mux's routes and <code>@json</code> structs, clients from specs</td></tr>
+  <tr><td>GraphQL</td><td>package</td><td>A GraphQL server</td></tr>
+  <tr><td>OAuth2, OIDC</td><td>package</td><td>Login with Google, GitHub and others</td></tr>
+  <tr><td>i18n</td><td>package</td><td>Translations and plural rules</td></tr>
+  <tr><td>Images</td><td>package</td><td>PNG and JPEG, resizing</td></tr>
+  <tr><td>CLI and TUI</td><td>package</td><td>Prompts, colours, progress bars, tables</td></tr>
+</table></div>
+
+<h2 id="order">Order<a class="anchor" href="#order" aria-label="Link to this section">#</a></h2>
+<ol>
+  <li><code>net.tls</code>, <code>crypto</code>, base64 and hex, <code>url</code>, <code>uuid</code>: everything else builds on them.</li>
+  <li>The <code>net.http</code> client and HTTPS, ktm-pg finished, <code>flag</code>, env config.</li>
+  <li>Passwords, ktm-jwt, validation, migrations: a whole API with logins and a database.</li>
+  <li>ktm-redis, the SQL interface, ktm-mysql, WebSocket, <code>compress</code>, the middleware pack.</li>
+  <li>Metrics, tracing, <code>regex</code>, templates, <code>toml</code>, <code>decimal</code>, time zones, testing helpers.</li>
+  <li>Tier 3, as people ask for it.</li>
+</ol>
+
+<h2 id="when-one-counts-as-done">When one counts as done<a class="anchor" href="#when-one-counts-as-done" aria-label="Link to this section">#</a></h2>
+<ul class="rules">
+  <li>Tests pass on Linux x86_64, Linux arm64 and macOS, and under <code>-Memsafe</code>, with a docs page whose examples run.</li>
+  <li>A protocol client is tested against the real server, in several versions, and measured against the Go equivalent.</li>
+  <li>A package's tests fetch it with <code>ktm get</code>, so every package also tests the package manager.</li>
+  <li>One reference application (a REST API with logins, PostgreSQL, Redis, migrations and metrics) uses Tiers 1 and 2
+  together and runs under load as a long test.</li>
+</ul>
+
+    <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="known-issues.html"><span>Previous</span>Known issues</a><a class="next" href="releases.html"><span>Next</span>Releases</a></nav>
+    <footer class="page-foot">
+      <p><a href="https://github.com/ozzenerol/ktm-lang/edit/main/docs/pages/roadmap.html">Edit this page</a>. Every example on these pages is compiled and run, ahead of time and in the JIT,
+      by <code>docs/tools/check-examples.py</code>.</p>
+    </footer>
+  </main>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#how-they-are-built">How they are built</a></li><li><a href="#the-package-manager">The package manager</a></li><li><a href="#tier-1-needed-for-any-production-api">Tier 1: needed for any production API</a></li><li><a href="#tier-2-what-most-services-reach-for-soon">Tier 2: what most services reach for soon</a></li><li><a href="#tier-3-growth-and-specific-needs">Tier 3: growth and specific needs</a></li><li><a href="#order">Order</a></li><li><a href="#when-one-counts-as-done">When one counts as done</a></li></ul></nav>
+</div>
+</body>
+</html>
