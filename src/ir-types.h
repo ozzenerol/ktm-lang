@@ -564,12 +564,11 @@ IrValue *irTmp(IrValueType type, u32 size);
 /* Source line currently being lowered - set by ir.c's dispatchers
  * from Ast->line, stamped onto every irInstrNew instruction. */
 extern int ir_line_hint;
-extern int ir_line_lock;
 
 /* A call the inliner expanded: the function, the line of the call in
  * the code around it, and that code's own site (NULL: the function
- * being compiled). Same-file calls only: a function from another file
- * has its lines locked to the call's (ir_line_lock). */
+ * being compiled). The lines inside it are the callee's, in the
+ * callee's file. */
 typedef struct IrInlineSite {
     Ast *callee;
     int call_line;

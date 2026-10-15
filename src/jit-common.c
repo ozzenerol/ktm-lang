@@ -622,6 +622,9 @@ static void jitNoteFunction(KtmJit *jit, Ast *fn, size_t start, u32 from) {
     for (u64 i = 0; i < sites->size; ++i) {
         IrInlineSite *site = sites->entries[i];
         f->sites[i].name = strdup(asmLinesName(cc, site->callee->fname));
+        u32 fid = site->callee->file_id;
+        AoStr *sfile = fid && fid != fn->file_id ? cctrlLookUpFile(cc, fid) : NULL;
+        f->sites[i].file = sfile ? strdup(asmLinesPath(cc, sfile->data)) : NULL;
         f->sites[i].line = site->call_line;
         f->sites[i].outer = jitSiteNum(sites, site->outer);
     }
@@ -636,7 +639,7 @@ typedef struct KtmCrashFn {
 } KtmCrashFn;
 
 typedef struct KtmCrashSite {
-    int32_t name, line, outer;
+    int32_t name, line, outer, file;
 } KtmCrashSite;
 
 /* The offset from `field` to `to` */
@@ -660,7 +663,10 @@ static KtmCrashFn *jitCrashTable(KtmJit *jit) {
         total += ((f->n_sites * sizeof(KtmCrashSite)) + 7) & ~(size_t)7;
         total += strlen(f->name) + 8;
         if (f->file) total += strlen(f->file) + 8;
-        for (int k = 0; k < f->n_sites; ++k) total += strlen(f->sites[k].name) + 8;
+        for (int k = 0; k < f->n_sites; ++k) {
+            total += strlen(f->sites[k].name) + 8;
+            if (f->sites[k].file) total += strlen(f->sites[k].file) + 8;
+        }
     }
     char *block = calloc(1, total), *at = block;
     if (!block) return NULL;
@@ -690,6 +696,11 @@ static KtmCrashFn *jitCrashTable(KtmJit *jit) {
                 sites[k].name = jitCrashRel(&sites[k].name, sn);
                 sites[k].line = f->sites[k].line;
                 sites[k].outer = f->sites[k].outer;
+                if (f->sites[k].file) {
+                    char *sf = jitCrashTake(&at, strlen(f->sites[k].file) + 1);
+                    strcpy(sf, f->sites[k].file);
+                    sites[k].file = jitCrashRel(&sites[k].file, sf);
+                }
             }
             r->sites = jitCrashRel(&r->sites, sites);
         }
@@ -873,6 +884,7 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
             jit->lines[jit->n_lines].addr =
                 (uintptr_t)code->code + jit->pending_lines[i].addr;
             jit->lines[jit->n_lines].line = jit->pending_lines[i].line;
+            jit->lines[jit->n_lines].own_line = jit->pending_lines[i].own_line;
             jit->lines[jit->n_lines].site = NULL;  /* its arena is gone */
             /* KTM_DEBUG_LINES=1 dumps the table as chunks finalize -
              * pairs with `replDisasm` output when debugging attribution. */
@@ -1000,8 +1012,18 @@ void ktmJitNoteLine(KtmJit *jit, int line, IrInlineSite *site) {
         jit->pending_lines = realloc(jit->pending_lines,
                 jit->cap_pending * sizeof(KtmJitLine));
     }
+    /* a line inside a call inlined from another file is that file's:
+     * the function's own line is the call's, outward until one is */
+    int own = line;
+    for (IrInlineSite *s = site; s; s = s->outer) {
+        if (s->callee->file_id && s->callee->file_id != jit->fn_file_id &&
+            s->call_line > 0) {
+            own = s->call_line;
+        }
+    }
     jit->pending_lines[jit->n_pending].addr = (uintptr_t)jit->enc.len;
     jit->pending_lines[jit->n_pending].line = line;
+    jit->pending_lines[jit->n_pending].own_line = own;
     jit->pending_lines[jit->n_pending].site = site;
     jit->n_pending++;
 }
@@ -1021,7 +1043,7 @@ int ktmJitFindLineForAddr(KtmJit *jit, void *pc) {
         if (e->addr < lo || e->addr >= hi) continue; /* other chunk */
         if (e->addr <= p && e->addr >= best_addr) {
             best_addr = e->addr;
-            best_line = e->line;
+            best_line = e->own_line;
         }
     }
     return best_line;

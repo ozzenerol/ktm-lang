@@ -5,7 +5,9 @@ import cstr, fs, libc, mem, proc, test;
  * that ktm.mod `replace`s with a directory by the way there from the
  * program (./../thing/thing.ktm). It now shows thing.Box.get and
  * example.com/acme/ktm-thing/thing.ktm. Compiled and in the JIT,
- * crashes and uncaught errors alike. */
+ * crashes and uncaught errors alike. A package's function the inliner
+ * merged into main shows as "(inlined)" at its own file's line (it was
+ * left out before v0.22.0). */
 
 #define DIR "./ktm-841"
 #define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 60) \"$K\" ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
@@ -51,14 +53,16 @@ void report(bool jit, u8 *arg, u8 *want, u8 *what) {
 #define CRASH_WANT "crash: null pointer dereference\n"                            \
     "  at example.com/acme/ktm-thing/thing.ktm:10 in thing.Box.get\n"            \
     "  called from example.com/acme/ktm-thing/thing.ktm:8 in thing.Box.get\n"    \
-    "  called from main.ktm:"
+    "  called from example.com/acme/ktm-thing/thing.ktm:8 in thing.Box.get (inlined)\n" \
+    "  called from main.ktm:9 in main"
 
 /* the headline names the package's file too (it named the importing
  * file, main.ktm, before v0.22.0) */
 #define THROW_WANT "uncaught error 4: no 3 (example.com/acme/ktm-thing/thing.ktm:15)\n" \
     "  at example.com/acme/ktm-thing/thing.ktm:15 in thing.Box.check\n"                  \
     "  called from example.com/me/app/own/own.ktm:8 in own.twice\n"                     \
-    "  called from main.ktm:"
+    "  called from example.com/me/app/own/own.ktm:6 in own.twice (inlined)\n"           \
+    "  called from main.ktm:7 in main"
 
 i32 main() {
     printf("Test - crash report package names: ");

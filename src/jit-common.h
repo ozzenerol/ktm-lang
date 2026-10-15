@@ -92,11 +92,14 @@ typedef struct KtmJit {
     struct KtmJitFn *fns;
     u32 n_fns, cap_fns, n_pending_fns;
     int fn_omit_frame;
+    u32 fn_file_id;  /* the function being compiled's file */
 } KtmJit;
 
 typedef struct KtmJitLine {
     uintptr_t addr; /* absolute pc in `lines`; enc offset in pending */
     int line;
+    int own_line;   /* the line in the function's own file: an inlined
+                     * call from another file's line instead of its own */
     struct IrInlineSite *site;  /* the inlined call it is in, or NULL */
 } KtmJitLine;
 
@@ -114,6 +117,7 @@ typedef struct KtmJitFn {
 
 typedef struct KtmJitSite {
     char *name;
+    char *file;                 /* NULL: the function's */
     int32_t line, outer;
 } KtmJitSite;
 
@@ -171,7 +175,8 @@ const char *ktmJitFindSymbolForAddr(KtmJit *jit, void *pc, size_t *off_out);
  * duplicates collapse. line 0 (synthetic) is ignored. */
 void ktmJitNoteLine(KtmJit *jit, int line, struct IrInlineSite *site);
 
-/* Source line for a pc inside JIT code, 0 when unknown. */
+/* Source line for a pc inside JIT code, in its function's own file (the
+ * call's line in code inlined from another file), 0 when unknown. */
 int ktmJitFindLineForAddr(KtmJit *jit, void *pc);
 /* The source file of the function `sym` (from ktmJitFindSymbolForAddr),
  * NULL if unknown. */
