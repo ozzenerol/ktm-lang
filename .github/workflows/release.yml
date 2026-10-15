@@ -87,10 +87,11 @@ jobs:
           rm -rf "$stage/modules/net/tls" "$stage/modules/net/https" "$stage/modules/crypto"
           "$GITHUB_WORKSPACE/ktm-native" -fPIC -lib ktm --install-dir="$stage" "$stage/modules"
           # every library module (the prelude is read whole by every
-          # program, it has none) must have its marker: a missing one makes
-          # importers compile the module again and fail to link
+          # program, and rt.crash is compiled into each one: they have none)
+          # must have its marker: a missing one makes importers compile the
+          # module again and fail to link
           missing=$(cd "$stage/modules" && for d in $(find . -name '*.ktm' -exec dirname {} \; | sort -u); do
-                      [ "$d" = ./prelude ] || [ -f "$d/.ktmlib" ] || echo "$d"; done)
+                      [ "$d" = ./prelude ] || [ "$d" = ./rt/crash ] || [ -f "$d/.ktmlib" ] || echo "$d"; done)
           [ -z "$missing" ] || { echo "no .ktmlib in: $missing"; exit 1; }
 
           # net.tls (source) and libktmtls (mbedTLS), which the cmake
