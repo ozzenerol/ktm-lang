@@ -3,7 +3,7 @@ module crypto;
 import coro, encoding.base64, mem, str;
 
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
- * libktmtls, as net.tls is): secure random bytes, SHA-256/512, HMAC,
+ * libktmtls, as net.tls is): secure random bytes, SHA-256/384/512, HMAC,
  * HKDF and PBKDF2, a constant-time compare, authenticated encryption
  * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256 signatures, and
  * password hashing (Argon2id, bcrypt; ktm's own C, beside mbedTLS).
@@ -22,6 +22,7 @@ import coro, encoding.base64, mem, str;
 pub const i64 ERR_CRYPTO = 0x6B746D22;
 
 pub const i64 SHA256_SIZE = 32;
+pub const i64 SHA384_SIZE = 48;
 pub const i64 SHA512_SIZE = 64;
 pub const i64 KEY_SIZE = 32;        /* seal/open keys */
 pub const i64 NONCE_SIZE = 12;      /* never twice with one key */
@@ -43,6 +44,7 @@ pub struct Key {
 extern "c" i32 ktm_crypto_random(u8 *buf, u64 len);
 extern "c" void ktm_crypto_error(i32 code, u8 *out, u64 len);
 extern "c" i32 ktm_crypto_sha256(u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_sha384(u8 *in, u64 len, u8 *out);
 extern "c" i32 ktm_crypto_sha512(u8 *in, u64 len, u8 *out);
 extern "c" i32 ktm_crypto_hmac(i32 bits, u8 *key, u64 klen, u8 *in, u64 len, u8 *out);
 extern "c" i32 ktm_crypto_hkdf(i32 bits, u8 *salt, u64 slen, u8 *ikm, u64 ilen, u8 *info, u64 infolen,
@@ -106,6 +108,12 @@ pub void sha256(u8[] data, u8[] out) {
     ktm_crypto_sha256(data.ptr, data.len, out.ptr);
 }
 
+/* SHA-384 of data into out (48 bytes) */
+pub void sha384(u8[] data, u8[] out) {
+    need(out, SHA384_SIZE, "a SHA-384 output");
+    ktm_crypto_sha384(data.ptr, data.len, out.ptr);
+}
+
 /* SHA-512 of data into out (64 bytes) */
 pub void sha512(u8[] data, u8[] out) {
     need(out, SHA512_SIZE, "a SHA-512 output");
@@ -116,6 +124,13 @@ pub void sha512(u8[] data, u8[] out) {
 pub void hmacSha256(u8[] key, u8[] data, u8[] out) {
     need(out, SHA256_SIZE, "an HMAC-SHA256 output");
     i32 r = ktm_crypto_hmac(256, key.ptr, key.len, data.ptr, data.len, out.ptr);
+    if (r != 0) { fail("HMAC", r); }
+}
+
+/* HMAC-SHA384 of data with key into out (48 bytes; JWT's HS384) */
+pub void hmacSha384(u8[] key, u8[] data, u8[] out) {
+    need(out, SHA384_SIZE, "an HMAC-SHA384 output");
+    i32 r = ktm_crypto_hmac(384, key.ptr, key.len, data.ptr, data.len, out.ptr);
     if (r != 0) { fail("HMAC", r); }
 }
 
