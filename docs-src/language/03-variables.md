@@ -90,8 +90,8 @@ Write `u8 buf[65536] = {0};` when you need it zeroed.
 
 ## Global variables
 
-A variable declared outside every function is a global: it lives for the whole program and every
-function in the file sees it. A global without a value is zero.
+A variable declared outside every function is a global: it lives for the whole program, and every
+function below its declaration sees it. A global without a value is zero.
 
 ```ktm run
 i64 gTotal = 100, gCount;

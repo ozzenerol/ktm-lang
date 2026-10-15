@@ -100,8 +100,9 @@ void main() {
 7 after 4 calls
 ```
 
-- Order doesn't matter between functions: `main` can call a function declared below it.
-- Names at file scope are visible in the whole file.
+- A function is declared before it is called: define it above its first call, or declare it there
+  with a prototype (see [Functions](07-functions.html#order-and-prototypes)).
+- Globals, types and constants are visible from their declaration to the end of the file.
 - A global's initial value can run code. Those run in order, before `main`.
 
 ```ktm run
