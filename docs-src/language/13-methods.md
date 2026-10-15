@@ -736,6 +736,41 @@ i32 main() {
 can only be defined in the module that defines it
 ```
 
+That goes for `String` and `Error` too: every program has them, but their methods come from the
+standard library. A helper of your own for them is a function that takes one:
+
+```ktm error
+void String.shout() {
+}
+
+i32 main() {
+    return 0;
+}
+```
+
+```output
+methods of `String` can only be defined by the standard library
+```
+
+```ktm run
+import str;
+
+void shout(String *s) {
+    s.toUpper();
+    s.append("!");
+}
+
+void main() {
+    scoped String s = str.from("hey");
+    shout(&s);
+    printf("%s\n", s);
+}
+```
+
+```output
+HEY!
+```
+
 ## Rules
 
 - A method is `Ret Type.name(params) { ... }`, written outside the struct, for a struct or a
@@ -743,6 +778,8 @@ can only be defined in the module that defines it
 - `self` is a pointer to the value the method was called on, and can't be reassigned.
 - `v.name(...)` works on a value, a pointer, an array element, a field or a returned struct.
 - Default arguments, overloads and varargs work as for functions.
+- Only the module that defines a type gives it methods; `String`'s and `Error`'s come from the
+  standard library.
 - `struct D : B` extends one struct: `D` starts with `B`'s fields, has `B`'s methods, and a
   `D *` converts to a `B *`.
 - A derived struct's method of the same name hides the base's; `B.name(self)` calls the base's.

@@ -203,6 +203,9 @@ typedef struct AstType {
     /* A class or union the standard library defines: only it can add
      * methods to it */
     u8 in_std;
+    /* A struct the prelude declares (String, Error): every program has
+     * it, but only the standard library adds methods to it */
+    u8 in_prelude;
     /* On a class field marked `private`: the module that defines its
      * class (Lexer.modules, 1-based; 0 for a public field), the only one
      * that can use it, and the class's name for the messages */
