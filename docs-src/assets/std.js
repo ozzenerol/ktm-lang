@@ -64,8 +64,9 @@
   function firstSentence(text) {
     if (!text) return "";
     var s = text.split("\n\n")[0].replace(/\s+/g, " ").trim();
-    var m = s.match(/^(.+?[.:])(\s|$)/);
+    var m = s.match(/^(.+?\.)(\s|$)/);
     s = m ? m[1] : s;
+    s = s.replace(/:$/, "");
     return s.length > 140 ? s.slice(0, 137) + "..." : s;
   }
 
