@@ -53,9 +53,9 @@ void report(bool jit, u8 *arg, u8 *want, u8 *what) {
     "  called from example.com/acme/ktm-thing/thing.ktm:8 in thing.Box.get\n"    \
     "  called from main.ktm:"
 
-/* (the headline's own file isn't checked: a throw in a package names
- * the importing file there, item throw-file-in-package) */
-#define THROW_WANT "uncaught error 4: no 3 (\n"                                    \
+/* the headline names the package's file too (it named the importing
+ * file, main.ktm, before v0.22.0) */
+#define THROW_WANT "uncaught error 4: no 3 (example.com/acme/ktm-thing/thing.ktm:15)\n" \
     "  at example.com/acme/ktm-thing/thing.ktm:15 in thing.Box.check\n"                  \
     "  called from example.com/me/app/own/own.ktm:8 in own.twice\n"                     \
     "  called from main.ktm:"
