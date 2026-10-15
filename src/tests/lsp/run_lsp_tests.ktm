@@ -122,6 +122,7 @@ u8 *CALC_HC;
 u8 *CALC_TRIPLE_HC;
 u8 *CALC_MAIN_HC;
 u8 *CALC_MAIN2_HC;
+u8 *AUTO_HC;
 
 void initFixtures() {
     LIB_HC =
@@ -168,6 +169,20 @@ void initFixtures() {
     CALC_MAIN2_HC =
         "import calc;\n"
         "i32 main() { return calc.double(1); }\n";
+    /* Names of modules not imported: json (the standard library's),
+     * geo (beside it, the project's); str is imported already */
+    AUTO_HC =
+        "import str;\n"
+        "\n"
+        "i64 one() {\n"
+        "    json.\n"
+        "}\n"
+        "i64 two() {\n"
+        "    pars\n"
+        "}\n"
+        "i64 three() {\n"
+        "    return area(2);\n"
+        "}\n";
     /* geo's second file: uses geo.ktm's square bare */
     MOD_GEO2_HC =
         "module geo;\n"
@@ -1515,7 +1530,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 22;
+const i64 LSP_GROUPS = 23;
 
 /* Files that read each other show no error they don't have: a
  * package's module in a directory named otherwise, an importer whose
@@ -1546,6 +1561,153 @@ void testCrossFile() {
     lspDidOpen(l, main2Uri, CALC_MAIN2_HC);
     check("an imported file's warning is not the importer's", lastPublishClean(l));
     lspClose(l);
+}
+
+/* The completion item labelled `label`, or null */
+json.Value *itemNamed(json.Value *resp, u8 *label) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return null; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *lab = json.select(it, ".label:s");
+        if (lab != null && cstr.cmp(lab.str.ptr, label) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* The completion item whose textEdit writes `text`, or null */
+json.Value *itemWriting(json.Value *resp, u8 *text) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return null; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *t = json.select(it, ".textEdit.newText:s");
+        if (t != null && cstr.cmp(t.str.ptr, text) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Is the TextEdit `text` at line:chr? */
+bool editIs(json.Value *e, i64 line, i64 chr, u8 *text) {
+    if (e == null) { return false; }
+    json.Value *l = json.select(e, ".range.start.line:i");
+    json.Value *c = json.select(e, ".range.start.character:i");
+    json.Value *t = json.select(e, ".newText:s");
+    return l != null && c != null && t != null && l.intVal == line &&
+           c.intVal == chr && cstr.cmp(t.str.ptr, text) == 0;
+}
+
+/* Does the edit list hold one inserting `text` at line:chr? */
+bool hasEditText(json.Value *edits, i64 line, i64 chr, u8 *text) {
+    if (edits == null) { return false; }
+    json.Value *it = edits.array;
+    while (it != null) {
+        if (editIs(it, line, chr, text)) { return true; }
+        it = it.next;
+    }
+    return false;
+}
+
+/* The edits of a code action for uri, or null */
+json.Value *actionChangesFor(json.Value *act, u8 *uri) {
+    if (act == null) { return null; }
+    json.Value *changes = json.select(act, ".edit.changes:o");
+    if (changes == null) { return null; }
+    json.Value *it = changes.object;
+    while (it != null) {
+        if (it.key.ptr != null && cstr.cmp(it.key.ptr, uri) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Is any item's labelDetails.description `desc`? */
+bool anyItemDescribed(json.Value *resp, u8 *desc) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return false; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *d = json.select(it, ".labelDetails.description:s");
+        if (d != null && cstr.cmp(d.str.ptr, desc) == 0) { return true; }
+        it = it.next;
+    }
+    return false;
+}
+
+/* The code action titled `title` of a codeAction response, or null */
+json.Value *actionNamed(json.Value *resp, u8 *title) {
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return null; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *t = json.select(it, ".title:s");
+        if (t != null && cstr.cmp(t.str.ptr, title) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Auto-import: completion offers the names of modules the file doesn't
+ * import (after `json.`, and `pars` -> json.parse) with the import line
+ * as an additional edit; a code action imports the module an unknown
+ * name needs */
+void testAutoImport() {
+    printf("auto-import\n");
+    LspClient *l = lspStart();
+    json.Value *init = lspRequest(l, "initialize", "{}");
+    check("codeActionProvider is advertised",
+                json.select(init, ".result.capabilities.codeActionProvider:o") != null);
+    u8 *uri = uriOf("auto.ktm");
+    lspDidOpen(l, uri, AUTO_HC);
+    u8 *diags = json.toStr(json.select(l.lastPublish, ".params.diagnostics:a")).take();
+
+    i64 line;
+    i64 chr;
+    posOf(AUTO_HC, "json.\n", 5, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    json.Value *it = itemNamed(resp, "parse");
+    check("completion after `json.` offers json's names though json isn't imported",
+                it != null);
+    check("picking one adds `import json;` after the imports",
+                hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                            "import json;\n"));
+
+    posOf(AUTO_HC, "pars\n", 4, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    it = itemWriting(resp, "json.parse");
+    check("completion of `pars` offers json's parse, written json.parse over `pars`",
+                editIs(json.select(it, ".textEdit:o"), line, chr - 4, "json.parse") &&
+                labelsOk(resp, "pars", "parse", null));
+    check("json.parse imports json",
+                hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                            "import json;\n"));
+
+    posOf(AUTO_HC, "area(2)", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    it = itemWriting(resp, "geo.area");
+    check("completion offers the project's own modules' names (geo.area)",
+                it != null && hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                                          "import geo;\n"));
+    check("a module imported already is not offered again",
+                !anyItemDescribed(resp, "import str"));
+
+    u8 *params = cstr.format(
+        "{\"textDocument\":{\"uri\":\"%s\"},\"range\":{\"start\":{\"line\":0,"
+        "\"character\":0},\"end\":{\"line\":0,\"character\":0}},"
+        "\"context\":{\"diagnostics\":%s}}", uri, diags);
+    resp = lspRequest(l, "textDocument/codeAction", params);
+    json.Value *act = actionNamed(resp, "import json");
+    check("code action `import json` on `json.` not imported",
+                hasEditText(actionChangesFor(act, uri), 1, 0, "import json;\n"));
+    act = actionNamed(resp, "import geo, use geo.area");
+    posOf(AUTO_HC, "area(2)", 0, &line, &chr);
+    json.Value *edits = actionChangesFor(act, uri);
+    check("code action on an unknown bare name imports its module and qualifies it",
+                hasEditText(edits, 1, 0, "import geo;\n") &&
+                hasEditText(edits, line, chr, "geo.area"));
+    check("clean shutdown", lspClose(l) == 0);
 }
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
@@ -2172,6 +2334,7 @@ void runGroup(i64 group) {
         case 19: testCompletionKinds();
         case 20: testFoldingAndHints();
         case 21: testCrossFile();
+        case 22: testAutoImport();
     }
 }
 
