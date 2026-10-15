@@ -23,163 +23,354 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.23.2</span>
+    <span class="ver">v0.24.0</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
 <div class="doc">
-  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html" class="on"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-scoped.html"><span class="num">16</span>defer and scoped</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html" class="on"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
   <article class="prose">
 <h1>Threads and threadlocal</h1>
-<p>A ktm program can run several threads at once, each with its own stack, all sharing the program's globals and heap. The language adds one thing for them, <code>threadlocal</code>: a global with one copy per thread. The rest comes from the library: POSIX threads through <code>libc</code>, a thread pool in <code>thread</code>, atomic integers in <code>atomic</code>, and coroutines in <code>coro</code>. This chapter covers starting threads, sharing data safely, <code>threadlocal</code> in depth, errors in threads, and coroutines in brief.</p>
+<p>A ktm program can run several threads at once, each with its own stack, all sharing the program's globals and heap. The <a href="../std/index.html#thread">thread</a> module starts them and gives them locks to take turns with; the language adds <code>threadlocal</code>, a global with one copy per thread. This chapter covers starting threads, errors in them, sharing data safely, <code>threadlocal</code>, many threads at once (WaitGroup, each, channels, pools), coroutines in brief, and C's threads.</p>
 <h2 id="starting-a-thread"><a href="#starting-a-thread">Starting a thread</a></h2>
-<p><code>libc.pthread_create</code> starts a thread running a function of type <code>fn(void *) void *</code>; the argument is passed through as a <code>void *</code>. <code>libc.pthread_join</code> waits for it. Pass <code>&amp;th</code> to create and <code>th</code> to join:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<p><code>thread.spawn(&amp;f, &amp;arg)</code> runs <code>f(&amp;arg)</code> on a new thread and returns a <code>thread.Thread</code>; its <code>join()</code> waits for it to end. The function takes a pointer to any type, so a thread gets its input and leaves its result in the same struct:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
 
-<span class="t">i64</span> sums[<span class="n">4</span>];
+<span class="k">struct</span> Part {
+    <span class="t">i64</span> from, to;
+    <span class="t">i64</span> sum;
+};
 
-<span class="t">void</span> *sum(<span class="t">void</span> *arg) {
-    <span class="t">i64</span> part = (<span class="t">i64</span>)arg, total = <span class="n">0</span>;
-    <span class="k">for</span> (<span class="t">i64</span> i = part * <span class="n">250</span> + <span class="n">1</span>; i &lt;= (part + <span class="n">1</span>) * <span class="n">250</span>; i++) {
-        total += i;
+<span class="t">void</span> add(Part *p) {
+    <span class="k">for</span> (<span class="t">i64</span> i = p.from; i &lt; p.to; i++) {
+        p.sum += i;
     }
-    sums[part] = total;
-    <span class="k">return</span> <span class="k">null</span>;
 }
 
-<span class="t">i32</span> main() {
-    libc.pthread_t *th[<span class="n">4</span>];
+<span class="t">void</span> main() {
+    Part parts[<span class="n">4</span>];
+    thread.Thread t[<span class="n">4</span>];
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_create(&amp;th[i], <span class="k">null</span>, &amp;sum, (<span class="t">void</span> *)i);
+        parts[i].from = i * <span class="n">250</span> + <span class="n">1</span>;
+        parts[i].to = (i + <span class="n">1</span>) * <span class="n">250</span> + <span class="n">1</span>;
+        t[i] = thread.spawn(&amp;add, &amp;parts[i]);
     }
     <span class="t">i64</span> total = <span class="n">0</span>;
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_join(th[i]);
-        total += sums[i];
+        t[i].join();
+        total += parts[i].sum;
     }
     printf(<span class="s">&quot;1 + 2 + ... + 1000 = %d\n&quot;</span>, total);
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>1 + 2 + ... + 1000 = 500500</code></pre>
-<p>Each thread wrote only its own slot of <code>sums</code>, so they didn't need to coordinate. A struct passed by pointer carries several arguments:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<p>Each thread wrote only its own <code>Part</code>, so they didn't need to take turns. The argument is shared with the caller: keep it alive until <code>join()</code> returns.</p>
+<p>A function with no argument is started with <code>thread.spawn(&amp;f)</code>:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+<span class="t">i64</span> gDone;
+
+<span class="t">void</span> work() {
+    gDone = <span class="n">1</span>;
+}
+
+<span class="t">void</span> main() {
+    thread.Thread t = thread.spawn(&amp;work);
+    t.join();
+    printf(<span class="s">&quot;done: %d\n&quot;</span>, gDone);
+}</code></pre>
+<pre class="out"><code>done: 1</code></pre>
+<ul><li>A <code>Thread</code> is joined once; joining it again, or joining a <code>Thread</code> never started, does nothing.</li><li>A thread that is never joined keeps a little memory until the program ends.</li><li>A spawned thread has all of ktm's runtime: a crash in it is reported with its frames, <code>try</code> works, and <code>threadlocal</code> globals are its own.</li></ul>
+<h2 id="many-threads-at-once"><a href="#many-threads-at-once">Many threads at once</a></h2>
+<h3 id="go-and-waitgroup"><a href="#go-and-waitgroup">go and WaitGroup</a></h3>
+<p>To start many threads and wait for all of them, <code>thread.go(&amp;f, &amp;arg, &amp;wg)</code> starts one and counts it in a <code>thread.WaitGroup</code>; <code>wg.wait()</code> returns when every one has finished. There is nothing to join:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
 
 <span class="k">struct</span> Job {
-    <span class="t">u8</span> *name;
-    <span class="t">i64</span> from, to;
+    <span class="t">i64</span> n;
+    <span class="t">i64</span> square;
+};
+
+<span class="t">void</span> work(Job *j) {
+    j.square = j.n * j.n;
+}
+
+<span class="t">void</span> main() {
+    Job jobs[<span class="n">5</span>];
+    thread.WaitGroup wg;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        jobs[i].n = i + <span class="n">1</span>;
+        thread.go(&amp;work, &amp;jobs[i], &amp;wg);
+    }
+    wg.wait();
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        printf(<span class="s">&quot;%d &quot;</span>, jobs[i].square);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>1 4 9 16 25 </code></pre>
+<p><code>wg.wait()</code> throws the first error one of its threads threw. A <code>WaitGroup</code> can count work of your own too: <code>wg.add(n)</code> before it starts, <code>wg.done()</code> as each piece ends.</p>
+<h3 id="each"><a href="#each">each</a></h3>
+<p><code>thread.each(items, &amp;f)</code> runs <code>f</code> on every element of a slice, split over as many threads as the machine has cores, and returns when all are done. It is the simplest way to use every core:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+<span class="k">struct</span> Image {
+    <span class="t">i64</span> id;
+    <span class="t">i64</span> pixels;
+};
+
+<span class="t">void</span> shrink(Image *img) {
+    img.pixels = img.pixels / <span class="n">4</span>;
+}
+
+<span class="t">void</span> main() {
+    Image images[<span class="n">6</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">6</span>; i++) {
+        images[i].id = i;
+        images[i].pixels = <span class="n">1000</span> * (i + <span class="n">1</span>);
+    }
+    thread.each(images[<span class="n">0</span>:<span class="n">6</span>], &amp;shrink);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">6</span>; i++) {
+        printf(<span class="s">&quot;%d &quot;</span>, images[i].pixels);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>250 500 750 1000 1250 1500 </code></pre>
+<p>Like <code>wg.wait()</code>, <code>each</code> throws the first error one of the calls threw.</p>
+<h3 id="channels"><a href="#channels">Channels</a></h3>
+<p>A <code>thread.Channel&lt;T&gt;</code> passes values from thread to thread: <code>send(v)</code> puts one in, <code>recv(&amp;v)</code> takes the oldest out. <code>thread.channel&lt;T&gt;(n)</code> makes one that holds up to <code>n</code> values: a send waits while it is full, a receive while it is empty. <code>close()</code> says no more will come: <code>recv</code> returns false once a closed channel is empty. <code>scoped</code> frees it:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+<span class="t">void</span> produce(thread.Channel&lt;<span class="t">i64</span>&gt; *ch) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">5</span>; i++) {
+        ch.send(i * <span class="n">10</span>);
+    }
+    ch.close();
+}
+
+<span class="t">void</span> main() {
+    <span class="k">scoped</span> thread.Channel&lt;<span class="t">i64</span>&gt; ch = thread.channel&lt;<span class="t">i64</span>&gt;(<span class="n">2</span>);
+    thread.Thread t = thread.spawn(&amp;produce, &amp;ch);
+    <span class="t">i64</span> v;
+    <span class="t">i64</span> total = <span class="n">0</span>;
+    <span class="k">while</span> (ch.recv(&amp;v)) {
+        total += v;
+    }
+    t.join();
+    printf(<span class="s">&quot;received %d in all\n&quot;</span>, total);
+}</code></pre>
+<pre class="out"><code>received 150 in all</code></pre>
+<p>A channel made with no size (<code>thread.channel&lt;T&gt;()</code>) holds nothing: each send waits until a receive takes the value. Sending on a closed channel throws.</p>
+<h3 id="a-pool-of-threads"><a href="#a-pool-of-threads">A pool of threads</a></h3>
+<p>Starting a thread costs some microseconds. For many small jobs, a <code>thread.Pool</code> keeps a few threads running and hands them the jobs: <code>thread.pool(n)</code> starts <code>n</code> (0 for one per core), <code>p.run(&amp;f, &amp;arg)</code> queues a job, <code>p.wait()</code> waits until the queue is done and throws the first error a job threw. <code>scoped</code> stops it:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+<span class="k">struct</span> Job {
+    <span class="t">i64</span> n;
     <span class="t">i64</span> result;
 };
 
-<span class="t">void</span> *count(<span class="t">void</span> *arg) {
-    Job *j = arg;
-    <span class="k">for</span> (<span class="t">i64</span> i = j.from; i &lt; j.to; i++) {
-        <span class="k">if</span> (i % <span class="n">7</span> == <span class="n">0</span>) {
-            j.result++;
-        }
-    }
-    <span class="k">return</span> <span class="k">null</span>;
+<span class="t">void</span> triple(Job *j) {
+    j.result = j.n * <span class="n">3</span>;
 }
 
-<span class="t">i32</span> main() {
-    Job jobs[<span class="n">2</span>] = {{<span class="s">&quot;low&quot;</span>, <span class="n">0</span>, <span class="n">500</span>, <span class="n">0</span>}, {<span class="s">&quot;high&quot;</span>, <span class="n">500</span>, <span class="n">1000</span>, <span class="n">0</span>}};
-    libc.pthread_t *th[<span class="n">2</span>];
-    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
-        libc.pthread_create(&amp;th[i], <span class="k">null</span>, &amp;count, &amp;jobs[i]);
+<span class="t">void</span> main() {
+    Job jobs[<span class="n">8</span>];
+    <span class="k">scoped</span> thread.Pool *p = thread.pool(<span class="n">2</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">8</span>; i++) {
+        jobs[i].n = i;
+        p.run(&amp;triple, &amp;jobs[i]);
     }
-    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
-        libc.pthread_join(th[i]);
-        printf(<span class="s">&quot;%s: %d multiples of 7\n&quot;</span>, jobs[i].name, jobs[i].result);
-    }
-    <span class="k">return</span> <span class="n">0</span>;
+    p.wait();
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, jobs[<span class="n">1</span>].result, jobs[<span class="n">7</span>].result);
 }</code></pre>
-<pre class="out"><code>low: 72 multiples of 7
-high: 71 multiples of 7</code></pre>
-<h2 id="sharing-data"><a href="#sharing-data">Sharing data</a></h2>
-<p>When threads change the same data, they must take turns. A mutex does it:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<pre class="out"><code>3 21</code></pre>
+<h2 id="errors-in-threads"><a href="#errors-in-threads">Errors in threads</a></h2>
+<p>What a thread throws comes back from <code>join()</code>: the same code, message, file and line, thrown in the thread that joins. A <code>try</code> around the <code>join()</code> catches it:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
 
-libc.pthread_mutex_t gLock;
+<span class="k">enum</span> Err { badInput };
+
+<span class="k">struct</span> Job {
+    <span class="t">i64</span> n;
+};
+
+<span class="t">void</span> check(Job *j) {
+    <span class="k">if</span> (j.n &lt; <span class="n">0</span>) {
+        <span class="k">throw</span>(Err.badInput, <span class="s">&quot;job %d: negative input&quot;</span>, j.n);
+    }
+}
+
+<span class="t">void</span> main() {
+    Job j = {-<span class="n">3</span>};
+    thread.Thread t = thread.spawn(&amp;check, &amp;j);
+    <span class="k">try</span> {
+        t.join();
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;the thread failed: %s\n&quot;</span>, e.message);
+    }
+}</code></pre>
+<pre class="out"><code>the thread failed: job -3: negative input</code></pre>
+<p>Within a thread, <code>try</code> and <code>catch</code> work as anywhere else: each thread has its own chain of <code>try</code> blocks, and a throw is caught only by a <code>try</code> of its own thread before <code>join()</code> sees it.</p>
+<h2 id="sharing-data"><a href="#sharing-data">Sharing data</a></h2>
+<p>When threads change the same data, they must take turns. A <code>thread.Mutex</code> is held by one thread at a time: <code>lock()</code> waits until no other thread holds it. It needs no setup and nothing to free:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+thread.Mutex gLock;
 <span class="t">i64</span> gTotal = <span class="n">0</span>;
 
-<span class="t">void</span> *add(<span class="t">void</span> *arg) {
+<span class="t">void</span> add() {
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">10000</span>; i++) {
-        libc.pthread_mutex_lock(&amp;gLock);
+        gLock.lock();
         gTotal++;
-        libc.pthread_mutex_unlock(&amp;gLock);
+        gLock.unlock();
     }
-    <span class="k">return</span> <span class="k">null</span>;
 }
 
-<span class="t">i32</span> main() {
-    libc.pthread_mutex_init(&amp;gLock, <span class="k">null</span>);
-    libc.pthread_t *th[<span class="n">4</span>];
+<span class="t">void</span> main() {
+    thread.Thread t[<span class="n">4</span>];
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_create(&amp;th[i], <span class="k">null</span>, &amp;add, <span class="k">null</span>);
+        t[i] = thread.spawn(&amp;add);
     }
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_join(th[i]);
+        t[i].join();
     }
     printf(<span class="s">&quot;%d\n&quot;</span>, gTotal);
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>40000</code></pre>
-<p>For a single integer, the <code>atomic</code> module is simpler and faster:</p>
-<pre class="code run"><code><span class="k">import</span> atomic, libc;
+<p>Without the lock some of the 40000 additions would be lost: two threads read the same value and both write it plus one.</p>
+<p><code>guard()</code> locks and returns a <code>thread.Guard</code> that unlocks when it is freed, so with <code>scoped</code> the lock is held until the end of the block, however the block is left (a <code>return</code>, a <code>break</code>, a throw):</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+thread.Mutex gLock;
+<span class="t">i64</span> gBalance = <span class="n">100</span>;
+
+<span class="t">bool</span> withdraw(<span class="t">i64</span> amount) {
+    <span class="k">scoped</span> thread.Guard g = gLock.guard();
+    <span class="k">if</span> (gBalance &lt; amount) {
+        <span class="k">return</span> <span class="k">false</span>;
+    }
+    gBalance -= amount;
+    <span class="k">return</span> <span class="k">true</span>;
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, withdraw(<span class="n">60</span>), withdraw(<span class="n">60</span>), gBalance);
+}</code></pre>
+<pre class="out"><code>1 0 40</code></pre>
+<p><code>tryLock()</code> takes the lock only if it is free, and says whether it did.</p>
+<h3 id="waiting-for-a-condition"><a href="#waiting-for-a-condition">Waiting for a condition</a></h3>
+<p>A <code>thread.Cond</code> lets a thread sleep until another one says something changed. The waiting thread holds the mutex, checks the condition in a loop, and <code>wait(&amp;m)</code> lets go of the mutex while it sleeps:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+thread.Mutex gM;
+thread.Cond gReady;
+<span class="t">i64</span> gQueued;
+<span class="t">i64</span> gTaken;
+
+<span class="t">void</span> consume() {
+    <span class="k">for</span> (<span class="t">i64</span> n = <span class="n">0</span>; n &lt; <span class="n">3</span>; n++) {
+        gM.lock();
+        <span class="k">while</span> (gQueued == <span class="n">0</span>) {
+            gReady.wait(&amp;gM);
+        }
+        gQueued--;
+        gTaken++;
+        gM.unlock();
+    }
+}
+
+<span class="t">void</span> main() {
+    thread.Thread t = thread.spawn(&amp;consume);
+    <span class="k">for</span> (<span class="t">i64</span> n = <span class="n">0</span>; n &lt; <span class="n">3</span>; n++) {
+        gM.lock();
+        gQueued++;
+        gReady.signal();
+        gM.unlock();
+    }
+    t.join();
+    printf(<span class="s">&quot;taken %d\n&quot;</span>, gTaken);
+}</code></pre>
+<pre class="out"><code>taken 3</code></pre>
+<p><code>signal()</code> wakes one waiting thread, <code>broadcast()</code> all of them.</p>
+<h3 id="readers-and-writers-and-running-once"><a href="#readers-and-writers-and-running-once">Readers and writers, and running once</a></h3>
+<p>A <code>thread.RwLock</code> lets many threads read at once while no one writes: <code>readLock()</code> and <code>readUnlock()</code> around reading, <code>writeLock()</code> and <code>writeUnlock()</code> around changing. A <code>thread.Once</code> runs a function once, however many threads ask:</p>
+<pre class="code run"><code><span class="k">import</span> thread;
+
+thread.Once gSetup;
+<span class="t">i64</span> gSetups;
+
+<span class="t">void</span> setup() {
+    gSetups++;
+}
+
+<span class="t">void</span> worker() {
+    gSetup.run(&amp;setup);
+}
+
+<span class="t">void</span> main() {
+    thread.Thread t[<span class="n">4</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        t[i] = thread.spawn(&amp;worker);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        t[i].join();
+    }
+    printf(<span class="s">&quot;setup ran %d time\n&quot;</span>, gSetups);
+}</code></pre>
+<pre class="out"><code>setup ran 1 time</code></pre>
+<h3 id="atomics"><a href="#atomics">Atomics</a></h3>
+<p>For a single integer, the <a href="../std/index.html#atomic">atomic</a> module is simpler and faster than a lock:</p>
+<pre class="code run"><code><span class="k">import</span> atomic, thread;
 
 <span class="t">i64</span> gHits = <span class="n">0</span>;
 
-<span class="t">void</span> *worker(<span class="t">void</span> *unused) {
+<span class="t">void</span> worker() {
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">100000</span>; i++) {
         atomic.add(&amp;gHits, <span class="n">1</span>);
     }
-    <span class="k">return</span> <span class="k">null</span>;
 }
 
-<span class="t">i32</span> main() {
-    libc.pthread_t *th[<span class="n">4</span>];
+<span class="t">void</span> main() {
+    thread.Thread t[<span class="n">4</span>];
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_create(&amp;th[i], <span class="k">null</span>, &amp;worker, <span class="k">null</span>);
+        t[i] = thread.spawn(&amp;worker);
     }
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
-        libc.pthread_join(th[i]);
+        t[i].join();
     }
     printf(<span class="s">&quot;%d hits\n&quot;</span>, atomic.load(&amp;gHits));
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>400000 hits</code></pre>
-<p>See <a href="../std/index.html#thread">thread</a> for the thread pool and <a href="../std/index.html#atomic">atomic</a> for every atomic operation.</p>
 <h2 id="threadlocal"><a href="#threadlocal">threadlocal</a></h2>
 <p>A global marked <code>threadlocal</code> has one copy per thread. Every thread starts with the declared value, and what one thread writes the others don't see:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<pre class="code run"><code><span class="k">import</span> thread;
 
 <span class="k">threadlocal</span> <span class="t">i64</span> hits = <span class="n">10</span>;
 <span class="t">i64</span> seen[<span class="n">2</span>];
 
-<span class="t">void</span> *work(<span class="t">void</span> *arg) {
-    <span class="t">i64</span> k = (<span class="t">i64</span>)arg;
-    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt;= k; i++) {
+<span class="t">void</span> work(<span class="t">i64</span> *k) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt;= *k; i++) {
         hits++;
     }
-    seen[k] = hits;
-    <span class="k">return</span> <span class="k">null</span>;
+    seen[*k] = hits;
 }
 
-<span class="t">i32</span> main() {
+<span class="t">void</span> main() {
     hits = <span class="n">100</span>;
-    libc.pthread_t *th[<span class="n">2</span>];
+    <span class="t">i64</span> ks[<span class="n">2</span>] = {<span class="n">0</span>, <span class="n">1</span>};
+    thread.Thread t[<span class="n">2</span>];
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
-        libc.pthread_create(&amp;th[i], <span class="k">null</span>, &amp;work, (<span class="t">void</span> *)i);
+        t[i] = thread.spawn(&amp;work, &amp;ks[i]);
     }
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
-        libc.pthread_join(th[i]);
+        t[i].join();
     }
     printf(<span class="s">&quot;%d %d, main %d\n&quot;</span>, seen[<span class="n">0</span>], seen[<span class="n">1</span>], hits);
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>11 12, main 100</code></pre>
 <p>Main's <code>hits = 100</code> changed only main's copy; each thread started from 10.</p>
 <p>A threadlocal is useful for per-thread state that would otherwise be passed through every call: a buffer each thread reuses, a counter, the current request:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<pre class="code run"><code><span class="k">import</span> thread;
 
 <span class="k">threadlocal</span> <span class="t">u8</span> *gWorker = <span class="s">&quot;main&quot;</span>;
 
@@ -187,23 +378,20 @@ libc.pthread_mutex_t gLock;
     printf(<span class="s">&quot;[%s] %s\n&quot;</span>, gWorker, what);
 }
 
-<span class="t">void</span> *run(<span class="t">void</span> *name) {
+<span class="t">void</span> run(<span class="t">u8</span> *name) {
     gWorker = name;
     say(<span class="s">&quot;started&quot;</span>);
-    <span class="k">return</span> <span class="k">null</span>;
 }
 
-<span class="t">i32</span> main() {
-    libc.pthread_t *th;
-    libc.pthread_create(&amp;th, <span class="k">null</span>, &amp;run, <span class="s">&quot;worker-1&quot;</span>);
-    libc.pthread_join(th);
+<span class="t">void</span> main() {
+    thread.Thread t = thread.spawn(&amp;run, <span class="s">&quot;worker-1&quot;</span>);
+    t.join();
     say(<span class="s">&quot;still main&quot;</span>);
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>[worker-1] started
 [main] still main</code></pre>
 <p>A struct or an array can be threadlocal too, each thread getting its own:</p>
-<pre class="code run"><code><span class="k">import</span> libc;
+<pre class="code run"><code><span class="k">import</span> thread;
 
 <span class="k">struct</span> Stats {
     <span class="t">i64</span> calls;
@@ -212,22 +400,19 @@ libc.pthread_mutex_t gLock;
 
 <span class="k">threadlocal</span> Stats gStats;
 
-<span class="t">void</span> *busy(<span class="t">void</span> *arg) {
+<span class="t">void</span> busy() {
     <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
         gStats.calls++;
     }
     gStats.errors = <span class="n">1</span>;
     printf(<span class="s">&quot;thread: %d calls, %d errors\n&quot;</span>, gStats.calls, gStats.errors);
-    <span class="k">return</span> <span class="k">null</span>;
 }
 
-<span class="t">i32</span> main() {
+<span class="t">void</span> main() {
     gStats.calls = <span class="n">1</span>;
-    libc.pthread_t *th;
-    libc.pthread_create(&amp;th, <span class="k">null</span>, &amp;busy, <span class="k">null</span>);
-    libc.pthread_join(th);
+    thread.Thread t = thread.spawn(&amp;busy);
+    t.join();
     printf(<span class="s">&quot;main: %d calls, %d errors\n&quot;</span>, gStats.calls, gStats.errors);
-    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>thread: 5 calls, 1 errors
 main: 1 calls, 0 errors</code></pre>
@@ -239,30 +424,6 @@ main: 1 calls, 0 errors</code></pre>
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <pre class="out"><code>`threadlocal` only goes on a global variable, not a local</code></pre>
-<h2 id="errors-in-threads"><a href="#errors-in-threads">Errors in threads</a></h2>
-<p>Each thread has its own chain of <code>try</code> blocks: a throw is caught only by a <code>try</code> of its own thread. An error no <code>try</code> catches, in any thread, ends the whole program (see <a href="15-errors.html">Errors</a>):</p>
-<pre class="code run"><code><span class="k">import</span> libc;
-
-<span class="k">enum</span> Err { bad };
-
-<span class="t">void</span> *job(<span class="t">void</span> *arg) {
-    <span class="k">try</span> {
-        <span class="k">throw</span>(Err.bad, <span class="s">&quot;inside the thread&quot;</span>);
-    } <span class="k">catch</span> (<span class="t">Error</span> e) {
-        printf(<span class="s">&quot;thread caught: %s\n&quot;</span>, e.message);
-    }
-    <span class="k">return</span> <span class="k">null</span>;
-}
-
-<span class="t">i32</span> main() {
-    libc.pthread_t *th;
-    libc.pthread_create(&amp;th, <span class="k">null</span>, &amp;job, <span class="k">null</span>);
-    libc.pthread_join(th);
-    printf(<span class="s">&quot;main goes on\n&quot;</span>);
-    <span class="k">return</span> <span class="n">0</span>;
-}</code></pre>
-<pre class="out"><code>thread caught: inside the thread
-main goes on</code></pre>
 <h2 id="coroutines-in-brief"><a href="#coroutines-in-brief">Coroutines in brief</a></h2>
 <p>A coroutine is a function that can pause in the middle and be resumed later, on its own small stack, in the same thread. Thousands of them are cheap. The <code>coro</code> module provides them: as generators, and as the event loop behind ktm's network servers, where a coroutine waiting for the network lets the others run.</p>
 <pre class="code run"><code><span class="k">import</span> coro;
@@ -289,15 +450,34 @@ main goes on</code></pre>
 }</code></pre>
 <pre class="out"><code>1 2 3 </code></pre>
 <p>See <a href="../std/index.html#coro">coro</a> for generators, the event loop (<code>coro.go</code>, <code>coro.run</code>, <code>coro.read</code>, <code>coro.write</code>) and <code>coro.serve</code>, which runs a loop on every core.</p>
+<h2 id="c-threads"><a href="#c-threads">C threads</a></h2>
+<p>The <code>thread</code> module is built on POSIX threads, which a program can also use directly through <code>libc</code>, as C does: <code>libc.pthread_create</code> starts a thread running a function of type <code>fn(void *) void *</code>, and <code>libc.pthread_join</code> waits for it. Pass <code>&amp;th</code> to create and <code>th</code> to join:</p>
+<pre class="code run"><code><span class="k">import</span> libc;
+
+<span class="t">i64</span> gSum;
+
+<span class="t">void</span> *add(<span class="t">void</span> *arg) {
+    gSum = (<span class="t">i64</span>)arg * <span class="n">2</span>;
+    <span class="k">return</span> <span class="k">null</span>;
+}
+
+<span class="t">void</span> main() {
+    libc.pthread_t *th;
+    libc.pthread_create(&amp;th, <span class="k">null</span>, &amp;add, (<span class="t">void</span> *)<span class="n">21</span>);
+    libc.pthread_join(th);
+    printf(<span class="s">&quot;%d\n&quot;</span>, gSum);
+}</code></pre>
+<pre class="out"><code>42</code></pre>
+<p>A thread started this way gets no help: what it throws ends the program unless it catches it, and its argument and result go through <code>void *</code>.</p>
 <h2 id="rules"><a href="#rules">Rules</a></h2>
-<ul><li>Threads come from <code>libc.pthread_create</code>/<code>pthread_join</code>; their function is <code>fn(void *) void *</code>.</li><li>Threads share globals and the heap; protect shared changes with a mutex or <code>atomic</code>.</li><li><code>threadlocal</code> on a global gives each thread its own copy, starting at the declared constant value.</li><li>Each thread has its own <code>try</code> chain; an uncaught error in any thread ends the program.</li><li>Coroutines run inside a thread; see the <code>coro</code> module.</li></ul>
+<ul><li><code>thread.spawn(&amp;f, &amp;arg)</code> runs <code>f(&amp;arg)</code> on a new thread (<code>f</code> takes a pointer), and <code>thread.spawn(&amp;f)</code> a function with no argument; <code>join()</code> waits for it.</li><li>What a thread throws, <code>join()</code> throws in the thread that joins; <code>WaitGroup.wait()</code>, <code>thread.each</code> and <code>Pool.wait()</code> throw the first error their threads threw.</li><li><code>thread.go</code> with a <code>WaitGroup</code> starts threads to wait for together, <code>thread.each</code> runs a function over a slice on every core, a <code>Channel&lt;T&gt;</code> passes values between threads, and a <code>Pool</code> runs many small jobs on a few threads.</li><li>Threads share globals and the heap; protect shared changes with a <code>thread.Mutex</code>, or use <code>atomic</code> for a single integer. The module's locks need no setup and nothing to free; don't copy one that is in use.</li><li><code>threadlocal</code> on a global gives each thread its own copy, starting at the declared constant value.</li><li>Coroutines run inside a thread; see the <code>coro</code> module.</li><li>C's threads are there too, through <code>libc.pthread_*</code>.</li></ul>
     <nav class="pager"><a class="prev" href="26-calling-c.html"><span>Previous</span>Calling C</a><a class="next" href="28-inline-assembly.html"><span>Next</span>Inline assembly</a></nav>
   </article>
-  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#starting-a-thread">Starting a thread</a></li><li><a href="#sharing-data">Sharing data</a></li><li><a href="#threadlocal">threadlocal</a></li><li><a href="#errors-in-threads">Errors in threads</a></li><li><a href="#coroutines-in-brief">Coroutines in brief</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#starting-a-thread">Starting a thread</a></li><li><a href="#many-threads-at-once">Many threads at once</a></li><li><a href="#errors-in-threads">Errors in threads</a></li><li><a href="#sharing-data">Sharing data</a></li><li><a href="#threadlocal">threadlocal</a></li><li><a href="#coroutines-in-brief">Coroutines in brief</a></li><li><a href="#c-threads">C threads</a></li><li><a href="#rules">Rules</a></li></ul></aside>
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.23.2</span>
+    <span>ktm v0.24.0</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>

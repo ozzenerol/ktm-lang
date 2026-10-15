@@ -436,7 +436,7 @@ typedef struct IrProgram {
 } IrProgram;
 
 #define IR_LOOP_STACK_MAX 32
-/* try blocks and defers (each `ad` local is one) in scope at once in a
+/* try blocks and defers (each `scoped` local is one) in scope at once in a
  * function: far more than code nests, 2 KiB per IrCtx */
 #define IR_TRY_STACK_MAX 256
 

@@ -1,7 +1,7 @@
 module set;
 import map, vec;
 
-/* A set of T, a hash set as a value type: `ad set.Set<i64> seen =
+/* A set of T, a hash set as a value type: `scoped set.Set<i64> seen =
  * set.new<i64>();`. Values are hashed and compared like map.Map's keys
  * (map.hashOf / map.keyEq: overloads for the integer types, pointers,
  * u8[] and String, and a byte-wise fallback for anything else; add

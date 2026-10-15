@@ -75,7 +75,7 @@ i32 main() {
     {
         String slash = str.format("%s/", dir);
         defer slash.free();
-        ad fs.Dir d2 = fs.openDir(slash);
+        scoped fs.Dir d2 = fs.openDir(slash);
         fs.DirEntry *first = d2.next();
         check(first != null && !str.contains(first.path, "//"), "openDir of dir/");
     }

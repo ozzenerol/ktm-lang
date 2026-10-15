@@ -5,7 +5,9 @@ import cstr, fs, libc, mem, proc, str, test;
  * struct with a free() method, or a pointer to one. Every way out of the
  * scope frees it (falling off, return, break, a throw). Returning an `ad`
  * variable, a type with no free(), and a struct without a value are
- * errors. `ad` stays an ordinary name elsewhere. */
+ * errors. `ad` stays an ordinary name elsewhere.
+ * v0.24.0: the keyword is spelled `scoped` (`ad` still works, with a
+ * warning: test 895). */
 
 #define AD_SRC "./ktm-580-ad.ktm"
 #define AD_OUT "./ktm-580-ad.out"
@@ -26,9 +28,9 @@ struct Owned { i64 id; };
 void Owned.free() { gFreed += self.id; mem.free(self); }
 
 i64 early(i64 n) {
-    ad Res a = {1};
+    scoped Res a = {1};
     if (n > 0) {
-        ad Res b = {100};
+        scoped Res b = {100};
         return n;
     }
     return 0;
@@ -36,7 +38,7 @@ i64 early(i64 n) {
 
 void loopBreak() {
     for (i64 i = 0; i < 5; i++) {
-        ad Res r = {10};
+        scoped Res r = {10};
         if (i == 2) { break; }
     }
 }
@@ -75,7 +77,7 @@ i32 main() {
 
     gFreed = 0;
     try {
-        ad Res t = {7};
+        scoped Res t = {7};
         throw(1, "out");
     } catch (Error e) { }
     tests++; if (gFreed == 7) { correct++; }
@@ -83,8 +85,8 @@ i32 main() {
     gFreed = 0;
     Res *raw = made(20);
     {
-        ad Child c = {5, 0};          /* Res.free through a derived type */
-        ad Res *p = raw;              /* a pointer: p.free() */
+        scoped Child c = {5, 0};          /* Res.free through a derived type */
+        scoped Res *p = raw;              /* a pointer: p.free() */
     }
     mem.free(raw);
     tests++; if (gFreed == 25) { correct++; }
@@ -93,15 +95,15 @@ i32 main() {
     {
         Owned *o = mem.alloc(sizeof(Owned));
         o.id = 3;
-        ad Owned *own = o;
+        scoped Owned *own = o;
     }
     tests++; if (gFreed == 3) { correct++; }
 
     {
-        ad String name = str.from("Lorenzo");
-        ad String empty;
-        ad u8[][] parts = str.split("a,b,c", ",");
-        ad auto copy = name.clone();
+        scoped String name = str.from("Lorenzo");
+        scoped String empty;
+        scoped u8[][] parts = str.split("a,b,c", ",");
+        scoped auto copy = name.clone();
         tests++; if (parts.len == 3 && empty.len == 0 && copy.len == 7) { correct++; }
     }
 
@@ -110,12 +112,12 @@ i32 main() {
     tests++; if (ad == 5) { correct++; }
 
     tests++;
-    if (reports("import str;\nString f() { ad String s = str.from(\"x\"); return s; }\n"
+    if (reports("import str;\nString f() { scoped String s = str.from(\"x\"); return s; }\n"
                 "i32 main() { return 0; }\n",
-                "`s` is declared with `ad`, so it is freed when this function returns")) { correct++; }
+                "`s` is declared `scoped`, so it is freed when this function returns")) { correct++; }
     tests++;
-    if (reports("i32 main() { ad i64 n = 5; return 0; }\n",
-                "`ad` frees its variable with `free()`, and `i64` has no `free()`")) { correct++; }
+    if (reports("i32 main() { scoped i64 n = 5; return 0; }\n",
+                "`scoped` frees its variable with `free()`, and `i64` has no `free()`")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

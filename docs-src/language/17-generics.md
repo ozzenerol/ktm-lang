@@ -275,7 +275,7 @@ void Stack<T>.free() {
 }
 
 i32 main() {
-    ad Stack<i64> nums;
+    scoped Stack<i64> nums;
     for (i64 i = 1; i <= 5; i++) {
         nums.push(i * i);
     }
@@ -283,7 +283,7 @@ i32 main() {
         printf("%d ", nums.pop());
     }
     printf("\n");
-    ad Stack<u8 *> words;
+    scoped Stack<u8 *> words;
     words.push("first");
     words.push("second");
     printf("%s\n", words.pop());
@@ -444,10 +444,10 @@ The containers are generic: `vec.Vec<T>`, `map.Map<K, V>`, `set.Set<T>`, `list.L
 import map, vec;
 
 i32 main() {
-    ad vec.Vec<u8 *> names = vec.new<u8 *>();
+    scoped vec.Vec<u8 *> names = vec.new<u8 *>();
     names.push("ann");
     names.push("bob");
-    ad map.Map<u8 *, i64> ages = map.new<u8 *, i64>();
+    scoped map.Map<u8 *, i64> ages = map.new<u8 *, i64>();
     ages.set("ann", 41);
     for (i64 i = 0; i < names.len; i++) {
         u8 *n = names.get(i);

@@ -13,12 +13,12 @@ void check(bool ok, u8 *what) {
 
 String gDir;
 String file(u8[] name) {
-    ad String path = str.format("%s/crypto-files/%.*s", gDir, name.len, name.ptr);
+    scoped String path = str.format("%s/crypto-files/%.*s", gDir, name.len, name.ptr);
     return fs.readAll(path[0:]);
 }
 
 String bytes(u8[] name) {
-    ad String text = file(name);
+    scoped String text = file(name);
     String out;
     hex.decode(str.trimEnd(text[0:]), &out);
     return out;
@@ -26,19 +26,19 @@ String bytes(u8[] name) {
 
 /* one curve: name "p384" or "p521", its kind, size, hash */
 void curve(u8[] name, crypto.KeyKind kind, i64 bits, i64 n, crypto.Hash h) {
-    ad String keyName = str.format("%.*s-key.pem", name.len, name.ptr);
-    ad String pubName = str.format("%.*s-pub.pem", name.len, name.ptr);
-    ad String keyPem = file(keyName[0:]);
-    ad String pubPem = file(pubName[0:]);
-    ad String msg = file("msg.txt");
-    ad String xName = str.format("%.*s-x.hex", name.len, name.ptr);
-    ad String yName = str.format("%.*s-y.hex", name.len, name.ptr);
-    ad String derName = str.format("%.*s-sig-der.hex", name.len, name.ptr);
-    ad String rawName = str.format("%.*s-sig-raw.hex", name.len, name.ptr);
-    ad String x = bytes(xName[0:]);
-    ad String y = bytes(yName[0:]);
-    ad String der = bytes(derName[0:]);
-    ad String raw = bytes(rawName[0:]);
+    scoped String keyName = str.format("%.*s-key.pem", name.len, name.ptr);
+    scoped String pubName = str.format("%.*s-pub.pem", name.len, name.ptr);
+    scoped String keyPem = file(keyName[0:]);
+    scoped String pubPem = file(pubName[0:]);
+    scoped String msg = file("msg.txt");
+    scoped String xName = str.format("%.*s-x.hex", name.len, name.ptr);
+    scoped String yName = str.format("%.*s-y.hex", name.len, name.ptr);
+    scoped String derName = str.format("%.*s-sig-der.hex", name.len, name.ptr);
+    scoped String rawName = str.format("%.*s-sig-raw.hex", name.len, name.ptr);
+    scoped String x = bytes(xName[0:]);
+    scoped String y = bytes(yName[0:]);
+    scoped String der = bytes(derName[0:]);
+    scoped String raw = bytes(rawName[0:]);
     crypto.Key *k = crypto.privateKey(keyPem[0:]);
     crypto.Key *p = crypto.publicKey(pubPem[0:]);
     crypto.Key *q = crypto.ecPublicKey(x[0:], y[0:]);
@@ -48,7 +48,7 @@ void curve(u8[] name, crypto.KeyKind kind, i64 bits, i64 n, crypto.Hash h) {
           q.verifyWith(h, msg[0:], raw[0:]), "openssl's signature verifies, DER and raw");
     check(!p.verifyWith(crypto.Hash.sha256, msg[0:], raw[0:]) && !p.verifyWith(h, "other", raw[0:]),
           "not with another hash or message");
-    ad String mine = k.signWith(h, msg[0:]);
+    scoped String mine = k.signWith(h, msg[0:]);
     check(mine.len == 2 * n && p.verifyWith(h, msg[0:], mine[0:]) && q.verifyWith(h, msg[0:], mine[0:]),
           "ours verifies with the public keys");
     mine.ptr[5] ^= 1;
@@ -57,11 +57,11 @@ void curve(u8[] name, crypto.KeyKind kind, i64 bits, i64 n, crypto.Hash h) {
     check(k.ecPoint(&px, &py) && str.equals(px[0:], x[0:]) && str.equals(py[0:], y[0:]), "ecPoint is openssl's point");
     px.free();
     py.free();
-    ad String outPub = q.publicPem();
+    scoped String outPub = q.publicPem();
     check(str.equals(str.trimEnd(outPub[0:]), str.trimEnd(pubPem[0:])), "the public PEM written is openssl's");
-    ad String outKey = k.privatePem();
+    scoped String outKey = k.privatePem();
     crypto.Key *back = crypto.privateKey(outKey[0:]);
-    ad String s2 = back.signWith(h, "x");
+    scoped String s2 = back.signWith(h, "x");
     check(back.kind() == kind && p.verifyWith(h, "x", s2[0:]), "the private PEM reads back");
     /* the point moved off the curve */
     y.ptr[y.len - 1] ^= 1;
@@ -81,8 +81,8 @@ i32 main() {
 
     crypto.Key *a = crypto.generateKey(crypto.KeyKind.ec384);
     crypto.Key *b = crypto.generateKey(crypto.KeyKind.ec521);
-    ad String sa = a.signWith(crypto.Hash.sha384, "hello");
-    ad String sb = b.signWith(crypto.Hash.sha512, "hello");
+    scoped String sa = a.signWith(crypto.Hash.sha384, "hello");
+    scoped String sb = b.signWith(crypto.Hash.sha512, "hello");
     check(a.kind() == crypto.KeyKind.ec384 && sa.len == 96 && a.verifyWith(crypto.Hash.sha384, "hello", sa[0:]),
           "generateKey(KeyKind.ec384)");
     check(b.kind() == crypto.KeyKind.ec521 && sb.len == 132 && b.verifyWith(crypto.Hash.sha512, "hello", sb[0:]),
@@ -92,13 +92,13 @@ i32 main() {
 
     /* P-256 is as before; RSA and Ed25519 have no point */
     crypto.Key *c = crypto.generateKey();
-    ad String sc = c.sign("hello");
+    scoped String sc = c.sign("hello");
     String x, y;
     check(c.kind() == crypto.KeyKind.ec256 && sc.len == 64 && c.ecPoint(&x, &y) && x.len == 32, "P-256 as before");
     crypto.Key *e = crypto.generateKey(crypto.KeyKind.ed25519);
     check(!e.ecPoint(&x, &y), "an Ed25519 key has no EC point");
     bool threw = false;
-    ad String x5 = str.from("12345");
+    scoped String x5 = str.from("12345");
     try { crypto.Key *bad = crypto.ecPublicKey(x5[0:], x5[0:]); bad.free(); } catch (Error err) { threw = true; }
     check(threw, "coordinates of 5 bytes are refused");
     x.free(); y.free();

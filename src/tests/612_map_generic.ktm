@@ -21,7 +21,7 @@ i32 main() {
     tests++; if (zero.len == 100 && odd.getOr(99, 0) == -99) { correct++; }
     zero.free(); odd.free();
 
-    ad map.Map<i64, i64> m = map.new<i64, i64>();
+    scoped map.Map<i64, i64> m = map.new<i64, i64>();
     for (i64 i = 0; i < 100000; i++) { m.set(i * 1024, i); }
     i64 got = 0;
     bool all = true;
@@ -35,7 +35,7 @@ i32 main() {
     *m.ref(1024) = 77;
     tests++; if (m.getOr(1024, 0) == 77 && m.ref(3) == null) { correct++; }
 
-    ad map.Map<u8[], i64> sm = map.new<u8[], i64>();
+    scoped map.Map<u8[], i64> sm = map.new<u8[], i64>();
     u8 buf[16];
     cstr.formatTo(buf, "alpha");
     sm.set(buf[0:5], 1);
@@ -52,8 +52,8 @@ i32 main() {
     tests++; if (sm.getOr("key", 0) == 30 && sm.len == 4) { correct++; }
 
     sm.delete("");
-    ad vec.Vec<u8[]> keys = sm.keys();
-    ad vec.Vec<i64> vals = sm.values();
+    scoped vec.Vec<u8[]> keys = sm.keys();
+    scoped vec.Vec<i64> vals = sm.values();
     tests++; if (keys.len == 3 && str.equals(keys.get(0), "alpha") && str.equals(keys.get(1), "key") &&
                  vals.get(0) == 1 && vals.get(1) == 30 && vals.get(2) == 5) { correct++; }
     i64 it = 0, n = 0, sum = 0;
@@ -66,7 +66,7 @@ i32 main() {
     sm.set("again", 1);
     tests++; if (sm.len == 1 && sm.getOr("again", 0) == 1 && !sm.has("alpha")) { correct++; }
 
-    ad map.Map<String, f64> strs = map.new<String, f64>();
+    scoped map.Map<String, f64> strs = map.new<String, f64>();
     String a = str.from("pi");
     strs.set(a, 3.14);
     a.free();
@@ -75,12 +75,12 @@ i32 main() {
     b.free();
 
     i64 x = 1, y = 2;
-    ad map.Map<i64 *, u8 *> pm = map.new<i64 *, u8 *>();
+    scoped map.Map<i64 *, u8 *> pm = map.new<i64 *, u8 *>();
     pm.set(&x, "x");
     pm.set(&y, "y");
-    ad map.Map<i32, i64> im = map.new<i32, i64>();
+    scoped map.Map<i32, i64> im = map.new<i32, i64>();
     im.set((i32)-5, 5);
-    ad map.Map<Pt, i64> ptm = map.new<Pt, i64>();
+    scoped map.Map<Pt, i64> ptm = map.new<Pt, i64>();
     Pt p = {1, 2}, q = {1, 2}, r = {2, 1};
     ptm.set(p, 12);
     tests++; if (pm.getOr(&y, "") [0] == 'y' && im.getOr((i32)-5, 0) == 5 &&

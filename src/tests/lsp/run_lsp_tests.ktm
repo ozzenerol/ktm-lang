@@ -38,6 +38,9 @@
  *               Locations, includeDeclaration honored both ways,
  *               stdlib symbols ALLOWED (decl synthesized from
  *               provenance); documentHighlight = one-buffer ranges
+ *   cross-file  a package's module in a directory named otherwise;
+ *               an importer's errors follow edits of what it imports;
+ *               an import's warnings stay in that file
  *
  * Allocation discipline: this is a short-lived test process, so
  * allocations are deliberately never freed - keeps the harness free
@@ -112,6 +115,15 @@ u8 *OVL_HC;
 u8 *GEN_HC;
 u8 *GENM_HC;
 u8 *ALIAS_HC;
+u8 *PKG_MOD;
+u8 *PKG_BOX_HC;
+u8 *PKG_USE_HC;
+u8 *CALC_HC;
+u8 *CALC_TRIPLE_HC;
+u8 *CALC_MAIN_HC;
+u8 *CALC_MAIN2_HC;
+u8 *AUTO_HC;
+u8 *CASCADE_HC;
 
 void initFixtures() {
     LIB_HC =
@@ -131,6 +143,56 @@ void initFixtures() {
         "pub enum Kind { square, circle };\n"
         "i64 square(i64 n) { return n * n; }\n"
         "pub i64 area(i64 side) { return square(side); }\n";
+    /* A package's module in a directory not named after it (ktm-box
+     * holds `module box;`): read through its ktm.mod, as `ktm test`
+     * reads it; use.ktm uses box.ktm's private names */
+    PKG_MOD = "module example.com/ktm-box\n\nktm 0.22\n";
+    PKG_BOX_HC =
+        "module box;\n"
+        "pub struct Box { private i64 v; };\n"
+        "i64 secret() { return 7; }\n";
+    PKG_USE_HC =
+        "module box;\n"
+        "pub i64 peek(Box *b) { return b.v + secret(); }\n";
+    /* calc gains triple (and an unused import) while calcmain.ktm,
+     * which calls it, is open */
+    CALC_HC =
+        "module calc;\n"
+        "pub i64 double(i64 n) { return n * 2; }\n";
+    CALC_TRIPLE_HC =
+        "module calc;\n"
+        "import cstr;\n"
+        "pub i64 double(i64 n) { return n * 2; }\n"
+        "pub i64 triple(i64 n) { return n * 3; }\n";
+    CALC_MAIN_HC =
+        "import calc;\n"
+        "i32 main() { return calc.triple(1); }\n";
+    CALC_MAIN2_HC =
+        "import calc;\n"
+        "i32 main() { return calc.double(1); }\n";
+    /* Names of modules not imported: json (the standard library's),
+     * geo (beside it, the project's); str is imported already */
+    AUTO_HC =
+        "import str;\n"
+        "\n"
+        "i64 one() {\n"
+        "    json.\n"
+        "}\n"
+        "i64 two() {\n"
+        "    pars\n"
+        "}\n"
+        "i64 three() {\n"
+        "    return area(2);\n"
+        "}\n";
+    /* main's error is the whole story (its return was lost to it); f
+     * really can run off its end */
+    CASCADE_HC =
+        "i32 main() {\n"
+        "    return nope(1);\n"
+        "}\n"
+        "i64 f(i64 x) {\n"
+        "    if (x) { return 1; }\n"
+        "}\n";
     /* geo's second file: uses geo.ktm's square bare */
     MOD_GEO2_HC =
         "module geo;\n"
@@ -150,7 +212,7 @@ void initFixtures() {
         "import str, vec;\n"
         "vec.Vec<String> gItems = vec.new<String>();\n"
         "pub void fill() {\n"
-        "  ad vec.Vec<i64> local = vec.new<i64>();\n"
+        "  scoped vec.Vec<i64> local = vec.new<i64>();\n"
         "  gItems.push(str.from(\"a\"));\n"
         "  local.push(1);\n"
         "  gItems.\n"
@@ -499,9 +561,40 @@ struct LspClient {
     i64 len;
     i64 cap;
     i64 nextId;
-    i64 publishes;      /* every publishDiagnostics seen, ever */
+    i64 publishes;      /* every publishDiagnostics for focus seen */
     json.Value *lastPublish; /* the most recent one */
+    u8 *focus;          /* the document last opened, changed or closed:
+                         * the server analyzes the other open ones again
+                         * after an edit, and those publishes don't count */
+    u8 **pubUris;       /* the last publish of every uri */
+    json.Value **pubs;
+    i64 npubs;
 };
+
+/* The most recent publish for uri, or null */
+json.Value *lastPublishOf(LspClient *l, u8 *uri) {
+    for (i64 i = 0; i < l.npubs; i++) {
+        if (cstr.cmp(l.pubUris[i], uri) == 0) { return l.pubs[i]; }
+    }
+    return null;
+}
+
+void recordPublish(LspClient *l, json.Value *msg) {
+    json.Value *uri = json.select(msg, ".params.uri:s");
+    if (uri == null) { return; }
+    u8 *u = cstr.formatTo(null, "%s", uri.str.ptr);
+    i64 i = 0;
+    while (i < l.npubs && cstr.cmp(l.pubUris[i], u) != 0) { i++; }
+    if (i == l.npubs && l.npubs < 64) { l.npubs++; }
+    if (i < 64) {
+        l.pubUris[i] = u;
+        l.pubs[i] = msg;
+    }
+    if (l.focus == null || cstr.cmp(l.focus, u) == 0) {
+        l.publishes++;
+        l.lastPublish = msg;
+    }
+}
 
 void lspSendBody(LspClient *l, u8 *body) {
     u8 hdr[64];
@@ -568,8 +661,7 @@ json.Value *lspTake(LspClient *l) {
         json.Value *method = json.select(msg, ".method:s");
         if (method != null &&
                 cstr.cmp(method.str.ptr, "textDocument/publishDiagnostics") == 0) {
-            l.publishes++;
-            l.lastPublish = msg;
+            recordPublish(l, msg);
             continue;
         }
         return msg;
@@ -675,6 +767,10 @@ LspClient *lspStart() {
     l.nextId = 0;
     l.publishes = 0;
     l.lastPublish = null;
+    l.focus = null;
+    l.pubUris = mem.alloc(64 * sizeof(u8 *));
+    l.pubs = mem.alloc(64 * sizeof(json.Value *));
+    l.npubs = 0;
     json.Value *resp = lspRequest(l, "initialize", "{}");
     if (resp == null) {
         printf("\033[0;31mFAILED\033[0;0m: no initialize response\n");
@@ -704,6 +800,7 @@ void lspDidOpen(LspClient *l, u8 *uri, u8 *text) {
                      "{\"textDocument\":{\"uri\":\"%s\",\"languageId\":\"ktm\","
                      "\"version\":1,\"text\":\"%s\"}}",
                      uri, esc);
+    l.focus = uri;
     lspNotify(l, "textDocument/didOpen", params);
     /* didOpen analyzes immediately - wait for its publish. */
     lspWaitPublishes(l, l.publishes + 1, 5000);
@@ -717,6 +814,7 @@ void lspDidChange(LspClient *l, u8 *uri, u8 *text) {
                      "{\"textDocument\":{\"uri\":\"%s\"},"
                      "\"contentChanges\":[{\"text\":\"%s\"}]}",
                      uri, esc);
+    l.focus = uri;
     lspNotify(l, "textDocument/didChange", params);
 }
 
@@ -861,11 +959,15 @@ bool hasLocation(json.Value *arr, u8 *uri, i64 line, i64 chr) {
 }
 
 /* Diagnostics array of the LAST publish is empty. */
-bool lastPublishClean(LspClient *l) {
-    if (l.lastPublish == null) { return false; }
-    json.Value *diags = json.select(l.lastPublish, ".params.diagnostics:a");
+bool publishClean(json.Value *msg) {
+    if (msg == null) { return false; }
+    json.Value *diags = json.select(msg, ".params.diagnostics:a");
     if (diags == null) { return false; }
     return diags.array == null;
+}
+
+bool lastPublishClean(LspClient *l) {
+    return publishClean(l.lastPublish);
 }
 
 /* ---------------- test groups ---------------- */
@@ -1246,11 +1348,11 @@ void testRegressions() {
         "import str, vec;\n"
         "vec.Vec<String> gNames = vec.new<String>();\n"
         "void main() {\n"
-        "  ad vec.Vec<u8[]> v = vec.new<u8[]>();\n"
+        "  scoped vec.Vec<u8[]> v = vec.new<u8[]>();\n"
         "  v.push(\"a\");\n"
         "  gNames.push(str.from(\"b\"));\n"
-        "  ad String s = str.join(&v, \" \");\n"
-        "  ad String t = str.join(&gNames, \", \");\n"
+        "  scoped String s = str.join(&v, \" \");\n"
+        "  scoped String t = str.join(&gNames, \", \");\n"
         "  printf(\"%s %s\\n\", s, t);\n"
         "}\n");
     check("stdlib generics (vec, str.join) give no false errors", lastPublishClean(l));
@@ -1358,6 +1460,13 @@ void testRegressions() {
     check("utf-16 columns on a non-ASCII line",
                 locEq(resp, uuri, dline, dchr - 1, true));
 
+    u8 *curi = uriOf("cascade.ktm");
+    lspDidOpen(l, curi, CASCADE_HC);
+    json.Value *cdiags = json.select(l.lastPublish, ".params.diagnostics:a");
+    json.Value *w = json.select(l.lastPublish, ".params.diagnostics[1].range.start.line:i");
+    check("an error in a return gives no missing-return warning; a real one still does",
+                jsonArrayCount(cdiags) == 2 && w != null && w.intVal == 3);
+
     lspRequest(l, "shutdown", "null", 5000);
     resp = lspPositionRequest(l, "textDocument/hover", uri, 0, 0);
     check("requests after shutdown are refused", isErrorResult(resp));
@@ -1438,7 +1547,185 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 21;
+const i64 LSP_GROUPS = 23;
+
+/* Files that read each other show no error they don't have: a
+ * package's module in a directory named otherwise, an importer whose
+ * error an edit of the imported file fixed (it is analyzed again), an
+ * imported file's warnings (they belong to that file) */
+void testCrossFile() {
+    printf("cross-file\n");
+    LspClient *l = lspStart();
+    u8 *useUri = uriOf("ktm-box/use.ktm");
+    lspDidOpen(l, useUri, PKG_USE_HC);
+    check("a package's file in a directory not named after its module has no errors",
+                lastPublishClean(l));
+
+    u8 *mainUri = uriOf("calcmain.ktm");
+    lspDidOpen(l, mainUri, CALC_MAIN_HC);
+    check("a call to a function not written yet is an error", !lastPublishClean(l));
+    u8 *calcUri = uriOf("calc/calc.ktm");
+    lspDidOpen(l, calcUri, CALC_HC);
+    lspDidChange(l, calcUri, CALC_TRIPLE_HC);
+    lspSettle(l, 1500);
+    json.Value *sev = json.select(lastPublishOf(l, calcUri),
+                                  ".params.diagnostics[0].severity:i");
+    check("the imported file warns about its unused import", sev != null && sev.intVal == 2);
+    check("writing the function in the imported file clears the importer's error",
+                publishClean(lastPublishOf(l, mainUri)));
+
+    u8 *main2Uri = uriOf("calcmain2.ktm");
+    lspDidOpen(l, main2Uri, CALC_MAIN2_HC);
+    check("an imported file's warning is not the importer's", lastPublishClean(l));
+    lspClose(l);
+}
+
+/* The completion item labelled `label`, or null */
+json.Value *itemNamed(json.Value *resp, u8 *label) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return null; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *lab = json.select(it, ".label:s");
+        if (lab != null && cstr.cmp(lab.str.ptr, label) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* The completion item whose textEdit writes `text`, or null */
+json.Value *itemWriting(json.Value *resp, u8 *text) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return null; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *t = json.select(it, ".textEdit.newText:s");
+        if (t != null && cstr.cmp(t.str.ptr, text) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Is the TextEdit `text` at line:chr? */
+bool editIs(json.Value *e, i64 line, i64 chr, u8 *text) {
+    if (e == null) { return false; }
+    json.Value *l = json.select(e, ".range.start.line:i");
+    json.Value *c = json.select(e, ".range.start.character:i");
+    json.Value *t = json.select(e, ".newText:s");
+    return l != null && c != null && t != null && l.intVal == line &&
+           c.intVal == chr && cstr.cmp(t.str.ptr, text) == 0;
+}
+
+/* Does the edit list hold one inserting `text` at line:chr? */
+bool hasEditText(json.Value *edits, i64 line, i64 chr, u8 *text) {
+    if (edits == null) { return false; }
+    json.Value *it = edits.array;
+    while (it != null) {
+        if (editIs(it, line, chr, text)) { return true; }
+        it = it.next;
+    }
+    return false;
+}
+
+/* The edits of a code action for uri, or null */
+json.Value *actionChangesFor(json.Value *act, u8 *uri) {
+    if (act == null) { return null; }
+    json.Value *changes = json.select(act, ".edit.changes:o");
+    if (changes == null) { return null; }
+    json.Value *it = changes.object;
+    while (it != null) {
+        if (it.key.ptr != null && cstr.cmp(it.key.ptr, uri) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Is any item's labelDetails.description `desc`? */
+bool anyItemDescribed(json.Value *resp, u8 *desc) {
+    json.Value *items = json.select(resp, ".result.items:a");
+    if (items == null) { return false; }
+    json.Value *it = items.array;
+    while (it != null) {
+        json.Value *d = json.select(it, ".labelDetails.description:s");
+        if (d != null && cstr.cmp(d.str.ptr, desc) == 0) { return true; }
+        it = it.next;
+    }
+    return false;
+}
+
+/* The code action titled `title` of a codeAction response, or null */
+json.Value *actionNamed(json.Value *resp, u8 *title) {
+    json.Value *arr = json.select(resp, ".result:a");
+    if (arr == null) { return null; }
+    json.Value *it = arr.array;
+    while (it != null) {
+        json.Value *t = json.select(it, ".title:s");
+        if (t != null && cstr.cmp(t.str.ptr, title) == 0) { return it; }
+        it = it.next;
+    }
+    return null;
+}
+
+/* Auto-import: completion offers the names of modules the file doesn't
+ * import (after `json.`, and `pars` -> json.parse) with the import line
+ * as an additional edit; a code action imports the module an unknown
+ * name needs */
+void testAutoImport() {
+    printf("auto-import\n");
+    LspClient *l = lspStart();
+    json.Value *init = lspRequest(l, "initialize", "{}");
+    check("codeActionProvider is advertised",
+                json.select(init, ".result.capabilities.codeActionProvider:o") != null);
+    u8 *uri = uriOf("auto.ktm");
+    lspDidOpen(l, uri, AUTO_HC);
+    u8 *diags = json.toStr(json.select(l.lastPublish, ".params.diagnostics:a")).take();
+
+    i64 line;
+    i64 chr;
+    posOf(AUTO_HC, "json.\n", 5, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    json.Value *it = itemNamed(resp, "parse");
+    check("completion after `json.` offers json's names though json isn't imported",
+                it != null);
+    check("picking one adds `import json;` after the imports",
+                hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                            "import json;\n"));
+
+    posOf(AUTO_HC, "pars\n", 4, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    it = itemWriting(resp, "json.parse");
+    check("completion of `pars` offers json's parse, written json.parse over `pars`",
+                editIs(json.select(it, ".textEdit:o"), line, chr - 4, "json.parse") &&
+                labelsOk(resp, "pars", "parse", null));
+    check("json.parse imports json",
+                hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                            "import json;\n"));
+
+    posOf(AUTO_HC, "area(2)", 2, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/completion", uri, line, chr);
+    it = itemWriting(resp, "geo.area");
+    check("completion offers the project's own modules' names (geo.area)",
+                it != null && hasEditText(json.select(it, ".additionalTextEdits:a"), 1, 0,
+                                          "import geo;\n"));
+    check("a module imported already is not offered again",
+                !anyItemDescribed(resp, "import str"));
+
+    u8 *params = cstr.format(
+        "{\"textDocument\":{\"uri\":\"%s\"},\"range\":{\"start\":{\"line\":0,"
+        "\"character\":0},\"end\":{\"line\":0,\"character\":0}},"
+        "\"context\":{\"diagnostics\":%s}}", uri, diags);
+    resp = lspRequest(l, "textDocument/codeAction", params);
+    json.Value *act = actionNamed(resp, "import json");
+    check("code action `import json` on `json.` not imported",
+                hasEditText(actionChangesFor(act, uri), 1, 0, "import json;\n"));
+    act = actionNamed(resp, "import geo, use geo.area");
+    posOf(AUTO_HC, "area(2)", 0, &line, &chr);
+    json.Value *edits = actionChangesFor(act, uri);
+    check("code action on an unknown bare name imports its module and qualifies it",
+                hasEditText(edits, 1, 0, "import geo;\n") &&
+                hasEditText(edits, line, chr, "geo.area"));
+    check("clean shutdown", lspClose(l) == 0);
+}
 
 /* Modules: completion after `geo.` offers geo's pub names only, after
  * `p.` the public fields of geo.Point only, hover
@@ -2063,6 +2350,8 @@ void runGroup(i64 group) {
         case 18: testSemanticTokens();
         case 19: testCompletionKinds();
         case 20: testFoldingAndHints();
+        case 21: testCrossFile();
+        case 22: testAutoImport();
     }
 }
 
@@ -2133,8 +2422,9 @@ i32 main() {
 
     u8 tmp[128];
     libc.snprintf(tmp, 128, "/tmp/ktm_lsp_test_%d", getpid());
-    u8 cmd[256];
-    libc.snprintf(cmd, 256, "mkdir -p %s/sub %s/geo %s/bag %s/order", tmp, tmp, tmp, tmp);
+    u8 cmd[512];
+    libc.snprintf(cmd, 512, "mkdir -p %s/sub %s/geo %s/bag %s/order %s/ktm-box %s/calc",
+                  tmp, tmp, tmp, tmp, tmp, tmp);
     proc.shell(cmd);
     gDir = mem.alloc(1024);
     realpath(tmp, gDir);
@@ -2170,11 +2460,23 @@ i32 main() {
     fs.writeAll(path, cstr.view(MOD_MAIN_HC));
     libc.snprintf(path, 512, "%s/modlist.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_LIST_HC));
+    libc.snprintf(path, 512, "%s/ktm-box/ktm.mod", gDir);
+    fs.writeAll(path, cstr.view(PKG_MOD));
+    libc.snprintf(path, 512, "%s/ktm-box/box.ktm", gDir);
+    fs.writeAll(path, cstr.view(PKG_BOX_HC));
+    libc.snprintf(path, 512, "%s/ktm-box/use.ktm", gDir);
+    fs.writeAll(path, cstr.view(PKG_USE_HC));
+    libc.snprintf(path, 512, "%s/calc/calc.ktm", gDir);
+    fs.writeAll(path, cstr.view(CALC_HC));
+    libc.snprintf(path, 512, "%s/calcmain.ktm", gDir);
+    fs.writeAll(path, cstr.view(CALC_MAIN_HC));
+    libc.snprintf(path, 512, "%s/calcmain2.ktm", gDir);
+    fs.writeAll(path, cstr.view(CALC_MAIN2_HC));
 
     printf("ktm -lsp tests (%s)\n", gKtm);
     runGroups();
 
-    libc.snprintf(cmd, 256, "rm -rf %s", tmp);
+    libc.snprintf(cmd, 512, "rm -rf %s", tmp);
     proc.shell(cmd);
 
     if (gFail == 0) {

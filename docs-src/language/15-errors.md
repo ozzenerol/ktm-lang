@@ -214,7 +214,7 @@ same: one `ERR_` constant per kind of failure, with values unlikely to clash.
 
 A throw leaves every function between it and the `try`: none of them returns normally, and
 the rest of their code doesn't run. Their `defer` statements do run, innermost first, on the
-way up (see [defer and ad](16-defer-and-ad.html)):
+way up (see [defer and scoped](16-defer-and-scoped.html)):
 
 ```ktm run
 enum Err { bad };

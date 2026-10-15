@@ -42,7 +42,7 @@ String squeeze(u8[] l) {
 
 bool lineIs(u8[] text, i64 n, u8 *want) {
     u8[] got = lineAfterTime(text, n);
-    ad String flat = squeeze(got);
+    scoped String flat = squeeze(got);
     bool ok = str.equals(flat, cstr.view(want));
     if (!ok) { printf("\n  line %d: got [%.*s] want [%s]", n, got.len, got.ptr, want); }
     return ok;
@@ -65,7 +65,7 @@ i32 main()
     printf("Test - log format arguments: ");
     fs.remove(LOG_FILE);
 
-    ad String name = str.format("users_%d", 2);
+    scoped String name = str.format("users_%d", 2);
     u8[] view = "orders and more";
     view = view[0:6];
 

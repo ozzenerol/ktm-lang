@@ -29,6 +29,7 @@
 #include "lexer.h"
 #include "lsp.h"
 #include "parser.h"
+#include "pkg.h"
 #include "util.h"
 #include "version.h"
 
@@ -46,7 +47,8 @@ typedef struct LspCtx {
     Vec *pending;           /* uris awaiting a debounced analyze */
     const char *analyzing;  /* uri lspPublishHandler publishes for */
     s64 pending_since_ms;   /* when the oldest pending uri landed */
-    int module_doc;         /* the last parse was a module's file */
+    Vec *stale;             /* open uris whose imports changed since
+                             * their diagnostics were published */
 } LspCtx;
 
 /* A module's file is analyzed as the compiler reads it: through a
@@ -253,7 +255,10 @@ static int lspIsDirPath(const char *path) {
 }
 
 /* A file starting `module a.b;` in a directory .../a/b: the directory
- * the module is found from (*_mod "a.b"), else NULL */
+ * the module is found from (*_mod "a.b", what to import), else NULL.
+ * A package's module (a directory under a ktm.mod whose name needn't be
+ * the module's: ktm-pg holding `module pg;`) is imported by its package
+ * path from the ktm.mod's directory, as `ktm test` does. */
 static char *lspModuleRoot(const char *path, AoStr *text, char **_mod) {
     char *mod = lspDocModule(text);
     const char *slash = strrchr(path, '/');
@@ -261,12 +266,24 @@ static char *lspModuleRoot(const char *path, AoStr *text, char **_mod) {
     char *rel = mprintf("%s", mod);
     for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
     size_t dlen = slash - path, rlen = strlen(rel);
-    if (dlen <= rlen || memcmp(path + dlen - rlen, rel, rlen) ||
-        path[dlen - rlen - 1] != '/') {
+    if (dlen > rlen && !memcmp(path + dlen - rlen, rel, rlen) &&
+        path[dlen - rlen - 1] == '/') {
+        *_mod = mod;
+        return mprintf("%.*s", (int)(dlen - rlen - 1), path);
+    }
+    char *dir = mprintf("%.*s", (int)dlen, path);
+    char *mod_file = pkgModFind(dir);
+    char *err = NULL;
+    PkgMod *m = mod_file ? pkgModLoad(mod_file, &err) : NULL;
+    char *real = realpath(dir, NULL);
+    char *mod_root = m ? realpath(m->dir, NULL) : NULL;
+    if (!real || !mod_root) return NULL;
+    size_t mlen = strlen(mod_root);
+    if (strncmp(real, mod_root, mlen) || (real[mlen] != '/' && real[mlen])) {
         return NULL;
     }
-    *_mod = mod;
-    return mprintf("%.*s", (int)(dlen - rlen - 1), path);
+    *_mod = mprintf("ktm_lsp_pkg = \"%s%s\"", m->path, real + mlen);
+    return mod_root;
 }
 
 static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
@@ -278,7 +295,6 @@ static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
     l->source_arg = ctx;
     char *mod = NULL;
     char *root = lspModuleRoot(path, text, &mod);
-    ctx->module_doc = root != NULL;
     if (root) {
         char *src = mprintf("import %s;\n", mod);
         /* a module's *_test.ktm is read only when its tests are: as
@@ -595,10 +611,11 @@ static void lspPublishDiagnostics(LspCtx *ctx, const char *uri,
         const char *dfile = (d->file && d->file->filename)
                           ? d->file->filename->data : NULL;
         int remote = dfile != NULL && strcmp(dfile, path) != 0;
-        /* the module's program says nothing of its own; the module's
-         * other files only matter for their errors */
+        /* the module's program says nothing of its own; another file
+         * (an import, the module's other files) only matters for its
+         * errors: its warnings show where it is opened */
         if (dfile && strstr(dfile, KTM_LSP_MODULE_FILE)) continue;
-        if (remote && ctx->module_doc && d->severity != CCTRL_ERROR) continue;
+        if (remote && d->severity != CCTRL_ERROR) continue;
         if (emitted++) aoStrPutChar(body, ',');
         lspCatDiagnostic(ctx, body, text, d, remote, dfile ? dfile : "?");
     }
@@ -684,10 +701,39 @@ static void lspDeferAnalysis(LspCtx *ctx, const char *uri) {
         vecPush(ctx->pending, strdup(uri));
 }
 
+/* A file's diagnostics depend on the files it imports: when one open
+ * document changes (or closes, and is read from disk again), every
+ * other open one is analyzed again, one at a time while stdin is quiet,
+ * so an error a sibling's edit fixed (or caused) doesn't linger until
+ * that file is edited itself */
+static void lspMarkOthersStale(LspCtx *ctx, const char *uri) {
+    MapIter mi;
+    mapIterInit(ctx->docs, &mi);
+    while (mapIterNext(&mi)) {
+        const char *other = (const char *)mi.node->key;
+        if (strcmp(other, uri) == 0 || vecHas(ctx->stale, (void *)other))
+            continue;
+        vecPush(ctx->stale, strdup(other));
+    }
+}
+
 static void lspFlushPending(LspCtx *ctx) {
-    for (u64 i = 0; i < ctx->pending->size; ++i)
-        lspAnalyze(ctx, vecGet(char *, ctx->pending, i));
+    for (u64 i = 0; i < ctx->pending->size; ++i) {
+        char *uri = vecGet(char *, ctx->pending, i);
+        vecRemove(ctx->stale, uri);
+        lspAnalyze(ctx, uri);
+        lspMarkOthersStale(ctx, uri);
+    }
     vecClear(ctx->pending);
+}
+
+/* Analyzes the first stale document; the rest wait for the next quiet
+ * moment */
+static void lspFlushStale(LspCtx *ctx) {
+    char *uri = strdup(vecGet(char *, ctx->stale, 0));
+    vecRemove(ctx->stale, uri);
+    lspAnalyze(ctx, uri);
+    free(uri);
 }
 
 /* Position queries against a document the client never opened (e.g. a
@@ -751,6 +797,7 @@ static void lspDidClose(LspCtx *ctx, Json *params) {
     const char *uri = jsonStrOr(td, "uri", NULL);
     if (uri == NULL) return;
     vecRemove(ctx->pending, (void *)uri);
+    vecRemove(ctx->stale, (void *)uri);
     AoStr *old = (AoStr *)mapGet(ctx->docs, (void *)uri);
     if (old) {
         mapRemove(ctx->docs, (void *)uri);
@@ -765,6 +812,8 @@ static void lspDidClose(LspCtx *ctx, Json *params) {
     aoStrCatPrintf(body, "\",\"diagnostics\":[]}}");
     lspWrite(body);
     aoStrRelease(body);
+    /* the others now read its file from disk */
+    if (old) lspMarkOthersStale(ctx, uri);
 }
 
 static int lspIsIdentChar(char c) {
@@ -1717,7 +1766,7 @@ static const char *lsp_keywords[] = {
     "true", "false", "null",
     "struct", "pub", "private", "const", "enum", "defer",
     "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
-    "type", "ad", "asm", "volatile", "inline", "threadlocal",
+    "type", "scoped", "ad", "asm", "volatile", "inline", "threadlocal",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -1988,6 +2037,480 @@ static int lspImportCompletion(LspCtx *ctx, Json *id, const char *uri,
     return 1;
 }
 
+/* ---- auto-import: names of modules the document doesn't import yet ---- */
+
+/* A module the document could import: the standard library's, one of
+ * the project's or a package of its ktm.mod */
+typedef struct LspCand {
+    char *prefix;   /* its name in the code: "http" */
+    char *path;     /* its names' qualifier: "net.http" */
+    char *import;   /* what the import line names: `net.http`, `"a.com/b"` */
+} LspCand;
+
+static void lspCandAdd(Vec *cands, AoStr *text, const char *own,
+                       const char *path, const char *import) {
+    const char *dot = strrchr(path, '.');
+    const char *prefix = dot ? dot + 1 : path;
+    /* imported already (as itself or by its prefix), or its own file */
+    if (own && !strcmp(own, path)) return;
+    if (lspImportPath(text, prefix, strlen(prefix))) return;
+    if (import[0] == '"' && strstr(text->data, import)) return;
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        if (!strcmp(c->path, path) || !strcmp(c->import, import)) return;
+    }
+    LspCand *c = malloc(sizeof(LspCand));
+    c->prefix = mprintf("%s", prefix);
+    c->path = mprintf("%s", path);
+    c->import = mprintf("%s", import);
+    vecPush(cands, c);
+}
+
+static int lspHasKtmFile(const char *dir) {
+    DIR *d = opendir(dir);
+    struct dirent *e;
+    int found = 0;
+    while (d && !found && (e = readdir(d)) != NULL) {
+        size_t n = strlen(e->d_name);
+        found = n > 4 && e->d_name[0] != '.' && !strcmp(e->d_name + n - 4, ".ktm");
+    }
+    if (d) closedir(d);
+    return found;
+}
+
+/* The modules under `dir` (`rel` their path so far: "" or "net."); with
+ * `check`, only directories whose files say `module <path>;` (a
+ * project's directories also hold programs, tests, builds). `budget`
+ * caps the directories looked at. */
+static void lspCandWalk(Vec *cands, AoStr *text, const char *own, const char *dir,
+                        const char *rel, int check, int depth, int *budget) {
+    if (depth > 4) return;
+    DIR *d = opendir(dir);
+    struct dirent *e;
+    while (d && (e = readdir(d)) != NULL && --*budget > 0) {
+        if (e->d_name[0] == '.') continue;
+        char *sub = mprintf("%s/%s", dir, e->d_name);
+        if (!lspIsDirPath(sub)) continue;
+        char *path = mprintf("%s%s", rel, e->d_name);
+        /* the runtime and the prelude are never imported */
+        if (!strcmp(path, "rt") || !strcmp(path, "prelude")) continue;
+        if (lspHasKtmFile(sub)) {
+            char *name = check ? pkgModuleName(sub) : NULL;
+            if (!check || (name && !strcmp(name, path))) {
+                lspCandAdd(cands, text, own, path, path);
+            }
+        }
+        lspCandWalk(cands, text, own, sub, mprintf("%s.", path), check,
+                    depth + 1, budget);
+    }
+    if (d) closedir(d);
+}
+
+/* The directory the document's modules are found from: a module's root,
+ * else its own directory */
+static char *lspProgramRoot(const char *uri, AoStr *text) {
+    char *path = lspUriToPath(uri);
+    char *mod = NULL;
+    char *root = lspModuleRoot(path, text, &mod);
+    if (!root) {
+        char *slash = strrchr(path, '/');
+        root = slash ? mprintf("%.*s", (int)(slash - path), path) : mprintf(".");
+    }
+    free(path);
+    return root;
+}
+
+/* Every module `uri` could import and doesn't */
+static Vec *lspImportCands(LspCtx *ctx, const char *uri, AoStr *text) {
+    Vec *cands = vecNew(&vec_cstring_type);
+    char *own = lspDocModule(text);
+    char *root = lspProgramRoot(uri, text);
+    int budget = 400;
+    lspCandWalk(cands, text, own, root, "", 1, 0, &budget);
+    budget = 400;
+    lspCandWalk(cands, text, own, ctx->std_dir, "", 0, 0, &budget);
+    char *mod_file = pkgModFind(root);
+    char *err = NULL;
+    PkgMod *m = mod_file ? pkgModLoad(mod_file, &err) : NULL;
+    for (int i = 0; m && i < m->req_len; ++i) {
+        if (m->req[i].indirect) continue;
+        char *dir = pkgResolveImport(root, m->req[i].path, &err);
+        char *name = dir ? pkgModuleName(dir) : NULL;
+        if (name) lspCandAdd(cands, text, own, name, mprintf("\"%s\"", m->req[i].path));
+    }
+    return cands;
+}
+
+/* Reads the candidates into this (child) process's compiler, each under
+ * an alias of its own so two with one name don't clash */
+static void lspLoadCands(LspCtx *ctx, const char *uri, AoStr *text, Vec *cands) {
+    if (cands->size == 0) return;
+    AoStr *src = aoStrNew();
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        aoStrCatPrintf(src, "import ktm_lsp_auto%llu = %s;\n", (unsigned long long)i,
+                       c->import);
+    }
+    char *root = lspProgramRoot(uri, text);
+    Lexer *l = (Lexer *)malloc(sizeof(Lexer));
+    lexInit(l, NULL, CCF_PRE_PROC);
+    l->cc = ctx->cc;
+    lexSetBuiltinRoot(l, ctx->root_dir);
+    l->source_for = lspSourceFor;
+    l->source_arg = ctx;
+    lexPushString(l, mprintf("%s/%s", root, KTM_LSP_MODULE_FILE), src->data, src->len);
+    cctrlResetTokenBuffer(ctx->cc);
+    if (sigsetjmp(lsp_parse_env, 1) == 0) {
+        lsp_in_parse = 1;
+        jmp_buf lex_recovery;
+        jmp_buf *prev_recovery = ctx->cc->current_recovery;
+        ctx->cc->current_recovery = &lex_recovery;
+        if (setjmp(lex_recovery) == 0) {
+            cctrlInitParse(ctx->cc, l);
+            parseToAst(ctx->cc);
+        }
+        ctx->cc->current_recovery = prev_recovery;
+    }
+    lsp_in_parse = 0;
+    /* a package's names are qualified by the path the compiler made
+     * for it ("github_com.user.repo.name") */
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        if (c->import[0] != '"') continue;
+        for (int k = 0; k < ctx->cc->packages_len; ++k) {
+            CctrlPackage *p = &ctx->cc->packages[k];
+            size_t n = strlen(p->package);
+            if (!strncmp(c->import + 1, p->package, n) && c->import[n + 1] == '"') {
+                c->path = mprintf("%s", p->module_path);
+            }
+        }
+    }
+}
+
+/* The candidate whose names `qn` is one of ("json.parse"), the name
+ * after its qualifier in *_name; NULL for none (or a method's) */
+static LspCand *lspCandOf(Vec *cands, const char *qn, const char **_name) {
+    LspCand *best = NULL;
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        size_t n = strlen(c->path);
+        if (strncmp(qn, c->path, n) || qn[n] != '.' || strchr(qn + n + 1, '.')) continue;
+        best = c;
+        *_name = qn + n + 1;
+    }
+    return best;
+}
+
+/* How `qn` (`name` in candidate c) is shown: a package's by its name in
+ * the code, a module's by its path */
+static const char *lspCandShown(LspCand *c, const char *qn, const char *name) {
+    return c->import[0] == '"' ? mprintf("%s.%s", c->prefix, name) : qn;
+}
+
+/* Where an import line goes: the line after the document's last import
+ * (or its `module` line), else the first */
+static int lspImportLine(AoStr *text) {
+    const char *s = text->data, *end = s + text->len;
+    int line = 0, after = 0;
+    while (s < end) {
+        const char *eol = memchr(s, '\n', end - s);
+        if (!eol) eol = end;
+        const char *p = s;
+        while (p < eol && isspace((unsigned char)*p)) p++;
+        int imp = eol - p > 7 && !memcmp(p, "import", 6) && isspace((unsigned char)p[6]);
+        int mod = eol - p > 7 && !memcmp(p, "module", 6) && isspace((unsigned char)p[6]);
+        if (imp || mod) {
+            /* to the `;` that ends it: a list may span lines */
+            const char *semi = memchr(p, ';', end - p);
+            const char *q = p;
+            while (semi && q < semi) {
+                if (*q++ == '\n') line++;
+            }
+            after = line + 1;
+            if (semi) {
+                eol = memchr(semi, '\n', end - semi);
+                if (!eol) eol = end;
+            }
+        }
+        line++;
+        s = eol + 1;
+    }
+    return after;
+}
+
+/* The edit adding `c`'s import line, as a TextEdit */
+static void lspCatImportEdit(AoStr *body, AoStr *text, LspCand *c) {
+    int line = lspImportLine(text);
+    aoStrCatPrintf(body,
+        "{\"range\":{\"start\":{\"line\":%d,\"character\":0},"
+        "\"end\":{\"line\":%d,\"character\":0}},\"newText\":\"", line, line);
+    AoStr *t = aoStrPrintf("import %s;\n", c->import);
+    jsonEscapeInto(body, t->data, t->len);
+    aoStrRelease(t);
+    aoStrCat(body, "\"}");
+}
+
+/* One CompletionItem that imports `c` when picked; `insert` (with the
+ * prefix's start column `from`) replaces the typed prefix */
+static void lspCatAutoImport(LspCtx *ctx, AoStr *body, int *emitted, AoStr *text,
+                             LspCand *c, const char *label, int kind,
+                             const char *detail, const char *insert, int line,
+                             int from, int to) {
+    if ((*emitted)++) aoStrPutChar(body, ',');
+    aoStrCat(body, "{\"label\":\"");
+    jsonEscapeInto(body, label, strlen(label));
+    aoStrCatPrintf(body, "\",\"kind\":%d", kind);
+    if (detail) {
+        aoStrCat(body, ",\"detail\":\"");
+        jsonEscapeInto(body, detail, strlen(detail));
+        aoStrPutChar(body, '"');
+    }
+    AoStr *desc = aoStrPrintf("import %s", c->import);
+    aoStrCat(body, ",\"labelDetails\":{\"description\":\"");
+    jsonEscapeInto(body, desc->data, desc->len);
+    aoStrCat(body, "\"}");
+    aoStrRelease(desc);
+    if (insert) {
+        const char *dot = strrchr(insert, '.');
+        const char *filter = dot ? dot + 1 : insert;
+        aoStrCat(body, ",\"filterText\":\"");
+        jsonEscapeInto(body, filter, strlen(filter));
+        aoStrCatPrintf(body,
+            "\",\"textEdit\":{\"range\":{\"start\":{\"line\":%d,\"character\":%d},"
+            "\"end\":{\"line\":%d,\"character\":%d}},\"newText\":\"",
+            line, lspColToWire(ctx, text, line, from), line,
+            lspColToWire(ctx, text, line, to));
+        jsonEscapeInto(body, insert, strlen(insert));
+        aoStrCat(body, "\"}");
+    }
+    aoStrCat(body, ",\"additionalTextEdits\":[");
+    lspCatImportEdit(body, text, c);
+    aoStrCat(body, "]}");
+}
+
+/* Kind and detail of a module's name `qn`, shown as `shown` (a
+ * package's names by its name in the code: jwt.Header) */
+static int lspQualKind(LspCtx *ctx, const char *qn, const char *shown,
+                       const char **_detail) {
+    Ast *entry = lspModuleValue(ctx, qn);
+    *_detail = NULL;
+    if (entry && lspIsFn(entry)) {
+        *_detail = lspModuleFnString(entry, shown);
+        return KTM_LSP_FUNCTION;
+    }
+    if (entry) {
+        *_detail = entry->type ? astTypeToString(entry->type) : NULL;
+        return (entry->flags & AST_FLAG_CONST) ? KTM_LSP_CONSTANT : KTM_LSP_VARIABLE;
+    }
+    AstType *t = mapGet(ctx->cc->clsdefs, (char *)qn);
+    if (t && t->is_enum) {
+        *_detail = mprintf("enum %s", shown);
+        return KTM_LSP_ENUM;
+    }
+    if (t || mapGet(ctx->cc->uniondefs, (char *)qn)) {
+        *_detail = mprintf("%s %s", t ? "struct" : "union", shown);
+        return KTM_LSP_UNION_STRUCT;
+    }
+    return KTM_LSP_CLASS;
+}
+
+/* After `recv.` where recv names no import, value or type but a module
+ * that could be imported: that module's pub names, importing it */
+static int lspAutoImportMembers(LspCtx *ctx, Json *id, const char *uri, AoStr *text,
+                                int line, int character, const char *prefix,
+                                size_t plen) {
+    size_t ls = lspLineStart(text, line), at = ls + (size_t)character;
+    if (at > text->len) at = text->len;
+    size_t start = at;
+    while (start > ls && lspIsIdentChar(text->data[start - 1])) start--;
+    if (start <= ls || text->data[start - 1] != '.') return 0;
+    size_t r_end = start - 1, r_start = r_end;
+    while (r_start > ls && lspIsIdentChar(text->data[r_start - 1])) r_start--;
+    if (r_start == r_end || (r_start > ls && text->data[r_start - 1] == '.')) return 0;
+    char *recv = mprintf("%.*s", (int)(r_end - r_start), text->data + r_start);
+    Vec *cands = lspImportCands(ctx, uri, text);
+    Vec *hits = vecNew(&vec_cstring_type);
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        if (!strcmp(c->prefix, recv)) vecPush(hits, c);
+    }
+    if (hits->size == 0) return 0;
+    lspLoadCands(ctx, uri, text, hits);
+    AoStr *body = aoStrNew();
+    aoStrCat(body, "{\"isIncomplete\":false,\"items\":[");
+    int emitted = 0;
+    SetIter it;
+    setIterInit(ctx->cc->pub_names, &it);
+    char *qn;
+    while ((qn = setNext(&it)) != NULL) {
+        const char *name = NULL;
+        LspCand *c = lspCandOf(hits, qn, &name);
+        if (!c || strncmp(name, prefix, plen)) continue;
+        const char *detail;
+        int kind = lspQualKind(ctx, qn, lspCandShown(c, qn, name), &detail);
+        lspCatAutoImport(ctx, body, &emitted, text, c, name, kind, detail, NULL,
+                         line, 0, 0);
+    }
+    aoStrCat(body, "]}");
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+    lspLog(ctx, "lsp: auto-import completion '%s.%s' -> %d item(s)", recv, prefix,
+           emitted);
+    return 1;
+}
+
+/* A bare prefix: the modules it could start (importing one) and, from
+ * two characters on, the pub names of every module not imported yet
+ * (`pars` -> parse, written json.parse, importing json) */
+#define KTM_LSP_AUTO_IMPORT_MAX 200
+static void lspAutoImportNames(LspCtx *ctx, AoStr *body, int *emitted, const char *uri,
+                               AoStr *text, int line, int character,
+                               const char *prefix, size_t plen) {
+    size_t ls = lspLineStart(text, line), at = ls + (size_t)character;
+    if (at > text->len) at = text->len;
+    size_t start = at;
+    while (start > ls && lspIsIdentChar(text->data[start - 1])) start--;
+    /* `a.b` is a member's, `import x` an import's */
+    if (plen == 0 || (start > ls && text->data[start - 1] == '.')) return;
+    Vec *cands = lspImportCands(ctx, uri, text);
+    int from = (int)(start - ls), to = (int)(at - ls);
+    int added = 0;
+    for (u64 i = 0; i < cands->size; ++i) {
+        LspCand *c = cands->entries[i];
+        if (strncmp(c->prefix, prefix, plen)) continue;
+        lspCatAutoImport(ctx, body, emitted, text, c, c->prefix, KTM_LSP_MODULE,
+                         mprintf("module %s", c->path), c->prefix, line, from, to);
+        added++;
+    }
+    if (plen < 2) return;
+    lspLoadCands(ctx, uri, text, cands);
+    SetIter it;
+    setIterInit(ctx->cc->pub_names, &it);
+    char *qn;
+    while ((qn = setNext(&it)) != NULL && added < KTM_LSP_AUTO_IMPORT_MAX) {
+        const char *name = NULL;
+        LspCand *c = lspCandOf(cands, qn, &name);
+        if (!c || strncmp(name, prefix, plen)) continue;
+        const char *detail;
+        int kind = lspQualKind(ctx, qn, lspCandShown(c, qn, name), &detail);
+        lspCatAutoImport(ctx, body, emitted, text, c, name, kind, detail,
+                         mprintf("%s.%s", c->prefix, name), line, from, to);
+        added++;
+    }
+}
+
+/* textDocument/codeAction: on an unknown name, "import X" (and for a
+ * bare name a module has, "import X, use X.name") */
+static char *lspBacktick(const char *msg) {
+    const char *b = strchr(msg, '`');
+    const char *e = b ? strchr(b + 1, '`') : NULL;
+    return e ? mprintf("%.*s", (int)(e - b - 1), b + 1) : NULL;
+}
+
+static void lspCatAction(AoStr *body, int *emitted, const char *uri, AoStr *text,
+                         Json *diag, const char *title, LspCand *c,
+                         const char *replace, int line, int from, int to,
+                         LspCtx *ctx) {
+    if ((*emitted)++) aoStrPutChar(body, ',');
+    aoStrCat(body, "{\"title\":\"");
+    jsonEscapeInto(body, title, strlen(title));
+    aoStrCat(body, "\",\"kind\":\"quickfix\",\"diagnostics\":[");
+    /* the diagnostic it fixes, as the client sent it (range, message) */
+    Json *r = jsonObjGet(diag, "range");
+    Json *rs = jsonObjGet(r, "start"), *re = jsonObjGet(r, "end");
+    const char *msg = jsonStrOr(diag, "message", "");
+    aoStrCatPrintf(body,
+        "{\"range\":{\"start\":{\"line\":%lld,\"character\":%lld},"
+        "\"end\":{\"line\":%lld,\"character\":%lld}},\"message\":\"",
+        (long long)jsonIntOr(rs, "line", 0), (long long)jsonIntOr(rs, "character", 0),
+        (long long)jsonIntOr(re, "line", 0), (long long)jsonIntOr(re, "character", 0));
+    jsonEscapeInto(body, msg, strlen(msg));
+    aoStrCat(body, "\"}");
+    aoStrCat(body, "],\"edit\":{\"changes\":{\"");
+    jsonEscapeInto(body, uri, strlen(uri));
+    aoStrCat(body, "\":[");
+    lspCatImportEdit(body, text, c);
+    if (replace) {
+        aoStrCatPrintf(body,
+            ",{\"range\":{\"start\":{\"line\":%d,\"character\":%d},"
+            "\"end\":{\"line\":%d,\"character\":%d}},\"newText\":\"",
+            line, lspColToWire(ctx, text, line, from), line,
+            lspColToWire(ctx, text, line, to));
+        jsonEscapeInto(body, replace, strlen(replace));
+        aoStrCat(body, "\"}");
+    }
+    aoStrCat(body, "]}}}");
+}
+
+static void lspCodeAction(LspCtx *ctx, Json *id, Json *params) {
+    const char *uri = jsonStrOr(jsonObjGet(params, "textDocument"), "uri", NULL);
+    AoStr *text = uri ? lspDocGetOrLoad(ctx, uri) : NULL;
+    Json *diags = jsonObjGet(jsonObjGet(params, "context"), "diagnostics");
+    if (!text || !diags || diags->kind != JSON_ARRAY) {
+        lspRespond(id, "[]");
+        return;
+    }
+    Vec *cands = NULL;
+    AoStr *body = aoStrNew();
+    aoStrPutChar(body, '[');
+    int emitted = 0;
+    for (u64 i = 0; i < (u64)diags->as.size; ++i) {
+        Json *diag = jsonArrayAt(diags, i);
+        const char *msg = jsonStrOr(diag, "message", "");
+        if (!strstr(msg, "is not imported") && !strstr(msg, "has not been defined") &&
+            !strstr(msg, "has not been declared")) {
+            continue;
+        }
+        char *name = lspBacktick(msg);
+        if (!name || !*name) continue;
+        if (!cands) {
+            cands = lspImportCands(ctx, uri, text);
+            lspLoadCands(ctx, uri, text, cands);
+        }
+        char *dot = strchr(name, '.');
+        if (dot || strstr(msg, "is not imported")) {
+            /* `json.parse`: the modules called json */
+            size_t n = dot ? (size_t)(dot - name) : strlen(name);
+            for (u64 k = 0; k < cands->size; ++k) {
+                LspCand *c = cands->entries[k];
+                if (strlen(c->prefix) != n || strncmp(c->prefix, name, n)) continue;
+                lspCatAction(body, &emitted, uri, text, diag,
+                             mprintf("import %s", c->import), c, NULL, 0, 0, 0, ctx);
+            }
+            continue;
+        }
+        /* `parse`: the modules with a pub `parse`; the name becomes
+         * json.parse where the diagnostic points at it */
+        Json *start = jsonObjGet(jsonObjGet(diag, "range"), "start");
+        int line = (int)jsonIntOr(start, "line", -1);
+        int col = lspColFromWire(ctx, text, line, (int)jsonIntOr(start, "character", 0));
+        if (line < 0) continue;
+        size_t ls = lspLineStart(text, line), le = ls;
+        while (le < text->len && text->data[le] != '\n') le++;
+        size_t nlen = strlen(name), from = ls + (size_t)col;
+        while (from + nlen <= le && strncmp(text->data + from, name, nlen)) from++;
+        if (from + nlen > le) continue;
+        for (u64 k = 0; k < cands->size; ++k) {
+            LspCand *c = cands->entries[k];
+            /* `jwt` alone: the module itself */
+            if (!strcmp(c->prefix, name)) {
+                lspCatAction(body, &emitted, uri, text, diag,
+                             mprintf("import %s", c->import), c, NULL, 0, 0, 0, ctx);
+                continue;
+            }
+            char *qn = mprintf("%s.%s", c->path, name);
+            if (!setHas(ctx->cc->pub_names, qn)) continue;
+            char *use = mprintf("%s.%s", c->prefix, name);
+            lspCatAction(body, &emitted, uri, text, diag,
+                         mprintf("import %s, use %s", c->import, use), c, use, line,
+                         (int)(from - ls), (int)(from - ls + nlen), ctx);
+        }
+    }
+    aoStrPutChar(body, ']');
+    lspRespond(id, body->data);
+    aoStrRelease(body);
+}
+
 /* Whether the document is a file of generic `d`'s own module */
 static int lspInModuleOf(LspCtx *ctx, GenericDef *d, AoStr *text) {
     (void)ctx;
@@ -2133,6 +2656,11 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
     int is_member = 0;
     AstType *mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
                                      &is_member);
+    /* `json.` with json not imported (and nothing else by that name) */
+    if (is_member && !mcls &&
+        lspAutoImportMembers(ctx, id, uri, text, line, character, prefix, plen)) {
+        return;
+    }
     if (is_member) {
         AoStr *mbody = aoStrNew();
         aoStrCatPrintf(mbody, "{\"isIncomplete\":false,\"items\":[");
@@ -2231,6 +2759,8 @@ static void lspCompletion(LspCtx *ctx, Json *id, Json *params) {
         if (strncmp(lsp_keywords[i], prefix, plen) != 0) continue;
         lspCatCompletion(body, &emitted, lsp_keywords[i], KTM_LSP_KEYWORD, NULL);
     }
+
+    lspAutoImportNames(ctx, body, &emitted, uri, text, line, character, prefix, plen);
 
     aoStrCatPrintf(body, "]}");
     lspRespond(id, body->data);
@@ -4478,7 +5008,7 @@ static void lspSemEmit(LspSemCtx *sc, int line, int bcol, int blen, int type,
 
 static int lspSemIsKeyword(const char *w, size_t n) {
     static const char *extra[] = {
-        "ad", "type", "asm", "volatile", "inline", "class", "public",
+        "scoped", "ad", "type", "asm", "volatile", "inline", "class", "public",
         "noreg", "reg", "elif", "elifdef", "ifdef", "ifndef", "endif",
         "define", "undef", "defined", "include", "link", "typeof", "alignof",
     };
@@ -5062,6 +5592,7 @@ static void lspInitialize(LspCtx *ctx, Json *id, Json *params) {
         "\"referencesProvider\":true,"
         "\"documentHighlightProvider\":true,"
         "\"documentSymbolProvider\":true,"
+        "\"codeActionProvider\":{\"codeActionKinds\":[\"quickfix\"]},"
         "\"foldingRangeProvider\":true,"
         "\"inlayHintProvider\":true,"
         "\"semanticTokensProvider\":{\"legend\":" LSP_SEMANTIC_LEGEND ",\"full\":true},"
@@ -5083,6 +5614,7 @@ int lspRun(CliArgs *args) {
     ctx->std_dir = mprintf("%s/modules/", args->install_dir);
     ctx->docs = mapNew(16, &map_cstring_opaque_type);
     ctx->pending = vecNew(&vec_cstring_owned_type);
+    ctx->stale = vecNew(&vec_cstring_owned_type);
     ctx->cc = lspFreshCctrl(ctx);
     lspInstallCrashHandlers();
     /* The debounce poll()s fd 0; an stdio read-ahead buffer would make
@@ -5101,6 +5633,9 @@ int lspRun(CliArgs *args) {
                 lspFlushPending(ctx);
                 continue;
             }
+        } else if (!vecEmpty(ctx->stale) && !lspInputWait(KTM_LSP_DEBOUNCE_MS)) {
+            lspFlushStale(ctx);
+            continue;
         }
         size_t len = 0;
         char *raw = lspReadMessage(&len);
@@ -5159,6 +5694,8 @@ int lspRun(CliArgs *args) {
             lspServe(ctx, id, params, lspFoldingRange, 0);
         } else if (strcmp(method, "textDocument/inlayHint") == 0) {
             lspServe(ctx, id, params, lspInlayHint, 0);
+        } else if (strcmp(method, "textDocument/codeAction") == 0) {
+            lspServe(ctx, id, params, lspCodeAction, 0);
         } else if (strcmp(method, "textDocument/documentSymbol") == 0) {
             lspServe(ctx, id, params, lspDocumentSymbol, 0);
         } else if (strcmp(method, "workspace/symbol") == 0) {

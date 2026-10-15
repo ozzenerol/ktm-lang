@@ -32,8 +32,8 @@ i32 main()
 {
     printf("Test - a String is a u8 *: ");
 
-    ad String s = str.from("hello");
-    ad String empty = str.new();
+    scoped String s = str.from("hello");
+    scoped String empty = str.new();
 
     check(lenOf(s) == 5, "an argument");
     check(lenOf(empty) == 0, "an empty String is \"\"");

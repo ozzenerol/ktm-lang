@@ -15,7 +15,7 @@ The standard library is a set of modules. `import` makes one available by its na
 import str;
 
 i32 main() {
-    ad String s = str.from("modules");
+    scoped String s = str.from("modules");
     s.append(" and packages");
     printf("%.*s\n", s.len, s.ptr);
     return 0;
@@ -53,7 +53,7 @@ are `http.get`, `http.Request`.
 import s = str;
 
 i32 main() {
-    ad String greeting = s.from("aliased");
+    scoped String greeting = s.from("aliased");
     printf("%.*s\n", greeting.len, greeting.ptr);
     return 0;
 }
@@ -307,7 +307,7 @@ i64 count(u8[] str) {
 }
 
 i32 main() {
-    ad String s = str.from("module again");
+    scoped String s = str.from("module again");
     printf("%d %.*s\n", count("four"), s.len, s.ptr);
     return 0;
 }

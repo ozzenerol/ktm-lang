@@ -98,8 +98,8 @@ i32 main() {
 
     /* Single thread, two trees interleaved: deleting from one doesn't
      * disturb the other */
-    ad map.Tree<i64, i64> a = map.treeNew<i64, i64>();
-    ad map.Tree<i64, i64> b = map.treeNew<i64, i64>();
+    scoped map.Tree<i64, i64> a = map.treeNew<i64, i64>();
+    scoped map.Tree<i64, i64> b = map.treeNew<i64, i64>();
     for (k = 1; k <= 200; k++) {
         a.set(k, k);
         b.set(k * 3, k);
@@ -110,7 +110,7 @@ i32 main() {
     }
     if (valid(&a) && valid(&b) && a.len == 134 && b.len == 134) { correct++; }
     /* A new tree made while others hold nodes is empty and independent */
-    ad map.Tree<i64, i64> c = map.treeNew<i64, i64>();
+    scoped map.Tree<i64, i64> c = map.treeNew<i64, i64>();
     c.set(1, 1);
     c.delete(1);
     if (c.len == 0 && valid(&c) && valid(&a) && valid(&b) && a.nil != b.nil && b.nil != c.nil) {
@@ -118,7 +118,7 @@ i32 main() {
     }
 
     /* the walk is in order */
-    ad map.Tree<i64, i64> t = map.treeNew<i64, i64>();
+    scoped map.Tree<i64, i64> t = map.treeNew<i64, i64>();
     for (k = 1; k <= 50; k++) { t.set((k * 37) % 101, 0); }
     i64 prev = -1;
     n = 0; ok = true;

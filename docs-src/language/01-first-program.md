@@ -321,7 +321,7 @@ negative: -1
 ```
 
 `os.exit` ends the program at once: the `defer` statements of the functions still running don't
-run. Returning from `main` runs them. See [defer and ad](16-defer-and-ad.html).
+run. Returning from `main` runs them. See [defer and scoped](16-defer-and-scoped.html).
 
 ## Scripts
 

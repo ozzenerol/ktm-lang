@@ -3,6 +3,54 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.24.0 <small>(2026-10-15)</small></h2>
+<p>Threads without C, a clearer name for <code>ad</code>, and an LSP that imports for you.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>ad</code> is spelled <code>scoped</code>: <code>scoped String s = str.from("x");</code> frees
+  <code>s</code> at the end of its block, as <code>ad</code> did. <code>ad</code> still works, with a warning
+  at it that says to write <code>scoped</code> (none for the files of a package in the module cache); it will
+  be removed in a later minor. See <a href="language/16-defer-and-scoped.html">defer and scoped</a>.</li>
+  <li><code>thread.Pool</code>'s field <code>run</code> is now <code>running</code> (the name is the new
+  <code>run()</code> method). <code>poolNew</code>, <code>poolEnqueue</code>, <code>poolWait</code>,
+  <code>poolStop</code> and <code>poolRelease</code> work as before, for one more minor.</li>
+</ul>
+
+<h3>The thread module</h3>
+<ul>
+  <li><code>thread.spawn(&amp;f, &amp;arg)</code> runs <code>f(T *)</code> on a new thread, typed, with no
+  casts; <code>join()</code> waits and throws what the thread threw, with its code, message, file and
+  line. A spawned thread has ktm's runtime: crash reports, <code>try</code>, <code>threadlocal</code>.</li>
+  <li><code>thread.Mutex</code> (with <code>guard()</code> for <code>scoped</code>), <code>Cond</code>,
+  <code>RwLock</code> and <code>Once</code>: ready as declared, no setup, nothing to free.</li>
+  <li><code>thread.go(&amp;f, &amp;arg, &amp;wg)</code> with a <code>thread.WaitGroup</code>,
+  <code>thread.each(items, &amp;f)</code> over a slice on every core, <code>thread.Channel&lt;T&gt;</code>
+  (buffered or not) and a typed <code>thread.pool(n)</code> with <code>run()</code> and
+  <code>wait()</code>; each wait throws the first error its threads threw.</li>
+  <li>The <a href="language/27-threads-and-threadlocal.html">threads chapter</a> teaches the module,
+  with C's threads last.</li>
+</ul>
+
+<h3>LSP</h3>
+<ul>
+  <li>Completion offers names from modules a file doesn't import yet (the library, the project's own
+  modules and its <code>ktm.mod</code> packages) and adds the <code>import</code> when one is picked;
+  quick fixes add a missing import for an unknown name.</li>
+  <li>A correct file no longer shows errors: files of a package repository (a <code>ktm.mod</code> with
+  <code>module pg;</code> in a directory named otherwise) were read as stray programs, open files kept
+  errors after the file they import was fixed, and an imported file's warnings showed up in every
+  importer.</li>
+  <li>An error in a <code>return</code> no longer also warns that the function may not return a
+  value.</li>
+</ul>
+
+<h3>Fixes</h3>
+<ul>
+  <li>macOS: a caught <code>throw</code> left the thread's signal mask garbled, so a thread started or a
+  program run afterwards blocked SIGSEGV, and a crash in it spun forever instead of being reported.</li>
+</ul>
+
 <h2>v0.23.2 <small>(2026-10-15)</small></h2>
 <p>Fixes, most of them to the compiler. Two make programs that were wrong fail loudly: a printf-style format whose
 values don't match it no longer compiles, and an integer division by zero on arm64 crashes as it does on x86_64.</p>

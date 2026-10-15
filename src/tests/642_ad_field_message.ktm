@@ -3,7 +3,9 @@ import cstr, fs, libc, mem, proc, test;
 /* `ad` on a struct field said "Unexpected type ad while parsing class R".
  * It now says ad goes on a local variable, and every struct/union body
  * error names a struct or a union, not a class (v0.13.3). A field that is
- * itself named ad still compiles. */
+ * itself named ad still compiles.
+ * v0.24.0: the keyword is spelled `scoped` (`ad` still works, with a
+ * warning: test 895). */
 
 #define AD_FILE "__642_ad_field.ktm"
 #define AD_OUT  "__642_ad_field.out"
@@ -38,16 +40,16 @@ bool compiles(u8 *source, i64 status, u8 *msg) {
 }
 
 i32 main() {
-    printf("Test - ad field message: ");
-    check(compiles("struct R { u8 major; ad String name; };\ni32 main() { return 0; }\n", 1,
-                   "`ad` goes on a local variable, not a struct field: free the field where the struct is freed"),
-          "ad on a struct field");
-    check(compiles("struct R { u8 major; ad String name; };\ni32 main() { return 0; }\n", 1,
+    printf("Test - scoped field message: ");
+    check(compiles("struct R { u8 major; scoped String name; };\ni32 main() { return 0; }\n", 1,
+                   "`scoped` goes on a local variable, not a struct field: free the field where the struct is freed"),
+          "scoped on a struct field");
+    check(compiles("struct R { u8 major; scoped String name; };\ni32 main() { return 0; }\n", 1,
                    "1:22"),
-          "the error points at ad");
-    check(compiles("union U { i64 a; ad String s; };\ni32 main() { return 0; }\n", 1,
-                   "`ad` goes on a local variable, not a union field"),
-          "ad on a union field");
+          "the error points at scoped");
+    check(compiles("union U { i64 a; scoped String s; };\ni32 main() { return 0; }\n", 1,
+                   "`scoped` goes on a local variable, not a union field"),
+          "scoped on a union field");
     check(compiles("struct R { i64 x; Nope y; };\ni32 main() { return 0; }\n", 1,
                    "Unexpected type `Nope` while parsing struct R"),
           "struct body errors say struct");

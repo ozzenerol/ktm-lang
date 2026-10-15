@@ -1285,6 +1285,7 @@ static int cctrlDiagInDependency(Cctrl *cc, CctrlDiagnostic *d) {
 }
 
 void cctrlDiagPush(Cctrl *cc, CctrlDiagnostic *d) {
+    if (cc && d && d->severity == CCTRL_ERROR) cc->errors_raised++;
     if (cctrlDiagInDependency(cc, d)) {
         if (d->message) aoStrRelease(d->message);
         if (d->suggestion) aoStrRelease(d->suggestion);

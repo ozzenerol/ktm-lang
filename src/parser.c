@@ -13,10 +13,34 @@
 #include "lexer.h"
 #include "list.h"
 #include "parser.h"
+#include "pkg.h"
 #include "prslib.h"
 #include "prsasm.h"
 #include "prsutil.h"
 #include "util.h"
+
+/* `scoped` in front of a declaration (or `ad`, its old spelling): 1 for
+ * `scoped`, 2 for `ad`, 0 for any other token */
+static int parseScopedWord(Lexeme *tok) {
+    if (!tok || tok->tk_type != TK_IDENT) return 0;
+    if (tok->len == 6 && !memcmp(tok->start, "scoped", 6)) return 1;
+    if (tok->len == 2 && !memcmp(tok->start, "ad", 2)) return 2;
+    return 0;
+}
+
+/* `ad` still works, with a warning: not in a package's own files (the
+ * module cache), which their authors update */
+static void parseWarnAd(Cctrl *cc, Lexeme *tok) {
+    LexFile *f = cctrlCurFile(cc);
+    char *cache = pkgCacheDir();
+    size_t n = strlen(cache);
+    int in_cache = f && f->filename && !strncmp(f->filename->data, cache, n) &&
+                   (f->filename->data[n] == '/' || f->filename->data[n] == '\0');
+    if (!in_cache) {
+        cctrlWarningAt(cc, tok->line, tok->col, tok->len,
+                "`ad` is now `scoped`: write `scoped` in front of the declaration");
+    }
+}
 
 #define MAX_ALIGN         16
 
@@ -841,16 +865,15 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
                         "Unexpected end of input in class/union body");
             }
         }
-        /* `ad T name;`: autodefer frees a local at the end of its scope; a
-         * field has no scope of its own to end */
-        if (tok_name->tk_type == TK_IDENT && tok_name->len == 2 &&
-            !memcmp(tok_name->start, "ad", 2))
-        {
+        /* `scoped T name;` frees a local at the end of its scope; a field
+         * has no scope of its own to end */
+        if (parseScopedWord(tok_name)) {
             Lexeme *next = cctrlTokenPeekBy(cc, 1);
             if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
                 cctrlRaiseExceptionAt(cc, tok_name->line, tok_name->col, tok_name->len,
-                        "`ad` goes on a local variable, not a %s field: free "
-                        "the field where the %s is freed", kind_str, kind_str);
+                        "`%.*s` goes on a local variable, not a %s field: free "
+                        "the field where the %s is freed", tok_name->len, tok_name->start,
+                        kind_str, kind_str);
             }
         }
         if (tokenPunctIs(tok_name,'}')) {
@@ -3765,8 +3788,8 @@ Ast *parseReturnStatement(Cctrl *cc) {
     AstType *check;
     if (retval && retval->kind == AST_LVAR && (retval->flags & AST_FLAG_AUTODEFER)) {
         cctrlRaiseExceptionAt(cc, ret_tok.line, ret_tok.col, ret_tok.len,
-            "`%s` is declared with `ad`, so it is freed when this function returns: "
-            "declare it without `ad` to return it", retval->lname->data);
+            "`%s` is declared `scoped`, so it is freed when this function returns: "
+            "declare it without `scoped` to return it", retval->lname->data);
     }
     cctrlTokenExpect(cc,';');
     cctrlTokenRewind(cc);
@@ -4735,12 +4758,16 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
             continue;
         }
 
-        /* `ad T name = ...;` (autodefer): `defer name.free();` follows */
-        Lexeme *ad_tok = NULL;
-        if (tok->tk_type == TK_IDENT && tok->len == 2 && !memcmp(tok->start, "ad", 2)) {
+        /* `scoped T name = ...;`: `defer name.free();` follows */
+        Lexeme *scoped_tok = NULL;
+        int scoped_word = parseScopedWord(tok);
+        if (scoped_word) {
             Lexeme *next = cctrlTokenPeekBy(cc, 1);
             if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
-                ad_tok = cctrlTokenGet(cc);
+                scoped_tok = cctrlTokenGet(cc);
+                if (scoped_word == 2) {
+                    parseWarnAd(cc, scoped_tok);
+                }
                 tok = cctrlTokenPeek(cc);
             } else if (next && next->tk_type == TK_IDENT) {
                 /* `ad Name x` / `ad mod.Name x`: a declaration whose type
@@ -4838,20 +4865,20 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
                 if (stmt) {
                     listAppend(body->stms,stmt);
                 }
-                if (ad_tok) {
+                if (scoped_tok) {
                     /* Without a value the variable starts zeroed (every
                      * local does, each time its declaration runs): an
                      * empty struct or slice, which its free() takes, or a
                      * null pointer, freed only once it holds something */
                     int no_value = !stmt || stmt->kind != AST_DECL || !stmt->declinit;
                     var->flags |= AST_FLAG_AUTODEFER;
-                    Ast *free_call = parseAutoDeferFree(cc, var, ad_tok);
+                    Ast *free_call = parseAutoDeferFree(cc, var, scoped_tok);
                     if (no_value && var->type->kind == AST_TYPE_POINTER) {
                         free_call = astIf(var, free_call, NULL);
                     }
                     Ast *deferred = astDefer(free_call);
-                    deferred->line = ad_tok->line;
-                    deferred->col = ad_tok->col;
+                    deferred->line = scoped_tok->line;
+                    deferred->col = scoped_tok->col;
                     listAppend(body->stms, deferred);
                 }
                 cctrlTokenRewind(cc);
@@ -5322,6 +5349,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     s64 fn_line = next ? next->line : cc->lineno;
     s64 fn_col  = next ? next->col  : 0;
     s64 fn_len  = next ? next->len  : 1;
+    int errors_before = cc->errors_raised;
     if (next == NULL) {
         cctrlRaiseException(cc,
                 "Unexpected end of input in function definition");
@@ -5627,10 +5655,13 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     /* Warn when a value-returning function can run off its end without
      * a `return` - control would then return whatever happens to be in
      * the return register. `inline` functions return through `retval`
-     * and `asm { }` bodies are opaque, so neither is checked. */
+     * and `asm { }` bodies are opaque, so neither is checked. A body
+     * with an error may have lost its `return` to the error (`return
+     * undefined(1);`): the error is the whole story. */
     AstType *rt = func->type ? func->type->rettype : NULL;
     if (rt && rt->kind != AST_TYPE_VOID && !(func->flags & AST_FLAG_INLINE) &&
-        !has_asm && astStmtFallsThrough(func_body))
+        !has_asm && cc->errors_raised == errors_before &&
+        astStmtFallsThrough(func_body))
     {
         cctrlWarningAt(cc, name_line, name_col, len,
             "control may reach the end of non-void function '%s' "

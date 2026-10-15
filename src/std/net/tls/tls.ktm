@@ -81,7 +81,7 @@ extern "c" void ktm_tls_free(void *c);
 /* ---- contexts ---- */
 
 static void fail(void *ctx, u8 *what) {
-    ad String m = str.from(cstr.view(ktm_tls_ctx_error(ctx)));
+    scoped String m = str.from(cstr.view(ktm_tls_ctx_error(ctx)));
     ktm_tls_ctx_free(ctx);
     if (m.len) { throw(ERR_TLS, "%s", m); }
     throw(ERR_TLS, "%s", what);
@@ -98,7 +98,7 @@ static Context *make(Config *cfg, bool server) {
     void *ctx = ktm_tls_ctx_new(server ? 1 : 0, verify, err, ERRLEN);
     if (!ctx) { throw(ERR_TLS, "%s", err); }
     if (cfg.caFile.len) {
-        ad String path = str.from(cfg.caFile);
+        scoped String path = str.from(cfg.caFile);
         if (ktm_tls_ctx_ca_file(ctx, path.cstr()) != 0) { fail(ctx, "tls: reading the CAs"); }
     } else if (cfg.caPem.len) {
         if (ktm_tls_ctx_ca_pem(ctx, cfg.caPem.ptr, cfg.caPem.len) != 0) { fail(ctx, "tls: reading the CAs"); }
@@ -130,7 +130,7 @@ static Context *make(Config *cfg, bool server) {
             ktm_tls_ctx_free(ctx);
             throw(ERR_TLS, "tls: a certificate needs its key, and a key its certificate");
         }
-        ad String pass = str.from(cfg.keyPassword);
+        scoped String pass = str.from(cfg.keyPassword);
         if (ktm_tls_ctx_cert(ctx, cert.ptr, cert.len, key.ptr, key.len,
                              cfg.keyPassword.len ? pass.cstr() : null) != 0) {
             fail(ctx, "tls: reading the certificate");
@@ -140,7 +140,7 @@ static Context *make(Config *cfg, bool server) {
         throw(ERR_TLS, "tls: a server needs a certificate and its key (certFile and keyFile)");
     }
     if (cfg.alpn.len) {
-        ad String list = str.from(cfg.alpn);
+        scoped String list = str.from(cfg.alpn);
         if (ktm_tls_ctx_alpn(ctx, list.cstr()) != 0) { fail(ctx, "tls: ALPN"); }
     }
     Context *c = mem.allocZero(sizeof(Context));
@@ -203,7 +203,7 @@ static i64 deadlineOf(i64 ms) {
 static Conn *start(Context *ctx, i32 fd, u8[] host) {
     u8 err[256];
     err[0] = 0;
-    ad String h = str.from(host);
+    scoped String h = str.from(host);
     void *n = ktm_tls_new(ctx.native, fd, host.len ? h.cstr() : null, err, ERRLEN);
     if (!n) { throw(ERR_TLS, "%s", err); }
     Conn *c = mem.allocZero(sizeof(Conn));
@@ -217,7 +217,7 @@ static Conn *start(Context *ctx, i32 fd, u8[] host) {
         if (r == WANT_READ) { ok = waitFd(fd, libc.POLLIN, deadline); }
         else if (r == WANT_WRITE) { ok = waitFd(fd, libc.POLLOUT, deadline); }
         if (!ok) {
-            ad String msg = r == WANT_READ || r == WANT_WRITE
+            scoped String msg = r == WANT_READ || r == WANT_WRITE
                           ? str.format("tls: the handshake took longer than %d ms", ctx.handshakeMs)
                           : str.from(cstr.view(ktm_tls_error(n)));
             ktm_tls_free(n);

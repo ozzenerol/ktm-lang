@@ -72,7 +72,7 @@ list.Node<i64> *nodeAt(list.List<i64> *l, i64 idx) {
 }
 
 bool modelRun(i64 ops) {
-    ad list.List<i64> l = list.new<i64>();
+    scoped list.List<i64> l = list.new<i64>();
     i64 model[MODEL_MAX];
     i64 n = 0, nextVal = 1;
     for (i64 op = 0; op < ops; ++op) {
@@ -119,7 +119,7 @@ i32 main() {
     printf("Test - list.List<T>: ");
 
     /* FIFO with append + shift, LIFO with append + pop */
-    ad list.List<i64> q = list.new<i64>();
+    scoped list.List<i64> q = list.new<i64>();
     bool ok;
     check(q.shift(&ok) == 0 && !ok && q.pop(&ok) == 0 && !ok && q.len == 0, "empty: zero value, ok false");
     q.append(1);
@@ -162,7 +162,7 @@ i32 main() {
     check(modelRun(20000), "20000 random appends, prepends, inserts, removes and clears");
 
     /* struct values, walking with a for loop */
-    ad list.List<Job> jobs = list.new<Job>();
+    scoped list.List<Job> jobs = list.new<Job>();
     Job a = {1, "build"}, b = {2, "test"};
     jobs.append(a);
     jobs.prepend(b);
@@ -174,7 +174,7 @@ i32 main() {
     check(first.id == 2 && jobs.len == 1, "shift a struct");
 
     /* pointers as values: the list frees its nodes, not what they point to */
-    ad list.List<i64 *> ptrs = list.new<i64 *>();
+    scoped list.List<i64 *> ptrs = list.new<i64 *>();
     i64 *p = mem.alloc(sizeof(i64));
     *p = 41;
     ptrs.append(p);

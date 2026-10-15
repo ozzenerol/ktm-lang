@@ -31,9 +31,9 @@ struct Point { i64 x, y; };
 i32 main() {
     printf("Test - set.Set<T>: ");
 
-    ad set.Set<i64> a = set.new<i64>();
-    ad set.Set<i64> b = set.new<i64>();
-    ad set.Set<i64> empty = set.new<i64>();
+    scoped set.Set<i64> a = set.new<i64>();
+    scoped set.Set<i64> b = set.new<i64>();
+    scoped set.Set<i64> empty = set.new<i64>();
     check(a.add(5) && a.add(-3) && a.add(9) && !a.add(5) && a.len == 3, "add says whether it was new");
     a.add(I64_MIN);
     a.add(0);
@@ -44,24 +44,24 @@ i32 main() {
     check(a.has(I64_MIN) && a.has(0) && !a.has(1) && a.len == 5, "has, the i64 extremes");
     check(sortedIs(&a, "-9223372036854775808,-3,0,5,9"), "items, sorted");
 
-    ad set.Set<i64> u = a.unionWith(&b);
-    ad set.Set<i64> d = a.diff(&b);
-    ad set.Set<i64> d2 = b.diff(&a);
-    ad set.Set<i64> sd = a.symDiff(&b);
-    ad set.Set<i64> in = a.intersection(&b);
+    scoped set.Set<i64> u = a.unionWith(&b);
+    scoped set.Set<i64> d = a.diff(&b);
+    scoped set.Set<i64> d2 = b.diff(&a);
+    scoped set.Set<i64> sd = a.symDiff(&b);
+    scoped set.Set<i64> in = a.intersection(&b);
     check(sortedIs(&u, "-9223372036854775808,-3,0,1,5,9,9223372036854775807"), "union");
     check(sortedIs(&d, "-9223372036854775808,0,5"), "a - b");
     check(sortedIs(&d2, "1,9223372036854775807"), "b - a");
     check(sortedIs(&sd, "-9223372036854775808,0,1,5,9223372036854775807"), "symmetric difference");
     check(sortedIs(&in, "-3,9"), "intersection");
-    ad set.Set<i64> ue = a.unionWith(&empty);
-    ad set.Set<i64> ie = a.intersection(&empty);
+    scoped set.Set<i64> ue = a.unionWith(&empty);
+    scoped set.Set<i64> ie = a.intersection(&empty);
     check(ue.equals(&a) && ie.len == 0 && in.isSubset(&a) && in.isSubset(&b) && !a.isSubset(&b) &&
           empty.isSubset(&a), "with the empty set, subsets, equality");
     check(a.delete(5) && !a.delete(5) && a.len == 4 && !a.has(5), "delete says whether it was there");
 
     /* walks in insertion order */
-    ad set.Set<i64> order = set.new<i64>();
+    scoped set.Set<i64> order = set.new<i64>();
     order.add(30);
     order.add(10);
     order.add(20);
@@ -74,7 +74,7 @@ i32 main() {
     walk.free();
 
     /* u8[] values are copied: the buffer can change after add */
-    ad set.Set<u8[]> words = set.new<u8[]>();
+    scoped set.Set<u8[]> words = set.new<u8[]>();
     u8 buf[8];
     mem.copy(buf, "pear", 5);
     words.add(buf[0:4]);
@@ -85,7 +85,7 @@ i32 main() {
     check(words.delete("pear") && words.len == 1, "delete a u8[] value");
 
     /* struct values: the byte-wise fallback */
-    ad set.Set<Point> pts = set.new<Point>();
+    scoped set.Set<Point> pts = set.new<Point>();
     Point p1 = {1, 2}, p2 = {1, 2}, p3 = {2, 1};
     pts.add(p1);
     check(pts.has(p2) && !pts.add(p2) && pts.add(p3) && pts.len == 2, "struct values");
@@ -93,7 +93,7 @@ i32 main() {
     /* many values against an array */
     const i64 N = 3000;
     bool *ref = mem.allocZero(N);
-    ad set.Set<i64> big = set.new<i64>();
+    scoped set.Set<i64> big = set.new<i64>();
     u64 seed = 99;
     i64 n = 0;
     bool ok = true;

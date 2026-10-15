@@ -14,12 +14,12 @@ void check(bool ok, u8 *what) {
 
 String gDir;
 String file(u8 *name) {
-    ad String path = str.format("%s/crypto-files/%s", gDir, name);
+    scoped String path = str.format("%s/crypto-files/%s", gDir, name);
     return fs.readAll(path[0:]);
 }
 
 String bytes(u8 *name) {
-    ad String text = file(name);
+    scoped String text = file(name);
     String out;
     hex.decode(str.trimEnd(text[0:]), &out);
     return out;
@@ -29,16 +29,16 @@ i32 main() {
     printf("Test - crypto RSA-PSS: ");
     gDir = proc.getenv("KTM_TEST_SRC");
     if (!gDir.len) { gDir.free(); gDir = str.from("."); }
-    ad String keyPem = file("rsa-key.pem");
-    ad String pubPem = file("rsa-pub.pem");
-    ad String msg = file("msg.txt");
+    scoped String keyPem = file("rsa-key.pem");
+    scoped String pubPem = file("rsa-pub.pem");
+    scoped String msg = file("msg.txt");
     crypto.Key *k = crypto.privateKey(keyPem[0:]);
     crypto.Key *p = crypto.publicKey(pubPem[0:]);
 
-    ad String s256 = bytes("rsa-pss-sha256.hex");
-    ad String s384 = bytes("rsa-pss-sha384.hex");
-    ad String s512 = bytes("rsa-pss-sha512.hex");
-    ad String maxSalt = bytes("rsa-pss-sha256-maxsalt.hex");
+    scoped String s256 = bytes("rsa-pss-sha256.hex");
+    scoped String s384 = bytes("rsa-pss-sha384.hex");
+    scoped String s512 = bytes("rsa-pss-sha512.hex");
+    scoped String maxSalt = bytes("rsa-pss-sha256-maxsalt.hex");
     check(p.verifyPss(crypto.Hash.sha256, msg[0:], s256[0:]), "openssl's PSS SHA-256 verifies");
     check(p.verifyPss(crypto.Hash.sha384, msg[0:], s384[0:]), "openssl's PSS SHA-384 verifies");
     check(p.verifyPss(crypto.Hash.sha512, msg[0:], s512[0:]), "openssl's PSS SHA-512 verifies");
@@ -48,16 +48,16 @@ i32 main() {
     check(!p.verify(msg[0:], s256[0:]), "a PSS signature isn't a PKCS#1 v1.5 one");
 
     /* PKCS#1 v1.5 before and after PSS signing: the same bytes */
-    ad String v15a = k.sign(msg[0:]);
-    ad String mine = k.signPss(crypto.Hash.sha256, msg[0:]);
-    ad String mine2 = k.signPss(crypto.Hash.sha256, msg[0:]);
-    ad String v15b = k.sign(msg[0:]);
+    scoped String v15a = k.sign(msg[0:]);
+    scoped String mine = k.signPss(crypto.Hash.sha256, msg[0:]);
+    scoped String mine2 = k.signPss(crypto.Hash.sha256, msg[0:]);
+    scoped String v15b = k.sign(msg[0:]);
     check(mine.len == 256 && p.verifyPss(crypto.Hash.sha256, msg[0:], mine[0:]), "ours verifies");
     check(!str.equals(mine[0:], mine2[0:]) && p.verifyPss(crypto.Hash.sha256, msg[0:], mine2[0:]),
           "PSS is randomised: two signatures differ, both verify");
     check(str.equals(v15a[0:], v15b[0:]) && p.verify(msg[0:], v15b[0:]), "PKCS#1 v1.5 is unchanged by PSS signing");
     check(!p.verifyPss(crypto.Hash.sha256, msg[0:], v15a[0:]), "a PKCS#1 v1.5 signature isn't a PSS one");
-    ad String m512 = k.signPss(crypto.Hash.sha512, "data");
+    scoped String m512 = k.signPss(crypto.Hash.sha512, "data");
     check(p.verifyPss(crypto.Hash.sha512, "data", m512[0:]), "SHA-512");
     mine.ptr[100] ^= 1;
     check(!p.verifyPss(crypto.Hash.sha256, msg[0:], mine[0:]), "a changed signature fails");
