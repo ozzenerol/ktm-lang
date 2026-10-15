@@ -4,6 +4,7 @@
 signed in or not. That needs a route with two audiences, and permission checks that don't leak what exists.</p>
 
 <h2>The migration</h2>
+<p><code>migrations/005_collections.up.sql</code>:</p>
 <pre><code>CREATE TABLE collections (
     id         uuid PRIMARY KEY,
     user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -17,6 +18,9 @@ CREATE TABLE collection_items (
     bookmark_id   uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
     PRIMARY KEY (collection_id, bookmark_id)
 );</code></pre>
+<p><code>migrations/005_collections.down.sql</code> undoes it, newest first:</p>
+<pre><code>DROP TABLE collection_items;
+DROP TABLE collections;</code></pre>
 
 <h2>Routes for owners, a route for everyone</h2>
 <pre><code>    http.Mux *collections = mux.group("/collections");

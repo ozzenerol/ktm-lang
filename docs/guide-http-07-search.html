@@ -59,6 +59,7 @@
 comes a page at a time. All three are SQL; the handlers stay small.</p>
 
 <h2 id="the-migration">The migration<a class="anchor" href="#the-migration" aria-label="Link to this section">#</a></h2>
+<p><code>migrations/003_tags_and_search.up.sql</code>:</p>
 <pre><code>CREATE TABLE tags (
     bookmark_id uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
     tag         text NOT NULL,
@@ -69,6 +70,10 @@ CREATE INDEX tags_tag ON tags (tag);
 ALTER TABLE bookmarks ADD search tsvector
     GENERATED ALWAYS AS (to_tsvector('simple', title || ' ' || notes || ' ' || url)) STORED;
 CREATE INDEX bookmarks_search ON bookmarks USING gin (search);</code></pre>
+<p><code>migrations/003_tags_and_search.down.sql</code> undoes it, newest first:</p>
+<pre><code>DROP INDEX bookmarks_search;
+ALTER TABLE bookmarks DROP search;
+DROP TABLE tags;</code></pre>
 <ul class="rules">
   <li>Tags are a table of their own, one row per bookmark and tag, deleted with their bookmark (<code>ON DELETE
   CASCADE</code>).</li>

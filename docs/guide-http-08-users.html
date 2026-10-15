@@ -59,6 +59,7 @@
 token, and send it with every request. Each bookmark has an owner, and nobody sees anybody else's.</p>
 
 <h2 id="the-migration">The migration<a class="anchor" href="#the-migration" aria-label="Link to this section">#</a></h2>
+<p><code>migrations/004_users_and_sessions.up.sql</code>:</p>
 <pre><code>CREATE TABLE users (
     id            uuid PRIMARY KEY,
     email         text NOT NULL UNIQUE,
@@ -77,6 +78,12 @@ DELETE FROM bookmarks;
 ALTER TABLE bookmarks ADD user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE;
 ALTER TABLE bookmarks DROP CONSTRAINT bookmarks_url_key;
 CREATE UNIQUE INDEX bookmarks_user_url ON bookmarks (user_id, url);</code></pre>
+<p><code>migrations/004_users_and_sessions.down.sql</code> undoes it, newest first:</p>
+<pre><code>DROP INDEX bookmarks_user_url;
+ALTER TABLE bookmarks DROP user_id;
+ALTER TABLE bookmarks ADD CONSTRAINT bookmarks_url_key UNIQUE (url);
+DROP TABLE sessions;
+DROP TABLE users;</code></pre>
 <ul class="rules">
   <li>Passwords are stored as <b>hashes</b>, never as text: Argon2id, slow on purpose, so a stolen table is expensive to
   guess from.</li>
