@@ -42,7 +42,7 @@
     ]},
     {"title": "Concurrency", "modules": [
       {"name": "coro", "title": "Coroutines", "summary": "Functions that pause and resume on their own stacks, and the event loop they wait on."},
-      {"name": "thread", "title": "Threads", "summary": "pthreads helpers."},
+      {"name": "thread", "title": "Threads", "summary": "Threads without C: spawn and join (errors come back), Mutex, Cond, RwLock, Once, and a pool."},
       {"name": "atomic", "title": "Atomics", "summary": "Atomic operations on integers and pointers shared between threads."}
     ]},
     {"title": "Network", "modules": [
