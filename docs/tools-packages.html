@@ -160,6 +160,11 @@ but no package the project imports needs it: it isn't downloaded or built</code>
   <tr><td><code>ktm mod verify</code></td><td>Checks the cached files against <code>ktm.sum</code></td></tr>
   <tr><td><code>ktm mod fmt</code></td><td>Checks <code>ktm.mod</code> and rewrites it in the standard layout</td></tr>
 </table></div>
+<ul class="rules">
+  <li><code>ktm build</code>, <code>ktm run</code> and <code>ktm test</code> take the compiler's options, before or after the command:
+  <code>ktm --install-dir=$HOME/ktm build</code> and <code>ktm build --install-dir=$HOME/ktm</code> are the same.</li>
+  <li><code>ktm mod</code> and <code>ktm get</code> take none, but let <code>--install-dir</code> through, so a script or alias that always passes it works with every command.</li>
+</ul>
 
 <h2 id="publishing-a-package">Publishing a package<a class="anchor" href="#publishing-a-package" aria-label="Link to this section">#</a></h2>
 <ol>

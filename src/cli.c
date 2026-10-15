@@ -402,6 +402,14 @@ void getASMFileName(CliArgs *args, enum CliFileType file_type, char *filename, u
     args->obj_outfile =  mprintf("%s.o", args->infile_no_ext);
 }
 
+/* Does option `arg` take the next word as its value (`-o name`,
+ * `--install-dir dir`, not `--install-dir=dir`)? */
+int cliOptionTakesValue(char *arg) {
+    u64 len = strlen(arg);
+    CliParser *parser = cliParserFind(arg, len);
+    return parser && parser->arg_count > 0 && len == parser->optlen;
+}
+
 int cliParseArgs(CliArgs *args, int argc, char **argv) {
     /* move past the program name */
     argc--;

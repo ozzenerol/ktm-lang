@@ -132,6 +132,7 @@ typedef struct CliArgs {
 
 void cliArgsInit(CliArgs *args);
 int cliParseArgs(struct CliArgs *cli_args, int argc, char **argv);
+int cliOptionTakesValue(char *arg);
 __noreturn void cliPanicGeneric(const char *const_msg, const char *fmt, va_list ap);
 
 AoStr *cliConcatArgv(CliArgs *args);
