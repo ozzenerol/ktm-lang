@@ -3871,16 +3871,19 @@ Ast *parseTryStatement(Cctrl *cc) {
     return astTry(try_body, catch_body);
 }
 
-/* The file a throw is in, as a string literal: the path it was compiled
- * from, as diagnostics show it. */
+/* The file a throw is in, as a string literal: the file of the token
+ * just read (a package's function is parsed from its saved tokens while
+ * the lexer is in the importing file), as a crash report shows it. */
 Ast *parseThrowFile(Cctrl *cc) {
-    char *path = "";
-    if (cc->lexer_ && cc->lexer_->cur_file && cc->lexer_->cur_file->filename) {
-        path = cc->lexer_->cur_file->filename->data;
+    const char *path = "";
+    LexFile *f = cc->tok_file;
+    if (!f && cc->lexer_) f = cc->lexer_->cur_file;
+    if (f && f->filename) {
+        path = asmLinesPath(cc, f->filename->data);
     }
     AoStr *esc = aoStrNew();
     s64 real_len = 1;
-    for (char *p = path; *p; ++p, ++real_len) {
+    for (const char *p = path; *p; ++p, ++real_len) {
         if (*p == '\\' || *p == '"') aoStrPutChar(esc, '\\');
         aoStrPutChar(esc, *p);
     }
