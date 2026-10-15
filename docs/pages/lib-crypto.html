@@ -2,7 +2,7 @@
 <!-- ref: crypto -->
 <h1>Cryptography</h1>
 <p class="lede"><code>crypto</code> has what applications need, built on mbedTLS's vetted code (inside ktm, as for
-<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption and ECDSA
+<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption, and ECDSA and RSA
 signatures. Only programs that import it carry it.</p>
 
 <h2>Random bytes</h2>
@@ -45,10 +45,24 @@ crypto.Key *k = crypto.generateKey();             // ECDSA P-256
 String sig = k.sign("payload");                   // 64 bytes r||s (JWT's ES256), deterministic
 bool ok = k.verify("payload", sig);              // also takes a DER signature
 String pem = k.publicPem();                       // to share; privatePem() to keep
-crypto.Key *pub = crypto.publicKey(pem);          // and back (privateKey(pem) for a private one)
+crypto.Key *other = crypto.publicKey(pem);        // and back (privateKey(pem) for a private one)
 </code></pre>
-<p>Keys are P-256, readable and writable as PEM, so they work with OpenSSL and other languages. (Ed25519 isn't there:
-mbedTLS 3.6 doesn't have it.)</p>
+<p>RSA keys (2048 bits or more) work the same way: <code>crypto.generateRsaKey()</code> makes one, and
+<code>privateKey</code> and <code>publicKey</code> read either kind from PEM. <code>signWith</code> and <code>verifyWith</code>
+pick the digest:</p>
+<pre><code>
+crypto.Key *rk = crypto.privateKey(rsaPem);
+String rs = rk.signWith(crypto.Hash.sha384, "payload");   // PKCS#1 v1.5 (JWT's RS384)
+bool good = rk.verifyWith(crypto.Hash.sha384, "payload", rs);
+if (rk.kind() == crypto.KeyKind.rsa) { printf("%d bits\n", rk.bits()); }
+</code></pre>
+<ul class="rules">
+  <li><code>sign</code> and <code>verify</code> are <code>signWith</code> and <code>verifyWith</code> with <code>crypto.Hash.sha256</code>:
+  ES256 for a P-256 key, RS256 for an RSA one.</li>
+  <li>A P-256 signature is 64 bytes r||s; an RSA one is the key's size (256 bytes for 2048 bits).</li>
+  <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages. Other kinds of key
+  (P-384, RSA under 2048 bits, Ed25519) are refused: mbedTLS 3.6 has no Ed25519.</li>
+</ul>
 
 <h2>Passwords</h2>
 <pre data-run><code>
