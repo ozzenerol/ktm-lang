@@ -683,8 +683,9 @@ void asmEmitInitData(AoStr *buf, Ast *init, AstType *type) {
  * where a source line starts, in code order, and the line | site << 20.
  * A site is an inlined call: the code there is the callee's, and
  * `sites` holds, for site n (from 1; 0 is the function's own code), the
- * callee's name, the line of the call and the site the call itself is
- * in (.long name, call line, outer site). flags bit 0: the function has
+ * callee's name, the line of the call, the site the call itself is in
+ * and the callee's file when it isn't the function's (.long name, call
+ * line, outer site, file or 0). flags bit 0: the function has
  * no frame (a leaf), so its return address is still in lr (arm64) or
  * at [sp] (x86_64). */
 
@@ -700,6 +701,7 @@ static int asm_lines_flags = 0;
 static char *asm_lines_fname = NULL;
 static int asm_lines_name = 0;        /* string label numbers */
 static int asm_lines_file = 0;
+static u32 asm_lines_file_id = 0;     /* the function's file */
 /* Labels the assembler keeps out of the symbol table: `.L` on ELF, `L`
  * on Mach-O (whose `.L` names stay, and would read as functions) */
 static const char *asm_lines_l = ".L";
@@ -865,6 +867,7 @@ void asmLinesBegin(Cctrl *cc, Ast *func, int omit_frame) {
     asm_lines_fname = asmNormaliseFunctionName(cc, func->fname);
     asm_lines_name = asmLinesString(asmLinesName(cc, func->fname));
     asm_lines_file = 0;
+    asm_lines_file_id = func->file_id;
     AoStr *path = func->file_id ? cctrlLookUpFile(cc, func->file_id) : NULL;
     if (path) asm_lines_file = asmLinesString(asmLinesPath(cc, path->data));
     asm_lines_sites = irValueVecNew();
@@ -905,17 +908,26 @@ void asmLinesEnd(AoStr *buf) {
     int nsites = (int)asm_lines_sites->size;
     if (nsites) {
         int *names = malloc(sizeof(int) * nsites);
+        int *files = malloc(sizeof(int) * nsites);
         for (int i = 0; i < nsites; ++i) {
             IrInlineSite *site = asm_lines_sites->entries[i];
             names[i] = asmLinesString(asmLinesName(asm_lines_cc, site->callee->fname));
+            /* a callee from another file: its lines are that file's */
+            u32 fid = site->callee->file_id;
+            AoStr *path = fid && fid != asm_lines_file_id
+                        ? cctrlLookUpFile(asm_lines_cc, fid) : NULL;
+            files[i] = path ? asmLinesString(asmLinesPath(asm_lines_cc, path->data)) : 0;
         }
         aoStrCatPrintf(asm_lines_data, "\t.p2align 2\n%sKTI%d:\n", l, id);
         for (int i = 0; i < nsites; ++i) {
             IrInlineSite *site = asm_lines_sites->entries[i];
-            aoStrCatPrintf(asm_lines_data, "\t.long %sKTS%d - ., %d, %d\n", l, names[i],
+            aoStrCatPrintf(asm_lines_data, "\t.long %sKTS%d - ., %d, %d", l, names[i],
                            site->call_line, asmLinesSiteNum(site->outer));
+            if (files[i]) aoStrCatPrintf(asm_lines_data, ", %sKTS%d - .\n", l, files[i]);
+            else aoStrCatPrintf(asm_lines_data, ", 0\n");
         }
         free(names);
+        free(files);
     }
 
     aoStrCatPrintf(asm_lines_recs,

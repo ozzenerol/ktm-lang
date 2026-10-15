@@ -1804,6 +1804,7 @@ static int jitCompileFunction(KtmJit *jit, Ast *ast, IrCtx *ir_ctx) {
     ctx.ast = ast;
     ctx.omit_frame = omit_frame;
     jit->fn_omit_frame = omit_frame;
+    jit->fn_file_id = ast->file_id;
 
     /* Publish the function entry as a public label. asmNormaliseFunctionName
      * strips/adds underscores per platform; the resolver uses the same name. */

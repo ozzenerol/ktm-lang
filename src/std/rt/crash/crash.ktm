@@ -25,12 +25,13 @@ import libc;
  * where each is stored (crashAt), so they need no relocating. */
 
 /* A call the inliner merged into the function: the callee's name, the
- * line of the call and the site that call is in (0: the function's own
- * code) */
+ * line of the call, the site that call is in (0: the function's own
+ * code) and the callee's file (0: the function's) */
 struct CrashSite {
     i32 name;
     i32 line;
     i32 outer;
+    i32 file;
 };
 
 struct CrashFn {
@@ -239,10 +240,13 @@ static void crashFrame(u64 pc, bool first) {
         first = true;
         crashNextAt = false;
     }
-    /* the calls the inliner merged in, innermost first */
+    /* the calls the inliner merged in, innermost first: a line in a
+     * site is in its callee's file */
     while (site) {
         CrashSite *c = (CrashSite *)crashAt(&f.sites) + (site - 1);
-        crashPlace(first ? "  at " : "  called from ", file, line, crashAt(&c.name));
+        u8 *siteFile = crashAt(&c.file);
+        crashPlace(first ? "  at " : "  called from ", siteFile ? siteFile : file, line,
+                   crashAt(&c.name));
         crashPut(" (inlined)\n");
         first = false;
         line = c.line;

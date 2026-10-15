@@ -129,7 +129,8 @@ void create(http.Writer *w, http.Request *r)
 <ul class="rules">
   <li>Compiled programs and <code>-jit</code> report the same way, in every thread.</li>
   <li>A function the compiler inlined into its caller still shows as a call of its own, marked
-  <code>(inlined)</code>. A recursion shows once, with how many times it repeated.</li>
+  <code>(inlined)</code>, at the line in its own file (a package's or another module's too). A recursion
+  shows once, with how many times it repeated.</li>
   <li>A crash inside C code (<code>libc.strlen(null)</code>) shows <code>in C code</code>,
   then the ktm line that called it.</li>
   <li>A package's function shows by the name the program calls it by (<code>pg.Pool.exec</code>),

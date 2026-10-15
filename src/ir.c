@@ -992,19 +992,15 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         if (st && st->kind == AST_RETURN && st->retval) only_ret = st;
     }
 
-    int saved_lock = ir_line_lock;
-    if (!ir_line_lock && call->line && callee->file_id && call->file_id &&
-        callee->file_id != call->file_id)
-        ir_line_lock = call->line;
+    /* The inlined code's lines are the callee's, in its own file (a
+     * crash report shows the site's file, asmLinesEnd) */
     int saved_hint = ir_line_hint;
     IrInlineSite *saved_site = ir_site_hint;
-    if (!ir_line_lock) {
-        IrInlineSite *site = irAlloc(sizeof(IrInlineSite));
-        site->callee = callee;
-        site->call_line = call->line ? call->line : ir_line_hint;
-        site->outer = ir_site_hint;
-        ir_site_hint = site;
-    }
+    IrInlineSite *site = irAlloc(sizeof(IrInlineSite));
+    site->callee = callee;
+    site->call_line = call->line ? call->line : ir_line_hint;
+    site->outer = ir_site_hint;
+    ir_site_hint = site;
 
     IrInline frame;
     frame.callee = callee;
@@ -1042,7 +1038,6 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         func->variables = saved_vars;
         ctx->loop_depth = saved_loops;
         ctx->inl = frame.outer;
-        ir_line_lock = saved_lock;
         ir_line_hint = saved_hint;
         ir_site_hint = saved_site;
         return v;
@@ -1064,7 +1059,6 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     func->exit_block = saved_exit;
     ctx->loop_depth = saved_loops;
     ctx->inl = frame.outer;
-    ir_line_lock = saved_lock;
     ir_line_hint = saved_hint;
     ir_site_hint = saved_site;
 
