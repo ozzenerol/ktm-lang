@@ -5683,6 +5683,7 @@ Ast *parseExternFunctionProto(Cctrl *cc, AstType *rettype, char *fname, int len)
      * pub), still calling the C symbol `open` */
     char *qual = cctrlDeclName(cc, fname, len);
     if (qual) {
+        func->c_qual = aoStrDupRaw(qual, strlen(qual));
         mapAdd(cc->global_env, qual, func);
         mapAdd(cc->c_externs, func->fname->data, func);
         if (cc->decl_pub) setAdd(cc->pub_names, qual);

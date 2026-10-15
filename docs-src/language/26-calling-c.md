@@ -296,9 +296,26 @@ done
 ```
 
 `mem.free` still releases the memory with C's `free`: the program's `free` is the symbol
-`_K04free`, not `free`. Within the program, though, keep such names apart from the modules it
-calls: a program function named like a module's function can be picked up by a call to the
-module's (a known bug, being fixed), so prefer names of your own.
+`_K04free`, not `free`. The same holds the other way round in one program: a module's C function
+is called by the module's name for it, so `libc.strlen` is C's `strlen` even next to a `strlen`
+of the program's own.
+
+```ktm run
+import libc;
+
+u64 strlen(u8 *s) {
+    return 1000;
+}
+
+i32 main() {
+    printf("%d %d\n", strlen("four"), libc.strlen("four"));
+    return 0;
+}
+```
+
+```output
+1000 4
+```
 
 - A prototype without `extern "c"` is a ktm function, which must be defined in the program or in
   a ktm library; linking fails otherwise.

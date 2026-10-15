@@ -2527,7 +2527,9 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
             /* Address of a function: emit `leaq <fname>(%rip), rax`
              * via the global-value mechanism. */
             src = irValueNew(IR_TYPE_PTR, IR_VAL_GLOBAL);
-            src->as.global.name = operand->fname;
+            /* a module's C function by its module name, as its calls */
+            src->as.global.name = operand->kind == AST_EXTERN_FUNC && operand->c_qual
+                                ? operand->c_qual : operand->fname;
             src->as.global.value = NULL;
             src->flags |= IR_VAL_FLAG_FUNC;
             if (operand->kind != AST_FUNC) {

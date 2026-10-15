@@ -3153,6 +3153,13 @@ Ast *parseFunctionArguments(Cctrl *cc, char *fname, int len, s64 terminator) {
                     aoStrDup(maybe_fn->asmfname),argv);
 
         case AST_EXTERN_FUNC:
+            /* a module's C function: by the module's name for it, so a
+             * program function with its C name can't take the call */
+            if (maybe_fn->c_qual) {
+                return astFunctionCall(rettype, maybe_fn->c_qual->data, maybe_fn->c_qual->len,
+                                       argv);
+            }
+            /* fall through */
         case AST_FUNC:
         case AST_FUN_PROTO:
             /* A module's function is called by its symbol (`a.b.f` or
