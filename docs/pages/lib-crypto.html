@@ -68,6 +68,9 @@ bool fine = ek.verify("payload", es);
   <code>signWith</code>/<code>verifyWith</code> throw.</li>
   <li>P-384 and P-521 keys (<code>crypto.generateKey(crypto.KeyKind.ec384)</code>, <code>ec521</code>, or from PEM) sign with
   <code>signWith</code>, usually over <code>Hash.sha384</code> and <code>Hash.sha512</code> (JWT's ES384, ES512).</li>
+  <li>An RSA key also signs with RSA-PSS: <code>signPss(h, data)</code> and <code>verifyPss(h, data, sig)</code>, MGF1 with
+  the same hash and a salt as long as the digest (JWT's PS256, PS384, PS512). PSS is randomised: two signatures of
+  the same data differ, and both verify.</li>
   <li>An EC signature is r||s: 64 bytes for P-256, 96 for P-384, 132 for P-521; an RSA one is the key's size
   (256 bytes for 2048 bits). <code>verifyWith</code> also takes the DER form.</li>
   <li>A public key also comes from its parts, as a JWK has them (base64url-decoded):
