@@ -1753,16 +1753,46 @@ static LexModule *parseInitModule(Cctrl *cc) {
     return cc->lexer_->modules[cc->cur_module - 1];
 }
 
+/* The module a `-lib` build of one module makes (a package's prebuild
+ * too), NULL for any other build */
+static LexModule *parseLibraryModule(Cctrl *cc) {
+    Lexer *l = cc->lexer_;
+    if (!l || !l->building_module || (cc->flags & CCTRL_REPL)) return NULL;
+    for (int i = 0; i < l->modules_len; ++i) {
+        LexModule *m = l->modules[i];
+        if (!m->prebuilt && !strcmp(m->path->data, l->building_module)) return m;
+    }
+    return NULL;
+}
+
 /* A global's run-time initialiser: its module's, or the program's. A
  * prebuilt module's `_init` is already compiled, so what a generic of it
  * adds while made for this program (reflect.of in json.decode<T>) runs
- * with the program's own initialisers. */
+ * with the program's own initialisers; in a `-lib` build of one module,
+ * which has no program start of its own, with that module's `_init`,
+ * which its importers call (the descriptor json.decode<Header> uses in
+ * a prebuilt package was left zeroed). */
 /* Run-time initialisers added so far: a threadlocal's must not get one */
 static u64 parse_init_count = 0;
+
+/* A `-lib` build of a tree of modules: the initialisers that belong to
+ * no module of it (a prebuilt generic's, as above). Every module of the
+ * tree calls them from its `_init`, once (parseModuleInits). */
+static List *parse_tree_inits = NULL;
 
 static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
     LexModule *m = parseInitModule(cc);
     parse_init_count++;
+    if (!m || m->prebuilt) {
+        LexModule *lib = parseLibraryModule(cc);
+        if (lib) {
+            m = lib;
+        } else if (cc->lexer_ && cc->lexer_->building_tree && !(cc->flags & CCTRL_REPL)) {
+            if (!parse_tree_inits) parse_tree_inits = listNew();
+            listAppend(parse_tree_inits, ast);
+            return;
+        }
+    }
     if (m && !m->prebuilt) {
         if (!m->init_stmts) m->init_stmts = listNew();
         listAppend(m->init_stmts, ast);
@@ -9124,10 +9154,42 @@ static void parseCheckCModuleItem(Cctrl *cc, Ast *ast) {
  * .ktmlib marker says `init`), in the order the modules were loaded (a
  * module's imports before it), before the program's own initialisers.
  * A -lib build only makes the functions: its importers call them. */
+/* parse_tree_inits as one static function run once, whose call starts
+ * the `_init` of every module the tree's library compiles */
+static void parseTreeInits(Cctrl *cc) {
+    Lexer *l = cc->lexer_;
+    if (!parse_tree_inits || listEmpty(parse_tree_inits)) return;
+    char *done_sym = "__ktmTreeInitDone";
+    Ast *done = astGVar(ast_int_type, done_sym, strlen(done_sym), 1);
+    listAppend(cc->ast_list, astDecl(done, NULL));
+    List *stmts = listNew();
+    int err = 0;
+    listAppend(stmts, astIf(done, astReturn(NULL, ast_void_type), NULL));
+    listAppend(stmts, astBinaryOp(AST_BIN_OP_ASSIGN, done, astI64Type(1), &err));
+    listForEach(parse_tree_inits) listAppend(stmts, it->value);
+    listAppend(stmts, astReturn(NULL, ast_void_type));
+    char *sym = "__ktmTreeInit";
+    AstType *fn_type = astMakeFunctionType(ast_void_type, astVecNew());
+    Ast *fn = astFunction(fn_type, sym, strlen(sym), astVecNew(), astCompountStatement(stmts),
+                          listNew(), 0);
+    fn->flags |= AST_FLAG_STATIC;
+    listAppend(cc->ast_list, fn);
+    for (int i = 0; i < l->load_order_len; ++i) {
+        LexModule *m = l->modules[l->load_order[i] - 1];
+        if (m->prebuilt) continue;
+        List *with = listNew();
+        listAppend(with, astFunctionCall(ast_void_type, sym, strlen(sym), astVecNew()));
+        if (m->init_stmts) listForEach(m->init_stmts) listAppend(with, it->value);
+        m->init_stmts = with;
+    }
+    parse_tree_inits = NULL;
+}
+
 static void parseModuleInits(Cctrl *cc) {
     Lexer *l = cc->lexer_;
     if (!l || l->load_order_len == 0) return;
     int library = l->building_module || l->building_tree;
+    if (l->building_tree) parseTreeInits(cc);
     List *calls = listNew();
     for (int i = 0; i < l->load_order_len; ++i) {
         LexModule *m = l->modules[l->load_order[i] - 1];
