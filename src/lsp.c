@@ -29,6 +29,7 @@
 #include "lexer.h"
 #include "lsp.h"
 #include "parser.h"
+#include "pkg.h"
 #include "util.h"
 #include "version.h"
 
@@ -46,7 +47,8 @@ typedef struct LspCtx {
     Vec *pending;           /* uris awaiting a debounced analyze */
     const char *analyzing;  /* uri lspPublishHandler publishes for */
     s64 pending_since_ms;   /* when the oldest pending uri landed */
-    int module_doc;         /* the last parse was a module's file */
+    Vec *stale;             /* open uris whose imports changed since
+                             * their diagnostics were published */
 } LspCtx;
 
 /* A module's file is analyzed as the compiler reads it: through a
@@ -253,7 +255,10 @@ static int lspIsDirPath(const char *path) {
 }
 
 /* A file starting `module a.b;` in a directory .../a/b: the directory
- * the module is found from (*_mod "a.b"), else NULL */
+ * the module is found from (*_mod "a.b", what to import), else NULL.
+ * A package's module (a directory under a ktm.mod whose name needn't be
+ * the module's: ktm-pg holding `module pg;`) is imported by its package
+ * path from the ktm.mod's directory, as `ktm test` does. */
 static char *lspModuleRoot(const char *path, AoStr *text, char **_mod) {
     char *mod = lspDocModule(text);
     const char *slash = strrchr(path, '/');
@@ -261,12 +266,24 @@ static char *lspModuleRoot(const char *path, AoStr *text, char **_mod) {
     char *rel = mprintf("%s", mod);
     for (char *p = rel; *p; ++p) if (*p == '.') *p = '/';
     size_t dlen = slash - path, rlen = strlen(rel);
-    if (dlen <= rlen || memcmp(path + dlen - rlen, rel, rlen) ||
-        path[dlen - rlen - 1] != '/') {
+    if (dlen > rlen && !memcmp(path + dlen - rlen, rel, rlen) &&
+        path[dlen - rlen - 1] == '/') {
+        *_mod = mod;
+        return mprintf("%.*s", (int)(dlen - rlen - 1), path);
+    }
+    char *dir = mprintf("%.*s", (int)dlen, path);
+    char *mod_file = pkgModFind(dir);
+    char *err = NULL;
+    PkgMod *m = mod_file ? pkgModLoad(mod_file, &err) : NULL;
+    char *real = realpath(dir, NULL);
+    char *mod_root = m ? realpath(m->dir, NULL) : NULL;
+    if (!real || !mod_root) return NULL;
+    size_t mlen = strlen(mod_root);
+    if (strncmp(real, mod_root, mlen) || (real[mlen] != '/' && real[mlen])) {
         return NULL;
     }
-    *_mod = mod;
-    return mprintf("%.*s", (int)(dlen - rlen - 1), path);
+    *_mod = mprintf("ktm_lsp_pkg = \"%s%s\"", m->path, real + mlen);
+    return mod_root;
 }
 
 static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
@@ -278,7 +295,6 @@ static int lspParse(LspCtx *ctx, const char *path, AoStr *text) {
     l->source_arg = ctx;
     char *mod = NULL;
     char *root = lspModuleRoot(path, text, &mod);
-    ctx->module_doc = root != NULL;
     if (root) {
         char *src = mprintf("import %s;\n", mod);
         /* a module's *_test.ktm is read only when its tests are: as
@@ -595,10 +611,11 @@ static void lspPublishDiagnostics(LspCtx *ctx, const char *uri,
         const char *dfile = (d->file && d->file->filename)
                           ? d->file->filename->data : NULL;
         int remote = dfile != NULL && strcmp(dfile, path) != 0;
-        /* the module's program says nothing of its own; the module's
-         * other files only matter for their errors */
+        /* the module's program says nothing of its own; another file
+         * (an import, the module's other files) only matters for its
+         * errors: its warnings show where it is opened */
         if (dfile && strstr(dfile, KTM_LSP_MODULE_FILE)) continue;
-        if (remote && ctx->module_doc && d->severity != CCTRL_ERROR) continue;
+        if (remote && d->severity != CCTRL_ERROR) continue;
         if (emitted++) aoStrPutChar(body, ',');
         lspCatDiagnostic(ctx, body, text, d, remote, dfile ? dfile : "?");
     }
@@ -684,10 +701,39 @@ static void lspDeferAnalysis(LspCtx *ctx, const char *uri) {
         vecPush(ctx->pending, strdup(uri));
 }
 
+/* A file's diagnostics depend on the files it imports: when one open
+ * document changes (or closes, and is read from disk again), every
+ * other open one is analyzed again, one at a time while stdin is quiet,
+ * so an error a sibling's edit fixed (or caused) doesn't linger until
+ * that file is edited itself */
+static void lspMarkOthersStale(LspCtx *ctx, const char *uri) {
+    MapIter mi;
+    mapIterInit(ctx->docs, &mi);
+    while (mapIterNext(&mi)) {
+        const char *other = (const char *)mi.node->key;
+        if (strcmp(other, uri) == 0 || vecHas(ctx->stale, (void *)other))
+            continue;
+        vecPush(ctx->stale, strdup(other));
+    }
+}
+
 static void lspFlushPending(LspCtx *ctx) {
-    for (u64 i = 0; i < ctx->pending->size; ++i)
-        lspAnalyze(ctx, vecGet(char *, ctx->pending, i));
+    for (u64 i = 0; i < ctx->pending->size; ++i) {
+        char *uri = vecGet(char *, ctx->pending, i);
+        vecRemove(ctx->stale, uri);
+        lspAnalyze(ctx, uri);
+        lspMarkOthersStale(ctx, uri);
+    }
     vecClear(ctx->pending);
+}
+
+/* Analyzes the first stale document; the rest wait for the next quiet
+ * moment */
+static void lspFlushStale(LspCtx *ctx) {
+    char *uri = strdup(vecGet(char *, ctx->stale, 0));
+    vecRemove(ctx->stale, uri);
+    lspAnalyze(ctx, uri);
+    free(uri);
 }
 
 /* Position queries against a document the client never opened (e.g. a
@@ -751,6 +797,7 @@ static void lspDidClose(LspCtx *ctx, Json *params) {
     const char *uri = jsonStrOr(td, "uri", NULL);
     if (uri == NULL) return;
     vecRemove(ctx->pending, (void *)uri);
+    vecRemove(ctx->stale, (void *)uri);
     AoStr *old = (AoStr *)mapGet(ctx->docs, (void *)uri);
     if (old) {
         mapRemove(ctx->docs, (void *)uri);
@@ -765,6 +812,8 @@ static void lspDidClose(LspCtx *ctx, Json *params) {
     aoStrCatPrintf(body, "\",\"diagnostics\":[]}}");
     lspWrite(body);
     aoStrRelease(body);
+    /* the others now read its file from disk */
+    if (old) lspMarkOthersStale(ctx, uri);
 }
 
 static int lspIsIdentChar(char c) {
@@ -5083,6 +5132,7 @@ int lspRun(CliArgs *args) {
     ctx->std_dir = mprintf("%s/modules/", args->install_dir);
     ctx->docs = mapNew(16, &map_cstring_opaque_type);
     ctx->pending = vecNew(&vec_cstring_owned_type);
+    ctx->stale = vecNew(&vec_cstring_owned_type);
     ctx->cc = lspFreshCctrl(ctx);
     lspInstallCrashHandlers();
     /* The debounce poll()s fd 0; an stdio read-ahead buffer would make
@@ -5101,6 +5151,9 @@ int lspRun(CliArgs *args) {
                 lspFlushPending(ctx);
                 continue;
             }
+        } else if (!vecEmpty(ctx->stale) && !lspInputWait(KTM_LSP_DEBOUNCE_MS)) {
+            lspFlushStale(ctx);
+            continue;
         }
         size_t len = 0;
         char *raw = lspReadMessage(&len);
