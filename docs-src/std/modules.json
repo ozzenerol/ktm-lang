@@ -1,0 +1,60 @@
+{
+  "groups": [
+    {"title": "Core", "modules": [
+      {"name": "prelude", "title": "Prelude", "summary": "In every program without an import: String, Error, EXIT_* and the integer limits."},
+      {"name": "mem", "title": "Memory", "summary": "Allocation and raw memory operations."},
+      {"name": "str", "title": "Strings", "summary": "String, the owned growable string, and the functions that read any text (u8[])."},
+      {"name": "cstr", "title": "C strings", "summary": "NUL-terminated u8 * strings: formatting, comparison, copying and conversion."},
+      {"name": "math", "title": "Maths", "summary": "Numeric helpers, bit operations and the C maths library."},
+      {"name": "sort", "title": "Sorting", "summary": "Sorting a slice in place."},
+      {"name": "reflect", "title": "Reflection", "summary": "What the compiler tells a program about its types."},
+      {"name": "libc", "title": "C library", "summary": "The C functions, structs and constants ktm programs call by their C names."}
+    ]},
+    {"title": "Collections", "modules": [
+      {"name": "vec", "title": "Vectors", "summary": "Growable arrays and bit vectors."},
+      {"name": "map", "title": "Maps", "summary": "Hash tables, and ordered maps (red-black trees)."},
+      {"name": "set", "title": "Sets", "summary": "Hash sets of any type."},
+      {"name": "list", "title": "Lists", "summary": "Circular doubly linked lists of void * values."},
+      {"name": "bytes", "title": "Byte buffers", "summary": "A queue of bytes for binary data that comes and goes in pieces."}
+    ]},
+    {"title": "Text and data", "modules": [
+      {"name": "json", "title": "JSON", "summary": "Parsing, querying, encoding and decoding JSON, structs included."},
+      {"name": "yaml", "title": "YAML", "summary": "Reading and writing YAML documents."},
+      {"name": "csv", "title": "CSV", "summary": "A streaming CSV tokenizer."},
+      {"name": "encoding.base64", "title": "Base64", "summary": "Base64, the standard and the URL-safe alphabet."},
+      {"name": "encoding.hex", "title": "Hex", "summary": "Hexadecimal encoding and decoding."},
+      {"name": "fzf", "title": "Fuzzy matching", "summary": "fzf-style fuzzy string matching."},
+      {"name": "uuid", "title": "UUIDs", "summary": "UUIDs, v4 and time-ordered v7: make, format, parse."},
+      {"name": "date", "title": "Dates and time", "summary": "date.Date values, clocks and conversions."},
+      {"name": "hash", "title": "Hashing", "summary": "SHA-256, CRC-32, FNV-1a and a constant-time compare."},
+      {"name": "crypto", "title": "Cryptography", "summary": "Random bytes, hashes, HMAC, key derivation, AEAD ciphers, ECDSA, RSA, Ed25519 and the building blocks of JWE."},
+      {"name": "validate", "title": "Validation", "summary": "Rules on struct fields (@required, @min, @max, @email, @url, @oneOf), errors per field."}
+    ]},
+    {"title": "System", "modules": [
+      {"name": "fs", "title": "Files", "summary": "Reading and writing files, directories, file status and path names."},
+      {"name": "os", "title": "Operating system", "summary": "Process exit, errno and the environment."},
+      {"name": "proc", "title": "Processes", "summary": "Shell commands, and running programs by argv without a shell, with pipes."},
+      {"name": "signal", "title": "Signals", "summary": "sigaction-based handlers and a clean-shutdown helper."},
+      {"name": "flag", "title": "Flags", "summary": "Command-line flags as Go's flag package, with GNU's forms, subcommands and a help text."},
+      {"name": "config", "title": "Settings", "summary": "Environment variables and a .env file into a struct: @env, @required, defaults."},
+      {"name": "log", "title": "Logging", "summary": "Leveled logging to stderr or a file, with size rotation and thread safety."},
+      {"name": "testing", "title": "Testing", "summary": "Tests run by ktm test: testing.T with check, equal, fail, fatal, skip and log."}
+    ]},
+    {"title": "Concurrency", "modules": [
+      {"name": "coro", "title": "Coroutines", "summary": "Functions that pause and resume on their own stacks, and the event loop they wait on."},
+      {"name": "thread", "title": "Threads", "summary": "pthreads helpers."},
+      {"name": "atomic", "title": "Atomics", "summary": "Atomic operations on integers and pointers shared between threads."}
+    ]},
+    {"title": "Network", "modules": [
+      {"name": "net", "title": "Sockets", "summary": "TCP and UDP sockets and address resolution."},
+      {"name": "net.url", "title": "URLs", "summary": "URLs: parse, build, query strings, resolving links (RFC 3986)."},
+      {"name": "net.http", "title": "HTTP", "summary": "HTTP/1.1 servers and clients: a Mux of Go-style patterns, handlers, JSON replies."},
+      {"name": "net.http.middleware", "title": "HTTP middleware", "summary": "Request IDs, the real client address, CORS, rate limiting, bearer tokens."},
+      {"name": "net.tls", "title": "TLS", "summary": "TLS connections, client and server: dial, verify, read, write."},
+      {"name": "net.https", "title": "HTTPS", "summary": "https:// for the HTTP client and TLS for servers."}
+    ]},
+    {"title": "Databases", "modules": [
+      {"name": "sql", "title": "SQLite", "summary": "SQLite bindings, available when ktm is built with sqlite."}
+    ]}
+  ]
+}
