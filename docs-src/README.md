@@ -1,6 +1,7 @@
 # docs-src: the sources of the documentation site
 
-`python3 docs-src/tools/build.py` writes the site into `docs/`, which GitHub Pages serves.
+`python3 docs-src/tools/build.py` writes the site into `docs/`, which GitHub Pages serves, and
+the same chapters and library as man pages into `man/` (installed on Linux: `man ktm`).
 `python3 docs-src/tools/check.py` compiles and runs every example and compares its output.
 Never edit `docs/` by hand. The old site is kept, unchanged, in `docs-old/`.
 
@@ -12,7 +13,7 @@ docs-src/
   language/NN-name.md     the language chapters, in order (NN = 01, 02, ...)
   std/modules.json        the standard library's module groups and one-line summaries
   assets/                 style.css, site.js, std.js (copied to docs/assets)
-  tools/                  build.py, md.py, gen_std.py, check.py
+  tools/                  build.py, md.py, gen_std.py, man.py, check.py
 ```
 
 The standard library reference (`docs/std/`) is generated from `src/std`: every `pub`

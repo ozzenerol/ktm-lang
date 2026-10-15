@@ -45,6 +45,10 @@ unzip it and run `sudo ./install.sh`. Or build from source (a C compiler, `make`
 [ozzenerol.github.io/ktm-lang](https://ozzenerol.github.io/ktm-lang/): the language, the standard
 library, releases and known issues.
 
+On Linux the language guide and the standard library are also installed as man pages: `man ktm`
+lists them, `man ktm-str` is one module, `man ktm-guide-errors` one chapter, and `man -k ktm`
+finds every page.
+
 ## Credits
 
 ktm started as a fork of [holyc-lang](https://github.com/Jamesbarford/holyc-lang) by James
