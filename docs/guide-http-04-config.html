@@ -74,8 +74,10 @@ capitals: <code>maxBookmarks</code> with <code>"SHELF_"</code> is <code>SHELF_MA
 (<code>@env("NAME")</code> picks another). <code>maxBookmarks</code> is new: <code>create</code> answers 507 once
 that many are saved.</p>
 
-<h2 id="main">main<a class="anchor" href="#main" aria-label="Link to this section">#</a></h2>
-<pre><code>i32 main(i32 argc, u8 **argv)
+<h2 id="main-ktm">main.ktm<a class="anchor" href="#main-ktm" aria-label="Link to this section">#</a></h2>
+<pre><code>import config, date, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+i32 main(i32 argc, u8 **argv)
 {
     /* defaults, then .env and the environment, then the command line */
     gSettings.port = 8080;
@@ -156,7 +158,7 @@ $ SHELF_MAX_BOOKMARKS=0 ktm run .
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#settings">Settings</a></li><li><a href="#main">main</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#settings">Settings</a></li><li><a href="#main-ktm">main.ktm</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
 </div>
 </body>
 </html>

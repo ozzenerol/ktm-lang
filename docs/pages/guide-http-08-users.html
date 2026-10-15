@@ -122,7 +122,12 @@ u8[] userOf(http.Request *r)
 <code>Authorization: Bearer &lt;token&gt;</code>, calls <code>checkToken</code> and answers 401 when it says no.
 <code>checkToken</code> keeps the user's id in the request (memory from <code>r.alloc</code> lives exactly as long), and
 handlers read it with <code>userOf(r)</code>. Every bookmark query gets <code>AND user_id = $n</code>.</p>
-<pre><code>i32 main(i32 argc, u8 **argv)
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;
+
+i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");

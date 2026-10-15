@@ -19,8 +19,10 @@ capitals: <code>maxBookmarks</code> with <code>"SHELF_"</code> is <code>SHELF_MA
 (<code>@env("NAME")</code> picks another). <code>maxBookmarks</code> is new: <code>create</code> answers 507 once
 that many are saved.</p>
 
-<h2>main</h2>
-<pre><code>i32 main(i32 argc, u8 **argv)
+<h2>main.ktm</h2>
+<pre><code>import config, date, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+i32 main(i32 argc, u8 **argv)
 {
     /* defaults, then .env and the environment, then the command line */
     gSettings.port = 8080;

@@ -23,8 +23,13 @@ ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</cod
   <li>Never edit a migration that has run somewhere: add a new one.</li>
 </ul>
 
-<h2>main</h2>
-<pre><code>i32 main(i32 argc, u8 **argv)
+<h2>main.ktm</h2>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");

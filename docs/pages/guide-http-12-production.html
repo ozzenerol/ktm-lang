@@ -17,7 +17,8 @@ TLS. Copy it with the <code>migrations</code> directory and it runs.</p>
 
 <h2>HTTPS</h2>
 <p>Two more settings, the certificate chain and its key as PEM files, and <code>main</code> serves over TLS when they
-are set:</p>
+are set. <code>main.ktm</code> imports <code>net.https</code> for it:</p>
+<pre><code>import config, flag, log, net.http, net.https, os, reflect, str, vec;</code></pre>
 <pre><code>    if (gSettings.tlsCert.len) {
         log.info("Shelf listening on https://localhost:%d", *port);
         return https.listen((i32)*port, &mux, gSettings.tlsCert, gSettings.tlsKey, db, &o);
