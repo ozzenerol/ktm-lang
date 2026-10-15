@@ -87,9 +87,27 @@ void asmEmitFunctionGlobal(Cctrl *cc, AoStr *buf, char *label) {
 static int asmGenericNames(GenericDef *d, char *sym) {
     AoStr *path = d->module_path;
     if (!path || !d->toks) return 0;
+    /* the module's function or method by its last name: a method is
+     * called through its receiver (`r.scanFields(...)`) and a function
+     * whose symbol has its parameter types in it (`quoteIdent(String *,
+     * u8[])`) doesn't mangle from its name alone */
+    const char *shown = astSymbolDisplayName(sym);
+    const char *base = NULL;
+    int base_len = 0;
+    if (shown && !strncmp(shown, path->data, path->len) && shown[path->len] == '.') {
+        const char *end = strchr(shown, '(');
+        if (!end) end = shown + strlen(shown);
+        const char *dot = end;
+        while (dot > shown && dot[-1] != '.') dot--;
+        base = dot;
+        base_len = (int)(end - dot);
+    }
     for (u64 j = 0; j < d->toks->size; ++j) {
         Lexeme *t = d->toks->entries[j];
         if (t->tk_type != TK_IDENT) continue;
+        if (base && base_len == t->len && !memcmp(base, t->start, t->len)) {
+            return 1;
+        }
         char *qual = mprintf("%s.%.*s", path->data, t->len, t->start);
         char *mangled = astModuleMangle(qual, (int)strlen(qual));
         int same = mangled && !strcmp(mangled, sym);
