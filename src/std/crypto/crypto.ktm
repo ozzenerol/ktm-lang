@@ -5,7 +5,7 @@ import coro, encoding.base64, mem, str;
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
  * libktmtls, as net.tls is): secure random bytes, SHA-256/384/512, HMAC,
  * HKDF and PBKDF2, a constant-time compare, authenticated encryption
- * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256 and RSA signatures, and
+ * (AES-256-GCM, ChaCha20-Poly1305), ECDSA (P-256, P-384, P-521), RSA and Ed25519 signatures, and
  * password hashing (Argon2id, bcrypt; ktm's own C, beside mbedTLS).
  *
  *   u8 key[32];
@@ -45,10 +45,14 @@ pub enum Hash {
 /* What a Key is */
 pub enum KeyKind {
     ec256,              /* ECDSA P-256 (JWT's ES256) */
-    rsa                 /* RSA, 2048 bits or more, PKCS#1 v1.5 (JWT's RS256) */
+    rsa,                /* RSA, 2048 bits or more, PKCS#1 v1.5 (JWT's RS256) */
+    ed25519,            /* Ed25519 (RFC 8032; JWT's EdDSA), Monocypher's */
+    ec384,              /* ECDSA P-384 (JWT's ES384) */
+    ec521               /* ECDSA P-521 (JWT's ES512) */
 };
 
-/* A signing key, private or public: ECDSA P-256 or RSA */
+/* A signing key, private or public: ECDSA (P-256, P-384, P-521), RSA or
+ * Ed25519 */
 pub struct Key {
     private void *native;
     private bool priv;
@@ -64,8 +68,17 @@ extern "c" i32 ktm_crypto_hkdf(i32 bits, u8 *salt, u64 slen, u8 *ikm, u64 ilen, 
                                u8 *out, u64 olen);
 extern "c" i32 ktm_crypto_pbkdf2(i32 bits, u8 *pw, u64 plen, u8 *salt, u64 slen, u32 iterations,
                                  u8 *out, u64 olen);
-extern "c" i32 ktm_crypto_seal(i32 alg, u8 *key, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len, u8 *out);
-extern "c" i32 ktm_crypto_open(i32 alg, u8 *key, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_seal(i32 alg, u8 *key, u64 klen, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len,
+                               u8 *out);
+extern "c" i32 ktm_crypto_open(i32 alg, u8 *key, u64 klen, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len,
+                               u8 *out);
+extern "c" i64 ktm_crypto_cbc_encrypt(u8 *key, u64 klen, u8 *iv, u8 *in, u64 len, u8 *out);
+extern "c" i64 ktm_crypto_cbc_decrypt(u8 *key, u64 klen, u8 *iv, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_kw_wrap(u8 *kek, u64 keklen, u8 *key, u64 klen, u8 *out);
+extern "c" i32 ktm_crypto_kw_unwrap(u8 *kek, u64 keklen, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_oaep_encrypt(void *key, i32 bits, u8 *in, u64 len, u8 *out, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_oaep_decrypt(void *key, i32 bits, u8 *in, u64 len, u8 *out, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_ecdh(void *key, void *peer, u8 *out, u64 *olen);
 extern "c" void *ktm_crypto_key_generate(i32 *err);
 extern "c" void *ktm_crypto_key_load(u8 *pem, u64 len, i32 priv, i32 *err);
 extern "c" i64 ktm_crypto_key_pem(void *key, i32 priv, u8 *out, u64 outlen);
@@ -75,6 +88,14 @@ extern "c" void *ktm_crypto_rsa_generate(i32 bits, i32 *err);
 extern "c" void *ktm_crypto_ec_public(u8 *x, u64 xlen, u8 *y, u64 ylen, i32 *err);
 extern "c" void *ktm_crypto_rsa_public(u8 *n, u64 nlen, u8 *e, u64 elen, i32 *err);
 extern "c" i32 ktm_crypto_key_kind(void *key);
+extern "c" void *ktm_crypto_ec_generate(i32 bits, i32 *err);
+extern "c" i32 ktm_crypto_ec_point(void *key, u8 *x, u8 *y, u64 *n);
+extern "c" i32 ktm_crypto_sign_pss(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_verify_pss(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 slen);
+extern "c" void *ktm_crypto_ed25519_generate(i32 *err);
+extern "c" void *ktm_crypto_ed25519_public(u8 *x, u64 len, i32 *err);
+extern "c" i32 ktm_crypto_ed25519_sign(void *key, u8 *data, u64 len, u8 *sig);
+extern "c" i32 ktm_crypto_ed25519_verify(void *key, u8 *data, u64 len, u8 *sig, u64 slen);
 extern "c" i64 ktm_crypto_key_bits(void *key);
 extern "c" void ktm_crypto_key_free(void *key);
 extern "c" i32 ktm_crypto_blake2b(u8 *in, u64 len, u8 *out, u64 outlen);
@@ -186,17 +207,35 @@ pub bool equal(u8[] a, u8[] b) {
 
 /* ---- authenticated encryption ---- */
 
-/* plain encrypted and authenticated with key (32 bytes) and nonce (12
+/* an AES key: 16, 24 or 32 bytes */
+static void needAes(u8[] key, u8 *what) {
+    if (key.len != 16 && key.len != 24 && key.len != 32) {
+        throw(ERR_CRYPTO, "crypto: %s is 16, 24 or 32 bytes, not %d", what, key.len);
+    }
+}
+
+/* seal's and open's key: AES-GCM's 16, 24 or 32 bytes, ChaCha20's 32 */
+static void needAeadKey(Aead alg, u8[] key) {
+    if (alg == Aead.aesGcm) {
+        needAes(key, "an AES-GCM key");
+    } else {
+        need(key, KEY_SIZE, "the key");
+    }
+}
+
+/* plain encrypted and authenticated with key (32 bytes; AES-GCM also
+ * takes 16 and 24: AES-128/192-GCM) and nonce (12
  * bytes, never used twice with one key: crypto.random makes one), and aad
  * authenticated too (sent in the clear, as headers): the ciphertext and
  * its 16-byte tag, a new String (yours) */
 pub String seal(Aead alg, u8[] key, u8[] nonce, u8[] plain, u8[] aad = "") {
-    need(key, KEY_SIZE, "the key");
+    needAeadKey(alg, key);
     need(nonce, NONCE_SIZE, "the nonce");
     String out;
     out.reserve(plain.len + TAG_SIZE);
     for (i64 i = 0; i < plain.len + TAG_SIZE; i++) { out.appendByte(0); }
-    i32 r = ktm_crypto_seal((i32)alg, key.ptr, nonce.ptr, aad.ptr, aad.len, plain.ptr, plain.len, out.ptr);
+    i32 r = ktm_crypto_seal((i32)alg, key.ptr, key.len, nonce.ptr, aad.ptr, aad.len, plain.ptr, plain.len,
+                            out.ptr);
     if (r != 0) {
         out.free();
         fail("seal", r);
@@ -207,15 +246,87 @@ pub String seal(Aead alg, u8[] key, u8[] nonce, u8[] plain, u8[] aad = "") {
 /* sealed (from seal) opened into *plain (replaced): false, with *plain
  * empty, when it was altered or the key, nonce or aad differ */
 pub bool open(Aead alg, u8[] key, u8[] nonce, u8[] sealed, String *plain, u8[] aad = "") {
-    need(key, KEY_SIZE, "the key");
+    needAeadKey(alg, key);
     need(nonce, NONCE_SIZE, "the nonce");
     plain.clear();
     if (sealed.len < TAG_SIZE) { return false; }
     i64 n = sealed.len - TAG_SIZE;
     plain.reserve(n);
     for (i64 i = 0; i < n; i++) { plain.appendByte(0); }
-    if (ktm_crypto_open((i32)alg, key.ptr, nonce.ptr, aad.ptr, aad.len, sealed.ptr, n, plain.ptr) != 0) {
+    if (ktm_crypto_open((i32)alg, key.ptr, key.len, nonce.ptr, aad.ptr, aad.len, sealed.ptr, n,
+                        plain.ptr) != 0) {
         plain.clear();
+        return false;
+    }
+    return true;
+}
+
+/* ---- AES-CBC and AES key wrap (for JWE; seal is the encryption to
+ * use otherwise: CBC alone doesn't authenticate) ---- */
+
+/* plain encrypted with AES-CBC, key (16, 24 or 32 bytes) and iv (16
+ * bytes), padded as PKCS#7 has it: a new String (yours) */
+pub String aesCbcEncrypt(u8[] key, u8[] iv, u8[] plain) {
+    needAes(key, "an AES key");
+    need(iv, 16, "an AES-CBC iv");
+    String out;
+    i64 n = plain.len + 16 - plain.len % 16;
+    out.reserve(n);
+    for (i64 i = 0; i < n; i++) { out.appendByte(0); }
+    i64 r = ktm_crypto_cbc_encrypt(key.ptr, key.len, iv.ptr, plain.ptr, plain.len, out.ptr);
+    if (r < 0) {
+        out.free();
+        fail("AES-CBC", (i32)r);
+    }
+    return out;
+}
+
+/* ct decrypted with AES-CBC into *plain (replaced): false, with *plain
+ * empty, when its padding is wrong. It doesn't authenticate: check a MAC
+ * over ct first (as JWE's A128CBC-HS256 does). */
+pub bool aesCbcDecrypt(u8[] key, u8[] iv, u8[] ct, String *plain) {
+    needAes(key, "an AES key");
+    need(iv, 16, "an AES-CBC iv");
+    plain.clear();
+    if (!ct.len || ct.len % 16) { return false; }
+    String buf;
+    buf.reserve(ct.len);
+    for (i64 i = 0; i < ct.len; i++) { buf.appendByte(0); }
+    i64 n = ktm_crypto_cbc_decrypt(key.ptr, key.len, iv.ptr, ct.ptr, ct.len, buf.ptr);
+    if (n < 0) {
+        buf.free();
+        return false;
+    }
+    plain.append(buf[0:n]);
+    buf.free();
+    return true;
+}
+
+/* key (16 bytes or more, a multiple of 8) wrapped with kek (16, 24 or
+ * 32 bytes), as RFC 3394 has it (JWE's A128KW, A192KW, A256KW): 8 bytes
+ * longer, a new String (yours) */
+pub String aesKeyWrap(u8[] kek, u8[] key) {
+    needAes(kek, "a key-wrapping key");
+    if (key.len < 16 || key.len % 8) { throw(ERR_CRYPTO, "crypto: a key to wrap is 16 bytes or more, a multiple of 8"); }
+    String out;
+    for (i64 i = 0; i < key.len + 8; i++) { out.appendByte(0); }
+    i32 r = ktm_crypto_kw_wrap(kek.ptr, kek.len, key.ptr, key.len, out.ptr);
+    if (r != 0) {
+        out.free();
+        fail("AES key wrap", r);
+    }
+    return out;
+}
+
+/* wrapped (from aesKeyWrap) unwrapped with kek into *key (replaced):
+ * false, with *key empty, when it wasn't wrapped with kek or was altered */
+pub bool aesKeyUnwrap(u8[] kek, u8[] wrapped, String *key) {
+    needAes(kek, "a key-wrapping key");
+    key.clear();
+    if (wrapped.len < 24 || wrapped.len % 8) { return false; }
+    for (i64 i = 0; i < wrapped.len - 8; i++) { key.appendByte(0); }
+    if (ktm_crypto_kw_unwrap(kek.ptr, kek.len, wrapped.ptr, wrapped.len, key.ptr) != 0) {
+        key.clear();
         return false;
     }
     return true;
@@ -230,10 +341,22 @@ static Key *keyOf(void *native, bool priv) {
     return k;
 }
 
-/* A new random private P-256 key */
-pub Key *generateKey() {
+/* A new random private key: P-256 (the default), P-384, P-521 or
+ * Ed25519 (an RSA key is generateRsaKey's) */
+pub Key *generateKey(KeyKind kind = KeyKind.ec256) {
     i32 err = 0;
-    void *n = ktm_crypto_key_generate(&err);
+    void *n = null;
+    if (kind == KeyKind.ed25519) {
+        n = ktm_crypto_ed25519_generate(&err);
+    } else if (kind == KeyKind.ec256) {
+        n = ktm_crypto_key_generate(&err);
+    } else if (kind == KeyKind.ec384) {
+        n = ktm_crypto_ec_generate(384, &err);
+    } else if (kind == KeyKind.ec521) {
+        n = ktm_crypto_ec_generate(521, &err);
+    } else {
+        throw(ERR_CRYPTO, "crypto: generateKey makes EC and Ed25519 keys: RSA's is generateRsaKey");
+    }
     if (!n) { fail("making a key", err); }
     return keyOf(n, true);
 }
@@ -250,30 +373,32 @@ pub Key *generateRsaKey(i64 bits = 2048) {
     return keyOf(n, true);
 }
 
-/* A private key from PEM: P-256 ("-----BEGIN EC PRIVATE KEY-----" or
- * PKCS#8) or RSA of 2048 bits or more ("-----BEGIN RSA PRIVATE KEY-----"
- * or PKCS#8) */
+/* A private key from PEM: P-256, P-384 or P-521 ("-----BEGIN EC PRIVATE
+ * KEY-----" or PKCS#8), RSA of 2048 bits or more ("-----BEGIN RSA PRIVATE KEY-----"
+ * or PKCS#8) or Ed25519 (PKCS#8, exactly as RFC 8410 has it) */
 pub Key *privateKey(u8[] pem) {
     i32 err = 0;
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 1, &err);
-    if (!n) { fail("reading the private key (P-256, or RSA of 2048 bits or more)", err); }
+    if (!n) { fail("reading the private key (P-256/384/521, RSA of 2048 bits or more, or Ed25519)", err); }
     return keyOf(n, true);
 }
 
-/* A public key from PEM ("-----BEGIN PUBLIC KEY-----"): P-256 or RSA */
+/* A public key from PEM ("-----BEGIN PUBLIC KEY-----"): P-256/384/521,
+ * RSA or Ed25519 */
 pub Key *publicKey(u8[] pem) {
     i32 err = 0;
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 0, &err);
-    if (!n) { fail("reading the public key (P-256, or RSA of 2048 bits or more)", err); }
+    if (!n) { fail("reading the public key (P-256/384/521, RSA of 2048 bits or more, or Ed25519)", err); }
     return keyOf(n, false);
 }
 
-/* A public P-256 key from its point: x and y, 32 bytes each, big-endian
- * (a JWK's "x" and "y", base64url-decoded) */
+/* A public EC key from its point: x and y, big-endian (a JWK's "x" and
+ * "y", base64url-decoded), 32 bytes each for P-256, 48 for P-384, 66
+ * for P-521 */
 pub Key *ecPublicKey(u8[] x, u8[] y) {
     i32 err = 0;
     void *n = ktm_crypto_ec_public(x.ptr, x.len, y.ptr, y.len, &err);
-    if (!n) { fail("making a P-256 key from x and y (32 bytes each, a point on the curve)", err); }
+    if (!n) { fail("making an EC key from x and y (32, 48 or 66 bytes each, a point on the curve)", err); }
     return keyOf(n, false);
 }
 
@@ -284,6 +409,15 @@ pub Key *rsaPublicKey(u8[] n, u8[] e) {
     void *k = ktm_crypto_rsa_public(n.ptr, n.len, e.ptr, e.len, &err);
     if (!k) { fail("making an RSA key from n and e (2048 bits or more)", err); }
     return keyOf(k, false);
+}
+
+/* A public Ed25519 key from its 32 bytes (a JWK's OKP "x",
+ * base64url-decoded) */
+pub Key *ed25519PublicKey(u8[] x) {
+    i32 err = 0;
+    void *n = ktm_crypto_ed25519_public(x.ptr, x.len, &err);
+    if (!n) { fail("making an Ed25519 key (32 bytes)", err); }
+    return keyOf(n, false);
 }
 
 static String pemOf(Key *k, bool priv) {
@@ -304,14 +438,28 @@ pub String Key.publicPem() {
     return pemOf(self, false);
 }
 
-/* What the key is: KeyKind.ec256 or KeyKind.rsa */
+/* What the key is: KeyKind.ec256, ec384, ec521, rsa or ed25519 */
 pub KeyKind Key.kind() {
-    return ktm_crypto_key_kind(self.native) == 1 ? KeyKind.rsa : KeyKind.ec256;
+    return (KeyKind)ktm_crypto_key_kind(self.native);
 }
 
-/* Its size in bits: 256 for P-256, the modulus's for RSA */
+/* Its size in bits: the curve's (256, 384, 521; 256 for Ed25519), the
+ * modulus's for RSA */
 pub i64 Key.bits() {
     return ktm_crypto_key_bits(self.native);
+}
+
+/* An EC key's public point into *x and *y (replaced: big-endian, 32,
+ * 48 or 66 bytes each, as a JWK's "x" and "y"); false for another kind */
+pub bool Key.ecPoint(String *x, String *y) {
+    u8 bx[66], by[66];
+    u64 n = 0;
+    if (ktm_crypto_ec_point(self.native, bx, by, &n) != 0) { return false; }
+    x.clear();
+    x.append(bx[0:n]);
+    y.clear();
+    y.append(by[0:n]);
+    return true;
 }
 
 static i32 hashBits(Hash h) {
@@ -320,11 +468,13 @@ static i32 hashBits(Hash h) {
     return 256;
 }
 
-/* The signature of data's h digest, a new String (yours): for P-256 the
- * 64 bytes r||s, as JWT's ES256 has it, deterministic (RFC 6979); for
- * RSA PKCS#1 v1.5, the key's size in bytes (JWT's RS256, RS384, RS512) */
+/* The signature of data's h digest, a new String (yours): for an EC key
+ * r||s, 64, 96 or 132 bytes (P-256, P-384, P-521), as JWT's ES256,
+ * ES384, ES512 have it, deterministic (RFC 6979); for RSA PKCS#1 v1.5,
+ * the key's size in bytes (JWT's RS256, RS384, RS512) */
 pub String Key.signWith(Hash h, u8[] data) {
     if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
+    if (self.kind() == KeyKind.ed25519) { throw(ERR_CRYPTO, "crypto: Ed25519 hashes itself: use sign"); }
     u8 sig[1024];
     u64 n = 0;
     i32 r = ktm_crypto_sign_with(self.native, hashBits(h), data.ptr, data.len, sig, 1024, &n);
@@ -332,20 +482,95 @@ pub String Key.signWith(Hash h, u8[] data) {
     return str.from(sig[0:n]);
 }
 
-/* Is sig this key's signature of data's h digest? (P-256: 64-byte r||s,
- * or DER; RSA: PKCS#1 v1.5) */
+/* Is sig this key's signature of data's h digest? (EC: r||s, or DER;
+ * RSA: PKCS#1 v1.5) */
 pub bool Key.verifyWith(Hash h, u8[] data, u8[] sig) {
+    if (self.kind() == KeyKind.ed25519) { throw(ERR_CRYPTO, "crypto: Ed25519 hashes itself: use verify"); }
     return ktm_crypto_verify_with(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
 }
 
-/* signWith(Hash.sha256, data): JWT's ES256 for a P-256 key, RS256 for RSA */
-pub String Key.sign(u8[] data) {
-    return self.signWith(Hash.sha256, data);
+/* The RSA-PSS signature of data's h digest (MGF1 with h, a salt as long
+ * as the digest: JWT's PS256, PS384, PS512), the key's size in bytes, a
+ * new String (yours). Randomised: two signatures of the same data
+ * differ. Throws ERR_CRYPTO for a key that isn't RSA. */
+pub String Key.signPss(Hash h, u8[] data) {
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-PSS needs an RSA key"); }
+    u8 sig[1024];
+    u64 n = 0;
+    i32 r = ktm_crypto_sign_pss(self.native, hashBits(h), data.ptr, data.len, sig, 1024, &n);
+    if (r != 0) { fail("signing", r); }
+    return str.from(sig[0:n]);
 }
 
-/* verifyWith(Hash.sha256, data, sig) */
+/* Is sig this RSA key's PSS signature of data's h digest (salt as long
+ * as the digest)? Throws ERR_CRYPTO for a key that isn't RSA. */
+pub bool Key.verifyPss(Hash h, u8[] data, u8[] sig) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-PSS needs an RSA key"); }
+    return ktm_crypto_verify_pss(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
+}
+
+/* data encrypted to this RSA key (public is enough) with RSA-OAEP, MGF1
+ * and the (empty) label's hash being h (JWE's RSA-OAEP-256 is
+ * Hash.sha256): the key's size in bytes, a new String (yours).
+ * Randomised. data is at most the key's size - 2 * h's size - 2 bytes. */
+pub String Key.encryptOaep(Hash h, u8[] data) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-OAEP needs an RSA key"); }
+    u8 out[1024];
+    u64 n = 0;
+    i32 r = ktm_crypto_oaep_encrypt(self.native, hashBits(h), data.ptr, data.len, out, 1024, &n);
+    if (r != 0) { fail("RSA-OAEP", r); }
+    return str.from(out[0:n]);
+}
+
+/* data (from encryptOaep with this key's public part) decrypted with
+ * this private RSA key into *plain (replaced): false, with *plain empty,
+ * for anything else, without saying why */
+pub bool Key.decryptOaep(Hash h, u8[] data, String *plain) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-OAEP needs an RSA key"); }
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: decrypting needs a private key"); }
+    plain.clear();
+    u8 out[1024];
+    u64 n = 0;
+    if (ktm_crypto_oaep_decrypt(self.native, hashBits(h), data.ptr, data.len, out, 1024, &n) != 0) {
+        return false;
+    }
+    plain.append(out[0:n]);
+    mem.set(out, 0, 1024);
+    return true;
+}
+
+/* The ECDH shared secret of this private EC key and peer's public key
+ * (the same curve; JWE's ECDH-ES): the x coordinate of the product, 32,
+ * 48 or 66 bytes, a new String (yours: derive keys from it, as with HKDF
+ * or JWE's Concat KDF, don't use it as one). peer's point is checked to
+ * be on the curve; another curve, or a key that isn't EC, throws. */
+pub String Key.ecdh(Key *peer) {
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: ECDH needs a private key"); }
+    u8 out[66];
+    u64 n = 0;
+    i32 r = ktm_crypto_ecdh(self.native, peer.native, out, &n);
+    if (r != 0) { fail("ECDH (two EC keys of one curve)", r); }
+    String z = str.from(out[0:n]);
+    mem.set(out, 0, 66);
+    return z;
+}
+
+/* signWith(Hash.sha256, data): JWT's ES256 for a P-256 key, RS256 for
+ * RSA; for Ed25519 its 64-byte signature of data (JWT's EdDSA) */
+pub String Key.sign(u8[] data) {
+    if (self.kind() != KeyKind.ed25519) { return self.signWith(Hash.sha256, data); }
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
+    u8 sig[64];
+    i32 r = ktm_crypto_ed25519_sign(self.native, data.ptr, data.len, sig);
+    if (r != 0) { fail("signing", r); }
+    return str.from(sig[0:64]);
+}
+
+/* verifyWith(Hash.sha256, data, sig); for Ed25519 its signature check */
 pub bool Key.verify(u8[] data, u8[] sig) {
-    return self.verifyWith(Hash.sha256, data, sig);
+    if (self.kind() != KeyKind.ed25519) { return self.verifyWith(Hash.sha256, data, sig); }
+    return ktm_crypto_ed25519_verify(self.native, data.ptr, data.len, sig.ptr, sig.len) == 0;
 }
 
 pub void Key.free() {

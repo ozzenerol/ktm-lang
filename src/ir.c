@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -101,8 +102,8 @@ static void irLeaveTries(IrCtx *ctx, u16 depth) {
     u16 saved_depth = ctx->try_depth;
     Ast *saved_stack[IR_TRY_STACK_MAX];
     IrValue *saved_frames[IR_TRY_STACK_MAX];
-    memcpy(saved_stack, ctx->try_stack, sizeof(saved_stack));
-    memcpy(saved_frames, ctx->try_frames, sizeof(saved_frames));
+    memcpy(saved_stack, ctx->try_stack, sizeof(Ast *) * saved_depth);
+    memcpy(saved_frames, ctx->try_frames, sizeof(IrValue *) * saved_depth);
 
     for (u16 i = saved_depth; i-- > depth; ) {
         irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmTryLeave"),
@@ -115,8 +116,8 @@ static void irLeaveTries(IrCtx *ctx, u16 depth) {
         }
     }
 
-    memcpy(ctx->try_stack, saved_stack, sizeof(saved_stack));
-    memcpy(ctx->try_frames, saved_frames, sizeof(saved_frames));
+    memcpy(ctx->try_stack, saved_stack, sizeof(Ast *) * saved_depth);
+    memcpy(ctx->try_frames, saved_frames, sizeof(IrValue *) * saved_depth);
     ctx->try_depth = saved_depth;
 }
 
@@ -802,6 +803,17 @@ static int irInlineCost(Ast *ast) {
         default:
             return -1;
     }
+}
+
+/* More try blocks and defers in scope at once than the IR keeps: an
+ * error at `ast` (file:line, as diagnostics show it), and the compile
+ * stops */
+static void irTooDeep(IrCtx *ctx, Ast *ast) {
+    AoStr *path = ast && ast->file_id ? cctrlLookUpFile(ctx->cc, ast->file_id) : NULL;
+    fprintf(stderr, "%s:%d: error: more than %d try blocks and defers (each `ad` variable is one) "
+            "in scope at once in this function: split it into smaller functions\n",
+            path ? path->data : "<unknown>", ast ? (int)ast->line : 0, IR_TRY_STACK_MAX);
+    exit(1);
 }
 
 /* Is file `id` one of the stdlib's (<install_dir>/modules/...)? */
@@ -2996,9 +3008,7 @@ void irLowerTry(IrCtx *ctx, Ast *ast) {
     /* 5. body_block: lower try body, leave the catch frame, jump to end. */
     irFnAddBlock(ctx->cur_func, body_block);
     ctx->cur_block = body_block;
-    if (ctx->try_depth >= IR_TRY_STACK_MAX) {
-        loggerPanic("try nesting above %d not supported\n", IR_TRY_STACK_MAX);
-    }
+    if (ctx->try_depth >= IR_TRY_STACK_MAX) irTooDeep(ctx, ast);
     ctx->try_stack[ctx->try_depth] = ast;
     ctx->try_frames[ctx->try_depth] = frame_addr;
     ctx->try_depth++;
@@ -3104,10 +3114,7 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
 
     irFnAddBlock(ctx->cur_func, cont_block);
     ctx->cur_block = cont_block;
-    if (ctx->try_depth >= IR_TRY_STACK_MAX) {
-        loggerPanic("try and defer nesting above %d not supported\n",
-                    IR_TRY_STACK_MAX);
-    }
+    if (ctx->try_depth >= IR_TRY_STACK_MAX) irTooDeep(ctx, ast);
     ctx->try_stack[ctx->try_depth] = ast;
     ctx->try_frames[ctx->try_depth] = frame_addr;
     ctx->try_depth++;
@@ -4348,8 +4355,10 @@ static void irTryLabelWalk(IrCtx *ctx, Ast *ast, IrTryChain *chain) {
         case AST_LABEL: {
             AoStr *lname = ast->slabel;
             if (!lname) return;
-            IrTryChain *copy = (IrTryChain *)irAlloc(sizeof(IrTryChain));
-            memcpy(copy, chain, sizeof(IrTryChain));
+            /* only the entries it has (they are all that's read) */
+            size_t n = offsetof(IrTryChain, tries) + sizeof(Ast *) * chain->depth;
+            IrTryChain *copy = (IrTryChain *)irAlloc(n);
+            memcpy(copy, chain, n);
             if (!ctx->label_tries) {
                 ctx->label_tries = mapNew(8, &map_cstring_opaque_type);
             }

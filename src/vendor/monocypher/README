@@ -1,0 +1,11 @@
+Monocypher 4.0.2, unchanged: src/monocypher.c, src/monocypher.h and
+src/optional/monocypher-ed25519.{c,h} of
+https://monocypher.org/download/monocypher-4.0.2.tar.gz (sha256
+38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c), the same
+as tag 4.0.2 of https://github.com/LoupVaillant/Monocypher but for the
+version line. Dual licensed CC0 or 2-clause BSD: LICENCE.md.
+
+ktm uses its Ed25519 (crypto.Key, KeyKind.ed25519): mbedTLS has none. It is
+compiled into libktmtls by ../ktmtls/ktmed25519.c and ktmed25519sig.c, which
+rename every public name to ktm_mc_* first, so a program that also links
+libsodium (or another Monocypher) doesn't clash.

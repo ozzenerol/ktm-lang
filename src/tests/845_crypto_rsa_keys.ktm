@@ -96,8 +96,8 @@ i32 main() {
     check(!ec.verify(msg[0:], s256[0:]) && !pk.verify("data", es[0:]), "an RSA signature isn't a P-256 one");
 
     /* what Key doesn't take */
-    ad String ed = file("ed25519-key.pem");
-    check(throws(ed[0:], true), "an Ed25519 key is refused");
+    ad String ed = file("k256-key.pem");
+    check(throws(ed[0:], true), "a secp256k1 key is refused");
     threw = false;
     try { pk.sign("x"); } catch (Error e) { threw = e.code == crypto.ERR_CRYPTO; }
     check(threw, "a public RSA key can't sign");

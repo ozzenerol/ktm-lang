@@ -91,8 +91,8 @@ i32 main() {
         box.free(); plain.free(); empty.free();
     }
     bool threw = false;
-    try { crypto.seal(crypto.Aead.aesGcm, key[0:16], nonce[0:], "x"); } catch (Error e) { threw = e.code == crypto.ERR_CRYPTO; }
-    check(threw, "a 16-byte key is refused");
+    try { crypto.seal(crypto.Aead.aesGcm, key[0:20], nonce[0:], "x"); } catch (Error e) { threw = e.code == crypto.ERR_CRYPTO; }
+    check(threw, "a 20-byte key is refused");
 
     /* ECDSA P-256 */
     crypto.Key *k = crypto.generateKey();
