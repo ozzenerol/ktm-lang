@@ -23,7 +23,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.24.0</span>
+    <span class="ver">v0.25.0</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -32,6 +32,24 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.25.0 <small>(2026-10-15)</small></h2>
+<p>Two changes to the language that make a program that compiled before fail to: both say what to
+write instead.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>ad</code> is gone (v0.24.0 renamed it <code>scoped</code>). <code>ad</code> in front of a
+  declaration is an error that says to write <code>scoped</code>; anywhere else <code>ad</code> is an
+  ordinary name. The packages moved too: <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.2.1,
+  <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.1 and
+  <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a> v0.1.1 use <code>scoped</code>
+  (<code>ktm get</code> them; older versions don't build any more).</li>
+  <li>A program or package can't give <code>String</code> or <code>Error</code> methods of its own
+  (<code>void String.shout()</code>), as it can't for any library type: their methods are the standard
+  library's. Write a function that takes one instead: <code>void shout(String *s)</code>. See
+  <a href="language/13-methods.html">Methods</a>.</li>
+</ul>
 
 <h2>v0.24.0 <small>(2026-10-15)</small></h2>
 <p>Threads without C, a clearer name for <code>ad</code>, and an LSP that imports for you.</p>
@@ -1571,7 +1589,7 @@ only names are new.</p>
 </main>
 <footer>
   <div class="bar">
-    <span>ktm v0.24.0</span>
+    <span>ktm v0.25.0</span>
     <a href="releases.html">Releases</a>
     <a href="known-issues.html">Known issues</a>
     <a href="roadmap.html">Roadmap</a>
