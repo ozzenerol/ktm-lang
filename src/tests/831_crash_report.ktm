@@ -14,8 +14,11 @@ import cstr, fs, libc, mem, proc, test;
 #define CR_ERR "__831_crash.stderr"
 
 /* Compile src (AOT, or run it in the JIT), run it and check that its
- * stderr holds each of the `\n`-separated lines of want, in order */
-bool crashes(u8 *src, bool jit, u8 *want) {
+ * stderr holds each of the `\n`-separated lines of want, in order. With
+ * noEnv, the AOT binary runs 8 times with an empty environment, which puts
+ * the top of the stack less than a page above the crash; every run must
+ * give the whole report. */
+bool crashes(u8 *src, bool jit, u8 *want, bool noEnv = false) {
     bool ok = false;
     i64 res = -1;
     u8 *err = null;
@@ -29,12 +32,19 @@ bool crashes(u8 *src, bool jit, u8 *want) {
                          CR_SRC " > /dev/null 2> " CR_ERR "; true) 2> /dev/null");
     } else if (proc.shell("../../ktm ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
                           CR_SRC " -o " CR_BIN) == 0) {
-        res = proc.shell("(" CR_BIN " > /dev/null 2> " CR_ERR "; true) 2> /dev/null");
+        if (noEnv) {
+            /* each run's report is appended: want must be found 8 times */
+            res = proc.shell("rm -f " CR_ERR "; for i in 1 2 3 4 5 6 7 8; do (env -i " CR_BIN
+                             " > /dev/null 2>> " CR_ERR "; true) 2> /dev/null; done");
+        } else {
+            res = proc.shell("(" CR_BIN " > /dev/null 2> " CR_ERR "; true) 2> /dev/null");
+        }
     }
     err = fs.readAll(CR_ERR).take();
     if (err) {
         ok = res == 0;  /* the run itself; a crash shows in stderr */
         u8 *at = err, *line = want;
+        i64 left = noEnv ? 8 : 1;
         while (ok && *line) {
             u8 *end = line;
             while (*end && *end != '\n') { end++; }
@@ -45,6 +55,7 @@ bool crashes(u8 *src, bool jit, u8 *want) {
             if (!found) { ok = false; }
             else { at = found + (end - line); }
             line = *end ? end + 1 : end;
+            if (!*line && --left > 0) { line = want; }
         }
         if (!ok) { printf("\n%s: exit %d, stderr [%s]\n", jit ? "jit" : "aot", res, err); }
     }
@@ -133,7 +144,7 @@ bool crashes(u8 *src, bool jit, u8 *want) {
 
 i32 main() {
     printf("Test - crash report: ");
-    i64 correct = 0, tests = 8;
+    i64 correct = 0, tests = 9;
 
     if (crashes(NULL_CHAIN, false, NULL_WANT)) { correct++; }
     if (crashes(NULL_CHAIN, true, NULL_WANT)) { correct++; }
@@ -141,6 +152,7 @@ i32 main() {
     if (crashes(RECURSE, true, RECURSE_WANT)) { correct++; }
     if (crashes(IN_C, false, IN_C_WANT)) { correct++; }
     if (crashes(IN_C, true, IN_C_WANT)) { correct++; }
+    if (crashes(IN_C, false, IN_C_WANT, true)) { correct++; }
     if (crashes(THREAD, false, THREAD_WANT)) { correct++; }
     if (crashes(THREAD, true, THREAD_WANT)) { correct++; }
 
