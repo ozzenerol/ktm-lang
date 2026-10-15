@@ -9,11 +9,13 @@ prints (stdout, then stderr) must equal the ```output block after it. A
 ```output block's text. Exit code 1 when anything fails.
 
 Usage: python3 docs-src/tools/check.py [--ktm PATH] [--install-dir DIR] [--jit-only] [file.md ...]
+Defaults to ./ktm and ./build/prefix (what ./build.sh produces).
 """
 import argparse
 import concurrent.futures
 import glob
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -80,12 +82,19 @@ def check_one(args, path, ex):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ktm", default="ktm")
-    ap.add_argument("--install-dir", default=os.environ.get("KTM_INSTALL_DIR"))
+    ap.add_argument("--ktm", default=os.path.join(ROOT, "ktm"))
+    ap.add_argument("--install-dir", default=os.environ.get("KTM_INSTALL_DIR") or os.path.join(ROOT, "build", "prefix"))
     ap.add_argument("--jit-only", action="store_true")
     ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("files", nargs="*")
     args = ap.parse_args()
+    # the examples run in directories of their own: paths from here must be absolute
+    if os.sep in args.ktm:
+        args.ktm = os.path.abspath(args.ktm)
+    if args.install_dir:
+        args.install_dir = os.path.abspath(args.install_dir)
+    if not (os.access(args.ktm, os.X_OK) or shutil.which(args.ktm)):
+        sys.exit(f"ktm not found at {args.ktm}; run ./build.sh first, or pass --ktm")
     files = args.files or sorted(glob.glob(os.path.join(ROOT, "docs-src", "language", "*.md")) +
                                  glob.glob(os.path.join(ROOT, "docs-src", "std", "*.md")))
     work = [(f, ex) for f in files for ex in examples(f)]

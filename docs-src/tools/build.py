@@ -79,6 +79,7 @@ def shell(title, body, root, section="", wide=False, desc=""):
     <span>ktm {VERSION}</span>
     <a href="{root}releases.html">Releases</a>
     <a href="{root}known-issues.html">Known issues</a>
+    <a href="{root}roadmap.html">Roadmap</a>
     <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
   </div>
 </footer>
@@ -179,8 +180,41 @@ def std_pages(index):
     return sum(len(m["decls"]) for m in mods)
 
 
+# Links of the old site's pages (releases, known issues and the roadmap
+# came from it) to where the same thing is now; a page that has no new
+# place (the guides, the tools pages) loses its link and keeps its text.
+OLD_LINKS = {
+    "lang-variables.html": "language/03-variables.html",
+    "lang-control-flow.html": "language/05-control-flow.html",
+    "lang-functions.html": "language/07-functions.html",
+    "language.html#autodefer": "language/16-defer-and-ad.html",
+    "language.html#generics": "language/17-generics.html",
+    "language.html#overloading": "language/18-overloading.html",
+    "lib-crypto.html": "std/index.html#crypto",
+    "lib-http.html": "std/index.html#net.http",
+    "lib-logging.html": "std/index.html#log",
+    "lib-tls.html": "std/index.html#net.tls",
+    "library.html#atomics": "std/index.html#atomic",
+    "library.html#directories": "std/index.html#fs",
+}
+KEEP = {"releases.html", "known-issues.html", "roadmap.html", "index.html"}
+
+
+def old_links(frag):
+    def fix(m):
+        href, text = m.group(1), m.group(2)
+        page = href.split("#")[0]
+        if page in KEEP:
+            return m.group(0)
+        new = OLD_LINKS.get(href) or OLD_LINKS.get(page)
+        if new and "#" in href and "#" not in new and href.split("#")[0] == page and page.startswith("lang-"):
+            new += "#" + href.split("#", 1)[1]
+        return f'<a href="{new}">{text}</a>' if new else text
+    return re.sub(r'<a href="([a-z][a-z0-9-]*\.html(?:#[^"]*)?)">(.*?)</a>', fix, frag, flags=re.S)
+
+
 def page_from(name, title, section, desc):
-    frag = open(os.path.join(SRC, "pages", name)).read()
+    frag = old_links(open(os.path.join(SRC, "pages", name)).read())
     write(name, shell(title, f'<main class="narrow prose">\n{frag}\n</main>', "", section, desc=desc))
 
 
@@ -199,8 +233,28 @@ def main():
     write("index.html", shell("ktm", home, "", "", desc="ktm, a compiled systems language for servers and tools."))
     page_from("releases.html", "Releases", "releases", "What changed in each version of ktm.")
     page_from("known-issues.html", "Known issues", "", "The bugs ktm has today, and how to work around them.")
+    page_from("roadmap.html", "Roadmap", "", "What ktm's standard library and packages have, and what comes next.")
     write("assets/search.js", "window.KTM_SEARCH = " + json.dumps(index, separators=(",", ":")) + ";\n")
     print(f"wrote {OUT}: {len(chs)} chapters, {n} library declarations, {len(index)} search entries")
+    broken = broken_links()
+    for page, href in broken:
+        print(f"broken link: {page} -> {href}")
+    if broken:
+        sys.exit(1)
+
+
+def broken_links():
+    """Links between the site's pages to a file that isn't there"""
+    out = []
+    for root, _, files in os.walk(OUT):
+        for f in files:
+            if not f.endswith(".html"):
+                continue
+            path = os.path.join(root, f)
+            for href in re.findall(r'href="([^"#:]+)(?:#[^"]*)?"', open(path).read()):
+                if not os.path.exists(os.path.normpath(os.path.join(root, href))):
+                    out.append((os.path.relpath(path, OUT), href))
+    return sorted(set(out))
 
 
 if __name__ == "__main__":
