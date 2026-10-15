@@ -1,5 +1,9 @@
 /* Arch-independent half of the in-process JIT. */
 
+/* RTLD_DEFAULT (glibc declares it only with _GNU_SOURCE) */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <ctype.h>
 #include <dlfcn.h>
 #include <pthread.h>
