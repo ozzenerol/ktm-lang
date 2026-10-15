@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>defer and ad - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html" class="on"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>defer and ad</h1>
+<p><code>defer</code> runs a statement when its block is left, however it is left: the end of the block, a <code>return</code>, a <code>break</code>, or an error passing through. <code>ad</code> in front of a declaration frees the variable the same way. Both keep the clean-up next to the code that needs it, so it can't be forgotten on one of the ways out. This chapter covers <code>defer</code>, the order defers run in, what they see, and <code>ad</code>.</p>
+<h2 id="defer"><a href="#defer">defer</a></h2>
+<p><code>defer statement;</code> registers the statement to run when the enclosing <code>{ }</code> block is left:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="k">defer</span> printf(<span class="s">&quot;last\n&quot;</span>);
+    printf(<span class="s">&quot;first\n&quot;</span>);
+    printf(<span class="s">&quot;second\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>first
+second
+last</code></pre>
+<p>A block after <code>defer</code> defers all of it:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> work() {
+    <span class="t">u8</span> *buf = mem.alloc(<span class="n">64</span>);
+    <span class="k">defer</span> {
+        mem.free(buf);
+        printf(<span class="s">&quot;freed\n&quot;</span>);
+    }
+    printf(<span class="s">&quot;working\n&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    work();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>working
+freed</code></pre>
+<p>The usual pattern is to defer the release right after acquiring, so the two sit together:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">i64</span> sumSquares(<span class="t">i64</span> n) {
+    <span class="t">i64</span> *squares = mem.alloc(n * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="k">defer</span> mem.free(squares);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; n; i++) {
+        squares[i] = i * i;
+    }
+    <span class="t">i64</span> total = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; n; i++) {
+        total += squares[i];
+    }
+    <span class="k">return</span> total;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, sumSquares(<span class="n">5</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>30</code></pre>
+<h2 id="every-way-out"><a href="#every-way-out">Every way out</a></h2>
+<p>A deferred statement runs at the end of its block, on a <code>return</code>, on <code>break</code> and <code>continue</code>, on a <code>goto</code> out of the block, and when a thrown error passes through:</p>
+<pre class="code run"><code><span class="k">enum</span> Err { negative };
+
+<span class="t">i64</span> check(<span class="t">i64</span> n) {
+    <span class="k">defer</span> printf(<span class="s">&quot;  check(%d) done\n&quot;</span>, n);
+    <span class="k">if</span> (n &lt; <span class="n">0</span>) {
+        <span class="k">throw</span>(Err.negative);
+    }
+    <span class="k">if</span> (n == <span class="n">0</span>) {
+        <span class="k">return</span> <span class="n">0</span>;
+    }
+    <span class="k">return</span> n * <span class="n">2</span>;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, check(<span class="n">5</span>));
+    printf(<span class="s">&quot;%d\n&quot;</span>, check(<span class="n">0</span>));
+    <span class="k">try</span> {
+        check(-<span class="n">1</span>);
+    } <span class="k">catch</span> {
+        printf(<span class="s">&quot;caught\n&quot;</span>);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>  check(5) done
+10
+  check(0) done
+0
+  check(-1) done
+caught</code></pre>
+<p>With several early returns, one <code>defer</code> replaces a clean-up before each of them:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">i64</span> firstEven(<span class="t">i64</span>[] input) {
+    <span class="t">i64</span> *copy = mem.alloc(input.len * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="k">defer</span> {
+        mem.free(copy);
+        printf(<span class="s">&quot;(copy freed)\n&quot;</span>);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; input.len; i++) {
+        copy[i] = input[i];
+        <span class="k">if</span> (copy[i] % <span class="n">2</span> == <span class="n">0</span>) {
+            <span class="k">return</span> copy[i];
+        }
+    }
+    <span class="k">return</span> -<span class="n">1</span>;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> a[<span class="n">4</span>] = {<span class="n">3</span>, <span class="n">5</span>, <span class="n">8</span>, <span class="n">9</span>};
+    <span class="t">i64</span> b[<span class="n">2</span>] = {<span class="n">1</span>, <span class="n">3</span>};
+    printf(<span class="s">&quot;%d\n&quot;</span>, firstEven(a));
+    printf(<span class="s">&quot;%d\n&quot;</span>, firstEven(b));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>(copy freed)
+8
+(copy freed)
+-1</code></pre>
+<h2 id="the-block-is-the-scope"><a href="#the-block-is-the-scope">The block is the scope</a></h2>
+<p>A defer belongs to the <code>{ }</code> block it is written in, not to the function. In a loop body it runs at the end of every iteration, <code>continue</code> included:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        <span class="k">defer</span> printf(<span class="s">&quot;end of %d\n&quot;</span>, i);
+        <span class="k">if</span> (i == <span class="n">1</span>) {
+            <span class="k">continue</span>;
+        }
+        printf(<span class="s">&quot;body %d\n&quot;</span>, i);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>body 0
+end of 0
+end of 1
+body 2
+end of 2</code></pre>
+<p>A plain block limits it too:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    printf(<span class="s">&quot;before\n&quot;</span>);
+    {
+        <span class="k">defer</span> printf(<span class="s">&quot;inner block left\n&quot;</span>);
+        printf(<span class="s">&quot;inside\n&quot;</span>);
+    }
+    printf(<span class="s">&quot;after\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>before
+inside
+inner block left
+after</code></pre>
+<p><code>break</code> leaves the loop's body, so its defers run first:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">10</span>; i++) {
+        <span class="k">defer</span> printf(<span class="s">&quot;done with %d\n&quot;</span>, i);
+        <span class="k">if</span> (i == <span class="n">2</span>) {
+            <span class="k">break</span>;
+        }
+    }
+    printf(<span class="s">&quot;loop over\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>done with 0
+done with 1
+done with 2
+loop over</code></pre>
+<h2 id="order"><a href="#order">Order</a></h2>
+<p>Several defers in a block run in reverse: the last one registered runs first. Inner blocks finish before outer ones.</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="k">defer</span> printf(<span class="s">&quot;outer\n&quot;</span>);
+    {
+        <span class="k">defer</span> printf(<span class="s">&quot;1st registered, runs last\n&quot;</span>);
+        <span class="k">defer</span> printf(<span class="s">&quot;2nd registered, runs first\n&quot;</span>);
+    }
+    printf(<span class="s">&quot;between\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2nd registered, runs first
+1st registered, runs last
+between
+outer</code></pre>
+<p>Reverse order is what nested resources need: what was acquired last is released first.</p>
+<pre class="code run"><code><span class="t">void</span> open(<span class="t">u8</span> *what) {
+    printf(<span class="s">&quot;open %s\n&quot;</span>, what);
+}
+
+<span class="t">void</span> close(<span class="t">u8</span> *what) {
+    printf(<span class="s">&quot;close %s\n&quot;</span>, what);
+}
+
+<span class="t">i32</span> main() {
+    open(<span class="s">&quot;database&quot;</span>);
+    <span class="k">defer</span> close(<span class="s">&quot;database&quot;</span>);
+    open(<span class="s">&quot;transaction&quot;</span>);
+    <span class="k">defer</span> close(<span class="s">&quot;transaction&quot;</span>);
+    printf(<span class="s">&quot;work\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>open database
+open transaction
+work
+close transaction
+close database</code></pre>
+<h2 id="what-a-defer-sees"><a href="#what-a-defer-sees">What a defer sees</a></h2>
+<p>The deferred statement runs later, as written: it sees the values variables have when the block ends, not when the <code>defer</code> was written.</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="t">i64</span> x = <span class="n">1</span>;
+    {
+        <span class="k">defer</span> printf(<span class="s">&quot;x is %d\n&quot;</span>, x);
+        x = <span class="n">2</span>;
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>x is 2</code></pre>
+<p><code>return</code> evaluates its value before the defers run, so a function can return something its defer then frees, as long as it isn't a pointer into what is freed:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">i64</span> first(<span class="t">i64</span> n) {
+    <span class="t">i64</span> *buf = mem.alloc(n * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="k">defer</span> mem.free(buf);
+    buf[<span class="n">0</span>] = <span class="n">42</span>;
+    <span class="k">return</span> buf[<span class="n">0</span>];
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, first(<span class="n">4</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>42</code></pre>
+<h2 id="only-if-reached"><a href="#only-if-reached">Only if reached</a></h2>
+<p>A <code>defer</code> is registered when execution reaches it. One written after an early return doesn't run on that return:</p>
+<pre class="code run"><code><span class="t">void</span> f(<span class="t">bool</span> early) {
+    <span class="k">if</span> (early) {
+        <span class="k">return</span>;
+    }
+    <span class="k">defer</span> printf(<span class="s">&quot;deferred\n&quot;</span>);
+    printf(<span class="s">&quot;late part\n&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    f(<span class="k">true</span>);
+    f(<span class="k">false</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>late part
+deferred</code></pre>
+<p>So a defer that frees something goes after the check that it was acquired:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">bool</span> fill(<span class="t">i64</span> n) {
+    <span class="k">if</span> (n &lt;= <span class="n">0</span>) {
+        <span class="k">return</span> <span class="k">false</span>;
+    }
+    <span class="t">u8</span> *buf = mem.alloc(n);
+    <span class="k">defer</span> {
+        mem.free(buf);
+        printf(<span class="s">&quot;freed %d\n&quot;</span>, n);
+    }
+    printf(<span class="s">&quot;filled %d\n&quot;</span>, n);
+    <span class="k">return</span> <span class="k">true</span>;
+}
+
+<span class="t">i32</span> main() {
+    fill(<span class="n">0</span>);
+    fill(<span class="n">16</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>filled 16
+freed 16</code></pre>
+<h2 id="what-a-deferred-statement-can-t-do"><a href="#what-a-deferred-statement-can-t-do">What a deferred statement can't do</a></h2>
+<p>A deferred statement can't leave itself with <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> (a loop inside it keeps its own <code>break</code>):</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
+        <span class="k">defer</span> {
+            <span class="k">break</span>;
+        }
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>`break` can&#x27;t leave a deferred statement</code></pre>
+<ul><li>A <code>goto</code> can't jump past a <code>defer</code> into the rest of its block.</li><li>A throw from a deferred statement goes on like any other throw.</li><li>Returning from <code>main</code> runs its defers; <code>os.exit()</code> and a crash don't.</li><li>Switching between coroutines doesn't leave a block, so it runs no defers.</li><li>Only functions that use <code>defer</code> pay for it.</li></ul>
+<h2 id="ad"><a href="#ad">ad</a></h2>
+<p><code>ad</code> in front of a declaration means <code>defer name.free();</code> right after it: the variable is freed when its block ends.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> name = str.from(<span class="s">&quot;Ada&quot;</span>);
+    name.append(<span class="s">&quot; Lovelace&quot;</span>);
+    printf(<span class="s">&quot;%.*s\n&quot;</span>, name.len, name.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Ada Lovelace</code></pre>
+<p>It works for a <code>String</code>, any slice the library allocated, and any struct with a <code>free()</code> method that takes no arguments, or a pointer to such a struct:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="k">struct</span> Conn { <span class="t">i64</span> fd; };
+
+<span class="t">void</span> Conn.free() {
+    printf(<span class="s">&quot;closing %d\n&quot;</span>, self.fd);
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> name = str.from(<span class="s">&quot;server&quot;</span>);
+    <span class="k">ad</span> <span class="t">u8</span>[][] words = str.split(<span class="s">&quot;a b c&quot;</span>, <span class="s">&quot; &quot;</span>);
+    <span class="k">ad</span> Conn c = {<span class="n">7</span>};
+    printf(<span class="s">&quot;%.*s has %d words\n&quot;</span>, name.len, name.ptr, words.len);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>server has 3 words
+closing 7</code></pre>
+<p>The library's containers all have <code>free()</code>, so <code>ad</code> is the usual way to hold them:</p>
+<pre class="code run"><code><span class="k">import</span> map, set, vec;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> vec.Vec&lt;<span class="t">i64</span>&gt; v = vec.new&lt;<span class="t">i64</span>&gt;();
+    <span class="k">ad</span> map.Map&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt; m = map.new&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt;();
+    <span class="k">ad</span> set.Set&lt;<span class="t">i64</span>&gt; s = set.new&lt;<span class="t">i64</span>&gt;();
+    v.push(<span class="n">1</span>);
+    v.push(<span class="n">2</span>);
+    m.set(<span class="s">&quot;a&quot;</span>, <span class="n">1</span>);
+    s.add(<span class="n">1</span>);
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, v.len, m.len, s.len);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2 1 1</code></pre>
+<p>Like a <code>defer</code>, an <code>ad</code> variable is freed on every way out of its block, a thrown error included:</p>
+<pre class="code run"><code><span class="k">struct</span> Res { <span class="t">u8</span> *name; };
+
+<span class="t">void</span> Res.free() {
+    printf(<span class="s">&quot;released %s\n&quot;</span>, self.name);
+}
+
+<span class="k">enum</span> Err { bad };
+
+<span class="t">void</span> use() {
+    <span class="k">ad</span> Res r = {<span class="s">&quot;lock&quot;</span>};
+    <span class="k">throw</span>(Err.bad, <span class="s">&quot;failed while holding it&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">try</span> {
+        use();
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;caught: %s\n&quot;</span>, e.message);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>released lock
+caught: failed while holding it</code></pre>
+<h3 id="without-a-value"><a href="#without-a-value">Without a value</a></h3>
+<p>An <code>ad</code> variable can be declared without a value and filled in later. Until then it is empty (every local starts zeroed), and freeing an empty <code>String</code>, slice or container does nothing:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s;
+    <span class="k">if</span> (s.len == <span class="n">0</span>) {
+        s = str.from(<span class="s">&quot;filled later&quot;</span>);
+    }
+    printf(<span class="s">&quot;%.*s\n&quot;</span>, s.len, s.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>filled later</code></pre>
+<p>A struct marked <code>@json</code> or <code>@yaml</code> that has no <code>free()</code> of its own is freed with the <code>freeDecoded()</code> those attributes generate (see <a href="23-attributes.html">Attributes</a>), so a value decoded later is freed too:</p>
+<pre class="code run"><code><span class="k">import</span> json;
+
+<span class="a">@json</span> <span class="k">struct</span> User {
+    <span class="t">String</span> name;
+    <span class="t">i64</span> age;
+};
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> User u;
+    u = json.decode&lt;User&gt;(<span class="s">&quot;{\&quot;name\&quot;: \&quot;ada\&quot;, \&quot;age\&quot;: 36}&quot;</span>);
+    printf(<span class="s">&quot;%.*s is %d\n&quot;</span>, u.name.len, u.name.ptr, u.age);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ada is 36</code></pre>
+<p>An <code>ad</code> pointer with no value is <code>null</code>, and is freed only if it holds something by the end of its block.</p>
+<h3 id="ad-and-returning"><a href="#ad-and-returning">ad and returning</a></h3>
+<p>Returning an <code>ad</code> variable is an error: it would be freed as the function returns. A function that hands a value to its caller declares it without <code>ad</code>, and the caller decides:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">import</span> str;
+
+<span class="t">String</span> make() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;x&quot;</span>);
+    <span class="k">return</span> s;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>is declared with `ad`, so it is freed when this function returns</code></pre>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">String</span> greeting(<span class="t">u8</span>[] who) {
+    <span class="t">String</span> s = str.format(<span class="s">&quot;hello, %.*s&quot;</span>, who.len, who.ptr);
+    <span class="k">return</span> s;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> g = greeting(<span class="s">&quot;ada&quot;</span>);
+    printf(<span class="s">&quot;%.*s\n&quot;</span>, g.len, g.ptr);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>hello, ada</code></pre>
+<p>A type with no <code>free()</code> can't be used with <code>ad</code>:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> Point p = {<span class="n">1</span>, <span class="n">2</span>};
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>has no `free()` that takes no arguments</code></pre>
+<h3 id="ad-rules"><a href="#ad-rules">ad rules</a></h3>
+<ul><li><code>ad T x = value;</code> is <code>T x = value; defer x.free();</code>.</li><li>It takes a <code>String</code>, a slice, or a struct (or pointer to one) with a <code>free()</code> that takes no arguments; an <code>@json</code>/<code>@yaml</code> struct without one uses <code>freeDecoded()</code>.</li><li>Without a value the variable starts empty and is still freed at the end.</li><li>Returning an <code>ad</code> variable is an error; a copy of it shares what it points to and is freed with it.</li><li><code>ad</code> goes on a local variable, not a field. It isn't a reserved word: a variable can be called <code>ad</code>.</li></ul>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>defer statement;</code> or <code>defer { ... }</code> runs when its enclosing block is left, by any way: the end, <code>return</code>, <code>break</code>, <code>continue</code>, <code>goto</code>, or a throw passing through.</li><li>Defers of a block run last first; inner blocks before outer ones.</li><li>A defer is registered when reached, and runs with the values of the moment it runs.</li><li><code>return</code> evaluates its value before the defers run.</li><li>A deferred statement can't <code>return</code>, <code>break</code>, <code>continue</code> or <code>goto</code> out of itself.</li><li><code>os.exit()</code> and crashes don't run defers; returning from <code>main</code> does.</li></ul>
+    <nav class="pager"><a class="prev" href="15-errors.html"><span>Previous</span>Errors</a><a class="next" href="17-generics.html"><span>Next</span>Generics</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#defer">defer</a></li><li><a href="#every-way-out">Every way out</a></li><li><a href="#the-block-is-the-scope">The block is the scope</a></li><li><a href="#order">Order</a></li><li><a href="#what-a-defer-sees">What a defer sees</a></li><li><a href="#only-if-reached">Only if reached</a></li><li><a href="#what-a-deferred-statement-can-t-do">What a deferred statement can&#x27;t do</a></li><li><a href="#ad">ad</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

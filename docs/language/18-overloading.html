@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overloading - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html" class="on"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Overloading</h1>
+<p>Several functions can share one name when their parameter types differ. A call picks the one its arguments fit best, at compile time. This chapter covers declaring overloads, how a call chooses, integer literals and casts, enums, defaults and ties, taking the address of an overload, overloaded methods, and the errors.</p>
+<h2 id="declaring-overloads"><a href="#declaring-overloads">Declaring overloads</a></h2>
+<p>Write each version as an ordinary function with the same name and different parameters, in type or in number:</p>
+<pre class="code run"><code><span class="t">void</span> show(<span class="t">i64</span> n) {
+    printf(<span class="s">&quot;number %d\n&quot;</span>, n);
+}
+
+<span class="t">void</span> show(<span class="t">f64</span> x) {
+    printf(<span class="s">&quot;float %.2f\n&quot;</span>, x);
+}
+
+<span class="t">void</span> show(<span class="t">u8</span> *s) {
+    printf(<span class="s">&quot;text %s\n&quot;</span>, s);
+}
+
+<span class="t">void</span> show(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    printf(<span class="s">&quot;pair %d, %d\n&quot;</span>, a, b);
+}
+
+<span class="t">i32</span> main() {
+    show(<span class="n">42</span>);
+    show(<span class="n">2.5</span>);
+    show(<span class="s">&quot;hello&quot;</span>);
+    show(<span class="n">1</span>, <span class="n">2</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>number 42
+float 2.50
+text hello
+pair 1, 2</code></pre>
+<p>Overloads usually do the same job for different inputs:</p>
+<pre class="code run"><code><span class="t">i64</span> area(<span class="t">i64</span> side) {
+    <span class="k">return</span> side * side;
+}
+
+<span class="t">i64</span> area(<span class="t">i64</span> width, <span class="t">i64</span> height) {
+    <span class="k">return</span> width * height;
+}
+
+<span class="t">f64</span> area(<span class="t">f64</span> radius) {
+    <span class="k">return</span> <span class="n">3.14159</span> * radius * radius;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d %.2f\n&quot;</span>, area(<span class="n">4</span>), area(<span class="n">3</span>, <span class="n">5</span>), area(<span class="n">1.0</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>16 15 3.14</code></pre>
+<h2 id="how-a-call-picks"><a href="#how-a-call-picks">How a call picks</a></h2>
+<p>Every overload the arguments can be converted to is a candidate. Each argument fits its parameter in one of three ways, from best to worst:</p>
+<ol><li>exactly: the same type, or an array or string literal for a slice of its element type;</li><li>in the same family: another integer width or signedness, a <code>String</code> for a <code>u8[]</code>, any pointer for a <code>void *</code>;</li><li>as an integer for a float.</li></ol>
+<p>The overload that fits every argument at least as well as any other, and at least one better, wins. A conversion that would only produce a warning (a pointer given for an integer) doesn't make a candidate.</p>
+<pre class="code run"><code><span class="t">void</span> take(<span class="t">i64</span> n) {
+    printf(<span class="s">&quot;i64\n&quot;</span>);
+}
+
+<span class="t">void</span> take(<span class="t">f64</span> x) {
+    printf(<span class="s">&quot;f64\n&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i32</span> small = <span class="n">3</span>;
+    <span class="t">f32</span> single = <span class="n">1.5</span>;
+    take(small);
+    take(single);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>i64
+f64</code></pre>
+<p><code>small</code> is an <code>i32</code>: it fits <code>i64</code> in the same family, but <code>f64</code> only as an integer for a float, so <code>take(i64)</code> wins. <code>single</code> fits <code>f64</code> in its family.</p>
+<p>A slice parameter takes arrays and string literals exactly, and a <code>String</code> in its family:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> describe(<span class="t">u8</span>[] s) {
+    printf(<span class="s">&quot;%d bytes\n&quot;</span>, s.len);
+}
+
+<span class="t">void</span> describe(<span class="t">i64</span> n) {
+    printf(<span class="s">&quot;the number %d\n&quot;</span>, n);
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">u8</span> word[<span class="n">5</span>] = {<span class="s">&#x27;h&#x27;</span>, <span class="s">&#x27;e&#x27;</span>, <span class="s">&#x27;l&#x27;</span>, <span class="s">&#x27;l&#x27;</span>, <span class="s">&#x27;o&#x27;</span>};
+    <span class="k">ad</span> <span class="t">String</span> owned = str.from(<span class="s">&quot;owned text&quot;</span>);
+    describe(<span class="s">&quot;literal&quot;</span>);
+    describe(word);
+    describe(owned);
+    describe(<span class="n">9</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 bytes
+5 bytes
+10 bytes
+the number 9</code></pre>
+<h2 id="integer-literals-are-i64"><a href="#integer-literals-are-i64">Integer literals are i64</a></h2>
+<p>An integer literal is an <code>i64</code>, so it fits an <code>i64</code> parameter exactly and picks it over a narrower one. Cast to choose the other:</p>
+<pre class="code run"><code><span class="t">void</span> f(<span class="t">i32</span> x) {
+    printf(<span class="s">&quot;i32\n&quot;</span>);
+}
+
+<span class="t">void</span> f(<span class="t">i64</span> x) {
+    printf(<span class="s">&quot;i64\n&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    f(<span class="n">5</span>);
+    f((<span class="t">i32</span>)<span class="n">5</span>);
+    <span class="t">i32</span> small = <span class="n">5</span>;
+    f(small);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>i64
+i32
+i32</code></pre>
+<p>With only narrower overloads, a literal fits each of them equally well, and the call is ambiguous until an argument is cast:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> f(<span class="t">i32</span> x) {
+}
+
+<span class="t">void</span> f(<span class="t">i16</span> x) {
+}
+
+<span class="t">i32</span> main() {
+    f(<span class="n">5</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>the call `f(i64)` is ambiguous: `f(i32)`, `f(i16)` fit as well; cast an argument to pick one</code></pre>
+<h2 id="enums-are-their-own-type"><a href="#enums-are-their-own-type">Enums are their own type</a></h2>
+<p>An enum member fits a parameter of its enum exactly, so an enum overload and an integer one can live together:</p>
+<pre class="code run"><code><span class="k">enum</span> Color { red, green };
+
+<span class="t">void</span> paint(Color c) {
+    printf(<span class="s">&quot;color %d\n&quot;</span>, c);
+}
+
+<span class="t">void</span> paint(<span class="t">i64</span> n) {
+    printf(<span class="s">&quot;number %d\n&quot;</span>, n);
+}
+
+<span class="t">i32</span> main() {
+    paint(Color.green);
+    paint(<span class="n">7</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>color 1
+number 7</code></pre>
+<h2 id="defaults-and-ties"><a href="#defaults-and-ties">Defaults and ties</a></h2>
+<p>When two overloads fit equally well, the one that needs no default arguments and no <code>...</code> extras wins:</p>
+<pre class="code run"><code><span class="t">void</span> send(<span class="t">u8</span> *msg) {
+    printf(<span class="s">&quot;plain: %s\n&quot;</span>, msg);
+}
+
+<span class="t">void</span> send(<span class="t">u8</span> *msg, <span class="t">i64</span> retry = <span class="n">3</span>) {
+    printf(<span class="s">&quot;retry %d: %s\n&quot;</span>, retry, msg);
+}
+
+<span class="t">i32</span> main() {
+    send(<span class="s">&quot;a&quot;</span>);
+    send(<span class="s">&quot;b&quot;</span>, <span class="n">5</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>plain: a
+retry 5: b</code></pre>
+<h2 id="when-nothing-fits"><a href="#when-nothing-fits">When nothing fits</a></h2>
+<p>A call that no overload takes is an error that lists them:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> h(<span class="t">i64</span> x) {
+}
+
+<span class="t">void</span> h(<span class="t">u8</span>[] s) {
+}
+
+<span class="t">i32</span> main() {
+    h(<span class="n">1.5</span>, <span class="n">2</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>no overload of `h` takes (f64, i64); there are `h(i64)`, `h(u8[])`</code></pre>
+<p>Two functions with the same parameters but different return types aren't overloads, they are a conflict:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i64</span> g(<span class="t">i64</span> x) {
+    <span class="k">return</span> x;
+}
+
+<span class="t">f64</span> g(<span class="t">i64</span> x) {
+    <span class="k">return</span> <span class="n">1.0</span>;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>conflicting types for `g`</code></pre>
+<h2 id="overloaded-methods"><a href="#overloaded-methods">Overloaded methods</a></h2>
+<p>Methods overload the same way, and so do a module's functions:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="k">struct</span> Counter { <span class="t">i64</span> n; };
+
+<span class="t">void</span> Counter.add(<span class="t">i64</span> by) {
+    self.n += by;
+}
+
+<span class="t">void</span> Counter.add(<span class="t">u8</span>[] word) {
+    self.n += word.len;
+}
+
+<span class="t">i32</span> main() {
+    Counter c = {<span class="n">0</span>};
+    c.add(<span class="n">3</span>);
+    c.add(<span class="s">&quot;four&quot;</span>);
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;owned&quot;</span>);
+    c.add(s);
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.n);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>12</code></pre>
+<p>A derived struct's method hides every overload of that name in its base (see <a href="13-methods.html">Methods</a>).</p>
+<h2 id="taking-the-address-of-an-overload"><a href="#taking-the-address-of-an-overload">Taking the address of an overload</a></h2>
+<p><code>&amp;name</code> picks the overload whose type the destination asks for: a typed variable, a parameter, a field (see <a href="20-function-pointers.html">Function pointers</a>):</p>
+<pre class="code run"><code><span class="t">i64</span> size(<span class="t">i64</span> n) {
+    <span class="k">return</span> n;
+}
+
+<span class="t">i64</span> size(<span class="t">u8</span>[] s) {
+    <span class="k">return</span> s.len;
+}
+
+<span class="t">i64</span> apply(fn(<span class="t">u8</span>[]) <span class="t">i64</span> f, <span class="t">u8</span>[] s) {
+    <span class="k">return</span> f(s);
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>) <span class="t">i64</span> byNumber = &amp;size;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, byNumber(<span class="n">7</span>), apply(&amp;size, <span class="s">&quot;four&quot;</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 4</code></pre>
+<p>With nothing to pick by, it is an error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i64</span> size(<span class="t">i64</span> n) {
+    <span class="k">return</span> n;
+}
+
+<span class="t">i64</span> size(<span class="t">u8</span>[] s) {
+    <span class="k">return</span> s.len;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">auto</span> p = &amp;size;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>`&amp;size` needs the function type to pick one</code></pre>
+<h2 id="overloads-and-generics"><a href="#overloads-and-generics">Overloads and generics</a></h2>
+<p>A generic function and plain overloads can share a name; a plain overload that fits exactly is preferred to an instance:</p>
+<pre class="code run"><code><span class="t">void</span> print&lt;T&gt;(T x) {
+    printf(<span class="s">&quot;something of %d bytes\n&quot;</span>, <span class="k">sizeof</span>(T));
+}
+
+<span class="t">void</span> print(<span class="t">u8</span> *s) {
+    printf(<span class="s">&quot;text: %s\n&quot;</span>, s);
+}
+
+<span class="t">i32</span> main() {
+    print(<span class="s">&quot;hi&quot;</span>);
+    print(<span class="n">3.5</span>);
+    print(<span class="n">7</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>text: hi
+something of 8 bytes
+something of 8 bytes</code></pre>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li>Functions and methods of one name are overloads when their parameter types differ; return types alone don't make an overload.</li><li>A call takes the overload every argument fits at least as well as with any other: exactly, then the same family, then integer for float. Warning-only conversions don't count.</li><li>On a tie, the overload without defaults or <code>...</code> extras wins; otherwise the call is ambiguous and must cast.</li><li>Integer literals are <code>i64</code>; enum members fit their enum exactly.</li><li><code>&amp;name</code> of an overloaded function needs a destination type.</li><li>An <code>extern &quot;c&quot;</code> function has one C symbol and can't be overloaded; <code>...args</code> can't be spread into an overloaded function.</li><li>Overloads with <code>@caller</code> parameters must all start with the same ones.</li><li>Messages show an overload with its parameter types: <code>show(u8[])</code>.</li></ul>
+    <nav class="pager"><a class="prev" href="17-generics.html"><span>Previous</span>Generics</a><a class="next" href="19-varargs.html"><span>Next</span>Variable arguments</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#declaring-overloads">Declaring overloads</a></li><li><a href="#how-a-call-picks">How a call picks</a></li><li><a href="#integer-literals-are-i64">Integer literals are i64</a></li><li><a href="#enums-are-their-own-type">Enums are their own type</a></li><li><a href="#defaults-and-ties">Defaults and ties</a></li><li><a href="#when-nothing-fits">When nothing fits</a></li><li><a href="#overloaded-methods">Overloaded methods</a></li><li><a href="#taking-the-address-of-an-overload">Taking the address of an overload</a></li><li><a href="#overloads-and-generics">Overloads and generics</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
