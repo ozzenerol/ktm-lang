@@ -22,7 +22,7 @@ stay in <code>main.ktm</code>. The whole file:</p>
 <details class="code"><summary>api/api.ktm</summary>
 <pre><code>module api;
 import "github.com/ozzenerol/ktm-pg";
-import crypto, encoding.base64, json, mem, net.http, net.http.middleware, reflect, str, uuid, vec;
+import crypto, encoding.base64, json, net.http, net.http.middleware, reflect, str, uuid, vec;
 
 /* Shelf's HTTP API: its routes, handlers and middleware. main.ktm reads
  * the settings, opens the database and serves what routes() set up. */
@@ -148,19 +148,14 @@ bool checkToken(u8[] token, http.Request *r)
         "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at > now()", h[0:32]);
     defer pg.free(reflect.of(ids));
     if (!ids.len) { return false; }
-    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
-    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
-    u8[] *id = r.alloc(sizeof(u8[]));
-    *id = keep[0:ids.data[0].len];
-    r.set("userId", id);
+    r.setText("userId", ids.data[0][0:]);         /* a copy, kept until the reply */
     return true;
 }
 
 /* The signed-in user's id (behind middleware.bearer) */
 u8[] userOf(http.Request *r)
 {
-    u8[] *id = r.get("userId");
-    return *id;
+    return r.getText("userId");
 }
 
 void logout(http.Writer *w, http.Request *r)
@@ -539,7 +534,7 @@ i32 main(i32 argc, u8 **argv)
     log.info("Shelf listening on http://localhost:%d", *port);
     return http.listen((i32)*port, &mux, db, &o);
 }</code></pre>
-<p><code>crypto</code>, <code>encoding.base64</code>, <code>json</code>, <code>mem</code>, <code>uuid</code> and
+<p><code>crypto</code>, <code>encoding.base64</code>, <code>json</code>, <code>uuid</code> and
 <code>net.http.middleware</code> leave its imports with the code that used them.</p>
 
 <h2>The tests</h2>
