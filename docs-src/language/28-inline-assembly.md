@@ -355,7 +355,8 @@ pub _extern _FM_TWICE i64 twice(i64 x);      // fastmath.twice for importers
 
 ## Errors
 
-The assembler checks each instruction while the program is compiled:
+The assembler checks each instruction while the program is compiled, and reports an error at the
+instruction that has it (here line 4, `MOV RAX`, on x86_64):
 
 ```ktm error
 #ifdef IS_X86_64
