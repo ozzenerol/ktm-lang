@@ -69,9 +69,14 @@ int ktm_crypto_sha512(const unsigned char *in, size_t len, unsigned char *out) {
     return mbedtls_sha512(in, len, out, 0);
 }
 
-/* md: 256 or 512 */
+int ktm_crypto_sha384(const unsigned char *in, size_t len, unsigned char *out) {
+    return mbedtls_sha512(in, len, out, 1);
+}
+
+/* md: 256, 384 or 512 */
 static const mbedtls_md_info_t *ktmCryptoMd(int bits) {
-    return mbedtls_md_info_from_type(bits == 512 ? MBEDTLS_MD_SHA512 : MBEDTLS_MD_SHA256);
+    return mbedtls_md_info_from_type(bits == 512 ? MBEDTLS_MD_SHA512
+                                     : bits == 384 ? MBEDTLS_MD_SHA384 : MBEDTLS_MD_SHA256);
 }
 
 int ktm_crypto_hmac(int bits, const unsigned char *key, size_t klen, const unsigned char *in, size_t len,

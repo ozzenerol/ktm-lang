@@ -68,8 +68,8 @@ String token = crypto.randomBytes(24);   // a session token's bytes (base64.enco
 <h2 id="hashes-macs-keys-from-secrets">Hashes, MACs, keys from secrets<a class="anchor" href="#hashes-macs-keys-from-secrets" aria-label="Link to this section">#</a></h2>
 <div class="table-wrap"><table>
   <tr><th>Call</th><th>What it does</th></tr>
-  <tr><td><code>crypto.sha256(data, out)</code>, <code>crypto.sha512(data, out)</code></td><td>Into a 32- or 64-byte <code>out</code></td></tr>
-  <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256)</td></tr>
+  <tr><td><code>crypto.sha256(data, out)</code>, <code>sha384</code>, <code>sha512</code></td><td>Into a 32-, 48- or 64-byte <code>out</code></td></tr>
+  <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha384</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256, HS384, HS512)</td></tr>
   <tr><td><code>crypto.equal(a, b)</code></td><td>Compares in constant time: use it for MACs, tokens and hashes, never <code>str.equals</code></td></tr>
   <tr><td><code>crypto.hkdfSha256(secret, salt, info, out)</code></td><td>Keys of <code>out.len</code> bytes from one secret (RFC 5869)</td></tr>
   <tr><td><code>crypto.pbkdf2Sha256(password, salt, iterations, out)</code></td><td>A key from a password; to store passwords use <code>hashPassword</code> (below)</td></tr>
