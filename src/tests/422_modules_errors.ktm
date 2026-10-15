@@ -7,7 +7,9 @@ import cstr, fs, libc, mem, proc, test;
  * whose `module` line doesn't match its directory or that has none, a
  * module found twice (here: next to the program and in KTM_PATH), a
  * declaration hiding an import prefix and `module` in the main program
- * are errors; an import never used is a warning. */
+ * are errors; an import never used is a warning. A function whose body
+ * has the error (`return geo.square(2);`, `return helper();`) isn't also
+ * warned about a missing return: the error dropped the `return`. */
 
 #define ERR_OUT "./ktm-422-modules.out"
 #define FIXTURES "${KTM_TEST_SRC:-.}/modules/errors/"
@@ -44,10 +46,10 @@ i32 main() {
     printf("Test - modules: errors: ");
     i64 correct = 0, tests = 0;
 
-    tests++; if (reports("private_fn", "", 1, 1, "`square` is private to module geo")) { correct++; }
+    tests++; if (reports("private_fn", "", 1, 0, "`square` is private to module geo")) { correct++; }
     tests++; if (reports("private_type", "", 1, 0, "`Hidden` is private to module geo")) { correct++; }
-    tests++; if (reports("main_name", "", 1, 1, "`helper` has not been defined")) { correct++; }
-    tests++; if (reports("main_name", "", 1, 1, "main_name/geo/geo.ktm:3:30")) { correct++; }
+    tests++; if (reports("main_name", "", 1, 0, "`helper` has not been defined")) { correct++; }
+    tests++; if (reports("main_name", "", 1, 0, "main_name/geo/geo.ktm:3:30")) { correct++; }
     tests++; if (reports("missing", "", 1, 0, "module nothere not found")) { correct++; }
     tests++; if (reports("cycle", "", 1, 0, "circular import: a -> b -> a")) { correct++; }
     tests++;

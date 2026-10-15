@@ -382,6 +382,9 @@ typedef struct Cctrl {
     /* `n_errors` counts only `CCTRL_ERROR` entries so the driver can decide
      * whether to proceed to codegen. */
     int n_errors;
+    /* Every error raised, repeats and replayed ones too: a function
+     * whose body had one isn't also warned about its missing return */
+    int errors_raised;
 
     /* Innermost active parser recovery point. `NULL` means errors
      * are fatal. non-NULL means `cctrlRaiseException` will record the
