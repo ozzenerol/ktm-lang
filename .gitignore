@@ -26,3 +26,4 @@ build
 compile.sh
 lsp-test-runner
 build-x86
+docs-src/tools/__pycache__/

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ktm</title>
+<meta name="description" content="ktm, a compiled systems language for servers and tools.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="index.html">ktm</a>
+    <nav class="main">
+      <a href="language/index.html">Language</a>
+      <a href="std/index.html">Library</a>
+      <a href="releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<main class="home">
+  <div>
+    <h1>A compiled systems language for servers and tools.</h1>
+    <p class="lede">Native code, coroutines for networking, a standard library with HTTP, JSON, TLS and
+    cryptography, and no garbage collector.</p>
+  </div>
+
+  <div class="block">
+    <span class="label">Faster than Go at networking, with less memory and less CPU</span>
+    <div class="table"><table>
+      <thead><tr><th>HTTP server, 64 keep-alive connections, 2 cores</th><th>ktm</th><th>Go 1.27 net/http</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Requests per second</td><td>327,612</td><td>126,202</td><td>2.6x</td></tr>
+        <tr><td>Requests per CPU second</td><td>164,008</td><td>70,187</td><td>2.3x</td></tr>
+        <tr><td>Memory (peak RSS)</td><td>3.3 MB</td><td>13.0 MB</td><td>4x less</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="block">
+    <span class="label">Install (Linux x86_64; arm64 and macOS zips are on the same page)</span>
+    <div class="install">
+      <pre class="code" id="install-cmd"><code>curl -LO https://github.com/ozzenerol/ktm-lang/releases/download/v0.23.1/ktm-v0.23.1-linux-x86_64.zip
+unzip ktm-v0.23.1-linux-x86_64.zip &amp;&amp; cd ktm-v0.23.1-linux-x86_64 &amp;&amp; sudo ./install.sh</code></pre>
+      <button class="copy" data-copy="install-cmd">Copy</button>
+    </div>
+  </div>
+
+  <div class="block">
+    <span class="label">hello.ktm</span>
+<pre class="code"><code><span class="k">import</span> net.http;
+
+<span class="t">void</span> hello(http.Writer *w, http.Request *r) {
+    <span class="t">u8</span>[] name = r.query(<span class="s">"name"</span>);
+    <span class="k">if</span> !name.len { name = <span class="s">"world"</span>; }
+    w.text(<span class="n">200</span>, <span class="s">"hello, %s\n"</span>, name);
+}
+
+<span class="t">i32</span> main() {
+    http.Mux mux;
+    mux.handle(<span class="s">"GET /"</span>, &amp;hello);
+    <span class="k">return</span> http.listen(<span class="n">8080</span>, &amp;mux);
+}</code></pre>
+<pre class="out"><code>$ ktm hello.ktm -o hello &amp;&amp; ./hello &amp;
+$ curl 'localhost:8080/?name=ada'
+hello, ada</code></pre>
+  </div>
+
+  <ul class="paths">
+    <li><a href="language/index.html"><b>Language</b><span>Every part of ktm, one topic per chapter, with many small programs you can run.</span></a></li>
+    <li><a href="std/index.html"><b>Library</b><span>Every module, type and function of the standard library.</span></a></li>
+    <li><a href="releases.html"><b>Releases</b><span>What changed in each version.</span></a></li>
+    <li><a href="known-issues.html"><b>Known issues</b><span>The bugs ktm has today, and how to work around them.</span></a></li>
+  </ul>
+</main>
+
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="releases.html">Releases</a>
+    <a href="known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="assets/search.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>
