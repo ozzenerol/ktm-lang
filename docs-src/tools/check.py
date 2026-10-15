@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Run every example of the docs (docs-src/language/*.md, docs-src/std/*.md).
 
-A ```ktm run block is compiled and run, ahead of time and in the JIT; what it
+Each example is the file example.ktm in a directory of its own (so what a
+program prints about its own file is the same on every run). A ```ktm run
+block is compiled and run, ahead of time and in the JIT; what it
 prints (stdout, then stderr) must equal the ```output block after it. A
 ```ktm error block must fail to compile, and ktm's output must contain the
 ```output block's text. Exit code 1 when anything fails.
@@ -56,7 +58,7 @@ def check_one(args, path, ex):
         src = os.path.join(tmp, "example.ktm")
         open(src, "w").write(code + "\n")
         if kind == "error":
-            rc, out = run(ktm + ["-S", src, "-o", os.devnull], tmp)
+            rc, out = run(ktm + ["-S", "example.ktm", "-o", os.devnull], tmp)
             if rc == 0:
                 return where, "compiled, but it should not"
             if want.strip() not in out:
@@ -64,13 +66,13 @@ def check_one(args, path, ex):
             return where, None
         want = want.rstrip("\n")
         if not args.jit_only:
-            rc, out = run(ktm + [src, "-o", os.path.join(tmp, "example")], tmp)
+            rc, out = run(ktm + ["example.ktm", "-o", "example"], tmp)
             if rc != 0:
                 return where, f"doesn't compile:\n{out}"
             rc, out = run([os.path.join(tmp, "example")], tmp)
             if out.rstrip("\n") != want:
                 return where, f"compiled, it prints:\n{out}\nbut the page says:\n{want}"
-        rc, out = run(ktm + ["-jit", src], tmp)
+        rc, out = run(ktm + ["-jit", "example.ktm"], tmp)
         if out.rstrip("\n") != want:
             return where, f"in the JIT, it prints:\n{out}\nbut the page says:\n{want}"
     return where, None

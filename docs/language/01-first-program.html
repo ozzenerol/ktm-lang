@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A first program - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html" class="on"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li></ol></aside>
+  <article class="prose">
+<h1>A first program</h1>
+<p>What a ktm source file looks like, where a program starts, how it prints, how it ends, and the ways to build and run it.</p>
+<h2 id="hello"><a href="#hello">Hello</a></h2>
+<p>A program starts at <code>main</code>. <code>printf</code> prints, as in C.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;Hello\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>Hello</code></pre>
+<p>Save it as <code>hello.ktm</code>. There are three ways to run it:</p>
+<pre class="code"><code>ktm hello.ktm -o hello &amp;&amp; ./hello    # compile to a native binary, then run it
+ktm -run hello.ktm                   # compile to a temporary binary and run it
+ktm -jit hello.ktm                   # compile in memory and run, no file written</code></pre>
+<p>The binary needs nothing installed to run: ktm's library is linked into it. <code>-jit</code> is the fastest way to try something; a binary is what you deploy.</p>
+<h2 id="three-forms-of-main"><a href="#three-forms-of-main">Three forms of main</a></h2>
+<p><code>main</code> returns nothing, or the program's exit code, and can take the command line.</p>
+<div class="table"><table><thead><tr><th>Form</th><th>Exit code</th></tr></thead><tbody><tr><td><code>void main()</code></td><td>0</td></tr><tr><td><code>i32 main()</code></td><td>what it returns</td></tr><tr><td><code>i32 main(i32 argc, u8 **argv)</code></td><td>what it returns; <code>argv</code> holds the arguments</td></tr></tbody></table></div>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    printf(<span class="s">&quot;returning 3\n&quot;</span>);
+    <span class="k">return</span> <span class="n">3</span>;
+}</code></pre>
+<pre class="out"><code>returning 3</code></pre>
+<p>The shell sees 3 as the exit status (<code>echo $?</code>). With arguments:</p>
+<pre class="code run"><code><span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    printf(<span class="s">&quot;%d argument(s)\n&quot;</span>, argc);
+    printf(<span class="s">&quot;the program is called %s\n&quot;</span>, argc &gt; <span class="n">0</span> ? <span class="s">&quot;something&quot;</span> : <span class="s">&quot;nothing&quot;</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt; argc; i++) {
+        printf(<span class="s">&quot;argument %d: %s\n&quot;</span>, i, argv[i]);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 argument(s)
+the program is called something</code></pre>
+<p><code>argv[0]</code> is the program's own name, so a program run with no arguments has <code>argc == 1</code>. After <code>ktm -jit file.ktm</code> or <code>ktm -run file.ktm</code>, everything after the file name goes to the program: <code>ktm -jit tool.ktm --verbose input.txt</code>.</p>
+<h2 id="what-goes-where"><a href="#what-goes-where">What goes where</a></h2>
+<p>A file holds declarations: imports, types, functions, global variables and constants. Statements go inside functions. Imports come first.</p>
+<pre class="code run"><code><span class="k">const</span> <span class="t">i64</span> LIMIT = <span class="n">3</span>;
+<span class="t">i64</span> gCalls = <span class="n">0</span>;
+
+<span class="k">struct</span> Point { <span class="t">i64</span> x; <span class="t">i64</span> y; };
+
+<span class="t">i64</span> manhattan(Point p) {
+    gCalls++;
+    <span class="k">return</span> p.x + p.y;
+}
+
+<span class="t">void</span> main() {
+    Point p = {<span class="n">2</span>, <span class="n">5</span>};
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; LIMIT; i++) {
+        manhattan(p);
+    }
+    printf(<span class="s">&quot;%d after %d calls\n&quot;</span>, manhattan(p), gCalls);
+}</code></pre>
+<pre class="out"><code>7 after 4 calls</code></pre>
+<ul><li>Order doesn't matter between functions: <code>main</code> can call a function declared below it.</li><li>Names at file scope are visible in the whole file.</li><li>A global's initial value can run code. Those run in order, before <code>main</code>.</li></ul>
+<pre class="code run"><code><span class="t">i64</span> square(<span class="t">i64</span> n) { <span class="k">return</span> n * n; }
+
+<span class="t">i64</span> gBase = <span class="n">7</span>;
+<span class="t">i64</span> gArea = square(gBase);    <span class="c">// runs before main</span>
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, gArea);
+}</code></pre>
+<pre class="out"><code>49</code></pre>
+<h2 id="comments"><a href="#comments">Comments</a></h2>
+<p>Line comments start with <code>//</code>, block comments are <code>/* ... */</code>, as in C. Block comments don't nest.</p>
+<pre class="code run"><code><span class="c">/* A block comment
+   over several lines. */</span>
+<span class="t">void</span> main() {
+    <span class="c">// to the end of the line</span>
+    printf(<span class="s">&quot;comments are ignored\n&quot;</span>);   <span class="c">/* or in the middle */</span>
+}</code></pre>
+<pre class="out"><code>comments are ignored</code></pre>
+<h2 id="printing"><a href="#printing">Printing</a></h2>
+<p><code>printf</code> takes a format and the values for it, one value for each conversion (<code>%d</code>, <code>%s</code>...).</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;plain text\n&quot;</span>);
+    printf(<span class="s">&quot;%s is %d years old\n&quot;</span>, <span class="s">&quot;Ada&quot;</span>, <span class="n">36</span>);
+    printf(<span class="s">&quot;%x %X %o\n&quot;</span>, <span class="n">255</span>, <span class="n">255</span>, <span class="n">8</span>);
+    printf(<span class="s">&quot;%c%c\n&quot;</span>, <span class="s">&#x27;o&#x27;</span>, <span class="s">&#x27;k&#x27;</span>);
+    printf(<span class="s">&quot;%f %.2f %e\n&quot;</span>, <span class="n">3.14159</span>, <span class="n">3.14159</span>, <span class="n">31415.9</span>);
+    printf(<span class="s">&quot;100%%\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>plain text
+Ada is 36 years old
+ff FF 10
+ok
+3.141590 3.14 3.141590e+04
+100%</code></pre>
+<p>Widths and flags work as in C: a number is the minimum width, <code>-</code> aligns left, <code>0</code> pads with zeros, <code>.n</code> is the precision.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;[%5d] [%-5d] [%05d]\n&quot;</span>, <span class="n">42</span>, <span class="n">42</span>, <span class="n">42</span>);
+    printf(<span class="s">&quot;[%8.3f] [%-8.1f]\n&quot;</span>, <span class="n">2.5</span>, <span class="n">2.5</span>);
+    printf(<span class="s">&quot;[%6s] [%-6s] [%.2s]\n&quot;</span>, <span class="s">&quot;ab&quot;</span>, <span class="s">&quot;ab&quot;</span>, <span class="s">&quot;abcdef&quot;</span>);
+}</code></pre>
+<pre class="out"><code>[   42] [42   ] [00042]
+[   2.500] [2.5     ]
+[    ab] [ab    ] [ab]</code></pre>
+<ul><li><code>%d</code>, <code>%u</code>, <code>%x</code> and <code>%o</code> print all 64 bits. <code>%ld</code> works too, but isn't needed.</li><li><code>%s</code> takes a C string (<code>u8 *</code>), a slice (<code>u8[]</code>) or a <code>String</code>.</li><li>The first argument is always a format: a literal <code>%</code> is written <code>%%</code>.</li></ul>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> big = <span class="n">5000000000</span>;
+    printf(<span class="s">&quot;%d %ld\n&quot;</span>, big, big);
+
+    <span class="t">u8</span>[] word = <span class="s">&quot;slice&quot;</span>;
+    <span class="t">String</span> owned = str.from(<span class="s">&quot;String&quot;</span>);
+    printf(<span class="s">&quot;%s, %s and %s\n&quot;</span>, <span class="s">&quot;C string&quot;</span>, word, owned);
+    owned.free();
+}</code></pre>
+<pre class="out"><code>5000000000 5000000000
+C string, slice and String</code></pre>
+<h3 id="ktm-s-own-conversions"><a href="#ktm-s-own-conversions">ktm's own conversions</a></h3>
+<p><code>%Q</code> prints a string escaped the way it would be written in source code. <code>%C</code> prints a character in upper case.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;%Q\n&quot;</span>, <span class="s">&quot;say \&quot;hi\&quot;\n&quot;</span>);
+    printf(<span class="s">&quot;%C%c\n&quot;</span>, <span class="s">&#x27;h&#x27;</span>, <span class="s">&#x27;i&#x27;</span>);
+}</code></pre>
+<pre class="out"><code>say \&quot;hi\&quot;\n
+Hi</code></pre>
+<h3 id="counting-the-values"><a href="#counting-the-values">Counting the values</a></h3>
+<p>The compiler counts the conversions in a format and checks there is one value for each. A missing value is an error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d and %d\n&quot;</span>, <span class="n">1</span>);
+}</code></pre>
+<pre class="out"><code>printf format expects 2 arguments but 1 was supplied</code></pre>
+<p>So is one too many:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, <span class="n">1</span>, <span class="n">2</span>);
+}</code></pre>
+<pre class="out"><code>printf format expects 1 argument but 2 were supplied</code></pre>
+<p>The types of the values aren't checked yet: give <code>%d</code> an integer, <code>%f</code> a float and <code>%s</code> text.</p>
+<h2 id="printing-to-stderr"><a href="#printing-to-stderr">Printing to stderr</a></h2>
+<p><code>os.eprintf</code> is <code>printf</code> to stderr, checked the same way.</p>
+<pre class="code run"><code><span class="k">import</span> os;
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;to stdout\n&quot;</span>);
+    os.eprintf(<span class="s">&quot;warning: %s\n&quot;</span>, <span class="s">&quot;disk almost full&quot;</span>);
+}</code></pre>
+<pre class="out"><code>to stdout
+warning: disk almost full</code></pre>
+<h2 id="ending-the-program"><a href="#ending-the-program">Ending the program</a></h2>
+<p>Returning from <code>main</code> ends the program with its exit code. <code>os.exit(code)</code> ends it from anywhere.</p>
+<pre class="code run"><code><span class="k">import</span> os;
+
+<span class="t">void</span> check(<span class="t">i64</span> n) {
+    <span class="k">if</span> (n &lt; <span class="n">0</span>) {
+        printf(<span class="s">&quot;negative: %d\n&quot;</span>, n);
+        os.exit(<span class="n">2</span>);
+    }
+    printf(<span class="s">&quot;ok: %d\n&quot;</span>, n);
+}
+
+<span class="t">void</span> main() {
+    check(<span class="n">5</span>);
+    check(-<span class="n">1</span>);
+    printf(<span class="s">&quot;never printed\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>ok: 5
+negative: -1</code></pre>
+<p><code>os.exit</code> ends the program at once: the <code>defer</code> statements of the functions still running don't run. Returning from <code>main</code> runs them. See <a href="16-defer-and-ad.html">defer and ad</a>.</p>
+<h2 id="scripts"><a href="#scripts">Scripts</a></h2>
+<p>ktm skips a first line that starts with <code>#!</code>, so a source file can run as a script:</p>
+<pre class="code"><code>#!/usr/bin/env -S ktm -jit
+<span class="t">void</span> main() { printf(<span class="s">&quot;Hello from a script\n&quot;</span>); }</code></pre>
+<pre class="code"><code>chmod +x hello.ktm
+./hello.ktm</code></pre>
+<h2 id="what-s-next"><a href="#what-s-next">What's next</a></h2>
+<p><a href="02-types-and-values.html">Types and values</a> covers the built-in types and how to write numbers, characters and text.</p>
+    <nav class="pager"><a class="next" href="02-types-and-values.html"><span>Next</span>Types and values</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#hello">Hello</a></li><li><a href="#three-forms-of-main">Three forms of main</a></li><li><a href="#what-goes-where">What goes where</a></li><li><a href="#comments">Comments</a></li><li><a href="#printing">Printing</a></li><li><a href="#printing-to-stderr">Printing to stderr</a></li><li><a href="#ending-the-program">Ending the program</a></li><li><a href="#scripts">Scripts</a></li><li><a href="#what-s-next">What&#x27;s next</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
