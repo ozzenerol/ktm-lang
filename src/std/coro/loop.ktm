@@ -1399,6 +1399,26 @@ pub i32 close(i32 fd) {
     return r;
 }
 
+/* fd leaves this thread's loop, so a coroutine of another thread's loop
+ * can wait on it (a connection kept in a pool that threads share): the
+ * loop drops its registration with the kernel queue and forgets what it
+ * knew of fd. Without it the loop takes fd as still registered, and a
+ * new fd with the same number, once the other thread closes this one,
+ * is never waited for. Throws ERR_LOOP while a coroutine of this loop
+ * waits on fd; nothing to do for an fd the loop never waited on, or on
+ * a thread without a loop. */
+pub void detach(i32 fd) {
+    Loop *lp = loopGet(false);
+    if (!lp || fd < 0 || fd >= lp.fdwCap || !lp.fdw[fd]) { return; }
+    LoopFd *f = lp.fdw[fd];
+    if (f.n) { throw(ERR_LOOP, "coro.detach: a coroutine of this thread's loop waits on fd %d", fd); }
+    if (lp.q >= 0 && f.armed) { loopRegister(lp, fd, f, 0); }
+    loopForget(lp, fd);
+    f.big = false;
+    f.burstNs = 0;
+    f.queuedRun = 0;
+}
+
 /* Ask the loop to wind down: every coro.waitIdle and coro.accept, now
  * and later, returns -1; plain waits and sleeps go on, so the work in
  * flight finishes, and coro.run returns once every coroutine has ended.
