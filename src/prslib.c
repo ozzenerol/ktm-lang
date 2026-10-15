@@ -4207,8 +4207,8 @@ Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at) {
     }
     if (!fn || !fn->params || fn->params->size != 1) {
         cctrlRaiseExceptionAt(cc, at->line, at->col, at->len,
-            "`ad` frees its variable with `free()`, and `%s` has no `free()` that "
-            "takes no arguments: declare it without `ad` and free it yourself",
+            "`scoped` frees its variable with `free()`, and `%s` has no `free()` that "
+            "takes no arguments: declare it without `scoped` and free it yourself",
             astTypeToString(t));
     }
     parseCheckMethodAccess(cc, owner, (char *)method, strlen(method));

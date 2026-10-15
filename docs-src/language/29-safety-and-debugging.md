@@ -274,7 +274,7 @@ memsafe: 3 allocation(s) (768 bytes) never freed
   0x5576d4d672c8       256 bytes  at loop.ktm:5 in main, via str.format
 ```
 
-The fix is `ad String s = ...` (see [defer and ad](16-defer-and-ad.html)), and the report is empty.
+The fix is `scoped String s = ...` (see [defer and scoped](16-defer-and-scoped.html)), and the report is empty.
 
 - A leak is a block nothing points to any more. What a global, the library, or (when the program
   calls `exit()`) a live variable still holds at exit is in use, not a leak: it is listed apart,

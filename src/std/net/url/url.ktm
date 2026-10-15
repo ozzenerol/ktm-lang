@@ -197,10 +197,10 @@ pub String URL.string() {
     if (self.hasAuthority || self.host.len || self.hasUser || self.port) {
         out.append("//");
         if (self.hasUser) {
-            ad String u = str.urlEncode(self.user);
+            scoped String u = str.urlEncode(self.user);
             out.append(u);
             if (self.hasPassword) {
-                ad String p = str.urlEncode(self.password);
+                scoped String p = str.urlEncode(self.password);
                 out.appendByte(':');
                 out.append(p);
             }
@@ -303,8 +303,8 @@ pub String Values.encode() {
     String out;
     for (i64 i = 0; i < self.items.len; i++) {
         if (i) { out.appendByte('&'); }
-        ad String n = str.urlEncode(self.items.data[i].name);
-        ad String v = str.urlEncode(self.items.data[i].value);
+        scoped String n = str.urlEncode(self.items.data[i].name);
+        scoped String v = str.urlEncode(self.items.data[i].value);
         out.append(n);
         out.appendByte('=');
         out.append(v);

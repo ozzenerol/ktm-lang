@@ -35,13 +35,13 @@ i64 total(i64 n) { return n * 100; }
 i32 main()
 {
     printf("Test - overloads with generic parameters: ");
-    ad vec.Vec<i64> a = vec.new<i64>();
+    scoped vec.Vec<i64> a = vec.new<i64>();
     a.push(2);
     a.push(3);
-    ad vec.Vec<u8[]> b = vec.new<u8[]>();
+    scoped vec.Vec<u8[]> b = vec.new<u8[]>();
     b.push("abc");
     b.push("de");
-    ad vec.Vec<String> c = vec.new<String>();
+    scoped vec.Vec<String> c = vec.new<String>();
     check(total(&a) == 5, "Vec<i64> *");
     check(total(&b) == 5 && total(&c) == 0, "Vec<u8[]> * and Vec<String> *");
     check(total(7) == 700, "the plain one");

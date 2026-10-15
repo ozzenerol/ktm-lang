@@ -63,8 +63,8 @@ i32 main()
 {
     printf("Test - user ...args functions take String and u8[]: ");
 
-    ad String name = str.format("users_%d", 2);
-    ad String empty = str.new();
+    scoped String name = str.format("users_%d", 2);
+    scoped String empty = str.new();
     u8[] view = "orders and more";
     view = view[0:6];
 

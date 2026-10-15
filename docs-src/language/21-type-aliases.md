@@ -215,10 +215,10 @@ type Ints = vec.Vec<i64>;
 type Ages = map.Map<u8 *, i64>;
 
 i32 main() {
-    ad Ints nums = vec.new<i64>();
+    scoped Ints nums = vec.new<i64>();
     nums.push(3);
     nums.push(4);
-    ad Ages ages = map.new<u8 *, i64>();
+    scoped Ages ages = map.new<u8 *, i64>();
     ages.set("ann", 41);
     printf("%d %d %s\n", nums.len, ages.getOr("ann", 0), typeof(nums));
     return 0;

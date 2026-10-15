@@ -22,7 +22,7 @@ void Res.free() {
 @json struct Named { i64 id; String name; };
 
 i64 lenOf() {
-    ad vec.Vec<i64> v;
+    scoped vec.Vec<i64> v;
     v.push(4);
     v.push(5);
     return v.len;
@@ -30,7 +30,7 @@ i64 lenOf() {
 
 void loop() {
     for i64 i = 1; i <= 3; i++ {
-        ad Res r;
+        scoped Res r;
         if i == 2 {
             r.id = 10;
         }
@@ -39,7 +39,7 @@ void loop() {
 
 Res gRes;
 void pointer(bool set) {
-    ad Res *p;
+    scoped Res *p;
     if set {
         p = &gRes;
         p.id = 100;
@@ -47,10 +47,10 @@ void pointer(bool set) {
 }
 
 i32 main() {
-    printf("Test - ad without a value: ");
+    printf("Test - scoped without a value: ");
 
     {
-        ad Res r;
+        scoped Res r;
         check(r.id == 0, "a struct starts zeroed");
         r.id = 7;
     }
@@ -64,13 +64,13 @@ i32 main() {
     check(lenOf() == 2, "a container filled after an empty start");
 
     {
-        ad Named u;
+        scoped Named u;
         check(u.id == 0 && u.name.len == 0, "an @json struct starts empty");
         u = json.decode<Named>("{\"id\": 3, \"name\": \"ada\"}");
         check(u.id == 3 && u.name.equals("ada"), "decoded into, freed by freeDecoded()");
     }
     {
-        ad Named empty;
+        scoped Named empty;
     }
     check(true, "an @json struct never filled is freed empty");
 
@@ -82,8 +82,8 @@ i32 main() {
     check(gFreed == 1 && gFreedSum == 100, "a pointer that is set is freed");
 
     {
-        ad Named n = json.decode<Named>("{\"id\": 1, \"name\": \"x\"}");
-        check(n.id == 1, "ad with a value of an @json struct (freeDecoded)");
+        scoped Named n = json.decode<Named>("{\"id\": 1, \"name\": \"x\"}");
+        check(n.id == 1, "scoped with a value of an @json struct (freeDecoded)");
     }
 
     test.printResult(gCorrect, gTests);

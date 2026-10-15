@@ -14,7 +14,7 @@ local probes = {
   {11, "const", "StorageClass"}, {11, "RATIO", "Constant"}, {11, "1.5e3", "Float"},
   {12, "fn", "Keyword"}, {12, "pick", "Function"}, {12, "bool", "Type"}, {12, "null", "Constant"},
   {13, "older", "Function"}, {13, "...", "Operator"},
-  {14, "ad", "Keyword"}, {14, "format", "Function"}, {14, "%d", "SpecialChar"}, {14, "%-5s", "SpecialChar"},
+  {14, "scoped", "Keyword"}, {14, "format", "Function"}, {14, "%d", "SpecialChar"}, {14, "%-5s", "SpecialChar"},
   {14, "%.2f", "SpecialChar"}, {14, "%Q", "SpecialChar"}, {14, "\\n", "SpecialChar"},
   {15, "defer", "Keyword"}, {15, "free", "Function"},
   {16, "'\\n'", "Character"},

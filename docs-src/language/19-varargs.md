@@ -350,7 +350,7 @@ void reply(u8 *fmt, ...args) {
 }
 
 i32 main() {
-    ad String user = str.from("ada");
+    scoped String user = str.from("ada");
     u8[] cmd = "GET key";
     reply("%s ran %s", user, cmd[0:3]);
     return 0;

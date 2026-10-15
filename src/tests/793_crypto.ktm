@@ -22,7 +22,7 @@ bool hexIs(u8[] bytes, u8[] want) {
 
 String gDir;
 String file(u8 *name) {
-    ad String path = str.format("%s/crypto-files/%s", gDir, name);
+    scoped String path = str.format("%s/crypto-files/%s", gDir, name);
     return fs.readAll(path[0:]);
 }
 

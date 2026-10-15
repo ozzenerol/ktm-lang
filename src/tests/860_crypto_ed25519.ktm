@@ -14,7 +14,7 @@ void check(bool ok, u8 *what) {
 
 String gDir;
 String file(u8 *name) {
-    ad String path = str.format("%s/crypto-files/%s", gDir, name);
+    scoped String path = str.format("%s/crypto-files/%s", gDir, name);
     return fs.readAll(path[0:]);
 }
 
@@ -26,11 +26,11 @@ String bytes(u8[] hexText) {
 
 /* the PEM of an Ed25519 private key with this seed (hex) */
 String seedPem(u8[] seedHex) {
-    ad String der = bytes("302e020100300506032b657004220420");
-    ad String seed = bytes(seedHex);
+    scoped String der = bytes("302e020100300506032b657004220420");
+    scoped String seed = bytes(seedHex);
     der.append(seed[0:]);
     String pem = str.from("-----BEGIN PRIVATE KEY-----\n");
-    ad String body = base64.encode(der[0:]);
+    scoped String body = base64.encode(der[0:]);
     pem.append(body[0:]);
     pem.append("\n-----END PRIVATE KEY-----\n");
     return pem;
@@ -39,18 +39,18 @@ String seedPem(u8[] seedHex) {
 /* RFC 8032 7.1: the key from the seed has this public key, and signs msg
  * as sig */
 bool vector(u8[] seedHex, u8[] pubHex, u8[] msgHex, u8[] sigHex) {
-    ad String pem = seedPem(seedHex);
+    scoped String pem = seedPem(seedHex);
     crypto.Key *k = crypto.privateKey(pem[0:]);
-    ad String pubPem = k.publicPem();
-    ad String pubDer;
+    scoped String pubPem = k.publicPem();
+    scoped String pubDer;
     u8[] body = pubPem[0:];
     i64 a = str.find(body, "\n") + 1;
     i64 b = str.find(body, "-----END");
     base64.decode(body[a:b], &pubDer);
-    ad String pubWant = bytes(pubHex);
-    ad String msg = bytes(msgHex);
-    ad String sigWant = bytes(sigHex);
-    ad String sig = k.sign(msg[0:]);
+    scoped String pubWant = bytes(pubHex);
+    scoped String msg = bytes(msgHex);
+    scoped String sigWant = bytes(sigHex);
+    scoped String sig = k.sign(msg[0:]);
     crypto.Key *p = crypto.ed25519PublicKey(pubWant[0:]);
     bool ok = k.kind() == crypto.KeyKind.ed25519 && pubDer.len == 44 &&
               str.equals(pubDer[12:], pubWant[0:]) && str.equals(sig[0:], sigWant[0:]) &&
@@ -89,20 +89,20 @@ i32 main() {
           "RFC 8032 test 3");
 
     /* openssl's key and signature */
-    ad String keyPem = file("ed-key.pem");
-    ad String pubPem = file("ed-pub.pem");
-    ad String msgHex = file("ed-msg.hex");
-    ad String sigHex = file("ed-sig.hex");
-    ad String msg = bytes(msgHex[0:]);
-    ad String sig = bytes(sigHex[0:]);
+    scoped String keyPem = file("ed-key.pem");
+    scoped String pubPem = file("ed-pub.pem");
+    scoped String msgHex = file("ed-msg.hex");
+    scoped String sigHex = file("ed-sig.hex");
+    scoped String msg = bytes(msgHex[0:]);
+    scoped String sig = bytes(sigHex[0:]);
     crypto.Key *ok = crypto.privateKey(keyPem[0:]);
     crypto.Key *op = crypto.publicKey(pubPem[0:]);
     check(op.kind() == crypto.KeyKind.ed25519 && op.bits() == 256, "openssl's public PEM is an Ed25519 key");
     check(op.verify(msg[0:], sig[0:]) && !op.verify(msg[0:1022], sig[0:]), "openssl's signature verifies");
-    ad String mine = ok.sign(msg[0:]);
+    scoped String mine = ok.sign(msg[0:]);
     check(str.equals(mine[0:], sig[0:]), "ours is openssl's (Ed25519 is deterministic)");
-    ad String outPub = ok.publicPem();
-    ad String outKey = ok.privatePem();
+    scoped String outPub = ok.publicPem();
+    scoped String outKey = ok.privatePem();
     check(str.equals(str.trimEnd(outPub[0:]), str.trimEnd(pubPem[0:])) &&
           str.equals(str.trimEnd(outKey[0:]), str.trimEnd(keyPem[0:])), "the PEM written is openssl's");
     mine.ptr[3] ^= 1;
@@ -111,15 +111,15 @@ i32 main() {
 
     /* a new key */
     crypto.Key *k = crypto.generateKey(crypto.KeyKind.ed25519);
-    ad String s = k.sign("hello");
+    scoped String s = k.sign("hello");
     check(k.kind() == crypto.KeyKind.ed25519 && s.len == 64 && k.verify("hello", s[0:]) &&
           !op.verify("hello", s[0:]), "generateKey(KeyKind.ed25519)");
     crypto.Key *dflt = crypto.generateKey();
     check(dflt.kind() == crypto.KeyKind.ec256, "generateKey() is still P-256");
 
     /* what isn't taken */
-    ad String trunc = file("ed-key-truncated.pem");
-    ad String trailing = file("ed-key-trailing.pem");
+    scoped String trunc = file("ed-key-truncated.pem");
+    scoped String trailing = file("ed-key-trailing.pem");
     check(throws(trunc[0:], true), "a truncated PEM is refused");
     check(throws(trailing[0:], true), "a PEM with trailing garbage is refused");
     check(throws(pubPem[0:], true), "a public PEM isn't a private key");

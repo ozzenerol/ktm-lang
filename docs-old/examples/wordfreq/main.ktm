@@ -34,14 +34,14 @@ i32 main(i32 argc, u8 **argv) {
         path = cstr.view(argv[1]);
     }
 
-    ad String text = fs.readAll(path);
+    scoped String text = fs.readAll(path);
     if (!text.ptr) {
         printf("cannot read %.*s\n", (i32)path.len, path.ptr);
         return 1;
     }
     i64 size = text.len;
 
-    ad map.Map<u8[], i64> counts = map.new<u8[], i64>();
+    scoped map.Map<u8[], i64> counts = map.new<u8[], i64>();
     u8 word[MAX_WORD];
     i64 len = 0, total = 0;
 
@@ -60,7 +60,7 @@ i32 main(i32 argc, u8 **argv) {
         }
     }
 
-    ad vec.Vec<WordCount> ranked = vec.new<WordCount>(counts.len + 1);
+    scoped vec.Vec<WordCount> ranked = vec.new<WordCount>(counts.len + 1);
     i64 it = 0;
     WordCount wc;
     while (counts.next(&it, &wc.word, &wc.count)) {

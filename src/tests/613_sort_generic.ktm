@@ -22,7 +22,7 @@ i32 main() {
     i64 correct = 0, tests = 0;
     i64 n = 100000;
 
-    ad vec.Vec<i64> v = vec.new<i64>(n);
+    scoped vec.Vec<i64> v = vec.new<i64>(n);
     for (i64 i = 0; i < n; i++) { v.push(rnd() % 1000); }
     v.sortAsc();
     tests++; if (ascending(v.items())) { correct++; }

@@ -306,9 +306,9 @@ x
 freed 64 bytes
 ```
 
-A value with a `free()` method can be declared with `ad` instead of a type's plain declaration:
+A value with a `free()` method can be declared `scoped` instead of a type's plain declaration:
 `free()` is then called for it when its block ends, however the block is left (see
-[defer and ad](16-defer-and-ad.html)).
+[defer and scoped](16-defer-and-scoped.html)).
 
 ```ktm run
 import mem;
@@ -329,7 +329,7 @@ void Buffer.free() {
 }
 
 i32 main() {
-    ad Buffer b = bufferNew(16);
+    scoped Buffer b = bufferNew(16);
     b.data[0] = 'y';
     printf("%c\n", b.data[0]);
     return 0;

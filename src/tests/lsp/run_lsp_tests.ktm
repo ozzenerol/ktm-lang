@@ -150,7 +150,7 @@ void initFixtures() {
         "import str, vec;\n"
         "vec.Vec<String> gItems = vec.new<String>();\n"
         "pub void fill() {\n"
-        "  ad vec.Vec<i64> local = vec.new<i64>();\n"
+        "  scoped vec.Vec<i64> local = vec.new<i64>();\n"
         "  gItems.push(str.from(\"a\"));\n"
         "  local.push(1);\n"
         "  gItems.\n"
@@ -1246,11 +1246,11 @@ void testRegressions() {
         "import str, vec;\n"
         "vec.Vec<String> gNames = vec.new<String>();\n"
         "void main() {\n"
-        "  ad vec.Vec<u8[]> v = vec.new<u8[]>();\n"
+        "  scoped vec.Vec<u8[]> v = vec.new<u8[]>();\n"
         "  v.push(\"a\");\n"
         "  gNames.push(str.from(\"b\"));\n"
-        "  ad String s = str.join(&v, \" \");\n"
-        "  ad String t = str.join(&gNames, \", \");\n"
+        "  scoped String s = str.join(&v, \" \");\n"
+        "  scoped String t = str.join(&gNames, \", \");\n"
         "  printf(\"%s %s\\n\", s, t);\n"
         "}\n");
     check("stdlib generics (vec, str.join) give no false errors", lastPublishClean(l));

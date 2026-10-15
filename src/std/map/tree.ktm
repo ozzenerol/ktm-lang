@@ -2,7 +2,7 @@ module map;
 import mem, str;
 
 /* An ordered map from K to V, a red-black tree, as a value type:
- * `ad map.Tree<u8[], i64> t = map.treeNew<u8[], i64>();`. Keys are
+ * `scoped map.Tree<u8[], i64> t = map.treeNew<u8[], i64>();`. Keys are
  * ordered by map.compare(K, K) (overloads for the integer types, f64 and
  * u8[]/String; a key type of your own adds one), and walked in order with
  * `for (auto n = t.first(); n; n = t.after(n))` (n.key, n.value). u8[] and
@@ -383,7 +383,7 @@ pub void Tree<K, V>.clear() {
         self.len = 0;
 }
 
-/* clear(), and the sentinel too: for `ad` and `defer t.free();` */
+/* clear(), and the sentinel too: for `scoped` and `defer t.free();` */
 pub void Tree<K, V>.free() {
         self.clear();
         mem.free(self.nil);

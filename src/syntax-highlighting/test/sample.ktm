@@ -11,7 +11,7 @@ extern "c" i32 abs(i32 x);
 const f64 RATIO = 1.5e3;
 fn(i64) i64 pick(bool sq) { return null; }
 i64 User.older(i64 years, i64 ...rest) {
-    ad String s = str.format("%d %-5s %.2f %Q\n", 1, "x", 2.0, "q");
+    scoped String s = str.format("%d %-5s %.2f %Q\n", 1, "x", 2.0, "q");
     defer s.free();
     u8 c = '\n';
     switch (years) { case 1 ... 5: break; default: fallthrough; }
