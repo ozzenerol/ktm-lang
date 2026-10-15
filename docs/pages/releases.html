@@ -4,6 +4,40 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.22.0 <small>(2026-10-15)</small></h2>
+<p>Conditions without parentheses, thread-local globals, crash reports that follow packages and inlined calls,
+JWTs, and packages compiled once.</p>
+<ul>
+  <li>The condition of <code>if</code>, <code>while</code>, <code>do ... while</code>, <code>for</code> and
+  <code>switch</code> can be written without parentheses, as in Go: <code>if x &gt; 0 {</code>,
+  <code>for i64 i = 0; i &lt; n; i++ {</code>, plus <code>for cond {</code> and <code>for {</code>. With them works as
+  before, and one program can mix both. See <a href="lang-control-flow.html">Control flow</a>.</li>
+  <li><code>threadlocal</code> globals: <code>threadlocal i64 x;</code> is one variable per thread, one instruction to
+  reach in compiled code. The runtime uses it for its own per-thread state, so <code>try</code>, <code>defer</code> and
+  <code>coro.current()</code> no longer call into pthreads (2x faster). See <a href="lang-variables.html">Variables</a>.</li>
+  <li><code>ad T x;</code> without a value: it starts empty and is freed at the end of its block (a pointer only if
+  set). An <code>@json</code> or <code>@yaml</code> struct with no <code>free()</code> is freed with its
+  <code>freeDecoded()</code>, so <code>ad User u = json.decode&lt;User&gt;(...)</code> works.</li>
+  <li><code>for (k = 0, i = n; ...)</code>: several comma-separated expressions before the first <code>;</code>, not
+  only declarations.</li>
+  <li>Crash reports and uncaught errors: an uncaught error prints the calls that led to the throw; a package's
+  function shows as <code>pg.Pool.exec</code> at <code>github.com/x/ktm-pg/pool.ktm</code>; a throw in a package
+  names the package's file; a function the compiler inlined from another file shows as <code>(inlined)</code> at
+  its own line.</li>
+  <li>Packages: a package from the module cache is compiled once into the cache and linked from there by later builds
+  (<a href="tools-packages.html">Prebuilt packages</a>; <code>KTM_PREBUILD=0</code> turns it off). Options can come
+  before a command: <code>ktm --install-dir=X mod init</code>.</li>
+  <li>Struct copies of up to 32 bytes (a <code>u8[]</code>, a <code>String</code>) are a few moves instead of a call
+  to <code>memcpy</code>: a loop that returns slices runs 2.2x faster.</li>
+  <li><code>crypto</code>: <code>sha384</code>, <code>hmacSha384</code>; RSA keys (<code>generateRsaKey</code>, PEM,
+  <code>Key.signWith</code>/<code>verifyWith</code> with SHA-256/384/512); keys from a JWK's parts
+  (<code>ecPublicKey</code>, <code>rsaPublicKey</code>). <code>coro.detach(fd)</code> hands an fd to another
+  thread's loop.</li>
+  <li>New package: <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.1.0: HS256/384/512, ES256 and
+  RS256/384/512 tokens, claims checks, JWK Sets from text or a URL.</li>
+</ul>
+<p><b>Changes you may notice:</b> <code>threadlocal</code> is a keyword now, so a variable can't be called that.</p>
+
 <h2>v0.21.0 <small>(2026-10-14)</small></h2>
 <p>Everything a REST API needs, and a guide that builds one: <a href="guide-http.html">HTTP programming</a> takes a
 bookmarks service from ten lines to PostgreSQL, accounts, tests and production.</p>
