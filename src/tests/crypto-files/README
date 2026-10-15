@@ -3,3 +3,6 @@ public key, and openssl's DER signature (hex) of msg.txt, which ktm verifies.
 For test 845 (RSA keys): a 2048-bit RSA key made by openssl (test only, public),
 its public key, openssl's PKCS#1 v1.5 signatures of msg.txt with SHA-256/384/512
 (hex), and an Ed25519 key, a kind crypto.Key doesn't take.
+For test 846 (keys from JWK parts): rsa-n.hex, the modulus of rsa-pub.pem (its
+exponent is 65537), and ec-x.hex, ec-y.hex, the point of pub.pem, as openssl
+prints them.
