@@ -75,7 +75,11 @@ const i64 CRASH_SI_ADDR_AT = 16;
 #endif
 
 const i32 CRASH_SIGILL = 4;
+const i32 CRASH_SIGTRAP = 5;
 const i32 CRASH_SIGFPE = 8;
+/* `brk #0xd10` (A64_BRK_DIVZERO): arm64's divide gives 0 for a zero
+ * divisor, so the compiler tests it and runs this instead */
+const u32 CRASH_BRK_DIVZERO = 0xd4200000 | (0xd10 << 5);
 const i32 CRASH_SIGSEGV = 11;
 
 const i64 CRASH_STACK_BYTES = 65536;
@@ -285,11 +289,13 @@ static u64 crashScanStack(u64 sp) {
     return 0;
 }
 
-static void crashHeadline(i32 sig, u8 *info, u64 sp) {
+static void crashHeadline(i32 sig, u8 *info, u64 sp, bool divZero) {
     u64 addr = *(u64 *)(info + CRASH_SI_ADDR_AT);
     i32 code = *(i32 *)(info + 8);
     crashPut("crash: ");
-    if (sig == CRASH_SIGSEGV || sig == CRASH_SIGBUS) {
+    if (divZero) {
+        crashPut("integer division by zero");
+    } else if (sig == CRASH_SIGSEGV || sig == CRASH_SIGBUS) {
         if (addr < 4096) {
             crashPut("null pointer dereference (address ");
             crashPutHex(addr);
@@ -342,7 +348,9 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     /* what the program printed comes first: unless the fault is inside
      * C code, which may hold stdio's lock */
     if (f) { libc.fflush(null); }
-    crashHeadline(sig, info, sp);
+    /* arm64's division by zero (CRASH_BRK_DIVZERO), only in ktm code */
+    bool divZero = sig == CRASH_SIGTRAP && f && *(u32 *)pc == CRASH_BRK_DIVZERO;
+    crashHeadline(sig, info, sp, divZero);
     crashFlush();
 
     crashFrame(pc, true);
@@ -378,6 +386,11 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
         crashPutDec(crashHidden);
         crashPut(" more\n");
         crashFlush();
+    }
+    /* die of a SIGFPE, as x86_64 does (exit status 136), not of the brk */
+    if (divZero) {
+        libc.signal(CRASH_SIGFPE, 0);
+        libc.raise(CRASH_SIGFPE);
     }
 }
 
@@ -492,4 +505,7 @@ pub void __ktmCrashInstall(CrashFn *lo, CrashFn *hi) {
     libc.sigaction(CRASH_SIGBUS, act, null);
     libc.sigaction(CRASH_SIGFPE, act, null);
     libc.sigaction(CRASH_SIGILL, act, null);
+#ifdef IS_ARM_64
+    libc.sigaction(CRASH_SIGTRAP, act, null);   /* CRASH_BRK_DIVZERO */
+#endif
 }

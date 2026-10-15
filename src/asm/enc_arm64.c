@@ -984,6 +984,19 @@ _aarch64_enc_cbz(AsmEnc *e, int is_64, int is_nonzero, A64Reg rt, int32_t rel_wo
     return put_word(e, w);
 }
 
+size_t
+aarch64_enc_cbnz(AsmEnc *e, int is_64, A64Reg rt, int32_t rel_words)
+{
+    return _aarch64_enc_cbz(e, is_64, 1, rt, rel_words);
+}
+
+/* BRK #imm16: a breakpoint, SIGTRAP.  Encoding: 11010100 001 imm16 00000 */
+size_t
+aarch64_enc_brk(AsmEnc *e, uint16_t imm)
+{
+    return put_word(e, 0xD4200000u | ((uint32_t)imm << 5));
+}
+
 /* FP scalar 1-source: FABS / FNEG / FSQRT.  Encoding:
  *   0 0 0 11110 ftype 1 opcode6 10000 Rn Rd
  *

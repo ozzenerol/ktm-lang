@@ -210,6 +210,9 @@ size_t aarch64_enc_bl(AsmEnc *e, int32_t rel_words);
 size_t aarch64_enc_br(AsmEnc *e, A64Reg rn);
 size_t aarch64_enc_blr(AsmEnc *e, A64Reg rn);
 size_t aarch64_enc_b_cond(AsmEnc *e, A64Cond cc, int32_t rel_words);
+/* CBNZ Rt, rel_words (4-byte units from this instruction) */
+size_t aarch64_enc_cbnz(AsmEnc *e, int is_64, A64Reg rt, int32_t rel_words);
+size_t aarch64_enc_brk(AsmEnc *e, uint16_t imm);
 size_t aarch64_enc_adrp(AsmEnc *e, A64Reg rd, int32_t pages);
 void aarch64_resolve_local_fixups(AsmEnc *e);
 void aarch64_enc_patch_branch26(AsmEnc *e, size_t patch, int32_t rel_words);

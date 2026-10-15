@@ -139,7 +139,7 @@ crash: null pointer dereference (address 0x0)
 `second` was inlined into `main` by the compiler, and still shows as a call of its own, marked
 `(inlined)`.
 
-An integer division by zero crashes on x86_64:
+An integer division by zero (`/` or `%`) crashes:
 
 ```ktm
 i64 average(i64 total, i64 count) {
@@ -163,9 +163,10 @@ crash: integer division by zero
 Floating point exception
 ```
 
-What the program printed before the crash comes first. On arm64 the processor doesn't trap a
-division by zero: the same program prints `0` and carries on. Check a divisor that can be zero
-before dividing, whatever the platform.
+What the program printed before the crash comes first. The arm64 processor doesn't trap a
+division by zero by itself, so there the compiler tests a divisor that can be zero before dividing:
+the crash, its report and the exit status (136, a SIGFPE) are the same on every platform. Check a
+divisor that can be zero before dividing when the program should go on.
 
 A recursion that never ends overflows the stack, and shows once, with how many times it
 repeated:

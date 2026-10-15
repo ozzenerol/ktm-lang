@@ -1395,9 +1395,14 @@ static void a64TxtAluReg(void *be, IrOp op, IrInstr *i) {
 static void a64TxtMul(void *be) {
     aoStrCatFmt(((IrCgCtx *)be)->buf, "mul x0, x0, x1\n\t");
 }
-static void a64TxtDivRem(void *be, IrOp op) {
+static void a64TxtDivRem(void *be, IrOp op, int check) {
     AoStr *buf = ((IrCgCtx *)be)->buf;
     const char *div = (op == IR_IDIV || op == IR_IREM) ? "sdiv" : "udiv";
+    if (check) {
+        aoStrCatFmt(buf, "cbnz x1, 1f\n\t");
+        aoStrCatFmt(buf, "brk #%i\n", A64_BRK_DIVZERO);
+        aoStrCatFmt(buf, "1:\n\t");
+    }
     if (op == IR_IDIV || op == IR_UDIV) {
         aoStrCatFmt(buf, "%s x0, x0, x1\n\t", div);
     } else {

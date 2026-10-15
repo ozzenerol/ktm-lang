@@ -1246,10 +1246,15 @@ static void a64JitAluReg(void *be, IrOp op, IrInstr *i) {
 static void a64JitMul(void *be) {
     aarch64_enc_mul(&((JitFnCtx *)be)->jit->enc, 1, A_X0, A_X0, A_X1);
 }
-static void a64JitDivRem(void *be, IrOp op) {
+static void a64JitDivRem(void *be, IrOp op, int check) {
     AsmEnc *enc = &((JitFnCtx *)be)->jit->enc;
     int is_signed = (op == IR_IDIV || op == IR_IREM);
     int is_rem = (op == IR_IREM || op == IR_UREM);
+    if (check) {
+        /* cbnz x1, past the brk; brk #A64_BRK_DIVZERO */
+        aarch64_enc_cbnz(enc, 1, A_X1, 2);
+        aarch64_enc_brk(enc, A64_BRK_DIVZERO);
+    }
     if (!is_rem) {
         if (is_signed) aarch64_enc_sdiv(enc, 1, A_X0, A_X0, A_X1);
         else           aarch64_enc_udiv(enc, 1, A_X0, A_X0, A_X1);

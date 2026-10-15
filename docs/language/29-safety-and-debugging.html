@@ -117,7 +117,7 @@
   at example.ktm:7 in second (inlined)
   called from example.ktm:12 in main</code></pre>
 <p><code>second</code> was inlined into <code>main</code> by the compiler, and still shows as a call of its own, marked <code>(inlined)</code>.</p>
-<p>An integer division by zero crashes on x86_64:</p>
+<p>An integer division by zero (<code>/</code> or <code>%</code>) crashes:</p>
 <pre class="code"><code><span class="t">i64</span> average(<span class="t">i64</span> total, <span class="t">i64</span> count) {
     <span class="k">return</span> total / count;
 }
@@ -134,7 +134,7 @@ crash: integer division by zero
   at avg.ktm:2 in average (inlined)
   called from avg.ktm:8 in main
 Floating point exception</code></pre>
-<p>What the program printed before the crash comes first. On arm64 the processor doesn't trap a division by zero: the same program prints <code>0</code> and carries on. Check a divisor that can be zero before dividing, whatever the platform.</p>
+<p>What the program printed before the crash comes first. The arm64 processor doesn't trap a division by zero by itself, so there the compiler tests a divisor that can be zero before dividing: the crash, its report and the exit status (136, a SIGFPE) are the same on every platform. Check a divisor that can be zero before dividing when the program should go on.</p>
 <p>A recursion that never ends overflows the stack, and shows once, with how many times it repeated:</p>
 <pre class="code"><code><span class="t">i64</span> depth(<span class="t">i64</span> n) {
     <span class="t">i64</span> pad[<span class="n">64</span>];

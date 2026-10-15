@@ -97,8 +97,7 @@ void main() {
 ### Division
 
 Integer division rounds towards zero, and `%` takes the sign of the left side. Dividing an integer
-by zero is a bug to avoid: on x86_64 it stops the program with a crash report that says where it
-happened, but on arm64 the processor gives 0 and the program goes on (see
+by zero (with `/` or `%`) stops the program with a crash report that says where it happened (see
 [Safety and debugging](29-safety-and-debugging.html)).
 
 ```ktm run
