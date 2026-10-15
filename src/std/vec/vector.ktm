@@ -2,7 +2,7 @@ module vec;
 import libc, mem, rt, sort;
 
 /* A growable array of T, held by value (like String): make one with
- * vec.new<T>(), free it with free() (or declare it with `ad`). A Vec of
+ * vec.new<T>(), free it with free() (or declare it `scoped`). A Vec of
  * String owns its Strings: free() and clear() free them, and set() frees
  * the one it replaces; pop() and removeAt() hand the item back to you.
  * Other items are yours: free() frees the array, not what pointers in it

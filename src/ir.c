@@ -810,7 +810,7 @@ static int irInlineCost(Ast *ast) {
  * stops */
 static void irTooDeep(IrCtx *ctx, Ast *ast) {
     AoStr *path = ast && ast->file_id ? cctrlLookUpFile(ctx->cc, ast->file_id) : NULL;
-    fprintf(stderr, "%s:%d: error: more than %d try blocks and defers (each `ad` variable is one) "
+    fprintf(stderr, "%s:%d: error: more than %d try blocks and defers (each `scoped` variable is one) "
             "in scope at once in this function: split it into smaller functions\n",
             path ? path->data : "<unknown>", ast ? (int)ast->line : 0, IR_TRY_STACK_MAX);
     exit(1);

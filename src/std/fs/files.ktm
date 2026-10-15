@@ -16,7 +16,7 @@ pub struct DirEntry {
 };
 
 /* An open directory: fs.openDir(path), next() until it gives null, then
- * close() (`defer d.close();`, or declare it with `ad`). "." and ".."
+ * close() (`defer d.close();`, or declare it `scoped`). "." and ".."
  * are left out. Its fields are its own: use ok(), next() and close(). */
 pub struct Dir {
     libc.DIR *handle;
@@ -80,7 +80,7 @@ pub void Dir.close() {
     self.entry.path.free();
 }
 
-/* For `ad`: the same as close() */
+/* For `scoped`: the same as close() */
 pub void Dir.free() {
     self.close();
 }

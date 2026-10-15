@@ -68,7 +68,7 @@ i32 main() {
     User u = json.decode<User>("{\"id\": 7, \"name\": \"Ada\", \"admin\": true}");
     printf("%d %s %d\n", u.id, u.name, u.admin);
     u.id = 8;
-    ad String text = json.encode(reflect.of(u));
+    scoped String text = json.encode(reflect.of(u));
     printf("%s\n", text);
     u.freeDecoded();
     return 0;
@@ -105,7 +105,7 @@ enum Role { guest, admin };
 i32 main() {
     User u = json.decode<User>("{\"id\": 1, \"role\": \"admin\", \"tags\": [{\"name\": \"math\", \"weight\": 3}], \"since\": 1843}");
     printf("%d %s %d %s\n", u.id, reflect.name(u.role), u.tags.len, u.tags[0].name);
-    ad String text = json.encode(reflect.of(u));
+    scoped String text = json.encode(reflect.of(u));
     printf("%s\n", text);
     u.freeDecoded();
     return 0;
@@ -155,7 +155,7 @@ i32 main() {
     Point p = {3, 4};
     json.Writer w = json.writerNew();
     p.toJson(&w);
-    ad String text = w.take();
+    scoped String text = w.take();
     w.free();
     printf("%s\n", text);
     return 0;
@@ -166,8 +166,8 @@ i32 main() {
 {"x":3,"y":4}
 ```
 
-A struct with `@json` and no `free()` of its own can be declared with `ad`: it is freed with
-`freeDecoded()` (see [defer and ad](16-defer-and-ad.html)).
+A struct with `@json` and no `free()` of its own can be declared `scoped`: it is freed with
+`freeDecoded()` (see [defer and scoped](16-defer-and-scoped.html)).
 
 ## @yaml
 
@@ -183,10 +183,10 @@ import json, yaml;
 };
 
 i32 main() {
-    ad Server s = json.decode<Server>("{\"host\": \"example.com\", \"port\": 443, \"aliases\": [\"www\", \"api\"]}");
+    scoped Server s = json.decode<Server>("{\"host\": \"example.com\", \"port\": 443, \"aliases\": [\"www\", \"api\"]}");
     yaml.Writer y = yaml.writerNew();
     s.toYaml(&y);
-    ad String doc = y.take();
+    scoped String doc = y.take();
     y.free();
     printf("%s", doc);
     return 0;
@@ -217,11 +217,11 @@ import json;
 };
 
 i32 main() {
-    ad User u = json.decode<User>("{\"id\": 7, \"e-mail\": \"ada@example.com\"}");
+    scoped User u = json.decode<User>("{\"id\": 7, \"e-mail\": \"ada@example.com\"}");
     u.cacheHits = 99;
     json.Writer w = json.writerNew();
     u.toJson(&w);
-    ad String text = w.take();
+    scoped String text = w.take();
     w.free();
     printf("%s\n", text);
     return 0;

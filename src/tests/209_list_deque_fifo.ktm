@@ -14,7 +14,7 @@ void recordJob(void *priv, void *argv) {
 i32 main() {
     printf("Test - ListDeque FIFO order: ");
     i64 correct = 0, tests = 7, i;
-    ad list.List<i64> l = list.new<i64>();
+    scoped list.List<i64> l = list.new<i64>();
 
     /* An empty list */
     bool okFlag = true;

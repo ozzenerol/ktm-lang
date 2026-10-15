@@ -1717,7 +1717,7 @@ static const char *lsp_keywords[] = {
     "true", "false", "null",
     "struct", "pub", "private", "const", "enum", "defer",
     "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
-    "type", "ad", "asm", "volatile", "inline", "threadlocal",
+    "type", "scoped", "ad", "asm", "volatile", "inline", "threadlocal",
 };
 
 #define KTM_LSP_FUNCTION     3
@@ -4478,7 +4478,7 @@ static void lspSemEmit(LspSemCtx *sc, int line, int bcol, int blen, int type,
 
 static int lspSemIsKeyword(const char *w, size_t n) {
     static const char *extra[] = {
-        "ad", "type", "asm", "volatile", "inline", "class", "public",
+        "scoped", "ad", "type", "asm", "volatile", "inline", "class", "public",
         "noreg", "reg", "elif", "elifdef", "ifdef", "ifndef", "endif",
         "define", "undef", "defined", "include", "link", "typeof", "alignof",
     };

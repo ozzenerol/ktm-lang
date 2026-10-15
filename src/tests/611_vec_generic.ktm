@@ -34,7 +34,7 @@ i32 main() {
     tests++; if (z.len == 1000 && z.get(999) == 999 && neg.get(500) == -500 && z.cap >= 1000) { correct++; }
     z.free(); neg.free();
 
-    ad vec.Vec<i64> v = vec.new<i64>();
+    scoped vec.Vec<i64> v = vec.new<i64>();
     for (i64 i = 0; i < 10; i++) { v.push(i); }
     v.set(0, 100);
     *v.at(1) += 10;
@@ -63,7 +63,7 @@ i32 main() {
     tests++; if (empty.pop(&ok) == 7 && ok && empty.len == 0) { correct++; }
     empty.free();
 
-    ad vec.Vec<Pt> pts = vec.new<Pt>(1);
+    scoped vec.Vec<Pt> pts = vec.new<Pt>(1);
     for (i64 i = 0; i < 100; i++) { Pt p = {i, i * 2}; pts.push(p); }
     i64 sum = 0;
     for (auto p : pts) { sum += p.y - p.x; }

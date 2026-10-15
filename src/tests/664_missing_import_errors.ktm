@@ -37,9 +37,9 @@ i32 main()
     printf("Test - missing import errors: ");
 
     check(compileFailsWith("import map;\nvoid main() {\n  map.Map<i64, i64> m = map.new<i64, i64>();\n"
-                           "  ad vec.Vec<i64> v = m.values();\n}\n",
+                           "  scoped vec.Vec<i64> v = m.values();\n}\n",
                            "module `vec` is not imported: add `import vec;`"),
-          "ad with a generic type of a module not imported");
+          "scoped with a generic type of a module not imported");
     check(compileFailsWith("void main() { vec.Vec<i64> v; }\n",
                            "module `vec` is not imported: add `import vec;`"),
           "a declaration with it");
@@ -49,27 +49,27 @@ i32 main()
     check(compileFailsWith("i32 main() { return rt.started(); }\n",
                            "Variable or function `rt` has not been defined"),
           "rt, which can't be imported, gets no import hint");
-    check(compileFailsWith("void main() { ad Nope x; }\n",
+    check(compileFailsWith("void main() { scoped Nope x; }\n",
                            "Type `Nope` has not been declared"),
-          "ad with an unknown type names the type");
-    check(compileFailsWith("void main() { ad foo.Bar x; }\n",
+          "scoped with an unknown type names the type");
+    check(compileFailsWith("void main() { scoped foo.Bar x; }\n",
                            "Type `foo.Bar` has not been declared"),
-          "ad with a name that is no module");
-    check(compileFailsWith("import map;\nvoid main() { ad map.Nope x; }\n",
+          "scoped with a name that is no module");
+    check(compileFailsWith("import map;\nvoid main() { scoped map.Nope x; }\n",
                            "Type `map.Nope` has not been declared"),
-          "ad with a type its module doesn't have");
+          "scoped with a type its module doesn't have");
 
-    /* with the import, ad works, and ad stays usable as a name */
+    /* with the import, scoped works, and ad stays usable as a name */
     i64 got = 0;
     {
         map.Map<i64, i64> m = map.new<i64, i64>();
         m.set(1, 2);
-        ad vec.Vec<i64> v = m.values();
+        scoped vec.Vec<i64> v = m.values();
         i64 ad = v.len;
         got = ad * 10 + v.data[0];
         m.free();
     }
-    check(got == 12, "ad with the import, and a local named ad");
+    check(got == 12, "scoped with the import, and a local named ad");
 
     test.printResult(gCorrect, gTests);
     printf("====\n");

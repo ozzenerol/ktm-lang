@@ -13,13 +13,13 @@ functions. This chapter covers all three and how they convert.
 ## Making a String
 
 A `String` you get from the [str](../std/index.html#str) module is yours, to free when you are done.
-`ad` frees it at the end of the block.
+`scoped` frees it at the end of the block.
 
 ```ktm run
 import str;
 
 void main() {
-    ad String s = str.from("Hello");
+    scoped String s = str.from("Hello");
     s.append(", world");
     s.appendFormat(" %d", 2026);
     printf("%s (%d bytes)\n", s, s.len);
@@ -34,10 +34,10 @@ Hello, world 2026 (17 bytes)
 import str;
 
 void main() {
-    ad String a = str.new();               // empty, nothing allocated yet
-    ad String b = str.from("copied");      // a copy of any text
-    ad String c = str.withCap(64);         // empty, with room for 64 bytes
-    ad String d = str.format("%d-%s", 42, "x");
+    scoped String a = str.new();               // empty, nothing allocated yet
+    scoped String b = str.from("copied");      // a copy of any text
+    scoped String c = str.withCap(64);         // empty, with room for 64 bytes
+    scoped String d = str.format("%d-%s", 42, "x");
     String e;                              // a declared String starts empty
     a.append("grown");
     printf("[%s] [%s] [%s] [%s] [%d]\n", a, b, c, d, e.len);
@@ -54,7 +54,7 @@ void main() {
 import str;
 
 void main() {
-    ad String line = str.format("%-6s|%5.1f|%03d", "id", 3.14159, 7);
+    scoped String line = str.format("%-6s|%5.1f|%03d", "id", 3.14159, 7);
     printf("[%s]\n", line);
 }
 ```
@@ -69,7 +69,7 @@ void main() {
 import str;
 
 void main() {
-    ad String s = str.from("found 3 files");
+    scoped String s = str.from("found 3 files");
     s.insert(0, "> ");
     s.replace("files", "logs");
     s.append(" in /tmp");
@@ -102,7 +102,7 @@ Building text in a loop:
 import str;
 
 void main() {
-    ad String csv = str.new();
+    scoped String csv = str.new();
     i64 values[] = {3, 1, 4, 1, 5};
     for (i64 i = 0; i < 5; i++) {
         if (i > 0) { csv.appendByte(','); }
@@ -125,7 +125,7 @@ either.
 import str;
 
 void main() {
-    ad String s = str.from("Hello, world");
+    scoped String s = str.from("Hello, world");
     u8[] hello = s[0:5];
     printf("%s %c %d\n", hello, s[7], s.len);
     printf("%d %d %d\n", s.startsWith("Hell"), s.find("world"), s.contains("xyz"));
@@ -165,13 +165,13 @@ void main() {
 import str;
 
 void main() {
-    ad u8[][] parts = str.split("red,green,,blue", ",");
+    scoped u8[][] parts = str.split("red,green,,blue", ",");
     printf("%d parts:", parts.len);
     for (auto p : parts) {
         printf(" [%s]", p);
     }
     printf("\n");
-    ad String joined = str.join(parts, " + ");
+    scoped String joined = str.join(parts, " + ");
     printf("%s\n", joined);
 }
 ```
@@ -200,7 +200,7 @@ void main() {
     if (str.toFloat("2.5", &f)) {
         printf("%.2f\n", f * 2);
     }
-    ad String back = str.format("%d", 1234);
+    scoped String back = str.format("%d", 1234);
     printf("%s has %d digits\n", back, back.len);
 }
 ```
@@ -221,9 +221,9 @@ of them may free them. `clone()` makes a copy with bytes of its own.
 import str;
 
 void main() {
-    ad String a = str.from("shared");
+    scoped String a = str.from("shared");
     String alias = a;              // the same bytes: don't free both
-    ad String own = a.clone();     // bytes of its own
+    scoped String own = a.clone();     // bytes of its own
     own.toUpper();
     printf("%s %s %s\n", a, alias, own);
 }
@@ -275,7 +275,7 @@ read-only
 import str;
 
 void main() {
-    ad String a = str.from("abc");
+    scoped String a = str.from("abc");
     a[0] = 'x';
     printf("%s\n", a);
 }
@@ -310,7 +310,7 @@ copy. `cstr.view(p)` turns a C string into a `u8[]`.
 import cstr, libc, str;
 
 void main() {
-    ad String s = str.from("for C");
+    scoped String s = str.from("for C");
     u8 *c = s;
     u8[] back = cstr.view(c);
     printf("%s %d %d\n", c, back.len, libc.strlen(s));
@@ -333,7 +333,7 @@ for C 5 5
 import str;
 
 void main() {
-    ad String s = str.from("ktm");
+    scoped String s = str.from("ktm");
     u8[] part = "language"[0:4];
     printf("[%-6s][%6s][%s][%.2s]\n", s, part, "c string", "abcdef");
 }

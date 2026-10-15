@@ -43,7 +43,7 @@ i32 main() {
     /* random against a reference: ref[k] = value + 1, 0 when absent */
     const i64 N = 2000;
     i64 *ref = mem.allocZero(sizeof(i64) * N);
-    ad map.Tree<i64, i64> t = map.treeNew<i64, i64>();
+    scoped map.Tree<i64, i64> t = map.treeNew<i64, i64>();
     u64 seed = 12345;
     bool ok = true, rules = true;
     for (i64 round = 0; round < 20; round++) {
@@ -106,7 +106,7 @@ i32 main() {
     mem.free(ref);
 
     /* u8[] keys are copied: the caller's buffer can change after set */
-    ad map.Tree<u8[], i64> words = map.treeNew<u8[], i64>();
+    scoped map.Tree<u8[], i64> words = map.treeNew<u8[], i64>();
     u8 buf[8];
     mem.copy(buf, "pear", 5);
     words.set(buf[0:4], 1);
@@ -120,7 +120,7 @@ i32 main() {
     order.free();
     check(words.delete("fig") && words.len == 2, "delete a u8[] key");
 
-    ad map.Tree<String, i64> owned = map.treeNew<String, i64>();
+    scoped map.Tree<String, i64> owned = map.treeNew<String, i64>();
     String k = str.from("zeta");
     owned.set(k, 1);
     k.free();
@@ -131,13 +131,13 @@ i32 main() {
     check(owned.has(z) && str.equals(owned.first().key, "alpha"), "String keys");
     z.free();
 
-    ad map.Tree<f64, u8 *> temps = map.treeNew<f64, u8 *>();
+    scoped map.Tree<f64, u8 *> temps = map.treeNew<f64, u8 *>();
     temps.set(21.5, "warm");
     temps.set(-3.0, "cold");
     temps.set(37.0, "hot");
     check(temps.first().key == -3.0 && temps.last().value[0] == 'h', "f64 keys");
 
-    ad map.Tree<Version, u8 *> rel = map.treeNew<Version, u8 *>();
+    scoped map.Tree<Version, u8 *> rel = map.treeNew<Version, u8 *>();
     Version a = {0, 10}, b = {0, 9}, c = {1, 0};
     rel.set(a, "a");
     rel.set(b, "b");

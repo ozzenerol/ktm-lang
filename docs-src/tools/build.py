@@ -187,7 +187,7 @@ OLD_LINKS = {
     "lang-variables.html": "language/03-variables.html",
     "lang-control-flow.html": "language/05-control-flow.html",
     "lang-functions.html": "language/07-functions.html",
-    "language.html#autodefer": "language/16-defer-and-ad.html",
+    "language.html#autodefer": "language/16-defer-and-scoped.html",
     "language.html#generics": "language/17-generics.html",
     "language.html#overloading": "language/18-overloading.html",
     "lib-crypto.html": "std/index.html#crypto",

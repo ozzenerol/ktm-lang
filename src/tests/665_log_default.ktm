@@ -40,7 +40,7 @@ String squeeze(u8[] l) {
 
 bool lineIs(u8[] text, i64 n, u8 *want) {
     u8[] got = lineAfterTime(text, n);
-    ad String flat = squeeze(got);
+    scoped String flat = squeeze(got);
     bool ok = str.equals(flat, cstr.view(want));
     if (!ok) { printf("\n  line %d: got [%.*s]\n          want [%s]", n, got.len, got.ptr, want); }
     return ok;

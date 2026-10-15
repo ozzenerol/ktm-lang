@@ -219,17 +219,17 @@ void main() {
 3 -1
 ```
 
-### ad
+### scoped
 
-For a value with a `free()` method, `ad` in front of its declaration means "free it at the end of the
+For a value with a `free()` method, `scoped` in front of its declaration means "free it at the end of the
 block". It is the shortest way to own something.
 
 ```ktm run
 import str, vec;
 
 void main() {
-    ad String name = str.from("ada");
-    ad vec.Vec<i64> nums = vec.new<i64>();
+    scoped String name = str.from("ada");
+    scoped vec.Vec<i64> nums = vec.new<i64>();
     nums.push(1);
     nums.push(2);
     name.append(" lovelace");
@@ -241,7 +241,7 @@ void main() {
 ada lovelace, 2 numbers
 ```
 
-Your own types get `ad` by having a `free()` method:
+Your own types can be `scoped` by having a `free()` method:
 
 ```ktm run
 import mem;
@@ -263,7 +263,7 @@ void Grid.set(i64 x, i64 y) {
 }
 
 void main() {
-    ad Grid g = gridNew(4, 3);
+    scoped Grid g = gridNew(4, 3);
     g.set(1, 2);
     printf("%d %d\n", g.cells[2 * 4 + 1], g.cells[0]);
 }
@@ -274,7 +274,7 @@ void main() {
 freeing 4x3
 ```
 
-[defer and ad](16-defer-and-ad.html) covers both in depth.
+[defer and scoped](16-defer-and-scoped.html) covers both in depth.
 
 ## Finding memory bugs
 

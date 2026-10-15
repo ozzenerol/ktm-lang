@@ -123,7 +123,7 @@ void describe(i64 n) {
 
 i32 main() {
     u8 word[5] = {'h', 'e', 'l', 'l', 'o'};
-    ad String owned = str.from("owned text");
+    scoped String owned = str.from("owned text");
     describe("literal");
     describe(word);
     describe(owned);
@@ -305,7 +305,7 @@ i32 main() {
     Counter c = {0};
     c.add(3);
     c.add("four");
-    ad String s = str.from("owned");
+    scoped String s = str.from("owned");
     c.add(s);
     printf("%d\n", c.n);
     return 0;

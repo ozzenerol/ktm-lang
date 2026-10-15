@@ -1,7 +1,7 @@
 module list;
 import mem;
 
-/* A doubly linked list of T, a value type: `ad list.List<Job *> q =
+/* A doubly linked list of T, a value type: `scoped list.List<Job *> q =
  * list.new<Job *>();`. append/prepend return the node, so remove(node)
  * takes it out later in O(1) (a timer, a client to drop). Walk it with
  * `for (auto n = l.head; n; n = n.next)` (n.value); head and tail are
@@ -145,7 +145,7 @@ pub void List<T>.clear() {
         self.len = 0;
 }
 
-/* The same as clear(): for `ad` and `defer l.free();` */
+/* The same as clear(): for `scoped` and `defer l.free();` */
 pub void List<T>.free() {
         self.clear();
 }

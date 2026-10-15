@@ -1,10 +1,10 @@
-# defer and ad
+# defer and scoped
 
 `defer` runs a statement when its block is left, however it is left: the end of the block, a
-`return`, a `break`, or an error passing through. `ad` in front of a declaration frees the
+`return`, a `break`, or an error passing through. `scoped` in front of a declaration frees the
 variable the same way. Both keep the clean-up next to the code that needs it, so it can't be
 forgotten on one of the ways out. This chapter covers `defer`, the order defers run in, what
-they see, and `ad`.
+they see, and `scoped`.
 
 ## defer
 
@@ -401,16 +401,16 @@ i32 main() {
 - Switching between coroutines doesn't leave a block, so it runs no defers.
 - Only functions that use `defer` pay for it.
 
-## ad
+## scoped
 
-`ad` in front of a declaration means `defer name.free();` right after it: the variable is freed
+`scoped` in front of a declaration means `defer name.free();` right after it: the variable is freed
 when its block ends.
 
 ```ktm run
 import str;
 
 i32 main() {
-    ad String name = str.from("Ada");
+    scoped String name = str.from("Ada");
     name.append(" Lovelace");
     printf("%.*s\n", name.len, name.ptr);
     return 0;
@@ -434,9 +434,9 @@ void Conn.free() {
 }
 
 i32 main() {
-    ad String name = str.from("server");
-    ad u8[][] words = str.split("a b c", " ");
-    ad Conn c = {7};
+    scoped String name = str.from("server");
+    scoped u8[][] words = str.split("a b c", " ");
+    scoped Conn c = {7};
     printf("%.*s has %d words\n", name.len, name.ptr, words.len);
     return 0;
 }
@@ -447,15 +447,15 @@ server has 3 words
 closing 7
 ```
 
-The library's containers all have `free()`, so `ad` is the usual way to hold them:
+The library's containers all have `free()`, so `scoped` is the usual way to hold them:
 
 ```ktm run
 import map, set, vec;
 
 i32 main() {
-    ad vec.Vec<i64> v = vec.new<i64>();
-    ad map.Map<u8 *, i64> m = map.new<u8 *, i64>();
-    ad set.Set<i64> s = set.new<i64>();
+    scoped vec.Vec<i64> v = vec.new<i64>();
+    scoped map.Map<u8 *, i64> m = map.new<u8 *, i64>();
+    scoped set.Set<i64> s = set.new<i64>();
     v.push(1);
     v.push(2);
     m.set("a", 1);
@@ -469,7 +469,7 @@ i32 main() {
 2 1 1
 ```
 
-Like a `defer`, an `ad` variable is freed on every way out of its block, a thrown error
+Like a `defer`, a `scoped` variable is freed on every way out of its block, a thrown error
 included:
 
 ```ktm run
@@ -482,7 +482,7 @@ void Res.free() {
 enum Err { bad };
 
 void use() {
-    ad Res r = {"lock"};
+    scoped Res r = {"lock"};
     throw(Err.bad, "failed while holding it");
 }
 
@@ -503,14 +503,14 @@ caught: failed while holding it
 
 ### Without a value
 
-An `ad` variable can be declared without a value and filled in later. Until then it is empty
+A `scoped` variable can be declared without a value and filled in later. Until then it is empty
 (every local starts zeroed), and freeing an empty `String`, slice or container does nothing:
 
 ```ktm run
 import str;
 
 i32 main() {
-    ad String s;
+    scoped String s;
     if (s.len == 0) {
         s = str.from("filled later");
     }
@@ -536,7 +536,7 @@ import json;
 };
 
 i32 main() {
-    ad User u;
+    scoped User u;
     u = json.decode<User>("{\"name\": \"ada\", \"age\": 36}");
     printf("%.*s is %d\n", u.name.len, u.name.ptr, u.age);
     return 0;
@@ -547,19 +547,19 @@ i32 main() {
 ada is 36
 ```
 
-An `ad` pointer with no value is `null`, and is freed only if it holds something by the end of
+A `scoped` pointer with no value is `null`, and is freed only if it holds something by the end of
 its block.
 
-### ad and returning
+### scoped and returning
 
-Returning an `ad` variable is an error: it would be freed as the function returns. A function
-that hands a value to its caller declares it without `ad`, and the caller decides:
+Returning a `scoped` variable is an error: it would be freed as the function returns. A function
+that hands a value to its caller declares it without `scoped`, and the caller decides:
 
 ```ktm error
 import str;
 
 String make() {
-    ad String s = str.from("x");
+    scoped String s = str.from("x");
     return s;
 }
 
@@ -569,7 +569,7 @@ i32 main() {
 ```
 
 ```output
-is declared with `ad`, so it is freed when this function returns
+is declared `scoped`, so it is freed when this function returns
 ```
 
 ```ktm run
@@ -581,7 +581,7 @@ String greeting(u8[] who) {
 }
 
 i32 main() {
-    ad String g = greeting("ada");
+    scoped String g = greeting("ada");
     printf("%.*s\n", g.len, g.ptr);
     return 0;
 }
@@ -591,13 +591,13 @@ i32 main() {
 hello, ada
 ```
 
-A type with no `free()` can't be used with `ad`:
+A type with no `free()` can't be declared `scoped`:
 
 ```ktm error
 struct Point { i64 x, y; };
 
 i32 main() {
-    ad Point p = {1, 2};
+    scoped Point p = {1, 2};
     return 0;
 }
 ```
@@ -606,16 +606,18 @@ i32 main() {
 has no `free()` that takes no arguments
 ```
 
-### ad rules
+### scoped rules
 
-- `ad T x = value;` is `T x = value; defer x.free();`.
+- `scoped T x = value;` is `T x = value; defer x.free();`.
 - It takes a `String`, a slice, or a struct (or pointer to one) with a `free()` that takes no
   arguments; an `@json`/`@yaml` struct without one uses `freeDecoded()`.
 - Without a value the variable starts empty and is still freed at the end.
-- Returning an `ad` variable is an error; a copy of it shares what it points to and is freed
+- Returning a `scoped` variable is an error; a copy of it shares what it points to and is freed
   with it.
-- `ad` goes on a local variable, not a field. It isn't a reserved word: a variable can be
-  called `ad`.
+- `scoped` goes on a local variable, not a field. It isn't a reserved word: a variable can be
+  called `scoped`.
+- Before v0.24.0 it was spelled `ad`. `ad` still works, with a warning that says to write
+  `scoped`; the files of a package in the module cache get no warning.
 
 ## Rules
 

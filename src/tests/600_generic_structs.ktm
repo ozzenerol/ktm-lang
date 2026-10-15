@@ -88,8 +88,8 @@ i32 main() {
     tests++; if (alias.get(0) == 5) { correct++; }
 
     {
-        ad Res<i64> r = {40};
-        ad Res<i64> s = {2};
+        scoped Res<i64> r = {40};
+        scoped Res<i64> s = {2};
     }
     tests++; if (gFreed == 42) { correct++; }
 

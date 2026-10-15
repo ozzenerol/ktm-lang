@@ -53,23 +53,23 @@ i32 main() {
     printf("Test - generic containers: ");
     i64 correct = 0, tests = 0;
     {
-        ad Vec<i64> v = vecNew<i64>();
+        scoped Vec<i64> v = vecNew<i64>();
         for (i64 i = 0; i < 100000; i++) { v.push(i); }
         i64 s = 0;
         for (i64 i = 0; i < v.len; i++) { s += v.get(i); }
         tests++; if (s == 4999950000) { correct++; }
-        ad Vec<u8[]> words = vecNew<u8[]>(1);
+        scoped Vec<u8[]> words = vecNew<u8[]>(1);
         words.push("a"); words.push("bb"); words.push("ccc");
         tests++; if (words.len == 3 && words.get(2).len == 3) { correct++; }
     }
     {
-        ad Map<i64, i64> m = mapNew<i64, i64>();
+        scoped Map<i64, i64> m = mapNew<i64, i64>();
         for (i64 i = 0; i < 100000; i++) { m.set(i, i * 3); }
         m.set(5, -1);
         i64 got = 0;
         tests++; if (m.len == 100000 && m.get(777, &got) && got == 2331 && !m.get(-4, &got)) { correct++; }
         tests++; if (m.get(5, &got) && got == -1) { correct++; }
-        ad Map<u8[], f64> prices = mapNew<u8[], f64>();
+        scoped Map<u8[], f64> prices = mapNew<u8[], f64>();
         prices.set("tea", 2.5);
         prices.set("coffee", 3.25);
         f64 p = 0;
