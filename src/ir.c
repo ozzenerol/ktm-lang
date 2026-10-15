@@ -443,14 +443,53 @@ static int irRetIsRegisterAggregate(AstType *rettype) {
     return irRetTypeIsAggregate(rettype) && rettype->size <= 16;
 }
 
-/* Make a call to ktm's memcpy routine. Used for struct by value returns. 
- * Simpler to do this than emit a bunch of instructions and from codegen is 
- * easy enough to reason with without feeling like magic. */
+/* The largest copy irEmitMemcpy does with loads and stores of its own:
+ * a u8[] (16 bytes), a String (24), a reflect.Value. A call to memcpy
+ * costs more than these few moves. */
+#define IR_INLINE_COPY_MAX 32
+
+/* The address `base + off` */
+static IrValue *irCopyAt(IrCtx *ctx, IrValue *base, int off) {
+    if (off == 0) return base;
+    IrValue *at = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_IADD, at, base, irConstInt(IR_TYPE_I64, off)));
+    return at;
+}
+
+/* Copy `n_bytes` from `src` to `dst` (both addresses). A small copy is
+ * loads and stores, widest first: every load comes before the first
+ * store, so it is right when the two overlap too. A larger one calls
+ * memcpy. */
 static void irEmitMemcpy(IrCtx *ctx,
-                         IrValue *dst, 
+                         IrValue *dst,
                          IrValue *src,
                          int n_bytes)
 {
+    if (n_bytes > 0 && n_bytes <= IR_INLINE_COPY_MAX) {
+        IrValue *vals[IR_INLINE_COPY_MAX];
+        int offs[IR_INLINE_COPY_MAX];
+        int n = 0, pos = 0;
+        while (pos < n_bytes) {
+            int remaining = n_bytes - pos;
+            int chunk;
+            IrValueType ty;
+            if      (remaining >= 8) { chunk = 8; ty = IR_TYPE_I64; }
+            else if (remaining >= 4) { chunk = 4; ty = IR_TYPE_I32; }
+            else if (remaining >= 2) { chunk = 2; ty = IR_TYPE_I16; }
+            else                     { chunk = 1; ty = IR_TYPE_I8;  }
+            IrValue *val = irTmp(ty, chunk);
+            irBlockAddInstr(ctx, irInstrNew(IR_LOAD_DEREF, val, irCopyAt(ctx, src, pos), NULL));
+            vals[n] = val;
+            offs[n] = pos;
+            n++;
+            pos += chunk;
+        }
+        for (int i = 0; i < n; ++i) {
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, irCopyAt(ctx, dst, offs[i]), vals[i], NULL));
+        }
+        return;
+    }
+
     IrValue *args_wrap = irValueNew(IR_TYPE_ARRAY, IR_VAL_UNRESOLVED);
     /* libc memcpy(dst, src, n) -> dst; resolves via libc for both the
      * AOT link and JIT dlsym. */
