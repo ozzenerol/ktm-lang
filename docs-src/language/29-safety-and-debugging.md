@@ -212,7 +212,7 @@ Segmentation fault
 ```
 
 - Compiled programs and `-jit` report the same way, in every thread.
-- A crash inside C code (`libc.strlen(null)`) shows `in C code`, then the ktm line that called it.
+- A crash inside C code (`libc.strlen(null)`) shows `in C code`, then the ktm line that called it and that line's callers, up to `main`.
 - A package's function shows by the name the program calls it by (`pg.Pool.exec`), its file
   under the package's path.
 - The exit status is still the signal's: 139 for a segmentation fault, 136 for a division by

@@ -274,24 +274,112 @@ static bool crashReadable(u64 p) {
     return libc.mincore((void *)page, (p + 16 > page + 4096) ? 8192 : 4096, vec) == 0;
 }
 
-/* x86_64 C code keeps no frame pointer we can trust: the first word on
- * the stack that is an address in ktm code is the return into it. Each
- * page is checked when the scan reaches it: the stack can end less than
- * a page above sp (the main thread's, with a small environment). */
-static u64 crashScanStack(u64 sp) {
+/* The frame record of the ktm function whose return into it is at slot:
+ * the first pair of words above it that looks like one, a saved frame
+ * pointer a little higher on the stack and a return into ktm code (its
+ * caller). The walk goes on from there, past the C frames whose frame
+ * pointer the fault left in an unknown state. 0 when there is none: a
+ * function called from C (main, a thread's), where the walk ends. */
+static u64 crashFrameAbove(u64 slot) {
     i64 i;
-    u64 mapped = 0;     /* the end of the pages checked so far */
-    sp &= ~(u64)7;
-    for (i = 0; i < 512; i++) {
-        u64 p = sp + 8 * i;
-        if (p + 8 > mapped) {
-            u8 vec[1];
-            u64 page = p & ~(u64)4095;
-            if (libc.mincore((void *)page, 4096, vec) != 0) { return 0; }
-            mapped = page + 4096;
+    for (i = 1; i < 8192; i++) {
+        u64 q = slot + 8 * i;
+        if (!crashReadable(q)) { return 0; }
+        u64 saved = *(u64 *)q;
+        if (saved > q && saved - q < 0x100000 && !(saved & 7) &&
+            crashFind(((u64 *)q)[1] - 1)) {
+            return q;
         }
-        u64 w = *(u64 *)p;
-        if (crashFind(w - 1)) { return w; }
+    }
+    return 0;
+}
+
+/* Does w follow a call instruction, as a return address does: on
+ * x86_64 a call rel32, through a register or through [rip + d32], on
+ * arm64 a bl or a blr. A word that points just past a function (a
+ * function pointer, the next one's start) is no return address. */
+static bool crashAfterCall(u64 w) {
+#ifdef IS_ARM_64
+    u32 insn = *(u32 *)(w - 4);
+    return (insn >> 26) == 0x25 || (insn & 0xfffffc1f) == 0xd63f0000;
+#else
+    u8 *c = (u8 *)w;
+    return c[-5] == 0xe8 || (c[-2] == 0xff && (c[-1] & 0xf8) == 0xd0) ||
+           (c[-6] == 0xff && c[-5] == 0x15);
+#endif
+}
+
+/* Where a direct call (call rel32, bl) before w goes, 0 for another */
+static u64 crashCallee(u64 w) {
+#ifdef IS_ARM_64
+    u32 insn = *(u32 *)(w - 4);
+    if ((insn >> 26) != 0x25) { return 0; }
+    i64 imm = insn & 0x3ffffff;
+    if (imm & 0x2000000) { imm -= 0x4000000; }
+    return w - 4 + (u64)(imm * 4);
+#else
+    u8 *c = (u8 *)w;
+    if (c[-5] != 0xe8) { return 0; }
+    i32 *rel = (i32 *)(c - 4);
+    i64 off = *rel;
+    return w + (u64)off;
+#endif
+}
+
+/* Is f one of rt.crash's own functions: they run only to set the
+ * handler up, before main, so a return into one that the stack still
+ * holds is left over from then */
+static bool crashOwn(CrashFn *f) {
+    u8 *n = crashAt(&f.name);
+    return n[0] == 'r' && n[1] == 't' && n[2] == '.' && n[3] == 'c' && n[4] == 'r' &&
+           n[5] == 'a' && n[6] == 's' && n[7] == 'h' && n[8] == '.';
+}
+
+/* The word at p as a code address: C code built with pointer
+ * authentication (Linux arm64) saves return addresses signed, the code
+ * in the bits above the 48 an address uses */
+static u64 crashRetAt(u64 p) {
+    u64 w = *(u64 *)p;
+#ifdef IS_ARM_64
+    w &= 0xffffffffffff;
+#endif
+    return w;
+}
+
+/* The first stack slot from p up that holds a return into ktm code, 0
+ * when there is none in the next 32 KiB */
+static u64 crashNextReturn(u64 p) {
+    i64 i;
+    for (i = 0; i < 4096; i++, p += 8) {
+        if (!crashReadable(p)) { return 0; }
+        u64 w = crashRetAt(p);
+        CrashFn *f = crashFind(w - 1);
+        if (f && !crashOwn(f) && crashAfterCall(w)) { return p; }
+    }
+    return 0;
+}
+
+/* x86_64 C code keeps no frame pointer we can trust: the return into
+ * the ktm code that called it is found on the stack. Deep C code like
+ * printf leaves returns from earlier calls in buffers it didn't fill,
+ * below the live one: a return into f is one of those when the next
+ * return above it comes from a call to another function than f (f's
+ * caller called f). *slot is where it was. */
+static u64 crashScanStack(u64 sp, u64 *slot) {
+    u64 p = crashNextReturn(sp & ~(u64)7);
+    while (p) {
+        u64 w = crashRetAt(p);
+        CrashFn *f = crashFind(w - 1);
+        u64 next = crashNextReturn(p + 8), to = 0;
+        if (next) {
+            u64 ret = crashRetAt(next);
+            to = crashCallee(ret);
+        }
+        if (!to || to == crashStart(f) || (f.flags & 1)) {
+            *slot = p;
+            return w;
+        }
+        p = next;
     }
     return 0;
 }
@@ -390,8 +478,29 @@ static void crashHandler(i32 sig, u8 *info, u8 *uc) {
     if (!crashAtMain && (!f || (f.flags & 1))) {
 #ifdef IS_ARM_64
         first = lr;
+#ifndef IS_MACOS
+        /* glibc's code may have saved lr and used x29 for itself: the
+         * return into ktm code is on the stack, with the frame pointer
+         * of the ktm function it returns into stored below it */
+        if (!f && !crashFind(lr - 1)) {
+            u64 slot = 0;
+            first = crashScanStack(sp, &slot);
+            if (first) {
+                u64 saved = ((u64 *)slot)[-1];
+                fp = saved > slot && saved - slot < 0x100000 && !(saved & 7) ? saved
+                                                                            : crashFrameAbove(slot);
+            }
+        }
+#endif
 #else
-        first = f ? *(u64 *)sp : crashScanStack(sp);
+        if (f) {
+            first = *(u64 *)sp;
+        } else {
+            u64 slot = 0;
+            first = crashScanStack(sp, &slot);
+            /* the frame pointer at the fault is the C code's */
+            if (first) { fp = crashFrameAbove(slot); }
+        }
 #endif
         if (first) { crashFrame(first, false); }
     }
