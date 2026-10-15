@@ -156,6 +156,8 @@ i32 main(i32 argc, u8 **argv)
 
 <h2>What changed</h2>
 <ul class="rules">
+  <li><code>maxBookmarks</code> and the 507 are gone: a table has no fixed size. <code>Settings</code> gets
+  <code>databaseUrl</code> instead, <code>@required</code>, so the server won't start without it.</li>
   <li><code>pg.open(url)</code> makes a <b>pool</b> of connections that every thread of the server shares. It goes to
   <code>http.listen</code> as the app's state, and each handler gets it back with <code>pg.Pool *db = r.app;</code>.
   Since the data lives in the database, <code>o.threads = 1</code> is gone: one loop per core again.</li>

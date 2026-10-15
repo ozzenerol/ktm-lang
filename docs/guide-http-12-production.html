@@ -6,7 +6,7 @@
 <title>12. Production - ktm</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="assets/style.css?v=bc6022efce">
+<link rel="stylesheet" href="assets/style.css?v=c4e8d50ba8">
 <script>
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
@@ -72,8 +72,8 @@ TLS. Copy it with the <code>migrations</code> directory and it runs.</p>
 
 <h2 id="https">HTTPS<a class="anchor" href="#https" aria-label="Link to this section">#</a></h2>
 <p>Two more settings, the certificate chain and its key as PEM files, and <code>main</code> serves over TLS when they
-are set. In <code>main.ktm</code>, <code>net.https</code> joins the imports and <code>Settings</code> grows:</p>
-<pre><code>import config, flag, log, net.http, net.https, os, reflect, str, vec;</code></pre>
+are set. They go in <code>Settings</code>; the whole <code>main.ktm</code> that uses them comes after the health
+check below.</p>
 <pre><code>struct Settings {
     i64 port;
     bool accessLog;
@@ -82,17 +82,8 @@ are set. In <code>main.ktm</code>, <code>net.https</code> joins the imports and 
     u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
     u8[] tlsCert;               /* HTTPS: the certificate chain and its key, PEM files */
     u8[] tlsKey;
-};</code></pre>
-<p>The end of <code>main</code>:</p>
-<pre><code>    http.Options o;
-    o.accessLog = *accessLog;
-    if (gSettings.tlsCert.len) {
-        log.info("Shelf listening on https://localhost:%d", *port);
-        return https.listen((i32)*port, &amp;mux, gSettings.tlsCert, gSettings.tlsKey, db, &amp;o);
-    }
-    log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;mux, db, &amp;o);
-}</code></pre>
+};
+</code></pre>
 <pre><code>SHELF_TLS_CERT=/etc/letsencrypt/live/shelf.example.com/fullchain.pem
 SHELF_TLS_KEY=/etc/letsencrypt/live/shelf.example.com/privkey.pem</code></pre>
 <p>Behind a load balancer or a proxy that ends TLS (nginx, Caddy, a cloud load balancer), leave them unset: the proxy
@@ -117,17 +108,137 @@ void health(http.Writer *w, http.Request *r)
     }
     w.text(200, "ok");
 }</code></pre>
-<p>its route in <code>routes()</code>, after the middleware and outside every group, so it needs no token:</p>
-<pre><code>    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
+<p>and its route in <code>routes()</code>, after the middleware and outside every group, so it needs no token:</p>
+<pre><code>/* Shelf's routes and middleware on mux. webOrigin: the web app that may
+ * call it from a browser ("": none); trustedProxies: the load balancer's
+ * addresses ("": none). */
+pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
+{
+    if (!gNoUser.len) {
+        String noise = uuid.v4().string();
+        gNoUser = crypto.hashPassword(noise[0:]);
+        noise.free();
+    }
+
+    if (trustedProxies.len) { middleware.realIp(mux, trustedProxies); }
+    middleware.requestId(mux);
+    if (webOrigin.len) {
+        middleware.CorsOptions cors;
+        cors.origins = webOrigin;
+        cors.expose = "X-Request-Id";
+        middleware.cors(mux, &amp;cors);
+    }
+    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
 
     mux.handle("GET /health", &amp;health);
-    mux.handle("POST /users", &amp;signup);</code></pre>
-<p>and in <code>main</code>, the pool opens with time limits:</p>
-<pre><code>    /* the database: a pool of connections shared by every thread */
+    mux.handle("POST /users", &amp;signup);
+    http.Mux *logins = mux.group("/sessions");
+    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
+    logins.handle("POST", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
+
+    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;checkToken);
+    collections.handle("POST", &amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
+}</code></pre>
+<p><code>main.ktm</code> opens the pool with time limits and serves HTTPS when the two settings are there. The whole
+file:</p>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import "example.com/shelf/api";
+import config, flag, log, net.http, net.https, os, reflect, str, vec;
+
+/* shelf migrate up | down | status */
+i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
+{
+    if (str.equals(what, "up")) {
+        printf("%d migrations ran\n", ms.up(d));
+    } else if (str.equals(what, "down")) {
+        printf("%d migration reverted\n", ms.down(d, 1));
+    } else if (str.equals(what, "status")) {
+        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
+        for (auto s : all) {
+            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
+        }
+        all.free();
+    } else {
+        log.error("shelf migrate: up, down or status, not `%s`", what);
+        return 2;
+    }
+    return 0;
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
+    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
+    u8[] tlsCert;               /* HTTPS: the certificate chain and its key, PEM files */
+    u8[] tlsKey;
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
     pg.Options po;
     po.queryTimeoutMs = 5000;           /* no request waits on a query for more than 5 s */
     po.acquireTimeoutMs = 2000;         /* nor 2 s for a connection (the default is 30) */
-    pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;po);</code></pre>
+    pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;po);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
+
+    http.Mux mux;
+    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    if (gSettings.tlsCert.len) {
+        log.info("Shelf listening on https://localhost:%d", *port);
+        return https.listen((i32)*port, &amp;mux, gSettings.tlsCert, gSettings.tlsKey, db, &amp;o);
+    }
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}
+</code></pre>
 <ul class="rules">
   <li><code>GET /health</code> is for the load balancer and the monitoring: 200 while the database answers, 503 when it
   doesn't, so traffic goes to instances that can serve it.</li>
@@ -191,6 +302,425 @@ that runs has only the binary and the migrations.</p>
 <pre><code>$ docker build -t shelf .
 $ docker run -p 8080:8080 --env-file .env shelf</code></pre>
 
+<h2 id="the-whole-program">The whole program<a class="anchor" href="#the-whole-program" aria-label="Link to this section">#</a></h2>
+<p><code>main.ktm</code> is above, whole; <code>api/api_test.ktm</code> is as in chapter 11. The rest:</p>
+<details class="code"><summary>api/api.ktm</summary>
+<pre><code>module api;
+import "github.com/ozzenerol/ktm-pg";
+import crypto, encoding.base64, json, mem, net.http, net.http.middleware, reflect, str, uuid, vec;
+
+/* Shelf's HTTP API: its routes, handlers and middleware. main.ktm reads
+ * the settings, opens the database and serves what routes() set up. */
+
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    vec.Vec&lt;String&gt; tags;
+    String createdAt;
+};
+
+/* A page of bookmarks: `next` is the cursor for the page after it */
+@json struct Page {
+    vec.Vec&lt;Bookmark&gt; items;
+    @omitEmpty String next;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+    vec.Vec&lt;String&gt; tags;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, " \
+    "(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""
+
+/* ---- users and sessions ---- */
+
+@json struct NewUser {
+    @required @email @max(254) u8[] email;
+    @required @min(10) @max(200) u8[] password;
+};
+
+@json struct User {
+    String id;
+    String email;
+};
+
+@json struct Login {
+    @required u8[] email;
+    @required u8[] password;
+};
+
+@json struct Session {
+    String token;
+    String expiresAt;
+};
+
+struct Credentials {
+    String id;
+    String passwordHash;
+};
+
+/* A hash no password matches: a login for an unknown email checks the
+ * password against it, so it takes as long as one for a known email */
+String gNoUser;
+
+void signup(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewUser in = http.decodeValid&lt;NewUser&gt;(r);
+    String hash = crypto.hashPassword(in.password);     /* Argon2id, on a worker thread */
+    defer hash.free();
+    String id = uuid.v7().string();
+    defer id.free();
+    User u;
+    try {
+        u = pg.queryOne&lt;User&gt;(db, "INSERT INTO users (id, email, password_hash) VALUES ($1, lower($2), $3) RETURNING id, email",
+                              id, in.email, hash);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that email has an account");
+        return;
+    }
+    defer u.freeDecoded();
+    w.json(201, reflect.of(u));
+}
+
+/* The SHA-256 of a token, as the sessions table keeps it */
+void tokenHash(u8[] token, u8 *out)
+{
+    crypto.sha256(token, out[0:32]);
+}
+
+void login(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    Login in = http.decodeValid&lt;Login&gt;(r);
+    vec.Vec&lt;Credentials&gt; found = pg.queryAll&lt;Credentials&gt;(db,
+        "SELECT id, password_hash AS \"passwordHash\" FROM users WHERE email = lower($1)", in.email);
+    defer pg.free(reflect.of(found));
+    u8[] hash = found.len ? found.data[0].passwordHash[0:] : gNoUser[0:];
+    if (!crypto.verifyPassword(in.password, hash) || !found.len) {
+        w.error(401, "wrong email or password");
+        return;
+    }
+    /* 32 random bytes are the token; the database keeps only their hash */
+    String raw = crypto.randomBytes(32);
+    defer raw.free();
+    Session s;
+    defer s.freeDecoded();
+    s.token = base64.encodeUrl(raw[0:]);
+    u8 h[32];
+    tokenHash(s.token[0:], h);
+    s.expiresAt = pg.queryOne&lt;String&gt;(db,
+        "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '30 days')"
+        " RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+        h[0:32], found.data[0].id);
+    w.json(201, reflect.of(s));
+}
+
+/* Is token a live session? Then the handlers get its user (userOf) */
+bool checkToken(u8[] token, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    u8 h[32];
+    tokenHash(token, h);
+    vec.Vec&lt;String&gt; ids = pg.queryAll&lt;String&gt;(db,
+        "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &gt; now()", h[0:32]);
+    defer pg.free(reflect.of(ids));
+    if (!ids.len) { return false; }
+    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
+    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
+    u8[] *id = r.alloc(sizeof(u8[]));
+    *id = keep[0:ids.data[0].len];
+    r.set("userId", id);
+    return true;
+}
+
+/* The signed-in user's id (behind middleware.bearer) */
+u8[] userOf(http.Request *r)
+{
+    u8[] *id = r.get("userId");
+    return *id;
+}
+
+void logout(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    u8 h[32];
+    tokenHash(str.trim(r.header("Authorization")[7:]), h);
+    db.exec("DELETE FROM sessions WHERE token_hash = $1", h[0:32]);
+    w.status(204);
+}
+
+/* ---- collections ---- */
+
+@json struct NewCollection {
+    @required @max(100) u8[] name;
+    @key("public") bool isPublic;
+};
+
+@json struct Collection {
+    String id;
+    String name;
+    @key("public") bool isPublic;
+    vec.Vec&lt;Bookmark&gt; bookmarks;
+};
+
+/* The signed-in user if the request has a good token, else "": for the
+ * routes anyone may call */
+u8[] maybeUser(http.Request *r)
+{
+    u8[] auth = str.trim(r.header("Authorization"));
+    if (auth.len &gt; 7 &amp;&amp; checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
+    return "";
+}
+
+void newCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewCollection in = http.decodeValid&lt;NewCollection&gt;(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    db.exec("INSERT INTO collections (id, user_id, name, public) VALUES ($1, $2, $3, $4)", id, userOf(r), in.name, in.isPublic);
+    Collection c;
+    c.id = str.from(id[0:]);
+    c.name = str.from(in.name);
+    c.isPublic = in.isPublic;
+    defer c.freeDecoded();
+    w.json(201, reflect.of(c));
+}
+
+/* PUT /collections/{id}/bookmarks/{bookmark}: both must be the user's */
+void addToCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID a, b;
+    if (!uuid.parse(r.param("id"), &amp;a) || !uuid.parse(r.param("bookmark"), &amp;b)) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    i64 mine = pg.queryOne&lt;i64&gt;(db, "SELECT count(*) FROM collections c, bookmarks b"
+                                    " WHERE c.id = $1 AND b.id = $2 AND c.user_id = $3 AND b.user_id = $3",
+                                r.param("id"), r.param("bookmark"), userOf(r));
+    if (!mine) {
+        w.error(404, "no such collection or bookmark");
+        return;
+    }
+    db.exec("INSERT INTO collection_items (collection_id, bookmark_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            r.param("id"), r.param("bookmark"));
+    w.status(204);
+}
+
+/* GET /collections/{id}: its owner, or anyone when it is public */
+void showCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!uuid.parse(r.param("id"), &amp;id)) {
+        w.error(404, "no such collection");
+        return;
+    }
+    /* someone else's private collection is a 404, not a 403: it doesn't
+     * say that it exists */
+    vec.Vec&lt;Collection&gt; found = pg.queryAll&lt;Collection&gt;(db,
+        "SELECT id, name, public FROM collections WHERE id = $1 AND (public OR user_id::text = $2)",
+        r.param("id"), maybeUser(r));
+    defer pg.free(reflect.of(found));
+    if (!found.len) {
+        w.error(404, "no such collection");
+        return;
+    }
+    Collection *c = &amp;found.data[0];
+    c.bookmarks = pg.queryAll&lt;Bookmark&gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks WHERE id IN"
+        " (SELECT bookmark_id FROM collection_items WHERE collection_id = $1) ORDER BY id DESC", r.param("id"));
+    w.json(200, reflect.of(*c));
+}
+
+/* GET /bookmarks?tag=go&amp;q=fast+servers&amp;limit=20&amp;after=&lt;cursor&gt;: newest first */
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    i64 limit = 20;
+    if (r.hasQuery("limit") &amp;&amp; (!str.toInt(r.query("limit"), &amp;limit) || limit &lt; 1 || limit &gt; 100)) {
+        w.error(400, "limit is 1 to 100");
+        return;
+    }
+    uuid.UUID after;
+    u8[] cursor = r.query("after");
+    if (cursor.len &amp;&amp; !uuid.parse(cursor, &amp;after)) {
+        w.error(400, "after isn't a cursor from this API");
+        return;
+    }
+    Page page;
+    defer page.freeDecoded();
+    /* one more than asked for: if it comes back, there is a next page */
+    page.items = pg.queryAll&lt;Bookmark&gt;(db,
+        "SELECT " COLUMNS " FROM bookmarks"
+        " WHERE user_id = $1"
+        "   AND ($2 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $2))"
+        "   AND ($3 = '' OR search @@ websearch_to_tsquery('simple', $3))"
+        "   AND ($4 = '' OR id &lt; $4::uuid)"
+        " ORDER BY id DESC LIMIT $5",
+        userOf(r), r.query("tag"), r.query("q"), cursor, limit + 1);
+    if (page.items.len &gt; limit) {
+        Bookmark extra = page.items.removeAt(limit);
+        pg.free(reflect.of(extra));
+        page.next = str.from(page.items.data[limit - 1].id[0:]);
+    }
+    w.json(200, reflect.of(page));
+}
+
+/* A tag is 1 to 30 lowercase letters, digits and dashes */
+bool goodTag(u8[] t)
+{
+    if (t.len &lt; 1 || t.len &gt; 30) { return false; }
+    for (auto c : t) {
+        if (!((c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '-')) { return false; }
+    }
+    return true;
+}
+
+/* The id in the path, or false (and a 404) when it isn't a UUID */
+bool pathId(http.Writer *w, http.Request *r, uuid.UUID *id)
+{
+    if (uuid.parse(r.param("id"), id)) { return true; }
+    w.error(404, "no such bookmark");
+    return false;
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne&lt;Bookmark&gt;(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1 AND user_id = $2",
+                                  r.param("id"), userOf(r));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);
+    if (in.tags.len &gt; 10) {
+        w.error(422, "at most 10 tags");
+        return;
+    }
+    for (auto t : in.tags) {
+        if (!goodTag(t[0:])) {
+            w.error(422, "a tag is 1 to 30 lowercase letters, digits and dashes");
+            return;
+        }
+    }
+    String id = uuid.v7().string();
+    defer id.free();
+    /* the bookmark and its tags together, or neither */
+    pg.Tx tx = db.begin();
+    defer tx.rollback();
+    try {
+        tx.exec("INSERT INTO bookmarks (id, user_id, url, title, notes) VALUES ($1, $2, $3, $4, $5)",
+                id, userOf(r), in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
+    Bookmark b = pg.queryOne&lt;Bookmark&gt;(&amp;tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    defer b.freeDecoded();
+    tx.commit();
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &amp;id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1 AND user_id = $2", r.param("id"), userOf(r)) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}
+
+/* GET /health: for the load balancer and the monitoring. 200 while the
+ * database answers, 503 when it doesn't (the instance takes no traffic) */
+void health(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    try {
+        pg.Conn *c = db.acquire();
+        defer c.release();
+        c.setQueryTimeout(1000);        /* a database that doesn't answer in a second is down */
+        c.ping();
+    } catch (Error e) {
+        w.error(503, "the database doesn't answer");
+        return;
+    }
+    w.text(200, "ok");
+}
+
+/* Shelf's routes and middleware on mux. webOrigin: the web app that may
+ * call it from a browser ("": none); trustedProxies: the load balancer's
+ * addresses ("": none). */
+pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
+{
+    if (!gNoUser.len) {
+        String noise = uuid.v4().string();
+        gNoUser = crypto.hashPassword(noise[0:]);
+        noise.free();
+    }
+
+    if (trustedProxies.len) { middleware.realIp(mux, trustedProxies); }
+    middleware.requestId(mux);
+    if (webOrigin.len) {
+        middleware.CorsOptions cors;
+        cors.origins = webOrigin;
+        cors.expose = "X-Request-Id";
+        middleware.cors(mux, &amp;cors);
+    }
+    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
+
+    mux.handle("GET /health", &amp;health);
+    mux.handle("POST /users", &amp;signup);
+    http.Mux *logins = mux.group("/sessions");
+    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
+    logins.handle("POST", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
+
+    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;checkToken);
+    collections.handle("POST", &amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
+}</code></pre>
+</details>
+
 <h2 id="where-to-go-from-here">Where to go from here<a class="anchor" href="#where-to-go-from-here" aria-label="Link to this section">#</a></h2>
 <p>Shelf now has everything a real API has: validated input, a database with migrations, accounts, permissions,
 middleware, tests and a deployment. The <a href="lib-http.html">HTTP</a>,
@@ -203,7 +733,7 @@ go deeper into each part.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#one-binary">One binary</a></li><li><a href="#https">HTTPS</a></li><li><a href="#health-and-time-limits">Health and time limits</a></li><li><a href="#stopping-cleanly">Stopping cleanly</a></li><li><a href="#running-it-with-systemd">Running it with systemd</a></li><li><a href="#or-in-a-container">Or in a container</a></li><li><a href="#where-to-go-from-here">Where to go from here</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#one-binary">One binary</a></li><li><a href="#https">HTTPS</a></li><li><a href="#health-and-time-limits">Health and time limits</a></li><li><a href="#stopping-cleanly">Stopping cleanly</a></li><li><a href="#running-it-with-systemd">Running it with systemd</a></li><li><a href="#or-in-a-container">Or in a container</a></li><li><a href="#the-whole-program">The whole program</a></li><li><a href="#where-to-go-from-here">Where to go from here</a></li></ul></nav>
 </div>
 </body>
 </html>

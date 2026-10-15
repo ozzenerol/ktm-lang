@@ -57,11 +57,11 @@ that many are saved:</p>
         os.exit(2);
     }
 
-    flag.Set *fs = flag.new("shelf", "a bookmarks API");
-    defer fs.free();
-    i64 *port = fs.integer("port", gSettings.port, "the port to listen on", 'p');
-    bool *accessLog = fs.boolean("access-log", gSettings.accessLog, "log every request");
-    fs.parseOrExit(argc, argv);
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flags.parseOrExit(argc, argv);
 
     http.Mux mux;
     mux.handle("GET /bookmarks", &list);
@@ -117,4 +117,129 @@ $ SHELF_MAX_BOOKMARKS=0 ktm run .
   <li>In production the same variables come from the service manager or the container, and <code>.env</code> isn't
   there: <code>loadDotenv</code> then sets nothing.</li>
 </ul>
+<h2>The whole program</h2>
+<p>The program at the end of this chapter, to check yours against:</p>
+<details class="code"><summary>main.ktm</summary>
+<pre><code>import config, date, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+/* A saved link */
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+/* What a client sends to save one */
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};
+
+/* Settings: SHELF_PORT, SHELF_ACCESS_LOG, SHELF_MAX_BOOKMARKS from the
+ * environment or .env, flags over them */
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @min(1) i64 maxBookmarks;
+};
+
+Settings gSettings;
+
+/* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
+vec.Vec<Bookmark> gBookmarks;
+
+/* The index of the bookmark with this id, or -1 */
+i64 find(u8[] id)
+{
+    for (i64 i = 0; i < gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
+    }
+    return -1;
+}
+
+void list(http.Writer *w, http.Request *r)
+{
+    w.json(200, reflect.of(gBookmarks));
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i < 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.json(200, reflect.of(gBookmarks.data[i]));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid<NewBookmark>(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i < gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    if (gBookmarks.len >= gSettings.maxBookmarks) {
+        w.error(507, "the shelf is full");
+        return;
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i < 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    Bookmark b = gBookmarks.removeAt(i);
+    b.id.free();
+    b.url.free();
+    b.title.free();
+    b.createdAt.free();
+    w.status(204);
+}
+
+i32 main(i32 argc, u8 **argv)
+{
+    /* defaults, then .env and the environment, then the command line */
+    gSettings.port = 8080;
+    gSettings.maxBookmarks = 10000;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flags.parseOrExit(argc, argv);
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
+
+    http.Options o;
+    o.threads = 1;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &mux, null, &o);
+}</code></pre>
+</details>
 <p>Next: <a href="guide-http-05-postgres.html">PostgreSQL</a>.</p>

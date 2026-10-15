@@ -763,3 +763,9 @@ ul.rules > li::before {
 
 .logo { display: block; width: auto; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- a whole file, folded (the guides' "The whole program") ---- */
+details.code { margin: 0 0 0.75rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-soft); }
+details.code > summary { padding: 0.55rem 1rem; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; color: var(--text); }
+details.code[open] > summary { border-bottom: 1px solid var(--border); }
+details.code > pre { margin: 0; border: 0; border-radius: 0 0 10px 10px; }
