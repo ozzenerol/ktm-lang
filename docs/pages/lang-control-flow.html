@@ -10,6 +10,7 @@ if (i64 n = count(); n > 5) { ... }    // n lives only in the if
 while (cond) { ... }
 do { ... } while (cond);
 for (i64 i = 0; i < n; i++) { ... }
+for (i = 0, j = n; i < j; i++, j--) { ... }   // several, comma-separated
 for (auto x : items) { ... }           // arrays, slices, vectors
 if x > 0 { ... }                       // the parentheses are optional
 for i64 i = 0; i < n; i++ { ... }</code></pre>

@@ -3431,7 +3431,19 @@ Ast *parseForLoopInitialiser(Cctrl *cc) {
     } else if (is_const) {
         cctrlRaiseException(cc,"const is only allowed on declarations");
     }
-    return parseStatement(cc);
+    /* An expression ends at a `,` or the `;`: `for (k = 0, i = n; ...)`
+     * runs each in turn */
+    Ast *first = parseStatement(cc);
+    cctrlTokenRewind(cc);
+    if (!tokenPunctIs(cctrlTokenGet(cc), ',')) return first;
+    List *inits = listNew();
+    if (first) listAppend(inits, first);
+    do {
+        Ast *next = parseStatement(cc);
+        if (next) listAppend(inits, next);
+        cctrlTokenRewind(cc);
+    } while (tokenPunctIs(cctrlTokenGet(cc), ','));
+    return astCompountStatement(inits);
 }
 
 Ast *parseForStatement(Cctrl *cc) {
