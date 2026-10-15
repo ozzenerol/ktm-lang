@@ -151,7 +151,7 @@ $ curl -H "Authorization: Bearer $ADA" localhost:8080/collections/$SECRET
 <pre><code>import "github.com/ozzenerol/ktm-pg";
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/postgres";
-import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;
+import config, crypto, encoding.base64, flag, json, log, net.http, net.http.middleware, os, reflect, str, uuid, vec;
 
 @json struct Bookmark {
     String id;
@@ -274,19 +274,14 @@ bool checkToken(u8[] token, http.Request *r)
         "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at > now()", h[0:32]);
     defer pg.free(reflect.of(ids));
     if (!ids.len) { return false; }
-    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
-    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
-    u8[] *id = r.alloc(sizeof(u8[]));
-    *id = keep[0:ids.data[0].len];
-    r.set("userId", id);
+    r.setText("userId", ids.data[0][0:]);         /* a copy, kept until the reply */
     return true;
 }
 
 /* The signed-in user's id (behind middleware.bearer) */
 u8[] userOf(http.Request *r)
 {
-    u8[] *id = r.get("userId");
-    return *id;
+    return r.getText("userId");
 }
 
 void logout(http.Writer *w, http.Request *r)

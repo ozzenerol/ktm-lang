@@ -48,7 +48,7 @@ syn keyword ktmStructure   struct union enum
 syn keyword ktmTypedef     type
 syn keyword ktmFnKeyword   fn
 syn keyword ktmModule      module
-syn keyword ktmStorage     pub private static const extern _extern inline volatile reg noreg
+syn keyword ktmStorage     pub private static const extern _extern inline volatile reg noreg threadlocal
 syn keyword ktmConditional if else switch
 syn keyword ktmLabel       case default
 syn keyword ktmRepeat      while for do

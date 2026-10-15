@@ -17,7 +17,7 @@
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=9467e22335" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -94,12 +94,12 @@ DROP TABLE users;</code></pre>
 </ul>
 
 <h2 id="imports-and-types">Imports and types<a class="anchor" href="#imports-and-types" aria-label="Link to this section">#</a></h2>
-<p>The import line gains <code>crypto</code>, <code>encoding.base64</code>, <code>mem</code> and
+<p>The import line gains <code>crypto</code>, <code>encoding.base64</code> and
 <code>net.http.middleware</code>:</p>
 <pre><code>import "github.com/ozzenerol/ktm-pg";
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/postgres";
-import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;</code></pre>
+import config, crypto, encoding.base64, flag, json, log, net.http, net.http.middleware, os, reflect, str, uuid, vec;</code></pre>
 <p>Under <code>COLUMNS</code>, the request and reply bodies of the new routes, and the row a login reads:</p>
 <pre><code>@json struct NewUser {
     @required @email @max(254) u8[] email;
@@ -211,19 +211,14 @@ bool checkToken(u8[] token, http.Request *r)
         "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &gt; now()", h[0:32]);
     defer pg.free(reflect.of(ids));
     if (!ids.len) { return false; }
-    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
-    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
-    u8[] *id = r.alloc(sizeof(u8[]));
-    *id = keep[0:ids.data[0].len];
-    r.set("userId", id);
+    r.setText("userId", ids.data[0][0:]);         /* a copy, kept until the reply */
     return true;
 }
 
 /* The signed-in user's id (behind middleware.bearer) */
 u8[] userOf(http.Request *r)
 {
-    u8[] *id = r.get("userId");
-    return *id;
+    return r.getText("userId");
 }
 
 void logout(http.Writer *w, http.Request *r)
@@ -236,7 +231,7 @@ void logout(http.Writer *w, http.Request *r)
 }</code></pre>
 <p><a href="lib-http-middleware.html"><code>middleware.bearer</code></a> reads
 <code>Authorization: Bearer &lt;token&gt;</code>, calls <code>checkToken</code> and answers 401 when it says no.
-<code>checkToken</code> keeps the user's id in the request (memory from <code>r.alloc</code> lives exactly as long), and
+<code>checkToken</code> keeps the user's id in the request with <code>r.setText</code>, a copy that lasts until the reply (the row it came from is freed when <code>checkToken</code> returns), and
 handlers read it with <code>userOf(r)</code>. <code>logout</code> sits behind the same check, so the header is there
 and its token is good; it deletes that one session.</p>
 
@@ -426,7 +421,7 @@ $ curl -H 'Authorization: Bearer Qbm37inXUg2aRtqNXGtUNRIW7Dr-gCPzqj4G_QEZ49o' lo
 <pre><code>import "github.com/ozzenerol/ktm-pg";
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/postgres";
-import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;
+import config, crypto, encoding.base64, flag, json, log, net.http, net.http.middleware, os, reflect, str, uuid, vec;
 
 @json struct Bookmark {
     String id;
@@ -549,19 +544,14 @@ bool checkToken(u8[] token, http.Request *r)
         "SELECT user_id::text FROM sessions WHERE token_hash = $1 AND expires_at &gt; now()", h[0:32]);
     defer pg.free(reflect.of(ids));
     if (!ids.len) { return false; }
-    u8 *keep = r.alloc(ids.data[0].len);          /* lives as long as the request */
-    mem.copy(keep, ids.data[0].ptr, ids.data[0].len);
-    u8[] *id = r.alloc(sizeof(u8[]));
-    *id = keep[0:ids.data[0].len];
-    r.set("userId", id);
+    r.setText("userId", ids.data[0][0:]);         /* a copy, kept until the reply */
     return true;
 }
 
 /* The signed-in user's id (behind middleware.bearer) */
 u8[] userOf(http.Request *r)
 {
-    u8[] *id = r.get("userId");
-    return *id;
+    return r.getText("userId");
 }
 
 void logout(http.Writer *w, http.Request *r)

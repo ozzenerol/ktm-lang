@@ -57,6 +57,22 @@ replace github.com/someone/color => ../color</code></pre>
   <li>A package from another repository's files are read-only in the cache (<code>~/.cache/ktm/mod</code>, or <code>KTM_CACHE</code>).</li>
 </ul>
 
+<h3>Prebuilt packages</h3>
+<p>A compiled build makes each package in the cache into a library the first time it needs it
+(<code>&lt;cache&gt;/.prebuilt</code>), and later builds link that instead of compiling the package again.
+Nothing has to be done for it.</p>
+<ul class="rules">
+  <li>A library is made again when anything it depends on changes: the compiler, the versions the program's
+  <code>ktm.mod</code> picks for its packages, <code>-D</code> names or <code>-Memsafe</code>.</li>
+  <li>A package <code>replace</code>d by a directory is always compiled from source (it is being edited), and so is
+  every package when the program's <code>ktm.mod</code> has such a <code>replace</code>.</li>
+  <li><code>-jit</code>, the REPL and the language server compile packages from source, as do builds for another
+  <code>--target</code>.</li>
+  <li>When a library can't be made, the package is compiled from source; why it failed is kept in
+  <code>&lt;cache&gt;/.prebuilt/&lt;key&gt;.failed</code>, and it isn't tried again until that file is removed.</li>
+  <li><code>KTM_PREBUILD=0</code> turns it off; removing <code>&lt;cache&gt;/.prebuilt</code> clears it.</li>
+</ul>
+
 <h2>Versions</h2>
 <p>A version is a git tag <code>vMAJOR.MINOR.PATCH</code> (<code>v1.2.0</code>, <code>v0.3.1-rc.1</code>). A build uses, for each
 package, the highest version anything requires: a package always gets at least what it asked for, and nothing newer than
@@ -106,6 +122,11 @@ but no package the project imports needs it: it isn't downloaded or built</code>
   <tr><td><code>ktm mod verify</code></td><td>Checks the cached files against <code>ktm.sum</code></td></tr>
   <tr><td><code>ktm mod fmt</code></td><td>Checks <code>ktm.mod</code> and rewrites it in the standard layout</td></tr>
 </table>
+<ul class="rules">
+  <li><code>ktm build</code>, <code>ktm run</code> and <code>ktm test</code> take the compiler's options, before or after the command:
+  <code>ktm --install-dir=$HOME/ktm build</code> and <code>ktm build --install-dir=$HOME/ktm</code> are the same.</li>
+  <li><code>ktm mod</code> and <code>ktm get</code> take none, but let <code>--install-dir</code> through, so a script or alias that always passes it works with every command.</li>
+</ul>
 
 <h2>Publishing a package</h2>
 <ol>

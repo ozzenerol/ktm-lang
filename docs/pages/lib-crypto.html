@@ -2,7 +2,7 @@
 <!-- ref: crypto -->
 <h1>Cryptography</h1>
 <p class="lede"><code>crypto</code> has what applications need, built on mbedTLS's vetted code (inside ktm, as for
-<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption and ECDSA
+<a href="lib-tls.html">TLS</a>): secure random bytes, hashes and MACs, key derivation, authenticated encryption, and ECDSA and RSA
 signatures. Only programs that import it carry it.</p>
 
 <h2>Random bytes</h2>
@@ -15,8 +15,8 @@ String token = crypto.randomBytes(24);   // a session token's bytes (base64.enco
 <h2>Hashes, MACs, keys from secrets</h2>
 <table>
   <tr><th>Call</th><th>What it does</th></tr>
-  <tr><td><code>crypto.sha256(data, out)</code>, <code>crypto.sha512(data, out)</code></td><td>Into a 32- or 64-byte <code>out</code></td></tr>
-  <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256)</td></tr>
+  <tr><td><code>crypto.sha256(data, out)</code>, <code>sha384</code>, <code>sha512</code></td><td>Into a 32-, 48- or 64-byte <code>out</code></td></tr>
+  <tr><td><code>crypto.hmacSha256(key, data, out)</code>, <code>hmacSha384</code>, <code>hmacSha512</code></td><td>A MAC: proves data came from who holds key (JWT's HS256, HS384, HS512)</td></tr>
   <tr><td><code>crypto.equal(a, b)</code></td><td>Compares in constant time: use it for MACs, tokens and hashes, never <code>str.equals</code></td></tr>
   <tr><td><code>crypto.hkdfSha256(secret, salt, info, out)</code></td><td>Keys of <code>out.len</code> bytes from one secret (RFC 5869)</td></tr>
   <tr><td><code>crypto.pbkdf2Sha256(password, salt, iterations, out)</code></td><td>A key from a password; to store passwords use <code>hashPassword</code> (below)</td></tr>
@@ -45,10 +45,26 @@ crypto.Key *k = crypto.generateKey();             // ECDSA P-256
 String sig = k.sign("payload");                   // 64 bytes r||s (JWT's ES256), deterministic
 bool ok = k.verify("payload", sig);              // also takes a DER signature
 String pem = k.publicPem();                       // to share; privatePem() to keep
-crypto.Key *pub = crypto.publicKey(pem);          // and back (privateKey(pem) for a private one)
+crypto.Key *other = crypto.publicKey(pem);        // and back (privateKey(pem) for a private one)
 </code></pre>
-<p>Keys are P-256, readable and writable as PEM, so they work with OpenSSL and other languages. (Ed25519 isn't there:
-mbedTLS 3.6 doesn't have it.)</p>
+<p>RSA keys (2048 bits or more) work the same way: <code>crypto.generateRsaKey()</code> makes one, and
+<code>privateKey</code> and <code>publicKey</code> read either kind from PEM. <code>signWith</code> and <code>verifyWith</code>
+pick the digest:</p>
+<pre><code>
+crypto.Key *rk = crypto.privateKey(rsaPem);
+String rs = rk.signWith(crypto.Hash.sha384, "payload");   // PKCS#1 v1.5 (JWT's RS384)
+bool good = rk.verifyWith(crypto.Hash.sha384, "payload", rs);
+if (rk.kind() == crypto.KeyKind.rsa) { printf("%d bits\n", rk.bits()); }
+</code></pre>
+<ul class="rules">
+  <li><code>sign</code> and <code>verify</code> are <code>signWith</code> and <code>verifyWith</code> with <code>crypto.Hash.sha256</code>:
+  ES256 for a P-256 key, RS256 for an RSA one.</li>
+  <li>A P-256 signature is 64 bytes r||s; an RSA one is the key's size (256 bytes for 2048 bits).</li>
+  <li>A public key also comes from its parts, as a JWK has them (base64url-decoded):
+  <code>crypto.ecPublicKey(x, y)</code> (32 bytes each) and <code>crypto.rsaPublicKey(n, e)</code> (big-endian).</li>
+  <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages. Other kinds of key
+  (P-384, RSA under 2048 bits, Ed25519) are refused: mbedTLS 3.6 has no Ed25519.</li>
+</ul>
 
 <h2>Passwords</h2>
 <pre data-run><code>

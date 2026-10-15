@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <strings.h>
 #include <math.h>
 #include <stdlib.h>
@@ -9,7 +10,9 @@
 #include "asm/asm_enc.h"
 #include "cctrl.h"
 #include "cli.h"
+#include "ir.h"
 #include "config.h"
+#include "pkg.h"
 #include "prsasm.h"
 #include "x86_64.h"
 #include "types.h"
@@ -604,6 +607,66 @@ void asmEmitAddrConst(AoStr *buf, AoStr *sym, s64 off) {
     }
 }
 
+/* A threadlocal global's storage, the initial image every thread's copy
+ * starts from: ELF .tdata/.tbss, or on Mach-O the image in __thread_data /
+ * __thread_bss plus the TLV descriptor in __thread_vars that the code
+ * reaches it through (`label` is the descriptor there). Returns 0 when
+ * the global isn't threadlocal. */
+int asmThreadLocalGlobal(Cctrl *cc, AoStr *buf, Ast *declvar, Ast *declinit,
+                         AoStr *label, int local)
+{
+    if (!(declvar->flags & AST_FLAG_TLS)) return 0;
+    int darwin = cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                 cc->target == TARGET_X86_64_APPLE_DARWIN;
+    int size = declvar->type->size;
+    int align_log2 = asmDataAlignLog2(declvar->type);
+    if (align_log2 < 3 && size >= 8) align_log2 = 3;
+    AoStr *addr_sym;
+    s64 addr_off;
+    int is_addr = declinit && asmAddrConst(cc, declinit, &addr_sym, &addr_off, 0);
+    int has_init = is_addr || (declinit &&
+                   (declinit->kind == AST_ARRAY_INIT ||
+                    declinit->kind == AST_LITERAL ||
+                    declinit->kind == AST_STRING));
+
+    if (darwin) {
+        if (has_init) {
+            aoStrCatFmt(buf, ".section __DATA,__thread_data,thread_local_regular\n"
+                        ".p2align %i\n%S$tlv$init:\n\t", align_log2, label);
+        } else {
+            aoStrCatFmt(buf, ".tbss %S$tlv$init, %i, %i\n",
+                        label, size > 0 ? size : 1, align_log2);
+        }
+    } else {
+        if (!local) aoStrCatFmt(buf, ".globl %S\n", label);
+        if (has_init) {
+            aoStrCatPrintf(buf, ".section .tdata,\"awT\",@progbits\n");
+        } else {
+            aoStrCatPrintf(buf, ".section .tbss,\"awT\",@nobits\n");
+        }
+        aoStrCatFmt(buf, ".p2align %i\n.type %S, @object\n.size %S, %i\n%S:\n\t",
+                    align_log2, label, label, size, label);
+    }
+    if (is_addr) {
+        asmEmitAddrConst(buf, addr_sym, addr_off);
+    } else if (declinit && declinit->kind == AST_STRING &&
+               declvar->type->kind == AST_TYPE_POINTER) {
+        aoStrCatFmt(buf, ".quad %S\n\t", declinit->slabel);
+    } else if (has_init) {
+        asmEmitInitData(buf, declinit, declvar->type);
+    } else if (!darwin) {
+        aoStrCatFmt(buf, ".zero %i\n\t", size > 0 ? size : 1);
+    }
+    if (darwin) {
+        aoStrCatPrintf(buf, "\n.section __DATA,__thread_vars,thread_local_variables\n");
+        if (!local) aoStrCatFmt(buf, ".globl %S\n", label);
+        aoStrCatFmt(buf, ".p2align 3\n%S:\n\t.quad __tlv_bootstrap\n\t"
+                    ".quad 0\n\t.quad %S$tlv$init\n\t", label, label);
+    }
+    aoStrCatPrintf(buf, "\n.text\n");
+    return 1;
+}
+
 int asmDataAlignLog2(AstType *type) {
     int align = astTypeAlign(type);
     int log2 = 0;
@@ -664,4 +727,350 @@ void asmEmitInitData(AoStr *buf, Ast *init, AstType *type) {
     if (zeros) aoStrCatPrintf(buf, ".zero %d\n\t", zeros);
     free(bytes);
     free(items);
+}
+
+/* ---- Line tables for the crash report ----
+ *
+ * A record per function, in a section of its own so the runtime finds
+ * them all (every object's, libktm's included) between the linker's
+ * section start and end symbols. Every address in it is an offset from
+ * where it is stored, so the linker resolves them all and loading the
+ * program has nothing to relocate:
+ *
+ *   .quad start   .long size, name, file, lines, sites, count, flags, 0
+ *
+ * (file 0: none). `lines` is `count` pairs of .long: the code offset
+ * where a source line starts, in code order, and the line | site << 20.
+ * A site is an inlined call: the code there is the callee's, and
+ * `sites` holds, for site n (from 1; 0 is the function's own code), the
+ * callee's name, the line of the call, the site the call itself is in
+ * and the callee's file when it isn't the function's (.long name, call
+ * line, outer site, file or 0). flags bit 0: the function has
+ * no frame (a leaf), so its return address is still in lr (arm64) or
+ * at [sp] (x86_64). */
+
+#define ASM_LINES_MAX_LINE 0xFFFFF
+
+static AoStr *asm_lines_recs = NULL;  /* records */
+static AoStr *asm_lines_data = NULL;  /* line pairs, sites and strings */
+static Map *asm_lines_strs = NULL;    /* string -> its label number */
+static int asm_lines_id = 0;          /* labels: unique per process */
+static int asm_lines_count = 0;
+static int asm_lines_last = 0;
+static int asm_lines_flags = 0;
+static char *asm_lines_fname = NULL;
+static int asm_lines_name = 0;        /* string label numbers */
+static int asm_lines_file = 0;
+static u32 asm_lines_file_id = 0;     /* the function's file */
+/* Labels the assembler keeps out of the symbol table: `.L` on ELF, `L`
+ * on Mach-O (whose `.L` names stay, and would read as functions) */
+static const char *asm_lines_l = ".L";
+static Cctrl *asm_lines_cc = NULL;
+static Vec *asm_lines_sites = NULL;   /* this function's IrInlineSite *s */
+static IrInlineSite *asm_lines_site = NULL;
+
+void asmLinesReset(void) {
+    asm_lines_recs = aoStrNew();
+    asm_lines_data = aoStrNew();
+    asm_lines_strs = mapNew(64, &map_cstring_opaque_type);
+    asm_lines_fname = NULL;
+}
+
+static void asmLinesPrefix(Cctrl *cc) {
+    asm_lines_l = (cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                   cc->target == TARGET_X86_64_APPLE_DARWIN) ? "L" : ".L";
+}
+
+/* The label number of string s, written once per module */
+static int asmLinesString(const char *s) {
+    void *have = mapGet(asm_lines_strs, (void *)s);
+    if (have) return (int)(u64)have;
+    int id = ++asm_lines_id;
+    mapAdd(asm_lines_strs, strdup(s), (void *)(u64)id);
+    AoStr *buf = asm_lines_data;
+    aoStrCatPrintf(buf, "%sKTS%d:\n\t.asciz \"", asm_lines_l, id);
+    for (; *s; ++s) {
+        unsigned char c = (unsigned char)*s;
+        if (c == '"' || c == '\\') aoStrCatPrintf(buf, "\\%c", c);
+        else if (c < ' ' || c > '~') aoStrCatPrintf(buf, "\\%03o", c);
+        else aoStrPutChar(buf, c);
+    }
+    aoStrCatPrintf(buf, "\"\n");
+    return id;
+}
+
+/* A package's module (`import "github.com/x/ktm-pg";`, module path
+ * github_com.x.ktm_pg.pg) by the name a program calls it by: every
+ * `github_com.x.ktm_pg.pg.` in s (a generic's type arguments too)
+ * becomes `pg.` */
+static char *asmLinesShortPackages(Cctrl *cc, const char *s) {
+    if (!cc->packages_len) return (char *)s;
+    AoStr *out = NULL;
+    const char *p = s;
+    while (*p) {
+        int boundary = p == s || !(isalnum((unsigned char)p[-1]) || p[-1] == '_' ||
+                                   p[-1] == '.');
+        CctrlPackage *found = NULL;
+        size_t len = 0;
+        for (int i = 0; boundary && i < cc->packages_len; ++i) {
+            CctrlPackage *pk = &cc->packages[i];
+            size_t n = strlen(pk->module_path);
+            if (n > len && !strncmp(p, pk->module_path, n) && p[n] == '.') {
+                found = pk;
+                len = n;
+            }
+        }
+        if (!found) {
+            if (out) aoStrPutChar(out, *p);
+            p++;
+            continue;
+        }
+        if (!out) {
+            out = aoStrNew();
+            aoStrCatLen(out, s, p - s);
+        }
+        const char *name = strrchr(found->module_path, '.');
+        aoStrCat(out, name ? name + 1 : found->module_path);
+        p += len;
+    }
+    return out ? out->data : (char *)s;
+}
+
+/* The name a report shows for function `fname`: `net.http.serve`, a
+ * package's `pg.Pool.exec` */
+char *asmLinesName(Cctrl *cc, AoStr *fname) {
+    const char *sym = asmNormaliseFunctionName(cc, fname);
+    const char *shown = astSymbolDisplayName(sym);
+    /* Mach-O's `_` in front of a C name (`_main`); a ktm symbol starts
+     * with one anyway (`_K03get`) and keeps it */
+    if ((cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+         cc->target == TARGET_X86_64_APPLE_DARWIN) &&
+        sym[0] == '_' && !strcmp(shown, sym)) {
+        shown = astSymbolDisplayName(sym + 1);
+    }
+    return asmLinesShortPackages(cc, shown);
+}
+
+/* path as a file of a package that isn't in the cache (a ktm.mod
+ * `replace` with a directory): the package's path and the file's in it,
+ * github.com/x/y/pool.ktm; NULL for any other file */
+static char *asm_lines_pkg_path = NULL, *asm_lines_pkg_shown = NULL;  /* the last */
+
+static char *asmLinesPackageFile(Cctrl *cc, const char *path) {
+    if (!cc->packages_len || !path) return NULL;
+    /* a file's functions come one after another */
+    if (asm_lines_pkg_path && !strcmp(asm_lines_pkg_path, path)) return asm_lines_pkg_shown;
+    free(asm_lines_pkg_path);
+    free(asm_lines_pkg_shown);
+    asm_lines_pkg_path = strdup(path);
+    asm_lines_pkg_shown = NULL;
+    char *real = realpath(path, NULL), *best = NULL;
+    if (!real) return NULL;
+    size_t best_len = 0;
+    for (int i = 0; i < cc->packages_len; ++i) {
+        CctrlPackage *pk = &cc->packages[i];
+        size_t n = strlen(pk->dir);
+        if (n > best_len && !strncmp(real, pk->dir, n) && real[n] == '/') {
+            best = mprintf("%s/%s", pk->package, real + n + 1);
+            best_len = n;
+        }
+    }
+    free(real);
+    asm_lines_pkg_shown = best ? strdup(best) : NULL;
+    return asm_lines_pkg_shown;
+}
+
+/* A file as a report shows it: the stdlib's from its modules
+ * directory (net/http/mux.ktm), a package's from the cache
+ * (github.com/x/y@v1.0.0/y.ktm) or by its package's path
+ * (github.com/x/y/y.ktm), a program's as it was named */
+const char *asmLinesPath(Cctrl *cc, const char *path) {
+    const char *cache = pkgCacheDir();
+    size_t n = strlen(cache);
+    if (!strncmp(path, cache, n) && path[n] == '/') return path + n + 1;
+    char *pkg_file = asmLinesPackageFile(cc, path);
+    if (pkg_file) return pkg_file;
+    if (cc->install_dir) {
+        char *mods = mprintf("%s/modules/", cc->install_dir);
+        n = strlen(mods);
+        if (!strncmp(path, mods, n)) return path + n;
+    }
+    if (cc->is_libktm) {
+        const char *m = strstr(path, "/modules/");
+        if (m) return m + strlen("/modules/");
+    }
+    return path;
+}
+
+/* Site `site`'s number in this function's table (from 1), its outer
+ * sites numbered first */
+static int asmLinesSiteNum(IrInlineSite *site) {
+    if (!site) return 0;
+    for (u64 i = 0; i < asm_lines_sites->size; ++i) {
+        if (asm_lines_sites->entries[i] == site) return (int)i + 1;
+    }
+    asmLinesSiteNum(site->outer);
+    vecPush(asm_lines_sites, site);
+    return (int)asm_lines_sites->size;
+}
+
+/* A line and the site it is in, as one .long */
+static int asmLinesPack(int line, int site) {
+    if (line > ASM_LINES_MAX_LINE) line = ASM_LINES_MAX_LINE;
+    return line | (site << 20);
+}
+
+void asmLinesBegin(Cctrl *cc, Ast *func, int omit_frame) {
+    if (!asm_lines_recs) return;
+    asm_lines_cc = cc;
+    asmLinesPrefix(cc);
+    asm_lines_fname = asmNormaliseFunctionName(cc, func->fname);
+    asm_lines_name = asmLinesString(asmLinesName(cc, func->fname));
+    asm_lines_file = 0;
+    asm_lines_file_id = func->file_id;
+    AoStr *path = func->file_id ? cctrlLookUpFile(cc, func->file_id) : NULL;
+    if (path) asm_lines_file = asmLinesString(asmLinesPath(cc, path->data));
+    asm_lines_sites = irValueVecNew();
+    asm_lines_site = NULL;
+    asm_lines_flags = omit_frame ? 1 : 0;
+    asm_lines_count = 0;
+    asm_lines_last = 0;
+    asm_lines_id++;
+
+    aoStrCatPrintf(asm_lines_data, "\t.p2align 2\n%sKTL%d:\n", asm_lines_l, asm_lines_id);
+    if (func->line) {
+        aoStrCatPrintf(asm_lines_data, "\t.long 0, %d\n", asmLinesPack(func->line, 0));
+        asm_lines_count++;
+        asm_lines_last = func->line;
+    }
+}
+
+void asmLinesNote(AoStr *buf, int line, IrInlineSite *site) {
+    if (!asm_lines_fname || line <= 0) return;
+    if (line == asm_lines_last && site == asm_lines_site) return;
+    aoStrRemovePreviousChar(buf, '\t');
+    aoStrCatPrintf(buf, "%sKTP%d_%d:\n\t", asm_lines_l, asm_lines_id, asm_lines_count);
+    aoStrCatPrintf(asm_lines_data, "\t.long %sKTP%d_%d - %s, %d\n",
+                   asm_lines_l, asm_lines_id, asm_lines_count, asm_lines_fname,
+                   asmLinesPack(line, asmLinesSiteNum(site)));
+    asm_lines_count++;
+    asm_lines_last = line;
+    asm_lines_site = site;
+}
+
+void asmLinesEnd(AoStr *buf) {
+    if (!asm_lines_fname) return;
+    int id = asm_lines_id;
+    const char *l = asm_lines_l;
+    aoStrRemovePreviousChar(buf, '\t');
+    aoStrCatPrintf(buf, "%sKTE%d:\n", l, id);
+
+    int nsites = (int)asm_lines_sites->size;
+    if (nsites) {
+        int *names = malloc(sizeof(int) * nsites);
+        int *files = malloc(sizeof(int) * nsites);
+        for (int i = 0; i < nsites; ++i) {
+            IrInlineSite *site = asm_lines_sites->entries[i];
+            names[i] = asmLinesString(asmLinesName(asm_lines_cc, site->callee->fname));
+            /* a callee from another file: its lines are that file's */
+            u32 fid = site->callee->file_id;
+            AoStr *path = fid && fid != asm_lines_file_id
+                        ? cctrlLookUpFile(asm_lines_cc, fid) : NULL;
+            files[i] = path ? asmLinesString(asmLinesPath(asm_lines_cc, path->data)) : 0;
+        }
+        aoStrCatPrintf(asm_lines_data, "\t.p2align 2\n%sKTI%d:\n", l, id);
+        for (int i = 0; i < nsites; ++i) {
+            IrInlineSite *site = asm_lines_sites->entries[i];
+            aoStrCatPrintf(asm_lines_data, "\t.long %sKTS%d - ., %d, %d", l, names[i],
+                           site->call_line, asmLinesSiteNum(site->outer));
+            if (files[i]) aoStrCatPrintf(asm_lines_data, ", %sKTS%d - .\n", l, files[i]);
+            else aoStrCatPrintf(asm_lines_data, ", 0\n");
+        }
+        free(names);
+        free(files);
+    }
+
+    aoStrCatPrintf(asm_lines_recs,
+                   "\t.quad %s - .\n"
+                   "\t.long %sKTE%d - %s\n"
+                   "\t.long %sKTS%d - .\n",
+                   asm_lines_fname, l, id, asm_lines_fname, l, asm_lines_name);
+    if (asm_lines_file) {
+        aoStrCatPrintf(asm_lines_recs, "\t.long %sKTS%d - .\n", l, asm_lines_file);
+    } else {
+        aoStrCatPrintf(asm_lines_recs, "\t.long 0\n");
+    }
+    aoStrCatPrintf(asm_lines_recs, "\t.long %sKTL%d - .\n", l, id);
+    if (nsites) {
+        aoStrCatPrintf(asm_lines_recs, "\t.long %sKTI%d - .\n", l, id);
+    } else {
+        aoStrCatPrintf(asm_lines_recs, "\t.long 0\n");
+    }
+    aoStrCatPrintf(asm_lines_recs, "\t.long %d, %d, 0\n",
+                   asm_lines_count, asm_lines_flags);
+    asm_lines_fname = NULL;
+}
+
+void asmLinesEmit(Cctrl *cc, AoStr *buf, int has_main) {
+    if (!asm_lines_recs) return;
+    asmLinesPrefix(cc);
+    int darwin = cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+                 cc->target == TARGET_X86_64_APPLE_DARWIN;
+    int arm = cc->target == TARGET_AARCH64_APPLE_DARWIN ||
+              cc->target == TARGET_AARCH64_UNKNOWN_LINUX_GNU;
+
+    if (asm_lines_recs->len) {
+        aoStrCatPrintf(buf, "\t.data\n");
+        aoStrCatLen(buf, asm_lines_data->data, asm_lines_data->len);
+        aoStrCatPrintf(buf, darwin ? "\t.section __DATA,__ktm_lines\n"
+                                   : "\t.section ktm_lines,\"aw\"\n");
+        aoStrCatPrintf(buf, "\t.p2align 3\n");
+        aoStrCatLen(buf, asm_lines_recs->data, asm_lines_recs->len);
+    }
+
+    const char *lo = darwin ? "section$start$__DATA$__ktm_lines" : "__start_ktm_lines";
+    const char *hi = darwin ? "section$end$__DATA$__ktm_lines" : "__stop_ktm_lines";
+
+    /* libktm: its records' bounds, for the JIT, which loads it as a
+     * shared library (a program's link puts them with its own) */
+    if (cc->is_libktm) {
+        const char *u = darwin ? "_" : "";
+        aoStrCatPrintf(buf,
+            "\t.data\n\t.p2align 3\n"
+            "\t.globl %sktm_lines_lo\n%sktm_lines_lo:\n\t.quad %s\n"
+            "\t.globl %sktm_lines_hi\n%sktm_lines_hi:\n\t.quad %s\n",
+            u, u, lo, u, u, hi);
+    }
+
+    /* A program installs the crash handler (rt.crash, compiled into it)
+     * before main runs, with the bounds of every record the link put
+     * together */
+    if (has_main) {
+        char *qual = "rt.crash.__ktmCrashInstall";
+        AoStr sym = { .data = astModuleMangle(qual, strlen(qual)), .len = 0, .capacity = 0 };
+        sym.len = strlen(sym.data);
+        char *install = asmNormaliseFunctionName(cc, &sym);
+        aoStrCatPrintf(buf, "\t.text\n\t.p2align 4\n%sKTinit:\n", asm_lines_l);
+        if (arm && darwin) {
+            aoStrCatPrintf(buf,
+                "\tadrp x0, %s@PAGE\n\tadd x0, x0, %s@PAGEOFF\n"
+                "\tadrp x1, %s@PAGE\n\tadd x1, x1, %s@PAGEOFF\n"
+                "\tb %s\n", lo, lo, hi, hi, install);
+        } else if (arm) {
+            aoStrCatPrintf(buf,
+                "\tadrp x0, %s\n\tadd x0, x0, :lo12:%s\n"
+                "\tadrp x1, %s\n\tadd x1, x1, :lo12:%s\n"
+                "\tb %s\n", lo, lo, hi, hi, install);
+        } else {
+            aoStrCatPrintf(buf,
+                "\tleaq %s(%%rip), %%rdi\n\tleaq %s(%%rip), %%rsi\n"
+                "\tjmp %s\n", lo, hi, install);
+        }
+        aoStrCatPrintf(buf, darwin
+            ? "\t.section __DATA,__mod_init_func,mod_init_funcs\n"
+            : "\t.section .init_array,\"aw\"\n");
+        aoStrCatPrintf(buf, "\t.p2align 3\n\t.quad %sKTinit\n", asm_lines_l);
+    }
+    asm_lines_recs = NULL;
+    asm_lines_data = NULL;
 }

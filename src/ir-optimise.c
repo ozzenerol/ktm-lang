@@ -206,6 +206,8 @@ static void irFoldGlobalDeref(IrFunction *fn) {
             if (!cur->r1 || cur->r1->kind != IR_VAL_GLOBAL) continue;
             /* an extern one is reached through the GOT, by its address */
             if (cur->r1->flags & IR_VAL_FLAG_EXTERN) continue;
+            /* a threadlocal's address is the thread pointer's plus an offset */
+            if (cur->r1->flags & IR_VAL_FLAG_TLS) continue;
             if (!irIsTmp(cur->dst)) continue;
             mapAdd(tmp_to_global,
                    (void *)(u64)irDstVarId(cur), cur->r1);

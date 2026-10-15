@@ -30,6 +30,7 @@ pub struct HCFs {
     fn(void *loop) void coroLoopFree;  /* frees it when the thread ends */
     u64 stackLo, stackHi;    /* the running coroutine's stack (coroutines.ktm) */
     u64 threadLo, threadHi;  /* the thread's own stack, 0 until looked up */
+    u8 *crashStack;          /* the thread's signal stack (__ktmCrashThread) */
 };
 
 /* The "" of an Error without a message (or file): never freed. */
@@ -52,11 +53,21 @@ static i64 fsOnce[2] = {0, 0};
 
 static u64 fsKey = 0;
 
+/* The calling thread's HCFs, read with one TLS access (Fs()). The key
+ * above stays only so fsFree runs when the thread ends. Keep libktm's
+ * threadlocals this small: libktm.so reaches them initial-exec, which a
+ * dlopen'd library (the JIT's) can only do from the few hundred spare
+ * bytes of the static TLS block. */
+static threadlocal HCFs *fsCur;
+
 static void fsFree(void *p) {
     HCFs *fs = p;
+    /* an Fs() from a later destructor makes a new state, as before */
+    fsCur = null;
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     if (fs.coroLoop) { fs.coroLoopFree(fs.coroLoop); }
     coroStacksFree(fs);
+    crashThreadEnd(fs);
     libc.free(fs.coroRoot);
     libc.free(fs);
 }
@@ -65,18 +76,23 @@ static void fsKeyCreate() {
     libc.pthread_key_create(&fsKey, &fsFree);
 }
 
+/* The thread's first Fs(): its HCFs, freed by fsFree when it ends. */
+static HCFs *FsNew() {
+    libc.pthread_once(fsOnce, &fsKeyCreate);
+    HCFs *fs = libc.calloc(1, sizeof(HCFs));
+    if (!fs) {
+        printf("out of memory for the exception state\n");
+        os.exit(1);
+    }
+    libc.pthread_setspecific(fsKey, fs);
+    fsCur = fs;
+    return fs;
+}
+
 /* The calling thread's HCFs, created on its first use. */
 pub HCFs *Fs() {
-    libc.pthread_once(fsOnce, &fsKeyCreate);
-    HCFs *fs = libc.pthread_getspecific(fsKey);
-    if (!fs) {
-        fs = libc.calloc(1, sizeof(HCFs));
-        if (!fs) {
-            printf("out of memory for the exception state\n");
-            os.exit(1);
-        }
-        libc.pthread_setspecific(fsKey, fs);
-    }
+    HCFs *fs = fsCur;
+    if (!fs) { fs = FsNew(); }
     return fs;
 }
 
@@ -115,8 +131,40 @@ static void WriteErr(u8 *s) {
     libc.write(os.STDERR, s, n);
 }
 
+/* ---- the calls that led to an uncaught error ----
+ * rt.crash (compiled into the program, not into libktm) has the stack
+ * walker. Neither can name the other: rt.crash needs only libc, and
+ * libktm can't name a program's function. rt.crash finds this setter
+ * by its name in the line records of libktm it is given, and hands it
+ * the walker (__ktmCrashAdd). */
+static fn(u64 fp) void uncaughtTrace;
+
+pub void __ktmUncaughtTraceSet(fn(u64 fp) void trace) {
+    uncaughtTrace = trace;
+}
+
+/* The frame pointer of the function that calls it */
+#ifdef IS_X86_64
+asm {
+_RT_FRAME::
+        DU8    0x48, 0x89, 0xE8         // MOV RAX, RBP
+        RET
+}
+#endif
+#ifdef IS_ARM_64
+asm {
+_RT_FRAME::
+        DU8    0xE0, 0x03, 0x1D, 0xAA   // MOV X0, X29
+        RET
+}
+#endif
+_extern _RT_FRAME u64 rtFrame();
+
 /* Report an error no try catches on stderr and exit with 1:
  *   uncaught error <code>: <message> (<file>:<line>)
+ *     at <file>:<line> in <function>
+ *     called from ...
+ * (the calls, when the program has rt.crash's walker)
  * A code that is a character constant whose bytes are all printable is
  * shown as text ('Late'), any other as a signed decimal number. */
 static void __ktmUncaught(HCFs *fs) {
@@ -171,6 +219,7 @@ static void __ktmUncaught(HCFs *fs) {
         WriteErr(buf);
     }
     WriteErr("\n");
+    if (uncaughtTrace) { uncaughtTrace(rtFrame()); }
     os.exit(1);
 }
 
@@ -275,6 +324,49 @@ static void stackThreadBounds(HCFs *fs) {
      * it a few pages short of what the C library reports; the reserve
      * also leaves the overflow report room to run. */
     fs.threadLo += STACK_RESERVE;
+}
+
+/* ---- signal stacks ----
+ * A thread the stdlib starts (a thread pool's, a server's) gets a stack
+ * for signal handlers, so the crash report (rt/crash) can tell of its
+ * stack overflow too: a handler can't run on the stack that overflowed. */
+
+const i64 CRASH_STACK_BYTES = 65536;
+
+#ifdef IS_MACOS
+const i32 CRASH_SS_DISABLE = 4;
+#else
+const i32 CRASH_SS_DISABLE = 2;
+#endif
+
+/* Set the calling thread's signal stack (a stack_t: ss_sp, then
+ * ss_flags and ss_size, whose order differs, at 8 or 16) */
+static void crashAltStack(u8 *stack, i32 flags) {
+    u64 ss[3];
+    ss[0] = (u64)stack;
+#ifdef IS_MACOS
+    ss[1] = CRASH_STACK_BYTES;
+    ss[2] = flags;
+#else
+    ss[1] = flags;
+    ss[2] = CRASH_STACK_BYTES;
+#endif
+    libc.sigaltstack(ss, null);
+}
+
+pub void __ktmCrashThread() {
+    HCFs *fs = Fs();
+    if (fs.crashStack) { return; }
+    fs.crashStack = libc.malloc(CRASH_STACK_BYTES);
+    if (fs.crashStack) { crashAltStack(fs.crashStack, 0); }
+}
+
+/* The thread ends (its HCFs is freed) */
+static void crashThreadEnd(HCFs *fs) {
+    if (!fs.crashStack) { return; }
+    crashAltStack(null, CRASH_SS_DISABLE);
+    libc.free(fs.crashStack);
+    fs.crashStack = null;
 }
 
 pub void __ktmStackCheck(u64 low) {

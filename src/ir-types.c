@@ -791,10 +791,7 @@ void irCtxAddFunction(IrCtx *ctx, IrFunction *func) {
 }
 
 int ir_line_hint = 0;
-/* While a function from another file is inlined: its instructions take
- * the call's line, as its own lines would be read against the caller's
- * file in reports (0 = off) */
-int ir_line_lock = 0;
+IrInlineSite *ir_site_hint = NULL;
 
 IrInstr *irInstrNew(IrOp op, IrValue *dst, IrValue *r1, IrValue *r2) {
     IrInstr *instr = irAlloc(sizeof(IrInstr));
@@ -804,7 +801,8 @@ IrInstr *irInstrNew(IrOp op, IrValue *dst, IrValue *r1, IrValue *r2) {
     instr->dst = dst;
     instr->r1 = r1;
     instr->r2 = r2;
-    instr->line = ir_line_lock ? ir_line_lock : ir_line_hint;
+    instr->line = ir_line_hint;
+    instr->site = ir_site_hint;
     return instr;
 }
 

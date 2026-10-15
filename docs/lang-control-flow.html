@@ -17,7 +17,7 @@
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=9467e22335" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -65,7 +65,10 @@ if (i64 n = count(); n &gt; 5) { ... }    // n lives only in the if
 while (cond) { ... }
 do { ... } while (cond);
 for (i64 i = 0; i &lt; n; i++) { ... }
-for (auto x : items) { ... }           // arrays, slices, vectors</code></pre>
+for (i = 0, j = n; i &lt; j; i++, j--) { ... }   // several, comma-separated
+for (auto x : items) { ... }           // arrays, slices, vectors
+if x &gt; 0 { ... }                       // the parentheses are optional
+for i64 i = 0; i &lt; n; i++ { ... }</code></pre>
 </div>
 
 <h2 id="braces-are-required">Braces are required<a class="anchor" href="#braces-are-required" aria-label="Link to this section">#</a></h2>
@@ -77,6 +80,40 @@ for (auto x : items) { ... }           // arrays, slices, vectors</code></pre>
 <div><p class="label">ktm</p>
 <pre><code>if (x) { y = 1; }</code></pre></div>
 </div>
+
+<h2 id="parentheses-are-optional">Parentheses are optional<a class="anchor" href="#parentheses-are-optional" aria-label="Link to this section">#</a></h2>
+<p>The condition of <code>if</code>, <code>while</code>, <code>do ... while</code>, <code>for</code> and
+<code>switch</code> can be written with or without parentheses, as in C or as in Go. Both mean the same,
+and one program can mix them. Without parentheses the condition runs up to the <code>{</code> of the body.
+<code>for</code> also has Go's <code>for cond { }</code> (a <code>while</code>) and <code>for { }</code> (for ever).</p>
+<pre data-run><code>void main()
+{
+  i64 a = 1, b = 2;
+  if a &lt; b { printf("a is smaller\n"); }
+  if (a + b) * 2 &gt; 5 { printf("a parenthesised start is fine\n"); }
+
+  i64 n = 0, xs[2] = {4, 5};
+  while n &lt; 3 { n++; }
+  for i64 i = 0; i &lt; 2; i++ { printf("i=%d ", i); }
+  for auto x : xs { printf("x=%d ", x); }
+  for n &gt; 0 { n--; }
+  for {
+    n++;
+    if n == 2 { break; }
+  }
+  printf("\nn=%d\n", n);
+  switch n {
+    case 2: printf("two\n"); break;
+    default: printf("other\n");
+  }
+}
+</code></pre>
+<pre class="output">a is smaller
+a parenthesised start is fine
+i=0 i=1 x=4 x=5 
+n=2
+two
+</pre>
 
 <h2 id="if-and-else">if and else<a class="anchor" href="#if-and-else" aria-label="Link to this section">#</a></h2>
 <pre data-run><code>void main()
@@ -241,7 +278,7 @@ out of both loops
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#braces-are-required">Braces are required</a></li><li><a href="#if-and-else">if and else</a></li><li><a href="#loops">Loops</a></li><li><a href="#range-based-for">Range-based for</a></li><li><a href="#goto">goto</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#braces-are-required">Braces are required</a></li><li><a href="#parentheses-are-optional">Parentheses are optional</a></li><li><a href="#if-and-else">if and else</a></li><li><a href="#loops">Loops</a></li><li><a href="#range-based-for">Range-based for</a></li><li><a href="#goto">goto</a></li></ul></nav>
 </div>
 </body>
 </html>

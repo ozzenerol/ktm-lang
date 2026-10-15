@@ -302,7 +302,7 @@ i32 main() {
   throw(E.locked, \"account %d is locked\", 42);
   return 0;
 }
-", "", true, 1, "before\nuncaught error 1: account 42 is locked (" ERR_SRC ":4)\n")) {
+", "", true, 1, "before\nuncaught error 1: account 42 is locked (" ERR_SRC ":4)\n  at " ERR_SRC ":4 in main\n")) {
         correct++;
 }
 

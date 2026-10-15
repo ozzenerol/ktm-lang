@@ -443,14 +443,53 @@ static int irRetIsRegisterAggregate(AstType *rettype) {
     return irRetTypeIsAggregate(rettype) && rettype->size <= 16;
 }
 
-/* Make a call to ktm's memcpy routine. Used for struct by value returns. 
- * Simpler to do this than emit a bunch of instructions and from codegen is 
- * easy enough to reason with without feeling like magic. */
+/* The largest copy irEmitMemcpy does with loads and stores of its own:
+ * a u8[] (16 bytes), a String (24), a reflect.Value. A call to memcpy
+ * costs more than these few moves. */
+#define IR_INLINE_COPY_MAX 32
+
+/* The address `base + off` */
+static IrValue *irCopyAt(IrCtx *ctx, IrValue *base, int off) {
+    if (off == 0) return base;
+    IrValue *at = irTmp(IR_TYPE_PTR, 8);
+    irBlockAddInstr(ctx, irInstrNew(IR_IADD, at, base, irConstInt(IR_TYPE_I64, off)));
+    return at;
+}
+
+/* Copy `n_bytes` from `src` to `dst` (both addresses). A small copy is
+ * loads and stores, widest first: every load comes before the first
+ * store, so it is right when the two overlap too. A larger one calls
+ * memcpy. */
 static void irEmitMemcpy(IrCtx *ctx,
-                         IrValue *dst, 
+                         IrValue *dst,
                          IrValue *src,
                          int n_bytes)
 {
+    if (n_bytes > 0 && n_bytes <= IR_INLINE_COPY_MAX) {
+        IrValue *vals[IR_INLINE_COPY_MAX];
+        int offs[IR_INLINE_COPY_MAX];
+        int n = 0, pos = 0;
+        while (pos < n_bytes) {
+            int remaining = n_bytes - pos;
+            int chunk;
+            IrValueType ty;
+            if      (remaining >= 8) { chunk = 8; ty = IR_TYPE_I64; }
+            else if (remaining >= 4) { chunk = 4; ty = IR_TYPE_I32; }
+            else if (remaining >= 2) { chunk = 2; ty = IR_TYPE_I16; }
+            else                     { chunk = 1; ty = IR_TYPE_I8;  }
+            IrValue *val = irTmp(ty, chunk);
+            irBlockAddInstr(ctx, irInstrNew(IR_LOAD_DEREF, val, irCopyAt(ctx, src, pos), NULL));
+            vals[n] = val;
+            offs[n] = pos;
+            n++;
+            pos += chunk;
+        }
+        for (int i = 0; i < n; ++i) {
+            irBlockAddInstr(ctx, irInstrNew(IR_STORE_DEREF, irCopyAt(ctx, dst, offs[i]), vals[i], NULL));
+        }
+        return;
+    }
+
     IrValue *args_wrap = irValueNew(IR_TYPE_ARRAY, IR_VAL_UNRESOLVED);
     /* libc memcpy(dst, src, n) -> dst; resolves via libc for both the
      * AOT link and JIT dlsym. */
@@ -953,10 +992,15 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         if (st && st->kind == AST_RETURN && st->retval) only_ret = st;
     }
 
-    int saved_lock = ir_line_lock;
-    if (!ir_line_lock && call->line && callee->file_id && call->file_id &&
-        callee->file_id != call->file_id)
-        ir_line_lock = call->line;
+    /* The inlined code's lines are the callee's, in its own file (a
+     * crash report shows the site's file, asmLinesEnd) */
+    int saved_hint = ir_line_hint;
+    IrInlineSite *saved_site = ir_site_hint;
+    IrInlineSite *site = irAlloc(sizeof(IrInlineSite));
+    site->callee = callee;
+    site->call_line = call->line ? call->line : ir_line_hint;
+    site->outer = ir_site_hint;
+    ir_site_hint = site;
 
     IrInline frame;
     frame.callee = callee;
@@ -994,7 +1038,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
         func->variables = saved_vars;
         ctx->loop_depth = saved_loops;
         ctx->inl = frame.outer;
-        ir_line_lock = saved_lock;
+        ir_line_hint = saved_hint;
+        ir_site_hint = saved_site;
         return v;
     }
 
@@ -1014,7 +1059,8 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
     func->exit_block = saved_exit;
     ctx->loop_depth = saved_loops;
     ctx->inl = frame.outer;
-    ir_line_lock = saved_lock;
+    ir_line_hint = saved_hint;
+    ir_site_hint = saved_site;
 
     IrValue *result = irTmp(frame.ret_slot ? irConvertType(rt) : IR_TYPE_I64,
                             frame.ret_slot ? rt->size : 8);
@@ -1462,7 +1508,34 @@ static IrValue *irGlobalValue(Ast *gvar_ast) {
      * it may be in a shared library, so its address comes from the GOT
      * (a shared object can't reach it PC-relatively) */
     if (gvar_ast->flags & AST_FLAG_EXTERN) v->flags |= IR_VAL_FLAG_EXTERN;
+    if (gvar_ast->flags & AST_FLAG_TLS) v->flags |= IR_VAL_FLAG_TLS;
     return v;
+}
+
+/* The address of a global. A threadlocal one is the calling thread's
+ * copy: the backends emit the TLS sequence for the LEA, and the JIT,
+ * which can't lay out ELF/Mach-O TLS, asks __ktmJitTls for this
+ * thread's copy of the global's storage (which holds its initial value).
+ * The address is worked out again at every use, never kept across a
+ * call: a coroutine can resume on another thread inside one. */
+static IrValue *irGlobalAddr(IrCtx *ctx, Ast *gvar_ast) {
+    IrValue *gv = irGlobalValue(gvar_ast);
+    IrValue *addr = irTmp(IR_TYPE_PTR, 8);
+    if ((gv->flags & IR_VAL_FLAG_TLS) && (ctx->cc->flags & CCTRL_JIT)) {
+        gv->flags &= ~IR_VAL_FLAG_TLS;
+        if (gv->flags & IR_VAL_FLAG_EXTERN) {
+            Cctrl *cc = ctx->cc;
+            if (!cc->jit_tls_syms) cc->jit_tls_syms = setNew(16, &set_cstring_type);
+            setAdd(cc->jit_tls_syms, gv->as.global.name->data);
+        }
+        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *argv[2] = {
+            addr, irConstInt(IR_TYPE_I64, gvar_ast->type->size)
+        };
+        return irEmitRuntimeCallN(ctx, "__ktmJitTls", IR_TYPE_PTR, 8, 2, argv);
+    }
+    irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+    return addr;
 }
 
 /* A value converted to Bool is 0 or 1, as in C: `value != 0` (a float
@@ -1671,9 +1744,7 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
         if (cls && cls->kind == AST_GVAR) {
             /* Global class field write: lea the global's address, add the
              * field offset, store via STORE_DEREF. */
-            IrValue *gv = irGlobalValue(cls);
-            IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-            irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+            IrValue *addr = irGlobalAddr(ctx, cls);
             if (offset != 0) {
                 IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
                 IrValue *field_addr = irTmp(IR_TYPE_PTR, 8);
@@ -1746,9 +1817,7 @@ static IrAssignTarget irLowerAssignTarget(IrCtx *ctx, Ast *lhs) {
 
     if (lhs->kind == AST_GVAR) {
         /* `g = ...`: lea g's address, store* through it. */
-        IrValue *gv = irGlobalValue(lhs);
-        IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *addr = irGlobalAddr(ctx, lhs);
         out.target = addr;
         out.type = lhs->type;
         out.indirect = 1;
@@ -2215,9 +2284,7 @@ IrValue *irLowerGlobal(IrCtx *ctx, Ast *ast) {
     /* Global int read: lea its address, then load*. Arrays
      * decay to a pointer to the first element - just return
      * the LEA'd address with no load. */
-    IrValue *gv = irGlobalValue(ast);
-    IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-    irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+    IrValue *addr = irGlobalAddr(ctx, ast);
     /* Arrays and by-value aggregates decay to a pointer to their storage -
      * return the LEA'd address with no load. (Mirrors irLowerLVar; a struct
      * read by value, e.g. as a call argument, needs its address, not a
@@ -2318,9 +2385,7 @@ IrValue *irLowerClassRef(IrCtx *ctx, Ast *ast) {
     if (cls && cls->kind == AST_GVAR) {
         /* Global class: lea the global's address, add the field offset,
          * then load (or return the field address for an array field). */
-        IrValue *gv = irGlobalValue(cls);
-        IrValue *addr = irTmp(IR_TYPE_PTR, 8);
-        irBlockAddInstr(ctx, irInstrNew(IR_LEA, addr, gv, NULL));
+        IrValue *addr = irGlobalAddr(ctx, cls);
         if (offset != 0) {
             IrValue *off_const = irConstInt(IR_TYPE_I64, offset);
             IrValue *field_addr = irTmp(IR_TYPE_PTR, 8);
@@ -2437,7 +2502,7 @@ IrValue *irLowerUnOp(IrCtx *ctx, Ast *ast) {
             src = irFnGetVar(ctx->cur_func, operand->lvar_id);
             if (!src) loggerPanic("&lvar on unknown lvar\n");
         } else if (operand->kind == AST_GVAR) {
-            src = irGlobalValue(operand);
+            return irGlobalAddr(ctx, operand);
         } else if (operand->kind == AST_FUNPTR) {
             /* `&fp` on a local function pointer: its slot, as for an lvar
              * (a pointer to a function pointer, `T (**pp)(...)`) */
@@ -4358,6 +4423,7 @@ IrFunction *irLowerFunction(IrCtx *ctx, Ast *ast_func) {
     /* Prologue instructions attribute to the definition, not to
      * whatever line the previous function ended on. */
     ir_line_hint = ast_func->line;
+    ir_site_hint = NULL;
 
     IrFunction *func = irFunctionNew(ast_func->fname);
     IrBlock *entry = irBlockNew();

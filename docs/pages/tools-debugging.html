@@ -33,7 +33,7 @@ memsafe: 1 allocation(s) (32 bytes) never freed
 <h2>Errors at run time</h2>
 <ul class="rules">
   <li>An out-of-range slice index throws <code>ERR_BOUNDS</code> with the index, the length and where.</li>
-  <li>An uncaught error prints its code, message, file and line, and exits with 1.</li>
+  <li>An uncaught error prints its code, message, file and line, and the calls that led to the throw, and exits with 1.</li>
   <li>Writing to a string literal faults: copy it with <code>str.from</code> first.</li>
 </ul>
 <pre data-run><code>
@@ -52,6 +52,41 @@ void main()
 <pre class="output">
 index 3 out of range for length 3 (example.ktm:7)
 </pre>
+
+<h2>Crashes</h2>
+<p>A program that crashes (a null pointer, a stack overflow, an integer division by zero) says what
+happened and where, with the calls that led there, before it dies of the signal as before
+(exit status 139 for a segmentation fault):</p>
+<pre class="shell"><code>struct Pool { i64 conns; };
+
+void create(http.Writer *w, http.Request *r)
+{
+    Pool *db = r.app;               // null: http.listen was given no app
+    w.text(200, "%d", db.conns);
+}</code></pre>
+<pre class="output">
+crash: null pointer dereference (address 0x0)
+  at shelf.ktm:6 in create
+  called from net/http/mux.ktm:421 in net.http.muxServe
+  called from net/http/mux.ktm:360 in net.http.Mux.serve
+  called from net/http/server.ktm:383 in net.http.dispatch
+  called from net/http/server.ktm:475 in net.http.serveConn
+  called from coro/serve.ktm:173 in coro.serveClient
+  called from coro/coroutines.ktm:256 in coro.coroMain
+</pre>
+<ul class="rules">
+  <li>Compiled programs and <code>-jit</code> report the same way, in every thread.</li>
+  <li>A function the compiler inlined into its caller still shows as a call of its own, marked
+  <code>(inlined)</code>, at the line in its own file (a package's or another module's too). A recursion
+  shows once, with how many times it repeated.</li>
+  <li>A crash inside C code (<code>libc.strlen(null)</code>) shows <code>in C code</code>,
+  then the ktm line that called it.</li>
+  <li>A package's function shows by the name the program calls it by (<code>pg.Pool.exec</code>),
+  its file under the package's path: <code>github.com/x/ktm-pg@v0.2.0/pool.ktm</code> from the
+  package cache, <code>github.com/x/ktm-pg/pool.ktm</code> when <code>ktm.mod</code> replaces it with a directory.</li>
+  <li>Programs carry a table of their functions' lines for it, which adds about a quarter to
+  their size.</li>
+</ul>
 
 <h2>Looking under the hood</h2>
 <pre class="shell"><code>ktm -tokens main.ktm         # what the lexer sees

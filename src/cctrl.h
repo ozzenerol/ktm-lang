@@ -33,6 +33,9 @@
 /* The language server: REPL-style redefinition, but overloads as in a
  * compile (each analysis parses the document afresh) */
 #define CCTRL_LSP                  (1<<9)
+/* Compiling for the JIT (or the REPL): a threadlocal global is reached
+ * through __ktmJitTls, the JIT can't lay out ELF/Mach-O TLS */
+#define CCTRL_JIT                  (1<<10)
 
 /* For messages */
 #define CCTRL_ICE   0
@@ -401,6 +404,9 @@ typedef struct Cctrl {
 
     /* Are we compiling position independent code? */
     int is_pic;
+    /* JIT: the labels of extern threadlocals JIT code uses; one only a
+     * prebuilt library defines can't be reached (jitResolveSymbol) */
+    Set *jit_tls_syms;
 
     /* Building a library (`-lib`): its functions are emitted as weak
      * definitions, so a program that defines a function of the same
@@ -408,6 +414,13 @@ typedef struct Cctrl {
     int is_library;
     /* Building the standard library itself (`-lib ktm`) */
     int is_libktm;
+    /* rt.crash is compiled in: a main installs the crash report */
+    int crash_report;
+    /* The packages imported (`import "github.com/x/y";`), for the
+     * names and files a crash report shows (asmLinesName): their own
+     * copies, kept for the Cctrl's life (a REPL's lexers come and go) */
+    struct CctrlPackage *packages;
+    int packages_len, packages_cap;
     /* The builtin header (std.ktmh) as read: a name whose declaring token
      * lies in this buffer is part of the library's public API */
     char *header_src;
@@ -421,6 +434,8 @@ typedef struct Cctrl {
      * by a `#link "<path>"` directive, these should be usable with the
      * JIT */
     List *shared_object_files;
+    /* -D names, for the key of a prebuilt package (lexPackagePrebuilt) */
+    List *cmdline_defines;
 
     /* .o files that may have been passed on the commandline */
     List *object_files;
@@ -452,6 +467,16 @@ void cctrlTokenRewind(Cctrl *cc);
 void cctrlTokenExpect(Cctrl *cc, s64 expected);
 void cctrlSetCommandLineDefines(Cctrl *cc, List *defines_list);
 
+/* A package's module: its module path (github_com.x.y.y), the
+ * package's path (github.com/x/y) and its directory, resolved */
+typedef struct CctrlPackage {
+    char *module_path;
+    char *package;
+    char *dir;
+} CctrlPackage;
+
+void cctrlAddPackage(Cctrl *cc, const char *module_path, const char *package,
+                     const char *dir);
 void cctrlInitParse(Cctrl *cc, Lexer *lexer_);
 
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len);

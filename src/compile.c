@@ -78,7 +78,14 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
     if (args->test_dir) l->test_dir = realpath(args->test_dir, NULL);
     if (args->test_root) l->program_root = mprintf("%s", args->test_root);
 
-    if (args->module_dir) {
+    if (args->prebuild_pkg && args->prebuild_mod && args->module_dir) {
+        /* a package into the cache: a program that imports it, with
+         * its modules found from the program's root (--test-root) */
+        l->building_module = mprintf("%s", args->prebuild_mod);
+        l->prebuilding = 1;
+        char *src = mprintf("import \"%s\";\n", args->prebuild_pkg);
+        lexPushString(l, "<package library>", src, strlen(src));
+    } else if (args->module_dir) {
         /* `ktm -lib a.b dir/a/b`: compile the module as a program that
          * imports it, found from dir (dir/a/b less the a/b) */
         char *src;
@@ -103,7 +110,9 @@ int compileToAst(Cctrl *cc, CliArgs *args, int lexer_flags) {
         lexPushFile(l,aoStrDupRaw(args->infile,strlen(args->infile)));
     }
     /* the runtime, after the header and before the program */
+    l->no_crash = args->emit_object || args->emit_dylib;
     lexPushRuntime(l);
+    cc->crash_report = l->with_crash;
     /* the prelude, read first (the stdlib is modules, read when imported) */
     lexPushPrelude(l);
 

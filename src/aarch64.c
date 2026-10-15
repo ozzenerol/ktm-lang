@@ -231,6 +231,29 @@ static void aarch64GotAddr(Cctrl *cc, AoStr *buf, const char *sym,
     }
 }
 
+/* `x0 = &sym` for a threadlocal: the calling thread's copy.
+ * Linux: initial-exec, the thread pointer plus the offset from the GOT
+ * (ld relaxes the GOT load to a movz/movk in a program). Only x16 is
+ * used besides x0; nothing is ever kept in it between instructions.
+ * Mach-O: the TLV descriptor's thunk (tlv_get_addr), which takes the
+ * descriptor in x0, returns the address in x0 and keeps every register
+ * but x16, x17 and lr; lr (and fp with it, sp stays 16-aligned) is saved
+ * around the call, as a frameless leaf still has its return address in
+ * it. A frameless function keeps nothing below sp. */
+static void aarch64TlsAddr(Cctrl *cc, AoStr *buf, const char *sym) {
+    if (cc->target == TARGET_AARCH64_APPLE_DARWIN) {
+        aoStrCatFmt(buf, "stp x29, x30, [sp, #-16]!\n\t");
+        aoStrCatFmt(buf, "adrp    x0, %s@TLVPPAGE\n\t", sym);
+        aoStrCatFmt(buf, "ldr x0, [x0, %s@TLVPPAGEOFF]\n\t", sym);
+        aoStrCatFmt(buf, "ldr x16, [x0]\n\tblr x16\n\t");
+        aoStrCatFmt(buf, "ldp x29, x30, [sp], #16\n\t");
+    } else {
+        aoStrCatFmt(buf, "adrp    x0, :gottprel:%s\n\t", sym);
+        aoStrCatFmt(buf, "ldr x0, [x0, #:gottprel_lo12:%s]\n\t", sym);
+        aoStrCatFmt(buf, "mrs x16, tpidr_el0\n\tadd x0, x16, x0\n\t");
+    }
+}
+
 /* Pick the addressing form for a frame access. AArch64 ldr/str
  * scaled-imm wants non-negative offsets in size-multiples; ldur/stur
  * supports signed -256..255; anything else needs the offset
@@ -1661,7 +1684,9 @@ static void aarch64EmitInstr(IrCgCtx *ctx, IrInstr *instr) {
                     name = asmNormaliseFunctionName(ctx->cc,
                             instr->r1->as.global.name);
                 }
-                if (instr->r1->flags & IR_VAL_FLAG_EXTERN) {
+                if (instr->r1->flags & IR_VAL_FLAG_TLS) {
+                    aarch64TlsAddr(ctx->cc, ctx->buf, name);
+                } else if (instr->r1->flags & IR_VAL_FLAG_EXTERN) {
                     aarch64GotAddr(ctx->cc, ctx->buf, name, "x0");
                 } else {
                     aarch64GlobalAddr(ctx->cc, ctx->buf, name, "x0");
@@ -2225,6 +2250,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         (fn->stack_space == 0) && !irFnHasCalls(fn) && (ast->loff == 0) &&
         !is_variadic;
 
+    asmLinesBegin(ctx->cc, ast, ctx->omit_frame);
     aarch64EmitFunctionPrologue(ctx->cc, buf, ast, fn->stack_space,
                                 ctx->omit_frame);
     A64ParamEmitter pe;
@@ -2247,6 +2273,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         }
         listForEach(block->instructions) {
             IrInstr *instr = (IrInstr *)it->value;
+            asmLinesNote(buf, instr->line, instr->site);
             aarch64EmitInstr(ctx, instr);
         }
     }
@@ -2260,6 +2287,7 @@ void aarch64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         aoStrRemovePreviousChar(buf, '\t');
         aarch64Epilogue(ctx, (int)aligned, ctx->omit_frame);
     }
+    asmLinesEnd(buf);
 }
 
 void aarch64InitialiseEmptyGlobal(Cctrl *cc, AoStr *buf, Ast *global,
@@ -2318,6 +2346,7 @@ void aarch64GlobalVar(Cctrl *cc, Set *seen_globals, AoStr *buf, Ast *ast) {
     if (setHasLen(seen_globals, varname->data, varname->len)) return;
     aoStrRemovePreviousChar(buf, '\t');
     setAdd(seen_globals, varname->data);
+    if (asmThreadLocalGlobal(cc, buf, declvar, declinit, label, local)) return;
 
     /* `U8 *p = &g;`, `&arr[2]`, `&Fn`: a relocated pointer */
     AoStr *addr_sym;
@@ -2431,6 +2460,7 @@ static void aarch64PasteAsmBlocks(AoStr *buf, Cctrl *cc) {
 AoStr *aarch64AsmGenerate(Cctrl *cc) {
     AoStr *buf = aoStrAlloc(2048);
     aarch64InitRegPool();
+    asmLinesReset();
     aarch64PasteDataSection(cc, buf);
     aarch64PasteAsmBlocks(buf, cc);
 
@@ -2461,6 +2491,9 @@ AoStr *aarch64AsmGenerate(Cctrl *cc) {
         aarch64GenerateFunction(&ctx, synth_main);
     }
 
+    Ast *user_main = (Ast *)mapGetLen(cc->global_env, str_lit("main"));
+    asmLinesEmit(cc, buf, cc->crash_report &&
+                 (synth_main != NULL || (user_main && user_main->kind == AST_FUNC)));
     asmEmitAsmInfo(cc, buf);
     setRelease(seen_globals);
     return buf;

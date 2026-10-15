@@ -86,12 +86,40 @@ typedef struct KtmJit {
     u32 n_lines, cap_lines;
     struct KtmJitLine *pending_lines;
     u32 n_pending, cap_pending;
+    /* Every compiled function's code range, rebased like `lines`, for
+     * the crash report (ktmJitRunMain); the backend sets fn_omit_frame
+     * for the function it is emitting. */
+    struct KtmJitFn *fns;
+    u32 n_fns, cap_fns, n_pending_fns;
+    int fn_omit_frame;
+    u32 fn_file_id;  /* the function being compiled's file */
 } KtmJit;
 
 typedef struct KtmJitLine {
     uintptr_t addr; /* absolute pc in `lines`; enc offset in pending */
     int line;
+    int own_line;   /* the line in the function's own file: an inlined
+                     * call from another file's line instead of its own */
+    struct IrInlineSite *site;  /* the inlined call it is in, or NULL */
 } KtmJitLine;
+
+typedef struct KtmJitFn {
+    uintptr_t addr;  /* absolute once its chunk is final; enc offset before */
+    size_t size;
+    char *name;      /* as a report shows it */
+    char *file;
+    int omit_frame;
+    int32_t *lines;  /* count pairs: offset, line | site << 20 (see asm.c) */
+    int count;
+    struct KtmJitSite *sites;
+    int n_sites;
+} KtmJitFn;
+
+typedef struct KtmJitSite {
+    char *name;
+    char *file;                 /* NULL: the function's */
+    int32_t line, outer;
+} KtmJitSite;
 
 /* What a per-arch backend plugs into the shared compile pipeline. */
 typedef struct KtmJitBackend {
@@ -145,9 +173,10 @@ const char *ktmJitFindSymbolForAddr(KtmJit *jit, void *pc, size_t *off_out);
 /* Record "code emitted from enc offset jit->enc.len onward is source
  * line `line`" - called by the backends per IR instruction; consecutive
  * duplicates collapse. line 0 (synthetic) is ignored. */
-void ktmJitNoteLine(KtmJit *jit, int line);
+void ktmJitNoteLine(KtmJit *jit, int line, struct IrInlineSite *site);
 
-/* Source line for a pc inside JIT code, 0 when unknown. */
+/* Source line for a pc inside JIT code, in its function's own file (the
+ * call's line in code inlined from another file), 0 when unknown. */
 int ktmJitFindLineForAddr(KtmJit *jit, void *pc);
 /* The source file of the function `sym` (from ktmJitFindSymbolForAddr),
  * NULL if unknown. */
@@ -156,6 +185,7 @@ const char *ktmJitFindFileForSymbol(KtmJit *jit, const char *sym);
 /* Register a host-provided symbol (e.g. printf, malloc, a libktm hook)
  * so JITted code can call it. Overrides dlsym for that name. */
 void ktmJitDefineSymbol(KtmJit *jit, const char *name, void *addr);
+void *ktmJitSymbolAddr(KtmJit *jit, const char *sym);
 
 /* Convenience: look up `main` and invoke it as `int main(int, char **)`,
  * returning its exit code. */

@@ -104,6 +104,8 @@ u8 *SEM_HC;
 u8 *COMP_HC;
 u8 *FOLD_HC;
 u8 *MOD_GEO2_HC;
+u8 *ORDER_A_HC;
+u8 *ORDER_B_HC;
 u8 *BAG_HC;
 u8 *METH_HC;
 u8 *OVL_HC;
@@ -133,6 +135,14 @@ void initFixtures() {
     MOD_GEO2_HC =
         "module geo;\n"
         "i64 cube(i64 n) { return square(n) * n; }\n";
+    /* Module order: a.ktm's struct holds b.ktm's Price by value (the
+     * compiler reads a module's types in any order) */
+    ORDER_A_HC =
+        "module order;\n"
+        "pub struct Item { Price p; i64 n; };\n";
+    ORDER_B_HC =
+        "module order;\n"
+        "struct Price { i64 cents; };\n";
     /* A module with a global and a local vec.Vec: completion after `.`
      * offers every method of the instance, called yet or not */
     BAG_HC =
@@ -1245,6 +1255,27 @@ void testRegressions() {
         "}\n");
     check("stdlib generics (vec, str.join) give no false errors", lastPublishClean(l));
 
+    /* a module's struct holding a later file's type by value: the
+     * server's startup parse had used module number 1, so the child's
+     * module 1 skipped reading its types in any order and gave "field
+     * `p` of order.Item holds a order.Price, which is not complete
+     * here" (net.http's MuxRoute and Pattern, the Shelf guide's first
+     * program); the compiler was fine */
+    lspDidOpen(l, uriOf("order_main.ktm"),
+        "import order;\n"
+        "i32 main() { order.Item it; return (i32)it.p.cents; }\n");
+    check("a module's struct holding a later file's type gives no false error",
+                lastPublishClean(l));
+    lspDidOpen(l, uriOf("http_mux.ktm"),
+        "import net.http;\n"
+        "void hello(http.Writer *w, http.Request *r) { w.text(200, \"hi\\n\"); }\n"
+        "i32 main() {\n"
+        "  http.Mux mux;\n"
+        "  mux.handle(\"GET /{$}\", &hello);\n"
+        "  return 0;\n"
+        "}\n");
+    check("a program with an http.Mux gives no false error", lastPublishClean(l));
+
     i64 line;
     i64 chr;
     posOf(REG_HC, "Square(counter)", 1, &line, &chr);
@@ -2103,7 +2134,7 @@ i32 main() {
     u8 tmp[128];
     libc.snprintf(tmp, 128, "/tmp/ktm_lsp_test_%d", getpid());
     u8 cmd[256];
-    libc.snprintf(cmd, 256, "mkdir -p %s/sub %s/geo %s/bag", tmp, tmp, tmp);
+    libc.snprintf(cmd, 256, "mkdir -p %s/sub %s/geo %s/bag %s/order", tmp, tmp, tmp, tmp);
     proc.shell(cmd);
     gDir = mem.alloc(1024);
     realpath(tmp, gDir);
@@ -2131,6 +2162,10 @@ i32 main() {
     fs.writeAll(path, cstr.view(MOD_GEO_HC));
     libc.snprintf(path, 512, "%s/geo/more.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_GEO2_HC));
+    libc.snprintf(path, 512, "%s/order/a.ktm", gDir);
+    fs.writeAll(path, cstr.view(ORDER_A_HC));
+    libc.snprintf(path, 512, "%s/order/b.ktm", gDir);
+    fs.writeAll(path, cstr.view(ORDER_B_HC));
     libc.snprintf(path, 512, "%s/modmain.ktm", gDir);
     fs.writeAll(path, cstr.view(MOD_MAIN_HC));
     libc.snprintf(path, 512, "%s/modlist.ktm", gDir);

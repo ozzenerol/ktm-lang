@@ -77,6 +77,17 @@ int pkgIsProjectPath(const char *program_dir, const char *path);
 /* The name on the `module` line of the package in dir, NULL if none */
 char *pkgModuleName(const char *dir);
 
+/* The sha256 of the bytes, or of a file's (NULL: unreadable), in hex */
+char *pkgSha256Hex(const void *data, size_t n);
+char *pkgSha256File(const char *path);
+/* This ktm's executable (pkgtest.c) */
+char *pkgSelfPath(const char *argv0);
+/* The program's build list as text, every selected path@version and
+ * replace, for the key of a prebuilt package; NULL when there is none
+ * or a package is replaced by a directory (being edited: nothing is
+ * prebuilt then) */
+char *pkgBuildListKey(const char *program_dir);
+
 /* Downloading (pkgfetch.c) */
 char *pkgDirHash(const char *root);
 char *pkgRepoRoot(const char *path);

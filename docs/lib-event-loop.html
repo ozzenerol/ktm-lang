@@ -17,7 +17,7 @@
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=9467e22335" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -142,6 +142,7 @@ stopped
     <tr><td><code>coro.park(ms)</code></td><td>Another coroutine (of this loop or another thread's) calls <code>coro.unpark(c)</code></td><td>1, or 0 on timeout, -1 on <code>coro.stop()</code>; an unpark before the park makes it return at once. No syscall within a loop; <code>coro.unpark</code> from another thread works too (through the loop's mailbox, one <code>write</code>)</td></tr>
     <tr><td><code>coro.waitChild(pid, ms)</code></td><td>A child process exits</td><td>Its wait status, or -1</td></tr>
     <tr><td><code>coro.close(fd)</code></td><td></td><td>Closes the fd and tells the loop</td></tr>
+    <tr><td><code>coro.detach(fd)</code></td><td></td><td>Takes the fd out of this thread's loop, so another thread's loop can wait on it</td></tr>
   </tbody>
 </table></div>
 <ul class="rules">
@@ -300,6 +301,17 @@ void main()
 
 <h2 id="on-every-core">On every core<a class="anchor" href="#on-every-core" aria-label="Link to this section">#</a></h2>
 <p>One loop runs on one thread. To use every core, see <a href="lib-serve.html"><code>coro.serve</code></a>.</p>
+<p>An fd belongs to the loop that waited on it last: it stays registered there. Before another thread's
+loop waits on it (a connection kept in a pool that threads share), the thread that used it calls
+<code>coro.detach(fd)</code>. Without it the first loop takes the fd's number as still registered, and once the
+other thread closes the fd, a new fd with that number is never waited for there.</p>
+<pre><code>// thread A, done with the connection for now
+coro.detach(conn.fd);
+pool.put(conn);            // thread B's coroutines may take it next</code></pre>
+<ul class="rules">
+  <li><code>coro.detach</code> throws <code>coro.ERR_LOOP</code> while a coroutine of the same loop waits on the fd.</li>
+  <li>For an fd the loop never waited on, or on a thread without a loop, it does nothing.</li>
+</ul>
 
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="lib-coroutines.html"><span>Previous</span>Coroutines</a><a class="next" href="lib-serve.html"><span>Next</span>Serving on every core</a></nav>
     <footer class="page-foot">

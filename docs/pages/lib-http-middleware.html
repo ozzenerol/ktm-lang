@@ -48,7 +48,7 @@ void main()
   <tr><td><code>middleware.realIp(m, "10.0.0.0/8, ::1")</code></td><td>For requests from those proxies, <code>r.remoteAddr()</code> becomes the right-most address in <code>X-Forwarded-For</code> that isn't a proxy; from anywhere else the header is ignored, so it can't be faked</td></tr>
   <tr><td><code>middleware.cors(m, &amp;opts)</code></td><td>CORS for the origins in a <code>middleware.CorsOptions</code> (<code>origins</code>, <code>methods</code>, <code>headers</code>, <code>expose</code>, <code>credentials</code>, <code>maxAge</code>); answers preflights itself. Add it on the Mux the server serves</td></tr>
   <tr><td><code>middleware.rateLimit(m, requests, seconds)</code></td><td>Per client address, a token bucket shared by all the server's threads; past it 429 with <code>Retry-After</code>, and <code>RateLimit-Limit</code>/<code>-Remaining</code> on every reply</td></tr>
-  <tr><td><code>middleware.bearer(m, &amp;check)</code></td><td><code>Authorization: Bearer &lt;token&gt;</code> that <code>check(token, r)</code> accepts, else 401 with <code>WWW-Authenticate</code>; <code>check</code> can <code>r.set</code> the user</td></tr>
+  <tr><td><code>middleware.bearer(m, &amp;check)</code></td><td><code>Authorization: Bearer &lt;token&gt;</code> that <code>check(token, r)</code> accepts, else 401 with <code>WWW-Authenticate</code>; <code>check</code> can <code>r.setText</code> the user</td></tr>
 </table>
 
 <h2>Order and groups</h2>

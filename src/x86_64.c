@@ -170,7 +170,18 @@ static void x86_64Lea(IrCgCtx *ctx, IrInstr *lea, const char *reg) {
             name = asmNormaliseFunctionName(ctx->cc,
                     lea->r1->as.global.name);
         }
-        if (lea->r1->flags & IR_VAL_FLAG_EXTERN) {
+        if (lea->r1->flags & IR_VAL_FLAG_TLS) {
+            /* A threadlocal: initial-exec, the thread pointer plus the
+             * variable's offset from the GOT. ld relaxes the GOT load to
+             * `movq $x@tpoff` in a program (local-exec); libktm.so keeps
+             * it, its TLS is in the static block (see rt/except.ktm). */
+            if (ctx->cc->target == TARGET_X86_64_APPLE_DARWIN) {
+                loggerPanic("threadlocal globals are not supported on "
+                            "x86_64 macOS\n");
+            }
+            aoStrCatFmt(ctx->buf, "movq    %s@gottpoff(%%rip), %%%s\n\t"
+                        "addq    %%fs:0, %%%s\n\t", name, reg, reg);
+        } else if (lea->r1->flags & IR_VAL_FLAG_EXTERN) {
             /* Possibly in a shared library: through the GOT (ELF and
              * Mach-O spell it the same; the linker relaxes it back to
              * a lea when the symbol turns out to be local) */
@@ -2572,6 +2583,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
                       && (ast->loff == 0)
                       && !has_struct_param;
 
+    asmLinesBegin(ctx->cc, ast, ctx->omit_frame);
     x86_64EmitFunctionPrologue(ctx->cc, buf, ast,
                                fn->stack_space,
                                ctx->pinned_regs,
@@ -2594,6 +2606,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         }
         listForEach(block->instructions) {
             IrInstr *instr = (IrInstr *)it->value;
+            asmLinesNote(buf, instr->line, instr->site);
             x86_64EmitInstr(ctx, instr);
         }
     }
@@ -2605,6 +2618,7 @@ void x86_64GenerateFunction(IrCgCtx *ctx, Ast *ast) {
         x86_64RestorePinnedRegs(buf, ctx->pinned_regs);
         x86_64Epilogue(ctx);
     }
+    asmLinesEnd(buf);
 }
 
 void x86_64InitialiseEmptyGlobal(Cctrl *cc,
@@ -2673,6 +2687,7 @@ void x86_64GlobalVar(Cctrl *cc,
 
     aoStrRemovePreviousChar(buf, '\t');
     setAdd(seen_globals, varname->data);
+    if (asmThreadLocalGlobal(cc, buf, declvar, declinit, label, local)) return;
 
     /* `U8 *p = &g;`, `&arr[2]`, `&Fn`: a relocated pointer */
     AoStr *addr_sym;
@@ -2790,6 +2805,7 @@ static void x86_64PasteAsmBlocks(AoStr *buf, Cctrl *cc) {
 AoStr *x86_64AsmGenerate(Cctrl *cc) {
     AoStr *buf = aoStrAlloc(2048);
     x86_64InitRegPool();
+    asmLinesReset();
     x86_64PasteDataSection(cc, buf);
     x86_64PasteAsmBlocks(buf, cc);
 
@@ -2825,6 +2841,9 @@ AoStr *x86_64AsmGenerate(Cctrl *cc) {
         x86_64GenerateFunction(&ctx, synth_main);
     }
 
+    Ast *user_main = (Ast *)mapGetLen(cc->global_env, str_lit("main"));
+    asmLinesEmit(cc, buf, cc->crash_report &&
+                 (synth_main != NULL || (user_main && user_main->kind == AST_FUNC)));
     asmEmitAsmInfo(cc, buf);
     setRelease(seen_globals);
     return buf;

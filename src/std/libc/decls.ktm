@@ -229,6 +229,8 @@ pub extern "c" i32 pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *lk);
 
 pub extern "c" i32 pthread_exit(void *data = null);
 
+pub extern "c" i32 pthread_atfork(void *prepare, void *parent, void *child);
+
 pub extern "c" i32 pthread_detach(pthread_t *th);
 
 pub extern "c" i32 pthread_attr_setstacksize(pthread_attr_t *attr, u64 stacksize);

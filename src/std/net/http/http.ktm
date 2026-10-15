@@ -408,7 +408,26 @@ pub i64 Request.getInt(u8[] key, i64 def = 0)
     return v ? v.n : def;
 }
 
-/* Was key set (by set or setInt) on this request? */
+/* A text under key (the signed-in user's id, a tenant name): copied into
+ * the request's memory, so text may be freed or reused right after */
+pub void Request.setText(u8[] key, u8[] text)
+{
+    u8 *keep = arenaAlloc(&self.arena, text.len + 1);
+    if (text.len) { mem.copy(keep, text.ptr, text.len); }
+    keep[text.len] = 0;
+    RequestValue *v = slotFor(self, key);
+    v.ptr = keep;
+    v.n = text.len;
+}
+
+/* The text setText kept under key, or def */
+pub u8[] Request.getText(u8[] key, u8[] def = "")
+{
+    RequestValue *v = findValue(self, key);
+    return v ? ((u8 *)v.ptr)[0:v.n] : def;
+}
+
+/* Was key set (by set, setInt or setText) on this request? */
 pub bool Request.has(u8[] key)
 {
     return findValue(self, key) != null;

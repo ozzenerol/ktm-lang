@@ -461,8 +461,7 @@ static void jitGlobalAddr(KtmJit *jit, A64Reg reg, const char *sym) {
     }
     /* Internal global / string / external function: address is known
      * now (host arena malloc, or dlsym for libc). Materialise it. */
-    void *addr = mapGet(jit->host_symbols, (void *)sym);
-    if (!addr) addr = asm_jit_dlsym_resolver(NULL, sym);
+    void *addr = ktmJitSymbolAddr(jit, sym);
     if (!addr) {
         /* nothing defines it: the chunk fails (it was a null address) */
         asm_jit_unresolved(&jit->enc, sym);
@@ -1931,6 +1930,8 @@ static int jitCompileFunction(KtmJit *jit, Ast *ast, IrCtx *ir_ctx) {
     ctx.fn = fn;
     ctx.ast = ast;
     ctx.omit_frame = omit_frame;
+    jit->fn_omit_frame = omit_frame;
+    jit->fn_file_id = ast->file_id;
 
     /* Publish the function entry as a public label. asmNormaliseFunctionName
      * strips/adds underscores per platform; the resolver uses the same name. */
@@ -1957,7 +1958,7 @@ static int jitCompileFunction(KtmJit *jit, Ast *ast, IrCtx *ir_ctx) {
         }
         listForEach(block->instructions) {
             IrInstr *in = (IrInstr *)it->value;
-            ktmJitNoteLine(jit, in->line);
+            ktmJitNoteLine(jit, in->line, in->site);
             jitEmitInstr(&ctx, in);
         }
     }

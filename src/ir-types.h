@@ -200,6 +200,8 @@ typedef struct IrVar {
  * prototyped): its address comes from the GOT, as it may live in a
  * shared library and a PIE can't reach it with a PC-relative lea. */
 #define IR_VAL_FLAG_EXTERN 0x2
+/* A threadlocal global: its address is the calling thread's copy */
+#define IR_VAL_FLAG_TLS 0x4
 
 /* Where an IrValue physically lives after register allocation.
  * Filled in by the regalloc pass; consumed by codegen so it never
@@ -308,6 +310,10 @@ struct IrInstr {
      * created (statement-level accuracy). 0 = unknown/synthetic. The
      * JIT backends turn these into per-chunk pc->line tables. */
     int line;
+    /* The inlined call this instruction came from (innermost first),
+     * NULL in the function's own code: crash reports rebuild the calls
+     * the inliner merged. */
+    struct IrInlineSite *site;
 
     union {
         IrBlockPair blocks;
@@ -560,7 +566,17 @@ IrValue *irTmp(IrValueType type, u32 size);
 /* Source line currently being lowered - set by ir.c's dispatchers
  * from Ast->line, stamped onto every irInstrNew instruction. */
 extern int ir_line_hint;
-extern int ir_line_lock;
+
+/* A call the inliner expanded: the function, the line of the call in
+ * the code around it, and that code's own site (NULL: the function
+ * being compiled). The lines inside it are the callee's, in the
+ * callee's file. */
+typedef struct IrInlineSite {
+    Ast *callee;
+    int call_line;
+    struct IrInlineSite *outer;
+} IrInlineSite;
+extern IrInlineSite *ir_site_hint;
 
 IrInstr *irInstrNew(IrOp op, IrValue *dst, IrValue *r1, IrValue *r2);
 IrFunction *irFunctionNew(AoStr *fname);

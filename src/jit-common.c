@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,24 @@
  * inside asm_jit_finalize via enc->labels by name -- the resolver only
  * sees external symbols. Host overrides win over libc. */
 static void *jitResolveSymbol(void *ud, const char *sym) {
-    KtmJit *jit = ud;
+    return ktmJitSymbolAddr(ud, sym);
+}
+
+/* The address of a symbol JIT code uses: the JIT's own (or a host
+ * override), else what dlsym finds */
+void *ktmJitSymbolAddr(KtmJit *jit, const char *sym) {
     void *p;
     if ((p = mapGet(jit->host_symbols, (void *)sym))) return p;
+    /* A threadlocal of a prebuilt library: dlsym gives this thread's copy
+     * of it, which isn't the storage every thread's JIT code would need */
+    Set *tls = jit->cc->jit_tls_syms;
+    if (tls && (setHas(tls, (char *)sym) ||
+                (sym[0] == '_' && setHas(tls, (char *)sym + 1)))) {
+        fprintf(stderr, "error: threadlocal `%s` is defined in a prebuilt "
+                "library, which JIT code can't reach: read it through a "
+                "function of the library, or compile ahead of time\n", sym);
+        exit(EXIT_FAILURE);
+    }
     return asm_jit_dlsym_resolver(NULL, sym);
 }
 
@@ -55,6 +71,91 @@ int ktmJitIsInternalFunc(KtmJit *jit, const char *sym) {
      * those calls route through label fixups. Functions from earlier
      * chunks resolve through host_symbols like any other host address. */
     return mapGet(jit->chunk_fns, (void *)sym) != NULL;
+}
+
+/* ---------------- threadlocal globals ---------------- */
+
+/* JIT code can't use ELF/Mach-O TLS, so a threadlocal global is laid out
+ * once like any global (holding its initial value) and each thread gets
+ * its own copy of that storage on first use: `image` is the global's
+ * address, the table maps it to this thread's copy. Freed at thread exit. */
+typedef struct JitTlsEnt {
+    void *image;
+    void *copy;
+} JitTlsEnt;
+
+typedef struct JitTlsTab {
+    JitTlsEnt *ents;
+    size_t cap;
+    size_t len;
+} JitTlsTab;
+
+static __thread JitTlsTab *jit_tls_tab = NULL;
+static pthread_key_t jit_tls_key;
+static pthread_once_t jit_tls_once = PTHREAD_ONCE_INIT;
+
+static void jitTlsFree(void *p) {
+    JitTlsTab *tab = p;
+    for (size_t i = 0; i < tab->cap; ++i) free(tab->ents[i].copy);
+    free(tab->ents);
+    free(tab);
+}
+
+static void jitTlsKeyCreate(void) {
+    pthread_key_create(&jit_tls_key, jitTlsFree);
+}
+
+static size_t jitTlsSlot(JitTlsEnt *ents, size_t cap, void *image) {
+    size_t i = (((size_t)image) >> 3) * 0x9E3779B97F4A7C15ULL & (cap - 1);
+    while (ents[i].image && ents[i].image != image) i = (i + 1) & (cap - 1);
+    return i;
+}
+
+static void jitTlsGrow(JitTlsTab *tab) {
+    size_t cap = tab->cap ? tab->cap * 2 : 16;
+    JitTlsEnt *ents = calloc(cap, sizeof(JitTlsEnt));
+    if (!ents) {
+        fprintf(stderr, "out of memory for a threadlocal global\n");
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = 0; i < tab->cap; ++i) {
+        if (!tab->ents[i].image) continue;
+        ents[jitTlsSlot(ents, cap, tab->ents[i].image)] = tab->ents[i];
+    }
+    free(tab->ents);
+    tab->ents = ents;
+    tab->cap = cap;
+}
+
+/* The calling thread's copy of the threadlocal global at `image` */
+static void *ktmJitTls(void *image, long size) {
+    JitTlsTab *tab = jit_tls_tab;
+    if (tab) {
+        size_t i = jitTlsSlot(tab->ents, tab->cap, image);
+        if (tab->ents[i].image) return tab->ents[i].copy;
+    } else {
+        pthread_once(&jit_tls_once, jitTlsKeyCreate);
+        tab = calloc(1, sizeof(JitTlsTab));
+        if (!tab) {
+            fprintf(stderr, "out of memory for a threadlocal global\n");
+            exit(EXIT_FAILURE);
+        }
+        jitTlsGrow(tab);
+        jit_tls_tab = tab;
+        pthread_setspecific(jit_tls_key, tab);
+    }
+    if ((tab->len + 1) * 2 > tab->cap) jitTlsGrow(tab);
+    void *copy = malloc(size > 0 ? (size_t)size : 1);
+    if (!copy) {
+        fprintf(stderr, "out of memory for a threadlocal global\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(copy, image, (size_t)size);
+    size_t i = jitTlsSlot(tab->ents, tab->cap, image);
+    tab->ents[i].image = image;
+    tab->ents[i].copy = copy;
+    tab->len++;
+    return copy;
 }
 
 /* ---------------- fixup helpers ---------------- */
@@ -558,6 +659,8 @@ KtmJit *ktmJitNew(Cctrl *cc, const KtmJitBackend *backend) {
     backend->init_reg_pool();
     jitLoadLibtos(cc);
     jitLoadSharedObjects(cc);
+    /* both spellings: ktmJitDefineSymbol adds or drops one `_` */
+    ktmJitDefineSymbol(jit, "___ktmJitTls", (void *)(uintptr_t)ktmJitTls);
     return jit;
 }
 
@@ -570,6 +673,169 @@ static void jitNoteSymFile(KtmJit *jit, Cctrl *cc, Ast *fn) {
     const char *name = asmNormaliseFunctionName(cc, fn->fname);
     if (mapGet(jit->sym_files, (void *)name)) return;
     mapAdd(jit->sym_files, strdup(name), strdup(file->data));
+}
+
+/* Site `site`'s number in *sites (from 1), its outer sites first */
+static int jitSiteNum(Vec *sites, IrInlineSite *site) {
+    if (!site) return 0;
+    for (u64 i = 0; i < sites->size; ++i) {
+        if (sites->entries[i] == site) return (int)i + 1;
+    }
+    jitSiteNum(sites, site->outer);
+    vecPush(sites, site);
+    return (int)sites->size;
+}
+
+/* Record the function just emitted from enc offset `start`, with the
+ * pending lines from `from` on, for the crash report: the records
+ * asmLinesEmit writes for a compiled program, in memory. The inline
+ * sites live in the IR arena, so they are copied now. */
+static void jitNoteFunction(KtmJit *jit, Ast *fn, size_t start, u32 from) {
+    Cctrl *cc = jit->cc;
+    if (jit->n_fns == jit->cap_fns) {
+        jit->cap_fns = jit->cap_fns ? jit->cap_fns * 2 : 64;
+        jit->fns = realloc(jit->fns, jit->cap_fns * sizeof(KtmJitFn));
+    }
+    KtmJitFn *f = &jit->fns[jit->n_fns++];
+    memset(f, 0, sizeof(*f));
+    f->addr = start;
+    f->size = jit->enc.len - start;
+    f->name = strdup(asmLinesName(cc, fn->fname));
+    AoStr *file = cctrlLookUpFile(cc, fn->file_id);
+    f->file = file ? strdup(asmLinesPath(cc, file->data)) : NULL;
+    f->omit_frame = jit->fn_omit_frame;
+
+    u32 n = jit->n_pending - from + 1;
+    f->lines = malloc(n * 2 * sizeof(int32_t));
+    Vec *sites = vecNew(&vec_unsigned_long_type);
+    if (fn->line) {
+        f->lines[0] = 0;
+        f->lines[1] = fn->line > 0xFFFFF ? 0xFFFFF : fn->line;
+        f->count = 1;
+    }
+    for (u32 i = from; i < jit->n_pending; ++i) {
+        KtmJitLine *l = &jit->pending_lines[i];
+        int32_t *t = &f->lines[2 * f->count++];
+        t[0] = (int32_t)(l->addr - start);
+        t[1] = (l->line > 0xFFFFF ? 0xFFFFF : l->line) |
+               (jitSiteNum(sites, l->site) << 20);
+    }
+    f->n_sites = (int)sites->size;
+    f->sites = calloc(sites->size + 1, sizeof(KtmJitSite));
+    for (u64 i = 0; i < sites->size; ++i) {
+        IrInlineSite *site = sites->entries[i];
+        f->sites[i].name = strdup(asmLinesName(cc, site->callee->fname));
+        u32 fid = site->callee->file_id;
+        AoStr *sfile = fid && fid != fn->file_id ? cctrlLookUpFile(cc, fid) : NULL;
+        f->sites[i].file = sfile ? strdup(asmLinesPath(cc, sfile->data)) : NULL;
+        f->sites[i].line = site->call_line;
+        f->sites[i].outer = jitSiteNum(sites, site->outer);
+    }
+    vecRelease(sites);
+}
+
+/* rt.crash's CrashFn and CrashSite: their addresses are offsets from
+ * where each is stored */
+typedef struct KtmCrashFn {
+    int64_t start;
+    int32_t size, name, file, lines, sites, count, flags, pad;
+} KtmCrashFn;
+
+typedef struct KtmCrashSite {
+    int32_t name, line, outer, file;
+} KtmCrashSite;
+
+/* The offset from `field` to `to` */
+static int32_t jitCrashRel(void *field, void *to) {
+    return to ? (int32_t)((char *)to - (char *)field) : 0;
+}
+
+/* Bump allocation in the block jitCrashTable builds, 8-aligned */
+static char *jitCrashTake(char **at, size_t n) {
+    char *p = *at;
+    *at += (n + 7) & ~(size_t)7;
+    return p;
+}
+
+/* Every JIT'd function's record, in one block so its offsets are short */
+static KtmCrashFn *jitCrashTable(KtmJit *jit) {
+    size_t total = jit->n_fns * sizeof(KtmCrashFn);
+    for (u32 i = 0; i < jit->n_fns; ++i) {
+        KtmJitFn *f = &jit->fns[i];
+        total += ((f->count * 2 * sizeof(int32_t)) + 7) & ~(size_t)7;
+        total += ((f->n_sites * sizeof(KtmCrashSite)) + 7) & ~(size_t)7;
+        total += strlen(f->name) + 8;
+        if (f->file) total += strlen(f->file) + 8;
+        for (int k = 0; k < f->n_sites; ++k) {
+            total += strlen(f->sites[k].name) + 8;
+            if (f->sites[k].file) total += strlen(f->sites[k].file) + 8;
+        }
+    }
+    char *block = calloc(1, total), *at = block;
+    if (!block) return NULL;
+    KtmCrashFn *t = (KtmCrashFn *)jitCrashTake(&at, jit->n_fns * sizeof(KtmCrashFn));
+    for (u32 i = 0; i < jit->n_fns; ++i) {
+        KtmJitFn *f = &jit->fns[i];
+        KtmCrashFn *r = &t[i];
+        r->start = (int64_t)(f->addr - (uintptr_t)&r->start);
+        r->size = (int32_t)f->size;
+        char *name = jitCrashTake(&at, strlen(f->name) + 1);
+        strcpy(name, f->name);
+        r->name = jitCrashRel(&r->name, name);
+        if (f->file) {
+            char *file = jitCrashTake(&at, strlen(f->file) + 1);
+            strcpy(file, f->file);
+            r->file = jitCrashRel(&r->file, file);
+        }
+        int32_t *lines = (int32_t *)jitCrashTake(&at, f->count * 2 * sizeof(int32_t));
+        memcpy(lines, f->lines, f->count * 2 * sizeof(int32_t));
+        r->lines = jitCrashRel(&r->lines, lines);
+        if (f->n_sites) {
+            KtmCrashSite *sites = (KtmCrashSite *)jitCrashTake(&at,
+                    f->n_sites * sizeof(KtmCrashSite));
+            for (int k = 0; k < f->n_sites; ++k) {
+                char *sn = jitCrashTake(&at, strlen(f->sites[k].name) + 1);
+                strcpy(sn, f->sites[k].name);
+                sites[k].name = jitCrashRel(&sites[k].name, sn);
+                sites[k].line = f->sites[k].line;
+                sites[k].outer = f->sites[k].outer;
+                if (f->sites[k].file) {
+                    char *sf = jitCrashTake(&at, strlen(f->sites[k].file) + 1);
+                    strcpy(sf, f->sites[k].file);
+                    sites[k].file = jitCrashRel(&sites[k].file, sf);
+                }
+            }
+            r->sites = jitCrashRel(&r->sites, sites);
+        }
+        r->count = f->count;
+        r->flags = f->omit_frame ? 1 : 0;
+    }
+    return t;
+}
+
+/* rt.crash's function `name`, JIT'd with the program */
+static void *jitCrashFunction(KtmJit *jit, const char *name) {
+    char *qual = mprintf("rt.crash.%s", name);
+    AoStr sym = { .data = astModuleMangle(qual, strlen(qual)), .len = 0, .capacity = 0 };
+    sym.len = strlen(sym.data);
+    return jitResolveSymbol(jit, asmNormaliseFunctionName(jit->cc, &sym));
+}
+
+/* Hand every JIT'd function to the crash handler, as a compiled
+ * program's constructor does (asmLinesEmit), and libktm's records:
+ * the shared library's own, which it says where they are */
+static void jitInstallCrashReport(KtmJit *jit) {
+    void (*install)(KtmCrashFn *, KtmCrashFn *) =
+            (void (*)(KtmCrashFn *, KtmCrashFn *))jitCrashFunction(jit, "__ktmCrashInstall");
+    void (*add)(KtmCrashFn *, KtmCrashFn *) =
+            (void (*)(KtmCrashFn *, KtmCrashFn *))jitCrashFunction(jit, "__ktmCrashAdd");
+    if (!install || !jit->n_fns) return;
+    KtmCrashFn *t = jitCrashTable(jit);
+    if (!t) return;
+    install(t, t + jit->n_fns);
+    KtmCrashFn **lo = dlsym(RTLD_DEFAULT, "ktm_lines_lo");
+    KtmCrashFn **hi = dlsym(RTLD_DEFAULT, "ktm_lines_hi");
+    if (add && lo && hi) add(*lo, *hi);
 }
 
 static void jitChunkFnAdd(KtmJit *jit, const char *name) {
@@ -633,16 +899,23 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
     }
 
     IrCtx *ir_ctx = irCtxNew(cc);
+    u32 first_fn = jit->n_fns;
     for (List *it = ast_from; it != cc->ast_list; it = it->next) {
         Ast *ast = it->value;
         if (ast->kind != AST_FUNC) continue;
         jitNoteSymFile(jit, cc, ast);
+        u32 from = jit->n_pending;
+        size_t start = jit->enc.len;
         if (jit->backend->compile_function(jit, ast, ir_ctx) != 0) return -1;
+        jitNoteFunction(jit, ast, start, from);
     }
     if (extra_fn) {
         jitNoteSymFile(jit, cc, extra_fn);
+        u32 from = jit->n_pending;
+        size_t start = jit->enc.len;
         if (jit->backend->compile_function(jit, extra_fn, ir_ctx) != 0)
             return -1;
+        jitNoteFunction(jit, extra_fn, start, from);
     }
 
     /* `asm {}` function bodies: define each public label, then splice
@@ -695,6 +968,11 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
     }
     listAppend(jit->chunks, code);
 
+    /* this chunk's functions: offsets become addresses */
+    for (u32 i = first_fn; i < jit->n_fns; ++i) {
+        jit->fns[i].addr += (uintptr_t)code->code;
+    }
+
     /* Rebase this chunk's pending (enc offset, line) notes onto the
      * finalized mapping and publish them for pc->line lookups. */
     if (jit->n_pending) {
@@ -709,6 +987,8 @@ int ktmJitCompileChunk(KtmJit *jit, Ast *extra_fn) {
             jit->lines[jit->n_lines].addr =
                 (uintptr_t)code->code + jit->pending_lines[i].addr;
             jit->lines[jit->n_lines].line = jit->pending_lines[i].line;
+            jit->lines[jit->n_lines].own_line = jit->pending_lines[i].own_line;
+            jit->lines[jit->n_lines].site = NULL;  /* its arena is gone */
             /* KTM_DEBUG_LINES=1 dumps the table as chunks finalize -
              * pairs with `replDisasm` output when debugging attribution. */
             if (getenv("KTM_DEBUG_LINES"))
@@ -821,11 +1101,12 @@ const char *ktmJitFindFileForSymbol(KtmJit *jit, const char *sym) {
     return f;
 }
 
-void ktmJitNoteLine(KtmJit *jit, int line) {
+void ktmJitNoteLine(KtmJit *jit, int line, IrInlineSite *site) {
     if (!jit || line <= 0) return;
     /* Collapse runs: only the line CHANGES matter. */
     if (jit->n_pending &&
-        jit->pending_lines[jit->n_pending - 1].line == line)
+        jit->pending_lines[jit->n_pending - 1].line == line &&
+        jit->pending_lines[jit->n_pending - 1].site == site)
     {
         return;
     }
@@ -834,8 +1115,19 @@ void ktmJitNoteLine(KtmJit *jit, int line) {
         jit->pending_lines = realloc(jit->pending_lines,
                 jit->cap_pending * sizeof(KtmJitLine));
     }
+    /* a line inside a call inlined from another file is that file's:
+     * the function's own line is the call's, outward until one is */
+    int own = line;
+    for (IrInlineSite *s = site; s; s = s->outer) {
+        if (s->callee->file_id && s->callee->file_id != jit->fn_file_id &&
+            s->call_line > 0) {
+            own = s->call_line;
+        }
+    }
     jit->pending_lines[jit->n_pending].addr = (uintptr_t)jit->enc.len;
     jit->pending_lines[jit->n_pending].line = line;
+    jit->pending_lines[jit->n_pending].own_line = own;
+    jit->pending_lines[jit->n_pending].site = site;
     jit->n_pending++;
 }
 
@@ -854,7 +1146,7 @@ int ktmJitFindLineForAddr(KtmJit *jit, void *pc) {
         if (e->addr < lo || e->addr >= hi) continue; /* other chunk */
         if (e->addr <= p && e->addr >= best_addr) {
             best_addr = e->addr;
-            best_line = e->line;
+            best_line = e->own_line;
         }
     }
     return best_line;
@@ -892,6 +1184,7 @@ int ktmJitRunMain(KtmJit *jit, int argc, char **argv) {
                 argc > 0 ? argv[0] : "-jit");
         return 1;
     }
+    jitInstallCrashReport(jit);
     return entry.main_fn(argc, argv);
 }
 

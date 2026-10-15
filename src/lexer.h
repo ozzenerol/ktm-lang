@@ -158,6 +158,8 @@
 #define KW_ENUM         95
 /* `defer <stmt>` (ktm syntax v0.2): run <stmt> when the block is left. */
 #define KW_DEFER        96
+/* `threadlocal T x;`: a global with one copy per thread */
+#define KW_THREADLOCAL  97
 
 /* Compiler Flags*/
 #define CCF_MULTI_CHAR_OP     (1<<0)
@@ -364,9 +366,17 @@ typedef struct Lexer {
     /* `ktm -lib a.b dir/a/b`: the module being built into a library,
      * compiled in full even if it has a .ktmlib marker */
     char *building_module;
+    /* building a package into the cache (--prebuild-pkg): a module that
+     * the program compiles itself (the stdlib's not in libktm, as
+     * net.tls) is only declared here, so its code is in one place */
+    int prebuilding;
     /* `ktm -lib name dir` over a tree of modules: dir (a real path),
      * whose modules are all compiled in full */
     char *building_tree;
+    /* the compile makes no program (`-lib`, `-c`): rt.crash, the crash
+     * report's handler, isn't compiled in (a program has it once) */
+    int no_crash;
+    int with_crash;   /* lexPushRuntime imported it */
     /* `ktm test`: the directory (a real path) of the module whose
      * *_test.ktm files are read (every other module leaves its own out),
      * and that module's id once loaded */

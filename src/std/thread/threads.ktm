@@ -1,5 +1,5 @@
 module thread;
-import libc, list, mem;
+import libc, list, mem, rt;
 
 pub struct Worker {
         libc.pthread_t *th;
@@ -54,6 +54,8 @@ static void *threadPoolMain(void *argv)
     // Once the pool is stopped it finishes the queued jobs, then returns.
         Pool *pool = (Pool *)argv;
         Job *job;
+
+        rt.__ktmCrashThread();
 
         libc.pthread_mutex_lock(&pool.lock);
         pool.aliveThreads++;
