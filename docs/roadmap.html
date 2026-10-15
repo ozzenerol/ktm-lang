@@ -90,7 +90,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>net.tls</code></td><td>stdlib</td><td>TLS client and server (mbedTLS inside)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td><code>net.http</code> client</td><td>stdlib</td><td><code>http.get</code>, <code>http.post</code>, keep-alive pool, timeouts, redirects, JSON helpers</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td><code>net.http</code> HTTPS</td><td>stdlib</td><td><code>net.https</code>: serving over TLS, and <code>https://</code> in the client</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
-  <tr><td><code>crypto</code></td><td>stdlib</td><td>Secure random bytes, SHA-256/512, HMAC, HKDF, PBKDF2, constant-time compare, AES-256-GCM, ChaCha20-Poly1305, ECDSA P-256 (no Ed25519 in mbedTLS 3.6)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
+  <tr><td><code>crypto</code></td><td>stdlib</td><td>Secure random bytes, SHA-256/384/512, HMAC, HKDF, PBKDF2, constant-time compare, AES-256-GCM, ChaCha20-Poly1305, ECDSA P-256, RSA (0.22.0), keys from JWK parts (no Ed25519 in mbedTLS 3.6)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td>Passwords</td><td>stdlib</td><td>Argon2id and bcrypt hash and verify, in <code>crypto</code></td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td>base64, hex</td><td>stdlib</td><td>Standard and URL-safe encodings (<code>encoding.base64</code>, <code>encoding.hex</code>)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td><code>uuid</code></td><td>stdlib</td><td>v4 and v7 (time-ordered, good primary keys)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
@@ -98,7 +98,7 @@ files), <code>coro</code>, <code>json</code>, <code>yaml</code>, <code>csv</code
   <tr><td><code>flag</code></td><td>stdlib</td><td>Command-line flags and subcommands</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td><code>config</code></td><td>stdlib</td><td>Environment variables and <code>.env</code> into a struct (<code>@env</code>, <code>@required</code>)</td><td><span class="tag done">done</span> rc/0.20.0</td></tr>
   <tr><td>ktm-pg</td><td>package</td><td>PostgreSQL client, written in ktm (no libpq): pool, pipelining, TLS, LISTEN/NOTIFY, COPY, arrays, fuzzed, a 1-hour soak test clean</td><td><span class="tag done">done</span> v0.1.0</td></tr>
-  <tr><td>ktm-jwt</td><td>package</td><td>Sign and verify JWTs (HS256, RS256, ES256, EdDSA), JWKS</td><td><span class="tag">planned</span></td></tr>
+  <tr><td><a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a></td><td>package</td><td>Sign and verify JWTs (HS256/384/512, ES256, RS256/384/512), claims checks, JWK Sets from text or a URL; EdDSA in 0.2.0</td><td><span class="tag done">done</span> v0.1.0</td></tr>
   <tr><td>Validation</td><td>stdlib</td><td>Struct attributes (<code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code>, <code>@oneOf</code>, <code>@required</code>) with readable errors; <code>http.decodeValid</code> answers 422</td><td><span class="tag done">done</span> rc/0.21.0</td></tr>
   <tr><td>Migrations</td><td>package</td><td>SQL migrations (up and down, a versions table) for PostgreSQL and SQLite</td><td><span class="tag done">done</span> ktm-migrate v0.1.0</td></tr>
 </table></div>
