@@ -59,6 +59,26 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2 id="v0-23-0-2026-10-15">v0.23.0 <small>(2026-10-15)</small><a class="anchor" href="#v0-23-0-2026-10-15" aria-label="Link to this section">#</a></h2>
+<p>The cryptography that signed and encrypted tokens need, and new versions of two packages.</p>
+<ul>
+  <li><code>crypto</code>: Ed25519 keys (<code>generateKey(KeyKind.ed25519)</code>, PEM, <code>ed25519PublicKey</code>;
+  from <a href="https://monocypher.org">Monocypher</a> 4.0.2); P-384 and P-521 keys (<code>KeyKind.ec384</code>,
+  <code>ec521</code>, <code>Key.ecPoint</code>); RSA-PSS (<code>Key.signPss</code>, <code>verifyPss</code>); and the
+  building blocks of encrypted tokens: AES-128/192-GCM, AES-CBC, AES key wrap, RSA-OAEP
+  (<code>Key.encryptOaep</code>, <code>decryptOaep</code>) and ECDH (<code>Key.ecdh</code>). See
+  <a href="lib-crypto.html">Cryptography</a>.</li>
+  <li>A function can have 256 <code>try</code> blocks and <code>defer</code>s (each <code>ad</code> variable is one)
+  in scope at once, not 32, and going past that says where.</li>
+  <li><a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0: EdDSA, ES384/ES512 and PS256/384/512 tokens;
+  encrypted tokens (JWE: <code>dir</code>, AES key wrap, RSA-OAEP-256 and ECDH-ES with AES-GCM or AES-CBC-HMAC),
+  signed tokens inside encrypted ones; <code>crit</code> headers.</li>
+  <li><a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.2.0: <code>pg.queryResult&lt;T&gt;</code> keeps a big
+  result's text in a few blocks freed at once (about 20% faster than <code>queryAll</code>), and
+  <code>c.copyInto&lt;T&gt;(table)</code> copies structs into a table in PostgreSQL's binary format (2.5x faster than
+  text rows).</li>
+</ul>
+
 <h2 id="v0-22-0-2026-10-15">v0.22.0 <small>(2026-10-15)</small><a class="anchor" href="#v0-22-0-2026-10-15" aria-label="Link to this section">#</a></h2>
 <p>Conditions without parentheses, thread-local globals, crash reports that follow packages and inlined calls,
 JWTs, and packages compiled once.</p>
@@ -1493,7 +1513,7 @@ only names are new.</p>
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-22-0-2026-10-15">v0.22.0 (2026-10-15)</a></li><li><a href="#v0-21-0-2026-10-14">v0.21.0 (2026-10-14)</a></li><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#v0-23-0-2026-10-15">v0.23.0 (2026-10-15)</a></li><li><a href="#v0-22-0-2026-10-15">v0.22.0 (2026-10-15)</a></li><li><a href="#v0-21-0-2026-10-14">v0.21.0 (2026-10-14)</a></li><li><a href="#v0-20-1-2026-10-14">v0.20.1 (2026-10-14)</a></li><li><a href="#v0-20-0-2026-10-14">v0.20.0 (2026-10-14)</a></li><li><a href="#v0-19-0-2026-10-14">v0.19.0 (2026-10-14)</a></li><li><a href="#v0-18-0-2026-10-14">v0.18.0 (2026-10-14)</a></li><li><a href="#v0-17-2-2026-10-13">v0.17.2 (2026-10-13)</a></li><li><a href="#v0-17-1-2026-10-13">v0.17.1 (2026-10-13)</a></li><li><a href="#v0-17-0-2026-10-13">v0.17.0 (2026-10-13)</a></li><li><a href="#v0-16-0-2026-10-13">v0.16.0 (2026-10-13)</a></li><li><a href="#v0-15-2-2026-10-13">v0.15.2 (2026-10-13)</a></li><li><a href="#v0-15-1-2026-10-13">v0.15.1 (2026-10-13)</a></li><li><a href="#v0-15-0-2026-10-13">v0.15.0 (2026-10-13)</a></li><li><a href="#v0-14-0-2026-10-13">v0.14.0 (2026-10-13)</a></li><li><a href="#v0-13-3-2026-10-13">v0.13.3 (2026-10-13)</a></li><li><a href="#v0-13-2-2026-10-13">v0.13.2 (2026-10-13)</a></li><li><a href="#v0-13-1-2026-10-13">v0.13.1 (2026-10-13)</a></li><li><a href="#v0-13-0-2026-10-13">v0.13.0 (2026-10-13)</a></li><li><a href="#v0-12-0-2026-10-12">v0.12.0 (2026-10-12)</a></li><li><a href="#v0-11-0-2026-10-12">v0.11.0 (2026-10-12)</a></li><li><a href="#v0-10-1-2026-10-12">v0.10.1 (2026-10-12)</a></li><li><a href="#v0-10-0-2026-10-12">v0.10.0 (2026-10-12)</a></li><li><a href="#v0-9-0-2026-10-12">v0.9.0 (2026-10-12)</a></li><li><a href="#v0-8-0-2026-10-12">v0.8.0 (2026-10-12)</a></li><li><a href="#v0-7-0-2026-10-12">v0.7.0 (2026-10-12)</a></li><li><a href="#v0-6-0-2026-10-12">v0.6.0 (2026-10-12)</a></li><li><a href="#v0-5-1-2026-10-12">v0.5.1 (2026-10-12)</a></li><li><a href="#v0-5-0-2026-10-12">v0.5.0 (2026-10-12)</a></li><li><a href="#v0-4-0-2026-10-12">v0.4.0 (2026-10-12)</a></li><li><a href="#v0-3-1-2026-10-12">v0.3.1 (2026-10-12)</a></li><li><a href="#v0-3-0-2026-10-11">v0.3.0 (2026-10-11)</a></li><li><a href="#v0-2-1-2026-10-11">v0.2.1 (2026-10-11)</a></li><li><a href="#v0-2-0-2026-10-11">v0.2.0 (2026-10-11)</a></li><li><a href="#v0-1-0-2026-10-10">v0.1.0 (2026-10-10)</a></li></ul></nav>
 </div>
 </body>
 </html>
