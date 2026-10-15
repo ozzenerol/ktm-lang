@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "aostr.h"
+#include "cli.h"
 #include "pkg.h"
 #include "version.h"
 
@@ -1485,7 +1486,7 @@ static int pkgBuildOrRun(int run, int argc, char **argv, int *new_argc, char ***
     /* compiler flags first (-o takes a value), then the directory */
     int nflags = 0;
     while (nflags < argc && argv[nflags][0] == '-') {
-        if ((!strcmp(argv[nflags], "-o") || !strcmp(argv[nflags], "-lib")) && nflags + 1 < argc) nflags++;
+        if (cliOptionTakesValue(argv[nflags]) && nflags + 1 < argc) nflags++;
         nflags++;
     }
     int at = nflags;
@@ -1545,8 +1546,56 @@ static int pkgBuildOrRun(int run, int argc, char **argv, int *new_argc, char ***
     return -2;
 }
 
+static int pkgIsCommand(const char *s) {
+    return !strcmp(s, "build") || !strcmp(s, "run") || !strcmp(s, "mod") ||
+           !strcmp(s, "get") || !strcmp(s, "test");
+}
+
+/* `ktm --install-dir=X mod init`: options before the command. They move
+ * after it: build, run and test take the compiler's options there; mod
+ * and get take none, and only --install-dir (which they don't need) is
+ * let through, dropped. NULL when argv has no options before a command;
+ * an error message in *err when one can't be used. */
+static char **pkgOptionsFirst(int argc, char **argv, int *new_argc, char **err) {
+    int k = 1;
+    while (k < argc && argv[k][0] == '-' && strcmp(argv[k], "--")) {
+        k += cliOptionTakesValue(argv[k]) && k + 1 < argc ? 2 : 1;
+    }
+    if (k == 1 || k >= argc || !pkgIsCommand(argv[k])) return NULL;
+    int bare = !strcmp(argv[k], "mod") || !strcmp(argv[k], "get");
+    char **out = calloc(argc + 1, sizeof(char *));
+    int n = 0;
+    out[n++] = argv[0];
+    out[n++] = argv[k];
+    for (int i = 1; i < k; ++i) {
+        int with_value = cliOptionTakesValue(argv[i]) && i + 1 < k;
+        if (bare) {
+            if (strcmp(argv[i], "--install-dir") && strncmp(argv[i], "--install-dir=", 14)) {
+                *err = mprintf("`ktm %s` doesn't take %s", argv[k], argv[i]);
+                return NULL;
+            }
+        } else {
+            out[n++] = argv[i];
+            if (with_value) out[n++] = argv[i + 1];
+        }
+        if (with_value) i++;
+    }
+    for (int i = k + 1; i < argc; ++i) out[n++] = argv[i];
+    out[n] = NULL;
+    *new_argc = n;
+    return out;
+}
+
 int pkgMain(int argc, char **argv, int *new_argc, char ***new_argv) {
     if (argc < 2) return -1;
+    char *err = NULL;
+    int moved_argc = 0;
+    char **moved = pkgOptionsFirst(argc, argv, &moved_argc, &err);
+    if (err) return pkgFail("%s", err);
+    if (moved) {
+        argc = moved_argc;
+        argv = moved;
+    }
     if (!strcmp(argv[1], "build")) return pkgBuildOrRun(0, argc - 2, argv + 2, new_argc, new_argv);
     if (!strcmp(argv[1], "run")) return pkgBuildOrRun(1, argc - 2, argv + 2, new_argc, new_argv);
     if (!strcmp(argv[1], "mod")) return pkgModCommand(argc - 2, argv + 2);
