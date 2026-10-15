@@ -616,8 +616,8 @@ has no `free()` that takes no arguments
   with it.
 - `scoped` goes on a local variable, not a field. It isn't a reserved word: a variable can be
   called `scoped`.
-- Before v0.24.0 it was spelled `ad`. `ad` still works, with a warning that says to write
-  `scoped`; the files of a package in the module cache get no warning.
+- Until v0.24.0 it was spelled `ad`. Since v0.25.0 `ad` is an ordinary name, and in front of a
+  declaration an error that says to write `scoped`.
 
 ## Rules
 

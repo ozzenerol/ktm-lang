@@ -6,8 +6,8 @@ import cstr, fs, libc, mem, proc, str, test;
  * scope frees it (falling off, return, break, a throw). Returning an `ad`
  * variable, a type with no free(), and a struct without a value are
  * errors. `ad` stays an ordinary name elsewhere.
- * v0.24.0: the keyword is spelled `scoped` (`ad` still works, with a
- * warning: test 895). */
+ * v0.24.0: the keyword is spelled `scoped`; v0.25.0 removed `ad` (test
+ * 895). */
 
 #define AD_SRC "./ktm-580-ad.ktm"
 #define AD_OUT "./ktm-580-ad.out"

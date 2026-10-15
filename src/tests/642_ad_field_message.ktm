@@ -4,8 +4,8 @@ import cstr, fs, libc, mem, proc, test;
  * It now says ad goes on a local variable, and every struct/union body
  * error names a struct or a union, not a class (v0.13.3). A field that is
  * itself named ad still compiles.
- * v0.24.0: the keyword is spelled `scoped` (`ad` still works, with a
- * warning: test 895). */
+ * v0.24.0: the keyword is spelled `scoped`; v0.25.0 removed `ad` (test
+ * 895). */
 
 #define AD_FILE "__642_ad_field.ktm"
 #define AD_OUT  "__642_ad_field.out"
