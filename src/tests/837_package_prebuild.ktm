@@ -5,7 +5,9 @@ import cstr, fs, libc, mem, proc, str, test;
  * program uses package a, which uses package b; both have state in a
  * global, which must exist once (a's library doesn't hold a copy of b).
  * The key changes with -D; KTM_PREBUILD=0 and the JIT build from source;
- * a cache where nothing can be written falls back to source. */
+ * a cache where nothing can be written falls back to source. b's generics,
+ * made in the program, call b's static method and function (v0.23.1: they
+ * were left local to b's library, and the program didn't link). */
 
 #define DIR "./ktm-837"
 #define KTM "$(command -v timeout >/dev/null 2>&1 && echo timeout 120) \"$K\" ${KTM_INSTALL_DIR:+--install-dir=$KTM_INSTALL_DIR} "
@@ -35,7 +37,7 @@ i64 prebuilt() {
     return n;
 }
 
-#define WANT "a=1 b=2 b.count=3"
+#define WANT "a=1 b=2 b.count=3 gen=11,15"
 
 i32 main() {
     printf("Test - package prebuild: ");
@@ -46,7 +48,14 @@ i32 main() {
         "module b;\n"
         "i64 gCount = 0;\n"
         "pub i64 bump() { gCount++; return gCount; }\n"
-        "pub i64 count() { return gCount; }\n");
+        "pub i64 count() { return gCount; }\n"
+        /* generics the program instantiates, calling b's static (local)
+         * method and function: they must be in b's library all the same */
+        "pub struct Box { i64 v; };\n"
+        "static i64 Box.twice() { return self.v * 2; }\n"
+        "static i64 plus(u8[] *s, u8[] x) { return s.len + x.len; }\n"
+        "pub i64 viaGen<T>(Box *bx, T x) { return bx.twice() + (i64)x; }\n"
+        "pub i64 Box.via<T>(T x) { u8[] s = \"c\"; return plus(&s, \"ab\") + self.twice() + (i64)x; }\n");
     put(DIR "/cache/example.com/a@v1.0.0/ktm.mod",
         "module example.com/a\nrequire example.com/b v1.0.0\n");
     put(DIR "/cache/example.com/a@v1.0.0/a.ktm",
@@ -64,7 +73,9 @@ i32 main() {
         "    i64 x = a.viaB();\n"
         "    i64 y = b.bump();\n"
         "    b.bump();\n"
-        "    printf(\"a=%d b=%d b.count=%d\\n\", x, y, b.count());\n"
+        "    b.Box bx;\n"
+        "    bx.v = 5;\n"
+        "    printf(\"a=%d b=%d b.count=%d gen=%d,%d\\n\", x, y, b.count(), b.viaGen<i64>(&bx, 1), bx.via<i64>(2));\n"
         "    return 0;\n"
         "}\n");
 
