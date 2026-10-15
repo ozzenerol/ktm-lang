@@ -214,9 +214,11 @@ void main()
 /api/users/7: 200 user 7
 </pre>
 
-<p>Middleware hands a handler what it found with <code>r.set(key, ptr)</code> and <code>r.setInt(key, n)</code>; the
-handler reads them with <code>r.get(key)</code>, <code>r.getInt(key)</code> and <code>r.has(key)</code>. They last until
-the reply, and every request starts with none:</p>
+<p>Middleware hands a handler what it found with <code>r.set(key, ptr)</code>, <code>r.setInt(key, n)</code> and
+<code>r.setText(key, text)</code>; the handler reads them with <code>r.get(key)</code>, <code>r.getInt(key)</code>,
+<code>r.getText(key)</code> and <code>r.has(key)</code>. They last until the reply, and every request starts with none.
+<code>setText</code> keeps a copy, so the text can come from memory freed right after (a database row); with
+<code>set</code>, what the pointer points at must last as long as the request, which <code>r.alloc</code> gives:</p>
 <pre><code>
 bool auth(http.Writer *w, http.Request *r)
 {
