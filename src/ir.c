@@ -363,7 +363,7 @@ static IrValue *irFloatExtend(IrCtx *ctx, IrValue *v, IrValueType ty, int sz) {
  * pass's pure-value-producer list. */
 static int irRedirectLastDst(IrCtx *ctx, IrValue *val, IrValue *target) {
     if (!val || !target) return 0;
-    if (!irIsTmp(val)) return 0;
+    if (!irIsTmp(val) || (val->flags & IR_VAL_FLAG_SHARED)) return 0;
     if (!ctx->cur_block || listEmpty(ctx->cur_block->instructions)) return 0;
     for (List *node = ctx->cur_block->instructions->prev;
          node != ctx->cur_block->instructions;
@@ -1032,6 +1032,7 @@ static IrValue *irLowerInlineCall(IrCtx *ctx, Ast *call, Ast *callee) {
                     p->type->kind == AST_TYPE_FLOAT || p->type->kind == AST_TYPE_POINTER;
         int stable = vals[i]->kind != IR_VAL_TMP || !has_loop;
         if (plain && stable && !irInlineWrites(callee->body, p->lvar_id)) {
+            if (irIsTmp(vals[i])) vals[i]->flags |= IR_VAL_FLAG_SHARED;
             irFnAddVar(func, p->lvar_id, vals[i]);
             continue;
         }

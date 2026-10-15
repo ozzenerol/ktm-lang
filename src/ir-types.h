@@ -202,6 +202,10 @@ typedef struct IrVar {
 #define IR_VAL_FLAG_EXTERN 0x2
 /* A threadlocal global: its address is the calling thread's copy */
 #define IR_VAL_FLAG_TLS 0x4
+/* A tmp read more than once: an inlined call's parameter that is its
+ * argument's value. Its producer must keep writing it, so a store of it
+ * can't redirect the producer into the store's slot. */
+#define IR_VAL_FLAG_SHARED 0x8
 
 /* Where an IrValue physically lives after register allocation.
  * Filled in by the regalloc pass; consumed by codegen so it never
