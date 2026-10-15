@@ -226,7 +226,11 @@ static void __ktmUncaught(HCFs *fs) {
 static void ErrJump(HCFs *fs) {
     auto t = fs.catchTop;
     if (!t) { __ktmUncaught(fs); }
+#ifdef IS_MACOS
+    libc.__longjmp(t.jb, 1);
+#else
     libc._longjmp(t.jb, 1);
+#endif
 }
 
 /* `throw(code)`: the compiler passes where the throw is. */
