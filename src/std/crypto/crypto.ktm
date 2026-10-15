@@ -5,7 +5,7 @@ import coro, encoding.base64, mem, str;
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
  * libktmtls, as net.tls is): secure random bytes, SHA-256/384/512, HMAC,
  * HKDF and PBKDF2, a constant-time compare, authenticated encryption
- * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256, RSA and Ed25519 signatures, and
+ * (AES-256-GCM, ChaCha20-Poly1305), ECDSA (P-256, P-384, P-521), RSA and Ed25519 signatures, and
  * password hashing (Argon2id, bcrypt; ktm's own C, beside mbedTLS).
  *
  *   u8 key[32];
@@ -46,10 +46,13 @@ pub enum Hash {
 pub enum KeyKind {
     ec256,              /* ECDSA P-256 (JWT's ES256) */
     rsa,                /* RSA, 2048 bits or more, PKCS#1 v1.5 (JWT's RS256) */
-    ed25519             /* Ed25519 (RFC 8032; JWT's EdDSA), Monocypher's */
+    ed25519,            /* Ed25519 (RFC 8032; JWT's EdDSA), Monocypher's */
+    ec384,              /* ECDSA P-384 (JWT's ES384) */
+    ec521               /* ECDSA P-521 (JWT's ES512) */
 };
 
-/* A signing key, private or public: ECDSA P-256, RSA or Ed25519 */
+/* A signing key, private or public: ECDSA (P-256, P-384, P-521), RSA or
+ * Ed25519 */
 pub struct Key {
     private void *native;
     private bool priv;
@@ -76,6 +79,8 @@ extern "c" void *ktm_crypto_rsa_generate(i32 bits, i32 *err);
 extern "c" void *ktm_crypto_ec_public(u8 *x, u64 xlen, u8 *y, u64 ylen, i32 *err);
 extern "c" void *ktm_crypto_rsa_public(u8 *n, u64 nlen, u8 *e, u64 elen, i32 *err);
 extern "c" i32 ktm_crypto_key_kind(void *key);
+extern "c" void *ktm_crypto_ec_generate(i32 bits, i32 *err);
+extern "c" i32 ktm_crypto_ec_point(void *key, u8 *x, u8 *y, u64 *n);
 extern "c" void *ktm_crypto_ed25519_generate(i32 *err);
 extern "c" void *ktm_crypto_ed25519_public(u8 *x, u64 len, i32 *err);
 extern "c" i32 ktm_crypto_ed25519_sign(void *key, u8 *data, u64 len, u8 *sig);
@@ -235,8 +240,8 @@ static Key *keyOf(void *native, bool priv) {
     return k;
 }
 
-/* A new random private key: P-256 (the default) or Ed25519 (an RSA key
- * is generateRsaKey's) */
+/* A new random private key: P-256 (the default), P-384, P-521 or
+ * Ed25519 (an RSA key is generateRsaKey's) */
 pub Key *generateKey(KeyKind kind = KeyKind.ec256) {
     i32 err = 0;
     void *n = null;
@@ -244,8 +249,12 @@ pub Key *generateKey(KeyKind kind = KeyKind.ec256) {
         n = ktm_crypto_ed25519_generate(&err);
     } else if (kind == KeyKind.ec256) {
         n = ktm_crypto_key_generate(&err);
+    } else if (kind == KeyKind.ec384) {
+        n = ktm_crypto_ec_generate(384, &err);
+    } else if (kind == KeyKind.ec521) {
+        n = ktm_crypto_ec_generate(521, &err);
     } else {
-        throw(ERR_CRYPTO, "crypto: generateKey makes P-256 and Ed25519 keys: RSA's is generateRsaKey");
+        throw(ERR_CRYPTO, "crypto: generateKey makes EC and Ed25519 keys: RSA's is generateRsaKey");
     }
     if (!n) { fail("making a key", err); }
     return keyOf(n, true);
@@ -263,31 +272,32 @@ pub Key *generateRsaKey(i64 bits = 2048) {
     return keyOf(n, true);
 }
 
-/* A private key from PEM: P-256 ("-----BEGIN EC PRIVATE KEY-----" or
- * PKCS#8), RSA of 2048 bits or more ("-----BEGIN RSA PRIVATE KEY-----"
+/* A private key from PEM: P-256, P-384 or P-521 ("-----BEGIN EC PRIVATE
+ * KEY-----" or PKCS#8), RSA of 2048 bits or more ("-----BEGIN RSA PRIVATE KEY-----"
  * or PKCS#8) or Ed25519 (PKCS#8, exactly as RFC 8410 has it) */
 pub Key *privateKey(u8[] pem) {
     i32 err = 0;
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 1, &err);
-    if (!n) { fail("reading the private key (P-256, RSA of 2048 bits or more, or Ed25519)", err); }
+    if (!n) { fail("reading the private key (P-256/384/521, RSA of 2048 bits or more, or Ed25519)", err); }
     return keyOf(n, true);
 }
 
-/* A public key from PEM ("-----BEGIN PUBLIC KEY-----"): P-256, RSA or
- * Ed25519 */
+/* A public key from PEM ("-----BEGIN PUBLIC KEY-----"): P-256/384/521,
+ * RSA or Ed25519 */
 pub Key *publicKey(u8[] pem) {
     i32 err = 0;
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 0, &err);
-    if (!n) { fail("reading the public key (P-256, RSA of 2048 bits or more, or Ed25519)", err); }
+    if (!n) { fail("reading the public key (P-256/384/521, RSA of 2048 bits or more, or Ed25519)", err); }
     return keyOf(n, false);
 }
 
-/* A public P-256 key from its point: x and y, 32 bytes each, big-endian
- * (a JWK's "x" and "y", base64url-decoded) */
+/* A public EC key from its point: x and y, big-endian (a JWK's "x" and
+ * "y", base64url-decoded), 32 bytes each for P-256, 48 for P-384, 66
+ * for P-521 */
 pub Key *ecPublicKey(u8[] x, u8[] y) {
     i32 err = 0;
     void *n = ktm_crypto_ec_public(x.ptr, x.len, y.ptr, y.len, &err);
-    if (!n) { fail("making a P-256 key from x and y (32 bytes each, a point on the curve)", err); }
+    if (!n) { fail("making an EC key from x and y (32, 48 or 66 bytes each, a point on the curve)", err); }
     return keyOf(n, false);
 }
 
@@ -327,14 +337,28 @@ pub String Key.publicPem() {
     return pemOf(self, false);
 }
 
-/* What the key is: KeyKind.ec256, KeyKind.rsa or KeyKind.ed25519 */
+/* What the key is: KeyKind.ec256, ec384, ec521, rsa or ed25519 */
 pub KeyKind Key.kind() {
     return (KeyKind)ktm_crypto_key_kind(self.native);
 }
 
-/* Its size in bits: 256 for P-256 and Ed25519, the modulus's for RSA */
+/* Its size in bits: the curve's (256, 384, 521; 256 for Ed25519), the
+ * modulus's for RSA */
 pub i64 Key.bits() {
     return ktm_crypto_key_bits(self.native);
+}
+
+/* An EC key's public point into *x and *y (replaced: big-endian, 32,
+ * 48 or 66 bytes each, as a JWK's "x" and "y"); false for another kind */
+pub bool Key.ecPoint(String *x, String *y) {
+    u8 bx[66], by[66];
+    u64 n = 0;
+    if (ktm_crypto_ec_point(self.native, bx, by, &n) != 0) { return false; }
+    x.clear();
+    x.append(bx[0:n]);
+    y.clear();
+    y.append(by[0:n]);
+    return true;
 }
 
 static i32 hashBits(Hash h) {
@@ -343,9 +367,10 @@ static i32 hashBits(Hash h) {
     return 256;
 }
 
-/* The signature of data's h digest, a new String (yours): for P-256 the
- * 64 bytes r||s, as JWT's ES256 has it, deterministic (RFC 6979); for
- * RSA PKCS#1 v1.5, the key's size in bytes (JWT's RS256, RS384, RS512) */
+/* The signature of data's h digest, a new String (yours): for an EC key
+ * r||s, 64, 96 or 132 bytes (P-256, P-384, P-521), as JWT's ES256,
+ * ES384, ES512 have it, deterministic (RFC 6979); for RSA PKCS#1 v1.5,
+ * the key's size in bytes (JWT's RS256, RS384, RS512) */
 pub String Key.signWith(Hash h, u8[] data) {
     if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
     if (self.kind() == KeyKind.ed25519) { throw(ERR_CRYPTO, "crypto: Ed25519 hashes itself: use sign"); }
@@ -356,8 +381,8 @@ pub String Key.signWith(Hash h, u8[] data) {
     return str.from(sig[0:n]);
 }
 
-/* Is sig this key's signature of data's h digest? (P-256: 64-byte r||s,
- * or DER; RSA: PKCS#1 v1.5) */
+/* Is sig this key's signature of data's h digest? (EC: r||s, or DER;
+ * RSA: PKCS#1 v1.5) */
 pub bool Key.verifyWith(Hash h, u8[] data, u8[] sig) {
     if (self.kind() == KeyKind.ed25519) { throw(ERR_CRYPTO, "crypto: Ed25519 hashes itself: use verify"); }
     return ktm_crypto_verify_with(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;

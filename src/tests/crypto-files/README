@@ -11,3 +11,6 @@ random bytes) and ed-sig.hex (openssl's signature of them); ed-key-truncated.pem
 and ed-key-trailing.pem must be refused. (ed25519-key.pem reads since 0.23.0, so
 test 845's "a kind of key Key doesn't take" is k256-key.pem, a secp256k1
 key, now.)
+For test 861 (P-384, P-521): p384-key.pem, p521-key.pem and their public PEMs
+(openssl), their points (p384-x.hex ...), and openssl's signatures of msg.txt
+(SHA-384 for P-384, SHA-512 for P-521) as DER and as raw r||s.
