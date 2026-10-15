@@ -166,7 +166,8 @@ Floating point exception
 What the program printed before the crash comes first. The arm64 processor doesn't trap a
 division by zero by itself, so there the compiler tests a divisor that can be zero before dividing:
 the crash, its report and the exit status (136, a SIGFPE) are the same on every platform. Check a
-divisor that can be zero before dividing when the program should go on.
+divisor that can be zero before dividing when the program should go on. The smallest `i64` divided
+by -1 crashes the same way, with `crash: integer overflow in division (-9223372036854775808 / -1)`.
 
 A recursion that never ends overflows the stack, and shows once, with how many times it
 repeated:

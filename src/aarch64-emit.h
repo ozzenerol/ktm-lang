@@ -30,6 +30,9 @@
  * with this immediate, which the crash handler (rt/crash) reports as an
  * integer division by zero and turns into a SIGFPE, as on x86_64 */
 #define A64_BRK_DIVZERO 0xd10
+/* The same for the smallest i64 divided by -1 (signed), whose quotient
+ * doesn't fit: x86_64's IDIV traps, SDIV gives the dividend */
+#define A64_BRK_DIVOVF 0xd11
 
 typedef struct {
     void *be;  /* backend context: IrCgCtx* (AOT) or JitFnCtx* (JIT) */
@@ -494,7 +497,8 @@ typedef struct {
     int  (*alu_imm)(void *be, IrOp op, s64 imm); /* try `op x0,x0,#imm`; 1 if done */
     void (*alu_reg)(void *be, IrOp op, IrInstr *instr); /* op x0,x0,<r2> */
     void (*mul)(void *be);                       /* mul x0,x0,x1 */
-    void (*divrem)(void *be, IrOp op, int check);/* [x1 == 0 test,] sdiv/udiv [+ msub] */
+    /* [x1 == 0 test,] [overflow test,] sdiv/udiv [+ msub] */
+    void (*divrem)(void *be, IrOp op, int check_zero, int check_ovf);
     void (*unary)(void *be, IrOp op);            /* neg / mvn x0,x0 */
     void (*shift_imm)(void *be, IrOp op, int sh);
     void (*shift_reg)(void *be, IrOp op, IrInstr *instr);
@@ -522,13 +526,17 @@ static inline void a64EmitArith(A64ArithEmitter *e, IrInstr *instr) {
         e->load_gp(be, instr); e->load_x1(be, instr);
         e->mul(be); e->spill_gp(be, instr);
         break;
-    case IR_IDIV: case IR_UDIV: case IR_IREM: case IR_UREM:
+    case IR_IDIV: case IR_UDIV: case IR_IREM: case IR_UREM: {
+        /* a constant divisor needs no test, unless it is 0, or -1 in a
+         * signed division */
+        int is_const = instr->r2 && instr->r2->kind == IR_VAL_CONST_INT;
+        s64 d = is_const ? instr->r2->as._i64 : 0;
         e->load_gp(be, instr); e->load_x1(be, instr);
-        /* a constant divisor other than 0 needs no test */
-        e->divrem(be, op, !(instr->r2 && instr->r2->kind == IR_VAL_CONST_INT &&
-                            instr->r2->as._i64 != 0));
+        e->divrem(be, op, !is_const || d == 0,
+                  (op == IR_IDIV || op == IR_IREM) && (!is_const || d == -1));
         e->spill_gp(be, instr);
         break;
+    }
     case IR_INEG: case IR_NOT:
         e->load_gp(be, instr); e->unary(be, op); e->spill_gp(be, instr);
         break;

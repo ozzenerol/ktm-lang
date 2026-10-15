@@ -134,7 +134,7 @@ crash: integer division by zero
   at avg.ktm:2 in average (inlined)
   called from avg.ktm:8 in main
 Floating point exception</code></pre>
-<p>What the program printed before the crash comes first. The arm64 processor doesn't trap a division by zero by itself, so there the compiler tests a divisor that can be zero before dividing: the crash, its report and the exit status (136, a SIGFPE) are the same on every platform. Check a divisor that can be zero before dividing when the program should go on.</p>
+<p>What the program printed before the crash comes first. The arm64 processor doesn't trap a division by zero by itself, so there the compiler tests a divisor that can be zero before dividing: the crash, its report and the exit status (136, a SIGFPE) are the same on every platform. Check a divisor that can be zero before dividing when the program should go on. The smallest <code>i64</code> divided by -1 crashes the same way, with <code>crash: integer overflow in division (-9223372036854775808 / -1)</code>.</p>
 <p>A recursion that never ends overflows the stack, and shows once, with how many times it repeated:</p>
 <pre class="code"><code><span class="t">i64</span> depth(<span class="t">i64</span> n) {
     <span class="t">i64</span> pad[<span class="n">64</span>];
