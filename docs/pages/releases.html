@@ -4,6 +4,20 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.23.1 <small>(2026-10-15)</small></h2>
+<p>Two fixes to prebuilt packages (v0.22.0), found building <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a>
+v0.2.0 and <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.0 from GitHub. With v0.22.0 or v0.23.0,
+<code>KTM_PREBUILD=0</code> (or <code>-jit</code>) avoids both.</p>
+<ul>
+  <li>A package whose generic code calls its own <code>static</code> functions or methods linked: they stayed local
+  to its library while the generic is made in the program (<code>pg.queryAll</code>, <code>copyInto</code> and
+  <code>queryResult</code> didn't build).</li>
+  <li>A library's own use of a generic on its types (<code>json.decode&lt;Header&gt;</code> inside
+  <code>jwt.header</code>) has its types' descriptions filled in: they were set up only when a program starts, which
+  a library's code never sees, so <code>jwt.header</code> failed for every token. The same for <code>ktm -lib</code>
+  of a module or a tree.</li>
+</ul>
+
 <h2>v0.23.0 <small>(2026-10-15)</small></h2>
 <p>The cryptography that signed and encrypted tokens need, and new versions of two packages.</p>
 <ul>
