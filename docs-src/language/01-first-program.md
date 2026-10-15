@@ -218,10 +218,12 @@ say \"hi\"\n
 Hi
 ```
 
-### Counting the values
+### Checking the values
 
-The compiler counts the conversions in a format and checks there is one value for each. A missing
-value is an error:
+The compiler checks a literal format against its values: one value for each conversion, of a type the
+conversion prints. A mistake is an error at compile time instead of garbage, or a crash, at run time.
+
+A missing value:
 
 ```ktm error
 void main() {
@@ -233,7 +235,7 @@ void main() {
 printf format expects 2 arguments but 1 was supplied
 ```
 
-So is one too many:
+One too many:
 
 ```ktm error
 void main() {
@@ -245,7 +247,33 @@ void main() {
 printf format expects 1 argument but 2 were supplied
 ```
 
-The types of the values aren't checked yet: give `%d` an integer, `%f` a float and `%s` text.
+A number where text goes:
+
+```ktm error
+void main() {
+    printf("%s\n", 42);
+}
+```
+
+```output
+`%s` in a `printf` format prints text (a u8 *, a u8[] or a String), not `i64`
+```
+
+An integer for a float conversion, which would print garbage:
+
+```ktm error
+void main() {
+    i64 total = 7;
+    printf("%.2f\n", total);
+}
+```
+
+```output
+`%f` in a `printf` format prints a float (an integer goes in as one with (f64)n), not `i64`
+```
+
+The same checks apply to `str.format`, `os.eprintf`, `log.info` and the other functions that take a
+format, and to `throw`'s message.
 
 ## Printing to stderr
 

@@ -55,7 +55,7 @@ i32 main() {
     check(out && libc.strstr(out, "error: a slice or a String passed to `printf` needs a literal format"),
           "a computed format");
     out = run("printf(\"%d\", s);");
-    check(out && libc.strstr(out, "error: a u8[] passed to `printf` is printed by a `%s` (a u8[] or a String only)"),
+    check(out && libc.strstr(out, "error: `%d` in a `printf` format prints an integer, not `u8[]`"),
           "another conversion");
     out = run("printf(\"%.2s\", s);");
     check(out && libc.strstr(out, "can't have a precision"), "a precision");

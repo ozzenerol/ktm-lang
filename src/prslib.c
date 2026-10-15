@@ -1822,6 +1822,104 @@ static void parseSliceParts(Cctrl *cc, Ast *expr, Ast **_len, Ast **_ptr,
     *_ptr = astClassRef(ptr_t, ptr_first ? assign : var, "ptr");
 }
 
+/* What a value given to a printf conversion is */
+enum { FMT_INT, FMT_FLOAT, FMT_PTR, FMT_TEXT, FMT_OTHER };
+
+static int parseFormatKind(AstType *t) {
+    if (!t) return FMT_OTHER;
+    if (astIsIntOrIntrinsic(t)) return FMT_INT;
+    if (astIsFloatType(t)) return FMT_FLOAT;
+    if (parseIsByteSlice(t)) return FMT_TEXT;
+    if ((t->kind == AST_TYPE_POINTER || t->kind == AST_TYPE_ARRAY) && t->ptr &&
+        t->ptr->size == 1 && (t->ptr->kind == AST_TYPE_CHAR || t->ptr->kind == AST_TYPE_INT)) {
+        return FMT_TEXT;
+    }
+    if (t->kind == AST_TYPE_POINTER || t->kind == AST_TYPE_ARRAY || t->kind == AST_TYPE_FUNC) {
+        return FMT_PTR;
+    }
+    return FMT_OTHER;
+}
+
+/* A literal format's conversions against the values after it, args[first..]
+ * (before parseLowerSliceFormat rewrites them): a value whose type its
+ * conversion can't print is an error at the value, where printf would
+ * print garbage or crash (`%s` of a number, `%d` of a float or a struct,
+ * `%f` of an integer). Integers of any size, enums and bools take any
+ * integer conversion; a pointer also goes to %u %x %X %o and %p; text is
+ * a u8 * or u8 array, a u8[] or a String, and a void * for %s. */
+static void parseFormatTypeCheck(Cctrl *cc, Ast *fmt, Vec *args, int first,
+                                 Vec *spans, char *fname, int len)
+{
+    if (!fmt || fmt->kind != AST_STRING || !fmt->sval) return;
+    char *text = fmt->sval->data;
+    int n = (int)fmt->sval->len, argi = first;
+    for (int i = 0; i < n; ++i) {
+        if (text[i] != '%') continue;
+        if (++i >= n) break;
+        if (text[i] == '%') continue;
+        while (i < n && strchr("-+ #0'", text[i])) i++;
+        /* a `*` width or precision takes an integer of its own */
+        for (int pass = 0; pass < 2; ++pass) {
+            if (i < n && text[i] == '*') {
+                Ast *w = argi < (int)args->size ? args->entries[argi] : NULL;
+                if (w && w->type && w->kind != AST_PLACEHOLDER && parseFormatKind(w->type) != FMT_INT) {
+                    ParseCallLoc *wat = spans && (int)spans->size > argi ? spans->entries[argi] : NULL;
+                    char *msg = "`*` in a `%.*s` format takes an integer, not `%s`";
+                    if (wat) cctrlRaiseExceptionAt(cc, wat->line, wat->col, wat->len, msg, len, fname, astTypeToString(w->type));
+                    cctrlRaiseException(cc, msg, len, fname, astTypeToString(w->type));
+                }
+                argi++;
+                i++;
+            }
+            while (i < n && isdigit((unsigned char)text[i])) i++;
+            if (pass == 0 && i < n && text[i] == '.') i++;
+            else break;
+        }
+        while (i < n && strchr("hlLqjzt", text[i])) i++;
+        if (i >= n) break;
+        char conv = text[i];
+        Ast *arg = argi < (int)args->size ? args->entries[argi] : NULL;
+        ParseCallLoc *at = spans && (int)spans->size > argi ? spans->entries[argi] : NULL;
+        argi++;
+        if (!arg || !arg->type || arg->kind == AST_PLACEHOLDER) continue;
+        int kind = parseFormatKind(arg->type);
+        int ok = 1;
+        const char *want = "";
+        switch (conv) {
+            case 'd': case 'i': case 'c': case 'C':
+                ok = kind == FMT_INT;
+                want = "an integer";
+                break;
+            case 'u': case 'x': case 'X': case 'o': case 'b':
+                ok = kind == FMT_INT || kind == FMT_PTR || kind == FMT_TEXT;
+                want = "an integer";
+                break;
+            case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A':
+                ok = kind == FMT_FLOAT;
+                want = "a float (an integer goes in as one with (f64)n)";
+                break;
+            case 's': case 'Q':
+                ok = kind == FMT_TEXT || (kind == FMT_PTR && arg->type->kind == AST_TYPE_POINTER &&
+                                          arg->type->ptr && arg->type->ptr->kind == AST_TYPE_VOID);
+                want = "text (a u8 *, a u8[] or a String)";
+                break;
+            case 'p':
+                ok = kind == FMT_PTR || kind == FMT_TEXT || kind == FMT_INT;
+                want = "a pointer";
+                break;
+            default:
+                break;   /* unknown conversions are reported elsewhere */
+        }
+        if (ok) continue;
+        char *msg = "`%%%c` in a `%.*s` format prints %s, not `%s`";
+        if (at) {
+            cctrlRaiseExceptionAt(cc, at->line, at->col, at->len, msg, conv, len, fname,
+                                  want, astTypeToString(arg->type));
+        }
+        cctrlRaiseException(cc, msg, conv, len, fname, want, astTypeToString(arg->type));
+    }
+}
+
 /* A call to a format function (printf, str.format, throw, ...): each
  * `u8[]` argument of a `%s` is passed as its length and pointer, the
  * `%s` becoming `%.*s`, since a slice has no NUL to stop at. The extras
@@ -2174,6 +2272,9 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
                 Ast *a = va_items->entries[i];
                 if (a && a->type && astTypeIsSlice(a->type)) only_strings = 0;
             }
+            if (literal) {
+                parseFormatTypeCheck(cc, fmt, va_items, 0, va_spans, fname, len);
+            }
             if (literal || !only_strings || !own_fmt) {
                 parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], va_items,
                                       0, va_spans, fname, len);
@@ -2189,6 +2290,7 @@ Vec *parseArgv(Cctrl *cc, Ast *decl, s64 terminator, char *fname, int len,
     }
 
     if (fmt_idx >= 0 && fmt_idx < (int)argv_vec->size) {
+        parseFormatTypeCheck(cc, argv_vec->entries[fmt_idx], argv_vec, fmt_idx + 1, spans, fname, len);
         parseLowerSliceFormat(cc, (Ast **)&argv_vec->entries[fmt_idx], argv_vec,
                               fmt_idx + 1, spans, fname, len);
     }
