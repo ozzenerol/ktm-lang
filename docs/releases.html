@@ -68,8 +68,8 @@ JWTs, and packages compiled once.</p>
   <code>for i64 i = 0; i &lt; n; i++ {</code>, plus <code>for cond {</code> and <code>for {</code>. With them works as
   before, and one program can mix both. See <a href="lang-control-flow.html">Control flow</a>.</li>
   <li><code>threadlocal</code> globals: <code>threadlocal i64 x;</code> is one variable per thread, one instruction to
-  reach in compiled code. The runtime uses it for its own per-thread state, so <code>try</code>, <code>defer</code> and
-  <code>coro.current()</code> no longer call into pthreads (2x faster). See <a href="lang-variables.html">Variables</a>.</li>
+  reach in compiled code. The runtime keeps its per-thread state in one, so it no longer calls into pthreads to find
+  it: <code>coro.current()</code> is 2x faster, a <code>try</code> about 15%. See <a href="lang-variables.html">Variables</a>.</li>
   <li><code>ad T x;</code> without a value: it starts empty and is freed at the end of its block (a pointer only if
   set). An <code>@json</code> or <code>@yaml</code> struct with no <code>free()</code> is freed with its
   <code>freeDecoded()</code>, so <code>ad User u = json.decode&lt;User&gt;(...)</code> works.</li>
