@@ -115,13 +115,16 @@ bool fine = ek.verify("payload", es);
   <li><code>sign</code> and <code>verify</code> are <code>signWith</code> and <code>verifyWith</code> with <code>crypto.Hash.sha256</code>:
   ES256 for a P-256 key, RS256 for an RSA one. For an Ed25519 key they are Ed25519 itself, and
   <code>signWith</code>/<code>verifyWith</code> throw.</li>
-  <li>A P-256 signature is 64 bytes r||s; an RSA one is the key's size (256 bytes for 2048 bits).</li>
+  <li>P-384 and P-521 keys (<code>crypto.generateKey(crypto.KeyKind.ec384)</code>, <code>ec521</code>, or from PEM) sign with
+  <code>signWith</code>, usually over <code>Hash.sha384</code> and <code>Hash.sha512</code> (JWT's ES384, ES512).</li>
+  <li>An EC signature is r||s: 64 bytes for P-256, 96 for P-384, 132 for P-521; an RSA one is the key's size
+  (256 bytes for 2048 bits). <code>verifyWith</code> also takes the DER form.</li>
   <li>A public key also comes from its parts, as a JWK has them (base64url-decoded):
-  <code>crypto.ecPublicKey(x, y)</code> (32 bytes each), <code>crypto.rsaPublicKey(n, e)</code> (big-endian) and
-  <code>crypto.ed25519PublicKey(x)</code> (32 bytes).</li>
+  <code>crypto.ecPublicKey(x, y)</code> (32, 48 or 66 bytes each: the curve follows), <code>crypto.rsaPublicKey(n, e)</code>
+  (big-endian) and <code>crypto.ed25519PublicKey(x)</code> (32 bytes). <code>k.ecPoint(&amp;x, &amp;y)</code> gives an EC key's back.</li>
   <li>Keys are readable and writable as PEM, so they work with OpenSSL and other languages; an Ed25519 key is read
   only in the exact form RFC 8410 gives (PKCS#8, or SubjectPublicKeyInfo). Other kinds of key
-  (P-384, secp256k1, RSA under 2048 bits) are refused.</li>
+  (secp256k1, P-224, RSA under 2048 bits) are refused.</li>
   <li>Ed25519 is <a href="https://monocypher.org">Monocypher</a>'s (mbedTLS 3.6 has none), inside ktm as mbedTLS is.</li>
 </ul>
 
