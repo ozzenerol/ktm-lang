@@ -60,6 +60,9 @@ from its environment: variables and a <code>.env</code> file for development, fl
 them.</p>
 
 <h2 id="settings">Settings<a class="anchor" href="#settings" aria-label="Link to this section">#</a></h2>
+<p>Four more modules come in at the top of <code>main.ktm</code>:</p>
+<pre><code>import config, date, flag, json, log, net.http, os, reflect, str, uuid, vec;</code></pre>
+<p>and the settings go after the structs:</p>
 <pre><code>/* Settings: SHELF_PORT, SHELF_ACCESS_LOG, SHELF_MAX_BOOKMARKS from the
  * environment or .env, flags over them */
 struct Settings {
@@ -72,12 +75,31 @@ Settings gSettings;</code></pre>
 <p>The settings are a struct, with the same rules as a request. Each field's variable is the prefix and its name in
 capitals: <code>maxBookmarks</code> with <code>"SHELF_"</code> is <code>SHELF_MAX_BOOKMARKS</code>
 (<code>@env("NAME")</code> picks another). <code>maxBookmarks</code> is new: <code>create</code> answers 507 once
-that many are saved.</p>
+that many are saved:</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    if (gBookmarks.len &gt;= gSettings.maxBookmarks) {
+        w.error(507, "the shelf is full");
+        return;
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}</code></pre>
 
-<h2 id="main-ktm">main.ktm<a class="anchor" href="#main-ktm" aria-label="Link to this section">#</a></h2>
-<pre><code>import config, date, flag, json, log, net.http, os, reflect, str, uuid, vec;
-
-i32 main(i32 argc, u8 **argv)
+<h2 id="main">main<a class="anchor" href="#main" aria-label="Link to this section">#</a></h2>
+<pre><code>i32 main(i32 argc, u8 **argv)
 {
     /* defaults, then .env and the environment, then the command line */
     gSettings.port = 8080;
@@ -158,7 +180,7 @@ $ SHELF_MAX_BOOKMARKS=0 ktm run .
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#settings">Settings</a></li><li><a href="#main-ktm">main.ktm</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#settings">Settings</a></li><li><a href="#main">main</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
 </div>
 </body>
 </html>

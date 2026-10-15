@@ -23,13 +23,54 @@ ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</cod
   <li>Never edit a migration that has run somewhere: add a new one.</li>
 </ul>
 
-<h2>main.ktm</h2>
+<h2>Notes, in the code</h2>
+<p>The new column goes in <code>Bookmark</code>, in <code>NewBookmark</code> (at most 2000 bytes), in
+<code>COLUMNS</code> and in the <code>INSERT</code>: a migration and the code that uses it go in one commit.</p>
+<pre><code>@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""</code></pre>
+<p>In <code>create</code>, the <code>INSERT</code> takes the notes as a fourth parameter:</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4) RETURNING " COLUMNS,
+                                  id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(201, reflect.of(b));
+}</code></pre>
+
+<h2>main</h2>
+<p>The two packages are imported by their paths; their names in the code are <code>migrate</code> and
+<code>postgres</code>. <code>fs</code> isn't needed any more (nothing reads <code>schema.sql</code>), and
+<code>str</code> is, for <code>runMigrate</code> below:</p>
 <pre><code>import "github.com/ozzenerol/ktm-pg";
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/postgres";
-import config, flag, json, log, net.http, os, reflect, str, uuid, vec;
-
-i32 main(i32 argc, u8 **argv)
+import config, flag, json, log, net.http, os, reflect, str, uuid, vec;</code></pre>
+<pre><code>i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");
@@ -111,6 +152,4 @@ $ ./shelf
 
 $ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm", "notes": "read the guide"}'
 {"id":"01a13b0b-acf0-7000-b963-567833f2b799","url":"https://ktm-lang.org","title":"ktm","notes":"read the guide","createdAt":"2026-10-14T15:33:03Z"}</code></pre>
-<p>The new field is in <code>Bookmark</code>, <code>NewBookmark</code> (with <code>@max(2000)</code>), the
-<code>COLUMNS</code> list and the <code>INSERT</code>: a migration and the code that uses it go in one commit.</p>
 <p>Next: <a href="guide-http-07-search.html">Tags, search and pages</a>.</p>

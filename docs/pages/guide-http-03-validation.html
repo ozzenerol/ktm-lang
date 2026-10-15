@@ -4,7 +4,7 @@
 request's fields fix the first two, and a check in the handler the third.</p>
 
 <h2>Rules on fields</h2>
-<p>Only <code>NewBookmark</code> and one line of <code>create</code> change:</p>
+<p>Only <code>NewBookmark</code> and <code>create</code> change. The struct gets rules:</p>
 <pre><code>@json struct NewBookmark {
     @required @url @max(2048) u8[] url;
     @max(200) u8[] title;

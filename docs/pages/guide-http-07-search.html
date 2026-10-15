@@ -28,9 +28,39 @@ DROP TABLE tags;</code></pre>
 
 <h2>Tags in, tags out</h2>
 <p><code>Bookmark</code> and <code>NewBookmark</code> get a <code>vec.Vec&lt;String&gt; tags</code>: a JSON array, and a
-PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one:</p>
-<pre><code>(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags</code></pre>
-<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither.</p>
+PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one with a
+subquery:</p>
+<pre><code>@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    vec.Vec<String> tags;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+    vec.Vec<String> tags;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, " \
+    "(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""</code></pre>
+<p>A tag is checked by hand: the rules of chapter 3 check fields, and this is about each element of one.</p>
+<pre><code>/* A tag is 1 to 30 lowercase letters, digits and dashes */
+bool goodTag(u8[] t)
+{
+    if (t.len < 1 || t.len > 30) { return false; }
+    for (auto c : t) {
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) { return false; }
+    }
+    return true;
+}</code></pre>
+<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither. The whole
+<code>create</code>:</p>
 <pre><code>void create(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
@@ -68,11 +98,18 @@ PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each
   <li><code>db.begin()</code> takes a connection from the pool for the transaction; <code>defer tx.rollback()</code>
   undoes it on any way out except after <code>tx.commit()</code>, a 409 included.</li>
   <li><code>unnest($2::text[])</code> turns the array parameter (the vector, sent as one value) into rows.</li>
-  <li><code>goodTag</code> checks each tag by hand: the rules of chapter 3 check fields, and this is about each
-  element of one.</li>
+  <li>The bookmark is read back with <code>pg.queryOne</code> on <code>&amp;tx</code>, inside the transaction, so
+  its tags are already there.</li>
 </ul>
 
 <h2>Filtering, search and pages</h2>
+<p>The list is no longer an array but a page of it, with the cursor for the next page:</p>
+<pre><code>/* A page of bookmarks: `next` is the cursor for the page after it */
+@json struct Page {
+    vec.Vec<Bookmark> items;
+    @omitEmpty String next;
+};</code></pre>
+<p>The whole <code>list</code>:</p>
 <pre><code>/* GET /bookmarks?tag=go&q=fast+servers&limit=20&after=<cursor>: newest first */
 void list(http.Writer *w, http.Request *r)
 {

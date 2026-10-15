@@ -72,12 +72,27 @@ TLS. Copy it with the <code>migrations</code> directory and it runs.</p>
 
 <h2 id="https">HTTPS<a class="anchor" href="#https" aria-label="Link to this section">#</a></h2>
 <p>Two more settings, the certificate chain and its key as PEM files, and <code>main</code> serves over TLS when they
-are set. <code>main.ktm</code> imports <code>net.https</code> for it:</p>
+are set. In <code>main.ktm</code>, <code>net.https</code> joins the imports and <code>Settings</code> grows:</p>
 <pre><code>import config, flag, log, net.http, net.https, os, reflect, str, vec;</code></pre>
-<pre><code>    if (gSettings.tlsCert.len) {
+<pre><code>struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
+    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
+    u8[] tlsCert;               /* HTTPS: the certificate chain and its key, PEM files */
+    u8[] tlsKey;
+};</code></pre>
+<p>The end of <code>main</code>:</p>
+<pre><code>    http.Options o;
+    o.accessLog = *accessLog;
+    if (gSettings.tlsCert.len) {
         log.info("Shelf listening on https://localhost:%d", *port);
         return https.listen((i32)*port, &amp;mux, gSettings.tlsCert, gSettings.tlsKey, db, &amp;o);
-    }</code></pre>
+    }
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}</code></pre>
 <pre><code>SHELF_TLS_CERT=/etc/letsencrypt/live/shelf.example.com/fullchain.pem
 SHELF_TLS_KEY=/etc/letsencrypt/live/shelf.example.com/privkey.pem</code></pre>
 <p>Behind a load balancer or a proxy that ends TLS (nginx, Caddy, a cloud load balancer), leave them unset: the proxy
@@ -85,6 +100,7 @@ speaks HTTPS to the world, Shelf plain HTTP to the proxy, and <code>SHELF_TRUSTE
 the real client addresses back.</p>
 
 <h2 id="health-and-time-limits">Health and time limits<a class="anchor" href="#health-and-time-limits" aria-label="Link to this section">#</a></h2>
+<p>A handler in <code>api/api.ktm</code>, after the others:</p>
 <pre><code>/* GET /health: for the load balancer and the monitoring. 200 while the
  * database answers, 503 when it doesn't (the instance takes no traffic) */
 void health(http.Writer *w, http.Request *r)
@@ -101,7 +117,14 @@ void health(http.Writer *w, http.Request *r)
     }
     w.text(200, "ok");
 }</code></pre>
-<pre><code>    pg.Options po;
+<p>its route in <code>routes()</code>, after the middleware and outside every group, so it needs no token:</p>
+<pre><code>    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
+
+    mux.handle("GET /health", &amp;health);
+    mux.handle("POST /users", &amp;signup);</code></pre>
+<p>and in <code>main</code>, the pool opens with time limits:</p>
+<pre><code>    /* the database: a pool of connections shared by every thread */
+    pg.Options po;
     po.queryTimeoutMs = 5000;           /* no request waits on a query for more than 5 s */
     po.acquireTimeoutMs = 2000;         /* nor 2 s for a connection (the default is 30) */
     pg.Pool *db = pg.open(gSettings.databaseUrl, &amp;po);</code></pre>

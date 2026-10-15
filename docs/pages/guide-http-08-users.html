@@ -36,6 +36,43 @@ DROP TABLE users;</code></pre>
   <li>A url is now unique per user, not in the whole table.</li>
 </ul>
 
+<h2>Imports and types</h2>
+<p>The import line gains <code>crypto</code>, <code>encoding.base64</code>, <code>mem</code> and
+<code>net.http.middleware</code>:</p>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;</code></pre>
+<p>Under <code>COLUMNS</code>, the request and reply bodies of the new routes, and the row a login reads:</p>
+<pre><code>@json struct NewUser {
+    @required @email @max(254) u8[] email;
+    @required @min(10) @max(200) u8[] password;
+};
+
+@json struct User {
+    String id;
+    String email;
+};
+
+@json struct Login {
+    @required u8[] email;
+    @required u8[] password;
+};
+
+@json struct Session {
+    String token;
+    String expiresAt;
+};
+
+struct Credentials {
+    String id;
+    String passwordHash;
+};
+
+/* A hash no password matches: a login for an unknown email checks the
+ * password against it, so it takes as long as one for a known email */
+String gNoUser;</code></pre>
+
 <h2>Signing up</h2>
 <pre><code>void signup(http.Writer *w, http.Request *r)
 {
@@ -66,7 +103,13 @@ DROP TABLE users;</code></pre>
 </ul>
 
 <h2>Logging in</h2>
-<pre><code>void login(http.Writer *w, http.Request *r)
+<pre><code>/* The SHA-256 of a token, as the sessions table keeps it */
+void tokenHash(u8[] token, u8 *out)
+{
+    crypto.sha256(token, out[0:32]);
+}
+
+void login(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
     Login in = http.decodeValid<Login>(r);
@@ -124,17 +167,125 @@ u8[] userOf(http.Request *r)
 {
     u8[] *id = r.get("userId");
     return *id;
+}
+
+void logout(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    u8 h[32];
+    tokenHash(str.trim(r.header("Authorization")[7:]), h);
+    db.exec("DELETE FROM sessions WHERE token_hash = $1", h[0:32]);
+    w.status(204);
 }</code></pre>
 <p><a href="lib-http-middleware.html"><code>middleware.bearer</code></a> reads
 <code>Authorization: Bearer &lt;token&gt;</code>, calls <code>checkToken</code> and answers 401 when it says no.
 <code>checkToken</code> keeps the user's id in the request (memory from <code>r.alloc</code> lives exactly as long), and
-handlers read it with <code>userOf(r)</code>. Every bookmark query gets <code>AND user_id = $n</code>.</p>
-<pre><code>import "github.com/ozzenerol/ktm-pg";
-import "github.com/ozzenerol/ktm-migrate";
-import "github.com/ozzenerol/ktm-migrate/postgres";
-import config, crypto, encoding.base64, flag, json, log, mem, net.http, net.http.middleware, os, reflect, str, uuid, vec;
+handlers read it with <code>userOf(r)</code>. <code>logout</code> sits behind the same check, so the header is there
+and its token is good; it deletes that one session.</p>
 
-i32 main(i32 argc, u8 **argv)
+<h2>Every bookmark has an owner</h2>
+<p>Every bookmark query takes the user's id. In <code>list</code>, the query gains <code>user_id = $1</code> and the
+other parameters move up by one:</p>
+<pre><code>/* GET /bookmarks?tag=go&q=fast+servers&limit=20&after=<cursor>: newest first */
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    i64 limit = 20;
+    if (r.hasQuery("limit") && (!str.toInt(r.query("limit"), &limit) || limit < 1 || limit > 100)) {
+        w.error(400, "limit is 1 to 100");
+        return;
+    }
+    uuid.UUID after;
+    u8[] cursor = r.query("after");
+    if (cursor.len && !uuid.parse(cursor, &after)) {
+        w.error(400, "after isn't a cursor from this API");
+        return;
+    }
+    Page page;
+    defer page.freeDecoded();
+    /* one more than asked for: if it comes back, there is a next page */
+    page.items = pg.queryAll<Bookmark>(db,
+        "SELECT " COLUMNS " FROM bookmarks"
+        " WHERE user_id = $1"
+        "   AND ($2 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $2))"
+        "   AND ($3 = '' OR search @@ websearch_to_tsquery('simple', $3))"
+        "   AND ($4 = '' OR id < $4::uuid)"
+        " ORDER BY id DESC LIMIT $5",
+        userOf(r), r.query("tag"), r.query("q"), cursor, limit + 1);
+    if (page.items.len > limit) {
+        Bookmark extra = page.items.removeAt(limit);
+        pg.free(reflect.of(extra));
+        page.next = str.from(page.items.data[limit - 1].id[0:]);
+    }
+    w.json(200, reflect.of(page));
+}</code></pre>
+<p>In <code>get</code>, someone else's bookmark is a 404 like a missing one:</p>
+<pre><code>void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1 AND user_id = $2",
+                                  r.param("id"), userOf(r));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}</code></pre>
+<p>In <code>create</code>, the new bookmark is the user's:</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
+    if (in.tags.len > 10) {
+        w.error(422, "at most 10 tags");
+        return;
+    }
+    for (auto t : in.tags) {
+        if (!goodTag(t[0:])) {
+            w.error(422, "a tag is 1 to 30 lowercase letters, digits and dashes");
+            return;
+        }
+    }
+    String id = uuid.v7().string();
+    defer id.free();
+    /* the bookmark and its tags together, or neither */
+    pg.Tx tx = db.begin();
+    defer tx.rollback();
+    try {
+        tx.exec("INSERT INTO bookmarks (id, user_id, url, title, notes) VALUES ($1, $2, $3, $4, $5)",
+                id, userOf(r), in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
+    Bookmark b = pg.queryOne<Bookmark>(&tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    defer b.freeDecoded();
+    tx.commit();
+    w.json(201, reflect.of(b));
+}</code></pre>
+<p>In <code>remove</code>, only the user's own bookmark goes:</p>
+<pre><code>void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1 AND user_id = $2", r.param("id"), userOf(r)) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}</code></pre>
+
+<h2>main</h2>
+<pre><code>i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
     config.loadDotenv(".env");

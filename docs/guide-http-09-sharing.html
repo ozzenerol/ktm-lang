@@ -77,7 +77,26 @@ CREATE TABLE collection_items (
 <pre><code>DROP TABLE collection_items;
 DROP TABLE collections;</code></pre>
 
+<h2 id="the-types">The types<a class="anchor" href="#the-types" aria-label="Link to this section">#</a></h2>
+<p>Under the users and sessions code:</p>
+<pre><code>@json struct NewCollection {
+    @required @max(100) u8[] name;
+    @key("public") bool isPublic;
+};
+
+@json struct Collection {
+    String id;
+    String name;
+    @key("public") bool isPublic;
+    vec.Vec&lt;Bookmark&gt; bookmarks;
+};</code></pre>
+<ul class="rules">
+  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
+  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
+</ul>
+
 <h2 id="routes-for-owners-a-route-for-everyone">Routes for owners, a route for everyone<a class="anchor" href="#routes-for-owners-a-route-for-everyone" aria-label="Link to this section">#</a></h2>
+<p>In <code>main</code>, after the bookmark routes:</p>
 <pre><code>    http.Mux *collections = mux.group("/collections");
     middleware.bearer(collections, &amp;checkToken);
     collections.handle("POST", &amp;newCollection);
@@ -93,6 +112,23 @@ u8[] maybeUser(http.Request *r)
     if (auth.len &gt; 7 &amp;&amp; checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
     return "";
 }</code></pre>
+
+<h2 id="creating-one">Creating one<a class="anchor" href="#creating-one" aria-label="Link to this section">#</a></h2>
+<pre><code>void newCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewCollection in = http.decodeValid&lt;NewCollection&gt;(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    db.exec("INSERT INTO collections (id, user_id, name, public) VALUES ($1, $2, $3, $4)", id, userOf(r), in.name, in.isPublic);
+    Collection c;
+    c.id = str.from(id[0:]);
+    c.name = str.from(in.name);
+    c.isPublic = in.isPublic;
+    defer c.freeDecoded();
+    w.json(201, reflect.of(c));
+}</code></pre>
+<p>The reply is built from what was inserted, so it needs no second query: a new collection has no bookmarks yet.</p>
 
 <h2 id="permissions-in-the-query">Permissions in the query<a class="anchor" href="#permissions-in-the-query" aria-label="Link to this section">#</a></h2>
 <pre><code>/* GET /collections/{id}: its owner, or anyone when it is public */
@@ -124,8 +160,6 @@ void showCollection(http.Writer *w, http.Request *r)
   <li>The permission rule is part of the <code>WHERE</code>: <code>public OR user_id = me</code>. There is no "load it,
   then check" step to forget.</li>
   <li>Someone else's private collection gets the same 404 as one that doesn't exist. A 403 would confirm it exists.</li>
-  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
-  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
 </ul>
 <pre><code>/* PUT /collections/{id}/bookmarks/{bookmark}: both must be the user's */
 void addToCollection(http.Writer *w, http.Request *r)
@@ -174,7 +208,7 @@ $ curl -H "Authorization: Bearer $ADA" localhost:8080/collections/$SECRET
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-migration">The migration</a></li><li><a href="#routes-for-owners-a-route-for-everyone">Routes for owners, a route for everyone</a></li><li><a href="#permissions-in-the-query">Permissions in the query</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#the-migration">The migration</a></li><li><a href="#the-types">The types</a></li><li><a href="#routes-for-owners-a-route-for-everyone">Routes for owners, a route for everyone</a></li><li><a href="#creating-one">Creating one</a></li><li><a href="#permissions-in-the-query">Permissions in the query</a></li><li><a href="#try-it">Try it</a></li></ul></nav>
 </div>
 </body>
 </html>

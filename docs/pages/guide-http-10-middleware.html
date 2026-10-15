@@ -17,6 +17,8 @@ Settings gSettings;</code></pre>
 <pre><code>SHELF_WEB_ORIGIN=http://localhost:5173</code></pre>
 
 <h2>The middleware</h2>
+<p><code>net.http.middleware</code> is imported since chapter 8. In <code>main</code>, the routes up to the bookmark
+group become this (the bookmark and collection groups below stay as they are):</p>
 <pre><code>    http.Mux mux;
     if (gSettings.trustedProxies.len) { middleware.realIp(&mux, gSettings.trustedProxies); }
     middleware.requestId(&mux);

@@ -22,7 +22,26 @@ CREATE TABLE collection_items (
 <pre><code>DROP TABLE collection_items;
 DROP TABLE collections;</code></pre>
 
+<h2>The types</h2>
+<p>Under the users and sessions code:</p>
+<pre><code>@json struct NewCollection {
+    @required @max(100) u8[] name;
+    @key("public") bool isPublic;
+};
+
+@json struct Collection {
+    String id;
+    String name;
+    @key("public") bool isPublic;
+    vec.Vec<Bookmark> bookmarks;
+};</code></pre>
+<ul class="rules">
+  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
+  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
+</ul>
+
 <h2>Routes for owners, a route for everyone</h2>
+<p>In <code>main</code>, after the bookmark routes:</p>
 <pre><code>    http.Mux *collections = mux.group("/collections");
     middleware.bearer(collections, &checkToken);
     collections.handle("POST", &newCollection);
@@ -38,6 +57,23 @@ u8[] maybeUser(http.Request *r)
     if (auth.len > 7 && checkToken(str.trim(auth[7:]), r)) { return userOf(r); }
     return "";
 }</code></pre>
+
+<h2>Creating one</h2>
+<pre><code>void newCollection(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewCollection in = http.decodeValid<NewCollection>(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    db.exec("INSERT INTO collections (id, user_id, name, public) VALUES ($1, $2, $3, $4)", id, userOf(r), in.name, in.isPublic);
+    Collection c;
+    c.id = str.from(id[0:]);
+    c.name = str.from(in.name);
+    c.isPublic = in.isPublic;
+    defer c.freeDecoded();
+    w.json(201, reflect.of(c));
+}</code></pre>
+<p>The reply is built from what was inserted, so it needs no second query: a new collection has no bookmarks yet.</p>
 
 <h2>Permissions in the query</h2>
 <pre><code>/* GET /collections/{id}: its owner, or anyone when it is public */
@@ -69,8 +105,6 @@ void showCollection(http.Writer *w, http.Request *r)
   <li>The permission rule is part of the <code>WHERE</code>: <code>public OR user_id = me</code>. There is no "load it,
   then check" step to forget.</li>
   <li>Someone else's private collection gets the same 404 as one that doesn't exist. A 403 would confirm it exists.</li>
-  <li><code>public</code> is the column and the JSON key, but a reserved word in ktm, so the field is
-  <code>isPublic</code> with <code>@key("public")</code>: JSON and ktm-pg both read it.</li>
 </ul>
 <pre><code>/* PUT /collections/{id}/bookmarks/{bookmark}: both must be the user's */
 void addToCollection(http.Writer *w, http.Request *r)
