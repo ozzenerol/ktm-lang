@@ -123,6 +123,7 @@ u8 *CALC_TRIPLE_HC;
 u8 *CALC_MAIN_HC;
 u8 *CALC_MAIN2_HC;
 u8 *AUTO_HC;
+u8 *CASCADE_HC;
 
 void initFixtures() {
     LIB_HC =
@@ -182,6 +183,15 @@ void initFixtures() {
         "}\n"
         "i64 three() {\n"
         "    return area(2);\n"
+        "}\n";
+    /* main's error is the whole story (its return was lost to it); f
+     * really can run off its end */
+    CASCADE_HC =
+        "i32 main() {\n"
+        "    return nope(1);\n"
+        "}\n"
+        "i64 f(i64 x) {\n"
+        "    if (x) { return 1; }\n"
         "}\n";
     /* geo's second file: uses geo.ktm's square bare */
     MOD_GEO2_HC =
@@ -1449,6 +1459,13 @@ void testRegressions() {
      * two-byte é is one unit. */
     check("utf-16 columns on a non-ASCII line",
                 locEq(resp, uuri, dline, dchr - 1, true));
+
+    u8 *curi = uriOf("cascade.ktm");
+    lspDidOpen(l, curi, CASCADE_HC);
+    json.Value *cdiags = json.select(l.lastPublish, ".params.diagnostics:a");
+    json.Value *w = json.select(l.lastPublish, ".params.diagnostics[1].range.start.line:i");
+    check("an error in a return gives no missing-return warning; a real one still does",
+                jsonArrayCount(cdiags) == 2 && w != null && w.intVal == 3);
 
     lspRequest(l, "shutdown", "null", 5000);
     resp = lspPositionRequest(l, "textDocument/hover", uri, 0, 0);

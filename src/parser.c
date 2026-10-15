@@ -5349,6 +5349,7 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     s64 fn_line = next ? next->line : cc->lineno;
     s64 fn_col  = next ? next->col  : 0;
     s64 fn_len  = next ? next->len  : 1;
+    int errors_before = cc->errors_raised;
     if (next == NULL) {
         cctrlRaiseException(cc,
                 "Unexpected end of input in function definition");
@@ -5654,10 +5655,13 @@ Ast *parseFunctionDef(Cctrl *cc, AstType *rettype,
     /* Warn when a value-returning function can run off its end without
      * a `return` - control would then return whatever happens to be in
      * the return register. `inline` functions return through `retval`
-     * and `asm { }` bodies are opaque, so neither is checked. */
+     * and `asm { }` bodies are opaque, so neither is checked. A body
+     * with an error may have lost its `return` to the error (`return
+     * undefined(1);`): the error is the whole story. */
     AstType *rt = func->type ? func->type->rettype : NULL;
     if (rt && rt->kind != AST_TYPE_VOID && !(func->flags & AST_FLAG_INLINE) &&
-        !has_asm && astStmtFallsThrough(func_body))
+        !has_asm && cc->errors_raised == errors_before &&
+        astStmtFallsThrough(func_body))
     {
         cctrlWarningAt(cc, name_line, name_col, len,
             "control may reach the end of non-void function '%s' "
