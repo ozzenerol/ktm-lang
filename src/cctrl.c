@@ -1863,6 +1863,7 @@ int cctrlTokIsKeyword(Cctrl *cc, Lexeme *tok) {
 }
 
 void cctrlSetCommandLineDefines(Cctrl *cc, List *defines_list) {
+    cc->cmdline_defines = defines_list;
     listForEach(defines_list) {
         mapAdd(cc->macro_defs,(char*)it->value,lexemeSentinal());
     }

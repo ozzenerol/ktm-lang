@@ -366,6 +366,10 @@ typedef struct Lexer {
     /* `ktm -lib a.b dir/a/b`: the module being built into a library,
      * compiled in full even if it has a .ktmlib marker */
     char *building_module;
+    /* building a package into the cache (--prebuild-pkg): a module that
+     * the program compiles itself (the stdlib's not in libktm, as
+     * net.tls) is only declared here, so its code is in one place */
+    int prebuilding;
     /* `ktm -lib name dir` over a tree of modules: dir (a real path),
      * whose modules are all compiled in full */
     char *building_tree;

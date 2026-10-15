@@ -456,7 +456,7 @@ static void emitModuleLibrary(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
         fprintf(mf, "static %s\nshared %s\n", relativePath(mod_dir, archive),
                 relativePath(mod_dir, shared));
         /* its globals' run-time initialisers are its `_init` (M2) */
-        char *real = realpath(mod_dir, NULL);
+        char *real = realpath(args->prebuild_dir ? args->prebuild_dir : mod_dir, NULL);
         if (cc->init_module_dirs && setHas(cc->init_module_dirs, real ? real : mod_dir)) {
             fprintf(mf, "init\n");
         }
@@ -520,12 +520,21 @@ void emitFile(Cctrl *cc, AoStr *asmbuf, CliArgs *args) {
         AoStr *ofiles = aoStrNew();
         AoStr *link_flags = linkLibFlags(cc);
 
-        /* Concatinate a string with all of the .o and .so files */
+        /* Concatinate a string with all of the .o and .so files. The
+         * archives in a group: a library can use one that comes before
+         * it (a prebuilt package and another it imports, linked in the
+         * order they were found); ld64 searches them all anyway */
         if (!listEmpty(cc->object_files)) {
+#if !IS_BSD
+            aoStrCatFmt(ofiles, "-Wl,--start-group ");
+#endif
             listForEach(cc->object_files) {
                 AoStr *o = it->value;
                 aoStrCatFmt(ofiles, "%s ", o->data);
             }
+#if !IS_BSD
+            aoStrCatFmt(ofiles, "-Wl,--end-group ");
+#endif
         }
         if (!listEmpty(cc->shared_object_files)) {
             listForEach(cc->shared_object_files) {

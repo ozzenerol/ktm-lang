@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <assert.h>
@@ -21,6 +22,7 @@
 #include "prslib.h"
 #include "prsutil.h"
 #include "util.h"
+#include "version.h"
 
 typedef struct {
     char *name;
@@ -412,6 +414,7 @@ void lexInit(Lexer *l, char *source, int flags) {
     l->mod_depth = 0;
     l->program_root = NULL;
     l->building_module = NULL;
+    l->prebuilding = 0;
     l->building_tree = NULL;
     l->test_dir = NULL;
     l->test_module_id = 0;
@@ -3406,28 +3409,141 @@ static int lexIsFile(const char *path) {
     return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
-/* A module with a .ktmlib marker (written by `ktm -lib`): only its
- * declarations are read, and its library is linked: the archive by AOT,
- * the shared object by the JIT. 0 when it has none. */
-static int lexModulePrebuilt(Lexer *l, LexModule *m) {
-    if (l->building_module && !strcmp(l->building_module, m->path->data)) {
-        return 0;
+/* The host's target: a package is prebuilt only for it (the assembler
+ * and linker that build its library are the host's) */
+static enum CliTarget lexHostTarget(void) {
+#if IS_ARM_64 && IS_LINUX
+    return TARGET_AARCH64_UNKNOWN_LINUX_GNU;
+#elif IS_ARM_64 && IS_BSD
+    return TARGET_AARCH64_APPLE_DARWIN;
+#elif IS_X86_64 && IS_LINUX
+    return TARGET_X86_64_UNKNOWN_LINUX_GNU;
+#else
+    return TARGET_X86_64_APPLE_DARWIN;
+#endif
+}
+
+/* The compiler itself, hashed once: a rebuilt ktm (same version, new
+ * code) makes new libraries, whose records rt.crash reads */
+static const char *lexSelfHash(void) {
+    static char *hash = NULL;
+    if (!hash) {
+        char *self = pkgSelfPath(NULL);
+        hash = self ? pkgSha256File(self) : NULL;
+        if (!hash) hash = "";
     }
-    if (l->test_module_id == m->id) return 0;
-    if (l->building_tree) {
-        char *dir = realpath(m->dir->data, NULL);
-        size_t len = strlen(l->building_tree);
-        int inside = dir && !strncmp(dir, l->building_tree, len) &&
-                     (dir[len] == '/' || dir[len] == '\0');
-        free(dir);
-        if (inside) return 0;
+    return hash;
+}
+
+/* A package from the module cache, prebuilt once into
+ * <cache>/.prebuilt/<key>: its library and .ktmlib marker, made by
+ * running this ktm with --prebuild-pkg on a program that imports it. The
+ * key covers the compiler (and its stdlib), the target, -Memsafe, the
+ * -D names, the package and the program's whole build list (a
+ * package's dependencies are the versions the program picks), so any
+ * change makes a new one. Its own imports of packages are prebuilt the
+ * same way while it builds, so each package's code is in exactly one
+ * library (two copies would split its globals). Not for a package
+ * replaced by a directory (being edited) or a program whose ktm.mod
+ * has such a replace, nor for another target, the JIT, the LSP, the
+ * REPL or with KTM_PREBUILD=0. A failed build is remembered (<key>.failed, its
+ * output) and the package is built from source, as before. NULL: from
+ * source. */
+static char *lexPackagePrebuilt(Lexer *l, LexModule *m) {
+    Cctrl *cc = l->cc;
+    if (!cc || !m->package || l->building_tree) return NULL;
+    if (cc->flags & (CCTRL_LSP | CCTRL_REPL)) return NULL;
+    /* not for the JIT: a shared library can't call into JIT'd code (the
+     * stdlib modules the program compiles itself), so it compiles
+     * packages as before */
+    if (mapGet(cc->macro_defs, "__KTM_JIT__")) return NULL;
+    const char *off = getenv("KTM_PREBUILD");
+    if (off && !strcmp(off, "0")) return NULL;
+    if (cc->target != lexHostTarget()) return NULL;
+    char *dir = realpath(m->dir->data, NULL);
+    char *real_cache = realpath(pkgCacheDir(), NULL);
+    if (!dir || !real_cache) return NULL;
+    size_t clen = strlen(real_cache);
+    if (strncmp(dir, real_cache, clen) || dir[clen] != '/') return NULL;
+    const char *root = l->program_root ? l->program_root : ".";
+    char *list = pkgBuildListKey(root);
+    if (!list) return NULL;
+
+    AoStr *k = aoStrNew();
+    aoStrCatPrintf(k, "ktm %s %s\ninstall %s\n", cctrlGetVersion(), lexSelfHash(),
+                   cc->install_dir ? cc->install_dir : "");
+    char *libktm = mprintf("%s/lib/libktm.a", cc->install_dir ? cc->install_dir : "/usr/local");
+    struct stat st;
+    if (stat(libktm, &st) == 0) {
+        aoStrCatPrintf(k, "libktm %lld %lld\n", (long long)st.st_size, (long long)st.st_mtime);
     }
-    char *marker = mprintf("%s/.ktmlib", m->dir->data);
-    if (!lexIsFile(marker)) return 0;
-    if (!l->cc) return 1;
+    aoStrCatPrintf(k, "target %d memsafe %d\n", (int)cc->target,
+                   (cc->flags & CCTRL_MEMSAFE) ? 1 : 0);
+    if (cc->cmdline_defines) {
+        listForEach(cc->cmdline_defines) aoStrCatPrintf(k, "-D%s\n", (char *)it->value);
+    }
+    aoStrCatPrintf(k, "package %s %s %s\n%s", m->package, m->path->data, dir + clen + 1, list);
+    char *key = pkgSha256Hex(k->data, k->len);
+    char *base = mprintf("%s/.prebuilt", real_cache);
+    char *out = mprintf("%s/%s", base, key);
+    char *marker = mprintf("%s/.ktmlib", out);
+    char *failed = mprintf("%s.failed", out);
+    free(real_cache);
+    if (lexIsFile(marker)) return out;
+    if (lexIsFile(failed)) return NULL;
+
+    /* one build of it at a time, whatever builds it */
+    mkdir(base, 0755);
+    char *lock = mprintf("%s.lock", out);
+    int fd = open(lock, O_CREAT | O_RDWR, 0644);
+    if (fd < 0) return NULL;
+    flock(fd, LOCK_EX);
+    if (lexIsFile(marker) || lexIsFile(failed)) {
+        flock(fd, LOCK_UN);
+        close(fd);
+        return lexIsFile(marker) ? out : NULL;
+    }
+    char *tmp = mprintf("%s.tmp%d", out, (int)getpid());
+    mkdir(tmp, 0755);
+    char *self = pkgSelfPath(NULL);
+    AoStr *cmd = aoStrNew();
+    aoStrCatPrintf(cmd, "'%s'", self ? self : "ktm");
+    if (cc->install_dir) aoStrCatPrintf(cmd, " --install-dir '%s'", cc->install_dir);
+    if (cc->flags & CCTRL_MEMSAFE) aoStrCatPrintf(cmd, " -Memsafe");
+    if (cc->cmdline_defines) {
+        listForEach(cc->cmdline_defines) aoStrCatPrintf(cmd, " -D%s", (char *)it->value);
+    }
+    char *root_real = realpath(root, NULL);
+    aoStrCatPrintf(cmd, " --test-root '%s' --prebuild-pkg '%s' --prebuild-mod '%s' "
+                   "--prebuild-dir '%s' -lib '%s' '%s' > '%s/build.log' 2>&1",
+                   root_real ? root_real : root, m->package, m->path->data, dir,
+                   m->path->data, tmp, tmp);
+    free(root_real);
+    int rc = system(cmd->data);
+    char *tmp_marker = mprintf("%s/.ktmlib", tmp);
+    if (rc == 0 && lexIsFile(tmp_marker) && rename(tmp, out) == 0) {
+        flock(fd, LOCK_UN);
+        close(fd);
+        return out;
+    }
+    /* remembered, with what it said, so it isn't tried on every build */
+    char *mv = mprintf("mv -f '%s/build.log' '%s' 2>/dev/null; rm -rf '%s'", tmp, failed, tmp);
+    if (system(mv) != 0 || !lexIsFile(failed)) {
+        FILE *f = fopen(failed, "w");
+        if (f) fclose(f);
+    }
+    flock(fd, LOCK_UN);
+    close(fd);
+    return NULL;
+}
+
+/* The libraries a .ktmlib marker names (relative to `base`, the
+ * marker's directory) added to the program's: the archives for AOT,
+ * the shared objects for the JIT; and whether the module has an _init */
+static void lexReadMarker(Lexer *l, LexModule *m, const char *marker, const char *base) {
     s64 len = 0;
-    char *text = lexTryReadfile(marker, &len);
-    if (!text) return 1;
+    char *text = lexTryReadfile((char *)marker, &len);
+    if (!text) return;
     int jit = mapGet(l->cc->macro_defs, "__KTM_JIT__") != NULL;
     char *save = NULL;
     for (char *line = strtok_r(text, "\n", &save); line;
@@ -3448,9 +3564,8 @@ static int lexModulePrebuilt(Lexer *l, LexModule *m) {
             libs = &l->cc->shared_object_files;
         }
         if (!libs) continue;
-        /* relative to the module's directory (the marker's) */
         if (path[0] != '/') {
-            char *joined = mprintf("%s/%s", m->dir->data, path);
+            char *joined = mprintf("%s/%s", base, path);
             char *real = realpath(joined, NULL);
             path = real ? mprintf("%s", real) : joined;
             free(real);
@@ -3459,6 +3574,35 @@ static int lexModulePrebuilt(Lexer *l, LexModule *m) {
         if (*libs == NULL) *libs = listNew();
         if (!listContainsAoStr(*libs, lib)) listAppend(*libs, lib);
     }
+}
+
+/* A module with a .ktmlib marker (written by `ktm -lib`), or a package
+ * prebuilt into the cache (lexPackagePrebuilt): only its declarations
+ * are read, and its library is linked: the archive by AOT, the shared
+ * object by the JIT. 0 when it has none. */
+static int lexModulePrebuilt(Lexer *l, LexModule *m) {
+    if (l->building_module && !strcmp(l->building_module, m->path->data)) {
+        return 0;
+    }
+    if (l->test_module_id == m->id) return 0;
+    if (l->building_tree) {
+        char *dir = realpath(m->dir->data, NULL);
+        size_t len = strlen(l->building_tree);
+        int inside = dir && !strncmp(dir, l->building_tree, len) &&
+                     (dir[len] == '/' || dir[len] == '\0');
+        free(dir);
+        if (inside) return 0;
+    }
+    char *marker = mprintf("%s/.ktmlib", m->dir->data);
+    if (!lexIsFile(marker)) {
+        if (l->prebuilding && !m->package) return 1;
+        char *pre = lexPackagePrebuilt(l, m);
+        if (!pre) return 0;
+        lexReadMarker(l, m, mprintf("%s/.ktmlib", pre), pre);
+        return 1;
+    }
+    if (!l->cc) return 1;
+    lexReadMarker(l, m, marker, m->dir->data);
     return 1;
 }
 

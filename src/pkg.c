@@ -818,6 +818,34 @@ char *pkgResolveImport(const char *program_dir, const char *path, char **err) {
     return dir;
 }
 
+static int pkgSelCmp(const void *a, const void *b) {
+    return strcmp(((PkgSel *)a)->path, ((PkgSel *)b)->path);
+}
+
+char *pkgBuildListKey(const char *program_dir) {
+    char *err = NULL;
+    PkgMod *m = pkgModFor(program_dir, &err);
+    if (!m) return NULL;
+    PkgList *l = pkgBuildListFor(m, &err);
+    if (!l) return NULL;
+    PkgSel *sel = malloc(sizeof(PkgSel) * (l->n ? l->n : 1));
+    memcpy(sel, l->sel, sizeof(PkgSel) * l->n);
+    qsort(sel, l->n, sizeof(PkgSel), pkgSelCmp);
+    AoStr *key = aoStrNew();
+    for (int i = 0; i < l->n; ++i) {
+        PkgReplace *rep = pkgReplaceFor(m, sel[i].path, sel[i].version);
+        if (rep && !rep->new_version) {
+            free(sel);
+            return NULL;
+        }
+        aoStrCatPrintf(key, "%s@%s", sel[i].path, sel[i].version);
+        if (rep) aoStrCatPrintf(key, " => %s@%s", rep->new_path, rep->new_version);
+        aoStrPutChar(key, '\n');
+    }
+    free(sel);
+    return aoStrMove(key);
+}
+
 int pkgIsProjectPath(const char *program_dir, const char *path) {
     char *err = NULL;
     PkgMod *m = pkgModFor(program_dir, &err);

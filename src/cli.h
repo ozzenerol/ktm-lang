@@ -44,6 +44,9 @@ enum CliArgType {
     CLI_MEM_STATS,
     CLI_TEST_DIR,
     CLI_TEST_ROOT,
+    CLI_PREBUILD_PKG,
+    CLI_PREBUILD_MOD,
+    CLI_PREBUILD_DIR,
     CLI_OUTPUT_FILENAME,
     CLI_PRINT_AST,
     CLI_PRINT_TOKENS,
@@ -112,6 +115,12 @@ typedef struct CliArgs {
      * *_test.ktm files are read, and where modules are found from */
     char *test_dir;
     char *test_root;
+    /* A package prebuilt into the cache (lexer.c lexPackagePrebuilt):
+     * its import path, module path and directory; -lib <name> <dir>
+     * then writes its library and marker into dir */
+    char *prebuild_pkg;
+    char *prebuild_mod;
+    char *prebuild_dir;
     char *output_filename;
     char *clibs;
     char *install_dir;
