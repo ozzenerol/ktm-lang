@@ -5,7 +5,7 @@ import coro, encoding.base64, mem, str;
 /* Cryptography (v0.20.0), on mbedTLS's vetted primitives (built into
  * libktmtls, as net.tls is): secure random bytes, SHA-256/384/512, HMAC,
  * HKDF and PBKDF2, a constant-time compare, authenticated encryption
- * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256 signatures, and
+ * (AES-256-GCM, ChaCha20-Poly1305), ECDSA P-256 and RSA signatures, and
  * password hashing (Argon2id, bcrypt; ktm's own C, beside mbedTLS).
  *
  *   u8 key[32];
@@ -27,7 +27,7 @@ pub const i64 SHA512_SIZE = 64;
 pub const i64 KEY_SIZE = 32;        /* seal/open keys */
 pub const i64 NONCE_SIZE = 12;      /* never twice with one key */
 pub const i64 TAG_SIZE = 16;        /* what seal adds to the text */
-pub const i64 SIGNATURE_SIZE = 64;  /* sign's r||s */
+pub const i64 SIGNATURE_SIZE = 64;  /* a P-256 key's sign: r||s */
 
 /* The authenticated encryption seal and open use */
 pub enum Aead {
@@ -35,7 +35,20 @@ pub enum Aead {
     chacha20Poly1305    /* ChaCha20-Poly1305: fast everywhere */
 };
 
-/* An ECDSA P-256 key, private or public */
+/* The digest a signature is made over */
+pub enum Hash {
+    sha256,
+    sha384,
+    sha512
+};
+
+/* What a Key is */
+pub enum KeyKind {
+    ec256,              /* ECDSA P-256 (JWT's ES256) */
+    rsa                 /* RSA, 2048 bits or more, PKCS#1 v1.5 (JWT's RS256) */
+};
+
+/* A signing key, private or public: ECDSA P-256 or RSA */
 pub struct Key {
     private void *native;
     private bool priv;
@@ -56,8 +69,11 @@ extern "c" i32 ktm_crypto_open(i32 alg, u8 *key, u8 *nonce, u8 *aad, u64 alen, u
 extern "c" void *ktm_crypto_key_generate(i32 *err);
 extern "c" void *ktm_crypto_key_load(u8 *pem, u64 len, i32 priv, i32 *err);
 extern "c" i64 ktm_crypto_key_pem(void *key, i32 priv, u8 *out, u64 outlen);
-extern "c" i32 ktm_crypto_sign(void *key, u8 *data, u64 len, u8 *sig);
-extern "c" i32 ktm_crypto_verify(void *key, u8 *data, u64 len, u8 *sig, u64 slen);
+extern "c" i32 ktm_crypto_sign_with(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_verify_with(void *key, i32 bits, u8 *data, u64 len, u8 *sig, u64 slen);
+extern "c" void *ktm_crypto_rsa_generate(i32 bits, i32 *err);
+extern "c" i32 ktm_crypto_key_kind(void *key);
+extern "c" i64 ktm_crypto_key_bits(void *key);
 extern "c" void ktm_crypto_key_free(void *key);
 extern "c" i32 ktm_crypto_blake2b(u8 *in, u64 len, u8 *out, u64 outlen);
 extern "c" i32 ktm_crypto_argon2id(u8 *pw, u64 plen, u8 *salt, u64 slen, u32 t, u32 m, u32 p, u8 *out, u64 olen);
@@ -203,7 +219,7 @@ pub bool open(Aead alg, u8[] key, u8[] nonce, u8[] sealed, String *plain, u8[] a
     return true;
 }
 
-/* ---- ECDSA P-256 ---- */
+/* ---- signatures: ECDSA P-256, RSA ---- */
 
 static Key *keyOf(void *native, bool priv) {
     Key *k = mem.allocZero(sizeof(Key));
@@ -212,7 +228,7 @@ static Key *keyOf(void *native, bool priv) {
     return k;
 }
 
-/* A new random private key */
+/* A new random private P-256 key */
 pub Key *generateKey() {
     i32 err = 0;
     void *n = ktm_crypto_key_generate(&err);
@@ -220,25 +236,39 @@ pub Key *generateKey() {
     return keyOf(n, true);
 }
 
-/* A private key from PEM ("-----BEGIN EC PRIVATE KEY-----" or PKCS#8) */
-pub Key *privateKey(u8[] pem) {
+/* A new random private RSA key of bits bits (2048 or more; it takes a
+ * moment: about a tenth of a second for 2048) */
+pub Key *generateRsaKey(i64 bits = 2048) {
+    if (bits < 2048 || bits > 8192) {
+        throw(ERR_CRYPTO, "crypto: an RSA key has 2048 to 8192 bits, not %d", bits);
+    }
     i32 err = 0;
-    void *n = ktm_crypto_key_load(pem.ptr, pem.len, 1, &err);
-    if (!n) { fail("reading the private key (a P-256 one)", err); }
+    void *n = ktm_crypto_rsa_generate((i32)bits, &err);
+    if (!n) { fail("making an RSA key", err); }
     return keyOf(n, true);
 }
 
-/* A public key from PEM ("-----BEGIN PUBLIC KEY-----") */
+/* A private key from PEM: P-256 ("-----BEGIN EC PRIVATE KEY-----" or
+ * PKCS#8) or RSA of 2048 bits or more ("-----BEGIN RSA PRIVATE KEY-----"
+ * or PKCS#8) */
+pub Key *privateKey(u8[] pem) {
+    i32 err = 0;
+    void *n = ktm_crypto_key_load(pem.ptr, pem.len, 1, &err);
+    if (!n) { fail("reading the private key (P-256, or RSA of 2048 bits or more)", err); }
+    return keyOf(n, true);
+}
+
+/* A public key from PEM ("-----BEGIN PUBLIC KEY-----"): P-256 or RSA */
 pub Key *publicKey(u8[] pem) {
     i32 err = 0;
     void *n = ktm_crypto_key_load(pem.ptr, pem.len, 0, &err);
-    if (!n) { fail("reading the public key (a P-256 one)", err); }
+    if (!n) { fail("reading the public key (P-256, or RSA of 2048 bits or more)", err); }
     return keyOf(n, false);
 }
 
 static String pemOf(Key *k, bool priv) {
-    u8 buf[2048];
-    i64 n = ktm_crypto_key_pem(k.native, priv ? 1 : 0, buf, 2048);
+    u8 buf[8192];
+    i64 n = ktm_crypto_key_pem(k.native, priv ? 1 : 0, buf, 8192);
     if (n < 0) { fail("writing the key", (i32)n); }
     return str.from(buf[0:n]);
 }
@@ -254,19 +284,48 @@ pub String Key.publicPem() {
     return pemOf(self, false);
 }
 
-/* The signature of data (SHA-256, then ECDSA): 64 bytes r||s, as JWT's
- * ES256 has it, a new String (yours). Deterministic (RFC 6979). */
-pub String Key.sign(u8[] data) {
-    if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
-    u8 sig[64];
-    i32 r = ktm_crypto_sign(self.native, data.ptr, data.len, sig);
-    if (r != 0) { fail("signing", r); }
-    return str.from(sig[0:64]);
+/* What the key is: KeyKind.ec256 or KeyKind.rsa */
+pub KeyKind Key.kind() {
+    return ktm_crypto_key_kind(self.native) == 1 ? KeyKind.rsa : KeyKind.ec256;
 }
 
-/* Is sig (64-byte r||s, or DER) this key's signature of data? */
+/* Its size in bits: 256 for P-256, the modulus's for RSA */
+pub i64 Key.bits() {
+    return ktm_crypto_key_bits(self.native);
+}
+
+static i32 hashBits(Hash h) {
+    if (h == Hash.sha384) { return 384; }
+    if (h == Hash.sha512) { return 512; }
+    return 256;
+}
+
+/* The signature of data's h digest, a new String (yours): for P-256 the
+ * 64 bytes r||s, as JWT's ES256 has it, deterministic (RFC 6979); for
+ * RSA PKCS#1 v1.5, the key's size in bytes (JWT's RS256, RS384, RS512) */
+pub String Key.signWith(Hash h, u8[] data) {
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: signing needs a private key"); }
+    u8 sig[1024];
+    u64 n = 0;
+    i32 r = ktm_crypto_sign_with(self.native, hashBits(h), data.ptr, data.len, sig, 1024, &n);
+    if (r != 0) { fail("signing", r); }
+    return str.from(sig[0:n]);
+}
+
+/* Is sig this key's signature of data's h digest? (P-256: 64-byte r||s,
+ * or DER; RSA: PKCS#1 v1.5) */
+pub bool Key.verifyWith(Hash h, u8[] data, u8[] sig) {
+    return ktm_crypto_verify_with(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
+}
+
+/* signWith(Hash.sha256, data): JWT's ES256 for a P-256 key, RS256 for RSA */
+pub String Key.sign(u8[] data) {
+    return self.signWith(Hash.sha256, data);
+}
+
+/* verifyWith(Hash.sha256, data, sig) */
 pub bool Key.verify(u8[] data, u8[] sig) {
-    return ktm_crypto_verify(self.native, data.ptr, data.len, sig.ptr, sig.len) == 0;
+    return self.verifyWith(Hash.sha256, data, sig);
 }
 
 pub void Key.free() {

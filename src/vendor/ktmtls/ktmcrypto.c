@@ -18,6 +18,7 @@
 #include "mbedtls/md.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/pkcs5.h"
+#include "mbedtls/rsa.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/sha512.h"
 #include "psa/crypto.h"
@@ -161,6 +162,13 @@ void *ktm_crypto_key_generate(int *err) {
     return pk;
 }
 
+/* The keys crypto.Key takes: P-256, and RSA of 2048 bits or more */
+static int ktmCryptoKeyUsable(mbedtls_pk_context *pk) {
+    if (mbedtls_pk_get_type(pk) == MBEDTLS_PK_RSA) return mbedtls_pk_get_bitlen(pk) >= 2048;
+    return mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY) &&
+           mbedtls_pk_ec(*pk)->MBEDTLS_PRIVATE(grp).id == MBEDTLS_ECP_DP_SECP256R1;
+}
+
 /* A PEM (or DER) key: private when priv, else public. NULL with *err. */
 void *ktm_crypto_key_load(const unsigned char *pem, size_t len, int priv, int *err) {
     if (!ktmCryptoStart()) { *err = -1; return NULL; }
@@ -172,10 +180,7 @@ void *ktm_crypto_key_load(const unsigned char *pem, size_t len, int priv, int *e
     int r = priv ? mbedtls_pk_parse_key(pk, z, len + 1, NULL, 0, mbedtls_ctr_drbg_random, &ktm_crypto_drbg)
                  : mbedtls_pk_parse_public_key(pk, z, len + 1);
     free(z);
-    if (r == 0 && (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY) ||
-                   mbedtls_pk_ec(*pk)->MBEDTLS_PRIVATE(grp).id != MBEDTLS_ECP_DP_SECP256R1)) {
-        r = MBEDTLS_ERR_PK_TYPE_MISMATCH;
-    }
+    if (r == 0 && !ktmCryptoKeyUsable(pk)) r = MBEDTLS_ERR_PK_TYPE_MISMATCH;
     if (r != 0) {
         mbedtls_pk_free(pk);
         free(pk);
@@ -185,6 +190,32 @@ void *ktm_crypto_key_load(const unsigned char *pem, size_t len, int priv, int *e
     return pk;
 }
 
+/* A new RSA private key of bits bits (exponent 65537). NULL with *err. */
+void *ktm_crypto_rsa_generate(int bits, int *err) {
+    if (!ktmCryptoStart()) { *err = -1; return NULL; }
+    mbedtls_pk_context *pk = calloc(1, sizeof(*pk));
+    mbedtls_pk_init(pk);
+    int r = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+    if (r == 0) r = mbedtls_rsa_gen_key(mbedtls_pk_rsa(*pk), mbedtls_ctr_drbg_random, &ktm_crypto_drbg,
+                                        (unsigned int)bits, 65537);
+    if (r != 0) {
+        mbedtls_pk_free(pk);
+        free(pk);
+        *err = r;
+        return NULL;
+    }
+    return pk;
+}
+
+/* 0: P-256, 1: RSA */
+int ktm_crypto_key_kind(void *key) {
+    return mbedtls_pk_get_type(key) == MBEDTLS_PK_RSA ? 1 : 0;
+}
+
+long ktm_crypto_key_bits(void *key) {
+    return (long)mbedtls_pk_get_bitlen(key);
+}
+
 /* The key as PEM into out (outlen bytes): its length, or a negative code */
 long ktm_crypto_key_pem(void *key, int priv, unsigned char *out, size_t outlen) {
     int r = priv ? mbedtls_pk_write_key_pem(key, out, outlen) : mbedtls_pk_write_pubkey_pem(key, out, outlen);
@@ -192,37 +223,64 @@ long ktm_crypto_key_pem(void *key, int priv, unsigned char *out, size_t outlen) 
     return (long)strlen((char *)out);
 }
 
-/* A raw r||s signature (64 bytes, as JWT's ES256) of SHA-256(data) */
-int ktm_crypto_sign(void *key, const unsigned char *data, size_t len, unsigned char *sig64) {
-    unsigned char h[32];
+/* SHA-256, -384 or -512 (bits) of data into h: its length */
+static size_t ktmCryptoDigest(int bits, const unsigned char *data, size_t len, unsigned char *h,
+                              mbedtls_md_type_t *md) {
+    *md = bits == 512 ? MBEDTLS_MD_SHA512 : bits == 384 ? MBEDTLS_MD_SHA384 : MBEDTLS_MD_SHA256;
+    if (bits == 512 || bits == 384) {
+        mbedtls_sha512(data, len, h, bits == 384);
+        return bits / 8;
+    }
     mbedtls_sha256(data, len, h, 0);
-    mbedtls_ecp_keypair *k = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
+    return 32;
+}
+
+/* The signature of the bits-bit SHA-2 digest of data into sig (cap
+ * bytes), its length in *olen: P-256 ECDSA as raw r||s (64 bytes, as
+ * JWT's ES256 has it, deterministic: RFC 6979), RSA as PKCS#1 v1.5
+ * (the key's size, as RS256) */
+int ktm_crypto_sign_with(void *key, int bits, const unsigned char *data, size_t len, unsigned char *sig,
+                         size_t cap, size_t *olen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
+    mbedtls_pk_context *pk = key;
+    if (mbedtls_pk_get_type(pk) == MBEDTLS_PK_RSA) {
+        return mbedtls_pk_sign(pk, md, h, hlen, sig, cap, olen, mbedtls_ctr_drbg_random, &ktm_crypto_drbg);
+    }
+    if (cap < 64) return MBEDTLS_ERR_PK_BUFFER_TOO_SMALL;
+    mbedtls_ecp_keypair *k = mbedtls_pk_ec(*pk);
     mbedtls_mpi r, s;
     mbedtls_mpi_init(&r);
     mbedtls_mpi_init(&s);
-    int e = mbedtls_ecdsa_sign_det_ext(&k->MBEDTLS_PRIVATE(grp), &r, &s, &k->MBEDTLS_PRIVATE(d), h, 32,
-                                       MBEDTLS_MD_SHA256, mbedtls_ctr_drbg_random, &ktm_crypto_drbg);
-    if (e == 0) e = mbedtls_mpi_write_binary(&r, sig64, 32);
-    if (e == 0) e = mbedtls_mpi_write_binary(&s, sig64 + 32, 32);
+    int e = mbedtls_ecdsa_sign_det_ext(&k->MBEDTLS_PRIVATE(grp), &r, &s, &k->MBEDTLS_PRIVATE(d), h, hlen,
+                                       md, mbedtls_ctr_drbg_random, &ktm_crypto_drbg);
+    if (e == 0) e = mbedtls_mpi_write_binary(&r, sig, 32);
+    if (e == 0) e = mbedtls_mpi_write_binary(&s, sig + 32, 32);
     mbedtls_mpi_free(&r);
     mbedtls_mpi_free(&s);
+    *olen = 64;
     return e;
 }
 
-/* 0 when sig (64-byte r||s, or DER) is key's signature of data */
-int ktm_crypto_verify(void *key, const unsigned char *data, size_t len, const unsigned char *sig, size_t slen) {
-    unsigned char h[32];
-    mbedtls_sha256(data, len, h, 0);
-    if (slen != 64) {
-        return mbedtls_pk_verify(key, MBEDTLS_MD_SHA256, h, 32, sig, slen);
+/* 0 when sig is key's signature of the bits-bit SHA-2 digest of data
+ * (P-256: 64-byte r||s or DER; RSA: PKCS#1 v1.5) */
+int ktm_crypto_verify_with(void *key, int bits, const unsigned char *data, size_t len,
+                           const unsigned char *sig, size_t slen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    size_t hlen = ktmCryptoDigest(bits, data, len, h, &md);
+    mbedtls_pk_context *pk = key;
+    if (mbedtls_pk_get_type(pk) == MBEDTLS_PK_RSA || slen != 64) {
+        return mbedtls_pk_verify(pk, md, h, hlen, sig, slen);
     }
-    mbedtls_ecp_keypair *k = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
+    mbedtls_ecp_keypair *k = mbedtls_pk_ec(*pk);
     mbedtls_mpi r, s;
     mbedtls_mpi_init(&r);
     mbedtls_mpi_init(&s);
     int e = mbedtls_mpi_read_binary(&r, sig, 32);
     if (e == 0) e = mbedtls_mpi_read_binary(&s, sig + 32, 32);
-    if (e == 0) e = mbedtls_ecdsa_verify(&k->MBEDTLS_PRIVATE(grp), h, 32, &k->MBEDTLS_PRIVATE(Q), &r, &s);
+    if (e == 0) e = mbedtls_ecdsa_verify(&k->MBEDTLS_PRIVATE(grp), h, hlen, &k->MBEDTLS_PRIVATE(Q), &r, &s);
     mbedtls_mpi_free(&r);
     mbedtls_mpi_free(&s);
     return e;
