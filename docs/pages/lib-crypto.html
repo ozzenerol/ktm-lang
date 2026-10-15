@@ -36,8 +36,20 @@ if (!crypto.open(crypto.Aead.aesGcm, key[0:], nonce[0:], box, &plain, "msg-7")) 
   // altered, or not ours
 }
 </code></pre>
-<p><code>Aead.aesGcm</code> is AES-256-GCM (fastest where the CPU has AES instructions), <code>Aead.chacha20Poly1305</code>
-is ChaCha20-Poly1305 (fast everywhere). <code>seal</code> adds <code>crypto.TAG_SIZE</code> (16) bytes.</p>
+<p><code>Aead.aesGcm</code> is AES-256-GCM (fastest where the CPU has AES instructions; a 16- or 24-byte key makes it
+AES-128 or AES-192), <code>Aead.chacha20Poly1305</code> is ChaCha20-Poly1305 (fast everywhere, 32-byte keys).
+<code>seal</code> adds <code>crypto.TAG_SIZE</code> (16) bytes.</p>
+
+<h2>Building blocks for JWE</h2>
+<p>Encrypted JSON Web Tokens (ktm-jwt) put these together. Use <code>seal</code> for your own data: these don't
+authenticate on their own.</p>
+<table>
+  <tr><th>Call</th><th>What it does</th></tr>
+  <tr><td><code>crypto.aesCbcEncrypt(key, iv, plain)</code>, <code>aesCbcDecrypt(key, iv, ct, &amp;plain)</code></td><td>AES-CBC (16-, 24- or 32-byte key, 16-byte iv) with PKCS#7 padding; decrypting says false on bad padding. Check a MAC over <code>ct</code> first.</td></tr>
+  <tr><td><code>crypto.aesKeyWrap(kek, key)</code>, <code>aesKeyUnwrap(kek, wrapped, &amp;key)</code></td><td>RFC 3394 key wrap (JWE's A128KW, A192KW, A256KW): 8 bytes longer; unwrapping says false for another <code>kek</code> or an altered one</td></tr>
+  <tr><td><code>k.encryptOaep(h, data)</code>, <code>k.decryptOaep(h, data, &amp;plain)</code></td><td>RSA-OAEP, MGF1 and label hash <code>h</code> (JWE's RSA-OAEP-256 is <code>Hash.sha256</code>); randomised; decrypting says false, never why</td></tr>
+  <tr><td><code>k.ecdh(peer)</code></td><td>The ECDH shared secret of a private EC key and a public one of the same curve (JWE's ECDH-ES): 32, 48 or 66 bytes to derive keys from. The peer's point is checked to be on the curve.</td></tr>
+</table>
 
 <h2>Signatures</h2>
 <pre><code>

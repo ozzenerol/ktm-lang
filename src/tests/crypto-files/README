@@ -17,3 +17,7 @@ For test 861 (P-384, P-521): p384-key.pem, p521-key.pem and their public PEMs
 For test 862 (RSA-PSS): openssl's PSS signatures of msg.txt with rsa-key.pem
 (rsa-pss-sha256/384/512.hex, salt as long as the hash, as JWA has it), and one
 with the longest salt (rsa-pss-sha256-maxsalt.hex), which JWA's PS256 refuses.
+For test 863 (JWE primitives): rsa-oaep256.hex (openssl's RSA-OAEP-256
+encryption of msg.txt to rsa-pub.pem), ecdh-a.pem, ecdh-b.pem, ecdh-b-pub.pem and
+their shared secret by openssl (ecdh-ab.hex), and ec-offcurve-pub.pem
+(ecdh-b-pub.pem with its last byte changed: not on the curve).

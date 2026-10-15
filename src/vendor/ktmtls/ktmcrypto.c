@@ -15,7 +15,10 @@
 #include "mbedtls/error.h"
 #include "mbedtls/gcm.h"
 #include "mbedtls/hkdf.h"
+#include "mbedtls/aes.h"
+#include "mbedtls/ecdh.h"
 #include "mbedtls/md.h"
+#include "mbedtls/nist_kw.h"
 #include "mbedtls/pem.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/pkcs5.h"
@@ -99,17 +102,18 @@ int ktm_crypto_pbkdf2(int bits, const unsigned char *pw, size_t plen, const unsi
                                          iterations, (uint32_t)olen, out);
 }
 
-/* ---- authenticated encryption: 32-byte key, 12-byte nonce, 16-byte tag ---- */
+/* ---- authenticated encryption: 12-byte nonce, 16-byte tag; AES-GCM
+ * keys of 16, 24 or 32 bytes (klen), ChaCha20-Poly1305's 32 ---- */
 
-/* alg 0: AES-256-GCM, 1: ChaCha20-Poly1305. out: len bytes, then the tag */
-int ktm_crypto_seal(int alg, const unsigned char *key, const unsigned char *nonce,
+/* alg 0: AES-GCM, 1: ChaCha20-Poly1305. out: len bytes, then the tag */
+int ktm_crypto_seal(int alg, const unsigned char *key, size_t klen, const unsigned char *nonce,
                     const unsigned char *aad, size_t alen, const unsigned char *in, size_t len,
                     unsigned char *out) {
     int r;
     if (alg == 0) {
         mbedtls_gcm_context g;
         mbedtls_gcm_init(&g);
-        r = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, 256);
+        r = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, (unsigned int)klen * 8);
         if (r == 0) r = mbedtls_gcm_crypt_and_tag(&g, MBEDTLS_GCM_ENCRYPT, len, nonce, 12, aad, alen,
                                                   in, out, 16, out + len);
         mbedtls_gcm_free(&g);
@@ -126,14 +130,14 @@ int ktm_crypto_seal(int alg, const unsigned char *key, const unsigned char *nonc
 /* in: len bytes of ciphertext then the 16-byte tag; out: len bytes.
  * MBEDTLS_ERR_GCM_AUTH_FAILED / MBEDTLS_ERR_CHACHAPOLY_AUTH_FAILED when
  * it was altered or the key, nonce or aad differ. */
-int ktm_crypto_open(int alg, const unsigned char *key, const unsigned char *nonce,
+int ktm_crypto_open(int alg, const unsigned char *key, size_t klen, const unsigned char *nonce,
                     const unsigned char *aad, size_t alen, const unsigned char *in, size_t len,
                     unsigned char *out) {
     int r;
     if (alg == 0) {
         mbedtls_gcm_context g;
         mbedtls_gcm_init(&g);
-        r = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, 256);
+        r = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, (unsigned int)klen * 8);
         if (r == 0) r = mbedtls_gcm_auth_decrypt(&g, len, nonce, 12, aad, alen, in + len, 16, in, out);
         mbedtls_gcm_free(&g);
     } else {
@@ -414,6 +418,155 @@ int ktm_crypto_verify_with(void *key, int bits, const unsigned char *data, size_
     mbedtls_mpi_free(&r);
     mbedtls_mpi_free(&s);
     return e;
+}
+
+/* ---- AES-CBC with PKCS#7 padding (JWE's A128CBC-HS256 and kin: their
+ * callers check the MAC before decrypting) ---- */
+
+/* plain (len bytes) into out (len rounded up to the next 16, a whole
+ * block more when len is a multiple of 16): its length, or a negative
+ * code */
+long ktm_crypto_cbc_encrypt(const unsigned char *key, size_t klen, const unsigned char *iv16,
+                            const unsigned char *in, size_t len, unsigned char *out) {
+    size_t pad = 16 - len % 16, n = len + pad;
+    unsigned char iv[16];
+    memcpy(iv, iv16, 16);
+    memcpy(out, in, len);
+    memset(out + len, (int)pad, pad);
+    mbedtls_aes_context a;
+    mbedtls_aes_init(&a);
+    int r = mbedtls_aes_setkey_enc(&a, key, (unsigned int)klen * 8);
+    if (r == 0) r = mbedtls_aes_crypt_cbc(&a, MBEDTLS_AES_ENCRYPT, n, iv, out, out);
+    mbedtls_aes_free(&a);
+    return r != 0 ? r : (long)n;
+}
+
+/* ct (len bytes, a multiple of 16) into out: the plain text's length,
+ * or -1 when the padding is wrong (or a negative code) */
+long ktm_crypto_cbc_decrypt(const unsigned char *key, size_t klen, const unsigned char *iv16,
+                            const unsigned char *in, size_t len, unsigned char *out) {
+    if (len == 0 || len % 16 != 0) return -1;
+    unsigned char iv[16];
+    memcpy(iv, iv16, 16);
+    mbedtls_aes_context a;
+    mbedtls_aes_init(&a);
+    int r = mbedtls_aes_setkey_dec(&a, key, (unsigned int)klen * 8);
+    if (r == 0) r = mbedtls_aes_crypt_cbc(&a, MBEDTLS_AES_DECRYPT, len, iv, in, out);
+    mbedtls_aes_free(&a);
+    if (r != 0) return r;
+    /* every padding byte is the count, without branching on which */
+    unsigned char pad = out[len - 1], bad = (unsigned char)(pad == 0) | (unsigned char)(pad > 16);
+    for (size_t i = 0; i < 16; i++) {
+        unsigned char in_pad = (unsigned char)(((i < pad) & 1) * 0xff);
+        bad |= in_pad & (out[len - 1 - i] ^ pad);
+    }
+    if (bad) {
+        memset(out, 0, len);
+        return -1;
+    }
+    return (long)(len - pad);
+}
+
+/* ---- AES key wrap (RFC 3394, JWE's A128KW...) ---- */
+
+/* key (klen bytes, a multiple of 8, at least 16) wrapped with kek
+ * (16/24/32 bytes) into out (klen + 8): 0, or a negative code */
+int ktm_crypto_kw_wrap(const unsigned char *kek, size_t keklen, const unsigned char *key, size_t klen,
+                       unsigned char *out) {
+    mbedtls_nist_kw_context c;
+    size_t olen = 0;
+    mbedtls_nist_kw_init(&c);
+    int r = mbedtls_nist_kw_setkey(&c, MBEDTLS_CIPHER_ID_AES, kek, (unsigned int)keklen * 8, 1);
+    if (r == 0) r = mbedtls_nist_kw_wrap(&c, MBEDTLS_KW_MODE_KW, key, klen, out, &olen, klen + 8);
+    mbedtls_nist_kw_free(&c);
+    return r;
+}
+
+/* wrapped (len bytes) unwrapped with kek into out (len - 8): 0, or a
+ * negative code when it isn't kek's */
+int ktm_crypto_kw_unwrap(const unsigned char *kek, size_t keklen, const unsigned char *in, size_t len,
+                         unsigned char *out) {
+    mbedtls_nist_kw_context c;
+    size_t olen = 0;
+    if (len < 24 || len % 8 != 0) return MBEDTLS_ERR_CIPHER_BAD_INPUT_DATA;
+    mbedtls_nist_kw_init(&c);
+    int r = mbedtls_nist_kw_setkey(&c, MBEDTLS_CIPHER_ID_AES, kek, (unsigned int)keklen * 8, 0);
+    if (r == 0) r = mbedtls_nist_kw_unwrap(&c, MBEDTLS_KW_MODE_KW, in, len, out, &olen, len - 8);
+    mbedtls_nist_kw_free(&c);
+    if (r != 0) memset(out, 0, len - 8);
+    return r;
+}
+
+/* ---- RSA-OAEP (PKCS#1 v2.1, empty label; JWE's RSA-OAEP-256) ---- */
+
+/* data encrypted to key (public), MGF1 and the label hash with bits'
+ * SHA-2, into out (the key's size): 0, or a negative code */
+int ktm_crypto_oaep_encrypt(void *key, int bits, const unsigned char *in, size_t len, unsigned char *out,
+                            size_t cap, size_t *olen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key) || mbedtls_pk_get_type(key) != MBEDTLS_PK_RSA) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(*(mbedtls_pk_context *)key);
+    size_t n = mbedtls_rsa_get_len(rsa);
+    if (cap < n) return MBEDTLS_ERR_PK_BUFFER_TOO_SMALL;
+    ktmCryptoDigest(bits, (const unsigned char *)"", 0, h, &md);
+    /* a copy set to OAEP, as for PSS: the key's context isn't touched */
+    mbedtls_rsa_context tmp;
+    mbedtls_rsa_init(&tmp);
+    int r = mbedtls_rsa_copy(&tmp, rsa);
+    if (r == 0) r = mbedtls_rsa_set_padding(&tmp, MBEDTLS_RSA_PKCS_V21, md);
+    if (r == 0) r = mbedtls_rsa_rsaes_oaep_encrypt(&tmp, mbedtls_ctr_drbg_random, &ktm_crypto_drbg, NULL, 0,
+                                                   len, in, out);
+    mbedtls_rsa_free(&tmp);
+    if (r == 0) *olen = n;
+    return r;
+}
+
+/* in (the key's size) decrypted with key (private) into out (cap bytes),
+ * its length in *olen: 0, or a negative code, the same for every way it
+ * can fail */
+int ktm_crypto_oaep_decrypt(void *key, int bits, const unsigned char *in, size_t len, unsigned char *out,
+                            size_t cap, size_t *olen) {
+    unsigned char h[64];
+    mbedtls_md_type_t md;
+    if (ktmKeyIsEd(key) || mbedtls_pk_get_type(key) != MBEDTLS_PK_RSA) return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(*(mbedtls_pk_context *)key);
+    if (len != mbedtls_rsa_get_len(rsa)) return MBEDTLS_ERR_RSA_INVALID_PADDING;
+    ktmCryptoDigest(bits, (const unsigned char *)"", 0, h, &md);
+    mbedtls_rsa_context tmp;
+    mbedtls_rsa_init(&tmp);
+    int r = mbedtls_rsa_copy(&tmp, rsa);
+    if (r == 0) r = mbedtls_rsa_set_padding(&tmp, MBEDTLS_RSA_PKCS_V21, md);
+    if (r == 0) r = mbedtls_rsa_rsaes_oaep_decrypt(&tmp, mbedtls_ctr_drbg_random, &ktm_crypto_drbg, NULL, 0,
+                                                   olen, in, out, cap);
+    mbedtls_rsa_free(&tmp);
+    return r != 0 ? MBEDTLS_ERR_RSA_INVALID_PADDING : 0;
+}
+
+/* ---- ECDH (JWE's ECDH-ES) ---- */
+
+/* The shared secret of key (private) and peer (public, the same curve):
+ * the x coordinate, the curve's size, into out (66 bytes of room), its
+ * length in *olen. The peer's point is checked to be on the curve. */
+int ktm_crypto_ecdh(void *key, void *peer, unsigned char *out, size_t *olen) {
+    if (ktmKeyIsEd(key) || ktmKeyIsEd(peer) || mbedtls_pk_get_type(key) == MBEDTLS_PK_RSA ||
+        mbedtls_pk_get_type(peer) == MBEDTLS_PK_RSA) {
+        return MBEDTLS_ERR_PK_TYPE_MISMATCH;
+    }
+    mbedtls_ecp_keypair *k = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
+    mbedtls_ecp_keypair *p = mbedtls_pk_ec(*(mbedtls_pk_context *)peer);
+    if (k->MBEDTLS_PRIVATE(grp).id != p->MBEDTLS_PRIVATE(grp).id) return MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
+    int r = mbedtls_ecp_check_pubkey(&k->MBEDTLS_PRIVATE(grp), &p->MBEDTLS_PRIVATE(Q));
+    if (r != 0) return r;
+    mbedtls_mpi z;
+    mbedtls_mpi_init(&z);
+    r = mbedtls_ecdh_compute_shared(&k->MBEDTLS_PRIVATE(grp), &z, &p->MBEDTLS_PRIVATE(Q),
+                                    &k->MBEDTLS_PRIVATE(d), mbedtls_ctr_drbg_random, &ktm_crypto_drbg);
+    size_t n = ktmEcBytes(key);
+    if (r == 0) r = mbedtls_mpi_write_binary(&z, out, n);
+    mbedtls_mpi_free(&z);
+    if (r == 0) *olen = n;
+    return r;
 }
 
 /* ---- RSA-PSS (PKCS#1 v2.1): MGF1 with the same hash, salt as long as
