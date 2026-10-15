@@ -3,6 +3,24 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.25.0 <small>(2026-10-15)</small></h2>
+<p>Two changes to the language that make a program that compiled before fail to: both say what to
+write instead.</p>
+
+<h3>Changes you may notice</h3>
+<ul>
+  <li><code>ad</code> is gone (v0.24.0 renamed it <code>scoped</code>). <code>ad</code> in front of a
+  declaration is an error that says to write <code>scoped</code>; anywhere else <code>ad</code> is an
+  ordinary name. The packages moved too: <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> v0.2.1,
+  <a href="https://github.com/ozzenerol/ktm-jwt">ktm-jwt</a> v0.2.1 and
+  <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a> v0.1.1 use <code>scoped</code>
+  (<code>ktm get</code> them; older versions don't build any more).</li>
+  <li>A program or package can't give <code>String</code> or <code>Error</code> methods of its own
+  (<code>void String.shout()</code>), as it can't for any library type: their methods are the standard
+  library's. Write a function that takes one instead: <code>void shout(String *s)</code>. See
+  <a href="language/13-methods.html">Methods</a>.</li>
+</ul>
+
 <h2>v0.24.0 <small>(2026-10-15)</small></h2>
 <p>Threads without C, a clearer name for <code>ad</code>, and an LSP that imports for you.</p>
 

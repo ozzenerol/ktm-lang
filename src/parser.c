@@ -13,14 +13,13 @@
 #include "lexer.h"
 #include "list.h"
 #include "parser.h"
-#include "pkg.h"
 #include "prslib.h"
 #include "prsasm.h"
 #include "prsutil.h"
 #include "util.h"
 
-/* `scoped` in front of a declaration (or `ad`, its old spelling): 1 for
- * `scoped`, 2 for `ad`, 0 for any other token */
+/* `scoped` in front of a declaration: 1, and 2 for `ad`, its spelling
+ * until v0.24.0 (removed in v0.25.0: an error that says so) */
 static int parseScopedWord(Lexeme *tok) {
     if (!tok || tok->tk_type != TK_IDENT) return 0;
     if (tok->len == 6 && !memcmp(tok->start, "scoped", 6)) return 1;
@@ -28,18 +27,9 @@ static int parseScopedWord(Lexeme *tok) {
     return 0;
 }
 
-/* `ad` still works, with a warning: not in a package's own files (the
- * module cache), which their authors update */
-static void parseWarnAd(Cctrl *cc, Lexeme *tok) {
-    LexFile *f = cctrlCurFile(cc);
-    char *cache = pkgCacheDir();
-    size_t n = strlen(cache);
-    int in_cache = f && f->filename && !strncmp(f->filename->data, cache, n) &&
-                   (f->filename->data[n] == '/' || f->filename->data[n] == '\0');
-    if (!in_cache) {
-        cctrlWarningAt(cc, tok->line, tok->col, tok->len,
-                "`ad` is now `scoped`: write `scoped` in front of the declaration");
-    }
+static void parseRejectAd(Cctrl *cc, Lexeme *tok) {
+    cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
+            "`ad` was renamed `scoped` (v0.24.0) and is gone: write `scoped`");
 }
 
 #define MAX_ALIGN         16
@@ -869,7 +859,10 @@ List *parseClassOrUnionFields(Cctrl *cc, AoStr *name,
          * has no scope of its own to end */
         if (parseScopedWord(tok_name)) {
             Lexeme *next = cctrlTokenPeekBy(cc, 1);
-            if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
+            if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next) &&
+                parseScopedWord(tok_name) == 2) {
+                parseRejectAd(cc, tok_name);
+            } else if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
                 cctrlRaiseExceptionAt(cc, tok_name->line, tok_name->col, tok_name->len,
                         "`%.*s` goes on a local variable, not a %s field: free "
                         "the field where the %s is freed", tok_name->len, tok_name->start,
@@ -1340,6 +1333,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
         prev->col = tag_col;
         prev->file_id = tag_file;
         prev->in_std = !cc->cur_module && !cc->decl_from_main;
+        prev->in_prelude = cctrlInPrelude(cc);
         mapAdd(env, tag->data, prev);
     }
 
@@ -1412,6 +1406,7 @@ AstType *parseClassOrUnion(Cctrl *cc, Map *env,
     ref->col = tag_col;
     ref->file_id = tag_file;
     ref->in_std = !cc->cur_module && !cc->decl_from_main;
+    ref->in_prelude = cctrlInPrelude(cc);
     if (tag) {
         mapAdd(env,tag->data,ref);
     }
@@ -4764,14 +4759,17 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
         if (scoped_word) {
             Lexeme *next = cctrlTokenPeekBy(cc, 1);
             if (next && next->tk_type != TK_PUNCT && cctrlTokIsKeyword(cc, next)) {
-                scoped_tok = cctrlTokenGet(cc);
                 if (scoped_word == 2) {
-                    parseWarnAd(cc, scoped_tok);
+                    parseRejectAd(cc, tok);
                 }
+                scoped_tok = cctrlTokenGet(cc);
                 tok = cctrlTokenPeek(cc);
             } else if (next && next->tk_type == TK_IDENT) {
-                /* `ad Name x` / `ad mod.Name x`: a declaration whose type
-                 * isn't known (two names in a row are no expression) */
+                /* `scoped Name x` / `scoped mod.Name x`: a declaration whose
+                 * type isn't known (two names in a row are no expression) */
+                if (scoped_word == 2) {
+                    parseRejectAd(cc, tok);
+                }
                 Lexeme *after = cctrlTokenPeekBy(cc, 2);
                 Lexeme *member = after && tokenPunctIs(after, '.') ? cctrlTokenPeekBy(cc, 3) : NULL;
                 if (member) {
@@ -6357,14 +6355,25 @@ static Ast *parseMethodDef(Cctrl *cc, AstType *rettype, Lexeme *type_tok,
          * part), from the prelude itself */
         mine = mine && (!path || cctrlInPrelude(cc));
     }
-    /* the prelude's String: its methods are module str's */
-    if (!dot && astTypeIsString(cls) && path && path->len == 3 &&
-        !memcmp(path->data, "str", 3)) {
-        mine = 1;
+    /* a prelude struct looks like the program's own (its name has no
+     * module part): only the prelude adds methods to it, and module str
+     * to String */
+    if (!dot && cls->in_prelude) {
+        mine = cctrlInPrelude(cc) ||
+               (astTypeIsString(cls) && path && path->len == 3 &&
+                !memcmp(path->data, "str", 3));
     }
     /* (reported once, by a module's full pass) */
     if (!mine && !cc->decls_only) {
+        Lexeme *mpeek = cctrlTokenPeek(cc);
+        int mlen = mpeek && mpeek->tk_type == TK_IDENT ? mpeek->len : 1;
+        const char *mname = mpeek && mpeek->tk_type == TK_IDENT ? mpeek->start : "f";
         cctrlRewindUntilStrMatch(cc, tname, tlen, NULL);
+        if (cls->in_prelude) {
+            cctrlRaiseException(cc, "methods of `%s` can only be defined by the standard "
+                    "library: write a function that takes it, as `%.*s(%s *s)`",
+                    cls->clsname->data, mlen, mname, cls->clsname->data);
+        }
         cctrlRaiseException(cc, "methods of `%s` can only be defined %s",
                 cls->clsname->data,
                 cls->in_std ? "by the standard library"

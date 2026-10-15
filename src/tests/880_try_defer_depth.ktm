@@ -1,6 +1,6 @@
 import cstr, fs, libc, mem, proc, str, test;
 
-/* v0.23.0: up to 256 try blocks and defers (each `ad` variable is one) in
+/* v0.23.0: up to 256 try blocks and defers (each `scoped` variable is one) in
  * scope at once in a function, not 32; past that, an error that names the
  * file and line, not a bare "nesting above 32". */
 
@@ -117,10 +117,10 @@ u8 *compile(u8 *source) {
 
 i32 main() {
     printf("Test - try and defer depth: ");
-    check(deep() == 2, "60 ad variables and 12 nested tries in one function");
+    check(deep() == 2, "60 scoped variables and 12 nested tries in one function");
 
     String src = str.from("import str;\nvoid f() {\n");
-    for (i64 i = 0; i < 300; i++) { src.appendFormat("    ad String t%d = str.from(\"y\");\n", i); }
+    for (i64 i = 0; i < 300; i++) { src.appendFormat("    scoped String t%d = str.from(\"y\");\n", i); }
     src.append("}\ni32 main() { f(); return 0; }\n");
     u8 *out = compile(src.cstr());
     check(out && libc.strstr(out, "ktm-880-deep.ktm:259: error: more than 256 try blocks and defers"),
