@@ -28,7 +28,7 @@
   </div>
 </header>
 <div class="doc">
-  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html" class="on"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li></ol></aside>
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html" class="on"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li></ol></aside>
   <article class="prose">
 <h1>A first program</h1>
 <p>What a ktm source file looks like, where a program starts, how it prints, how it ends, and the ways to build and run it.</p>
@@ -83,7 +83,7 @@ the program is called something</code></pre>
     printf(<span class="s">&quot;%d after %d calls\n&quot;</span>, manhattan(p), gCalls);
 }</code></pre>
 <pre class="out"><code>7 after 4 calls</code></pre>
-<ul><li>Order doesn't matter between functions: <code>main</code> can call a function declared below it.</li><li>Names at file scope are visible in the whole file.</li><li>A global's initial value can run code. Those run in order, before <code>main</code>.</li></ul>
+<ul><li>A function is declared before it is called: define it above its first call, or declare it there with a prototype (see <a href="07-functions.html#order-and-prototypes">Functions</a>).</li><li>Globals, types and constants are visible from their declaration to the end of the file.</li><li>A global's initial value can run code. Those run in order, before <code>main</code>.</li></ul>
 <pre class="code run"><code><span class="t">i64</span> square(<span class="t">i64</span> n) { <span class="k">return</span> n * n; }
 
 <span class="t">i64</span> gBase = <span class="n">7</span>;

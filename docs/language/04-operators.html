@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operators - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html" class="on"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li></ol></aside>
+  <article class="prose">
+<h1>Operators</h1>
+<p>Arithmetic, bit operations, assignment, comparisons and logic, ktm's chained comparisons, <code>sizeof</code> and <code>typeof</code>, casts, and the order operators apply in.</p>
+<h2 id="arithmetic"><a href="#arithmetic">Arithmetic</a></h2>
+<p><code>+</code>, <code>-</code>, <code>*</code>, <code>/</code> and <code>%</code> work as in C. Integer division drops the fraction; with a float on either side the result is a float.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">7</span>, b = <span class="n">2</span>;
+    printf(<span class="s">&quot;%d %d %d %d %d\n&quot;</span>, a + b, a - b, a * b, a / b, a % b);
+    printf(<span class="s">&quot;%.2f %.2f\n&quot;</span>, <span class="n">7.0</span> / <span class="n">2</span>, a / <span class="n">2.0</span>);
+}</code></pre>
+<pre class="out"><code>9 5 14 3 1
+3.50 3.50</code></pre>
+<p>There is no exponent operator: use <code>math.power(x, y)</code>, which takes and returns an <code>f64</code>.</p>
+<pre class="code run"><code><span class="k">import</span> math;
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%.0f %.3f\n&quot;</span>, math.power(<span class="n">2</span>, <span class="n">10</span>), math.power(<span class="n">2</span>, <span class="n">0.5</span>));
+}</code></pre>
+<pre class="out"><code>1024 1.414</code></pre>
+<h3 id="unary-minus-and-plus"><a href="#unary-minus-and-plus">Unary minus and plus</a></h3>
+<p>Unary <code>-</code> and <code>+</code> take a number. A narrower integer is widened to <code>i64</code> first, so negating a <code>u8</code> gives a negative number, not a wrapped byte.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> small = <span class="n">200</span>;
+    <span class="t">i64</span> n = <span class="n">5</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, -small, -n, +n);
+}</code></pre>
+<pre class="out"><code>-200 -5 5</code></pre>
+<h2 id="bit-operations"><a href="#bit-operations">Bit operations</a></h2>
+<p><code>&amp;</code> (and), <code>|</code> (or), <code>^</code> (exclusive or), <code>~</code> (not), <code>&lt;&lt;</code> and <code>&gt;&gt;</code> (shifts).</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">0b1100</span>, b = <span class="n">0b1010</span>;
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, a &amp; b, a | b, a ^ b, ~a);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">1</span> &lt;&lt; <span class="n">10</span>, <span class="n">1024</span> &gt;&gt; <span class="n">3</span>);
+}</code></pre>
+<pre class="out"><code>8 14 6 -13
+1024 128</code></pre>
+<p>Flags are the usual use: one bit per option, <code>|</code> to combine, <code>&amp;</code> to test, <code>&amp; ~</code> to clear.</p>
+<pre class="code run"><code><span class="k">const</span> <span class="t">i64</span> READ = <span class="n">1</span> &lt;&lt; <span class="n">0</span>;
+<span class="k">const</span> <span class="t">i64</span> WRITE = <span class="n">1</span> &lt;&lt; <span class="n">1</span>;
+<span class="k">const</span> <span class="t">i64</span> EXEC = <span class="n">1</span> &lt;&lt; <span class="n">2</span>;
+
+<span class="t">void</span> show(<span class="t">i64</span> mode) {
+    printf(<span class="s">&quot;%c%c%c\n&quot;</span>, mode &amp; READ ? <span class="s">&#x27;r&#x27;</span> : <span class="s">&#x27;-&#x27;</span>, mode &amp; WRITE ? <span class="s">&#x27;w&#x27;</span> : <span class="s">&#x27;-&#x27;</span>, mode &amp; EXEC ? <span class="s">&#x27;x&#x27;</span> : <span class="s">&#x27;-&#x27;</span>);
+}
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> mode = READ | WRITE;
+    show(mode);
+    mode |= EXEC;
+    show(mode);
+    mode &amp;= ~WRITE;
+    show(mode);
+}</code></pre>
+<pre class="out"><code>rw-
+rwx
+r-x</code></pre>
+<p><code>&gt;&gt;</code> on a signed value keeps the sign (an arithmetic shift); on an unsigned value it shifts in zeros.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> neg = -<span class="n">16</span>;
+    <span class="t">u64</span> big = <span class="n">0xFFFFFFFFFFFFFFFF</span>;
+    printf(<span class="s">&quot;%d %u\n&quot;</span>, neg &gt;&gt; <span class="n">2</span>, big &gt;&gt; <span class="n">60</span>);
+}</code></pre>
+<pre class="out"><code>-4 15</code></pre>
+<p><code>~</code> takes an integer only: <code>~</code> on an <code>f64</code> is an error.</p>
+<h2 id="assignment"><a href="#assignment">Assignment</a></h2>
+<p><code>=</code> stores a value; <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>, <code>&amp;=</code>, <code>|=</code>, <code>^=</code>, <code>&lt;&lt;=</code> and <code>&gt;&gt;=</code> combine an operation with it. <code>++</code> and <code>--</code> add or subtract one, before (<code>++n</code>) or after (<code>n++</code>) the value is used.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">10</span>;
+    n += <span class="n">5</span>;
+    n *= <span class="n">2</span>;
+    n -= <span class="n">1</span>;
+    n /= <span class="n">3</span>;
+    n %= <span class="n">4</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, n);
+
+    <span class="t">i64</span> i = <span class="n">5</span>;
+    <span class="t">i64</span> before = i++;
+    <span class="t">i64</span> after = ++i;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, before, after, i);
+}</code></pre>
+<pre class="out"><code>1
+5 7 7</code></pre>
+<p>An assignment is also an expression: its value is what was stored. That value has the type of the left side, so it is cut to fit:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a, b, c;
+    a = b = c = <span class="n">7</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, a, b, c);
+
+    <span class="t">u8</span> byte;
+    <span class="t">i64</span> v = (byte = <span class="n">300</span>);
+    printf(<span class="s">&quot;%d\n&quot;</span>, v);
+}</code></pre>
+<pre class="out"><code>7 7 7
+44</code></pre>
+<h2 id="comparisons"><a href="#comparisons">Comparisons</a></h2>
+<p><code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code> give 1 or 0.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">3</span>, b = <span class="n">5</span>;
+    printf(<span class="s">&quot;%d %d %d %d %d %d\n&quot;</span>, a == b, a != b, a &lt; b, a &lt;= b, a &gt; b, a &gt;= b);
+}</code></pre>
+<pre class="out"><code>0 1 1 1 0 0</code></pre>
+<p>On <code>u64</code> values, comparisons, <code>/</code>, <code>%</code> and <code>&gt;&gt;</code> are unsigned:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u64</span> big = <span class="n">0xFFFFFFFFFFFFFFFF</span>;
+    <span class="t">i64</span> neg = -<span class="n">1</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, big &gt; <span class="n">1</span>, neg &gt; <span class="n">1</span>);
+}</code></pre>
+<pre class="out"><code>1 0</code></pre>
+<h3 id="chained-comparisons"><a href="#chained-comparisons">Chained comparisons</a></h3>
+<p>As in mathematics, <code>lo &lt; x &lt; hi</code> means <code>lo &lt; x &amp;&amp; x &lt; hi</code>, and the middle value is computed once.</p>
+<pre class="code run"><code><span class="t">bool</span> inRange(<span class="t">i64</span> x) { <span class="k">return</span> <span class="n">1</span> &lt;= x &lt;= <span class="n">10</span>; }
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, inRange(<span class="n">0</span>), inRange(<span class="n">5</span>), inRange(<span class="n">10</span>));
+    <span class="t">i64</span> a = <span class="n">1</span>, b = <span class="n">2</span>, c = <span class="n">3</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a &lt; b &lt; c, a &lt; c &lt; b);
+}</code></pre>
+<pre class="out"><code>0 1 1
+1 0</code></pre>
+<h2 id="logic"><a href="#logic">Logic</a></h2>
+<p><code>&amp;&amp;</code> (and), <code>||</code> (or) and <code>!</code> (not) take any number or pointer: zero and <code>null</code> are false, everything else is true. They give 1 or 0.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">f64</span> half = <span class="n">0.5</span>;
+    <span class="t">u8</span> *none = <span class="k">null</span>;
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, half &amp;&amp; <span class="n">1</span>, !half, none || <span class="n">0</span>, !none);
+}</code></pre>
+<pre class="out"><code>1 0 0 1</code></pre>
+<p><code>&amp;&amp;</code> and <code>||</code> stop as soon as the answer is known: the right side runs only when it is needed. That makes "check, then use" safe in one expression.</p>
+<pre class="code run"><code><span class="t">bool</span> loud(<span class="t">u8</span> *name, <span class="t">bool</span> v) {
+    printf(<span class="s">&quot;%s &quot;</span>, name);
+    <span class="k">return</span> v;
+}
+
+<span class="t">void</span> main() {
+    <span class="t">bool</span> r1 = loud(<span class="s">&quot;a&quot;</span>, <span class="k">false</span>) &amp;&amp; loud(<span class="s">&quot;b&quot;</span>, <span class="k">true</span>);
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="t">bool</span> r2 = loud(<span class="s">&quot;c&quot;</span>, <span class="k">true</span>) || loud(<span class="s">&quot;d&quot;</span>, <span class="k">true</span>);
+    printf(<span class="s">&quot;\n%d %d\n&quot;</span>, r1, r2);
+
+    <span class="t">u8</span> *name = <span class="k">null</span>;
+    <span class="k">if</span> (name &amp;&amp; name[<span class="n">0</span>] == <span class="s">&#x27;x&#x27;</span>) {
+        printf(<span class="s">&quot;starts with x\n&quot;</span>);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;no name, and no crash\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>a 
+c 
+0 1
+no name, and no crash</code></pre>
+<h2 id="the-conditional-operator"><a href="#the-conditional-operator">The conditional operator</a></h2>
+<p><code>cond ? a : b</code> is <code>a</code> when <code>cond</code> is true, else <code>b</code>. Only the chosen side runs.</p>
+<pre class="code run"><code><span class="t">i64</span> abs(<span class="t">i64</span> n) { <span class="k">return</span> n &lt; <span class="n">0</span> ? -n : n; }
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> count = <span class="n">1</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, abs(-<span class="n">4</span>), abs(<span class="n">4</span>));
+    printf(<span class="s">&quot;%d item%s\n&quot;</span>, count, count == <span class="n">1</span> ? <span class="s">&quot;&quot;</span> : <span class="s">&quot;s&quot;</span>);
+    count = <span class="n">3</span>;
+    printf(<span class="s">&quot;%d item%s\n&quot;</span>, count, count == <span class="n">1</span> ? <span class="s">&quot;&quot;</span> : <span class="s">&quot;s&quot;</span>);
+}</code></pre>
+<pre class="out"><code>4 4
+1 item
+3 items</code></pre>
+<h2 id="sizeof-alignof-and-typeof"><a href="#sizeof-alignof-and-typeof">sizeof, alignof and typeof</a></h2>
+<p><code>sizeof</code> is the size of a type or an expression, <code>alignof</code> its alignment, in bytes. <code>typeof</code> is the name of an expression's type, as a string.</p>
+<pre class="code run"><code><span class="k">struct</span> Pair { <span class="t">i32</span> a; <span class="t">i64</span> b; };
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> arr[<span class="n">10</span>];
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="k">sizeof</span>(arr), <span class="k">sizeof</span>(arr) / <span class="k">sizeof</span>(arr[<span class="n">0</span>]));
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="k">sizeof</span>(Pair), alignof(Pair));
+    printf(<span class="s">&quot;%s | %s | %s\n&quot;</span>, <span class="k">typeof</span>(<span class="n">1</span> + <span class="n">1</span>), <span class="k">typeof</span>(&amp;arr[<span class="n">0</span>]), <span class="k">typeof</span>(arr));
+}</code></pre>
+<pre class="out"><code>80 10
+16 8
+i64 | i64 * | i64[10]</code></pre>
+<p>All three are worked out at compile time. Their operand never runs:</p>
+<pre class="code run"><code><span class="t">i64</span> noisy() {
+    printf(<span class="s">&quot;called!\n&quot;</span>);
+    <span class="k">return</span> <span class="n">1</span>;
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%s %d\n&quot;</span>, <span class="k">typeof</span>(noisy()), <span class="k">sizeof</span>(noisy()));
+}</code></pre>
+<pre class="out"><code>i64 8</code></pre>
+<h2 id="casts"><a href="#casts">Casts</a></h2>
+<p><code>(type)value</code> converts a value, as in C. A cast binds tighter than any binary operator: <code>(f64)a / b</code> converts <code>a</code>, then divides.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">f64</span> f = <span class="n">3.9</span>;
+    <span class="t">i64</span> i = (<span class="t">i64</span>)f;
+    printf(<span class="s">&quot;%d\n&quot;</span>, i);
+    printf(<span class="s">&quot;%.1f %.1f\n&quot;</span>, (<span class="t">f64</span>)(<span class="n">7</span> / <span class="n">2</span>), (<span class="t">f64</span>)<span class="n">7</span> / <span class="n">2</span>);
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, (<span class="t">f64</span>)-i / <span class="n">2</span>);
+
+    <span class="t">u8</span> *s = <span class="s">&quot;hey&quot;</span>;
+    <span class="t">i64</span> address = (<span class="t">i64</span>)s;
+    printf(<span class="s">&quot;%c\n&quot;</span>, *(<span class="t">u8</span> *)address);
+}</code></pre>
+<pre class="out"><code>3
+3.0 3.5
+-1.5
+h</code></pre>
+<ul><li>A cast applies to the whole postfix expression after it: <code>(i64)p.n</code> casts <code>p.n</code>.</li><li>Any type works, function types included: <code>(fn(i64) i64)ptr</code>.</li><li><a href="02-types-and-values.html#converting-between-types">Types and values</a> covers what each conversion does to the value.</li></ul>
+<h2 id="precedence"><a href="#precedence">Precedence</a></h2>
+<p>The same as C, from the tightest to the loosest:</p>
+<div class="table"><table><thead><tr><th>Operators</th><th>Kind</th></tr></thead><tbody><tr><td><code>a[i]</code> <code>f()</code> <code>a.b</code> <code>a-&gt;b</code> <code>x++</code> <code>x--</code></td><td>Postfix</td></tr><tr><td><code>-</code> <code>!</code> <code>~</code> <code>*p</code> <code>&amp;x</code> <code>++x</code> <code>--x</code> <code>(T)x</code> <code>sizeof</code></td><td>Unary</td></tr><tr><td><code>*</code> <code>/</code> <code>%</code></td><td>Multiplicative</td></tr><tr><td><code>+</code> <code>-</code></td><td>Additive</td></tr><tr><td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td><td>Shifts</td></tr><tr><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Relational (they chain)</td></tr><tr><td><code>==</code> <code>!=</code></td><td>Equality</td></tr><tr><td><code>&amp;</code>, then <code>^</code>, then <code>|</code></td><td>Bitwise</td></tr><tr><td><code>&amp;&amp;</code>, then <code>||</code></td><td>Logical</td></tr><tr><td><code>?:</code></td><td>Conditional</td></tr><tr><td><code>=</code> <code>+=</code> <code>-=</code> ...</td><td>Assignment</td></tr></tbody></table></div>
+<p>When in doubt, add parentheses: they cost nothing.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">2</span>, b = <span class="n">3</span>, c = <span class="n">4</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a + b * c, (a + b) * c);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">1</span> &lt;&lt; <span class="n">2</span> + <span class="n">1</span>, (<span class="n">1</span> &lt;&lt; <span class="n">2</span>) + <span class="n">1</span>);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">6</span> &amp; <span class="n">3</span> == <span class="n">3</span>, (<span class="n">6</span> &amp; <span class="n">3</span>) == <span class="n">2</span>);
+}</code></pre>
+<pre class="out"><code>14 20
+8 5
+0 1</code></pre>
+<p>The middle line shows a classic trap: <code>+</code> binds tighter than <code>&lt;&lt;</code>. So does the last one: <code>==</code> binds tighter than <code>&amp;</code>.</p>
+    <nav class="pager"><a class="prev" href="03-variables.html"><span>Previous</span>Variables</a><a class="next" href="05-control-flow.html"><span>Next</span>Control flow</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#arithmetic">Arithmetic</a></li><li><a href="#bit-operations">Bit operations</a></li><li><a href="#assignment">Assignment</a></li><li><a href="#comparisons">Comparisons</a></li><li><a href="#logic">Logic</a></li><li><a href="#the-conditional-operator">The conditional operator</a></li><li><a href="#sizeof-alignof-and-typeof">sizeof, alignof and typeof</a></li><li><a href="#casts">Casts</a></li><li><a href="#precedence">Precedence</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

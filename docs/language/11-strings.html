@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strings - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html" class="on"><span class="num">11</span>Strings</a></li></ol></aside>
+  <article class="prose">
+<h1>Strings</h1>
+<p>ktm has three ways to hold text. A <code>String</code> is text you own: it grows and you free it. A <code>u8[]</code> is a view of text someone else owns: what functions take to read text. A <code>u8 *</code> is a C string, for C functions. This chapter covers all three and how they convert.</p>
+<div class="table"><table><thead><tr><th>Type</th><th>What it is</th><th>Use it for</th></tr></thead><tbody><tr><td><code>String</code></td><td>A pointer, a length and a capacity (24 bytes). Owned, growable, always ends in a NUL</td><td>Text you build or keep</td></tr><tr><td><code>u8[]</code></td><td>A pointer and a length (16 bytes). A view</td><td>Parameters, parts of text, literals</td></tr><tr><td><code>u8 *</code></td><td>A pointer to bytes ending in a NUL</td><td>C functions</td></tr></tbody></table></div>
+<h2 id="making-a-string"><a href="#making-a-string">Making a String</a></h2>
+<p>A <code>String</code> you get from the <a href="../std/index.html#str">str</a> module is yours, to free when you are done. <code>ad</code> frees it at the end of the block.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;Hello&quot;</span>);
+    s.append(<span class="s">&quot;, world&quot;</span>);
+    s.appendFormat(<span class="s">&quot; %d&quot;</span>, <span class="n">2026</span>);
+    printf(<span class="s">&quot;%s (%d bytes)\n&quot;</span>, s, s.len);
+}</code></pre>
+<pre class="out"><code>Hello, world 2026 (17 bytes)</code></pre>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> a = str.new();               <span class="c">// empty, nothing allocated yet</span>
+    <span class="k">ad</span> <span class="t">String</span> b = str.from(<span class="s">&quot;copied&quot;</span>);      <span class="c">// a copy of any text</span>
+    <span class="k">ad</span> <span class="t">String</span> c = str.withCap(<span class="n">64</span>);         <span class="c">// empty, with room for 64 bytes</span>
+    <span class="k">ad</span> <span class="t">String</span> d = str.format(<span class="s">&quot;%d-%s&quot;</span>, <span class="n">42</span>, <span class="s">&quot;x&quot;</span>);
+    <span class="t">String</span> e;                              <span class="c">// a declared String starts empty</span>
+    a.append(<span class="s">&quot;grown&quot;</span>);
+    printf(<span class="s">&quot;[%s] [%s] [%s] [%s] [%d]\n&quot;</span>, a, b, c, d, e.len);
+}</code></pre>
+<pre class="out"><code>[grown] [copied] [] [42-x] [0]</code></pre>
+<p><code>str.format</code> takes <code>printf</code>'s format and returns the result as a new <code>String</code>:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> line = str.format(<span class="s">&quot;%-6s|%5.1f|%03d&quot;</span>, <span class="s">&quot;id&quot;</span>, <span class="n">3.14159</span>, <span class="n">7</span>);
+    printf(<span class="s">&quot;[%s]\n&quot;</span>, line);
+}</code></pre>
+<pre class="out"><code>[id    |  3.1|007]</code></pre>
+<h2 id="changing-a-string"><a href="#changing-a-string">Changing a String</a></h2>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;found 3 files&quot;</span>);
+    s.insert(<span class="n">0</span>, <span class="s">&quot;&gt; &quot;</span>);
+    s.replace(<span class="s">&quot;files&quot;</span>, <span class="s">&quot;logs&quot;</span>);
+    s.append(<span class="s">&quot; in /tmp&quot;</span>);
+    s.appendByte(<span class="s">&#x27;!&#x27;</span>);
+    printf(<span class="s">&quot;%s\n&quot;</span>, s);
+    s.remove(<span class="n">0</span>, <span class="n">2</span>);
+    s.toUpper();
+    printf(<span class="s">&quot;%s\n&quot;</span>, s);
+    s.reverse();
+    printf(<span class="s">&quot;%s\n&quot;</span>, s);
+    s.clear();
+    printf(<span class="s">&quot;[%s] %d\n&quot;</span>, s, s.len);
+}</code></pre>
+<pre class="out"><code>&gt; found 3 logs in /tmp!
+FOUND 3 LOGS IN /TMP!
+!PMT/ NI SGOL 3 DNUOF
+[] 0</code></pre>
+<ul><li><code>s.remove(a, b)</code> removes the bytes from <code>a</code> up to, not including, <code>b</code>.</li><li><code>s.replace(old, new)</code> replaces every <code>old</code>.</li><li>The length and capacity fields can't be assigned: the methods keep them right.</li></ul>
+<p>Building text in a loop:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> csv = str.new();
+    <span class="t">i64</span> values[] = {<span class="n">3</span>, <span class="n">1</span>, <span class="n">4</span>, <span class="n">1</span>, <span class="n">5</span>};
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        <span class="k">if</span> (i &gt; <span class="n">0</span>) { csv.appendByte(<span class="s">&#x27;,&#x27;</span>); }
+        csv.appendFormat(<span class="s">&quot;%d&quot;</span>, values[i]);
+    }
+    printf(<span class="s">&quot;%s\n&quot;</span>, csv);
+}</code></pre>
+<pre class="out"><code>3,1,4,1,5</code></pre>
+<h2 id="reading-text"><a href="#reading-text">Reading text</a></h2>
+<p>A <code>String</code> converts to a <code>u8[]</code>, and so does a literal. So every function that reads text takes either.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;Hello, world&quot;</span>);
+    <span class="t">u8</span>[] hello = s[<span class="n">0</span>:<span class="n">5</span>];
+    printf(<span class="s">&quot;%s %c %d\n&quot;</span>, hello, s[<span class="n">7</span>], s.len);
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, s.startsWith(<span class="s">&quot;Hell&quot;</span>), s.find(<span class="s">&quot;world&quot;</span>), s.contains(<span class="s">&quot;xyz&quot;</span>));
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, s.equals(<span class="s">&quot;Hello, world&quot;</span>), s.endsWith(<span class="s">&quot;!&quot;</span>));
+}</code></pre>
+<pre class="out"><code>Hello w 12
+1 7 0
+1 0</code></pre>
+<p>The functions that read text are in <a href="../std/index.html#str">str</a>, and can be called as methods on a <code>u8[]</code> or a <code>String</code>: <code>s.find(&quot;x&quot;)</code> is <code>str.find(s, &quot;x&quot;)</code>.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span>[] line = <span class="s">&quot;  name = ktm  &quot;</span>;
+    <span class="t">u8</span>[] t = str.trim(line);
+    <span class="t">i64</span> eq = t.find(<span class="s">&quot;=&quot;</span>);
+    <span class="t">u8</span>[] key = str.trim(t[<span class="n">0</span>:eq]);
+    <span class="t">u8</span>[] value = str.trim(t[eq + <span class="n">1</span>:]);
+    printf(<span class="s">&quot;[%s] [%s]\n&quot;</span>, key, value);
+}</code></pre>
+<pre class="out"><code>[name] [ktm]</code></pre>
+<h3 id="splitting-and-joining"><a href="#splitting-and-joining">Splitting and joining</a></h3>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">u8</span>[][] parts = str.split(<span class="s">&quot;red,green,,blue&quot;</span>, <span class="s">&quot;,&quot;</span>);
+    printf(<span class="s">&quot;%d parts:&quot;</span>, parts.len);
+    <span class="k">for</span> (<span class="k">auto</span> p : parts) {
+        printf(<span class="s">&quot; [%s]&quot;</span>, p);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">ad</span> <span class="t">String</span> joined = str.join(parts, <span class="s">&quot; + &quot;</span>);
+    printf(<span class="s">&quot;%s\n&quot;</span>, joined);
+}</code></pre>
+<pre class="out"><code>4 parts: [red] [green] [] [blue]
+red + green +  + blue</code></pre>
+<p>The parts are views into the text that was split: the list is yours to free, the parts are not.</p>
+<h3 id="numbers-in-text"><a href="#numbers-in-text">Numbers in text</a></h3>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> n;
+    <span class="t">f64</span> f;
+    <span class="k">if</span> (str.toInt(<span class="s">&quot;42&quot;</span>, &amp;n)) {
+        printf(<span class="s">&quot;%d\n&quot;</span>, n + <span class="n">1</span>);
+    }
+    <span class="k">if</span> (!str.toInt(<span class="s">&quot;42x&quot;</span>, &amp;n)) {
+        printf(<span class="s">&quot;42x isn&#x27;t an integer\n&quot;</span>);
+    }
+    <span class="k">if</span> (str.toFloat(<span class="s">&quot;2.5&quot;</span>, &amp;f)) {
+        printf(<span class="s">&quot;%.2f\n&quot;</span>, f * <span class="n">2</span>);
+    }
+    <span class="k">ad</span> <span class="t">String</span> back = str.format(<span class="s">&quot;%d&quot;</span>, <span class="n">1234</span>);
+    printf(<span class="s">&quot;%s has %d digits\n&quot;</span>, back, back.len);
+}</code></pre>
+<pre class="out"><code>43
+42x isn&#x27;t an integer
+5.00
+1234 has 4 digits</code></pre>
+<h2 id="copies-share-bytes"><a href="#copies-share-bytes">Copies share bytes</a></h2>
+<p>Assigning a <code>String</code> copies its three fields, so both variables point at the same bytes, and only one of them may free them. <code>clone()</code> makes a copy with bytes of its own.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> a = str.from(<span class="s">&quot;shared&quot;</span>);
+    <span class="t">String</span> alias = a;              <span class="c">// the same bytes: don&#x27;t free both</span>
+    <span class="k">ad</span> <span class="t">String</span> own = a.clone();     <span class="c">// bytes of its own</span>
+    own.toUpper();
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, a, alias, own);
+}</code></pre>
+<pre class="out"><code>shared shared SHARED</code></pre>
+<ul><li><code>free()</code> empties the <code>String</code> it is called on, so freeing the same variable twice is harmless.</li><li>A view (<code>s[a:b]</code>) is valid until the <code>String</code> changes or is freed: growing may move its bytes.</li><li>Freeing through two copies is a double free, which <code>-jit -Memsafe</code> reports.</li></ul>
+<h2 id="bytes-not-characters"><a href="#bytes-not-characters">Bytes, not characters</a></h2>
+<p><code>len</code> and <code>s[i]</code> count bytes. Text is UTF-8 by convention, so a character outside ASCII takes more than one byte.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span>[] word = <span class="s">&quot;naïve&quot;</span>;
+    printf(<span class="s">&quot;%d bytes, %d characters\n&quot;</span>, word.len, str.runeCount(word));
+}</code></pre>
+<pre class="out"><code>6 bytes, 5 characters</code></pre>
+<h2 id="literals-are-read-only"><a href="#literals-are-read-only">Literals are read-only</a></h2>
+<p>A string literal's bytes can't be changed. A write the compiler can see is an error that says what to do; one it can't see crashes at run time. Copy the text into a <code>String</code> first.</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">u8</span>[] a = <span class="s">&quot;abc&quot;</span>;
+    a[<span class="n">0</span>] = <span class="s">&#x27;x&#x27;</span>;
+}</code></pre>
+<pre class="out"><code>read-only</code></pre>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> a = str.from(<span class="s">&quot;abc&quot;</span>);
+    a[<span class="n">0</span>] = <span class="s">&#x27;x&#x27;</span>;
+    printf(<span class="s">&quot;%s\n&quot;</span>, a);
+}</code></pre>
+<pre class="out"><code>xbc</code></pre>
+<p>A <code>u8</code> array initialised from a literal gets its own writable copy:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> buf[] = <span class="s">&quot;abc&quot;</span>;        <span class="c">// 4 bytes: a, b, c and the NUL</span>
+    <span class="t">u8</span> name[<span class="n">8</span>] = <span class="s">&quot;hi&quot;</span>;       <span class="c">// the 6 bytes after &quot;hi&quot; are zero</span>
+    buf[<span class="n">0</span>] = <span class="s">&#x27;X&#x27;</span>;
+    printf(<span class="s">&quot;%s %d %s %d\n&quot;</span>, buf, <span class="k">sizeof</span>(buf), name, <span class="k">sizeof</span>(name));
+}</code></pre>
+<pre class="out"><code>Xbc 4 hi 8</code></pre>
+<h2 id="c-strings"><a href="#c-strings">C strings</a></h2>
+<p>A C string is a <code>u8 *</code> to bytes that end in a NUL: what C functions take and return. A <code>String</code>'s bytes always end in a NUL, so a <code>String</code> variable goes where a <code>u8 *</code> is expected as it is, with no copy. <code>cstr.view(p)</code> turns a C string into a <code>u8[]</code>.</p>
+<pre class="code run"><code><span class="k">import</span> cstr, libc, str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;for C&quot;</span>);
+    <span class="t">u8</span> *c = s;
+    <span class="t">u8</span>[] back = cstr.view(c);
+    printf(<span class="s">&quot;%s %d %d\n&quot;</span>, c, back.len, libc.strlen(s));
+}</code></pre>
+<pre class="out"><code>for C 5 5</code></pre>
+<ul><li>The pointer is the <code>String</code>'s own buffer: valid until the <code>String</code> changes or is freed.</li><li>A <code>String</code> that a call returns doesn't convert (nothing would free it): keep it in a variable first.</li><li>The <a href="../std/index.html#cstr">cstr</a> module has the classic C string functions.</li></ul>
+<h2 id="printf-and-s"><a href="#printf-and-s">printf and %s</a></h2>
+<p><code>%s</code> takes a C string, a <code>u8[]</code> or a <code>String</code>. A width works (<code>%-10s</code>); a precision cuts the text.</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> s = str.from(<span class="s">&quot;ktm&quot;</span>);
+    <span class="t">u8</span>[] part = <span class="s">&quot;language&quot;</span>[<span class="n">0</span>:<span class="n">4</span>];
+    printf(<span class="s">&quot;[%-6s][%6s][%s][%.2s]\n&quot;</span>, s, part, <span class="s">&quot;c string&quot;</span>, <span class="s">&quot;abcdef&quot;</span>);
+}</code></pre>
+<pre class="out"><code>[ktm   ][  lang][c string][ab]</code></pre>
+<h2 id="which-one-to-use"><a href="#which-one-to-use">Which one to use</a></h2>
+<ul><li>Take text as a <code>u8[]</code> parameter: callers can pass a literal, a slice or a <code>String</code>.</li><li>Return a <code>String</code> when you make new text, and say in the comment that the caller frees it.</li><li>Keep a <code>String</code> in a struct for text the struct owns, and free it in the struct's <code>free()</code>.</li><li>Use <code>u8 *</code> only to talk to C.</li></ul>
+    <nav class="pager"><a class="prev" href="10-arrays-and-slices.html"><span>Previous</span>Arrays and slices</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#making-a-string">Making a String</a></li><li><a href="#changing-a-string">Changing a String</a></li><li><a href="#reading-text">Reading text</a></li><li><a href="#copies-share-bytes">Copies share bytes</a></li><li><a href="#bytes-not-characters">Bytes, not characters</a></li><li><a href="#literals-are-read-only">Literals are read-only</a></li><li><a href="#c-strings">C strings</a></li><li><a href="#printf-and-s">printf and %s</a></li><li><a href="#which-one-to-use">Which one to use</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
