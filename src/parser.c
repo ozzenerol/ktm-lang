@@ -1716,7 +1716,8 @@ static Ast *parseConstGlobalInit(Cctrl *cc, Ast *var, Ast *rhs) {
             s64 v = evalIntConstExprOrErr(rhs, &ok);
             if (!ok) return NULL;
             lit = astI64Type(v);
-        } else if (parseAddrConst(rhs, &target, &off)) {
+        } else if (parseAddrConst(rhs, &target, &off) &&
+                   !(target->kind == AST_GVAR && (target->flags & AST_FLAG_TLS))) {
             /* `&g`, `&arr[2]`, `&Fn`: as `(U8 *)&target + off`, which the
              * backends write as a relocation (asmAddrConst) */
             int is_err = 0;
@@ -1756,8 +1757,12 @@ static LexModule *parseInitModule(Cctrl *cc) {
  * prebuilt module's `_init` is already compiled, so what a generic of it
  * adds while made for this program (reflect.of in json.decode<T>) runs
  * with the program's own initialisers. */
+/* Run-time initialisers added so far: a threadlocal's must not get one */
+static u64 parse_init_count = 0;
+
 static void parseAddInitialiser(Cctrl *cc, Ast *ast) {
     LexModule *m = parseInitModule(cc);
+    parse_init_count++;
     if (m && !m->prebuilt) {
         if (!m->init_stmts) m->init_stmts = listNew();
         listAppend(m->init_stmts, ast);
@@ -4342,6 +4347,10 @@ Ast *parseStatement(Cctrl *cc) {
                 cctrlTokenRewind(cc);
                 cctrlRaiseException(cc,
                     "`defer` must be a statement of a { } block");
+            case KW_THREADLOCAL:
+                cctrlTokenRewind(cc);
+                cctrlRaiseException(cc,
+                    "`threadlocal` only goes on a global variable, not a local");
             case KW_SWITCH:   return parseSwitchStatement(cc);
             case KW_CASE:     return parseCaseLabel(cc,tok);
             case KW_DEFAULT:  return parseDefaultStatement(cc);
@@ -8131,7 +8140,7 @@ static void parseModuleNamesDecl(Cctrl *cc, Lexeme *first) {
         }
         if (t->tk_type != TK_KEYWORD ||
             (t->i64 != KW_PUBLIC && t->i64 != KW_PRIVATE &&
-             t->i64 != KW_STATIC)) break;
+             t->i64 != KW_STATIC && t->i64 != KW_THREADLOCAL)) break;
         i++;
     }
     Lexeme *kw = i < d->toks->size ? d->toks->entries[i] : NULL;
@@ -8208,7 +8217,54 @@ static int parseGotParenFnType(Cctrl *cc) {
     cctrlTokenGet(cc);
     return 0;
 }
+/* `threadlocal` seen on the declaration being parsed (and where), and
+ * whether a `threadlocal T a, b;` list continues into the next declarator */
+static int parse_decl_tls = 0;
+static s64 parse_tls_line = 0, parse_tls_col = 0;
+static int parse_gvar_list_tls = 0;
+
+static void parseSawThreadLocal(Lexeme *tok) {
+    parse_decl_tls = 1;
+    parse_tls_line = tok->line;
+    parse_tls_col = tok->col;
+}
+
+static Ast *parseToplevelDefImpl(Cctrl *cc, int *is_global);
+
+/* A `threadlocal` declaration: the global it declared gets one copy per
+ * thread. Anything else under the keyword is an error. */
+static void parseMarkThreadLocal(Cctrl *cc, Ast *ast, int run_time_init) {
+    int is_gvar_init = ast && ast->kind == AST_BINOP &&
+                       ast->binop == AST_BIN_OP_ASSIGN &&
+                       ast->left && ast->left->kind == AST_GVAR;
+    if (is_gvar_init || (run_time_init && ast && ast->kind == AST_DECL)) {
+        cctrlRaiseExceptionAt(cc, parse_tls_line, parse_tls_col, 11,
+            "a threadlocal global's initial value must be a constant: "
+            "every thread starts from it");
+    }
+    if (ast && ast->kind == AST_DECL && ast->declvar &&
+        ast->declvar->kind == AST_GVAR)
+    {
+        ast->flags |= AST_FLAG_TLS;
+        ast->declvar->flags |= AST_FLAG_TLS;
+        return;
+    }
+    cctrlRaiseExceptionAt(cc, parse_tls_line, parse_tls_col, 11,
+        "`threadlocal` only goes on a global variable");
+}
+
 Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
+    parse_decl_tls = cc->tmp_gvar_base_type ? parse_gvar_list_tls : 0;
+    u64 inits = parse_init_count;
+    Ast *ast = parseToplevelDefImpl(cc, is_global);
+    int tls = parse_decl_tls;
+    parse_decl_tls = 0;
+    parse_gvar_list_tls = cc->tmp_gvar_base_type ? tls : 0;
+    if (tls) parseMarkThreadLocal(cc, ast, parse_init_count != inits);
+    return ast;
+}
+
+static Ast *parseToplevelDefImpl(Cctrl *cc, int *is_global) {
     Ast *variable, *asm_block, *asm_func, *extern_func, *ast;
     AstType *type = NULL, *base_type = NULL;
     Lexeme *tok, *name, *peek;
@@ -8345,6 +8401,11 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
 
                 case KW_EXTERN: {
                     tok = cctrlTokenGetRequired(cc);
+                    /* `extern threadlocal T name;` */
+                    if (tok->tk_type == TK_KEYWORD && tok->i64 == KW_THREADLOCAL) {
+                        parseSawThreadLocal(tok);
+                        tok = cctrlTokenGetRequired(cc);
+                    }
                     if (tok->tk_type == TK_STR && !strncmp(tok->start,"c",1)) {
                         /* extern "c" func(...) - C-ABI function decl. */
                         type = parseDeclSpec(cc);
@@ -8464,6 +8525,9 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                 case KW_CONST:
                     is_const = 1;
                     continue;
+                case KW_THREADLOCAL:
+                    parseSawThreadLocal(tok);
+                    continue;
 
                 case KW_DEFER:
                     cctrlRaiseExceptionAt(cc, tok->line, tok->col, tok->len,
@@ -8471,6 +8535,12 @@ Ast *parseToplevelDef(Cctrl *cc, int *is_global) {
                     cctrlTerminate(cc);
 
                 case KW_STATIC:
+                    /* `static threadlocal T x;` */
+                    peek = cctrlTokenPeek(cc);
+                    if (peek && peek->tk_type == TK_KEYWORD &&
+                        peek->i64 == KW_THREADLOCAL) {
+                        parseSawThreadLocal(cctrlTokenGet(cc));
+                    }
                     base_type = parseBaseDeclSpec(cc);
                     if (base_type == NULL) {
                         cctrlRaiseException(cc,"Expected type declaration");

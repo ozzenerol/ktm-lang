@@ -17,7 +17,7 @@
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js?v=9467e22335" defer></script>
+<script src="assets/docs.js?v=d0fee83c85" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -63,6 +63,7 @@
 u8 *name = "ktm", letter;  // each * belongs to the name after it
 auto count = 3;            // i64, from the initialiser
 static i64 calls = 0;      // keeps its value between calls
+threadlocal i64 hits;      // a global with one copy per thread
 const i64 MAX = 64;        // read-only, a compile-time constant</code></pre>
 </div>
 
@@ -170,6 +171,40 @@ void main()
 </pre>
 <p>On a function or a global, <code>static</code> keeps it private to its file.</p>
 
+<h2 id="threadlocal">threadlocal<a class="anchor" href="#threadlocal" aria-label="Link to this section">#</a></h2>
+<p>A <code>threadlocal</code> global has one copy per thread. Every thread starts with the declared
+value, and what one thread writes the others don't see.</p>
+<pre data-run><code>import libc;
+
+threadlocal i64 hits = 10;
+i64 seen[2];
+
+void *work(void *arg)
+{
+  i64 k = (i64)arg;
+  for (i64 i = 0; i &lt;= k; i++) { hits++; }
+  seen[k] = hits;               // this thread's copy
+  return null;
+}
+
+void main()
+{
+  hits = 100;                   // main's copy
+  libc.pthread_t *th[2];
+  for (i64 i = 0; i &lt; 2; i++) { libc.pthread_create(&amp;th[i], null, &amp;work, (void *)i); }
+  for (i64 i = 0; i &lt; 2; i++) { libc.pthread_join(th[i]); }
+  printf("%d %d, main %d\n", seen[0], seen[1], hits);
+}
+</code></pre>
+<pre class="output">11 12, main 100
+</pre>
+<ul class="rules">
+  <li>Only on a global: <code>threadlocal i64 x;</code>, <code>static threadlocal ...</code>, <code>pub threadlocal ...</code>, <code>extern threadlocal ...</code>.</li>
+  <li>The initial value must be a constant (a number, a string, <code>{...}</code>, the address of an ordinary global).</li>
+  <li><code>&amp;x</code> is the calling thread's copy. A coroutine resumed on another thread sees that thread's copies.</li>
+  <li>Compiled programs reach it in one or two instructions through the thread pointer (on macOS through the system's thread-local call). The JIT keeps a copy per thread, a little slower, and can't reach the threadlocal of a module built with <code>-lib</code>: read it through a function of the module there.</li>
+</ul>
+
 <h2 id="const">const<a class="anchor" href="#const" aria-label="Link to this section">#</a></h2>
 <p><code>const</code> marks a declaration read-only. With a constant initialiser it is a
 compile-time constant: usable as an array size, a <code>case</code> label, or in another <code>const</code>.</p>
@@ -239,7 +274,7 @@ void main()
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#declaring-variables">Declaring variables</a></li><li><a href="#globals">Globals</a></li><li><a href="#locals-start-zeroed">Locals start zeroed</a></li><li><a href="#auto">auto</a></li><li><a href="#static">static</a></li><li><a href="#const">const</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#declaring-variables">Declaring variables</a></li><li><a href="#globals">Globals</a></li><li><a href="#locals-start-zeroed">Locals start zeroed</a></li><li><a href="#auto">auto</a></li><li><a href="#static">static</a></li><li><a href="#threadlocal">threadlocal</a></li><li><a href="#const">const</a></li><li><a href="#shadowing-a-module">Shadowing a module</a></li></ul></nav>
 </div>
 </body>
 </html>

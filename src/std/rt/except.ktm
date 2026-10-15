@@ -53,8 +53,17 @@ static i64 fsOnce[2] = {0, 0};
 
 static u64 fsKey = 0;
 
+/* The calling thread's HCFs, read with one TLS access (Fs()). The key
+ * above stays only so fsFree runs when the thread ends. Keep libktm's
+ * threadlocals this small: libktm.so reaches them initial-exec, which a
+ * dlopen'd library (the JIT's) can only do from the few hundred spare
+ * bytes of the static TLS block. */
+static threadlocal HCFs *fsCur;
+
 static void fsFree(void *p) {
     HCFs *fs = p;
+    /* an Fs() from a later destructor makes a new state, as before */
+    fsCur = null;
     if (ErrOwns(fs.error.message)) { mem.free(fs.error.message); }
     if (fs.coroLoop) { fs.coroLoopFree(fs.coroLoop); }
     coroStacksFree(fs);
@@ -67,18 +76,23 @@ static void fsKeyCreate() {
     libc.pthread_key_create(&fsKey, &fsFree);
 }
 
+/* The thread's first Fs(): its HCFs, freed by fsFree when it ends. */
+static HCFs *FsNew() {
+    libc.pthread_once(fsOnce, &fsKeyCreate);
+    HCFs *fs = libc.calloc(1, sizeof(HCFs));
+    if (!fs) {
+        printf("out of memory for the exception state\n");
+        os.exit(1);
+    }
+    libc.pthread_setspecific(fsKey, fs);
+    fsCur = fs;
+    return fs;
+}
+
 /* The calling thread's HCFs, created on its first use. */
 pub HCFs *Fs() {
-    libc.pthread_once(fsOnce, &fsKeyCreate);
-    HCFs *fs = libc.pthread_getspecific(fsKey);
-    if (!fs) {
-        fs = libc.calloc(1, sizeof(HCFs));
-        if (!fs) {
-            printf("out of memory for the exception state\n");
-            os.exit(1);
-        }
-        libc.pthread_setspecific(fsKey, fs);
-    }
+    HCFs *fs = fsCur;
+    if (!fs) { fs = FsNew(); }
     return fs;
 }
 

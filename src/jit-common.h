@@ -185,6 +185,7 @@ const char *ktmJitFindFileForSymbol(KtmJit *jit, const char *sym);
 /* Register a host-provided symbol (e.g. printf, malloc, a libktm hook)
  * so JITted code can call it. Overrides dlsym for that name. */
 void ktmJitDefineSymbol(KtmJit *jit, const char *name, void *addr);
+void *ktmJitSymbolAddr(KtmJit *jit, const char *sym);
 
 /* Convenience: look up `main` and invoke it as `int main(int, char **)`,
  * returning its exit code. */

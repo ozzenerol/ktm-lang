@@ -35,7 +35,7 @@
   /* The words of src/syntax-highlighting/vim/syntax/ktm.vim; `ad` only
    * where it starts a declaration (see highlight). The HolyC type names
    * are still read by the compiler, so they stay types here. */
-  var KEYWORDS = /^(if|else|for|while|do|switch|case|default|break|continue|return|goto|fallthrough|try|catch|throw|defer|struct|union|enum|type|fn|module|import|pub|private|static|const|extern|_extern|inline|volatile|reg|noreg|asm|sizeof|alignof|typeof|self|class)$/;
+  var KEYWORDS = /^(if|else|for|while|do|switch|case|default|break|continue|return|goto|fallthrough|try|catch|throw|defer|struct|union|enum|type|fn|module|import|pub|private|static|const|extern|_extern|inline|volatile|reg|noreg|threadlocal|asm|sizeof|alignof|typeof|self|class)$/;
   var TYPES = /^(void|bool|auto|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|String|Error|U0|I8|U8|I16|U16|I32|U32|I64|U64|F32|F64|Bool)$/;
   var LITERALS = /^(true|false|null)$/;
 

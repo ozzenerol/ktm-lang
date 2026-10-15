@@ -143,6 +143,7 @@ static LexerType lexer_types[] = {
     {"catch",    KW_CATCH},
     {"throw",    KW_THROW},
     {"defer",    KW_DEFER},
+    {"threadlocal", KW_THREADLOCAL},
     {"reg",      KW_REG},
     {"noreg",    KW_NOREG},
 
@@ -704,6 +705,7 @@ AoStr *lexemeToAoStr(Lexeme *tok) {
                 case KW_STATIC:      aoStrCatPrintf(str,"static");  break;
                 case KW_CONST:       aoStrCatPrintf(str,"const");   break;
                 case KW_DEFER:       aoStrCatPrintf(str,"defer");   break;
+                case KW_THREADLOCAL: aoStrCatPrintf(str,"threadlocal"); break;
                 case KW_DEFINED:     aoStrCatPrintf(str,"defined"); break;
 
                 case KW_PP_INCLUDE:  aoStrCatPrintf(str,"#include"); break;

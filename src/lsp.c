@@ -1717,7 +1717,7 @@ static const char *lsp_keywords[] = {
     "true", "false", "null",
     "struct", "pub", "private", "const", "enum", "defer",
     "fn", "self", "module", "import", "fallthrough", "try", "catch", "throw",
-    "type", "ad", "asm", "volatile", "inline",
+    "type", "ad", "asm", "volatile", "inline", "threadlocal",
 };
 
 #define KTM_LSP_FUNCTION     3

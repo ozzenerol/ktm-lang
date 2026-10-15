@@ -857,7 +857,7 @@ static const char *repl_keywords[] = {
     "continue", "while", "do", "for", "goto", "default", "return",
     "try", "catch", "throw", "reg", "noreg", "if", "else", "sizeof",
     "alignof", "typeof", "inline", "atomic", "volatile", "public", "private",
-    "class", "union", "static",
+    "class", "union", "static", "threadlocal",
 };
 
 static int replIsKeyword(const char *s, size_t len) {
