@@ -117,8 +117,40 @@ static void WriteErr(u8 *s) {
     libc.write(os.STDERR, s, n);
 }
 
+/* ---- the calls that led to an uncaught error ----
+ * rt.crash (compiled into the program, not into libktm) has the stack
+ * walker. Neither can name the other: rt.crash needs only libc, and
+ * libktm can't name a program's function. rt.crash finds this setter
+ * by its name in the line records of libktm it is given, and hands it
+ * the walker (__ktmCrashAdd). */
+static fn(u64 fp) void uncaughtTrace;
+
+pub void __ktmUncaughtTraceSet(fn(u64 fp) void trace) {
+    uncaughtTrace = trace;
+}
+
+/* The frame pointer of the function that calls it */
+#ifdef IS_X86_64
+asm {
+_RT_FRAME::
+        DU8    0x48, 0x89, 0xE8         // MOV RAX, RBP
+        RET
+}
+#endif
+#ifdef IS_ARM_64
+asm {
+_RT_FRAME::
+        DU8    0xE0, 0x03, 0x1D, 0xAA   // MOV X0, X29
+        RET
+}
+#endif
+_extern _RT_FRAME u64 rtFrame();
+
 /* Report an error no try catches on stderr and exit with 1:
  *   uncaught error <code>: <message> (<file>:<line>)
+ *     at <file>:<line> in <function>
+ *     called from ...
+ * (the calls, when the program has rt.crash's walker)
  * A code that is a character constant whose bytes are all printable is
  * shown as text ('Late'), any other as a signed decimal number. */
 static void __ktmUncaught(HCFs *fs) {
@@ -173,6 +205,7 @@ static void __ktmUncaught(HCFs *fs) {
         WriteErr(buf);
     }
     WriteErr("\n");
+    if (uncaughtTrace) { uncaughtTrace(rtFrame()); }
     os.exit(1);
 }
 
