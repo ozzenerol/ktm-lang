@@ -68,8 +68,17 @@ extern "c" i32 ktm_crypto_hkdf(i32 bits, u8 *salt, u64 slen, u8 *ikm, u64 ilen, 
                                u8 *out, u64 olen);
 extern "c" i32 ktm_crypto_pbkdf2(i32 bits, u8 *pw, u64 plen, u8 *salt, u64 slen, u32 iterations,
                                  u8 *out, u64 olen);
-extern "c" i32 ktm_crypto_seal(i32 alg, u8 *key, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len, u8 *out);
-extern "c" i32 ktm_crypto_open(i32 alg, u8 *key, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_seal(i32 alg, u8 *key, u64 klen, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len,
+                               u8 *out);
+extern "c" i32 ktm_crypto_open(i32 alg, u8 *key, u64 klen, u8 *nonce, u8 *aad, u64 alen, u8 *in, u64 len,
+                               u8 *out);
+extern "c" i64 ktm_crypto_cbc_encrypt(u8 *key, u64 klen, u8 *iv, u8 *in, u64 len, u8 *out);
+extern "c" i64 ktm_crypto_cbc_decrypt(u8 *key, u64 klen, u8 *iv, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_kw_wrap(u8 *kek, u64 keklen, u8 *key, u64 klen, u8 *out);
+extern "c" i32 ktm_crypto_kw_unwrap(u8 *kek, u64 keklen, u8 *in, u64 len, u8 *out);
+extern "c" i32 ktm_crypto_oaep_encrypt(void *key, i32 bits, u8 *in, u64 len, u8 *out, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_oaep_decrypt(void *key, i32 bits, u8 *in, u64 len, u8 *out, u64 cap, u64 *olen);
+extern "c" i32 ktm_crypto_ecdh(void *key, void *peer, u8 *out, u64 *olen);
 extern "c" void *ktm_crypto_key_generate(i32 *err);
 extern "c" void *ktm_crypto_key_load(u8 *pem, u64 len, i32 priv, i32 *err);
 extern "c" i64 ktm_crypto_key_pem(void *key, i32 priv, u8 *out, u64 outlen);
@@ -198,17 +207,35 @@ pub bool equal(u8[] a, u8[] b) {
 
 /* ---- authenticated encryption ---- */
 
-/* plain encrypted and authenticated with key (32 bytes) and nonce (12
+/* an AES key: 16, 24 or 32 bytes */
+static void needAes(u8[] key, u8 *what) {
+    if (key.len != 16 && key.len != 24 && key.len != 32) {
+        throw(ERR_CRYPTO, "crypto: %s is 16, 24 or 32 bytes, not %d", what, key.len);
+    }
+}
+
+/* seal's and open's key: AES-GCM's 16, 24 or 32 bytes, ChaCha20's 32 */
+static void needAeadKey(Aead alg, u8[] key) {
+    if (alg == Aead.aesGcm) {
+        needAes(key, "an AES-GCM key");
+    } else {
+        need(key, KEY_SIZE, "the key");
+    }
+}
+
+/* plain encrypted and authenticated with key (32 bytes; AES-GCM also
+ * takes 16 and 24: AES-128/192-GCM) and nonce (12
  * bytes, never used twice with one key: crypto.random makes one), and aad
  * authenticated too (sent in the clear, as headers): the ciphertext and
  * its 16-byte tag, a new String (yours) */
 pub String seal(Aead alg, u8[] key, u8[] nonce, u8[] plain, u8[] aad = "") {
-    need(key, KEY_SIZE, "the key");
+    needAeadKey(alg, key);
     need(nonce, NONCE_SIZE, "the nonce");
     String out;
     out.reserve(plain.len + TAG_SIZE);
     for (i64 i = 0; i < plain.len + TAG_SIZE; i++) { out.appendByte(0); }
-    i32 r = ktm_crypto_seal((i32)alg, key.ptr, nonce.ptr, aad.ptr, aad.len, plain.ptr, plain.len, out.ptr);
+    i32 r = ktm_crypto_seal((i32)alg, key.ptr, key.len, nonce.ptr, aad.ptr, aad.len, plain.ptr, plain.len,
+                            out.ptr);
     if (r != 0) {
         out.free();
         fail("seal", r);
@@ -219,15 +246,87 @@ pub String seal(Aead alg, u8[] key, u8[] nonce, u8[] plain, u8[] aad = "") {
 /* sealed (from seal) opened into *plain (replaced): false, with *plain
  * empty, when it was altered or the key, nonce or aad differ */
 pub bool open(Aead alg, u8[] key, u8[] nonce, u8[] sealed, String *plain, u8[] aad = "") {
-    need(key, KEY_SIZE, "the key");
+    needAeadKey(alg, key);
     need(nonce, NONCE_SIZE, "the nonce");
     plain.clear();
     if (sealed.len < TAG_SIZE) { return false; }
     i64 n = sealed.len - TAG_SIZE;
     plain.reserve(n);
     for (i64 i = 0; i < n; i++) { plain.appendByte(0); }
-    if (ktm_crypto_open((i32)alg, key.ptr, nonce.ptr, aad.ptr, aad.len, sealed.ptr, n, plain.ptr) != 0) {
+    if (ktm_crypto_open((i32)alg, key.ptr, key.len, nonce.ptr, aad.ptr, aad.len, sealed.ptr, n,
+                        plain.ptr) != 0) {
         plain.clear();
+        return false;
+    }
+    return true;
+}
+
+/* ---- AES-CBC and AES key wrap (for JWE; seal is the encryption to
+ * use otherwise: CBC alone doesn't authenticate) ---- */
+
+/* plain encrypted with AES-CBC, key (16, 24 or 32 bytes) and iv (16
+ * bytes), padded as PKCS#7 has it: a new String (yours) */
+pub String aesCbcEncrypt(u8[] key, u8[] iv, u8[] plain) {
+    needAes(key, "an AES key");
+    need(iv, 16, "an AES-CBC iv");
+    String out;
+    i64 n = plain.len + 16 - plain.len % 16;
+    out.reserve(n);
+    for (i64 i = 0; i < n; i++) { out.appendByte(0); }
+    i64 r = ktm_crypto_cbc_encrypt(key.ptr, key.len, iv.ptr, plain.ptr, plain.len, out.ptr);
+    if (r < 0) {
+        out.free();
+        fail("AES-CBC", (i32)r);
+    }
+    return out;
+}
+
+/* ct decrypted with AES-CBC into *plain (replaced): false, with *plain
+ * empty, when its padding is wrong. It doesn't authenticate: check a MAC
+ * over ct first (as JWE's A128CBC-HS256 does). */
+pub bool aesCbcDecrypt(u8[] key, u8[] iv, u8[] ct, String *plain) {
+    needAes(key, "an AES key");
+    need(iv, 16, "an AES-CBC iv");
+    plain.clear();
+    if (!ct.len || ct.len % 16) { return false; }
+    String buf;
+    buf.reserve(ct.len);
+    for (i64 i = 0; i < ct.len; i++) { buf.appendByte(0); }
+    i64 n = ktm_crypto_cbc_decrypt(key.ptr, key.len, iv.ptr, ct.ptr, ct.len, buf.ptr);
+    if (n < 0) {
+        buf.free();
+        return false;
+    }
+    plain.append(buf[0:n]);
+    buf.free();
+    return true;
+}
+
+/* key (16 bytes or more, a multiple of 8) wrapped with kek (16, 24 or
+ * 32 bytes), as RFC 3394 has it (JWE's A128KW, A192KW, A256KW): 8 bytes
+ * longer, a new String (yours) */
+pub String aesKeyWrap(u8[] kek, u8[] key) {
+    needAes(kek, "a key-wrapping key");
+    if (key.len < 16 || key.len % 8) { throw(ERR_CRYPTO, "crypto: a key to wrap is 16 bytes or more, a multiple of 8"); }
+    String out;
+    for (i64 i = 0; i < key.len + 8; i++) { out.appendByte(0); }
+    i32 r = ktm_crypto_kw_wrap(kek.ptr, kek.len, key.ptr, key.len, out.ptr);
+    if (r != 0) {
+        out.free();
+        fail("AES key wrap", r);
+    }
+    return out;
+}
+
+/* wrapped (from aesKeyWrap) unwrapped with kek into *key (replaced):
+ * false, with *key empty, when it wasn't wrapped with kek or was altered */
+pub bool aesKeyUnwrap(u8[] kek, u8[] wrapped, String *key) {
+    needAes(kek, "a key-wrapping key");
+    key.clear();
+    if (wrapped.len < 24 || wrapped.len % 8) { return false; }
+    for (i64 i = 0; i < wrapped.len - 8; i++) { key.appendByte(0); }
+    if (ktm_crypto_kw_unwrap(kek.ptr, kek.len, wrapped.ptr, wrapped.len, key.ptr) != 0) {
+        key.clear();
         return false;
     }
     return true;
@@ -409,6 +508,52 @@ pub String Key.signPss(Hash h, u8[] data) {
 pub bool Key.verifyPss(Hash h, u8[] data, u8[] sig) {
     if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-PSS needs an RSA key"); }
     return ktm_crypto_verify_pss(self.native, hashBits(h), data.ptr, data.len, sig.ptr, sig.len) == 0;
+}
+
+/* data encrypted to this RSA key (public is enough) with RSA-OAEP, MGF1
+ * and the (empty) label's hash being h (JWE's RSA-OAEP-256 is
+ * Hash.sha256): the key's size in bytes, a new String (yours).
+ * Randomised. data is at most the key's size - 2 * h's size - 2 bytes. */
+pub String Key.encryptOaep(Hash h, u8[] data) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-OAEP needs an RSA key"); }
+    u8 out[1024];
+    u64 n = 0;
+    i32 r = ktm_crypto_oaep_encrypt(self.native, hashBits(h), data.ptr, data.len, out, 1024, &n);
+    if (r != 0) { fail("RSA-OAEP", r); }
+    return str.from(out[0:n]);
+}
+
+/* data (from encryptOaep with this key's public part) decrypted with
+ * this private RSA key into *plain (replaced): false, with *plain empty,
+ * for anything else, without saying why */
+pub bool Key.decryptOaep(Hash h, u8[] data, String *plain) {
+    if (self.kind() != KeyKind.rsa) { throw(ERR_CRYPTO, "crypto: RSA-OAEP needs an RSA key"); }
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: decrypting needs a private key"); }
+    plain.clear();
+    u8 out[1024];
+    u64 n = 0;
+    if (ktm_crypto_oaep_decrypt(self.native, hashBits(h), data.ptr, data.len, out, 1024, &n) != 0) {
+        return false;
+    }
+    plain.append(out[0:n]);
+    mem.set(out, 0, 1024);
+    return true;
+}
+
+/* The ECDH shared secret of this private EC key and peer's public key
+ * (the same curve; JWE's ECDH-ES): the x coordinate of the product, 32,
+ * 48 or 66 bytes, a new String (yours: derive keys from it, as with HKDF
+ * or JWE's Concat KDF, don't use it as one). peer's point is checked to
+ * be on the curve; another curve, or a key that isn't EC, throws. */
+pub String Key.ecdh(Key *peer) {
+    if (!self.priv) { throw(ERR_CRYPTO, "crypto: ECDH needs a private key"); }
+    u8 out[66];
+    u64 n = 0;
+    i32 r = ktm_crypto_ecdh(self.native, peer.native, out, &n);
+    if (r != 0) { fail("ECDH (two EC keys of one curve)", r); }
+    String z = str.from(out[0:n]);
+    mem.set(out, 0, 66);
+    return z;
 }
 
 /* signWith(Hash.sha256, data): JWT's ES256 for a P-256 key, RS256 for
