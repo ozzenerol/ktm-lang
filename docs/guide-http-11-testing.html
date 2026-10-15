@@ -69,378 +69,11 @@ start: settings, the database, migrations, listening.</p>
     api.ktm             module api; handlers, middleware, routes()
     api_test.ktm        module api; the tests
   migrations/</code></pre>
-<p><code>api/api.ktm</code> starts with <code>module api;</code> and the imports the handlers use:</p>
-<pre><code>module api;
-import "github.com/ozzenerol/ktm-pg";
-import crypto, encoding.base64, json, mem, net.http, net.http.middleware, reflect, str, uuid, vec;
-
-/* Shelf's HTTP API: its routes, handlers and middleware. main.ktm reads
- * the settings, opens the database and serves what routes() set up. */</code></pre>
-<p>Below that goes, unchanged, everything in <code>main.ktm</code> from <code>@json struct Bookmark</code> down to the
-last handler (<code>showCollection</code>): the structs, <code>COLUMNS</code>, <code>gNoUser</code>, the token
-functions and every handler. <code>runMigrate</code>, <code>Settings</code> and <code>main</code> stay behind. Last in
-the file comes the one function that isn't private, the routes and middleware out of <code>main</code>, with
-<code>gNoUser</code>'s hash made the first time:</p>
-<pre><code>/* Shelf's routes and middleware on mux. webOrigin: the web app that may
- * call it from a browser ("": none); trustedProxies: the load balancer's
- * addresses ("": none). */
-pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
-{
-    if (!gNoUser.len) {
-        String noise = uuid.v4().string();
-        gNoUser = crypto.hashPassword(noise[0:]);
-        noise.free();
-    }
-
-    if (trustedProxies.len) { middleware.realIp(mux, trustedProxies); }
-    middleware.requestId(mux);
-    if (webOrigin.len) {
-        middleware.CorsOptions cors;
-        cors.origins = webOrigin;
-        cors.expose = "X-Request-Id";
-        middleware.cors(mux, &amp;cors);
-    }
-    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
-
-    mux.handle("POST /users", &amp;signup);
-    http.Mux *logins = mux.group("/sessions");
-    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
-    logins.handle("POST", &amp;login);
-    http.Mux *session = mux.group("/sessions");
-    middleware.bearer(session, &amp;checkToken);
-    session.handle("DELETE", &amp;logout);
-
-    /* every bookmark route needs a signed-in user */
-    http.Mux *bookmarks = mux.group("/bookmarks");
-    middleware.bearer(bookmarks, &amp;checkToken);
-    bookmarks.handle("GET", &amp;list);
-    bookmarks.handle("POST", &amp;create);
-    bookmarks.handle("GET /{id}", &amp;get);
-    bookmarks.handle("DELETE /{id}", &amp;remove);
-
-    http.Mux *collections = mux.group("/collections");
-    middleware.bearer(collections, &amp;checkToken);
-    collections.handle("POST", &amp;newCollection);
-    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
-    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
-}</code></pre>
-<p>The package is imported by the project's path from <code>ktm.mod</code> (<code>module example.com/shelf</code>)
-and its directory. <code>main.ktm</code> is now this, the whole file:</p>
-<pre><code>import "github.com/ozzenerol/ktm-pg";
-import "github.com/ozzenerol/ktm-migrate";
-import "github.com/ozzenerol/ktm-migrate/postgres";
-import "example.com/shelf/api";
-import config, flag, log, net.http, os, reflect, str, vec;
-
-/* shelf migrate up | down | status */
-i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
-{
-    if (str.equals(what, "up")) {
-        printf("%d migrations ran\n", ms.up(d));
-    } else if (str.equals(what, "down")) {
-        printf("%d migration reverted\n", ms.down(d, 1));
-    } else if (str.equals(what, "status")) {
-        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
-        for (auto s : all) {
-            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
-        }
-        all.free();
-    } else {
-        log.error("shelf migrate: up, down or status, not `%s`", what);
-        return 2;
-    }
-    return 0;
-}
-
-struct Settings {
-    i64 port;
-    bool accessLog;
-    @required u8[] databaseUrl;
-    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
-    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
-};
-
-Settings gSettings;
-
-i32 main(i32 argc, u8 **argv)
-{
-    gSettings.port = 8080;
-    config.loadDotenv(".env");
-    try {
-        config.fromEnv(reflect.of(gSettings), "SHELF_");
-    } catch (Error e) {
-        log.error("%s", e.message);     /* every bad or missing variable, by name */
-        os.exit(2);
-    }
-
-    flag.Set *flags = flag.new("shelf", "a bookmarks API");
-    defer flags.free();
-    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
-    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
-    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
-    flags.parseOrExit(argc, argv);
-
-    /* the database: a pool of connections shared by every thread */
-    pg.Pool *db = pg.open(gSettings.databaseUrl);
-    defer db.close();
-    migrate.Migrations ms = migrate.load("migrations");
-    defer ms.free();
-    migrate.Driver d = postgres.driverPool(db);
-    if (flags.chosen() == migrateCmd) {
-        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
-    }
-    i64 ran = ms.up(&amp;d);
-    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
-
-    http.Mux mux;
-    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);
-
-    http.Options o;
-    o.accessLog = *accessLog;
-    log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;mux, db, &amp;o);
-}</code></pre>
-<p><code>crypto</code>, <code>encoding.base64</code>, <code>json</code>, <code>mem</code>, <code>uuid</code> and
-<code>net.http.middleware</code> leave its imports with the code that used them.</p>
-
-<h2 id="the-tests">The tests<a class="anchor" href="#the-tests" aria-label="Link to this section">#</a></h2>
-<p>A test file is named <code>*_test.ktm</code> and starts with the same <code>module api;</code> line, so its tests see
-every function of the package, private ones too. Each <code>void testXxx(testing.T *t)</code> is a test.</p>
-<pre><code>module api;
-import "github.com/ozzenerol/ktm-pg";
-import "github.com/ozzenerol/ktm-migrate";
-import "github.com/ozzenerol/ktm-migrate/postgres";
-import net.http, proc, str, testing;
-
-/* The API's tests, through the real routes and middleware, against a
- * database of their own: SHELF_TEST_DATABASE_URL (they are skipped
- * without it). Every test starts from empty tables. */
-
-http.Mux gMux;
-pg.Pool *gDb;
-i64 gClient = 0;        /* each test is another client, with its own rate limits */
-
-/* The mux and the database, once; empty tables for every test */
-bool setup(testing.T *t)
-{
-    if (!gDb) {
-        String url = proc.getenv("SHELF_TEST_DATABASE_URL");
-        defer url.free();
-        if (!url.len) { t.skip("SHELF_TEST_DATABASE_URL isn't set"); }
-        gDb = pg.open(url[0:]);
-        migrate.Migrations ms = migrate.load("../migrations");
-        migrate.Driver d = postgres.driverPool(gDb);
-        ms.up(&amp;d);
-        ms.free();
-        routes(&amp;gMux, "", "");
-    }
-    gDb.exec("TRUNCATE users, bookmarks CASCADE");
-    gClient++;
-    return true;
-}
-
-/* A request through the routes: the reply, yours to free */
-http.Writer send(u8[] method, u8[] target, u8[] body = "", u8[] token = "")
-{
-    http.Request r = http.testRequest(method, target, body);
-    r.app = gDb;
-    String addr = str.format("192.0.2.%d", gClient);
-    r.setRemoteAddr(addr[0:]);
-    addr.free();
-    String auth = str.format("Bearer %s", token);
-    if (token.len) { r.addHeader("Authorization", auth[0:]); }
-    http.Writer w = http.recorder();
-    gMux.serve(&amp;w, &amp;r);
-    r.free();
-    auth.free();
-    return w;
-}
-
-/* A new user's session token (yours to free) */
-String signIn(testing.T *t, u8[] email)
-{
-    String body = str.format("{\"email\": \"%s\", \"password\": \"a long password\"}", email);
-    defer body.free();
-    http.Writer w = send("POST", "/users", body[0:]);
-    t.equal(w.code, 201);
-    w.free();
-    w = send("POST", "/sessions", body[0:]);
-    t.equal(w.code, 201);
-    i64 at = str.find(w.body[0:], "\"token\":\"") + 9;
-    String token = str.from(w.body[at:at + 43]);
-    w.free();
-    return token;
-}
-
-void testSignupRules(testing.T *t)
-{
-    setup(t);
-    http.Writer w = send("POST", "/users", "{\"email\": \"not an email\", \"password\": \"short\"}");
-    t.equal(w.code, 422);
-    t.check(str.find(w.body[0:], "\"field\":\"email\"") &gt; 0 &amp;&amp; str.find(w.body[0:], "\"field\":\"password\"") &gt; 0,
-            "both fields named: %s", w.body);
-    w.free();
-}
-
-void testLogin(testing.T *t)
-{
-    setup(t);
-    String token = signIn(t, "ada@example.com");
-    defer token.free();
-    t.equal(token.len, 43);
-    http.Writer w = send("POST", "/sessions", "{\"email\": \"ada@example.com\", \"password\": \"wrong one\"}");
-    t.equal(w.code, 401);
-    w.free();
-}
-
-void testBookmarksNeedAToken(testing.T *t)
-{
-    setup(t);
-    http.Writer w = send("GET", "/bookmarks");
-    t.equal(w.code, 401);
-    w.free();
-}
-
-void testUsersSeeOnlyTheirOwn(testing.T *t)
-{
-    setup(t);
-    String ada = signIn(t, "ada@example.com");
-    String bob = signIn(t, "bob@example.com");
-    defer ada.free();
-    defer bob.free();
-    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\", \"tags\": [\"go\"]}", ada[0:]);
-    t.equal(w.code, 201);
-    w.free();
-    w = send("GET", "/bookmarks", "", bob[0:]);
-    t.equal(w.body, "{\"items\":[]}");
-    w.free();
-    w = send("GET", "/bookmarks?tag=go", "", ada[0:]);
-    t.check(str.find(w.body[0:], "https://go.dev") &gt; 0, "ada's list: %s", w.body);
-    w.free();
-}
-
-void testDuplicateLink(testing.T *t)
-{
-    setup(t);
-    String ada = signIn(t, "ada@example.com");
-    defer ada.free();
-    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
-    w.free();
-    w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
-    t.equal(w.code, 409);
-    w.free();
-}</code></pre>
-<ul class="rules">
-  <li><code>http.testRequest</code> and <code>http.recorder()</code> make a request and catch the reply without a
-  socket; <code>gMux.serve</code> runs them through the same routes and middleware as the server. <code>r.app</code> is
-  what <code>http.listen</code> would have set.</li>
-  <li>The tests use a database of their own, named by <code>SHELF_TEST_DATABASE_URL</code>, migrated once and emptied
-  before every test. Without it they are skipped, not failed, so <code>ktm test</code> works on a machine with no
-  database.</li>
-  <li>Each test is another client address (<code>setRemoteAddr</code>), so the login rate limit of chapter 10 doesn't
-  carry over from one test to the next.</li>
-  <li><code>t.equal(got, want)</code> compares numbers and texts and says both when they differ; <code>t.check(ok,
-  "...")</code> takes any condition and a message. A failed check doesn't stop the test: every failure is listed.</li>
-</ul>
-
-<h2 id="run-them">Run them<a class="anchor" href="#run-them" aria-label="Link to this section">#</a></h2>
-<pre><code>$ docker exec shelf-db createdb -U postgres shelf_test
-$ export SHELF_TEST_DATABASE_URL=postgres://postgres:shelf@localhost:5432/shelf_test
-$ ktm test ./...
-ok  	api	0.21s  (5 passed)
-
-$ ktm test -v ./api
-=== RUN   testSignupRules
---- PASS: testSignupRules (0.04s)
-=== RUN   testLogin
---- PASS: testLogin (0.05s)
-...</code></pre>
-<p>When one fails, the line says where and what:</p>
-<pre><code>--- FAIL: testDuplicateLink (0.03s)
-    api_test.ktm:122: got 409, want 400
-FAIL
-FAIL	api	0.19s  (4 passed, 1 failed)</code></pre>
-<p><code>ktm test</code> exits with 1 when any test failed, so it works as a CI step as it is.
-<code>-run Login</code> runs only the tests whose names contain <code>Login</code>; <code>-jit -Memsafe</code> runs them
-in the JIT and reports memory leaks and bad frees (<a href="tools-testing.html">Testing</a>).</p>
-<h2 id="the-whole-program">The whole program<a class="anchor" href="#the-whole-program" aria-label="Link to this section">#</a></h2>
-<p>The program at the end of this chapter, to check yours against (<code>api/api_test.ktm</code> is above, whole):</p>
-<details class="code"><summary>main.ktm</summary>
-<pre><code>import "github.com/ozzenerol/ktm-pg";
-import "github.com/ozzenerol/ktm-migrate";
-import "github.com/ozzenerol/ktm-migrate/postgres";
-import "example.com/shelf/api";
-import config, flag, log, net.http, os, reflect, str, vec;
-
-/* shelf migrate up | down | status */
-i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
-{
-    if (str.equals(what, "up")) {
-        printf("%d migrations ran\n", ms.up(d));
-    } else if (str.equals(what, "down")) {
-        printf("%d migration reverted\n", ms.down(d, 1));
-    } else if (str.equals(what, "status")) {
-        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
-        for (auto s : all) {
-            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
-        }
-        all.free();
-    } else {
-        log.error("shelf migrate: up, down or status, not `%s`", what);
-        return 2;
-    }
-    return 0;
-}
-
-struct Settings {
-    i64 port;
-    bool accessLog;
-    @required u8[] databaseUrl;
-    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
-    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
-};
-
-Settings gSettings;
-
-i32 main(i32 argc, u8 **argv)
-{
-    gSettings.port = 8080;
-    config.loadDotenv(".env");
-    try {
-        config.fromEnv(reflect.of(gSettings), "SHELF_");
-    } catch (Error e) {
-        log.error("%s", e.message);     /* every bad or missing variable, by name */
-        os.exit(2);
-    }
-
-    flag.Set *flags = flag.new("shelf", "a bookmarks API");
-    defer flags.free();
-    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
-    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
-    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
-    flags.parseOrExit(argc, argv);
-
-    /* the database: a pool of connections shared by every thread */
-    pg.Pool *db = pg.open(gSettings.databaseUrl);
-    defer db.close();
-    migrate.Migrations ms = migrate.load("migrations");
-    defer ms.free();
-    migrate.Driver d = postgres.driverPool(db);
-    if (flags.chosen() == migrateCmd) {
-        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
-    }
-    i64 ran = ms.up(&amp;d);
-    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
-
-    http.Mux mux;
-    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);
-
-    http.Options o;
-    o.accessLog = *accessLog;
-    log.info("Shelf listening on http://localhost:%d", *port);
-    return http.listen((i32)*port, &amp;mux, db, &amp;o);
-}</code></pre>
-</details>
+<p><code>api/api.ktm</code> is the code that leaves <code>main.ktm</code>, unchanged: everything from
+<code>@json struct Bookmark</code> down to <code>showCollection</code> (the structs, <code>COLUMNS</code>,
+<code>gNoUser</code>, the token functions and every handler). On top go a <code>module api;</code> line and the imports
+that code uses; at the bottom, one new function. <code>runMigrate</code>, <code>Settings</code> and <code>main</code>
+stay in <code>main.ktm</code>. The whole file:</p>
 <details class="code"><summary>api/api.ktm</summary>
 <pre><code>module api;
 import "github.com/ozzenerol/ktm-pg";
@@ -839,6 +472,291 @@ pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
     mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
 }</code></pre>
 </details>
+<p>The new function, <code>routes</code>, is the only one marked <code>pub</code>, so it's the only one
+<code>main.ktm</code> can call. It holds the routes and middleware that were in <code>main</code>, and makes
+<code>gNoUser</code>'s hash the first time it runs:</p>
+<pre><code>/* Shelf's routes and middleware on mux. webOrigin: the web app that may
+ * call it from a browser ("": none); trustedProxies: the load balancer's
+ * addresses ("": none). */
+pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
+{
+    if (!gNoUser.len) {
+        String noise = uuid.v4().string();
+        gNoUser = crypto.hashPassword(noise[0:]);
+        noise.free();
+    }
+
+    if (trustedProxies.len) { middleware.realIp(mux, trustedProxies); }
+    middleware.requestId(mux);
+    if (webOrigin.len) {
+        middleware.CorsOptions cors;
+        cors.origins = webOrigin;
+        cors.expose = "X-Request-Id";
+        middleware.cors(mux, &amp;cors);
+    }
+    middleware.rateLimit(mux, 300, 60);            /* any client: 300 requests a minute */
+
+    mux.handle("POST /users", &amp;signup);
+    http.Mux *logins = mux.group("/sessions");
+    middleware.rateLimit(logins, 5, 60);            /* guessing passwords: 5 tries a minute */
+    logins.handle("POST", &amp;login);
+    http.Mux *session = mux.group("/sessions");
+    middleware.bearer(session, &amp;checkToken);
+    session.handle("DELETE", &amp;logout);
+
+    /* every bookmark route needs a signed-in user */
+    http.Mux *bookmarks = mux.group("/bookmarks");
+    middleware.bearer(bookmarks, &amp;checkToken);
+    bookmarks.handle("GET", &amp;list);
+    bookmarks.handle("POST", &amp;create);
+    bookmarks.handle("GET /{id}", &amp;get);
+    bookmarks.handle("DELETE /{id}", &amp;remove);
+
+    http.Mux *collections = mux.group("/collections");
+    middleware.bearer(collections, &amp;checkToken);
+    collections.handle("POST", &amp;newCollection);
+    collections.handle("PUT /{id}/bookmarks/{bookmark}", &amp;addToCollection);
+    mux.handle("GET /collections/{id}", &amp;showCollection);      /* outside the group: anyone may ask */
+}</code></pre>
+<p>The package is imported by the project's path from <code>ktm.mod</code> (<code>module example.com/shelf</code>)
+and its directory. <code>main.ktm</code> is now this, the whole file:</p>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import "example.com/shelf/api";
+import config, flag, log, net.http, os, reflect, str, vec;
+
+/* shelf migrate up | down | status */
+i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
+{
+    if (str.equals(what, "up")) {
+        printf("%d migrations ran\n", ms.up(d));
+    } else if (str.equals(what, "down")) {
+        printf("%d migration reverted\n", ms.down(d, 1));
+    } else if (str.equals(what, "status")) {
+        vec.Vec&lt;migrate.Status&gt; all = ms.status(d);
+        for (auto s : all) {
+            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
+        }
+        all.free();
+    } else {
+        log.error("shelf migrate: up, down or status, not `%s`", what);
+        return 2;
+    }
+    return 0;
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+    u8[] webOrigin;             /* the web app allowed to call the API from a browser */
+    u8[] trustedProxies;        /* the load balancer's addresses, when there is one */
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&amp;ms, &amp;d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&amp;d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&amp;d), ran);
+
+    http.Mux mux;
+    api.routes(&amp;mux, gSettings.webOrigin, gSettings.trustedProxies);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &amp;mux, db, &amp;o);
+}</code></pre>
+<p><code>crypto</code>, <code>encoding.base64</code>, <code>json</code>, <code>mem</code>, <code>uuid</code> and
+<code>net.http.middleware</code> leave its imports with the code that used them.</p>
+
+<h2 id="the-tests">The tests<a class="anchor" href="#the-tests" aria-label="Link to this section">#</a></h2>
+<p>A test file is named <code>*_test.ktm</code> and starts with the same <code>module api;</code> line, so its tests see
+every function of the package, private ones too. Each <code>void testXxx(testing.T *t)</code> is a test.</p>
+<pre><code>module api;
+import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import net.http, proc, str, testing;
+
+/* The API's tests, through the real routes and middleware, against a
+ * database of their own: SHELF_TEST_DATABASE_URL (they are skipped
+ * without it). Every test starts from empty tables. */
+
+http.Mux gMux;
+pg.Pool *gDb;
+i64 gClient = 0;        /* each test is another client, with its own rate limits */
+
+/* The mux and the database, once; empty tables for every test */
+bool setup(testing.T *t)
+{
+    if (!gDb) {
+        String url = proc.getenv("SHELF_TEST_DATABASE_URL");
+        defer url.free();
+        if (!url.len) { t.skip("SHELF_TEST_DATABASE_URL isn't set"); }
+        gDb = pg.open(url[0:]);
+        migrate.Migrations ms = migrate.load("../migrations");
+        migrate.Driver d = postgres.driverPool(gDb);
+        ms.up(&amp;d);
+        ms.free();
+        routes(&amp;gMux, "", "");
+    }
+    gDb.exec("TRUNCATE users, bookmarks CASCADE");
+    gClient++;
+    return true;
+}
+
+/* A request through the routes: the reply, yours to free */
+http.Writer send(u8[] method, u8[] target, u8[] body = "", u8[] token = "")
+{
+    http.Request r = http.testRequest(method, target, body);
+    r.app = gDb;
+    String addr = str.format("192.0.2.%d", gClient);
+    r.setRemoteAddr(addr[0:]);
+    addr.free();
+    String auth = str.format("Bearer %s", token);
+    if (token.len) { r.addHeader("Authorization", auth[0:]); }
+    http.Writer w = http.recorder();
+    gMux.serve(&amp;w, &amp;r);
+    r.free();
+    auth.free();
+    return w;
+}
+
+/* A new user's session token (yours to free) */
+String signIn(testing.T *t, u8[] email)
+{
+    String body = str.format("{\"email\": \"%s\", \"password\": \"a long password\"}", email);
+    defer body.free();
+    http.Writer w = send("POST", "/users", body[0:]);
+    t.equal(w.code, 201);
+    w.free();
+    w = send("POST", "/sessions", body[0:]);
+    t.equal(w.code, 201);
+    i64 at = str.find(w.body[0:], "\"token\":\"") + 9;
+    String token = str.from(w.body[at:at + 43]);
+    w.free();
+    return token;
+}
+
+void testSignupRules(testing.T *t)
+{
+    setup(t);
+    http.Writer w = send("POST", "/users", "{\"email\": \"not an email\", \"password\": \"short\"}");
+    t.equal(w.code, 422);
+    t.check(str.find(w.body[0:], "\"field\":\"email\"") &gt; 0 &amp;&amp; str.find(w.body[0:], "\"field\":\"password\"") &gt; 0,
+            "both fields named: %s", w.body);
+    w.free();
+}
+
+void testLogin(testing.T *t)
+{
+    setup(t);
+    String token = signIn(t, "ada@example.com");
+    defer token.free();
+    t.equal(token.len, 43);
+    http.Writer w = send("POST", "/sessions", "{\"email\": \"ada@example.com\", \"password\": \"wrong one\"}");
+    t.equal(w.code, 401);
+    w.free();
+}
+
+void testBookmarksNeedAToken(testing.T *t)
+{
+    setup(t);
+    http.Writer w = send("GET", "/bookmarks");
+    t.equal(w.code, 401);
+    w.free();
+}
+
+void testUsersSeeOnlyTheirOwn(testing.T *t)
+{
+    setup(t);
+    String ada = signIn(t, "ada@example.com");
+    String bob = signIn(t, "bob@example.com");
+    defer ada.free();
+    defer bob.free();
+    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\", \"tags\": [\"go\"]}", ada[0:]);
+    t.equal(w.code, 201);
+    w.free();
+    w = send("GET", "/bookmarks", "", bob[0:]);
+    t.equal(w.body, "{\"items\":[]}");
+    w.free();
+    w = send("GET", "/bookmarks?tag=go", "", ada[0:]);
+    t.check(str.find(w.body[0:], "https://go.dev") &gt; 0, "ada's list: %s", w.body);
+    w.free();
+}
+
+void testDuplicateLink(testing.T *t)
+{
+    setup(t);
+    String ada = signIn(t, "ada@example.com");
+    defer ada.free();
+    http.Writer w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
+    w.free();
+    w = send("POST", "/bookmarks", "{\"url\": \"https://go.dev\"}", ada[0:]);
+    t.equal(w.code, 409);
+    w.free();
+}</code></pre>
+<ul class="rules">
+  <li><code>http.testRequest</code> and <code>http.recorder()</code> make a request and catch the reply without a
+  socket; <code>gMux.serve</code> runs them through the same routes and middleware as the server. <code>r.app</code> is
+  what <code>http.listen</code> would have set.</li>
+  <li>The tests use a database of their own, named by <code>SHELF_TEST_DATABASE_URL</code>, migrated once and emptied
+  before every test. Without it they are skipped, not failed, so <code>ktm test</code> works on a machine with no
+  database.</li>
+  <li>Each test is another client address (<code>setRemoteAddr</code>), so the login rate limit of chapter 10 doesn't
+  carry over from one test to the next.</li>
+  <li><code>t.equal(got, want)</code> compares numbers and texts and says both when they differ; <code>t.check(ok,
+  "...")</code> takes any condition and a message. A failed check doesn't stop the test: every failure is listed.</li>
+</ul>
+
+<h2 id="run-them">Run them<a class="anchor" href="#run-them" aria-label="Link to this section">#</a></h2>
+<pre><code>$ docker exec shelf-db createdb -U postgres shelf_test
+$ export SHELF_TEST_DATABASE_URL=postgres://postgres:shelf@localhost:5432/shelf_test
+$ ktm test ./...
+ok  	api	0.21s  (5 passed)
+
+$ ktm test -v ./api
+=== RUN   testSignupRules
+--- PASS: testSignupRules (0.04s)
+=== RUN   testLogin
+--- PASS: testLogin (0.05s)
+...</code></pre>
+<p>When one fails, the line says where and what:</p>
+<pre><code>--- FAIL: testDuplicateLink (0.03s)
+    api_test.ktm:122: got 409, want 400
+FAIL
+FAIL	api	0.19s  (4 passed, 1 failed)</code></pre>
+<p><code>ktm test</code> exits with 1 when any test failed, so it works as a CI step as it is.
+<code>-run Login</code> runs only the tests whose names contain <code>Login</code>; <code>-jit -Memsafe</code> runs them
+in the JIT and reports memory leaks and bad frees (<a href="tools-testing.html">Testing</a>).</p>
 <p>Next: <a href="guide-http-12-production.html">Production</a>.</p>
 
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-10-middleware.html"><span>Previous</span>10. Middleware</a><a class="next" href="guide-http-12-production.html"><span>Next</span>12. Production</a></nav>
@@ -847,7 +765,7 @@ pub void routes(http.Mux *mux, u8[] webOrigin, u8[] trustedProxies)
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-package-for-the-api">A package for the API</a></li><li><a href="#the-tests">The tests</a></li><li><a href="#run-them">Run them</a></li><li><a href="#the-whole-program">The whole program</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#a-package-for-the-api">A package for the API</a></li><li><a href="#the-tests">The tests</a></li><li><a href="#run-them">Run them</a></li></ul></nav>
 </div>
 </body>
 </html>
