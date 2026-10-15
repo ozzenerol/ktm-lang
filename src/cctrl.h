@@ -410,6 +410,11 @@ typedef struct Cctrl {
     int is_libktm;
     /* rt.crash is compiled in: a main installs the crash report */
     int crash_report;
+    /* The packages imported (`import "github.com/x/y";`), for the
+     * names and files a crash report shows (asmLinesName): their own
+     * copies, kept for the Cctrl's life (a REPL's lexers come and go) */
+    struct CctrlPackage *packages;
+    int packages_len, packages_cap;
     /* The builtin header (std.ktmh) as read: a name whose declaring token
      * lies in this buffer is part of the library's public API */
     char *header_src;
@@ -454,6 +459,16 @@ void cctrlTokenRewind(Cctrl *cc);
 void cctrlTokenExpect(Cctrl *cc, s64 expected);
 void cctrlSetCommandLineDefines(Cctrl *cc, List *defines_list);
 
+/* A package's module: its module path (github_com.x.y.y), the
+ * package's path (github.com/x/y) and its directory, resolved */
+typedef struct CctrlPackage {
+    char *module_path;
+    char *package;
+    char *dir;
+} CctrlPackage;
+
+void cctrlAddPackage(Cctrl *cc, const char *module_path, const char *package,
+                     const char *dir);
 void cctrlInitParse(Cctrl *cc, Lexer *lexer_);
 
 Ast *cctrlGetVar(Cctrl *cc, char *varname, int len);

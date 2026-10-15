@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <strings.h>
 #include <math.h>
 #include <stdlib.h>
@@ -736,7 +737,45 @@ static int asmLinesString(const char *s) {
     return id;
 }
 
-/* The name a report shows for function `fname`: `net.http.serve` */
+/* A package's module (`import "github.com/x/ktm-pg";`, module path
+ * github_com.x.ktm_pg.pg) by the name a program calls it by: every
+ * `github_com.x.ktm_pg.pg.` in s (a generic's type arguments too)
+ * becomes `pg.` */
+static char *asmLinesShortPackages(Cctrl *cc, const char *s) {
+    if (!cc->packages_len) return (char *)s;
+    AoStr *out = NULL;
+    const char *p = s;
+    while (*p) {
+        int boundary = p == s || !(isalnum((unsigned char)p[-1]) || p[-1] == '_' ||
+                                   p[-1] == '.');
+        CctrlPackage *found = NULL;
+        size_t len = 0;
+        for (int i = 0; boundary && i < cc->packages_len; ++i) {
+            CctrlPackage *pk = &cc->packages[i];
+            size_t n = strlen(pk->module_path);
+            if (n > len && !strncmp(p, pk->module_path, n) && p[n] == '.') {
+                found = pk;
+                len = n;
+            }
+        }
+        if (!found) {
+            if (out) aoStrPutChar(out, *p);
+            p++;
+            continue;
+        }
+        if (!out) {
+            out = aoStrNew();
+            aoStrCatLen(out, s, p - s);
+        }
+        const char *name = strrchr(found->module_path, '.');
+        aoStrCat(out, name ? name + 1 : found->module_path);
+        p += len;
+    }
+    return out ? out->data : (char *)s;
+}
+
+/* The name a report shows for function `fname`: `net.http.serve`, a
+ * package's `pg.Pool.exec` */
 char *asmLinesName(Cctrl *cc, AoStr *fname) {
     const char *sym = asmNormaliseFunctionName(cc, fname);
     const char *shown = astSymbolDisplayName(sym);
@@ -747,16 +786,48 @@ char *asmLinesName(Cctrl *cc, AoStr *fname) {
         sym[0] == '_' && !strcmp(shown, sym)) {
         shown = astSymbolDisplayName(sym + 1);
     }
-    return (char *)shown;
+    return asmLinesShortPackages(cc, shown);
+}
+
+/* path as a file of a package that isn't in the cache (a ktm.mod
+ * `replace` with a directory): the package's path and the file's in it,
+ * github.com/x/y/pool.ktm; NULL for any other file */
+static char *asm_lines_pkg_path = NULL, *asm_lines_pkg_shown = NULL;  /* the last */
+
+static char *asmLinesPackageFile(Cctrl *cc, const char *path) {
+    if (!cc->packages_len || !path) return NULL;
+    /* a file's functions come one after another */
+    if (asm_lines_pkg_path && !strcmp(asm_lines_pkg_path, path)) return asm_lines_pkg_shown;
+    free(asm_lines_pkg_path);
+    free(asm_lines_pkg_shown);
+    asm_lines_pkg_path = strdup(path);
+    asm_lines_pkg_shown = NULL;
+    char *real = realpath(path, NULL), *best = NULL;
+    if (!real) return NULL;
+    size_t best_len = 0;
+    for (int i = 0; i < cc->packages_len; ++i) {
+        CctrlPackage *pk = &cc->packages[i];
+        size_t n = strlen(pk->dir);
+        if (n > best_len && !strncmp(real, pk->dir, n) && real[n] == '/') {
+            best = mprintf("%s/%s", pk->package, real + n + 1);
+            best_len = n;
+        }
+    }
+    free(real);
+    asm_lines_pkg_shown = best ? strdup(best) : NULL;
+    return asm_lines_pkg_shown;
 }
 
 /* A file as a report shows it: the stdlib's from its modules
  * directory (net/http/mux.ktm), a package's from the cache
- * (github.com/x/y@v1.0.0/y.ktm), a program's as it was named */
+ * (github.com/x/y@v1.0.0/y.ktm) or by its package's path
+ * (github.com/x/y/y.ktm), a program's as it was named */
 const char *asmLinesPath(Cctrl *cc, const char *path) {
     const char *cache = pkgCacheDir();
     size_t n = strlen(cache);
     if (!strncmp(path, cache, n) && path[n] == '/') return path + n + 1;
+    char *pkg_file = asmLinesPackageFile(cc, path);
+    if (pkg_file) return pkg_file;
     if (cc->install_dir) {
         char *mods = mprintf("%s/modules/", cc->install_dir);
         n = strlen(mods);
