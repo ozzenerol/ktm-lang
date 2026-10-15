@@ -108,6 +108,34 @@ static void pkgShaFinal(PkgSha *s, uint8_t out[32]) {
     }
 }
 
+/* The sha256 of n bytes at data, as 64 hex digits */
+char *pkgSha256Hex(const void *data, size_t n) {
+    PkgSha s;
+    uint8_t out[32];
+    pkgShaInit(&s);
+    pkgShaUpdate(&s, data, n);
+    pkgShaFinal(&s, out);
+    AoStr *hex = aoStrNew();
+    for (int i = 0; i < 32; ++i) aoStrCatPrintf(hex, "%02x", out[i]);
+    return aoStrMove(hex);
+}
+
+/* The sha256 of a file's bytes, as hex; NULL when it can't be read */
+char *pkgSha256File(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    PkgSha s;
+    uint8_t buf[65536], out[32];
+    size_t n;
+    pkgShaInit(&s);
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) pkgShaUpdate(&s, buf, n);
+    fclose(f);
+    pkgShaFinal(&s, out);
+    AoStr *hex = aoStrNew();
+    for (int i = 0; i < 32; ++i) aoStrCatPrintf(hex, "%02x", out[i]);
+    return aoStrMove(hex);
+}
+
 static char *pkgBase64(const uint8_t *p, int n) {
     static const char *abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     AoStr *b = aoStrNew();

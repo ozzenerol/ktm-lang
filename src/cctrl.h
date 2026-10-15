@@ -428,6 +428,8 @@ typedef struct Cctrl {
      * by a `#link "<path>"` directive, these should be usable with the
      * JIT */
     List *shared_object_files;
+    /* -D names, for the key of a prebuilt package (lexPackagePrebuilt) */
+    List *cmdline_defines;
 
     /* .o files that may have been passed on the commandline */
     List *object_files;

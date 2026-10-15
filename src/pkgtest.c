@@ -184,8 +184,10 @@ static void pkgTestFuncs(const char *code, char ***names, int *n) {
     }
 }
 
-/* This ktm, to run again for each directory */
-static char *pkgTestSelf(const char *argv0) {
+/* This ktm's executable, to run again (argv0 when it can't be found
+ * another way; NULL: "ktm") */
+char *pkgSelfPath(const char *argv0) {
+    if (!argv0) argv0 = "ktm";
     char buf[PATH_MAX];
 #if defined(__APPLE__)
     uint32_t size = sizeof(buf);
@@ -401,7 +403,7 @@ int pkgTest(int argc, char **argv, char *argv0) {
         }
     }
 
-    char *self = pkgTestSelf(argv0);
+    char *self = pkgSelfPath(argv0);
     for (int i = 0; i < ndirs; ++i) {
         if (pkgTestDir(self, &dirs[i], cflags, ncflags, jit, rflags, nrflags)) bad = 1;
     }
