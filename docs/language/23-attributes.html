@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attributes - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html" class="on"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <article class="prose">
+<h1>Attributes</h1>
+<p>An attribute is a word starting with <code>@</code>, written before a struct, a field or a parameter. It asks the compiler to write code for the declaration, or tells a library how to treat it. This chapter covers where attributes go, <code>@json</code> and <code>@yaml</code> and the methods they generate, the field attributes <code>@key</code>, <code>@skip</code> and <code>@omitEmpty</code>, the settings attributes <code>@env</code> and <code>@required</code>, the validation rules <code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code> and <code>@oneOf</code>, <code>@caller</code> on parameters, seeing the generated code, and reading attributes through reflection.</p>
+<h2 id="where-attributes-go"><a href="#where-attributes-go">Where attributes go</a></h2>
+<p>An attribute is <code>@name</code> or <code>@name(arguments)</code>, before what it applies to. Several can be written one after another:</p>
+<pre class="code"><code><span class="a">@json</span> <span class="a">@yaml</span>
+<span class="k">struct</span> User {
+    <span class="a">@key</span>(<span class="s">&quot;e-mail&quot;</span>) <span class="a">@required</span> <span class="t">String</span> email;
+    <span class="a">@skip</span> <span class="t">i64</span> cacheHits;
+};</code></pre>
+<div class="table"><table><thead><tr><th>Attribute</th><th>Goes before</th><th>What it does</th></tr></thead><tbody><tr><td><code>@json</code></td><td>a struct</td><td>generates <code>toJson</code>, <code>fromJson</code>, <code>freeDecoded</code></td></tr><tr><td><code>@yaml</code></td><td>a struct</td><td>generates <code>toYaml</code>, <code>fromYaml</code> (and <code>freeDecoded</code>)</td></tr><tr><td><code>@key(&quot;name&quot;)</code></td><td>a field</td><td>the field's key in JSON and YAML, its column for ktm-pg</td></tr><tr><td><code>@skip</code></td><td>a field</td><td>leaves the field out of JSON, YAML, settings and validation</td></tr><tr><td><code>@omitEmpty</code></td><td>a field</td><td>leaves it out of JSON and YAML when it is 0, empty or null</td></tr><tr><td><code>@env(&quot;NAME&quot;)</code></td><td>a field</td><td>its environment variable for <code>config.fromEnv</code></td></tr><tr><td><code>@required</code></td><td>a field</td><td><code>config.fromEnv</code> fails without it; <code>validate.check</code> without a value</td></tr><tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a field</td><td><code>validate.check</code>: a number's bounds, a text's or slice's length</td></tr><tr><td><code>@email</code>, <code>@url</code></td><td>a field</td><td><code>validate.check</code>: an email address, an absolute URL</td></tr><tr><td><code>@oneOf(&quot;a&quot;, &quot;b&quot;)</code></td><td>a field</td><td><code>validate.check</code>: one of the values</td></tr><tr><td><code>@caller(&quot;file&quot;)</code>, <code>(&quot;line&quot;)</code>, <code>(&quot;func&quot;)</code></td><td>a parameter</td><td>filled by every call with where the call is</td></tr></tbody></table></div>
+<p>An attribute ktm doesn't know, or one in the wrong place, is a compile error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> User {
+    <span class="a">@jsonn</span> <span class="t">u8</span> *name;
+};
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>unknown attribute `@jsonn`</code></pre>
+<h2 id="json"><a href="#json">@json</a></h2>
+<p><code>@json</code> before a struct makes the compiler write a JSON encoder and decoder for it, as methods. The struct's file must import <code>json</code>. <code>json.decode&lt;T&gt;</code> and <code>json.encode</code> then use them:</p>
+<pre class="code run"><code><span class="k">import</span> json, reflect;
+
+<span class="a">@json</span> <span class="k">struct</span> User {
+    <span class="t">i64</span> id;
+    <span class="t">String</span> name;
+    <span class="t">bool</span> admin;
+};
+
+<span class="t">i32</span> main() {
+    User u = json.decode&lt;User&gt;(<span class="s">&quot;{\&quot;id\&quot;: 7, \&quot;name\&quot;: \&quot;Ada\&quot;, \&quot;admin\&quot;: true}&quot;</span>);
+    printf(<span class="s">&quot;%d %s %d\n&quot;</span>, u.id, u.name, u.admin);
+    u.id = <span class="n">8</span>;
+    <span class="k">ad</span> <span class="t">String</span> text = json.encode(reflect.of(u));
+    printf(<span class="s">&quot;%s\n&quot;</span>, text);
+    u.freeDecoded();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 Ada 1
+{&quot;id&quot;:8,&quot;name&quot;:&quot;Ada&quot;,&quot;admin&quot;:true}</code></pre>
+<ul><li>A key the struct has no field for is ignored; a field the JSON leaves out is zero.</li><li>An enum field is written as its member's name.</li><li>Nested structs, slices, <code>vec.Vec&lt;T&gt;</code> and pointers are written and read at any depth.</li><li><code>freeDecoded()</code> frees what decoding allocated (<code>String</code>s, slices, pointed-to structs); <code>json.free(reflect.of(u))</code> does the same.</li></ul>
+<pre class="code run"><code><span class="k">import</span> json, reflect;
+
+<span class="k">enum</span> Role { guest, admin };
+
+<span class="a">@json</span> <span class="k">struct</span> Tag {
+    <span class="t">String</span> name;
+    <span class="t">i64</span> weight;
+};
+
+<span class="a">@json</span> <span class="k">struct</span> User {
+    <span class="t">i64</span> id;
+    Role role;
+    Tag[] tags;
+};
+
+<span class="t">i32</span> main() {
+    User u = json.decode&lt;User&gt;(<span class="s">&quot;{\&quot;id\&quot;: 1, \&quot;role\&quot;: \&quot;admin\&quot;, \&quot;tags\&quot;: [{\&quot;name\&quot;: \&quot;math\&quot;, \&quot;weight\&quot;: 3}], \&quot;since\&quot;: 1843}&quot;</span>);
+    printf(<span class="s">&quot;%d %s %d %s\n&quot;</span>, u.id, reflect.name(u.role), u.tags.len, u.tags[<span class="n">0</span>].name);
+    <span class="k">ad</span> <span class="t">String</span> text = json.encode(reflect.of(u));
+    printf(<span class="s">&quot;%s\n&quot;</span>, text);
+    u.freeDecoded();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 admin 1 math
+{&quot;id&quot;:1,&quot;role&quot;:&quot;admin&quot;,&quot;tags&quot;:[{&quot;name&quot;:&quot;math&quot;,&quot;weight&quot;:3}]}</code></pre>
+<p>Without <code>@json</code> the same calls work by reflection, about three times slower to decode; adding <code>@json</code> makes existing code faster with no other change. The struct's file must import <code>json</code>:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="a">@json</span> <span class="k">struct</span> User {
+    <span class="t">i64</span> id;
+};
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>needs `import json;`</code></pre>
+<h3 id="the-generated-methods"><a href="#the-generated-methods">The generated methods</a></h3>
+<div class="table"><table><thead><tr><th>Method</th><th>Does</th></tr></thead><tbody><tr><td><code>u.toJson(&amp;w)</code></td><td>writes <code>u</code> to a <code>json.Writer</code></td></tr><tr><td><code>u.fromJson(&amp;r)</code></td><td>reads <code>u</code> from a <code>json.Reader</code></td></tr><tr><td><code>u.freeDecoded()</code></td><td>frees what <code>fromJson</code> (or <code>decode</code>) allocated</td></tr><tr><td><code>u.toYaml(&amp;w)</code>, <code>u.fromYaml(&amp;r)</code></td><td>the same for YAML, with <code>@yaml</code></td></tr></tbody></table></div>
+<pre class="code run"><code><span class="k">import</span> json;
+
+<span class="a">@json</span> <span class="k">struct</span> Point {
+    <span class="t">i64</span> x;
+    <span class="t">i64</span> y;
+};
+
+<span class="t">i32</span> main() {
+    Point p = {<span class="n">3</span>, <span class="n">4</span>};
+    json.Writer w = json.writerNew();
+    p.toJson(&amp;w);
+    <span class="k">ad</span> <span class="t">String</span> text = w.take();
+    w.free();
+    printf(<span class="s">&quot;%s\n&quot;</span>, text);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>{&quot;x&quot;:3,&quot;y&quot;:4}</code></pre>
+<p>A struct with <code>@json</code> and no <code>free()</code> of its own can be declared with <code>ad</code>: it is freed with <code>freeDecoded()</code> (see <a href="16-defer-and-ad.html">defer and ad</a>).</p>
+<h2 id="yaml"><a href="#yaml">@yaml</a></h2>
+<p><code>@yaml</code> does the same for YAML, and the two go together on one struct:</p>
+<pre class="code run"><code><span class="k">import</span> json, yaml;
+
+<span class="a">@json</span> <span class="a">@yaml</span> <span class="k">struct</span> Server {
+    <span class="t">String</span> host;
+    <span class="t">i64</span> port;
+    <span class="t">String</span>[] aliases;
+};
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> Server s = json.decode&lt;Server&gt;(<span class="s">&quot;{\&quot;host\&quot;: \&quot;example.com\&quot;, \&quot;port\&quot;: 443, \&quot;aliases\&quot;: [\&quot;www\&quot;, \&quot;api\&quot;]}&quot;</span>);
+    yaml.Writer y = yaml.writerNew();
+    s.toYaml(&amp;y);
+    <span class="k">ad</span> <span class="t">String</span> doc = y.take();
+    y.free();
+    printf(<span class="s">&quot;%s&quot;</span>, doc);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>host: example.com
+port: 443
+aliases:
+  - www
+  - api</code></pre>
+<h2 id="field-attributes-for-json-and-yaml"><a href="#field-attributes-for-json-and-yaml">Field attributes for JSON and YAML</a></h2>
+<p><code>@key(&quot;name&quot;)</code> is the field's key in the text, <code>@skip</code> leaves the field out entirely, and <code>@omitEmpty</code> leaves it out of the output when it is 0, empty or null:</p>
+<pre class="code run"><code><span class="k">import</span> json;
+
+<span class="a">@json</span> <span class="k">struct</span> User {
+    <span class="t">i64</span> id;
+    <span class="a">@key</span>(<span class="s">&quot;e-mail&quot;</span>) <span class="t">String</span> email;
+    <span class="a">@omitEmpty</span> <span class="t">String</span> nickname;
+    <span class="a">@skip</span> <span class="t">i64</span> cacheHits;
+};
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> User u = json.decode&lt;User&gt;(<span class="s">&quot;{\&quot;id\&quot;: 7, \&quot;e-mail\&quot;: \&quot;ada@example.com\&quot;}&quot;</span>);
+    u.cacheHits = <span class="n">99</span>;
+    json.Writer w = json.writerNew();
+    u.toJson(&amp;w);
+    <span class="k">ad</span> <span class="t">String</span> text = w.take();
+    w.free();
+    printf(<span class="s">&quot;%s\n&quot;</span>, text);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>{&quot;id&quot;:7,&quot;e-mail&quot;:&quot;ada@example.com&quot;}</code></pre>
+<p><code>nickname</code> is empty, so <code>@omitEmpty</code> left it out; <code>cacheHits</code> is <code>@skip</code>, so it is never written, whatever its value.</p>
+<p>Strict decoding refuses keys the struct doesn't have and keys it misses, but a <code>@skip</code> field is never required:</p>
+<pre class="code run"><code><span class="k">import</span> json;
+
+<span class="a">@json</span> <span class="k">struct</span> Point {
+    <span class="t">i64</span> x;
+    <span class="t">i64</span> y;
+    <span class="a">@skip</span> <span class="t">i64</span> cached;
+};
+
+<span class="t">i32</span> main() {
+    <span class="t">u8</span>[] inputs[<span class="n">3</span>] = {<span class="s">&quot;{\&quot;x\&quot;: 1, \&quot;y\&quot;: 2}&quot;</span>, <span class="s">&quot;{\&quot;x\&quot;: 1}&quot;</span>, <span class="s">&quot;{\&quot;x\&quot;: 1, \&quot;y\&quot;: 2, \&quot;z\&quot;: 3}&quot;</span>};
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        <span class="k">try</span> {
+            Point p = json.decode&lt;Point&gt;(inputs[i], json.STRICT);
+            printf(<span class="s">&quot;ok: %d %d\n&quot;</span>, p.x, p.y);
+        } <span class="k">catch</span> (<span class="t">Error</span> e) {
+            printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+        }
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ok: 1 2
+1:9: y: missing
+1:22: z: no such field in Point</code></pre>
+<p>A field whose type can't be written (a union, a function pointer, a struct without <code>@json</code> when the others need it) is an error at that field; mark it <code>@skip</code>.</p>
+<h2 id="settings-env-and-required"><a href="#settings-env-and-required">Settings: @env and @required</a></h2>
+<p><code>config.fromEnv</code> fills a struct of settings from environment variables. A field's variable is a prefix and its name in <code>SNAKE_CASE</code> (<code>databaseUrl</code> with <code>APP_</code> reads <code>APP_DATABASE_URL</code>). <code>@env(&quot;NAME&quot;)</code> names the variable exactly, and <code>@required</code> makes a missing one an error:</p>
+<pre class="code run"><code><span class="k">import</span> config, proc, reflect;
+
+<span class="k">struct</span> Settings {
+    <span class="t">i64</span> port;
+    <span class="a">@required</span> <span class="t">String</span> databaseUrl;
+    <span class="a">@env</span>(<span class="s">&quot;LOG_LEVEL&quot;</span>) <span class="t">u8</span>[] level;
+};
+
+<span class="t">i32</span> main() {
+    proc.setenv(<span class="s">&quot;APP_DATABASE_URL&quot;</span>, <span class="s">&quot;postgres://localhost/app&quot;</span>);
+    proc.setenv(<span class="s">&quot;LOG_LEVEL&quot;</span>, <span class="s">&quot;warn&quot;</span>);
+    Settings s;
+    s.port = <span class="n">8080</span>;
+    config.fromEnv(reflect.of(s), <span class="s">&quot;APP_&quot;</span>);
+    printf(<span class="s">&quot;%d %s %.*s\n&quot;</span>, s.port, s.databaseUrl, s.level.len, s.level.ptr);
+    config.free(reflect.of(s));
+    proc.unsetenv(<span class="s">&quot;APP_DATABASE_URL&quot;</span>);
+    <span class="k">try</span> {
+        config.fromEnv(reflect.of(s), <span class="s">&quot;APP_&quot;</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>8080 postgres://localhost/app warn
+config: APP_DATABASE_URL is required</code></pre>
+<p>A field keeps what it holds when its variable isn't set, so defaults are whatever the struct holds first (<code>port</code> above). See <a href="../std/index.html#config">config</a>.</p>
+<h2 id="validation-rules"><a href="#validation-rules">Validation rules</a></h2>
+<p><code>validate.check</code> checks a struct's values against rules written on its fields, and collects one error per broken rule, naming the field:</p>
+<pre class="code run"><code><span class="k">import</span> reflect, str, validate;
+
+<span class="k">struct</span> Signup {
+    <span class="a">@required</span> <span class="a">@email</span> <span class="t">u8</span>[] email;
+    <span class="a">@required</span> <span class="a">@min</span>(<span class="n">3</span>) <span class="a">@max</span>(<span class="n">20</span>) <span class="t">String</span> name;
+    <span class="a">@min</span>(<span class="n">18</span>) <span class="t">i64</span> age;
+    <span class="a">@oneOf</span>(<span class="s">&quot;free&quot;</span>, <span class="s">&quot;pro&quot;</span>) <span class="t">u8</span>[] plan;
+};
+
+<span class="t">i32</span> main() {
+    Signup s;
+    s.email = <span class="s">&quot;ann@example&quot;</span>;
+    s.name = str.from(<span class="s">&quot;an&quot;</span>);
+    s.age = <span class="n">17</span>;
+    s.plan = <span class="s">&quot;gold&quot;</span>;
+    validate.Errors errs;
+    <span class="k">if</span> (!validate.check(reflect.of(s), &amp;errs)) {
+        <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; errs.items.len; i++) {
+            validate.FieldError e = errs.items.get(i);
+            printf(<span class="s">&quot;%s: %s\n&quot;</span>, e.field, e.message);
+        }
+    }
+    errs.free();
+    s.name.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>email: not an email address
+name: must have at least 3 characters
+age: must be at least 18
+plan: must be one of free, pro</code></pre>
+<div class="table"><table><thead><tr><th>Rule</th><th>On</th><th>Holds when</th></tr></thead><tbody><tr><td><code>@required</code></td><td>any field</td><td>the value isn't 0, false, "", an empty slice or null</td></tr><tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a number</td><td>its value is at least / at most n</td></tr><tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td><code>String</code>, <code>u8[]</code></td><td>its length in characters is at least / at most n</td></tr><tr><td><code>@min(n)</code>, <code>@max(n)</code></td><td>a slice</td><td>it has at least / at most n items</td></tr><tr><td><code>@email</code></td><td><code>String</code>, <code>u8[]</code></td><td>it looks like <code>name@example.com</code></td></tr><tr><td><code>@url</code></td><td><code>String</code>, <code>u8[]</code></td><td>it is an absolute URL with a host</td></tr><tr><td><code>@oneOf(&quot;a&quot;, &quot;b&quot;)</code></td><td><code>String</code>, <code>u8[]</code></td><td>it is exactly one of the values</td></tr></tbody></table></div>
+<ul><li>An empty text or slice that isn't <code>@required</code> passes its other rules; a number is always checked.</li><li>Nested structs, pointed-to structs and slices of structs are checked too.</li><li>The rules work on any struct, with or without <code>@json</code>; <code>@skip</code> fields are left alone.</li><li>A rule on a field it can't check (<code>@email</code> on an <code>i64</code>) makes <code>check</code> throw <code>validate.ERR_VALIDATE</code>.</li></ul>
+<p>See <a href="../std/index.html#validate">validate</a> for the error list's methods and HTTP use.</p>
+<h2 id="caller-on-parameters"><a href="#caller-on-parameters">@caller on parameters</a></h2>
+<p>A parameter marked <code>@caller(&quot;file&quot;)</code>, <code>@caller(&quot;line&quot;)</code> or <code>@caller(&quot;func&quot;)</code> is filled in by every call with where that call is written. Callers never pass it:</p>
+<pre class="code run"><code><span class="t">void</span> trace(<span class="a">@caller</span>(<span class="s">&quot;file&quot;</span>) <span class="t">u8</span> *file, <span class="a">@caller</span>(<span class="s">&quot;line&quot;</span>) <span class="t">i64</span> line, <span class="a">@caller</span>(<span class="s">&quot;func&quot;</span>) <span class="t">u8</span> *func, <span class="t">u8</span> *what) {
+    printf(<span class="s">&quot;%s:%d in %s: %s\n&quot;</span>, file, line, func, what);
+}
+
+<span class="t">void</span> load() {
+    trace(<span class="s">&quot;loading&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    trace(<span class="s">&quot;start&quot;</span>);
+    load();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>example.ktm:10 in main: start
+example.ktm:6 in load: loading</code></pre>
+<ul><li><code>file</code> is the source file's path as ktm was given it, <code>func</code> the function the call is in; both are <code>u8 *</code>. <code>line</code> is an integer.</li><li>They can go anywhere in the parameter list, and have no default.</li><li><a href="15-errors.html">Errors</a> uses them to report where a check failed.</li></ul>
+<h2 id="seeing-the-generated-code"><a href="#seeing-the-generated-code">Seeing the generated code</a></h2>
+<p><code>ktm --expand</code> prints the methods <code>@json</code> and <code>@yaml</code> write, on stderr:</p>
+<pre class="code"><code>$ ktm --expand user.ktm -o user</code></pre>
+<h2 id="attributes-through-reflection"><a href="#attributes-through-reflection">Attributes through reflection</a></h2>
+<p>The type information of a struct carries its attributes: whether it is <code>@json</code>, and each field's key and <code>@skip</code> (see <a href="24-reflection.html">Reflection</a>):</p>
+<pre class="code run"><code><span class="k">import</span> json, reflect;
+
+<span class="a">@json</span> <span class="k">struct</span> Item {
+    <span class="a">@key</span>(<span class="s">&quot;item-id&quot;</span>) <span class="t">i64</span> id;
+    <span class="a">@skip</span> <span class="t">i64</span> internal;
+    <span class="t">u8</span> *label;
+};
+
+<span class="t">i32</span> main() {
+    reflect.Type *t = reflect.typeOf(Item);
+    printf(<span class="s">&quot;json: %d\n&quot;</span>, t.json);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; t.fields.len; i++) {
+        reflect.Field f = t.fields[i];
+        printf(<span class="s">&quot;%.*s key=%.*s skip=%d\n&quot;</span>, f.name.len, f.name.ptr, f.key.len, f.key.ptr, f.skip);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>json: 1
+id key=item-id skip=0
+internal key=internal skip=1
+label key=label skip=0</code></pre>
+<p><code>Field.key</code> is the key a field is written under: its <code>@key</code>, or its name.</p>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>@json</code> and <code>@yaml</code> go before the struct's definition (and before <code>pub</code>), not before a declaration ahead; the file imports <code>json</code> or <code>yaml</code>.</li><li>Field attributes go before the field's type.</li><li><code>@key</code>, <code>@skip</code>, <code>@omitEmpty</code> shape JSON and YAML; <code>@env</code>, <code>@required</code> are read by <code>config</code>; <code>@required</code>, <code>@min</code>, <code>@max</code>, <code>@email</code>, <code>@url</code>, <code>@oneOf</code> by <code>validate</code>.</li><li><code>@caller</code> goes on parameters only.</li><li>An unknown or misplaced attribute is a compile error.</li></ul>
+    <nav class="pager"><a class="prev" href="22-modules-and-packages.html"><span>Previous</span>Modules and packages</a><a class="next" href="24-reflection.html"><span>Next</span>Reflection</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#where-attributes-go">Where attributes go</a></li><li><a href="#json">@json</a></li><li><a href="#yaml">@yaml</a></li><li><a href="#field-attributes-for-json-and-yaml">Field attributes for JSON and YAML</a></li><li><a href="#settings-env-and-required">Settings: @env and @required</a></li><li><a href="#validation-rules">Validation rules</a></li><li><a href="#caller-on-parameters">@caller on parameters</a></li><li><a href="#seeing-the-generated-code">Seeing the generated code</a></li><li><a href="#attributes-through-reflection">Attributes through reflection</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

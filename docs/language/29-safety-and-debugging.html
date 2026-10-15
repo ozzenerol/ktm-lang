@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safety and debugging - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html" class="on"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
+  <article class="prose">
+<h1>Safety and debugging</h1>
+<p>ktm is a systems language: it has pointers and manual memory, and a program can still go wrong in the ways C programs do. What it adds is help in finding out where. This chapter covers the checks ktm makes while a program runs (bounds checks, zeroed locals), the reports a failing program prints (uncaught errors and crashes), finding memory bugs with <code>-Memsafe</code>, looking at what the compiler made of a program, and using a native debugger.</p>
+<h2 id="bounds-checks"><a href="#bounds-checks">Bounds checks</a></h2>
+<p>Indexing a slice checks the index against its length; out of range, it throws <code>ERR_BOUNDS</code> with the index, the length and where (see <a href="10-arrays-and-slices.html">Arrays and slices</a>):</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="t">i64</span> nums[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="t">i64</span>[] s = nums;
+    <span class="t">i64</span> i = <span class="n">3</span>;
+    <span class="k">try</span> {
+        printf(<span class="s">&quot;%d\n&quot;</span>, s[i]);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s (%s:%d)\n&quot;</span>, e.message, e.file, e.line);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>index 3 out of range for length 3 (example.ktm:6)</code></pre>
+<p>Slicing is checked the same way:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="t">u8</span>[] word = <span class="s">&quot;hello&quot;</span>;
+    <span class="t">i64</span> end = <span class="n">9</span>;
+    <span class="k">try</span> {
+        <span class="t">u8</span>[] part = word[<span class="n">2</span>:end];
+        printf(<span class="s">&quot;%d\n&quot;</span>, part.len);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>slice 2:9 out of range for length 5</code></pre>
+<p>The check is what makes a slice safer than a pointer: a pointer has no length, so <code>p[i]</code> on a plain pointer isn't checked. Prefer slices for anything indexed with a computed number.</p>
+<h2 id="locals-start-zeroed"><a href="#locals-start-zeroed">Locals start zeroed</a></h2>
+<p>A local variable declared without a value is zero: 0, 0.0, false, null, an empty <code>String</code> or slice, a struct or array with every byte 0. Reading one before setting it is never garbage:</p>
+<pre class="code run"><code><span class="k">struct</span> Report {
+    <span class="t">i64</span> lines;
+    <span class="t">f64</span> ratio;
+    <span class="t">u8</span> *name;
+};
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> n;
+    Report r;
+    <span class="t">i64</span> grid[<span class="n">4</span>];
+    printf(<span class="s">&quot;%d %d %.1f %d %d\n&quot;</span>, n, r.lines, r.ratio, r.name == <span class="k">null</span>, grid[<span class="n">3</span>]);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>0 0 0.0 1 0</code></pre>
+<h2 id="uncaught-errors"><a href="#uncaught-errors">Uncaught errors</a></h2>
+<p>An error no <code>try</code> catches ends the program with exit status 1, after printing its code, message, where it was thrown, and the calls that led there (see <a href="15-errors.html">Errors</a>):</p>
+<pre class="code run"><code><span class="t">i64</span> parsePort(<span class="t">u8</span>[] s) {
+    <span class="k">if</span> (s.len == <span class="n">0</span>) {
+        <span class="k">throw</span>(<span class="n">1</span>, <span class="s">&quot;empty port&quot;</span>);
+    }
+    <span class="k">return</span> <span class="n">80</span>;
+}
+
+<span class="t">i64</span> loadConfig() {
+    <span class="k">return</span> parsePort(<span class="s">&quot;&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;port %d\n&quot;</span>, loadConfig());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>uncaught error 1: empty port (example.ktm:3)
+  at example.ktm:3 in parsePort
+  called from example.ktm:9 in loadConfig (inlined)
+  called from example.ktm:13 in main</code></pre>
+<h2 id="crash-reports"><a href="#crash-reports">Crash reports</a></h2>
+<p>A program that crashes (a null pointer, an integer division by zero, a stack overflow, memory it doesn't own) prints what happened and where, with the calls that led there, before it dies of the signal as it would without the report:</p>
+<pre class="code run"><code><span class="k">struct</span> Node {
+    <span class="t">i64</span> value;
+    Node *next;
+};
+
+<span class="t">i64</span> second(Node *n) {
+    <span class="k">return</span> n.next.value;
+}
+
+<span class="t">i32</span> main() {
+    Node last = {<span class="n">2</span>, <span class="k">null</span>};
+    printf(<span class="s">&quot;%d\n&quot;</span>, second(&amp;last));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>crash: null pointer dereference (address 0x0)
+  at example.ktm:7 in second (inlined)
+  called from example.ktm:12 in main</code></pre>
+<p><code>second</code> was inlined into <code>main</code> by the compiler, and still shows as a call of its own, marked <code>(inlined)</code>.</p>
+<p>An integer division by zero crashes on x86_64:</p>
+<pre class="code"><code><span class="t">i64</span> average(<span class="t">i64</span> total, <span class="t">i64</span> count) {
+    <span class="k">return</span> total / count;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, average(<span class="n">10</span>, <span class="n">2</span>));
+    <span class="t">i64</span> none = <span class="n">0</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, average(<span class="n">10</span>, none));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm avg.ktm -o avg &amp;&amp; ./avg
+5
+crash: integer division by zero
+  at avg.ktm:2 in average (inlined)
+  called from avg.ktm:8 in main
+Floating point exception</code></pre>
+<p>What the program printed before the crash comes first. On arm64 the processor doesn't trap a division by zero: the same program prints <code>0</code> and carries on. Check a divisor that can be zero before dividing, whatever the platform.</p>
+<p>A recursion that never ends overflows the stack, and shows once, with how many times it repeated:</p>
+<pre class="code"><code><span class="t">i64</span> depth(<span class="t">i64</span> n) {
+    <span class="t">i64</span> pad[<span class="n">64</span>];
+    pad[<span class="n">0</span>] = n;
+    <span class="k">return</span> depth(n + <span class="n">1</span>) + pad[<span class="n">0</span>];
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, depth(<span class="n">0</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm deep.ktm -o deep &amp;&amp; ./deep
+crash: stack overflow: the calls below went too deep (a recursion that never ends?)
+  at deep.ktm:1 in depth
+  called from deep.ktm:4 in depth (14962 times)
+  called from deep.ktm:4 in depth (inlined)
+  called from deep.ktm:8 in main
+Segmentation fault</code></pre>
+<p>Writing to a string literal is a crash too: literals live in read-only memory. Copy one with <code>str.from</code> (or into a <code>u8</code> array) to change it.</p>
+<pre class="code"><code>$ cat lit.ktm
+i32 main() {
+    u8 *s = &quot;literal&quot;;
+    s[0] = 76;
+    return 0;
+}
+$ ktm lit.ktm -o lit &amp;&amp; ./lit
+crash: invalid memory access at address 0x562a92f81361 (memory that was freed, never allocated, or read-only)
+  at lit.ktm:3 in main
+Segmentation fault</code></pre>
+<ul><li>Compiled programs and <code>-jit</code> report the same way, in every thread.</li><li>A crash inside C code (<code>libc.strlen(null)</code>) shows <code>in C code</code>, then the ktm line that called it.</li><li>A package's function shows by the name the program calls it by (<code>pg.Pool.exec</code>), its file under the package's path.</li><li>The exit status is still the signal's: 139 for a segmentation fault, 136 for a division by zero on x86_64, as a shell reports them.</li><li>Programs carry a table of their functions' lines for the report, about a quarter of their size.</li></ul>
+<h2 id="memory-bugs-memsafe"><a href="#memory-bugs-memsafe">Memory bugs: -Memsafe</a></h2>
+<p><code>ktm -jit -Memsafe</code> tracks every heap block while the program runs. Double frees and frees of memory that was never allocated are reported, and skipped, as they happen; blocks that leaked are listed when <code>main</code> returns or the program calls <code>exit()</code>. Each report names the line in your code:</p>
+<pre class="code"><code><span class="k">import</span> mem;
+
+<span class="t">i32</span> main() {
+    <span class="t">u8</span> *a = mem.alloc(<span class="n">16</span>);
+    <span class="t">u8</span> *b = mem.alloc(<span class="n">32</span>);
+    mem.free(a);
+    mem.free(a);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm -jit -Memsafe leaky.ktm
+Free: double free of 0x555e8dc678c8 (16 bytes)
+  allocated   at leaky.ktm:4 in main
+  first freed at leaky.ktm:6 in main
+  this free   at leaky.ktm:7 in main - ignored, heap unharmed
+memsafe: 1 allocation(s) (32 bytes) never freed
+  0x555e8dc67ea8        32 bytes  at leaky.ktm:5 in main</code></pre>
+<p>What the library allocates for you is tracked too, and reported at your line with the library function it went through:</p>
+<pre class="code"><code><span class="k">import</span> str;
+
+<span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        <span class="t">String</span> s = str.format(<span class="s">&quot;item %d&quot;</span>, i);
+        printf(<span class="s">&quot;%s\n&quot;</span>, s);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm -jit -Memsafe loop.ktm
+item 0
+item 1
+item 2
+memsafe: 3 allocation(s) (768 bytes) never freed
+  0x5576d4d659c8       256 bytes  at loop.ktm:5 in main, via str.format
+  0x5576d4d670d8       256 bytes  at loop.ktm:5 in main, via str.format
+  0x5576d4d672c8       256 bytes  at loop.ktm:5 in main, via str.format</code></pre>
+<p>The fix is <code>ad String s = ...</code> (see <a href="16-defer-and-ad.html">defer and ad</a>), and the report is empty.</p>
+<ul><li>A leak is a block nothing points to any more. What a global, the library, or (when the program calls <code>exit()</code>) a live variable still holds at exit is in use, not a leak: it is listed apart, so a program that ends while holding its data needs no frees just for the report.</li><li>The check is conservative: a word that looks like a pointer keeps a block alive.</li><li>It works in any thread. The REPL always tracks allocations: <code>replHeap();</code> lists the live ones.</li><li><code>-Memsafe</code> is for the JIT; a test suite runs it with <code>ktm test -jit -Memsafe</code>.</li></ul>
+<h2 id="looking-under-the-hood"><a href="#looking-under-the-hood">Looking under the hood</a></h2>
+<p>Each stage of the compiler can be shown:</p>
+<pre class="code"><code>$ ktm -tokens main.ktm         # what the lexer sees
+$ ktm -ast main.ktm            # the parsed program
+$ ktm --dump-ir main.ktm       # the SSA intermediate representation
+$ ktm -S -o- main.ktm          # the generated assembly
+$ ktm --expand main.ktm        # the code @json and @yaml wrote
+$ ktm -cfg main.ktm &amp;&amp; dot -Tpng main.dot -o main.png   # a control flow graph</code></pre>
+<p><code>-cfg-png</code> and <code>-cfg-svg</code> write the image directly (they need Graphviz). <code>typeof(x)</code> prints a type inside a program:</p>
+<pre class="code run"><code><span class="t">i32</span> main() {
+    <span class="k">auto</span> n = <span class="n">3</span>;
+    <span class="k">auto</span> ratio = n / <span class="n">2.0</span>;
+    <span class="t">u8</span> *name = <span class="s">&quot;x&quot;</span>;
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, <span class="k">typeof</span>(n), <span class="k">typeof</span>(ratio), <span class="k">typeof</span>(&amp;name));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>i64 f64 u8 **</code></pre>
+<h2 id="native-debuggers"><a href="#native-debuggers">Native debuggers</a></h2>
+<p>A compiled ktm program is a normal executable: <code>gdb</code> and <code>lldb</code> can run it, set breakpoints on function names, step through it and show registers and memory.</p>
+<pre class="code"><code>$ ktm app.ktm -o app
+$ gdb ./app
+(gdb) break main
+(gdb) run</code></pre>
+<p>A module's functions have their own symbols, <code>_K</code> followed by the module and name (<code>geo.area</code> is <code>_K3geo4area</code>), so break on that name.</p>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li>Slice indexes and slices are bounds-checked and throw <code>ERR_BOUNDS</code>; pointer indexes aren't.</li><li>Locals start zeroed.</li><li>An uncaught error prints its place and calls and exits with 1; a crash prints what happened and the calls, then dies of its signal. Both work compiled and in the JIT.</li><li><code>ktm -jit -Memsafe</code> reports double frees, wild frees and leaks at your lines.</li><li><code>-tokens</code>, <code>-ast</code>, <code>--dump-ir</code>, <code>-S</code>, <code>--expand</code> and <code>-cfg</code> show the compiler's stages; compiled programs work with gdb and lldb.</li></ul>
+    <nav class="pager"><a class="prev" href="28-inline-assembly.html"><span>Previous</span>Inline assembly</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#bounds-checks">Bounds checks</a></li><li><a href="#locals-start-zeroed">Locals start zeroed</a></li><li><a href="#uncaught-errors">Uncaught errors</a></li><li><a href="#crash-reports">Crash reports</a></li><li><a href="#memory-bugs-memsafe">Memory bugs: -Memsafe</a></li><li><a href="#looking-under-the-hood">Looking under the hood</a></li><li><a href="#native-debuggers">Native debuggers</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
