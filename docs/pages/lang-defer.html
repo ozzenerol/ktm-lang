@@ -159,7 +159,8 @@ deferred
 
 <h2 id="ad">ad</h2>
 <p><code>ad</code> in front of a declaration means <code>defer name.free();</code> right after it.
-It works for a <code>String</code>, any slice, and any struct with a <code>free()</code> method that takes no arguments (or a pointer to one).</p>
+It works for a <code>String</code>, any slice, and any struct with a <code>free()</code> method that takes no arguments (or a pointer to one).
+An <code>@json</code> or <code>@yaml</code> struct with no <code>free()</code> of its own is freed with its <code>freeDecoded()</code>.</p>
 <pre data-run><code>
 import str;
 
@@ -197,11 +198,30 @@ void main()
 1 1 1
 </pre>
 
+<p>The variable can be declared first and filled in later, as when it is decoded into:</p>
+<pre data-run><code>
+import json;
+
+@json struct User { String name; i64 age; };
+
+void main()
+{
+  ad User u;                  // empty for now, u.freeDecoded() at the end
+  u = json.decode<User>("{\"name\": \"ada\", \"age\": 36}");
+  printf("%s is %d\n", u.name, u.age);
+}
+</code></pre>
+<pre class="output">
+ada is 36
+</pre>
+
 <h3>ad rules</h3>
 <ul class="rules">
   <li>Returning an <code>ad</code> variable is an error: it would be freed. Declare it without <code>ad</code> to hand it to the caller.</li>
   <li>A type with no such <code>free()</code> is an error.</li>
-  <li>An <code>ad</code> struct needs a value. Only a String may start empty.</li>
+  <li>Without a value an <code>ad</code> variable starts zeroed, as every local does: an empty String, slice or
+  container, freed by its <code>free()</code> like any other (the library's all take an empty value). An <code>ad</code>
+  pointer with no value is null and is freed only if it holds something by the end of its block.</li>
   <li>A copy of an <code>ad</code> variable shares what it points to, and is freed with the original.</li>
   <li><code>ad</code> goes on a local variable, not a field. It is not reserved: a variable can be called <code>ad</code>.</li>
 </ul>

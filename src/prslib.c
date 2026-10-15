@@ -4063,8 +4063,8 @@ Ast *parseSubscriptExpr(Cctrl *cc, Ast *ast) {
 
 /* `ad T name = ...;`: the call that frees `var` at the end of its scope,
  * `name.free()`: a slice's buffer (as `parts.free()`), or the `free()`
- * method of its type or of the type it points to. An error naming the
- * type when it has none. */
+ * method of its type or of the type it points to (else an @json struct's
+ * `freeDecoded()`). An error naming the type when it has neither. */
 Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at) {
     AstType *t = var->type;
     if (astTypeIsSlice(t) && !astTypeIsString(t)) {
@@ -4077,9 +4077,15 @@ Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at) {
     AstType *cls = is_ptr ? t->ptr : t;
     AstType *owner = NULL;
     Ast *fn = NULL;
+    const char *method = "free";
     if (cls && (cls->kind == AST_TYPE_CLASS || cls->kind == AST_TYPE_UNION) &&
         !cls->is_intrinsic) {
         fn = parseFindMethod(cc, cls, "free", 4, &owner);
+        if (!fn) {
+            /* an @json / @yaml struct's generated freeDecoded() */
+            fn = parseFindMethod(cc, cls, "freeDecoded", 11, &owner);
+            method = "freeDecoded";
+        }
     }
     /* of an overloaded free(), the one that takes nothing */
     if (fn && fn->overloads) {
@@ -4096,7 +4102,7 @@ Ast *parseAutoDeferFree(Cctrl *cc, Ast *var, Lexeme *at) {
             "takes no arguments: declare it without `ad` and free it yourself",
             astTypeToString(t));
     }
-    parseCheckMethodAccess(cc, owner, "free", 4);
+    parseCheckMethodAccess(cc, owner, (char *)method, strlen(method));
     Ast *recv = is_ptr ? var
               : astUnaryOperator(astMakePointerType(t), AST_UN_OP_ADDR_OF, var);
     AstType *self_type = ((Ast *)fn->params->entries[0])->type;

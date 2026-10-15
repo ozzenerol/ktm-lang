@@ -116,9 +116,6 @@ i32 main() {
     tests++;
     if (reports("i32 main() { ad i64 n = 5; return 0; }\n",
                 "`ad` frees its variable with `free()`, and `i64` has no `free()`")) { correct++; }
-    tests++;
-    if (reports("struct R { i64 a; };\nvoid R.free() { }\ni32 main() { ad R r; return 0; }\n",
-                "`ad r` needs a value to free later: write `ad R r = ...;`")) { correct++; }
 
     test.printResult(correct, tests);
     printf("====\n");

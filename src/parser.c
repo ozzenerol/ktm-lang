@@ -4785,16 +4785,16 @@ static void parseBlockInternal(Cctrl *cc, Ast *body, int arm) {
                     listAppend(body->stms,stmt);
                 }
                 if (ad_tok) {
-                    /* without a value only a String is ready to free (empty) */
-                    if ((!stmt || stmt->kind != AST_DECL || !stmt->declinit) &&
-                        !astTypeIsString(var->type)) {
-                        cctrlRaiseExceptionAt(cc, var->line, var->col, var->lname->len,
-                            "`ad %s` needs a value to free later: write "
-                            "`ad %s %s = ...;`", var->lname->data,
-                            astTypeToString(var->type), var->lname->data);
-                    }
+                    /* Without a value the variable starts zeroed (every
+                     * local does, each time its declaration runs): an
+                     * empty struct or slice, which its free() takes, or a
+                     * null pointer, freed only once it holds something */
+                    int no_value = !stmt || stmt->kind != AST_DECL || !stmt->declinit;
                     var->flags |= AST_FLAG_AUTODEFER;
                     Ast *free_call = parseAutoDeferFree(cc, var, ad_tok);
+                    if (no_value && var->type->kind == AST_TYPE_POINTER) {
+                        free_call = astIf(var, free_call, NULL);
+                    }
                     Ast *deferred = astDefer(free_call);
                     deferred->line = ad_tok->line;
                     deferred->col = ad_tok->col;
