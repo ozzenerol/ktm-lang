@@ -76,7 +76,7 @@ u32: 0 .. 4294967295
 ### Overflow wraps
 
 Integer arithmetic wraps around at the type's size, as in C on every machine ktm runs on: there is
-no trap and no undefined behaviour to worry about.
+no trap and no undefined behaviour to worry about. Division is the exception (below).
 
 ```ktm run
 void main() {
@@ -98,7 +98,8 @@ void main() {
 
 Integer division rounds towards zero, and `%` takes the sign of the left side. Dividing an integer
 by zero (with `/` or `%`) stops the program with a crash report that says where it happened (see
-[Safety and debugging](29-safety-and-debugging.html)).
+[Safety and debugging](29-safety-and-debugging.html)). So does the one `i64` division whose result
+doesn't fit, `I64_MIN / -1` (or `I64_MIN % -1`): its report says `integer overflow in division`.
 
 ```ktm run
 void main() {

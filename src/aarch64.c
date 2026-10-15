@@ -1395,13 +1395,22 @@ static void a64TxtAluReg(void *be, IrOp op, IrInstr *i) {
 static void a64TxtMul(void *be) {
     aoStrCatFmt(((IrCgCtx *)be)->buf, "mul x0, x0, x1\n\t");
 }
-static void a64TxtDivRem(void *be, IrOp op, int check) {
+static void a64TxtDivRem(void *be, IrOp op, int check_zero, int check_ovf) {
     AoStr *buf = ((IrCgCtx *)be)->buf;
     const char *div = (op == IR_IDIV || op == IR_IREM) ? "sdiv" : "udiv";
-    if (check) {
+    if (check_zero) {
         aoStrCatFmt(buf, "cbnz x1, 1f\n\t");
         aoStrCatFmt(buf, "brk #%i\n", A64_BRK_DIVZERO);
         aoStrCatFmt(buf, "1:\n\t");
+    }
+    if (check_ovf) {
+        /* x1 == -1 and x0 the smallest i64 (0 - x0 overflows) */
+        aoStrCatFmt(buf, "add x2, x1, #1\n\t");
+        aoStrCatFmt(buf, "cbnz x2, 2f\n\t");
+        aoStrCatFmt(buf, "cmp xzr, x0\n\t");
+        aoStrCatFmt(buf, "b.vc 2f\n\t");
+        aoStrCatFmt(buf, "brk #%i\n", A64_BRK_DIVOVF);
+        aoStrCatFmt(buf, "2:\n\t");
     }
     if (op == IR_IDIV || op == IR_UDIV) {
         aoStrCatFmt(buf, "%s x0, x0, x1\n\t", div);
